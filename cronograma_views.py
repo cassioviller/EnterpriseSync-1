@@ -1114,6 +1114,14 @@ def aplicar_template(obra_id: int):
         criadas = 0
         data_corrente = data_inicio
         for item in tmpl.itens:
+            # Verificação de tenant no próprio item (defesa em profundidade)
+            if item.admin_id != admin_id:
+                logger.warning(
+                    f"SEGURANÇA aplicar_template: item_id={item.id} "
+                    f"admin={item.admin_id} != tenant={admin_id}. Pulando."
+                )
+                continue
+
             # unidade_medida e quantidade_total vêm da subatividade ou do item
             # SEGURANÇA: verificar que a subatividade vinculada pertence ao mesmo tenant
             unidade = None

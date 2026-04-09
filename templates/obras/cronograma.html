@@ -1518,26 +1518,30 @@ document.addEventListener('DOMContentLoaded', () => {
   renderGantt();
   syncScroll();
   initRowDrag();
-});
 
-// ── Carregar templates ao abrir o modal ──
-document.getElementById('modalAplicarTemplate')?.addEventListener('show.bs.modal', async () => {
-  const sel = document.getElementById('selectTemplate');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Carregando...</option>';
-  try {
-    const res = await fetch(`{{ url_for('cronograma.api_listar_templates') }}`);
-    const data = await res.json();
-    if (data.status === 'ok' && data.templates.length) {
-      sel.innerHTML = '<option value="">Selecione um template...</option>' +
-        data.templates.map(t =>
-          `<option value="${t.id}">${t.nome}${t.categoria ? ' — ' + t.categoria : ''} (${t.total_itens} tarefas)</option>`
-        ).join('');
-    } else {
-      sel.innerHTML = '<option value="">Nenhum template disponível</option>';
-    }
-  } catch (e) {
-    sel.innerHTML = '<option value="">Erro ao carregar templates</option>';
+  // Carregar templates ao abrir o modal (dentro do DOMContentLoaded
+  // para garantir que o elemento #modalAplicarTemplate já foi parseado)
+  const modalEl = document.getElementById('modalAplicarTemplate');
+  if (modalEl) {
+    modalEl.addEventListener('show.bs.modal', async () => {
+      const sel = document.getElementById('selectTemplate');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Carregando...</option>';
+      try {
+        const res = await fetch(`{{ url_for('cronograma.api_listar_templates') }}`);
+        const data = await res.json();
+        if (data.status === 'ok' && data.templates.length) {
+          sel.innerHTML = '<option value="">Selecione um template...</option>' +
+            data.templates.map(t =>
+              `<option value="${t.id}">${t.nome}${t.categoria ? ' — ' + t.categoria : ''} (${t.total_itens} tarefas)</option>`
+            ).join('');
+        } else {
+          sel.innerHTML = '<option value="">Nenhum template disponível</option>';
+        }
+      } catch (e) {
+        sel.innerHTML = '<option value="">Erro ao carregar templates</option>';
+      }
+    });
   }
 });
 </script>
