@@ -888,6 +888,7 @@ def novo_template():
             nome=nome,
             descricao=(request.form.get('descricao') or '').strip() or None,
             categoria=(request.form.get('categoria') or '').strip() or None,
+            ativo=request.form.get('ativo') == '1',
             admin_id=admin_id,
         )
         db.session.add(tmpl)
