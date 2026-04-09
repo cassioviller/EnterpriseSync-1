@@ -78,11 +78,24 @@ def editar_rdo_form(rdo_id):
         from models import RDOMaoObra
         funcionarios_rdo = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
         funcionarios_data = {}
+        # Dict por subatividade: {sub_mestre_id_str: {func_id_str: horas}}
+        funcionarios_vinculados_por_sub = {}
         for func_rdo in funcionarios_rdo:
             funcionarios_data[func_rdo.funcionario_id] = {
                 'funcao': func_rdo.funcao_exercida,
                 'horas': func_rdo.horas_trabalhadas
             }
+            # Obter o sub_mestre_id associado a este registro de mão de obra
+            if func_rdo.subatividade_id:
+                sub_obj = RDOServicoSubatividade.query.get(func_rdo.subatividade_id)
+                m_id = getattr(sub_obj, 'subatividade_mestre_id', None) if sub_obj else None
+            else:
+                m_id = None
+            if m_id:
+                key = str(m_id)
+                if key not in funcionarios_vinculados_por_sub:
+                    funcionarios_vinculados_por_sub[key] = {}
+                funcionarios_vinculados_por_sub[key][str(func_rdo.funcionario_id)] = func_rdo.horas_trabalhadas
         
         # Buscar lista de todos os funcionários ativos do admin (para seleção por subatividade)
         from models import Funcionario
@@ -129,6 +142,7 @@ def editar_rdo_form(rdo_id):
                              subatividades_rdo_lista=subatividades_rdo_lista,
                              funcionarios_data=funcionarios_data,
                              funcionarios_todos_list=funcionarios_todos_list,
+                             funcionarios_vinculados_por_sub=funcionarios_vinculados_por_sub,
                              apontamentos_cronograma=apontamentos_cronograma)
 
     except Exception as e:

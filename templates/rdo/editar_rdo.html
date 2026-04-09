@@ -543,6 +543,8 @@ const rdoId = {{ rdo.id }};
 const subatividadesSalvas = {{ (subatividades_rdo_lista or [])|tojson }};
 // Lista de todos os funcionários ativos do admin (para seleção por subatividade)
 const funcionariosTodosLista = {{ (funcionarios_todos_list or [])|tojson }};
+// Vínculos existentes por subatividade mestre: {sub_mestre_id_str: {func_id_str: horas}}
+const funcionariosVinculadosPorSub = {{ (funcionarios_vinculados_por_sub or {})|tojson }};
 
 /**
  * Gera campos HTML para seleção de funcionários vinculados a uma subatividade específica.
@@ -550,6 +552,10 @@ const funcionariosTodosLista = {{ (funcionarios_todos_list or [])|tojson }};
  */
 function renderCamposEmpregadosPorSubatividade(subMestreId) {
     if (!funcionariosTodosLista || funcionariosTodosLista.length === 0) return '';
+    // Vínculos existentes apenas para esta subatividade
+    const subKey = String(subMestreId);
+    const vinculadosNestaSub = funcionariosVinculadosPorSub[subKey] || {};
+
     let html = `
         <div class="mt-2 pt-2 border-top border-success border-opacity-25">
             <div class="fw-semibold small text-success mb-1">
@@ -558,8 +564,10 @@ function renderCamposEmpregadosPorSubatividade(subMestreId) {
             <div class="row g-1">
     `;
     funcionariosTodosLista.forEach(func => {
-        const jaVinculado = funcionariosAtuais && funcionariosAtuais[func.id];
-        const horasAtual = jaVinculado ? funcionariosAtuais[func.id].horas : '';
+        const funcKey = String(func.id);
+        const horasVinculadas = vinculadosNestaSub[funcKey];
+        const jaVinculadoNestaSub = horasVinculadas !== undefined;
+        const horasAtual = jaVinculadoNestaSub ? horasVinculadas : '';
         html += `
             <div class="col-12 col-sm-6" style="font-size:.8rem">
                 <div class="input-group input-group-sm">
@@ -568,7 +576,7 @@ function renderCamposEmpregadosPorSubatividade(subMestreId) {
                                type="checkbox"
                                id="chk_sub_${subMestreId}_${func.id}"
                                onchange="toggleSubFuncHoras(${subMestreId},${func.id},this.checked)"
-                               ${jaVinculado ? 'checked' : ''}>
+                               ${jaVinculadoNestaSub ? 'checked' : ''}>
                     </div>
                     <label class="input-group-text flex-grow-1 text-start justify-content-start p-1"
                            for="chk_sub_${subMestreId}_${func.id}">${func.nome}</label>
@@ -580,7 +588,7 @@ function renderCamposEmpregadosPorSubatividade(subMestreId) {
                            step="0.1" min="0" placeholder="h"
                            form="formEditarRDO"
                            style="max-width:60px"
-                           ${jaVinculado ? '' : 'disabled'}>
+                           ${jaVinculadoNestaSub ? '' : 'disabled'}>
                 </div>
             </div>
         `;

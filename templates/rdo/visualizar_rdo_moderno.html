@@ -971,8 +971,7 @@ console.log('Initializing RDO view with light theme...');
 
                             {% if is_v2_active is defined and is_v2_active() and rdo.status == 'Finalizado' %}
                             {% set maos_sub = subatividade.mao_obra_registros if subatividade.mao_obra_registros else [] %}
-                            {% set maos_com_prod = maos_sub | selectattr('produtividade_real') | list %}
-                            {% if maos_com_prod %}
+                            {% if maos_sub %}
                             <div class="mt-2" style="font-size:.78rem">
                                 <table class="table table-sm table-borderless mb-0">
                                     <thead><tr>
@@ -982,7 +981,7 @@ console.log('Initializing RDO view with light theme...');
                                         <th class="text-muted py-0">Índice</th>
                                     </tr></thead>
                                     <tbody>
-                                    {% for mo in maos_com_prod %}
+                                    {% for mo in maos_sub %}
                                     {% set idx = mo.indice_produtividade %}
                                     {% if idx is not none %}
                                         {% if idx >= 1.0 %}
