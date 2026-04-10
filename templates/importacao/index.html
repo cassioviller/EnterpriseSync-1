@@ -60,8 +60,38 @@
 
       <!-- Formulário de upload -->
       <form action="{{ url_for('importacao.preview', modulo=slug) }}" method="POST"
-            enctype="multipart/form-data" class="px-4 pb-4">
+            enctype="multipart/form-data" class="px-4 pb-4"
+            {% if cfg.tem_defaults %}id="form-funcionarios"{% endif %}>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% if cfg.tem_defaults %}
+        <!-- Seleção de formato — exibida apenas para funcionários -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:.84rem;">Formato da planilha</label>
+          <div class="d-flex gap-4">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="formato_planilha"
+                     id="fmt_sige_{{ slug }}" value="sige" checked
+                     onchange="toggleDefaults('{{ slug }}', this.value)">
+              <label class="form-check-label" for="fmt_sige_{{ slug }}" style="font-size:.84rem;">
+                Template SIGE
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="formato_planilha"
+                     id="fmt_colab_{{ slug }}" value="colaboradores"
+                     onchange="toggleDefaults('{{ slug }}', this.value)">
+              <label class="form-check-label" for="fmt_colab_{{ slug }}" style="font-size:.84rem;">
+                Registro de Colaboradores
+              </label>
+            </div>
+          </div>
+          <div class="form-text">
+            Use <strong>Registro de Colaboradores</strong> ao importar planilhas do HR com campos
+            NOME, CPF, RG, DATA NASC, TEL, ENDEREÇO, CHAVE PIX, STATUS.
+          </div>
+        </div>
+        {% endif %}
 
         <div class="row g-3 align-items-end">
 
@@ -75,29 +105,30 @@
           </div>
 
           {% if cfg.tem_defaults %}
-          <!-- Defaults para funcionários (formato Registro de Colaboradores) -->
-          <div class="col-md-2">
-            <label class="form-label fw-semibold" style="font-size:.84rem;">Admissão padrão</label>
-            <input type="date" name="default_data_admissao" class="form-control form-control-sm"
-                   placeholder="dd/mm/aaaa">
-            <div class="form-text">Usado se não consta na planilha</div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label fw-semibold" style="font-size:.84rem;">Remuneração padrão</label>
-            <select name="default_tipo_remuneracao" class="form-select form-select-sm">
-              <option value="salario">Salário mensal</option>
-              <option value="diaria">Diária</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label fw-semibold" style="font-size:.84rem;">Valor padrão (R$)</label>
-            <input type="text" name="default_valor" class="form-control form-control-sm" placeholder="0,00">
-            <div class="form-text">Salário ou diária padrão</div>
+          <!-- Defaults para Registro de Colaboradores — ocultos até o formato ser selecionado -->
+          <div id="defaults-{{ slug }}" class="col-md-6 row g-2 align-items-end" style="display:none!important;">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold" style="font-size:.84rem;">Admissão padrão</label>
+              <input type="date" name="default_data_admissao" class="form-control form-control-sm">
+              <div class="form-text">Usado se ausente na planilha</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold" style="font-size:.84rem;">Remuneração padrão</label>
+              <select name="default_tipo_remuneracao" class="form-select form-select-sm">
+                <option value="salario">Salário mensal</option>
+                <option value="diaria">Diária</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold" style="font-size:.84rem;">Valor padrão (R$)</label>
+              <input type="text" name="default_valor" class="form-control form-control-sm" placeholder="0,00">
+              <div class="form-text">Salário ou diária padrão</div>
+            </div>
           </div>
           {% endif %}
 
           <!-- Botão -->
-          <div class="col-md-{% if cfg.tem_defaults %}1{% else %}7{% endif %} d-flex {% if not cfg.tem_defaults %}justify-content-end{% endif %}">
+          <div class="col-md-1 d-flex">
             <button type="submit" class="btn btn-primary btn-sm px-4 align-self-center">
               <i data-feather="eye" style="width:14px;height:14px;"></i>
               Pré-visualizar
@@ -140,4 +171,16 @@
   </div>
 
 </div>
+
+<script>
+function toggleDefaults(slug, formato) {
+  var el = document.getElementById('defaults-' + slug);
+  if (!el) return;
+  if (formato === 'colaboradores') {
+    el.style.removeProperty('display');
+  } else {
+    el.style.setProperty('display', 'none', 'important');
+  }
+}
+</script>
 {% endblock %}
