@@ -12,3 +12,33 @@ id = "kReBKKi01Y3U5J_tJ4CIm"
 uri = "file://static/manual_almoxarifado.md"
 type = "text"
 title = "Manual do Almoxarifado — SIGE v9.0 (atualizado)"
+
+[[outputs]]
+id = "ck62zIEG-TsPke9TjwlFQ"
+uri = "file://static/templates_importacao/1_funcionarios.xlsx"
+type = "table"
+title = "Template 1 — Funcionários"
+
+[[outputs]]
+id = "bmoNWXHZyFC9v4euegiEU"
+uri = "file://static/templates_importacao/2_diarias.xlsx"
+type = "table"
+title = "Template 2 — Diárias"
+
+[[outputs]]
+id = "JCKgazWR_3HeGh5RIeUFU"
+uri = "file://static/templates_importacao/3_alimentacao.xlsx"
+type = "table"
+title = "Template 3 — Alimentação"
+
+[[outputs]]
+id = "n4blKhpGzIAcbfVheUoN_"
+uri = "file://static/templates_importacao/4_transporte.xlsx"
+type = "table"
+title = "Template 4 — Transporte"
+
+[[outputs]]
+id = "cykcidTAgSy8zkqm3b2ky"
+uri = "file://static/templates_importacao/5_custos.xlsx"
+type = "table"
+title = "Template 5 — Custos (Fluxo de Caixa)"
