@@ -412,15 +412,13 @@
                   <i class="fas fa-check-circle fa-xs"></i>
                 </button>
                 {% endif %}
-                {# Excluir — disponível para PENDENTE e RECUSADO #}
-                {% if reg.status in ('PENDENTE', 'RECUSADO') %}
+                {# Excluir — disponível para TODOS os status (cascata total) #}
                 <form method="post" action="{{ url_for('gestao_custos.excluir', pai_id=reg.id) }}"
-                      onsubmit="return confirm('Excluir este registro?')">
-                  <button class="btn btn-sm btn-outline-danger" title="Excluir" aria-label="Excluir registro">
+                      onsubmit="return confirmarExclusao(this, '{{ reg.entidade_nome|e }}', '{{ reg.status }}', {{ reg.valor_total|float }})">
+                  <button class="btn btn-sm btn-outline-danger" title="Excluir (cascata)" aria-label="Excluir registro">
                     <i class="fas fa-trash fa-xs"></i>
                   </button>
                 </form>
-                {% endif %}
               </div>
             </td>
           </tr>
@@ -636,6 +634,27 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+// ── Confirmação de exclusão com mensagem contextual ──────────────
+function confirmarExclusao(form, entidade, status, valor) {
+    const valorFmt = 'R$ ' + valor.toFixed(2).replace('.', ',');
+    const statusPago = ['PAGO', 'PARCIAL', 'SOLICITADO', 'AUTORIZADO'].includes(status);
+
+    let msg;
+    if (statusPago) {
+        msg = `⚠️ ATENÇÃO: Este registro está ${status}.\n\n` +
+              `Entidade: ${entidade}\n` +
+              `Valor: ${valorFmt}\n\n` +
+              `Esta ação irá excluir:\n` +
+              `  • O lançamento na Gestão de Custos\n` +
+              `  • O(s) registro(s) no módulo de origem (RDO, Transporte, etc.)\n` +
+              `  • O(s) registro(s) no Fluxo de Caixa\n\n` +
+              `Deseja continuar?`;
+    } else {
+        msg = `Excluir "${entidade}" (${valorFmt})?\n\nOs lançamentos de origem também serão removidos.`;
+    }
+    return confirm(msg);
+}
 </script>
   {% endif %}{# fim modo != 'novo' #}
 </div>{# container-fluid #}

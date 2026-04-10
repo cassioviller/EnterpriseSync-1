@@ -724,7 +724,7 @@ def editar(pai_id):
 
 
 # ───────────────────────────────────────────────────────────────
-# EXCLUIR PAI (apenas PENDENTE)
+# EXCLUIR PAI (qualquer status — cascata total)
 # ───────────────────────────────────────────────────────────────
 
 @gestao_custos_bp.route('/<int:pai_id>/excluir', methods=['POST'])
@@ -735,37 +735,52 @@ def excluir(pai_id):
         return err
 
     pai = GestaoCustoPai.query.filter_by(id=pai_id, admin_id=admin_id).first_or_404()
-    if pai.status not in ('PENDENTE', 'RECUSADO'):
-        flash('Apenas registros PENDENTES ou RECUSADOS podem ser excluídos.', 'warning')
-        return redirect(url_for('gestao_custos.index'))
 
     try:
-        # CRUD Integrado: excluir registros de origem vinculados nos filhos
-        _excluir_origens_vinculadas(pai, admin_id)
-
+        status_anterior = pai.status
+        # 1. Excluir lançamentos nos módulos de origem (transporte, alimentação, RDO, etc.)
+        qtd_origens = _excluir_origens_vinculadas(pai, admin_id)
+        # 2. Excluir registros no Fluxo de Caixa vinculados a este custo
+        qtd_fc = _excluir_fluxo_caixa_vinculado(pai, admin_id)
+        # 3. Excluir o registro pai (filhos em cascata via FK)
         db.session.delete(pai)
         db.session.commit()
-        flash('Registro excluído com sucesso (lançamentos de origem também removidos).', 'success')
+
+        partes = [f'Gestão de Custos #{pai_id} ({status_anterior}) excluído']
+        if qtd_origens:
+            partes.append(f'{qtd_origens} lançamento(s) de origem removido(s)')
+        if qtd_fc:
+            partes.append(f'{qtd_fc} registro(s) do Fluxo de Caixa removido(s)')
+        flash(' | '.join(partes) + '.', 'success')
     except Exception as e:
         db.session.rollback()
+        logger.error(f"[ERROR] excluir gestao_custo pai={pai_id}: {e}", exc_info=True)
         flash(f'Erro ao excluir: {e}', 'danger')
 
     return redirect(url_for('gestao_custos.index'))
 
 
-def _excluir_origens_vinculadas(pai, admin_id):
-    """Remove os registros de origem (transporte, alimentação, etc.) referenciados pelos filhos."""
+def _excluir_origens_vinculadas(pai, admin_id) -> int:
+    """
+    Remove os registros de origem referenciados pelos filhos do pai.
+    Suporta: rdo_mao_obra, lancamento_transporte, lancamento_alimentacao, reembolso_funcionario.
+    Retorna a quantidade de registros excluídos.
+    """
     _TABELAS_SUPORTADAS = {
-        'lancamento_transporte': ('models', 'LancamentoTransporte'),
+        'rdo_mao_obra':           ('models', 'RDOMaoObra'),
+        'lancamento_transporte':  ('models', 'LancamentoTransporte'),
         'lancamento_alimentacao': ('models', 'AlimentacaoLancamento'),
-        'reembolso_funcionario': ('models', 'ReembolsoFuncionario'),
+        'reembolso_funcionario':  ('models', 'ReembolsoFuncionario'),
     }
 
     from models import GestaoCustoFilho
+    import importlib
+
     filhos = GestaoCustoFilho.query.filter_by(pai_id=pai.id).all()
+    total = 0
 
     for filho in filhos:
-        tabela = filho.origem_tabela
+        tabela    = filho.origem_tabela
         origem_id = filho.origem_id
         if not tabela or not origem_id:
             continue
@@ -773,15 +788,57 @@ def _excluir_origens_vinculadas(pai, admin_id):
             continue
         try:
             mod_name, class_name = _TABELAS_SUPORTADAS[tabela]
-            import importlib
-            mod = importlib.import_module(mod_name)
+            mod        = importlib.import_module(mod_name)
             ModelClass = getattr(mod, class_name)
-            registro = ModelClass.query.filter_by(id=origem_id, admin_id=admin_id).first()
+            registro   = ModelClass.query.filter_by(id=origem_id, admin_id=admin_id).first()
             if registro:
                 db.session.delete(registro)
-                logger.info(f"[OK] CRUD Integrado: {tabela} id={origem_id} excluído junto com GestaoCusto pai={pai.id}")
+                total += 1
+                logger.info(f"[OK] CRUD cascata: {tabela} id={origem_id} excluído (pai={pai.id})")
         except Exception as e:
-            logger.warning(f"[WARN] CRUD Integrado: erro ao excluir {tabela} id={origem_id}: {e}")
+            logger.warning(f"[WARN] CRUD cascata: erro ao excluir {tabela} id={origem_id}: {e}")
+
+    return total
+
+
+def _excluir_fluxo_caixa_vinculado(pai, admin_id) -> int:
+    """
+    Remove todos os registros de FluxoCaixa ligados a este GestaoCustoPai.
+    Estratégia dupla:
+      1. Via referencia_tabela + referencia_id (registros criados pelo fluxo de aprovação)
+      2. Via fluxo_caixa_id diretamente no pai
+    Retorna a quantidade de registros excluídos.
+    """
+    total = 0
+    ids_deletar = set()
+
+    # Estratégia 1: referencia_tabela + referencia_id
+    try:
+        registros = FluxoCaixa.query.filter_by(
+            admin_id=admin_id,
+            referencia_tabela='gestao_custo_pai',
+            referencia_id=pai.id,
+        ).all()
+        for fc in registros:
+            ids_deletar.add(fc.id)
+    except Exception as e:
+        logger.warning(f"[WARN] FluxoCaixa referencia query falhou: {e}")
+
+    # Estratégia 2: FK direta no pai
+    if pai.fluxo_caixa_id:
+        ids_deletar.add(pai.fluxo_caixa_id)
+
+    for fc_id in ids_deletar:
+        try:
+            fc = FluxoCaixa.query.filter_by(id=fc_id, admin_id=admin_id).first()
+            if fc:
+                db.session.delete(fc)
+                total += 1
+                logger.info(f"[OK] FluxoCaixa id={fc_id} excluído (pai={pai.id})")
+        except Exception as e:
+            logger.warning(f"[WARN] Erro ao excluir FluxoCaixa id={fc_id}: {e}")
+
+    return total
 
 
 # ─────────────────────────────────────────────
