@@ -372,8 +372,7 @@ def calcular_horas_folha(data: dict, admin_id: int):
                 origem_id=registro.id,
             )
             if filho:
-                db.session.commit()
-                logger.info(f"[OK] Custo diária lançado na Gestão V2: R$ {valor_diaria:.2f} na obra {registro.obra_id} — {funcionario.nome}")
+                logger.info(f"[OK] Custo diária pendente: R$ {valor_diaria:.2f} na obra {registro.obra_id} — {funcionario.nome}")
             else:
                 logger.warning(f"[WARN] registrar_custo_automatico retornou None para diarista {funcionario.nome}")
 
@@ -392,15 +391,14 @@ def calcular_horas_folha(data: dict, admin_id: int):
                         entidade_nome=funcionario.nome,
                         entidade_id=funcionario.id,
                         data=registro.data,
-                        descricao=f"Vale Alimentação - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}",
+                        descricao=f"VA - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}",
                         valor=valor_va,
                         obra_id=registro.obra_id,
                         origem_tabela='registro_ponto_va',
                         origem_id=registro.id,
                     )
                     if filho_va:
-                        db.session.commit()
-                        logger.info(f"[OK] VA lançado: R$ {valor_va:.2f} — {funcionario.nome}")
+                        logger.info(f"[OK] VA pendente: R$ {valor_va:.2f} — {funcionario.nome}")
                     else:
                         logger.warning(f"[WARN] VA não lançado para {funcionario.nome}")
                 else:
@@ -421,20 +419,22 @@ def calcular_horas_folha(data: dict, admin_id: int):
                         entidade_nome=funcionario.nome,
                         entidade_id=funcionario.id,
                         data=registro.data,
-                        descricao=f"Vale Transporte - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}",
+                        descricao=f"VT - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}",
                         valor=valor_vt,
                         obra_id=registro.obra_id,
                         origem_tabela='registro_ponto_vt',
                         origem_id=registro.id,
                     )
                     if filho_vt:
-                        db.session.commit()
-                        logger.info(f"[OK] VT lançado: R$ {valor_vt:.2f} — {funcionario.nome}")
+                        logger.info(f"[OK] VT pendente: R$ {valor_vt:.2f} — {funcionario.nome}")
                     else:
                         logger.warning(f"[WARN] VT não lançado para {funcionario.nome}")
                 else:
                     logger.info(f"[INFO] VT {funcionario.nome} em {registro.data} já existe — skip")
 
+            # ── Commit único para diária + VA + VT ────────────────────────
+            db.session.commit()
+            logger.info(f"[OK] Lançamentos diarista commitados: diária={valor_diaria:.2f} VA={valor_va:.2f} VT={valor_vt:.2f} — {funcionario.nome}")
             return
         # ── FIM V2: DIARISTA ──────────────────────────────────────────────
 
