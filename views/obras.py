@@ -920,7 +920,14 @@ def excluir_obra(id):
             # [FAST] LISTA COMPLETA: TODAS as 38 tabelas com FK para obra.id
             # Ordem importa - dependências mais profundas primeiro
             tabelas_dependentes = [
-                # Tabelas críticas com admin_id
+                # ── V2: Módulos adicionados posteriormente (adicionar ANTES dos legados) ──
+                'reembolso_funcionario',       # V2: Reembolsos vinculados à obra
+                'lancamento_transporte',       # V2: Lançamentos de transporte
+                'gestao_custo_filho',          # V2: Itens de custo (filho de gestao_custo_pai)
+                'pedido_compra',               # V2: Pedidos de compra de materiais
+                'tarefa_cronograma',           # V2: Tarefas do cronograma
+                'folha_processada',            # V2: Folhas processadas por obra
+                # ── Tabelas legadas com admin_id ──────────────────────────────────────────
                 'custo_obra',
                 'servico_obra_real',
                 'servico_obra',
@@ -955,14 +962,15 @@ def excluir_obra(id):
                 'vehicle_usage',
                 'weekly_plan',
                 'allocation',
-                # Tabelas sem admin_id (tentar, mas não falhar)
+                # ── Tabelas sem admin_id (tentar, mas não falhar) ─────────────────────────
                 'propostas_comerciais',  # tem obra_id mas admin_id próprio
-                'proposta'  # obra_gerada_id
+                'proposta',              # obra_gerada_id
             ]
             
             # Mapeamento especial para tabelas com nomes de coluna FK diferentes
             fk_column_map = {
-                'proposta': 'obra_gerada_id',  # Usa obra_gerada_id em vez de obra_id
+                'proposta':            'obra_gerada_id',  # Usa obra_gerada_id em vez de obra_id
+                'fleet_vehicle_usage': 'worksite_id',     # Usa worksite_id em vez de obra_id
             }
             
             # [DEBUG] INTROSPECT: Detectar quais tabelas têm admin_id ANTES de deletar
