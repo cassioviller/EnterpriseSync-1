@@ -14,7 +14,7 @@
       <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Aprovado → Pago</small>
     </div>
     <div class="d-flex gap-2">
-      {% if modo == 'novo' %}
+      {% if modo in ('novo', 'editar') %}
       <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-left me-1"></i> Voltar
       </a>
@@ -32,6 +32,132 @@
     </div>
   </div>
 
+  {# ── MACRO: FORMULÁRIO COMPARTILHADO (novo / editar) ──────────── #}
+  {% macro form_campos(is_edit) %}
+    {% set v_cat   = pai.tipo_categoria if is_edit else request.args.get('tipo','') %}
+    {% set v_forn  = pai.fornecedor_id  if is_edit else '' %}
+    {% set v_nome  = pai.entidade_nome  if is_edit else '' %}
+    {% set v_emis  = pai.data_emissao.strftime('%Y-%m-%d')   if (is_edit and pai.data_emissao)  else '' %}
+    {% set v_doc   = pai.numero_documento if is_edit else '' %}
+    {% set v_parc  = pai.numero_parcela  if is_edit else 1 %}
+    {% set v_totparc = pai.total_parcelas if is_edit else 1 %}
+    {% set v_forma = pai.forma_pagamento  if is_edit else '' %}
+    {% set v_venc  = pai.data_vencimento.strftime('%Y-%m-%d') if (is_edit and pai.data_vencimento) else '' %}
+    {% set v_cont  = pai.conta_contabil_codigo if is_edit else '' %}
+    {% set v_desc  = filho.descricao if (is_edit and filho) else '' %}
+    {% set v_val   = '%.2f'|format(pai.valor_total|float) if is_edit else '' %}
+    {% set v_ref   = filho.data_referencia.strftime('%Y-%m-%d') if (is_edit and filho and filho.data_referencia) else today %}
+    {% set v_obra  = filho.obra_id if (is_edit and filho) else '' %}
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Categoria *</label>
+      <select name="tipo_categoria" class="form-select" required>
+        {% for grupo_nome, grupo_keys in categorias_grupos %}
+        <optgroup label="{{ grupo_nome }}">
+          {% for k in grupo_keys %}
+          {% set info = categoria_labels[k] %}
+          <option value="{{ k }}" {% if v_cat == k %}selected{% endif %}>{{ info[0] }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Fornecedor</label>
+      <select name="fornecedor_id" class="form-select">
+        <option value="">— Selecione (opcional) —</option>
+        {% for f in fornecedores %}
+        <option value="{{ f.id }}" {% if v_forn == f.id %}selected{% endif %}>{{ f.nome }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Vincule ao fornecedor ou preencha o nome manualmente abaixo.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Entidade / Nome *</label>
+      <input type="text" name="entidade_nome" class="form-control"
+             placeholder="Ex: João Silva, Fornecedor ABC…" required autocomplete="off"
+             value="{{ v_nome }}">
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-sm-6">
+        <label class="form-label fw-semibold">Data de Emissão</label>
+        <input type="date" name="data_emissao" class="form-control" value="{{ v_emis }}">
+        <div class="form-text">Data da nota fiscal / documento.</div>
+      </div>
+      <div class="col-sm-6">
+        <label class="form-label fw-semibold">Nº Documento</label>
+        <input type="text" name="numero_documento" class="form-control"
+               placeholder="NF, boleto, contrato…" autocomplete="off" value="{{ v_doc }}">
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-sm-4">
+        <label class="form-label fw-semibold">Parcela Nº</label>
+        <input type="number" name="numero_parcela" class="form-control" min="1" value="{{ v_parc }}">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label fw-semibold">Total de Parcelas</label>
+        <input type="number" name="total_parcelas" class="form-control" min="1" value="{{ v_totparc }}">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label fw-semibold">Forma de Pagamento</label>
+        <select name="forma_pagamento" class="form-select">
+          <option value="">— Selecione —</option>
+          {% for fp in ['Boleto','PIX','Transferência','Dinheiro','Cheque','Cartão'] %}
+          <option value="{{ fp }}" {% if v_forma == fp %}selected{% endif %}>{{ fp }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-sm-6">
+        <label class="form-label fw-semibold">Data de Vencimento</label>
+        <input type="date" name="data_vencimento" class="form-control" value="{{ v_venc }}">
+        <div class="form-text">Usado para projeção no Fluxo de Caixa.</div>
+      </div>
+      <div class="col-sm-6">
+        <label class="form-label fw-semibold">Conta Contábil</label>
+        <input type="text" name="conta_contabil_codigo" class="form-control"
+               placeholder="Ex: 3.1.1.01" autocomplete="off" value="{{ v_cont }}">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Descrição do lançamento</label>
+      <input type="text" name="descricao" class="form-control"
+             placeholder="Ex: Diária 01/04, Almoço equipe, Compra cimento…" autocomplete="off"
+             value="{{ v_desc }}">
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-sm-6">
+        <label class="form-label fw-semibold">Valor (R$) *</label>
+        <input type="number" name="valor" class="form-control"
+               step="0.01" min="0.01" placeholder="0,00" required value="{{ v_val }}">
+      </div>
+      <div class="col-sm-6">
+        <label class="form-label fw-semibold">Data de referência *</label>
+        <input type="date" name="data_referencia" class="form-control"
+               value="{{ v_ref }}" required>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label fw-semibold">Obra (opcional)</label>
+      <select name="obra_id" class="form-select">
+        <option value="">— Nenhuma —</option>
+        {% for o in obras %}
+        <option value="{{ o.id }}" {% if v_obra == o.id %}selected{% endif %}>{{ o.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endmacro %}
+
   {# ── FORMULÁRIO NOVO LANÇAMENTO ────────────────────────────── #}
   {% if modo == 'novo' %}
   <div class="row justify-content-center">
@@ -41,118 +167,8 @@
           <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Novo Lançamento Manual</h5>
         </div>
         <div class="card-body">
-          <form method="post" action="{{ url_for('gestao_custos.novo') }}" id="formNovoLancamento">
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Categoria *</label>
-              <select name="tipo_categoria" id="selectCategoria" class="form-select" required>
-                {% for grupo_nome, grupo_keys in categorias_grupos %}
-                <optgroup label="{{ grupo_nome }}">
-                  {% for k in grupo_keys %}
-                  {% set info = categoria_labels[k] %}
-                  <option value="{{ k }}" {% if request.args.get('tipo') == k %}selected{% endif %}>{{ info[0] }}</option>
-                  {% endfor %}
-                </optgroup>
-                {% endfor %}
-              </select>
-            </div>
-
-            {# Fornecedor #}
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Fornecedor</label>
-              <select name="fornecedor_id" class="form-select">
-                <option value="">— Selecione (opcional) —</option>
-                {% for f in fornecedores %}
-                <option value="{{ f.id }}">{{ f.nome }}</option>
-                {% endfor %}
-              </select>
-              <div class="form-text">Vincule ao fornecedor cadastrado ou preencha o nome manualmente abaixo.</div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label fw-semibold" id="labelEntidade">Entidade / Nome *</label>
-              <input type="text" name="entidade_nome" id="inputEntidade" class="form-control"
-                     placeholder="Ex: João Silva, Fornecedor ABC, Obra Central…" required autocomplete="off">
-              <div class="form-text" id="helpEntidade">Pessoa, fornecedor ou entidade a pagar.</div>
-            </div>
-
-            {# Dados do documento #}
-            <div class="row g-3 mb-3">
-              <div class="col-sm-6">
-                <label class="form-label fw-semibold">Data de Emissão</label>
-                <input type="date" name="data_emissao" class="form-control">
-                <div class="form-text">Data da nota fiscal / documento.</div>
-              </div>
-              <div class="col-sm-6">
-                <label class="form-label fw-semibold">Nº Documento</label>
-                <input type="text" name="numero_documento" class="form-control"
-                       placeholder="NF, boleto, contrato…" autocomplete="off">
-              </div>
-            </div>
-
-            {# Parcelas #}
-            <div class="row g-3 mb-3">
-              <div class="col-sm-4">
-                <label class="form-label fw-semibold">Parcela Nº</label>
-                <input type="number" name="numero_parcela" class="form-control" min="1" value="1">
-              </div>
-              <div class="col-sm-4">
-                <label class="form-label fw-semibold">Total de Parcelas</label>
-                <input type="number" name="total_parcelas" class="form-control" min="1" value="1">
-              </div>
-              <div class="col-sm-4">
-                <label class="form-label fw-semibold">Forma de Pagamento</label>
-                <select name="forma_pagamento" class="form-select">
-                  <option value="">— Selecione —</option>
-                  <option value="Boleto">Boleto</option>
-                  <option value="PIX">PIX</option>
-                  <option value="Transferência">Transferência</option>
-                  <option value="Dinheiro">Dinheiro</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Cartão">Cartão</option>
-                </select>
-              </div>
-            </div>
-
-            {# Campos opcionais — disponíveis para todas as categorias #}
-            <div class="row g-3 mb-3">
-              <div class="col-sm-6">
-                <label class="form-label fw-semibold">Data de Vencimento</label>
-                <input type="date" name="data_vencimento" id="inputDataVenc" class="form-control">
-                <div class="form-text">Usado para projeção no Fluxo de Caixa.</div>
-              </div>
-              <div class="col-sm-6">
-                <label class="form-label fw-semibold">Conta Contábil</label>
-                <input type="text" name="conta_contabil_codigo" class="form-control"
-                       placeholder="Ex: 3.1.1.01" autocomplete="off">
-              </div>
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Descrição do lançamento</label>
-              <input type="text" name="descricao" class="form-control"
-                     placeholder="Ex: Diária 01/04, Almoço equipe, Compra cimento…" autocomplete="off">
-            </div>
-            <div class="row g-3 mb-3">
-              <div class="col-sm-6">
-                <label class="form-label fw-semibold">Valor (R$) *</label>
-                <input type="number" name="valor" class="form-control"
-                       step="0.01" min="0.01" placeholder="0,00" required>
-              </div>
-              <div class="col-sm-6">
-                <label class="form-label fw-semibold">Data de referência *</label>
-                <input type="date" name="data_referencia" class="form-control"
-                       value="{{ today }}" required>
-              </div>
-            </div>
-            <div class="mb-4">
-              <label class="form-label fw-semibold">Obra (opcional)</label>
-              <select name="obra_id" class="form-select">
-                <option value="">— Nenhuma —</option>
-                {% for o in obras %}
-                <option value="{{ o.id }}">{{ o.nome }}</option>
-                {% endfor %}
-              </select>
-            </div>
+          <form method="post" action="{{ url_for('gestao_custos.novo') }}">
+            {{ form_campos(false) }}
             <div class="d-flex gap-2 justify-content-end">
               <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-secondary">Cancelar</a>
               <button type="submit" class="btn btn-success">
@@ -166,7 +182,40 @@
   </div>
   {% endif %}
 
-  {% if modo != 'novo' %}
+  {# ── FORMULÁRIO EDITAR LANÇAMENTO ─────────────────────────── #}
+  {% if modo == 'editar' %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="mb-0">
+            <i class="fas fa-edit me-2"></i>Editar Lançamento
+            <span class="badge bg-dark ms-2 fw-normal">#{{ pai.id }}</span>
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if pai.status == 'RECUSADO' %}
+          <div class="alert alert-warning py-2 mb-3">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Este registro está <strong>RECUSADO</strong>. Edite e reenvie para aprovação.
+          </div>
+          {% endif %}
+          <form method="post" action="{{ url_for('gestao_custos.editar', pai_id=pai.id) }}">
+            {{ form_campos(true) }}
+            <div class="d-flex gap-2 justify-content-end">
+              <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+              <button type="submit" class="btn btn-warning text-dark">
+                <i class="fas fa-save me-1"></i>Salvar Alterações
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if modo not in ('novo', 'editar') %}
 
   {# ── CARDS DE RESUMO ────────────────────────────────────────── #}
   <div class="row g-3 mb-4">
@@ -337,6 +386,14 @@
             </td>
             <td class="text-center">
               <div class="d-flex justify-content-center gap-1">
+                {# Editar — disponível para PENDENTE e RECUSADO #}
+                {% if reg.status in ('PENDENTE', 'RECUSADO') %}
+                <a href="{{ url_for('gestao_custos.editar', pai_id=reg.id) }}"
+                   class="btn btn-sm btn-outline-primary"
+                   title="Editar registro" aria-label="Editar">
+                  <i class="fas fa-edit fa-xs"></i>
+                </a>
+                {% endif %}
                 {# PENDENTE / PARCIAL → Solicitar próximo pagamento #}
                 {% if reg.status in ('PENDENTE', 'PARCIAL') %}
                 <button class="btn btn-sm btn-outline-warning"
@@ -355,7 +412,7 @@
                   <i class="fas fa-check-circle fa-xs"></i>
                 </button>
                 {% endif %}
-                {# Excluir #}
+                {# Excluir — disponível para PENDENTE e RECUSADO #}
                 {% if reg.status in ('PENDENTE', 'RECUSADO') %}
                 <form method="post" action="{{ url_for('gestao_custos.excluir', pai_id=reg.id) }}"
                       onsubmit="return confirm('Excluir este registro?')">

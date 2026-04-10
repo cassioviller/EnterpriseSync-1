@@ -617,6 +617,113 @@ def pagar(pai_id):
 
 
 # ───────────────────────────────────────────────────────────────
+# EDITAR PAI  (apenas PENDENTE ou RECUSADO)
+# ───────────────────────────────────────────────────────────────
+
+@gestao_custos_bp.route('/<int:pai_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar(pai_id):
+    admin_id, err = _check_v2()
+    if err:
+        return err
+
+    pai = GestaoCustoPai.query.filter_by(id=pai_id, admin_id=admin_id).first_or_404()
+
+    if pai.status not in ('PENDENTE', 'RECUSADO'):
+        flash('Apenas registros PENDENTES ou RECUSADOS podem ser editados.', 'warning')
+        return redirect(url_for('gestao_custos.index'))
+
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.nome).all()
+
+    # Filho principal (o primeiro, se existir)
+    filho_principal = GestaoCustoFilho.query.filter_by(pai_id=pai.id).order_by(
+        GestaoCustoFilho.data_referencia.asc()).first()
+
+    if request.method == 'POST':
+        try:
+            tipo_categoria  = request.form.get('tipo_categoria', pai.tipo_categoria)
+            entidade_nome   = request.form.get('entidade_nome', '').strip()
+            valor_str       = request.form.get('valor', '').replace(',', '.')
+            valor           = Decimal(valor_str) if valor_str else pai.valor_total
+            data_venc_str   = request.form.get('data_vencimento', '').strip()
+            data_venc       = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
+            numero_doc      = request.form.get('numero_documento', '').strip() or None
+            fornecedor_id   = request.form.get('fornecedor_id', type=int)
+            forma_pagamento = request.form.get('forma_pagamento', '').strip() or None
+            data_emissao_str= request.form.get('data_emissao', '').strip()
+            data_emissao    = datetime.strptime(data_emissao_str, '%Y-%m-%d').date() if data_emissao_str else None
+            numero_parcela  = request.form.get('numero_parcela', type=int) or 1
+            total_parcelas  = request.form.get('total_parcelas', type=int) or 1
+            conta_contabil  = request.form.get('conta_contabil_codigo', '').strip() or None
+
+            # Campos do filho principal
+            descricao_filho = request.form.get('descricao', '').strip() or entidade_nome
+            obra_id_filho   = request.form.get('obra_id', type=int)
+            data_ref_str    = request.form.get('data_referencia', '').strip()
+            data_ref        = datetime.strptime(data_ref_str, '%Y-%m-%d').date() if data_ref_str else date.today()
+
+            if not entidade_nome or valor <= 0:
+                flash('Entidade e valor são obrigatórios.', 'warning')
+            else:
+                # Atualizar Pai
+                pai.tipo_categoria       = tipo_categoria
+                pai.entidade_nome        = entidade_nome
+                pai.valor_total          = valor
+                pai.saldo                = valor - Decimal(str(pai.valor_pago or 0))
+                pai.data_vencimento      = data_venc
+                pai.numero_documento     = numero_doc
+                pai.fornecedor_id        = fornecedor_id
+                pai.forma_pagamento      = forma_pagamento
+                pai.data_emissao         = data_emissao
+                pai.numero_parcela       = numero_parcela
+                pai.total_parcelas       = total_parcelas
+                pai.conta_contabil_codigo= conta_contabil
+
+                # Atualizar ou criar filho principal
+                if filho_principal:
+                    filho_principal.descricao        = descricao_filho
+                    filho_principal.obra_id          = obra_id_filho
+                    filho_principal.data_referencia  = data_ref
+                    filho_principal.valor            = valor
+                else:
+                    novo_filho = GestaoCustoFilho(
+                        pai_id=pai.id,
+                        admin_id=admin_id,
+                        data_referencia=data_ref,
+                        descricao=descricao_filho,
+                        valor=valor,
+                        obra_id=obra_id_filho,
+                        origem_tabela='manual',
+                    )
+                    db.session.add(novo_filho)
+
+                db.session.commit()
+                flash(f'Registro "{entidade_nome}" atualizado com sucesso.', 'success')
+                return redirect(url_for('gestao_custos.index'))
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"[ERROR] Erro ao editar custo: {e}")
+            flash(f'Erro ao salvar: {e}', 'danger')
+
+    return render_template(
+        'custos/gestao.html',
+        modo='editar',
+        pai=pai,
+        filho=filho_principal,
+        obras=obras,
+        fornecedores=fornecedores,
+        today=date.today().strftime('%Y-%m-%d'),
+        categoria_labels=CATEGORIA_LABELS,
+        categorias_grupos=CATEGORIAS_GRUPOS,
+        status_badges=STATUS_BADGES,
+        registros=[],
+        resumo={},
+    )
+
+
+# ───────────────────────────────────────────────────────────────
 # EXCLUIR PAI (apenas PENDENTE)
 # ───────────────────────────────────────────────────────────────
 
