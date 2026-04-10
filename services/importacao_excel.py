@@ -376,7 +376,7 @@ class ImportacaoDiarias:
                 data_ref = _parse_data(row['data'])
                 filho = registrar_custo_automatico(
                     admin_id=admin_id,
-                    tipo_categoria='SALARIO',
+                    tipo_categoria='MAO_OBRA_DIRETA',
                     entidade_nome=row['nome'],
                     entidade_id=row['funcionario_id'],
                     data=data_ref,
