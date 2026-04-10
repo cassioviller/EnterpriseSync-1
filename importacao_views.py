@@ -3,11 +3,13 @@ Blueprint de Importação Excel — SIGE v9.0
 5 módulos: Funcionários, Diárias, Alimentação, Transporte, Custos
 Fluxo por módulo: download template → upload → preview → confirmar
 """
+import hashlib
+import hmac
 import json
 import logging
 import os
 
-from flask import (Blueprint, flash, redirect, render_template,
+from flask import (Blueprint, current_app, flash, redirect, render_template,
                    request, send_file, url_for)
 from flask_login import current_user, login_required
 
@@ -17,6 +19,30 @@ from views.helpers import get_admin_id_robusta
 logger = logging.getLogger(__name__)
 
 importacao_bp = Blueprint('importacao', __name__, url_prefix='/importacao')
+
+
+def _assinar_payload(dados: list) -> str:
+    """Serializa e assina a lista de dados com HMAC-SHA256 para evitar adulteração."""
+    body = json.dumps(dados, sort_keys=True, default=str).encode()
+    chave = (current_app.secret_key or 'sige-secret').encode()
+    sig = hmac.new(chave, body, digestmod=hashlib.sha256).hexdigest()
+    return f"{sig}:{body.decode()}"
+
+
+def _verificar_payload(token: str):
+    """Verifica a assinatura e retorna a lista de dados, ou None se inválido."""
+    try:
+        sig_rec, body = token.split(':', 1)
+    except ValueError:
+        return None
+    chave = (current_app.secret_key or 'sige-secret').encode()
+    sig_esp = hmac.new(chave, body.encode(), digestmod=hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig_rec, sig_esp):
+        return None
+    try:
+        return json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'static', 'templates_importacao')
 
@@ -184,7 +210,8 @@ def _handle_preview(modulo):
         return redirect(url_for('importacao.index'))
 
     cfg = MODULO_CONFIG[modulo]
-    dados_json = json.dumps(validos, default=str)
+    # Assina o payload para impedir adulteração entre preview e confirmar
+    dados_assinados = _assinar_payload(validos)
 
     return render_template(
         'importacao/preview.html',
@@ -193,7 +220,7 @@ def _handle_preview(modulo):
         validos=validos,
         erros=erros,
         colunas=cfg['colunas'],
-        dados_json=dados_json,
+        dados_json=dados_assinados,
     )
 
 
@@ -204,12 +231,12 @@ def _handle_confirmar(modulo):
         return redirect(url_for('importacao.index'))
 
     admin_id = get_admin_id_robusta()
-    dados_json = request.form.get('dados_json', '[]')
+    token = request.form.get('dados_json', '')
 
-    try:
-        rows = json.loads(dados_json)
-    except (json.JSONDecodeError, ValueError) as e:
-        flash(f'Dados inválidos — faça o preview novamente. ({e})', 'danger')
+    # Verifica assinatura — rejeita payload adulterado
+    rows = _verificar_payload(token)
+    if rows is None:
+        flash('Dados de preview inválidos ou adulterados — faça o upload novamente.', 'danger')
         return redirect(url_for('importacao.index'))
 
     if not rows:

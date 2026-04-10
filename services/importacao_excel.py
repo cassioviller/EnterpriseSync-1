@@ -96,32 +96,34 @@ class ImportacaoFuncionarios:
     """
 
     def _detectar_formato(self, raw_headers):
-        """Detecta formato baseado nos headers brutos (antes da normalização)."""
+        """
+        Detecta formato estritamente pelo primeiro header bruto (sem normalização):
+          col[0] == 'nome' (lowercase exato) → SIGE
+          col[0] == qualquer forma de 'NOME' diferente de 'nome' exato → REGISTRO_COLABORADORES
+          outro → 'desconhecido' (levará a erro no chamador)
+        """
         if not raw_headers:
-            return 'sige'
-        # Usa o primeiro header bruto para distinguir maiúsculo de minúsculo
-        primeiro = _norm(raw_headers[0])
-        if not primeiro:
-            return 'sige'
-        # SIGE: header minúsculo 'nome' → indica template SIGE padrão
+            return 'desconhecido'
+        # Pega o primeiro header real (ignora None/vazio)
+        primeiro = None
+        for h in raw_headers:
+            v = _norm(h)
+            if v:
+                primeiro = v
+                break
+        if primeiro is None:
+            return 'desconhecido'
+        # Comparação estrita: 'nome' minúsculo = SIGE
         if primeiro == 'nome':
             return 'sige'
-        # REGISTRO_COLABORADORES: qualquer casing diferente de 'nome' no col[0]
-        # típico 'NOME' ou ausência de tipo_remuneracao/data_admissao
-        raw_upper = [_norm(str(h)).upper() for h in raw_headers if h]
-        if 'REMUNERACAO' in raw_upper or 'ENDERECO' in raw_upper:
-            return 'colaboradores'
-        # Fallback: sem tipo_remuneracao nem data_admissao → colaboradores
+        # Qualquer outra variante contendo 'nome' (maiúsculo, com espaços, etc.) = colaboradores
         import unicodedata
-        def n(s):
-            s = _norm(s).lower()
+        def sem_acento(s):
             s = unicodedata.normalize('NFD', s)
-            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-            return s.replace(' ', '_').replace('*', '').strip('_')
-        norm_set = {n(str(h)) for h in raw_headers if h}
-        if 'tipo_remuneracao' not in norm_set and 'data_admissao' not in norm_set:
+            return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+        if sem_acento(primeiro.lower()) == 'nome':
             return 'colaboradores'
-        return 'sige'
+        return 'desconhecido'
 
     def processar(self, ws, admin_id, defaults=None):
         """
@@ -138,6 +140,9 @@ class ImportacaoFuncionarios:
 
         hm = _mapear_headers(raw_headers)
         formato = self._detectar_formato(raw_headers)
+        if formato == 'desconhecido':
+            return [], [{'linha': 3, 'nome': '—',
+                         'motivo': 'Formato não reconhecido. Use o template SIGE ou o modelo "Registro de Colaboradores".'}]
 
         validos, erros = [], []
         cpfs_vistos = set()
@@ -168,9 +173,18 @@ class ImportacaoFuncionarios:
             operacao = 'atualizar' if existe else 'criar'
 
             if formato == 'colaboradores':
-                rem_raw = _norm(c('remuneracao')).upper()
-                tipo_rem = 'diaria' if ('DIARIA' in rem_raw or 'DIÁRIA' in rem_raw) else 'salario'
-                valor = _parse_float(c('valor'))
+                # Tenta ler da planilha; se ausente, usa defaults do formulário
+                rem_raw = _norm(c('remuneracao', 'tipo_remuneracao')).upper()
+                if rem_raw:
+                    tipo_rem = 'diaria' if ('DIARIA' in rem_raw or 'DIÁRIA' in rem_raw) else 'salario'
+                else:
+                    tipo_rem = _norm(defaults.get('tipo_remuneracao') or 'salario').lower()
+                    tipo_rem = 'diaria' if 'diaria' in tipo_rem else 'salario'
+
+                valor = _parse_float(c('valor', 'salario', 'valor_diaria'))
+                if valor == 0:
+                    valor = _parse_float(defaults.get('valor', '0'))
+
                 data_admissao = _parse_data(c('data_admissao', 'admissao')) or (
                     _parse_data(defaults.get('data_admissao')) or date.today()
                 )
@@ -325,7 +339,7 @@ class ImportacaoDiarias:
                 erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
                 continue
 
-            # Buscar obra
+            # Buscar obra (obrigatória quando informada)
             obra_raw = _norm(c('obra', 'obra_id', 'codigo_obra'))
             obra = None
             if obra_raw:
@@ -333,6 +347,10 @@ class ImportacaoDiarias:
                         .filter(Obra.admin_id == admin_id)
                         .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
+                if not obra:
+                    erros.append({'linha': rn, 'nome': func.nome,
+                                  'motivo': f'Obra "{obra_raw}" não encontrada'})
+                    continue
 
             validos.append({
                 'linha': rn,
@@ -412,14 +430,16 @@ class ImportacaoAlimentacao:
                 continue
 
             obra_raw = _norm(c('obra', 'obra_id'))
-            obra = None
-            if obra_raw:
-                obra = (Obra.query.filter(Obra.admin_id == admin_id)
-                        .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
-                        .first())
-                if not obra:
-                    erros.append({'linha': rn, 'nome': str(data_ref), 'motivo': f'Obra "{obra_raw}" não encontrada'})
-                    continue
+            if not obra_raw:
+                erros.append({'linha': rn, 'nome': str(data_ref),
+                              'motivo': 'Obra obrigatória para lançamento de alimentação'})
+                continue
+            obra = (Obra.query.filter(Obra.admin_id == admin_id)
+                    .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
+                    .first())
+            if not obra:
+                erros.append({'linha': rn, 'nome': str(data_ref), 'motivo': f'Obra "{obra_raw}" não encontrada'})
+                continue
 
             # Resolver lista de funcionários
             funcs_raw = _norm(c('funcionarios', 'funcionario'))
@@ -551,6 +571,10 @@ class ImportacaoTransporte:
                 obra = (Obra.query.filter(Obra.admin_id == admin_id)
                         .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
+                if not obra:
+                    erros.append({'linha': rn, 'nome': nome,
+                                  'motivo': f'Obra "{obra_raw}" não encontrada'})
+                    continue
 
             # Busca CategoriaTransporte por nome (case-insensitive)
             categoria_raw = _norm(c('categoria')) or ''
@@ -668,6 +692,10 @@ class ImportacaoCustos:
                 obra = (Obra.query.filter(Obra.admin_id == admin_id)
                         .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
+                if not obra:
+                    erros.append({'linha': rn, 'nome': fornecedor or descricao,
+                                  'motivo': f'Obra/centro de custo "{obra_raw}" não encontrado'})
+                    continue
 
             status_raw = _norm(c('status')).upper()
             status = status_raw if status_raw in ('PAGO', 'PENDENTE', 'AUTORIZADO') else 'PENDENTE'
