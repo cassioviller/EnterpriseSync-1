@@ -202,64 +202,72 @@ def importar_funcionarios(ws, admin_id, inicio_linha=4):
             valor_vt = _parse_float(cel('valor_vt', ['vt', 'vale_transporte']))
 
             # ── Upsert ────────────────────────────────────────────────────────
-            existente = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
-            if existente:
-                existente.nome = nome
-                existente.rg = rg or existente.rg
-                existente.telefone = telefone or existente.telefone
-                existente.endereco = endereco or existente.endereco
-                if chave_pix:
-                    existente.chave_pix = chave_pix
-                if data_nasc:
-                    existente.data_nascimento = data_nasc
-                existente.ativo = ativo
-                existente.tipo_remuneracao = tipo_remuneracao
-                if tipo_remuneracao == 'diaria' and valor > 0:
-                    existente.valor_diaria = valor
-                elif tipo_remuneracao == 'salario' and valor > 0:
-                    existente.salario = valor
-                if valor_va > 0:
-                    existente.valor_va = valor_va
-                if valor_vt > 0:
-                    existente.valor_vt = valor_vt
-                resultado['atualizados'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'cpf': cpf, 'status': 'atualizado'})
-            else:
-                # Código automático VV###
-                ultimo = Funcionario.query.filter(
-                    Funcionario.codigo.like('VV%'),
-                    Funcionario.admin_id == admin_id
-                ).order_by(Funcionario.codigo.desc()).first()
-                try:
-                    proximo_num = int(ultimo.codigo[2:]) + 1 if ultimo else 1
-                except Exception:
-                    proximo_num = 1
-                codigo = f"VV{proximo_num:03d}"
-
-                kwargs = dict(
-                    nome=nome, cpf=cpf, rg=rg or None, telefone=telefone or None,
-                    endereco=endereco or None, chave_pix=chave_pix or None,
-                    data_nascimento=data_nasc, ativo=ativo, admin_id=admin_id,
-                    codigo=codigo, tipo_remuneracao=tipo_remuneracao,
-                    data_admissao=data_admissao, valor_va=valor_va, valor_vt=valor_vt,
-                )
-                if tipo_remuneracao == 'diaria':
-                    kwargs['valor_diaria'] = valor
-                    kwargs['salario'] = 0
+            # Savepoint por linha — falha em uma linha não desfaz as anteriores
+            savepoint = db.session.begin_nested()
+            try:
+                existente = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
+                if existente:
+                    existente.nome = nome
+                    existente.rg = rg or existente.rg
+                    existente.telefone = telefone or existente.telefone
+                    existente.endereco = endereco or existente.endereco
+                    if chave_pix:
+                        existente.chave_pix = chave_pix
+                    if data_nasc:
+                        existente.data_nascimento = data_nasc
+                    existente.ativo = ativo
+                    existente.tipo_remuneracao = tipo_remuneracao
+                    if tipo_remuneracao == 'diaria' and valor > 0:
+                        existente.valor_diaria = valor
+                    elif tipo_remuneracao == 'salario' and valor > 0:
+                        existente.salario = valor
+                    if valor_va > 0:
+                        existente.valor_va = valor_va
+                    if valor_vt > 0:
+                        existente.valor_vt = valor_vt
+                    savepoint.commit()
+                    resultado['atualizados'] += 1
+                    resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'cpf': cpf, 'status': 'atualizado'})
                 else:
-                    kwargs['salario'] = valor
-                    kwargs['valor_diaria'] = 0
+                    # Código automático VV###
+                    ultimo = Funcionario.query.filter(
+                        Funcionario.codigo.like('VV%'),
+                        Funcionario.admin_id == admin_id
+                    ).order_by(Funcionario.codigo.desc()).first()
+                    try:
+                        proximo_num = int(ultimo.codigo[2:]) + 1 if ultimo else 1
+                    except Exception:
+                        proximo_num = 1
+                    codigo = f"VV{proximo_num:03d}"
 
-                func = Funcionario(**kwargs)
-                db.session.add(func)
-                resultado['importados'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'cpf': cpf, 'status': 'importado', 'codigo': codigo})
+                    kwargs = dict(
+                        nome=nome, cpf=cpf, rg=rg or None, telefone=telefone or None,
+                        endereco=endereco or None, chave_pix=chave_pix or None,
+                        data_nascimento=data_nasc, ativo=ativo, admin_id=admin_id,
+                        codigo=codigo, tipo_remuneracao=tipo_remuneracao,
+                        data_admissao=data_admissao, valor_va=valor_va, valor_vt=valor_vt,
+                    )
+                    if tipo_remuneracao == 'diaria':
+                        kwargs['valor_diaria'] = valor
+                        kwargs['salario'] = 0
+                    else:
+                        kwargs['salario'] = valor
+                        kwargs['valor_diaria'] = 0
 
-            db.session.flush()
+                    func = Funcionario(**kwargs)
+                    db.session.add(func)
+                    savepoint.commit()
+                    resultado['importados'] += 1
+                    resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'cpf': cpf, 'status': 'importado', 'codigo': codigo})
+
+            except Exception as row_err:
+                savepoint.rollback()
+                logger.error(f"[IMPORT] Erro na linha {row_num}: {row_err}", exc_info=True)
+                resultado['erros'] += 1
+                resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'status': 'erro', 'mensagem': str(row_err)})
 
         except Exception as e:
-            logger.error(f"[IMPORT] Erro na linha {row_num}: {e}", exc_info=True)
-            db.session.rollback()
+            logger.error(f"[IMPORT] Erro inesperado na linha {row_num}: {e}", exc_info=True)
             resultado['erros'] += 1
             resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'status': 'erro', 'mensagem': str(e)})
 
