@@ -97,33 +97,45 @@ class ImportacaoFuncionarios:
 
     def _detectar_formato(self, raw_headers):
         """
-        Detecta formato estritamente pelo primeiro header bruto (sem normalização):
-          col[0] == 'nome' (lowercase exato) → SIGE
-          col[0] == qualquer forma de 'NOME' diferente de 'nome' exato → REGISTRO_COLABORADORES
-          outro → 'desconhecido' (levará a erro no chamador)
+        Detecta formato pelo primeiro header não-vazio, após remover sufixos de marcação (*, !).
+
+        Regra:
+          • Primeiro char minúsculo → SIGE (ex: 'nome', 'nome *', 'nome*')
+          • Primeiro char maiúsculo → REGISTRO_COLABORADORES (ex: 'NOME', 'NOME *')
+          • Não inicia com 'nome'/variante → 'desconhecido'
         """
-        if not raw_headers:
-            return 'desconhecido'
-        # Pega o primeiro header real (ignora None/vazio)
-        primeiro = None
-        for h in raw_headers:
-            v = _norm(h)
-            if v:
-                primeiro = v
-                break
-        if primeiro is None:
-            return 'desconhecido'
-        # Comparação estrita: 'nome' minúsculo = SIGE
-        if primeiro == 'nome':
-            return 'sige'
-        # Qualquer outra variante contendo 'nome' (maiúsculo, com espaços, etc.) = colaboradores
         import unicodedata
+
         def sem_acento(s):
             s = unicodedata.normalize('NFD', s)
             return ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-        if sem_acento(primeiro.lower()) == 'nome':
-            return 'colaboradores'
-        return 'desconhecido'
+
+        if not raw_headers:
+            return 'desconhecido'
+
+        # Pega o primeiro header real (ignora None/vazio)
+        primeiro_raw = None
+        for h in raw_headers:
+            v = str(h).strip() if h is not None else ''
+            if v:
+                primeiro_raw = v
+                break
+        if primeiro_raw is None:
+            return 'desconhecido'
+
+        # Remove sufixos de marcação (*, !, espaços) para comparar a raiz
+        primeiro_clean = sem_acento(
+            primeiro_raw.replace('*', '').replace('!', '').strip().lower()
+        )
+        if primeiro_clean != 'nome':
+            return 'desconhecido'
+
+        # Diferencia SIGE (minúsculo) de REGISTRO_COLABORADORES (maiúsculo)
+        # usa o primeiro caractere alfabético do header original
+        primeiro_alfa = next((c for c in primeiro_raw if c.isalpha()), '')
+        if primeiro_alfa.islower():
+            return 'sige'
+        return 'colaboradores'
 
     def processar(self, ws, admin_id, defaults=None):
         """
@@ -188,6 +200,12 @@ class ImportacaoFuncionarios:
                 valor = _parse_float(c('valor', 'salario', 'valor_diaria'))
                 if valor == 0:
                     valor = _parse_float(defaults.get('valor', '0'))
+                # Para Registro de Colaboradores, o valor padrão é obrigatório
+                if valor == 0:
+                    erros.append({'linha': rn, 'nome': nome,
+                                  'motivo': 'Valor não informado. Defina o valor padrão '
+                                            'de salário/diária no formulário de importação.'})
+                    continue
 
                 data_admissao = _parse_data(c('data_admissao', 'admissao')) or (
                     _parse_data(defaults.get('data_admissao')) or date.today()
@@ -216,6 +234,7 @@ class ImportacaoFuncionarios:
                 'data_admissao': str(data_admissao),
                 'valor_va': _parse_float(c('valor_va', 'va')),
                 'valor_vt': _parse_float(c('valor_vt', 'vt')),
+                'operacao': 'criar',  # Importação cria novos; CPFs existentes são rejeitados em preview
             }
             validos.append(row)
 
