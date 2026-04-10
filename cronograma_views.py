@@ -1633,9 +1633,46 @@ def api_produtividade():
 
     rows = q.order_by(RDO.data_relatorio).all()
 
-    # ── Agregação por (funcionario, subatividade_mestre) ──────────────────
+    # ── Query separada para média_empresa (sem filtro de funcionário) ──────
+    # media_empresa deve refletir o desempenho de TODOS os funcionários da empresa,
+    # independente do filtro de funcionario_id.
     from collections import defaultdict
 
+    q_emp = (
+        db.session.query(RDOMaoObra, RDOServicoSubatividade, RDO)
+        .join(RDOServicoSubatividade, RDOMaoObra.subatividade_id == RDOServicoSubatividade.id)
+        .join(RDO, RDOMaoObra.rdo_id == RDO.id)
+        .filter(
+            RDO.admin_id == admin_id,
+            RDO.status == 'Finalizado',
+            RDOServicoSubatividade.subatividade_mestre_id.isnot(None),
+            RDOMaoObra.produtividade_real.isnot(None),
+        )
+    )
+    if obra_id:
+        q_emp = q_emp.filter(RDO.obra_id == obra_id)
+    if sub_mestre_id:
+        q_emp = q_emp.filter(RDOServicoSubatividade.subatividade_mestre_id == sub_mestre_id)
+    if data_inicio:
+        q_emp = q_emp.filter(RDO.data_relatorio >= data_inicio)
+    if data_fim:
+        q_emp = q_emp.filter(RDO.data_relatorio <= data_fim)
+
+    rows_empresa = q_emp.all()
+
+    # Calcular rdo_sub_totais a partir dos dados de TODA a empresa
+    rdo_sub_totais: dict = {}
+    for mo_e, sub_e, rdo_e in rows_empresa:
+        day_key = (rdo_e.id, sub_e.id)
+        if day_key not in rdo_sub_totais:
+            rdo_sub_totais[day_key] = {
+                'sub_mestre_id': sub_e.subatividade_mestre_id,
+                'quantidade': sub_e.quantidade_produzida or 0.0,
+                'horas_totais': 0.0,
+            }
+        rdo_sub_totais[day_key]['horas_totais'] += mo_e.horas_trabalhadas or 0.0
+
+    # ── Agregação por (funcionario, subatividade_mestre) ──────────────────
     # Por funcionário × subatividade: média ponderada por horas individuais
     # prod_ponderada = Σ(produtividade_real × horas_pessoa) / Σ(horas_pessoa)
     agg = defaultdict(lambda: {
@@ -1649,9 +1686,6 @@ def api_produtividade():
         'total_horas': 0.0,      # Σ(horas_pessoa)
         'count': 0,
     })
-
-    # Por (rdo, sub_raw_id): para calcular média_empresa sem dupla-contagem de quantidade
-    rdo_sub_totais: dict = {}
 
     for mo, sub, rdo, func in rows:
         key = (func.id, sub.subatividade_mestre_id)
@@ -1669,16 +1703,6 @@ def api_produtividade():
         entry['soma_indice_pond'] += idx * h
         entry['total_horas'] += h
         entry['count'] += 1
-
-        # Acumular horas por (rdo_id, sub_raw_id) para média_empresa
-        day_key = (rdo.id, sub.id)
-        if day_key not in rdo_sub_totais:
-            rdo_sub_totais[day_key] = {
-                'sub_mestre_id': sub.subatividade_mestre_id,
-                'quantidade': sub.quantidade_produzida or 0.0,
-                'horas_totais': 0.0,
-            }
-        rdo_sub_totais[day_key]['horas_totais'] += h
 
     # ── Média da empresa por subatividade_mestre ───────────────────────────
     # media_empresa[sub_mestre_id] = Σ(quantidade) / Σ(horas_totais_equipe_por_dia)
@@ -1766,6 +1790,22 @@ def api_produtividade():
         for d in linha_labels
     ]
 
+    # ── Agregação mensal para gráfico de evolução no perfil do funcionário ─
+    mensal_agg = defaultdict(lambda: {'soma_pond': 0.0, 'soma_horas': 0.0})
+    for mo, sub, rdo, func in rows:
+        mes = rdo.data_relatorio.strftime('%Y-%m')
+        h = mo.horas_trabalhadas or 0.0
+        if mo.produtividade_real is not None and h > 0:
+            mensal_agg[mes]['soma_pond'] += mo.produtividade_real * h
+            mensal_agg[mes]['soma_horas'] += h
+
+    mensal_labels = sorted(mensal_agg.keys())
+    mensal_valores = [
+        round(mensal_agg[m]['soma_pond'] / mensal_agg[m]['soma_horas'], 3)
+        if mensal_agg[m]['soma_horas'] > 0 else 0
+        for m in mensal_labels
+    ]
+
     # ── Cards de resumo ───────────────────────────────────────────────────
     melhor = ranking[0] if ranking else None
     pior = ranking[-1] if ranking else None
@@ -1781,6 +1821,10 @@ def api_produtividade():
             'prod': barra_prod,
             'meta': meta_ref,
             'media_empresa': media_empresa_ref,
+        },
+        'mensal': {
+            'labels': mensal_labels,
+            'valores': mensal_valores,
         },
         'linha': {
             'labels': linha_labels,

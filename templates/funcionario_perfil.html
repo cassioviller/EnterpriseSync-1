@@ -1003,7 +1003,7 @@
                 </h5>
                 <a href="{{ url_for('cronograma.produtividade') }}?funcionario_id={{ funcionario.id }}"
                    class="btn btn-light btn-sm">
-                    <i class="fas fa-external-link-alt me-1"></i>Ver Dashboard
+                    <i class="fas fa-external-link-alt me-1"></i>Ver Dashboard Completo
                 </a>
             </div>
             <div class="card-body p-0">
@@ -1016,6 +1016,7 @@
                     Os dados aparecem após finalizar RDOs com subatividades do catálogo e quantidade produzida preenchida.</small>
                 </div>
                 <div id="produtividadeConteudo" class="d-none">
+                    <!-- Tabela por subatividade -->
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light">
@@ -1031,20 +1032,34 @@
                             <tbody id="produtividadeBody"></tbody>
                         </table>
                     </div>
-                    <div class="border-top p-3 bg-light d-flex gap-4 flex-wrap" style="border-radius:0 0 12px 12px;font-size:.8rem">
-                        <span class="text-muted"><span class="badge bg-success me-1">Acima</span> ≥ 85% da média empresa</span>
-                        <span class="text-muted"><span class="badge bg-warning text-dark me-1">Próximo</span> 70–85%</span>
-                        <span class="text-muted"><span class="badge bg-danger me-1">Abaixo</span> &lt; 70%</span>
+                    <!-- Gráfico de evolução mensal -->
+                    <div class="border-top p-3">
+                        <h6 class="fw-semibold mb-2 text-muted" style="font-size:.85rem">
+                            <i class="fas fa-chart-line me-1 text-primary"></i>
+                            Evolução Mensal da Produtividade (média ponderada por horas)
+                        </h6>
+                        <div style="position:relative;height:180px">
+                            <canvas id="graficoMensalFuncionario"></canvas>
+                        </div>
+                    </div>
+                    <!-- Legenda -->
+                    <div class="border-top px-3 py-2 bg-light d-flex gap-3 flex-wrap align-items-center" style="border-radius:0 0 12px 12px;font-size:.75rem">
+                        <span class="text-muted fw-semibold">vs Empresa:</span>
+                        <span class="text-muted"><span class="badge bg-success me-1">Acima</span> ≥ 100% da média</span>
+                        <span class="text-muted"><span class="badge bg-warning text-dark me-1">Próximo</span> 85–100%</span>
+                        <span class="text-muted"><span class="badge bg-danger me-1">Abaixo</span> &lt; 85%</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 (function () {
     const funcId = {{ funcionario.id }};
     const apiUrl = {{ url_for('cronograma.api_produtividade') | tojson }};
+    let graficoMensal = null;
 
     async function carregarProdutividade() {
         try {
@@ -1055,6 +1070,8 @@
                 document.getElementById('produtividadeVazio').classList.remove('d-none');
                 return;
             }
+
+            // Tabela por subatividade
             const tbody = document.getElementById('produtividadeBody');
             const badgeClass = { success: 'bg-success', warning: 'bg-warning text-dark', danger: 'bg-danger', secondary: 'bg-secondary' };
             const badgeLabel = { success: 'Acima da média', warning: 'Próximo da média', danger: 'Abaixo da média', secondary: 'Sem ref.' };
@@ -1076,6 +1093,41 @@
                     <td class="text-center pe-3"><span class="badge ${vsEmpBadge}" style="font-size:.7rem">${vsEmpLabel}</span></td>
                 </tr>`;
             }).join('');
+
+            // Gráfico mensal
+            if (data.mensal && data.mensal.labels && data.mensal.labels.length > 0) {
+                if (graficoMensal) graficoMensal.destroy();
+                const ctx = document.getElementById('graficoMensalFuncionario').getContext('2d');
+                graficoMensal = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.mensal.labels,
+                        datasets: [{
+                            label: 'Prod. Mensal (ponderada)',
+                            data: data.mensal.valores,
+                            borderColor: 'rgba(13,110,253,.8)',
+                            backgroundColor: 'rgba(13,110,253,.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: 'rgba(13,110,253,.8)',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+                            x: { ticks: { font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
+
             document.getElementById('produtividadeConteudo').classList.remove('d-none');
         } catch (e) {
             document.getElementById('produtividadeLoading').classList.add('d-none');
