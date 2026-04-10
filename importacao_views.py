@@ -21,22 +21,33 @@ logger = logging.getLogger(__name__)
 importacao_bp = Blueprint('importacao', __name__, url_prefix='/importacao')
 
 
+def _get_chave_hmac() -> bytes:
+    """Retorna a chave HMAC derivada do secret_key configurado."""
+    chave = current_app.secret_key
+    if not chave:
+        raise RuntimeError(
+            'SECRET_KEY não configurada. Defina a variável de ambiente SESSION_SECRET.'
+        )
+    return chave.encode() if isinstance(chave, str) else chave
+
+
 def _assinar_payload(dados: list) -> str:
     """Serializa e assina a lista de dados com HMAC-SHA256 para evitar adulteração."""
     body = json.dumps(dados, sort_keys=True, default=str).encode()
-    chave = (current_app.secret_key or 'sige-secret').encode()
-    sig = hmac.new(chave, body, digestmod=hashlib.sha256).hexdigest()
+    sig = hmac.new(_get_chave_hmac(), body, digestmod=hashlib.sha256).hexdigest()
     return f"{sig}:{body.decode()}"
 
 
 def _verificar_payload(token: str):
-    """Verifica a assinatura e retorna a lista de dados, ou None se inválido."""
+    """Verifica a assinatura e retorna a lista de dados, ou None se inválido/adulterado."""
     try:
         sig_rec, body = token.split(':', 1)
     except ValueError:
         return None
-    chave = (current_app.secret_key or 'sige-secret').encode()
-    sig_esp = hmac.new(chave, body.encode(), digestmod=hashlib.sha256).hexdigest()
+    try:
+        sig_esp = hmac.new(_get_chave_hmac(), body.encode(), digestmod=hashlib.sha256).hexdigest()
+    except RuntimeError:
+        return None
     if not hmac.compare_digest(sig_rec, sig_esp):
         return None
     try:

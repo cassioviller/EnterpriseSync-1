@@ -168,9 +168,13 @@ class ImportacaoFuncionarios:
                 continue
             cpfs_vistos.add(cpf)
 
-            # Verifica se já existe (será atualização, não erro)
+            # CPF já cadastrado neste tenant → rejeitado (importação cria novos, não atualiza)
             existe = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
-            operacao = 'atualizar' if existe else 'criar'
+            if existe:
+                erros.append({'linha': rn, 'nome': nome,
+                              'motivo': f'CPF {cpf} já cadastrado (funcionário: {existe.nome}). '
+                                        f'Use a edição individual para atualizar.'})
+                continue
 
             if formato == 'colaboradores':
                 # Tenta ler da planilha; se ausente, usa defaults do formulário
@@ -212,76 +216,62 @@ class ImportacaoFuncionarios:
                 'data_admissao': str(data_admissao),
                 'valor_va': _parse_float(c('valor_va', 'va')),
                 'valor_vt': _parse_float(c('valor_vt', 'vt')),
-                'operacao': operacao,
             }
             validos.append(row)
 
         return validos, erros
 
     def importar(self, rows, admin_id):
+        """
+        Apenas CRIA novos funcionários. CPFs já existentes devem ter sido rejeitados em processar().
+        Se por alguma razão um CPF duplicado chegar aqui, é registrado como erro sem alteração.
+        """
         from models import db, Funcionario
-        criados, atualizados, erros = 0, 0, []
+        criados, erros = 0, []
 
         for row in rows:
             sp = db.session.begin_nested()
             try:
                 cpf = row['cpf']
                 data_adm = _parse_data(row.get('data_admissao')) or date.today()
-                existente = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
-                if existente:
-                    existente.nome = row['nome']
-                    if row.get('rg'):
-                        existente.rg = row['rg']
-                    if row.get('telefone'):
-                        existente.telefone = row['telefone']
-                    if row.get('endereco'):
-                        existente.endereco = row['endereco']
-                    if row.get('chave_pix'):
-                        existente.chave_pix = row['chave_pix']
-                    if row.get('data_nascimento'):
-                        existente.data_nascimento = _parse_data(row['data_nascimento'])
-                    existente.ativo = row.get('ativo', True)
-                    existente.tipo_remuneracao = row['tipo_remuneracao']
-                    v = _parse_float(row.get('valor', 0))
-                    if row['tipo_remuneracao'] == 'diaria' and v > 0:
-                        existente.valor_diaria = v
-                    elif v > 0:
-                        existente.salario = v
-                    if _parse_float(row.get('valor_va', 0)) > 0:
-                        existente.valor_va = _parse_float(row['valor_va'])
-                    if _parse_float(row.get('valor_vt', 0)) > 0:
-                        existente.valor_vt = _parse_float(row['valor_vt'])
-                    sp.commit()
-                    atualizados += 1
+
+                # Dupla verificação: rejeita se CPF já existe (não atualiza)
+                if Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first():
+                    erros.append({'linha': row.get('linha'), 'nome': row.get('nome'),
+                                  'motivo': f'CPF {cpf} já cadastrado — ignorado na importação'})
+                    continue
+
+                ultimo = (Funcionario.query
+                          .filter(Funcionario.codigo.like('VV%'), Funcionario.admin_id == admin_id)
+                          .order_by(Funcionario.codigo.desc()).first())
+                try:
+                    proximo = int(ultimo.codigo[2:]) + 1 if ultimo else 1
+                except Exception:
+                    proximo = 1
+                codigo = f"VV{proximo:03d}"
+
+                v = _parse_float(row.get('valor', 0))
+                kwargs = dict(
+                    nome=row['nome'], cpf=cpf, rg=row.get('rg'),
+                    telefone=row.get('telefone'), endereco=row.get('endereco'),
+                    chave_pix=row.get('chave_pix'),
+                    data_nascimento=_parse_data(row.get('data_nascimento')),
+                    ativo=row.get('ativo', True), admin_id=admin_id, codigo=codigo,
+                    tipo_remuneracao=row['tipo_remuneracao'], data_admissao=data_adm,
+                    valor_va=_parse_float(row.get('valor_va', 0)),
+                    valor_vt=_parse_float(row.get('valor_vt', 0)),
+                )
+                if row['tipo_remuneracao'] == 'diaria':
+                    kwargs['valor_diaria'] = v
+                    kwargs['salario'] = 0
                 else:
-                    ultimo = (Funcionario.query
-                              .filter(Funcionario.codigo.like('VV%'), Funcionario.admin_id == admin_id)
-                              .order_by(Funcionario.codigo.desc()).first())
-                    try:
-                        proximo = int(ultimo.codigo[2:]) + 1 if ultimo else 1
-                    except Exception:
-                        proximo = 1
-                    codigo = f"VV{proximo:03d}"
-                    v = _parse_float(row.get('valor', 0))
-                    kwargs = dict(
-                        nome=row['nome'], cpf=cpf, rg=row.get('rg'),
-                        telefone=row.get('telefone'), endereco=row.get('endereco'),
-                        chave_pix=row.get('chave_pix'),
-                        data_nascimento=_parse_data(row.get('data_nascimento')),
-                        ativo=row.get('ativo', True), admin_id=admin_id, codigo=codigo,
-                        tipo_remuneracao=row['tipo_remuneracao'], data_admissao=data_adm,
-                        valor_va=_parse_float(row.get('valor_va', 0)),
-                        valor_vt=_parse_float(row.get('valor_vt', 0)),
-                    )
-                    if row['tipo_remuneracao'] == 'diaria':
-                        kwargs['valor_diaria'] = v
-                        kwargs['salario'] = 0
-                    else:
-                        kwargs['salario'] = v
-                        kwargs['valor_diaria'] = 0
-                    db.session.add(Funcionario(**kwargs))
-                    sp.commit()
-                    criados += 1
+                    kwargs['salario'] = v
+                    kwargs['valor_diaria'] = 0
+
+                db.session.add(Funcionario(**kwargs))
+                sp.commit()
+                criados += 1
+
             except Exception as e:
                 sp.rollback()
                 erros.append({'linha': row.get('linha'), 'nome': row.get('nome'), 'motivo': str(e)})
@@ -292,7 +282,7 @@ class ImportacaoFuncionarios:
             db.session.rollback()
             erros.append({'linha': 'COMMIT', 'motivo': str(e)})
 
-        return {'criados': criados, 'atualizados': atualizados, 'erros': erros}
+        return {'criados': criados, 'atualizados': 0, 'erros': erros}
 
 
 # ── MÓDULO 2: Diárias ──────────────────────────────────────────────────────────
