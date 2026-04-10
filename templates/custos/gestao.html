@@ -1,5 +1,5 @@
 {% extends "base_completo.html" %}
-{% block title %}Gestão de Custos V2{% endblock %}
+{% block title %}Contas a Pagar{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -8,8 +8,7 @@
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div>
       <h2 class="fw-bold mb-0">
-        <i class="fas fa-coins me-2 text-warning"></i>Gestão de Custos
-        <span class="badge bg-primary ms-2" style="font-size:.6rem">V2</span>
+        <i class="fas fa-file-invoice-dollar me-2 text-primary"></i>Contas a Pagar
       </h2>
       <small class="text-muted">Fluxo de aprovação: Pendente → Solicitado → Aprovado → Pago</small>
     </div>
@@ -20,7 +19,7 @@
       </a>
       {% else %}
       <form method="post" action="{{ url_for('gestao_custos.migrar_contas_pagar') }}"
-            onsubmit="return confirm('Migrar contas a pagar pendentes para Gestão de Custos? Esta ação é segura e pode ser repetida.')">
+            onsubmit="return confirm('Migrar contas a pagar pendentes para este módulo? Esta ação é segura e pode ser repetida.')">
         <button type="submit" class="btn btn-outline-warning btn-sm">
           <i class="fas fa-exchange-alt me-1"></i> Migrar Contas Antigas
         </button>
@@ -646,7 +645,7 @@ function confirmarExclusao(form, entidade, status, valor) {
               `Entidade: ${entidade}\n` +
               `Valor: ${valorFmt}\n\n` +
               `Esta ação irá excluir:\n` +
-              `  • O lançamento na Gestão de Custos\n` +
+              `  • O lançamento em Contas a Pagar\n` +
               `  • O(s) registro(s) no módulo de origem (RDO, Transporte, etc.)\n` +
               `  • O(s) registro(s) no Fluxo de Caixa\n\n` +
               `Deseja continuar?`;

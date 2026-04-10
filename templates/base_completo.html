@@ -777,11 +777,16 @@
                                     <i class="fas fa-water me-1"></i> Fluxo de Caixa
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('gestao_custos.index') }}">
-                                    <i class="fas fa-coins me-1"></i> Gestão de Custos
+                                    <i class="fas fa-file-invoice-dollar me-1"></i> Contas a Pagar
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('financeiro.listar_contas_receber') }}">
                                     <i class="fas fa-hand-holding-usd me-1"></i> Contas a Receber
                                 </a></li>
+                                {% if is_v2_active() %}
+                                <li><a class="dropdown-item" href="{{ url_for('reembolso.index') }}">
+                                    <i class="fas fa-undo me-1"></i> Reembolsos
+                                </a></li>
+                                {% endif %}
                                 <li><a class="dropdown-item" href="{{ url_for('financeiro.listar_bancos') }}">
                                     <i class="fas fa-university me-1"></i> Bancos
                                 </a></li>
@@ -838,20 +843,6 @@
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('frota.dashboard') }}">
                                     <i class="fas fa-chart-bar me-1"></i> Dashboard de Frota
-                                </a></li>
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="gestaoV2Dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-coins me-1"></i> Gestão Financeira
-                                <span class="badge bg-primary ms-1" style="font-size:.55rem">V2</span>
-                            </a>
-                            <ul class="dropdown-menu" aria-labelledby="gestaoV2Dropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('gestao_custos.index') }}">
-                                    <i class="fas fa-coins me-1"></i> Gestão de Custos
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('reembolso.index') }}">
-                                    <i class="fas fa-hand-holding-usd me-1"></i> Reembolsos
                                 </a></li>
                             </ul>
                         </li>
