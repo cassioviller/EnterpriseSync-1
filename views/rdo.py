@@ -1101,6 +1101,8 @@ def finalizar_rdo(id):
         rdo.status = 'Finalizado'
 
         # Calcular produtividade por funcionário vinculado (V2) — mesma transação
+        # Fórmula: produtividade_real = quantidade / horas_totais_equipe (taxa da equipe, igual para todos)
+        # A diferença entre funcionários emerge da média ponderada por horas ao longo dos dias.
         subs_com_meta = RDOServicoSubatividade.query.filter(
             RDOServicoSubatividade.rdo_id == id,
             RDOServicoSubatividade.quantidade_produzida.isnot(None),
@@ -1109,10 +1111,14 @@ def finalizar_rdo(id):
         ).all()
         for sub in subs_com_meta:
             maos_obra = RDOMaoObra.query.filter_by(rdo_id=id, subatividade_id=sub.id).all()
+            horas_totais_equipe = sum(mo.horas_trabalhadas or 0.0 for mo in maos_obra)
+            if horas_totais_equipe <= 0:
+                continue
+            taxa_equipe = sub.quantidade_produzida / horas_totais_equipe
             for mo in maos_obra:
                 if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
-                    mo.produtividade_real = sub.quantidade_produzida / mo.horas_trabalhadas
-                    mo.indice_produtividade = mo.produtividade_real / sub.meta_produtividade_snapshot
+                    mo.produtividade_real = taxa_equipe
+                    mo.indice_produtividade = taxa_equipe / sub.meta_produtividade_snapshot
                 else:
                     mo.produtividade_real = None
                     mo.indice_produtividade = None

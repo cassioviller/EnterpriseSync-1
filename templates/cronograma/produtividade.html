@@ -173,6 +173,9 @@
             <h6 class="fw-semibold mb-3">
               <i class="fas fa-chart-bar me-1 text-primary"></i>
               Produtividade Real vs Meta por Funcionário
+              <span id="mediaEmpresaLabel" class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-2 d-none" style="font-size:.65rem;font-weight:500;vertical-align:middle">
+                Média empresa: <strong id="mediaEmpresaValor"></strong>
+              </span>
             </h6>
             <div style="position:relative;height:260px">
               <canvas id="graficoBarras"></canvas>
@@ -210,10 +213,10 @@
                 <th class="text-muted small">Funcionário</th>
                 <th class="text-muted small">Subatividade</th>
                 <th class="text-muted small text-end">Horas</th>
-                <th class="text-muted small text-end">Qtd Produzida</th>
-                <th class="text-muted small text-end">Prod. Média</th>
-                <th class="text-muted small text-end">Índice Médio</th>
-                <th class="text-muted small text-center">Performance</th>
+                <th class="text-muted small text-end">Prod. Pond.</th>
+                <th class="text-muted small text-end">Média Empresa</th>
+                <th class="text-muted small text-end">vs Meta</th>
+                <th class="text-muted small text-center">vs Empresa</th>
               </tr>
             </thead>
             <tbody id="tabelaRankingBody">
@@ -313,24 +316,31 @@ function renderCards(resumo) {
 
 function renderTabela(ranking) {
     const tbody = document.getElementById('tabelaRankingBody');
-    const badgeClass = { success: 'bg-success', warning: 'bg-warning text-dark', danger: 'bg-danger' };
-    const badgeLabel = { success: 'Acima da Meta', warning: 'Próximo da Meta', danger: 'Abaixo da Meta' };
-    tbody.innerHTML = ranking.map((r, i) => `
+    const badgeClass = { success: 'bg-success', warning: 'bg-warning text-dark', danger: 'bg-danger', secondary: 'bg-secondary' };
+    const badgeVsEmpresaLabel = { success: 'Acima da média', warning: 'Próximo da média', danger: 'Abaixo da média', secondary: 'Sem ref.' };
+    // Capture unidade for chart label
+    if (ranking.length > 0 && ranking[0].unidade) window._prodUnidade = ranking[0].unidade;
+    tbody.innerHTML = ranking.map((r, i) => {
+        const unidade = r.unidade || '';
+        const prodStr = r.prod_media.toFixed(3) + (unidade ? ' ' + unidade + '/h' : '');
+        const empStr = r.media_empresa !== null ? r.media_empresa.toFixed(3) + (unidade ? ' ' + unidade + '/h' : '') : '—';
+        const vsMeta = (r.indice_medio * 100).toFixed(1) + '%';
+        const vsEmpBadge = badgeClass[r.badge_empresa] || 'bg-secondary';
+        const vsEmpLabel = badgeVsEmpresaLabel[r.badge_empresa] || '—';
+        return `
         <tr>
             <td class="text-muted small">${i + 1}</td>
             <td class="fw-semibold">${r.funcionario}</td>
             <td class="text-muted small">${r.subatividade}</td>
             <td class="text-end">${r.total_horas.toFixed(1)}h</td>
-            <td class="text-end">${r.total_qtd.toFixed(2)} ${r.unidade || ''}</td>
-            <td class="text-end">${r.prod_media.toFixed(3)} ${r.unidade || ''}/h</td>
-            <td class="text-end fw-semibold">${(r.indice_medio * 100).toFixed(1)}%</td>
+            <td class="text-end fw-semibold">${prodStr}</td>
+            <td class="text-end text-info fw-semibold">${empStr}</td>
+            <td class="text-end fw-semibold ${r.badge === 'success' ? 'text-success' : r.badge === 'warning' ? 'text-warning' : 'text-danger'}">${vsMeta}</td>
             <td class="text-center">
-                <span class="badge ${badgeClass[r.badge] || 'bg-secondary'}" style="font-size:.7rem">
-                    ${badgeLabel[r.badge] || '—'}
-                </span>
+                <span class="badge ${vsEmpBadge}" style="font-size:.7rem">${vsEmpLabel}</span>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function renderBarras(barra) {
@@ -358,6 +368,25 @@ function renderBarras(barra) {
             pointRadius: 0,
             fill: false,
         });
+    }
+    if (barra.media_empresa !== null && barra.media_empresa !== undefined) {
+        datasets.push({
+            type: 'line',
+            label: 'Média Empresa',
+            data: Array(barra.labels.length).fill(barra.media_empresa),
+            borderColor: 'rgba(13,110,253,.7)',
+            borderDash: [8, 4],
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+        });
+        const lbl = document.getElementById('mediaEmpresaLabel');
+        const val = document.getElementById('mediaEmpresaValor');
+        const unidade = (window._prodUnidade || '');
+        val.textContent = barra.media_empresa.toFixed(3) + (unidade ? ' ' + unidade + '/h' : '');
+        lbl.classList.remove('d-none');
+    } else {
+        document.getElementById('mediaEmpresaLabel').classList.add('d-none');
     }
     graficoBarras = new Chart(ctx, {
         type: 'bar',

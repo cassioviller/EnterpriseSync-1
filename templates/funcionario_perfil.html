@@ -989,6 +989,105 @@
     </div>
 </div>
 
+{% if is_v2_active() %}
+<!-- Produtividade V2 -->
+<div class="row mb-4" id="secaoProdutividade">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm" style="border-radius:12px">
+            <div class="card-header d-flex align-items-center justify-content-between py-3"
+                 style="background:linear-gradient(135deg,#0d6efd 0%,#6610f2 100%);border-radius:12px 12px 0 0">
+                <h5 class="card-title mb-0 text-white fw-bold">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Produtividade por Subatividade
+                    <span class="badge bg-light text-primary ms-2" style="font-size:.65rem;vertical-align:middle">V2</span>
+                </h5>
+                <a href="{{ url_for('cronograma.produtividade') }}?funcionario_id={{ funcionario.id }}"
+                   class="btn btn-light btn-sm">
+                    <i class="fas fa-external-link-alt me-1"></i>Ver Dashboard
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div id="produtividadeLoading" class="text-center py-4 text-muted">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Carregando dados de produtividade…
+                </div>
+                <div id="produtividadeVazio" class="text-center py-4 text-muted d-none">
+                    <i class="fas fa-chart-bar fa-2x opacity-25 mb-2"></i><br>
+                    <small>Nenhum dado de produtividade disponível.<br>
+                    Os dados aparecem após finalizar RDOs com subatividades do catálogo e quantidade produzida preenchida.</small>
+                </div>
+                <div id="produtividadeConteudo" class="d-none">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-muted small ps-3">Subatividade</th>
+                                    <th class="text-muted small text-end">Horas</th>
+                                    <th class="text-muted small text-end">Prod. Pond. (func.)</th>
+                                    <th class="text-muted small text-end">Média Empresa</th>
+                                    <th class="text-muted small text-end">vs Meta</th>
+                                    <th class="text-muted small text-center pe-3">vs Empresa</th>
+                                </tr>
+                            </thead>
+                            <tbody id="produtividadeBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="border-top p-3 bg-light d-flex gap-4 flex-wrap" style="border-radius:0 0 12px 12px;font-size:.8rem">
+                        <span class="text-muted"><span class="badge bg-success me-1">Acima</span> ≥ 85% da média empresa</span>
+                        <span class="text-muted"><span class="badge bg-warning text-dark me-1">Próximo</span> 70–85%</span>
+                        <span class="text-muted"><span class="badge bg-danger me-1">Abaixo</span> &lt; 70%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const funcId = {{ funcionario.id }};
+    const apiUrl = {{ url_for('cronograma.api_produtividade') | tojson }};
+
+    async function carregarProdutividade() {
+        try {
+            const resp = await fetch(apiUrl + '?funcionario_id=' + funcId);
+            const data = await resp.json();
+            document.getElementById('produtividadeLoading').classList.add('d-none');
+            if (!data.ranking || data.ranking.length === 0) {
+                document.getElementById('produtividadeVazio').classList.remove('d-none');
+                return;
+            }
+            const tbody = document.getElementById('produtividadeBody');
+            const badgeClass = { success: 'bg-success', warning: 'bg-warning text-dark', danger: 'bg-danger', secondary: 'bg-secondary' };
+            const badgeLabel = { success: 'Acima da média', warning: 'Próximo da média', danger: 'Abaixo da média', secondary: 'Sem ref.' };
+            tbody.innerHTML = data.ranking.map(r => {
+                const un = r.unidade || '';
+                const prodStr = r.prod_media.toFixed(3) + (un ? ' ' + un + '/h' : '');
+                const empStr = r.media_empresa !== null && r.media_empresa !== undefined
+                    ? r.media_empresa.toFixed(3) + (un ? ' ' + un + '/h' : '') : '—';
+                const vsMetaColor = r.badge === 'success' ? 'text-success' : r.badge === 'warning' ? 'text-warning' : 'text-danger';
+                const vsMeta = (r.indice_medio * 100).toFixed(1) + '%';
+                const vsEmpBadge = badgeClass[r.badge_empresa] || 'bg-secondary';
+                const vsEmpLabel = badgeLabel[r.badge_empresa] || '—';
+                return `<tr>
+                    <td class="fw-semibold ps-3">${r.subatividade}</td>
+                    <td class="text-end">${r.total_horas.toFixed(1)}h</td>
+                    <td class="text-end fw-semibold">${prodStr}</td>
+                    <td class="text-end text-info">${empStr}</td>
+                    <td class="text-end fw-semibold ${vsMetaColor}">${vsMeta}</td>
+                    <td class="text-center pe-3"><span class="badge ${vsEmpBadge}" style="font-size:.7rem">${vsEmpLabel}</span></td>
+                </tr>`;
+            }).join('');
+            document.getElementById('produtividadeConteudo').classList.remove('d-none');
+        } catch (e) {
+            document.getElementById('produtividadeLoading').classList.add('d-none');
+            document.getElementById('produtividadeVazio').classList.remove('d-none');
+        }
+    }
+
+    carregarProdutividade();
+})();
+</script>
+{% endif %}
+
 <!-- Modal Registro de Ponto -->
 <div class="modal fade" id="pontoModal" tabindex="-1">
     <div class="modal-dialog modal-lg">

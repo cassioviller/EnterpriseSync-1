@@ -1633,96 +1633,154 @@ def api_produtividade():
 
     rows = q.order_by(RDO.data_relatorio).all()
 
-    # ── Agregação por (funcionario, subatividade) ──────────────────────────
+    # ── Agregação por (funcionario, subatividade_mestre) ──────────────────
     from collections import defaultdict
 
+    # Por funcionário × subatividade: média ponderada por horas individuais
+    # prod_ponderada = Σ(produtividade_real × horas_pessoa) / Σ(horas_pessoa)
     agg = defaultdict(lambda: {
         'func_nome': '',
         'sub_nome': '',
         'sub_mestre_id': None,
         'meta': None,
         'unidade': '',
-        'total_horas': 0.0,
-        'total_qtd': 0.0,
-        'soma_prod': 0.0,
-        'soma_indice': 0.0,
+        'soma_prod_pond': 0.0,   # Σ(prod_real × horas_pessoa)
+        'soma_indice_pond': 0.0, # Σ(indice × horas_pessoa)
+        'total_horas': 0.0,      # Σ(horas_pessoa)
         'count': 0,
     })
 
+    # Por (rdo, sub_raw_id): para calcular média_empresa sem dupla-contagem de quantidade
+    rdo_sub_totais: dict = {}
+
     for mo, sub, rdo, func in rows:
         key = (func.id, sub.subatividade_mestre_id)
+        h = mo.horas_trabalhadas or 0.0
+        p = mo.produtividade_real or 0.0
+        idx = mo.indice_produtividade or 0.0
+
         entry = agg[key]
         entry['func_nome'] = func.nome
         entry['sub_nome'] = sub.nome_subatividade
         entry['sub_mestre_id'] = sub.subatividade_mestre_id
         entry['meta'] = sub.meta_produtividade_snapshot
         entry['unidade'] = sub.unidade_medida_snapshot or ''
-        entry['total_horas'] += mo.horas_trabalhadas or 0.0
-        entry['total_qtd'] += sub.quantidade_produzida or 0.0
-        entry['soma_prod'] += mo.produtividade_real or 0.0
-        entry['soma_indice'] += mo.indice_produtividade or 0.0
+        entry['soma_prod_pond'] += p * h
+        entry['soma_indice_pond'] += idx * h
+        entry['total_horas'] += h
         entry['count'] += 1
 
+        # Acumular horas por (rdo_id, sub_raw_id) para média_empresa
+        day_key = (rdo.id, sub.id)
+        if day_key not in rdo_sub_totais:
+            rdo_sub_totais[day_key] = {
+                'sub_mestre_id': sub.subatividade_mestre_id,
+                'quantidade': sub.quantidade_produzida or 0.0,
+                'horas_totais': 0.0,
+            }
+        rdo_sub_totais[day_key]['horas_totais'] += h
+
+    # ── Média da empresa por subatividade_mestre ───────────────────────────
+    # media_empresa[sub_mestre_id] = Σ(quantidade) / Σ(horas_totais_equipe_por_dia)
+    empresa_by_sub = defaultdict(lambda: {'total_qtd': 0.0, 'total_horas': 0.0})
+    for d in rdo_sub_totais.values():
+        k = d['sub_mestre_id']
+        if k is None:
+            continue
+        empresa_by_sub[k]['total_qtd'] += d['quantidade']
+        empresa_by_sub[k]['total_horas'] += d['horas_totais']
+
+    media_empresa: dict = {
+        str(sid): round(e['total_qtd'] / e['total_horas'], 3)
+        for sid, e in empresa_by_sub.items()
+        if e['total_horas'] > 0
+    }
+
+    # ── Montar ranking ─────────────────────────────────────────────────────
     ranking = []
     for (fid, sid), e in agg.items():
-        n = e['count']
-        prod_media = round(e['soma_prod'] / n, 3) if n else 0
-        indice_medio = round(e['soma_indice'] / n, 3) if n else 0
-        if indice_medio >= 1.0:
+        h = e['total_horas']
+        prod_pond = round(e['soma_prod_pond'] / h, 3) if h > 0 else 0.0
+        indice_pond = round(e['soma_indice_pond'] / h, 3) if h > 0 else 0.0
+        if indice_pond >= 1.0:
             badge = 'success'
-        elif indice_medio >= 0.8:
+        elif indice_pond >= 0.8:
             badge = 'warning'
         else:
             badge = 'danger'
+        sub_mestre_str = str(sid) if sid else None
+        media_emp = media_empresa.get(sub_mestre_str)
+        # badge_vs_empresa: compara prod ponderada do funcionário vs média empresa
+        if media_emp and media_emp > 0:
+            ratio = prod_pond / media_emp
+            if ratio >= 1.0:
+                badge_empresa = 'success'
+            elif ratio >= 0.85:
+                badge_empresa = 'warning'
+            else:
+                badge_empresa = 'danger'
+        else:
+            ratio = None
+            badge_empresa = 'secondary'
         ranking.append({
             'funcionario_id': fid,
             'funcionario': e['func_nome'],
             'subatividade': e['sub_nome'],
-            'sub_mestre_id': e['sub_mestre_id'],
+            'sub_mestre_id': sid,
             'meta': e['meta'],
             'unidade': e['unidade'],
-            'total_horas': round(e['total_horas'], 1),
-            'total_qtd': round(e['total_qtd'], 2),
-            'prod_media': prod_media,
-            'indice_medio': indice_medio,
+            'total_horas': round(h, 1),
+            'prod_media': prod_pond,
+            'indice_medio': indice_pond,
+            'media_empresa': media_emp,
+            'ratio_empresa': round(ratio, 3) if ratio is not None else None,
             'badge': badge,
-            'registros': n,
+            'badge_empresa': badge_empresa,
+            'registros': e['count'],
         })
     ranking.sort(key=lambda x: x['indice_medio'], reverse=True)
 
-    # ── Gráfico de barras: prod real vs meta por funcionário ───────────────
+    # ── Gráfico de barras ─────────────────────────────────────────────────
     barra_labels = [r['funcionario'] for r in ranking]
     barra_prod = [r['prod_media'] for r in ranking]
-    # Linha de meta só faz sentido quando há uma única subatividade selecionada (metas iguais)
     metas_distintas = {r['meta'] for r in ranking if r['meta'] is not None}
     meta_ref = metas_distintas.pop() if len(metas_distintas) == 1 else None
+    # Média empresa no gráfico de barras: só faz sentido quando há uma única subatividade
+    medias_empresa_distintas = {r['media_empresa'] for r in ranking if r['media_empresa'] is not None}
+    media_empresa_ref = medias_empresa_distintas.pop() if len(medias_empresa_distintas) == 1 else None
 
-    # ── Gráfico de linha: evolução diária da prod média ───────────────────
-    dia_agg = defaultdict(lambda: {'soma': 0.0, 'count': 0})
+    # ── Gráfico de linha: evolução diária da prod média (ponderada) ────────
+    # Por dia: Σ(prod_real × horas) / Σ(horas) — para a seleção de filtros
+    dia_agg = defaultdict(lambda: {'soma_pond': 0.0, 'soma_horas': 0.0})
     for mo, sub, rdo, func in rows:
         d = str(rdo.data_relatorio)
-        if mo.produtividade_real is not None:
-            dia_agg[d]['soma'] += mo.produtividade_real
-            dia_agg[d]['count'] += 1
+        h = mo.horas_trabalhadas or 0.0
+        if mo.produtividade_real is not None and h > 0:
+            dia_agg[d]['soma_pond'] += mo.produtividade_real * h
+            dia_agg[d]['soma_horas'] += h
 
     linha_labels = sorted(dia_agg.keys())
     linha_valores = [
-        round(dia_agg[d]['soma'] / dia_agg[d]['count'], 3) if dia_agg[d]['count'] else 0
+        round(dia_agg[d]['soma_pond'] / dia_agg[d]['soma_horas'], 3)
+        if dia_agg[d]['soma_horas'] > 0 else 0
         for d in linha_labels
     ]
 
     # ── Cards de resumo ───────────────────────────────────────────────────
     melhor = ranking[0] if ranking else None
     pior = ranking[-1] if ranking else None
-    media_equipe = round(sum(r['indice_medio'] for r in ranking) / len(ranking), 3) if ranking else None
+    indices = [r['indice_medio'] for r in ranking if r['indice_medio'] > 0]
+    media_equipe = round(sum(indices) / len(indices), 3) if indices else None
 
     return jsonify({
         'status': 'ok',
         'ranking': ranking,
+        'media_empresa': media_empresa,
         'barra': {
             'labels': barra_labels,
             'prod': barra_prod,
             'meta': meta_ref,
+            'media_empresa': media_empresa_ref,
         },
         'linha': {
             'labels': linha_labels,
