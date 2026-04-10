@@ -67,10 +67,10 @@
                           enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Arquivo (.xlsx / .xls)</label>
-                            <input type="file" name="arquivo" accept=".xlsx,.xls"
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">Arquivo (.xlsx)</label>
+                            <input type="file" name="arquivo" accept=".xlsx"
                                    class="form-control" required>
-                            <div class="form-text">Formatos aceitos: <code>.xlsx</code> e <code>.xls</code></div>
+                            <div class="form-text">Formato aceito: <code>.xlsx</code> (Excel 2007 ou superior)</div>
                         </div>
                         <button type="submit" class="btn btn-primary px-4">
                             <i data-feather="upload-cloud" style="width:15px;height:15px;"></i>

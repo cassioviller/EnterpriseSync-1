@@ -42,8 +42,8 @@ def upload_funcionarios():
         return redirect(url_for('importacao.index'))
 
     ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
-    if ext not in ('xlsx', 'xls'):
-        flash('Formato inválido. Use .xlsx ou .xls.', 'danger')
+    if ext != 'xlsx':
+        flash('Formato inválido. Use o arquivo .xlsx (Excel 2007 ou superior).', 'danger')
         return redirect(url_for('importacao.index'))
 
     admin_id = get_admin_id_robusta()

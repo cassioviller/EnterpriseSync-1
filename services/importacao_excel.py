@@ -35,7 +35,21 @@ def _parse_data(v):
     return None
 
 def _parse_float(v, default=0.0):
-    s = _normalizar_texto(v).replace('R$', '').replace('.', '').replace(',', '.').strip()
+    """
+    Converte valor numérico para float suportando formatos BR e EN.
+    BR: 1.800,50  → 1800.50  (ponto = milhar, vírgula = decimal)
+    EN: 1800.50   → 1800.50  (ponto = decimal, sem milhar)
+    Simples: 180  → 180.0
+    """
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = _normalizar_texto(v).replace('R$', '').replace(' ', '').strip()
+    if not s:
+        return default
+    if ',' in s:
+        # Formato BR: remover ponto (milhar) e trocar vírgula por ponto (decimal)
+        s = s.replace('.', '').replace(',', '.')
+    # Formato EN ou inteiro: o ponto já é decimal, usar diretamente
     try:
         return float(s)
     except (ValueError, TypeError):
