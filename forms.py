@@ -28,6 +28,9 @@ class FuncionarioForm(FlaskForm):
     horario_trabalho_id = SelectField('Horário de Trabalho', coerce=int, validators=[Optional()])
     foto = FileField('Foto', validators=[Optional(), FileAllowed(['jpg', 'jpeg', 'png'], 'Apenas arquivos JPG, JPEG e PNG são permitidos!')])
     ativo = BooleanField('Ativo', default=True)
+    chave_pix = StringField('Chave PIX', validators=[Optional(), Length(max=150)])
+    valor_va = FloatField('Vale Alimentação/dia (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
+    valor_vt = FloatField('Vale Transporte/dia (R$)', validators=[Optional(), NumberRange(min=0)], default=0.0)
 
 class ObraForm(FlaskForm):
     nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])

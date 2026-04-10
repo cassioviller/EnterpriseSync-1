@@ -376,6 +376,65 @@ def calcular_horas_folha(data: dict, admin_id: int):
                 logger.info(f"[OK] Custo diária lançado na Gestão V2: R$ {valor_diaria:.2f} na obra {registro.obra_id} — {funcionario.nome}")
             else:
                 logger.warning(f"[WARN] registrar_custo_automatico retornou None para diarista {funcionario.nome}")
+
+            # ── AUTO-LANÇAMENTO VA (Vale Alimentação) ─────────────────────
+            valor_va = float(getattr(funcionario, 'valor_va', 0) or 0)
+            if valor_va > 0:
+                ja_existe_va = GestaoCustoFilho.query.filter_by(
+                    origem_tabela='registro_ponto_va',
+                    origem_id=registro.id,
+                    admin_id=admin_id
+                ).first()
+                if not ja_existe_va:
+                    filho_va = registrar_custo_automatico(
+                        admin_id=admin_id,
+                        tipo_categoria='ALIMENTACAO',
+                        entidade_nome=funcionario.nome,
+                        entidade_id=funcionario.id,
+                        data=registro.data,
+                        descricao=f"Vale Alimentação - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}",
+                        valor=valor_va,
+                        obra_id=registro.obra_id,
+                        origem_tabela='registro_ponto_va',
+                        origem_id=registro.id,
+                    )
+                    if filho_va:
+                        db.session.commit()
+                        logger.info(f"[OK] VA lançado: R$ {valor_va:.2f} — {funcionario.nome}")
+                    else:
+                        logger.warning(f"[WARN] VA não lançado para {funcionario.nome}")
+                else:
+                    logger.info(f"[INFO] VA {funcionario.nome} em {registro.data} já existe — skip")
+
+            # ── AUTO-LANÇAMENTO VT (Vale Transporte) ──────────────────────
+            valor_vt = float(getattr(funcionario, 'valor_vt', 0) or 0)
+            if valor_vt > 0:
+                ja_existe_vt = GestaoCustoFilho.query.filter_by(
+                    origem_tabela='registro_ponto_vt',
+                    origem_id=registro.id,
+                    admin_id=admin_id
+                ).first()
+                if not ja_existe_vt:
+                    filho_vt = registrar_custo_automatico(
+                        admin_id=admin_id,
+                        tipo_categoria='TRANSPORTE',
+                        entidade_nome=funcionario.nome,
+                        entidade_id=funcionario.id,
+                        data=registro.data,
+                        descricao=f"Vale Transporte - {funcionario.nome} - {registro.data.strftime('%d/%m/%Y')}",
+                        valor=valor_vt,
+                        obra_id=registro.obra_id,
+                        origem_tabela='registro_ponto_vt',
+                        origem_id=registro.id,
+                    )
+                    if filho_vt:
+                        db.session.commit()
+                        logger.info(f"[OK] VT lançado: R$ {valor_vt:.2f} — {funcionario.nome}")
+                    else:
+                        logger.warning(f"[WARN] VT não lançado para {funcionario.nome}")
+                else:
+                    logger.info(f"[INFO] VT {funcionario.nome} em {registro.data} já existe — skip")
+
             return
         # ── FIM V2: DIARISTA ──────────────────────────────────────────────
 

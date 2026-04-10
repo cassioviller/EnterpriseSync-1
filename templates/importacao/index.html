@@ -1,0 +1,115 @@
+{% extends "base_completo.html" %}
+{% block title %}Importar Funcionários — SIGE{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+
+    <div class="d-flex align-items-center mb-4">
+        <div class="me-3" style="width:42px;height:42px;background:linear-gradient(135deg,#1e3a5f,#2c6fad);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+            <i data-feather="upload-cloud" style="color:#fff;width:22px;height:22px;"></i>
+        </div>
+        <div>
+            <h4 class="mb-0 fw-bold text-dark">Importar Funcionários</h4>
+            <small class="text-muted">Carregue dados em massa via planilha Excel (.xlsx)</small>
+        </div>
+        <a href="{{ url_for('funcionarios') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+            <i data-feather="arrow-left" style="width:14px;height:14px;"></i> Funcionários
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="row g-4">
+
+        <!-- Passo 1: baixar template -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+                <div class="card-body p-4 text-center">
+                    <div class="mx-auto mb-3 d-flex align-items-center justify-content-center"
+                         style="width:56px;height:56px;background:#e8f5e9;border-radius:50%;">
+                        <i data-feather="download" style="width:26px;height:26px;color:#198754;"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Passo 1</h6>
+                    <p class="text-muted small mb-3">Baixe o template e preencha com os dados dos funcionários</p>
+                    <a href="{{ url_for('importacao.baixar_template') }}"
+                       class="btn btn-success w-100">
+                        <i data-feather="download" style="width:14px;height:14px;"></i>
+                        Baixar planilha modelo
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Passo 2: enviar arquivo -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3 d-flex align-items-center justify-content-center"
+                             style="width:44px;height:44px;background:#e3f0ff;border-radius:50%;flex-shrink:0;">
+                            <i data-feather="upload" style="width:22px;height:22px;color:#2c6fad;"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">Passo 2 — Enviar planilha</h6>
+                            <small class="text-muted">Selecione o arquivo preenchido e clique em Importar</small>
+                        </div>
+                    </div>
+
+                    <form action="{{ url_for('importacao.upload_funcionarios') }}" method="POST"
+                          enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" style="font-size:.85rem;">Arquivo (.xlsx / .xls)</label>
+                            <input type="file" name="arquivo" accept=".xlsx,.xls"
+                                   class="form-control" required>
+                            <div class="form-text">Formatos aceitos: <code>.xlsx</code> e <code>.xls</code></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i data-feather="upload-cloud" style="width:15px;height:15px;"></i>
+                            Importar funcionários
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instruções / dicas -->
+    <div class="card border-0 shadow-sm mt-4" style="border-radius:14px;">
+        <div class="card-body p-4">
+            <h6 class="fw-bold mb-3 text-dark">
+                <i data-feather="info" style="width:16px;height:16px;color:#2c6fad;"></i>
+                Regras da planilha
+            </h6>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <ul class="mb-0 text-muted" style="font-size:.86rem;line-height:2;">
+                        <li>Não altere os cabeçalhos da planilha</li>
+                        <li>Campos obrigatórios: <strong>nome</strong> e <strong>cpf</strong></li>
+                        <li>CPF pode ser <code>123.456.789-00</code> ou <code>12345678900</code></li>
+                        <li>Datas no formato <code>DD/MM/AAAA</code></li>
+                        <li>Status: <code>ATIVO</code> ou <code>INATIVO</code></li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <ul class="mb-0 text-muted" style="font-size:.86rem;line-height:2;">
+                        <li>Tipo de remuneração: <code>salario</code> ou <code>diaria</code></li>
+                        <li><strong>Vale Alimentação</strong> (VA): valor diário em R$ — <code>0</code> se não tem</li>
+                        <li><strong>Vale Transporte</strong> (VT): valor diário em R$ — <code>0</code> se não tem</li>
+                        <li>CPFs já cadastrados são <strong>atualizados</strong> automaticamente</li>
+                        <li>Planilha do tipo "Registro de Colaboradores" também é aceita</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

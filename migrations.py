@@ -3800,6 +3800,7 @@ def executar_migracoes():
             (98, "SubatividadeMestre tipo+servico_id nullable, CronogramaTemplateItem parent_item_id - catálogo hierárquico", migration_98_catalogo_hierarquico),
             (99, "RDOServicoSubatividade servico_id nullable para suportar subatividades sem serviço vinculado", migration_99_rdo_servico_sub_nullable),
             (100, "TarefaCronograma - subatividade_mestre_id FK para rastreamento de catálogo", migration_100_tarefa_cronograma_subatividade_mestre_id),
+            (101, "Funcionario - chave_pix, valor_va e valor_vt para PIX e benefícios diários", migration_101_funcionario_pix_va_vt),
         ]
         
         # Executar cada migração com rastreamento
@@ -8038,6 +8039,53 @@ def migration_100_tarefa_cronograma_subatividade_mestre_id():
 
     except Exception as e:
         logger.error(f"Erro na migracao 100: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_101_funcionario_pix_va_vt():
+    """
+    Migração 101: funcionario — adicionar chave_pix, valor_va e valor_vt
+    para suporte a pagamentos via PIX e benefícios diários (VA e VT).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'funcionario' AND column_name = 'chave_pix'
+        """)
+        if not cursor.fetchone():
+            logger.info("  Adicionando funcionario.chave_pix, valor_va, valor_vt...")
+            cursor.execute("""
+                ALTER TABLE funcionario
+                  ADD COLUMN IF NOT EXISTS chave_pix VARCHAR(150),
+                  ADD COLUMN IF NOT EXISTS valor_va  FLOAT DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS valor_vt  FLOAT DEFAULT 0
+            """)
+            logger.info("  Colunas chave_pix, valor_va, valor_vt adicionadas com sucesso.")
+        else:
+            logger.info("  funcionario.chave_pix já existe — verificando valor_va/valor_vt...")
+            cursor.execute("""
+                ALTER TABLE funcionario
+                  ADD COLUMN IF NOT EXISTS valor_va FLOAT DEFAULT 0,
+                  ADD COLUMN IF NOT EXISTS valor_vt FLOAT DEFAULT 0
+            """)
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 101 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 101: {e}")
         if connection:
             try:
                 connection.rollback()

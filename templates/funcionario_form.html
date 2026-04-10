@@ -125,6 +125,47 @@
                                                value="{{ funcionario.valor_diaria if funcionario and funcionario.valor_diaria else '' }}">
                                     </div>
                                     {% endif %}
+
+                                    <!-- Benefícios e Pagamento -->
+                                    <div class="col-12 mt-2 mb-1">
+                                        <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem;letter-spacing:.05em;">
+                                            <i class="fas fa-hand-holding-usd me-1 text-success"></i>Benefícios e Pagamento
+                                        </small>
+                                        <hr class="mt-1 mb-2">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="chave_pix" class="form-label">Chave PIX</label>
+                                        <input type="text" class="form-control" id="chave_pix" name="chave_pix"
+                                               placeholder="CPF, e-mail, telefone ou aleatória"
+                                               value="{{ funcionario.chave_pix if funcionario and funcionario.chave_pix else '' }}">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="valor_va" class="form-label">
+                                            Vale Alimentação <small class="text-muted">(R$/dia)</small>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text text-success"><i class="fas fa-utensils"></i></span>
+                                            <input type="number" class="form-control" id="valor_va" name="valor_va"
+                                                   step="0.01" min="0" placeholder="0.00"
+                                                   value="{{ '%.2f'|format(funcionario.valor_va) if funcionario and funcionario.valor_va else '0.00' }}">
+                                        </div>
+                                        <small class="text-muted">0 = sem benefício</small>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="valor_vt" class="form-label">
+                                            Vale Transporte <small class="text-muted">(R$/dia)</small>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text text-primary"><i class="fas fa-bus"></i></span>
+                                            <input type="number" class="form-control" id="valor_vt" name="valor_vt"
+                                                   step="0.01" min="0" placeholder="0.00"
+                                                   value="{{ '%.2f'|format(funcionario.valor_vt) if funcionario and funcionario.valor_vt else '0.00' }}">
+                                        </div>
+                                        <small class="text-muted">0 = sem benefício</small>
+                                    </div>
                                 </div>
                             </div>
                             

@@ -96,13 +96,39 @@
                                 <strong class="text-dark">{{ funcionario.telefone or '-' }}</strong>
                             </div>
                         </div>
-                        <div class="col-md-8">
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;">Chave PIX</span><br>
+                                <strong class="text-dark">{{ funcionario.chave_pix or '-' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
                             <div class="mb-2">
                                 <span class="text-muted" style="font-size:0.78rem;">E-mail</span><br>
                                 <strong class="text-dark">{{ funcionario.email or '-' }}</strong>
                             </div>
                         </div>
                     </div>
+                    {% if funcionario.valor_va or funcionario.valor_vt %}
+                    <div class="row mt-1">
+                        {% if funcionario.valor_va %}
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;"><i class="fas fa-utensils text-success me-1"></i>Vale Alimentação/dia</span><br>
+                                <strong class="text-success">R$ {{ '%.2f'|format(funcionario.valor_va) }}</strong>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if funcionario.valor_vt %}
+                        <div class="col-md-4">
+                            <div class="mb-2">
+                                <span class="text-muted" style="font-size:0.78rem;"><i class="fas fa-bus text-primary me-1"></i>Vale Transporte/dia</span><br>
+                                <strong class="text-primary">R$ {{ '%.2f'|format(funcionario.valor_vt) }}</strong>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 <!-- Linha 2: Dados Contratuais -->
                 <div class="border-bottom px-3 pt-3 pb-2">
@@ -1494,16 +1520,56 @@
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <label for="telefone" class="form-label">Telefone</label>
                                 <input type="text" class="form-control" id="telefone" name="telefone" value="{{ funcionario.telefone or '' }}">
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="chave_pix" class="form-label">Chave PIX</label>
+                                <input type="text" class="form-control" id="chave_pix" name="chave_pix"
+                                       placeholder="CPF, e-mail, telefone ou aleatória"
+                                       value="{{ funcionario.chave_pix or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email</label>
                                 <input type="email" class="form-control" id="email" name="email" value="{{ funcionario.email or '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Benefícios -->
+                    <div class="row">
+                        <div class="col-12 mb-2">
+                            <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem;letter-spacing:.05em;">
+                                <i class="fas fa-hand-holding-usd me-1 text-success"></i>Benefícios
+                            </small>
+                            <hr class="mt-1 mb-2">
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="valor_va" class="form-label">
+                                    <i class="fas fa-utensils text-success me-1"></i>Vale Alimentação (R$/dia)
+                                </label>
+                                <input type="number" class="form-control" id="valor_va" name="valor_va"
+                                       step="0.01" min="0" placeholder="0.00"
+                                       value="{{ '%.2f'|format(funcionario.valor_va or 0) }}">
+                                <small class="text-muted">0 = funcionário não tem o benefício</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="valor_vt" class="form-label">
+                                    <i class="fas fa-bus text-primary me-1"></i>Vale Transporte (R$/dia)
+                                </label>
+                                <input type="number" class="form-control" id="valor_vt" name="valor_vt"
+                                       step="0.01" min="0" placeholder="0.00"
+                                       value="{{ '%.2f'|format(funcionario.valor_vt or 0) }}">
+                                <small class="text-muted">0 = funcionário não tem o benefício</small>
                             </div>
                         </div>
                     </div>

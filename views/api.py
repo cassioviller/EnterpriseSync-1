@@ -521,6 +521,9 @@ def get_funcionario(funcionario_id):
                 'salario': float(funcionario.salario) if funcionario.salario else 0,
                 'tipo_remuneracao': funcionario.tipo_remuneracao or 'salario',
                 'valor_diaria': float(funcionario.valor_diaria) if funcionario.valor_diaria else 0,
+                'chave_pix': funcionario.chave_pix or '',
+                'valor_va': float(funcionario.valor_va or 0),
+                'valor_vt': float(funcionario.valor_vt or 0),
                 'departamento_id': funcionario.departamento_id or 0,
                 'funcao_id': funcionario.funcao_id or 0,
                 'horario_trabalho_id': funcionario.horario_trabalho_id or 0,
@@ -560,6 +563,7 @@ def editar_funcionario(funcionario_id):
         
         funcionario.email = request.form.get('email', '').strip()
         funcionario.telefone = request.form.get('telefone', '').strip()
+        funcionario.chave_pix = request.form.get('chave_pix', '').strip()
         funcionario.endereco = request.form.get('endereco', '').strip()
         
         if request.form.get('data_admissao'):
@@ -572,11 +576,13 @@ def editar_funcionario(funcionario_id):
         if request.form.get('jornada_semanal'):
             funcionario.jornada_semanal = int(request.form['jornada_semanal'])
 
-        # Campos V2: remuneração por diária
+        # Campos V2: remuneração por diária + benefícios
         if request.form.get('tipo_remuneracao') in ('salario', 'diaria'):
             funcionario.tipo_remuneracao = request.form['tipo_remuneracao']
         if request.form.get('valor_diaria') is not None:
             funcionario.valor_diaria = float(request.form.get('valor_diaria') or 0)
+        funcionario.valor_va = float(request.form.get('valor_va') or 0)
+        funcionario.valor_vt = float(request.form.get('valor_vt') or 0)
         
         # Atualizar IDs de relacionamentos
         funcionario.departamento_id = int(request.form['departamento_id']) if request.form.get('departamento_id') and request.form['departamento_id'] != '0' else None

@@ -162,7 +162,14 @@ except Exception as e:
 
 # Alimentação CRUD já registrado em app.py - removendo duplicação
 
-    logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
+logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
+
+try:
+    from importacao_views import importacao_bp
+    app.register_blueprint(importacao_bp)
+    logger.info("[OK] Blueprint IMPORTACAO FUNCIONARIOS registrado")
+except Exception as e:
+    logger.error(f"[ERROR] Erro ao registrar Importação Funcionários: {e}")
 
 from app import csrf
 main_py_exempt_blueprints = [
@@ -170,6 +177,7 @@ main_py_exempt_blueprints = [
     'analytics_preditivos', 'dashboards_especificos',
     'exportacao_relatorios', 'relatorios_financeiros',
     'api_funcionarios', 'api_buscar_funcionarios', 'health',
+    'importacao',
 ]
 for bp_name in main_py_exempt_blueprints:
     bp = app.blueprints.get(bp_name)

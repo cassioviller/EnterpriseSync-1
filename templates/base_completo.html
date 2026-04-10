@@ -715,10 +715,19 @@
                           {% endif %}
                         </li>
                         
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.funcionarios') }}">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="funcionariosDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-users me-1"></i> Funcionários
                             </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('main.funcionarios') }}">
+                                    <i class="fas fa-users me-1"></i> Lista de Funcionários
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('importacao.index') }}">
+                                    <i class="fas fa-file-excel me-1 text-success"></i> Importar por Planilha
+                                </a></li>
+                            </ul>
                         </li>
                         
                         <li class="nav-item">

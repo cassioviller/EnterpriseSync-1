@@ -198,6 +198,10 @@ class Funcionario(db.Model):
     # V2: Tipo de remuneração — 'salario' (padrão V1) ou 'diaria' (V2)
     tipo_remuneracao = db.Column(db.String(20), default='salario', nullable=False)
     valor_diaria = db.Column(db.Float, default=0.0)
+    # V2: Dados de pagamento e benefícios
+    chave_pix = db.Column(db.String(150))       # Chave PIX: CPF, e-mail, telefone ou aleatória
+    valor_va  = db.Column(db.Float, default=0.0)  # Vale Alimentação por dia trabalhado (R$)
+    valor_vt  = db.Column(db.Float, default=0.0)  # Vale Transporte por dia trabalhado (R$)
     
     # Relacionamentos
     horario_trabalho = db.relationship('HorarioTrabalho', backref=db.backref('funcionarios', overlaps="horario_trabalho"), overlaps="funcionarios")

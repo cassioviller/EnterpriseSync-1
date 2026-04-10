@@ -99,6 +99,8 @@ def funcionarios():
             if tipo_remuneracao not in ('salario', 'diaria'):
                 tipo_remuneracao = 'salario'
             valor_diaria = float(request.form.get('valor_diaria', 0)) if request.form.get('valor_diaria') else 0.0
+            valor_va = float(request.form.get('valor_va') or 0)
+            valor_vt = float(request.form.get('valor_vt') or 0)
 
             novo_funcionario = Funcionario(
                 nome=nome,
@@ -106,11 +108,14 @@ def funcionarios():
                 codigo=codigo,
                 email=request.form.get('email', ''),
                 telefone=request.form.get('telefone', ''),
+                chave_pix=request.form.get('chave_pix', '').strip(),
                 endereco=request.form.get('endereco', ''),
                 data_admissao=datetime.strptime(request.form.get('data_admissao', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
                 salario=float(request.form.get('salario', 0)) if request.form.get('salario') else None,
                 tipo_remuneracao=tipo_remuneracao,
                 valor_diaria=valor_diaria,
+                valor_va=valor_va,
+                valor_vt=valor_vt,
                 departamento_id=int(dept_id) if dept_id and dept_id != '0' and dept_id != '' else None,
                 funcao_id=int(func_id) if func_id and func_id != '0' and func_id != '' else None,
                 horario_trabalho_id=int(horario_id) if horario_id and horario_id != '0' and horario_id != '' else None,
