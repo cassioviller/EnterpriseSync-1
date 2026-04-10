@@ -738,11 +738,24 @@ def excluir(pai_id):
 
     try:
         status_anterior = pai.status
+
+        # 0. Coletar IDs do FluxoCaixa ANTES de qualquer delete
+        #    (para não ter problemas de autoflush durante a query)
+        fc_ids = _coletar_ids_fluxo_caixa(pai, admin_id)
+
         # 1. Excluir lançamentos nos módulos de origem (transporte, alimentação, RDO, etc.)
         qtd_origens = _excluir_origens_vinculadas(pai, admin_id)
-        # 2. Excluir registros no Fluxo de Caixa vinculados a este custo
-        qtd_fc = _excluir_fluxo_caixa_vinculado(pai, admin_id)
-        # 3. Excluir o registro pai (filhos em cascata via FK)
+
+        # 2. Quebrar a FK circular: pai.fluxo_caixa_id → fluxo_caixa.id
+        #    Sem isso, o banco bloqueia o DELETE em fluxo_caixa
+        if pai.fluxo_caixa_id is not None:
+            pai.fluxo_caixa_id = None
+            db.session.flush()
+
+        # 3. Excluir os registros do Fluxo de Caixa
+        qtd_fc = _deletar_fluxo_caixa_por_ids(fc_ids, admin_id)
+
+        # 4. Excluir o registro pai (filhos em cascata via FK)
         db.session.delete(pai)
         db.session.commit()
 
@@ -801,16 +814,12 @@ def _excluir_origens_vinculadas(pai, admin_id) -> int:
     return total
 
 
-def _excluir_fluxo_caixa_vinculado(pai, admin_id) -> int:
+def _coletar_ids_fluxo_caixa(pai, admin_id) -> set:
     """
-    Remove todos os registros de FluxoCaixa ligados a este GestaoCustoPai.
-    Estratégia dupla:
-      1. Via referencia_tabela + referencia_id (registros criados pelo fluxo de aprovação)
-      2. Via fluxo_caixa_id diretamente no pai
-    Retorna a quantidade de registros excluídos.
+    Coleta os IDs de FluxoCaixa vinculados ao pai ANTES de qualquer operação de delete.
+    Chamado cedo para evitar conflitos de autoflush durante queries posteriores.
     """
-    total = 0
-    ids_deletar = set()
+    ids = set()
 
     # Estratégia 1: referencia_tabela + referencia_id
     try:
@@ -820,24 +829,33 @@ def _excluir_fluxo_caixa_vinculado(pai, admin_id) -> int:
             referencia_id=pai.id,
         ).all()
         for fc in registros:
-            ids_deletar.add(fc.id)
+            ids.add(fc.id)
     except Exception as e:
         logger.warning(f"[WARN] FluxoCaixa referencia query falhou: {e}")
 
-    # Estratégia 2: FK direta no pai
+    # Estratégia 2: FK direta armazenada no pai
     if pai.fluxo_caixa_id:
-        ids_deletar.add(pai.fluxo_caixa_id)
+        ids.add(pai.fluxo_caixa_id)
 
-    for fc_id in ids_deletar:
+    return ids
+
+
+def _deletar_fluxo_caixa_por_ids(fc_ids: set, admin_id) -> int:
+    """
+    Exclui os registros de FluxoCaixa pelos IDs fornecidos.
+    A FK circular (gestao_custo_pai.fluxo_caixa_id) já deve ter sido zerada antes desta chamada.
+    Retorna a quantidade de registros excluídos.
+    """
+    total = 0
+    for fc_id in fc_ids:
         try:
             fc = FluxoCaixa.query.filter_by(id=fc_id, admin_id=admin_id).first()
             if fc:
                 db.session.delete(fc)
                 total += 1
-                logger.info(f"[OK] FluxoCaixa id={fc_id} excluído (pai={pai.id})")
+                logger.info(f"[OK] FluxoCaixa id={fc_id} excluído (cascata gestao_custo)")
         except Exception as e:
             logger.warning(f"[WARN] Erro ao excluir FluxoCaixa id={fc_id}: {e}")
-
     return total
 
 
