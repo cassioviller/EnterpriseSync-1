@@ -246,7 +246,18 @@ def novo_post():
         except Exception as _e:
             logger.warning(f"[WARN] Lancamento contabil transporte nao gerado: {_e}")
 
-        # Integração automática: Gestão de Custos V2
+        # ── Calcular total de reembolsos ANTES de registrar o transporte ──
+        # Assim o transporte entra em Contas a Pagar com o VALOR LÍQUIDO
+        # (ex: transporte R$40 − reembolso R$20 → Contas a Pagar: R$20 transporte + R$20 reembolso)
+        _total_reembolso = 0.0
+        if request.form.get('is_reembolso') == 'true':
+            for _rv in request.form.getlist('reimb_valor[]'):
+                try:
+                    _total_reembolso += float(str(_rv).replace(',', '.'))
+                except (ValueError, TypeError):
+                    pass
+
+        # Integração automática: Gestão de Custos V2 (valor líquido = total − reembolsos)
         try:
             from utils.financeiro_integration import registrar_custo_automatico
             if funcionario_id:
@@ -260,22 +271,27 @@ def novo_post():
             else:
                 _entidade_nome = 'Transporte Geral'
                 _entidade_id = None
-            registrar_custo_automatico(
-                admin_id=admin_id,
-                tipo_categoria='TRANSPORTE',
-                entidade_nome=_entidade_nome,
-                entidade_id=_entidade_id,
-                data=data_lancamento,
-                descricao=descricao or f'Lançamento de transporte — {_entidade_nome}',
-                valor=float(valor),
-                obra_id=obra_id,
-                centro_custo_id=centro_custo_id,
-                origem_tabela='lancamento_transporte',
-                origem_id=lancamento.id,
-            )
+
+            _valor_liquido = round(float(valor) - _total_reembolso, 2)
+            if _valor_liquido > 0:
+                registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria='TRANSPORTE',
+                    entidade_nome=_entidade_nome,
+                    entidade_id=_entidade_id,
+                    data=data_lancamento,
+                    descricao=descricao or f'Lançamento de transporte — {_entidade_nome}',
+                    valor=_valor_liquido,
+                    obra_id=obra_id,
+                    centro_custo_id=centro_custo_id,
+                    origem_tabela='lancamento_transporte',
+                    origem_id=lancamento.id,
+                )
+                logger.info(f"[OK] GestaoCusto TRANSPORTE registrado para {_entidade_nome} — líquido R${_valor_liquido}")
+            else:
+                logger.info(f"[INFO] TRANSPORTE 100% coberto por reembolso — sem lançamento em Contas a Pagar")
             from app import db as _db
             _db.session.commit()
-            logger.info(f"[OK] GestaoCusto TRANSPORTE registrado para {_entidade_nome}")
         except Exception as _e:
             logger.warning(f"[WARN] Gestao custo transporte nao registrado: {_e}")
 
