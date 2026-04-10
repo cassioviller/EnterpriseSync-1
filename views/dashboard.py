@@ -5,7 +5,7 @@ from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_custos_obra, get_admin_id_robusta, get_admin_id_dinamico
+from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
 import calendar
 from sqlalchemy import func, desc, or_, and_, text, inspect
@@ -819,12 +819,12 @@ def dashboard():
         custo_outros_real = safe_db_operation(calcular_outros_custos, 0)
         logger.debug(f"DEBUG Custos Outros FINAL: R$ {custo_outros_real:.2f}")
         
-        # 4. Funcionários por Departamento - com proteção de transação
+        # 4. Funcionários por Função - com proteção de transação
         funcionarios_por_departamento = safe_db_operation(
-            lambda: _calcular_funcionarios_departamento(admin_id), 
+            lambda: _calcular_funcionarios_funcao(admin_id),
             {}
         )
-        logger.debug(f"DEBUG FINAL - Funcionários por dept: {funcionarios_por_departamento}")
+        logger.debug(f"DEBUG FINAL - Funcionários por função: {funcionarios_por_departamento}")
         
         # 5. Custos por Obra - com proteção de transação
         custos_por_obra = safe_db_operation(
@@ -958,12 +958,13 @@ def dashboard():
     )
     
     # Normalizar retornos (novos helpers já retornam listas)
-    funcionarios_dept = funcionarios_por_departamento if isinstance(funcionarios_por_departamento, list) else []
+    funcionarios_funcao = funcionarios_por_departamento if isinstance(funcionarios_por_departamento, list) else []
+    funcionarios_dept = funcionarios_funcao  # Compatibilidade com template
     custos_obra = custos_por_obra if isinstance(custos_por_obra, list) else []
     # Compatibilidade com código legado que ainda referencie custos_recentes
     custos_recentes = custos_obra
 
-    logger.debug(f"DEBUG FINAL - Funcionários por dept: {funcionarios_dept}")
+    logger.debug(f"DEBUG FINAL - Funcionários por função: {funcionarios_funcao}")
     logger.debug(f"DEBUG FINAL - Custos por obra: {custos_obra}")
     
     # Buscar obras em andamento para a tabela com tratamento de erro
@@ -994,6 +995,7 @@ def dashboard():
                          veiculos_disponiveis=veiculos_disponiveis,
                          margem_percentual=margem_percentual,
                          valor_contrato_total=valor_contrato_total,
+                         funcionarios_por_funcao=funcionarios_funcao,
                          funcionarios_por_departamento=funcionarios_por_departamento,
                          custos_por_obra=custos_por_obra,
                          funcionarios_dept=funcionarios_dept,

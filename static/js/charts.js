@@ -79,7 +79,7 @@ const ChartUtils = {
 
 // Chart configurations
 const ChartConfigs = {
-    // Dashboard funcionários por departamento
+    // Dashboard funcionários por departamento (também usado para função)
     funcionariosPorDepartamento: function(labels, data) {
         return {
             type: 'doughnut',
@@ -139,6 +139,11 @@ const ChartConfigs = {
                 cutout: '50%'
             }
         };
+    },
+
+    // Alias para funcionários por função (mesma configuração de gráfico doughnut)
+    funcionariosPorFuncao: function(labels, data) {
+        return ChartConfigs.funcionariosPorDepartamento(labels, data);
     },
     
     // Dashboard custos por obra

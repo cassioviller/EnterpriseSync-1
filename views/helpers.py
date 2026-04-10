@@ -88,6 +88,52 @@ def safe_db_operation(operation, default_value=None):
         return default_value
 
 
+def _calcular_funcionarios_funcao(admin_id):
+    """Calcula funcionários ativos por função com headcount e custo mensal de folha."""
+    try:
+        rows = db.session.execute(text("""
+            SELECT
+                fu.nome                           AS nome,
+                COUNT(f.id)                       AS total,
+                COALESCE(SUM(f.salario), 0)       AS custo_mensal
+            FROM funcao fu
+            LEFT JOIN funcionario f
+                   ON f.funcao_id = fu.id
+                  AND f.ativo = true
+                  AND f.admin_id = :admin_id
+            WHERE fu.admin_id = :admin_id
+            GROUP BY fu.nome
+            ORDER BY total DESC
+        """), {'admin_id': admin_id}).fetchall()
+
+        result = [
+            {
+                'nome': row[0],
+                'total': int(row[1]),
+                'custo_mensal': float(row[2] or 0)
+            }
+            for row in rows if row[1] > 0
+        ]
+
+        sem_funcao = db.session.execute(text("""
+            SELECT COUNT(*) AS total, COALESCE(SUM(salario), 0) AS custo
+            FROM funcionario
+            WHERE admin_id = :admin_id AND ativo = true AND funcao_id IS NULL
+        """), {'admin_id': admin_id}).first()
+        if sem_funcao and sem_funcao[0] > 0:
+            result.append({
+                'nome': 'Sem Função',
+                'total': int(sem_funcao[0]),
+                'custo_mensal': float(sem_funcao[1] or 0)
+            })
+
+        return result
+    except Exception as e:
+        logger.error(f"Erro funcionários por função: {e}")
+        db.session.rollback()
+        return []
+
+
 def _calcular_funcionarios_departamento(admin_id):
     """Calcula funcionários ativos por departamento com headcount e custo mensal de folha."""
     try:

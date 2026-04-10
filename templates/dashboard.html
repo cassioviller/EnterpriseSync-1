@@ -410,7 +410,7 @@ html[data-bs-theme="dark"] .header-btn i {
             <div class="card h-100">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-sitemap"></i> Funcionários por Departamento
+                        <i class="fas fa-sitemap"></i> Funcionários por Função
                     </h5>
                 </div>
                 <div class="card-body">
@@ -431,7 +431,7 @@ html[data-bs-theme="dark"] .header-btn i {
                         {% endfor %}
                     </div>
                     {% else %}
-                    <canvas id="funcionariosDeptChart" width="400" height="200"></canvas>
+                    <canvas id="funcionariosFuncaoChart" width="400" height="200"></canvas>
                     {% endif %}
                 </div>
             </div>
@@ -809,15 +809,15 @@ function aplicarFiltrosDashboard() {
 
 // Gráficos
 document.addEventListener('DOMContentLoaded', function() {
-    // Gráfico de funcionários por departamento (fallback quando não há dados para cards)
-    const ctxFuncionarios = document.getElementById('funcionariosDeptChart') ?
-        document.getElementById('funcionariosDeptChart').getContext('2d') : null;
-    if (!ctxFuncionarios) { /* seção substituída por cards de departamento */ }
+    // Gráfico de funcionários por função (fallback quando não há dados para cards)
+    const ctxFuncionarios = document.getElementById('funcionariosFuncaoChart') ?
+        document.getElementById('funcionariosFuncaoChart').getContext('2d') : null;
+    if (!ctxFuncionarios) { /* seção substituída por cards de função */ }
     const funcionariosLabels = [{% for dept in funcionarios_dept %}'{{ dept.nome }}'{% if not loop.last %},{% endif %}{% endfor %}];
     const funcionariosData = [{% for dept in funcionarios_dept %}{{ dept.total }}{% if not loop.last %},{% endif %}{% endfor %}];
     
     if (ctxFuncionarios && typeof ChartConfigs !== 'undefined') {
-        const funcionariosConfig = ChartConfigs.funcionariosPorDepartamento(funcionariosLabels, funcionariosData);
+        const funcionariosConfig = ChartConfigs.funcionariosPorFuncao(funcionariosLabels, funcionariosData);
         new Chart(ctxFuncionarios, funcionariosConfig);
     } else if (ctxFuncionarios) {
         // Fallback se ChartConfigs não estiver disponível
