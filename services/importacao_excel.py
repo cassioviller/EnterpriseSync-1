@@ -88,14 +88,38 @@ def _cel(ws, row_num, hm, *keys):
 class ImportacaoFuncionarios:
     """
     Suporta dois formatos:
-    - SIGE: cabeçalho na linha 3 com: nome, cpf, tipo_remuneracao, valor, ...
-    - REGISTRO_COLABORADORES: cabeçalho na linha 3 com NOME, CPF, REMUNERACAO, VALOR
+    - SIGE: cabeçalho com headers minúsculos: nome, cpf, tipo_remuneracao, data_admissao, ...
+    - REGISTRO_COLABORADORES: cabeçalho com headers maiúsculos: NOME, RG, CPF, DATA NASC, ...
+
+    Detecção: raw header[0] == 'nome' (lowercase) → SIGE
+              raw header[0] == 'NOME' (uppercase) → REGISTRO_COLABORADORES
     """
 
-    def _detectar_formato(self, hm):
-        if 'tipo_remuneracao' in hm or 'data_admissao' in hm:
+    def _detectar_formato(self, raw_headers):
+        """Detecta formato baseado nos headers brutos (antes da normalização)."""
+        if not raw_headers:
             return 'sige'
-        if 'remuneracao' in hm and 'valor' in hm:
+        # Usa o primeiro header bruto para distinguir maiúsculo de minúsculo
+        primeiro = _norm(raw_headers[0])
+        if not primeiro:
+            return 'sige'
+        # SIGE: header minúsculo 'nome' → indica template SIGE padrão
+        if primeiro == 'nome':
+            return 'sige'
+        # REGISTRO_COLABORADORES: qualquer casing diferente de 'nome' no col[0]
+        # típico 'NOME' ou ausência de tipo_remuneracao/data_admissao
+        raw_upper = [_norm(str(h)).upper() for h in raw_headers if h]
+        if 'REMUNERACAO' in raw_upper or 'ENDERECO' in raw_upper:
+            return 'colaboradores'
+        # Fallback: sem tipo_remuneracao nem data_admissao → colaboradores
+        import unicodedata
+        def n(s):
+            s = _norm(s).lower()
+            s = unicodedata.normalize('NFD', s)
+            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            return s.replace(' ', '_').replace('*', '').strip('_')
+        norm_set = {n(str(h)) for h in raw_headers if h}
+        if 'tipo_remuneracao' not in norm_set and 'data_admissao' not in norm_set:
             return 'colaboradores'
         return 'sige'
 
@@ -113,7 +137,7 @@ class ImportacaoFuncionarios:
             return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
 
         hm = _mapear_headers(raw_headers)
-        formato = self._detectar_formato(hm)
+        formato = self._detectar_formato(raw_headers)
 
         validos, erros = [], []
         cpfs_vistos = set()
@@ -295,7 +319,7 @@ class ImportacaoDiarias:
 
             # Buscar funcionário
             func = (Funcionario.query
-                    .filter(Funcionario.nome.ilike(f'%{nome}%'), Funcionario.admin_id == admin_id)
+                    .filter(Funcionario.nome.ilike(nome), Funcionario.admin_id == admin_id)
                     .first())
             if not func:
                 erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
@@ -307,7 +331,7 @@ class ImportacaoDiarias:
             if obra_raw:
                 obra = (Obra.query
                         .filter(Obra.admin_id == admin_id)
-                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
 
             validos.append({
@@ -391,7 +415,7 @@ class ImportacaoAlimentacao:
             obra = None
             if obra_raw:
                 obra = (Obra.query.filter(Obra.admin_id == admin_id)
-                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
                 if not obra:
                     erros.append({'linha': rn, 'nome': str(data_ref), 'motivo': f'Obra "{obra_raw}" não encontrada'})
@@ -405,7 +429,7 @@ class ImportacaoAlimentacao:
             if funcs_raw:
                 for fn in [x.strip() for x in funcs_raw.split(';') if x.strip()]:
                     f = (Funcionario.query
-                         .filter(Funcionario.nome.ilike(f'%{fn}%'), Funcionario.admin_id == admin_id)
+                         .filter(Funcionario.nome.ilike(fn), Funcionario.admin_id == admin_id)
                          .first())
                     if f:
                         func_ids.append(f.id)
@@ -481,7 +505,7 @@ class ImportacaoTransporte:
     """
 
     def processar(self, ws, admin_id):
-        from models import Funcionario, Obra
+        from models import Funcionario, Obra, CategoriaTransporte
 
         header_row, raw_headers = _detectar_header_row(ws, ['nome_funcionario', 'funcionario', 'nome'])
         if not header_row:
@@ -489,6 +513,12 @@ class ImportacaoTransporte:
 
         hm = _mapear_headers(raw_headers)
         validos, erros = [], []
+
+        # Cache de categorias para evitar N queries
+        categorias_cache = {
+            c.nome.lower(): c
+            for c in CategoriaTransporte.query.filter_by(admin_id=admin_id).all()
+        }
 
         for rn in range(header_row + 1, ws.max_row + 1):
             def c(*keys):
@@ -509,7 +539,7 @@ class ImportacaoTransporte:
                 continue
 
             func = (Funcionario.query
-                    .filter(Funcionario.nome.ilike(f'%{nome}%'), Funcionario.admin_id == admin_id)
+                    .filter(Funcionario.nome.ilike(nome), Funcionario.admin_id == admin_id)
                     .first())
             if not func:
                 erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
@@ -519,10 +549,27 @@ class ImportacaoTransporte:
             obra = None
             if obra_raw:
                 obra = (Obra.query.filter(Obra.admin_id == admin_id)
-                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
 
-            categoria = _norm(c('categoria')) or 'Transporte'
+            # Busca CategoriaTransporte por nome (case-insensitive)
+            categoria_raw = _norm(c('categoria')) or ''
+            cat_obj = categorias_cache.get(categoria_raw.lower())
+            if not cat_obj and categoria_raw:
+                # Busca direta caso não esteja no cache (criado após o cache)
+                cat_obj = CategoriaTransporte.query.filter(
+                    CategoriaTransporte.nome.ilike(categoria_raw),
+                    CategoriaTransporte.admin_id == admin_id,
+                ).first()
+            if not cat_obj:
+                erros.append({
+                    'linha': rn, 'nome': nome,
+                    'motivo': (
+                        f'Categoria de transporte "{categoria_raw}" não encontrada. '
+                        f'Disponíveis: {", ".join(categorias_cache.keys()) or "nenhuma cadastrada"}'
+                    ),
+                })
+                continue
 
             validos.append({
                 'linha': rn,
@@ -530,10 +577,11 @@ class ImportacaoTransporte:
                 'funcionario_id': func.id,
                 'data': str(data_ref),
                 'valor': valor,
-                'categoria': categoria,
+                'categoria': cat_obj.nome,
+                'categoria_id': cat_obj.id,
                 'obra_id': obra.id if obra else None,
                 'obra_nome': obra.nome if obra else '(sem obra)',
-                'descricao': _norm(c('descricao')) or f'{categoria} - {func.nome} - {data_ref.strftime("%d/%m/%Y")}',
+                'descricao': _norm(c('descricao')) or f'{cat_obj.nome} - {func.nome} - {data_ref.strftime("%d/%m/%Y")}',
             })
 
         return validos, erros
@@ -618,7 +666,7 @@ class ImportacaoCustos:
             obra = None
             if obra_raw:
                 obra = (Obra.query.filter(Obra.admin_id == admin_id)
-                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
                         .first())
 
             status_raw = _norm(c('status')).upper()

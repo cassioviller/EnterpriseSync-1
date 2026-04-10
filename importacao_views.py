@@ -140,9 +140,8 @@ def baixar_template(modulo):
     return send_file(path, as_attachment=True, download_name=cfg['template_file'])
 
 
-@importacao_bp.route('/preview/<modulo>', methods=['POST'])
-@login_required
-def preview(modulo):
+def _handle_preview(modulo):
+    """Lógica central de preview reutilizada pelas rotas genérica e por módulo."""
     if modulo not in MODULOS_VALIDOS:
         flash('Módulo inválido.', 'danger')
         return redirect(url_for('importacao.index'))
@@ -198,9 +197,8 @@ def preview(modulo):
     )
 
 
-@importacao_bp.route('/confirmar/<modulo>', methods=['POST'])
-@login_required
-def confirmar(modulo):
+def _handle_confirmar(modulo):
+    """Lógica central de confirmação reutilizada pelas rotas genérica e por módulo."""
     if modulo not in MODULOS_VALIDOS:
         flash('Módulo inválido.', 'danger')
         return redirect(url_for('importacao.index'))
@@ -234,3 +232,78 @@ def confirmar(modulo):
         cfg=cfg,
         resultado=resultado,
     )
+
+
+# ── Rotas genéricas (/preview/<modulo>) e específicas (/funcionarios/preview) ──
+
+@importacao_bp.route('/preview/<modulo>', methods=['POST'])
+@login_required
+def preview(modulo):
+    return _handle_preview(modulo)
+
+
+@importacao_bp.route('/confirmar/<modulo>', methods=['POST'])
+@login_required
+def confirmar(modulo):
+    return _handle_confirmar(modulo)
+
+
+# Rotas explícitas por módulo (contrato especificado no task)
+@importacao_bp.route('/funcionarios/preview', methods=['POST'])
+@login_required
+def funcionarios_preview():
+    return _handle_preview('funcionarios')
+
+
+@importacao_bp.route('/funcionarios/confirmar', methods=['POST'])
+@login_required
+def funcionarios_confirmar():
+    return _handle_confirmar('funcionarios')
+
+
+@importacao_bp.route('/diarias/preview', methods=['POST'])
+@login_required
+def diarias_preview():
+    return _handle_preview('diarias')
+
+
+@importacao_bp.route('/diarias/confirmar', methods=['POST'])
+@login_required
+def diarias_confirmar():
+    return _handle_confirmar('diarias')
+
+
+@importacao_bp.route('/alimentacao/preview', methods=['POST'])
+@login_required
+def alimentacao_preview():
+    return _handle_preview('alimentacao')
+
+
+@importacao_bp.route('/alimentacao/confirmar', methods=['POST'])
+@login_required
+def alimentacao_confirmar():
+    return _handle_confirmar('alimentacao')
+
+
+@importacao_bp.route('/transporte/preview', methods=['POST'])
+@login_required
+def transporte_preview():
+    return _handle_preview('transporte')
+
+
+@importacao_bp.route('/transporte/confirmar', methods=['POST'])
+@login_required
+def transporte_confirmar():
+    return _handle_confirmar('transporte')
+
+
+@importacao_bp.route('/custos/preview', methods=['POST'])
+@login_required
+def custos_preview():
+    return _handle_preview('custos')
+
+
+@importacao_bp.route('/custos/confirmar', methods=['POST'])
+@login_required
+def custos_confirmar():
+    return _handle_confirmar('custos')
