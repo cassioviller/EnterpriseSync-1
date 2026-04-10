@@ -219,10 +219,27 @@ class ImportacaoFuncionarios:
             status_raw = _norm(c('status')).upper()
             ativo = status_raw != 'INATIVO'
 
+            # Resolução de funcao_id por nome
+            funcao_raw = _norm(c('funcao', 'cargo', 'funcao_id'))
+            funcao_id = None
+            funcao_nome = None
+            if funcao_raw:
+                from models import Funcao
+                funcao_obj = Funcao.query.filter(
+                    Funcao.admin_id == admin_id,
+                    Funcao.nome.ilike(funcao_raw)
+                ).first()
+                if funcao_obj:
+                    funcao_id = funcao_obj.id
+                    funcao_nome = funcao_obj.nome
+                else:
+                    funcao_nome = f'{funcao_raw} (não encontrada)'
+
             row = {
                 'linha': rn,
                 'nome': nome,
                 'cpf': cpf,
+                'email': _norm(c('email')) or None,
                 'rg': _norm(c('rg')) or None,
                 'telefone': _norm(c('telefone', 'tel')) or None,
                 'endereco': _norm(c('endereco')) or None,
@@ -234,6 +251,8 @@ class ImportacaoFuncionarios:
                 'data_admissao': str(data_admissao),
                 'valor_va': _parse_float(c('valor_va', 'va')),
                 'valor_vt': _parse_float(c('valor_vt', 'vt')),
+                'funcao_id': funcao_id,
+                'funcao_nome': funcao_nome,
                 'operacao': 'criar',  # Importação cria novos; CPFs existentes são rejeitados em preview
             }
             validos.append(row)
@@ -272,6 +291,7 @@ class ImportacaoFuncionarios:
                 v = _parse_float(row.get('valor', 0))
                 kwargs = dict(
                     nome=row['nome'], cpf=cpf, rg=row.get('rg'),
+                    email=row.get('email'),
                     telefone=row.get('telefone'), endereco=row.get('endereco'),
                     chave_pix=row.get('chave_pix'),
                     data_nascimento=_parse_data(row.get('data_nascimento')),
@@ -280,6 +300,8 @@ class ImportacaoFuncionarios:
                     valor_va=_parse_float(row.get('valor_va', 0)),
                     valor_vt=_parse_float(row.get('valor_vt', 0)),
                 )
+                if row.get('funcao_id'):
+                    kwargs['funcao_id'] = row['funcao_id']
                 if row['tipo_remuneracao'] == 'diaria':
                     kwargs['valor_diaria'] = v
                     kwargs['salario'] = 0

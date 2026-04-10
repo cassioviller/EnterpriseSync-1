@@ -31,15 +31,22 @@ def _get_chave_hmac() -> bytes:
     return chave.encode() if isinstance(chave, str) else chave
 
 
-def _assinar_payload(dados: list) -> str:
-    """Serializa e assina a lista de dados com HMAC-SHA256 para evitar adulteração."""
-    body = json.dumps(dados, sort_keys=True, default=str).encode()
+def _assinar_payload(dados: list, admin_id: int, modulo: str) -> str:
+    """
+    Serializa e assina a lista de dados com HMAC-SHA256.
+    O admin_id e modulo são incluídos no envelope para evitar replay cross-context.
+    """
+    envelope = {'admin_id': admin_id, 'modulo': modulo, 'rows': dados}
+    body = json.dumps(envelope, sort_keys=True, default=str).encode()
     sig = hmac.new(_get_chave_hmac(), body, digestmod=hashlib.sha256).hexdigest()
     return f"{sig}:{body.decode()}"
 
 
-def _verificar_payload(token: str):
-    """Verifica a assinatura e retorna a lista de dados, ou None se inválido/adulterado."""
+def _verificar_payload(token: str, admin_id: int, modulo: str):
+    """
+    Verifica a assinatura e retorna a lista de dados.
+    Retorna None se inválido, adulterado, ou se admin_id/modulo não correspondem.
+    """
     try:
         sig_rec, body = token.split(':', 1)
     except ValueError:
@@ -51,9 +58,13 @@ def _verificar_payload(token: str):
     if not hmac.compare_digest(sig_rec, sig_esp):
         return None
     try:
-        return json.loads(body)
+        envelope = json.loads(body)
     except (json.JSONDecodeError, ValueError):
         return None
+    # Verificação de contexto — previne replay cross-tenant e cross-modulo
+    if envelope.get('admin_id') != admin_id or envelope.get('modulo') != modulo:
+        return None
+    return envelope.get('rows', [])
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'static', 'templates_importacao')
 
@@ -69,9 +80,11 @@ MODULO_CONFIG = {
             ('operacao', 'Ação'),
             ('nome', 'Nome'),
             ('cpf', 'CPF'),
+            ('email', 'E-mail'),
             ('tipo_remuneracao', 'Remuneração'),
             ('valor', 'Valor (R$)'),
             ('data_admissao', 'Admissão'),
+            ('funcao_nome', 'Função'),
         ],
         'tem_defaults': True,
     },
@@ -221,8 +234,8 @@ def _handle_preview(modulo):
         return redirect(url_for('importacao.index'))
 
     cfg = MODULO_CONFIG[modulo]
-    # Assina o payload para impedir adulteração entre preview e confirmar
-    dados_assinados = _assinar_payload(validos)
+    # Assina com admin_id + modulo para impedir adulteração e replay cross-context
+    dados_assinados = _assinar_payload(validos, admin_id, modulo)
 
     return render_template(
         'importacao/preview.html',
@@ -244,8 +257,8 @@ def _handle_confirmar(modulo):
     admin_id = get_admin_id_robusta()
     token = request.form.get('dados_json', '')
 
-    # Verifica assinatura — rejeita payload adulterado
-    rows = _verificar_payload(token)
+    # Verifica assinatura e contexto (admin_id + modulo) — rejeita payload adulterado/replay
+    rows = _verificar_payload(token, admin_id, modulo)
     if rows is None:
         flash('Dados de preview inválidos ou adulterados — faça o upload novamente.', 'danger')
         return redirect(url_for('importacao.index'))

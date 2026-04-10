@@ -182,5 +182,33 @@ function toggleDefaults(slug, formato) {
     el.style.setProperty('display', 'none', 'important');
   }
 }
+
+// Auto-detecção de formato pelo nome do arquivo
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('input[type="file"][name="arquivo"]').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var fname = (this.value || '').toLowerCase();
+      // Detecta padrão de nome de arquivo para Registro de Colaboradores
+      var isColab = /colaborad|registro/i.test(fname);
+      // Localiza o card pai e encontra os rádios
+      var form = this.closest('form');
+      if (!form) return;
+      var radios = form.querySelectorAll('input[name="formato_planilha"]');
+      if (!radios.length) return;
+      radios.forEach(function(r) {
+        if (r.value === (isColab ? 'colaboradores' : 'sige')) {
+          r.checked = true;
+          toggleDefaults(r.value === 'colaboradores'
+            ? r.id.replace('fmt_colab_', '')
+            : r.id.replace('fmt_sige_', ''),
+            r.value);
+        }
+      });
+      // Extrai o slug do form id (form-funcionarios → funcionarios)
+      var slug = (form.id || '').replace('form-', '') || 'funcionarios';
+      toggleDefaults(slug, isColab ? 'colaboradores' : 'sige');
+    });
+  });
+});
 </script>
 {% endblock %}
