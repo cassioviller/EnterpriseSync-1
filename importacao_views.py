@@ -1,11 +1,15 @@
 """
-Blueprint de Importação de Funcionários via Excel — SIGE v9.0
-Rota: /importacao/*
+Blueprint de Importação Excel — SIGE v9.0
+5 módulos: Funcionários, Diárias, Alimentação, Transporte, Custos
+Fluxo por módulo: download template → upload → preview → confirmar
 """
+import json
 import logging
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
-from flask_login import login_required, current_user
+
+from flask import (Blueprint, flash, redirect, render_template,
+                   request, send_file, url_for)
+from flask_login import current_user, login_required
 
 from models import db
 from views.helpers import get_admin_id_robusta
@@ -14,54 +18,219 @@ logger = logging.getLogger(__name__)
 
 importacao_bp = Blueprint('importacao', __name__, url_prefix='/importacao')
 
-TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), 'static', 'templates_importacao', '1_funcionarios.xlsx')
+TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'static', 'templates_importacao')
 
+MODULO_CONFIG = {
+    'funcionarios': {
+        'label': 'Funcionários',
+        'icone': 'users',
+        'cor': '#1e3a5f',
+        'cor_bg': '#e8f0f8',
+        'template_file': '1_funcionarios.xlsx',
+        'descricao': 'Cadastra ou atualiza funcionários em massa. Suporta o formato SIGE e planilha Registro de Colaboradores.',
+        'colunas': [
+            ('operacao', 'Ação'),
+            ('nome', 'Nome'),
+            ('cpf', 'CPF'),
+            ('tipo_remuneracao', 'Remuneração'),
+            ('valor', 'Valor (R$)'),
+            ('data_admissao', 'Admissão'),
+        ],
+        'tem_defaults': True,
+    },
+    'diarias': {
+        'label': 'Diárias',
+        'icone': 'calendar',
+        'cor': '#155724',
+        'cor_bg': '#d4edda',
+        'template_file': '2_diarias.xlsx',
+        'descricao': 'Registra diárias de mão de obra por funcionário e data. Integra automaticamente com Contas a Pagar.',
+        'colunas': [
+            ('nome', 'Funcionário'),
+            ('data', 'Data'),
+            ('valor', 'Valor (R$)'),
+            ('obra_nome', 'Obra'),
+            ('status', 'Status'),
+            ('descricao', 'Descrição'),
+        ],
+        'tem_defaults': False,
+    },
+    'alimentacao': {
+        'label': 'Alimentação',
+        'icone': 'coffee',
+        'cor': '#856404',
+        'cor_bg': '#fff3cd',
+        'template_file': '3_alimentacao.xlsx',
+        'descricao': 'Lançamentos de alimentação com múltiplos funcionários separados por ponto e vírgula.',
+        'colunas': [
+            ('data', 'Data'),
+            ('obra_nome', 'Obra'),
+            ('valor_total', 'Valor Total (R$)'),
+            ('funcionarios_nomes', 'Funcionários'),
+            ('descricao', 'Descrição'),
+            ('restaurante', 'Restaurante'),
+        ],
+        'tem_defaults': False,
+    },
+    'transporte': {
+        'label': 'Transporte',
+        'icone': 'truck',
+        'cor': '#6f42c1',
+        'cor_bg': '#ede7f6',
+        'template_file': '4_transporte.xlsx',
+        'descricao': 'Registra despesas de transporte: VT, combustível, aplicativo, passagens. Integra com Contas a Pagar.',
+        'colunas': [
+            ('nome', 'Funcionário'),
+            ('data', 'Data'),
+            ('categoria', 'Categoria'),
+            ('valor', 'Valor (R$)'),
+            ('obra_nome', 'Obra'),
+            ('descricao', 'Descrição'),
+        ],
+        'tem_defaults': False,
+    },
+    'custos': {
+        'label': 'Custos (Contas a Pagar)',
+        'icone': 'file-text',
+        'cor': '#721c24',
+        'cor_bg': '#f8d7da',
+        'template_file': '5_custos.xlsx',
+        'descricao': 'Importa lançamentos financeiros diretamente para Contas a Pagar. Ideal para migrar dados de planilhas de pagamentos.',
+        'colunas': [
+            ('fornecedor', 'Fornecedor'),
+            ('descricao', 'Descrição'),
+            ('valor', 'Valor (R$)'),
+            ('data', 'Data'),
+            ('categoria', 'Categoria'),
+            ('obra_nome', 'Obra'),
+            ('status', 'Status'),
+        ],
+        'tem_defaults': False,
+    },
+}
+
+MODULOS_VALIDOS = set(MODULO_CONFIG.keys())
+
+
+def _parse_xlsx(arquivo):
+    import openpyxl
+    wb = openpyxl.load_workbook(arquivo, data_only=True)
+    return wb.active
+
+
+# ─── Rotas ────────────────────────────────────────────────────────────────────
 
 @importacao_bp.route('/', methods=['GET'])
 @login_required
 def index():
-    return render_template('importacao/index.html')
+    return render_template('importacao/index.html', modulos=MODULO_CONFIG)
 
 
-@importacao_bp.route('/template/funcionarios', methods=['GET'])
+@importacao_bp.route('/template/<modulo>', methods=['GET'])
 @login_required
-def baixar_template():
-    if not os.path.exists(TEMPLATE_PATH):
-        flash('Template não encontrado.', 'warning')
+def baixar_template(modulo):
+    if modulo not in MODULOS_VALIDOS:
+        flash('Módulo inválido.', 'danger')
         return redirect(url_for('importacao.index'))
-    return send_file(TEMPLATE_PATH, as_attachment=True, download_name='1_funcionarios.xlsx')
+    cfg = MODULO_CONFIG[modulo]
+    path = os.path.join(TEMPLATES_DIR, cfg['template_file'])
+    if not os.path.exists(path):
+        flash('Template não encontrado no servidor.', 'warning')
+        return redirect(url_for('importacao.index'))
+    return send_file(path, as_attachment=True, download_name=cfg['template_file'])
 
 
-@importacao_bp.route('/upload/funcionarios', methods=['POST'])
+@importacao_bp.route('/preview/<modulo>', methods=['POST'])
 @login_required
-def upload_funcionarios():
-    arquivo = request.files.get('arquivo')
+def preview(modulo):
+    if modulo not in MODULOS_VALIDOS:
+        flash('Módulo inválido.', 'danger')
+        return redirect(url_for('importacao.index'))
 
+    arquivo = request.files.get('arquivo')
     if not arquivo or arquivo.filename == '':
         flash('Nenhum arquivo selecionado.', 'warning')
         return redirect(url_for('importacao.index'))
 
     ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
     if ext != 'xlsx':
-        flash('Formato inválido. Use o arquivo .xlsx (Excel 2007 ou superior).', 'danger')
+        flash('Formato inválido. Use arquivo .xlsx (Excel 2007 ou superior).', 'danger')
         return redirect(url_for('importacao.index'))
 
     admin_id = get_admin_id_robusta()
 
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(arquivo, data_only=True)
-        ws = wb.active
+        ws = _parse_xlsx(arquivo)
     except Exception as e:
         flash(f'Erro ao abrir planilha: {e}', 'danger')
         return redirect(url_for('importacao.index'))
 
     try:
-        from services.importacao_excel import importar_funcionarios
-        resultado = importar_funcionarios(ws, admin_id)
+        from services.importacao_excel import MODULO_MAP
+        servico = MODULO_MAP[modulo]()
+
+        if modulo == 'funcionarios':
+            defaults = {
+                'data_admissao': request.form.get('default_data_admissao') or None,
+                'tipo_remuneracao': request.form.get('default_tipo_remuneracao') or 'salario',
+                'valor': request.form.get('default_valor') or '0',
+            }
+            validos, erros = servico.processar(ws, admin_id, defaults=defaults)
+        else:
+            validos, erros = servico.processar(ws, admin_id)
+
     except Exception as e:
-        logger.error(f"[IMPORTACAO] Erro fatal: {e}", exc_info=True)
-        flash(f'Erro inesperado durante a importação: {e}', 'danger')
+        logger.error(f'[IMPORTACAO][{modulo}] Erro no preview: {e}', exc_info=True)
+        flash(f'Erro inesperado ao processar planilha: {e}', 'danger')
         return redirect(url_for('importacao.index'))
 
-    return render_template('importacao/resultado.html', resultado=resultado)
+    cfg = MODULO_CONFIG[modulo]
+    dados_json = json.dumps(validos, default=str)
+
+    return render_template(
+        'importacao/preview.html',
+        modulo=modulo,
+        cfg=cfg,
+        validos=validos,
+        erros=erros,
+        colunas=cfg['colunas'],
+        dados_json=dados_json,
+    )
+
+
+@importacao_bp.route('/confirmar/<modulo>', methods=['POST'])
+@login_required
+def confirmar(modulo):
+    if modulo not in MODULOS_VALIDOS:
+        flash('Módulo inválido.', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    admin_id = get_admin_id_robusta()
+    dados_json = request.form.get('dados_json', '[]')
+
+    try:
+        rows = json.loads(dados_json)
+    except (json.JSONDecodeError, ValueError) as e:
+        flash(f'Dados inválidos — faça o preview novamente. ({e})', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    if not rows:
+        flash('Nenhum registro válido para importar.', 'warning')
+        return redirect(url_for('importacao.index'))
+
+    try:
+        from services.importacao_excel import MODULO_MAP
+        servico = MODULO_MAP[modulo]()
+        resultado = servico.importar(rows, admin_id)
+    except Exception as e:
+        logger.error(f'[IMPORTACAO][{modulo}] Erro no confirmar: {e}', exc_info=True)
+        flash(f'Erro inesperado ao importar: {e}', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    cfg = MODULO_CONFIG[modulo]
+    return render_template(
+        'importacao/resultado.html',
+        modulo=modulo,
+        cfg=cfg,
+        resultado=resultado,
+    )

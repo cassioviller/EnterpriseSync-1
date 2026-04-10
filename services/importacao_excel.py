@@ -1,33 +1,31 @@
 """
 Serviço de Importação Excel para o SIGE v9.0
-Suporta 5 módulos:
-  1. Funcionários (formato SIGE + formato REGISTRO_COLABORADORES)
-  2. Diárias (ponto eletrônico / registros manuais)
-  3. Alimentação
-  4. Transporte
-  5. Custos / Gestão de Custos V2
+5 módulos: Funcionários, Diárias, Alimentação, Transporte, Custos
+
+Fluxo por módulo:
+  1. processar(ws, admin_id, defaults={}) → (validos, erros)
+     - Lê planilha, valida campos, retorna preview sem salvar no DB
+  2. importar(rows, admin_id) → {'criados': N, 'erros': [...]}
+     - Recebe lista de dicts com dados já validados, salva no DB
 """
 import logging
+import re
 from datetime import datetime, date
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Helpers compartilhados ─────────────────────────────────────────────────────
 
-def _normalizar_texto(v):
+def _norm(v):
     if v is None:
         return ''
     return str(v).strip()
 
 def _parse_data(v):
-    """Converte string DD/MM/AAAA, AAAA-MM-DD ou objeto date/datetime → date."""
     if isinstance(v, (date, datetime)):
         return v.date() if isinstance(v, datetime) else v
-    s = _normalizar_texto(v)
-    if not s:
-        return None
-    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y'):
+    s = _norm(v)
+    for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d', '%d-%m-%Y'):
         try:
             return datetime.strptime(s, fmt).date()
         except ValueError:
@@ -35,659 +33,682 @@ def _parse_data(v):
     return None
 
 def _parse_float(v, default=0.0):
-    """
-    Converte valor numérico para float suportando formatos BR e EN.
-    BR: 1.800,50  → 1800.50  (ponto = milhar, vírgula = decimal)
-    EN: 1800.50   → 1800.50  (ponto = decimal, sem milhar)
-    Simples: 180  → 180.0
-    """
     if isinstance(v, (int, float)):
         return float(v)
-    s = _normalizar_texto(v).replace('R$', '').replace(' ', '').strip()
+    s = _norm(v).replace('R$', '').replace(' ', '')
     if not s:
         return default
     if ',' in s:
-        # Formato BR: remover ponto (milhar) e trocar vírgula por ponto (decimal)
         s = s.replace('.', '').replace(',', '.')
-    # Formato EN ou inteiro: o ponto já é decimal, usar diretamente
     try:
         return float(s)
     except (ValueError, TypeError):
         return default
 
-def _normalizar_cpf(cpf_raw):
-    """Remove pontuação, retorna string limpa de 11 dígitos."""
-    import re
-    cpf = re.sub(r'\D', '', _normalizar_texto(cpf_raw))
-    return cpf[:11] if cpf else ''
+def _limpar_cpf(v):
+    return re.sub(r'\D', '', _norm(v))[:11]
 
-def _mapear_headers(row):
-    """Converte lista de headers para dict {header_normalizado: col_index}."""
+def _mapear_headers(row_vals):
+    """Retorna {header_normalizado: col_index (0-based)}."""
     import unicodedata
-    def normalizar(s):
-        s = _normalizar_texto(s).lower()
+    def n(s):
+        s = _norm(s).lower()
         s = unicodedata.normalize('NFD', s)
         s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-        s = s.replace(' ', '_').replace('-', '_').replace('/', '_')
+        s = s.replace(' ', '_').replace('*', '').replace('-', '_').strip('_')
         return s
-    return {normalizar(str(cell)): idx for idx, cell in enumerate(row)}
+    return {n(str(cell)): idx for idx, cell in enumerate(row_vals)}
 
-# ── Detecção de formato ────────────────────────────────────────────────────────
+def _detectar_header_row(ws, must_contain):
+    """Detecta qual linha tem o cabeçalho contendo pelo menos um dos termos."""
+    import unicodedata
+    def n(s):
+        s = _norm(s).lower()
+        s = unicodedata.normalize('NFD', s)
+        s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+        s = s.replace(' ', '_').replace('*', '').strip('_')
+        return s
+    for r in range(1, min(6, ws.max_row + 1)):
+        vals = [ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)]
+        normalized = [n(str(v)) for v in vals]
+        if any(term in normalized for term in must_contain):
+            return r, [ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)]
+    return None, None
 
-def detectar_formato_funcionarios(headers_map):
-    """
-    Retorna 'sige' ou 'colaboradores' conforme os cabeçalhos encontrados.
-    Formato SIGE:          nome, cpf, tipo_remuneracao ...
-    Formato COLABORADORES: nome, remuneracao, valor (header na linha 3, dado na 4+)
-    """
-    if 'tipo_remuneracao' in headers_map or 'data_admissao' in headers_map:
-        return 'sige'
-    # Formato REGISTRO_COLABORADORES: tem "remuneracao" e "valor" mas não "tipo_remuneracao"
-    if 'remuneracao' in headers_map and 'valor' in headers_map:
-        return 'colaboradores'
-    return 'sige'
+def _cel(ws, row_num, hm, *keys):
+    """Retorna o valor da primeira chave encontrada no header_map."""
+    for k in keys:
+        if k in hm:
+            return ws.cell(row=row_num, column=hm[k] + 1).value
+    return None
+
 
 # ── MÓDULO 1: Funcionários ─────────────────────────────────────────────────────
 
-def importar_funcionarios(ws, admin_id, inicio_linha=4):
+class ImportacaoFuncionarios:
     """
-    Importa funcionários de planilha.
-    Tenta detectar automaticamente o formato pelo cabeçalho.
-    Retorna dict: {importados, atualizados, erros, detalhes}
+    Suporta dois formatos:
+    - SIGE: cabeçalho na linha 3 com: nome, cpf, tipo_remuneracao, valor, ...
+    - REGISTRO_COLABORADORES: cabeçalho na linha 3 com NOME, CPF, REMUNERACAO, VALOR
     """
-    from models import db, Funcionario, Departamento, Funcao
 
-    resultado = {'importados': 0, 'atualizados': 0, 'erros': 0, 'detalhes': []}
+    def _detectar_formato(self, hm):
+        if 'tipo_remuneracao' in hm or 'data_admissao' in hm:
+            return 'sige'
+        if 'remuneracao' in hm and 'valor' in hm:
+            return 'colaboradores'
+        return 'sige'
 
-    # ── Ler cabeçalho ──────────────────────────────────────────────────────────
-    # Tentar linha 3 primeiro (formato padrão), senão linha 1
-    header_row = None
-    for tentativa in [3, 1, 2]:
-        row_vals = [ws.cell(row=tentativa, column=c).value for c in range(1, ws.max_column + 1)]
-        if any(v for v in row_vals):
-            # Verifica se tem pelo menos "nome" ou "nome *"
-            import unicodedata
-            def norm(s):
-                s = _normalizar_texto(s).lower()
-                s = unicodedata.normalize('NFD', s)
-                s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-                s = s.replace(' ', '_').replace('-', '_').replace('*', '').strip()
-                return s
-            normalized = [norm(str(v)) for v in row_vals]
-            if 'nome' in normalized:
-                header_row = tentativa
-                inicio_linha = tentativa + 1
-                break
+    def processar(self, ws, admin_id, defaults=None):
+        """
+        Retorna (validos, erros).
+        validos = list[dict] prontos para importar
+        erros   = list[dict] com 'linha' e 'motivo'
+        """
+        from models import Funcionario
+        defaults = defaults or {}
 
-    if header_row is None:
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'N/A', 'status': 'erro', 'mensagem': 'Cabeçalho não encontrado'})
-        return resultado
+        header_row, raw_headers = _detectar_header_row(ws, ['nome', 'cpf'])
+        if not header_row:
+            return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
 
-    raw_headers = [ws.cell(row=header_row, column=c).value for c in range(1, ws.max_column + 1)]
-    hm = _mapear_headers(raw_headers)
+        hm = _mapear_headers(raw_headers)
+        formato = self._detectar_formato(hm)
 
-    # Remover asteriscos dos nomes de chave
-    hm_clean = {}
-    for k, v in hm.items():
-        clean_k = k.replace('*', '').strip('_').strip()
-        hm_clean[clean_k] = v
-    hm = hm_clean
+        validos, erros = [], []
+        cpfs_vistos = set()
 
-    formato = detectar_formato_funcionarios(hm)
-    logger.info(f"[IMPORT] Formato detectado: {formato}, início linha {inicio_linha}")
+        for rn in range(header_row + 1, ws.max_row + 1):
+            def c(*keys):
+                return _cel(ws, rn, hm, *keys)
 
-    # ── Processar linhas de dados ──────────────────────────────────────────────
-    for row_num in range(inicio_linha, ws.max_row + 1):
-        def cel(key, aliases=None):
-            """Pega valor de célula pela chave do header_map com suporte a aliases."""
-            keys_to_try = [key] + (aliases or [])
-            for k in keys_to_try:
-                if k in hm:
-                    v = ws.cell(row=row_num, column=hm[k] + 1).value
-                    return v
-            return None
+            nome = _norm(c('nome'))
+            if not nome or nome.upper() in ('NOME', '-', '#N/A', 'NONE'):
+                continue
 
-        nome = _normalizar_texto(cel('nome'))
-        if not nome or nome.upper() in ('NOME', 'NOME *', '-', '#N/A'):
-            continue
+            cpf_raw = c('cpf')
+            if not cpf_raw:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': 'CPF não informado'})
+                continue
+            cpf = _limpar_cpf(cpf_raw)
+            if len(cpf) < 11:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': f'CPF inválido: {cpf_raw}'})
+                continue
+            if cpf in cpfs_vistos:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': f'CPF duplicado na planilha: {cpf}'})
+                continue
+            cpfs_vistos.add(cpf)
 
-        cpf_raw = cel('cpf')
-        if not cpf_raw:
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'status': 'erro', 'mensagem': 'CPF não informado'})
-            continue
-        cpf = _normalizar_cpf(cpf_raw)
-        if len(cpf) < 11:
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'status': 'erro', 'mensagem': f'CPF inválido: {cpf_raw}'})
-            continue
+            # Verifica se já existe (será atualização, não erro)
+            existe = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
+            operacao = 'atualizar' if existe else 'criar'
 
-        try:
-            # ── Campos comuns ──────────────────────────────────────────────────
-            rg = _normalizar_texto(cel('rg'))
-            telefone = _normalizar_texto(cel('telefone', ['tel', 'telefone_whatsapp']))
-            endereco = _normalizar_texto(cel('endereco', ['endereco_completo']))
-            chave_pix = _normalizar_texto(cel('chave_pix', ['pix', 'chavepix']))
-            data_nasc_raw = cel('data_nascimento', ['data_nasc', 'data_nasc_', 'datanascimento'])
-            data_nasc = _parse_data(data_nasc_raw)
+            if formato == 'colaboradores':
+                rem_raw = _norm(c('remuneracao')).upper()
+                tipo_rem = 'diaria' if ('DIARIA' in rem_raw or 'DIÁRIA' in rem_raw) else 'salario'
+                valor = _parse_float(c('valor'))
+                data_admissao = _parse_data(c('data_admissao', 'admissao')) or (
+                    _parse_data(defaults.get('data_admissao')) or date.today()
+                )
+            else:
+                rem_raw = _norm(c('tipo_remuneracao')).lower()
+                tipo_rem = 'diaria' if 'diaria' in rem_raw or 'diária' in rem_raw else 'salario'
+                valor = _parse_float(c('valor', 'valor_diaria', 'salario'))
+                data_admissao = _parse_data(c('data_admissao', 'admissao')) or date.today()
 
-            status_raw = _normalizar_texto(cel('status')).upper()
+            status_raw = _norm(c('status')).upper()
             ativo = status_raw != 'INATIVO'
 
-            # ── Campos de remuneração (adaptar conforme formato) ────────────────
-            if formato == 'colaboradores':
-                remuneracao_raw = _normalizar_texto(cel('remuneracao')).upper()
-                if 'DIARIA' in remuneracao_raw or 'DIÁRIA' in remuneracao_raw:
-                    tipo_remuneracao = 'diaria'
-                else:
-                    tipo_remuneracao = 'salario'
-                valor_raw = cel('valor')
-                valor = _parse_float(valor_raw)
-                # No formato COLABORADORES, não há data_admissao — usar hoje
-                data_admissao_raw = cel('data_admissao', ['data_admissao', 'admissao'])
-                data_admissao = _parse_data(data_admissao_raw) or date.today()
-            else:  # sige
-                tipo_remuneracao_raw = _normalizar_texto(cel('tipo_remuneracao', ['tipo_remuneracao_'])).lower()
-                if 'diaria' in tipo_remuneracao_raw or 'diária' in tipo_remuneracao_raw:
-                    tipo_remuneracao = 'diaria'
-                else:
-                    tipo_remuneracao = 'salario'
-                valor_raw = cel('valor', ['valor_diaria', 'salario', 'remuneracao'])
-                valor = _parse_float(valor_raw)
-                data_admissao_raw = cel('data_admissao', ['admissao', 'data_de_admissao'])
-                data_admissao = _parse_data(data_admissao_raw) or date.today()
+            row = {
+                'linha': rn,
+                'nome': nome,
+                'cpf': cpf,
+                'rg': _norm(c('rg')) or None,
+                'telefone': _norm(c('telefone', 'tel')) or None,
+                'endereco': _norm(c('endereco')) or None,
+                'chave_pix': _norm(c('chave_pix', 'pix')) or None,
+                'data_nascimento': _parse_data(c('data_nascimento', 'data_nasc')),
+                'ativo': ativo,
+                'tipo_remuneracao': tipo_rem,
+                'valor': valor,
+                'data_admissao': str(data_admissao),
+                'valor_va': _parse_float(c('valor_va', 'va')),
+                'valor_vt': _parse_float(c('valor_vt', 'vt')),
+                'operacao': operacao,
+            }
+            validos.append(row)
 
-            valor_va = _parse_float(cel('valor_va', ['va', 'vale_alimentacao']))
-            valor_vt = _parse_float(cel('valor_vt', ['vt', 'vale_transporte']))
+        return validos, erros
 
-            # ── Upsert ────────────────────────────────────────────────────────
-            # Savepoint por linha — falha em uma linha não desfaz as anteriores
-            savepoint = db.session.begin_nested()
+    def importar(self, rows, admin_id):
+        from models import db, Funcionario
+        criados, atualizados, erros = 0, 0, []
+
+        for row in rows:
+            sp = db.session.begin_nested()
             try:
+                cpf = row['cpf']
+                data_adm = _parse_data(row.get('data_admissao')) or date.today()
                 existente = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
                 if existente:
-                    existente.nome = nome
-                    existente.rg = rg or existente.rg
-                    existente.telefone = telefone or existente.telefone
-                    existente.endereco = endereco or existente.endereco
-                    if chave_pix:
-                        existente.chave_pix = chave_pix
-                    if data_nasc:
-                        existente.data_nascimento = data_nasc
-                    existente.ativo = ativo
-                    existente.tipo_remuneracao = tipo_remuneracao
-                    if tipo_remuneracao == 'diaria' and valor > 0:
-                        existente.valor_diaria = valor
-                    elif tipo_remuneracao == 'salario' and valor > 0:
-                        existente.salario = valor
-                    if valor_va > 0:
-                        existente.valor_va = valor_va
-                    if valor_vt > 0:
-                        existente.valor_vt = valor_vt
-                    savepoint.commit()
-                    resultado['atualizados'] += 1
-                    resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'cpf': cpf, 'status': 'atualizado'})
+                    existente.nome = row['nome']
+                    if row.get('rg'):
+                        existente.rg = row['rg']
+                    if row.get('telefone'):
+                        existente.telefone = row['telefone']
+                    if row.get('endereco'):
+                        existente.endereco = row['endereco']
+                    if row.get('chave_pix'):
+                        existente.chave_pix = row['chave_pix']
+                    if row.get('data_nascimento'):
+                        existente.data_nascimento = _parse_data(row['data_nascimento'])
+                    existente.ativo = row.get('ativo', True)
+                    existente.tipo_remuneracao = row['tipo_remuneracao']
+                    v = _parse_float(row.get('valor', 0))
+                    if row['tipo_remuneracao'] == 'diaria' and v > 0:
+                        existente.valor_diaria = v
+                    elif v > 0:
+                        existente.salario = v
+                    if _parse_float(row.get('valor_va', 0)) > 0:
+                        existente.valor_va = _parse_float(row['valor_va'])
+                    if _parse_float(row.get('valor_vt', 0)) > 0:
+                        existente.valor_vt = _parse_float(row['valor_vt'])
+                    sp.commit()
+                    atualizados += 1
                 else:
-                    # Código automático VV###
-                    ultimo = Funcionario.query.filter(
-                        Funcionario.codigo.like('VV%'),
-                        Funcionario.admin_id == admin_id
-                    ).order_by(Funcionario.codigo.desc()).first()
+                    ultimo = (Funcionario.query
+                              .filter(Funcionario.codigo.like('VV%'), Funcionario.admin_id == admin_id)
+                              .order_by(Funcionario.codigo.desc()).first())
                     try:
-                        proximo_num = int(ultimo.codigo[2:]) + 1 if ultimo else 1
+                        proximo = int(ultimo.codigo[2:]) + 1 if ultimo else 1
                     except Exception:
-                        proximo_num = 1
-                    codigo = f"VV{proximo_num:03d}"
-
+                        proximo = 1
+                    codigo = f"VV{proximo:03d}"
+                    v = _parse_float(row.get('valor', 0))
                     kwargs = dict(
-                        nome=nome, cpf=cpf, rg=rg or None, telefone=telefone or None,
-                        endereco=endereco or None, chave_pix=chave_pix or None,
-                        data_nascimento=data_nasc, ativo=ativo, admin_id=admin_id,
-                        codigo=codigo, tipo_remuneracao=tipo_remuneracao,
-                        data_admissao=data_admissao, valor_va=valor_va, valor_vt=valor_vt,
+                        nome=row['nome'], cpf=cpf, rg=row.get('rg'),
+                        telefone=row.get('telefone'), endereco=row.get('endereco'),
+                        chave_pix=row.get('chave_pix'),
+                        data_nascimento=_parse_data(row.get('data_nascimento')),
+                        ativo=row.get('ativo', True), admin_id=admin_id, codigo=codigo,
+                        tipo_remuneracao=row['tipo_remuneracao'], data_admissao=data_adm,
+                        valor_va=_parse_float(row.get('valor_va', 0)),
+                        valor_vt=_parse_float(row.get('valor_vt', 0)),
                     )
-                    if tipo_remuneracao == 'diaria':
-                        kwargs['valor_diaria'] = valor
+                    if row['tipo_remuneracao'] == 'diaria':
+                        kwargs['valor_diaria'] = v
                         kwargs['salario'] = 0
                     else:
-                        kwargs['salario'] = valor
+                        kwargs['salario'] = v
                         kwargs['valor_diaria'] = 0
+                    db.session.add(Funcionario(**kwargs))
+                    sp.commit()
+                    criados += 1
+            except Exception as e:
+                sp.rollback()
+                erros.append({'linha': row.get('linha'), 'nome': row.get('nome'), 'motivo': str(e)})
 
-                    func = Funcionario(**kwargs)
-                    db.session.add(func)
-                    savepoint.commit()
-                    resultado['importados'] += 1
-                    resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'cpf': cpf, 'status': 'importado', 'codigo': codigo})
-
-            except Exception as row_err:
-                savepoint.rollback()
-                logger.error(f"[IMPORT] Erro na linha {row_num}: {row_err}", exc_info=True)
-                resultado['erros'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'status': 'erro', 'mensagem': str(row_err)})
-
+        try:
+            db.session.commit()
         except Exception as e:
-            logger.error(f"[IMPORT] Erro inesperado na linha {row_num}: {e}", exc_info=True)
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'nome': nome, 'status': 'erro', 'mensagem': str(e)})
+            db.session.rollback()
+            erros.append({'linha': 'COMMIT', 'motivo': str(e)})
 
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"[IMPORT] Erro ao commitar funcionários: {e}")
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'COMMIT', 'status': 'erro', 'mensagem': str(e)})
-
-    return resultado
+        return {'criados': criados, 'atualizados': atualizados, 'erros': erros}
 
 
 # ── MÓDULO 2: Diárias ──────────────────────────────────────────────────────────
 
-def importar_diarias(ws, admin_id, inicio_linha=4):
+class ImportacaoDiarias:
     """
-    Importa registros de ponto (diárias) para diaristas V2.
-    Colunas esperadas: cpf_funcionario, data, obra_id/obra_codigo, tipo_ponto, horas_trabalhadas
+    Colunas: nome_funcionario, data, valor, obra, status, descricao, chave_pix
+    Cria GestaoCustoPai/Filho via registrar_custo_automatico(tipo='SALARIO')
     """
-    from models import db, Funcionario, Obra, RegistroPonto
-    from event_manager import fire_event
 
-    resultado = {'importados': 0, 'erros': 0, 'detalhes': []}
+    def processar(self, ws, admin_id):
+        from models import Funcionario, Obra
 
-    # Detectar cabeçalho
-    header_row = None
-    for tentativa in [3, 1, 2]:
-        row_vals = [ws.cell(row=tentativa, column=c).value for c in range(1, ws.max_column + 1)]
-        import unicodedata
-        def norm(s):
-            s = _normalizar_texto(s).lower()
-            s = unicodedata.normalize('NFD', s)
-            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-            s = s.replace(' ', '_').replace('*', '').strip()
-            return s
-        normalized = [norm(str(v)) for v in row_vals]
-        if any(x in normalized for x in ['cpf', 'cpf_funcionario', 'funcionario']):
-            header_row = tentativa
-            inicio_linha = tentativa + 1
-            break
+        header_row, raw_headers = _detectar_header_row(ws, ['nome_funcionario', 'nome', 'funcionario'])
+        if not header_row:
+            return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
 
-    if header_row is None:
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'N/A', 'status': 'erro', 'mensagem': 'Cabeçalho não encontrado'})
-        return resultado
+        hm = _mapear_headers(raw_headers)
+        validos, erros = [], []
 
-    raw_headers = [ws.cell(row=header_row, column=c).value for c in range(1, ws.max_column + 1)]
-    hm_raw = _mapear_headers(raw_headers)
-    hm = {k.replace('*', '').strip('_'): v for k, v in hm_raw.items()}
+        for rn in range(header_row + 1, ws.max_row + 1):
+            def c(*keys):
+                return _cel(ws, rn, hm, *keys)
 
-    for row_num in range(inicio_linha, ws.max_row + 1):
-        def cel(key, aliases=None):
-            for k in [key] + (aliases or []):
-                if k in hm:
-                    return ws.cell(row=row_num, column=hm[k] + 1).value
-            return None
-
-        cpf_raw = cel('cpf', ['cpf_funcionario'])
-        data_raw = cel('data', ['data_ponto', 'data_diaria'])
-        if not cpf_raw or not data_raw:
-            continue
-
-        cpf = _normalizar_cpf(cpf_raw)
-        data_ponto = _parse_data(data_raw)
-        if not data_ponto:
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': f'Data inválida: {data_raw}'})
-            continue
-
-        try:
-            funcionario = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
-            if not funcionario:
-                resultado['erros'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': f'Funcionário CPF {cpf} não encontrado'})
+            nome = _norm(c('nome_funcionario', 'nome', 'funcionario'))
+            if not nome:
                 continue
 
-            # Obra
-            obra_id = None
-            obra_raw = cel('obra_id', ['obra', 'obra_codigo', 'codigo_obra'])
+            data_ref = _parse_data(c('data', 'data_ponto'))
+            if not data_ref:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': 'Data inválida'})
+                continue
+
+            valor = _parse_float(c('valor', 'valor_diaria'))
+            if valor <= 0:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': 'Valor deve ser maior que 0'})
+                continue
+
+            # Buscar funcionário
+            func = (Funcionario.query
+                    .filter(Funcionario.nome.ilike(f'%{nome}%'), Funcionario.admin_id == admin_id)
+                    .first())
+            if not func:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
+                continue
+
+            # Buscar obra
+            obra_raw = _norm(c('obra', 'obra_id', 'codigo_obra'))
+            obra = None
             if obra_raw:
-                try:
-                    obra_id = int(obra_raw)
-                except (ValueError, TypeError):
-                    obra = Obra.query.filter_by(codigo=str(obra_raw).strip(), admin_id=admin_id).first()
-                    if obra:
-                        obra_id = obra.id
+                obra = (Obra.query
+                        .filter(Obra.admin_id == admin_id)
+                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .first())
 
-            # Idempotência
-            ja_existe = RegistroPonto.query.filter_by(
-                funcionario_id=funcionario.id,
-                data=data_ponto,
-                tipo_ponto='entrada',
-                admin_id=admin_id
-            ).first()
-            if ja_existe:
-                resultado['detalhes'].append({'linha': row_num, 'status': 'skip', 'mensagem': f'Registro de {funcionario.nome} em {data_ponto} já existe'})
-                continue
+            validos.append({
+                'linha': rn,
+                'nome': func.nome,
+                'funcionario_id': func.id,
+                'data': str(data_ref),
+                'valor': valor,
+                'obra_id': obra.id if obra else None,
+                'obra_nome': obra.nome if obra else '(sem obra)',
+                'status': _norm(c('status')) or 'PENDENTE',
+                'descricao': _norm(c('descricao')) or f'Diária - {func.nome} - {data_ref.strftime("%d/%m/%Y")}',
+            })
 
-            tipo_ponto = _normalizar_texto(cel('tipo_ponto')).lower() or 'entrada'
-            horas = _parse_float(cel('horas_trabalhadas', ['horas']), 8.0)
+        return validos, erros
 
-            reg = RegistroPonto(
-                funcionario_id=funcionario.id,
-                data=data_ponto,
-                tipo_ponto=tipo_ponto,
-                horas_trabalhadas=horas,
-                obra_id=obra_id,
-                admin_id=admin_id,
-            )
-            db.session.add(reg)
-            db.session.flush()
+    def importar(self, rows, admin_id):
+        from models import db
+        from utils.financeiro_integration import registrar_custo_automatico
+        criados, erros = 0, []
 
-            # Disparar evento para criar custo automático
-            fire_event('ponto_registrado', {'registro_id': reg.id, 'tipo_ponto': tipo_ponto}, admin_id)
+        for row in rows:
+            try:
+                data_ref = _parse_data(row['data'])
+                filho = registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria='SALARIO',
+                    entidade_nome=row['nome'],
+                    entidade_id=row['funcionario_id'],
+                    data=data_ref,
+                    descricao=row['descricao'],
+                    valor=_parse_float(row['valor']),
+                    obra_id=row.get('obra_id'),
+                    origem_tabela='importacao_diaria',
+                    origem_id=row['linha'],
+                )
+                if filho:
+                    db.session.commit()
+                    criados += 1
+                else:
+                    erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': 'Erro ao registrar custo'})
+            except Exception as e:
+                db.session.rollback()
+                erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': str(e)})
 
-            resultado['importados'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'status': 'importado', 'nome': funcionario.nome, 'data': str(data_ponto)})
-
-        except Exception as e:
-            logger.error(f"[IMPORT DIARIA] Linha {row_num}: {e}", exc_info=True)
-            db.session.rollback()
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': str(e)})
-
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'COMMIT', 'status': 'erro', 'mensagem': str(e)})
-
-    return resultado
+        return {'criados': criados, 'erros': erros}
 
 
 # ── MÓDULO 3: Alimentação ──────────────────────────────────────────────────────
 
-def importar_alimentacao(ws, admin_id, inicio_linha=4):
+class ImportacaoAlimentacao:
     """
-    Colunas: cpf_funcionario|nome_funcionario, data, descricao, valor, obra_id
+    Colunas: data, obra, valor_total, funcionarios (sep por ;), descricao, restaurante
+    Cria AlimentacaoLancamento + associa funcionários por nome
     """
-    from models import db, Funcionario, Obra, AlimentacaoLancamento
-    from utils.financeiro_integration import registrar_custo_automatico
 
-    resultado = {'importados': 0, 'erros': 0, 'detalhes': []}
+    def processar(self, ws, admin_id):
+        from models import Funcionario, Obra
 
-    header_row = _detectar_linha_header(ws, ['cpf', 'nome', 'funcionario', 'descricao'])
-    if header_row is None:
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'N/A', 'status': 'erro', 'mensagem': 'Cabeçalho não encontrado'})
-        return resultado
+        header_row, raw_headers = _detectar_header_row(ws, ['data', 'valor_total', 'funcionarios'])
+        if not header_row:
+            return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
 
-    raw_headers = [ws.cell(row=header_row, column=c).value for c in range(1, ws.max_column + 1)]
-    hm = {k.replace('*', '').strip('_'): v for k, v in _mapear_headers(raw_headers).items()}
+        hm = _mapear_headers(raw_headers)
+        validos, erros = [], []
 
-    for row_num in range(header_row + 1, ws.max_row + 1):
-        def cel(key, aliases=None):
-            for k in [key] + (aliases or []):
-                if k in hm:
-                    return ws.cell(row=row_num, column=hm[k] + 1).value
-            return None
+        for rn in range(header_row + 1, ws.max_row + 1):
+            def c(*keys):
+                return _cel(ws, rn, hm, *keys)
 
-        data_raw = cel('data', ['data_lancamento'])
-        valor_raw = cel('valor')
-        if not data_raw or not valor_raw:
-            continue
+            data_ref = _parse_data(c('data'))
+            if not data_ref:
+                continue
 
-        data_ref = _parse_data(data_raw)
-        valor = _parse_float(valor_raw)
-        if not data_ref or valor <= 0:
-            continue
+            valor = _parse_float(c('valor_total', 'valor'))
+            if valor <= 0:
+                erros.append({'linha': rn, 'nome': str(data_ref), 'motivo': 'Valor deve ser maior que 0'})
+                continue
 
-        descricao = _normalizar_texto(cel('descricao', ['item', 'refeicao'])) or 'Alimentação importada'
+            obra_raw = _norm(c('obra', 'obra_id'))
+            obra = None
+            if obra_raw:
+                obra = (Obra.query.filter(Obra.admin_id == admin_id)
+                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .first())
+                if not obra:
+                    erros.append({'linha': rn, 'nome': str(data_ref), 'motivo': f'Obra "{obra_raw}" não encontrada'})
+                    continue
 
-        # Buscar funcionário por CPF ou nome
-        funcionario = None
-        cpf_raw = cel('cpf', ['cpf_funcionario'])
-        nome_raw = cel('nome', ['nome_funcionario', 'funcionario'])
-        if cpf_raw:
-            cpf = _normalizar_cpf(cpf_raw)
-            funcionario = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
-        if not funcionario and nome_raw:
-            nome_busca = _normalizar_texto(nome_raw)
-            funcionario = Funcionario.query.filter(
-                Funcionario.nome.ilike(f'%{nome_busca}%'),
-                Funcionario.admin_id == admin_id
-            ).first()
+            # Resolver lista de funcionários
+            funcs_raw = _norm(c('funcionarios', 'funcionario'))
+            func_ids = []
+            func_nomes_ok = []
+            func_nomes_erro = []
+            if funcs_raw:
+                for fn in [x.strip() for x in funcs_raw.split(';') if x.strip()]:
+                    f = (Funcionario.query
+                         .filter(Funcionario.nome.ilike(f'%{fn}%'), Funcionario.admin_id == admin_id)
+                         .first())
+                    if f:
+                        func_ids.append(f.id)
+                        func_nomes_ok.append(f.nome)
+                    else:
+                        func_nomes_erro.append(fn)
 
-        obra_id = None
-        obra_raw = cel('obra_id', ['obra', 'codigo_obra'])
-        if obra_raw:
+            if func_nomes_erro:
+                erros.append({'linha': rn, 'nome': str(data_ref),
+                               'motivo': f'Funcionários não encontrados: {", ".join(func_nomes_erro)}'})
+                continue
+
+            validos.append({
+                'linha': rn,
+                'data': str(data_ref),
+                'valor_total': valor,
+                'obra_id': obra.id if obra else None,
+                'obra_nome': obra.nome if obra else '(sem obra)',
+                'descricao': _norm(c('descricao')) or 'Alimentação importada',
+                'restaurante': _norm(c('restaurante', 'fornecedor')) or None,
+                'funcionario_ids': func_ids,
+                'funcionarios_nomes': '; '.join(func_nomes_ok),
+            })
+
+        return validos, erros
+
+    def importar(self, rows, admin_id):
+        from models import db, AlimentacaoLancamento, Funcionario
+        from sqlalchemy import text
+        criados, erros = 0, []
+
+        for row in rows:
+            sp = db.session.begin_nested()
             try:
-                obra_id = int(obra_raw)
-            except (ValueError, TypeError):
-                obra = Obra.query.filter_by(codigo=str(obra_raw).strip(), admin_id=admin_id).first()
-                if obra:
-                    obra_id = obra.id
+                data_ref = _parse_data(row['data'])
+                lanc = AlimentacaoLancamento(
+                    data=data_ref,
+                    valor_total=_parse_float(row['valor_total']),
+                    descricao=row['descricao'],
+                    obra_id=row.get('obra_id'),
+                    admin_id=admin_id,
+                )
+                db.session.add(lanc)
+                db.session.flush()
+
+                # Associar funcionários (tabela M2M: alimentacao_funcionarios_assoc)
+                for fid in row.get('funcionario_ids', []):
+                    db.session.execute(
+                        text('INSERT INTO alimentacao_funcionarios_assoc (lancamento_id, funcionario_id, admin_id) VALUES (:lid, :fid, :aid) ON CONFLICT DO NOTHING'),
+                        {'lid': lanc.id, 'fid': fid, 'aid': admin_id}
+                    )
+                sp.commit()
+                criados += 1
+            except Exception as e:
+                sp.rollback()
+                erros.append({'linha': row['linha'], 'motivo': str(e)})
 
         try:
-            filho = registrar_custo_automatico(
-                admin_id=admin_id,
-                tipo_categoria='ALIMENTACAO',
-                entidade_nome=funcionario.nome if funcionario else 'Importação Excel',
-                entidade_id=funcionario.id if funcionario else None,
-                data=data_ref,
-                descricao=descricao,
-                valor=valor,
-                obra_id=obra_id,
-                origem_tabela='importacao_alimentacao',
-                origem_id=row_num,
-            )
-            if filho:
-                db.session.commit()
-                resultado['importados'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'importado', 'valor': valor, 'data': str(data_ref)})
-            else:
-                resultado['erros'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': 'registrar_custo_automatico retornou None'})
+            db.session.commit()
         except Exception as e:
-            logger.error(f"[IMPORT ALIMENTACAO] Linha {row_num}: {e}", exc_info=True)
             db.session.rollback()
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': str(e)})
+            erros.append({'linha': 'COMMIT', 'motivo': str(e)})
 
-    return resultado
+        return {'criados': criados, 'erros': erros}
 
 
 # ── MÓDULO 4: Transporte ───────────────────────────────────────────────────────
 
-def importar_transporte(ws, admin_id, inicio_linha=4):
+class ImportacaoTransporte:
     """
-    Colunas: cpf_funcionario|nome_funcionario, data, descricao, valor, obra_id, categoria
+    Colunas: data, nome_funcionario, categoria, valor, obra, descricao
+    Cria GestaoCustoPai/Filho via registrar_custo_automatico(tipo='TRANSPORTE')
     """
-    from models import db, Funcionario, Obra
-    from utils.financeiro_integration import registrar_custo_automatico
 
-    resultado = {'importados': 0, 'erros': 0, 'detalhes': []}
+    def processar(self, ws, admin_id):
+        from models import Funcionario, Obra
 
-    header_row = _detectar_linha_header(ws, ['cpf', 'nome', 'funcionario', 'valor'])
-    if header_row is None:
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'N/A', 'status': 'erro', 'mensagem': 'Cabeçalho não encontrado'})
-        return resultado
+        header_row, raw_headers = _detectar_header_row(ws, ['nome_funcionario', 'funcionario', 'nome'])
+        if not header_row:
+            return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
 
-    raw_headers = [ws.cell(row=header_row, column=c).value for c in range(1, ws.max_column + 1)]
-    hm = {k.replace('*', '').strip('_'): v for k, v in _mapear_headers(raw_headers).items()}
+        hm = _mapear_headers(raw_headers)
+        validos, erros = [], []
 
-    for row_num in range(header_row + 1, ws.max_row + 1):
-        def cel(key, aliases=None):
-            for k in [key] + (aliases or []):
-                if k in hm:
-                    return ws.cell(row=row_num, column=hm[k] + 1).value
-            return None
+        for rn in range(header_row + 1, ws.max_row + 1):
+            def c(*keys):
+                return _cel(ws, rn, hm, *keys)
 
-        data_raw = cel('data', ['data_lancamento'])
-        valor_raw = cel('valor')
-        if not data_raw or not valor_raw:
-            continue
+            nome = _norm(c('nome_funcionario', 'nome', 'funcionario'))
+            if not nome:
+                continue
 
-        data_ref = _parse_data(data_raw)
-        valor = _parse_float(valor_raw)
-        if not data_ref or valor <= 0:
-            continue
+            data_ref = _parse_data(c('data'))
+            if not data_ref:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': 'Data inválida'})
+                continue
 
-        descricao = _normalizar_texto(cel('descricao', ['tipo', 'categoria'])) or 'Transporte importado'
+            valor = _parse_float(c('valor'))
+            if valor <= 0:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': 'Valor deve ser maior que 0'})
+                continue
 
-        funcionario = None
-        cpf_raw = cel('cpf', ['cpf_funcionario'])
-        nome_raw = cel('nome', ['nome_funcionario', 'funcionario'])
-        if cpf_raw:
-            cpf = _normalizar_cpf(cpf_raw)
-            funcionario = Funcionario.query.filter_by(cpf=cpf, admin_id=admin_id).first()
-        if not funcionario and nome_raw:
-            nome_busca = _normalizar_texto(nome_raw)
-            funcionario = Funcionario.query.filter(
-                Funcionario.nome.ilike(f'%{nome_busca}%'),
-                Funcionario.admin_id == admin_id
-            ).first()
+            func = (Funcionario.query
+                    .filter(Funcionario.nome.ilike(f'%{nome}%'), Funcionario.admin_id == admin_id)
+                    .first())
+            if not func:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
+                continue
 
-        obra_id = None
-        obra_raw = cel('obra_id', ['obra', 'codigo_obra'])
-        if obra_raw:
+            obra_raw = _norm(c('obra'))
+            obra = None
+            if obra_raw:
+                obra = (Obra.query.filter(Obra.admin_id == admin_id)
+                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .first())
+
+            categoria = _norm(c('categoria')) or 'Transporte'
+
+            validos.append({
+                'linha': rn,
+                'nome': func.nome,
+                'funcionario_id': func.id,
+                'data': str(data_ref),
+                'valor': valor,
+                'categoria': categoria,
+                'obra_id': obra.id if obra else None,
+                'obra_nome': obra.nome if obra else '(sem obra)',
+                'descricao': _norm(c('descricao')) or f'{categoria} - {func.nome} - {data_ref.strftime("%d/%m/%Y")}',
+            })
+
+        return validos, erros
+
+    def importar(self, rows, admin_id):
+        from models import db
+        from utils.financeiro_integration import registrar_custo_automatico
+        criados, erros = 0, []
+
+        for row in rows:
             try:
-                obra_id = int(obra_raw)
-            except (ValueError, TypeError):
-                obra = Obra.query.filter_by(codigo=str(obra_raw).strip(), admin_id=admin_id).first()
-                if obra:
-                    obra_id = obra.id
+                data_ref = _parse_data(row['data'])
+                filho = registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria='TRANSPORTE',
+                    entidade_nome=row['nome'],
+                    entidade_id=row['funcionario_id'],
+                    data=data_ref,
+                    descricao=row['descricao'],
+                    valor=_parse_float(row['valor']),
+                    obra_id=row.get('obra_id'),
+                    origem_tabela='importacao_transporte',
+                    origem_id=row['linha'],
+                )
+                if filho:
+                    db.session.commit()
+                    criados += 1
+                else:
+                    erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': 'Erro ao registrar custo'})
+            except Exception as e:
+                db.session.rollback()
+                erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': str(e)})
+
+        return {'criados': criados, 'erros': erros}
+
+
+# ── MÓDULO 5: Custos ───────────────────────────────────────────────────────────
+
+class ImportacaoCustos:
+    """
+    Colunas: data, fornecedor, descricao, valor, obra, categoria, status,
+             forma_pagamento, banco_conta, nf_numero, parcela, data_vencimento, observacoes
+    Cria GestaoCustoPai diretamente
+    """
+    CATEGORIAS_VALIDAS = {
+        'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'MATERIAL',
+        'COMPRA', 'DESPESA_GERAL', 'REEMBOLSO',
+    }
+
+    def processar(self, ws, admin_id):
+        from models import Obra
+
+        header_row, raw_headers = _detectar_header_row(ws, ['fornecedor', 'descricao', 'valor'])
+        if not header_row:
+            return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
+
+        hm = _mapear_headers(raw_headers)
+        validos, erros = [], []
+
+        for rn in range(header_row + 1, ws.max_row + 1):
+            def c(*keys):
+                return _cel(ws, rn, hm, *keys)
+
+            fornecedor = _norm(c('fornecedor', 'nome', 'empresa'))
+            descricao = _norm(c('descricao', 'historico', 'item'))
+            if not descricao and not fornecedor:
+                continue
+
+            valor = _parse_float(c('valor', 'valor_total'))
+            if valor <= 0:
+                erros.append({'linha': rn, 'nome': fornecedor or descricao, 'motivo': 'Valor deve ser maior que 0'})
+                continue
+
+            data_ref = _parse_data(c('data', 'data_pagamento')) or date.today()
+            data_venc = _parse_data(c('data_vencimento'))
+
+            categoria = _norm(c('categoria', 'tipo', 'tipo_categoria')).upper()
+            if categoria not in self.CATEGORIAS_VALIDAS:
+                categoria = 'DESPESA_GERAL'
+
+            obra_raw = _norm(c('obra', 'centro_custo', 'obra_id'))
+            obra = None
+            if obra_raw:
+                obra = (Obra.query.filter(Obra.admin_id == admin_id)
+                        .filter((Obra.nome.ilike(f'%{obra_raw}%')) | (Obra.codigo == obra_raw))
+                        .first())
+
+            status_raw = _norm(c('status')).upper()
+            status = status_raw if status_raw in ('PAGO', 'PENDENTE', 'AUTORIZADO') else 'PENDENTE'
+
+            validos.append({
+                'linha': rn,
+                'fornecedor': fornecedor or 'Importação',
+                'descricao': descricao or fornecedor,
+                'valor': valor,
+                'data': str(data_ref),
+                'data_vencimento': str(data_venc) if data_venc else None,
+                'categoria': categoria,
+                'obra_id': obra.id if obra else None,
+                'obra_nome': obra.nome if obra else '(sem obra)',
+                'status': status,
+                'forma_pagamento': _norm(c('forma_pagamento')) or None,
+                'banco_conta': _norm(c('banco_conta')) or None,
+                'nf_numero': _norm(c('nf_numero', 'nota_fiscal')) or None,
+                'parcela': _norm(c('parcela')) or None,
+                'observacoes': _norm(c('observacoes', 'obs')) or None,
+            })
+
+        return validos, erros
+
+    def importar(self, rows, admin_id):
+        from models import db, GestaoCustoPai, GestaoCustoFilho
+        criados, erros = 0, []
+
+        for row in rows:
+            sp = db.session.begin_nested()
+            try:
+                data_ref = _parse_data(row['data'])
+                data_venc = _parse_data(row.get('data_vencimento'))
+                valor = _parse_float(row['valor'])
+
+                pai = GestaoCustoPai(
+                    admin_id=admin_id,
+                    tipo_categoria=row['categoria'],
+                    entidade_nome=row['fornecedor'],
+                    entidade_id=None,
+                    valor_total=valor,
+                    status=row.get('status', 'PENDENTE'),
+                    forma_pagamento=row.get('forma_pagamento') or None,
+                    data_vencimento=data_venc,
+                    numero_documento=row.get('nf_numero') or None,
+                    observacoes=row.get('observacoes') or None,
+                    data_pagamento=data_ref if row.get('status') == 'PAGO' else None,
+                )
+                db.session.add(pai)
+                db.session.flush()
+
+                filho = GestaoCustoFilho(
+                    pai_id=pai.id,
+                    data_referencia=data_ref,
+                    descricao=row.get('descricao') or row['fornecedor'],
+                    valor=valor,
+                    obra_id=row.get('obra_id'),
+                    admin_id=admin_id,
+                    origem_tabela='importacao_custos',
+                    origem_id=row.get('linha'),
+                )
+                db.session.add(filho)
+                sp.commit()
+                criados += 1
+            except Exception as e:
+                sp.rollback()
+                erros.append({'linha': row.get('linha', '?'), 'motivo': str(e)})
 
         try:
-            filho = registrar_custo_automatico(
-                admin_id=admin_id,
-                tipo_categoria='TRANSPORTE',
-                entidade_nome=funcionario.nome if funcionario else 'Importação Excel',
-                entidade_id=funcionario.id if funcionario else None,
-                data=data_ref,
-                descricao=descricao,
-                valor=valor,
-                obra_id=obra_id,
-                origem_tabela='importacao_transporte',
-                origem_id=row_num,
-            )
-            if filho:
-                db.session.commit()
-                resultado['importados'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'importado', 'valor': valor, 'data': str(data_ref)})
-            else:
-                resultado['erros'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': 'registrar_custo_automatico retornou None'})
+            db.session.commit()
         except Exception as e:
-            logger.error(f"[IMPORT TRANSPORTE] Linha {row_num}: {e}", exc_info=True)
             db.session.rollback()
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': str(e)})
+            erros.append({'linha': 'COMMIT', 'motivo': str(e)})
 
-    return resultado
-
-
-# ── MÓDULO 5: Custos Gerais ────────────────────────────────────────────────────
-
-def importar_custos(ws, admin_id, inicio_linha=4):
-    """
-    Colunas: data, descricao, categoria, valor, obra_id, fornecedor
-    """
-    from models import db, Obra
-    from utils.financeiro_integration import registrar_custo_automatico
-
-    resultado = {'importados': 0, 'erros': 0, 'detalhes': []}
-
-    header_row = _detectar_linha_header(ws, ['descricao', 'valor', 'categoria'])
-    if header_row is None:
-        resultado['erros'] += 1
-        resultado['detalhes'].append({'linha': 'N/A', 'status': 'erro', 'mensagem': 'Cabeçalho não encontrado'})
-        return resultado
-
-    raw_headers = [ws.cell(row=header_row, column=c).value for c in range(1, ws.max_column + 1)]
-    hm = {k.replace('*', '').strip('_'): v for k, v in _mapear_headers(raw_headers).items()}
-
-    CATEGORIAS_VALIDAS = {'SALARIO', 'ALIMENTACAO', 'TRANSPORTE', 'MATERIAL', 'COMPRA', 'DESPESA_GERAL', 'REEMBOLSO'}
-
-    for row_num in range(header_row + 1, ws.max_row + 1):
-        def cel(key, aliases=None):
-            for k in [key] + (aliases or []):
-                if k in hm:
-                    return ws.cell(row=row_num, column=hm[k] + 1).value
-            return None
-
-        descricao = _normalizar_texto(cel('descricao', ['item', 'historico']))
-        valor_raw = cel('valor', ['valor_total'])
-        if not descricao or not valor_raw:
-            continue
-
-        valor = _parse_float(valor_raw)
-        if valor <= 0:
-            continue
-
-        data_raw = cel('data', ['data_lancamento', 'data_custo', 'data_vencimento'])
-        data_ref = _parse_data(data_raw) or date.today()
-
-        categoria_raw = _normalizar_texto(cel('categoria', ['tipo', 'tipo_categoria'])).upper()
-        if categoria_raw not in CATEGORIAS_VALIDAS:
-            categoria_raw = 'DESPESA_GERAL'
-
-        entidade_nome = _normalizar_texto(cel('fornecedor', ['nome', 'empresa'])) or 'Importação Excel'
-
-        obra_id = None
-        obra_raw = cel('obra_id', ['obra', 'codigo_obra'])
-        if obra_raw:
-            try:
-                obra_id = int(obra_raw)
-            except (ValueError, TypeError):
-                obra = Obra.query.filter_by(codigo=str(obra_raw).strip(), admin_id=admin_id).first()
-                if obra:
-                    obra_id = obra.id
-
-        try:
-            filho = registrar_custo_automatico(
-                admin_id=admin_id,
-                tipo_categoria=categoria_raw,
-                entidade_nome=entidade_nome,
-                entidade_id=None,
-                data=data_ref,
-                descricao=descricao,
-                valor=valor,
-                obra_id=obra_id,
-                origem_tabela='importacao_custo',
-                origem_id=row_num,
-            )
-            if filho:
-                db.session.commit()
-                resultado['importados'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'importado', 'descricao': descricao, 'valor': valor})
-            else:
-                resultado['erros'] += 1
-                resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': 'registrar_custo_automatico retornou None'})
-        except Exception as e:
-            logger.error(f"[IMPORT CUSTOS] Linha {row_num}: {e}", exc_info=True)
-            db.session.rollback()
-            resultado['erros'] += 1
-            resultado['detalhes'].append({'linha': row_num, 'status': 'erro', 'mensagem': str(e)})
-
-    return resultado
+        return {'criados': criados, 'erros': erros}
 
 
-# ── Utilitário interno ─────────────────────────────────────────────────────────
+# ── Fábrica ────────────────────────────────────────────────────────────────────
 
-def _detectar_linha_header(ws, chaves_esperadas):
-    """Detecta automaticamente qual linha contém o cabeçalho."""
-    import unicodedata
-    def norm(s):
-        s = _normalizar_texto(s).lower()
-        s = unicodedata.normalize('NFD', s)
-        s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-        s = s.replace(' ', '_').replace('*', '').strip()
-        return s
+MODULO_MAP = {
+    'funcionarios': ImportacaoFuncionarios,
+    'diarias': ImportacaoDiarias,
+    'alimentacao': ImportacaoAlimentacao,
+    'transporte': ImportacaoTransporte,
+    'custos': ImportacaoCustos,
+}
 
-    for tentativa in range(1, min(6, ws.max_row + 1)):
-        row_vals = [ws.cell(row=tentativa, column=c).value for c in range(1, ws.max_column + 1)]
-        normalized = [norm(str(v)) for v in row_vals]
-        if any(ch in normalized for ch in chaves_esperadas):
-            return tentativa
-    return None
+def get_importador(modulo):
+    cls = MODULO_MAP.get(modulo)
+    if not cls:
+        raise ValueError(f'Módulo desconhecido: {modulo}')
+    return cls()

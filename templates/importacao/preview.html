@@ -1,0 +1,154 @@
+{% extends "base_completo.html" %}
+{% block title %}Preview — {{ cfg.label }} — SIGE{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Cabeçalho -->
+  <div class="d-flex align-items-center mb-4">
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#1e3a5f,#2c6fad);border-radius:10px;">
+      <i data-feather="eye" style="color:#fff;width:22px;height:22px;"></i>
+    </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Pré-visualização — {{ cfg.label }}</h4>
+      <small class="text-muted">Revise os dados antes de confirmar a importação</small>
+    </div>
+    <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+      <i data-feather="arrow-left" style="width:14px;height:14px;"></i> Voltar
+    </a>
+  </div>
+
+  <!-- Resumo -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-dark" style="font-size:2rem;">{{ validos|length }}</div>
+          <small class="text-success fw-semibold">Registros válidos (serão importados)</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-dark" style="font-size:2rem;">{{ erros|length }}</div>
+          <small class="text-danger fw-semibold">Registros com erro (serão ignorados)</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-dark" style="font-size:2rem;">{{ (validos|length) + (erros|length) }}</div>
+          <small class="text-muted fw-semibold">Total de linhas processadas</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if erros %}
+  <!-- Erros -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px; border-left: 4px solid #dc3545 !important;">
+    <div class="card-body p-4">
+      <h6 class="fw-bold text-danger mb-3">
+        <i data-feather="alert-circle" style="width:16px;height:16px;"></i>
+        Linhas com erro — NÃO serão importadas
+      </h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.85rem;">
+          <thead>
+            <tr style="background:#fff5f5;">
+              <th class="text-muted" style="width:70px;">Linha</th>
+              <th class="text-muted">Nome / Referência</th>
+              <th class="text-muted">Motivo do erro</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in erros %}
+            <tr style="background:#fff8f8;">
+              <td class="text-danger fw-semibold">{{ e.linha }}</td>
+              <td>{{ e.get('nome', e.get('referencia', '—')) }}</td>
+              <td class="text-danger">{{ e.motivo }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if validos %}
+  <!-- Registros válidos -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px; border-left: 4px solid #198754 !important;">
+    <div class="card-body p-4">
+      <h6 class="fw-bold text-success mb-3">
+        <i data-feather="check-circle" style="width:16px;height:16px;"></i>
+        Registros válidos — serão importados após confirmação
+      </h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.85rem;">
+          <thead>
+            <tr style="background:#f0fff4;">
+              <th class="text-muted" style="width:60px;">Linha</th>
+              {% for col_key, col_label in colunas %}
+              <th class="text-muted">{{ col_label }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in validos %}
+            <tr style="background:#f8fff9;">
+              <td class="text-success fw-semibold">{{ row.get('linha', '—') }}</td>
+              {% for col_key, col_label in colunas %}
+              <td>
+                {% set val = row.get(col_key, '') %}
+                {% if col_key == 'operacao' %}
+                  {% if val == 'criar' %}
+                    <span class="badge" style="background:#198754;font-size:.75rem;">+ Criar</span>
+                  {% else %}
+                    <span class="badge" style="background:#fd7e14;font-size:.75rem;">↻ Atualizar</span>
+                  {% endif %}
+                {% elif col_key == 'valor' or col_key == 'valor_total' %}
+                  R$ {{ '%.2f'|format(val|float) }}
+                {% elif val is none or val == '' %}
+                  <span class="text-muted">—</span>
+                {% else %}
+                  {{ val }}
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulário de confirmação -->
+  <div class="d-flex gap-3 align-items-center">
+    <form action="{{ url_for('importacao.confirmar', modulo=modulo) }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="dados_json" value="{{ dados_json | e }}">
+      <button type="submit" class="btn btn-success px-5">
+        <i data-feather="check" style="width:16px;height:16px;"></i>
+        Confirmar e importar {{ validos|length }} registro{{ 's' if validos|length != 1 else '' }}
+      </button>
+    </form>
+    <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary px-4">
+      <i data-feather="x" style="width:16px;height:16px;"></i>
+      Cancelar
+    </a>
+  </div>
+
+  {% else %}
+  <div class="alert alert-warning">
+    <i data-feather="alert-triangle" style="width:16px;height:16px;"></i>
+    Nenhum registro válido encontrado. Verifique se o arquivo está no formato correto e volte para tentar novamente.
+    <a href="{{ url_for('importacao.index') }}" class="alert-link ms-2">Voltar</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

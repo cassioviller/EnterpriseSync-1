@@ -1,116 +1,143 @@
 {% extends "base_completo.html" %}
-{% block title %}Importar Funcionários — SIGE{% endblock %}
+{% block title %}Importação Excel — SIGE{% endblock %}
 {% block content %}
 <div class="container-fluid py-4">
 
-    <div class="d-flex align-items-center mb-4">
-        <div class="me-3" style="width:42px;height:42px;background:linear-gradient(135deg,#1e3a5f,#2c6fad);border-radius:10px;display:flex;align-items:center;justify-content:center;">
-            <i data-feather="upload-cloud" style="color:#fff;width:22px;height:22px;"></i>
+  <!-- Cabeçalho -->
+  <div class="d-flex align-items-center mb-4">
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#1e3a5f,#2c6fad);border-radius:10px;">
+      <i data-feather="upload-cloud" style="color:#fff;width:22px;height:22px;"></i>
+    </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Importação via Planilha Excel</h4>
+      <small class="text-muted">Carregue dados em massa em 5 módulos — baixe o template, preencha e importe</small>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+  {% endwith %}
+
+  <!-- Cards dos módulos -->
+  {% set modulos_lista = [
+    ('funcionarios', modulos.funcionarios),
+    ('diarias', modulos.diarias),
+    ('alimentacao', modulos.alimentacao),
+    ('transporte', modulos.transporte),
+    ('custos', modulos.custos),
+  ] %}
+
+  {% for slug, cfg in modulos_lista %}
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-0">
+
+      <!-- Cabeçalho do card -->
+      <div class="d-flex align-items-center p-4 pb-0">
+        <div class="me-3 d-flex align-items-center justify-content-center flex-shrink-0"
+             style="width:44px;height:44px;background:{{ cfg.cor_bg }};border-radius:10px;">
+          <i data-feather="{{ cfg.icone }}" style="width:22px;height:22px;color:{{ cfg.cor }};"></i>
         </div>
-        <div>
-            <h4 class="mb-0 fw-bold text-dark">Importar Funcionários</h4>
-            <small class="text-muted">Carregue dados em massa via planilha Excel (.xlsx)</small>
+        <div class="flex-grow-1">
+          <h6 class="fw-bold mb-0 text-dark">{{ cfg.label }}</h6>
+          <small class="text-muted">{{ cfg.descricao }}</small>
         </div>
-        <a href="{{ url_for('main.funcionarios') }}" class="btn btn-outline-secondary btn-sm ms-auto">
-            <i data-feather="arrow-left" style="width:14px;height:14px;"></i> Funcionários
+        <a href="{{ url_for('importacao.baixar_template', modulo=slug) }}"
+           class="btn btn-sm btn-outline-success ms-3 flex-shrink-0">
+          <i data-feather="download" style="width:14px;height:14px;"></i>
+          Baixar template
         </a>
+      </div>
+
+      <hr class="mx-4 mt-3 mb-3">
+
+      <!-- Formulário de upload -->
+      <form action="{{ url_for('importacao.preview', modulo=slug) }}" method="POST"
+            enctype="multipart/form-data" class="px-4 pb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="row g-3 align-items-end">
+
+          <!-- Arquivo -->
+          <div class="col-md-5">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">
+              Planilha (.xlsx) <span class="text-danger">*</span>
+            </label>
+            <input type="file" name="arquivo" accept=".xlsx" class="form-control form-control-sm" required>
+            <div class="form-text">Formato: <code>.xlsx</code> (Excel 2007+)</div>
+          </div>
+
+          {% if cfg.tem_defaults %}
+          <!-- Defaults para funcionários (formato Registro de Colaboradores) -->
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">Admissão padrão</label>
+            <input type="date" name="default_data_admissao" class="form-control form-control-sm"
+                   placeholder="dd/mm/aaaa">
+            <div class="form-text">Usado se não consta na planilha</div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">Remuneração padrão</label>
+            <select name="default_tipo_remuneracao" class="form-select form-select-sm">
+              <option value="salario">Salário mensal</option>
+              <option value="diaria">Diária</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">Valor padrão (R$)</label>
+            <input type="text" name="default_valor" class="form-control form-control-sm" placeholder="0,00">
+            <div class="form-text">Salário ou diária padrão</div>
+          </div>
+          {% endif %}
+
+          <!-- Botão -->
+          <div class="col-md-{% if cfg.tem_defaults %}1{% else %}7{% endif %} d-flex {% if not cfg.tem_defaults %}justify-content-end{% endif %}">
+            <button type="submit" class="btn btn-primary btn-sm px-4 align-self-center">
+              <i data-feather="eye" style="width:14px;height:14px;"></i>
+              Pré-visualizar
+            </button>
+          </div>
+
+        </div>
+      </form>
+
     </div>
+  </div>
+  {% endfor %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <!-- Dicas gerais -->
+  <div class="card border-0 shadow-sm mt-2" style="border-radius:14px;">
+    <div class="card-body p-4">
+      <h6 class="fw-bold mb-3 text-dark">
+        <i data-feather="info" style="width:16px;height:16px;color:#2c6fad;"></i>
+        Regras gerais
+      </h6>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <ul class="mb-0 text-muted" style="font-size:.86rem;line-height:2;">
+            <li>Não altere os cabeçalhos da planilha</li>
+            <li>Datas aceitas: <code>DD/MM/AAAA</code>, <code>DD/MM/AA</code> ou <code>YYYY-MM-DD</code></li>
+            <li>Valores: use vírgula (<code>1.800,50</code>) ou ponto (<code>1800.50</code>)</li>
+            <li>O sistema mostra um preview antes de salvar qualquer dado</li>
+          </ul>
         </div>
-      {% endfor %}
-    {% endif %}
-    {% endwith %}
-
-    <div class="row g-4">
-
-        <!-- Passo 1: baixar template -->
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
-                <div class="card-body p-4 text-center">
-                    <div class="mx-auto mb-3 d-flex align-items-center justify-content-center"
-                         style="width:56px;height:56px;background:#e8f5e9;border-radius:50%;">
-                        <i data-feather="download" style="width:26px;height:26px;color:#198754;"></i>
-                    </div>
-                    <h6 class="fw-bold text-dark mb-1">Passo 1</h6>
-                    <p class="text-muted small mb-3">Baixe o template e preencha com os dados dos funcionários</p>
-                    <a href="{{ url_for('importacao.baixar_template') }}"
-                       class="btn btn-success w-100">
-                        <i data-feather="download" style="width:14px;height:14px;"></i>
-                        Baixar planilha modelo
-                    </a>
-                </div>
-            </div>
+        <div class="col-md-6">
+          <ul class="mb-0 text-muted" style="font-size:.86rem;line-height:2;">
+            <li>Linhas com erros ficam em <span class="text-danger fw-semibold">vermelho</span> no preview — não são salvas</li>
+            <li>Linhas válidas ficam em <span class="text-success fw-semibold">verde</span> — só salvas após confirmar</li>
+            <li>Funcionários com CPF já cadastrado são <strong>atualizados</strong></li>
+            <li>Obras buscadas por nome parcial ou código exato</li>
+          </ul>
         </div>
-
-        <!-- Passo 2: enviar arquivo -->
-        <div class="col-md-8">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="me-3 d-flex align-items-center justify-content-center"
-                             style="width:44px;height:44px;background:#e3f0ff;border-radius:50%;flex-shrink:0;">
-                            <i data-feather="upload" style="width:22px;height:22px;color:#2c6fad;"></i>
-                        </div>
-                        <div>
-                            <h6 class="fw-bold text-dark mb-0">Passo 2 — Enviar planilha</h6>
-                            <small class="text-muted">Selecione o arquivo preenchido e clique em Importar</small>
-                        </div>
-                    </div>
-
-                    <form action="{{ url_for('importacao.upload_funcionarios') }}" method="POST"
-                          enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold" style="font-size:.85rem;">Arquivo (.xlsx)</label>
-                            <input type="file" name="arquivo" accept=".xlsx"
-                                   class="form-control" required>
-                            <div class="form-text">Formato aceito: <code>.xlsx</code> (Excel 2007 ou superior)</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary px-4">
-                            <i data-feather="upload-cloud" style="width:15px;height:15px;"></i>
-                            Importar funcionários
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-
-    <!-- Instruções / dicas -->
-    <div class="card border-0 shadow-sm mt-4" style="border-radius:14px;">
-        <div class="card-body p-4">
-            <h6 class="fw-bold mb-3 text-dark">
-                <i data-feather="info" style="width:16px;height:16px;color:#2c6fad;"></i>
-                Regras da planilha
-            </h6>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <ul class="mb-0 text-muted" style="font-size:.86rem;line-height:2;">
-                        <li>Não altere os cabeçalhos da planilha</li>
-                        <li>Campos obrigatórios: <strong>nome</strong> e <strong>cpf</strong></li>
-                        <li>CPF pode ser <code>123.456.789-00</code> ou <code>12345678900</code></li>
-                        <li>Datas no formato <code>DD/MM/AAAA</code></li>
-                        <li>Status: <code>ATIVO</code> ou <code>INATIVO</code></li>
-                    </ul>
-                </div>
-                <div class="col-md-6">
-                    <ul class="mb-0 text-muted" style="font-size:.86rem;line-height:2;">
-                        <li>Tipo de remuneração: <code>salario</code> ou <code>diaria</code></li>
-                        <li><strong>Vale Alimentação</strong> (VA): valor diário em R$ — <code>0</code> se não tem</li>
-                        <li><strong>Vale Transporte</strong> (VT): valor diário em R$ — <code>0</code> se não tem</li>
-                        <li>CPFs já cadastrados são <strong>atualizados</strong> automaticamente</li>
-                        <li>Planilha do tipo "Registro de Colaboradores" também é aceita</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
 
 </div>
 {% endblock %}

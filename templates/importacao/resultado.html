@@ -1,129 +1,119 @@
 {% extends "base_completo.html" %}
-{% block title %}Resultado da Importação — Funcionários{% endblock %}
+{% block title %}Resultado da Importação — {{ cfg.label }}{% endblock %}
 {% block content %}
 <div class="container-fluid py-4">
 
-    <div class="d-flex align-items-center mb-4">
-        <div class="me-3" style="width:42px;height:42px;background:linear-gradient(135deg,#1e3a5f,#2c6fad);border-radius:10px;display:flex;align-items:center;justify-content:center;">
-            <i data-feather="check-circle" style="color:#fff;width:22px;height:22px;"></i>
-        </div>
-        <div>
-            <h4 class="mb-0 fw-bold text-dark">Resultado da Importação</h4>
-            <small class="text-muted">Resumo do processamento da planilha de funcionários</small>
-        </div>
-        <div class="ms-auto d-flex gap-2">
-            <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i data-feather="upload-cloud" style="width:14px;height:14px;"></i> Nova importação
-            </a>
-            <a href="{{ url_for('main.funcionarios') }}" class="btn btn-primary btn-sm">
-                <i data-feather="users" style="width:14px;height:14px;"></i> Ver funcionários
-            </a>
-        </div>
+  <!-- Cabeçalho -->
+  <div class="d-flex align-items-center mb-4">
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#198754,#157347);border-radius:10px;">
+      <i data-feather="check-circle" style="color:#fff;width:22px;height:22px;"></i>
     </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Importação concluída — {{ cfg.label }}</h4>
+      <small class="text-muted">Resumo do processamento</small>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i data-feather="upload-cloud" style="width:14px;height:14px;"></i> Nova importação
+      </a>
+    </div>
+  </div>
 
-    <!-- Cards de resumo -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #198754;">
-                <div class="card-body py-3">
-                    <div class="display-6 fw-bold text-success">{{ resultado.importados }}</div>
-                    <div class="text-muted small mt-1">Novos importados</div>
-                </div>
-            </div>
+  <!-- Cards de resumo -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #198754;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-success">{{ resultado.get('criados', 0) }}</div>
+          <div class="text-muted small mt-1">
+            {% if modulo == 'funcionarios' %}Novos cadastros{% else %}Importados{% endif %}
+          </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #0d6efd;">
-                <div class="card-body py-3">
-                    <div class="display-6 fw-bold text-primary">{{ resultado.atualizados }}</div>
-                    <div class="text-muted small mt-1">Atualizados</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #dc3545;">
-                <div class="card-body py-3">
-                    <div class="display-6 fw-bold text-danger">{{ resultado.erros }}</div>
-                    <div class="text-muted small mt-1">Erros</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #6c757d;">
-                <div class="card-body py-3">
-                    <div class="display-6 fw-bold text-secondary">{{ resultado.detalhes | length }}</div>
-                    <div class="text-muted small mt-1">Total processados</div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-
-    <!-- Tabela de detalhes -->
-    {% if resultado.detalhes %}
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
-        <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
-            <h6 class="mb-0 fw-bold text-dark">Detalhes por linha</h6>
-            <span class="badge bg-secondary ms-2">{{ resultado.detalhes | length }}</span>
+    {% if resultado.get('atualizados') is not none %}
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #0d6efd;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-primary">{{ resultado.get('atualizados', 0) }}</div>
+          <div class="text-muted small mt-1">Atualizados</div>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="px-4" style="width:70px;">Linha</th>
-                            <th>Nome</th>
-                            <th>CPF</th>
-                            <th style="width:140px;">Status</th>
-                            <th>Observação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in resultado.detalhes %}
-                        <tr>
-                            <td class="px-4 text-muted small">{{ item.linha }}</td>
-                            <td>
-                                <strong class="text-dark">{{ item.nome or '—' }}</strong>
-                            </td>
-                            <td class="text-muted small font-monospace">{{ item.cpf or '—' }}</td>
-                            <td>
-                                {% if item.status == 'importado' %}
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
-                                        <i data-feather="user-plus" style="width:11px;height:11px;"></i> Importado
-                                    </span>
-                                {% elif item.status == 'atualizado' %}
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
-                                        <i data-feather="refresh-cw" style="width:11px;height:11px;"></i> Atualizado
-                                    </span>
-                                {% elif item.status == 'skip' %}
-                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
-                                        — Ignorado
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
-                                        <i data-feather="alert-circle" style="width:11px;height:11px;"></i> Erro
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td class="small">
-                                {% if item.mensagem is defined and item.mensagem %}
-                                    <span class="text-danger">{{ item.mensagem }}</span>
-                                {% elif item.codigo is defined %}
-                                    <span class="text-muted">Código: <code>{{ item.codigo }}</code></span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="alert alert-warning">
-        Nenhuma linha foi processada. Verifique se a planilha está no formato correto.
+      </div>
     </div>
     {% endif %}
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #dc3545;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-danger">{{ resultado.get('erros', [])|length }}</div>
+          <div class="text-muted small mt-1">Erros na importação</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #6c757d;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-secondary">
+            {{ resultado.get('criados', 0) + resultado.get('atualizados', 0) + resultado.get('erros', [])|length }}
+          </div>
+          <div class="text-muted small mt-1">Total processados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% set erros_lista = resultado.get('erros', []) %}
+  {% if erros_lista %}
+  <!-- Erros na importação -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
+      <h6 class="mb-0 fw-bold text-danger">
+        <i data-feather="alert-circle" style="width:16px;height:16px;"></i>
+        Erros encontrados durante a importação
+      </h6>
+      <span class="badge bg-danger ms-2">{{ erros_lista|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.86rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-4" style="width:80px;">Linha</th>
+              <th>Nome / Referência</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in erros_lista %}
+            <tr>
+              <td class="px-4 text-danger fw-semibold">{{ e.get('linha', '—') }}</td>
+              <td>{{ e.get('nome', e.get('fornecedor', '—')) }}</td>
+              <td class="text-danger">{{ e.get('motivo', '—') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if resultado.get('criados', 0) + resultado.get('atualizados', 0) > 0 %}
+  <div class="alert alert-success">
+    <i data-feather="check-circle" style="width:16px;height:16px;"></i>
+    <strong>Importação realizada com sucesso!</strong>
+    {% if modulo == 'funcionarios' %}
+      {{ resultado.get('criados', 0) }} funcionário{{ 's' if resultado.get('criados',0) != 1 else '' }} criado{{ 's' if resultado.get('criados',0) != 1 else '' }}
+      e {{ resultado.get('atualizados', 0) }} atualizado{{ 's' if resultado.get('atualizados',0) != 1 else '' }}.
+    {% else %}
+      {{ resultado.get('criados', 0) }} registro{{ 's' if resultado.get('criados',0) != 1 else '' }} importado{{ 's' if resultado.get('criados',0) != 1 else '' }} com sucesso.
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    Nenhum registro foi importado. Verifique os erros acima ou volte e tente com outra planilha.
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}
