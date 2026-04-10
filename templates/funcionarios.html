@@ -594,6 +594,12 @@
                             <span>R$ {{ '{:,.2f}'.format(kpi.funcionario.salario or 0) }} / mês</span>
                         {% endif %}
                     </div>
+                    {% if kpi.funcionario.chave_pix %}
+                    <div class="mb-2">
+                        <i class="fas fa-qrcode text-secondary me-2"></i>
+                        <span class="text-muted" style="font-size:.82rem;" title="Chave PIX">{{ kpi.funcionario.chave_pix }}</span>
+                    </div>
+                    {% endif %}
                     {% endif %}
                 </div>
                 
@@ -718,6 +724,12 @@
                             <span class="text-muted">R$ {{ '{:,.2f}'.format(kpi.funcionario.salario or 0) }} / mês</span>
                         {% endif %}
                     </div>
+                    {% if kpi.funcionario.chave_pix %}
+                    <div class="mb-2">
+                        <i class="fas fa-qrcode text-muted me-2"></i>
+                        <span class="text-muted" style="font-size:.82rem;" title="Chave PIX">{{ kpi.funcionario.chave_pix }}</span>
+                    </div>
+                    {% endif %}
                     {% endif %}
                 </div>
                 

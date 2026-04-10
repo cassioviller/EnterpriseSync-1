@@ -177,7 +177,6 @@ main_py_exempt_blueprints = [
     'analytics_preditivos', 'dashboards_especificos',
     'exportacao_relatorios', 'relatorios_financeiros',
     'api_funcionarios', 'api_buscar_funcionarios', 'health',
-    'importacao',
 ]
 for bp_name in main_py_exempt_blueprints:
     bp = app.blueprints.get(bp_name)

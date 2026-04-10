@@ -65,6 +65,7 @@
 
                     <form action="{{ url_for('importacao.upload_funcionarios') }}" method="POST"
                           enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label class="form-label fw-semibold" style="font-size:.85rem;">Arquivo (.xlsx / .xls)</label>
                             <input type="file" name="arquivo" accept=".xlsx,.xls"
