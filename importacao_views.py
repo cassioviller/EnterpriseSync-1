@@ -541,12 +541,15 @@ def fluxo_caixa_rollback(batch_id):
 @importacao_bp.route('/historico', methods=['GET'])
 @login_required
 def historico():
-    """Lista todas as importações de fluxo de caixa com batch_id."""
+    """Lista todas as importações de fluxo de caixa com batch_id.
+    UNION de gestao_custo_pai e conta_receber para cobrir lotes com só entradas.
+    """
     admin_id = get_admin_id_robusta()
     try:
         from sqlalchemy import text as sa_text
         with db.engine.connect() as conn:
-            rows = conn.execute(sa_text("""
+            # Custos (saídas)
+            custo_rows = conn.execute(sa_text("""
                 SELECT import_batch_id,
                        MIN(data_criacao) as data_import,
                        COUNT(*) as n_custos,
@@ -556,35 +559,46 @@ def historico():
                   AND import_batch_id LIKE 'import\_%' ESCAPE '\\'
                   AND admin_id = :aid
                 GROUP BY import_batch_id
-                ORDER BY data_import DESC
             """), {'aid': admin_id}).fetchall()
 
-        entradas_rows = []
-        try:
-            with db.engine.connect() as conn:
-                entradas_rows = conn.execute(sa_text("""
-                    SELECT import_batch_id, COUNT(*) as n_entradas, SUM(valor_original) as total
-                    FROM conta_receber
-                    WHERE import_batch_id IS NOT NULL
-                      AND import_batch_id LIKE 'import\_%' ESCAPE '\\'
-                      AND admin_id = :aid
-                    GROUP BY import_batch_id
-                """), {'aid': admin_id}).fetchall()
-        except Exception:
-            pass
+            # Entradas (conta_receber)
+            entrada_rows = conn.execute(sa_text("""
+                SELECT import_batch_id,
+                       MIN(created_at) as data_import,
+                       COUNT(*) as n_entradas,
+                       SUM(valor_original) as total
+                FROM conta_receber
+                WHERE import_batch_id IS NOT NULL
+                  AND import_batch_id LIKE 'import\_%' ESCAPE '\\'
+                  AND admin_id = :aid
+                GROUP BY import_batch_id
+            """), {'aid': admin_id}).fetchall()
 
-        entradas_map = {r[0]: {'n': r[1], 'total': float(r[2] or 0)} for r in entradas_rows}
+        custo_map = {r[0]: {'data_import': r[1], 'n': r[2], 'total': float(r[3] or 0)}
+                     for r in custo_rows}
+        entrada_map = {r[0]: {'data_import': r[1], 'n': r[2], 'total': float(r[3] or 0)}
+                       for r in entrada_rows}
+
+        # UNION de todos os batch_ids conhecidos
+        all_bids = sorted(
+            set(custo_map.keys()) | set(entrada_map.keys()),
+            key=lambda b: (custo_map.get(b, {}).get('data_import')
+                           or entrada_map.get(b, {}).get('data_import')),
+            reverse=True,
+        )
 
         batches = []
-        for row in rows:
-            bid = row[0]
+        for bid in all_bids:
+            c = custo_map.get(bid, {})
+            e = entrada_map.get(bid, {})
+            data_import = c.get('data_import') or e.get('data_import')
             batches.append({
                 'batch_id': bid,
-                'data_import': row[1],
-                'n_custos': row[2],
-                'total_custos': float(row[3] or 0),
-                'n_entradas': entradas_map.get(bid, {}).get('n', 0),
-                'total_entradas': entradas_map.get(bid, {}).get('total', 0),
+                'data_import': data_import,
+                'n_custos': c.get('n', 0),
+                'total_custos': c.get('total', 0.0),
+                'n_entradas': e.get('n', 0),
+                'total_entradas': e.get('total', 0.0),
             })
 
     except Exception as e:
