@@ -170,7 +170,34 @@ def obras():
             
             custos_transporte = custos_query.all()
             custo_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
-            
+
+            # 5. Custos via Gestão de Custos V2 (importação diárias, etc.)
+            try:
+                from models import GestaoCustoFilho, GestaoCustoPai
+                from sqlalchemy import func as sqlfunc_l
+                gestao_lista = (
+                    db.session.query(GestaoCustoPai.tipo_categoria, sqlfunc_l.sum(GestaoCustoFilho.valor))
+                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                    .filter(
+                        GestaoCustoFilho.obra_id == obra.id,
+                        GestaoCustoFilho.data_referencia >= periodo_inicio,
+                        GestaoCustoFilho.data_referencia <= periodo_fim,
+                        GestaoCustoPai.admin_id == admin_id,
+                    )
+                    .group_by(GestaoCustoPai.tipo_categoria)
+                    .all()
+                )
+                for tipo_cat, total_gc in gestao_lista:
+                    v = float(total_gc or 0)
+                    if tipo_cat in ('SALARIO', 'MAO_OBRA_DIRETA'):
+                        custo_mao_obra += v
+                    elif tipo_cat in ('ALIMENTACAO', 'ALIMENTACAO_DIARIA'):
+                        custo_alimentacao += v
+                    elif tipo_cat in ('TRANSPORTE', 'VALE_TRANSPORTE'):
+                        custo_transporte_total += v
+            except Exception as e:
+                logger.error(f"Erro ao somar GestaoCusto para obra {obra.id}: {e}")
+
             # CUSTO TOTAL REAL da obra
             custo_total_obra = custo_mao_obra + custo_alimentacao + custo_diversos_total + custo_transporte_total
             
@@ -1382,7 +1409,34 @@ def detalhes_obra(id):
         ]))
         
         custos_transporte_total = sum(c.valor for c in custos_transporte if c.valor)
-        
+
+        # ── Custos lançados via Gestão de Custos V2 (importação diárias, etc.) ──
+        try:
+            from models import GestaoCustoFilho, GestaoCustoPai
+            from sqlalchemy import func as sqlfunc
+            gestao_q = (
+                db.session.query(GestaoCustoPai.tipo_categoria, sqlfunc.sum(GestaoCustoFilho.valor))
+                .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                .filter(
+                    GestaoCustoFilho.obra_id == obra_id,
+                    GestaoCustoFilho.data_referencia >= data_inicio,
+                    GestaoCustoFilho.data_referencia <= data_fim,
+                )
+            )
+            if admin_id is not None:
+                gestao_q = gestao_q.filter(GestaoCustoPai.admin_id == admin_id)
+            for tipo_cat, total_gc in gestao_q.group_by(GestaoCustoPai.tipo_categoria).all():
+                v = float(total_gc or 0)
+                if tipo_cat in ('SALARIO', 'MAO_OBRA_DIRETA'):
+                    total_custo_mao_obra += v
+                elif tipo_cat in ('ALIMENTACAO', 'ALIMENTACAO_DIARIA'):
+                    custo_alimentacao += v
+                elif tipo_cat in ('TRANSPORTE', 'VALE_TRANSPORTE'):
+                    custo_transporte += v
+                logger.debug(f"[GestaoCusto] obra={obra_id} {tipo_cat}={v:.2f}")
+        except Exception as e:
+            logger.error(f"Erro ao somar GestaoCusto para obra {obra_id}: {e}")
+
         logger.debug(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao} (tabela={custo_alimentacao_tabela}, outros={custo_alimentacao_outros}), Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
         
         # Calcular progresso geral da obra baseado no último RDO
