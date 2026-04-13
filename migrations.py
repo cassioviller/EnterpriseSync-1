@@ -3801,6 +3801,7 @@ def executar_migracoes():
             (99, "RDOServicoSubatividade servico_id nullable para suportar subatividades sem serviço vinculado", migration_99_rdo_servico_sub_nullable),
             (100, "TarefaCronograma - subatividade_mestre_id FK para rastreamento de catálogo", migration_100_tarefa_cronograma_subatividade_mestre_id),
             (101, "Funcionario - chave_pix, valor_va e valor_vt para PIX e benefícios diários", migration_101_funcionario_pix_va_vt),
+            (102, "Funcionario - codigo unique por tenant (codigo+admin_id) em vez de global", migration_102_funcionario_codigo_per_tenant),
         ]
         
         # Executar cada migração com rastreamento
@@ -8244,6 +8245,81 @@ def migration_97_rdo_mao_obra_produtividade():
 
     except Exception as e:
         logger.error(f"Erro na migracao 97: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_102_funcionario_codigo_per_tenant():
+    """
+    Migração 102: funcionario.codigo — troca unique global por unique composto (codigo, admin_id).
+
+    Cada tenant tem sua própria sequência de códigos VV independente. A constraint global
+    `funcionario_codigo_key` impedia isso: se tenant A tinha VV001, tenant B não conseguia
+    criar outro VV001. A constraint correta é única por (codigo + admin_id).
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+
+        # 1. Remover constraint global funcionario_codigo_key (se ainda existir)
+        cursor.execute("""
+            SELECT constraint_name FROM information_schema.table_constraints
+            WHERE table_name = 'funcionario' AND constraint_name = 'funcionario_codigo_key'
+        """)
+        if cursor.fetchone():
+            cursor.execute("ALTER TABLE funcionario DROP CONSTRAINT funcionario_codigo_key")
+            logger.info("MIGRACAO 102: constraint global funcionario_codigo_key removida")
+        else:
+            logger.info("MIGRACAO 102: funcionario_codigo_key não encontrada — já removida ou nunca existiu")
+
+        # 2. Criar unique composto (codigo, admin_id) por tenant — se não existir
+        cursor.execute("""
+            SELECT indexname FROM pg_indexes
+            WHERE tablename = 'funcionario' AND indexname = 'uq_funcionario_codigo_admin_id'
+        """)
+        if not cursor.fetchone():
+            # Resolver duplicatas de (codigo, admin_id) antes de criar o índice
+            cursor.execute("""
+                SELECT codigo, admin_id, array_agg(id ORDER BY id) as ids
+                FROM funcionario
+                WHERE codigo IS NOT NULL AND admin_id IS NOT NULL
+                GROUP BY codigo, admin_id
+                HAVING COUNT(*) > 1
+            """)
+            duplicates = cursor.fetchall()
+            for dup_codigo, dup_admin_id, dup_ids in duplicates:
+                # Mantém o ID mais antigo, renomeia os demais com sufixo
+                for suffix_n, dup_id in enumerate(dup_ids[1:], start=2):
+                    new_code = f"{dup_codigo}-D{suffix_n}"
+                    cursor.execute(
+                        "UPDATE funcionario SET codigo = %s WHERE id = %s",
+                        (new_code, dup_id)
+                    )
+                    logger.info(f"MIGRACAO 102: código duplicado renomeado id={dup_id}: {dup_codigo} → {new_code}")
+
+            cursor.execute("""
+                CREATE UNIQUE INDEX uq_funcionario_codigo_admin_id
+                ON funcionario (codigo, admin_id)
+                WHERE codigo IS NOT NULL AND admin_id IS NOT NULL
+            """)
+            logger.info("MIGRACAO 102: unique index composto (codigo, admin_id) criado")
+        else:
+            logger.info("MIGRACAO 102: unique index uq_funcionario_codigo_admin_id já existe")
+
+        connection.close()
+        logger.info("MIGRACAO 102 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 102: {e}")
         if connection:
             try:
                 connection.rollback()

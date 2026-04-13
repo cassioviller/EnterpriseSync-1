@@ -267,6 +267,18 @@ class ImportacaoFuncionarios:
         from models import db, Funcionario
         criados, erros = 0, []
 
+        # Busca o max código VV do tenant uma única vez, antes do loop.
+        # O filtro admin_id está correto: cada tenant tem sua própria sequência independente.
+        # Re-consultar dentro do loop não funcionaria porque os INSERTs estão em savepoint
+        # (não commitados para a sessão principal) e a query retornaria sempre o mesmo valor.
+        ultimo_tenant = (Funcionario.query
+                         .filter(Funcionario.codigo.like('VV%'), Funcionario.admin_id == admin_id)
+                         .order_by(Funcionario.codigo.desc()).first())
+        try:
+            proximo_num = int(ultimo_tenant.codigo[2:]) + 1 if ultimo_tenant else 1
+        except Exception:
+            proximo_num = 1
+
         for row in rows:
             sp = db.session.begin_nested()
             try:
@@ -279,14 +291,8 @@ class ImportacaoFuncionarios:
                                   'motivo': f'CPF {cpf} já cadastrado — ignorado na importação'})
                     continue
 
-                ultimo = (Funcionario.query
-                          .filter(Funcionario.codigo.like('VV%'), Funcionario.admin_id == admin_id)
-                          .order_by(Funcionario.codigo.desc()).first())
-                try:
-                    proximo = int(ultimo.codigo[2:]) + 1 if ultimo else 1
-                except Exception:
-                    proximo = 1
-                codigo = f"VV{proximo:03d}"
+                codigo = f"VV{proximo_num:03d}"
+                proximo_num += 1  # incrementa o contador local para o próximo do lote
 
                 v = _parse_float(row.get('valor', 0))
                 kwargs = dict(

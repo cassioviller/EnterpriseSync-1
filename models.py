@@ -175,8 +175,11 @@ class HorarioDia(db.Model):
         return max(horas_brutas - pausa, Decimal('0'))
 
 class Funcionario(db.Model):
+    __table_args__ = (
+        db.UniqueConstraint('codigo', 'admin_id', name='uq_funcionario_codigo_admin_id'),
+    )
     id = db.Column(db.Integer, primary_key=True)
-    codigo = db.Column(db.String(10), unique=True, nullable=False)  # F0001, F0002, etc.
+    codigo = db.Column(db.String(10), nullable=False)  # VV001, VV002, etc. — único por tenant
     nome = db.Column(db.String(100), nullable=False)
     cpf = db.Column(db.String(14), unique=True, nullable=False)
     rg = db.Column(db.String(20))
