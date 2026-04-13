@@ -1358,38 +1358,57 @@ def _fuzzy_match_entidade(nome_excel, funcionarios, fornecedores):
     """
     Retorna (tipo, id, nome_banco, score) ou (None, None, None, 0).
     tipo = 'funcionario' | 'fornecedor'
+    Prioridade: Funcionario > Fornecedor (regra de negócio para reembolsos).
+    Fornecedores consideram nome, razao_social e nome_fantasia.
     Carregue funcionarios e fornecedores EM MEMÓRIA antes de chamar.
+
+    funcionarios: list of (id, nome)
+    fornecedores: list of (id, nome, razao_social, nome_fantasia)  — aliases opcionais
     """
     try:
         from thefuzz import fuzz
     except ImportError:
         return None, None, None, 0
 
+    THRESHOLD = 85
     nome_norm = _normalizar(nome_excel)
-    melhor_score = 0
-    melhor_tipo = None
-    melhor_id = None
-    melhor_nome = None
 
-    for fid, fnome in funcionarios:
+    # ── 1. Tenta funcionário primeiro (prioridade) ──────────────────────────
+    melhor_f_score = 0
+    melhor_f_id = None
+    melhor_f_nome = None
+    for item in funcionarios:
+        fid, fnome = item[0], item[1]
         score = fuzz.token_set_ratio(nome_norm, _normalizar(fnome))
-        if score > melhor_score:
-            melhor_score = score
-            melhor_tipo = 'funcionario'
-            melhor_id = fid
-            melhor_nome = fnome
+        if score > melhor_f_score:
+            melhor_f_score = score
+            melhor_f_id = fid
+            melhor_f_nome = fnome
 
-    for fid, fnome in fornecedores:
-        score = fuzz.token_set_ratio(nome_norm, _normalizar(fnome))
-        if score > melhor_score:
-            melhor_score = score
-            melhor_tipo = 'fornecedor'
-            melhor_id = fid
-            melhor_nome = fnome
+    if melhor_f_score >= THRESHOLD:
+        return 'funcionario', melhor_f_id, melhor_f_nome, melhor_f_score
 
-    if melhor_score > 85:
-        return melhor_tipo, melhor_id, melhor_nome, melhor_score
-    return None, None, None, melhor_score
+    # ── 2. Tenta fornecedor (considera todos os aliases) ────────────────────
+    melhor_s_score = 0
+    melhor_s_id = None
+    melhor_s_nome = None
+    for item in fornecedores:
+        fid = item[0]
+        aliases = [a for a in item[1:] if a]  # nome, razao_social, nome_fantasia
+        for alias in aliases:
+            score = fuzz.token_set_ratio(nome_norm, _normalizar(alias))
+            if score > melhor_s_score:
+                melhor_s_score = score
+                melhor_s_id = fid
+                melhor_s_nome = alias
+
+    if melhor_s_score >= THRESHOLD:
+        return 'fornecedor', melhor_s_id, melhor_s_nome, melhor_s_score
+
+    # Nenhum match suficiente: retorna o melhor score geral (sem vínculo)
+    if melhor_f_score >= melhor_s_score:
+        return None, None, None, melhor_f_score
+    return None, None, None, melhor_s_score
 
 
 class ImportacaoFluxoCaixa:
@@ -1413,10 +1432,10 @@ class ImportacaoFluxoCaixa:
         from models import Funcionario, Fornecedor
         funcionarios = [(f.id, f.nome) for f in
                         Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()]
+        # Fornecedores: tupla (id, nome, razao_social, nome_fantasia) para fuzzy com 3 aliases
         fornecedores = []
         for f in Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).all():
-            nome = f.razao_social or f.nome_fantasia or f.nome
-            fornecedores.append((f.id, nome))
+            fornecedores.append((f.id, f.nome or '', f.razao_social or '', f.nome_fantasia or ''))
 
         # Carregar obras em memória para match fuzzy de CC
         from models import Obra
@@ -1719,9 +1738,23 @@ class ImportacaoFluxoCaixa:
                     db.session.add(fc)
                     n_fluxo += 1
 
-                # ContaPagar para reembolsos — fornecedor_id apenas para match tipo fornecedor
+                # ContaPagar para reembolsos
                 if row.get('eh_reembolso') and data_obj:
-                    eh_forn = row.get('entidade_tipo') == 'fornecedor'
+                    ent_tipo_row = row.get('entidade_tipo')
+                    eh_forn = ent_tipo_row == 'fornecedor'
+                    eh_func = ent_tipo_row == 'funcionario'
+
+                    # Observações estruturadas: auditam o vínculo de funcionário
+                    obs_parts = []
+                    if cat:
+                        obs_parts.append(f'Categoria: {cat}')
+                    if eh_func and ent_id:
+                        obs_parts.append(f'FUNCIONARIO_ID: {ent_id}')
+                        obs_parts.append(f'Funcionario: {row.get("entidade_nome_banco") or fornecedor}')
+                    if obs:
+                        obs_parts.append(obs)
+                    obs_final = '. '.join(obs_parts) or None
+
                     cp = ContaPagar(
                         descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
                         valor_original=Decimal(str(valor)),
@@ -1734,7 +1767,7 @@ class ImportacaoFluxoCaixa:
                         obra_id=obra_id,
                         admin_id=admin_id,
                         fornecedor_id=ent_id if (ent_id and eh_forn) else None,
-                        observacoes=f'Categoria real: {cat}. {obs}'.strip('. ') or None,
+                        observacoes=obs_final,
                         origem_tipo='gestao_custo_pai',
                         origem_id=gcp.id,
                         import_batch_id=batch_id,
