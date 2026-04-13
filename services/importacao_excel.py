@@ -343,7 +343,7 @@ _TIPOS_ESPECIAIS_DIARIA = {
     'FALTOU':     'sem_lancamento',
     'DESCANSO':   'sem_lancamento',
     'FOLGA':      'sem_lancamento',
-    'FALTA':      'diaria_completa',  # falta sem desconto → lança diária + VA + VT
+    'FALTA':      'sem_lancamento',    # falta → só registro, sem lançamento
     'ATESTADO':   'somente_diaria',   # atestado → lança só diária, sem VA e VT
 }
 
