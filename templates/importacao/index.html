@@ -49,11 +49,28 @@
           <h6 class="fw-bold mb-0 text-dark">{{ cfg.label }}</h6>
           <small class="text-muted">{{ cfg.descricao }}</small>
         </div>
+        {% if slug == 'diarias' %}
+        <div class="d-flex gap-1 ms-3 flex-shrink-0">
+          <a href="{{ url_for('importacao.baixar_template', modulo=slug) }}"
+             class="btn btn-sm btn-outline-success"
+             title="Template SIGE — uma linha por funcionário/dia">
+            <i data-feather="download" style="width:13px;height:13px;"></i>
+            SIGE
+          </a>
+          <a href="{{ url_for('importacao.baixar_template', modulo=slug, formato='colaboradores') }}"
+             class="btn btn-sm btn-outline-primary"
+             title="Formato Colaboradores — múltiplos funcionários com blocos COLABORADOR">
+            <i data-feather="download" style="width:13px;height:13px;"></i>
+            Colaboradores
+          </a>
+        </div>
+        {% else %}
         <a href="{{ url_for('importacao.baixar_template', modulo=slug) }}"
            class="btn btn-sm btn-outline-success ms-3 flex-shrink-0">
           <i data-feather="download" style="width:14px;height:14px;"></i>
           Baixar template
         </a>
+        {% endif %}
       </div>
 
       <hr class="mx-4 mt-3 mb-3">

@@ -94,7 +94,7 @@ MODULO_CONFIG = {
         'cor': '#155724',
         'cor_bg': '#d4edda',
         'template_file': '2_diarias.xlsx',
-        'descricao': 'Registra diárias por funcionário e data. O valor da diária, VA e VT vêm automaticamente do cadastro do funcionário.',
+        'descricao': 'Registra diárias por funcionário e data. Suporta formato SIGE (uma linha/dia) e Colaboradores (múltiplos funcionários). Tipos especiais no campo Obra: FERIADO, FALTOU, FOLGA, DESCANSO, FALTA → sem lançamento · ATESTADO → só diária.',
         'colunas': [
             ('nome', 'Funcionário'),
             ('data', 'Data'),
@@ -184,11 +184,16 @@ def baixar_template(modulo):
         flash('Módulo inválido.', 'danger')
         return redirect(url_for('importacao.index'))
     cfg = MODULO_CONFIG[modulo]
-    path = os.path.join(TEMPLATES_DIR, cfg['template_file'])
+    fmt = request.args.get('formato', 'sige')
+    if modulo == 'diarias' and fmt == 'colaboradores':
+        fname = '2_diarias_colaboradores.xlsx'
+    else:
+        fname = cfg['template_file']
+    path = os.path.join(TEMPLATES_DIR, fname)
     if not os.path.exists(path):
         flash('Template não encontrado no servidor.', 'warning')
         return redirect(url_for('importacao.index'))
-    return send_file(path, as_attachment=True, download_name=cfg['template_file'])
+    return send_file(path, as_attachment=True, download_name=fname)
 
 
 def _handle_preview(modulo):
