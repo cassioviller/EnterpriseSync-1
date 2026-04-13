@@ -574,14 +574,25 @@ def historico():
                 GROUP BY import_batch_id
             """), {'aid': admin_id}).fetchall()
 
+            # ContaPagar (reembolsos importados)
+            cp_rows = conn.execute(sa_text("""
+                SELECT import_batch_id, COUNT(*) as n_cp, SUM(valor_original) as total
+                FROM conta_pagar
+                WHERE import_batch_id IS NOT NULL
+                  AND import_batch_id LIKE 'import\_%' ESCAPE '\\'
+                  AND admin_id = :aid
+                GROUP BY import_batch_id
+            """), {'aid': admin_id}).fetchall()
+
         custo_map = {r[0]: {'data_import': r[1], 'n': r[2], 'total': float(r[3] or 0)}
                      for r in custo_rows}
         entrada_map = {r[0]: {'data_import': r[1], 'n': r[2], 'total': float(r[3] or 0)}
                        for r in entrada_rows}
+        cp_map = {r[0]: {'n': r[1], 'total': float(r[2] or 0)} for r in cp_rows}
 
         # UNION de todos os batch_ids conhecidos
         all_bids = sorted(
-            set(custo_map.keys()) | set(entrada_map.keys()),
+            set(custo_map.keys()) | set(entrada_map.keys()) | set(cp_map.keys()),
             key=lambda b: (custo_map.get(b, {}).get('data_import')
                            or entrada_map.get(b, {}).get('data_import')),
             reverse=True,
@@ -591,6 +602,7 @@ def historico():
         for bid in all_bids:
             c = custo_map.get(bid, {})
             e = entrada_map.get(bid, {})
+            cp = cp_map.get(bid, {})
             data_import = c.get('data_import') or e.get('data_import')
             batches.append({
                 'batch_id': bid,
@@ -599,6 +611,7 @@ def historico():
                 'total_custos': c.get('total', 0.0),
                 'n_entradas': e.get('n', 0),
                 'total_entradas': e.get('total', 0.0),
+                'n_reembolsos': cp.get('n', 0),
             })
 
     except Exception as e:

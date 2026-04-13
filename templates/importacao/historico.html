@@ -42,6 +42,7 @@
               <th class="text-end">Total Custos</th>
               <th class="text-center">Entradas</th>
               <th class="text-end">Total Entradas</th>
+              <th class="text-center">Reembolsos</th>
               <th class="text-end px-4">Ação</th>
             </tr>
           </thead>
@@ -62,6 +63,7 @@
               <td class="text-end fw-semibold text-dark">R$ {{ '%.2f'|format(b.total_custos) }}</td>
               <td class="text-center">{{ b.n_entradas }}</td>
               <td class="text-end fw-semibold text-success">R$ {{ '%.2f'|format(b.total_entradas) }}</td>
+              <td class="text-center text-muted">{{ b.n_reembolsos }}</td>
               <td class="text-end px-4">
                 <button type="button"
                         class="btn btn-outline-danger btn-sm"
