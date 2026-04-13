@@ -346,8 +346,6 @@
     var allFilled = Array.from(selects).every(function (s) { return s.value !== ''; });
     btn.disabled = !allFilled;
     if (allFilled) {
-      btn.classList.remove('btn-success');
-      btn.classList.add('btn-success');
       btn.style.opacity = '1';
     }
   }
