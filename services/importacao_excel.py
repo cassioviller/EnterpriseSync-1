@@ -1334,9 +1334,14 @@ def _match_cc_obra(cc, obras_dict):
     if any(x in cc_norm for x in _CC_ADMIN):
         return None
     # Lookup direto
+    valid_obra_ids = set(obras_dict.values()) if obras_dict else set()
     for chave, oid in _CC_OBRA_MAP.items():
         if chave in cc_norm or cc_norm in chave:
-            return oid
+            # Valida que o ID pertence às obras do admin atual
+            if oid in valid_obra_ids:
+                return oid
+            # ID não pertence a este tenant: segue para fuzzy
+            break
     # Fuzzy fallback com obras do banco
     try:
         from thefuzz import process as fuzz_process
@@ -1714,8 +1719,9 @@ class ImportacaoFluxoCaixa:
                     db.session.add(fc)
                     n_fluxo += 1
 
-                # ContaPagar para reembolsos — inclui fornecedor_id quando matched
+                # ContaPagar para reembolsos — fornecedor_id apenas para match tipo fornecedor
                 if row.get('eh_reembolso') and data_obj:
+                    eh_forn = row.get('entidade_tipo') == 'fornecedor'
                     cp = ContaPagar(
                         descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
                         valor_original=Decimal(str(valor)),
@@ -1727,7 +1733,7 @@ class ImportacaoFluxoCaixa:
                         status='PAGO' if status == 'PAGO' else 'PENDENTE',
                         obra_id=obra_id,
                         admin_id=admin_id,
-                        fornecedor_id=ent_id if ent_id else None,
+                        fornecedor_id=ent_id if (ent_id and eh_forn) else None,
                         observacoes=f'Categoria real: {cat}. {obs}'.strip('. ') or None,
                         origem_tipo='gestao_custo_pai',
                         origem_id=gcp.id,

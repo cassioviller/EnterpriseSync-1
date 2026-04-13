@@ -3,8 +3,20 @@
 {% block content %}
 <div class="container-fluid py-4">
 
+  {% set teve_falha_geral = resultado.erros | selectattr('linha', 'equalto', 'GERAL') | list | length > 0 %}
+
   <!-- Cabeçalho -->
   <div class="d-flex align-items-center mb-4">
+    {% if teve_falha_geral %}
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#dc3545,#b02a37);border-radius:10px;">
+      <i data-feather="x-circle" style="color:#fff;width:22px;height:22px;"></i>
+    </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-danger">Importação falhou — rollback total</h4>
+      <small class="text-muted">Nenhum registro foi salvo. Lote: <code>{{ batch_id }}</code></small>
+    </div>
+    {% else %}
     <div class="me-3 d-flex align-items-center justify-content-center"
          style="width:44px;height:44px;background:linear-gradient(135deg,#198754,#157347);border-radius:10px;">
       <i data-feather="check-circle" style="color:#fff;width:22px;height:22px;"></i>
@@ -13,6 +25,7 @@
       <h4 class="mb-0 fw-bold text-dark">Importação concluída — Fluxo de Caixa</h4>
       <small class="text-muted">Lote: <code>{{ batch_id }}</code></small>
     </div>
+    {% endif %}
     <div class="ms-auto d-flex gap-2">
       <a href="{{ url_for('importacao.historico') }}" class="btn btn-outline-primary btn-sm">
         <i data-feather="list" style="width:14px;height:14px;"></i> Histórico
@@ -62,8 +75,25 @@
     </div>
   </div>
 
+  <!-- Aviso de falha geral -->
+  {% if teve_falha_geral %}
+  <div class="alert alert-danger mb-4 d-flex align-items-center">
+    <i data-feather="alert-triangle" class="me-2" style="width:18px;height:18px;flex-shrink:0;"></i>
+    <div>
+      <strong>Rollback total realizado.</strong>
+      Nenhum registro foi persistido no banco de dados.
+      Corrija o arquivo e tente novamente.
+      {% for err in resultado.erros %}
+        <div class="mt-1 text-danger" style="font-size:.85rem;">
+          <code>{{ err.linha }}</code>: {{ err.motivo }}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Totais por categoria -->
-  {% if resultado.totais %}
+  {% if resultado.totais and not teve_falha_geral %}
   <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
     <div class="card-header bg-transparent border-bottom py-3 px-4">
       <h6 class="mb-0 fw-bold text-dark">
@@ -161,7 +191,8 @@
   </div>
   {% endif %}
 
-  <!-- Card Rollback -->
+  <!-- Card Rollback (só quando importação foi bem-sucedida) -->
+  {% if not teve_falha_geral %}
   <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;border-left:4px solid #dc3545 !important;">
     <div class="card-body py-3 px-4 d-flex align-items-center gap-3">
       <i data-feather="rotate-ccw" style="width:22px;height:22px;color:#dc3545;"></i>
@@ -175,6 +206,7 @@
       </button>
     </div>
   </div>
+  {% endif %}
 
   <!-- Links de navegação -->
   <div class="d-flex gap-2">
@@ -185,6 +217,11 @@
     <a href="{{ url_for('importacao.historico') }}" class="btn btn-outline-secondary btn-sm">
       <i data-feather="list" style="width:14px;height:14px;"></i> Histórico de importações
     </a>
+    {% if teve_falha_geral %}
+    <a href="{{ url_for('importacao.index') }}" class="btn btn-primary btn-sm">
+      <i data-feather="upload-cloud" style="width:14px;height:14px;"></i> Tentar novamente
+    </a>
+    {% endif %}
   </div>
 
   <!-- Form oculto de rollback -->
