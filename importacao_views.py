@@ -98,8 +98,8 @@ MODULO_CONFIG = {
         'colunas': [
             ('nome', 'Funcionário'),
             ('data', 'Data'),
-            ('obra_nome', 'Obra'),
-            ('status', 'Status'),
+            ('obra_nome', 'Obra / Tipo'),
+            ('tipo_label', 'Lançamento'),
             ('valor_diaria', 'Diária (R$)'),
             ('valor_va', 'VA (R$)'),
             ('valor_vt', 'VT (R$)'),

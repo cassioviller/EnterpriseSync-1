@@ -334,20 +334,196 @@ class ImportacaoFuncionarios:
 
 # ── MÓDULO 2: Diárias ──────────────────────────────────────────────────────────
 
+
+# ── Tipos especiais de lançamento no campo "obra / centro de custo" ────────────
+# A palavra-chave é detectada no campo obra da planilha.
+# Qualquer valor não reconhecido como tipo especial é tratado como nome de obra.
+_TIPOS_ESPECIAIS_DIARIA = {
+    'FERIADO':    'sem_lancamento',   # registro apenas, sem custo
+    'FALTOU':     'sem_lancamento',
+    'DESCANSO':   'sem_lancamento',
+    'FOLGA':      'sem_lancamento',
+    'FALTA':      'diaria_completa',  # falta sem desconto → lança diária + VA + VT
+    'ATESTADO':   'somente_diaria',   # atestado → lança só diária, sem VA e VT
+}
+
+_TIPO_LABELS = {
+    'sem_lancamento': '🚫 Sem lançamento',
+    'diaria_completa': '✅ Diária + VA + VT',
+    'somente_diaria': '📋 Só diária (atestado)',
+}
+
+def _detectar_tipo_lancamento(obra_raw):
+    """Retorna tipo especial ou None quando for obra normal."""
+    if not obra_raw:
+        return None
+    return _TIPOS_ESPECIAIS_DIARIA.get(obra_raw.strip().upper())
+
+
 class ImportacaoDiarias:
     """
-    Colunas obrigatórias: nome_funcionario, data, obra
-    Colunas opcionais:    status
+    Suporta dois formatos de planilha:
 
-    O valor da diária (e dos benefícios VA e VT) vem do cadastro do funcionário,
-    não da planilha. Para cada linha válida, são criados até 3 lançamentos na
-    Gestão de Custos: diária (SALARIO) + VA (ALIMENTACAO) + VT (TRANSPORTE),
-    usando a mesma lógica do auto-lançamento do ponto eletrônico.
+    FORMATO SIGE (colunas: nome_funcionario, data, obra, status)
+    - Valor da diária, VA e VT vêm do cadastro do funcionário
+
+    FORMATO COLABORADORES (detectado pela palavra COLABORADOR na linha 1)
+    - Nome do funcionário em: linha 1, col C (ou col A com rótulo COLABORADOR na mesma linha)
+    - Cabeçalho: DATA | DIA DA SEMANA | CENTRO DE CUSTO | $ DIÁRIA | $ VT | $ VA
+    - Valores lidos diretamente da planilha por linha
+    - Múltiplos funcionários por arquivo (cada seção começa com COLABORADOR)
+
+    Regras de lançamento por tipo de centro de custo:
+    - Obra normal               → diária + VA + VT
+    - FALTA                     → diária + VA + VT (sem desconto)
+    - FERIADO / FALTOU / DESCANSO / FOLGA → registro apenas (sem lançamento financeiro)
+    - ATESTADO                  → somente diária
+
+    Se a obra não existir → é criada automaticamente com o nome (para editar depois).
+    Se o funcionário não existir → é criado com o nome e os valores da planilha (CPF temporário).
     """
 
-    def processar(self, ws, admin_id):
-        from models import Funcionario, Obra
+    # ── Detecção de formato ────────────────────────────────────────────────────
+    def _is_formato_colaboradores(self, ws):
+        """Retorna True se a planilha usa o formato multi-colaborador."""
+        cell_a1 = _norm(ws.cell(1, 1).value).upper()
+        return 'COLABORADOR' in cell_a1
 
+    # ── Busca ou prepara funcionário (usado nos dois formatos) ─────────────────
+    def _resolver_funcionario(self, nome, admin_id, valor_diaria=0, valor_va=0, valor_vt=0):
+        """
+        Busca funcionário por nome. Se não encontrado, prepara dict de criação.
+        Retorna (func_id_ou_None, nome_normalizado, func_criar, aviso)
+        """
+        from models import Funcionario
+        func = (Funcionario.query
+                .filter(Funcionario.nome.ilike(nome), Funcionario.admin_id == admin_id)
+                .first())
+        if func:
+            return func.id, func.nome, False, None
+        # Não encontrado → será criado no importar()
+        aviso = f'Funcionário "{nome}" não encontrado — será criado automaticamente'
+        return None, nome.title(), True, aviso
+
+    # ── Busca ou prepara obra (usado nos dois formatos) ────────────────────────
+    def _resolver_obra(self, obra_raw, admin_id):
+        """
+        Busca obra por nome/código. Se não encontrada, prepara criação automática.
+        Retorna (obra_id_ou_None, obra_nome, obra_criar)
+        """
+        from models import Obra
+        if not obra_raw:
+            return None, '(sem obra)', False
+        obra = (Obra.query
+                .filter(Obra.admin_id == admin_id)
+                .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
+                .first())
+        if obra:
+            return obra.id, obra.nome, False
+        # Não encontrada → será criada automaticamente
+        return None, obra_raw.title(), True
+
+    # ── FORMATO COLABORADORES ──────────────────────────────────────────────────
+    def _processar_colaboradores(self, ws, admin_id):
+        """
+        Formato: linha com COLABORADOR define o funcionário atual.
+        A seguir, cabeçalho DATA | DIA DA SEMANA | CENTRO DE CUSTO | $ DIÁRIA | $ VT | $ VA
+        Depois, linhas de dados.
+        """
+        validos, erros, avisos = [], [], []
+        funcionario_nome = None
+        em_dados = False
+        col_data = col_cc = col_diaria = col_vt = col_va = None
+
+        for rn in range(1, ws.max_row + 1):
+            row = [ws.cell(rn, c).value for c in range(1, ws.max_column + 1)]
+
+            # ── Detecta linha COLABORADOR ──────────────────────────────────────
+            primeira = _norm(row[0]).upper()
+            if 'COLABORADOR' in primeira:
+                # Nome pode estar na coluna A, B ou C dependendo do layout
+                for ci in range(len(row) - 1, -1, -1):
+                    v = _norm(row[ci])
+                    if v and v.upper() not in ('COLABORADOR',):
+                        funcionario_nome = v.strip()
+                        break
+                em_dados = False
+                col_data = col_cc = col_diaria = col_vt = col_va = None
+                continue
+
+            # ── Detecta linha de cabeçalho ──────────────────────────────────
+            normalized_row = [_norm(v).upper() for v in row]
+            if 'DATA' in normalized_row and ('DIÁRIA' in ' '.join(normalized_row) or 'DIARIA' in ' '.join(normalized_row)):
+                col_data = next((i for i, v in enumerate(normalized_row) if v == 'DATA'), None)
+                col_cc = next((i for i, v in enumerate(normalized_row)
+                               if 'CENTRO' in v or 'CUSTO' in v or 'OBRA' in v), None)
+                col_diaria = next((i for i, v in enumerate(normalized_row)
+                                   if 'DIÁRIA' in v or 'DIARIA' in v), None)
+                col_vt = next((i for i, v in enumerate(normalized_row) if 'VT' in v), None)
+                col_va = next((i for i, v in enumerate(normalized_row) if 'VA' in v), None)
+                em_dados = True
+                continue
+
+            # ── Processa linha de dados ────────────────────────────────────
+            if not em_dados or funcionario_nome is None:
+                continue
+
+            data_ref = _parse_data(row[col_data] if col_data is not None else None)
+            if not data_ref:
+                continue  # linha sem data válida → pula silenciosamente (DOMINGO vazio etc.)
+
+            obra_raw = _norm(row[col_cc] if col_cc is not None else None)
+            valor_d = _parse_float(row[col_diaria] if col_diaria is not None else 0)
+            valor_vt_ = _parse_float(row[col_vt] if col_vt is not None else 0)
+            valor_va_ = _parse_float(row[col_va] if col_va is not None else 0)
+
+            # Linhas sem obra e sem valores → dia de descanso, pula
+            if not obra_raw and valor_d == 0 and valor_vt_ == 0 and valor_va_ == 0:
+                continue
+
+            tipo_lancamento = _detectar_tipo_lancamento(obra_raw)
+
+            # Validação de valor: se não for tipo especial, precisa de valor
+            if tipo_lancamento is None and valor_d <= 0:
+                # Sem tipo especial e sem valor → pula silenciosamente
+                continue
+
+            func_id, func_nome, func_criar, aviso = self._resolver_funcionario(
+                funcionario_nome, admin_id, valor_d, valor_va_, valor_vt_)
+            if aviso:
+                avisos.append({'linha': rn, 'nome': func_nome, 'motivo': aviso})
+
+            if tipo_lancamento:
+                obra_id, obra_nome, obra_criar = None, obra_raw.title(), False
+            else:
+                obra_id, obra_nome, obra_criar = self._resolver_obra(obra_raw, admin_id)
+
+            row_dict = {
+                'linha': rn,
+                'nome': func_nome,
+                'funcionario_id': func_id,
+                'func_criar': func_criar,
+                'func_valores': {'valor_diaria': valor_d, 'valor_va': valor_va_, 'valor_vt': valor_vt_}
+                                if func_criar else None,
+                'data': str(data_ref),
+                'valor_diaria': valor_d,
+                'valor_va': valor_va_,
+                'valor_vt': valor_vt_,
+                'obra_id': obra_id,
+                'obra_nome': obra_nome,
+                'obra_criar': obra_criar,
+                'obra_raw': obra_raw,
+                'tipo_lancamento': tipo_lancamento or 'diaria_completa',
+                'tipo_label': _TIPO_LABELS.get(tipo_lancamento or 'diaria_completa', ''),
+                'status': 'PENDENTE',
+            }
+            validos.append(row_dict)
+
+        # Avisos integrados como "erros" não-bloqueantes para exibição no preview
+        return validos, avisos
+
+    # ── FORMATO SIGE ──────────────────────────────────────────────────────────
+    def _processar_sige(self, ws, admin_id):
         header_row, raw_headers = _detectar_header_row(ws, ['nome_funcionario', 'nome', 'funcionario'])
         if not header_row:
             return [], [{'linha': '?', 'nome': '—', 'motivo': 'Cabeçalho não encontrado'}]
@@ -368,67 +544,159 @@ class ImportacaoDiarias:
                 erros.append({'linha': rn, 'nome': nome, 'motivo': 'Data inválida'})
                 continue
 
-            # Buscar funcionário
-            func = (Funcionario.query
-                    .filter(Funcionario.nome.ilike(nome), Funcionario.admin_id == admin_id)
-                    .first())
-            if not func:
-                erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
+            obra_raw = _norm(c('obra', 'obra_id', 'codigo_obra', 'centro_custo', 'centro de custo'))
+            tipo_lancamento = _detectar_tipo_lancamento(obra_raw)
+
+            func_id, func_nome, func_criar, aviso = self._resolver_funcionario(nome, admin_id)
+            if aviso and not func_criar:
+                erros.append({'linha': rn, 'nome': nome, 'motivo': aviso})
                 continue
 
-            # Valor vem do cadastro do funcionário — não da planilha
-            valor_diaria = float(func.valor_diaria or 0)
-            if valor_diaria <= 0:
-                erros.append({'linha': rn, 'nome': func.nome,
+            # Valor: da planilha se informado, senão do cadastro
+            valor_d = _parse_float(c('valor_diaria', 'valor', '$ diária', 'diaria'))
+            valor_va_ = _parse_float(c('valor_va', 'va', '$ va'))
+            valor_vt_ = _parse_float(c('valor_vt', 'vt', '$ vt'))
+
+            if not func_criar:
+                from models import Funcionario
+                func = Funcionario.query.get(func_id)
+                if func:
+                    if valor_d <= 0: valor_d = float(func.valor_diaria or 0)
+                    if valor_va_ <= 0: valor_va_ = float(func.valor_va or 0)
+                    if valor_vt_ <= 0: valor_vt_ = float(func.valor_vt or 0)
+
+            if tipo_lancamento is None and valor_d <= 0:
+                erros.append({'linha': rn, 'nome': func_nome,
                               'motivo': 'Funcionário não tem valor de diária cadastrado no perfil'})
                 continue
 
-            valor_va = float(func.valor_va or 0)
-            valor_vt = float(func.valor_vt or 0)
-
-            # Buscar obra (obrigatória quando informada)
-            obra_raw = _norm(c('obra', 'obra_id', 'codigo_obra'))
-            obra = None
-            if obra_raw:
-                obra = (Obra.query
-                        .filter(Obra.admin_id == admin_id)
-                        .filter((Obra.nome.ilike(obra_raw)) | (Obra.codigo == obra_raw))
-                        .first())
-                if not obra:
-                    erros.append({'linha': rn, 'nome': func.nome,
-                                  'motivo': f'Obra "{obra_raw}" não encontrada'})
-                    continue
+            if tipo_lancamento:
+                obra_id, obra_nome, obra_criar = None, (obra_raw.title() if obra_raw else ''), False
+            else:
+                obra_id, obra_nome, obra_criar = self._resolver_obra(obra_raw, admin_id)
 
             validos.append({
                 'linha': rn,
-                'nome': func.nome,
-                'funcionario_id': func.id,
+                'nome': func_nome,
+                'funcionario_id': func_id,
+                'func_criar': func_criar,
+                'func_valores': {'valor_diaria': valor_d, 'valor_va': valor_va_, 'valor_vt': valor_vt_}
+                                if func_criar else None,
                 'data': str(data_ref),
-                'valor_diaria': valor_diaria,
-                'valor_va': valor_va,
-                'valor_vt': valor_vt,
-                'obra_id': obra.id if obra else None,
-                'obra_nome': obra.nome if obra else '(sem obra)',
+                'valor_diaria': valor_d,
+                'valor_va': valor_va_,
+                'valor_vt': valor_vt_,
+                'obra_id': obra_id,
+                'obra_nome': obra_nome,
+                'obra_criar': obra_criar,
+                'obra_raw': obra_raw,
+                'tipo_lancamento': tipo_lancamento or 'diaria_completa',
+                'tipo_label': _TIPO_LABELS.get(tipo_lancamento or 'diaria_completa', ''),
                 'status': _norm(c('status')) or 'PENDENTE',
             })
 
         return validos, erros
 
+    # ── Entry point ───────────────────────────────────────────────────────────
+    def processar(self, ws, admin_id):
+        if self._is_formato_colaboradores(ws):
+            return self._processar_colaboradores(ws, admin_id)
+        return self._processar_sige(ws, admin_id)
+
+    # ── importar ──────────────────────────────────────────────────────────────
     def importar(self, rows, admin_id):
-        from models import db
+        from models import db, Funcionario, Obra
         from utils.financeiro_integration import registrar_custo_automatico
+        import random, string
         criados, erros = 0, []
+
+        # Cache de obras e funcionários criados nesta importação para reusar IDs
+        obras_criadas = {}      # obra_raw_upper → obra_id
+        funcs_criados = {}      # nome_upper → func_id
 
         for row in rows:
             try:
                 data_ref = _parse_data(row['data'])
                 linha = row['linha']
                 nome = row['nome']
-                func_id = row['funcionario_id']
-                obra_id = row.get('obra_id')
-                data_fmt = data_ref.strftime('%d/%m/%Y')
+                tipo = row.get('tipo_lancamento', 'diaria_completa')
 
-                # 1. Lançamento da diária
+                # ── Tipo "sem_lancamento": só registro, sem custo ──────────
+                if tipo == 'sem_lancamento':
+                    criados += 1
+                    continue
+
+                # ── Resolver / criar funcionário ──────────────────────────
+                func_id = row.get('funcionario_id')
+                if row.get('func_criar') and not func_id:
+                    nome_up = nome.upper()
+                    if nome_up in funcs_criados:
+                        func_id = funcs_criados[nome_up]
+                    else:
+                        # Gera CPF temporário único (até 14 chars)
+                        cpf_tmp = f"TMP{random.randint(10000000000, 99999999999)}"
+                        # Garante unicidade consultando o DB
+                        while Funcionario.query.filter_by(cpf=cpf_tmp).first():
+                            cpf_tmp = f"TMP{random.randint(10000000000, 99999999999)}"
+
+                        # Busca max codigo VV global (constraint global)
+                        ultimo_vv = (Funcionario.query
+                                     .filter(Funcionario.codigo.like('VV%'))
+                                     .order_by(Funcionario.codigo.desc()).first())
+                        try:
+                            proximo_vv = int(ultimo_vv.codigo[2:]) + 1 if ultimo_vv else 1
+                        except Exception:
+                            proximo_vv = 1
+                        # Garante unicidade do código
+                        while Funcionario.query.filter(
+                            Funcionario.codigo == f"VV{proximo_vv:03d}",
+                            Funcionario.admin_id == admin_id
+                        ).first():
+                            proximo_vv += 1
+
+                        vals = row.get('func_valores') or {}
+                        novo_func = Funcionario(
+                            codigo=f"VV{proximo_vv:03d}",
+                            nome=nome,
+                            cpf=cpf_tmp,
+                            tipo_remuneracao='diaria',
+                            valor_diaria=float(vals.get('valor_diaria', row.get('valor_diaria', 0))),
+                            valor_va=float(vals.get('valor_va', row.get('valor_va', 0))),
+                            valor_vt=float(vals.get('valor_vt', row.get('valor_vt', 0))),
+                            data_admissao=data_ref,
+                            ativo=True,
+                            admin_id=admin_id,
+                        )
+                        db.session.add(novo_func)
+                        db.session.flush()  # obtém ID sem commit
+                        func_id = novo_func.id
+                        funcs_criados[nome_up] = func_id
+
+                # ── Resolver / criar obra ─────────────────────────────────
+                obra_id = row.get('obra_id')
+                if row.get('obra_criar') and not obra_id:
+                    obra_raw = row.get('obra_raw', row.get('obra_nome', ''))
+                    obra_up = obra_raw.strip().upper()
+                    if obra_up in obras_criadas:
+                        obra_id = obras_criadas[obra_up]
+                    else:
+                        nova_obra = Obra(
+                            nome=obra_raw.title(),
+                            codigo=None,   # sem código — editável depois
+                            data_inicio=data_ref,
+                            admin_id=admin_id,
+                            ativo=True,
+                        )
+                        db.session.add(nova_obra)
+                        db.session.flush()
+                        obra_id = nova_obra.id
+                        obras_criadas[obra_up] = obra_id
+
+                # ── Lançamentos financeiros ───────────────────────────────
+                data_fmt = data_ref.strftime('%d/%m/%Y')
+                origem_sfx = f"{func_id}_{data_fmt.replace('/','')}"
+
+                # Diária — sempre (exceto sem_lancamento já tratado acima)
                 filho = registrar_custo_automatico(
                     admin_id=admin_id,
                     tipo_categoria='SALARIO',
@@ -436,51 +704,53 @@ class ImportacaoDiarias:
                     entidade_id=func_id,
                     data=data_ref,
                     descricao=f'Diária - {nome} - {data_fmt}',
-                    valor=row['valor_diaria'],
+                    valor=row.get('valor_diaria', 0),
                     obra_id=obra_id,
                     origem_tabela='importacao_diaria',
-                    origem_id=linha,
+                    origem_id=origem_sfx,
                 )
                 if not filho:
-                    erros.append({'linha': linha, 'nome': nome, 'motivo': 'Erro ao registrar custo da diária'})
+                    erros.append({'linha': linha, 'nome': nome,
+                                  'motivo': 'Erro ao registrar custo da diária'})
+                    db.session.rollback()
                     continue
 
-                # 2. Lançamento VA (Vale Alimentação) — somente se configurado
-                if row.get('valor_va', 0) > 0:
-                    registrar_custo_automatico(
-                        admin_id=admin_id,
-                        tipo_categoria='ALIMENTACAO',
-                        entidade_nome=nome,
-                        entidade_id=func_id,
-                        data=data_ref,
-                        descricao=f'VA - {nome} - {data_fmt}',
-                        valor=row['valor_va'],
-                        obra_id=obra_id,
-                        origem_tabela='importacao_diaria_va',
-                        origem_id=linha,
-                    )
-
-                # 3. Lançamento VT (Vale Transporte) — somente se configurado
-                if row.get('valor_vt', 0) > 0:
-                    registrar_custo_automatico(
-                        admin_id=admin_id,
-                        tipo_categoria='TRANSPORTE',
-                        entidade_nome=nome,
-                        entidade_id=func_id,
-                        data=data_ref,
-                        descricao=f'VT - {nome} - {data_fmt}',
-                        valor=row['valor_vt'],
-                        obra_id=obra_id,
-                        origem_tabela='importacao_diaria_vt',
-                        origem_id=linha,
-                    )
+                # VA e VT — somente se tipo for diaria_completa
+                if tipo == 'diaria_completa':
+                    if row.get('valor_va', 0) > 0:
+                        registrar_custo_automatico(
+                            admin_id=admin_id,
+                            tipo_categoria='ALIMENTACAO',
+                            entidade_nome=nome,
+                            entidade_id=func_id,
+                            data=data_ref,
+                            descricao=f'VA - {nome} - {data_fmt}',
+                            valor=row['valor_va'],
+                            obra_id=obra_id,
+                            origem_tabela='importacao_diaria_va',
+                            origem_id=origem_sfx,
+                        )
+                    if row.get('valor_vt', 0) > 0:
+                        registrar_custo_automatico(
+                            admin_id=admin_id,
+                            tipo_categoria='TRANSPORTE',
+                            entidade_nome=nome,
+                            entidade_id=func_id,
+                            data=data_ref,
+                            descricao=f'VT - {nome} - {data_fmt}',
+                            valor=row['valor_vt'],
+                            obra_id=obra_id,
+                            origem_tabela='importacao_diaria_vt',
+                            origem_id=origem_sfx,
+                        )
+                # tipo 'somente_diaria' (ATESTADO) → só diária, sem VA/VT
 
                 db.session.commit()
                 criados += 1
 
             except Exception as e:
                 db.session.rollback()
-                erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': str(e)})
+                erros.append({'linha': row.get('linha'), 'nome': row.get('nome'), 'motivo': str(e)})
 
         return {'criados': criados, 'erros': erros}
 
