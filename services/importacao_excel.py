@@ -1711,19 +1711,30 @@ class ImportacaoFluxoCaixa:
             # ── Auto-criar Fornecedores não reconhecidos ─────────────────────
             from models import Fornecedor as FornecedorModel
 
-            def _inferir_tipo_fornecedor(cat, nome_lower):
-                """Infere tipo_fornecedor a partir da categoria e nome."""
+            def _inferir_tipo_fornecedor(cat, nome_lower, plano_lower=''):
+                """Infere tipo_fornecedor a partir da categoria, plano de contas e nome."""
                 if cat == 'MATERIAL':
                     return 'MATERIAL'
-                if cat == 'MAO_OBRA_DIRETA':
+                if cat in ('MAO_OBRA_DIRETA', 'SERVICO'):
                     return 'PRESTADOR_SERVICO'
-                # Fallback: keywords no nome
-                _mat_kw = ('material', 'ferrag', 'constru', 'leroy', 'tintas',
-                           'pvc', 'ferro', 'aco', 'cimento', 'madeira', 'vidro',
-                           'lojas', 'ferramentas', 'parafus', 'tubos', 'telha')
+                # Keywords no plano de contas (mais específico que o nome)
+                _plano_mat_kw = ('material', 'compra', 'estoque', 'suprimento')
+                _plano_prest_kw = ('servico', 'servico', 'honorario', 'empreitada',
+                                   'terceiro', 'prestac')
+                for kw in _plano_mat_kw:
+                    if kw in plano_lower:
+                        return 'MATERIAL'
+                for kw in _plano_prest_kw:
+                    if kw in plano_lower:
+                        return 'PRESTADOR_SERVICO'
+                # Fallback: keywords no nome do fornecedor
+                _mat_kw = ('material', 'ferrag', 'leroy', 'tintas', 'pvc',
+                           'ferro', 'aco', 'cimento', 'madeira', 'vidro',
+                           'ferramentas', 'parafus', 'tubos', 'telha', 'compra')
                 _prest_kw = ('empreit', 'servic', 'construtora', 'reform',
                              'instalac', 'manutenc', 'eletric', 'hidraul',
-                             'pedreiro', 'pintor', 'gesseiro', 'serralheria')
+                             'honorar', 'pedreiro', 'pintor', 'gesseiro',
+                             'serralheria', 'terceiro')
                 for kw in _mat_kw:
                     if kw in nome_lower:
                         return 'MATERIAL'
@@ -1735,8 +1746,9 @@ class ImportacaoFluxoCaixa:
             n_fornecedores_criados = 0
             _fornecedor_id_map = {}   # nome_lower → fornecedor_id (novos ou já existentes)
 
-            # Coletar nomes únicos + melhor categoria por nome
-            nomes_nao_matched = {}  # nome_lower → (nome_original, best_cat)
+            # Coletar nomes únicos + melhor categoria + plano de contas por nome
+            nomes_nao_matched = {}  # nome_lower → (nome_original, best_cat, best_plano)
+            _PREF_CATS = ('MATERIAL', 'MAO_OBRA_DIRETA', 'SERVICO')
             for row in dados.get('saidas', []):
                 ent_tipo = row.get('entidade_tipo')
                 ent_id_row = row.get('entidade_id')
@@ -1744,12 +1756,13 @@ class ImportacaoFluxoCaixa:
                 nome_lower = nome.lower()
                 if nome and not ent_tipo and not ent_id_row and nome_lower not in ('desconhecido', ''):
                     cat_row = row.get('tipo_categoria') or 'OUTROS'
-                    # Prefer MATERIAL or PRESTADOR_SERVICO over OUTROS when merging
-                    prev = nomes_nao_matched.get(nome_lower, (nome, 'OUTROS'))
-                    best_cat = cat_row if cat_row in ('MATERIAL', 'MAO_OBRA_DIRETA') else prev[1]
-                    nomes_nao_matched[nome_lower] = (nome, best_cat)
+                    plano_row = (row.get('plano_contas') or '').lower()
+                    prev = nomes_nao_matched.get(nome_lower, (nome, 'OUTROS', ''))
+                    best_cat = cat_row if cat_row in _PREF_CATS else prev[1]
+                    best_plano = plano_row if plano_row else prev[2]
+                    nomes_nao_matched[nome_lower] = (nome, best_cat, best_plano)
 
-            for nome_lower, (nome_original, best_cat) in nomes_nao_matched.items():
+            for nome_lower, (nome_original, best_cat, best_plano) in nomes_nao_matched.items():
                 existente = FornecedorModel.query.filter(
                     FornecedorModel.admin_id == admin_id,
                     db.func.lower(FornecedorModel.nome) == nome_lower
@@ -1757,7 +1770,7 @@ class ImportacaoFluxoCaixa:
                 if existente:
                     _fornecedor_id_map[nome_lower] = existente.id
                     continue
-                tipo = _inferir_tipo_fornecedor(best_cat, nome_lower)
+                tipo = _inferir_tipo_fornecedor(best_cat, nome_lower, best_plano)
                 cnpj_placeholder = f'IMP-{uuid.uuid4().hex[:14]}'
                 novo_forn = FornecedorModel(
                     nome=nome_original[:100],
