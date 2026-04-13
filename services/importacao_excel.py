@@ -1421,7 +1421,6 @@ class ImportacaoFluxoCaixa:
         """
         Lê o Excel e retorna dict com 4 listas:
           entradas, saidas_auto, saidas_manual, ignorados
-        Também retorna 'funcionarios_cache' e 'fornecedores_cache' (para uso no importar).
         """
         import openpyxl
         from datetime import datetime as dt
