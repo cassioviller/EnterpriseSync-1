@@ -658,7 +658,32 @@ def dashboard():
         except Exception as kpi_error:
             logger.error(f"[ERROR] ERRO GERAL nos cálculos KPI: {kpi_error}")
             db.session.rollback()
-        
+
+        # Helper: soma GestaoCustoFilho por categorias no período (fonte principal V2)
+        def _soma_gcf(categorias):
+            try:
+                from models import GestaoCustoFilho, GestaoCustoPai
+                total = db.session.query(
+                    db.func.coalesce(db.func.sum(GestaoCustoFilho.valor), 0)
+                ).join(
+                    GestaoCustoPai, GestaoCustoPai.id == GestaoCustoFilho.pai_id
+                ).filter(
+                    GestaoCustoFilho.admin_id == admin_id,
+                    GestaoCustoFilho.data_referencia >= data_inicio,
+                    GestaoCustoFilho.data_referencia <= data_fim,
+                    GestaoCustoPai.tipo_categoria.in_(categorias),
+                    GestaoCustoPai.status.in_(['PENDENTE', 'SOLICITADO', 'AUTORIZADO', 'PARCIAL', 'PAGO'])
+                ).scalar()
+                return float(total or 0)
+            except Exception as e:
+                logger.error(f"Erro _soma_gcf {categorias}: {e}")
+                return 0.0
+
+        # Mão de Obra via GestaoCustoFilho (diárias importadas: SALARIO + MAO_OBRA_DIRETA)
+        total_gcf_mao_obra = _soma_gcf(['SALARIO', 'MAO_OBRA_DIRETA'])
+        total_custo_real += total_gcf_mao_obra
+        logger.debug(f"DEBUG MÃO DE OBRA: RegistroPonto=R${total_custo_real - total_gcf_mao_obra:.2f}, GCF(SALARIO+MAO_OBRA_DIRETA)=R${total_gcf_mao_obra:.2f}, Total=R${total_custo_real:.2f}")
+
         # Buscar custos de alimentação TOTAL para o período (não por funcionário para evitar duplicação)
         custo_alimentacao_real = 0
         try:
@@ -671,7 +696,7 @@ def dashboard():
             ).all()
             total_lancamentos_novos = sum(float(l.valor_total or 0) for l in lancamentos_novos)
             custo_alimentacao_real += total_lancamentos_novos
-            
+
             # 2. Tabela ANTIGA: registro_alimentacao (sem admin_id direto, precisa JOIN)
             alimentacao_registros = db.session.query(RegistroAlimentacao).join(
                 Funcionario, RegistroAlimentacao.funcionario_id == Funcionario.id
@@ -682,7 +707,7 @@ def dashboard():
             ).all()
             total_registros_antigos = sum(a.valor or 0 for a in alimentacao_registros)
             custo_alimentacao_real += total_registros_antigos
-            
+
             # 3. Também buscar em outro_custo
             from models import OutroCusto
             outros_alimentacao = OutroCusto.query.filter(
@@ -693,8 +718,12 @@ def dashboard():
             ).all()
             total_outros = sum(o.valor or 0 for o in outros_alimentacao)
             custo_alimentacao_real += total_outros
-            
-            logger.debug(f"DEBUG ALIMENTAÇÃO DASHBOARD: Lançamentos Novos ({len(lancamentos_novos)})=R${total_lancamentos_novos:.2f}, Registros Antigos ({len(alimentacao_registros)})=R${total_registros_antigos:.2f}, Outros ({len(outros_alimentacao)})=R${total_outros:.2f}, Total=R${custo_alimentacao_real:.2f}")
+
+            # 4. GestaoCustoFilho ALIMENTACAO (importação de diárias e lançamentos V2)
+            total_gcf_alim = _soma_gcf(['ALIMENTACAO'])
+            custo_alimentacao_real += total_gcf_alim
+
+            logger.debug(f"DEBUG ALIMENTAÇÃO: AlimLanc=R${total_lancamentos_novos:.2f}, RegAlim=R${total_registros_antigos:.2f}, OutroCusto=R${total_outros:.2f}, GCF=R${total_gcf_alim:.2f}, Total=R${custo_alimentacao_real:.2f}")
         except Exception as e:
             logger.error(f"Erro cálculo alimentação: {e}")
             import traceback
@@ -743,8 +772,11 @@ def dashboard():
             except Exception as e:
                 logger.debug(f" DEBUG TRANSPORTE V2: LancamentoTransporte não disponível ({e})")
             
-            total = total_vehicle_expense + total_custo_obra + total_lancamento_transporte
-            logger.debug(f" DEBUG TRANSPORTE: VehicleExpense ({len(custos_veiculo)})=R${total_vehicle_expense:.2f}, CustoObra ({len(custos_obra_transporte)})=R${total_custo_obra:.2f}, LancamentoTransporte=R${total_lancamento_transporte:.2f}, Total=R${total:.2f}")
+            # 1.4. GestaoCustoFilho TRANSPORTE (importação de diárias e lançamentos V2)
+            total_gcf_transp = _soma_gcf(['TRANSPORTE'])
+
+            total = total_vehicle_expense + total_custo_obra + total_lancamento_transporte + total_gcf_transp
+            logger.debug(f" DEBUG TRANSPORTE: VehicleExpense=R${total_vehicle_expense:.2f}, CustoObra=R${total_custo_obra:.2f}, LancamentoTransporte=R${total_lancamento_transporte:.2f}, GCF=R${total_gcf_transp:.2f}, Total=R${total:.2f}")
             return total
         
         custo_transporte_real = safe_db_operation(calcular_custos_veiculo, 0)
@@ -815,8 +847,10 @@ def dashboard():
                 CustoObra.tipo.in_(['outros', 'servico'])
             ).all()
             total_custo_obra = sum(float(c.valor or 0) for c in custos_obra_outros)
-            total = total_outro_custo + total_custo_obra
-            logger.debug(f"DEBUG Outros: OutroCusto=R${total_outro_custo:.2f}, CustoObra=R${total_custo_obra:.2f}, Total=R${total:.2f}")
+            # GestaoCustoFilho: categorias não mapeadas em outros cards
+            total_gcf_outros = _soma_gcf(['OUTROS', 'ALUGUEL_UTILITIES', 'TRIBUTOS', 'COMPRA', 'SERVICO'])
+            total = total_outro_custo + total_custo_obra + total_gcf_outros
+            logger.debug(f"DEBUG Outros: OutroCusto=R${total_outro_custo:.2f}, CustoObra=R${total_custo_obra:.2f}, GCF=R${total_gcf_outros:.2f}, Total=R${total:.2f}")
             return total
 
         custo_outros_real = safe_db_operation(calcular_outros_custos, 0)
