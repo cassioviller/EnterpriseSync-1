@@ -1448,28 +1448,12 @@ class ImportacaoFluxoCaixa:
         obras_dict = {_normalizar(o.nome): o.id for o in obras_qs}
 
         # Pre-computar fornecedores MATERIAL com compras no período (para sugestao_apenas_pagamento)
-        try:
-            from models import PedidoCompra as PC
-            _forn_material_ids = set(
-                f.id for f in Fornecedor.query.filter(
-                    Fornecedor.admin_id == admin_id,
-                    Fornecedor.tipo_fornecedor == 'MATERIAL',
-                ).all()
-            )
-            _forn_com_compras = set()
-            if _forn_material_ids:
-                q_pc = PC.query.filter(
-                    PC.admin_id == admin_id,
-                    PC.fornecedor_id.in_(_forn_material_ids),
-                )
-                if data_inicio:
-                    q_pc = q_pc.filter(PC.data_compra >= data_inicio)
-                if data_fim:
-                    q_pc = q_pc.filter(PC.data_compra <= data_fim)
-                _forn_com_compras = set(pc.fornecedor_id for pc in q_pc.all() if pc.fornecedor_id)
-        except Exception:
-            _forn_material_ids = set()
-            _forn_com_compras = set()
+        # Nota: a query de PedidoCompra é feita DEPOIS de coletar as datas do arquivo
+        # para que, quando o usuário não passar data_inicio/data_fim, seja possível
+        # usar o intervalo real das datas encontradas no arquivo.
+        # Portanto, _forn_com_compras é populado após o primeiro parse das abas.
+        _forn_material_ids = set()
+        _forn_com_compras = set()  # será preenchido após o primeiro loop
 
         entradas = []
         saidas_auto = []
@@ -1617,10 +1601,6 @@ class ImportacaoFluxoCaixa:
                     if cat is None:
                         precisa_revisao = True
 
-                sugestao_ap = (
-                    ent_tipo == 'funcionario'
-                    or (ent_tipo == 'fornecedor' and ent_id and ent_id in _forn_com_compras)
-                )
                 registro = {
                     'tipo': 'saida',
                     'data': str(data_obj),
@@ -1638,13 +1618,55 @@ class ImportacaoFluxoCaixa:
                     'entidade_nome_banco': ent_nome_banco,
                     'fuzzy_score': ent_score,
                     'observacoes': obs_fuzzy,
-                    'sugestao_apenas_pagamento': sugestao_ap,
+                    'sugestao_apenas_pagamento': False,  # será ajustado após todos os loops
                 }
 
                 if precisa_revisao:
                     saidas_manual.append(registro)
                 else:
                     saidas_auto.append(registro)
+
+        # ── Sugestão "Apenas Pagamento" ──────────────────────────────────────────
+        # Feita APÓS todos os loops para que todas_datas contenha o intervalo real do arquivo.
+        # Quando o usuário não passa data_inicio/data_fim, usamos o min/max das datas encontradas.
+        _ap_inicio = data_inicio or (min(todas_datas) if todas_datas else None)
+        _ap_fim = data_fim or (max(todas_datas) if todas_datas else None)
+        try:
+            from models import PedidoCompra as PC
+            _forn_material_ids = set(
+                f.id for f in Fornecedor.query.filter(
+                    Fornecedor.admin_id == admin_id,
+                    Fornecedor.tipo_fornecedor == 'MATERIAL',
+                ).all()
+            )
+            if _forn_material_ids:
+                q_pc = PC.query.filter(
+                    PC.admin_id == admin_id,
+                    PC.fornecedor_id.in_(_forn_material_ids),
+                )
+                if _ap_inicio:
+                    q_pc = q_pc.filter(PC.data_compra >= _ap_inicio)
+                if _ap_fim:
+                    q_pc = q_pc.filter(PC.data_compra <= _ap_fim)
+                _forn_com_compras = set(
+                    pc.fornecedor_id for pc in q_pc.all() if pc.fornecedor_id
+                )
+        except Exception as exc_ap:
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                f'[FLUXO processar] Falha ao calcular sugestao_apenas_pagamento: {exc_ap}'
+            )
+
+        # Atualizar sugestao_apenas_pagamento em todos os registros de saída
+        for r in saidas_auto + saidas_manual:
+            r['sugestao_apenas_pagamento'] = (
+                r.get('entidade_tipo') == 'funcionario'
+                or (
+                    r.get('entidade_tipo') == 'fornecedor'
+                    and r.get('entidade_id')
+                    and r.get('entidade_id') in _forn_com_compras
+                )
+            )
 
         # Período descritivo
         datas_sorted = sorted(todas_datas)
