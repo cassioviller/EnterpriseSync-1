@@ -517,8 +517,8 @@ def fluxo_caixa_rollback(batch_id):
             r3 = conn.execute(sa_text(
                 "DELETE FROM conta_pagar WHERE import_batch_id=:bid AND admin_id=:aid"
             ), {'bid': batch_id, 'aid': admin_id})
-            # Filhos antes do pai (coluna = pai_id)
-            conn.execute(sa_text("""
+            # Filhos antes do pai (coluna = pai_id) — conta para auditoria
+            r_filhos = conn.execute(sa_text("""
                 DELETE FROM gestao_custo_filho
                 WHERE pai_id IN (
                     SELECT id FROM gestao_custo_pai
@@ -529,7 +529,7 @@ def fluxo_caixa_rollback(batch_id):
                 "DELETE FROM gestao_custo_pai WHERE import_batch_id=:bid AND admin_id=:aid"
             ), {'bid': batch_id, 'aid': admin_id})
 
-        total = r1.rowcount + r2.rowcount + r3.rowcount + r4.rowcount
+        total = r1.rowcount + r2.rowcount + r3.rowcount + r_filhos.rowcount + r4.rowcount
         flash(f'Importação {batch_id} desfeita com sucesso. {total} registros removidos.', 'success')
     except Exception as e:
         logger.error(f'[ROLLBACK] Erro: {e}', exc_info=True)
