@@ -1385,7 +1385,7 @@ def _fuzzy_match_entidade(nome_excel, funcionarios, fornecedores):
             melhor_f_id = fid
             melhor_f_nome = fnome
 
-    if melhor_f_score >= THRESHOLD:
+    if melhor_f_score > THRESHOLD:
         return 'funcionario', melhor_f_id, melhor_f_nome, melhor_f_score
 
     # ── 2. Tenta fornecedor (considera todos os aliases) ────────────────────
@@ -1402,7 +1402,7 @@ def _fuzzy_match_entidade(nome_excel, funcionarios, fornecedores):
                 melhor_s_id = fid
                 melhor_s_nome = alias
 
-    if melhor_s_score >= THRESHOLD:
+    if melhor_s_score > THRESHOLD:
         return 'fornecedor', melhor_s_id, melhor_s_nome, melhor_s_score
 
     # Nenhum match suficiente: retorna o melhor score geral (sem vínculo)
@@ -1794,6 +1794,11 @@ class ImportacaoFluxoCaixa:
 
                 data_obj = _parse_data(data_str)
 
+                # Observação estruturada para entradas sem vínculo automático
+                cr_obs = None
+                if not row.get('entidade_id'):
+                    cr_obs = f'Vincular manualmente: cliente "{cliente}" não identificado automaticamente.'
+
                 cr = ContaReceber(
                     cliente_nome=cliente,
                     descricao=row.get('descricao') or f'Entrada {data_str}',
@@ -1806,6 +1811,7 @@ class ImportacaoFluxoCaixa:
                     status='RECEBIDO' if status == 'PAGO' else 'PENDENTE',
                     obra_id=obra_id,
                     admin_id=admin_id,
+                    observacoes=cr_obs,
                     import_batch_id=batch_id,
                 )
                 db.session.add(cr)
