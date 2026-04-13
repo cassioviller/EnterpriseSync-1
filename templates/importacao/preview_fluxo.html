@@ -148,6 +148,12 @@
         <span class="badge bg-primary ms-2">{{ saidas_auto|length }}</span>
       </h6>
       <small class="text-muted ms-3">Categoria editável — clique no select para alterar</small>
+      <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
+              onclick="marcarFuncionarios('auto')"
+              title="Marca 'Apenas pgto.' para todos os funcionários">
+        <i data-feather="users" style="width:13px;height:13px;"></i>
+        Marcar todos funcionários
+      </button>
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -162,11 +168,18 @@
               <th>Status</th>
               <th>Categoria</th>
               <th>Score</th>
+              <th class="text-center" title="Quando marcado: cria apenas Fluxo de Caixa + Conta a Pagar, sem registrar Custo (evita duplicidade para diárias e compras já lançadas)">
+                Apenas pgto.
+                <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
+                   data-bs-toggle="tooltip"
+                   title="Marque para pagamentos cujo custo já foi registrado em outro módulo (ex: diárias, compras de material). O sistema só cria Fluxo de Caixa + Conta a Pagar, sem duplicar o custo."></i>
+              </th>
             </tr>
           </thead>
           <tbody>
             {% for r in saidas_auto %}
-            <tr {% if r.eh_reembolso %}style="background:#f0f8ff;"{% endif %}>
+            <tr {% if r.eh_reembolso %}style="background:#f0f8ff;"{% endif %}
+                data-entidade="{{ r.entidade_tipo or '' }}">
               <td class="px-3">{{ r.data }}</td>
               <td>
                 {% if r.entidade_nome_banco %}
@@ -214,6 +227,13 @@
                   <span class="text-muted small">—</span>
                 {% endif %}
               </td>
+              <td class="text-center">
+                <input type="checkbox"
+                       name="apenas_pag_auto_{{ loop.index0 }}"
+                       class="form-check-input apenas-pgto-cb"
+                       data-func="{{ 'true' if r.entidade_tipo == 'funcionario' else 'false' }}"
+                       {% if r.sugestao_apenas_pagamento %}checked{% endif %}>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -233,6 +253,12 @@
         <span class="badge bg-warning text-dark ms-2">{{ saidas_manual|length }}</span>
       </h6>
       <small class="text-muted ms-3">Classificação opcional — sem seleção serão salvos como <strong>Outros</strong></small>
+      <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
+              onclick="marcarFuncionarios('manual')"
+              title="Marca 'Apenas pgto.' para todos os funcionários">
+        <i data-feather="users" style="width:13px;height:13px;"></i>
+        Marcar todos funcionários
+      </button>
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -245,6 +271,7 @@
               <th class="text-end">Valor</th>
               <th>Status</th>
               <th>Categoria <span class="text-danger">*</span></th>
+              <th class="text-center">Apenas pgto.</th>
             </tr>
           </thead>
           <tbody>
@@ -276,6 +303,13 @@
                   <option value="{{ val }}">{{ label }}</option>
                   {% endfor %}
                 </select>
+              </td>
+              <td class="text-center">
+                <input type="checkbox"
+                       name="apenas_pag_manual_{{ loop.index0 }}"
+                       class="form-check-input apenas-pgto-cb"
+                       data-func="{{ 'true' if r.entidade_tipo == 'funcionario' else 'false' }}"
+                       {% if r.sugestao_apenas_pagamento %}checked{% endif %}>
               </td>
             </tr>
             {% endfor %}
@@ -345,5 +379,24 @@
 
   </form>
 </div>
+
+<script>
+function marcarFuncionarios(prefix) {
+  // Marca (sem desmarcar) todos os checkboxes de funcionários na tabela
+  var cbs = document.querySelectorAll(
+    'input[name^="apenas_pag_' + prefix + '_"][data-func="true"]'
+  );
+  cbs.forEach(function(cb) { cb.checked = true; });
+}
+
+// Inicializar tooltips Bootstrap
+document.addEventListener('DOMContentLoaded', function () {
+  var tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  tooltipEls.forEach(function(el) {
+    new bootstrap.Tooltip(el);
+  });
+  feather.replace();
+});
+</script>
 
 {% endblock %}

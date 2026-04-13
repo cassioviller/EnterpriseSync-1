@@ -1447,6 +1447,30 @@ class ImportacaoFluxoCaixa:
         obras_qs = Obra.query.filter_by(admin_id=admin_id).all()
         obras_dict = {_normalizar(o.nome): o.id for o in obras_qs}
 
+        # Pre-computar fornecedores MATERIAL com compras no período (para sugestao_apenas_pagamento)
+        try:
+            from models import PedidoCompra as PC
+            _forn_material_ids = set(
+                f.id for f in Fornecedor.query.filter(
+                    Fornecedor.admin_id == admin_id,
+                    Fornecedor.tipo_fornecedor == 'MATERIAL',
+                ).all()
+            )
+            _forn_com_compras = set()
+            if _forn_material_ids:
+                q_pc = PC.query.filter(
+                    PC.admin_id == admin_id,
+                    PC.fornecedor_id.in_(_forn_material_ids),
+                )
+                if data_inicio:
+                    q_pc = q_pc.filter(PC.data_compra >= data_inicio)
+                if data_fim:
+                    q_pc = q_pc.filter(PC.data_compra <= data_fim)
+                _forn_com_compras = set(pc.fornecedor_id for pc in q_pc.all() if pc.fornecedor_id)
+        except Exception:
+            _forn_material_ids = set()
+            _forn_com_compras = set()
+
         entradas = []
         saidas_auto = []
         saidas_manual = []
@@ -1593,6 +1617,10 @@ class ImportacaoFluxoCaixa:
                     if cat is None:
                         precisa_revisao = True
 
+                sugestao_ap = (
+                    ent_tipo == 'funcionario'
+                    or (ent_tipo == 'fornecedor' and ent_id and ent_id in _forn_com_compras)
+                )
                 registro = {
                     'tipo': 'saida',
                     'data': str(data_obj),
@@ -1610,6 +1638,7 @@ class ImportacaoFluxoCaixa:
                     'entidade_nome_banco': ent_nome_banco,
                     'fuzzy_score': ent_score,
                     'observacoes': obs_fuzzy,
+                    'sugestao_apenas_pagamento': sugestao_ap,
                 }
 
                 if precisa_revisao:
@@ -1661,6 +1690,7 @@ class ImportacaoFluxoCaixa:
         n_saidas = 0
         n_fluxo = 0
         n_conta_pagar = 0
+        n_apenas_pagamento = 0
         n_fornecedores_criados = 0
         erros = []
         duplicados = 0
@@ -1794,7 +1824,9 @@ class ImportacaoFluxoCaixa:
                 status = row.get('status', 'PENDENTE')
                 obra_id = _obra_efetiva(row.get('obra_id'))
                 ent_id = row.get('entidade_id')
+                ent_tipo_row = row.get('entidade_tipo')
                 obs = row.get('observacoes') or ''
+                apenas_pagamento = bool(row.get('apenas_pagamento', False))
 
                 # Usar fornecedor auto-criado se entidade não estava vinculada
                 if not ent_id and fornecedor.lower() in _fornecedor_id_map:
@@ -1805,71 +1837,36 @@ class ImportacaoFluxoCaixa:
                     continue
 
                 data_obj = _parse_data(data_str)
-                status_gcp = 'PAGO' if status == 'PAGO' else 'PENDENTE'
 
-                # GestaoCustoPai
-                gcp = GestaoCustoPai(
-                    tipo_categoria=cat,
-                    entidade_nome=fornecedor,
-                    entidade_id=ent_id,
-                    valor_total=Decimal(str(valor)),
-                    status=status_gcp,
-                    data_pagamento=data_obj if status == 'PAGO' else None,
-                    observacoes=obs or None,
-                    admin_id=admin_id,
-                    import_batch_id=batch_id,
-                )
-                db.session.add(gcp)
-                db.session.flush()
+                if apenas_pagamento:
+                    # ── Modo "Apenas Pagamento": pular GCP/GCF ───────────────
+                    # FluxoCaixa para PAGO
+                    if status == 'PAGO':
+                        fc = FluxoCaixa(
+                            admin_id=admin_id,
+                            data_movimento=data_obj,
+                            tipo_movimento='SAIDA',
+                            categoria=cat,
+                            valor=valor,
+                            descricao=(row.get('descricao') or fornecedor)[:200],
+                            obra_id=obra_id,
+                            observacoes=obs or None,
+                            import_batch_id=batch_id,
+                        )
+                        db.session.add(fc)
+                        n_fluxo += 1
 
-                # GestaoCustoFilho
-                gcf = GestaoCustoFilho(
-                    pai_id=gcp.id,
-                    descricao=(row.get('descricao') or fornecedor)[:300],
-                    valor=Decimal(str(valor)),
-                    data_referencia=data_obj,
-                    obra_id=obra_id,
-                    admin_id=admin_id,
-                )
-                db.session.add(gcf)
-
-                # FluxoCaixa para PAGO
-                if status == 'PAGO':
-                    fc = FluxoCaixa(
-                        admin_id=admin_id,
-                        data_movimento=data_obj,
-                        tipo_movimento='SAIDA',
-                        categoria=cat,
-                        valor=valor,
-                        descricao=(row.get('descricao') or fornecedor)[:200],
-                        obra_id=obra_id,
-                        referencia_id=gcp.id,
-                        referencia_tabela='gestao_custo_pai',
-                        observacoes=obs or None,
-                        import_batch_id=batch_id,
-                    )
-                    db.session.add(fc)
-                    n_fluxo += 1
-
-                # ContaPagar para reembolsos
-                if row.get('eh_reembolso') and data_obj:
-                    ent_tipo_row = row.get('entidade_tipo')
+                    # ContaPagar (sempre — registra a obrigação/pagamento sem criar custo)
                     eh_forn = ent_tipo_row == 'fornecedor'
                     eh_func = ent_tipo_row == 'funcionario'
-
-                    # Observações estruturadas: auditam o vínculo de funcionário
-                    obs_parts = []
-                    if cat:
-                        obs_parts.append(f'Categoria: {cat}')
+                    obs_parts = [f'[APENAS PGTO] Categoria: {cat}']
                     if eh_func and ent_id:
                         obs_parts.append(f'FUNCIONARIO_ID: {ent_id}')
                         obs_parts.append(f'Funcionario: {row.get("entidade_nome_banco") or fornecedor}')
                     if obs:
                         obs_parts.append(obs)
-                    obs_final = '. '.join(obs_parts) or None
-
                     cp = ContaPagar(
-                        descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
+                        descricao=(row.get('descricao') or fornecedor)[:300],
                         valor_original=Decimal(str(valor)),
                         valor_pago=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
                         saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
@@ -1880,13 +1877,95 @@ class ImportacaoFluxoCaixa:
                         obra_id=obra_id,
                         admin_id=admin_id,
                         fornecedor_id=ent_id if (ent_id and eh_forn) else None,
-                        observacoes=obs_final,
-                        origem_tipo='gestao_custo_pai',
-                        origem_id=gcp.id,
+                        observacoes='. '.join(obs_parts),
                         import_batch_id=batch_id,
                     )
                     db.session.add(cp)
                     n_conta_pagar += 1
+                    n_apenas_pagamento += 1
+
+                else:
+                    # ── Modo normal: GCP + GCF + FluxoCaixa + ContaPagar (reembolso) ─
+                    status_gcp = 'PAGO' if status == 'PAGO' else 'PENDENTE'
+
+                    # GestaoCustoPai
+                    gcp = GestaoCustoPai(
+                        tipo_categoria=cat,
+                        entidade_nome=fornecedor,
+                        entidade_id=ent_id,
+                        valor_total=Decimal(str(valor)),
+                        status=status_gcp,
+                        data_pagamento=data_obj if status == 'PAGO' else None,
+                        observacoes=obs or None,
+                        admin_id=admin_id,
+                        import_batch_id=batch_id,
+                    )
+                    db.session.add(gcp)
+                    db.session.flush()
+
+                    # GestaoCustoFilho
+                    gcf = GestaoCustoFilho(
+                        pai_id=gcp.id,
+                        descricao=(row.get('descricao') or fornecedor)[:300],
+                        valor=Decimal(str(valor)),
+                        data_referencia=data_obj,
+                        obra_id=obra_id,
+                        admin_id=admin_id,
+                    )
+                    db.session.add(gcf)
+
+                    # FluxoCaixa para PAGO
+                    if status == 'PAGO':
+                        fc = FluxoCaixa(
+                            admin_id=admin_id,
+                            data_movimento=data_obj,
+                            tipo_movimento='SAIDA',
+                            categoria=cat,
+                            valor=valor,
+                            descricao=(row.get('descricao') or fornecedor)[:200],
+                            obra_id=obra_id,
+                            referencia_id=gcp.id,
+                            referencia_tabela='gestao_custo_pai',
+                            observacoes=obs or None,
+                            import_batch_id=batch_id,
+                        )
+                        db.session.add(fc)
+                        n_fluxo += 1
+
+                    # ContaPagar para reembolsos
+                    if row.get('eh_reembolso') and data_obj:
+                        eh_forn = ent_tipo_row == 'fornecedor'
+                        eh_func = ent_tipo_row == 'funcionario'
+
+                        obs_parts = []
+                        if cat:
+                            obs_parts.append(f'Categoria: {cat}')
+                        if eh_func and ent_id:
+                            obs_parts.append(f'FUNCIONARIO_ID: {ent_id}')
+                            obs_parts.append(f'Funcionario: {row.get("entidade_nome_banco") or fornecedor}')
+                        if obs:
+                            obs_parts.append(obs)
+                        obs_final = '. '.join(obs_parts) or None
+
+                        cp = ContaPagar(
+                            descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
+                            valor_original=Decimal(str(valor)),
+                            valor_pago=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
+                            saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
+                            data_emissao=data_obj,
+                            data_vencimento=data_obj,
+                            data_pagamento=data_obj if status == 'PAGO' else None,
+                            status='PAGO' if status == 'PAGO' else 'PENDENTE',
+                            obra_id=obra_id,
+                            admin_id=admin_id,
+                            fornecedor_id=ent_id if (ent_id and eh_forn) else None,
+                            observacoes=obs_final,
+                            origem_tipo='gestao_custo_pai',
+                            origem_id=gcp.id,
+                            import_batch_id=batch_id,
+                        )
+                        db.session.add(cp)
+                        n_conta_pagar += 1
 
                 n_saidas += 1
                 totais[cat] = totais.get(cat, {'count': 0, 'valor': 0.0})
@@ -1961,6 +2040,7 @@ class ImportacaoFluxoCaixa:
             'n_entradas': n_entradas,
             'n_fluxo': n_fluxo,
             'n_conta_pagar': n_conta_pagar,
+            'n_apenas_pagamento': n_apenas_pagamento,
             'n_fornecedores_criados': n_fornecedores_criados,
             'duplicados': duplicados,
             'totais': totais,

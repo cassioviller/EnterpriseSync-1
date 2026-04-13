@@ -75,6 +75,16 @@
     </div>
   </div>
 
+  {% if resultado.n_apenas_pagamento %}
+  <div class="alert alert-warning d-flex align-items-center mb-4" style="border-radius:10px;">
+    <i data-feather="credit-card" class="me-2" style="width:18px;height:18px;flex-shrink:0;"></i>
+    <div>
+      <strong>{{ resultado.n_apenas_pagamento }} registro(s) tratado(s) como "apenas pagamento"</strong> —
+      apenas Fluxo de Caixa e Conta a Pagar foram criados; nenhum custo (Gestão de Custos) foi duplicado.
+    </div>
+  </div>
+  {% endif %}
+
   {% if resultado.n_fornecedores_criados %}
   <div class="alert alert-info d-flex align-items-center mb-4" style="border-radius:10px;">
     <i data-feather="user-plus" class="me-2" style="width:18px;height:18px;flex-shrink:0;"></i>

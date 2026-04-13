@@ -480,6 +480,8 @@ def fluxo_caixa_confirmar():
         cat_editada = request.form.get(f'cat_auto_{i}')
         if cat_editada:
             row['tipo_categoria'] = cat_editada
+        # Checkbox "apenas pagamento" — presente no form = True
+        row['apenas_pagamento'] = request.form.get(f'apenas_pag_auto_{i}') is not None
 
     # Aplicar categorias das saídas manuais (opcional — padrão OUTROS)
     for i, row in enumerate(saidas_manual):
@@ -488,6 +490,8 @@ def fluxo_caixa_confirmar():
             row['tipo_categoria'] = cat_manual
         elif not row.get('tipo_categoria'):
             row['tipo_categoria'] = 'OUTROS'
+        # Checkbox "apenas pagamento"
+        row['apenas_pagamento'] = request.form.get(f'apenas_pag_manual_{i}') is not None
 
     todas_saidas = saidas_auto + saidas_manual
 
