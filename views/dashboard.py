@@ -205,7 +205,8 @@ def dashboard():
     # DEFINIR VARIÁVEIS DE DATA NO INÍCIO (SEMPRE) - date e datetime já importados no topo
     data_inicio_param = request.args.get('data_inicio')
     data_fim_param = request.args.get('data_fim')
-    
+    obras_ids_param = request.args.getlist('obras_ids')  # lista de IDs selecionados
+
     if data_inicio_param:
         data_inicio = datetime.strptime(data_inicio_param, '%Y-%m-%d').date()
     else:
@@ -219,6 +220,8 @@ def dashboard():
         # Padrão: último dia do mês atual
         ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
         data_fim = date(data_inicio.year, data_inicio.month, ultimo_dia)
+
+    obras_selecionadas = [int(i) for i in obras_ids_param if i.isdigit()]
     
     # REDIRECIONAMENTO BASEADO NO TIPO DE USUÁRIO
     if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
@@ -827,8 +830,9 @@ def dashboard():
         logger.debug(f"DEBUG FINAL - Funcionários por função: {funcionarios_por_departamento}")
         
         # 5. Custos por Obra - com proteção de transação
+        _oids = obras_selecionadas if obras_selecionadas else None
         custos_por_obra = safe_db_operation(
-            lambda: _calcular_custos_obra(admin_id, data_inicio, data_fim), 
+            lambda: _calcular_custos_obra(admin_id, data_inicio, data_fim, _oids),
             {}
         )
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
@@ -974,7 +978,15 @@ def dashboard():
         ).order_by(Obra.data_inicio.desc()).limit(5).all(),
         default_value=[]
     )
-    
+
+    # Lista de todas as obras para o filtro de seleção no gráfico
+    obras_disponiveis = safe_db_operation(
+        lambda: [{'id': o.id, 'nome': o.nome}
+                 for o in Obra.query.filter_by(admin_id=admin_id)
+                                    .order_by(Obra.nome).all()],
+        default_value=[]
+    )
+
     return render_template('dashboard.html',
                          total_funcionarios=total_funcionarios,
                          total_obras=total_obras,
@@ -1004,6 +1016,8 @@ def dashboard():
                          obras_andamento=obras_andamento,
                          data_inicio=data_inicio,
                          data_fim=data_fim,
+                         obras_disponiveis=obras_disponiveis,
+                         obras_selecionadas=obras_selecionadas,
                          # Métricas de Propostas
                          propostas_aprovadas=propostas_aprovadas,
                          propostas_enviadas=propostas_enviadas,
