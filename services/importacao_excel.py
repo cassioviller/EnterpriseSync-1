@@ -695,7 +695,6 @@ class ImportacaoDiarias:
 
                 # ── Lançamentos financeiros ───────────────────────────────
                 data_fmt = data_ref.strftime('%d/%m/%Y')
-                origem_sfx = f"{func_id}_{data_fmt.replace('/','')}"
 
                 # Diária — sempre (exceto sem_lancamento já tratado acima)
                 filho = registrar_custo_automatico(
@@ -708,7 +707,7 @@ class ImportacaoDiarias:
                     valor=row.get('valor_diaria', 0),
                     obra_id=obra_id,
                     origem_tabela='importacao_diaria',
-                    origem_id=origem_sfx,
+                    origem_id=func_id,        # Integer — ID do funcionário
                 )
                 if not filho:
                     erros.append({'linha': linha, 'nome': nome,
@@ -729,7 +728,7 @@ class ImportacaoDiarias:
                             valor=row['valor_va'],
                             obra_id=obra_id,
                             origem_tabela='importacao_diaria_va',
-                            origem_id=origem_sfx,
+                            origem_id=func_id,
                         )
                     if row.get('valor_vt', 0) > 0:
                         registrar_custo_automatico(
@@ -742,7 +741,7 @@ class ImportacaoDiarias:
                             valor=row['valor_vt'],
                             obra_id=obra_id,
                             origem_tabela='importacao_diaria_vt',
-                            origem_id=origem_sfx,
+                            origem_id=func_id,
                         )
                 # tipo 'somente_diaria' (ATESTADO) → só diária, sem VA/VT
 
