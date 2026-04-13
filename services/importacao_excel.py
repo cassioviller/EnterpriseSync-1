@@ -490,7 +490,8 @@ class ImportacaoDiarias:
 
             func_id, func_nome, func_criar, aviso = self._resolver_funcionario(
                 funcionario_nome, admin_id, valor_d, valor_va_, valor_vt_)
-            if aviso:
+            # func_criar não é erro — será criado no importar(); apenas erros reais vão para avisos
+            if aviso and not func_criar:
                 avisos.append({'linha': rn, 'nome': func_nome, 'motivo': aviso})
 
             if tipo_lancamento:
