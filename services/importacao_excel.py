@@ -1635,7 +1635,7 @@ class ImportacaoFluxoCaixa:
                 GestaoCustoPai.valor_total == Decimal(str(valor)),
             ).join(
                 GestaoCustoFilho,
-                GestaoCustoFilho.gestao_custo_pai_id == GestaoCustoPai.id
+                GestaoCustoFilho.pai_id == GestaoCustoPai.id
             ).filter(
                 GestaoCustoFilho.data_referencia == _parse_data(data_str)
             ).first()
@@ -1652,157 +1652,149 @@ class ImportacaoFluxoCaixa:
 
         try:
             # ── Saídas ──────────────────────────────────────────────────────
+            # Erros em qualquer linha propagam para o bloco externo que faz rollback total
             for row in dados.get('saidas', []):
-                try:
-                    cat = row.get('tipo_categoria') or 'OUTROS'
-                    valor = float(row.get('valor') or 0)
-                    fornecedor = row.get('fornecedor') or 'Desconhecido'
-                    data_str = row.get('data', '')
-                    status = row.get('status', 'PENDENTE')
-                    obra_id = _obra_efetiva(row.get('obra_id'))
-                    ent_id = row.get('entidade_id')
-                    obs = row.get('observacoes') or ''
+                cat = row.get('tipo_categoria') or 'OUTROS'
+                valor = float(row.get('valor') or 0)
+                fornecedor = row.get('fornecedor') or 'Desconhecido'
+                data_str = row.get('data', '')
+                status = row.get('status', 'PENDENTE')
+                obra_id = _obra_efetiva(row.get('obra_id'))
+                ent_id = row.get('entidade_id')
+                obs = row.get('observacoes') or ''
 
-                    if _ja_existe_saida(data_str, valor, fornecedor, admin_id):
-                        duplicados += 1
-                        continue
+                if _ja_existe_saida(data_str, valor, fornecedor, admin_id):
+                    duplicados += 1
+                    continue
 
-                    data_obj = _parse_data(data_str)
-                    status_gcp = 'PAGO' if status == 'PAGO' else 'PENDENTE'
+                data_obj = _parse_data(data_str)
+                status_gcp = 'PAGO' if status == 'PAGO' else 'PENDENTE'
 
-                    # GestaoCustoPai
-                    gcp = GestaoCustoPai(
-                        tipo_categoria=cat,
-                        entidade_nome=fornecedor,
-                        entidade_id=ent_id,
-                        valor_total=Decimal(str(valor)),
-                        status=status_gcp,
-                        data_pagamento=data_obj if status == 'PAGO' else None,
-                        observacoes=obs or None,
+                # GestaoCustoPai
+                gcp = GestaoCustoPai(
+                    tipo_categoria=cat,
+                    entidade_nome=fornecedor,
+                    entidade_id=ent_id,
+                    valor_total=Decimal(str(valor)),
+                    status=status_gcp,
+                    data_pagamento=data_obj if status == 'PAGO' else None,
+                    observacoes=obs or None,
+                    admin_id=admin_id,
+                    import_batch_id=batch_id,
+                )
+                db.session.add(gcp)
+                db.session.flush()
+
+                # GestaoCustoFilho
+                gcf = GestaoCustoFilho(
+                    pai_id=gcp.id,
+                    descricao=(row.get('descricao') or fornecedor)[:300],
+                    valor=Decimal(str(valor)),
+                    data_referencia=data_obj,
+                    obra_id=obra_id,
+                    admin_id=admin_id,
+                )
+                db.session.add(gcf)
+
+                # FluxoCaixa para PAGO
+                if status == 'PAGO':
+                    fc = FluxoCaixa(
                         admin_id=admin_id,
+                        data_movimento=data_obj,
+                        tipo_movimento='SAIDA',
+                        categoria=cat,
+                        valor=valor,
+                        descricao=(row.get('descricao') or fornecedor)[:200],
+                        obra_id=obra_id,
+                        referencia_id=gcp.id,
+                        referencia_tabela='gestao_custo_pai',
+                        observacoes=obs or None,
                         import_batch_id=batch_id,
                     )
-                    db.session.add(gcp)
-                    db.session.flush()
+                    db.session.add(fc)
+                    n_fluxo += 1
 
-                    # GestaoCustoFilho
-                    gcf = GestaoCustoFilho(
-                        pai_id=gcp.id,
-                        descricao=(row.get('descricao') or fornecedor)[:300],
-                        valor=Decimal(str(valor)),
-                        data_referencia=data_obj,
-                        obra_id=obra_id,
-                        admin_id=admin_id,
-                    )
-                    db.session.add(gcf)
-
-                    # FluxoCaixa para PAGO
-                    if status == 'PAGO':
-                        fc = FluxoCaixa(
-                            admin_id=admin_id,
-                            data_movimento=data_obj,
-                            tipo_movimento='SAIDA',
-                            categoria=cat,
-                            valor=valor,
-                            descricao=(row.get('descricao') or fornecedor)[:200],
-                            obra_id=obra_id,
-                            referencia_id=gcp.id,
-                            referencia_tabela='gestao_custo_pai',
-                            observacoes=obs or None,
-                            import_batch_id=batch_id,
-                        )
-                        db.session.add(fc)
-                        n_fluxo += 1
-
-                    # ContaPagar para reembolsos (vincula ao funcionário)
-                    if row.get('eh_reembolso') and data_obj:
-                        cp = ContaPagar(
-                            descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
-                            valor_original=Decimal(str(valor)),
-                            valor_pago=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
-                            saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
-                            data_emissao=data_obj,
-                            data_vencimento=data_obj,
-                            data_pagamento=data_obj if status == 'PAGO' else None,
-                            status='PAGO' if status == 'PAGO' else 'PENDENTE',
-                            obra_id=obra_id,
-                            admin_id=admin_id,
-                            observacoes=f'Categoria real: {cat}. {obs}'.strip('. ') or None,
-                            origem_tipo='gestao_custo_pai',
-                            origem_id=gcp.id,
-                            import_batch_id=batch_id,
-                        )
-                        db.session.add(cp)
-                        n_conta_pagar += 1
-
-                    n_saidas += 1
-                    totais[cat] = totais.get(cat, {'count': 0, 'valor': 0.0})
-                    totais[cat]['count'] += 1
-                    totais[cat]['valor'] += valor
-
-                except Exception as e_row:
-                    logger.error(f'[FLUXO] Erro saída {row}: {e_row}')
-                    erros.append({'linha': row.get('data', '?'), 'motivo': str(e_row)})
-
-            # ── Entradas ─────────────────────────────────────────────────────
-            for row in dados.get('entradas', []):
-                try:
-                    valor = float(row.get('valor') or 0)
-                    cliente = row.get('cliente') or 'Desconhecido'
-                    data_str = row.get('data', '')
-                    status = row.get('status', 'PENDENTE')
-                    obra_id = _obra_efetiva(row.get('obra_id'))
-
-                    if _ja_existe_entrada(data_str, valor, cliente, admin_id):
-                        duplicados += 1
-                        continue
-
-                    data_obj = _parse_data(data_str)
-
-                    cr = ContaReceber(
-                        cliente_nome=cliente,
-                        descricao=row.get('descricao') or f'Entrada {data_str}',
+                # ContaPagar para reembolsos — inclui fornecedor_id quando matched
+                if row.get('eh_reembolso') and data_obj:
+                    cp = ContaPagar(
+                        descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
                         valor_original=Decimal(str(valor)),
-                        valor_recebido=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
+                        valor_pago=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
                         saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
                         data_emissao=data_obj,
                         data_vencimento=data_obj,
-                        data_recebimento=data_obj if status == 'PAGO' else None,
-                        status='RECEBIDO' if status == 'PAGO' else 'PENDENTE',
+                        data_pagamento=data_obj if status == 'PAGO' else None,
+                        status='PAGO' if status == 'PAGO' else 'PENDENTE',
                         obra_id=obra_id,
                         admin_id=admin_id,
+                        fornecedor_id=ent_id if ent_id else None,
+                        observacoes=f'Categoria real: {cat}. {obs}'.strip('. ') or None,
+                        origem_tipo='gestao_custo_pai',
+                        origem_id=gcp.id,
                         import_batch_id=batch_id,
                     )
-                    db.session.add(cr)
-                    db.session.flush()
+                    db.session.add(cp)
+                    n_conta_pagar += 1
 
-                    if status == 'PAGO':
-                        fc = FluxoCaixa(
-                            admin_id=admin_id,
-                            data_movimento=data_obj,
-                            tipo_movimento='ENTRADA',
-                            categoria='receita',
-                            valor=valor,
-                            descricao=(row.get('descricao') or cliente)[:200],
-                            obra_id=obra_id,
-                            referencia_id=cr.id,
-                            referencia_tabela='conta_receber',
-                            import_batch_id=batch_id,
-                        )
-                        db.session.add(fc)
-                        n_fluxo += 1
+                n_saidas += 1
+                totais[cat] = totais.get(cat, {'count': 0, 'valor': 0.0})
+                totais[cat]['count'] += 1
+                totais[cat]['valor'] += valor
 
-                    n_entradas += 1
+            # ── Entradas ─────────────────────────────────────────────────────
+            for row in dados.get('entradas', []):
+                valor = float(row.get('valor') or 0)
+                cliente = row.get('cliente') or 'Desconhecido'
+                data_str = row.get('data', '')
+                status = row.get('status', 'PENDENTE')
+                obra_id = _obra_efetiva(row.get('obra_id'))
 
-                except Exception as e_row:
-                    logger.error(f'[FLUXO] Erro entrada {row}: {e_row}')
-                    erros.append({'linha': row.get('data', '?'), 'motivo': str(e_row)})
+                if _ja_existe_entrada(data_str, valor, cliente, admin_id):
+                    duplicados += 1
+                    continue
+
+                data_obj = _parse_data(data_str)
+
+                cr = ContaReceber(
+                    cliente_nome=cliente,
+                    descricao=row.get('descricao') or f'Entrada {data_str}',
+                    valor_original=Decimal(str(valor)),
+                    valor_recebido=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
+                    saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
+                    data_emissao=data_obj,
+                    data_vencimento=data_obj,
+                    data_recebimento=data_obj if status == 'PAGO' else None,
+                    status='RECEBIDO' if status == 'PAGO' else 'PENDENTE',
+                    obra_id=obra_id,
+                    admin_id=admin_id,
+                    import_batch_id=batch_id,
+                )
+                db.session.add(cr)
+                db.session.flush()
+
+                if status == 'PAGO':
+                    fc = FluxoCaixa(
+                        admin_id=admin_id,
+                        data_movimento=data_obj,
+                        tipo_movimento='ENTRADA',
+                        categoria='receita',
+                        valor=valor,
+                        descricao=(row.get('descricao') or cliente)[:200],
+                        obra_id=obra_id,
+                        referencia_id=cr.id,
+                        referencia_tabela='conta_receber',
+                        import_batch_id=batch_id,
+                    )
+                    db.session.add(fc)
+                    n_fluxo += 1
+
+                n_entradas += 1
 
             db.session.commit()
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f'[FLUXO] Erro geral na importação: {e}', exc_info=True)
+            logger.error(f'[FLUXO] Erro na importação — rollback total do lote {batch_id}: {e}', exc_info=True)
             erros.append({'linha': 'GERAL', 'motivo': str(e)})
 
         return {
