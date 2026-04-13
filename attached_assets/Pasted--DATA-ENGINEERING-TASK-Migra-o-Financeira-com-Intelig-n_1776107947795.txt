@@ -1,0 +1,32 @@
+# DATA ENGINEERING TASK: Migração Financeira com Inteligência de Classificação (Excel -> SIGE V2)
+
+Atue como um Especialista em Automação de Dados Financeiros. Sua missão é importar o histórico do arquivo `1.FLUXODECAIXA_VeksEngenharia.xlsx` (foco em Q1/2026), utilizando um motor de classificação por palavras-chave para organizar as "Despesas Operacionais" nas categorias corretas do SIGE V2.
+
+### 1. MOTOR DE CLASSIFICAÇÃO POR PALAVRAS-CHAVE (MAPPING LOGIC)
+
+Ao processar a aba **Saída**, aplique a seguinte lógica de reclassificação baseada na coluna **DESCRIÇÃO** e **FORNECEDOR**. O script deve ignorar maiúsculas/minúsculas e acentos:
+
+| Categoria Destino (V2) | Palavras-Chave Identificadas no seu Excel |
+| :--- | :--- |
+| **MATERIAL** | cimento, ferro, aço, tijolo, areia, brita, tubo, fios, cabos, tinta, parafuso, prego, ferragens, telha, gesso, drywall, porcelanato, argamassa, madeira, vidro, esquadria, aluminio, pvc, torneira, luminaria, lampada, conduite, mangueira, bico, epi, bota, luva, capacete. |
+| **MAO_OBRA_DIRETA** | diaria, servico, mao de obra, pedreiro, ajudante, eletricista, encanador, pintor, gesseiro, serralheria, vidraçaria, empreitada, armação, carpinteiro. |
+| **ALIMENTACAO / VA** | VA, vale alimentacao, almoco, refeicao, marmita, mercado, pao, lanche, cesta basica. |
+| **TRANSPORTE / VT** | VT, vale transporte, combustivel, gasolina, diesel, passagem, uber, pedagio, estacionamento, manutencao veiculo. |
+| **ALUGUEL_UTILITIES** | aluguel, luz, agua, internet, energia, enel, sabesp, vivo, claro, tim, iptu, condominio. |
+| **TRIBUTOS** | imposto, DAS, ISS, taxa, prefeitura, simples nacional, GPS, FGTS, DARF. |
+| **OUTROS** | pix, transferencia, tarifa, juros, multa, seguro, mensalidade, papelaria, limpeza. |
+
+### 2. LOGIC DE IMPORTAÇÃO (BUSINESS RULES)
+
+1.  **Obra Administrativa:** Crie ou vincule à obra **"000 - ADMINISTRATIVO / GERAL"** para todos os lançamentos que não tenham uma obra específica (ex: Escritório, Retirada de Sócios).
+2.  **Abertos vs. Pagos:**
+    - Se a coluna 'STATUS' for **'PAGO'** -> Crie como `PAGO` e gere registro na tabela `FluxoCaixa`.
+    - Se for **'EM ABERTO'** -> Crie como `PENDENTE` na `GestaoCustoPai` (V2) ou `ContaPagar/Receber`.
+3.  **Entradas:** Importe da aba "Entrada" para `ContaReceber`. Se status for 'PAGO', gere entrada no `FluxoCaixa`.
+
+### 3. REGRAS DE INTEGRIDADE
+- **admin_id:** Filtro obrigatório para isolamento de dados.
+- **Não-Duplicidade:** Use a chave composta (Data + Valor + Fornecedor/Cliente) para evitar importar a mesma linha duas vezes.
+- **Relatório Final:** O script deve imprimir o total importado por categoria para conferência com o Dashboard do Excel.
+
+**ESTE SCRIPT ELIMINA A NECESSIDADE DE SEPARAÇÃO MANUAL, GARANTINDO QUE SEU DASHBOARD SIGE JÁ NASÇA COM DADOS CLASSIFICADOS E PRECISOS.**

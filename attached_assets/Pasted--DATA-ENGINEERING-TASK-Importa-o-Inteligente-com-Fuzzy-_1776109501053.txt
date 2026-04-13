@@ -1,0 +1,31 @@
+# DATA ENGINEERING TASK: Importação Inteligente com Fuzzy Matching e Rollback (Excel -> SIGE V2)
+
+Atue como um Engenheiro de Dados Sênior. Sua missão é criar um script de importação do arquivo `1.FLUXODECAIXA_VeksEngenharia.xlsx` que seja tolerante a falhas de digitação nos nomes dos fornecedores/funcionários e que permita ao usuário desfazer (rollback) a importação inteira com um clique.
+
+### 1. FUZZY MATCHING DE NOMES (ALGORITHM LOGIC)
+**Problema:** O nome do funcionário no Excel (ex: "Joao Silva") não bate exatamente com o cadastro do banco (ex: "João da Silva Santos").
+**Solução:**
+- Implemente a biblioteca `thefuzz` (ou similar) para comparar a coluna 'FORNECEDOR' do Excel com os nomes na tabela `Funcionario` e `Fornecedor`.
+- **Regra de Aceite:** Se a similaridade for **> 85%**, vincule automaticamente o `entidade_id` ou `funcionario_id`.
+- **Fallback:** Se for < 85%, crie o registro de custo/reembolso sem vínculo de entidade, mas salve o nome original do Excel no campo `observacao` para ajuste manual posterior.
+
+### 2. SISTEMA DE ROLLBACK (TRANSACTION LOGIC)
+**Problema:** O usuário precisa poder apagar uma importação inteira se o resultado não ficar como esperado.
+**Solução:**
+- **Lote Único:** Antes de iniciar a leitura do Excel, gere um UUID único (ex: `batch_20260413_1030`).
+- **Marcação:** Adicione uma coluna `import_batch_id` (string, nullable) nas tabelas `GestaoCustoPai`, `ContaPagar`, `ContaReceber` e `FluxoCaixa`.
+- **Gravação:** Todo registro criado por este script deve receber esse `batch_id`.
+- **Ação de Desfazer:** Crie uma rota/botão na interface (ex: "Desfazer Última Importação") que execute um `DELETE FROM tabela WHERE import_batch_id = 'X'` em todas as tabelas afetadas, garantindo a limpeza total.
+
+### 3. FLUXO DE REEMBOLSO (BUSINESS LOGIC)
+- Quando a categoria for **REEMBOLSO** (identificada por palavras-chave na descrição):
+  - Use o Fuzzy Match para encontrar o funcionário.
+  - Crie a `ContaPagar` vinculada a ele.
+  - Aproprie o custo na `GestaoCustoPai` (V2) na categoria real do gasto (Material, Transporte, etc.).
+  - Se 'PAGO' no Excel, liquide a conta e gere o `FluxoCaixa`.
+
+### 4. REGRAS DE INTEGRIDADE
+- **Multi-tenant:** O `admin_id` é obrigatório em todas as queries (Match, Insert e Delete).
+- **Performance:** Faça o Fuzzy Match em memória (carregue a lista de funcionários uma vez) para não sobrecarregar o banco de dados durante o loop do Excel.
+
+**ESTA ARQUITETURA GARANTE QUE O GESTOR TENHA CONFIANÇA PARA IMPORTAR MILHARES DE LINHAS, SABENDO QUE O SISTEMA É INTELIGENTE PARA LIGAR OS PONTOS E SEGURO PARA DESFAZER ERROS.**
