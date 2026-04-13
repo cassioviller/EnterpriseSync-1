@@ -386,13 +386,28 @@ def fluxo_caixa_upload():
 
     admin_id = get_admin_id_robusta()
 
+    # Ler período selecionado pelo usuário
+    from datetime import date as _date
+    data_inicio = None
+    data_fim = None
+    try:
+        di_str = request.form.get('data_inicio', '').strip()
+        df_str = request.form.get('data_fim', '').strip()
+        if di_str:
+            data_inicio = datetime.strptime(di_str, '%Y-%m-%d').date()
+        if df_str:
+            data_fim = datetime.strptime(df_str, '%Y-%m-%d').date()
+    except ValueError:
+        pass
+
     try:
         import io
         from services.importacao_excel import ImportacaoFluxoCaixa
         conteudo = arquivo.read()
         arquivo_like = io.BytesIO(conteudo)
         svc = ImportacaoFluxoCaixa()
-        resultado = svc.processar(arquivo_like, admin_id)
+        resultado = svc.processar(arquivo_like, admin_id,
+                                  data_inicio=data_inicio, data_fim=data_fim)
     except Exception as e:
         logger.error(f'[FLUXO_CAIXA] Erro no upload: {e}', exc_info=True)
         flash(f'Erro ao processar arquivo: {e}', 'danger')
@@ -402,6 +417,8 @@ def fluxo_caixa_upload():
     saidas_auto = resultado['saidas_auto']
     saidas_manual = resultado['saidas_manual']
     ignorados = resultado['ignorados']
+    primeiro_dia = resultado.get('primeiro_dia')
+    periodo_str = resultado.get('periodo_str', '—')
 
     # Assinar payload com HMAC (envelope contendo os 3 tipos)
     payload = {
@@ -434,6 +451,8 @@ def fluxo_caixa_upload():
         total_saidas=len(saidas_auto) + len(saidas_manual),
         total_valor_saidas=sum(r.get('valor', 0) for r in saidas_auto + saidas_manual),
         total_valor_entradas=sum(r.get('valor', 0) for r in entradas),
+        primeiro_dia=primeiro_dia,
+        periodo_str=periodo_str,
     )
 
 
@@ -462,14 +481,13 @@ def fluxo_caixa_confirmar():
         if cat_editada:
             row['tipo_categoria'] = cat_editada
 
-    # Aplicar categorias das saídas manuais (obrigatório)
+    # Aplicar categorias das saídas manuais (opcional — padrão OUTROS)
     for i, row in enumerate(saidas_manual):
         cat_manual = request.form.get(f'cat_manual_{i}')
         if cat_manual:
             row['tipo_categoria'] = cat_manual
         elif not row.get('tipo_categoria'):
-            flash('Há saídas sem categoria definida. Preencha todos os campos obrigatórios.', 'warning')
-            return redirect(url_for('importacao.index'))
+            row['tipo_categoria'] = 'OUTROS'
 
     todas_saidas = saidas_auto + saidas_manual
 

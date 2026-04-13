@@ -1417,10 +1417,16 @@ class ImportacaoFluxoCaixa:
     Processa abas 'Entrada' e 'Saída', retorna 4 listas.
     """
 
-    def processar(self, arquivo_path_ou_file, admin_id):
+    def processar(self, arquivo_path_ou_file, admin_id,
+                  data_inicio=None, data_fim=None):
         """
-        Lê o Excel e retorna dict com 4 listas:
-          entradas, saidas_auto, saidas_manual, ignorados
+        Lê o Excel e retorna dict com 4 listas + metadados:
+          entradas, saidas_auto, saidas_manual, ignorados,
+          primeiro_dia (date | None), periodo_str (str),
+          datas_disponiveis (sorted list of date strings in file)
+
+        data_inicio / data_fim: date objects para filtrar o período.
+        Se ambos None, processa todas as datas do arquivo.
         """
         import openpyxl
         from datetime import datetime as dt
@@ -1445,6 +1451,15 @@ class ImportacaoFluxoCaixa:
         saidas_auto = []
         saidas_manual = []
         ignorados = []
+        primeiro_dia = None   # primeira data com lançamento no arquivo
+        todas_datas = set()   # todas as datas encontradas no arquivo
+
+        def _dentro_periodo(d):
+            if data_inicio and d < data_inicio:
+                return False
+            if data_fim and d > data_fim:
+                return False
+            return True
 
         # ── Aba Entrada ──────────────────────────────────────────────────────
         if 'Entrada' in wb.sheetnames:
@@ -1454,8 +1469,10 @@ class ImportacaoFluxoCaixa:
                 if not data_val or not isinstance(data_val, (dt, date)):
                     continue
                 data_obj = data_val.date() if isinstance(data_val, dt) else data_val
-                # Filtro Q1 2026
-                if data_obj.year != 2026 or data_obj.month > 3:
+                todas_datas.add(data_obj)
+                if primeiro_dia is None or data_obj < primeiro_dia:
+                    primeiro_dia = data_obj
+                if not _dentro_periodo(data_obj):
                     continue
 
                 plano = _norm(row[1]) if row[1] else ''
@@ -1508,7 +1525,10 @@ class ImportacaoFluxoCaixa:
                 if not data_val or not isinstance(data_val, (dt, date)):
                     continue
                 data_obj = data_val.date() if isinstance(data_val, dt) else data_val
-                if data_obj.year != 2026 or data_obj.month > 3:
+                todas_datas.add(data_obj)
+                if primeiro_dia is None or data_obj < primeiro_dia:
+                    primeiro_dia = data_obj
+                if not _dentro_periodo(data_obj):
                     continue
 
                 plano = _norm(row[2]) if len(row) > 2 and row[2] else ''
@@ -1597,11 +1617,24 @@ class ImportacaoFluxoCaixa:
                 else:
                     saidas_auto.append(registro)
 
+        # Período descritivo
+        datas_sorted = sorted(todas_datas)
+        if data_inicio and data_fim:
+            periodo_str = f"{data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}"
+        elif datas_sorted:
+            periodo_str = (f"{datas_sorted[0].strftime('%d/%m/%Y')} a "
+                           f"{datas_sorted[-1].strftime('%d/%m/%Y')}")
+        else:
+            periodo_str = '—'
+
         return {
             'entradas': entradas,
             'saidas_auto': saidas_auto,
             'saidas_manual': saidas_manual,
             'ignorados': ignorados,
+            'primeiro_dia': str(primeiro_dia) if primeiro_dia else None,
+            'periodo_str': periodo_str,
+            'datas_disponiveis': [str(d) for d in datas_sorted],
         }
 
     def importar(self, dados, admin_id):
@@ -1628,6 +1661,7 @@ class ImportacaoFluxoCaixa:
         n_saidas = 0
         n_fluxo = 0
         n_conta_pagar = 0
+        n_fornecedores_criados = 0
         erros = []
         duplicados = 0
 
@@ -1674,6 +1708,40 @@ class ImportacaoFluxoCaixa:
             return existing is not None
 
         try:
+            # ── Auto-criar Fornecedores não reconhecidos ─────────────────────
+            from models import Fornecedor as FornecedorModel
+            n_fornecedores_criados = 0
+            _fornecedor_id_map = {}   # nome_lower → fornecedor_id (novos ou já existentes)
+
+            nomes_nao_matched = {}
+            for row in dados.get('saidas', []):
+                ent_tipo = row.get('entidade_tipo')
+                ent_id_row = row.get('entidade_id')
+                nome = (row.get('fornecedor') or '').strip()
+                nome_lower = nome.lower()
+                if nome and not ent_tipo and not ent_id_row and nome_lower not in ('desconhecido', ''):
+                    nomes_nao_matched[nome_lower] = nome
+
+            for nome_lower, nome_original in nomes_nao_matched.items():
+                existente = FornecedorModel.query.filter(
+                    FornecedorModel.admin_id == admin_id,
+                    db.func.lower(FornecedorModel.nome) == nome_lower
+                ).first()
+                if existente:
+                    _fornecedor_id_map[nome_lower] = existente.id
+                    continue
+                cnpj_placeholder = f'IMP-{uuid.uuid4().hex[:14]}'
+                novo_forn = FornecedorModel(
+                    nome=nome_original[:100],
+                    cnpj=cnpj_placeholder,
+                    admin_id=admin_id,
+                    ativo=True,
+                )
+                db.session.add(novo_forn)
+                db.session.flush()
+                _fornecedor_id_map[nome_lower] = novo_forn.id
+                n_fornecedores_criados += 1
+
             # ── Saídas ──────────────────────────────────────────────────────
             # Erros em qualquer linha propagam para o bloco externo que faz rollback total
             for row in dados.get('saidas', []):
@@ -1685,6 +1753,10 @@ class ImportacaoFluxoCaixa:
                 obra_id = _obra_efetiva(row.get('obra_id'))
                 ent_id = row.get('entidade_id')
                 obs = row.get('observacoes') or ''
+
+                # Usar fornecedor auto-criado se entidade não estava vinculada
+                if not ent_id and fornecedor.lower() in _fornecedor_id_map:
+                    ent_id = _fornecedor_id_map[fornecedor.lower()]
 
                 if _ja_existe_saida(data_str, valor, fornecedor, admin_id):
                     duplicados += 1
@@ -1847,6 +1919,7 @@ class ImportacaoFluxoCaixa:
             'n_entradas': n_entradas,
             'n_fluxo': n_fluxo,
             'n_conta_pagar': n_conta_pagar,
+            'n_fornecedores_criados': n_fornecedores_criados,
             'duplicados': duplicados,
             'totais': totais,
             'erros': erros,

@@ -184,14 +184,22 @@
             enctype="multipart/form-data" class="px-4 pb-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row g-3 align-items-end">
-          <div class="col-md-6">
+          <div class="col-md-5">
             <label class="form-label fw-semibold" style="font-size:.84rem;">
               Arquivo Fluxo de Caixa (.xlsx) <span class="text-danger">*</span>
             </label>
             <input type="file" name="arquivo" accept=".xlsx" class="form-control form-control-sm" required>
-            <div class="form-text">
-              Abas "Entrada" e "Saída" — formato Veks Engenharia. Apenas Q1/2026.
-            </div>
+            <div class="form-text">Abas "Entrada" e "Saída" — formato Veks Engenharia</div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">Data início</label>
+            <input type="date" name="data_inicio" class="form-control form-control-sm">
+            <div class="form-text">Opcional — filtra período</div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">Data fim</label>
+            <input type="date" name="data_fim" class="form-control form-control-sm">
+            <div class="form-text">Deixe em branco para importar tudo</div>
           </div>
           <div class="col-md-2 d-flex">
             <button type="submit" class="btn btn-primary btn-sm px-4 align-self-center">

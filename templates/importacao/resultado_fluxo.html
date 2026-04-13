@@ -75,6 +75,17 @@
     </div>
   </div>
 
+  {% if resultado.n_fornecedores_criados %}
+  <div class="alert alert-info d-flex align-items-center mb-4" style="border-radius:10px;">
+    <i data-feather="user-plus" class="me-2" style="width:18px;height:18px;flex-shrink:0;"></i>
+    <div>
+      <strong>{{ resultado.n_fornecedores_criados }} fornecedor(es) criado(s) automaticamente</strong> a partir dos nomes do arquivo.
+      Nos próximos imports, eles serão reconhecidos automaticamente pelo motor de fuzzy matching.
+      Você pode completar os dados (CNPJ, endereço etc.) no cadastro de fornecedores.
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Aviso de falha geral -->
   {% if teve_falha_geral %}
   <div class="alert alert-danger mb-4 d-flex align-items-center">

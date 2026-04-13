@@ -12,6 +12,17 @@
     <div>
       <h4 class="mb-0 fw-bold text-dark">Pré-visualização — Fluxo de Caixa</h4>
       <small class="text-muted">Revise a classificação automática e confirme para importar</small>
+      {% if primeiro_dia %}
+      <div class="mt-1">
+        <span class="badge bg-info text-dark me-2">
+          <i data-feather="calendar" style="width:11px;height:11px;"></i>
+          Primeiro lançamento no arquivo: {{ primeiro_dia }}
+        </span>
+        <span class="badge bg-light text-dark border">
+          Período importado: {{ periodo_str }}
+        </span>
+      </div>
+      {% endif %}
     </div>
     <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">
       <i data-feather="arrow-left" style="width:14px;height:14px;"></i> Voltar
@@ -44,7 +55,7 @@
           <div class="fw-bold text-warning" style="font-size:1.6rem;">{{ saidas_manual|length }}</div>
           <small class="text-muted">Revisão manual</small>
           {% if saidas_manual %}
-          <div class="badge bg-warning text-dark mt-1" style="font-size:.72rem;">Obrigatório preencher</div>
+          <div class="badge bg-secondary mt-1" style="font-size:.72rem;">Padrão: Outros</div>
           {% endif %}
         </div>
       </div>
@@ -218,10 +229,10 @@
     <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
       <h6 class="mb-0 fw-bold text-warning">
         <i data-feather="alert-triangle" style="width:16px;height:16px;"></i>
-        Revisão manual obrigatória
+        Revisão manual
         <span class="badge bg-warning text-dark ms-2">{{ saidas_manual|length }}</span>
       </h6>
-      <small class="text-danger ms-3 fw-semibold">Selecione a categoria de todas antes de confirmar</small>
+      <small class="text-muted ms-3">Classificação opcional — sem seleção serão salvos como <strong>Outros</strong></small>
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -259,8 +270,8 @@
               <td>
                 <select name="cat_manual_{{ loop.index0 }}"
                         class="form-select form-select-sm cat-manual-select"
-                        style="min-width:150px;" required>
-                  <option value="" disabled selected>— Escolha —</option>
+                        style="min-width:150px;">
+                  <option value="">— Outros (padrão) —</option>
                   {% for val, label in categorias_opcoes %}
                   <option value="{{ val }}">{{ label }}</option>
                   {% endfor %}
@@ -316,8 +327,7 @@
 
   <!-- Botão Confirmar -->
   <div class="d-flex gap-3 align-items-center mt-2">
-    <button type="submit" id="btnConfirmar" class="btn btn-success px-5"
-            {% if saidas_manual %}disabled{% endif %}>
+    <button type="submit" id="btnConfirmar" class="btn btn-success px-5">
       <i data-feather="check" style="width:16px;height:16px;"></i>
       Confirmar e importar
       ({{ entradas|length + saidas_auto|length + saidas_manual|length }} registros)
@@ -326,9 +336,9 @@
       <i data-feather="x" style="width:14px;height:14px;"></i> Cancelar
     </a>
     {% if saidas_manual %}
-    <small class="text-danger">
-      <i data-feather="alert-circle" style="width:13px;height:13px;"></i>
-      Preencha as {{ saidas_manual|length }} categorias obrigatórias acima para habilitar
+    <small class="text-muted">
+      <i data-feather="info" style="width:13px;height:13px;"></i>
+      {{ saidas_manual|length }} itens sem categoria serão salvos como <strong>Outros</strong> — você pode reclassificar depois
     </small>
     {% endif %}
   </div>
@@ -336,22 +346,4 @@
   </form>
 </div>
 
-<script>
-(function () {
-  var btn = document.getElementById('btnConfirmar');
-  var selects = document.querySelectorAll('.cat-manual-select');
-
-  function checkAllFilled() {
-    if (!selects.length) { btn.disabled = false; return; }
-    var allFilled = Array.from(selects).every(function (s) { return s.value !== ''; });
-    btn.disabled = !allFilled;
-    if (allFilled) {
-      btn.style.opacity = '1';
-    }
-  }
-
-  selects.forEach(function (s) { s.addEventListener('change', checkAllFilled); });
-  checkAllFilled();
-})();
-</script>
 {% endblock %}
