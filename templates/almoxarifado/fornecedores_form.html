@@ -36,6 +36,25 @@
                                    placeholder="Ex: Materiais Silva">
                         </div>
 
+                        <div class="mb-3">
+                            <label for="tipo_fornecedor" class="form-label fw-semibold">Tipo</label>
+                            <select class="form-select" id="tipo_fornecedor" name="tipo_fornecedor">
+                                <option value="MATERIAL"
+                                  {{ 'selected' if fornecedor and fornecedor.tipo_fornecedor == 'MATERIAL' else '' }}>
+                                  Material / Produto
+                                </option>
+                                <option value="PRESTADOR_SERVICO"
+                                  {{ 'selected' if fornecedor and fornecedor.tipo_fornecedor == 'PRESTADOR_SERVICO' else '' }}>
+                                  Prestador de Serviço
+                                </option>
+                                <option value="OUTRO"
+                                  {{ 'selected' if (not fornecedor or (fornecedor.tipo_fornecedor or 'OUTRO') == 'OUTRO') else '' }}>
+                                  Outro
+                                </option>
+                            </select>
+                            <div class="form-text">Usado para auto-classificar lançamentos no Fluxo de Caixa</div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="cnpj" class="form-label">CNPJ *</label>

@@ -2756,6 +2756,10 @@ def fornecedores_criar():
                 flash(f'Já existe um fornecedor cadastrado com o CNPJ {cnpj}', 'danger')
                 return redirect(url_for('almoxarifado.fornecedores_criar'))
             
+            tipo_fornecedor = request.form.get('tipo_fornecedor', 'OUTRO').strip()
+            if tipo_fornecedor not in ('MATERIAL', 'PRESTADOR_SERVICO', 'OUTRO'):
+                tipo_fornecedor = 'OUTRO'
+
             # Criar fornecedor
             # NOTA: Campo 'nome' é obrigatório no banco - usar razao_social como valor
             fornecedor = Fornecedor(
@@ -2771,6 +2775,7 @@ def fornecedores_criar():
                 telefone=telefone or None,
                 email=email or None,
                 contato_responsavel=contato_responsavel or None,
+                tipo_fornecedor=tipo_fornecedor,
                 admin_id=admin_id
             )
             
@@ -2834,6 +2839,10 @@ def fornecedores_editar(id):
                 flash(f'Já existe outro fornecedor cadastrado com o CNPJ {cnpj}', 'danger')
                 return redirect(url_for('almoxarifado.fornecedores_editar', id=id))
             
+            tipo_fornecedor = request.form.get('tipo_fornecedor', 'OUTRO').strip()
+            if tipo_fornecedor not in ('MATERIAL', 'PRESTADOR_SERVICO', 'OUTRO'):
+                tipo_fornecedor = 'OUTRO'
+
             # Atualizar fornecedor
             fornecedor.nome = razao_social  # Campo legado obrigatório
             fornecedor.razao_social = razao_social
@@ -2847,6 +2856,7 @@ def fornecedores_editar(id):
             fornecedor.telefone = telefone or None
             fornecedor.email = email or None
             fornecedor.contato_responsavel = contato_responsavel or None
+            fornecedor.tipo_fornecedor = tipo_fornecedor
             fornecedor.updated_at = datetime.utcnow()
             
             db.session.commit()

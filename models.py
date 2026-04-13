@@ -1451,6 +1451,9 @@ class Fornecedor(db.Model):
     email = db.Column(db.String(100))
     contato_responsavel = db.Column(db.String(100))
     
+    # Tipo: MATERIAL | PRESTADOR_SERVICO | OUTRO
+    tipo_fornecedor = db.Column(db.String(20), nullable=True, default='OUTRO')
+
     # Status
     ativo = db.Column(db.Boolean, default=True)
     

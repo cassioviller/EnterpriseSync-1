@@ -3803,6 +3803,7 @@ def executar_migracoes():
             (101, "Funcionario - chave_pix, valor_va e valor_vt para PIX e benefícios diários", migration_101_funcionario_pix_va_vt),
             (102, "Funcionario - codigo unique por tenant (codigo+admin_id) em vez de global", migration_102_funcionario_codigo_per_tenant),
             (103, "import_batch_id em gestao_custo_pai, conta_pagar, conta_receber, fluxo_caixa — rollback de importação", migration_103_import_batch_id),
+            (104, "Fornecedor - tipo_fornecedor (MATERIAL / PRESTADOR_SERVICO / OUTRO)", migration_104_tipo_fornecedor),
         ]
         
         # Executar cada migração com rastreamento
@@ -8321,6 +8322,45 @@ def migration_102_funcionario_codigo_per_tenant():
 
     except Exception as e:
         logger.error(f"Erro na migracao 102: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_104_tipo_fornecedor():
+    """
+    Migration 104: Adicionar tipo_fornecedor à tabela fornecedor
+    Valores: MATERIAL | PRESTADOR_SERVICO | OUTRO (padrão OUTRO para registros existentes)
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'fornecedor' AND column_name = 'tipo_fornecedor'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                ALTER TABLE fornecedor
+                ADD COLUMN tipo_fornecedor VARCHAR(20) DEFAULT 'OUTRO'
+            """)
+            logger.info("MIGRACAO 104: tipo_fornecedor adicionado em fornecedor")
+        else:
+            logger.info("MIGRACAO 104: tipo_fornecedor já existe em fornecedor")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 104 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 104: {e}")
         if connection:
             try:
                 connection.rollback()

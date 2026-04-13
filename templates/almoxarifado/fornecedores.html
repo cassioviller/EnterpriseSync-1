@@ -52,6 +52,7 @@
                         <tr>
                             <th>Razão Social</th>
                             <th>Nome Fantasia</th>
+                            <th>Tipo</th>
                             <th>CNPJ</th>
                             <th>Cidade/UF</th>
                             <th>Contato</th>
@@ -68,6 +69,16 @@
                                 {% endif %}
                             </td>
                             <td>{{ fornecedor.nome_fantasia or '-' }}</td>
+                            <td>
+                                {% set tipo = fornecedor.tipo_fornecedor or 'OUTRO' %}
+                                {% if tipo == 'MATERIAL' %}
+                                  <span class="badge" style="background:#0d6efd;">Material</span>
+                                {% elif tipo == 'PRESTADOR_SERVICO' %}
+                                  <span class="badge" style="background:#6610f2;">Prestador</span>
+                                {% else %}
+                                  <span class="badge bg-secondary">Outro</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <code class="small">{{ fornecedor.cnpj_formatado }}</code>
                             </td>
