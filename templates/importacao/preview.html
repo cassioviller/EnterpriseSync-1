@@ -109,7 +109,7 @@
                   {% else %}
                     <span class="badge" style="background:#fd7e14;font-size:.75rem;">↻ Atualizar</span>
                   {% endif %}
-                {% elif col_key == 'valor' or col_key == 'valor_total' %}
+                {% elif col_key in ('valor', 'valor_total', 'valor_diaria', 'valor_va', 'valor_vt') %}
                   R$ {{ '%.2f'|format(val|float) }}
                 {% elif val is none or val == '' %}
                   <span class="text-muted">—</span>

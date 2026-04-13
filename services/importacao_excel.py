@@ -336,8 +336,13 @@ class ImportacaoFuncionarios:
 
 class ImportacaoDiarias:
     """
-    Colunas: nome_funcionario, data, valor, obra, status, descricao, chave_pix
-    Cria GestaoCustoPai/Filho via registrar_custo_automatico(tipo='SALARIO')
+    Colunas obrigatórias: nome_funcionario, data, obra
+    Colunas opcionais:    status
+
+    O valor da diária (e dos benefícios VA e VT) vem do cadastro do funcionário,
+    não da planilha. Para cada linha válida, são criados até 3 lançamentos na
+    Gestão de Custos: diária (SALARIO) + VA (ALIMENTACAO) + VT (TRANSPORTE),
+    usando a mesma lógica do auto-lançamento do ponto eletrônico.
     """
 
     def processar(self, ws, admin_id):
@@ -363,11 +368,6 @@ class ImportacaoDiarias:
                 erros.append({'linha': rn, 'nome': nome, 'motivo': 'Data inválida'})
                 continue
 
-            valor = _parse_float(c('valor', 'valor_diaria'))
-            if valor <= 0:
-                erros.append({'linha': rn, 'nome': nome, 'motivo': 'Valor deve ser maior que 0'})
-                continue
-
             # Buscar funcionário
             func = (Funcionario.query
                     .filter(Funcionario.nome.ilike(nome), Funcionario.admin_id == admin_id)
@@ -375,6 +375,16 @@ class ImportacaoDiarias:
             if not func:
                 erros.append({'linha': rn, 'nome': nome, 'motivo': f'Funcionário "{nome}" não encontrado'})
                 continue
+
+            # Valor vem do cadastro do funcionário — não da planilha
+            valor_diaria = float(func.valor_diaria or 0)
+            if valor_diaria <= 0:
+                erros.append({'linha': rn, 'nome': func.nome,
+                              'motivo': 'Funcionário não tem valor de diária cadastrado no perfil'})
+                continue
+
+            valor_va = float(func.valor_va or 0)
+            valor_vt = float(func.valor_vt or 0)
 
             # Buscar obra (obrigatória quando informada)
             obra_raw = _norm(c('obra', 'obra_id', 'codigo_obra'))
@@ -394,11 +404,12 @@ class ImportacaoDiarias:
                 'nome': func.nome,
                 'funcionario_id': func.id,
                 'data': str(data_ref),
-                'valor': valor,
+                'valor_diaria': valor_diaria,
+                'valor_va': valor_va,
+                'valor_vt': valor_vt,
                 'obra_id': obra.id if obra else None,
                 'obra_nome': obra.nome if obra else '(sem obra)',
                 'status': _norm(c('status')) or 'PENDENTE',
-                'descricao': _norm(c('descricao')) or f'Diária - {func.nome} - {data_ref.strftime("%d/%m/%Y")}',
             })
 
         return validos, erros
@@ -411,23 +422,62 @@ class ImportacaoDiarias:
         for row in rows:
             try:
                 data_ref = _parse_data(row['data'])
+                linha = row['linha']
+                nome = row['nome']
+                func_id = row['funcionario_id']
+                obra_id = row.get('obra_id')
+                data_fmt = data_ref.strftime('%d/%m/%Y')
+
+                # 1. Lançamento da diária
                 filho = registrar_custo_automatico(
                     admin_id=admin_id,
-                    tipo_categoria='MAO_OBRA_DIRETA',
-                    entidade_nome=row['nome'],
-                    entidade_id=row['funcionario_id'],
+                    tipo_categoria='SALARIO',
+                    entidade_nome=nome,
+                    entidade_id=func_id,
                     data=data_ref,
-                    descricao=row['descricao'],
-                    valor=_parse_float(row['valor']),
-                    obra_id=row.get('obra_id'),
+                    descricao=f'Diária - {nome} - {data_fmt}',
+                    valor=row['valor_diaria'],
+                    obra_id=obra_id,
                     origem_tabela='importacao_diaria',
-                    origem_id=row['linha'],
+                    origem_id=linha,
                 )
-                if filho:
-                    db.session.commit()
-                    criados += 1
-                else:
-                    erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': 'Erro ao registrar custo'})
+                if not filho:
+                    erros.append({'linha': linha, 'nome': nome, 'motivo': 'Erro ao registrar custo da diária'})
+                    continue
+
+                # 2. Lançamento VA (Vale Alimentação) — somente se configurado
+                if row.get('valor_va', 0) > 0:
+                    registrar_custo_automatico(
+                        admin_id=admin_id,
+                        tipo_categoria='ALIMENTACAO',
+                        entidade_nome=nome,
+                        entidade_id=func_id,
+                        data=data_ref,
+                        descricao=f'VA - {nome} - {data_fmt}',
+                        valor=row['valor_va'],
+                        obra_id=obra_id,
+                        origem_tabela='importacao_diaria_va',
+                        origem_id=linha,
+                    )
+
+                # 3. Lançamento VT (Vale Transporte) — somente se configurado
+                if row.get('valor_vt', 0) > 0:
+                    registrar_custo_automatico(
+                        admin_id=admin_id,
+                        tipo_categoria='TRANSPORTE',
+                        entidade_nome=nome,
+                        entidade_id=func_id,
+                        data=data_ref,
+                        descricao=f'VT - {nome} - {data_fmt}',
+                        valor=row['valor_vt'],
+                        obra_id=obra_id,
+                        origem_tabela='importacao_diaria_vt',
+                        origem_id=linha,
+                    )
+
+                db.session.commit()
+                criados += 1
+
             except Exception as e:
                 db.session.rollback()
                 erros.append({'linha': row['linha'], 'nome': row['nome'], 'motivo': str(e)})
