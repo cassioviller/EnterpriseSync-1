@@ -701,6 +701,7 @@ class FluxoCaixa(db.Model):
     referencia_id = db.Column(db.Integer)  # ID da tabela de origem (receita, custo_obra, etc.)
     referencia_tabela = db.Column(db.String(30))  # Nome da tabela de origem
     observacoes = db.Column(db.Text)
+    import_batch_id = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
@@ -1501,6 +1502,7 @@ class ContaPagar(db.Model):
     observacoes = db.Column(db.Text)
     origem_tipo = db.Column(db.String(50))
     origem_id = db.Column(db.Integer)
+    import_batch_id = db.Column(db.String(50), nullable=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -1540,6 +1542,7 @@ class ContaReceber(db.Model):
     observacoes = db.Column(db.Text)
     origem_tipo = db.Column(db.String(50))
     origem_id = db.Column(db.Integer)
+    import_batch_id = db.Column(db.String(50), nullable=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -4340,6 +4343,7 @@ class GestaoCustoPai(db.Model):
     data_emissao = db.Column(db.Date, nullable=True)
     numero_parcela = db.Column(db.Integer, nullable=True)
     total_parcelas = db.Column(db.Integer, nullable=True)
+    import_batch_id = db.Column(db.String(50), nullable=True)
 
     itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
                             cascade='all, delete-orphan')

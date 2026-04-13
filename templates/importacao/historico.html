@@ -1,0 +1,106 @@
+{% extends "base_completo.html" %}
+{% block title %}Histórico de Importações — SIGE{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Cabeçalho -->
+  <div class="d-flex align-items-center mb-4">
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#1e3a5f,#2c6fad);border-radius:10px;">
+      <i data-feather="list" style="color:#fff;width:22px;height:22px;"></i>
+    </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Histórico de Importações — Fluxo de Caixa</h4>
+      <small class="text-muted">Gerencie e desfaça importações anteriores</small>
+    </div>
+    <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+      <i data-feather="upload-cloud" style="width:14px;height:14px;"></i> Nova importação
+    </a>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+  {% endwith %}
+
+  {% if batches %}
+  <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" style="font-size:.9rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-4">Lote (Batch ID)</th>
+              <th>Data importação</th>
+              <th class="text-center">Custos</th>
+              <th class="text-end">Total Custos</th>
+              <th class="text-center">Entradas</th>
+              <th class="text-end">Total Entradas</th>
+              <th class="text-end px-4">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in batches %}
+            <tr>
+              <td class="px-4">
+                <code style="font-size:.8rem;">{{ b.batch_id }}</code>
+              </td>
+              <td>
+                {% if b.data_import %}
+                  {{ b.data_import.strftime('%d/%m/%Y %H:%M') if b.data_import else '—' }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="text-center">{{ b.n_custos }}</td>
+              <td class="text-end fw-semibold text-dark">R$ {{ '%.2f'|format(b.total_custos) }}</td>
+              <td class="text-center">{{ b.n_entradas }}</td>
+              <td class="text-end fw-semibold text-success">R$ {{ '%.2f'|format(b.total_entradas) }}</td>
+              <td class="text-end px-4">
+                <button type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        onclick="confirmarRollback('{{ b.batch_id }}')">
+                  <i data-feather="rotate-ccw" style="width:13px;height:13px;"></i>
+                  Desfazer
+                </button>
+                <!-- Form oculto individual -->
+                <form id="form-{{ b.batch_id | replace('_', '-') }}" method="POST"
+                      action="{{ url_for('importacao.fluxo_caixa_rollback', batch_id=b.batch_id) }}"
+                      style="display:none;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="alert alert-info">
+    <i data-feather="info" style="width:16px;height:16px;"></i>
+    Nenhuma importação de Fluxo de Caixa encontrada.
+    <a href="{{ url_for('importacao.index') }}" class="alert-link ms-2">Fazer primeira importação</a>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function confirmarRollback(batchId) {
+  if (confirm('Desfazer a importação ' + batchId + '?\n\nTodos os registros deste lote serão removidos permanentemente.')) {
+    var formId = 'form-' + batchId.replace(/_/g, '-');
+    var form = document.getElementById(formId);
+    if (form) form.submit();
+  }
+}
+</script>
+{% endblock %}

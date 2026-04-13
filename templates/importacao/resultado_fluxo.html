@@ -1,0 +1,206 @@
+{% extends "base_completo.html" %}
+{% block title %}Resultado — Fluxo de Caixa — SIGE{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Cabeçalho -->
+  <div class="d-flex align-items-center mb-4">
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#198754,#157347);border-radius:10px;">
+      <i data-feather="check-circle" style="color:#fff;width:22px;height:22px;"></i>
+    </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Importação concluída — Fluxo de Caixa</h4>
+      <small class="text-muted">Lote: <code>{{ batch_id }}</code></small>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{{ url_for('importacao.historico') }}" class="btn btn-outline-primary btn-sm">
+        <i data-feather="list" style="width:14px;height:14px;"></i> Histórico
+      </a>
+      <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i data-feather="upload-cloud" style="width:14px;height:14px;"></i> Nova importação
+      </a>
+    </div>
+  </div>
+
+  <!-- Cards de resumo -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #0d6efd;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-primary">{{ resultado.n_saidas }}</div>
+          <div class="text-muted small mt-1">Saídas (Custos)</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #198754;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-success">{{ resultado.n_entradas }}</div>
+          <div class="text-muted small mt-1">Entradas (Contas a Receber)</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #6610f2;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold" style="color:#6610f2;">{{ resultado.n_fluxo }}</div>
+          <div class="text-muted small mt-1">Registros no Fluxo de Caixa</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #dc3545;">
+        <div class="card-body py-3">
+          <div class="display-6 fw-bold text-danger">{{ resultado.erros|length }}</div>
+          <div class="text-muted small mt-1">Erros / Duplicados</div>
+          {% if resultado.duplicados %}
+          <div class="text-muted" style="font-size:.75rem;">{{ resultado.duplicados }} duplicados ignorados</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Totais por categoria -->
+  {% if resultado.totais %}
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-header bg-transparent border-bottom py-3 px-4">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i data-feather="bar-chart-2" style="width:16px;height:16px;color:#0d6efd;"></i>
+        Totais por categoria — confira com o dashboard do Excel
+      </h6>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0" style="font-size:.9rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-4">Categoria</th>
+              <th class="text-center">Registros</th>
+              <th class="text-end px-4">Total (R$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set CAT_LABELS = {
+              'SALARIO': 'Salário',
+              'MAO_OBRA_DIRETA': 'Mão de Obra Direta',
+              'MATERIAL': 'Material',
+              'ALIMENTACAO': 'Alimentação',
+              'TRANSPORTE': 'Transporte',
+              'ALUGUEL_UTILITIES': 'Aluguel / Utilitários',
+              'TRIBUTOS': 'Tributos',
+              'EQUIPAMENTO': 'Equipamento',
+              'OUTROS': 'Outros',
+            } %}
+            {% set CAT_CORES = {
+              'SALARIO': '#1e3a5f',
+              'MAO_OBRA_DIRETA': '#198754',
+              'MATERIAL': '#dc3545',
+              'ALIMENTACAO': '#fd7e14',
+              'TRANSPORTE': '#6610f2',
+              'ALUGUEL_UTILITIES': '#0dcaf0',
+              'TRIBUTOS': '#6c757d',
+              'EQUIPAMENTO': '#0d6efd',
+              'OUTROS': '#adb5bd',
+            } %}
+            {% set total_geral = resultado.totais.values()|sum(attribute='valor') %}
+            {% for cat, dados in resultado.totais.items()|sort(attribute='0') %}
+            <tr>
+              <td class="px-4">
+                <span class="badge me-2"
+                      style="background:{{ CAT_CORES.get(cat, '#adb5bd') }};font-size:.72rem;">
+                  {{ cat }}
+                </span>
+                {{ CAT_LABELS.get(cat, cat) }}
+              </td>
+              <td class="text-center">{{ dados.count }}</td>
+              <td class="text-end px-4 fw-semibold text-dark">
+                R$ {{ '%.2f'|format(dados.valor) }}
+              </td>
+            </tr>
+            {% endfor %}
+            <tr class="table-light fw-bold">
+              <td class="px-4">Total Saídas</td>
+              <td class="text-center">{{ resultado.n_saidas }}</td>
+              <td class="text-end px-4">R$ {{ '%.2f'|format(total_geral) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Erros -->
+  {% if resultado.erros %}
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-header bg-transparent border-bottom py-3 px-4">
+      <h6 class="mb-0 fw-bold text-danger">
+        <i data-feather="alert-circle" style="width:16px;height:16px;"></i>
+        Erros durante a importação
+      </h6>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0" style="font-size:.85rem;">
+          <thead class="table-light">
+            <tr><th class="px-4">Referência</th><th>Motivo</th></tr>
+          </thead>
+          <tbody>
+            {% for e in resultado.erros %}
+            <tr>
+              <td class="px-4 text-danger fw-semibold">{{ e.get('linha', '—') }}</td>
+              <td class="text-danger">{{ e.get('motivo', '—') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Card Rollback -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;border-left:4px solid #dc3545 !important;">
+    <div class="card-body py-3 px-4 d-flex align-items-center gap-3">
+      <i data-feather="rotate-ccw" style="width:22px;height:22px;color:#dc3545;"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold text-dark">Desfazer esta importação</div>
+        <small class="text-muted">Remove TODOS os registros deste lote (<code>{{ batch_id }}</code>) de todas as tabelas.</small>
+      </div>
+      <button type="button" class="btn btn-outline-danger btn-sm"
+              onclick="confirmarRollback('{{ batch_id }}')">
+        <i data-feather="trash-2" style="width:14px;height:14px;"></i> Desfazer
+      </button>
+    </div>
+  </div>
+
+  <!-- Links de navegação -->
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('gestao_custos_v2.index') if 'gestao_custos_v2' in request.url else '#' }}"
+       class="btn btn-outline-primary btn-sm">
+      <i data-feather="briefcase" style="width:14px;height:14px;"></i> Ver Gestão de Custos
+    </a>
+    <a href="{{ url_for('importacao.historico') }}" class="btn btn-outline-secondary btn-sm">
+      <i data-feather="list" style="width:14px;height:14px;"></i> Histórico de importações
+    </a>
+  </div>
+
+  <!-- Form oculto de rollback -->
+  <form id="formRollback" method="POST"
+        action="{{ url_for('importacao.fluxo_caixa_rollback', batch_id=batch_id) }}"
+        style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  </form>
+
+</div>
+
+<script>
+function confirmarRollback(batchId) {
+  if (confirm('Tem certeza que deseja desfazer a importação ' + batchId + '?\n\nTodos os registros deste lote serão removidos permanentemente.')) {
+    document.getElementById('formRollback').submit();
+  }
+}
+</script>
+{% endblock %}

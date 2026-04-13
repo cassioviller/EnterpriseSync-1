@@ -1,0 +1,359 @@
+{% extends "base_completo.html" %}
+{% block title %}Preview Fluxo de Caixa — SIGE{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Cabeçalho -->
+  <div class="d-flex align-items-center mb-4">
+    <div class="me-3 d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;background:linear-gradient(135deg,#0d6efd,#6610f2);border-radius:10px;">
+      <i data-feather="dollar-sign" style="color:#fff;width:22px;height:22px;"></i>
+    </div>
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Pré-visualização — Fluxo de Caixa</h4>
+      <small class="text-muted">Revise a classificação automática e confirme para importar</small>
+    </div>
+    <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+      <i data-feather="arrow-left" style="width:14px;height:14px;"></i> Voltar
+    </a>
+  </div>
+
+  <!-- Cards de resumo -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #198754;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-success" style="font-size:1.6rem;">{{ entradas|length }}</div>
+          <small class="text-muted">Entradas</small>
+          <div class="fw-bold text-dark" style="font-size:.9rem;">R$ {{ '%.2f'|format(total_valor_entradas) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #0d6efd;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-primary" style="font-size:1.6rem;">{{ saidas_auto|length }}</div>
+          <small class="text-muted">Saídas auto-classificadas</small>
+          <div class="fw-bold text-dark" style="font-size:.9rem;">R$ {{ '%.2f'|format(saidas_auto|sum(attribute='valor')) }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #ffc107;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-warning" style="font-size:1.6rem;">{{ saidas_manual|length }}</div>
+          <small class="text-muted">Revisão manual</small>
+          {% if saidas_manual %}
+          <div class="badge bg-warning text-dark mt-1" style="font-size:.72rem;">Obrigatório preencher</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #6c757d;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-secondary" style="font-size:1.6rem;">{{ ignorados|length }}</div>
+          <small class="text-muted">Ignorados</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form id="formConfirmar" action="{{ url_for('importacao.fluxo_caixa_confirmar') }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="dados_json" value="{{ dados_json | e }}">
+
+  <!-- 1. ENTRADAS -->
+  {% if entradas %}
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;border-left:4px solid #198754 !important;">
+    <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
+      <h6 class="mb-0 fw-bold text-success">
+        <i data-feather="arrow-down-circle" style="width:16px;height:16px;"></i>
+        Entradas <span class="badge bg-success ms-2">{{ entradas|length }}</span>
+      </h6>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-3">Data</th>
+              <th>Cliente</th>
+              <th>Descrição</th>
+              <th>CC / Obra</th>
+              <th class="text-end">Valor</th>
+              <th>Status</th>
+              <th>Fuzzy match</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in entradas %}
+            <tr>
+              <td class="px-3">{{ r.data }}</td>
+              <td>
+                {{ r.cliente }}
+                {% if r.entidade_nome_banco %}
+                  <br><small class="text-success">→ {{ r.entidade_nome_banco }}
+                  ({{ r.fuzzy_score }}%)</small>
+                {% elif r.fuzzy_score %}
+                  <br><small class="text-warning">{{ r.fuzzy_score }}% — sem match</small>
+                {% endif %}
+              </td>
+              <td>{{ r.descricao or '—' }}</td>
+              <td>{{ r.cc or '—' }}</td>
+              <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+              <td>
+                {% if r.status == 'PAGO' %}
+                  <span class="badge bg-success">PAGO</span>
+                {% else %}
+                  <span class="badge bg-secondary">PENDENTE</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.fuzzy_score > 85 %}
+                  <span class="badge bg-success">Auto</span>
+                {% elif r.fuzzy_score > 60 %}
+                  <span class="badge bg-warning text-dark">{{ r.fuzzy_score }}%</span>
+                {% else %}
+                  <span class="badge bg-light text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 2. SAÍDAS AUTO-CLASSIFICADAS -->
+  {% if saidas_auto %}
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;border-left:4px solid #0d6efd !important;">
+    <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
+      <h6 class="mb-0 fw-bold text-primary">
+        <i data-feather="check-circle" style="width:16px;height:16px;"></i>
+        Saídas auto-classificadas
+        <span class="badge bg-primary ms-2">{{ saidas_auto|length }}</span>
+      </h6>
+      <small class="text-muted ms-3">Categoria editável — clique no select para alterar</small>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-3">Data</th>
+              <th>Fornecedor / Entidade</th>
+              <th>Descrição</th>
+              <th>CC</th>
+              <th class="text-end">Valor</th>
+              <th>Status</th>
+              <th>Categoria</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in saidas_auto %}
+            <tr {% if r.eh_reembolso %}style="background:#f0f8ff;"{% endif %}>
+              <td class="px-3">{{ r.data }}</td>
+              <td>
+                {% if r.entidade_nome_banco %}
+                  <span title="Match: {{ r.fuzzy_score }}% → {{ r.entidade_nome_banco }}">
+                    {{ r.fornecedor }}
+                  </span>
+                  <br><small class="text-success">→ {{ r.entidade_nome_banco }}</small>
+                {% else %}
+                  {{ r.fornecedor }}
+                  {% if r.observacoes %}
+                    <br><small class="text-warning">{{ r.observacoes }}</small>
+                  {% endif %}
+                {% endif %}
+                {% if r.eh_reembolso %}
+                  <span class="badge ms-1" style="background:#6610f2;font-size:.68rem;">Reembolso</span>
+                {% endif %}
+              </td>
+              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                  title="{{ r.descricao }}">{{ r.descricao or '—' }}</td>
+              <td>{{ r.cc or '—' }}</td>
+              <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+              <td>
+                {% if r.status == 'PAGO' %}
+                  <span class="badge bg-success">PAGO</span>
+                {% else %}
+                  <span class="badge bg-secondary">PENDENTE</span>
+                {% endif %}
+              </td>
+              <td>
+                <select name="cat_auto_{{ loop.index0 }}" class="form-select form-select-sm"
+                        style="min-width:150px;">
+                  {% for val, label in categorias_opcoes %}
+                  <option value="{{ val }}" {% if r.tipo_categoria == val %}selected{% endif %}>
+                    {{ label }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                {% if r.fuzzy_score > 85 %}
+                  <span class="badge bg-success">{{ r.fuzzy_score }}%</span>
+                {% elif r.fuzzy_score > 60 %}
+                  <span class="badge bg-warning text-dark">{{ r.fuzzy_score }}%</span>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 3. REVISÃO MANUAL -->
+  {% if saidas_manual %}
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;border-left:4px solid #ffc107 !important;">
+    <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
+      <h6 class="mb-0 fw-bold text-warning">
+        <i data-feather="alert-triangle" style="width:16px;height:16px;"></i>
+        Revisão manual obrigatória
+        <span class="badge bg-warning text-dark ms-2">{{ saidas_manual|length }}</span>
+      </h6>
+      <small class="text-danger ms-3 fw-semibold">Selecione a categoria de todas antes de confirmar</small>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-3">Data</th>
+              <th>Fornecedor</th>
+              <th>Descrição</th>
+              <th class="text-end">Valor</th>
+              <th>Status</th>
+              <th>Categoria <span class="text-danger">*</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in saidas_manual %}
+            <tr>
+              <td class="px-3">{{ r.data }}</td>
+              <td>
+                {{ r.fornecedor }}
+                {% if r.observacoes %}
+                  <br><small class="text-warning">{{ r.observacoes }}</small>
+                {% endif %}
+              </td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                  title="{{ r.descricao }}">{{ r.descricao or '—' }}</td>
+              <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+              <td>
+                {% if r.status == 'PAGO' %}
+                  <span class="badge bg-success">PAGO</span>
+                {% else %}
+                  <span class="badge bg-secondary">PENDENTE</span>
+                {% endif %}
+              </td>
+              <td>
+                <select name="cat_manual_{{ loop.index0 }}"
+                        class="form-select form-select-sm cat-manual-select"
+                        style="min-width:150px;" required>
+                  <option value="" disabled selected>— Escolha —</option>
+                  {% for val, label in categorias_opcoes %}
+                  <option value="{{ val }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 4. IGNORADOS -->
+  {% if ignorados %}
+  <div class="mb-4">
+    <button class="btn btn-sm btn-outline-secondary" type="button"
+            data-bs-toggle="collapse" data-bs-target="#ignoradosCollapse">
+      <i data-feather="eye-off" style="width:14px;height:14px;"></i>
+      Ignorados ({{ ignorados|length }}) — transferências internas e sem valor
+    </button>
+    <div class="collapse mt-2" id="ignoradosCollapse">
+      <div class="card border-0 shadow-sm" style="border-radius:14px;">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0" style="font-size:.82rem;">
+              <thead class="table-light">
+                <tr>
+                  <th class="px-3">Data</th>
+                  <th>Fornecedor</th>
+                  <th>Descrição</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in ignorados %}
+                <tr class="text-muted">
+                  <td class="px-3">{{ r.data }}</td>
+                  <td>{{ r.fornecedor or '—' }}</td>
+                  <td>{{ r.descricao or '—' }}</td>
+                  <td><span class="badge bg-light text-secondary">{{ r.motivo }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Botão Confirmar -->
+  <div class="d-flex gap-3 align-items-center mt-2">
+    <button type="submit" id="btnConfirmar" class="btn btn-success px-5"
+            {% if saidas_manual %}disabled{% endif %}>
+      <i data-feather="check" style="width:16px;height:16px;"></i>
+      Confirmar e importar
+      ({{ entradas|length + saidas_auto|length + saidas_manual|length }} registros)
+    </button>
+    <a href="{{ url_for('importacao.index') }}" class="btn btn-outline-secondary px-4">
+      <i data-feather="x" style="width:14px;height:14px;"></i> Cancelar
+    </a>
+    {% if saidas_manual %}
+    <small class="text-danger">
+      <i data-feather="alert-circle" style="width:13px;height:13px;"></i>
+      Preencha as {{ saidas_manual|length }} categorias obrigatórias acima para habilitar
+    </small>
+    {% endif %}
+  </div>
+
+  </form>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('btnConfirmar');
+  var selects = document.querySelectorAll('.cat-manual-select');
+
+  function checkAllFilled() {
+    if (!selects.length) { btn.disabled = false; return; }
+    var allFilled = Array.from(selects).every(function (s) { return s.value !== ''; });
+    btn.disabled = !allFilled;
+    if (allFilled) {
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-success');
+      btn.style.opacity = '1';
+    }
+  }
+
+  selects.forEach(function (s) { s.addEventListener('change', checkAllFilled); });
+  checkAllFilled();
+})();
+</script>
+{% endblock %}

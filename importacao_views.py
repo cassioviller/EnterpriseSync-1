@@ -1,6 +1,6 @@
 """
 Blueprint de Importação Excel — SIGE v9.0
-5 módulos: Funcionários, Diárias, Alimentação, Transporte, Custos
+Módulos: Funcionários, Diárias, Alimentação, Transporte, Custos, Fluxo de Caixa
 Fluxo por módulo: download template → upload → preview → confirmar
 """
 import hashlib
@@ -8,9 +8,11 @@ import hmac
 import json
 import logging
 import os
+import uuid
+from datetime import datetime
 
 from flask import (Blueprint, current_app, flash, redirect, render_template,
-                   request, send_file, url_for)
+                   request, send_file, url_for, jsonify)
 from flask_login import current_user, login_required
 
 from models import db
@@ -364,3 +366,230 @@ def custos_preview():
 @login_required
 def custos_confirmar():
     return _handle_confirmar('custos')
+
+
+# ─── Fluxo de Caixa ─────────────────────────────────────────────────────────
+
+@importacao_bp.route('/fluxo-caixa/upload', methods=['POST'])
+@login_required
+def fluxo_caixa_upload():
+    """Recebe o arquivo, processa e exibe preview de 4 seções."""
+    arquivo = request.files.get('arquivo')
+    if not arquivo or arquivo.filename == '':
+        flash('Nenhum arquivo selecionado.', 'warning')
+        return redirect(url_for('importacao.index'))
+
+    ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
+    if ext != 'xlsx':
+        flash('Formato inválido. Use arquivo .xlsx.', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    admin_id = get_admin_id_robusta()
+
+    try:
+        import io
+        from services.importacao_excel import ImportacaoFluxoCaixa
+        conteudo = arquivo.read()
+        arquivo_like = io.BytesIO(conteudo)
+        svc = ImportacaoFluxoCaixa()
+        resultado = svc.processar(arquivo_like, admin_id)
+    except Exception as e:
+        logger.error(f'[FLUXO_CAIXA] Erro no upload: {e}', exc_info=True)
+        flash(f'Erro ao processar arquivo: {e}', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    entradas = resultado['entradas']
+    saidas_auto = resultado['saidas_auto']
+    saidas_manual = resultado['saidas_manual']
+    ignorados = resultado['ignorados']
+
+    # Assinar payload com HMAC (envelope contendo os 3 tipos)
+    payload = {
+        'entradas': entradas,
+        'saidas_auto': saidas_auto,
+        'saidas_manual': saidas_manual,
+    }
+    dados_assinados = _assinar_payload([payload], admin_id, 'fluxo_caixa')
+
+    CATEGORIAS_OPCOES = [
+        ('SALARIO', 'Salário'),
+        ('MAO_OBRA_DIRETA', 'Mão de Obra Direta'),
+        ('MATERIAL', 'Material'),
+        ('ALIMENTACAO', 'Alimentação'),
+        ('TRANSPORTE', 'Transporte'),
+        ('ALUGUEL_UTILITIES', 'Aluguel / Utilitários'),
+        ('TRIBUTOS', 'Tributos'),
+        ('EQUIPAMENTO', 'Equipamento'),
+        ('OUTROS', 'Outros'),
+    ]
+
+    return render_template(
+        'importacao/preview_fluxo.html',
+        entradas=entradas,
+        saidas_auto=saidas_auto,
+        saidas_manual=saidas_manual,
+        ignorados=ignorados,
+        categorias_opcoes=CATEGORIAS_OPCOES,
+        dados_json=dados_assinados,
+        total_saidas=len(saidas_auto) + len(saidas_manual),
+        total_valor_saidas=sum(r.get('valor', 0) for r in saidas_auto + saidas_manual),
+        total_valor_entradas=sum(r.get('valor', 0) for r in entradas),
+    )
+
+
+@importacao_bp.route('/fluxo-caixa/confirmar', methods=['POST'])
+@login_required
+def fluxo_caixa_confirmar():
+    """Persiste os dados confirmados após o preview."""
+    admin_id = get_admin_id_robusta()
+    token = request.form.get('dados_json', '')
+
+    rows = _verificar_payload(token, admin_id, 'fluxo_caixa')
+    if rows is None or not rows:
+        flash('Dados de preview inválidos ou expirados — faça o upload novamente.', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    payload = rows[0]
+
+    # Coletar edições manuais do form
+    saidas_auto = payload.get('saidas_auto', [])
+    saidas_manual = payload.get('saidas_manual', [])
+    entradas = payload.get('entradas', [])
+
+    # Aplicar categorias editadas pelo usuário nas saídas auto
+    for i, row in enumerate(saidas_auto):
+        cat_editada = request.form.get(f'cat_auto_{i}')
+        if cat_editada:
+            row['tipo_categoria'] = cat_editada
+
+    # Aplicar categorias das saídas manuais (obrigatório)
+    for i, row in enumerate(saidas_manual):
+        cat_manual = request.form.get(f'cat_manual_{i}')
+        if cat_manual:
+            row['tipo_categoria'] = cat_manual
+        elif not row.get('tipo_categoria'):
+            flash('Há saídas sem categoria definida. Preencha todos os campos obrigatórios.', 'warning')
+            return redirect(url_for('importacao.index'))
+
+    todas_saidas = saidas_auto + saidas_manual
+
+    batch_id = f"import_{datetime.now().strftime('%Y%m%d_%H%M')}_{uuid.uuid4().hex[:6]}"
+
+    try:
+        from services.importacao_excel import ImportacaoFluxoCaixa
+        svc = ImportacaoFluxoCaixa()
+        resultado = svc.importar({
+            'entradas': entradas,
+            'saidas': todas_saidas,
+            'batch_id': batch_id,
+        }, admin_id)
+    except Exception as e:
+        logger.error(f'[FLUXO_CAIXA] Erro no confirmar: {e}', exc_info=True)
+        flash(f'Erro ao importar: {e}', 'danger')
+        return redirect(url_for('importacao.index'))
+
+    return render_template(
+        'importacao/resultado_fluxo.html',
+        resultado=resultado,
+        batch_id=batch_id,
+    )
+
+
+@importacao_bp.route('/fluxo-caixa/rollback/<batch_id>', methods=['POST'])
+@login_required
+def fluxo_caixa_rollback(batch_id):
+    """Desfaz uma importação inteira pelo batch_id."""
+    admin_id = get_admin_id_robusta()
+    if not batch_id or not batch_id.startswith('import_'):
+        flash('Batch ID inválido.', 'danger')
+        return redirect(url_for('importacao.historico'))
+
+    try:
+        from sqlalchemy import text as sa_text
+        with db.engine.begin() as conn:
+            # Ordem: FluxoCaixa e ContaReceber primeiro, depois ContaPagar e GestaoCustoPai
+            r1 = conn.execute(sa_text(
+                "DELETE FROM fluxo_caixa WHERE import_batch_id=:bid AND admin_id=:aid"
+            ), {'bid': batch_id, 'aid': admin_id})
+            r2 = conn.execute(sa_text(
+                "DELETE FROM conta_receber WHERE import_batch_id=:bid AND admin_id=:aid"
+            ), {'bid': batch_id, 'aid': admin_id})
+            r3 = conn.execute(sa_text(
+                "DELETE FROM conta_pagar WHERE import_batch_id=:bid AND admin_id=:aid"
+            ), {'bid': batch_id, 'aid': admin_id})
+            # Filhos antes do pai (coluna = pai_id)
+            conn.execute(sa_text("""
+                DELETE FROM gestao_custo_filho
+                WHERE pai_id IN (
+                    SELECT id FROM gestao_custo_pai
+                    WHERE import_batch_id=:bid AND admin_id=:aid
+                )
+            """), {'bid': batch_id, 'aid': admin_id})
+            r4 = conn.execute(sa_text(
+                "DELETE FROM gestao_custo_pai WHERE import_batch_id=:bid AND admin_id=:aid"
+            ), {'bid': batch_id, 'aid': admin_id})
+
+        total = r1.rowcount + r2.rowcount + r3.rowcount + r4.rowcount
+        flash(f'Importação {batch_id} desfeita com sucesso. {total} registros removidos.', 'success')
+    except Exception as e:
+        logger.error(f'[ROLLBACK] Erro: {e}', exc_info=True)
+        flash(f'Erro ao desfazer importação: {e}', 'danger')
+
+    return redirect(url_for('importacao.historico'))
+
+
+@importacao_bp.route('/historico', methods=['GET'])
+@login_required
+def historico():
+    """Lista todas as importações de fluxo de caixa com batch_id."""
+    admin_id = get_admin_id_robusta()
+    try:
+        from sqlalchemy import text as sa_text
+        with db.engine.connect() as conn:
+            rows = conn.execute(sa_text("""
+                SELECT import_batch_id,
+                       MIN(data_criacao) as data_import,
+                       COUNT(*) as n_custos,
+                       SUM(valor_total) as total_valor
+                FROM gestao_custo_pai
+                WHERE import_batch_id IS NOT NULL
+                  AND import_batch_id LIKE 'import\_%' ESCAPE '\\'
+                  AND admin_id = :aid
+                GROUP BY import_batch_id
+                ORDER BY data_import DESC
+            """), {'aid': admin_id}).fetchall()
+
+        entradas_rows = []
+        try:
+            with db.engine.connect() as conn:
+                entradas_rows = conn.execute(sa_text("""
+                    SELECT import_batch_id, COUNT(*) as n_entradas, SUM(valor_original) as total
+                    FROM conta_receber
+                    WHERE import_batch_id IS NOT NULL
+                      AND import_batch_id LIKE 'import\_%' ESCAPE '\\'
+                      AND admin_id = :aid
+                    GROUP BY import_batch_id
+                """), {'aid': admin_id}).fetchall()
+        except Exception:
+            pass
+
+        entradas_map = {r[0]: {'n': r[1], 'total': float(r[2] or 0)} for r in entradas_rows}
+
+        batches = []
+        for row in rows:
+            bid = row[0]
+            batches.append({
+                'batch_id': bid,
+                'data_import': row[1],
+                'n_custos': row[2],
+                'total_custos': float(row[3] or 0),
+                'n_entradas': entradas_map.get(bid, {}).get('n', 0),
+                'total_entradas': entradas_map.get(bid, {}).get('total', 0),
+            })
+
+    except Exception as e:
+        logger.error(f'[HISTORICO] {e}', exc_info=True)
+        batches = []
+        flash(f'Erro ao carregar histórico: {e}', 'warning')
+
+    return render_template('importacao/historico.html', batches=batches)

@@ -42,4 +42,6 @@ dependencies = [
     "pytz>=2024.1",
     "flask-limiter>=4.1.1",
     "click>=8.2.1",
+    "thefuzz>=0.22.1",
+    "python-levenshtein>=0.27.3",
 ]

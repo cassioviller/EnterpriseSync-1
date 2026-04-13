@@ -159,6 +159,51 @@
   </div>
   {% endfor %}
 
+  <!-- Card: Fluxo de Caixa -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;border-left:4px solid #0d6efd;">
+    <div class="card-body p-0">
+      <div class="d-flex align-items-center p-4 pb-0">
+        <div class="me-3 d-flex align-items-center justify-content-center flex-shrink-0"
+             style="width:44px;height:44px;background:#e8f0f8;border-radius:10px;">
+          <i data-feather="dollar-sign" style="width:22px;height:22px;color:#0d6efd;"></i>
+        </div>
+        <div class="flex-grow-1">
+          <h6 class="fw-bold mb-0 text-dark">Fluxo de Caixa</h6>
+          <small class="text-muted">
+            Importa saídas e entradas do arquivo Excel Veks Engenharia. Motor de 2 níveis de classificação
+            por palavras-chave + fuzzy matching de nomes. Suporta rollback completo por lote.
+          </small>
+        </div>
+        <a href="{{ url_for('importacao.historico') }}"
+           class="btn btn-sm btn-outline-primary ms-3 flex-shrink-0">
+          <i data-feather="list" style="width:13px;height:13px;"></i> Histórico
+        </a>
+      </div>
+      <hr class="mx-4 mt-3 mb-3">
+      <form action="{{ url_for('importacao.fluxo_caixa_upload') }}" method="POST"
+            enctype="multipart/form-data" class="px-4 pb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" style="font-size:.84rem;">
+              Arquivo Fluxo de Caixa (.xlsx) <span class="text-danger">*</span>
+            </label>
+            <input type="file" name="arquivo" accept=".xlsx" class="form-control form-control-sm" required>
+            <div class="form-text">
+              Abas "Entrada" e "Saída" — formato Veks Engenharia. Apenas Q1/2026.
+            </div>
+          </div>
+          <div class="col-md-2 d-flex">
+            <button type="submit" class="btn btn-primary btn-sm px-4 align-self-center">
+              <i data-feather="eye" style="width:14px;height:14px;"></i>
+              Pré-visualizar
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Dicas gerais -->
   <div class="card border-0 shadow-sm mt-2" style="border-radius:14px;">
     <div class="card-body p-4">

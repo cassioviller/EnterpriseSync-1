@@ -3802,6 +3802,7 @@ def executar_migracoes():
             (100, "TarefaCronograma - subatividade_mestre_id FK para rastreamento de catálogo", migration_100_tarefa_cronograma_subatividade_mestre_id),
             (101, "Funcionario - chave_pix, valor_va e valor_vt para PIX e benefícios diários", migration_101_funcionario_pix_va_vt),
             (102, "Funcionario - codigo unique por tenant (codigo+admin_id) em vez de global", migration_102_funcionario_codigo_per_tenant),
+            (103, "import_batch_id em gestao_custo_pai, conta_pagar, conta_receber, fluxo_caixa — rollback de importação", migration_103_import_batch_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -8320,6 +8321,47 @@ def migration_102_funcionario_codigo_per_tenant():
 
     except Exception as e:
         logger.error(f"Erro na migracao 102: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_103_import_batch_id():
+    """
+    Migration 103: Adicionar import_batch_id às tabelas de importação
+    Tabelas: gestao_custo_pai, conta_pagar, conta_receber, fluxo_caixa
+    Permite rollback completo de uma importação por batch_id.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        tabelas = ['gestao_custo_pai', 'conta_pagar', 'conta_receber', 'fluxo_caixa']
+        for tabela in tabelas:
+            cursor.execute(f"""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = '{tabela}' AND column_name = 'import_batch_id'
+            """)
+            if not cursor.fetchone():
+                cursor.execute(f"""
+                    ALTER TABLE {tabela} ADD COLUMN import_batch_id VARCHAR(50)
+                """)
+                logger.info(f"MIGRACAO 103: import_batch_id adicionado em {tabela}")
+            else:
+                logger.info(f"MIGRACAO 103: import_batch_id já existe em {tabela}")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 103 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 103: {e}")
         if connection:
             try:
                 connection.rollback()

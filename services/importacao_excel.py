@@ -1130,6 +1130,693 @@ class ImportacaoCustos:
         return {'criados': criados, 'erros': erros}
 
 
+# ── Importação Fluxo de Caixa ─────────────────────────────────────────────────
+
+import unicodedata as _ud
+
+def _normalizar(texto):
+    """Lowercase sem acentos."""
+    s = str(texto or '').lower()
+    s = _ud.normalize('NFD', s)
+    s = ''.join(c for c in s if _ud.category(c) != 'Mn')
+    return s.strip()
+
+
+# ---------------------------------------------------------------------------
+# Mapeamento Plano de Contas → tipo_categoria (Nível 1)
+# ---------------------------------------------------------------------------
+_PLANO_PARA_CATEGORIA = {
+    'salarios': 'SALARIO',
+    'salario': 'SALARIO',
+    'adiantamento salarial': 'SALARIO',
+    'das simples nacional': 'TRIBUTOS',
+    'simples nacional': 'TRIBUTOS',
+    'inss': 'TRIBUTOS',
+    'fgts': 'TRIBUTOS',
+    'das': 'TRIBUTOS',
+    'projeto': 'MAO_OBRA_DIRETA',
+    'honorarios': 'MAO_OBRA_DIRETA',
+    'honorario': 'MAO_OBRA_DIRETA',
+    'beneficios': 'ALIMENTACAO',
+    'beneficio': 'ALIMENTACAO',
+    'consumo': 'ALUGUEL_UTILITIES',
+    'despesa bancaria': 'OUTROS',
+    'despesa financeira': 'OUTROS',
+    'manutencao': 'OUTROS',
+    'marketing': 'OUTROS',
+    'retirada dos socios': 'OUTROS',
+    'retirada de socios': 'OUTROS',
+}
+
+def _categoria_por_plano(plano):
+    p = _normalizar(plano)
+    for chave, cat in _PLANO_PARA_CATEGORIA.items():
+        if chave in p:
+            return cat
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Keywords por categoria (Nível 2b)
+# ---------------------------------------------------------------------------
+_KEYWORDS_CATEGORIA = [
+    ('MATERIAL', [
+        'cimento', 'ferro', 'aco', 'tijolo', 'areia', 'brita', 'tubo', 'fios',
+        'cabos', 'tinta', 'parafuso', 'prego', 'ferragens', 'telha', 'gesso',
+        'drywall', 'porcelanato', 'argamassa', 'madeira', 'vidro', 'esquadria',
+        'aluminio', 'pvc', 'torneira', 'luminaria', 'lampada', 'conduite',
+        'mangueira', 'epi', 'bota', 'luva', 'capacete', 'leroy', 'concrelagos',
+        'loja do mecanico', 'lojas mm', 'materiais', 'ferramenta', 'parafusadeira',
+    ]),
+    ('MAO_OBRA_DIRETA', [
+        'diaria', 'servico', 'mao de obra', 'pedreiro', 'ajudante', 'eletricista',
+        'encanador', 'pintor', 'gesseiro', 'serralheria', 'vidraca', 'empreitada',
+        'armacao', 'carpinteiro', 'medicao', 'pintura', 'hidraulica', 'eletrica',
+        'medicao', 'medir', 'contratado', 'terceirizado',
+    ]),
+    ('ALIMENTACAO', [
+        'vale alimentacao', 'almoco', 'refeicao', 'marmita', 'pao', 'lanche',
+        'cesta basica', 'restaurante', 'cafe', 'marmitex', 'jantar', 'cambuca',
+        'ifood', 'mercado livre', 'mercado', 'supermercado', 'alimentos',
+    ]),
+    ('TRANSPORTE', [
+        'vale transporte', 'combustivel', 'gasolina', 'diesel', 'passagem', 'uber',
+        'pedagio', 'estacionamento', 'frete', ' km ', '+km', 'km ', 'kilometro',
+        'quilometro', 'rodagem',
+    ]),
+    ('ALUGUEL_UTILITIES', [
+        'aluguel', ' luz', 'agua', 'internet', 'energia', 'enel', 'sabesp',
+        'vivo', 'claro', 'tim', 'iptu', 'condominio', 'google', 'workspace',
+        'oi ', 'net ', 'sky ', 'streaming',
+    ]),
+    ('TRIBUTOS', [
+        'imposto', ' das', 'iss', 'taxa', 'prefeitura', 'simples nacional',
+        'gps', 'fgts', 'darf', 'tributo', 'inss', 'contribuicao',
+    ]),
+    ('OUTROS', [
+        'tarifa', 'juros', 'multa', 'seguro', 'mensalidade', 'papelaria',
+        'limpeza', 'plotagem', 'bonus', 'gratificacao', 'mouse', 'notebook',
+        'computador', 'celular', 'escritorio',
+    ]),
+]
+
+# Keywords de contexto dentro de reembolsos (Nível 2a)
+_KEYWORDS_REEMBOLSO_CONTEXTO = [
+    ('TRANSPORTE', ['km', 'kilometro', 'quilometro', 'rodagem', 'combustivel',
+                    'gasolina', 'uber', 'passagem', 'frete', 'pedagio']),
+    ('ALIMENTACAO', ['almoco', 'refeicao', 'marmita', 'cafe', 'jantar', 'lanche',
+                     'ifood', 'alimentos', 'refeicoes', 'lanchonete']),
+    ('MATERIAL', ['material', 'cimento', 'ferragem', 'leroy', 'parafuso', 'epi',
+                  'bota', 'loja do mecanico', 'parafusadeira', 'ferramenta',
+                  'tinta', 'madeira', 'vidro']),
+    ('MAO_OBRA_DIRETA', ['diaria', 'medicao', 'servico', 'empreitada', 'contratado']),
+    ('SALARIO', ['salario', 'salário']),
+    ('ALUGUEL_UTILITIES', ['luz', 'agua', 'internet', 'energia', 'enel', 'sabesp',
+                            'google', 'workspace', 'aluguel', 'gas']),
+    ('OUTROS', ['cartao', 'compras', 'diverso', 'reembolso', 'adiantamento']),
+]
+
+
+def _classificar_keywords(texto):
+    """Aplica keywords gerais ao texto. Retorna tipo_categoria ou None."""
+    t = _normalizar(texto)
+    for cat, kws in _KEYWORDS_CATEGORIA:
+        for kw in kws:
+            if kw in t:
+                return cat
+    return None
+
+
+def _classificar_reembolso_contexto(desc_completa):
+    """
+    Extrai contexto após '|' ou '-' e aplica keywords de reembolso.
+    Padrão fixo 'km' → TRANSPORTE.
+    Retorna (tipo_categoria, contexto_extraido) ou (None, '').
+    """
+    desc_norm = _normalizar(desc_completa)
+
+    # Padrão fixo "reembolso + km"
+    if 'km' in desc_norm:
+        return 'TRANSPORTE', desc_norm
+
+    # Extrair contexto: texto após '|' ou '-'
+    contexto = desc_completa
+    if '|' in desc_completa:
+        contexto = desc_completa.split('|', 1)[-1]
+    elif ' - ' in desc_completa:
+        partes = desc_completa.split(' - ', 1)
+        # Usar a segunda parte só se a primeira tiver "reembolso/adiantamento"
+        primeira = _normalizar(partes[0])
+        if any(x in primeira for x in ['reembolso', 'adiantamento']):
+            contexto = partes[1]
+
+    ctx_norm = _normalizar(contexto)
+    for cat, kws in _KEYWORDS_REEMBOLSO_CONTEXTO:
+        for kw in kws:
+            if kw in ctx_norm:
+                if cat != 'OUTROS':  # OUTROS é fallback, verificar outros primeiro
+                    return cat, ctx_norm
+    # Segunda passagem para OUTROS
+    for kw in _KEYWORDS_REEMBOLSO_CONTEXTO[-1][1]:
+        if kw in ctx_norm:
+            return None, ctx_norm  # sem contexto suficiente → revisão manual
+
+    return None, ctx_norm
+
+
+def _eh_reembolso(desc):
+    d = _normalizar(desc)
+    return any(x in d for x in ['reembolso', 'adiantamento', 'reembolsos'])
+
+
+def _eh_transferencia_interna(desc, valor):
+    if valor is None:
+        return True
+    d = _normalizar(str(desc or ''))
+    return ('transferencia de valores' in d or
+            ('nubank' in d and 'itau' in d))
+
+
+# ---------------------------------------------------------------------------
+# Mapeamento Centro de Custo → obra_id (admin_id=63)
+# ---------------------------------------------------------------------------
+_CC_OBRA_MAP = {
+    'gespi refeitorio': 243,
+    'gespi - refeitorio': 243,
+    'gespi suprimentos': 245,
+    'gespi - suprimentos': 245,
+    'gespi sala de controle': 245,
+    'gespi - sala de controle': 245,
+    'angela cid': 249,
+    'clinica dgm': 255,
+    'dgm': 255,
+    'gattai': 254,
+    'braganca': 254,
+    'anderson': 251,
+    'anderson - urbanova': 251,
+    'steel home': 246,
+    'steelhome': 246,
+    'vereda': 247,
+    'rafael': 256,
+    'rafael - urbanova': 256,
+    'urbanova': 256,
+}
+_CC_ADMIN = ['escritorio', 'guilherme e ariane', 'guilherme', 'ariane',
+             'administrativo', 'geral', 'head', 'holding']
+
+
+def _match_cc_obra(cc, obras_dict):
+    """Retorna obra_id ou None (None = usar obra ADMINISTRATIVO)."""
+    if not cc:
+        return None
+    cc_norm = _normalizar(cc)
+    # Checa se é administrativo
+    if any(x in cc_norm for x in _CC_ADMIN):
+        return None
+    # Lookup direto
+    for chave, oid in _CC_OBRA_MAP.items():
+        if chave in cc_norm or cc_norm in chave:
+            return oid
+    # Fuzzy fallback com obras do banco
+    try:
+        from thefuzz import process as fuzz_process
+        if obras_dict:
+            match = fuzz_process.extractOne(cc_norm, obras_dict.keys(), score_cutoff=70)
+            if match:
+                return obras_dict[match[0]]
+    except ImportError:
+        pass
+    return None
+
+
+def _fuzzy_match_entidade(nome_excel, funcionarios, fornecedores):
+    """
+    Retorna (tipo, id, nome_banco, score) ou (None, None, None, 0).
+    tipo = 'funcionario' | 'fornecedor'
+    Carregue funcionarios e fornecedores EM MEMÓRIA antes de chamar.
+    """
+    try:
+        from thefuzz import fuzz
+    except ImportError:
+        return None, None, None, 0
+
+    nome_norm = _normalizar(nome_excel)
+    melhor_score = 0
+    melhor_tipo = None
+    melhor_id = None
+    melhor_nome = None
+
+    for fid, fnome in funcionarios:
+        score = fuzz.token_set_ratio(nome_norm, _normalizar(fnome))
+        if score > melhor_score:
+            melhor_score = score
+            melhor_tipo = 'funcionario'
+            melhor_id = fid
+            melhor_nome = fnome
+
+    for fid, fnome in fornecedores:
+        score = fuzz.token_set_ratio(nome_norm, _normalizar(fnome))
+        if score > melhor_score:
+            melhor_score = score
+            melhor_tipo = 'fornecedor'
+            melhor_id = fid
+            melhor_nome = fnome
+
+    if melhor_score > 85:
+        return melhor_tipo, melhor_id, melhor_nome, melhor_score
+    return None, None, None, melhor_score
+
+
+class ImportacaoFluxoCaixa:
+    """
+    Parser + classificador para o arquivo Fluxo de Caixa Veks Engenharia.
+    Processa abas 'Entrada' e 'Saída', retorna 4 listas.
+    """
+
+    def processar(self, arquivo_path_ou_file, admin_id):
+        """
+        Lê o Excel e retorna dict com 4 listas:
+          entradas, saidas_auto, saidas_manual, ignorados
+        Também retorna 'funcionarios_cache' e 'fornecedores_cache' (para uso no importar).
+        """
+        import openpyxl
+        from datetime import datetime as dt
+
+        wb = openpyxl.load_workbook(arquivo_path_ou_file, data_only=True)
+
+        # Carregar entidades em memória (um hit no BD)
+        from models import Funcionario, Fornecedor
+        funcionarios = [(f.id, f.nome) for f in
+                        Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()]
+        fornecedores = []
+        for f in Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).all():
+            nome = f.razao_social or f.nome_fantasia or f.nome
+            fornecedores.append((f.id, nome))
+
+        # Carregar obras em memória para match fuzzy de CC
+        from models import Obra
+        obras_qs = Obra.query.filter_by(admin_id=admin_id).all()
+        obras_dict = {_normalizar(o.nome): o.id for o in obras_qs}
+
+        entradas = []
+        saidas_auto = []
+        saidas_manual = []
+        ignorados = []
+
+        # ── Aba Entrada ──────────────────────────────────────────────────────
+        if 'Entrada' in wb.sheetnames:
+            ws_e = wb['Entrada']
+            for row in ws_e.iter_rows(min_row=6, values_only=True):
+                data_val = row[0]
+                if not data_val or not isinstance(data_val, (dt, date)):
+                    continue
+                data_obj = data_val.date() if isinstance(data_val, dt) else data_val
+                # Filtro Q1 2026
+                if data_obj.year != 2026 or data_obj.month > 3:
+                    continue
+
+                plano = _norm(row[1]) if row[1] else ''
+                cliente = _norm(row[2]) if row[2] else ''
+                desc = _norm(row[3]) if row[3] else ''
+                cc = _norm(row[4]) if row[4] else ''
+                status_raw = _norm(row[9]) if len(row) > 9 else ''
+                valor = None
+                for i in range(10, min(len(row), 13)):
+                    if row[i] and isinstance(row[i], (int, float)):
+                        valor = float(row[i])
+                        break
+                    elif row[i]:
+                        v = _parse_float(row[i])
+                        if v > 0:
+                            valor = v
+                            break
+
+                if not valor:
+                    continue
+
+                status = 'PAGO' if 'pago' in _normalizar(status_raw) else 'PENDENTE'
+                obra_id = _match_cc_obra(cc, obras_dict)
+
+                # Fuzzy match do cliente
+                ent_tipo, ent_id, ent_nome_banco, ent_score = _fuzzy_match_entidade(
+                    cliente, funcionarios, fornecedores)
+
+                entradas.append({
+                    'tipo': 'entrada',
+                    'data': str(data_obj),
+                    'plano_contas': plano,
+                    'cliente': cliente,
+                    'descricao': desc,
+                    'cc': cc,
+                    'obra_id': obra_id,
+                    'valor': valor,
+                    'status': status,
+                    'entidade_tipo': ent_tipo,
+                    'entidade_id': ent_id,
+                    'entidade_nome_banco': ent_nome_banco,
+                    'fuzzy_score': ent_score,
+                })
+
+        # ── Aba Saída ────────────────────────────────────────────────────────
+        if 'Saída' in wb.sheetnames:
+            ws_s = wb['Saída']
+            for row in ws_s.iter_rows(min_row=6, values_only=True):
+                data_val = row[1]
+                if not data_val or not isinstance(data_val, (dt, date)):
+                    continue
+                data_obj = data_val.date() if isinstance(data_val, dt) else data_val
+                if data_obj.year != 2026 or data_obj.month > 3:
+                    continue
+
+                plano = _norm(row[2]) if len(row) > 2 and row[2] else ''
+                fornecedor_nome = _norm(row[3]) if len(row) > 3 and row[3] else ''
+                desc = _norm(row[4]) if len(row) > 4 and row[4] else ''
+                cc = _norm(row[5]) if len(row) > 5 and row[5] else ''
+                valor = None
+                for i in range(10, min(len(row), 14)):
+                    if row[i] and isinstance(row[i], (int, float)):
+                        valor = float(row[i])
+                        break
+                    elif row[i]:
+                        v = _parse_float(row[i])
+                        if v > 0:
+                            valor = v
+                            break
+
+                # Determinar status — procurar em colunas restantes
+                status_raw = ''
+                for i in range(6, min(len(row), 12)):
+                    cell = _norm(row[i]) if row[i] else ''
+                    if 'pago' in cell.lower() or 'aberto' in cell.lower():
+                        status_raw = cell
+                        break
+
+                # Transferência interna → ignorar
+                if _eh_transferencia_interna(desc + ' ' + plano, valor):
+                    ignorados.append({
+                        'data': str(data_obj),
+                        'fornecedor': fornecedor_nome,
+                        'descricao': desc,
+                        'motivo': 'Transferência interna',
+                    })
+                    continue
+
+                status = 'PAGO' if 'pago' in _normalizar(status_raw) else 'PENDENTE'
+                obra_id = _match_cc_obra(cc, obras_dict)
+
+                # Fuzzy match do fornecedor
+                ent_tipo, ent_id, ent_nome_banco, ent_score = _fuzzy_match_entidade(
+                    fornecedor_nome, funcionarios, fornecedores)
+                obs_fuzzy = None
+                if ent_score <= 85 and fornecedor_nome:
+                    obs_fuzzy = f'[EXCEL] {fornecedor_nome} — vincular manualmente'
+
+                texto_busca = (desc + ' ' + fornecedor_nome).strip()
+                eh_reembolso = _eh_reembolso(desc)
+
+                # Nível 1: Plano de Contas
+                cat = _categoria_por_plano(plano)
+
+                # Nível 2a: Reembolso com contexto
+                precisa_revisao = False
+                if cat is None and eh_reembolso:
+                    cat, _ = _classificar_reembolso_contexto(desc)
+                    if cat is None:
+                        precisa_revisao = True
+
+                # Nível 2b: keywords gerais
+                if cat is None and not precisa_revisao:
+                    cat = _classificar_keywords(texto_busca)
+                    if cat is None:
+                        precisa_revisao = True
+
+                registro = {
+                    'tipo': 'saida',
+                    'data': str(data_obj),
+                    'plano_contas': plano,
+                    'fornecedor': fornecedor_nome,
+                    'descricao': desc,
+                    'cc': cc,
+                    'obra_id': obra_id,
+                    'valor': valor,
+                    'status': status,
+                    'tipo_categoria': cat,
+                    'eh_reembolso': eh_reembolso,
+                    'entidade_tipo': ent_tipo,
+                    'entidade_id': ent_id,
+                    'entidade_nome_banco': ent_nome_banco,
+                    'fuzzy_score': ent_score,
+                    'observacoes': obs_fuzzy,
+                }
+
+                if precisa_revisao:
+                    saidas_manual.append(registro)
+                else:
+                    saidas_auto.append(registro)
+
+        return {
+            'entradas': entradas,
+            'saidas_auto': saidas_auto,
+            'saidas_manual': saidas_manual,
+            'ignorados': ignorados,
+        }
+
+    def importar(self, dados, admin_id):
+        """
+        Persiste os registros confirmados no BD.
+        dados = {
+          'entradas': [...],
+          'saidas': [...],  # combinação de auto + manual já com categorias definidas
+          'batch_id': str,
+        }
+        Retorna dict com totais por categoria + contagens.
+        """
+        import uuid
+        from datetime import datetime as dt
+        from decimal import Decimal
+        from models import (db, GestaoCustoPai, GestaoCustoFilho, ContaPagar,
+                            ContaReceber, FluxoCaixa, Obra)
+
+        batch_id = dados.get('batch_id') or \
+            f"import_{dt.now().strftime('%Y%m%d_%H%M')}_{uuid.uuid4().hex[:6]}"
+
+        totais = {}
+        n_entradas = 0
+        n_saidas = 0
+        n_fluxo = 0
+        n_conta_pagar = 0
+        erros = []
+        duplicados = 0
+
+        # Garantir obra administrativa
+        from datetime import date as _date
+        obra_adm = Obra.query.filter(
+            Obra.admin_id == admin_id,
+            Obra.nome.ilike('%ADMINISTRATIVO%')
+        ).first()
+        if not obra_adm:
+            obra_adm = Obra(
+                nome='000 - ADMINISTRATIVO / GERAL',
+                admin_id=admin_id,
+                data_inicio=_date.today(),
+            )
+            db.session.add(obra_adm)
+            db.session.flush()
+        obra_adm_id = obra_adm.id
+
+        def _obra_efetiva(obra_id):
+            return obra_id if obra_id else obra_adm_id
+
+        def _ja_existe_saida(data_str, valor, fornecedor, aid):
+            """Checa chave de não-duplicidade para saídas."""
+            existing = GestaoCustoPai.query.filter(
+                GestaoCustoPai.admin_id == aid,
+                GestaoCustoPai.entidade_nome == fornecedor,
+                GestaoCustoPai.valor_total == Decimal(str(valor)),
+            ).join(
+                GestaoCustoFilho,
+                GestaoCustoFilho.gestao_custo_pai_id == GestaoCustoPai.id
+            ).filter(
+                GestaoCustoFilho.data_referencia == _parse_data(data_str)
+            ).first()
+            return existing is not None
+
+        def _ja_existe_entrada(data_str, valor, cliente, aid):
+            existing = ContaReceber.query.filter(
+                ContaReceber.admin_id == aid,
+                ContaReceber.cliente_nome == cliente,
+                ContaReceber.valor_original == Decimal(str(valor)),
+                ContaReceber.data_emissao == _parse_data(data_str)
+            ).first()
+            return existing is not None
+
+        try:
+            # ── Saídas ──────────────────────────────────────────────────────
+            for row in dados.get('saidas', []):
+                try:
+                    cat = row.get('tipo_categoria') or 'OUTROS'
+                    valor = float(row.get('valor') or 0)
+                    fornecedor = row.get('fornecedor') or 'Desconhecido'
+                    data_str = row.get('data', '')
+                    status = row.get('status', 'PENDENTE')
+                    obra_id = _obra_efetiva(row.get('obra_id'))
+                    ent_id = row.get('entidade_id')
+                    obs = row.get('observacoes') or ''
+
+                    if _ja_existe_saida(data_str, valor, fornecedor, admin_id):
+                        duplicados += 1
+                        continue
+
+                    data_obj = _parse_data(data_str)
+                    status_gcp = 'PAGO' if status == 'PAGO' else 'PENDENTE'
+
+                    # GestaoCustoPai
+                    gcp = GestaoCustoPai(
+                        tipo_categoria=cat,
+                        entidade_nome=fornecedor,
+                        entidade_id=ent_id,
+                        valor_total=Decimal(str(valor)),
+                        status=status_gcp,
+                        data_pagamento=data_obj if status == 'PAGO' else None,
+                        observacoes=obs or None,
+                        admin_id=admin_id,
+                        import_batch_id=batch_id,
+                    )
+                    db.session.add(gcp)
+                    db.session.flush()
+
+                    # GestaoCustoFilho
+                    gcf = GestaoCustoFilho(
+                        pai_id=gcp.id,
+                        descricao=(row.get('descricao') or fornecedor)[:300],
+                        valor=Decimal(str(valor)),
+                        data_referencia=data_obj,
+                        obra_id=obra_id,
+                        admin_id=admin_id,
+                    )
+                    db.session.add(gcf)
+
+                    # FluxoCaixa para PAGO
+                    if status == 'PAGO':
+                        fc = FluxoCaixa(
+                            admin_id=admin_id,
+                            data_movimento=data_obj,
+                            tipo_movimento='SAIDA',
+                            categoria=cat,
+                            valor=valor,
+                            descricao=(row.get('descricao') or fornecedor)[:200],
+                            obra_id=obra_id,
+                            referencia_id=gcp.id,
+                            referencia_tabela='gestao_custo_pai',
+                            observacoes=obs or None,
+                            import_batch_id=batch_id,
+                        )
+                        db.session.add(fc)
+                        n_fluxo += 1
+
+                    # ContaPagar para reembolsos (vincula ao funcionário)
+                    if row.get('eh_reembolso') and data_obj:
+                        cp = ContaPagar(
+                            descricao=f"[REEMBOLSO] {row.get('descricao') or fornecedor}",
+                            valor_original=Decimal(str(valor)),
+                            valor_pago=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
+                            saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
+                            data_emissao=data_obj,
+                            data_vencimento=data_obj,
+                            data_pagamento=data_obj if status == 'PAGO' else None,
+                            status='PAGO' if status == 'PAGO' else 'PENDENTE',
+                            obra_id=obra_id,
+                            admin_id=admin_id,
+                            observacoes=f'Categoria real: {cat}. {obs}'.strip('. ') or None,
+                            origem_tipo='gestao_custo_pai',
+                            origem_id=gcp.id,
+                            import_batch_id=batch_id,
+                        )
+                        db.session.add(cp)
+                        n_conta_pagar += 1
+
+                    n_saidas += 1
+                    totais[cat] = totais.get(cat, {'count': 0, 'valor': 0.0})
+                    totais[cat]['count'] += 1
+                    totais[cat]['valor'] += valor
+
+                except Exception as e_row:
+                    logger.error(f'[FLUXO] Erro saída {row}: {e_row}')
+                    erros.append({'linha': row.get('data', '?'), 'motivo': str(e_row)})
+
+            # ── Entradas ─────────────────────────────────────────────────────
+            for row in dados.get('entradas', []):
+                try:
+                    valor = float(row.get('valor') or 0)
+                    cliente = row.get('cliente') or 'Desconhecido'
+                    data_str = row.get('data', '')
+                    status = row.get('status', 'PENDENTE')
+                    obra_id = _obra_efetiva(row.get('obra_id'))
+
+                    if _ja_existe_entrada(data_str, valor, cliente, admin_id):
+                        duplicados += 1
+                        continue
+
+                    data_obj = _parse_data(data_str)
+
+                    cr = ContaReceber(
+                        cliente_nome=cliente,
+                        descricao=row.get('descricao') or f'Entrada {data_str}',
+                        valor_original=Decimal(str(valor)),
+                        valor_recebido=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
+                        saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
+                        data_emissao=data_obj,
+                        data_vencimento=data_obj,
+                        data_recebimento=data_obj if status == 'PAGO' else None,
+                        status='RECEBIDO' if status == 'PAGO' else 'PENDENTE',
+                        obra_id=obra_id,
+                        admin_id=admin_id,
+                        import_batch_id=batch_id,
+                    )
+                    db.session.add(cr)
+                    db.session.flush()
+
+                    if status == 'PAGO':
+                        fc = FluxoCaixa(
+                            admin_id=admin_id,
+                            data_movimento=data_obj,
+                            tipo_movimento='ENTRADA',
+                            categoria='receita',
+                            valor=valor,
+                            descricao=(row.get('descricao') or cliente)[:200],
+                            obra_id=obra_id,
+                            referencia_id=cr.id,
+                            referencia_tabela='conta_receber',
+                            import_batch_id=batch_id,
+                        )
+                        db.session.add(fc)
+                        n_fluxo += 1
+
+                    n_entradas += 1
+
+                except Exception as e_row:
+                    logger.error(f'[FLUXO] Erro entrada {row}: {e_row}')
+                    erros.append({'linha': row.get('data', '?'), 'motivo': str(e_row)})
+
+            db.session.commit()
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'[FLUXO] Erro geral na importação: {e}', exc_info=True)
+            erros.append({'linha': 'GERAL', 'motivo': str(e)})
+
+        return {
+            'batch_id': batch_id,
+            'n_saidas': n_saidas,
+            'n_entradas': n_entradas,
+            'n_fluxo': n_fluxo,
+            'n_conta_pagar': n_conta_pagar,
+            'duplicados': duplicados,
+            'totais': totais,
+            'erros': erros,
+        }
+
+
 # ── Fábrica ────────────────────────────────────────────────────────────────────
 
 MODULO_MAP = {
