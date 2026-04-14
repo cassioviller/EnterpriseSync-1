@@ -505,13 +505,13 @@
                 <option value="{{ b.id }}">{{ b.nome_banco }} — Ag {{ b.agencia }} / C {{ b.conta }}</option>
                 {% endfor %}
                 {% if not bancos %}
-                <option value="" disabled>Nenhum banco cadastrado</option>
+                <option value="" disabled>— Nenhum banco cadastrado —</option>
                 {% endif %}
               </select>
               {% if not bancos %}
               <small class="text-muted">
                 <a href="{{ url_for('financeiro.listar_bancos') }}" target="_blank">
-                  <i class="fas fa-plus-circle"></i> Cadastrar conta bancária
+                  <i class="fas fa-plus-circle"></i> Cadastrar banco
                 </a>
               </small>
               {% endif %}
