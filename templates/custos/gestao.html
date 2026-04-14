@@ -499,16 +499,21 @@
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold small text-uppercase text-muted">Origem (banco)</label>
-              {% if bancos %}
               <select class="form-select" name="banco_id" id="aprovarBanco">
                 <option value="">— Selecione o banco —</option>
                 {% for b in bancos %}
                 <option value="{{ b.id }}">{{ b.nome_banco }} — Ag {{ b.agencia }} / C {{ b.conta }}</option>
                 {% endfor %}
+                {% if not bancos %}
+                <option value="" disabled>Nenhum banco cadastrado</option>
+                {% endif %}
               </select>
-              {% else %}
-              <input type="text" class="form-control" name="conta_bancaria_manual"
-                     id="aprovarBancoManual" placeholder="Ex: Bradesco Ag 1234 / CC 56789-0">
+              {% if not bancos %}
+              <small class="text-muted">
+                <a href="{{ url_for('financeiro.listar_bancos') }}" target="_blank">
+                  <i class="fas fa-plus-circle"></i> Cadastrar conta bancária
+                </a>
+              </small>
               {% endif %}
             </div>
             <div class="col-12 mt-2">
