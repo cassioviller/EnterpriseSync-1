@@ -149,6 +149,10 @@ def upload_comprovante(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
 
+    if compra.status_aprovacao_cliente != 'APROVADO':
+        flash('Comprovante só pode ser enviado para compras aprovadas.', 'danger')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
     arquivo = request.files.get('comprovante')
     if not arquivo or arquivo.filename == '':
         flash('Nenhum arquivo selecionado.', 'danger')

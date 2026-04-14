@@ -347,9 +347,33 @@
     <div class="card-portal mb-4">
         {% for r in rdos %}
         <div class="rdo-row">
+            {% if r.fotos and r.fotos|length > 0 %}
+            {% set foto = r.fotos[0] %}
+            {% if foto.thumbnail_base64 %}
+            <img src="data:image/webp;base64,{{ foto.thumbnail_base64 }}" alt="Foto RDO"
+                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
+            {% elif foto.thumbnail %}
+            <img src="{{ foto.thumbnail }}" alt="Foto RDO"
+                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
+            {% elif foto.caminho_arquivo %}
+            <img src="/{{ foto.caminho_arquivo }}" alt="Foto RDO"
+                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
+            {% else %}
+            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i class="fas fa-image text-muted"></i>
+            </div>
+            {% endif %}
+            {% else %}
+            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i class="fas fa-image text-muted"></i>
+            </div>
+            {% endif %}
             <span class="badge bg-success" style="min-width:80px">Finalizado</span>
             <span class="fw-semibold">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</span>
-            <span class="text-muted small">{{ r.comentario_geral or '' }}</span>
+            <span class="text-muted small flex-fill">{{ r.comentario_geral or '' }}</span>
+            {% if r.fotos and r.fotos|length > 1 %}
+            <span class="badge bg-light text-dark" style="font-size:.7rem">+{{ r.fotos|length - 1 }} fotos</span>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

@@ -184,13 +184,22 @@ main_py_exempt_blueprints = [
     'analytics_preditivos', 'dashboards_especificos',
     'exportacao_relatorios', 'relatorios_financeiros',
     'api_funcionarios', 'api_buscar_funcionarios', 'health',
-    'portal_obras',
 ]
 for bp_name in main_py_exempt_blueprints:
     bp = app.blueprints.get(bp_name)
     if bp:
         csrf.exempt(bp)
         logger.info(f"[OK] CSRF exempt: {bp_name}")
+
+try:
+    from portal_obras_views import portal_obra, aprovar_compra, recusar_compra, upload_comprovante
+    csrf.exempt(portal_obra)
+    csrf.exempt(aprovar_compra)
+    csrf.exempt(recusar_compra)
+    csrf.exempt(upload_comprovante)
+    logger.info("[OK] CSRF exempt: portal_obras (public routes only)")
+except Exception as e:
+    logger.error(f"[WARN] CSRF exempt portal_obras routes: {e}")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
