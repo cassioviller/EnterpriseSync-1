@@ -524,12 +524,23 @@ def novo_fluxo_caixa():
     """Cria um lançamento direto no FluxoCaixa (sem GCP)"""
     admin_id = get_admin_id()
     try:
+        TIPOS_VALIDOS = {'ENTRADA', 'SAIDA'}
+        CATEGORIAS_VALIDAS = {
+            'CUSTO_DIRETO', 'CUSTO_INDIRETO', 'DESPESA_ADMINISTRATIVA',
+            'RETIRADA_SOCIOS', 'RECEITA', 'TRANSFERENCIA', 'OUTROS',
+            'MATERIAL', 'MAO_DE_OBRA', 'EQUIPAMENTO', 'SERVICO_TERCEIRO',
+            'IMPOSTO', 'SALARIO', 'ENCARGO', 'COMPRA', 'REEMBOLSO',
+        }
         tipo_movimento = request.form.get('tipo_movimento', 'SAIDA')
+        if tipo_movimento not in TIPOS_VALIDOS:
+            tipo_movimento = 'SAIDA'
         data_str = request.form.get('data_movimento', '').strip()
         data_mov = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else date.today()
-        valor = float(request.form.get('valor', '0').replace(',', '.'))
+        valor = abs(float(request.form.get('valor', '0').replace(',', '.')))
         descricao = request.form.get('descricao', '').strip()[:200]
         categoria = request.form.get('categoria', 'OUTROS')
+        if categoria not in CATEGORIAS_VALIDAS:
+            categoria = 'OUTROS'
         banco_id = request.form.get('banco_id', type=int) or None
         obra_id = request.form.get('obra_id', type=int) or None
 
