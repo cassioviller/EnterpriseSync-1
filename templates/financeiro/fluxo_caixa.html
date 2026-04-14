@@ -192,7 +192,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                                 {% set editavel  = movimento.editavel|default(false) %}
                                 {% set mov_id    = movimento.id|default(0) %}
                                 {% set edit_url  = url_for('financeiro.editar_fluxo_caixa', fc_id=mov_id) if editavel else '' %}
-                                <tr id="row-{{ mov_id }}"
+                                <tr {% if editavel %}id="row-{{ mov_id }}"{% else %}id="nrow-{{ loop.index }}"{% endif %}
                                     class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}"
                                     data-editavel="{{ 'true' if editavel else 'false' }}"
                                     data-edit-url="{{ edit_url }}"
@@ -394,12 +394,17 @@ function getCsrfToken() {
 
 function enterEdit(td) {
     if (td.classList.contains('cell-editing')) return;
-    td.classList.add('cell-editing');
     var inp = td.querySelector('.cell-input');
+    if (inp) { inp.dataset.origValue = inp.value; } // store original before editing
+    td.classList.add('cell-editing');
     if (inp) { inp.focus(); inp.select(); }
 }
 
 function cancelEdit(td) {
+    var inp = td.querySelector('.cell-input');
+    if (inp && inp.dataset.origValue !== undefined) {
+        inp.value = inp.dataset.origValue; // restore original value on cancel
+    }
     td.classList.remove('cell-editing');
 }
 

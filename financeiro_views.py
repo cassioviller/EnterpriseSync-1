@@ -566,7 +566,7 @@ def novo_fluxo_caixa():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao criar FluxoCaixa: {e}", exc_info=True)
-        flash(f'Erro ao criar lançamento: {e}', 'danger')
+        flash('Não foi possível criar o lançamento. Tente novamente ou contate o suporte.', 'danger')
 
     return redirect(url_for('financeiro.fluxo_caixa',
                             data_inicio=request.form.get('_filtro_inicio', ''),
