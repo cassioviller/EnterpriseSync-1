@@ -3805,6 +3805,7 @@ def executar_migracoes():
             (103, "import_batch_id em gestao_custo_pai, conta_pagar, conta_receber, fluxo_caixa — rollback de importação", migration_103_import_batch_id),
             (104, "Fornecedor - tipo_fornecedor (MATERIAL / PRESTADOR_SERVICO / OUTRO)", migration_104_tipo_fornecedor),
             (105, "FluxoCaixa - banco_id FK opcional para BancoEmpresa", migration_105_fluxo_caixa_banco_id),
+            (106, "RDO e filhos — ON DELETE CASCADE para exclusão em cascata com Obra", migration_106_rdo_obra_cascade),
         ]
         
         # Executar cada migração com rastreamento
@@ -8409,6 +8410,82 @@ def migration_103_import_batch_id():
                 connection.close()
             except Exception:
                 pass
+
+
+def migration_106_rdo_obra_cascade():
+    """
+    Migration 106: Adicionar ON DELETE CASCADE nas FKs de RDO e seus filhos.
+    Permite excluir uma Obra sem erro de integridade referencial quando há RDOs vinculados.
+    Tabelas afetadas: rdo (obra_id), rdo_mao_obra, rdo_equipamento, rdo_ocorrencia,
+    rdo_foto, rdo_servico_subatividade (todos com rdo_id).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        fk_changes = [
+            ('rdo', 'obra_id', 'obra'),
+            ('rdo_mao_obra', 'rdo_id', 'rdo'),
+            ('rdo_equipamento', 'rdo_id', 'rdo'),
+            ('rdo_ocorrencia', 'rdo_id', 'rdo'),
+            ('rdo_foto', 'rdo_id', 'rdo'),
+            ('rdo_servico_subatividade', 'rdo_id', 'rdo'),
+        ]
+
+        for table_name, column_name, referenced_table in fk_changes:
+            cursor.execute("""
+                SELECT tc.constraint_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                WHERE tc.table_name = %s
+                AND tc.constraint_type = 'FOREIGN KEY'
+                AND kcu.column_name = %s
+                AND tc.table_schema = 'public'
+            """, (table_name, column_name))
+
+            row = cursor.fetchone()
+            if row:
+                constraint_name = row[0]
+                cursor.execute("""
+                    SELECT delete_rule
+                    FROM information_schema.referential_constraints
+                    WHERE constraint_name = %s
+                    AND constraint_schema = 'public'
+                """, (constraint_name,))
+                rc_row = cursor.fetchone()
+                if rc_row and rc_row[0] == 'CASCADE':
+                    logger.info(f"MIGRACAO 106: {table_name}.{column_name} ja e CASCADE — ignorado")
+                    continue
+                cursor.execute(f'ALTER TABLE "{table_name}" DROP CONSTRAINT IF EXISTS "{constraint_name}"')
+                logger.info(f"MIGRACAO 106: constraint {constraint_name} removida de {table_name}")
+
+            new_constraint = f"{table_name}_{column_name}_cascade_fkey"
+            cursor.execute(f"""
+                ALTER TABLE "{table_name}"
+                ADD CONSTRAINT "{new_constraint}"
+                FOREIGN KEY ("{column_name}")
+                REFERENCES "{referenced_table}"(id)
+                ON DELETE CASCADE
+            """)
+            logger.info(f"MIGRACAO 106: {table_name}.{column_name} -> {referenced_table}.id ON DELETE CASCADE aplicado")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 106 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 106: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
 
 
 def migration_105_fluxo_caixa_banco_id():

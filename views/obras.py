@@ -934,12 +934,6 @@ def excluir_obra(id):
         obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         nome = obra.nome
         
-        # Verificar se há RDOs associados
-        rdos_count = RDO.query.filter_by(obra_id=id).count()
-        if rdos_count > 0:
-            flash(f'Não é possível excluir a obra "{nome}" pois possui {rdos_count} RDOs associados', 'warning')
-            return redirect(url_for('main.detalhes_obra', id=id))
-        
         # [CLEAN] EXCLUSÃO COMPLETA VIA SQL DIRETO: Evitar lazy loading e problemas de cache
         # [WARN] TODAS as exclusões incluem admin_id para SEGURANÇA MULTI-TENANT
         # [LIST] Ordem de exclusão respeita dependências FK (filhos antes de pais)
@@ -979,6 +973,7 @@ def excluir_obra(id):
                 'movimentacao_estoque',
                 'movimentacao_material',
                 'notificacao_cliente',
+                'rdo',                         # RDOs da obra — CASCADE remove filhos (rdo_mao_obra, rdo_equipamento, rdo_ocorrencia, rdo_foto, rdo_servico_subatividade)
                 'obra_servico',
                 'orcamento_obra',
                 'outro_custo',

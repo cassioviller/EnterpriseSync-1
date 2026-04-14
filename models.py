@@ -736,7 +736,7 @@ class RDO(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_rdo = db.Column(db.String(20), unique=True, nullable=False)  # Auto-gerado
     data_relatorio = db.Column(db.Date, nullable=False)
-    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
     criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     
@@ -761,7 +761,7 @@ class RDO(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    obra = db.relationship('Obra', backref='rdos', overlaps="rdos")
+    obra = db.relationship('Obra', backref=db.backref('rdos', cascade='all, delete-orphan', passive_deletes=True), overlaps="rdos")
     criado_por = db.relationship('Usuario', foreign_keys=[criado_por_id], backref='rdos_criados', overlaps="rdos_criados")
     admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='rdos_admin', overlaps="rdos_admin")
     mao_obra = db.relationship('RDOMaoObra', backref='rdo_ref', cascade='all, delete-orphan', overlaps="rdo_ref")
@@ -818,7 +818,7 @@ class RDOMaoObra(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     funcao_exercida = db.Column(db.String(100), nullable=False)
     horas_trabalhadas = db.Column(db.Float, nullable=False)
@@ -850,7 +850,7 @@ class RDOEquipamento(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=False)
     nome_equipamento = db.Column(db.String(100), nullable=False)
     quantidade = db.Column(db.Integer, nullable=False)
     horas_uso = db.Column(db.Float, nullable=False)
@@ -865,7 +865,7 @@ class RDOOcorrencia(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=False)
     tipo_ocorrencia = db.Column(db.String(50), nullable=False)  # "Problema", "Observação", "Melhoria", "Segurança"
     severidade = db.Column(db.String(20), default='Baixa')  # "Baixa", "Média", "Alta", "Crítica"
     descricao_ocorrencia = db.Column(db.Text, nullable=False)
@@ -883,7 +883,7 @@ class RDOFoto(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False, index=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=False, index=True)
     
     # [OK] CORREÇÃO CRÍTICA: Campos legados são NOT NULL no banco de dados
     nome_arquivo = db.Column(db.String(255), nullable=False)
@@ -908,7 +908,7 @@ class RDOFoto(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamento com RDO
-    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='selectin', order_by='RDOFoto.ordem'))
+    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='selectin', order_by='RDOFoto.ordem', cascade='all, delete-orphan', passive_deletes=True))
 
 
 # ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====
@@ -1139,7 +1139,7 @@ class RDOServicoSubatividade(db.Model):
     __tablename__ = 'rdo_servico_subatividade'
     
     id = db.Column(db.Integer, primary_key=True)
-    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'), nullable=False)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=False)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True)
     
     # Campos conforme estrutura real do database
@@ -1166,7 +1166,7 @@ class RDOServicoSubatividade(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    rdo = db.relationship('RDO', backref='servico_subatividades')
+    rdo = db.relationship('RDO', backref=db.backref('servico_subatividades', cascade='all, delete-orphan', passive_deletes=True))
     servico = db.relationship('Servico', backref='rdo_subatividades')
     
     # Propriedades de compatibilidade
