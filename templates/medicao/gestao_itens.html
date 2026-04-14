@@ -114,16 +114,28 @@
               </div>
             </div>
 
+            {% set rt_perc = item_realtime_perc.get(item.id, 0) %}
             <div class="d-flex align-items-center gap-2 mb-2">
               <div class="progress progress-thin flex-grow-1">
-                <div class="progress-bar bg-success" style="width:{{ item.percentual_executado_acumulado|float }}%"></div>
+                <div class="progress-bar bg-success" style="width:{{ rt_perc }}%"></div>
               </div>
-              <span class="small fw-semibold">{{ "%.1f"|format(item.percentual_executado_acumulado|float) }}%</span>
+              <span class="small fw-semibold" title="Percentual atual em tempo real (ponderado pelas tarefas)">{{ "%.1f"|format(rt_perc) }}%</span>
+              {% if rt_perc != item.percentual_executado_acumulado|float %}
+              <span class="badge bg-info-subtle text-info-emphasis" style="font-size:.65rem">Tempo real</span>
+              {% endif %}
             </div>
+
+            {% set peso_total = item_peso_total.get(item.id, 0) %}
+            {% if item.tarefas_vinculadas and peso_total != 100 %}
+            <div class="alert alert-warning py-1 px-2 mb-2 small">
+              <i class="fas fa-exclamation-triangle me-1"></i>
+              Soma dos pesos: <strong>{{ "%.0f"|format(peso_total) }}%</strong> — deve ser 100% para cálculo correto.
+            </div>
+            {% endif %}
 
             {% if item.tarefas_vinculadas %}
             <div class="mb-1">
-              <small class="text-muted fw-semibold">Tarefas vinculadas:</small>
+              <small class="text-muted fw-semibold">Tarefas vinculadas ({{ "%.0f"|format(peso_total) }}%):</small>
             </div>
             {% for v in item.tarefas_vinculadas %}
             <div class="d-flex align-items-center gap-2 mb-1">

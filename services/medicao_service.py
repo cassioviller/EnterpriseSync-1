@@ -1,3 +1,4 @@
+import calendar
 import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -14,14 +15,32 @@ logger = logging.getLogger(__name__)
 
 
 def calcular_periodo_atual(obra):
-    ref = obra.data_inicio_medicao or obra.data_inicio or date.today()
-    hoje = date.today()
+    ultima = (
+        MedicaoObra.query
+        .filter_by(obra_id=obra.id, admin_id=obra.admin_id)
+        .order_by(MedicaoObra.numero.desc())
+        .first()
+    )
 
-    periodo_inicio = ref
-    while periodo_inicio + timedelta(days=14) < hoje:
-        periodo_inicio += timedelta(days=15)
+    if ultima and ultima.periodo_fim:
+        prox = ultima.periodo_fim + timedelta(days=1)
+        if prox.day <= 15:
+            periodo_inicio = prox.replace(day=1)
+        else:
+            periodo_inicio = prox.replace(day=16)
+    else:
+        ref = obra.data_inicio_medicao or obra.data_inicio or date.today()
+        if ref.day <= 15:
+            periodo_inicio = ref.replace(day=1)
+        else:
+            periodo_inicio = ref.replace(day=16)
 
-    periodo_fim = periodo_inicio + timedelta(days=14)
+    if periodo_inicio.day <= 15:
+        periodo_fim = periodo_inicio.replace(day=15)
+    else:
+        ultimo_dia = calendar.monthrange(periodo_inicio.year, periodo_inicio.month)[1]
+        periodo_fim = periodo_inicio.replace(day=ultimo_dia)
+
     return periodo_inicio, periodo_fim
 
 
@@ -43,6 +62,14 @@ def calcular_percentual_item(item):
             perc_ponderado += perc_tarefa * peso_norm
 
     return perc_ponderado.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def validar_pesos_item(item_id):
+    vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item_id).all()
+    if not vinc:
+        return True, Decimal('0')
+    total = sum(Decimal(str(v.peso)) for v in vinc)
+    return total == Decimal('100'), total
 
 
 def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=None, observacoes=None):
@@ -110,8 +137,8 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
             item.status = 'CONCLUIDO'
 
     entrada_proporcional = Decimal('0')
-    if valor_contrato > 0 and valor_entrada > 0 and proximo_numero == 1:
-        entrada_proporcional = valor_entrada
+    if valor_contrato > 0 and valor_entrada > 0 and total_medido_periodo > 0:
+        entrada_proporcional = (total_medido_periodo * valor_entrada / valor_contrato).quantize(Decimal('0.01'))
 
     valor_a_faturar = total_medido_periodo - entrada_proporcional
     if valor_a_faturar < 0:
@@ -126,6 +153,25 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
         soma_acum = sum(Decimal(str(i.valor_executado_acumulado or 0)) for i in itens_comerciais)
         medicao.percentual_executado = float((soma_acum / valor_contrato * 100).quantize(Decimal('0.01')))
 
+    if valor_a_faturar > 0:
+        cr = ContaReceber(
+            cliente_nome=obra.cliente or obra.nome,
+            obra_id=obra.id,
+            numero_documento=f"MED-{proximo_numero:03d}",
+            descricao=f"Medição #{proximo_numero} — {obra.nome} ({periodo_inicio.strftime('%d/%m')} a {periodo_fim.strftime('%d/%m/%Y')})",
+            valor_original=valor_a_faturar.quantize(Decimal('0.01')),
+            data_emissao=date.today(),
+            data_vencimento=date.today() + timedelta(days=30),
+            status='PENDENTE',
+            origem_tipo='MEDICAO',
+            origem_id=medicao.id,
+            admin_id=admin_id,
+        )
+        db.session.add(cr)
+        db.session.flush()
+        medicao.conta_receber_id = cr.id
+        logger.info(f"[OK] ContaReceber id={cr.id} criada para medição #{proximo_numero}")
+
     db.session.commit()
     logger.info(f"[OK] Medição #{proximo_numero} gerada para obra {obra_id}")
     return medicao, None
@@ -137,28 +183,6 @@ def fechar_medicao(medicao_id, admin_id):
         return None, "Medição não encontrada"
     if medicao.status != 'PENDENTE':
         return None, "Medição já fechada"
-
-    obra = Obra.query.get(medicao.obra_id)
-    valor_faturar = Decimal(str(medicao.valor_a_faturar_periodo or 0))
-
-    if valor_faturar > 0:
-        cr = ContaReceber(
-            cliente_nome=obra.cliente or obra.nome,
-            obra_id=obra.id,
-            numero_documento=f"MED-{medicao.numero:03d}",
-            descricao=f"Medição #{medicao.numero} — {obra.nome} ({medicao.periodo_inicio.strftime('%d/%m')} a {medicao.periodo_fim.strftime('%d/%m/%Y')})",
-            valor_original=valor_faturar,
-            data_emissao=date.today(),
-            data_vencimento=date.today() + timedelta(days=30),
-            status='PENDENTE',
-            origem_tipo='MEDICAO',
-            origem_id=medicao.id,
-            admin_id=admin_id,
-        )
-        db.session.add(cr)
-        db.session.flush()
-        medicao.conta_receber_id = cr.id
-        logger.info(f"[OK] ContaReceber id={cr.id} criada para medição #{medicao.numero}")
 
     medicao.status = 'APROVADO'
     db.session.commit()

@@ -29,6 +29,11 @@ def _check_v2():
     return None
 
 
+def _calc_realtime_perc(item):
+    from services.medicao_service import calcular_percentual_item
+    return float(calcular_percentual_item(item))
+
+
 @medicao_bp.route('/obra/<int:obra_id>')
 @login_required
 def gestao_itens(obra_id):
@@ -57,6 +62,13 @@ def gestao_itens(obra_id):
     soma_itens = sum(float(i.valor_comercial or 0) for i in itens)
     saldo = valor_contrato - soma_itens
 
+    item_realtime_perc = {}
+    item_peso_total = {}
+    for item in itens:
+        item_realtime_perc[item.id] = _calc_realtime_perc(item)
+        vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item.id).all()
+        item_peso_total[item.id] = float(sum(Decimal(str(v.peso)) for v in vinc))
+
     return render_template(
         'medicao/gestao_itens.html',
         obra=obra,
@@ -67,6 +79,8 @@ def gestao_itens(obra_id):
         valor_contrato=valor_contrato,
         soma_itens=soma_itens,
         saldo=saldo,
+        item_realtime_perc=item_realtime_perc,
+        item_peso_total=item_peso_total,
     )
 
 
@@ -160,6 +174,10 @@ def vincular_tarefa(obra_id, item_id):
         flash('Tarefa e peso são obrigatórios.', 'danger')
         return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
+    if peso > Decimal('100'):
+        flash('Peso não pode exceder 100%.', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
     tarefa = TarefaCronograma.query.filter_by(
         id=tarefa_id, obra_id=obra_id, admin_id=admin_id
     ).first()
@@ -170,6 +188,16 @@ def vincular_tarefa(obra_id, item_id):
     existente = ItemMedicaoCronogramaTarefa.query.filter_by(
         item_medicao_id=item_id, cronograma_tarefa_id=tarefa_id
     ).first()
+
+    outros_pesos = sum(
+        Decimal(str(v.peso)) for v in
+        ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item_id).all()
+        if v.cronograma_tarefa_id != tarefa_id
+    )
+    if outros_pesos + peso > Decimal('100'):
+        flash(f'A soma dos pesos excederia 100% (atual: {float(outros_pesos):.0f}% + {float(peso):.0f}% = {float(outros_pesos + peso):.0f}%).', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
     if existente:
         existente.peso = peso
     else:
@@ -254,7 +282,7 @@ def gerar_medicao(obra_id):
     if erro:
         flash(f'Erro ao gerar medição: {erro}', 'danger')
     else:
-        flash(f'Medição #{medicao.numero:03d} gerada com sucesso!', 'success')
+        flash(f'Medição #{medicao.numero:03d} gerada com sucesso! Conta a receber criada automaticamente.', 'success')
 
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
@@ -269,14 +297,15 @@ def fechar(obra_id, medicao_id):
     if erro:
         flash(f'Erro: {erro}', 'danger')
     else:
-        flash(f'Medição #{medicao.numero:03d} aprovada e conta a receber gerada.', 'success')
+        flash(f'Medição #{medicao.numero:03d} aprovada.', 'success')
 
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
 @medicao_bp.route('/obra/<int:obra_id>/pdf/<int:medicao_id>')
+@medicao_bp.route('/<int:medicao_id>/pdf')
 @login_required
-def pdf_extrato(obra_id, medicao_id):
+def pdf_extrato(obra_id=None, medicao_id=None):
     admin_id = _admin_id()
     from services.medicao_service import gerar_pdf_extrato_medicao
     buf = gerar_pdf_extrato_medicao(medicao_id, admin_id)
