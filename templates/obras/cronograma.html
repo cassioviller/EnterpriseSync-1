@@ -297,6 +297,14 @@
       {% endif %}
     </div>{# /cronograma-left #}
 
+    {# ── Divisor com botão de colapso ── #}
+    <div class="gantt-divider" id="ganttDivider">
+      <button class="gantt-toggle-btn" id="ganttToggleBtn"
+              onclick="toggleGantt()" title="Mostrar/ocultar Gantt">
+        <i class="fas fa-chevron-right" id="ganttToggleIcon"></i>
+      </button>
+    </div>
+
     {# ── Painel direito: Gantt ── #}
     <div class="cronograma-gantt" id="ganttPane">
       <div id="ganttContainer"></div>
@@ -548,6 +556,53 @@
   flex: 1;
   overflow: auto;
   background: #fafbfc;
+  transition: width .25s ease, opacity .2s ease;
+}
+
+/* ── Divisor / botão collapse Gantt ── */
+.gantt-divider {
+  width: 14px;
+  flex-shrink: 0;
+  background: #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: col-resize;
+  z-index: 5;
+}
+.gantt-divider:hover { background: #d0d7e0; }
+.gantt-toggle-btn {
+  width: 22px;
+  height: 44px;
+  border: none;
+  border-radius: 4px;
+  background: #2c3249;
+  color: #fff;
+  font-size: .65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background .15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.gantt-toggle-btn:hover { background: #3a4060; }
+
+/* Estado: Gantt oculto */
+.cronograma-split.gantt-hidden .cronograma-gantt {
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.cronograma-split.gantt-hidden .cronograma-left {
+  flex: 1;
+}
+.cronograma-split.gantt-hidden .gantt-divider {
+  border-left: 2px solid #dee2e6;
 }
 
 /* ── Tabela ── */
@@ -745,6 +800,26 @@ function syncScroll() {
   let sync = false;
   left.addEventListener('scroll', () => { if (sync) return; sync = true; right.scrollTop = left.scrollTop; sync = false; });
   right.addEventListener('scroll', () => { if (sync) return; sync = true; left.scrollTop = right.scrollTop; sync = false; });
+}
+
+// ── Toggle Gantt (collapse / expand) ──
+const GANTT_HIDDEN_KEY = 'cronograma_gantt_hidden';
+function toggleGantt() {
+  const split = document.getElementById('cronogramaSplit');
+  const icon  = document.getElementById('ganttToggleIcon');
+  const hidden = split.classList.toggle('gantt-hidden');
+  icon.className = hidden ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+  localStorage.setItem(GANTT_HIDDEN_KEY, hidden ? '1' : '0');
+  // Re-renderiza o Gantt quando expandido para garantir layout correto
+  if (!hidden) setTimeout(renderGantt, 50);
+}
+function initGanttToggle() {
+  const split = document.getElementById('cronogramaSplit');
+  const icon  = document.getElementById('ganttToggleIcon');
+  if (localStorage.getItem(GANTT_HIDDEN_KEY) === '1') {
+    split.classList.add('gantt-hidden');
+    icon.className = 'fas fa-chevron-left';
+  }
 }
 
 // ── Toggle filhas ──
@@ -1765,6 +1840,7 @@ function updatePredBadges() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initGanttToggle();
   updatePredBadges();
   renderGantt();
   syncScroll();
