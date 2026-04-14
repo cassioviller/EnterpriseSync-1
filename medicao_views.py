@@ -35,6 +35,7 @@ def _calc_realtime_perc(item):
     return float(calcular_percentual_item(item))
 
 
+@medicao_bp.route('/obras/<int:obra_id>/medicao/')
 @medicao_bp.route('/obras/<int:obra_id>/medicao')
 @medicao_bp.route('/medicao/obra/<int:obra_id>')
 @login_required
