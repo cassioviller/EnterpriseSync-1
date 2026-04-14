@@ -592,7 +592,10 @@ def novo_fluxo_caixa():
 
     return redirect(url_for('financeiro.fluxo_caixa',
                             data_inicio=request.form.get('_filtro_inicio', ''),
-                            data_fim=request.form.get('_filtro_fim', '')))
+                            data_fim=request.form.get('_filtro_fim', ''),
+                            obra_id=request.form.get('_filtro_obra_id', ''),
+                            centro_custo_id=request.form.get('_filtro_centro_custo_id', ''),
+                            tipo_movimento=request.form.get('_filtro_tipo', '')))
 
 
 @financeiro_bp.route('/fluxo-caixa/<int:fc_id>/editar', methods=['POST'])
@@ -614,8 +617,7 @@ def editar_fluxo_caixa(fc_id):
         if valor_str:
             fc.valor = abs(_parse_valor(valor_str))
         desc = request.form.get('descricao', '').strip()
-        if desc:
-            fc.descricao = desc[:200]
+        fc.descricao = desc[:200] if desc else fc.descricao
         db.session.commit()
         return jsonify({
             'ok': True,

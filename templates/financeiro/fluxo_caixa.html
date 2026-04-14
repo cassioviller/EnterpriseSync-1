@@ -169,7 +169,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                     <h5 class="mb-0"><i class="fas fa-list me-2"></i>Movimentos do Período ({{ fluxo.detalhes|default([])|length }} registros)</h5>
                     <small class="text-muted">
                         <i class="fas fa-pencil-alt me-1 text-primary"></i>
-                        Clique nas células de data, descrição ou valor de lançamentos diretos para editar inline
+                        Clique em células com <i class="fas fa-pencil-alt" style="font-size:.65rem;color:#adb5bd;"></i> para editar data, valor ou descrição inline
                     </small>
                 </div>
                 <div class="card-body p-0">
@@ -308,8 +308,11 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
     <div class="modal-content">
       <form action="{{ url_for('financeiro.novo_fluxo_caixa') }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="_filtro_inicio" value="{{ filtros.data_inicio }}">
-        <input type="hidden" name="_filtro_fim"    value="{{ filtros.data_fim }}">
+        <input type="hidden" name="_filtro_inicio"          value="{{ filtros.data_inicio }}">
+        <input type="hidden" name="_filtro_fim"             value="{{ filtros.data_fim }}">
+        <input type="hidden" name="_filtro_obra_id"         value="{{ filtros.obra_id|default('') }}">
+        <input type="hidden" name="_filtro_centro_custo_id" value="{{ filtros.centro_custo_id|default('') }}">
+        <input type="hidden" name="_filtro_tipo"            value="{{ filtros.tipo_movimento|default('') }}">
         <div class="modal-header">
           <h5 class="modal-title">
             <i class="fas fa-plus-circle text-success me-2"></i>Nova Movimentação
