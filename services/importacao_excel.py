@@ -1459,6 +1459,7 @@ class ImportacaoFluxoCaixa:
         saidas_auto = []
         saidas_manual = []
         ignorados = []
+        transferencias = []   # transferências internas entre contas
         primeiro_dia = None   # primeira data com lançamento no arquivo
         todas_datas = set()   # todas as datas encontradas no arquivo
 
@@ -1562,13 +1563,16 @@ class ImportacaoFluxoCaixa:
                         status_raw = cell
                         break
 
-                # Transferência interna → ignorar
+                # Transferência interna → lista própria (não ignorado)
                 if _eh_transferencia_interna(desc + ' ' + plano, valor):
-                    ignorados.append({
+                    transferencias.append({
                         'data': str(data_obj),
                         'fornecedor': fornecedor_nome,
                         'descricao': desc,
+                        'valor': valor,
                         'motivo': 'Transferência interna',
+                        'banco_origem_id': None,
+                        'banco_destino_id': None,
                     })
                     continue
 
@@ -1683,6 +1687,7 @@ class ImportacaoFluxoCaixa:
             'saidas_auto': saidas_auto,
             'saidas_manual': saidas_manual,
             'ignorados': ignorados,
+            'transferencias': transferencias,
             'primeiro_dia': str(primeiro_dia) if primeiro_dia else None,
             'periodo_str': periodo_str,
             'datas_disponiveis': [str(d) for d in datas_sorted],

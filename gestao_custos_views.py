@@ -444,26 +444,31 @@ def autorizar(pai_id):
         cat_fc = cat_mapa.get(pai.tipo_categoria, 'custo_obra')
         label = CATEGORIA_LABELS.get(pai.tipo_categoria, ('Custo',))[0]
 
-        fc = FluxoCaixa(
-            admin_id=admin_id,
-            data_movimento=data_pgto,
-            tipo_movimento='SAIDA',
-            categoria=cat_fc,
-            valor=float(valor_autorizado),
-            descricao=f'{label} — {pai.entidade_nome}',
-            referencia_id=pai.id,
-            referencia_tabela='gestao_custo_pai',
-            observacoes=conta or None,
-        )
-        db.session.add(fc)
-        db.session.flush()
+        # Checkbox "Criar lançamento no Fluxo de Caixa" — marcado por padrão
+        criar_fc = 'criar_fluxo_caixa' in request.form
+
+        fc = None
+        if criar_fc:
+            fc = FluxoCaixa(
+                admin_id=admin_id,
+                data_movimento=data_pgto,
+                tipo_movimento='SAIDA',
+                categoria=cat_fc,
+                valor=float(valor_autorizado),
+                descricao=f'{label} — {pai.entidade_nome}',
+                referencia_id=pai.id,
+                referencia_tabela='gestao_custo_pai',
+                observacoes=conta or None,
+            )
+            db.session.add(fc)
+            db.session.flush()
 
         pai.status = novo_status
         pai.valor_pago = novo_valor_pago
         pai.saldo = novo_saldo
         pai.data_pagamento = data_pgto
         pai.conta_bancaria = conta
-        if novo_status == 'PAGO':
+        if novo_status == 'PAGO' and fc:
             pai.fluxo_caixa_id = fc.id
         db.session.commit()
 

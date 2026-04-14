@@ -511,6 +511,16 @@
                      id="aprovarBancoManual" placeholder="Ex: Bradesco Ag 1234 / CC 56789-0">
               {% endif %}
             </div>
+            <div class="col-12 mt-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="criar_fluxo_caixa"
+                       id="aprovarCriarFC" value="1" checked>
+                <label class="form-check-label small" for="aprovarCriarFC">
+                  Criar lançamento no <strong>Fluxo de Caixa</strong>
+                  <span class="text-muted">(desmarque se já foi registrado por outro meio)</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer d-flex justify-content-between">

@@ -417,14 +417,16 @@ def fluxo_caixa_upload():
     saidas_auto = resultado['saidas_auto']
     saidas_manual = resultado['saidas_manual']
     ignorados = resultado['ignorados']
+    transferencias = resultado.get('transferencias', [])
     primeiro_dia = resultado.get('primeiro_dia')
     periodo_str = resultado.get('periodo_str', '—')
 
-    # Assinar payload com HMAC (envelope contendo os 3 tipos)
+    # Assinar payload com HMAC (envelope contendo os 3 tipos + transferências)
     payload = {
         'entradas': entradas,
         'saidas_auto': saidas_auto,
         'saidas_manual': saidas_manual,
+        'transferencias': transferencias,
     }
     dados_assinados = _assinar_payload([payload], admin_id, 'fluxo_caixa')
 
@@ -464,6 +466,7 @@ def fluxo_caixa_upload():
         saidas_auto=saidas_auto,
         saidas_manual=saidas_manual,
         ignorados=ignorados,
+        transferencias=transferencias,
         categorias_grupos=CATEGORIAS_GRUPOS,
         categorias_opcoes=CATEGORIAS_OPCOES,
         dados_json=dados_assinados,
@@ -552,6 +555,28 @@ def fluxo_caixa_confirmar():
     todas_saidas = saidas_auto + saidas_manual
 
     batch_id = f"import_{datetime.now().strftime('%Y%m%d_%H%M')}_{uuid.uuid4().hex[:6]}"
+
+    # ── Atualizar Saldo Inicial de Bancos ────────────────────────────
+    try:
+        from models import BancoEmpresa
+        bancos_todos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()
+        saldos_atualizados = 0
+        for banco in bancos_todos:
+            campo = request.form.get(f'saldo_inicial_{banco.id}', '').strip()
+            if campo:
+                try:
+                    novo_saldo = float(campo.replace('.', '').replace(',', '.'))
+                    banco.saldo_inicial = novo_saldo
+                    # Atualiza saldo_atual apenas se estiver zerado (inicialização)
+                    if (banco.saldo_atual or 0) == 0:
+                        banco.saldo_atual = novo_saldo
+                    saldos_atualizados += 1
+                except ValueError:
+                    pass
+        if saldos_atualizados:
+            db.session.commit()
+    except Exception as e_saldo:
+        logger.warning(f'[FLUXO_CAIXA] Erro ao atualizar saldo inicial: {e_saldo}')
 
     try:
         from services.importacao_excel import ImportacaoFluxoCaixa

@@ -85,7 +85,15 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md-2">
+      <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #0dcaf0;">
+        <div class="card-body py-3">
+          <div class="fw-bold text-info" style="font-size:1.6rem;">{{ transferencias|length }}</div>
+          <small class="text-muted">Transferências</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
       <div class="card border-0 shadow-sm text-center" style="border-radius:12px;border-top:4px solid #6c757d;">
         <div class="card-body py-3">
           <div class="fw-bold text-secondary" style="font-size:1.6rem;">{{ ignorados|length }}</div>
@@ -455,13 +463,79 @@
   </div>
   {% endif %}
 
-  <!-- 4. IGNORADOS -->
+  <!-- 4. TRANSFERÊNCIAS INTERNAS -->
+  {% if transferencias %}
+  <div class="mb-4">
+    <button class="btn btn-sm btn-outline-info" type="button"
+            data-bs-toggle="collapse" data-bs-target="#transferenciasCollapse">
+      <i data-feather="repeat" style="width:14px;height:14px;"></i>
+      Transferências Internas ({{ transferencias|length }}) — mapear De/Para
+    </button>
+    <div class="collapse mt-2" id="transferenciasCollapse">
+      <div class="card border-0 shadow-sm" style="border-radius:14px;border-left:4px solid #0dcaf0 !important;">
+        <div class="card-header bg-transparent border-bottom py-2 px-4">
+          <small class="text-muted">
+            <i data-feather="info" style="width:12px;height:12px;"></i>
+            Transferências entre contas não impactam o resultado — apenas o saldo dos bancos.
+            Selecione De / Para para registrá-las.
+          </small>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0" style="font-size:.82rem;">
+              <thead class="table-light">
+                <tr>
+                  <th class="px-3">Data</th>
+                  <th>Descrição</th>
+                  <th class="text-end">Valor</th>
+                  <th>De (Banco Origem)</th>
+                  <th>Para (Banco Destino)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in transferencias %}
+                <tr>
+                  <td class="px-3">{{ r.data }}</td>
+                  <td>{{ r.descricao or r.fornecedor or '—' }}</td>
+                  <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+                  <td>
+                    {% if bancos %}
+                    <select name="transf_origem_{{ loop.index0 }}" class="form-select form-select-sm" style="min-width:130px;font-size:.8rem;">
+                      <option value="">— Origem —</option>
+                      {% for b in bancos %}
+                      <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                      {% endfor %}
+                    </select>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                  </td>
+                  <td>
+                    {% if bancos %}
+                    <select name="transf_destino_{{ loop.index0 }}" class="form-select form-select-sm" style="min-width:130px;font-size:.8rem;">
+                      <option value="">— Destino —</option>
+                      {% for b in bancos %}
+                      <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                      {% endfor %}
+                    </select>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 5. IGNORADOS -->
   {% if ignorados %}
   <div class="mb-4">
     <button class="btn btn-sm btn-outline-secondary" type="button"
             data-bs-toggle="collapse" data-bs-target="#ignoradosCollapse">
       <i data-feather="eye-off" style="width:14px;height:14px;"></i>
-      Ignorados ({{ ignorados|length }}) — transferências internas e sem valor
+      Ignorados ({{ ignorados|length }}) — sem valor ou não processáveis
     </button>
     <div class="collapse mt-2" id="ignoradosCollapse">
       <div class="card border-0 shadow-sm" style="border-radius:14px;">
@@ -487,6 +561,50 @@
                 {% endfor %}
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 6. SALDO INICIAL DE BANCOS -->
+  {% if bancos %}
+  <div class="mb-4">
+    <button class="btn btn-sm btn-outline-primary" type="button"
+            data-bs-toggle="collapse" data-bs-target="#saldoInicialCollapse">
+      <i data-feather="credit-card" style="width:14px;height:14px;"></i>
+      Saldo Inicial de Bancos ({{ bancos|length }}) — opcional
+    </button>
+    <div class="collapse mt-2" id="saldoInicialCollapse">
+      <div class="card border-0 shadow-sm" style="border-radius:14px;border-left:4px solid #0d6efd !important;">
+        <div class="card-header bg-transparent border-bottom py-2 px-4">
+          <small class="text-muted">
+            <i data-feather="info" style="width:12px;height:12px;"></i>
+            Informe o saldo inicial de cada conta bancária. Isso configura o ponto de partida para o controle de saldo.
+            Deixe em branco para não alterar.
+          </small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {% for b in bancos %}
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label small fw-semibold text-muted text-uppercase">
+                {{ b.nome_banco }}
+                <small class="text-muted fw-normal">Ag {{ b.agencia }} / C {{ b.conta }}</small>
+              </label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">R$</span>
+                <input type="text" class="form-control"
+                       name="saldo_inicial_{{ b.id }}"
+                       placeholder="{{ '%.2f'|format(b.saldo_inicial or 0) }}"
+                       value="{{ '%.2f'|format(b.saldo_inicial) if b.saldo_inicial else '' }}">
+              </div>
+              {% if b.saldo_atual %}
+              <small class="text-muted">Saldo atual: R$ {{ '%.2f'|format(b.saldo_atual) }}</small>
+              {% endif %}
+            </div>
+            {% endfor %}
           </div>
         </div>
       </div>

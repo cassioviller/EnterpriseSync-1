@@ -491,6 +491,39 @@ def dashboard():
             funcionarios_recentes = []
         if 'obras_ativas' not in locals():
             obras_ativas = []
+        # Guards para variáveis de propostas (evita UnboundLocalError)
+        if 'propostas_aprovadas' not in locals():
+            propostas_aprovadas = 0
+        if 'propostas_enviadas' not in locals():
+            propostas_enviadas = 0
+        if 'propostas_rascunho' not in locals():
+            propostas_rascunho = 0
+        if 'propostas_rejeitadas' not in locals():
+            propostas_rejeitadas = 0
+        if 'propostas_expiradas' not in locals():
+            propostas_expiradas = 0
+        if 'taxa_conversao' not in locals():
+            taxa_conversao = 0
+        if 'valor_medio' not in locals():
+            valor_medio = 0
+        if 'tempo_resposta_medio' not in locals():
+            tempo_resposta_medio = 0
+        if 'propostas_por_mes' not in locals():
+            propostas_por_mes = 0
+        if 'templates_populares' not in locals():
+            templates_populares = []
+        if 'outros_templates' not in locals():
+            outros_templates = 0
+        if 'acessos_unicos' not in locals():
+            acessos_unicos = 0
+        if 'tempo_medio_portal' not in locals():
+            tempo_medio_portal = "0h 0m"
+        if 'feedbacks_positivos' not in locals():
+            feedbacks_positivos = 0
+        if 'downloads_pdf' not in locals():
+            downloads_pdf = 0
+        if 'total_propostas' not in locals():
+            total_propostas = 0
     
     # CÁLCULOS REAIS - Usar mesma lógica da página funcionários
     try:
