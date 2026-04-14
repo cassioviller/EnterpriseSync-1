@@ -148,6 +148,7 @@
             align-items: center;
             gap: .75rem;
         }
+        .rdo-row:hover { background: #f8fafc; }
         .rdo-row:last-child { border-bottom: none; }
         .footer-portal {
             text-align: center;
@@ -342,43 +343,6 @@
     </div>
     {% endif %}
 
-    {% if rdos %}
-    <div class="section-title"><i class="fas fa-clipboard-list"></i> Relatórios Diários (RDOs Finalizados)</div>
-    <div class="card-portal mb-4">
-        {% for r in rdos %}
-        <div class="rdo-row">
-            {% if r.fotos and r.fotos|length > 0 %}
-            {% set foto = r.fotos[0] %}
-            {% if foto.thumbnail_base64 %}
-            <img src="data:image/webp;base64,{{ foto.thumbnail_base64 }}" alt="Foto RDO"
-                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
-            {% elif foto.thumbnail %}
-            <img src="{{ foto.thumbnail }}" alt="Foto RDO"
-                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
-            {% elif foto.caminho_arquivo %}
-            <img src="/{{ foto.caminho_arquivo }}" alt="Foto RDO"
-                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
-            {% else %}
-            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <i class="fas fa-image text-muted"></i>
-            </div>
-            {% endif %}
-            {% else %}
-            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <i class="fas fa-image text-muted"></i>
-            </div>
-            {% endif %}
-            <span class="badge bg-success" style="min-width:80px">Finalizado</span>
-            <span class="fw-semibold">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</span>
-            <span class="text-muted small flex-fill">{{ r.comentario_geral or '' }}</span>
-            {% if r.fotos and r.fotos|length > 1 %}
-            <span class="badge bg-light text-dark" style="font-size:.7rem">+{{ r.fotos|length - 1 }} fotos</span>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
     {% if medicoes %}
     <div class="section-title"><i class="fas fa-ruler-combined"></i> Medições</div>
     <div class="card-portal mb-4">
@@ -433,6 +397,44 @@
             <div class="small text-muted mt-1">{{ m.observacoes }}</div>
             {% endif %}
         </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if rdos %}
+    <div class="section-title"><i class="fas fa-clipboard-list"></i> Relatórios Diários (RDOs Finalizados)</div>
+    <div class="card-portal mb-4">
+        {% for r in rdos %}
+        <a href="{{ url_for('portal_obras.portal_rdo_detalhe', token=obra.token_cliente, rdo_id=r.id) }}" class="rdo-row" style="text-decoration:none;color:inherit;cursor:pointer;transition:background .15s">
+            {% if r.fotos and r.fotos|length > 0 %}
+            {% set foto = r.fotos[0] %}
+            {% if foto.thumbnail_base64 %}
+            <img src="data:image/webp;base64,{{ foto.thumbnail_base64 }}" alt="Foto RDO"
+                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
+            {% elif foto.thumbnail %}
+            <img src="{{ foto.thumbnail }}" alt="Foto RDO"
+                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
+            {% elif foto.caminho_arquivo %}
+            <img src="/{{ foto.caminho_arquivo }}" alt="Foto RDO"
+                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
+            {% else %}
+            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i class="fas fa-image text-muted"></i>
+            </div>
+            {% endif %}
+            {% else %}
+            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <i class="fas fa-image text-muted"></i>
+            </div>
+            {% endif %}
+            <span class="badge bg-success" style="min-width:80px">Finalizado</span>
+            <span class="fw-semibold">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</span>
+            <span class="text-muted small flex-fill">{{ r.comentario_geral or '' }}</span>
+            {% if r.fotos and r.fotos|length > 0 %}
+            <span class="badge bg-light text-dark" style="font-size:.7rem"><i class="fas fa-camera me-1"></i>{{ r.fotos|length }} foto{{ 's' if r.fotos|length > 1 }}</span>
+            {% endif %}
+            <i class="fas fa-chevron-right text-muted"></i>
+        </a>
         {% endfor %}
     </div>
     {% endif %}

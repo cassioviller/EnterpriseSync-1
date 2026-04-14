@@ -21,6 +21,7 @@ from werkzeug.utils import secure_filename
 from models import (
     db, Obra, TarefaCronograma, PedidoCompra, PedidoCompraItem,
     MedicaoObra, Fornecedor, ConfiguracaoEmpresa, RDO,
+    RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,3 +258,35 @@ def gerar_medicao(obra_id: int):
     logger.info(f"[MEDICAO] #{proximo_numero} gerada para obra {obra_id}")
     flash(f'Medição #{proximo_numero} gerada com sucesso!', 'success')
     return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>')
+def portal_rdo_detalhe(token: str, rdo_id: int):
+    obra = _get_obra_by_token(token)
+    admin_id = obra.admin_id
+
+    rdo = RDO.query.filter_by(id=rdo_id, obra_id=obra.id, admin_id=admin_id).first()
+    if not rdo:
+        abort(404)
+
+    fotos = RDOFoto.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).order_by(RDOFoto.ordem).all()
+    subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).order_by(RDOServicoSubatividade.ordem_execucao).all()
+    mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
+    equipamentos = RDOEquipamento.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
+    ocorrencias = RDOOcorrencia.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
+
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    nome_empresa = config.nome_empresa if config else 'Construtora'
+
+    return render_template(
+        'portal/portal_rdo_detalhe.html',
+        obra=obra,
+        rdo=rdo,
+        fotos=fotos,
+        subatividades=subatividades,
+        mao_obra=mao_obra,
+        equipamentos=equipamentos,
+        ocorrencias=ocorrencias,
+        nome_empresa=nome_empresa,
+        token=token,
+    )
