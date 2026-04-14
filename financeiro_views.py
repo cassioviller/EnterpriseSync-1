@@ -9,7 +9,7 @@ from decimal import Decimal
 from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, Fornecedor, 
-    PlanoContas, Obra, CentroCusto, GestaoCustoPai
+    PlanoContas, Obra, CentroCusto, GestaoCustoPai, FluxoCaixa
 )
 from utils.tenant import is_v2_active
 from financeiro_service import FinanceiroService
@@ -495,6 +495,15 @@ def fluxo_caixa():
         pass
     
     fluxo = FinanceiroService.calcular_fluxo_caixa(admin_id, data_inicio, data_fim)
+
+    bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
+
+    from gestao_custos_views import CATEGORIAS_GRUPOS as _CAT_GRUPOS, CATEGORIA_LABELS as _CAT_LABELS
+    # Converter de (grupo, [KEY, KEY, ...]) para (grupo, [(val, label), ...])
+    categorias_grupos = [
+        (grupo_nome, [(k, _CAT_LABELS.get(k, (k,))[0]) for k in chaves])
+        for grupo_nome, chaves in _CAT_GRUPOS
+    ]
     
     return render_template(
         'financeiro/fluxo_caixa.html',
@@ -502,9 +511,74 @@ def fluxo_caixa():
         filtros=filtros,
         obras=obras,
         centros_custo=centros_custo,
+        bancos=bancos,
+        categorias_grupos=categorias_grupos,
         data_inicio=data_inicio,
         data_fim=data_fim
     )
+
+
+@financeiro_bp.route('/fluxo-caixa/novo', methods=['POST'])
+@login_required
+def novo_fluxo_caixa():
+    """Cria um lançamento direto no FluxoCaixa (sem GCP)"""
+    admin_id = get_admin_id()
+    try:
+        tipo_movimento = request.form.get('tipo_movimento', 'SAIDA')
+        data_str = request.form.get('data_movimento', '').strip()
+        data_mov = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else date.today()
+        valor = float(request.form.get('valor', '0').replace(',', '.'))
+        descricao = request.form.get('descricao', '').strip()[:200]
+        categoria = request.form.get('categoria', 'OUTROS')
+        banco_id = request.form.get('banco_id', type=int) or None
+        obra_id = request.form.get('obra_id', type=int) or None
+
+        fc = FluxoCaixa(
+            admin_id=admin_id,
+            tipo_movimento=tipo_movimento,
+            data_movimento=data_mov,
+            valor=valor,
+            descricao=descricao or 'Lançamento manual',
+            categoria=categoria,
+            banco_id=banco_id,
+            obra_id=obra_id,
+        )
+        db.session.add(fc)
+        db.session.commit()
+        flash('Lançamento criado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar FluxoCaixa: {e}", exc_info=True)
+        flash(f'Erro ao criar lançamento: {e}', 'danger')
+
+    return redirect(url_for('financeiro.fluxo_caixa',
+                            data_inicio=request.form.get('_filtro_inicio', ''),
+                            data_fim=request.form.get('_filtro_fim', '')))
+
+
+@financeiro_bp.route('/fluxo-caixa/<int:fc_id>/editar', methods=['POST'])
+@login_required
+def editar_fluxo_caixa(fc_id):
+    """Edita inline data, valor e descrição de um lançamento direto"""
+    admin_id = get_admin_id()
+    fc = FluxoCaixa.query.filter_by(id=fc_id, admin_id=admin_id).first_or_404()
+    try:
+        data_str = request.form.get('data_movimento', '').strip()
+        if data_str:
+            fc.data_movimento = datetime.strptime(data_str, '%Y-%m-%d').date()
+        valor_str = request.form.get('valor', '').strip()
+        if valor_str:
+            fc.valor = float(valor_str.replace(',', '.'))
+        desc = request.form.get('descricao', '').strip()
+        if desc:
+            fc.descricao = desc[:200]
+        db.session.commit()
+        flash('Lançamento atualizado.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao editar FluxoCaixa {fc_id}: {e}", exc_info=True)
+        flash(f'Erro ao salvar: {e}', 'danger')
+    return redirect(request.referrer or url_for('financeiro.fluxo_caixa'))
 
 
 # ==================== BANCOS ====================

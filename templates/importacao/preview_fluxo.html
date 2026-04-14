@@ -1,5 +1,30 @@
 {% extends "base_completo.html" %}
 {% block title %}Preview Fluxo de Caixa — SIGE{% endblock %}
+
+{% block head_extra %}
+<style>
+/* Inputs inline — sem borda em repouso, com borda ao focar */
+.inline-input {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: .84rem;
+  transition: border-color .15s, background .15s;
+  width: 100%;
+}
+.inline-input:hover { border-color: #dee2e6; background: #fff; }
+.inline-input:focus { border-color: #0d6efd; background: #fff; outline: none; }
+.inline-input.input-data { min-width: 108px; }
+.inline-input.input-valor { min-width: 80px; text-align: right; }
+.inline-input.input-desc { min-width: 140px; }
+.banco-select { min-width: 130px; font-size: .8rem; }
+.cat-select   { min-width: 155px; font-size: .8rem; }
+/* Reembolso checkbox — centralizado */
+.reembolso-cb { margin: 0 auto; display: block; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
 
@@ -147,7 +172,7 @@
         Saídas auto-classificadas
         <span class="badge bg-primary ms-2">{{ saidas_auto|length }}</span>
       </h6>
-      <small class="text-muted ms-3">Categoria editável — clique no select para alterar</small>
+      <small class="text-muted ms-3">Edite data, valor, descrição, categoria e banco direto na linha</small>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
               onclick="marcarFuncionarios('auto')"
               title="Marca 'Apenas pgto.' para todos os funcionários">
@@ -160,27 +185,45 @@
         <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
           <thead class="table-light">
             <tr>
-              <th class="px-3">Data</th>
-              <th>Fornecedor / Entidade</th>
-              <th>Descrição</th>
+              <th class="px-3" style="min-width:112px;">Data</th>
+              <th style="min-width:140px;">Fornecedor / Entidade</th>
+              <th style="min-width:150px;">Descrição</th>
               <th>CC</th>
-              <th class="text-end">Valor</th>
+              <th class="text-end" style="min-width:90px;">Valor (R$)</th>
               <th>Status</th>
               <th>Categoria</th>
               <th>Score</th>
-              <th class="text-center" title="Quando marcado: cria apenas Fluxo de Caixa + Conta a Pagar, sem registrar Custo (evita duplicidade para diárias e compras já lançadas)">
+              <th class="text-center"
+                  title="Cria somente o lançamento no Fluxo de Caixa, sem registrar custo (GCP/GCF) e sem Conta a Pagar">
                 Apenas pgto.
                 <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
                    data-bs-toggle="tooltip"
-                   title="Marque para pagamentos cujo custo já foi registrado em outro módulo (ex: diárias, compras de material). O sistema só cria Fluxo de Caixa + Conta a Pagar, sem duplicar o custo."></i>
+                   title="Cria somente o lançamento no Fluxo de Caixa, sem registrar custo (GCP/GCF) e sem Conta a Pagar."></i>
               </th>
+              <th class="text-center"
+                  title="Marca este lançamento como reembolso a pagar a um funcionário ou colaborador">
+                Reembolso
+                <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
+                   data-bs-toggle="tooltip"
+                   title="Marca este lançamento como reembolso a pagar."></i>
+              </th>
+              <th style="min-width:130px;">Banco</th>
             </tr>
           </thead>
           <tbody>
             {% for r in saidas_auto %}
             <tr {% if r.eh_reembolso %}style="background:#f0f8ff;"{% endif %}
                 data-entidade="{{ r.entidade_tipo or '' }}">
-              <td class="px-3">{{ r.data }}</td>
+              <!-- Data editável -->
+              <td class="px-3">
+                <input type="text"
+                       name="data_auto_{{ loop.index0 }}"
+                       class="inline-input input-data"
+                       value="{{ r.data }}"
+                       placeholder="dd/mm/aaaa"
+                       title="Edite a data">
+              </td>
+              <!-- Fornecedor (somente leitura) -->
               <td>
                 {% if r.entidade_nome_banco %}
                   <span title="Match: {{ r.fuzzy_score }}% → {{ r.entidade_nome_banco }}">
@@ -197,10 +240,24 @@
                   <span class="badge ms-1" style="background:#6610f2;font-size:.68rem;">Reembolso</span>
                 {% endif %}
               </td>
-              <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                  title="{{ r.descricao }}">{{ r.descricao or '—' }}</td>
+              <!-- Descrição editável -->
+              <td>
+                <input type="text"
+                       name="desc_auto_{{ loop.index0 }}"
+                       class="inline-input input-desc"
+                       value="{{ r.descricao or '' }}"
+                       placeholder="Descrição"
+                       title="Edite a descrição">
+              </td>
               <td>{{ r.cc or '—' }}</td>
-              <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+              <!-- Valor editável -->
+              <td class="text-end">
+                <input type="text"
+                       name="valor_auto_{{ loop.index0 }}"
+                       class="inline-input input-valor"
+                       value="{{ '%.2f'|format(r.valor) }}"
+                       title="Edite o valor">
+              </td>
               <td>
                 {% if r.status == 'PAGO' %}
                   <span class="badge bg-success">PAGO</span>
@@ -208,16 +265,21 @@
                   <span class="badge bg-secondary">PENDENTE</span>
                 {% endif %}
               </td>
+              <!-- Categoria com optgroups -->
               <td>
-                <select name="cat_auto_{{ loop.index0 }}" class="form-select form-select-sm"
-                        style="min-width:150px;">
-                  {% for val, label in categorias_opcoes %}
-                  <option value="{{ val }}" {% if r.tipo_categoria == val %}selected{% endif %}>
-                    {{ label }}
-                  </option>
+                <select name="cat_auto_{{ loop.index0 }}" class="form-select form-select-sm cat-select">
+                  {% for grupo_nome, grupo_itens in categorias_grupos %}
+                  <optgroup label="{{ grupo_nome }}">
+                    {% for val, label in grupo_itens %}
+                    <option value="{{ val }}" {% if r.tipo_categoria == val %}selected{% endif %}>
+                      {{ label }}
+                    </option>
+                    {% endfor %}
+                  </optgroup>
                   {% endfor %}
                 </select>
               </td>
+              <!-- Score -->
               <td>
                 {% if r.fuzzy_score > 85 %}
                   <span class="badge bg-success">{{ r.fuzzy_score }}%</span>
@@ -227,12 +289,33 @@
                   <span class="text-muted small">—</span>
                 {% endif %}
               </td>
+              <!-- Apenas pagamento -->
               <td class="text-center">
                 <input type="checkbox"
                        name="apenas_pag_auto_{{ loop.index0 }}"
                        class="form-check-input apenas-pgto-cb"
                        data-func="{{ 'true' if r.entidade_tipo == 'funcionario' else 'false' }}"
                        {% if r.sugestao_apenas_pagamento %}checked{% endif %}>
+              </td>
+              <!-- Reembolso -->
+              <td class="text-center">
+                <input type="checkbox"
+                       name="reembolso_auto_{{ loop.index0 }}"
+                       class="form-check-input reembolso-cb"
+                       {% if r.eh_reembolso %}checked{% endif %}>
+              </td>
+              <!-- Banco -->
+              <td>
+                {% if bancos %}
+                <select name="banco_auto_{{ loop.index0 }}" class="form-select form-select-sm banco-select">
+                  <option value="">— Banco —</option>
+                  {% for b in bancos %}
+                  <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <span class="text-muted small">Nenhum banco</span>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -252,7 +335,7 @@
         Revisão manual
         <span class="badge bg-warning text-dark ms-2">{{ saidas_manual|length }}</span>
       </h6>
-      <small class="text-muted ms-3">Classificação opcional — sem seleção serão salvos como <strong>Outros</strong></small>
+      <small class="text-muted ms-3">Classificação obrigatória — sem seleção serão salvos como <strong>Outros</strong></small>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
               onclick="marcarFuncionarios('manual')"
               title="Marca 'Apenas pgto.' para todos os funcionários">
@@ -265,28 +348,53 @@
         <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
           <thead class="table-light">
             <tr>
-              <th class="px-3">Data</th>
-              <th>Fornecedor</th>
-              <th>Descrição</th>
-              <th class="text-end">Valor</th>
+              <th class="px-3" style="min-width:112px;">Data</th>
+              <th style="min-width:140px;">Fornecedor</th>
+              <th style="min-width:150px;">Descrição</th>
+              <th class="text-end" style="min-width:90px;">Valor (R$)</th>
               <th>Status</th>
               <th>Categoria <span class="text-danger">*</span></th>
               <th class="text-center">Apenas pgto.</th>
+              <th class="text-center">Reembolso</th>
+              <th style="min-width:130px;">Banco</th>
             </tr>
           </thead>
           <tbody>
             {% for r in saidas_manual %}
-            <tr>
-              <td class="px-3">{{ r.data }}</td>
+            <tr data-entidade="{{ r.entidade_tipo or '' }}">
+              <!-- Data editável -->
+              <td class="px-3">
+                <input type="text"
+                       name="data_manual_{{ loop.index0 }}"
+                       class="inline-input input-data"
+                       value="{{ r.data }}"
+                       placeholder="dd/mm/aaaa"
+                       title="Edite a data">
+              </td>
+              <!-- Fornecedor (somente leitura) -->
               <td>
                 {{ r.fornecedor }}
                 {% if r.observacoes %}
                   <br><small class="text-warning">{{ r.observacoes }}</small>
                 {% endif %}
               </td>
-              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                  title="{{ r.descricao }}">{{ r.descricao or '—' }}</td>
-              <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+              <!-- Descrição editável -->
+              <td>
+                <input type="text"
+                       name="desc_manual_{{ loop.index0 }}"
+                       class="inline-input input-desc"
+                       value="{{ r.descricao or '' }}"
+                       placeholder="Descrição"
+                       title="Edite a descrição">
+              </td>
+              <!-- Valor editável -->
+              <td class="text-end">
+                <input type="text"
+                       name="valor_manual_{{ loop.index0 }}"
+                       class="inline-input input-valor"
+                       value="{{ '%.2f'|format(r.valor) }}"
+                       title="Edite o valor">
+              </td>
               <td>
                 {% if r.status == 'PAGO' %}
                   <span class="badge bg-success">PAGO</span>
@@ -294,22 +402,49 @@
                   <span class="badge bg-secondary">PENDENTE</span>
                 {% endif %}
               </td>
+              <!-- Categoria com optgroups -->
               <td>
                 <select name="cat_manual_{{ loop.index0 }}"
-                        class="form-select form-select-sm cat-manual-select"
-                        style="min-width:150px;">
+                        class="form-select form-select-sm cat-select cat-manual-select">
                   <option value="">— Outros (padrão) —</option>
-                  {% for val, label in categorias_opcoes %}
-                  <option value="{{ val }}">{{ label }}</option>
+                  {% for grupo_nome, grupo_itens in categorias_grupos %}
+                  <optgroup label="{{ grupo_nome }}">
+                    {% for val, label in grupo_itens %}
+                    <option value="{{ val }}" {% if r.tipo_categoria == val %}selected{% endif %}>
+                      {{ label }}
+                    </option>
+                    {% endfor %}
+                  </optgroup>
                   {% endfor %}
                 </select>
               </td>
+              <!-- Apenas pagamento -->
               <td class="text-center">
                 <input type="checkbox"
                        name="apenas_pag_manual_{{ loop.index0 }}"
                        class="form-check-input apenas-pgto-cb"
                        data-func="{{ 'true' if r.entidade_tipo == 'funcionario' else 'false' }}"
                        {% if r.sugestao_apenas_pagamento %}checked{% endif %}>
+              </td>
+              <!-- Reembolso -->
+              <td class="text-center">
+                <input type="checkbox"
+                       name="reembolso_manual_{{ loop.index0 }}"
+                       class="form-check-input reembolso-cb"
+                       {% if r.eh_reembolso %}checked{% endif %}>
+              </td>
+              <!-- Banco -->
+              <td>
+                {% if bancos %}
+                <select name="banco_manual_{{ loop.index0 }}" class="form-select form-select-sm banco-select">
+                  <option value="">— Banco —</option>
+                  {% for b in bancos %}
+                  <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <span class="text-muted small">Nenhum banco</span>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -372,7 +507,7 @@
     {% if saidas_manual %}
     <small class="text-muted">
       <i data-feather="info" style="width:13px;height:13px;"></i>
-      {{ saidas_manual|length }} itens sem categoria serão salvos como <strong>Outros</strong> — você pode reclassificar depois
+      {{ saidas_manual|length }} itens sem categoria serão salvos como <strong>Outros</strong>
     </small>
     {% endif %}
   </div>
@@ -382,19 +517,15 @@
 
 <script>
 function marcarFuncionarios(prefix) {
-  // Marca (sem desmarcar) todos os checkboxes de funcionários na tabela
   var cbs = document.querySelectorAll(
     'input[name^="apenas_pag_' + prefix + '_"][data-func="true"]'
   );
   cbs.forEach(function(cb) { cb.checked = true; });
 }
 
-// Inicializar tooltips Bootstrap
 document.addEventListener('DOMContentLoaded', function () {
   var tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-  tooltipEls.forEach(function(el) {
-    new bootstrap.Tooltip(el);
-  });
+  tooltipEls.forEach(function(el) { new bootstrap.Tooltip(el); });
   feather.replace();
 });
 </script>

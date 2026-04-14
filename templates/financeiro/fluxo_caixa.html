@@ -2,6 +2,22 @@
 
 {% block title %}Fluxo de Caixa - SIGE{% endblock %}
 
+{% block head_extra %}
+<style>
+.edit-display { cursor: default; }
+.edit-form    { display: none; }
+tr.row-editing .edit-display { display: none !important; }
+tr.row-editing .edit-form    { display: flex !important; align-items: center; gap: 4px; }
+.inline-td-input {
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: .84rem;
+  width: 100%;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- Header -->
@@ -9,9 +25,14 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2><i class="fas fa-exchange-alt me-2"></i>Fluxo de Caixa</h2>
-                <button class="btn btn-outline-primary" onclick="sincronizarFluxo()">
-                    <i class="fas fa-sync"></i> Sincronizar
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNovaMovimentacao">
+                        <i class="fas fa-plus me-1"></i> Nova Movimentação
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="location.reload()">
+                        <i class="fas fa-sync"></i> Sincronizar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -24,12 +45,12 @@
                     <form method="GET" class="row g-3">
                         <div class="col-md-2">
                             <label for="data_inicio" class="form-label">Data Início</label>
-                            <input type="date" name="data_inicio" id="data_inicio" class="form-control" 
+                            <input type="date" name="data_inicio" id="data_inicio" class="form-control"
                                    value="{{ filtros.data_inicio }}">
                         </div>
                         <div class="col-md-2">
                             <label for="data_fim" class="form-label">Data Fim</label>
-                            <input type="date" name="data_fim" id="data_fim" class="form-control" 
+                            <input type="date" name="data_fim" id="data_fim" class="form-control"
                                    value="{{ filtros.data_fim }}">
                         </div>
                         <div class="col-md-2">
@@ -59,7 +80,7 @@
                             <select name="tipo_movimento" id="tipo_movimento" class="form-select">
                                 <option value="">Todos</option>
                                 <option value="ENTRADA" {{ 'selected' if filtros.tipo_movimento == 'ENTRADA' }}>Entrada</option>
-                                <option value="SAIDA" {{ 'selected' if filtros.tipo_movimento == 'SAIDA' }}>Saída</option>
+                                <option value="SAIDA"   {{ 'selected' if filtros.tipo_movimento == 'SAIDA' }}>Saída</option>
                             </select>
                         </div>
                         <div class="col-md-2 d-flex align-items-end">
@@ -113,100 +134,266 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-list me-2"></i>Movimentos do Período ({{ fluxo.detalhes|default([])|length }} registros)</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Movimentos do Período ({{ fluxo.detalhes|default([])|length }} registros)</h5>
+                    <small class="text-muted"><i class="fas fa-pencil-alt me-1"></i>Clique em "Editar" para alterar lançamentos diretos</small>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if fluxo.detalhes %}
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="movimentosTable">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Tipo</th>
-                                        <th>Status</th>
-                                        <th>Origem</th>
-                                        <th>Descrição</th>
-                                        <th>Valor</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for movimento in fluxo.detalhes %}
-                                    {% set realizado = movimento.realizado|default(false) %}
-                                    <tr class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}">
-                                        <td>{{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}</td>
-                                        <td>
-                                            <span class="badge bg-{% if movimento.tipo == 'ENTRADA' %}success{% elif realizado %}secondary{% else %}danger{% endif %}">
-                                                {% if movimento.tipo == 'ENTRADA' %}
-                                                    <i class="fas fa-arrow-up me-1"></i>Entrada
-                                                {% elif realizado %}
-                                                    <i class="fas fa-check me-1"></i>Pago
-                                                {% else %}
-                                                    <i class="fas fa-arrow-down me-1"></i>Saída Prevista
-                                                {% endif %}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {% set st = movimento.status|default('') %}
-                                            {% if st == 'PAGO' %}
-                                                <span class="badge bg-primary">Pago</span>
-                                            {% elif st == 'AUTORIZADO' %}
-                                                <span class="badge bg-success">Autorizado</span>
-                                            {% elif st == 'SOLICITADO' %}
-                                                <span class="badge bg-warning text-dark">Solicitado</span>
-                                            {% elif st == 'PENDENTE' %}
-                                                <span class="badge bg-light text-dark border">Pendente</span>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="movimentosTable" style="font-size:.9rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="min-width:110px;">Data</th>
+                                    <th>Tipo</th>
+                                    <th>Status</th>
+                                    <th>Origem</th>
+                                    <th>Descrição</th>
+                                    <th class="text-end" style="min-width:110px;">Valor</th>
+                                    <th class="text-center" style="width:60px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movimento in fluxo.detalhes %}
+                                {% set realizado = movimento.realizado|default(false) %}
+                                {% set editavel  = movimento.editavel|default(false) %}
+                                {% set mov_id    = movimento.id|default(0) %}
+                                <tr id="row-{{ mov_id }}"
+                                    class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}">
+                                    <!-- Data -->
+                                    <td>
+                                        <span class="edit-display">{{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}</span>
+                                        {% if editavel %}
+                                        <div class="edit-form">
+                                            <input type="date" class="inline-td-input"
+                                                   id="inp_data_{{ mov_id }}"
+                                                   value="{{ movimento.data.strftime('%Y-%m-%d') if movimento.data else '' }}"
+                                                   style="min-width:130px;">
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                    <!-- Tipo -->
+                                    <td>
+                                        <span class="badge bg-{% if movimento.tipo == 'ENTRADA' %}success{% elif realizado %}secondary{% else %}danger{% endif %}">
+                                            {% if movimento.tipo == 'ENTRADA' %}
+                                                <i class="fas fa-arrow-up me-1"></i>Entrada
+                                            {% elif realizado %}
+                                                <i class="fas fa-check me-1"></i>Pago
                                             {% else %}
-                                                <span class="badge bg-light text-dark border">—</span>
+                                                <i class="fas fa-arrow-down me-1"></i>Saída Prevista
                                             {% endif %}
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-secondary">
-                                                {{ movimento.origem|default('') }}
-                                            </span>
-                                        </td>
-                                        <td>{{ movimento.descricao|default('-') }}</td>
-                                        <td class="text-end">
-                                            <strong class="{% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %}">
-                                                {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
-                                                R$ {{ "%.2f"|format(movimento.valor|default(0)) }}
-                                            </strong>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                        </span>
+                                    </td>
+                                    <!-- Status -->
+                                    <td>
+                                        {% set st = movimento.status|default('') %}
+                                        {% if st == 'PAGO' or st == 'RECEBIDO' %}
+                                            <span class="badge bg-primary">{{ st|title }}</span>
+                                        {% elif st == 'AUTORIZADO' %}
+                                            <span class="badge bg-success">Autorizado</span>
+                                        {% elif st == 'SOLICITADO' %}
+                                            <span class="badge bg-warning text-dark">Solicitado</span>
+                                        {% elif st == 'PENDENTE' %}
+                                            <span class="badge bg-light text-dark border">Pendente</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark border">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <!-- Origem -->
+                                    <td><span class="badge bg-secondary">{{ movimento.origem|default('') }}</span></td>
+                                    <!-- Descrição -->
+                                    <td>
+                                        <span class="edit-display">{{ movimento.descricao|default('-') }}</span>
+                                        {% if editavel %}
+                                        <div class="edit-form">
+                                            <input type="text" class="inline-td-input"
+                                                   id="inp_desc_{{ mov_id }}"
+                                                   value="{{ movimento.descricao|default('') }}"
+                                                   style="min-width:180px;">
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                    <!-- Valor -->
+                                    <td class="text-end">
+                                        <strong class="edit-display {% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %}">
+                                            {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
+                                            R$ {{ "%.2f"|format(movimento.valor|default(0)) }}
+                                        </strong>
+                                        {% if editavel %}
+                                        <div class="edit-form">
+                                            <input type="text" class="inline-td-input text-end"
+                                                   id="inp_valor_{{ mov_id }}"
+                                                   value="{{ "%.2f"|format(movimento.valor|default(0)) }}"
+                                                   style="min-width:80px;">
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                    <!-- Ações -->
+                                    <td class="text-center">
+                                        {% if editavel %}
+                                        <button type="button"
+                                                class="btn btn-xs btn-outline-secondary btn-edit"
+                                                style="font-size:.75rem;padding:2px 7px;"
+                                                onclick="toggleEdit({{ mov_id }}, this)"
+                                                title="Editar este lançamento">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </button>
+                                        <form id="form-edit-{{ mov_id }}"
+                                              action="{{ url_for('financeiro.editar_fluxo_caixa', fc_id=mov_id) }}"
+                                              method="POST"
+                                              style="display:none;">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="data_movimento" id="hid_data_{{ mov_id }}">
+                                            <input type="hidden" name="valor" id="hid_valor_{{ mov_id }}">
+                                            <input type="hidden" name="descricao" id="hid_desc_{{ mov_id }}">
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                     {% else %}
-                        <div class="text-center text-muted py-5">
-                            <i class="fas fa-exchange-alt fa-3x mb-3"></i>
-                            <h5>Nenhum movimento encontrado</h5>
-                            <p>Não há movimentos financeiros no período selecionado.</p>
-                        </div>
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-exchange-alt fa-3x mb-3"></i>
+                        <h5>Nenhum movimento encontrado</h5>
+                        <p>Não há movimentos financeiros no período selecionado.</p>
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNovaMovimentacao">
+                            <i class="fas fa-plus me-1"></i> Criar primeiro lançamento
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ===== MODAL: Nova Movimentação ===== -->
+<div class="modal fade" id="modalNovaMovimentacao" tabindex="-1" aria-labelledby="modalNovaMovLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form action="{{ url_for('financeiro.novo_fluxo_caixa') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="_filtro_inicio" value="{{ filtros.data_inicio }}">
+        <input type="hidden" name="_filtro_fim" value="{{ filtros.data_fim }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalNovaMovLabel">
+            <i class="fas fa-plus-circle text-success me-2"></i>Nova Movimentação no Fluxo de Caixa
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <!-- Tipo -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Tipo <span class="text-danger">*</span></label>
+              <select name="tipo_movimento" class="form-select" required>
+                <option value="SAIDA">Saída (Despesa)</option>
+                <option value="ENTRADA">Entrada (Receita)</option>
+              </select>
+            </div>
+            <!-- Data -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Data <span class="text-danger">*</span></label>
+              <input type="date" name="data_movimento" class="form-control" required
+                     value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
+            </div>
+            <!-- Valor -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Valor (R$) <span class="text-danger">*</span></label>
+              <input type="text" name="valor" class="form-control" required
+                     placeholder="0.00">
+            </div>
+            <!-- Descrição -->
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
+              <input type="text" name="descricao" class="form-control" required
+                     placeholder="Ex: Pagamento fornecedor, Recebimento cliente...">
+            </div>
+            <!-- Categoria -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Categoria</label>
+              <select name="categoria" class="form-select">
+                {% for grupo_nome, grupo_itens in categorias_grupos %}
+                <optgroup label="{{ grupo_nome }}">
+                  {% for val, label in grupo_itens %}
+                  <option value="{{ val }}">{{ label }}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </div>
+            <!-- Banco -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Banco (opcional)</label>
+              <select name="banco_id" class="form-select">
+                <option value="">— Nenhum —</option>
+                {% for b in bancos %}
+                <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <!-- Obra -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Obra (opcional)</label>
+              <select name="obra_id" class="form-select">
+                <option value="">— Nenhuma —</option>
+                {% for o in obras %}
+                <option value="{{ o.id }}">{{ o.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-save me-1"></i> Salvar Lançamento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// DataTable
-$(document).ready(function() {
-    $('#movimentosTable').DataTable({
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
-        order: [[0, 'desc']],
-        pageLength: 25,
-        columnDefs: [
-            { targets: [4], className: 'text-end' }
-        ]
-    });
-});
+function toggleEdit(id, btn) {
+    var row = document.getElementById('row-' + id);
+    var form = document.getElementById('form-edit-' + id);
+    var editing = row.classList.contains('row-editing');
 
-function sincronizarFluxo() {
-    location.reload();
+    if (editing) {
+        // Confirmar salvamento
+        document.getElementById('hid_data_'  + id).value = document.getElementById('inp_data_'  + id).value;
+        document.getElementById('hid_valor_' + id).value = document.getElementById('inp_valor_' + id).value;
+        document.getElementById('hid_desc_'  + id).value = document.getElementById('inp_desc_'  + id).value;
+        form.submit();
+    } else {
+        // Entrar em modo edição
+        row.classList.add('row-editing');
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.replace('btn-outline-secondary', 'btn-success');
+        btn.title = 'Salvar alterações';
+    }
 }
+
+$(document).ready(function() {
+    if (typeof $.fn.DataTable !== 'undefined') {
+        $('#movimentosTable').DataTable({
+            language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+            order: [[0, 'desc']],
+            pageLength: 25,
+            columnDefs: [
+                { targets: [5], className: 'text-end' },
+                { targets: [6], orderable: false }
+            ]
+        });
+    }
+});
 </script>
 {% endblock %}

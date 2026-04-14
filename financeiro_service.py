@@ -536,6 +536,7 @@ class FinanceiroService:
             for fc_mov in pagamentos_realizados:
                 ids_gc_no_fluxo.add(fc_mov.referencia_id)
                 detalhes.append({
+                    'id': fc_mov.id,
                     'data': fc_mov.data_movimento,
                     'tipo': 'SAIDA',
                     'descricao': fc_mov.descricao or 'Pagamento Gestão de Custos',
@@ -543,6 +544,7 @@ class FinanceiroService:
                     'origem': 'Gestão de Custos V2',
                     'status': 'PAGO',
                     'realizado': True,
+                    'editavel': True,
                 })
             # Fallback: PAGO via GestaoCustoPai.data_pagamento (entradas antigas sem FluxoCaixa)
             for custo in custos_v2_pagos:
@@ -557,6 +559,31 @@ class FinanceiroService:
                         'realizado': True,
                     })
             
+            # Entradas e saídas diretas no FluxoCaixa (importação ou lançamento manual)
+            fluxos_diretos = FluxoCaixa.query.filter(
+                and_(
+                    FluxoCaixa.admin_id == admin_id,
+                    FluxoCaixa.data_movimento >= data_inicio,
+                    FluxoCaixa.data_movimento <= data_fim,
+                    sql_or(
+                        FluxoCaixa.referencia_tabela == None,
+                        FluxoCaixa.referencia_tabela.notin_(['gestao_custo_pai']),
+                    )
+                )
+            ).all()
+            for fc in fluxos_diretos:
+                detalhes.append({
+                    'id': fc.id,
+                    'data': fc.data_movimento,
+                    'tipo': fc.tipo_movimento,
+                    'descricao': fc.descricao or '—',
+                    'valor': float(fc.valor),
+                    'origem': 'Lançamento Direto',
+                    'status': 'PAGO' if fc.tipo_movimento == 'SAIDA' else 'RECEBIDO',
+                    'realizado': True,
+                    'editavel': True,
+                })
+
             # Ordenar por data
             detalhes.sort(key=lambda x: x['data'])
             
