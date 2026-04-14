@@ -544,6 +544,7 @@ class FinanceiroService:
                     'origem': 'Gestão de Custos V2',
                     'status': 'PAGO',
                     'realizado': True,
+                    'editavel': True,
                 })
             # Fallback: PAGO via GestaoCustoPai.data_pagamento (entradas antigas sem FluxoCaixa)
             for custo in custos_v2_pagos:

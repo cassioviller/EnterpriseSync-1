@@ -601,11 +601,10 @@ def editar_fluxo_caixa(fc_id):
     """Edita inline data, valor e descrição de um lançamento direto — retorna JSON"""
     from flask import jsonify
     admin_id = get_admin_id()
-    # Restringe a apenas lançamentos diretos (sem vínculo a outros módulos)
+    # Qualquer FluxoCaixa pertencente ao tenant pode ser editado inline
     fc = FluxoCaixa.query.filter(
         FluxoCaixa.id == fc_id,
         FluxoCaixa.admin_id == admin_id,
-        FluxoCaixa.referencia_tabela == None,  # noqa: E711
     ).first_or_404()
     try:
         data_str = request.form.get('data_movimento', '').strip()
