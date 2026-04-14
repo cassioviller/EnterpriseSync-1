@@ -524,13 +524,9 @@ def novo_fluxo_caixa():
     """Cria um lançamento direto no FluxoCaixa (sem GCP)"""
     admin_id = get_admin_id()
     try:
+        from gestao_custos_views import CATEGORIA_LABELS as _CAT_LABELS
         TIPOS_VALIDOS = {'ENTRADA', 'SAIDA'}
-        CATEGORIAS_VALIDAS = {
-            'CUSTO_DIRETO', 'CUSTO_INDIRETO', 'DESPESA_ADMINISTRATIVA',
-            'RETIRADA_SOCIOS', 'RECEITA', 'TRANSFERENCIA', 'OUTROS',
-            'MATERIAL', 'MAO_DE_OBRA', 'EQUIPAMENTO', 'SERVICO_TERCEIRO',
-            'IMPOSTO', 'SALARIO', 'ENCARGO', 'COMPRA', 'REEMBOLSO',
-        }
+        CATEGORIAS_VALIDAS = set(_CAT_LABELS.keys())
         tipo_movimento = request.form.get('tipo_movimento', 'SAIDA')
         if tipo_movimento not in TIPOS_VALIDOS:
             tipo_movimento = 'SAIDA'
