@@ -176,6 +176,7 @@ def editar_item(obra_id, item_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>', methods=['DELETE'])
 @medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/excluir', methods=['POST', 'DELETE'])
 @medicao_bp.route('/medicao/obra/<int:obra_id>/item/<int:item_id>/excluir', methods=['POST', 'DELETE'])
 @login_required

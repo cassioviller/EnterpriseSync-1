@@ -18,6 +18,7 @@ def calcular_periodo_atual(obra):
     ultima = (
         MedicaoObra.query
         .filter_by(obra_id=obra.id, admin_id=obra.admin_id)
+        .filter(MedicaoObra.status.in_(['APROVADO', 'FATURADO']))
         .order_by(MedicaoObra.numero.desc())
         .first()
     )
