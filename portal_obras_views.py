@@ -219,12 +219,7 @@ def gerar_medicao(obra_id: int):
         data_fim_med = date.today().replace(day=ultimo_dia)
 
     tarefas_empresa = TarefaCronograma.query.filter_by(
-        obra_id=obra_id, admin_id=admin_id
-    ).filter(
-        db.or_(
-            TarefaCronograma.responsavel == 'empresa',
-            TarefaCronograma.responsavel.is_(None),
-        )
+        obra_id=obra_id, admin_id=admin_id, responsavel='empresa'
     ).all()
 
     total = len(tarefas_empresa)
