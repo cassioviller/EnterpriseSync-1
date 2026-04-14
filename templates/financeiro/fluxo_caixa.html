@@ -431,29 +431,35 @@ function saveEdit(td) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
-            // Update all three cells in the row with fresh values
+            // Update all three cells in the row with fresh values (textContent avoids XSS)
             var cells = row.querySelectorAll('.cell-editable');
             cells.forEach(function(c) {
                 var f = c.dataset.field;
                 var s = c.querySelector('.cell-text');
                 if (!s) return;
+                // Clear cell-text, then set safe text + re-add pencil icon
+                s.textContent = '';
+                var pencil = document.createElement('i');
+                pencil.className = 'fas fa-pencil-alt pencil-hint';
                 if (f === 'data_movimento') {
-                    s.innerHTML = data.data + ' <i class="fas fa-pencil-alt pencil-hint"></i>';
+                    s.textContent = data.data;
+                    s.appendChild(pencil);
                     var ci = c.querySelector('.cell-input');
-                    // convert dd/mm/yyyy back to yyyy-mm-dd for the input
                     if (ci) {
                         var parts = data.data.split('/');
                         if (parts.length === 3) ci.value = parts[2]+'-'+parts[1]+'-'+parts[0];
                     }
                 } else if (f === 'valor') {
-                    var sign = (row.querySelector('.badge.bg-success') || (row.querySelector('[class*="text-success"]'))) ? '+' : '-';
-                    s.innerHTML = sign + ' R$ ' + parseFloat(data.valor).toFixed(2) + ' <i class="fas fa-pencil-alt pencil-hint"></i>';
+                    var isEntrada = !!row.querySelector('.badge.bg-success');
+                    s.textContent = (isEntrada ? '+' : '-') + ' R$ ' + parseFloat(data.valor).toFixed(2) + ' ';
+                    s.appendChild(pencil);
                     var ci2 = c.querySelector('.cell-input');
                     if (ci2) ci2.value = parseFloat(data.valor).toFixed(2);
                 } else if (f === 'descricao') {
-                    s.innerHTML = data.descricao + ' <i class="fas fa-pencil-alt pencil-hint"></i>';
+                    s.textContent = data.descricao;
+                    s.appendChild(pencil);
                     var ci3 = c.querySelector('.cell-input');
-                    if (ci3) ci3.value = data.descricao;
+                    if (ci3) { ci3.value = data.descricao; ci3.dataset.origValue = data.descricao; }
                 }
             });
             cancelEdit(td);
