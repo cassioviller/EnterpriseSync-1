@@ -1860,50 +1860,24 @@ class ImportacaoFluxoCaixa:
 
                 data_obj = _parse_data(data_str)
 
-                if apenas_pagamento:
-                    # ── Modo "Apenas Pagamento": pular GCP/GCF ───────────────
-                    # FluxoCaixa para PAGO
-                    if status == 'PAGO':
-                        fc = FluxoCaixa(
-                            admin_id=admin_id,
-                            data_movimento=data_obj,
-                            tipo_movimento='SAIDA',
-                            categoria=cat,
-                            valor=valor,
-                            descricao=(row.get('descricao') or fornecedor)[:200],
-                            obra_id=obra_id,
-                            observacoes=obs or None,
-                            import_batch_id=batch_id,
-                        )
-                        db.session.add(fc)
-                        n_fluxo += 1
+                banco_id_row = row.get('banco_id') or None
 
-                    # ContaPagar (sempre — registra a obrigação/pagamento sem criar custo)
-                    eh_forn = ent_tipo_row == 'fornecedor'
-                    eh_func = ent_tipo_row == 'funcionario'
-                    obs_parts = [f'[APENAS PGTO] Categoria: {cat}']
-                    if eh_func and ent_id:
-                        obs_parts.append(f'FUNCIONARIO_ID: {ent_id}')
-                        obs_parts.append(f'Funcionario: {row.get("entidade_nome_banco") or fornecedor}')
-                    if obs:
-                        obs_parts.append(obs)
-                    cp = ContaPagar(
-                        descricao=(row.get('descricao') or fornecedor)[:300],
-                        valor_original=Decimal(str(valor)),
-                        valor_pago=Decimal(str(valor)) if status == 'PAGO' else Decimal('0'),
-                        saldo=Decimal('0') if status == 'PAGO' else Decimal(str(valor)),
-                        data_emissao=data_obj,
-                        data_vencimento=data_obj,
-                        data_pagamento=data_obj if status == 'PAGO' else None,
-                        status='PAGO' if status == 'PAGO' else 'PENDENTE',
-                        obra_id=obra_id,
+                if apenas_pagamento:
+                    # ── Modo "Apenas Pagamento": cria apenas FluxoCaixa, sem GCP/GCF/ContaPagar
+                    fc = FluxoCaixa(
                         admin_id=admin_id,
-                        fornecedor_id=ent_id if (ent_id and eh_forn) else None,
-                        observacoes='. '.join(obs_parts),
+                        data_movimento=data_obj,
+                        tipo_movimento='SAIDA',
+                        categoria=cat,
+                        valor=valor,
+                        descricao=(row.get('descricao') or fornecedor)[:200],
+                        obra_id=obra_id,
+                        observacoes=obs or None,
                         import_batch_id=batch_id,
+                        banco_id=banco_id_row,
                     )
-                    db.session.add(cp)
-                    n_conta_pagar += 1
+                    db.session.add(fc)
+                    n_fluxo += 1
                     n_apenas_pagamento += 1
 
                 else:

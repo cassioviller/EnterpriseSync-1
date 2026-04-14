@@ -702,11 +702,13 @@ class FluxoCaixa(db.Model):
     referencia_tabela = db.Column(db.String(30))  # Nome da tabela de origem
     observacoes = db.Column(db.Text)
     import_batch_id = db.Column(db.String(50), nullable=True)
+    banco_id = db.Column(db.Integer, db.ForeignKey('banco_empresa.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
     obra = db.relationship('Obra', overlaps="movimentos_caixa_lista")
     centro_custo = db.relationship('CentroCusto', overlaps="movimentos_caixa_lista")
+    banco = db.relationship('BancoEmpresa', foreign_keys=[banco_id], overlaps="fluxos_caixa")
 
 class RegistroAlimentacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)

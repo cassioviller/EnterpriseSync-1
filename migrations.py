@@ -3804,6 +3804,7 @@ def executar_migracoes():
             (102, "Funcionario - codigo unique por tenant (codigo+admin_id) em vez de global", migration_102_funcionario_codigo_per_tenant),
             (103, "import_batch_id em gestao_custo_pai, conta_pagar, conta_receber, fluxo_caixa — rollback de importação", migration_103_import_batch_id),
             (104, "Fornecedor - tipo_fornecedor (MATERIAL / PRESTADOR_SERVICO / OUTRO)", migration_104_tipo_fornecedor),
+            (105, "FluxoCaixa - banco_id FK opcional para BancoEmpresa", migration_105_fluxo_caixa_banco_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -8402,6 +8403,44 @@ def migration_103_import_batch_id():
 
     except Exception as e:
         logger.error(f"Erro na migracao 103: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+
+
+def migration_105_fluxo_caixa_banco_id():
+    """
+    Migration 105: fluxo_caixa — adicionar banco_id FK opcional para BancoEmpresa
+    Permite vincular cada movimentação de caixa a um banco específico.
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_name = 'fluxo_caixa' AND column_name = 'banco_id'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute(
+                "ALTER TABLE fluxo_caixa ADD COLUMN banco_id INTEGER REFERENCES banco_empresa(id) ON DELETE SET NULL"
+            )
+            logger.info("MIGRACAO 105: banco_id adicionado em fluxo_caixa")
+        else:
+            logger.info("MIGRACAO 105: banco_id já existe em fluxo_caixa")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 105 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 105: {e}")
         if connection:
             try:
                 connection.rollback()

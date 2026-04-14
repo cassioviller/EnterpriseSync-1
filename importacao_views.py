@@ -428,17 +428,35 @@ def fluxo_caixa_upload():
     }
     dados_assinados = _assinar_payload([payload], admin_id, 'fluxo_caixa')
 
-    CATEGORIAS_OPCOES = [
-        ('SALARIO', 'Salário'),
-        ('MAO_OBRA_DIRETA', 'Mão de Obra Direta'),
-        ('MATERIAL', 'Material'),
-        ('ALIMENTACAO', 'Alimentação'),
-        ('TRANSPORTE', 'Transporte'),
-        ('ALUGUEL_UTILITIES', 'Aluguel / Utilitários'),
-        ('TRIBUTOS', 'Tributos'),
-        ('EQUIPAMENTO', 'Equipamento'),
-        ('OUTROS', 'Outros'),
+    # Categorias agrupadas (igual a Gestão de Custos V2)
+    CATEGORIAS_GRUPOS = [
+        ('Custo Direto de Obra', [
+            ('MATERIAL',        'Material de Obra'),
+            ('MAO_OBRA_DIRETA', 'Mão de Obra Direta'),
+            ('EQUIPAMENTO',     'Equipamento / Frota'),
+            ('SUBEMPREITADA',   'Subempreitada'),
+        ]),
+        ('Custo Indireto de Obra', [
+            ('ALIMENTACAO',    'Alimentação'),
+            ('TRANSPORTE',     'Transporte'),
+            ('CANTEIRO',       'Canteiro / Instalações'),
+            ('TAXAS_LICENCAS', 'Taxas e Licenças'),
+        ]),
+        ('Despesa Administrativa', [
+            ('SALARIO_ADMIN',      'Salário Administrativo'),
+            ('SALARIO',            'Salário (diárias/folha)'),
+            ('ALUGUEL_UTILITIES',  'Aluguel / Utilities'),
+            ('TRIBUTOS',           'Tributos / Impostos'),
+            ('DESPESA_FINANCEIRA', 'Despesa Financeira'),
+            ('RETIRADA_SOCIOS',    'Retirada de Sócios'),
+            ('OUTROS',             'Outros'),
+        ]),
     ]
+    # Lista plana para retrocompatibilidade
+    CATEGORIAS_OPCOES = [(v, l) for _, grp in CATEGORIAS_GRUPOS for v, l in grp]
+
+    from models import BancoEmpresa
+    bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
 
     return render_template(
         'importacao/preview_fluxo.html',
@@ -446,8 +464,10 @@ def fluxo_caixa_upload():
         saidas_auto=saidas_auto,
         saidas_manual=saidas_manual,
         ignorados=ignorados,
+        categorias_grupos=CATEGORIAS_GRUPOS,
         categorias_opcoes=CATEGORIAS_OPCOES,
         dados_json=dados_assinados,
+        bancos=bancos,
         total_saidas=len(saidas_auto) + len(saidas_manual),
         total_valor_saidas=sum(r.get('valor', 0) for r in saidas_auto + saidas_manual),
         total_valor_entradas=sum(r.get('valor', 0) for r in entradas),
@@ -475,15 +495,33 @@ def fluxo_caixa_confirmar():
     saidas_manual = payload.get('saidas_manual', [])
     entradas = payload.get('entradas', [])
 
-    # Aplicar categorias editadas pelo usuário nas saídas auto
+    # Aplicar edições manuais nas saídas auto
     for i, row in enumerate(saidas_auto):
         cat_editada = request.form.get(f'cat_auto_{i}')
         if cat_editada:
             row['tipo_categoria'] = cat_editada
-        # Checkbox "apenas pagamento" — presente no form = True
+        # Checkbox "apenas pagamento"
         row['apenas_pagamento'] = request.form.get(f'apenas_pag_auto_{i}') is not None
+        # Checkbox "reembolso"
+        row['eh_reembolso'] = request.form.get(f'reembolso_auto_{i}') is not None
+        # Banco vinculado
+        banco_id_val = request.form.get(f'banco_auto_{i}', '').strip()
+        row['banco_id'] = int(banco_id_val) if banco_id_val else None
+        # Inline edits
+        data_edit = request.form.get(f'data_auto_{i}', '').strip()
+        if data_edit:
+            row['data'] = data_edit
+        desc_edit = request.form.get(f'desc_auto_{i}', '').strip()
+        if desc_edit:
+            row['descricao'] = desc_edit
+        valor_edit = request.form.get(f'valor_auto_{i}', '').strip()
+        if valor_edit:
+            try:
+                row['valor'] = float(valor_edit.replace(',', '.'))
+            except ValueError:
+                pass
 
-    # Aplicar categorias das saídas manuais (opcional — padrão OUTROS)
+    # Aplicar edições manuais das saídas manuais
     for i, row in enumerate(saidas_manual):
         cat_manual = request.form.get(f'cat_manual_{i}')
         if cat_manual:
@@ -492,6 +530,24 @@ def fluxo_caixa_confirmar():
             row['tipo_categoria'] = 'OUTROS'
         # Checkbox "apenas pagamento"
         row['apenas_pagamento'] = request.form.get(f'apenas_pag_manual_{i}') is not None
+        # Checkbox "reembolso"
+        row['eh_reembolso'] = request.form.get(f'reembolso_manual_{i}') is not None
+        # Banco vinculado
+        banco_id_val = request.form.get(f'banco_manual_{i}', '').strip()
+        row['banco_id'] = int(banco_id_val) if banco_id_val else None
+        # Inline edits
+        data_edit = request.form.get(f'data_manual_{i}', '').strip()
+        if data_edit:
+            row['data'] = data_edit
+        desc_edit = request.form.get(f'desc_manual_{i}', '').strip()
+        if desc_edit:
+            row['descricao'] = desc_edit
+        valor_edit = request.form.get(f'valor_manual_{i}', '').strip()
+        if valor_edit:
+            try:
+                row['valor'] = float(valor_edit.replace(',', '.'))
+            except ValueError:
+                pass
 
     todas_saidas = saidas_auto + saidas_manual
 

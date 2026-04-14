@@ -40,6 +40,7 @@ CATEGORIA_LABELS = {
     'TRIBUTOS':           ('Tributos / Impostos',      'fas fa-landmark',            'danger'),
     'DESPESA_FINANCEIRA': ('Despesa Financeira',       'fas fa-percentage',          'dark'),
     'OUTROS':             ('Outros',                   'fas fa-receipt',             'secondary'),
+    'RETIRADA_SOCIOS':    ('Retirada de Sócios',       'fas fa-hand-holding-usd',    'danger'),
     # ── Categorias legadas (retrocompatibilidade — lidas mas não oferecidas no dropdown) ──
     'SALARIO':            ('Pagamento Salário (legado)','fas fa-user-tie',           'primary'),
     'VEICULO':            ('Despesa de Frota (legado)', 'fas fa-truck',              'dark'),
@@ -52,7 +53,7 @@ CATEGORIA_LABELS = {
 CATEGORIAS_GRUPOS = [
     ('Custo Direto de Obra',    ['MATERIAL', 'MAO_OBRA_DIRETA', 'EQUIPAMENTO', 'SUBEMPREITADA']),
     ('Custo Indireto de Obra',  ['ALIMENTACAO', 'TRANSPORTE', 'CANTEIRO', 'TAXAS_LICENCAS']),
-    ('Despesa Administrativa',  ['SALARIO_ADMIN', 'ALUGUEL_UTILITIES', 'TRIBUTOS', 'DESPESA_FINANCEIRA', 'OUTROS']),
+    ('Despesa Administrativa',  ['SALARIO_ADMIN', 'ALUGUEL_UTILITIES', 'TRIBUTOS', 'DESPESA_FINANCEIRA', 'OUTROS', 'RETIRADA_SOCIOS']),
 ]
 
 # Mapeamento reverso: nova → lista de categorias legadas que representam o mesmo conceito
