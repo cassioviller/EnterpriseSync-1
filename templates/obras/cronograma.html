@@ -213,15 +213,19 @@
               {# Responsável #}
               {% set resp = t.responsavel if t.responsavel else 'empresa' %}
               <td class="td-center td-resp small">
-                {% if resp == 'terceiros' %}
-                  <span class="badge bg-warning text-dark" style="font-size:.7rem">
-                    <i class="fas fa-hard-hat me-1"></i>Terceiros
-                  </span>
-                {% else %}
-                  <span class="badge bg-info text-dark" style="font-size:.7rem">
-                    <i class="fas fa-building me-1"></i>Empresa
-                  </span>
-                {% endif %}
+                <span class="resp-val"
+                      ondblclick="iniciarEdicao(this, {{ t.id }}, 'responsavel')"
+                      title="Duplo-clique para editar">
+                  {% if resp == 'terceiros' %}
+                    <span class="badge bg-warning text-dark" style="font-size:.7rem">
+                      <i class="fas fa-hard-hat me-1"></i>Terceiros
+                    </span>
+                  {% else %}
+                    <span class="badge bg-info text-dark" style="font-size:.7rem">
+                      <i class="fas fa-building me-1"></i>Empresa
+                    </span>
+                  {% endif %}
+                </span>
               </td>
 
               {# Planejado — calculado linearmente pelas datas da tarefa até hoje #}
@@ -559,6 +563,10 @@
   transition: width .25s ease, opacity .2s ease;
 }
 
+/* ── Edição inline do responsável ── */
+.resp-val { cursor: pointer; border-radius: 4px; }
+.resp-val:hover { outline: 2px dashed #6c757d; outline-offset: 2px; }
+
 /* ── Divisor / botão collapse Gantt ── */
 .gantt-divider {
   width: 14px;
@@ -845,6 +853,34 @@ function iniciarEdicao(el, tarefaId, campo) {
   if (campo === 'percentual_concluido') raw = raw.replace('%', '').trim();
   if (raw === '—') raw = '';
 
+  if (campo === 'responsavel') {
+    const tarefa = tarefas.find(t => t.id === tarefaId);
+    const current = tarefa ? (tarefa.responsavel || 'empresa') : 'empresa';
+    const sel = document.createElement('select');
+    sel.className = 'cell-input';
+    sel.style.cssText = 'width:auto;min-width:120px;font-size:.78rem';
+    sel.innerHTML = `
+      <option value="empresa"   ${current === 'empresa'   ? 'selected' : ''}>🏢 Empresa</option>
+      <option value="terceiros" ${current === 'terceiros' ? 'selected' : ''}>👷 Terceiros</option>`;
+    el.innerHTML = '';
+    el.appendChild(sel);
+    sel.focus();
+    let done = false;
+    const commit = async () => {
+      if (done) return; done = true;
+      const val = sel.value;
+      if (val === current) { restaurarCelulaResp(el, tarefaId); return; }
+      await salvarCampo(tarefaId, campo, val, el, current);
+    };
+    sel.addEventListener('change', commit);
+    sel.addEventListener('blur', () => { if (!done) { done = true; restaurarCelulaResp(el, tarefaId); } });
+    sel.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { done = true; restaurarCelulaResp(el, tarefaId); }
+    });
+    return;
+  }
+
   if (campo === 'predecessora_id') {
     // Select dropdown
     const sel = document.createElement('select');
@@ -963,6 +999,18 @@ function restaurarCelula(el, campo, val, tarefaId) {
   else if (campo === 'percentual_concluido') el.textContent = (tarefa ? Math.round(tarefa.percentual_concluido || 0) : val) + '%';
   else el.textContent = val || '—';
 }
+function buildRespBadge(resp) {
+  if (resp === 'terceiros') {
+    return `<span class="badge bg-warning text-dark" style="font-size:.7rem"><i class="fas fa-hard-hat me-1"></i>Terceiros</span>`;
+  }
+  return `<span class="badge bg-info text-dark" style="font-size:.7rem"><i class="fas fa-building me-1"></i>Empresa</span>`;
+}
+function restaurarCelulaResp(el, tarefaId) {
+  const tarefa = tarefas.find(t => t.id === tarefaId);
+  const resp = tarefa ? (tarefa.responsavel || 'empresa') : 'empresa';
+  el.innerHTML = buildRespBadge(resp);
+}
+
 function restaurarCelulaPred(el, tarefaId) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
   const pid = tarefa ? tarefa.predecessora_id : null;
@@ -1009,7 +1057,7 @@ async function salvarCampoQty(tarefaId, qtdStr, un, el) {
 async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
   try {
     const body = {};
-    if (campo === 'nome_tarefa') body[campo] = valor;
+    if (campo === 'nome_tarefa' || campo === 'responsavel') body[campo] = valor;
     else if (campo === 'data_inicio') body[campo] = valor || null;
     else body[campo] = valor === '' ? null : Number(valor);
 
@@ -1036,7 +1084,8 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
       else if (campo === 'percentual_concluido') el.textContent = Math.round(t ? t.percentual_concluido || 0 : valor) + '%';
       else if (campo === 'data_inicio') el.textContent = t && t.data_inicio ? formatDate(t.data_inicio) : '—';
       else if (campo === 'predecessora_id') restaurarCelulaPred(el, tarefaId);
-      toast(campo === 'nome_tarefa' ? 'Nome atualizado' : 'Campo atualizado');
+      else if (campo === 'responsavel') restaurarCelulaResp(el, tarefaId);
+      toast(campo === 'nome_tarefa' ? 'Nome atualizado' : campo === 'responsavel' ? 'Responsável atualizado' : 'Campo atualizado');
     } else {
       restaurarCelula(el, campo, oldRaw, tarefaId);
       toast(data.msg || 'Erro ao salvar', 'error');
@@ -1053,12 +1102,13 @@ function updateTarefaLocal(t) {
   const row = document.querySelector(`[data-id="${t.id}"]`);
   if (!row) return;
 
-  const ini  = row.querySelector('.inicio-val');
-  const fim  = row.querySelector('.fim-val');
-  const pred = row.querySelector('.pred-val');
+  const ini    = row.querySelector('.inicio-val');
+  const fim    = row.querySelector('.fim-val');
+  const pred   = row.querySelector('.pred-val');
   const percEl = row.querySelector('.perc-val');
   const planEl = row.querySelector('.plan-val');
   const dur    = row.querySelector('.dur-val');
+  const respEl = row.querySelector('.resp-val');
 
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
@@ -1086,6 +1136,7 @@ function updateTarefaLocal(t) {
   }
   if (planEl) planEl.innerHTML = resp === 'terceiros' ? '<span class="text-muted small">—</span>' : buildPlanCell(t.percentual_planejado || 0);
   if (dur)    dur.textContent = t.duracao_dias + 'd';
+  if (respEl && !respEl.querySelector('select')) respEl.innerHTML = buildRespBadge(resp);
 
   const qtyEl = row.querySelector('.qty-val');
   if (qtyEl && !row.classList.contains('tarefa-pai')) {
