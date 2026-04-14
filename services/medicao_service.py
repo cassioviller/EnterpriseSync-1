@@ -1,0 +1,274 @@
+import logging
+from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
+from io import BytesIO
+
+from app import db
+from models import (
+    Obra, MedicaoObra, MedicaoObraItem, ItemMedicaoComercial,
+    ItemMedicaoCronogramaTarefa, TarefaCronograma, ContaReceber,
+    ConfiguracaoEmpresa,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def calcular_periodo_atual(obra):
+    ref = obra.data_inicio_medicao or obra.data_inicio or date.today()
+    hoje = date.today()
+
+    periodo_inicio = ref
+    while periodo_inicio + timedelta(days=14) < hoje:
+        periodo_inicio += timedelta(days=15)
+
+    periodo_fim = periodo_inicio + timedelta(days=14)
+    return periodo_inicio, periodo_fim
+
+
+def calcular_percentual_item(item):
+    vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item.id).all()
+    if not vinc:
+        return Decimal('0')
+
+    total_peso = sum(Decimal(str(v.peso)) for v in vinc)
+    if total_peso <= 0:
+        return Decimal('0')
+
+    perc_ponderado = Decimal('0')
+    for v in vinc:
+        tarefa = TarefaCronograma.query.get(v.cronograma_tarefa_id)
+        if tarefa:
+            perc_tarefa = Decimal(str(tarefa.percentual_concluido or 0))
+            peso_norm = Decimal(str(v.peso)) / total_peso
+            perc_ponderado += perc_tarefa * peso_norm
+
+    return perc_ponderado.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=None, observacoes=None):
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if not obra:
+        return None, "Obra não encontrada"
+
+    itens_comerciais = ItemMedicaoComercial.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).all()
+    if not itens_comerciais:
+        return None, "Nenhum item de medição comercial cadastrado para esta obra"
+
+    if not periodo_inicio or not periodo_fim:
+        periodo_inicio, periodo_fim = calcular_periodo_atual(obra)
+
+    ultima = MedicaoObra.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).order_by(MedicaoObra.numero.desc()).first()
+    proximo_numero = (ultima.numero + 1) if ultima else 1
+
+    valor_contrato = Decimal(str(obra.valor_contrato or 0))
+    valor_entrada = Decimal(str(obra.valor_entrada or 0))
+
+    medicao = MedicaoObra(
+        obra_id=obra_id,
+        admin_id=admin_id,
+        numero=proximo_numero,
+        data_medicao=datetime.utcnow(),
+        periodo_inicio=periodo_inicio,
+        periodo_fim=periodo_fim,
+        observacoes=observacoes,
+        status='PENDENTE',
+    )
+    db.session.add(medicao)
+    db.session.flush()
+
+    total_medido_periodo = Decimal('0')
+
+    for item in itens_comerciais:
+        perc_atual = calcular_percentual_item(item)
+        perc_anterior = Decimal(str(item.percentual_executado_acumulado or 0))
+        perc_periodo = max(Decimal('0'), perc_atual - perc_anterior)
+
+        valor_comercial = Decimal(str(item.valor_comercial or 0))
+        valor_periodo = (perc_periodo / Decimal('100')) * valor_comercial
+        valor_acum = (perc_atual / Decimal('100')) * valor_comercial
+
+        moi = MedicaoObraItem(
+            medicao_obra_id=medicao.id,
+            item_medicao_comercial_id=item.id,
+            percentual_anterior=perc_anterior,
+            percentual_atual=perc_atual,
+            percentual_executado_periodo=perc_periodo,
+            valor_medido_periodo=valor_periodo.quantize(Decimal('0.01')),
+            percentual_executado_acumulado=perc_atual,
+            valor_executado_acumulado=valor_acum.quantize(Decimal('0.01')),
+        )
+        db.session.add(moi)
+        total_medido_periodo += valor_periodo
+
+        item.percentual_executado_acumulado = perc_atual
+        item.valor_executado_acumulado = valor_acum.quantize(Decimal('0.01'))
+        if perc_atual >= 100:
+            item.status = 'CONCLUIDO'
+
+    entrada_proporcional = Decimal('0')
+    if valor_contrato > 0 and valor_entrada > 0 and proximo_numero == 1:
+        entrada_proporcional = valor_entrada
+
+    valor_a_faturar = total_medido_periodo - entrada_proporcional
+    if valor_a_faturar < 0:
+        valor_a_faturar = Decimal('0')
+
+    medicao.valor_total_medido_periodo = total_medido_periodo.quantize(Decimal('0.01'))
+    medicao.valor_entrada_abatido_periodo = entrada_proporcional.quantize(Decimal('0.01'))
+    medicao.valor_a_faturar_periodo = valor_a_faturar.quantize(Decimal('0.01'))
+    medicao.valor_medido = total_medido_periodo.quantize(Decimal('0.01'))
+
+    if valor_contrato > 0:
+        soma_acum = sum(Decimal(str(i.valor_executado_acumulado or 0)) for i in itens_comerciais)
+        medicao.percentual_executado = float((soma_acum / valor_contrato * 100).quantize(Decimal('0.01')))
+
+    db.session.commit()
+    logger.info(f"[OK] Medição #{proximo_numero} gerada para obra {obra_id}")
+    return medicao, None
+
+
+def fechar_medicao(medicao_id, admin_id):
+    medicao = MedicaoObra.query.filter_by(id=medicao_id, admin_id=admin_id).first()
+    if not medicao:
+        return None, "Medição não encontrada"
+    if medicao.status != 'PENDENTE':
+        return None, "Medição já fechada"
+
+    obra = Obra.query.get(medicao.obra_id)
+    valor_faturar = Decimal(str(medicao.valor_a_faturar_periodo or 0))
+
+    if valor_faturar > 0:
+        cr = ContaReceber(
+            cliente_nome=obra.cliente or obra.nome,
+            obra_id=obra.id,
+            numero_documento=f"MED-{medicao.numero:03d}",
+            descricao=f"Medição #{medicao.numero} — {obra.nome} ({medicao.periodo_inicio.strftime('%d/%m')} a {medicao.periodo_fim.strftime('%d/%m/%Y')})",
+            valor_original=valor_faturar,
+            data_emissao=date.today(),
+            data_vencimento=date.today() + timedelta(days=30),
+            status='PENDENTE',
+            origem_tipo='MEDICAO',
+            origem_id=medicao.id,
+            admin_id=admin_id,
+        )
+        db.session.add(cr)
+        db.session.flush()
+        medicao.conta_receber_id = cr.id
+        logger.info(f"[OK] ContaReceber id={cr.id} criada para medição #{medicao.numero}")
+
+    medicao.status = 'APROVADO'
+    db.session.commit()
+    return medicao, None
+
+
+def gerar_pdf_extrato_medicao(medicao_id, admin_id):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    medicao = MedicaoObra.query.filter_by(id=medicao_id, admin_id=admin_id).first()
+    if not medicao:
+        return None
+
+    obra = Obra.query.get(medicao.obra_id)
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    itens = MedicaoObraItem.query.filter_by(medicao_obra_id=medicao.id).all()
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15*mm, rightMargin=15*mm, topMargin=20*mm, bottomMargin=15*mm)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle('TitleMed', parent=styles['Title'], fontSize=16, spaceAfter=4*mm, textColor=colors.HexColor('#1976d2'))
+    subtitle_style = ParagraphStyle('SubtitleMed', parent=styles['Normal'], fontSize=10, spaceAfter=2*mm, textColor=colors.HexColor('#555'))
+    header_style = ParagraphStyle('HeaderMed', parent=styles['Normal'], fontSize=11, spaceAfter=3*mm, textColor=colors.HexColor('#333'), leading=14)
+
+    elements = []
+
+    empresa_nome = config.nome_empresa if config else 'Empresa'
+    elements.append(Paragraph(f"Extrato de Medição #{medicao.numero:03d}", title_style))
+    elements.append(Paragraph(empresa_nome, subtitle_style))
+    elements.append(Spacer(1, 4*mm))
+
+    info_data = [
+        ['Obra:', obra.nome, 'Contrato:', f"R$ {float(obra.valor_contrato or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+        ['Período:', f"{medicao.periodo_inicio.strftime('%d/%m/%Y')} a {medicao.periodo_fim.strftime('%d/%m/%Y')}", 'Status:', medicao.status],
+        ['Cliente:', obra.cliente or '—', 'Medição Nº:', f"{medicao.numero:03d}"],
+    ]
+    info_table = Table(info_data, colWidths=[60, 180, 70, 150])
+    info_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1976d2')),
+        ('TEXTCOLOR', (2, 0), (2, -1), colors.HexColor('#1976d2')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 6*mm))
+
+    elements.append(Paragraph("Itens da Medição", header_style))
+
+    table_data = [['Item', '% Ant.', '% Atual', '% Período', 'Valor Comercial', 'Valor Período', 'Valor Acum.']]
+    for mi in itens:
+        ic = mi.item_comercial
+        table_data.append([
+            ic.nome if ic else '—',
+            f"{float(mi.percentual_anterior or 0):.1f}%",
+            f"{float(mi.percentual_atual or 0):.1f}%",
+            f"{float(mi.percentual_executado_periodo or 0):.1f}%",
+            f"R$ {float(ic.valor_comercial or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            f"R$ {float(mi.valor_medido_periodo or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            f"R$ {float(mi.valor_executado_acumulado or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+        ])
+
+    t = Table(table_data, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1976d2')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 7.5),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ddd')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 6*mm))
+
+    def fmt_brl(v):
+        return f"R$ {float(v or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    resumo_data = [
+        ['Total Medido no Período:', fmt_brl(medicao.valor_total_medido_periodo)],
+        ['Entrada Abatida:', f"(−) {fmt_brl(medicao.valor_entrada_abatido_periodo)}"],
+        ['Valor a Faturar:', fmt_brl(medicao.valor_a_faturar_periodo)],
+    ]
+    rt = Table(resumo_data, colWidths=[300, 160])
+    rt.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('LINEABOVE', (0, 2), (-1, 2), 1.5, colors.HexColor('#1976d2')),
+        ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (1, 2), (1, 2), colors.HexColor('#1976d2')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(rt)
+
+    elements.append(Spacer(1, 8*mm))
+    elements.append(Paragraph(
+        f"Documento gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')} — {empresa_nome}",
+        ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999'))
+    ))
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf

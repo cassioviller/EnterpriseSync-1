@@ -169,6 +169,13 @@ try:
 except Exception as e:
     logger.error(f"[ERROR] Erro ao registrar Portal Obras: {e}")
 
+try:
+    from medicao_views import medicao_bp
+    app.register_blueprint(medicao_bp)
+    logger.info("[OK] Blueprint MEDICAO QUINZENAL registrado")
+except Exception as e:
+    logger.error(f"[ERROR] Erro ao registrar Medicao: {e}")
+
 logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
 
 try:
@@ -200,6 +207,13 @@ try:
     logger.info("[OK] CSRF exempt: portal_obras (public routes only)")
 except Exception as e:
     logger.error(f"[WARN] CSRF exempt portal_obras routes: {e}")
+
+try:
+    from medicao_views import portal_pdf_extrato
+    csrf.exempt(portal_pdf_extrato)
+    logger.info("[OK] CSRF exempt: medicao portal_pdf_extrato (public)")
+except Exception as e:
+    logger.error(f"[WARN] CSRF exempt medicao portal: {e}")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -3807,6 +3807,7 @@ def executar_migracoes():
             (105, "FluxoCaixa - banco_id FK opcional para BancoEmpresa", migration_105_fluxo_caixa_banco_id),
             (106, "RDO e filhos — ON DELETE CASCADE para exclusão em cascata com Obra", migration_106_rdo_obra_cascade),
             (107, "Portal do Cliente — chave_pix, status_aprovacao_cliente, medicao_obra", migration_107_portal_cliente_obra),
+            (108, "Medição Quinzenal — itens comerciais, tarefas vinculadas, expansão medicao_obra", migration_108_medicao_quinzenal),
         ]
         
         # Executar cada migração com rastreamento
@@ -8565,6 +8566,137 @@ def migration_107_portal_cliente_obra():
 
     except Exception as e:
         logger.error(f"Erro na migracao 107: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_108_medicao_quinzenal():
+    """
+    Migration 108: Medição Quinzenal de Obra
+    - Obra: data_inicio_medicao, valor_entrada, data_entrada
+    - Tabela item_medicao_comercial
+    - Tabela item_medicao_cronograma_tarefa
+    - MedicaoObra: periodo_inicio, periodo_fim, valor_total_medido_periodo,
+      valor_entrada_abatido_periodo, valor_a_faturar_periodo, conta_receber_id
+    - Tabela medicao_obra_item
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        obra_cols = [
+            ("obra", "data_inicio_medicao", "DATE"),
+            ("obra", "valor_entrada", "NUMERIC(15,2) DEFAULT 0"),
+            ("obra", "data_entrada", "DATE"),
+        ]
+        for table, col, dtype in obra_cols:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = %s AND column_name = %s
+            """, (table, col))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {dtype}')
+                logger.info(f"MIGRACAO 108: {table}.{col} adicionado")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'item_medicao_comercial'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE item_medicao_comercial (
+                    id SERIAL PRIMARY KEY,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    nome VARCHAR(200) NOT NULL,
+                    valor_comercial NUMERIC(15,2) NOT NULL,
+                    percentual_executado_acumulado NUMERIC(5,2) DEFAULT 0,
+                    valor_executado_acumulado NUMERIC(15,2) DEFAULT 0,
+                    status VARCHAR(20) DEFAULT 'PENDENTE',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_imc_obra_id ON item_medicao_comercial(obra_id)")
+            cursor.execute("CREATE INDEX idx_imc_admin_id ON item_medicao_comercial(admin_id)")
+            logger.info("MIGRACAO 108: tabela item_medicao_comercial criada")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'item_medicao_cronograma_tarefa'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE item_medicao_cronograma_tarefa (
+                    id SERIAL PRIMARY KEY,
+                    item_medicao_id INTEGER NOT NULL REFERENCES item_medicao_comercial(id) ON DELETE CASCADE,
+                    cronograma_tarefa_id INTEGER NOT NULL REFERENCES tarefa_cronograma(id) ON DELETE CASCADE,
+                    peso NUMERIC(5,2) NOT NULL,
+                    CONSTRAINT uq_item_tarefa UNIQUE(item_medicao_id, cronograma_tarefa_id)
+                )
+            """)
+            logger.info("MIGRACAO 108: tabela item_medicao_cronograma_tarefa criada")
+
+        medicao_cols = [
+            ("medicao_obra", "periodo_inicio", "DATE"),
+            ("medicao_obra", "periodo_fim", "DATE"),
+            ("medicao_obra", "valor_total_medido_periodo", "NUMERIC(15,2) DEFAULT 0"),
+            ("medicao_obra", "valor_entrada_abatido_periodo", "NUMERIC(15,2) DEFAULT 0"),
+            ("medicao_obra", "valor_a_faturar_periodo", "NUMERIC(15,2) DEFAULT 0"),
+            ("medicao_obra", "conta_receber_id", "INTEGER REFERENCES conta_receber(id)"),
+        ]
+        for table, col, dtype in medicao_cols:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = %s AND column_name = %s
+            """, (table, col))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {dtype}')
+                logger.info(f"MIGRACAO 108: {table}.{col} adicionado")
+
+        cursor.execute("""
+            ALTER TABLE medicao_obra
+            ALTER COLUMN data_medicao TYPE TIMESTAMP USING data_medicao::timestamp,
+            ALTER COLUMN data_medicao SET DEFAULT NOW(),
+            ALTER COLUMN data_inicio DROP NOT NULL,
+            ALTER COLUMN data_fim DROP NOT NULL
+        """)
+        logger.info("MIGRACAO 108: medicao_obra.data_medicao convertido para TIMESTAMP")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'medicao_obra_item'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE medicao_obra_item (
+                    id SERIAL PRIMARY KEY,
+                    medicao_obra_id INTEGER NOT NULL REFERENCES medicao_obra(id) ON DELETE CASCADE,
+                    item_medicao_comercial_id INTEGER NOT NULL REFERENCES item_medicao_comercial(id),
+                    percentual_anterior NUMERIC(5,2) DEFAULT 0,
+                    percentual_atual NUMERIC(5,2) DEFAULT 0,
+                    percentual_executado_periodo NUMERIC(5,2) DEFAULT 0,
+                    valor_medido_periodo NUMERIC(15,2) DEFAULT 0,
+                    percentual_executado_acumulado NUMERIC(5,2) DEFAULT 0,
+                    valor_executado_acumulado NUMERIC(15,2) DEFAULT 0
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_moi_medicao_id ON medicao_obra_item(medicao_obra_id)")
+            logger.info("MIGRACAO 108: tabela medicao_obra_item criada")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 108 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 108: {e}")
         if connection:
             try:
                 connection.rollback()

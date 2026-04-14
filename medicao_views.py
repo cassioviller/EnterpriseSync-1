@@ -1,0 +1,315 @@
+import logging
+from datetime import date, datetime
+from decimal import Decimal
+
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for, make_response
+from flask_login import current_user, login_required
+
+from app import db
+from models import (
+    Obra, MedicaoObra, MedicaoObraItem, ItemMedicaoComercial,
+    ItemMedicaoCronogramaTarefa, TarefaCronograma, ConfiguracaoEmpresa,
+)
+
+logger = logging.getLogger(__name__)
+
+medicao_bp = Blueprint('medicao', __name__, url_prefix='/medicao')
+
+
+def _admin_id():
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
+
+
+def _check_v2():
+    from utils.tenant import is_v2_active
+    if not is_v2_active():
+        flash('Esta funcionalidade está disponível apenas no plano V2.', 'warning')
+        return redirect(url_for('main.dashboard'))
+    return None
+
+
+@medicao_bp.route('/obra/<int:obra_id>')
+@login_required
+def gestao_itens(obra_id):
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+
+    itens = ItemMedicaoComercial.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).order_by(ItemMedicaoComercial.id).all()
+
+    tarefas = TarefaCronograma.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).order_by(TarefaCronograma.ordem).all()
+
+    medicoes = MedicaoObra.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).order_by(MedicaoObra.numero.desc()).all()
+
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+
+    valor_contrato = float(obra.valor_contrato or 0)
+    soma_itens = sum(float(i.valor_comercial or 0) for i in itens)
+    saldo = valor_contrato - soma_itens
+
+    return render_template(
+        'medicao/gestao_itens.html',
+        obra=obra,
+        itens=itens,
+        tarefas=tarefas,
+        medicoes=medicoes,
+        config=config,
+        valor_contrato=valor_contrato,
+        soma_itens=soma_itens,
+        saldo=saldo,
+    )
+
+
+@medicao_bp.route('/obra/<int:obra_id>/item', methods=['POST'])
+@login_required
+def criar_item(obra_id):
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+
+    nome = request.form.get('nome', '').strip()
+    try:
+        valor = Decimal(request.form.get('valor_comercial', '0').replace(',', '.'))
+    except Exception:
+        flash('Valor comercial inválido.', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+    if not nome or valor <= 0:
+        flash('Nome e valor comercial são obrigatórios.', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+    item = ItemMedicaoComercial(
+        admin_id=admin_id,
+        obra_id=obra_id,
+        nome=nome,
+        valor_comercial=valor,
+    )
+    db.session.add(item)
+    db.session.commit()
+    flash(f'Item "{nome}" criado com sucesso.', 'success')
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/editar', methods=['POST'])
+@login_required
+def editar_item(obra_id, item_id):
+    admin_id = _admin_id()
+    item = ItemMedicaoComercial.query.filter_by(
+        id=item_id, obra_id=obra_id, admin_id=admin_id
+    ).first_or_404()
+
+    nome = request.form.get('nome', '').strip()
+    try:
+        valor = Decimal(request.form.get('valor_comercial', '0').replace(',', '.'))
+    except Exception:
+        flash('Valor comercial inválido.', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+    if nome:
+        item.nome = nome
+    if valor > 0:
+        item.valor_comercial = valor
+
+    db.session.commit()
+    flash('Item atualizado.', 'success')
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/excluir', methods=['POST'])
+@login_required
+def excluir_item(obra_id, item_id):
+    admin_id = _admin_id()
+    item = ItemMedicaoComercial.query.filter_by(
+        id=item_id, obra_id=obra_id, admin_id=admin_id
+    ).first_or_404()
+
+    db.session.delete(item)
+    db.session.commit()
+    flash('Item excluído.', 'success')
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/vincular', methods=['POST'])
+@login_required
+def vincular_tarefa(obra_id, item_id):
+    admin_id = _admin_id()
+    item = ItemMedicaoComercial.query.filter_by(
+        id=item_id, obra_id=obra_id, admin_id=admin_id
+    ).first_or_404()
+
+    tarefa_id = request.form.get('tarefa_id', type=int)
+    try:
+        peso = Decimal(request.form.get('peso', '0').replace(',', '.'))
+    except Exception:
+        peso = Decimal('0')
+
+    if not tarefa_id or peso <= 0:
+        flash('Tarefa e peso são obrigatórios.', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+    tarefa = TarefaCronograma.query.filter_by(
+        id=tarefa_id, obra_id=obra_id, admin_id=admin_id
+    ).first()
+    if not tarefa:
+        flash('Tarefa não encontrada.', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+    existente = ItemMedicaoCronogramaTarefa.query.filter_by(
+        item_medicao_id=item_id, cronograma_tarefa_id=tarefa_id
+    ).first()
+    if existente:
+        existente.peso = peso
+    else:
+        vinculo = ItemMedicaoCronogramaTarefa(
+            item_medicao_id=item_id,
+            cronograma_tarefa_id=tarefa_id,
+            peso=peso,
+        )
+        db.session.add(vinculo)
+
+    db.session.commit()
+    flash('Tarefa vinculada ao item.', 'success')
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/desvincular/<int:vinculo_id>', methods=['POST'])
+@login_required
+def desvincular_tarefa(obra_id, item_id, vinculo_id):
+    admin_id = _admin_id()
+    ItemMedicaoComercial.query.filter_by(
+        id=item_id, obra_id=obra_id, admin_id=admin_id
+    ).first_or_404()
+
+    vinculo = ItemMedicaoCronogramaTarefa.query.get(vinculo_id)
+    if vinculo and vinculo.item_medicao_id == item_id:
+        db.session.delete(vinculo)
+        db.session.commit()
+        flash('Tarefa desvinculada.', 'success')
+
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/config', methods=['POST'])
+@login_required
+def config_obra_medicao(obra_id):
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+
+    data_inicio = request.form.get('data_inicio_medicao')
+    valor_entrada = request.form.get('valor_entrada', '0').replace(',', '.')
+    data_entrada = request.form.get('data_entrada')
+
+    if data_inicio:
+        obra.data_inicio_medicao = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+    try:
+        obra.valor_entrada = Decimal(valor_entrada)
+    except Exception:
+        pass
+    if data_entrada:
+        obra.data_entrada = datetime.strptime(data_entrada, '%Y-%m-%d').date()
+
+    db.session.commit()
+    flash('Configurações de medição atualizadas.', 'success')
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/gerar', methods=['POST'])
+@login_required
+def gerar_medicao(obra_id):
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+
+    periodo_inicio = request.form.get('periodo_inicio')
+    periodo_fim = request.form.get('periodo_fim')
+    obs = request.form.get('observacoes', '').strip()
+
+    p_ini = None
+    p_fim = None
+    if periodo_inicio and periodo_fim:
+        try:
+            p_ini = datetime.strptime(periodo_inicio, '%Y-%m-%d').date()
+            p_fim = datetime.strptime(periodo_fim, '%Y-%m-%d').date()
+        except Exception:
+            pass
+
+    from services.medicao_service import gerar_medicao_quinzenal
+    medicao, erro = gerar_medicao_quinzenal(obra_id, admin_id, p_ini, p_fim, obs or None)
+
+    if erro:
+        flash(f'Erro ao gerar medição: {erro}', 'danger')
+    else:
+        flash(f'Medição #{medicao.numero:03d} gerada com sucesso!', 'success')
+
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/fechar/<int:medicao_id>', methods=['POST'])
+@login_required
+def fechar(obra_id, medicao_id):
+    admin_id = _admin_id()
+    from services.medicao_service import fechar_medicao
+    medicao, erro = fechar_medicao(medicao_id, admin_id)
+
+    if erro:
+        flash(f'Erro: {erro}', 'danger')
+    else:
+        flash(f'Medição #{medicao.numero:03d} aprovada e conta a receber gerada.', 'success')
+
+    return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+
+
+@medicao_bp.route('/obra/<int:obra_id>/pdf/<int:medicao_id>')
+@login_required
+def pdf_extrato(obra_id, medicao_id):
+    admin_id = _admin_id()
+    from services.medicao_service import gerar_pdf_extrato_medicao
+    buf = gerar_pdf_extrato_medicao(medicao_id, admin_id)
+    if not buf:
+        abort(404)
+
+    response = make_response(buf.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=medicao_{medicao_id:03d}.pdf'
+    return response
+
+
+@medicao_bp.route('/portal/pdf/<int:medicao_id>')
+def portal_pdf_extrato(medicao_id):
+    token = request.args.get('token', '')
+    if not token:
+        abort(403)
+
+    from models import Obra as ObraModel
+    obra = ObraModel.query.filter_by(portal_token=token, portal_ativo=True).first()
+    if not obra:
+        abort(403)
+
+    medicao = MedicaoObra.query.filter_by(id=medicao_id, obra_id=obra.id).first()
+    if not medicao:
+        abort(404)
+
+    from services.medicao_service import gerar_pdf_extrato_medicao
+    buf = gerar_pdf_extrato_medicao(medicao_id, medicao.admin_id)
+    if not buf:
+        abort(404)
+
+    response = make_response(buf.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=medicao_{medicao_id:03d}.pdf'
+    return response

@@ -1,0 +1,402 @@
+{% extends "base_completo.html" %}
+{% block title %}Medição Quinzenal — {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<style>
+  .med-header { background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); color: #fff; border-radius: 12px; padding: 24px 28px; margin-bottom: 24px; }
+  .med-header h4 { font-weight: 700; margin: 0; }
+  .med-header .sub { opacity: .85; font-size: .85rem; }
+  .med-card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); margin-bottom: 20px; }
+  .med-card .card-header { background: #f8f9fa; border-bottom: 1px solid #eee; font-weight: 600; border-radius: 12px 12px 0 0 !important; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi-box { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 6px rgba(0,0,0,.05); text-align: center; }
+  .kpi-box .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1976d2; }
+  .kpi-box .kpi-lbl { font-size: .75rem; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+  .item-card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; margin-bottom: 12px; background: #fff; transition: box-shadow .2s; }
+  .item-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  .item-card .item-name { font-weight: 600; font-size: 1rem; color: #333; }
+  .item-card .item-valor { font-size: .95rem; color: #1976d2; font-weight: 600; }
+  .badge-vinc { font-size: .7rem; padding: 3px 8px; }
+  .med-table th { font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; color: #666; }
+  .med-table td { vertical-align: middle; }
+  .status-pendente { color: #f57c00; }
+  .status-aprovado { color: #388e3c; }
+  .status-faturado { color: #1976d2; }
+  .progress-thin { height: 6px; border-radius: 3px; }
+</style>
+
+<div class="container-fluid px-3 py-2">
+
+  <div class="med-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h4><i class="fas fa-ruler-combined me-2"></i>Medição Quinzenal</h4>
+        <div class="sub">{{ obra.nome }} — Gestão de Itens e Medições</div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" class="btn btn-light btn-sm">
+          <i class="fas fa-arrow-left me-1"></i> Voltar à Obra
+        </a>
+      </div>
+    </div>
+    <nav class="mt-2">
+      <ol class="breadcrumb mb-0 small" style="--bs-breadcrumb-divider-color: rgba(255,255,255,.5);">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}" class="text-white-50">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('main.obras') }}" class="text-white-50">Obras</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" class="text-white-50">{{ obra.nome }}</a></li>
+        <li class="breadcrumb-item active text-white">Medição</li>
+      </ol>
+    </nav>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-val">R$ {{ "%.2f"|format(valor_contrato) }}</div>
+      <div class="kpi-lbl">Valor Contrato</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val">R$ {{ "%.2f"|format(soma_itens) }}</div>
+      <div class="kpi-lbl">Itens Cadastrados</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val {% if saldo < 0 %}text-danger{% endif %}">R$ {{ "%.2f"|format(saldo) }}</div>
+      <div class="kpi-lbl">Saldo Disponível</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val">R$ {{ "%.2f"|format(obra.valor_entrada|float if obra.valor_entrada else 0) }}</div>
+      <div class="kpi-lbl">Entrada</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val">{{ itens|length }}</div>
+      <div class="kpi-lbl">Itens Comerciais</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-val">{{ medicoes|length }}</div>
+      <div class="kpi-lbl">Medições Geradas</div>
+    </div>
+  </div>
+
+  <div class="row">
+
+    <div class="col-lg-8">
+      <div class="card med-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-list-check me-2"></i>Itens Comerciais</span>
+          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoItem">
+            <i class="fas fa-plus me-1"></i> Novo Item
+          </button>
+        </div>
+        <div class="card-body">
+          {% if not itens %}
+          <div class="text-center py-4 text-muted">
+            <i class="fas fa-clipboard-list fa-3x mb-3 opacity-25"></i>
+            <p>Nenhum item cadastrado. Crie itens para iniciar as medições.</p>
+          </div>
+          {% else %}
+          {% for item in itens %}
+          <div class="item-card">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <div class="item-name">{{ item.nome }}</div>
+                <div class="item-valor">R$ {{ "%.2f"|format(item.valor_comercial|float) }}</div>
+              </div>
+              <div class="d-flex gap-1">
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalVincular{{ item.id }}" title="Vincular tarefa">
+                  <i class="fas fa-link"></i>
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditItem{{ item.id }}" title="Editar">
+                  <i class="fas fa-pen"></i>
+                </button>
+                <form method="post" action="{{ url_for('medicao.excluir_item', obra_id=obra.id, item_id=item.id) }}" onsubmit="return confirm('Excluir este item?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir"><i class="fas fa-trash"></i></button>
+                </form>
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="progress progress-thin flex-grow-1">
+                <div class="progress-bar bg-success" style="width:{{ item.percentual_executado_acumulado|float }}%"></div>
+              </div>
+              <span class="small fw-semibold">{{ "%.1f"|format(item.percentual_executado_acumulado|float) }}%</span>
+            </div>
+
+            {% if item.tarefas_vinculadas %}
+            <div class="mb-1">
+              <small class="text-muted fw-semibold">Tarefas vinculadas:</small>
+            </div>
+            {% for v in item.tarefas_vinculadas %}
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge bg-info badge-vinc">
+                <i class="fas fa-project-diagram me-1"></i>{{ v.tarefa.nome_tarefa if v.tarefa else 'N/A' }}
+                — Peso: {{ "%.0f"|format(v.peso|float) }}%
+                {% if v.tarefa %} | Progresso: {{ "%.0f"|format(v.tarefa.percentual_concluido|float) }}%{% endif %}
+              </span>
+              <form method="post" action="{{ url_for('medicao.desvincular_tarefa', obra_id=obra.id, item_id=item.id, vinculo_id=v.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Desvincular"><i class="fas fa-times"></i></button>
+              </form>
+            </div>
+            {% endfor %}
+            {% else %}
+            <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Nenhuma tarefa vinculada</small>
+            {% endif %}
+          </div>
+
+          <div class="modal fade" id="modalVincular{{ item.id }}" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <form method="post" action="{{ url_for('medicao.vincular_tarefa', obra_id=obra.id, item_id=item.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-link me-2"></i>Vincular Tarefa — {{ item.nome }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Tarefa do Cronograma</label>
+                      <select name="tarefa_id" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        {% for t in tarefas %}
+                        <option value="{{ t.id }}">{{ t.nome_tarefa }} ({{ "%.0f"|format(t.percentual_concluido|float) }}%)</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Peso (%)</label>
+                      <input type="number" name="peso" class="form-control" min="1" max="100" value="100" step="1" required>
+                      <small class="text-muted">Quanto esta tarefa contribui para o percentual do item</small>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-link me-1"></i> Vincular</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal fade" id="modalEditItem{{ item.id }}" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <form method="post" action="{{ url_for('medicao.editar_item', obra_id=obra.id, item_id=item.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-pen me-2"></i>Editar Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Nome</label>
+                      <input type="text" name="nome" class="form-control" value="{{ item.nome }}" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Valor Comercial (R$)</label>
+                      <input type="text" name="valor_comercial" class="form-control" value="{{ '%.2f'|format(item.valor_comercial|float) }}" required>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Salvar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card med-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-file-invoice-dollar me-2"></i>Medições Geradas</span>
+          {% if itens %}
+          <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalGerarMedicao">
+            <i class="fas fa-calculator me-1"></i> Gerar Medição
+          </button>
+          {% endif %}
+        </div>
+        <div class="card-body p-0">
+          {% if not medicoes %}
+          <div class="text-center py-4 text-muted">
+            <i class="fas fa-file-invoice fa-2x mb-2 opacity-25"></i>
+            <p class="mb-0">Nenhuma medição gerada ainda.</p>
+          </div>
+          {% else %}
+          <div class="table-responsive">
+            <table class="table med-table mb-0">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Período</th>
+                  <th>Medido</th>
+                  <th>Entrada</th>
+                  <th>A Faturar</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in medicoes %}
+                <tr>
+                  <td class="fw-semibold">{{ "%03d"|format(m.numero) }}</td>
+                  <td>
+                    {% if m.periodo_inicio and m.periodo_fim %}
+                    {{ m.periodo_inicio.strftime('%d/%m') }} — {{ m.periodo_fim.strftime('%d/%m/%Y') }}
+                    {% elif m.data_inicio and m.data_fim %}
+                    {{ m.data_inicio.strftime('%d/%m') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="fw-semibold">R$ {{ "%.2f"|format(m.valor_total_medido_periodo|float if m.valor_total_medido_periodo else m.valor_medido|float) }}</td>
+                  <td>R$ {{ "%.2f"|format(m.valor_entrada_abatido_periodo|float if m.valor_entrada_abatido_periodo else 0) }}</td>
+                  <td class="fw-bold text-primary">R$ {{ "%.2f"|format(m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0) }}</td>
+                  <td>
+                    <span class="badge {% if m.status == 'APROVADO' %}bg-success{% elif m.status == 'FATURADO' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
+                      {{ m.status }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a href="{{ url_for('medicao.pdf_extrato', obra_id=obra.id, medicao_id=m.id) }}" class="btn btn-outline-primary btn-sm" title="PDF" target="_blank">
+                        <i class="fas fa-file-pdf"></i>
+                      </a>
+                      {% if m.status == 'PENDENTE' %}
+                      <form method="post" action="{{ url_for('medicao.fechar', obra_id=obra.id, medicao_id=m.id) }}" onsubmit="return confirm('Aprovar esta medição e gerar conta a receber?')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-success btn-sm" title="Aprovar"><i class="fas fa-check"></i></button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+
+      <div class="card med-card">
+        <div class="card-header"><i class="fas fa-cog me-2"></i>Configuração de Medição</div>
+        <div class="card-body">
+          <form method="post" action="{{ url_for('medicao.config_obra_medicao', obra_id=obra.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+              <label class="form-label fw-semibold small">Data Início das Medições</label>
+              <input type="date" name="data_inicio_medicao" class="form-control"
+                     value="{{ obra.data_inicio_medicao.strftime('%Y-%m-%d') if obra.data_inicio_medicao else '' }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold small">Valor de Entrada (R$)</label>
+              <input type="text" name="valor_entrada" class="form-control"
+                     value="{{ '%.2f'|format(obra.valor_entrada|float) if obra.valor_entrada else '0.00' }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold small">Data da Entrada</label>
+              <input type="date" name="data_entrada" class="form-control"
+                     value="{{ obra.data_entrada.strftime('%Y-%m-%d') if obra.data_entrada else '' }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="fas fa-save me-1"></i> Salvar Configuração
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card med-card">
+        <div class="card-header"><i class="fas fa-info-circle me-2"></i>Como Funciona</div>
+        <div class="card-body">
+          <ol class="small mb-0" style="padding-left: 1.2rem;">
+            <li class="mb-2"><strong>Crie itens comerciais</strong> representando as etapas/serviços do contrato</li>
+            <li class="mb-2"><strong>Vincule tarefas</strong> do cronograma a cada item com pesos</li>
+            <li class="mb-2"><strong>Gere a medição</strong> — o sistema calcula automaticamente o percentual ponderado de cada item</li>
+            <li class="mb-2"><strong>Aprove a medição</strong> para gerar a conta a receber</li>
+            <li class="mb-0"><strong>Exporte o PDF</strong> com o extrato detalhado</li>
+          </ol>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="modal fade" id="modalNovoItem" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('medicao.criar_item', obra_id=obra.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header" style="background:linear-gradient(135deg,#1976d2,#42a5f5);color:#fff">
+          <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Novo Item Comercial</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nome do Item</label>
+            <input type="text" name="nome" class="form-control" placeholder="Ex: Fundação, Alvenaria..." required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Valor Comercial (R$)</label>
+            <input type="text" name="valor_comercial" class="form-control" placeholder="Ex: 50000.00" required>
+          </div>
+          {% if saldo > 0 %}
+          <div class="alert alert-info py-2 small mb-0">
+            <i class="fas fa-info-circle me-1"></i> Saldo disponível: <strong>R$ {{ "%.2f"|format(saldo) }}</strong>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Criar Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalGerarMedicao" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('medicao.gerar_medicao', obra_id=obra.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header" style="background:linear-gradient(135deg,#388e3c,#66bb6a);color:#fff">
+          <h5 class="modal-title"><i class="fas fa-calculator me-2"></i>Gerar Medição</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info py-2 small">
+            <i class="fas fa-info-circle me-1"></i>
+            O sistema calculará automaticamente o percentual executado de cada item
+            com base no progresso das tarefas vinculadas do cronograma.
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold small">Início do Período</label>
+              <input type="date" name="periodo_inicio" class="form-control">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold small">Fim do Período</label>
+              <input type="date" name="periodo_fim" class="form-control">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label fw-semibold small">Observações</label>
+            <textarea name="observacoes" class="form-control" rows="2" placeholder="Opcional..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success"><i class="fas fa-calculator me-1"></i> Gerar Medição</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

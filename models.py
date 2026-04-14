@@ -264,6 +264,11 @@ class Obra(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para isolamento multi-tenant
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Medição Quinzenal
+    data_inicio_medicao = db.Column(db.Date, nullable=True)
+    valor_entrada = db.Column(db.Numeric(15, 2), default=0)
+    data_entrada = db.Column(db.Date, nullable=True)
+
     # Campos de Geofencing (Cerca Virtual)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
@@ -4514,23 +4519,85 @@ class CronogramaTemplateItem(db.Model):
         return f'<CronogramaTemplateItem {self.nome_tarefa}>'
 
 
+class ItemMedicaoComercial(db.Model):
+    __tablename__ = 'item_medicao_comercial'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    nome = db.Column(db.String(200), nullable=False)
+    valor_comercial = db.Column(db.Numeric(15, 2), nullable=False)
+    percentual_executado_acumulado = db.Column(db.Numeric(5, 2), default=0)
+    valor_executado_acumulado = db.Column(db.Numeric(15, 2), default=0)
+    status = db.Column(db.String(20), default='PENDENTE')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref='itens_medicao_comercial')
+    tarefas_vinculadas = db.relationship('ItemMedicaoCronogramaTarefa', backref='item_medicao', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<ItemMedicaoComercial {self.nome} obra_id={self.obra_id}>'
+
+
+class ItemMedicaoCronogramaTarefa(db.Model):
+    __tablename__ = 'item_medicao_cronograma_tarefa'
+
+    id = db.Column(db.Integer, primary_key=True)
+    item_medicao_id = db.Column(db.Integer, db.ForeignKey('item_medicao_comercial.id', ondelete='CASCADE'), nullable=False)
+    cronograma_tarefa_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'), nullable=False)
+    peso = db.Column(db.Numeric(5, 2), nullable=False)
+
+    tarefa = db.relationship('TarefaCronograma')
+
+    __table_args__ = (
+        db.UniqueConstraint('item_medicao_id', 'cronograma_tarefa_id', name='uq_item_tarefa'),
+    )
+
+
 class MedicaoObra(db.Model):
     __tablename__ = 'medicao_obra'
 
     id = db.Column(db.Integer, primary_key=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     numero = db.Column(db.Integer, nullable=False)
-    data_medicao = db.Column(db.Date, nullable=False)
-    data_inicio = db.Column(db.Date, nullable=False)
-    data_fim = db.Column(db.Date, nullable=False)
+    data_medicao = db.Column(db.DateTime, default=datetime.utcnow)
+    periodo_inicio = db.Column(db.Date, nullable=False)
+    periodo_fim = db.Column(db.Date, nullable=False)
+    data_inicio = db.Column(db.Date)
+    data_fim = db.Column(db.Date)
     percentual_executado = db.Column(db.Float, default=0.0)
     valor_medido = db.Column(db.Numeric(14, 2), default=0)
+    valor_total_medido_periodo = db.Column(db.Numeric(15, 2), default=0)
+    valor_entrada_abatido_periodo = db.Column(db.Numeric(15, 2), default=0)
+    valor_a_faturar_periodo = db.Column(db.Numeric(15, 2), default=0)
     observacoes = db.Column(db.Text)
     status = db.Column(db.String(20), default='PENDENTE')
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    conta_receber_id = db.Column(db.Integer, db.ForeignKey('conta_receber.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra', backref='medicoes')
+    itens = db.relationship('MedicaoObraItem', backref='medicao', cascade='all, delete-orphan')
+    conta_receber = db.relationship('ContaReceber')
 
     def __repr__(self):
         return f'<MedicaoObra #{self.numero} obra_id={self.obra_id}>'
+
+
+class MedicaoObraItem(db.Model):
+    __tablename__ = 'medicao_obra_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    medicao_obra_id = db.Column(db.Integer, db.ForeignKey('medicao_obra.id', ondelete='CASCADE'), nullable=False)
+    item_medicao_comercial_id = db.Column(db.Integer, db.ForeignKey('item_medicao_comercial.id'), nullable=False)
+    percentual_anterior = db.Column(db.Numeric(5, 2), default=0)
+    percentual_atual = db.Column(db.Numeric(5, 2), default=0)
+    percentual_executado_periodo = db.Column(db.Numeric(5, 2), default=0)
+    valor_medido_periodo = db.Column(db.Numeric(15, 2), default=0)
+    percentual_executado_acumulado = db.Column(db.Numeric(5, 2), default=0)
+    valor_executado_acumulado = db.Column(db.Numeric(15, 2), default=0)
+
+    item_comercial = db.relationship('ItemMedicaoComercial')
+
+    def __repr__(self):
+        return f'<MedicaoObraItem medicao={self.medicao_obra_id} item={self.item_medicao_comercial_id}>'

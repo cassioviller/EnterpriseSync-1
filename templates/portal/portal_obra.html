@@ -386,19 +386,36 @@
         <div class="medicao-card">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
-                    <strong>Medição #{{ m.numero }}</strong>
+                    <strong>Medição #{{ "%03d"|format(m.numero) }}</strong>
+                    {% if m.periodo_inicio and m.periodo_fim %}
+                    <span class="text-muted small ms-2">{{ m.periodo_inicio.strftime('%d/%m/%Y') }} — {{ m.periodo_fim.strftime('%d/%m/%Y') }}</span>
+                    {% elif m.data_inicio and m.data_fim %}
                     <span class="text-muted small ms-2">{{ m.data_inicio.strftime('%d/%m/%Y') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}</span>
+                    {% endif %}
                 </div>
                 <div class="d-flex align-items-center gap-3">
                     <span class="fw-bold">{{ m.percentual_executado|round(1) }}%</span>
-                    {% if m.valor_medido and m.valor_medido > 0 %}
-                    <span class="fw-bold text-success">R$ {{ '%.2f'|format(m.valor_medido|float) }}</span>
+                    {% set val_display = m.valor_a_faturar_periodo if m.valor_a_faturar_periodo and m.valor_a_faturar_periodo|float > 0 else m.valor_medido %}
+                    {% if val_display and val_display|float > 0 %}
+                    <span class="fw-bold text-success">R$ {{ '%.2f'|format(val_display|float) }}</span>
                     {% endif %}
                     <span class="status-badge {% if m.status == 'APROVADO' %}status-aprovado{% elif m.status == 'FATURADO' %}status-faturado{% else %}status-pendente{% endif %}">
                         {{ m.status }}
                     </span>
+                    <a href="{{ url_for('medicao.portal_pdf_extrato', medicao_id=m.id, token=obra.portal_token) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Extrato PDF">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
                 </div>
             </div>
+            {% if m.valor_total_medido_periodo and m.valor_total_medido_periodo|float > 0 %}
+            <div class="small mt-1">
+                <span class="text-muted">Medido:</span> <strong>R$ {{ '%.2f'|format(m.valor_total_medido_periodo|float) }}</strong>
+                {% if m.valor_entrada_abatido_periodo and m.valor_entrada_abatido_periodo|float > 0 %}
+                <span class="text-muted ms-2">Entrada:</span> <strong class="text-danger">−R$ {{ '%.2f'|format(m.valor_entrada_abatido_periodo|float) }}</strong>
+                {% endif %}
+                <span class="text-muted ms-2">A Faturar:</span> <strong class="text-success">R$ {{ '%.2f'|format(m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0) }}</strong>
+            </div>
+            {% endif %}
             {% if m.observacoes %}
             <div class="small text-muted mt-1">{{ m.observacoes }}</div>
             {% endif %}
