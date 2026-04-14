@@ -55,7 +55,7 @@
             <dt class="col-sm-5">Aprovação Cliente</dt>
             <dd class="col-sm-7">
               {% set sa = pedido.status_aprovacao_cliente %}
-              <span class="badge {% if sa == 'APROVADO' %}bg-success{% elif sa == 'REJEITADO' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+              <span class="badge {% if sa == 'APROVADO' %}bg-success{% elif sa == 'RECUSADO' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
                 {{ sa }}
               </span>
             </dd>

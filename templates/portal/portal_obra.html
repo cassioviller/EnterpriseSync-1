@@ -120,7 +120,8 @@
         }
         .status-pendente { background: #fef3c7; color: #92400e; }
         .status-aprovado { background: #d1fae5; color: #065f46; }
-        .status-rejeitado { background: #fee2e2; color: #991b1b; }
+        .status-recusado { background: #fee2e2; color: #991b1b; }
+        .status-faturado { background: #dbeafe; color: #1e40af; }
         .tarefa-row {
             display: flex;
             align-items: center;
@@ -139,6 +140,15 @@
             border-bottom: 1px solid #f1f5f9;
         }
         .medicao-card:last-child { border-bottom: none; }
+        .rdo-row {
+            padding: .6rem 1.25rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: .9rem;
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+        }
+        .rdo-row:last-child { border-bottom: none; }
         .footer-portal {
             text-align: center;
             padding: 2rem 1rem;
@@ -208,8 +218,8 @@
                 </div>
                 <div class="col-6 col-lg-3">
                     <div class="card-portal kpi-card">
-                        <div class="kpi-val">{{ compras|length }}</div>
-                        <div class="kpi-lbl">Compras</div>
+                        <div class="kpi-val">{{ compras_pendentes|length }}</div>
+                        <div class="kpi-lbl">Compras Pendentes</div>
                     </div>
                 </div>
                 <div class="col-6 col-lg-3">
@@ -260,11 +270,41 @@
     </div>
     {% endif %}
 
-    {% if compras %}
-    <div class="section-title"><i class="fas fa-shopping-cart"></i> Compras de Materiais</div>
+    {% if compras_pendentes %}
+    <div class="section-title"><i class="fas fa-clipboard-check"></i> Compras para Aprovação</div>
     <div class="card-portal mb-4">
-        {% for c in compras %}
-        {% set status = c.status_aprovacao_cliente or 'PENDENTE' %}
+        {% for c in compras_pendentes %}
+        <div class="compra-row">
+            <div class="compra-info">
+                <div class="fornecedor">{{ c.fornecedor.nome }}</div>
+                <div class="meta">
+                    {{ c.data_compra.strftime('%d/%m/%Y') }}
+                    {% if c.numero %} &mdash; NF {{ c.numero }}{% endif %}
+                </div>
+                {% if c.fornecedor.chave_pix %}
+                <div class="meta mt-1"><i class="fas fa-key me-1"></i>PIX: {{ c.fornecedor.chave_pix }}</div>
+                {% endif %}
+            </div>
+            <div class="compra-valor">R$ {{ '%.2f'|format(c.valor_total|float) }}</div>
+            <span class="status-badge status-pendente"><i class="fas fa-clock"></i> Pendente</span>
+            <div class="compra-actions">
+                <form method="POST" action="{{ url_for('portal_obras.aprovar_compra', token=obra.token_cliente, compra_id=c.id) }}" class="d-inline">
+                    <button class="btn btn-sm btn-success"><i class="fas fa-check me-1"></i>Aprovar</button>
+                </form>
+                <form method="POST" action="{{ url_for('portal_obras.recusar_compra', token=obra.token_cliente, compra_id=c.id) }}" class="d-inline">
+                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times me-1"></i>Recusar</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if compras_resolvidas %}
+    <div class="section-title"><i class="fas fa-shopping-cart"></i> Compras Resolvidas</div>
+    <div class="card-portal mb-4">
+        {% for c in compras_resolvidas %}
+        {% set status = c.status_aprovacao_cliente %}
         <div class="compra-row">
             <div class="compra-info">
                 <div class="fornecedor">{{ c.fornecedor.nome }}</div>
@@ -280,21 +320,11 @@
             <div>
                 {% if status == 'APROVADO' %}
                 <span class="status-badge status-aprovado"><i class="fas fa-check-circle"></i> Aprovado</span>
-                {% elif status == 'REJEITADO' %}
-                <span class="status-badge status-rejeitado"><i class="fas fa-times-circle"></i> Rejeitado</span>
-                {% else %}
-                <span class="status-badge status-pendente"><i class="fas fa-clock"></i> Pendente</span>
+                {% elif status == 'RECUSADO' %}
+                <span class="status-badge status-recusado"><i class="fas fa-times-circle"></i> Recusado</span>
                 {% endif %}
             </div>
             <div class="compra-actions">
-                {% if status == 'PENDENTE' %}
-                <form method="POST" action="{{ url_for('portal_obras.aprovar_compra', token=obra.token_cliente, compra_id=c.id) }}" class="d-inline">
-                    <button class="btn btn-sm btn-success"><i class="fas fa-check me-1"></i>Aprovar</button>
-                </form>
-                <form method="POST" action="{{ url_for('portal_obras.rejeitar_compra', token=obra.token_cliente, compra_id=c.id) }}" class="d-inline">
-                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times me-1"></i>Rejeitar</button>
-                </form>
-                {% endif %}
                 {% if status == 'APROVADO' and not c.comprovante_pagamento_url %}
                 <form method="POST" action="{{ url_for('portal_obras.upload_comprovante', token=obra.token_cliente, compra_id=c.id) }}"
                       enctype="multipart/form-data" class="d-inline-flex align-items-center gap-1">
@@ -312,6 +342,19 @@
     </div>
     {% endif %}
 
+    {% if rdos %}
+    <div class="section-title"><i class="fas fa-clipboard-list"></i> Relatórios Diários (RDOs Finalizados)</div>
+    <div class="card-portal mb-4">
+        {% for r in rdos %}
+        <div class="rdo-row">
+            <span class="badge bg-success" style="min-width:80px">Finalizado</span>
+            <span class="fw-semibold">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</span>
+            <span class="text-muted small">{{ r.comentario_geral or '' }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if medicoes %}
     <div class="section-title"><i class="fas fa-ruler-combined"></i> Medições</div>
     <div class="card-portal mb-4">
@@ -323,11 +366,11 @@
                     <span class="text-muted small ms-2">{{ m.data_inicio.strftime('%d/%m/%Y') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}</span>
                 </div>
                 <div class="d-flex align-items-center gap-3">
-                    <span class="fw-bold">{{ m.percentual_acumulado|round(1) }}%</span>
+                    <span class="fw-bold">{{ m.percentual_executado|round(1) }}%</span>
                     {% if m.valor_medido and m.valor_medido > 0 %}
                     <span class="fw-bold text-success">R$ {{ '%.2f'|format(m.valor_medido|float) }}</span>
                     {% endif %}
-                    <span class="status-badge {% if m.status == 'APROVADO' %}status-aprovado{% elif m.status == 'RASCUNHO' %}status-pendente{% else %}status-pendente{% endif %}">
+                    <span class="status-badge {% if m.status == 'APROVADO' %}status-aprovado{% elif m.status == 'FATURADO' %}status-faturado{% else %}status-pendente{% endif %}">
                         {{ m.status }}
                     </span>
                 </div>

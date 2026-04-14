@@ -1457,7 +1457,7 @@ class Fornecedor(db.Model):
     tipo_fornecedor = db.Column(db.String(20), nullable=True, default='OUTRO')
 
     # Dados bancários / PIX
-    chave_pix = db.Column(db.String(100))
+    chave_pix = db.Column(db.String(255))
 
     # Status
     ativo = db.Column(db.Boolean, default=True)
@@ -4520,12 +4520,13 @@ class MedicaoObra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
     numero = db.Column(db.Integer, nullable=False)
+    data_medicao = db.Column(db.Date, nullable=False)
     data_inicio = db.Column(db.Date, nullable=False)
     data_fim = db.Column(db.Date, nullable=False)
-    percentual_acumulado = db.Column(db.Float, default=0.0)
+    percentual_executado = db.Column(db.Float, default=0.0)
     valor_medido = db.Column(db.Numeric(14, 2), default=0)
     observacoes = db.Column(db.Text)
-    status = db.Column(db.String(20), default='RASCUNHO')
+    status = db.Column(db.String(20), default='PENDENTE')
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

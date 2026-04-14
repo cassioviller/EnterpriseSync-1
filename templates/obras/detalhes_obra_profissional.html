@@ -688,12 +688,19 @@
                 <div class="obra-card-body" style="padding: 2rem;">
                     <div class="info-item">
                         <div class="info-label"><i class="fas fa-toggle-on"></i> Status</div>
-                        <div class="info-value">
+                        <div class="info-value d-flex align-items-center gap-2">
                             {% if obra.portal_ativo %}
                             <span class="badge bg-success">Ativo</span>
                             {% else %}
                             <span class="badge bg-secondary">Inativo</span>
                             {% endif %}
+                            <form method="POST" action="{{ url_for('portal_obras.toggle_portal', obra_id=obra.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm {% if obra.portal_ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                        onclick="return confirm('{% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %} o portal do cliente?')">
+                                    <i class="fas fa-{% if obra.portal_ativo %}toggle-off{% else %}toggle-on{% endif %} me-1"></i>
+                                    {% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %}
+                                </button>
+                            </form>
                         </div>
                     </div>
                     {% if obra.token_cliente %}

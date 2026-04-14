@@ -8504,7 +8504,7 @@ def migration_107_portal_cliente_obra():
         cursor = connection.cursor()
 
         cols = [
-            ("fornecedor", "chave_pix", "VARCHAR(100)"),
+            ("fornecedor", "chave_pix", "VARCHAR(255)"),
             ("pedido_compra", "status_aprovacao_cliente", "VARCHAR(20) DEFAULT 'PENDENTE'"),
             ("pedido_compra", "comprovante_pagamento_url", "VARCHAR(500)"),
         ]
@@ -8529,12 +8529,13 @@ def migration_107_portal_cliente_obra():
                     id SERIAL PRIMARY KEY,
                     obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
                     numero INTEGER NOT NULL,
+                    data_medicao DATE NOT NULL,
                     data_inicio DATE NOT NULL,
                     data_fim DATE NOT NULL,
-                    percentual_acumulado FLOAT DEFAULT 0.0,
+                    percentual_executado FLOAT DEFAULT 0.0,
                     valor_medido NUMERIC(14,2) DEFAULT 0,
                     observacoes TEXT,
-                    status VARCHAR(20) DEFAULT 'RASCUNHO',
+                    status VARCHAR(20) DEFAULT 'PENDENTE',
                     admin_id INTEGER NOT NULL REFERENCES usuario(id),
                     created_at TIMESTAMP DEFAULT NOW()
                 )
@@ -8544,6 +8545,18 @@ def migration_107_portal_cliente_obra():
             logger.info("MIGRACAO 107: tabela medicao_obra criada")
         else:
             logger.info("MIGRACAO 107: tabela medicao_obra ja existe")
+            med_cols = [
+                ("medicao_obra", "data_medicao", "DATE"),
+                ("medicao_obra", "percentual_executado", "FLOAT DEFAULT 0.0"),
+            ]
+            for tbl, col, dt in med_cols:
+                cursor.execute("""
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_name = %s AND column_name = %s
+                """, (tbl, col))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute(f'ALTER TABLE "{tbl}" ADD COLUMN "{col}" {dt}')
+                    logger.info(f"MIGRACAO 107: {tbl}.{col} adicionado")
 
         connection.commit()
         connection.close()
