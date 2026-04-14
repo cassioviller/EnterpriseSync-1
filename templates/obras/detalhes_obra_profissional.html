@@ -695,6 +695,7 @@
                             <span class="badge bg-secondary">Inativo</span>
                             {% endif %}
                             <form method="POST" action="{{ url_for('portal_obras.toggle_portal', obra_id=obra.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm {% if obra.portal_ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
                                         onclick="return confirm('{% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %} o portal do cliente?')">
                                     <i class="fas fa-{% if obra.portal_ativo %}toggle-off{% else %}toggle-on{% endif %} me-1"></i>
@@ -733,6 +734,7 @@
                     {% if obra.portal_ativo and obra.token_cliente %}
                     <div class="mt-3 pt-3" style="border-top:1px solid rgba(0,0,0,.08)">
                         <form method="POST" action="{{ url_for('portal_obras.gerar_medicao', obra_id=obra.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-outline-primary w-100"
                                     onclick="return confirm('Gerar nova medição para esta obra?')">
                                 <i class="fas fa-ruler-combined me-2"></i>Gerar Medição
