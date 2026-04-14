@@ -9,6 +9,7 @@ from app import db
 from models import (
     Obra, MedicaoObra, MedicaoObraItem, ItemMedicaoComercial,
     ItemMedicaoCronogramaTarefa, TarefaCronograma, ConfiguracaoEmpresa,
+    ContaReceber,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ def _calc_realtime_perc(item):
 
 
 @medicao_bp.route('/obra/<int:obra_id>')
+@medicao_bp.route('/obras/<int:obra_id>/medicao')
 @login_required
 def gestao_itens(obra_id):
     guard = _check_v2()
@@ -69,6 +71,13 @@ def gestao_itens(obra_id):
         vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item.id).all()
         item_peso_total[item.id] = float(sum(Decimal(str(v.peso)) for v in vinc))
 
+    medicao_contas = {}
+    for m in medicoes:
+        if m.conta_receber_id:
+            cr = ContaReceber.query.get(m.conta_receber_id)
+            if cr:
+                medicao_contas[m.id] = cr
+
     return render_template(
         'medicao/gestao_itens.html',
         obra=obra,
@@ -81,10 +90,12 @@ def gestao_itens(obra_id):
         saldo=saldo,
         item_realtime_perc=item_realtime_perc,
         item_peso_total=item_peso_total,
+        medicao_contas=medicao_contas,
     )
 
 
 @medicao_bp.route('/obra/<int:obra_id>/item', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens', methods=['POST'])
 @login_required
 def criar_item(obra_id):
     guard = _check_v2()
@@ -118,6 +129,7 @@ def criar_item(obra_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/editar', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>', methods=['POST'])
 @login_required
 def editar_item(obra_id, item_id):
     admin_id = _admin_id()
@@ -143,6 +155,7 @@ def editar_item(obra_id, item_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/excluir', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/excluir', methods=['POST'])
 @login_required
 def excluir_item(obra_id, item_id):
     admin_id = _admin_id()
@@ -157,6 +170,7 @@ def excluir_item(obra_id, item_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/vincular', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/tarefas', methods=['POST'])
 @login_required
 def vincular_tarefa(obra_id, item_id):
     admin_id = _admin_id()
@@ -214,6 +228,7 @@ def vincular_tarefa(obra_id, item_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/desvincular/<int:vinculo_id>', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/tarefas/<int:vinculo_id>/excluir', methods=['POST'])
 @login_required
 def desvincular_tarefa(obra_id, item_id, vinculo_id):
     admin_id = _admin_id()
@@ -231,6 +246,7 @@ def desvincular_tarefa(obra_id, item_id, vinculo_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/config', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/config', methods=['POST'])
 @login_required
 def config_obra_medicao(obra_id):
     admin_id = _admin_id()
@@ -255,6 +271,7 @@ def config_obra_medicao(obra_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/gerar', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/fechar', methods=['POST'], endpoint='fechar_quinzena')
 @login_required
 def gerar_medicao(obra_id):
     guard = _check_v2()
@@ -288,6 +305,7 @@ def gerar_medicao(obra_id):
 
 
 @medicao_bp.route('/obra/<int:obra_id>/fechar/<int:medicao_id>', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/<int:medicao_id>/aprovar', methods=['POST'])
 @login_required
 def fechar(obra_id, medicao_id):
     admin_id = _admin_id()
@@ -304,6 +322,7 @@ def fechar(obra_id, medicao_id):
 
 @medicao_bp.route('/obra/<int:obra_id>/pdf/<int:medicao_id>')
 @medicao_bp.route('/<int:medicao_id>/pdf')
+@medicao_bp.route('/obras/<int:obra_id>/medicao/<int:medicao_id>/pdf')
 @login_required
 def pdf_extrato(obra_id=None, medicao_id=None):
     admin_id = _admin_id()

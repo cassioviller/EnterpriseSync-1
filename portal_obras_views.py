@@ -105,6 +105,14 @@ def portal_obra(token: str):
         .all()
     )
 
+    from models import ContaReceber
+    medicao_contas = {}
+    for m in medicoes:
+        if m.conta_receber_id:
+            cr = ContaReceber.query.get(m.conta_receber_id)
+            if cr:
+                medicao_contas[m.id] = cr
+
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     nome_empresa = config.nome_empresa if config else 'Construtora'
 
@@ -117,6 +125,7 @@ def portal_obra(token: str):
         compras_resolvidas=compras_resolvidas,
         rdos=rdos,
         medicoes=medicoes,
+        medicao_contas=medicao_contas,
         nome_empresa=nome_empresa,
         hoje=date.today(),
     )

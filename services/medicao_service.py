@@ -83,6 +83,13 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
     if not itens_comerciais:
         return None, "Nenhum item de medição comercial cadastrado para esta obra"
 
+    for item in itens_comerciais:
+        vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item.id).all()
+        if vinc:
+            soma_pesos = sum(Decimal(str(v.peso)) for v in vinc)
+            if soma_pesos != Decimal('100'):
+                return None, f'Item "{item.nome}" possui soma de pesos = {float(soma_pesos):.0f}% (deve ser exatamente 100%)'
+
     if not periodo_inicio or not periodo_fim:
         periodo_inicio, periodo_fim = calcular_periodo_atual(obra)
 

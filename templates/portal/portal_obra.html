@@ -416,6 +416,19 @@
                 <span class="text-muted ms-2">A Faturar:</span> <strong class="text-success">R$ {{ '%.2f'|format(m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0) }}</strong>
             </div>
             {% endif %}
+            {% if medicao_contas and medicao_contas.get(m.id) %}
+            {% set cr = medicao_contas[m.id] %}
+            <div class="small mt-1">
+                <span class="text-muted">Conta a Receber:</span>
+                <span class="badge {% if cr.status == 'PAGO' or cr.status == 'RECEBIDO' %}bg-success{% elif cr.status == 'VENCIDO' %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size:.65rem">
+                    {{ cr.status }}
+                </span>
+                <span class="text-muted ms-1">{{ cr.numero_documento }}</span>
+                {% if cr.data_vencimento %}
+                <span class="text-muted ms-1">Venc: {{ cr.data_vencimento.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
             {% if m.observacoes %}
             <div class="small text-muted mt-1">{{ m.observacoes }}</div>
             {% endif %}
