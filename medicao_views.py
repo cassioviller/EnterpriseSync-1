@@ -325,7 +325,7 @@ def portal_pdf_extrato(medicao_id):
         abort(403)
 
     from models import Obra as ObraModel
-    obra = ObraModel.query.filter_by(portal_token=token, portal_ativo=True).first()
+    obra = ObraModel.query.filter_by(token_cliente=token, portal_ativo=True).first()
     if not obra:
         abort(403)
 

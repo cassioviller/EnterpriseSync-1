@@ -210,11 +210,12 @@ def gerar_medicao(obra_id: int):
     )
     proximo_numero = (ultima.numero + 1) if ultima else 1
 
-    data_inicio_med = date.today().replace(day=1)
     if date.today().day <= 15:
+        data_inicio_med = date.today().replace(day=1)
         data_fim_med = date.today().replace(day=15)
     else:
         import calendar
+        data_inicio_med = date.today().replace(day=16)
         ultimo_dia = calendar.monthrange(date.today().year, date.today().month)[1]
         data_fim_med = date.today().replace(day=ultimo_dia)
 
@@ -235,6 +236,8 @@ def gerar_medicao(obra_id: int):
         data_medicao=date.today(),
         data_inicio=data_inicio_med,
         data_fim=data_fim_med,
+        periodo_inicio=data_inicio_med,
+        periodo_fim=data_fim_med,
         percentual_executado=round(perc, 2),
         valor_medido=valor_medido,
         status='PENDENTE',
