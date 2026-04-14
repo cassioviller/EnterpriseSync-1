@@ -592,6 +592,7 @@
 
 /* Estado: Gantt oculto */
 .cronograma-split.gantt-hidden .cronograma-gantt {
+  flex: 0 0 0 !important;
   width: 0 !important;
   min-width: 0 !important;
   overflow: hidden;
@@ -599,10 +600,13 @@
   pointer-events: none;
 }
 .cronograma-split.gantt-hidden .cronograma-left {
-  flex: 1;
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  border-right: none;
 }
 .cronograma-split.gantt-hidden .gantt-divider {
-  border-left: 2px solid #dee2e6;
+  border-right: 2px solid #dee2e6;
 }
 
 /* ── Tabela ── */
