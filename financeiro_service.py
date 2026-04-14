@@ -559,15 +559,13 @@ class FinanceiroService:
                     })
             
             # Entradas e saídas diretas no FluxoCaixa (importação ou lançamento manual)
+            # Restringe a referencia_tabela IS NULL para alinhar com /editar (mesmo critério)
             fluxos_diretos = FluxoCaixa.query.filter(
                 and_(
                     FluxoCaixa.admin_id == admin_id,
                     FluxoCaixa.data_movimento >= data_inicio,
                     FluxoCaixa.data_movimento <= data_fim,
-                    sql_or(
-                        FluxoCaixa.referencia_tabela == None,
-                        FluxoCaixa.referencia_tabela.notin_(['gestao_custo_pai']),
-                    )
+                    FluxoCaixa.referencia_tabela == None,  # noqa: E711
                 )
             ).all()
             for fc in fluxos_diretos:
