@@ -22,6 +22,25 @@
 .cat-select   { min-width: 155px; font-size: .8rem; }
 /* Reembolso checkbox — centralizado */
 .reembolso-cb { margin: 0 auto; display: block; }
+/* Dblclick display text */
+.inline-display-text {
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+  display: inline-block;
+  min-width: 40px;
+  transition: background .12s;
+  color: #212529;
+}
+.inline-display-text:hover {
+  background: #e8f0ff;
+}
+.inline-display-text::after {
+  content: ' ✎';
+  font-size: .68rem;
+  color: #adb5bd;
+  vertical-align: middle;
+}
 </style>
 {% endblock %}
 
@@ -180,7 +199,7 @@
         Saídas auto-classificadas
         <span class="badge bg-primary ms-2">{{ saidas_auto|length }}</span>
       </h6>
-      <small class="text-muted ms-3">Edite data, valor, descrição, categoria e banco direto na linha</small>
+      <small class="text-muted ms-3">Duplo clique em um campo para editar data, valor, descrição, categoria ou banco</small>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
               onclick="marcarFuncionarios('auto')"
               title="Marca 'Apenas pgto.' para todos os funcionários">
@@ -343,7 +362,7 @@
         Revisão manual
         <span class="badge bg-warning text-dark ms-2">{{ saidas_manual|length }}</span>
       </h6>
-      <small class="text-muted ms-3">Classificação obrigatória — sem seleção serão salvos como <strong>Outros</strong></small>
+      <small class="text-muted ms-3">Duplo clique para editar — sem categoria serão salvos como <strong>Outros</strong></small>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto"
               onclick="marcarFuncionarios('manual')"
               title="Marca 'Apenas pgto.' para todos os funcionários">
@@ -645,6 +664,68 @@ document.addEventListener('DOMContentLoaded', function () {
   var tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
   tooltipEls.forEach(function(el) { new bootstrap.Tooltip(el); });
   feather.replace();
+
+  // ── Duplo clique para editar campos inline ──────────────────────────────
+  function getDisplayText(el) {
+    if (el.tagName === 'SELECT') {
+      var opt = el.options[el.selectedIndex];
+      return opt ? opt.text : '';
+    }
+    return el.value || '';
+  }
+
+  var editableEls = document.querySelectorAll(
+    'table .inline-input, table .cat-select, table .banco-select'
+  );
+
+  editableEls.forEach(function(el) {
+    var initText = getDisplayText(el);
+
+    // Create display span
+    var span = document.createElement('span');
+    span.className = 'inline-display-text';
+    span.textContent = initText || '—';
+    span.title = 'Duplo clique para editar';
+
+    // Insert span before element, hide element
+    el.parentNode.insertBefore(span, el);
+    el.style.display = 'none';
+    el.dataset.origValue = el.value;
+
+    // Double-click on span → show input / select
+    span.addEventListener('dblclick', function() {
+      el.dataset.origValue = el.value; // capture value at edit-start (for Esc)
+      span.style.display = 'none';
+      el.style.display = '';
+      el.focus();
+      if (el.tagName === 'INPUT' && typeof el.select === 'function') el.select();
+    });
+
+    // Blur on element → update span, hide element
+    el.addEventListener('blur', function() {
+      span.textContent = getDisplayText(el) || '—';
+      span.style.display = '';
+      el.style.display = 'none';
+      el.dataset.origValue = el.value; // keep in sync after confirmed edit
+    });
+
+    // Keyboard: Enter = confirm (blur), Escape = restore original and cancel
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        el.value = el.dataset.origValue; // restore value before edit began
+        el.blur(); // blur will update span with the restored value
+      }
+    });
+
+    // Change on select → immediately confirm (go back to text)
+    if (el.tagName === 'SELECT') {
+      el.addEventListener('change', function() {
+        el.blur();
+      });
+    }
+  });
 });
 </script>
 

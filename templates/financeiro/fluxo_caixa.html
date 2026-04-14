@@ -169,7 +169,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                     <h5 class="mb-0"><i class="fas fa-list me-2"></i>Movimentos do Período ({{ fluxo.detalhes|default([])|length }} registros)</h5>
                     <small class="text-muted">
                         <i class="fas fa-pencil-alt me-1 text-primary"></i>
-                        Clique em células com <i class="fas fa-pencil-alt" style="font-size:.65rem;color:#adb5bd;"></i> para editar data, valor ou descrição inline
+                        Duplo clique em células com <i class="fas fa-pencil-alt" style="font-size:.65rem;color:#adb5bd;"></i> para editar data, valor ou descrição inline
                     </small>
                 </div>
                 <div class="card-body p-0">
@@ -412,6 +412,7 @@ function cancelEdit(td) {
 }
 
 function saveEdit(td) {
+    if (!td.classList.contains('cell-editing')) return;
     var row     = td.closest('tr');
     var editUrl = row.dataset.editUrl;
     var field   = td.dataset.field;
@@ -484,13 +485,24 @@ function saveEdit(td) {
     });
 }
 
-// Bind click/key handlers to editable cells
+// Bind dblclick/key handlers to editable cells
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('td.cell-editable').forEach(function(td) {
-        // Click on cell (or its text span) → enter edit mode
-        td.addEventListener('click', function(e) {
+        // Add tooltip hint on the display text span
+        var textSpan = td.querySelector('.cell-text');
+        if (textSpan) textSpan.title = 'Duplo clique para editar';
+
+        // Double-click on cell (or its text span) → enter edit mode
+        td.addEventListener('dblclick', function(e) {
             if (e.target.closest('.cell-edit')) return; // ignore clicks inside form
             enterEdit(td);
+        });
+
+        // Focus leaves the cell entirely → save
+        td.addEventListener('focusout', function(e) {
+            if (!td.contains(e.relatedTarget)) {
+                saveEdit(td);
+            }
         });
     });
 
