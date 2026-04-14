@@ -21,6 +21,28 @@ logger = logging.getLogger(__name__)
 financeiro_bp = Blueprint('financeiro', __name__, url_prefix='/financeiro')
 
 
+def _parse_valor(raw: str) -> float:
+    """Converte string de valor em float suportando formatos BRL e internacionais.
+    
+    Suporta: '100.00', '100,00', '1.234,56', '1,234.56'
+    """
+    raw = raw.strip().replace(' ', '').replace('R$', '').replace('\xa0', '')
+    if not raw:
+        return 0.0
+    # Formato BRL: separador de milhar = '.', decimal = ',' (ex: 1.234,56)
+    if ',' in raw and '.' in raw:
+        if raw.rfind(',') > raw.rfind('.'):
+            # último separador é vírgula → BRL (1.234,56)
+            raw = raw.replace('.', '').replace(',', '.')
+        else:
+            # último separador é ponto → EN (1,234.56)
+            raw = raw.replace(',', '')
+    elif ',' in raw:
+        # somente vírgula → substituir por ponto
+        raw = raw.replace(',', '.')
+    return float(raw)
+
+
 # ==================== DASHBOARD ====================
 
 @financeiro_bp.route('/')
@@ -532,7 +554,7 @@ def novo_fluxo_caixa():
             tipo_movimento = 'SAIDA'
         data_str = request.form.get('data_movimento', '').strip()
         data_mov = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else date.today()
-        valor = abs(float(request.form.get('valor', '0').replace(',', '.')))
+        valor = abs(_parse_valor(request.form.get('valor', '0')))
         descricao = request.form.get('descricao', '').strip()[:200]
         categoria = request.form.get('categoria', 'OUTROS')
         if categoria not in CATEGORIAS_VALIDAS:
@@ -591,7 +613,7 @@ def editar_fluxo_caixa(fc_id):
             fc.data_movimento = datetime.strptime(data_str, '%Y-%m-%d').date()
         valor_str = request.form.get('valor', '').strip()
         if valor_str:
-            fc.valor = abs(float(valor_str.replace(',', '.')))
+            fc.valor = abs(_parse_valor(valor_str))
         desc = request.form.get('descricao', '').strip()
         if desc:
             fc.descricao = desc[:200]
