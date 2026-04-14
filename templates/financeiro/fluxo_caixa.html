@@ -447,14 +447,19 @@ function saveEdit(td) {
                     var ci = c.querySelector('.cell-input');
                     if (ci) {
                         var parts = data.data.split('/');
-                        if (parts.length === 3) ci.value = parts[2]+'-'+parts[1]+'-'+parts[0];
+                        var isoDate = (parts.length === 3) ? parts[2]+'-'+parts[1]+'-'+parts[0] : ci.value;
+                        ci.value = isoDate;
+                        ci.dataset.origValue = isoDate; // keep origValue in sync after save
                     }
                 } else if (f === 'valor') {
                     var isEntrada = !!row.querySelector('.badge.bg-success');
                     s.textContent = (isEntrada ? '+' : '-') + ' R$ ' + parseFloat(data.valor).toFixed(2) + ' ';
                     s.appendChild(pencil);
                     var ci2 = c.querySelector('.cell-input');
-                    if (ci2) ci2.value = parseFloat(data.valor).toFixed(2);
+                    if (ci2) {
+                        ci2.value = parseFloat(data.valor).toFixed(2);
+                        ci2.dataset.origValue = ci2.value; // keep origValue in sync after save
+                    }
                 } else if (f === 'descricao') {
                     s.textContent = data.descricao;
                     s.appendChild(pencil);
