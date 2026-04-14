@@ -48,6 +48,7 @@ The system employs a Flask backend, SQLAlchemy ORM, and PostgreSQL database, wit
 -   **Automated Database Error Diagnostics:** A `DatabaseDiagnostics` system analyzes SQLAlchemy errors, reports missing columns, and generates diagnostic reports.
 -   **Híbrido Data Model Support:** For food management, aggregates data from legacy and new models for seamless coexistence.
 -   **Transaction Isolation for Deletions:** Critical deletion operations use RAW connections with `isolation_level="AUTOCOMMIT"` and incorporate schema introspection for multi-tenant filtering.
+-   **FluxoCaixa Enhancements:** Migration #105 adds optional `banco_id` FK to `fluxo_caixa`. Import preview (`/importacao/fluxo-caixa/upload`) has grouped category optgroups (Custo Direto/Indireto/Despesa Administrativa including Retirada de Sócios), inline-editable Data/Valor/Descrição fields, Reembolso checkbox, and Banco dropdown per row. "Apenas pgto." creates only FluxoCaixa (no GCP/GCF/ContaPagar). Fluxo de Caixa list (`/financeiro/fluxo-caixa`) has "Nova Movimentação" modal (grouped categories, banco, obra) and AJAX-based inline cell editing for direct FluxoCaixa entries.
 
 ## External Dependencies
 -   **Flask:** Web framework.

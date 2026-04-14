@@ -533,6 +533,16 @@ def novo_fluxo_caixa():
         banco_id = request.form.get('banco_id', type=int) or None
         obra_id = request.form.get('obra_id', type=int) or None
 
+        # Validar que banco e obra pertencem ao tenant
+        if banco_id:
+            bk = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
+            if not bk:
+                banco_id = None
+        if obra_id:
+            ob = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+            if not ob:
+                obra_id = None
+
         fc = FluxoCaixa(
             admin_id=admin_id,
             tipo_movimento=tipo_movimento,
@@ -559,7 +569,8 @@ def novo_fluxo_caixa():
 @financeiro_bp.route('/fluxo-caixa/<int:fc_id>/editar', methods=['POST'])
 @login_required
 def editar_fluxo_caixa(fc_id):
-    """Edita inline data, valor e descrição de um lançamento direto"""
+    """Edita inline data, valor e descrição de um lançamento direto — retorna JSON"""
+    from flask import jsonify
     admin_id = get_admin_id()
     fc = FluxoCaixa.query.filter_by(id=fc_id, admin_id=admin_id).first_or_404()
     try:
@@ -573,12 +584,16 @@ def editar_fluxo_caixa(fc_id):
         if desc:
             fc.descricao = desc[:200]
         db.session.commit()
-        flash('Lançamento atualizado.', 'success')
+        return jsonify({
+            'ok': True,
+            'data': fc.data_movimento.strftime('%d/%m/%Y'),
+            'valor': round(fc.valor, 2),
+            'descricao': fc.descricao,
+        })
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao editar FluxoCaixa {fc_id}: {e}", exc_info=True)
-        flash(f'Erro ao salvar: {e}', 'danger')
-    return redirect(request.referrer or url_for('financeiro.fluxo_caixa'))
+        return jsonify({'ok': False, 'error': str(e)}), 400
 
 
 # ==================== BANCOS ====================

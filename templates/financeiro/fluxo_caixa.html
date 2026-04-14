@@ -4,16 +4,47 @@
 
 {% block head_extra %}
 <style>
-.edit-display { cursor: default; }
-.edit-form    { display: none; }
-tr.row-editing .edit-display { display: none !important; }
-tr.row-editing .edit-form    { display: flex !important; align-items: center; gap: 4px; }
-.inline-td-input {
-  border: 1px solid #ced4da;
+/* Células editáveis inline */
+td.cell-editable { cursor: pointer; position: relative; }
+td.cell-editable:hover .cell-text { background: #f0f7ff; border-radius:3px; padding:1px 3px; }
+td.cell-editable .cell-text { transition: background .15s; }
+td.cell-editable .cell-edit { display: none; }
+
+td.cell-editing .cell-text { display: none !important; }
+td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap: 3px; }
+
+.cell-input {
+  border: 1px solid #0d6efd;
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: .84rem;
-  width: 100%;
+  font-size: .85rem;
+  outline: none;
+}
+.cell-save-btn {
+  background: #0d6efd;
+  border: none;
+  border-radius: 3px;
+  color: #fff;
+  font-size: .75rem;
+  padding: 2px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cell-save-btn:hover { background: #0b5ed7; }
+.cell-cancel-btn {
+  background: transparent;
+  border: 1px solid #6c757d;
+  border-radius: 3px;
+  color: #6c757d;
+  font-size: .75rem;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.pencil-hint {
+  font-size: .65rem;
+  color: #adb5bd;
+  margin-left:3px;
+  vertical-align: middle;
 }
 </style>
 {% endblock %}
@@ -44,18 +75,18 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                 <div class="card-body">
                     <form method="GET" class="row g-3">
                         <div class="col-md-2">
-                            <label for="data_inicio" class="form-label">Data Início</label>
-                            <input type="date" name="data_inicio" id="data_inicio" class="form-control"
+                            <label class="form-label">Data Início</label>
+                            <input type="date" name="data_inicio" class="form-control"
                                    value="{{ filtros.data_inicio }}">
                         </div>
                         <div class="col-md-2">
-                            <label for="data_fim" class="form-label">Data Fim</label>
-                            <input type="date" name="data_fim" id="data_fim" class="form-control"
+                            <label class="form-label">Data Fim</label>
+                            <input type="date" name="data_fim" class="form-control"
                                    value="{{ filtros.data_fim }}">
                         </div>
                         <div class="col-md-2">
-                            <label for="obra_id" class="form-label">Obra</label>
-                            <select name="obra_id" id="obra_id" class="form-select">
+                            <label class="form-label">Obra</label>
+                            <select name="obra_id" class="form-select">
                                 <option value="0">Todas</option>
                                 {% for obra in obras %}
                                 <option value="{{ obra.id }}" {{ 'selected' if filtros.obra_id == obra.id }}>
@@ -65,8 +96,8 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label for="centro_custo_id" class="form-label">Centro de Custo</label>
-                            <select name="centro_custo_id" id="centro_custo_id" class="form-select">
+                            <label class="form-label">Centro de Custo</label>
+                            <select name="centro_custo_id" class="form-select">
                                 <option value="0">Todos</option>
                                 {% for centro in centros_custo %}
                                 <option value="{{ centro.id }}" {{ 'selected' if filtros.centro_custo_id == centro.id }}>
@@ -76,8 +107,8 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label for="tipo_movimento" class="form-label">Tipo</label>
-                            <select name="tipo_movimento" id="tipo_movimento" class="form-select">
+                            <label class="form-label">Tipo</label>
+                            <select name="tipo_movimento" class="form-select">
                                 <option value="">Todos</option>
                                 <option value="ENTRADA" {{ 'selected' if filtros.tipo_movimento == 'ENTRADA' }}>Entrada</option>
                                 <option value="SAIDA"   {{ 'selected' if filtros.tipo_movimento == 'SAIDA' }}>Saída</option>
@@ -94,7 +125,7 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
         </div>
     </div>
 
-    <!-- Resumo do Fluxo -->
+    <!-- Resumo -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card bg-info text-white">
@@ -130,13 +161,16 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
         </div>
     </div>
 
-    <!-- Tabela de Movimentos -->
+    <!-- Tabela -->
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-list me-2"></i>Movimentos do Período ({{ fluxo.detalhes|default([])|length }} registros)</h5>
-                    <small class="text-muted"><i class="fas fa-pencil-alt me-1"></i>Clique em "Editar" para alterar lançamentos diretos</small>
+                    <small class="text-muted">
+                        <i class="fas fa-pencil-alt me-1 text-primary"></i>
+                        Clique nas células de data, descrição ou valor de lançamentos diretos para editar inline
+                    </small>
                 </div>
                 <div class="card-body p-0">
                     {% if fluxo.detalhes %}
@@ -150,7 +184,6 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                                     <th>Origem</th>
                                     <th>Descrição</th>
                                     <th class="text-end" style="min-width:110px;">Valor</th>
-                                    <th class="text-center" style="width:60px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -158,20 +191,30 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                                 {% set realizado = movimento.realizado|default(false) %}
                                 {% set editavel  = movimento.editavel|default(false) %}
                                 {% set mov_id    = movimento.id|default(0) %}
+                                {% set edit_url  = url_for('financeiro.editar_fluxo_caixa', fc_id=mov_id) if editavel else '' %}
                                 <tr id="row-{{ mov_id }}"
-                                    class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}">
+                                    class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}"
+                                    data-editavel="{{ 'true' if editavel else 'false' }}"
+                                    data-edit-url="{{ edit_url }}"
+                                    data-id="{{ mov_id }}">
+
                                     <!-- Data -->
-                                    <td>
-                                        <span class="edit-display">{{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}</span>
+                                    <td class="{{ 'cell-editable' if editavel else '' }}" data-field="data_movimento">
+                                        <span class="cell-text">
+                                            {{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}
+                                            {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
+                                        </span>
                                         {% if editavel %}
-                                        <div class="edit-form">
-                                            <input type="date" class="inline-td-input"
-                                                   id="inp_data_{{ mov_id }}"
+                                        <div class="cell-edit">
+                                            <input type="date" class="cell-input"
                                                    value="{{ movimento.data.strftime('%Y-%m-%d') if movimento.data else '' }}"
                                                    style="min-width:130px;">
+                                            <button class="cell-save-btn" type="button">✓</button>
+                                            <button class="cell-cancel-btn" type="button">✕</button>
                                         </div>
                                         {% endif %}
                                     </td>
+
                                     <!-- Tipo -->
                                     <td>
                                         <span class="badge bg-{% if movimento.tipo == 'ENTRADA' %}success{% elif realizado %}secondary{% else %}danger{% endif %}">
@@ -184,10 +227,11 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                                             {% endif %}
                                         </span>
                                     </td>
+
                                     <!-- Status -->
                                     <td>
                                         {% set st = movimento.status|default('') %}
-                                        {% if st == 'PAGO' or st == 'RECEBIDO' %}
+                                        {% if st in ('PAGO', 'RECEBIDO') %}
                                             <span class="badge bg-primary">{{ st|title }}</span>
                                         {% elif st == 'AUTORIZADO' %}
                                             <span class="badge bg-success">Autorizado</span>
@@ -199,54 +243,42 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                                             <span class="badge bg-light text-dark border">—</span>
                                         {% endif %}
                                     </td>
+
                                     <!-- Origem -->
                                     <td><span class="badge bg-secondary">{{ movimento.origem|default('') }}</span></td>
+
                                     <!-- Descrição -->
-                                    <td>
-                                        <span class="edit-display">{{ movimento.descricao|default('-') }}</span>
+                                    <td class="{{ 'cell-editable' if editavel else '' }}" data-field="descricao">
+                                        <span class="cell-text">
+                                            {{ movimento.descricao|default('-') }}
+                                            {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
+                                        </span>
                                         {% if editavel %}
-                                        <div class="edit-form">
-                                            <input type="text" class="inline-td-input"
-                                                   id="inp_desc_{{ mov_id }}"
+                                        <div class="cell-edit">
+                                            <input type="text" class="cell-input"
                                                    value="{{ movimento.descricao|default('') }}"
-                                                   style="min-width:180px;">
+                                                   style="min-width:200px;">
+                                            <button class="cell-save-btn" type="button">✓</button>
+                                            <button class="cell-cancel-btn" type="button">✕</button>
                                         </div>
                                         {% endif %}
                                     </td>
+
                                     <!-- Valor -->
-                                    <td class="text-end">
-                                        <strong class="edit-display {% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %}">
+                                    <td class="text-end {{ 'cell-editable' if editavel else '' }}" data-field="valor">
+                                        <span class="cell-text {% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %} fw-semibold">
                                             {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
                                             R$ {{ "%.2f"|format(movimento.valor|default(0)) }}
-                                        </strong>
+                                            {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
+                                        </span>
                                         {% if editavel %}
-                                        <div class="edit-form">
-                                            <input type="text" class="inline-td-input text-end"
-                                                   id="inp_valor_{{ mov_id }}"
+                                        <div class="cell-edit">
+                                            <input type="text" class="cell-input text-end"
                                                    value="{{ "%.2f"|format(movimento.valor|default(0)) }}"
                                                    style="min-width:80px;">
+                                            <button class="cell-save-btn" type="button">✓</button>
+                                            <button class="cell-cancel-btn" type="button">✕</button>
                                         </div>
-                                        {% endif %}
-                                    </td>
-                                    <!-- Ações -->
-                                    <td class="text-center">
-                                        {% if editavel %}
-                                        <button type="button"
-                                                class="btn btn-xs btn-outline-secondary btn-edit"
-                                                style="font-size:.75rem;padding:2px 7px;"
-                                                onclick="toggleEdit({{ mov_id }}, this)"
-                                                title="Editar este lançamento">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <form id="form-edit-{{ mov_id }}"
-                                              action="{{ url_for('financeiro.editar_fluxo_caixa', fc_id=mov_id) }}"
-                                              method="POST"
-                                              style="display:none;">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <input type="hidden" name="data_movimento" id="hid_data_{{ mov_id }}">
-                                            <input type="hidden" name="valor" id="hid_valor_{{ mov_id }}">
-                                            <input type="hidden" name="descricao" id="hid_desc_{{ mov_id }}">
-                                        </form>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -270,23 +302,22 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
     </div>
 </div>
 
-<!-- ===== MODAL: Nova Movimentação ===== -->
-<div class="modal fade" id="modalNovaMovimentacao" tabindex="-1" aria-labelledby="modalNovaMovLabel" aria-hidden="true">
+<!-- Modal: Nova Movimentação -->
+<div class="modal fade" id="modalNovaMovimentacao" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form action="{{ url_for('financeiro.novo_fluxo_caixa') }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="_filtro_inicio" value="{{ filtros.data_inicio }}">
-        <input type="hidden" name="_filtro_fim" value="{{ filtros.data_fim }}">
+        <input type="hidden" name="_filtro_fim"    value="{{ filtros.data_fim }}">
         <div class="modal-header">
-          <h5 class="modal-title" id="modalNovaMovLabel">
-            <i class="fas fa-plus-circle text-success me-2"></i>Nova Movimentação no Fluxo de Caixa
+          <h5 class="modal-title">
+            <i class="fas fa-plus-circle text-success me-2"></i>Nova Movimentação
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <div class="row g-3">
-            <!-- Tipo -->
             <div class="col-md-4">
               <label class="form-label fw-semibold">Tipo <span class="text-danger">*</span></label>
               <select name="tipo_movimento" class="form-select" required>
@@ -294,25 +325,20 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                 <option value="ENTRADA">Entrada (Receita)</option>
               </select>
             </div>
-            <!-- Data -->
             <div class="col-md-4">
               <label class="form-label fw-semibold">Data <span class="text-danger">*</span></label>
               <input type="date" name="data_movimento" class="form-control" required
                      value="{{ data_inicio.strftime('%Y-%m-%d') if data_inicio else '' }}">
             </div>
-            <!-- Valor -->
             <div class="col-md-4">
               <label class="form-label fw-semibold">Valor (R$) <span class="text-danger">*</span></label>
-              <input type="text" name="valor" class="form-control" required
-                     placeholder="0.00">
+              <input type="text" name="valor" class="form-control" required placeholder="0.00">
             </div>
-            <!-- Descrição -->
             <div class="col-md-8">
               <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
               <input type="text" name="descricao" class="form-control" required
                      placeholder="Ex: Pagamento fornecedor, Recebimento cliente...">
             </div>
-            <!-- Categoria -->
             <div class="col-md-4">
               <label class="form-label fw-semibold">Categoria</label>
               <select name="categoria" class="form-select">
@@ -325,7 +351,6 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                 {% endfor %}
               </select>
             </div>
-            <!-- Banco -->
             <div class="col-md-4">
               <label class="form-label fw-semibold">Banco (opcional)</label>
               <select name="banco_id" class="form-select">
@@ -335,7 +360,6 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
                 {% endfor %}
               </select>
             </div>
-            <!-- Obra -->
             <div class="col-md-4">
               <label class="form-label fw-semibold">Obra (opcional)</label>
               <select name="obra_id" class="form-select">
@@ -362,36 +386,127 @@ tr.row-editing .edit-form    { display: flex !important; align-items: center; ga
 
 {% block scripts %}
 <script>
-function toggleEdit(id, btn) {
-    var row = document.getElementById('row-' + id);
-    var form = document.getElementById('form-edit-' + id);
-    var editing = row.classList.contains('row-editing');
-
-    if (editing) {
-        // Confirmar salvamento
-        document.getElementById('hid_data_'  + id).value = document.getElementById('inp_data_'  + id).value;
-        document.getElementById('hid_valor_' + id).value = document.getElementById('inp_valor_' + id).value;
-        document.getElementById('hid_desc_'  + id).value = document.getElementById('inp_desc_'  + id).value;
-        form.submit();
-    } else {
-        // Entrar em modo edição
-        row.classList.add('row-editing');
-        btn.innerHTML = '<i class="fas fa-check"></i>';
-        btn.classList.replace('btn-outline-secondary', 'btn-success');
-        btn.title = 'Salvar alterações';
-    }
+// ── Inline editing helpers ──────────────────────────────────────────────
+function getCsrfToken() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.content : '';
 }
 
-$(document).ready(function() {
-    if (typeof $.fn.DataTable !== 'undefined') {
+function enterEdit(td) {
+    if (td.classList.contains('cell-editing')) return;
+    td.classList.add('cell-editing');
+    var inp = td.querySelector('.cell-input');
+    if (inp) { inp.focus(); inp.select(); }
+}
+
+function cancelEdit(td) {
+    td.classList.remove('cell-editing');
+}
+
+function saveEdit(td) {
+    var row     = td.closest('tr');
+    var editUrl = row.dataset.editUrl;
+    var field   = td.dataset.field;
+    var inp     = td.querySelector('.cell-input');
+    if (!inp || !editUrl) { cancelEdit(td); return; }
+
+    var val  = inp.value.trim();
+    var body = new URLSearchParams();
+    body.append(field, val);
+
+    var span = td.querySelector('.cell-text');
+    var origText = span ? span.textContent.trim() : '';
+    if (span) span.textContent = '⏳ Salvando...';
+
+    fetch(editUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            // Update all three cells in the row with fresh values
+            var cells = row.querySelectorAll('.cell-editable');
+            cells.forEach(function(c) {
+                var f = c.dataset.field;
+                var s = c.querySelector('.cell-text');
+                if (!s) return;
+                if (f === 'data_movimento') {
+                    s.innerHTML = data.data + ' <i class="fas fa-pencil-alt pencil-hint"></i>';
+                    var ci = c.querySelector('.cell-input');
+                    // convert dd/mm/yyyy back to yyyy-mm-dd for the input
+                    if (ci) {
+                        var parts = data.data.split('/');
+                        if (parts.length === 3) ci.value = parts[2]+'-'+parts[1]+'-'+parts[0];
+                    }
+                } else if (f === 'valor') {
+                    var sign = (row.querySelector('.badge.bg-success') || (row.querySelector('[class*="text-success"]'))) ? '+' : '-';
+                    s.innerHTML = sign + ' R$ ' + parseFloat(data.valor).toFixed(2) + ' <i class="fas fa-pencil-alt pencil-hint"></i>';
+                    var ci2 = c.querySelector('.cell-input');
+                    if (ci2) ci2.value = parseFloat(data.valor).toFixed(2);
+                } else if (f === 'descricao') {
+                    s.innerHTML = data.descricao + ' <i class="fas fa-pencil-alt pencil-hint"></i>';
+                    var ci3 = c.querySelector('.cell-input');
+                    if (ci3) ci3.value = data.descricao;
+                }
+            });
+            cancelEdit(td);
+        } else {
+            if (span) span.textContent = origText;
+            cancelEdit(td);
+            alert('Erro ao salvar: ' + (data.error || 'desconhecido'));
+        }
+    })
+    .catch(function(err) {
+        if (span) span.textContent = origText;
+        cancelEdit(td);
+        console.error('Erro ao salvar lançamento:', err);
+    });
+}
+
+// Bind click/key handlers to editable cells
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('td.cell-editable').forEach(function(td) {
+        // Click on cell (or its text span) → enter edit mode
+        td.addEventListener('click', function(e) {
+            if (e.target.closest('.cell-edit')) return; // ignore clicks inside form
+            enterEdit(td);
+        });
+    });
+
+    // Save buttons
+    document.querySelectorAll('.cell-save-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            saveEdit(btn.closest('td.cell-editable'));
+        });
+    });
+
+    // Cancel buttons
+    document.querySelectorAll('.cell-cancel-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            cancelEdit(btn.closest('td.cell-editable'));
+        });
+    });
+
+    // Enter key = save, Escape key = cancel
+    document.querySelectorAll('.cell-input').forEach(function(inp) {
+        inp.addEventListener('keydown', function(e) {
+            var td = inp.closest('td.cell-editable');
+            if (e.key === 'Enter')  { e.preventDefault(); saveEdit(td); }
+            if (e.key === 'Escape') { e.preventDefault(); cancelEdit(td); }
+        });
+    });
+
+    // DataTable init
+    if (typeof $.fn !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
         $('#movimentosTable').DataTable({
             language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
             order: [[0, 'desc']],
             pageLength: 25,
-            columnDefs: [
-                { targets: [5], className: 'text-end' },
-                { targets: [6], orderable: false }
-            ]
+            columnDefs: [{ targets: [5], className: 'text-end' }]
         });
     }
 });
