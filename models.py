@@ -4546,6 +4546,7 @@ class ItemMedicaoCronogramaTarefa(db.Model):
     item_medicao_id = db.Column(db.Integer, db.ForeignKey('item_medicao_comercial.id', ondelete='CASCADE'), nullable=False)
     cronograma_tarefa_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'), nullable=False)
     peso = db.Column(db.Numeric(5, 2), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
 
     tarefa = db.relationship('TarefaCronograma')
 
@@ -4596,6 +4597,7 @@ class MedicaoObraItem(db.Model):
     valor_medido_periodo = db.Column(db.Numeric(15, 2), default=0)
     percentual_executado_acumulado = db.Column(db.Numeric(5, 2), default=0)
     valor_executado_acumulado = db.Column(db.Numeric(15, 2), default=0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
 
     item_comercial = db.relationship('ItemMedicaoComercial')
 

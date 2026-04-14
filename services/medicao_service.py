@@ -135,6 +135,7 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
             valor_medido_periodo=valor_periodo.quantize(Decimal('0.01')),
             percentual_executado_acumulado=perc_atual,
             valor_executado_acumulado=valor_acum.quantize(Decimal('0.01')),
+            admin_id=admin_id,
         )
         db.session.add(moi)
         total_medido_periodo += valor_periodo

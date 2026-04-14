@@ -245,6 +245,7 @@ def vincular_tarefa(obra_id, item_id):
             item_medicao_id=item_id,
             cronograma_tarefa_id=tarefa_id,
             peso=peso,
+            admin_id=admin_id,
         )
         db.session.add(vinculo)
 
