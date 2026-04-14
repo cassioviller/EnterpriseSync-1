@@ -579,14 +579,19 @@ def editar_fluxo_caixa(fc_id):
     """Edita inline data, valor e descrição de um lançamento direto — retorna JSON"""
     from flask import jsonify
     admin_id = get_admin_id()
-    fc = FluxoCaixa.query.filter_by(id=fc_id, admin_id=admin_id).first_or_404()
+    # Restringe a apenas lançamentos diretos (sem vínculo a outros módulos)
+    fc = FluxoCaixa.query.filter(
+        FluxoCaixa.id == fc_id,
+        FluxoCaixa.admin_id == admin_id,
+        FluxoCaixa.referencia_tabela == None,  # noqa: E711
+    ).first_or_404()
     try:
         data_str = request.form.get('data_movimento', '').strip()
         if data_str:
             fc.data_movimento = datetime.strptime(data_str, '%Y-%m-%d').date()
         valor_str = request.form.get('valor', '').strip()
         if valor_str:
-            fc.valor = float(valor_str.replace(',', '.'))
+            fc.valor = abs(float(valor_str.replace(',', '.')))
         desc = request.form.get('descricao', '').strip()
         if desc:
             fc.descricao = desc[:200]
@@ -600,7 +605,7 @@ def editar_fluxo_caixa(fc_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao editar FluxoCaixa {fc_id}: {e}", exc_info=True)
-        return jsonify({'ok': False, 'error': str(e)}), 400
+        return jsonify({'ok': False, 'error': 'Não foi possível salvar as alterações.'}), 400
 
 
 # ==================== BANCOS ====================
