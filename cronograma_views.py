@@ -1393,15 +1393,18 @@ def aplicar_template(obra_id: int):
         # Cache por id para acesso rápido a admin_id e subatividade
         item_by_id = {item.id: item for item in tmpl.itens}
 
-        def _criar_tarefas(nos: list, pai_tarefa_id, data_ref, ordem_offset: int) -> tuple[int, object]:
+        # Contador monotônico compartilhado: garante ordem única para cada tarefa
+        # independente do nível de profundidade na hierarquia do template.
+        ordem_seq = [0]
+
+        def _criar_tarefas(nos: list, pai_tarefa_id, data_ref) -> object:
             """
             Cria TarefaCronograma recursivamente.
-            Retorna (total_criadas, data_após_último_filho).
+            Retorna data_após_último_filho.
             """
             nonlocal criadas
-            total = 0
             data_corrente = data_ref
-            for i, no in enumerate(nos):
+            for no in nos:
                 item = item_by_id.get(no['id'])
                 if item is None or item.admin_id != admin_id:
                     continue
@@ -1426,19 +1429,19 @@ def aplicar_template(obra_id: int):
                     unidade_medida=None if is_grupo else unidade,
                     responsavel=item.responsavel or 'empresa',
                     tarefa_pai_id=pai_tarefa_id,
-                    ordem=ordem_base + (ordem_offset + i) * 10,
+                    ordem=ordem_base + ordem_seq[0] * 10,
                     admin_id=admin_id,
                 )
+                ordem_seq[0] += 1
                 db.session.add(tarefa)
                 db.session.flush()  # obtém tarefa.id para os filhos
 
                 item_id_para_tarefa_id[item.id] = tarefa.id
                 criadas += 1
-                total += 1
 
                 if no['filhos']:
                     # Filhos herdam data_corrente e têm pai = tarefa.id
-                    _criar_tarefas(no['filhos'], tarefa.id, data_corrente, 0)
+                    _criar_tarefas(no['filhos'], tarefa.id, data_corrente)
                     # Data avança pela duração total dos filhos (soma)
                     duracao_filhos = sum(
                         item_by_id[f['id']].duracao_dias
@@ -1449,9 +1452,9 @@ def aplicar_template(obra_id: int):
                 else:
                     data_corrente = data_corrente + timedelta(days=item.duracao_dias)
 
-            return total, data_corrente
+            return data_corrente
 
-        _criar_tarefas(arvore_template, None, data_inicio, 0)
+        _criar_tarefas(arvore_template, None, data_inicio)
         db.session.commit()
 
         # Recalcular datas do cronograma
