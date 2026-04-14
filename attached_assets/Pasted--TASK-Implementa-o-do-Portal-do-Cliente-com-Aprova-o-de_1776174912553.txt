@@ -1,0 +1,96 @@
+# TASK: Implementação do Portal do Cliente com Aprovação de Compras e Medição de Obra
+
+Atue como um Arquiteto de Soluções Full Stack. Sua missão é desenvolver um Portal do Cliente para cada obra, acessível via link único (sem login), que permita a visualização do progresso, aprovação de compras e gestão de pagamentos baseada na medição da obra.
+
+### 1. REFINAMENTO DO MODELO DE DADOS (`models.py`)
+
+**Objetivo:** Adicionar os campos necessários para o acesso seguro ao portal, vinculação de propostas ao cronograma, dados de fornecedores e status de aprovação/pagamento.
+
+1.  **Modelo `Obra`:**
+    *   Adicione `portal_token = db.Column(db.String(36), unique=True, nullable=True)`: Um UUID para acesso seguro ao portal.
+    *   Adicione `cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)`: Para vincular a obra a um cliente específico.
+
+2.  **Modelo `Cliente` (se não existir, crie):**
+    *   `id`, `admin_id`, `nome`, `email`, `telefone`, etc.
+
+3.  **Modelo `PropostaItem` (ou similar que represente os serviços da proposta):**
+    *   Adicione `cronograma_tarefas_vinculadas = db.Column(db.JSON, nullable=True)`: Armazenará uma lista de IDs de `CronogramaTarefa` que compõem este item da proposta. Isso é o "De-Para" para a medição.
+
+4.  **Modelo `Fornecedor`:**
+    *   Adicione `chave_pix = db.Column(db.String(255), nullable=True)`: Para exibir os dados de pagamento.
+
+5.  **Modelo `PedidoCompra`:**
+    *   Adicione `status_aprovacao_cliente = db.Column(db.Enum('PENDENTE', 'APROVADO', 'RECUSADO'), default='PENDENTE', nullable=False)`.
+    *   Adicione `comprovante_pagamento_url = db.Column(db.String(255), nullable=True)`: URL do comprovante de pagamento enviado pelo cliente.
+
+6.  **Modelo `MedicaoObra` (NOVO):**
+    *   `id`, `admin_id`, `obra_id` (FK), `proposta_item_id` (FK), `data_medicao`, `percentual_executado` (Decimal), `valor_medido` (Decimal), `status` (ENUM: 'PENDENTE', 'APROVADO', 'FATURADO'), `observacoes`.
+
+### 2. LÓGICA DE BACKEND (VIEWS, SERVICES, UTILS)
+
+**Objetivo:** Gerenciar o acesso ao portal, dados exibidos, aprovações e medições.
+
+1.  **Geração de `portal_token`:**
+    *   Ao criar uma nova `Obra`, gere um `UUID` e salve em `Obra.portal_token`.
+    *   Crie uma função para regenerar o token, se necessário.
+
+2.  **Rota do Portal do Cliente (`/portal/<token>/<obra_id>`):**
+    *   Crie um novo Blueprint ou rota específica para o portal.
+    *   **Segurança:** Valide o `token` e o `obra_id`. Se inválido, retorne 404 ou página de erro.
+    *   **Contexto:** Carregue todos os dados da `Obra` e seus relacionamentos (Cronograma, RDOs, Documentos, Pedidos de Compra, Proposta).
+
+3.  **Lógica de Medição de Obra (Serviço `MedicaoService`):**
+    *   **Vínculo Proposta-Cronograma:** Crie uma interface no painel administrativo para que o usuário possa vincular `CronogramaTarefa` a `PropostaItem`.
+    *   **Cálculo de `% Executado`:**
+        *   Para cada `PropostaItem`, calcule o `% executado` com base na média ponderada do `% concluído` das `CronogramaTarefa` vinculadas.
+        *   Considere o `peso` de cada tarefa no cronograma para o cálculo ponderado.
+    *   **Geração de `MedicaoObra`:** Crie uma função que, ao ser acionada, gera um registro de `MedicaoObra` com o `percentual_executado` e `valor_medido` para cada `PropostaItem`.
+
+4.  **Aprovação de Compra pelo Cliente:**
+    *   Crie uma rota (`/portal/aprovar_compra/<pedido_id>`) que o cliente acessa para aprovar/recusar um `PedidoCompra`.
+    *   **Ação:** Atualize `PedidoCompra.status_aprovacao_cliente`.
+    *   **Notificação:** Envie uma notificação ao `admin_id` da obra sobre a decisão do cliente.
+
+5.  **Upload de Comprovante de Pagamento:**
+    *   Crie uma rota (`/portal/upload_comprovante/<pedido_id>`) que o cliente usa para enviar o comprovante.
+    *   **Armazenamento:** Salve o arquivo em um local seguro (S3 ou sistema de arquivos) e armazene a URL em `PedidoCompra.comprovante_pagamento_url`.
+    *   **Status:** Atualize o `PedidoCompra.status` para, por exemplo, `AGUARDANDO_CONFIRMACAO_PAGAMENTO`.
+    *   **Notificação:** Notifique o `admin_id` sobre o upload.
+
+### 3. INTERFACE DO USUÁRIO (TEMPLATES)
+
+**Objetivo:** Criar uma experiência intuitiva e transparente para o cliente.
+
+1.  **Layout do Portal (`portal_cliente.html`):**
+    *   Design responsivo e limpo, sem elementos de navegação internos do SIGE.
+    *   Cabeçalho com o nome da obra e do cliente.
+
+2.  **Seção "Progresso da Obra":**
+    *   **Cronograma:** Exiba o cronograma da obra de forma visual (ex: gráfico de Gantt simplificado ou lista de tarefas com % de conclusão).
+    *   **RDO:** Liste os `RDO`s finalizados, permitindo a visualização de fotos e ocorrências.
+
+3.  **Seção "Documentos":**
+    *   Links para download ou visualização de `Contrato`, `Projeto` e outros `Documentos` (PDFs, imagens).
+
+4.  **Seção "Compras para Aprovação" (Mapa de Concorrência):**
+    *   Liste os `PedidoCompra` com `status_aprovacao_cliente = 'PENDENTE'`.
+    *   Para cada pedido, exiba:
+        *   Nome do material/serviço.
+        *   Lista de fornecedores com seus respectivos orçamentos (preço, prazo).
+        *   **PIX do Fornecedor:** Se o `PedidoCompra` já tiver um fornecedor selecionado, exiba a `chave_pix` do `Fornecedor`.
+        *   Botões "Aprovar" / "Recusar" para o cliente.
+        *   Campo de upload de arquivo para o comprovante de pagamento.
+
+5.  **Seção "Medições e Pagamentos":**
+    *   Liste os registros de `MedicaoObra`.
+    *   Para cada medição, exiba o `percentual_executado`, `valor_medido` e `status`.
+    *   Botão "Gerar Boleto" ou "Solicitar Pagamento" (se aplicável, com integração de gateway de pagamento).
+
+### 4. REGRAS DE INTEGRIDADE E SEGURANÇA
+
+*   **Multi-tenancy:** Todas as consultas e operações devem ser filtradas por `admin_id`.
+*   **Segurança do Token:** O `portal_token` deve ser um UUID v4, gerado de forma segura e único por obra.
+*   **Autorização:** O cliente só pode ver e interagir com dados da obra vinculada ao token.
+*   **Notificações:** Implemente notificações (e-mail/push) para o `admin_id` sobre aprovações, recusas e uploads de comprovantes.
+
+**ESTE PORTAL TRANSFORMARÁ A RELAÇÃO COM SEUS CLIENTES, OFERECENDO TRANSPARÊNCIA TOTAL E AGILIZANDO PROCESSOS CRÍTICOS.**

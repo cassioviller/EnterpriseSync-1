@@ -1,0 +1,113 @@
+# TASK: Implementação do Gestor de Itens de Medição com Amortização de Entrada e Fechamento Quinzenal
+
+Atue como um Arquiteto de Soluções Full Stack. Sua missão é desenvolver um módulo de Gestão de Medições que permita a criação de itens comerciais de medição, o vínculo com subatividades do cronograma, a amortização proporcional da entrada do cliente e a geração de extratos quinzenais para faturamento.
+
+### 1. REFINAMENTO DO MODELO DE DADOS (`models.py`)
+
+**Objetivo:** Adicionar os campos e modelos necessários para gerenciar os itens de medição comercial, seus vínculos com o cronograma e a lógica de amortização da entrada.
+
+1.  **Modelo `Obra`:**
+    *   Adicione `valor_entrada = db.Column(db.Numeric(15, 2), default=0.00)`: Valor total da entrada paga pelo cliente.
+    *   Adicione `data_entrada = db.Column(db.Date, nullable=True)`: Data em que a entrada foi recebida.
+    *   Adicione `valor_total_proposta = db.Column(db.Numeric(15, 2), default=0.00)`: Valor total da proposta comercial aprovada para a obra. (Crucial para o cálculo da % da entrada).
+
+2.  **Modelo `ItemMedicaoComercial` (NOVO Modelo):**
+    *   `id = db.Column(db.Integer, primary_key=True)`
+    *   `admin_id = db.Column(db.Integer, db.ForeignKey("usuario.id"), nullable=False)`
+    *   `obra_id = db.Column(db.Integer, db.ForeignKey("obra.id"), nullable=False)`
+    *   `nome = db.Column(db.String(255), nullable=False)`: Ex: "Fundação Fase 1", "Alvenaria Bloco A".
+    *   `valor_comercial = db.Column(db.Numeric(15, 2), nullable=False)`: Valor deste item de medição na proposta comercial.
+    *   `percentual_executado_acumulado = db.Column(db.Numeric(5, 2), default=0.00)`: % acumulada de execução deste item.
+    *   `valor_executado_acumulado = db.Column(db.Numeric(15, 2), default=0.00)`: Valor monetário acumulado executado.
+    *   `status = db.Column(db.Enum("PENDENTE", "EM_EXECUCAO", "CONCLUIDO"), default="PENDENTE")`
+    *   `created_at = db.Column(db.DateTime, default=datetime.utcnow)`
+    *   `obra = db.relationship("Obra", backref=db.backref("itens_medicao_comercial", lazy=True))`
+
+3.  **Modelo `ItemMedicaoCronogramaTarefa` (NOVA Tabela de Associação - Many-to-Many):**
+    *   `item_medicao_id = db.Column(db.Integer, db.ForeignKey("item_medicao_comercial.id"), primary_key=True)`
+    *   `cronograma_tarefa_id = db.Column(db.Integer, db.ForeignKey("cronograma_tarefa.id"), primary_key=True)`
+    *   `peso = db.Column(db.Numeric(5, 2), nullable=False)`: Peso desta tarefa no cálculo do item de medição (soma dos pesos deve ser 100%).
+    *   `item_medicao_comercial = db.relationship("ItemMedicaoComercial", backref="tarefas_vinculadas")`
+    *   `cronograma_tarefa = db.relationship("CronogramaTarefa")`
+
+4.  **Modelo `MedicaoObra` (EXISTENTE, mas com ajustes):**
+    *   `id`, `admin_id`, `obra_id` (FK), `data_medicao`, `periodo_inicio`, `periodo_fim`.
+    *   `valor_total_medido_periodo = db.Column(db.Numeric(15, 2), default=0.00)`: Soma dos valores medidos no período.
+    *   `valor_entrada_abatido_periodo = db.Column(db.Numeric(15, 2), default=0.00)`: Valor da entrada abatido neste período.
+    *   `valor_a_faturar_periodo = db.Column(db.Numeric(15, 2), default=0.00)`: Valor final a ser faturado no período.
+    *   `status = db.Column(db.Enum("PENDENTE", "APROVADO", "FATURADO"), default="PENDENTE")`
+    *   `observacoes = db.Column(db.Text)`
+    *   `itens_medidos = db.relationship("MedicaoObraItem", backref="medicao_obra", lazy=True, cascade="all, delete-orphan")`
+
+5.  **Modelo `MedicaoObraItem` (NOVO - Detalhe da Medição):**
+    *   `id = db.Column(db.Integer, primary_key=True)`
+    *   `medicao_obra_id = db.Column(db.Integer, db.ForeignKey("medicao_obra.id"), nullable=False)`
+    *   `item_medicao_comercial_id = db.Column(db.Integer, db.ForeignKey("item_medicao_comercial.id"), nullable=False)`
+    *   `percentual_executado_periodo = db.Column(db.Numeric(5, 2), nullable=False)`: % executada do item NESTE período.
+    *   `valor_medido_periodo = db.Column(db.Numeric(15, 2), nullable=False)`: Valor monetário medido NESTE período.
+    *   `percentual_executado_acumulado = db.Column(db.Numeric(5, 2), nullable=False)`: % acumulada do item até esta medição.
+    *   `valor_executado_acumulado = db.Column(db.Numeric(15, 2), nullable=False)`: Valor monetário acumulado do item até esta medição.
+    *   `item_medicao_comercial = db.relationship("ItemMedicaoComercial")`
+
+6.  **Modelo `CronogramaTarefa`:**
+    *   Garanta que tenha `percentual_concluido = db.Column(db.Numeric(5, 2), default=0.00)`.
+
+### 2. LÓGICA DE BACKEND (VIEWS, SERVICES, UTILS)
+
+**Objetivo:** Gerenciar a criação dos itens de medição, calcular o progresso, aplicar a amortização da entrada e gerar os extratos quinzenais.
+
+1.  **Serviço `MedicaoService` (NOVO):**
+    *   **`criar_item_medicao_comercial(obra_id, nome, valor_comercial, subatividades_com_peso)`:**
+        *   Cria `ItemMedicaoComercial` e `ItemMedicaoCronogramaTarefa`.
+        *   Valida se a soma dos `pesos` das subatividades é 100%.
+    *   **`calcular_percentual_executado_item_comercial(item_medicao_id)`:**
+        *   Busca as `CronogramaTarefa` vinculadas ao `ItemMedicaoComercial`.
+        *   Calcula a média ponderada dos `percentual_concluido` das tarefas, usando o `peso` definido em `ItemMedicaoCronogramaTarefa`.
+        *   Retorna o `% executado` para o item comercial.
+    *   **`gerar_medicao_quinzenal(obra_id, data_fim_periodo)`:**
+        *   **Identifica Itens a Medir:** Para cada `ItemMedicaoComercial` da obra, calcula o `percentual_executado` atual (usando a função acima).
+        *   **Calcula Progresso no Período:** Compara o `% executado` atual com o `percentual_executado_acumulado` da última `MedicaoObraItem` para cada item comercial.
+        *   **Calcula `valor_medido_periodo`:** `(percentual_executado_periodo / 100) * valor_comercial`.
+        *   **Aplica Amortização da Entrada:**
+            *   Calcule o `percentual_entrada_obra = (obra.valor_entrada / obra.valor_total_proposta) * 100`.
+            *   `valor_entrada_abatido_periodo = valor_total_medido_periodo * (percentual_entrada_obra / 100)`.
+        *   **Calcula `valor_a_faturar_periodo = valor_total_medido_periodo - valor_entrada_abatido_periodo`.
+        *   **Cria `MedicaoObra`:** Um registro para o período.
+        *   **Cria `MedicaoObraItem`:** Registros detalhados para cada `ItemMedicaoComercial` que teve progresso no período.
+        *   **Gera `ContaReceber`:** Cria uma `ContaReceber` para o cliente com o `valor_a_faturar_periodo`.
+        *   **Gera Extrato (PDF):** Um PDF detalhado para o cliente com a medição do período, valores, e o abatimento da entrada.
+
+2.  **Integração com RDO:**
+    *   Ao finalizar um RDO, o sistema deve atualizar o `percentual_concluido` das `CronogramaTarefa` impactadas, que por sua vez, alimentarão o cálculo dos `ItemMedicaoComercial`.
+
+3.  **Portal do Cliente (Atualização):**
+    *   Exiba as `MedicaoObra` geradas, permitindo que o cliente visualize o extrato (PDF) e o status de pagamento.
+
+### 3. INTERFACE DO USUÁRIO (TEMPLATES)
+
+**Objetivo:** Criar uma interface intuitiva para a gestão das medições e a visualização pelo cliente.
+
+1.  **Tela de Gestão de Itens de Medição (NOVA):**
+    *   Uma tela no painel administrativo onde o usuário pode:
+        *   Criar novos `ItemMedicaoComercial` (Nome, Valor Comercial).
+        *   Para cada item, selecionar `CronogramaTarefa` e atribuir `peso` (interface de drag-and-drop ou seleção múltipla com input de peso).
+        *   Visualizar o `% executado` atual de cada item comercial.
+
+2.  **Tela de Geração de Medição Quinzenal (NOVA):**
+    *   Um botão ou processo agendado que dispara a função `gerar_medicao_quinzenal`.
+    *   Exiba um resumo das medições geradas e o `valor_a_faturar_periodo`.
+
+3.  **Portal do Cliente (Atualização):**
+    *   **Seção "Medições e Faturamento":**
+        *   Liste as `MedicaoObra` geradas, com `data_medicao`, `valor_total_medido_periodo`, `valor_entrada_abatido_periodo` e `valor_a_faturar_periodo`.
+        *   Link para download do Extrato de Medição (PDF).
+        *   Status de pagamento da `ContaReceber` vinculada.
+
+### 4. REGRAS DE INTEGRIDADE E SEGURANÇA
+
+*   **Multi-tenancy:** Todas as operações devem ser filtradas por `admin_id`.
+*   **Consistência:** Garanta que a soma dos `pesos` das `CronogramaTarefa` para um `ItemMedicaoComercial` seja sempre 100%.
+*   **Histórico:** Uma vez gerada e aprovada, uma `MedicaoObra` não deve ser alterada, apenas novas medições podem ser criadas.
+*   **Notificações:** Notifique o cliente e o `admin_id` quando uma nova medição for gerada e quando um pagamento for recebido.
+
+**ESTA IMPLEMENTAÇÃO TRANSFORMARÁ A GESTÃO FINANCEIRA DA OBRA, ALINHANDO O PROGRESSO FÍSICO COM O FATURAMENTO DE FORMA TRANSPARENTE E AUTOMATIZADA.**
