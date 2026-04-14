@@ -1456,6 +1456,9 @@ class Fornecedor(db.Model):
     # Tipo: MATERIAL | PRESTADOR_SERVICO | OUTRO
     tipo_fornecedor = db.Column(db.String(20), nullable=True, default='OUTRO')
 
+    # Dados bancários / PIX
+    chave_pix = db.Column(db.String(100))
+
     # Status
     ativo = db.Column(db.Boolean, default=True)
     
@@ -4114,6 +4117,10 @@ class PedidoCompra(db.Model):
     observacoes = db.Column(db.Text)
     anexo_url = db.Column(db.String(500))
 
+    # Portal do Cliente — aprovação e comprovante
+    status_aprovacao_cliente = db.Column(db.String(20), default='PENDENTE')
+    comprovante_pagamento_url = db.Column(db.String(500))
+
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -4505,3 +4512,24 @@ class CronogramaTemplateItem(db.Model):
 
     def __repr__(self):
         return f'<CronogramaTemplateItem {self.nome_tarefa}>'
+
+
+class MedicaoObra(db.Model):
+    __tablename__ = 'medicao_obra'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    numero = db.Column(db.Integer, nullable=False)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date, nullable=False)
+    percentual_acumulado = db.Column(db.Float, default=0.0)
+    valor_medido = db.Column(db.Numeric(14, 2), default=0)
+    observacoes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='RASCUNHO')
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref='medicoes')
+
+    def __repr__(self):
+        return f'<MedicaoObra #{self.numero} obra_id={self.obra_id}>'

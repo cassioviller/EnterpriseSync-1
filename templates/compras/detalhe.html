@@ -51,6 +51,23 @@
             </dd>
             <dt class="col-sm-5 fw-bold">Total</dt>
             <dd class="col-sm-7 fw-bold text-dark fs-5">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</dd>
+            {% if pedido.status_aprovacao_cliente %}
+            <dt class="col-sm-5">Aprovação Cliente</dt>
+            <dd class="col-sm-7">
+              {% set sa = pedido.status_aprovacao_cliente %}
+              <span class="badge {% if sa == 'APROVADO' %}bg-success{% elif sa == 'REJEITADO' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                {{ sa }}
+              </span>
+            </dd>
+            {% endif %}
+            {% if pedido.comprovante_pagamento_url %}
+            <dt class="col-sm-5">Comprovante</dt>
+            <dd class="col-sm-7">
+              <a href="{{ pedido.comprovante_pagamento_url }}" target="_blank" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-file-alt me-1"></i>Ver Comprovante
+              </a>
+            </dd>
+            {% endif %}
           </dl>
           {% if pedido.observacoes %}
           <hr>

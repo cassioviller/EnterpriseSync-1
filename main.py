@@ -162,6 +162,13 @@ except Exception as e:
 
 # Alimentação CRUD já registrado em app.py - removendo duplicação
 
+try:
+    from portal_obras_views import portal_obras_bp
+    app.register_blueprint(portal_obras_bp)
+    logger.info("[OK] Portal do Cliente por Obra registrado")
+except Exception as e:
+    logger.error(f"[ERROR] Erro ao registrar Portal Obras: {e}")
+
 logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
 
 try:
@@ -177,6 +184,7 @@ main_py_exempt_blueprints = [
     'analytics_preditivos', 'dashboards_especificos',
     'exportacao_relatorios', 'relatorios_financeiros',
     'api_funcionarios', 'api_buscar_funcionarios', 'health',
+    'portal_obras',
 ]
 for bp_name in main_py_exempt_blueprints:
     bp = app.blueprints.get(bp_name)

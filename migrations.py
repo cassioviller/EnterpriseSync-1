@@ -3806,6 +3806,7 @@ def executar_migracoes():
             (104, "Fornecedor - tipo_fornecedor (MATERIAL / PRESTADOR_SERVICO / OUTRO)", migration_104_tipo_fornecedor),
             (105, "FluxoCaixa - banco_id FK opcional para BancoEmpresa", migration_105_fluxo_caixa_banco_id),
             (106, "RDO e filhos — ON DELETE CASCADE para exclusão em cascata com Obra", migration_106_rdo_obra_cascade),
+            (107, "Portal do Cliente — chave_pix, status_aprovacao_cliente, medicao_obra", migration_107_portal_cliente_obra),
         ]
         
         # Executar cada migração com rastreamento
@@ -8479,6 +8480,78 @@ def migration_106_rdo_obra_cascade():
 
     except Exception as e:
         logger.error(f"Erro na migracao 106: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_107_portal_cliente_obra():
+    """
+    Migration 107: Portal do Cliente por Obra
+    - Fornecedor.chave_pix (String 100)
+    - PedidoCompra.status_aprovacao_cliente (String 20, default PENDENTE)
+    - PedidoCompra.comprovante_pagamento_url (String 500)
+    - Tabela medicao_obra
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cols = [
+            ("fornecedor", "chave_pix", "VARCHAR(100)"),
+            ("pedido_compra", "status_aprovacao_cliente", "VARCHAR(20) DEFAULT 'PENDENTE'"),
+            ("pedido_compra", "comprovante_pagamento_url", "VARCHAR(500)"),
+        ]
+        for table, col, dtype in cols:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = %s AND column_name = %s
+            """, (table, col))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {dtype}')
+                logger.info(f"MIGRACAO 107: {table}.{col} adicionado")
+            else:
+                logger.info(f"MIGRACAO 107: {table}.{col} ja existe")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'medicao_obra'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE medicao_obra (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    numero INTEGER NOT NULL,
+                    data_inicio DATE NOT NULL,
+                    data_fim DATE NOT NULL,
+                    percentual_acumulado FLOAT DEFAULT 0.0,
+                    valor_medido NUMERIC(14,2) DEFAULT 0,
+                    observacoes TEXT,
+                    status VARCHAR(20) DEFAULT 'RASCUNHO',
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_medicao_obra_obra_id ON medicao_obra(obra_id)")
+            cursor.execute("CREATE INDEX idx_medicao_obra_admin_id ON medicao_obra(admin_id)")
+            logger.info("MIGRACAO 107: tabela medicao_obra criada")
+        else:
+            logger.info("MIGRACAO 107: tabela medicao_obra ja existe")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 107 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 107: {e}")
         if connection:
             try:
                 connection.rollback()

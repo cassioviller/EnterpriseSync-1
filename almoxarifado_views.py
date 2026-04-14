@@ -2762,8 +2762,10 @@ def fornecedores_criar():
 
             # Criar fornecedor
             # NOTA: Campo 'nome' é obrigatório no banco - usar razao_social como valor
+            chave_pix = request.form.get('chave_pix', '').strip()
+
             fornecedor = Fornecedor(
-                nome=razao_social,  # Campo legado obrigatório no banco
+                nome=razao_social,
                 razao_social=razao_social,
                 nome_fantasia=nome_fantasia or None,
                 cnpj=cnpj,
@@ -2776,6 +2778,7 @@ def fornecedores_criar():
                 email=email or None,
                 contato_responsavel=contato_responsavel or None,
                 tipo_fornecedor=tipo_fornecedor,
+                chave_pix=chave_pix or None,
                 admin_id=admin_id
             )
             
@@ -2857,6 +2860,7 @@ def fornecedores_editar(id):
             fornecedor.email = email or None
             fornecedor.contato_responsavel = contato_responsavel or None
             fornecedor.tipo_fornecedor = tipo_fornecedor
+            fornecedor.chave_pix = request.form.get('chave_pix', '').strip() or None
             fornecedor.updated_at = datetime.utcnow()
             
             db.session.commit()

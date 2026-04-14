@@ -143,6 +143,14 @@
                                    value="{{ fornecedor.contato_responsavel if fornecedor else '' }}"
                                    placeholder="Ex: João Silva">
                         </div>
+
+                        <div class="mb-3">
+                            <label for="chave_pix" class="form-label"><i class="fas fa-key me-1 text-success"></i>Chave PIX</label>
+                            <input type="text" class="form-control" id="chave_pix" name="chave_pix"
+                                   value="{{ fornecedor.chave_pix if fornecedor else '' }}"
+                                   placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória">
+                            <div class="form-text">Exibida no Portal do Cliente para pagamento direto</div>
+                        </div>
                     </div>
                 </div>
             </div>
