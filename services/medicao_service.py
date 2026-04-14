@@ -277,9 +277,13 @@ def gerar_pdf_extrato_medicao(medicao_id, admin_id):
     def fmt_brl(v):
         return f"R$ {float(v or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
+    entrada_perc = 0
+    if obra.valor_contrato and float(obra.valor_contrato) > 0 and obra.valor_entrada:
+        entrada_perc = float(obra.valor_entrada) / float(obra.valor_contrato) * 100
+
     resumo_data = [
         ['Total Medido no Período:', fmt_brl(medicao.valor_total_medido_periodo)],
-        ['Entrada Abatida:', f"(−) {fmt_brl(medicao.valor_entrada_abatido_periodo)}"],
+        [f'Entrada Abatida ({entrada_perc:.1f}%):', f"(−) {fmt_brl(medicao.valor_entrada_abatido_periodo)}"],
         ['Valor a Faturar:', fmt_brl(medicao.valor_a_faturar_periodo)],
     ]
     rt = Table(resumo_data, colWidths=[300, 160])

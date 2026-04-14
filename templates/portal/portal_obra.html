@@ -402,7 +402,7 @@
                     <span class="status-badge {% if m.status == 'APROVADO' %}status-aprovado{% elif m.status == 'FATURADO' %}status-faturado{% else %}status-pendente{% endif %}">
                         {{ m.status }}
                     </span>
-                    <a href="{{ url_for('medicao.portal_pdf_extrato', medicao_id=m.id, token=obra.token_cliente) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Extrato PDF">
+                    <a href="{{ url_for('medicao.portal_pdf_extrato', medicao_id=m.id) }}?token={{ obra.token_cliente }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Extrato PDF">
                         <i class="fas fa-file-pdf"></i>
                     </a>
                 </div>

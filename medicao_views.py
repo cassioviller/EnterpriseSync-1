@@ -14,7 +14,7 @@ from models import (
 
 logger = logging.getLogger(__name__)
 
-medicao_bp = Blueprint('medicao', __name__, url_prefix='/medicao')
+medicao_bp = Blueprint('medicao', __name__)
 
 
 def _admin_id():
@@ -35,8 +35,8 @@ def _calc_realtime_perc(item):
     return float(calcular_percentual_item(item))
 
 
-@medicao_bp.route('/obra/<int:obra_id>')
 @medicao_bp.route('/obras/<int:obra_id>/medicao')
+@medicao_bp.route('/medicao/obra/<int:obra_id>')
 @login_required
 def gestao_itens(obra_id):
     guard = _check_v2()
@@ -94,8 +94,30 @@ def gestao_itens(obra_id):
     )
 
 
-@medicao_bp.route('/obra/<int:obra_id>/item', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens', methods=['GET'])
+@login_required
+def listar_itens(obra_id):
+    admin_id = _admin_id()
+    Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    itens = ItemMedicaoComercial.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id
+    ).order_by(ItemMedicaoComercial.id).all()
+    result = []
+    for item in itens:
+        vinc = ItemMedicaoCronogramaTarefa.query.filter_by(item_medicao_id=item.id).all()
+        result.append({
+            'id': item.id,
+            'nome': item.nome,
+            'valor_comercial': float(item.valor_comercial or 0),
+            'percentual_executado_acumulado': float(item.percentual_executado_acumulado or 0),
+            'status': item.status,
+            'tarefas': [{'id': v.id, 'tarefa_id': v.cronograma_tarefa_id, 'peso': float(v.peso)} for v in vinc],
+        })
+    return jsonify(result)
+
+
 @medicao_bp.route('/obras/<int:obra_id>/medicao/itens', methods=['POST'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/item', methods=['POST'])
 @login_required
 def criar_item(obra_id):
     guard = _check_v2()
@@ -103,7 +125,7 @@ def criar_item(obra_id):
         return guard
 
     admin_id = _admin_id()
-    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
 
     nome = request.form.get('nome', '').strip()
     try:
@@ -128,8 +150,8 @@ def criar_item(obra_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/editar', methods=['POST'])
 @medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>', methods=['POST'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/item/<int:item_id>/editar', methods=['POST'])
 @login_required
 def editar_item(obra_id, item_id):
     admin_id = _admin_id()
@@ -154,8 +176,8 @@ def editar_item(obra_id, item_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/excluir', methods=['POST'])
-@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/excluir', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/excluir', methods=['POST', 'DELETE'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/item/<int:item_id>/excluir', methods=['POST', 'DELETE'])
 @login_required
 def excluir_item(obra_id, item_id):
     admin_id = _admin_id()
@@ -165,12 +187,14 @@ def excluir_item(obra_id, item_id):
 
     db.session.delete(item)
     db.session.commit()
+    if request.method == 'DELETE':
+        return jsonify({'status': 'ok'}), 200
     flash('Item excluído.', 'success')
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/vincular', methods=['POST'])
 @medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/tarefas', methods=['POST'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/item/<int:item_id>/vincular', methods=['POST'])
 @login_required
 def vincular_tarefa(obra_id, item_id):
     admin_id = _admin_id()
@@ -227,8 +251,8 @@ def vincular_tarefa(obra_id, item_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/item/<int:item_id>/desvincular/<int:vinculo_id>', methods=['POST'])
-@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/tarefas/<int:vinculo_id>/excluir', methods=['POST'])
+@medicao_bp.route('/obras/<int:obra_id>/medicao/itens/<int:item_id>/tarefas/<int:vinculo_id>/excluir', methods=['POST', 'DELETE'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/item/<int:item_id>/desvincular/<int:vinculo_id>', methods=['POST', 'DELETE'])
 @login_required
 def desvincular_tarefa(obra_id, item_id, vinculo_id):
     admin_id = _admin_id()
@@ -240,13 +264,15 @@ def desvincular_tarefa(obra_id, item_id, vinculo_id):
     if vinculo and vinculo.item_medicao_id == item_id:
         db.session.delete(vinculo)
         db.session.commit()
+        if request.method == 'DELETE':
+            return jsonify({'status': 'ok'}), 200
         flash('Tarefa desvinculada.', 'success')
 
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/config', methods=['POST'])
 @medicao_bp.route('/obras/<int:obra_id>/medicao/config', methods=['POST'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/config', methods=['POST'])
 @login_required
 def config_obra_medicao(obra_id):
     admin_id = _admin_id()
@@ -270,8 +296,8 @@ def config_obra_medicao(obra_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/gerar', methods=['POST'])
-@medicao_bp.route('/obras/<int:obra_id>/medicao/fechar', methods=['POST'], endpoint='fechar_quinzena')
+@medicao_bp.route('/obras/<int:obra_id>/medicao/fechar', methods=['POST'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/gerar', methods=['POST'])
 @login_required
 def gerar_medicao(obra_id):
     guard = _check_v2()
@@ -304,8 +330,8 @@ def gerar_medicao(obra_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/fechar/<int:medicao_id>', methods=['POST'])
 @medicao_bp.route('/obras/<int:obra_id>/medicao/<int:medicao_id>/aprovar', methods=['POST'])
+@medicao_bp.route('/medicao/obra/<int:obra_id>/fechar/<int:medicao_id>', methods=['POST'])
 @login_required
 def fechar(obra_id, medicao_id):
     admin_id = _admin_id()
@@ -320,9 +346,9 @@ def fechar(obra_id, medicao_id):
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
 
-@medicao_bp.route('/obra/<int:obra_id>/pdf/<int:medicao_id>')
-@medicao_bp.route('/<int:medicao_id>/pdf')
 @medicao_bp.route('/obras/<int:obra_id>/medicao/<int:medicao_id>/pdf')
+@medicao_bp.route('/medicao/obra/<int:obra_id>/pdf/<int:medicao_id>')
+@medicao_bp.route('/medicao/<int:medicao_id>/pdf')
 @login_required
 def pdf_extrato(obra_id=None, medicao_id=None):
     admin_id = _admin_id()
@@ -337,7 +363,7 @@ def pdf_extrato(obra_id=None, medicao_id=None):
     return response
 
 
-@medicao_bp.route('/portal/pdf/<int:medicao_id>')
+@medicao_bp.route('/medicao/portal/pdf/<int:medicao_id>')
 def portal_pdf_extrato(medicao_id):
     token = request.args.get('token', '')
     if not token:
