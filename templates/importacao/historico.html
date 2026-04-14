@@ -97,6 +97,7 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function(){ if (typeof feather !== 'undefined') feather.replace(); });
 function confirmarRollback(batchId) {
   if (confirm('Desfazer a importação ' + batchId + '?\n\nTodos os registros deste lote serão removidos permanentemente.')) {
     var formId = 'form-' + batchId.replace(/_/g, '-');

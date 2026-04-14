@@ -255,6 +255,7 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function(){ if (typeof feather !== 'undefined') feather.replace(); });
 function confirmarRollback(batchId) {
   if (confirm('Tem certeza que deseja desfazer a importação ' + batchId + '?\n\nTodos os registros deste lote serão removidos permanentemente.')) {
     document.getElementById('formRollback').submit();

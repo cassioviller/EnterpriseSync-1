@@ -255,6 +255,7 @@ function toggleDefaults(slug, formato) {
 
 // Auto-detecção de formato pelo nome do arquivo
 document.addEventListener('DOMContentLoaded', function() {
+  if (typeof feather !== 'undefined') feather.replace();
   document.querySelectorAll('input[type="file"][name="arquivo"]').forEach(function(input) {
     input.addEventListener('change', function() {
       var fname = (this.value || '').toLowerCase();
