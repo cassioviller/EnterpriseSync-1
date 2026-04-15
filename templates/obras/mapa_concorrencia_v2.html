@@ -1,6 +1,6 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Mapa de Concorrência V2 — {{ mapa.nome }}{% endblock %}
+{% block title %}Mapa de Concorrência — {{ mapa.nome }}{% endblock %}
 
 {% block head %}
 <style>
@@ -85,7 +85,7 @@
         <ol class="breadcrumb" style="font-size:.88rem;">
             <li class="breadcrumb-item"><a href="{{ url_for('main.obras') }}">Obras</a></li>
             <li class="breadcrumb-item"><a href="{{ url_for('main.detalhes_obra', id=obra.id) }}">{{ obra.nome }}</a></li>
-            <li class="breadcrumb-item active">Mapa V2 — {{ mapa.nome }}</li>
+            <li class="breadcrumb-item active">Mapa de Concorrência — {{ mapa.nome }}</li>
         </ol>
     </nav>
 
