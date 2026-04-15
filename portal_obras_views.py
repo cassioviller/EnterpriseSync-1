@@ -127,21 +127,6 @@ def portal_obra(token: str):
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     nome_empresa = config.nome_empresa if config else 'Construtora'
 
-    mapas_pendentes = (
-        MapaConcorrencia.query
-        .filter_by(obra_id=obra.id, admin_id=admin_id, status='pendente')
-        .order_by(MapaConcorrencia.created_at.desc())
-        .all()
-    )
-    mapas_concluidos = (
-        MapaConcorrencia.query
-        .filter_by(obra_id=obra.id, admin_id=admin_id, status='concluido')
-        .order_by(MapaConcorrencia.created_at.desc())
-        .all()
-    )
-    for m in mapas_pendentes + mapas_concluidos:
-        m._opcoes_list = m.opcoes.all()
-
     # Mapas V2 — separados em abertos (aguardando aprovação cliente) e concluídos
     mapas_v2_abertos = (
         MapaConcorrenciaV2.query
@@ -255,8 +240,6 @@ def portal_obra(token: str):
         medicao_contas=medicao_contas,
         nome_empresa=nome_empresa,
         hoje=date.today(),
-        mapas_pendentes=mapas_pendentes,
-        mapas_concluidos=mapas_concluidos,
         mapas_v2_abertos_ctx=mapas_v2_abertos_ctx,
         mapas_v2_concluidos_ctx=mapas_v2_concluidos_ctx,
     )
