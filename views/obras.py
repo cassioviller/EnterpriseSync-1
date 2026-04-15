@@ -1774,7 +1774,13 @@ def nova_mapa_concorrencia(obra_id):
 
         def _parse_num(val):
             try:
-                return float(val.replace('.', '').replace(',', '.'))
+                v = val.strip()
+                # Handle Brazilian format 1.234,56 → 1234.56
+                if ',' in v and '.' in v:
+                    v = v.replace('.', '').replace(',', '.')
+                elif ',' in v:
+                    v = v.replace(',', '.')
+                return float(v)
             except Exception:
                 return 0.0
 

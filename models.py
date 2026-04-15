@@ -4615,7 +4615,7 @@ class OpcaoConcorrencia(db.Model):
     prazo_entrega = db.Column(db.String(100))
     observacoes = db.Column(db.Text)
     selecionada = db.Column(db.Boolean, default=False, nullable=False)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
     def __repr__(self):
         return f'<OpcaoConcorrencia #{self.id} mapa={self.mapa_id}>'

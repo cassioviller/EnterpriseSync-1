@@ -3809,6 +3809,7 @@ def executar_migracoes():
             (107, "Portal do Cliente — chave_pix, status_aprovacao_cliente, medicao_obra", migration_107_portal_cliente_obra),
             (108, "Medição Quinzenal — itens comerciais, tarefas vinculadas, expansão medicao_obra", migration_108_medicao_quinzenal),
             (109, "Mapa de Concorrência — tabelas mapa_concorrencia e opcao_concorrencia", migration_109_mapa_concorrencia),
+            (110, "OpcaoConcorrencia — enforça NOT NULL em admin_id", migration_110_opcao_concorrencia_admin_not_null),
         ]
         
         # Executar cada migração com rastreamento
@@ -8737,6 +8738,66 @@ def migration_105_fluxo_caixa_banco_id():
 
     except Exception as e:
         logger.error(f"Erro na migracao 105: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_110_opcao_concorrencia_admin_not_null():
+    """
+    Migration 110: Enforces NOT NULL on opcao_concorrencia.admin_id.
+    Fills any existing NULLs from the parent mapa's admin_id before applying constraint.
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'opcao_concorrencia'
+        """)
+        if cursor.fetchone()[0] == 0:
+            logger.info("MIGRACAO 110: tabela opcao_concorrencia não existe — skip")
+            connection.commit()
+            connection.close()
+            return True
+
+        cursor.execute("""
+            UPDATE opcao_concorrencia oc
+            SET admin_id = mc.admin_id
+            FROM mapa_concorrencia mc
+            WHERE oc.mapa_id = mc.id AND oc.admin_id IS NULL
+        """)
+        updated = cursor.rowcount
+        if updated:
+            logger.info(f"MIGRACAO 110: {updated} linhas de opcao_concorrencia corrigidas com admin_id")
+
+        cursor.execute("""
+            SELECT is_nullable FROM information_schema.columns
+            WHERE table_name = 'opcao_concorrencia' AND column_name = 'admin_id'
+        """)
+        row = cursor.fetchone()
+        if row and row[0] == 'YES':
+            cursor.execute(
+                "ALTER TABLE opcao_concorrencia ALTER COLUMN admin_id SET NOT NULL"
+            )
+            logger.info("MIGRACAO 110: admin_id de opcao_concorrencia alterado para NOT NULL")
+        else:
+            logger.info("MIGRACAO 110: admin_id já é NOT NULL — skip")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 110 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 110: {e}")
         if connection:
             try:
                 connection.rollback()

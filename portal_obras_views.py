@@ -207,7 +207,9 @@ def upload_comprovante(token: str, compra_id: int):
 def aprovar_mapa_concorrencia(token: str, mapa_id: int):
     """O cliente seleciona a opção preferida no Mapa de Concorrência."""
     obra = _get_obra_by_token(token)
-    mapa = MapaConcorrencia.query.filter_by(id=mapa_id, obra_id=obra.id).first_or_404()
+    mapa = MapaConcorrencia.query.filter_by(
+        id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
+    ).first_or_404()
 
     opcao_id = request.form.get('opcao_id', type=int)
     if not opcao_id:
