@@ -4641,6 +4641,80 @@ class MedicaoObraItem(db.Model):
         return f'<MedicaoObraItem medicao={self.medicao_obra_id} item={self.item_medicao_comercial_id}>'
 
 
+class MapaConcorrenciaV2(db.Model):
+    """Mapa de Concorrência V2 — tabela multi-fornecedor comparativa (N itens × N fornecedores)"""
+    __tablename__ = 'mapa_concorrencia_v2'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(300), nullable=False)
+    status = db.Column(db.String(20), default='aberto', nullable=False)  # aberto / concluido
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref=db.backref('mapas_v2', lazy='dynamic', cascade='all,delete-orphan'))
+    fornecedores = db.relationship('MapaFornecedor', backref='mapa', cascade='all, delete-orphan',
+                                   order_by='MapaFornecedor.ordem')
+    itens = db.relationship('MapaItemCotacao', backref='mapa', cascade='all, delete-orphan',
+                            order_by='MapaItemCotacao.ordem')
+    cotacoes = db.relationship('MapaCotacao', backref='mapa', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<MapaConcorrenciaV2 #{self.id} "{self.nome}" obra={self.obra_id}>'
+
+
+class MapaFornecedor(db.Model):
+    """Fornecedor (coluna) de um MapaConcorrenciaV2"""
+    __tablename__ = 'mapa_fornecedor'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mapa_id = db.Column(db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(200), nullable=False)
+    ordem = db.Column(db.Integer, default=0)
+
+    cotacoes = db.relationship('MapaCotacao', backref='fornecedor', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<MapaFornecedor #{self.id} "{self.nome}">'
+
+
+class MapaItemCotacao(db.Model):
+    """Item (linha) de um MapaConcorrenciaV2"""
+    __tablename__ = 'mapa_item_cotacao'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mapa_id = db.Column(db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    descricao = db.Column(db.String(500), nullable=False)
+    unidade = db.Column(db.String(50), default='un')
+    quantidade = db.Column(db.Numeric(12, 3), default=1)
+    ordem = db.Column(db.Integer, default=0)
+
+    cotacoes = db.relationship('MapaCotacao', backref='item', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<MapaItemCotacao #{self.id} "{self.descricao}">'
+
+
+class MapaCotacao(db.Model):
+    """Cotação (célula) de um item × fornecedor no MapaConcorrenciaV2"""
+    __tablename__ = 'mapa_cotacao'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mapa_id = db.Column(db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='CASCADE'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('mapa_item_cotacao.id', ondelete='CASCADE'), nullable=False)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('mapa_fornecedor.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    valor_unitario = db.Column(db.Numeric(14, 2), default=0)
+    prazo = db.Column(db.String(100))
+    selecionado = db.Column(db.Boolean, default=False, nullable=False)
+
+    def __repr__(self):
+        return f'<MapaCotacao item={self.item_id} forn={self.fornecedor_id} val={self.valor_unitario}>'
+
+
 class CronogramaCliente(db.Model):
     """
     Cronograma editável exclusivo para apresentação ao cliente no Portal.

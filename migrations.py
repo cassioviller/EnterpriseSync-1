@@ -3811,6 +3811,7 @@ def executar_migracoes():
             (109, "Mapa de Concorrência — tabelas mapa_concorrencia e opcao_concorrencia", migration_109_mapa_concorrencia),
             (110, "OpcaoConcorrencia — enforça NOT NULL em admin_id", migration_110_opcao_concorrencia_admin_not_null),
             (111, "CronogramaCliente — cronograma editável para portal do cliente", migration_111_cronograma_cliente),
+            (112, "MapaConcorrenciaV2 — tabela multi-fornecedor com cotações por item", migration_112_mapa_concorrencia_v2),
         ]
         
         # Executar cada migração com rastreamento
@@ -8920,6 +8921,118 @@ def migration_111_cronograma_cliente():
 
     except Exception as e:
         logger.error(f"Erro na migracao 111: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_112_mapa_concorrencia_v2():
+    """
+    Migration 112: Cria tabelas para o Mapa de Concorrência V2 —
+    tabela multi-fornecedor com múltiplos itens e cotações por célula.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'mapa_concorrencia_v2'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE mapa_concorrencia_v2 (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(300) NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'aberto',
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_mapa_v2_obra_id ON mapa_concorrencia_v2(obra_id)")
+            cursor.execute("CREATE INDEX idx_mapa_v2_admin_id ON mapa_concorrencia_v2(admin_id)")
+            logger.info("MIGRACAO 112: tabela mapa_concorrencia_v2 criada")
+        else:
+            logger.info("MIGRACAO 112: mapa_concorrencia_v2 ja existe -- skip")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'mapa_fornecedor'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE mapa_fornecedor (
+                    id SERIAL PRIMARY KEY,
+                    mapa_id INTEGER NOT NULL REFERENCES mapa_concorrencia_v2(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(200) NOT NULL,
+                    ordem INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_mapa_fornecedor_mapa_id ON mapa_fornecedor(mapa_id)")
+            logger.info("MIGRACAO 112: tabela mapa_fornecedor criada")
+        else:
+            logger.info("MIGRACAO 112: mapa_fornecedor ja existe -- skip")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'mapa_item_cotacao'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE mapa_item_cotacao (
+                    id SERIAL PRIMARY KEY,
+                    mapa_id INTEGER NOT NULL REFERENCES mapa_concorrencia_v2(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    descricao VARCHAR(500) NOT NULL,
+                    unidade VARCHAR(50) DEFAULT 'un',
+                    quantidade NUMERIC(12,3) DEFAULT 1,
+                    ordem INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_mapa_item_mapa_id ON mapa_item_cotacao(mapa_id)")
+            logger.info("MIGRACAO 112: tabela mapa_item_cotacao criada")
+        else:
+            logger.info("MIGRACAO 112: mapa_item_cotacao ja existe -- skip")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'mapa_cotacao'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE mapa_cotacao (
+                    id SERIAL PRIMARY KEY,
+                    mapa_id INTEGER NOT NULL REFERENCES mapa_concorrencia_v2(id) ON DELETE CASCADE,
+                    item_id INTEGER NOT NULL REFERENCES mapa_item_cotacao(id) ON DELETE CASCADE,
+                    fornecedor_id INTEGER NOT NULL REFERENCES mapa_fornecedor(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    valor_unitario NUMERIC(14,2) DEFAULT 0,
+                    prazo VARCHAR(100),
+                    selecionado BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_mapa_cotacao_mapa_id ON mapa_cotacao(mapa_id)")
+            cursor.execute("CREATE INDEX idx_mapa_cotacao_item_id ON mapa_cotacao(item_id)")
+            cursor.execute("CREATE UNIQUE INDEX idx_mapa_cotacao_unique ON mapa_cotacao(item_id, fornecedor_id)")
+            logger.info("MIGRACAO 112: tabela mapa_cotacao criada")
+        else:
+            logger.info("MIGRACAO 112: mapa_cotacao ja existe -- skip")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 112 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 112: {e}")
         if connection:
             try:
                 connection.rollback()

@@ -1,0 +1,336 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Mapa de Concorrência V2 — {{ mapa.nome }}{% endblock %}
+
+{% block head %}
+<style>
+.mapa-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+}
+.section-card {
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+.section-card-header {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.section-card-body {
+    padding: 1.5rem;
+}
+.table-cotacao th, .table-cotacao td {
+    padding: .6rem .8rem;
+    vertical-align: middle;
+    font-size: .88rem;
+}
+.table-cotacao thead th {
+    background: #1e3a8a;
+    color: white;
+    font-weight: 600;
+    border: none;
+}
+.table-cotacao thead th:first-child {
+    border-radius: 8px 0 0 0;
+}
+.table-cotacao thead th:last-child {
+    border-radius: 0 8px 0 0;
+}
+.table-cotacao tbody tr:nth-child(even) { background: #f8fafc; }
+.table-cotacao tbody tr:hover { background: #eff6ff; }
+.table-cotacao input[type="number"], .table-cotacao input[type="text"] {
+    width: 100%;
+    min-width: 90px;
+    padding: .3rem .5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: .85rem;
+}
+.badge-status-aberto { background: #fef3c7; color: #92400e; padding: .35rem .8rem; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+.badge-status-concluido { background: #d1fae5; color: #065f46; padding: .35rem .8rem; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+.btn-action { padding: .4rem .9rem; border-radius: 8px; font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: all .2s; }
+.btn-primary-sm { background: #1e40af; color: white; }
+.btn-primary-sm:hover { background: #1e3a8a; color: white; }
+.btn-danger-sm { background: #dc2626; color: white; }
+.btn-danger-sm:hover { background: #b91c1c; color: white; }
+.btn-success-sm { background: #059669; color: white; }
+.btn-success-sm:hover { background: #047857; color: white; }
+.btn-warning-sm { background: #d97706; color: white; }
+.btn-warning-sm:hover { background: #b45309; color: white; }
+.input-add { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 1rem 1.25rem; background: #f8fafc; }
+.chip { display: inline-flex; align-items: center; gap: .4rem; background: #dbeafe; color: #1e40af; padding: .3rem .7rem; border-radius: 20px; font-size: .82rem; font-weight: 600; margin: .25rem; }
+.chip .del-btn { background: none; border: none; color: #1e40af; cursor: pointer; font-size: .9rem; padding: 0; line-height: 1; }
+.chip .del-btn:hover { color: #dc2626; }
+.no-items-hint { text-align: center; padding: 2rem; color: #94a3b8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width: 1200px;">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb" style="font-size:.88rem;">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.obras') }}">Obras</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('main.detalhes_obra', id=obra.id) }}">{{ obra.nome }}</a></li>
+            <li class="breadcrumb-item active">Mapa V2 — {{ mapa.nome }}</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="mapa-header">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <h2 style="margin:0;font-size:1.6rem;font-weight:700;">
+                    <i class="fas fa-balance-scale me-2"></i>{{ mapa.nome }}
+                </h2>
+                <div style="opacity:.85;margin-top:.4rem;font-size:.95rem;">
+                    <i class="fas fa-hard-hat me-1"></i>{{ obra.nome }}
+                    &mdash;
+                    {% if mapa.status == 'aberto' %}
+                    <span class="badge-status-aberto ms-1">Em edição</span>
+                    {% else %}
+                    <span class="badge-status-concluido ms-1">Aprovado pelo cliente</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <!-- Rename form -->
+                <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" class="d-flex gap-1">
+                    <input type="hidden" name="action" value="rename">
+                    <input type="text" name="nome" value="{{ mapa.nome }}" class="form-control form-control-sm" style="min-width:180px;" required>
+                    <button type="submit" class="btn btn-sm btn-light fw-semibold"><i class="fas fa-save me-1"></i>Renomear</button>
+                </form>
+                <!-- Toggle status -->
+                <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" onsubmit="return confirm('{% if mapa.status == 'aberto' %}Marcar este mapa como concluído? O cliente não poderá mais selecionar.{% else %}Reabrir o mapa para o cliente escolher?{% endif %}')">
+                    <input type="hidden" name="action" value="toggle_status">
+                    {% if mapa.status == 'aberto' %}
+                    <button type="submit" class="btn btn-sm btn-success fw-semibold" title="Este mapa já está visível no portal. Clique para marcar como concluído (bloquear seleção do cliente)."><i class="fas fa-check-double me-1"></i>Marcar como Concluído</button>
+                    {% else %}
+                    <button type="submit" class="btn btn-sm btn-warning text-white fw-semibold"><i class="fas fa-undo me-1"></i>Reabrir para Cliente</button>
+                    {% endif %}
+                </form>
+                <!-- Delete -->
+                <form method="POST" action="{{ url_for('main.deletar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" onsubmit="return confirm('Excluir este mapa permanentemente?')">
+                    <button type="submit" class="btn btn-sm btn-danger fw-semibold"><i class="fas fa-trash me-1"></i>Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left column: manage suppliers and items -->
+        <div class="col-lg-3">
+
+            <!-- Fornecedores -->
+            <div class="section-card">
+                <div class="section-card-header"><i class="fas fa-truck"></i> Fornecedores</div>
+                <div class="section-card-body">
+                    {% if mapa.fornecedores %}
+                    {% for f in mapa.fornecedores %}
+                    <div class="d-flex align-items-center justify-content-between mb-2" style="background:#f1f5f9;border-radius:8px;padding:.4rem .7rem;">
+                        <span style="font-size:.88rem;font-weight:600;color:#1e293b;">{{ f.nome }}</span>
+                        <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" onsubmit="return confirm('Remover fornecedor?')">
+                            <input type="hidden" name="action" value="del_fornecedor">
+                            <input type="hidden" name="fornecedor_id" value="{{ f.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remover"><i class="fas fa-times"></i></button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-items-hint" style="padding:1rem;"><i class="fas fa-info-circle me-1"></i>Nenhum fornecedor ainda.</div>
+                    {% endif %}
+                    <!-- Add fornecedor form -->
+                    <div class="input-add mt-3">
+                        <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}">
+                            <input type="hidden" name="action" value="add_fornecedor">
+                            <label class="form-label small fw-semibold text-muted">Adicionar fornecedor</label>
+                            <div class="d-flex gap-1">
+                                <input type="text" name="nome_fornecedor" placeholder="Nome do fornecedor" class="form-control form-control-sm" required>
+                                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Itens -->
+            <div class="section-card">
+                <div class="section-card-header"><i class="fas fa-list-ul"></i> Itens / Serviços</div>
+                <div class="section-card-body">
+                    {% if mapa.itens %}
+                    {% for item in mapa.itens %}
+                    <div class="d-flex align-items-start justify-content-between mb-2" style="background:#f1f5f9;border-radius:8px;padding:.4rem .7rem;">
+                        <div>
+                            <div style="font-size:.85rem;font-weight:600;color:#1e293b;">{{ item.descricao }}</div>
+                            <div style="font-size:.75rem;color:#64748b;">{{ item.quantidade|float|round(2) }} {{ item.unidade }}</div>
+                        </div>
+                        <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" onsubmit="return confirm('Remover item?')">
+                            <input type="hidden" name="action" value="del_item">
+                            <input type="hidden" name="item_id" value="{{ item.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Remover"><i class="fas fa-times"></i></button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-items-hint" style="padding:1rem;"><i class="fas fa-info-circle me-1"></i>Nenhum item ainda.</div>
+                    {% endif %}
+                    <!-- Add item form -->
+                    <div class="input-add mt-3">
+                        <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}">
+                            <input type="hidden" name="action" value="add_item">
+                            <label class="form-label small fw-semibold text-muted">Adicionar item</label>
+                            <input type="text" name="descricao" placeholder="Descrição do item" class="form-control form-control-sm mb-1" required>
+                            <div class="d-flex gap-1">
+                                <input type="text" name="quantidade" placeholder="Qtd" class="form-control form-control-sm" style="width:70px;" value="1">
+                                <input type="text" name="unidade" placeholder="Un" class="form-control form-control-sm" style="width:60px;" value="un">
+                                <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right column: cotação table -->
+        <div class="col-lg-9">
+            <div class="section-card">
+                <div class="section-card-header">
+                    <i class="fas fa-table"></i> Tabela de Cotações
+                    {% if mapa.fornecedores and mapa.itens %}
+                    <span class="ms-auto text-muted" style="font-size:.8rem;font-weight:400;">{{ mapa.itens|length }} item(s) × {{ mapa.fornecedores|length }} fornecedor(es)</span>
+                    {% endif %}
+                </div>
+                <div class="section-card-body p-0">
+                    {% if mapa.fornecedores and mapa.itens %}
+                    <form method="POST" action="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}">
+                        <input type="hidden" name="action" value="save_cotacoes">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-cotacao mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="min-width:200px;">Item / Serviço</th>
+                                        <th style="width:70px;text-align:center;">Qtd</th>
+                                        <th style="width:50px;text-align:center;">Un</th>
+                                        {% for forn in mapa.fornecedores %}
+                                        <th style="min-width:160px;text-align:center;">
+                                            <div>{{ forn.nome }}</div>
+                                            <div style="font-size:.72rem;font-weight:400;opacity:.8;">Valor Unit. / Prazo</div>
+                                        </th>
+                                        {% endfor %}
+                                        <th style="width:120px;text-align:center;">Total Mínimo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in mapa.itens %}
+                                    {% set item_cots = cotacoes_map.get(item.id, {}) %}
+                                    <tr>
+                                        <td style="font-weight:600;">{{ item.descricao }}</td>
+                                        <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
+                                        <td style="text-align:center;">{{ item.unidade }}</td>
+                                        {% set min_val = namespace(v=None) %}
+                                        {% for forn in mapa.fornecedores %}
+                                            {% set cot = item_cots.get(forn.id) %}
+                                            {% if cot and cot.valor_unitario and cot.valor_unitario|float > 0 %}
+                                                {% if min_val.v is none or cot.valor_unitario|float < min_val.v %}
+                                                    {% set min_val.v = cot.valor_unitario|float %}
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% for forn in mapa.fornecedores %}
+                                        {% set cot = item_cots.get(forn.id) %}
+                                        {% set cur_val = cot.valor_unitario|float if cot and cot.valor_unitario else 0 %}
+                                        {% set is_min = min_val.v is not none and cur_val > 0 and cur_val == min_val.v %}
+                                        <td {% if is_min %}style="background:#ecfdf5;"{% endif %}>
+                                            <input type="number" step="0.01" min="0"
+                                                   name="val_{{ item.id }}_{{ forn.id }}"
+                                                   value="{{ '%g' % cur_val }}"
+                                                   placeholder="0,00"
+                                                   {% if is_min %}style="border-color:#059669;background:#f0fdf4;"{% endif %}>
+                                            <input type="text"
+                                                   name="prazo_{{ item.id }}_{{ forn.id }}"
+                                                   value="{{ cot.prazo or '' if cot else '' }}"
+                                                   placeholder="Prazo (ex: 7 dias)"
+                                                   style="margin-top:4px;">
+                                        </td>
+                                        {% endfor %}
+                                        <!-- Total mínimo por item -->
+                                        <td style="text-align:center;font-weight:700;color:#059669;">
+                                            {% if min_val.v is not none %}
+                                            R$ {{ '%.2f'|format(min_val.v * item.quantidade|float) }}
+                                            {% else %}
+                                            —
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background:#f1f5f9;">
+                                        <td colspan="3" style="font-weight:700;padding:.8rem;">Total Geral por Fornecedor</td>
+                                        {% for forn in mapa.fornecedores %}
+                                        {% set total_forn = namespace(t=0) %}
+                                        {% for item in mapa.itens %}
+                                            {% set cot = cotacoes_map.get(item.id, {}).get(forn.id) %}
+                                            {% if cot and cot.valor_unitario %}
+                                                {% set total_forn.t = total_forn.t + (cot.valor_unitario|float * item.quantidade|float) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        <td style="text-align:center;font-weight:700;color:#1e3a8a;padding:.8rem;">
+                                            {% if total_forn.t > 0 %}
+                                            R$ {{ '%.2f'|format(total_forn.t) }}
+                                            {% else %}—{% endif %}
+                                        </td>
+                                        {% endfor %}
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div class="p-3 text-end">
+                            <button type="submit" class="btn btn-success fw-semibold px-4">
+                                <i class="fas fa-save me-2"></i>Salvar Cotações
+                            </button>
+                        </div>
+                    </form>
+                    {% elif not mapa.fornecedores and not mapa.itens %}
+                    <div class="no-items-hint" style="padding:3rem;">
+                        <i class="fas fa-table fa-3x mb-3" style="opacity:.3;display:block;"></i>
+                        <div style="font-weight:600;margin-bottom:.5rem;">Tabela vazia</div>
+                        <div style="font-size:.88rem;">Adicione fornecedores e itens à esquerda para montar a tabela de cotações.</div>
+                    </div>
+                    {% elif not mapa.fornecedores %}
+                    <div class="no-items-hint" style="padding:3rem;">
+                        <div style="font-weight:600;">Adicione ao menos um fornecedor (coluna) à esquerda.</div>
+                    </div>
+                    {% else %}
+                    <div class="no-items-hint" style="padding:3rem;">
+                        <div style="font-weight:600;">Adicione ao menos um item (linha) à esquerda.</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-2 mb-4">
+        <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Voltar para a Obra
+        </a>
+    </div>
+
+</div>
+{% endblock %}

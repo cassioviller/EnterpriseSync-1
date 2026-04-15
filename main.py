@@ -199,13 +199,14 @@ for bp_name in main_py_exempt_blueprints:
         logger.info(f"[OK] CSRF exempt: {bp_name}")
 
 try:
-    from portal_obras_views import portal_obra, aprovar_compra, recusar_compra, upload_comprovante, aprovar_mapa_concorrencia, portal_rdo_detalhe
+    from portal_obras_views import portal_obra, aprovar_compra, recusar_compra, upload_comprovante, aprovar_mapa_concorrencia, portal_rdo_detalhe, selecionar_mapa_v2
     csrf.exempt(portal_obra)
     csrf.exempt(aprovar_compra)
     csrf.exempt(recusar_compra)
     csrf.exempt(upload_comprovante)
     csrf.exempt(aprovar_mapa_concorrencia)
     csrf.exempt(portal_rdo_detalhe)
+    csrf.exempt(selecionar_mapa_v2)
     logger.info("[OK] CSRF exempt: portal_obras (public routes only)")
 except Exception as e:
     logger.error(f"[WARN] CSRF exempt portal_obras routes: {e}")

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -1578,6 +1578,17 @@ def detalhes_obra(id):
         except Exception:
             mapas_concorrencia = []
 
+        # Mapas de Concorrência V2 vinculados à obra
+        try:
+            mapas_v2 = (
+                MapaConcorrenciaV2.query
+                .filter_by(obra_id=obra_id, admin_id=tenant_admin_id)
+                .order_by(MapaConcorrenciaV2.created_at.desc())
+                .all()
+            )
+        except Exception:
+            mapas_v2 = []
+
         # Cronograma do cliente (apresentação no portal)
         try:
             cronograma_cliente_items = (
@@ -1611,6 +1622,7 @@ def detalhes_obra(id):
                              pedidos_compra_obra=pedidos_compra_obra,
                              fornecedores_lista=fornecedores_lista,
                              mapas_concorrencia=mapas_concorrencia,
+                             mapas_v2=mapas_v2,
                              cronograma_cliente_items=cronograma_cliente_items)
     except Exception as e:
         import traceback
@@ -1948,6 +1960,205 @@ def editar_cronograma_cliente(obra_id, item_id):
         logger.error(f"Erro ao editar cronograma cliente item {item_id}: {e}")
         flash('Erro ao salvar alterações. Tente novamente.', 'danger')
 
+    return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+# ===== MAPA DE CONCORRÊNCIA V2 =====
+
+def _parse_brl(val):
+    """Converte string BR (1.234,56) para float."""
+    try:
+        v = (val or '').strip()
+        if ',' in v and '.' in v:
+            v = v.replace('.', '').replace(',', '.')
+        elif ',' in v:
+            v = v.replace(',', '.')
+        return float(v) if v else 0.0
+    except Exception:
+        return 0.0
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-v2/criar', methods=['POST'])
+@login_required
+@admin_required
+def criar_mapa_v2(obra_id):
+    """Cria um novo Mapa de Concorrência V2 e redireciona para a página de edição."""
+    try:
+        admin_id = get_tenant_admin_id()
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada.', 'danger')
+            return redirect(url_for('main.obras'))
+
+        nome = (request.form.get('nome') or '').strip()
+        if not nome:
+            flash('Informe um nome para o mapa de concorrência.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        mapa = MapaConcorrenciaV2(obra_id=obra_id, admin_id=admin_id, nome=nome, status='aberto')
+        db.session.add(mapa)
+        db.session.commit()
+        flash(f'Mapa "{nome}" criado. Agora adicione fornecedores e itens.', 'success')
+        return redirect(url_for('main.editar_mapa_v2', obra_id=obra_id, mapa_id=mapa.id))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar mapa v2 obra {obra_id}: {e}")
+        flash('Erro ao criar mapa. Tente novamente.', 'danger')
+        return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/editar', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def editar_mapa_v2(obra_id, mapa_id):
+    """Página de gestão do Mapa de Concorrência V2 (add fornecedor, add item, salvar cotações)."""
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    mapa = MapaConcorrenciaV2.query.filter_by(id=mapa_id, obra_id=obra_id, admin_id=admin_id).first_or_404()
+
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        try:
+            if action == 'rename':
+                novo_nome = (request.form.get('nome') or '').strip()
+                if novo_nome:
+                    mapa.nome = novo_nome
+                    db.session.commit()
+                    flash('Nome atualizado.', 'success')
+
+            elif action == 'add_fornecedor':
+                nome_f = (request.form.get('nome_fornecedor') or '').strip()
+                if nome_f:
+                    ordem_f = len(mapa.fornecedores)
+                    forn = MapaFornecedor(mapa_id=mapa.id, admin_id=admin_id, nome=nome_f, ordem=ordem_f)
+                    db.session.add(forn)
+                    # Criar células de cotação para cada item existente
+                    for item in mapa.itens:
+                        cot = MapaCotacao(
+                            mapa_id=mapa.id, item_id=item.id,
+                            fornecedor_id=forn.id, admin_id=admin_id,
+                            valor_unitario=0, selecionado=False
+                        )
+                        db.session.add(cot)
+                    db.session.commit()
+                    flash(f'Fornecedor "{nome_f}" adicionado.', 'success')
+                else:
+                    flash('Informe o nome do fornecedor.', 'warning')
+
+            elif action == 'del_fornecedor':
+                forn_id = request.form.get('fornecedor_id', type=int)
+                forn = MapaFornecedor.query.filter_by(id=forn_id, mapa_id=mapa.id).first()
+                if forn:
+                    db.session.delete(forn)
+                    db.session.commit()
+                    flash('Fornecedor removido.', 'success')
+
+            elif action == 'add_item':
+                desc = (request.form.get('descricao') or '').strip()
+                if desc:
+                    unid = (request.form.get('unidade') or 'un').strip()
+                    qtd_raw = request.form.get('quantidade', '1').strip()
+                    try:
+                        qtd = float(qtd_raw.replace(',', '.')) if qtd_raw else 1
+                    except Exception:
+                        qtd = 1
+                    ordem_i = len(mapa.itens)
+                    item = MapaItemCotacao(
+                        mapa_id=mapa.id, admin_id=admin_id,
+                        descricao=desc, unidade=unid, quantidade=qtd, ordem=ordem_i
+                    )
+                    db.session.add(item)
+                    db.session.flush()
+                    # Criar células de cotação para cada fornecedor existente
+                    for forn in mapa.fornecedores:
+                        cot = MapaCotacao(
+                            mapa_id=mapa.id, item_id=item.id,
+                            fornecedor_id=forn.id, admin_id=admin_id,
+                            valor_unitario=0, selecionado=False
+                        )
+                        db.session.add(cot)
+                    db.session.commit()
+                    flash(f'Item "{desc}" adicionado.', 'success')
+                else:
+                    flash('Informe a descrição do item.', 'warning')
+
+            elif action == 'del_item':
+                item_id = request.form.get('item_id', type=int)
+                item = MapaItemCotacao.query.filter_by(id=item_id, mapa_id=mapa.id).first()
+                if item:
+                    db.session.delete(item)
+                    db.session.commit()
+                    flash('Item removido.', 'success')
+
+            elif action == 'save_cotacoes':
+                # Salva valores e prazos da tabela de cotações
+                for key, val in request.form.items():
+                    if key.startswith('val_'):
+                        _, item_id_s, forn_id_s = key.split('_', 2)
+                        item_id_k = int(item_id_s)
+                        forn_id_k = int(forn_id_s)
+                        cot = MapaCotacao.query.filter_by(
+                            mapa_id=mapa.id, item_id=item_id_k, fornecedor_id=forn_id_k
+                        ).first()
+                        if not cot:
+                            cot = MapaCotacao(
+                                mapa_id=mapa.id, item_id=item_id_k,
+                                fornecedor_id=forn_id_k, admin_id=admin_id,
+                                valor_unitario=0, selecionado=False
+                            )
+                            db.session.add(cot)
+                        cot.valor_unitario = _parse_brl(val)
+                        prazo_key = f'prazo_{item_id_s}_{forn_id_s}'
+                        prazo_val = request.form.get(prazo_key, '').strip()
+                        cot.prazo = prazo_val or None
+                db.session.commit()
+                flash('Cotações salvas com sucesso.', 'success')
+
+            elif action == 'toggle_status':
+                mapa.status = 'concluido' if mapa.status == 'aberto' else 'aberto'
+                db.session.commit()
+                status_label = 'enviado para portal' if mapa.status == 'concluido' else 'reaberto'
+                flash(f'Mapa {status_label}.', 'success')
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Erro ao editar mapa_v2 {mapa_id}: {e}")
+            flash('Erro ao salvar. Tente novamente.', 'danger')
+
+        return redirect(url_for('main.editar_mapa_v2', obra_id=obra_id, mapa_id=mapa_id))
+
+    # GET — renderizar página de edição
+    # Construir dict de cotações: {item_id: {fornecedor_id: cotacao}}
+    cotacoes_map = {}
+    for cot in mapa.cotacoes:
+        cotacoes_map.setdefault(cot.item_id, {})[cot.fornecedor_id] = cot
+
+    return render_template(
+        'obras/mapa_concorrencia_v2.html',
+        obra=obra,
+        mapa=mapa,
+        cotacoes_map=cotacoes_map,
+    )
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/deletar', methods=['POST'])
+@login_required
+@admin_required
+def deletar_mapa_v2(obra_id, mapa_id):
+    """Exclui um Mapa de Concorrência V2."""
+    try:
+        admin_id = get_tenant_admin_id()
+        mapa = MapaConcorrenciaV2.query.filter_by(id=mapa_id, obra_id=obra_id, admin_id=admin_id).first()
+        if not mapa:
+            flash('Mapa não encontrado.', 'danger')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+        db.session.delete(mapa)
+        db.session.commit()
+        flash('Mapa de concorrência V2 excluído.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao deletar mapa_v2 {mapa_id}: {e}")
+        flash('Erro ao excluir. Tente novamente.', 'danger')
     return redirect(url_for('main.detalhes_obra', id=obra_id))
 
 

@@ -23,6 +23,7 @@ from models import (
     MedicaoObra, Fornecedor, ConfiguracaoEmpresa, RDO,
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
     MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente,
+    MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,37 @@ def portal_obra(token: str):
     for m in mapas_pendentes + mapas_concluidos:
         m._opcoes_list = m.opcoes.all()
 
+    # Mapas V2 — separados em abertos (aguardando aprovação cliente) e concluídos
+    mapas_v2_abertos = (
+        MapaConcorrenciaV2.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id, status='aberto')
+        .order_by(MapaConcorrenciaV2.created_at.desc())
+        .all()
+    )
+    mapas_v2_concluidos = (
+        MapaConcorrenciaV2.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id, status='concluido')
+        .order_by(MapaConcorrenciaV2.created_at.desc())
+        .all()
+    )
+    # Pre-load itens, fornecedores and cotacoes_map for each V2 mapa
+    def _build_v2_context(mapa_list):
+        result = []
+        for mapa in mapa_list:
+            cotacoes_map = {}
+            for cot in mapa.cotacoes:
+                cotacoes_map.setdefault(cot.item_id, {})[cot.fornecedor_id] = cot
+            result.append({
+                'mapa': mapa,
+                'fornecedores': mapa.fornecedores,
+                'itens': mapa.itens,
+                'cotacoes_map': cotacoes_map,
+            })
+        return result
+
+    mapas_v2_abertos_ctx = _build_v2_context(mapas_v2_abertos)
+    mapas_v2_concluidos_ctx = _build_v2_context(mapas_v2_concluidos)
+
     return render_template(
         'portal/portal_obra.html',
         obra=obra,
@@ -156,6 +188,8 @@ def portal_obra(token: str):
         hoje=date.today(),
         mapas_pendentes=mapas_pendentes,
         mapas_concluidos=mapas_concluidos,
+        mapas_v2_abertos_ctx=mapas_v2_abertos_ctx,
+        mapas_v2_concluidos_ctx=mapas_v2_concluidos_ctx,
     )
 
 
@@ -324,6 +358,41 @@ def gerar_medicao(obra_id: int):
     logger.info(f"[MEDICAO] #{proximo_numero} gerada para obra {obra_id}")
     flash(f'Medição #{proximo_numero} gerada com sucesso!', 'success')
     return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@portal_obras_bp.route('/obra/<token>/mapa-v2/<int:mapa_id>/selecionar', methods=['POST'])
+def selecionar_mapa_v2(token: str, mapa_id: int):
+    """O cliente seleciona um fornecedor preferido para cada item do Mapa V2."""
+    obra = _get_obra_by_token(token)
+    mapa = MapaConcorrenciaV2.query.filter_by(
+        id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
+    ).first_or_404()
+
+    if mapa.status == 'concluido':
+        flash('Este mapa já foi aprovado e não pode ser alterado.', 'warning')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    try:
+        # Cada campo tem o nome "sel_<item_id>" com value = fornecedor_id
+        for key, val in request.form.items():
+            if key.startswith('sel_'):
+                item_id = int(key[4:])
+                forn_id = int(val)
+                # Desmarcar todas as cotações deste item
+                cotacoes_item = MapaCotacao.query.filter_by(mapa_id=mapa.id, item_id=item_id).all()
+                for cot in cotacoes_item:
+                    cot.selecionado = (cot.fornecedor_id == forn_id)
+
+        mapa.status = 'concluido'
+        db.session.commit()
+        logger.info(f"[PORTAL] Mapa V2 {mapa_id} aprovado pelo cliente — obra {obra.id}")
+        flash('Seleção confirmada! Fornecedores escolhidos registrados com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[PORTAL] Erro ao selecionar mapa_v2 {mapa_id}: {e}")
+        flash('Erro ao registrar seleção. Tente novamente.', 'danger')
+
+    return redirect(url_for('portal_obras.portal_obra', token=token))
 
 
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>')

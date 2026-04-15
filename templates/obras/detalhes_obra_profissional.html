@@ -1371,6 +1371,52 @@
             </div>
         </div>
 
+        <!-- Mapa de Concorrência V2 -->
+        <div class="obra-card">
+            <div class="obra-card-header" style="background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);">
+                <h3><i class="fas fa-table"></i> Mapa de Concorrência V2 <span style="font-size:.75rem;font-weight:400;opacity:.8;">Multi-fornecedor</span></h3>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark">{{ mapas_v2|length if mapas_v2 else 0 }}</span>
+                    <button type="button" class="btn btn-light btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNovoMapaV2">
+                        <i class="fas fa-plus me-1"></i>Novo Mapa V2
+                    </button>
+                </div>
+            </div>
+            <div class="obra-card-body" style="padding:1.25rem;">
+                {% if mapas_v2 %}
+                {% for mapa in mapas_v2 %}
+                <div style="border:1px solid #e0e7ff;border-radius:10px;margin-bottom:1rem;overflow:hidden;">
+                    <div style="background:#eff6ff;padding:.7rem 1rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid #dbeafe;">
+                        <i class="fas fa-table" style="color:#1d4ed8;"></i>
+                        <span style="font-weight:700;color:#1e3a8a;flex:1;">{{ mapa.nome }}</span>
+                        <span style="font-size:.8rem;color:#64748b;">{{ mapa.itens|length if mapa.itens is defined else '?' }} item(s) × {{ mapa.fornecedores|length if mapa.fornecedores is defined else '?' }} fornecedor(es)</span>
+                        {% if mapa.status == 'concluido' %}
+                        <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.73rem;"><i class="fas fa-check-circle me-1"></i>Aprovado pelo cliente</span>
+                        {% else %}
+                        <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.73rem;"><i class="fas fa-clock me-1"></i>Em edição</span>
+                        {% endif %}
+                        <a href="{{ url_for('main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" class="btn btn-sm btn-primary" title="Editar mapa">
+                            <i class="fas fa-pencil-alt"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('main.deletar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id) }}" style="display:inline;" onsubmit="return confirm('Excluir este mapa V2?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-table fa-2x mb-2" style="color:#d1d5db;"></i>
+                    <h6 style="color:#374151;">Nenhum Mapa V2 cadastrado</h6>
+                    <p style="font-size:.9rem;color:#64748b;">Crie uma tabela comparativa multi-fornecedor com cotações por item.</p>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoMapaV2">
+                        <i class="fas fa-plus me-1"></i>Novo Mapa V2
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Cronograma do Cliente -->
         <div class="obra-card">
             <div class="obra-card-header" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
@@ -2457,6 +2503,36 @@ function compraObraRemoverItem(btn) {
     cursor: not-allowed;
 }
 </style>
+
+<!-- Modal: Novo Mapa de Concorrência V2 -->
+<div class="modal fade" id="modalNovoMapaV2" tabindex="-1" aria-labelledby="modalNovoMapaV2Label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;">
+                <h5 class="modal-title" id="modalNovoMapaV2Label">
+                    <i class="fas fa-table me-2"></i>Novo Mapa de Concorrência V2
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.criar_mapa_v2', obra_id=obra.id) }}">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3"><i class="fas fa-info-circle me-1"></i>Após criar, você será redirecionado para a página de edição onde poderá adicionar fornecedores, itens e preencher as cotações.</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nome do Mapa <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="nome"
+                               placeholder="Ex: Cotação de Esquadrias — Jul/2025" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="fas fa-arrow-right me-1"></i>Criar e Editar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Modal: Novo Mapa de Concorrência -->
 <div class="modal fade" id="modalNovoMapaConcorrencia" tabindex="-1" aria-labelledby="modalNovoMapaConcorrenciaLabel" aria-hidden="true">

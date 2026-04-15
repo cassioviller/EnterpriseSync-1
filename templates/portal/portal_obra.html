@@ -532,6 +532,175 @@
     </div>
     {% endif %}
 
+    {% if mapas_v2_abertos_ctx %}
+    <div class="section-title"><i class="fas fa-table"></i> Comparativo de Fornecedores — Aguardando sua Escolha</div>
+    {% for ctx in mapas_v2_abertos_ctx %}
+    {% set mapa = ctx.mapa %}
+    {% set fornecedores = ctx.fornecedores %}
+    {% set itens = ctx.itens %}
+    {% set cotacoes_map = ctx.cotacoes_map %}
+    <div class="card-portal mb-4">
+        <div style="background:#eff6ff;padding:.9rem 1.25rem;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:.75rem;">
+            <i class="fas fa-table" style="color:#1d4ed8;"></i>
+            <span style="font-weight:700;color:#1e3a8a;flex:1;">{{ mapa.nome }}</span>
+            <span style="background:#fef3c7;color:#92400e;padding:.25rem .65rem;border-radius:20px;font-size:.75rem;font-weight:600;"><i class="fas fa-clock me-1"></i>Aguardando sua escolha</span>
+        </div>
+        <div style="padding:1rem 1.25rem;">
+            <p style="font-size:.85rem;color:#64748b;margin-bottom:.75rem;">
+                <i class="fas fa-info-circle me-1"></i>Compare os preços e selecione o fornecedor preferido para cada item. Clique em uma coluna para pré-selecionar todos os itens daquele fornecedor, ou escolha individualmente.
+            </p>
+            <form method="POST" action="{{ url_for('portal_obras.selecionar_mapa_v2', token=obra.token_cliente, mapa_id=mapa.id) }}" id="form-mapa-{{ mapa.id }}">
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered mb-0" style="font-size:.85rem;" id="table-mapa-{{ mapa.id }}">
+                        <thead>
+                            <tr style="background:#1e3a8a;color:#fff;">
+                                <th style="min-width:180px;vertical-align:middle;">Item</th>
+                                <th style="width:60px;text-align:center;vertical-align:middle;">Qtd</th>
+                                <th style="width:40px;text-align:center;vertical-align:middle;">Un</th>
+                                {% for forn in fornecedores %}
+                                <th style="min-width:130px;text-align:center;cursor:pointer;" class="forn-header" data-mapa="{{ mapa.id }}" data-forn="{{ forn.id }}" title="Clique para selecionar todos os itens deste fornecedor">
+                                    {{ forn.nome }}
+                                    <div style="font-size:.7rem;font-weight:400;opacity:.8;margin-top:.15rem;">clique para selecionar todos</div>
+                                </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itens %}
+                            {% set item_cots = cotacoes_map.get(item.id, {}) %}
+                            {% set min_val = namespace(v=None, forn_id=None) %}
+                            {% for forn in fornecedores %}
+                                {% set cot = item_cots.get(forn.id) %}
+                                {% if cot and cot.valor_unitario and cot.valor_unitario|float > 0 %}
+                                    {% if min_val.v is none or cot.valor_unitario|float < min_val.v %}
+                                        {% set min_val.v = cot.valor_unitario|float %}
+                                        {% set min_val.forn_id = forn.id %}
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            <tr>
+                                <td style="font-weight:600;">{{ item.descricao }}</td>
+                                <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
+                                <td style="text-align:center;">{{ item.unidade }}</td>
+                                {% for forn in fornecedores %}
+                                {% set cot = item_cots.get(forn.id) %}
+                                {% set cur_val = cot.valor_unitario|float if cot and cot.valor_unitario else 0 %}
+                                {% set is_min = min_val.forn_id is not none and forn.id == min_val.forn_id and cur_val > 0 %}
+                                <td class="cotacao-cell" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
+                                    style="text-align:center;cursor:pointer;transition:background .2s;{% if is_min %}background:#ecfdf5;{% endif %}">
+                                    <label style="cursor:pointer;display:block;width:100%;margin:0;">
+                                        <input type="radio" name="sel_{{ item.id }}" value="{{ forn.id }}"
+                                               class="cotacao-radio" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
+                                               {% if is_min %}checked{% endif %}
+                                               style="display:none;" required>
+                                        <div class="radio-visual" style="border:2px solid #cbd5e1;border-radius:6px;padding:.4rem .3rem;font-size:.82rem;transition:all .2s;">
+                                            {% if cur_val > 0 %}
+                                            <div style="font-weight:700;color:{% if is_min %}#059669{% else %}#1e293b{% endif %};">
+                                                {{ cur_val|brl }}
+                                                {% if is_min %}<i class="fas fa-star ms-1" style="font-size:.65rem;color:#f59e0b;"></i>{% endif %}
+                                            </div>
+                                            {% if cot and cot.prazo %}
+                                            <div style="font-size:.72rem;color:#64748b;margin-top:.15rem;"><i class="fas fa-clock me-1"></i>{{ cot.prazo }}</div>
+                                            {% endif %}
+                                            {% else %}
+                                            <div style="color:#94a3b8;">—</div>
+                                            {% endif %}
+                                        </div>
+                                    </label>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc;font-weight:700;">
+                                <td colspan="3" style="font-size:.82rem;">Total por Fornecedor</td>
+                                {% for forn in fornecedores %}
+                                {% set tot = namespace(v=0) %}
+                                {% for item in itens %}
+                                    {% set cot = cotacoes_map.get(item.id, {}).get(forn.id) %}
+                                    {% if cot and cot.valor_unitario %}
+                                        {% set tot.v = tot.v + (cot.valor_unitario|float * item.quantidade|float) %}
+                                    {% endif %}
+                                {% endfor %}
+                                <td style="text-align:center;color:#1e3a8a;" id="total-mapa{{ mapa.id }}-forn{{ forn.id }}">
+                                    {% if tot.v > 0 %}{{ tot.v|brl }}{% else %}—{% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="text-end">
+                    <button type="submit" class="btn btn-success fw-semibold px-4" onclick="return confirm('Confirmar a seleção de fornecedores para este mapa?')">
+                        <i class="fas fa-check-circle me-2"></i>Confirmar Seleção
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if mapas_v2_concluidos_ctx %}
+    <div class="section-title"><i class="fas fa-check-circle"></i> Comparativo de Fornecedores — Aprovados</div>
+    {% for ctx in mapas_v2_concluidos_ctx %}
+    {% set mapa = ctx.mapa %}
+    {% set fornecedores = ctx.fornecedores %}
+    {% set itens = ctx.itens %}
+    {% set cotacoes_map = ctx.cotacoes_map %}
+    <div class="card-portal mb-4">
+        <div style="background:#f0fdf4;padding:.9rem 1.25rem;border-bottom:1px solid #d1fae5;display:flex;align-items:center;gap:.75rem;">
+            <i class="fas fa-check-circle" style="color:#059669;"></i>
+            <span style="font-weight:700;color:#065f46;flex:1;">{{ mapa.nome }}</span>
+            <span style="background:#d1fae5;color:#065f46;padding:.25rem .65rem;border-radius:20px;font-size:.75rem;font-weight:600;"><i class="fas fa-check me-1"></i>Aprovado</span>
+        </div>
+        <div style="padding:.5rem 1.25rem 1rem;">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm mb-0" style="font-size:.84rem;">
+                    <thead style="background:#f8fafc;">
+                        <tr>
+                            <th>Item</th>
+                            <th style="width:60px;text-align:center;">Qtd</th>
+                            <th style="width:40px;text-align:center;">Un</th>
+                            {% for forn in fornecedores %}
+                            <th style="text-align:center;">{{ forn.nome }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in itens %}
+                        {% set item_cots = cotacoes_map.get(item.id, {}) %}
+                        <tr>
+                            <td style="font-weight:600;">{{ item.descricao }}</td>
+                            <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
+                            <td style="text-align:center;">{{ item.unidade }}</td>
+                            {% for forn in fornecedores %}
+                            {% set cot = item_cots.get(forn.id) %}
+                            <td style="text-align:center;{% if cot and cot.selecionado %}background:#ecfdf5;{% endif %}">
+                                {% if cot and cot.selecionado %}
+                                <strong style="color:#059669;">
+                                    {{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}
+                                    <i class="fas fa-check-circle ms-1" style="font-size:.75rem;"></i>
+                                </strong>
+                                {% if cot.prazo %}
+                                <div style="font-size:.72rem;color:#64748b;">{{ cot.prazo }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span style="color:#94a3b8;">{{ cot.valor_unitario|float|brl if cot and cot.valor_unitario else '—' }}</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
     {% if rdos %}
     <div class="section-title"><i class="fas fa-clipboard-list"></i> Relatórios Diários (RDOs Finalizados)</div>
     <div class="card-portal mb-4">
@@ -577,5 +746,56 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Mapa V2 — interactive radio selection with visual highlighting
+(function() {
+    function updateCellHighlights(mapaId, itemId) {
+        var radios = document.querySelectorAll('input.cotacao-radio[data-mapa="' + mapaId + '"][data-item="' + itemId + '"]');
+        radios.forEach(function(radio) {
+            var cell = radio.closest('td.cotacao-cell');
+            var visual = cell.querySelector('.radio-visual');
+            if (radio.checked) {
+                cell.style.background = '#ecfdf5';
+                visual.style.border = '2px solid #059669';
+                visual.style.background = '#f0fdf4';
+            } else {
+                cell.style.background = '';
+                visual.style.border = '2px solid #cbd5e1';
+                visual.style.background = '';
+            }
+        });
+    }
+
+    // Handle cell click → select that radio
+    document.querySelectorAll('td.cotacao-cell').forEach(function(cell) {
+        cell.addEventListener('click', function() {
+            var radio = cell.querySelector('input.cotacao-radio');
+            if (radio) {
+                radio.checked = true;
+                updateCellHighlights(radio.dataset.mapa, radio.dataset.item);
+            }
+        });
+    });
+
+    // Handle column header click → select all rows for that supplier
+    document.querySelectorAll('th.forn-header').forEach(function(th) {
+        th.addEventListener('click', function() {
+            var mapaId = th.dataset.mapa;
+            var fornId = th.dataset.forn;
+            // Find all radios in this mapa for this fornecedor
+            var radios = document.querySelectorAll('input.cotacao-radio[data-mapa="' + mapaId + '"][data-forn="' + fornId + '"]');
+            radios.forEach(function(radio) {
+                radio.checked = true;
+                updateCellHighlights(mapaId, radio.dataset.item);
+            });
+        });
+    });
+
+    // Initialize highlights for pre-checked radios
+    document.querySelectorAll('input.cotacao-radio:checked').forEach(function(radio) {
+        updateCellHighlights(radio.dataset.mapa, radio.dataset.item);
+    });
+})();
+</script>
 </body>
 </html>
