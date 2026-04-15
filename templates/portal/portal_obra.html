@@ -135,6 +135,39 @@
         .tarefa-perc { font-weight: 600; white-space: nowrap; min-width: 50px; text-align: right; }
         .tarefa-bar { width: 100px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
         .tarefa-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+        .tarefa-pai-header {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            padding: .7rem 1.25rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: .9rem;
+            cursor: pointer;
+            user-select: none;
+            background: #f8fafc;
+            transition: background .2s;
+        }
+        .tarefa-pai-header:hover { background: #f1f5f9; }
+        .tarefa-pai-header .chevron {
+            transition: transform .25s ease;
+            font-size: .7rem;
+            color: #94a3b8;
+            width: 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .tarefa-pai-header.open .chevron { transform: rotate(90deg); }
+        .tarefa-pai-header .tarefa-nome { font-weight: 600; }
+        .tarefa-filhas-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .3s ease;
+        }
+        .tarefa-filhas-container.open { max-height: 1000px; }
+        .tarefa-filhas-container .tarefa-row {
+            padding-left: 2.5rem;
+            background: #fff;
+        }
         .medicao-card {
             padding: 1rem 1.25rem;
             border-bottom: 1px solid #f1f5f9;
@@ -255,20 +288,59 @@
     {% if tarefas %}
     <div class="section-title"><i class="fas fa-tasks"></i> Cronograma</div>
     <div class="card-portal mb-4">
+        {% set ns = namespace(parent_ids=[]) %}
         {% for t in tarefas %}
-        {% set pc = t.percentual_concluido or 0 %}
-        <div class="tarefa-row">
-            {% if t.tarefa_pai_id %}
-            <span class="text-muted" style="width:18px"><i class="fas fa-level-up-alt fa-rotate-90" style="font-size:.7rem"></i></span>
+            {% if t.tarefa_pai_id and t.tarefa_pai_id not in ns.parent_ids %}
+                {% set ns.parent_ids = ns.parent_ids + [t.tarefa_pai_id] %}
             {% endif %}
-            <span class="tarefa-nome{% if t.tarefa_pai_id %} ps-1{% endif %}">{{ t.nome_tarefa }}</span>
-            <div class="tarefa-bar">
-                <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
-            </div>
-            <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
-        </div>
+        {% endfor %}
+
+        {% for t in tarefas %}
+            {% if not t.tarefa_pai_id %}
+                {% set pc = t.percentual_concluido or 0 %}
+                {% if t.id in ns.parent_ids %}
+                <div class="tarefa-pai-header" onclick="toggleTarefas(this)">
+                    <span class="chevron"><i class="fas fa-chevron-right"></i></span>
+                    <span class="tarefa-nome">{{ t.nome_tarefa }}</span>
+                    <div class="tarefa-bar">
+                        <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
+                    </div>
+                    <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
+                </div>
+                <div class="tarefa-filhas-container">
+                    {% for f in tarefas %}
+                        {% if f.tarefa_pai_id == t.id %}
+                        {% set fpc = f.percentual_concluido or 0 %}
+                        <div class="tarefa-row">
+                            <span class="text-muted" style="width:18px"><i class="fas fa-level-up-alt fa-rotate-90" style="font-size:.7rem"></i></span>
+                            <span class="tarefa-nome ps-1">{{ f.nome_tarefa }}</span>
+                            <div class="tarefa-bar">
+                                <div class="tarefa-bar-fill" style="width:{{ fpc }}%;background:{% if fpc >= 100 %}#22c55e{% elif fpc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
+                            </div>
+                            <span class="tarefa-perc" style="color:{% if fpc >= 100 %}#16a34a{% elif fpc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ fpc|round(1) }}%</span>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tarefa-row">
+                    <span class="tarefa-nome">{{ t.nome_tarefa }}</span>
+                    <div class="tarefa-bar">
+                        <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
+                    </div>
+                    <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
+                </div>
+                {% endif %}
+            {% endif %}
         {% endfor %}
     </div>
+    <script>
+    function toggleTarefas(header) {
+        header.classList.toggle('open');
+        var container = header.nextElementSibling;
+        container.classList.toggle('open');
+    }
+    </script>
     {% endif %}
 
     {% if compras_pendentes %}
