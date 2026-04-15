@@ -1613,6 +1613,13 @@ def nova_compra_obra(obra_id):
         observacoes = request.form.get('observacoes', '').strip()
         numero = request.form.get('numero', '').strip()
 
+        # Validar data
+        try:
+            data_compra_parsed = datetime.strptime(data_compra_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            flash('Data da compra inválida. Use o formato AAAA-MM-DD.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
         if not fornecedor_id:
             flash('Selecione um fornecedor para a compra.', 'warning')
             return redirect(url_for('main.detalhes_obra', id=obra_id))
@@ -1668,7 +1675,7 @@ def nova_compra_obra(obra_id):
         pedido = PedidoCompra(
             fornecedor_id=fornecedor_id,
             obra_id=obra_id,
-            data_compra=datetime.strptime(data_compra_str, '%Y-%m-%d').date(),
+            data_compra=data_compra_parsed,
             numero=numero or None,
             observacoes=observacoes or None,
             valor_total=valor_total,
@@ -1683,8 +1690,16 @@ def nova_compra_obra(obra_id):
         for desc, qtd_str, preco_str in zip(descricoes, quantidades, precos):
             if not desc.strip():
                 continue
-            qtd = _parse_num(qtd_str) or 1
+            qtd = _parse_num(qtd_str)
             preco = _parse_num(preco_str)
+            if qtd <= 0:
+                flash(f'Quantidade inválida para o item "{desc.strip()}". Informe um valor maior que zero.', 'warning')
+                db.session.rollback()
+                return redirect(url_for('main.detalhes_obra', id=obra_id))
+            if preco < 0:
+                flash(f'Preço inválido para o item "{desc.strip()}". O valor não pode ser negativo.', 'warning')
+                db.session.rollback()
+                return redirect(url_for('main.detalhes_obra', id=obra_id))
             item = PedidoCompraItem(
                 pedido_id=pedido.id,
                 descricao=desc.strip(),
