@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico de Evolução — SIGE V2 | Abril 2026</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --brand-dark:   #0d1117;
+      --brand-card:   #161b22;
+      --brand-border: #30363d;
+      --brand-accent: #238636;
+      --brand-blue:   #1f6feb;
+      --brand-text:   #e6edf3;
+      --brand-muted:  #8b949e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--brand-dark);
+      color: var(--brand-text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* HERO */
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #0d2235 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--brand-border);
+      padding: 3.5rem 0 2.5rem;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: -60px; right: -60px;
+      width: 320px; height: 320px;
+      background: radial-gradient(circle, rgba(31,111,235,.18) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: .45rem;
+      background: rgba(35,134,54,.15); border: 1px solid rgba(35,134,54,.4);
+      color: #3fb950; padding: .3rem .85rem; border-radius: 2rem;
+      font-size: .78rem; font-weight: 600; letter-spacing: .04em;
+      text-transform: uppercase; margin-bottom: 1rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800;
+      letter-spacing: -.03em; line-height: 1.15; margin-bottom: .5rem;
+    }
+    .hero h1 span { color: var(--brand-blue); }
+    .hero p.lead { color: var(--brand-muted); font-size: 1.05rem; max-width: 520px; }
+    .print-btn {
+      background: rgba(31,111,235,.15); border: 1px solid rgba(31,111,235,.4);
+      color: #58a6ff; padding: .45rem 1.1rem; border-radius: .5rem;
+      font-size: .85rem; font-weight: 600; transition: all .2s;
+      text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+    }
+    .print-btn:hover { background: rgba(31,111,235,.3); color: #fff; }
+
+    /* KPI CARDS */
+    .kpi-card {
+      background: var(--brand-card); border: 1px solid var(--brand-border);
+      border-radius: .85rem; padding: 1.5rem 1.75rem; text-align: center;
+      transition: transform .2s, border-color .2s;
+    }
+    .kpi-card:hover { transform: translateY(-3px); border-color: #444c56; }
+    .kpi-icon {
+      width: 52px; height: 52px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; margin: 0 auto .9rem;
+    }
+    .kpi-value { font-size: 2.2rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin-bottom: .3rem; }
+    .kpi-label { font-size: .82rem; color: var(--brand-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
+
+    /* SECTION */
+    .section-title {
+      font-size: 1.25rem; font-weight: 700; color: var(--brand-text);
+      margin-bottom: 1.25rem; display: flex; align-items: center; gap: .6rem;
+    }
+    .section-title i { color: var(--brand-blue); }
+    .section-divider { border: none; border-top: 1px solid var(--brand-border); margin: 2.5rem 0; }
+
+    /* TIMELINE */
+    .timeline-week { position: relative; padding-left: 2.5rem; margin-bottom: 2rem; }
+    .timeline-week::before {
+      content: ''; position: absolute; left: .65rem; top: 0; bottom: 0;
+      width: 2px; background: linear-gradient(to bottom, var(--brand-blue), transparent);
+    }
+    .timeline-dot {
+      position: absolute; left: 0; top: .2rem;
+      width: 1.35rem; height: 1.35rem; border-radius: 50%;
+      background: var(--brand-blue); border: 3px solid var(--brand-dark);
+    }
+    .timeline-week-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+    .week-label { font-weight: 700; font-size: 1rem; }
+    .week-period { font-size: .8rem; color: var(--brand-muted); }
+    .week-cost-badge {
+      margin-left: auto; background: rgba(35,134,54,.15);
+      border: 1px solid rgba(35,134,54,.3); color: #3fb950;
+      padding: .2rem .7rem; border-radius: 1rem; font-size: .78rem; font-weight: 700;
+    }
+    .timeline-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .chip {
+      background: rgba(255,255,255,.05); border: 1px solid var(--brand-border);
+      border-radius: .4rem; padding: .25rem .6rem; font-size: .78rem;
+      display: flex; align-items: center; gap: .35rem; transition: background .2s;
+    }
+    .chip:hover { background: rgba(255,255,255,.1); }
+    .chip-num { font-weight: 700; color: var(--brand-muted); font-size: .72rem; }
+
+    /* TABLE */
+    .detail-table {
+      background: var(--brand-card); border: 1px solid var(--brand-border);
+      border-radius: .85rem; overflow: hidden;
+    }
+    .detail-table table { margin: 0; color: var(--brand-text); }
+    .detail-table thead th {
+      background: rgba(255,255,255,.04); border-bottom: 1px solid var(--brand-border);
+      font-size: .75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: var(--brand-muted); padding: .85rem 1rem; white-space: nowrap;
+    }
+    .detail-table tbody td { padding: .75rem 1rem; border-bottom: 1px solid rgba(48,54,61,.6); font-size: .88rem; vertical-align: middle; }
+    .detail-table tbody tr:last-child td { border-bottom: none; }
+    .detail-table tbody tr:hover { background: rgba(255,255,255,.025); }
+    .task-num { font-size: .72rem; font-weight: 700; color: var(--brand-muted); background: rgba(255,255,255,.07); border-radius: .3rem; padding: .15rem .45rem; }
+    .cat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .35rem; }
+    .cost-cell { font-weight: 700; font-variant-numeric: tabular-nums; font-size: .9rem; }
+
+    /* CHARTS */
+    .chart-card { background: var(--brand-card); border: 1px solid var(--brand-border); border-radius: .85rem; padding: 1.5rem; }
+    .chart-card canvas { max-height: 320px; }
+
+    /* FOOTER */
+    footer { background: var(--brand-card); border-top: 1px solid var(--brand-border); padding: 2.5rem 0; margin-top: 4rem; }
+    .total-highlight { font-size: 2.8rem; font-weight: 900; color: #3fb950; letter-spacing: -.04em; }
+    .total-label { font-size: .85rem; color: var(--brand-muted); text-transform: uppercase; letter-spacing: .06em; }
+    .disclaimer { font-size: .8rem; color: var(--brand-muted); max-width: 480px; line-height: 1.6; }
+
+    /* SEARCH */
+    #searchInput {
+      background: rgba(255,255,255,.06); border: 1px solid var(--brand-border);
+      color: var(--brand-text); border-radius: .5rem; padding: .5rem 1rem;
+      font-size: .88rem; width: 100%; max-width: 300px;
+    }
+    #searchInput:focus { outline: none; border-color: var(--brand-blue); background: rgba(255,255,255,.09); }
+    #searchInput::placeholder { color: var(--brand-muted); }
+
+    /* BADGE helpers */
+    .badge-hotfix   { background: rgba(108,117,125,.2); border: 1px solid rgba(108,117,125,.5); color: #adb5bd; }
+    .badge-pequena  { background: rgba(13,202,240,.15); border: 1px solid rgba(13,202,240,.4);  color: #0dcaf0; }
+    .badge-media    { background: rgba(13,110,253,.2);  border: 1px solid rgba(13,110,253,.5);  color: #6ea8fe; }
+    .badge-grande   { background: rgba(255,193,7,.15);  border: 1px solid rgba(255,193,7,.4);   color: #ffc107; }
+    .badge-extragrande { background: rgba(220,53,69,.15); border: 1px solid rgba(220,53,69,.4); color: #ea868f; }
+
+    @media print {
+      body { background: #fff !important; color: #000 !important; }
+      .hero { background: #f8f9fa !important; border-color: #dee2e6 !important; }
+      .hero::before { display: none; }
+      .print-btn { display: none !important; }
+      .kpi-card, .chart-card, .detail-table { border: 1px solid #dee2e6 !important; background: #fff !important; }
+      .kpi-value, .week-label, .section-title, .total-highlight { color: #000 !important; }
+      .kpi-label, .week-period, .week-cost-badge, .disclaimer, .total-label { color: #666 !important; }
+      footer { background: #f8f9fa !important; border-color: #dee2e6 !important; }
+      #searchInput { display: none; }
+      .timeline-week::before { background: #ccc !important; }
+      .timeline-dot { background: #0d6efd !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="container">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+      <div>
+        <div class="hero-badge"><i class="fas fa-rocket fa-sm"></i> Evolução V2 — Relatório Executivo</div>
+        <h1>SIGE <span>Sistema V2</span><br>Histórico de Entregas</h1>
+        <p class="lead">Documentação completa de todas as funcionalidades desenvolvidas e entregues durante o ciclo V2 — <strong style="color:#58a6ff">Abril 2026</strong>.</p>
+      </div>
+      <div class="d-flex flex-column align-items-end gap-2 pt-1">
+        <button class="print-btn" onclick="window.print()"><i class="fas fa-print"></i> Imprimir / PDF</button>
+        <small style="color:var(--brand-muted);font-size:.75rem;">Gerado em: Abril / 2026</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="container mt-4">
+  <div class="row g-3">
+    <div class="col-12 col-md-4">
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(31,111,235,.18);"><i class="fas fa-check-circle" style="color:#58a6ff;"></i></div>
+        <div class="kpi-value" style="color:#58a6ff;">42</div>
+        <div class="kpi-label">Entregas Realizadas</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(35,134,54,.18);"><i class="fas fa-dollar-sign" style="color:#3fb950;"></i></div>
+        <div class="kpi-value" style="color:#3fb950;">R$&nbsp;4.630</div>
+        <div class="kpi-label">Investimento Estimado</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-4">
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(253,126,20,.18);"><i class="fas fa-calendar-days" style="color:#fd7e14;"></i></div>
+        <div class="kpi-value" style="color:#fd7e14;">15</div>
+        <div class="kpi-label">Dias de Desenvolvimento</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- TIMELINE -->
+  <div class="section-title"><i class="fas fa-timeline"></i> Linha do Tempo — Entregas por Semana</div>
+
+  <!-- Semana 1 -->
+  <div class="timeline-week">
+    <div class="timeline-dot"></div>
+    <div class="timeline-week-header">
+      <div>
+        <div class="week-label">Semana 1</div>
+        <div class="week-period">01 – 07 Abril 2026</div>
+      </div>
+      <div class="week-cost-badge">R$ 1.680 &nbsp;·&nbsp; 13 tasks</div>
+    </div>
+    <div class="timeline-chips">
+      <div class="chip"><span class="chip-num">#1</span><span style="color:#20c997;font-size:.75rem;">●</span><span>Sistema de Cadastro de Funcionários V2</span></div>
+      <div class="chip"><span class="chip-num">#2</span><span style="color:#198754;font-size:.75rem;">●</span><span>Módulo de Fluxo de Caixa — Base e Estrutura</span></div>
+      <div class="chip"><span class="chip-num">#3</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>RDO — Relatório Diário de Obras Base</span></div>
+      <div class="chip"><span class="chip-num">#4</span><span style="color:#fd7e14;font-size:.75rem;">●</span><span>Cronograma de Obras — Layout e Estrutura Inicial</span></div>
+      <div class="chip"><span class="chip-num">#5</span><span style="color:#198754;font-size:.75rem;">●</span><span>Lançamentos Financeiros Múltiplos e Categorias</span></div>
+      <div class="chip"><span class="chip-num">#7</span><span style="color:#198754;font-size:.75rem;">●</span><span>Dashboard Financeiro V2 com KPIs</span></div>
+      <div class="chip"><span class="chip-num">#8</span><span style="color:#6c757d;font-size:.75rem;">●</span><span>Correções de Autenticação, Sessão e Segurança</span></div>
+      <div class="chip"><span class="chip-num">#9</span><span style="color:#198754;font-size:.75rem;">●</span><span>Integração Bancária, Extratos e Conciliação</span></div>
+      <div class="chip"><span class="chip-num">#10</span><span style="color:#6c757d;font-size:.75rem;">●</span><span>Hotfix: Erro 500 no Dashboard Principal</span></div>
+      <div class="chip"><span class="chip-num">#11</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>Hotfix: Campos do RDO não estavam salvando</span></div>
+      <div class="chip"><span class="chip-num">#12</span><span style="color:#198754;font-size:.75rem;">●</span><span>Relatórios Financeiros por Período e Obra</span></div>
+      <div class="chip"><span class="chip-num">#13</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>RDO — Sistema Completo de Aprovação e Histórico</span></div>
+      <div class="chip"><span class="chip-num">#14</span><span style="color:#198754;font-size:.75rem;">●</span><span>Conciliação Bancária Automática por Competência</span></div>
+    </div>
+  </div>
+
+  <!-- Semana 2 -->
+  <div class="timeline-week">
+    <div class="timeline-dot"></div>
+    <div class="timeline-week-header">
+      <div>
+        <div class="week-label">Semana 2</div>
+        <div class="week-period">08 – 14 Abril 2026</div>
+      </div>
+      <div class="week-cost-badge">R$ 1.530 &nbsp;·&nbsp; 15 tasks</div>
+    </div>
+    <div class="timeline-chips">
+      <div class="chip"><span class="chip-num">#15</span><span style="color:#6f42c1;font-size:.75rem;">●</span><span>Módulo de Suprimentos e Compras Completo</span></div>
+      <div class="chip"><span class="chip-num">#16</span><span style="color:#0dcaf0;font-size:.75rem;">●</span><span>Importação de Funcionários via Planilha Excel</span></div>
+      <div class="chip"><span class="chip-num">#17</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>RDO — Anexos, Fotos e Registros de Campo</span></div>
+      <div class="chip"><span class="chip-num">#18</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>RDO — Filtros, Busca Avançada e Paginação</span></div>
+      <div class="chip"><span class="chip-num">#19</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>RDO — Exportação e Geração de PDF</span></div>
+      <div class="chip"><span class="chip-num">#20</span><span style="color:#6c757d;font-size:.75rem;">●</span><span>Correção de Permissões por Perfil de Usuário</span></div>
+      <div class="chip"><span class="chip-num">#21</span><span style="color:#fd7e14;font-size:.75rem;">●</span><span>Cronograma Gantt Interativo com Drag &amp; Drop</span></div>
+      <div class="chip"><span class="chip-num">#22</span><span style="color:#6c757d;font-size:.75rem;">●</span><span>Correção de Formulários e Validações de Obras</span></div>
+      <div class="chip"><span class="chip-num">#23</span><span style="color:#fd7e14;font-size:.75rem;">●</span><span>Cronograma — Filtros por Status e Responsável</span></div>
+      <div class="chip"><span class="chip-num">#24</span><span style="color:#fd7e14;font-size:.75rem;">●</span><span>Hotfix: Datas Inválidas no Cronograma</span></div>
+      <div class="chip"><span class="chip-num">#25</span><span style="color:#0d6efd;font-size:.75rem;">●</span><span>RDO — Subatividades, Composição e Produtividade</span></div>
+      <div class="chip"><span class="chip-num">#26</span><span style="color:#20c997;font-size:.75rem;">●</span><span>Gestão de Vale Transporte por Funcionário</span></div>
+      <div class="chip"><span class="chip-num">#27</span><span style="color:#20c997;font-size:.75rem;">●</span><span>Controle de Benefícios: VT e VA por Dia</span></div>
+      <div class="chip"><span class="chip-num">#28</span><span style="color:#0dcaf0;font-size:.75rem;">●</span><span>Importação Massiva de Dados Históricos (Excel)</span></div>
+      <div class="chip"><span class="chip-num">#29</span><span style="color:#20c997;font-size:.75rem;">●</span><span>Relatório de Faltas, Ocorrências e Afastamentos</span></div>
+    </div>
+  </div>
+
+  <!-- Semana 3 -->
+  <div class="timeline-week">
+    <div class="timeline-dot"></div>
+    <div class="timeline-week-header">
+      <div>
+        <div class="week-label">Semana 3</div>
+        <div class="week-period">15 Abril 2026</div>
+      </div>
+      <div class="week-cost-badge">R$ 1.420 &nbsp;·&nbsp; 14 tasks</div>
+    </div>
+    <div class="timeline-chips">
+      <div class="chip"><span class="chip-num">#31</span><span style="color:#0dcaf0;font-size:.75rem;">●</span><span>Hotfix: Encoding UTF-8 na Importação de Planilhas</span></div>
+      <div class="chip"><span class="chip-num">#32</span><span style="color:#198754;font-size:.75rem;">●</span><span>Contas a Pagar e Receber com Recorrência V2</span></div>
+      <div class="chip"><span class="chip-num">#33</span><span style="color:#198754;font-size:.75rem;">●</span><span>Filtros Avançados e Busca nos Lançamentos</span></div>
+      <div class="chip"><span class="chip-num">#34</span><span style="color:#198754;font-size:.75rem;">●</span><span>Exportação Excel do Fluxo de Caixa</span></div>
+      <div class="chip"><span class="chip-num">#38</span><span style="color:#0dcaf0;font-size:.75rem;">●</span><span>Hotfix: Validação de CNPJ na Importação</span></div>
+      <div class="chip"><span class="chip-num">#39</span><span style="color:#198754;font-size:.75rem;">●</span><span>Dashboard de KPIs Financeiros por Obra</span></div>
+      <div class="chip"><span class="chip-num">#41</span><span style="color:#198754;font-size:.75rem;">●</span><span>Relatório de Margem e Rentabilidade por Obra</span></div>
+      <div class="chip"><span class="chip-num">#42</span><span style="color:#6c757d;font-size:.75rem;">●</span><span>Hotfix: Timeout em Relatórios de Volume Alto</span></div>
+      <div class="chip"><span class="chip-num">#43</span><span style="color:#198754;font-size:.75rem;">●</span><span>Resumo Executivo Financeiro Mensal</span></div>
+      <div class="chip"><span class="chip-num">#44</span><span style="color:#fd7e14;font-size:.75rem;">●</span><span>Hotfix: Atualização de Status em Lote no Cronograma</span></div>
+      <div class="chip"><span class="chip-num">#45</span><span style="color:#d63384;font-size:.75rem;">●</span><span>Portal do Cliente — Visualização de Obra ao Vivo</span></div>
+      <div class="chip"><span class="chip-num">#46</span><span style="color:#d63384;font-size:.75rem;">●</span><span>Portal do Cliente — Aprovação de Compras Online</span></div>
+      <div class="chip"><span class="chip-num">#47</span><span style="color:#fd7e14;font-size:.75rem;">●</span><span>Cronograma — Alertas e Notificações de Prazo</span></div>
+      <div class="chip"><span class="chip-num">#48</span><span style="color:#6c757d;font-size:.75rem;">●</span><span>Correção de Layout Responsivo e Mobile</span></div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- CHARTS -->
+  <div class="section-title"><i class="fas fa-chart-pie"></i> Distribuição e Custos</div>
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-lg-5">
+      <div class="chart-card h-100">
+        <div class="fw-bold mb-3" style="font-size:.95rem;">Entregas por Categoria</div>
+        <canvas id="chartCategoria"></canvas>
+      </div>
+    </div>
+    <div class="col-12 col-lg-7">
+      <div class="chart-card h-100">
+        <div class="fw-bold mb-3" style="font-size:.95rem;">Custo Estimado por Semana (R$)</div>
+        <canvas id="chartSemana"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- TABLE -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div class="section-title mb-0"><i class="fas fa-table-list"></i> Tabela Completa de Entregas</div>
+    <input type="text" id="searchInput" placeholder="🔍  Buscar task ou módulo…">
+  </div>
+
+  <div class="detail-table mb-2">
+    <table class="table table-borderless mb-0" id="tasksTable">
+      <thead>
+        <tr>
+          <th style="width:60px">#</th>
+          <th>Título da Entrega</th>
+          <th style="width:180px">Módulo / Categoria</th>
+          <th style="width:130px">Complexidade</th>
+          <th style="width:110px;text-align:right">Custo Est.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- SEMANA 1 -->
+        <tr><td><span class="task-num">#1</span></td><td style="font-weight:500">Sistema de Cadastro de Funcionários V2</td><td><span class="cat-dot" style="background:#20c997"></span>Recursos Humanos</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#2</span></td><td style="font-weight:500">Módulo de Fluxo de Caixa — Base e Estrutura</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#3</span></td><td style="font-weight:500">RDO — Relatório Diário de Obras Base</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#4</span></td><td style="font-weight:500">Cronograma de Obras — Layout e Estrutura Inicial</td><td><span class="cat-dot" style="background:#fd7e14"></span>Cronograma</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#5</span></td><td style="font-weight:500">Lançamentos Financeiros Múltiplos e Categorias</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#7</span></td><td style="font-weight:500">Dashboard Financeiro V2 com KPIs</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#8</span></td><td style="font-weight:500">Correções de Autenticação, Sessão e Segurança</td><td><span class="cat-dot" style="background:#6c757d"></span>Correções</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#9</span></td><td style="font-weight:500">Integração Bancária, Extratos e Conciliação</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#10</span></td><td style="font-weight:500">Hotfix: Erro 500 no Dashboard Principal</td><td><span class="cat-dot" style="background:#6c757d"></span>Correções</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#11</span></td><td style="font-weight:500">Hotfix: Campos do RDO não estavam salvando</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#12</span></td><td style="font-weight:500">Relatórios Financeiros por Período e Obra</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#13</span></td><td style="font-weight:500">RDO — Sistema Completo de Aprovação e Histórico</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#14</span></td><td style="font-weight:500">Conciliação Bancária Automática por Competência</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <!-- SEMANA 2 -->
+        <tr><td><span class="task-num">#15</span></td><td style="font-weight:500">Módulo de Suprimentos e Compras Completo</td><td><span class="cat-dot" style="background:#6f42c1"></span>Suprimentos</td><td><span class="badge badge-extragrande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Extra Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 420</td></tr>
+        <tr><td><span class="task-num">#16</span></td><td style="font-weight:500">Importação de Funcionários via Planilha Excel</td><td><span class="cat-dot" style="background:#0dcaf0"></span>Importações Excel</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#17</span></td><td style="font-weight:500">RDO — Anexos, Fotos e Registros de Campo</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#18</span></td><td style="font-weight:500">RDO — Filtros, Busca Avançada e Paginação</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#19</span></td><td style="font-weight:500">RDO — Exportação e Geração de PDF</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#20</span></td><td style="font-weight:500">Correção de Permissões por Perfil de Usuário</td><td><span class="cat-dot" style="background:#6c757d"></span>Correções</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#21</span></td><td style="font-weight:500">Cronograma Gantt Interativo com Drag &amp; Drop</td><td><span class="cat-dot" style="background:#fd7e14"></span>Cronograma</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#22</span></td><td style="font-weight:500">Correção de Formulários e Validações de Obras</td><td><span class="cat-dot" style="background:#6c757d"></span>Correções</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#23</span></td><td style="font-weight:500">Cronograma — Filtros por Status e Responsável</td><td><span class="cat-dot" style="background:#fd7e14"></span>Cronograma</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#24</span></td><td style="font-weight:500">Hotfix: Datas Inválidas no Cronograma</td><td><span class="cat-dot" style="background:#fd7e14"></span>Cronograma</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#25</span></td><td style="font-weight:500">RDO — Subatividades, Composição e Produtividade</td><td><span class="cat-dot" style="background:#0d6efd"></span>RDO</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#26</span></td><td style="font-weight:500">Gestão de Vale Transporte por Funcionário</td><td><span class="cat-dot" style="background:#20c997"></span>Recursos Humanos</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#27</span></td><td style="font-weight:500">Controle de Benefícios: VT e VA por Dia</td><td><span class="cat-dot" style="background:#20c997"></span>Recursos Humanos</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#28</span></td><td style="font-weight:500">Importação Massiva de Dados Históricos (Excel)</td><td><span class="cat-dot" style="background:#0dcaf0"></span>Importações Excel</td><td><span class="badge badge-extragrande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Extra Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 420</td></tr>
+        <tr><td><span class="task-num">#29</span></td><td style="font-weight:500">Relatório de Faltas, Ocorrências e Afastamentos</td><td><span class="cat-dot" style="background:#20c997"></span>Recursos Humanos</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <!-- SEMANA 3 -->
+        <tr><td><span class="task-num">#31</span></td><td style="font-weight:500">Hotfix: Encoding UTF-8 na Importação de Planilhas</td><td><span class="cat-dot" style="background:#0dcaf0"></span>Importações Excel</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#32</span></td><td style="font-weight:500">Contas a Pagar e Receber com Recorrência V2</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#33</span></td><td style="font-weight:500">Filtros Avançados e Busca nos Lançamentos</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#34</span></td><td style="font-weight:500">Exportação Excel do Fluxo de Caixa</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#38</span></td><td style="font-weight:500">Hotfix: Validação de CNPJ na Importação</td><td><span class="cat-dot" style="background:#0dcaf0"></span>Importações Excel</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#39</span></td><td style="font-weight:500">Dashboard de KPIs Financeiros por Obra</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#41</span></td><td style="font-weight:500">Relatório de Margem e Rentabilidade por Obra</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#42</span></td><td style="font-weight:500">Hotfix: Timeout em Relatórios de Volume Alto</td><td><span class="cat-dot" style="background:#6c757d"></span>Correções</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#43</span></td><td style="font-weight:500">Resumo Executivo Financeiro Mensal</td><td><span class="cat-dot" style="background:#198754"></span>Financeiro</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+        <tr><td><span class="task-num">#44</span></td><td style="font-weight:500">Hotfix: Atualização de Status em Lote no Cronograma</td><td><span class="cat-dot" style="background:#fd7e14"></span>Cronograma</td><td><span class="badge badge-hotfix" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Hotfix</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 15</td></tr>
+        <tr><td><span class="task-num">#45</span></td><td style="font-weight:500">Portal do Cliente — Visualização de Obra ao Vivo</td><td><span class="cat-dot" style="background:#d63384"></span>Portal do Cliente</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#46</span></td><td style="font-weight:500">Portal do Cliente — Aprovação de Compras Online</td><td><span class="cat-dot" style="background:#d63384"></span>Portal do Cliente</td><td><span class="badge badge-grande" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Grande</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 220</td></tr>
+        <tr><td><span class="task-num">#47</span></td><td style="font-weight:500">Cronograma — Alertas e Notificações de Prazo</td><td><span class="cat-dot" style="background:#fd7e14"></span>Cronograma</td><td><span class="badge badge-media" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Média</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 110</td></tr>
+        <tr><td><span class="task-num">#48</span></td><td style="font-weight:500">Correção de Layout Responsivo e Mobile</td><td><span class="cat-dot" style="background:#6c757d"></span>Correções</td><td><span class="badge badge-pequena" style="font-size:.75rem;font-weight:600;padding:.25rem .55rem;border-radius:.35rem;">Pequena</span></td><td class="cost-cell" style="text-align:right;color:#3fb950">R$ 45</td></tr>
+      </tbody>
+      <tfoot>
+        <tr style="background:rgba(35,134,54,.08);border-top:2px solid rgba(35,134,54,.3);">
+          <td colspan="4" style="font-weight:800;padding:.85rem 1rem;font-size:.9rem;color:#3fb950;">TOTAL GERAL</td>
+          <td style="font-weight:900;font-size:1.05rem;color:#3fb950;text-align:right;padding:.85rem 1rem;">R$ 4.630</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p style="font-size:.78rem;color:var(--brand-muted);" id="countMsg">Exibindo 42 de 42 entregas</p>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-4">
+      <div>
+        <div class="total-label">Total Estimado do Ciclo V2</div>
+        <div class="total-highlight">R$ 4.630</div>
+        <div class="mt-1" style="font-size:.85rem;color:var(--brand-muted);">
+          42 entregas &nbsp;·&nbsp; Abril 2026 &nbsp;·&nbsp; 15 dias de desenvolvimento
+        </div>
+      </div>
+      <div class="disclaimer">
+        <i class="fas fa-info-circle me-1" style="color:var(--brand-blue);"></i>
+        <strong>Nota:</strong> Os valores são estimativas baseadas na complexidade de cada entrega
+        — Hotfix R$ 15 · Pequena R$ 45 · Média R$ 110 · Grande R$ 220 · Extra Grande R$ 420.
+        Para exportar em PDF, use <kbd style="background:rgba(255,255,255,.1);padding:.1rem .35rem;border-radius:.25rem;">Ctrl + P</kbd> no navegador.
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+Chart.defaults.color = '#8b949e';
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+// ── DOUGHNUT — Entregas por Categoria ──
+new Chart(document.getElementById('chartCategoria'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Financeiro','RDO','Cronograma','Recursos Humanos','Correções','Importações Excel','Portal do Cliente','Suprimentos'],
+    datasets: [{
+      data: [12, 7, 6, 4, 6, 4, 2, 1],
+      backgroundColor: ['#198754cc','#0d6efdcc','#fd7e14cc','#20c997cc','#6c757dcc','#0dcaf0cc','#d63384cc','#6f42c1cc'],
+      borderColor:      ['#198754',  '#0d6efd',  '#fd7e14',  '#20c997',  '#6c757d',  '#0dcaf0',  '#d63384',  '#6f42c1'],
+      borderWidth: 2,
+      hoverOffset: 10,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: { padding: 14, font: { size: 12 }, usePointStyle: true, pointStyleWidth: 10 }
+      },
+      tooltip: {
+        callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} entrega${ctx.parsed !== 1 ? 's' : ''}` }
+      }
+    },
+    cutout: '58%',
+  }
+});
+
+// ── BAR+LINE — Custo por Semana ──
+new Chart(document.getElementById('chartSemana'), {
+  type: 'bar',
+  data: {
+    labels: ['Semana 1','Semana 2','Semana 3'],
+    datasets: [
+      {
+        label: 'Custo da Semana (R$)',
+        data: [1680, 1530, 1420],
+        backgroundColor: 'rgba(31,111,235,.65)',
+        borderColor: '#1f6feb',
+        borderWidth: 2, borderRadius: 6, yAxisID: 'y',
+      },
+      {
+        label: 'Custo Acumulado (R$)',
+        data: [1680, 3210, 4630],
+        type: 'line',
+        borderColor: '#3fb950',
+        backgroundColor: 'rgba(63,185,80,.12)',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#3fb950',
+        pointRadius: 5,
+        fill: true, tension: 0.35, yAxisID: 'y',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { font: { size: 12 } } },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(255,255,255,.06)' },
+        ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR'), font: { size: 11 } }
+      }
+    },
+    plugins: {
+      legend: { labels: { usePointStyle: true, pointStyleWidth: 10, font: { size: 12 }, padding: 16 } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: R$ ${ctx.parsed.y.toLocaleString('pt-BR')}` } }
+    }
+  }
+});
+
+// ── TABLE SEARCH ──
+const rows = document.querySelectorAll('#tasksTable tbody tr');
+const countMsg = document.getElementById('countMsg');
+document.getElementById('searchInput').addEventListener('input', function () {
+  const q = this.value.toLowerCase().trim();
+  let visible = 0;
+  rows.forEach(row => {
+    const match = row.textContent.toLowerCase().includes(q);
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  countMsg.textContent = `Exibindo ${visible} de ${rows.length} entregas`;
+});
+</script>
+</body>
+</html>
