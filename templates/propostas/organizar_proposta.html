@@ -516,8 +516,8 @@
                         <span class="badge bg-secondary">${item.quantidade} ${item.unidade}</span>
                     </div>
                     <div class="item-valores">
-                        <div class="valor-unitario">R$ ${parseFloat(item.preco_unitario).toFixed(2)}</div>
-                        <div class="subtotal">R$ ${(item.quantidade * item.preco_unitario).toFixed(2)}</div>
+                        <div class="valor-unitario">${formatBRL(parseFloat(item.preco_unitario))}</div>
+                        <div class="subtotal">${formatBRL(item.quantidade * item.preco_unitario)}</div>
                     </div>
                 </div>
             `;
@@ -587,15 +587,18 @@
             });
         }
         
+        function formatBRL(v) {
+            return 'R$ ' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '#').replace('.', ',').replace(/#/g, '.');
+        }
         function atualizarValorTotal() {
             let total = 0;
             document.querySelectorAll('.item-proposta').forEach(item => {
                 const subtotalText = item.querySelector('.subtotal').textContent;
-                const subtotal = parseFloat(subtotalText.replace('R$ ', '').replace(',', '.'));
+                const subtotal = parseFloat(subtotalText.replace(/[R$\s.]/g, '').replace(',', '.'));
                 total += subtotal;
             });
             
-            document.getElementById('valor-total').textContent = total.toFixed(2);
+            document.getElementById('valor-total').textContent = formatBRL(total);
         }
         
         function initializarDragAndDrop() {
