@@ -1892,7 +1892,7 @@ def gerar_cronograma_cliente(obra_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao gerar cronograma cliente para obra {obra_id}: {e}")
-        flash(f'Erro ao gerar cronograma: {str(e)}', 'danger')
+        flash('Erro ao gerar cronograma. Tente novamente.', 'danger')
 
     return redirect(url_for('main.detalhes_obra', id=obra_id))
 
@@ -1915,19 +1915,24 @@ def editar_cronograma_cliente(obra_id, item_id):
         if nome:
             item.nome_tarefa = nome
 
-        data_ini = request.form.get('data_inicio_apresentacao', '').strip()
-        data_fim = request.form.get('data_fim_apresentacao', '').strip()
+        data_ini_raw = request.form.get('data_inicio_apresentacao', '').strip()
+        data_fim_raw = request.form.get('data_fim_apresentacao', '').strip()
         from datetime import datetime as _dt
-        if data_ini:
+        if data_ini_raw:
             try:
-                item.data_inicio_apresentacao = _dt.strptime(data_ini, '%Y-%m-%d').date()
+                item.data_inicio_apresentacao = _dt.strptime(data_ini_raw, '%Y-%m-%d').date()
             except ValueError:
                 pass
-        if data_fim:
+        else:
+            item.data_inicio_apresentacao = None
+
+        if data_fim_raw:
             try:
-                item.data_fim_apresentacao = _dt.strptime(data_fim, '%Y-%m-%d').date()
+                item.data_fim_apresentacao = _dt.strptime(data_fim_raw, '%Y-%m-%d').date()
             except ValueError:
                 pass
+        else:
+            item.data_fim_apresentacao = None
 
         perc = request.form.get('percentual_apresentacao', '').strip()
         if perc:
@@ -1941,7 +1946,7 @@ def editar_cronograma_cliente(obra_id, item_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao editar cronograma cliente item {item_id}: {e}")
-        flash(f'Erro ao editar tarefa: {str(e)}', 'danger')
+        flash('Erro ao salvar alterações. Tente novamente.', 'danger')
 
     return redirect(url_for('main.detalhes_obra', id=obra_id))
 
