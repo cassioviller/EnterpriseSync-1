@@ -569,7 +569,7 @@
                 </div>
             {% else %}
                 <div class="highlight-box">
-                    <div class="value-highlight">VALOR TOTAL: {{ proposta.valor_total or 0|brl }}</div>
+                    <div class="value-highlight">VALOR TOTAL: {{ (proposta.valor_total or 0)|brl }}</div>
                 </div>
             {% endif %}
         </div>

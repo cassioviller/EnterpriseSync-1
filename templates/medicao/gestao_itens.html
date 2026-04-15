@@ -63,7 +63,7 @@
       <div class="kpi-lbl">Saldo Disponível</div>
     </div>
     <div class="kpi-box">
-      <div class="kpi-val">{{ obra.valor_entrada|float if obra.valor_entrada else 0|brl }}</div>
+      <div class="kpi-val">{{ (obra.valor_entrada|float if obra.valor_entrada else 0)|brl }}</div>
       <div class="kpi-lbl">Entrada</div>
     </div>
     <div class="kpi-box">
@@ -262,9 +262,9 @@
                     {{ m.data_inicio.strftime('%d/%m') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}
                     {% else %}—{% endif %}
                   </td>
-                  <td class="fw-semibold">{{ m.valor_total_medido_periodo|float if m.valor_total_medido_periodo else m.valor_medido|float|brl }}</td>
-                  <td>{{ m.valor_entrada_abatido_periodo|float if m.valor_entrada_abatido_periodo else 0|brl }}</td>
-                  <td class="fw-bold text-primary">{{ m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0|brl }}</td>
+                  <td class="fw-semibold">{{ (m.valor_total_medido_periodo|float if m.valor_total_medido_periodo else m.valor_medido|float)|brl }}</td>
+                  <td>{{ (m.valor_entrada_abatido_periodo|float if m.valor_entrada_abatido_periodo else 0)|brl }}</td>
+                  <td class="fw-bold text-primary">{{ (m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0)|brl }}</td>
                   <td>
                     <span class="badge {% if m.status == 'APROVADO' %}bg-success{% elif m.status == 'FATURADO' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
                       {{ m.status }}

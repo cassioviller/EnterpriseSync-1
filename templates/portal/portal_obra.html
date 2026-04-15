@@ -377,7 +377,7 @@
                 {% if m.valor_entrada_abatido_periodo and m.valor_entrada_abatido_periodo|float > 0 %}
                 <span class="text-muted ms-2">Entrada:</span> <strong class="text-danger">−{{ m.valor_entrada_abatido_periodo|float|brl }}</strong>
                 {% endif %}
-                <span class="text-muted ms-2">A Faturar:</span> <strong class="text-success">{{ m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0|brl }}</strong>
+                <span class="text-muted ms-2">A Faturar:</span> <strong class="text-success">{{ (m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0)|brl }}</strong>
             </div>
             {% endif %}
             {% if medicao_contas and medicao_contas.get(m.id) %}

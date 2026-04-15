@@ -491,7 +491,7 @@
                         {% endfor %}
                         <tr>
                             <td colspan="5"><strong>VALOR TOTAL DA PROPOSTA:</strong></td>
-                            <td class="price"><strong>{{ proposta.valor_total or 0|brl }}</strong></td>
+                            <td class="price"><strong>{{ (proposta.valor_total or 0)|brl }}</strong></td>
                         </tr>
                     </tbody>
                 </table>

@@ -277,7 +277,7 @@
                                 {{ estoque.quantidade }}
                                 {% endif %}
                             </td>
-                            <td>{{ estoque.valor_unitario|float if estoque.valor_unitario else 0|brl }}</td>
+                            <td>{{ (estoque.valor_unitario|float if estoque.valor_unitario else 0)|brl }}</td>
                             <td>{{ ((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0))|brl }}</td>
                             <td>
                                 {% if estoque.status == 'DISPONIVEL' %}
@@ -529,7 +529,7 @@
                             </td>
                             <td>{{ estoque.updated_at.strftime('%d/%m/%Y') }}</td>
                             <td>{{ estoque.obra.nome if estoque.obra else '-' }}</td>
-                            <td>{{ estoque.valor_unitario|float if estoque.valor_unitario else 0|brl }}</td>
+                            <td>{{ (estoque.valor_unitario|float if estoque.valor_unitario else 0)|brl }}</td>
                             <td>{{ ((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0))|brl }}</td>
                         </tr>
                         {% endfor %}
@@ -629,7 +629,7 @@
                             <td>{{ obra }}</td>
                             <td>{{ saida.item.codigo }} - {{ saida.item.nome }}</td>
                             <td>{{ saida.quantidade }}</td>
-                            <td>{{ saida.valor_unitario|float if saida.valor_unitario else 0|brl }}</td>
+                            <td>{{ (saida.valor_unitario|float if saida.valor_unitario else 0)|brl }}</td>
                             <td>{{ ((saida.valor_unitario|float if saida.valor_unitario else 0) * (saida.quantidade|float if saida.quantidade else 0))|brl }}</td>
                             <td>{{ saida.data_movimento.strftime('%d/%m/%Y') }}</td>
                         </tr>

@@ -265,7 +265,7 @@
                                 {% if proposta.desconto_percentual > 0 %}
                                 <tr class="table-success">
                                     <td colspan="5" class="text-end"><strong>Desconto ({{ proposta.desconto_percentual }}%):</strong></td>
-                                    <td><strong>- {{ proposta.valor_total * proposta.desconto_percentual / 100|brl }}</strong></td>
+                                    <td><strong>- {{ (proposta.valor_total * proposta.desconto_percentual / 100)|brl }}</strong></td>
                                 </tr>
                                 <tr class="table-primary">
                                     <td colspan="5" class="text-end"><strong>Valor Final:</strong></td>
@@ -328,7 +328,7 @@
                             {% if proposta.desconto_percentual > 0 %}
                             <div class="d-flex justify-content-between text-success">
                                 <span>Desconto ({{ proposta.desconto_percentual }}%):</span>
-                                <strong>- {{ proposta.valor_total * proposta.desconto_percentual / 100|brl }}</strong>
+                                <strong>- {{ (proposta.valor_total * proposta.desconto_percentual / 100)|brl }}</strong>
                             </div>
                             <hr>
                             <div class="d-flex justify-content-between">

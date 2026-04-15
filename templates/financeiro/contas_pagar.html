@@ -171,7 +171,7 @@
                             <td><span class="text-muted">-</span></td>
                             <td>{{ custo.valor_total|brl }}</td>
                             <td>R$ 0,00</td>
-                            <td>{{ custo.valor_solicitado or custo.valor_total|brl }}</td>
+                            <td>{{ (custo.valor_solicitado or custo.valor_total)|brl }}</td>
                             <td>
                                 {% if custo.status == 'SOLICITADO' %}
                                 <span class="badge bg-warning text-dark">Solicitado</span>

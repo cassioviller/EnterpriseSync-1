@@ -157,7 +157,7 @@
                                     <td>{{ item.quantidade }}</td>
                                     <td><span class="badge bg-light text-dark">{{ item.unidade }}</span></td>
                                     <td>{{ item.preco_unitario|brl }}</td>
-                                    <td><strong>{{ item.quantidade * item.preco_unitario|brl }}</strong></td>
+                                    <td><strong>{{ (item.quantidade * item.preco_unitario)|brl }}</strong></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
