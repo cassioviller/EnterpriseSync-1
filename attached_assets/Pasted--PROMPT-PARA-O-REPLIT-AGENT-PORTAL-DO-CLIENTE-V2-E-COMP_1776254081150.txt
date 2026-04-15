@@ -1,0 +1,66 @@
+# PROMPT PARA O REPLIT AGENT: PORTAL DO CLIENTE V2 E COMPRAS SIMPLIFICADAS
+
+**Contexto:**
+Estamos desenvolvendo o EnterpriseSync V2. Precisamos refatorar o fluxo de compras para aprovação do cliente, implementar o Mapa de Concorrência no Portal do Cliente e criar uma versão V2 do Cronograma exclusiva para o cliente (sem alterar o cronograma interno de métricas).
+
+Por favor, implemente as seguintes funcionalidades seguindo estritamente a arquitetura descrita abaixo.
+
+---
+
+## 🔴 TASK 1: Módulo de Compras Simplificado na Obra
+
+**Objetivo:** O gestor não deve precisar ir até o Almoxarifado para criar uma compra para o cliente aprovar. Isso deve ser feito diretamente na tela de Detalhes da Obra.
+
+**Implementação Backend (`views/obras.py`):**
+1. Crie uma nova rota `@obras_bp.route('/<int:obra_id>/compras/nova', methods=['GET', 'POST'])`.
+2. Esta rota deve renderizar um formulário simplificado de `PedidoCompra` (apenas fornecedor, itens, valores e anexo).
+3. Ao salvar, o `PedidoCompra` deve ser criado com `obra_id=obra_id` e um novo campo `status_aprovacao_cliente = 'pendente'`.
+4. **Atenção ao Banco de Dados:** Adicione a coluna `status_aprovacao_cliente` (String, default='nao_aplicavel') no modelo `PedidoCompra` em `models.py`. Os status possíveis são: `nao_aplicavel`, `pendente`, `aprovado`, `rejeitado`.
+
+**Implementação Frontend (`templates/obras/detalhes.html`):**
+1. Adicione uma nova aba "Compras para Aprovação" na tela de detalhes da obra.
+2. Nesta aba, exiba uma tabela com os pedidos de compra vinculados à obra (`obra.pedidos_compra`).
+3. Adicione um botão "Nova Compra para Cliente" que abre um modal ou redireciona para o formulário simplificado criado no passo anterior.
+
+---
+
+## 🔴 TASK 2: Mapa de Concorrência no Portal do Cliente
+
+**Objetivo:** Quando o cliente acessar o portal, ele deve ver as compras pendentes de aprovação em formato de "Mapa de Concorrência", comparando o mesmo produto em diferentes fornecedores.
+
+**Implementação Backend (`models.py` e `views/obras.py`):**
+1. Crie o modelo `MapaConcorrencia` vinculado à `Obra` e ao `PedidoCompra`.
+   - Campos: `id`, `obra_id`, `descricao_item`, `admin_id`, `status` (pendente, concluido).
+2. Crie o modelo `OpcaoConcorrencia` vinculado ao `MapaConcorrencia`.
+   - Campos: `id`, `mapa_id`, `fornecedor_id`, `valor_unitario`, `prazo_entrega`, `observacoes`, `selecionada` (Boolean).
+3. Na rota do Portal do Cliente (que usa o `token_cliente`), busque os mapas de concorrência pendentes daquela obra.
+
+**Implementação Frontend (`templates/cliente/obra_dashboard.html`):**
+1. Crie uma nova seção/card chamada "Aprovações Pendentes" ou "Mapa de Concorrência".
+2. Para cada item que precisa de aprovação, exiba uma tabela comparativa (Fornecedor A vs Fornecedor B vs Fornecedor C).
+3. Adicione botões de rádio ou botões de ação para o cliente "Aprovar esta opção".
+4. Crie uma rota POST no backend para receber a aprovação do cliente, marcar a `OpcaoConcorrencia` como `selecionada=True`, atualizar o status do mapa e gerar o `PedidoCompra` final aprovado.
+
+---
+
+## 🔴 TASK 3: Cronograma V2 (Apresentável) para o Portal do Cliente
+
+**Objetivo:** O cronograma interno (`TarefaCronograma`) deve permanecer intocado para manter as métricas reais de atraso. O cliente deve ver uma "Versão V2" editável apenas para apresentação.
+
+**Implementação Backend (`models.py` e `cronograma_views.py`):**
+1. Crie o modelo `CronogramaCliente` (cópia simplificada de `TarefaCronograma`).
+   - Campos: `id`, `obra_id`, `nome_tarefa`, `data_inicio_apresentacao`, `data_fim_apresentacao`, `percentual_apresentacao`, `ordem`, `admin_id`.
+2. Crie uma rota no painel administrativo da obra: "Gerar Cronograma para Cliente".
+   - Esta rota deve copiar as tarefas atuais de `TarefaCronograma` para `CronogramaCliente`, permitindo que o gestor edite as datas de apresentação livremente antes de o cliente ver.
+3. Crie um CRUD simples para o gestor editar o `CronogramaCliente` (alterar datas e porcentagens falsas/ajustadas).
+
+**Implementação Frontend (`templates/cliente/obra_dashboard.html`):**
+1. Na aba de Cronograma do Portal do Cliente, altere a query para buscar de `CronogramaCliente` em vez de `TarefaCronograma`.
+2. Renderize o gráfico de Gantt ou a tabela de progresso usando exclusivamente os dados de `CronogramaCliente`.
+3. Se a obra não tiver nenhum registro em `CronogramaCliente`, exiba uma mensagem: "Cronograma em atualização".
+
+---
+**Regras Gerais para o Replit Agent:**
+- Não altere a lógica de cálculo de dias úteis do cronograma interno (`utils/cronograma_engine.py`).
+- Mantenha o isolamento de tenant (`admin_id`) em todas as novas queries e modelos.
+- Use as classes utilitárias do Bootstrap 5 que já estão no projeto para manter o padrão visual.
