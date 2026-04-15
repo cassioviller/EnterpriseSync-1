@@ -211,6 +211,10 @@ def aprovar_mapa_concorrencia(token: str, mapa_id: int):
         id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
     ).first_or_404()
 
+    if mapa.status != 'pendente':
+        flash('Este mapa de concorrência já foi concluído e não pode ser alterado.', 'warning')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
     opcao_id = request.form.get('opcao_id', type=int)
     if not opcao_id:
         flash('Selecione uma opção de fornecedor.', 'warning')
