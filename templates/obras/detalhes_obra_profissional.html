@@ -1228,6 +1228,75 @@
         </div>
         {% endif %}
 
+        <!-- Compras para Aprovação do Cliente -->
+        <div class="obra-card">
+            <div class="obra-card-header" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+                <h3><i class="fas fa-shopping-cart"></i> Compras para Aprovação</h3>
+                <div class="header-actions">
+                    <span class="badge bg-light text-dark ms-2">{{ pedidos_compra_obra|length if pedidos_compra_obra else 0 }}</span>
+                    <button type="button" class="btn-modern btn-success btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#modalNovaCompraObra">
+                        <i class="fas fa-plus"></i> Nova Compra
+                    </button>
+                </div>
+            </div>
+            <div class="obra-card-body" style="padding: 0;">
+                {% if pedidos_compra_obra %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" style="font-size:0.9rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fornecedor</th>
+                                <th>Data</th>
+                                <th>Itens</th>
+                                <th>Valor Total</th>
+                                <th>Status Cliente</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in pedidos_compra_obra %}
+                            <tr>
+                                <td>
+                                    <i class="fas fa-store text-primary me-1"></i>
+                                    <strong>{{ p.fornecedor.nome if p.fornecedor else '—' }}</strong>
+                                </td>
+                                <td>{{ p.data_compra.strftime('%d/%m/%Y') if p.data_compra else '—' }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ p.itens.count() }} itens</span>
+                                </td>
+                                <td><strong class="text-dark">{{ p.valor_total|brl }}</strong></td>
+                                <td>
+                                    {% if p.status_aprovacao_cliente == 'APROVADO' %}
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Aprovado</span>
+                                    {% elif p.status_aprovacao_cliente == 'REJEITADO' %}
+                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Rejeitado</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pendente</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('compras.detalhe', pedido_id=p.id) }}" class="btn btn-outline-primary btn-sm" title="Ver detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state" style="padding:2rem;text-align:center;color:#6b7280;">
+                    <i class="fas fa-shopping-cart" style="font-size:2.5rem;opacity:.4;margin-bottom:1rem;color:#0ea5e9;"></i>
+                    <h6 style="color:#374151;">Nenhuma compra cadastrada</h6>
+                    <p style="font-size:.9rem;">Clique em "Nova Compra" para criar um pedido que o cliente irá aprovar no portal.</p>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovaCompraObra">
+                        <i class="fas fa-plus me-1"></i> Nova Compra para Cliente
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Ações Rápidas -->
         <div class="obra-card">
             <div class="obra-card-header">
@@ -1376,6 +1445,109 @@
                     Salvar Serviços (<span id="contadorBotao">0</span>)
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Nova Compra para Aprovação do Cliente -->
+<div class="modal fade" id="modalNovaCompraObra" tabindex="-1" aria-labelledby="modalNovaCompraObraLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+                <h5 class="modal-title" id="modalNovaCompraObraLabel">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    Nova Compra para Aprovação — {{ obra.nome }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_compra_obra', obra_id=obra.id) }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="row g-3 mb-3">
+                        <!-- Fornecedor -->
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Fornecedor <span class="text-danger">*</span></label>
+                            <select name="fornecedor_id" class="form-select" required>
+                                <option value="">Selecione o fornecedor…</option>
+                                {% for f in fornecedores_lista %}
+                                <option value="{{ f.id }}">{{ f.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Data -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Data da Compra</label>
+                            <input type="date" name="data_compra" class="form-control" value="{{ date.today().isoformat() }}">
+                        </div>
+                        <!-- Nº NF/Recibo -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Nº NF / Recibo</label>
+                            <input type="text" name="numero" class="form-control" placeholder="Ex: NF-001234">
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Itens -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-semibold mb-0">Itens da Compra <span class="text-danger">*</span></label>
+                            <button type="button" class="btn btn-outline-success btn-sm" onclick="compraObraAdicionarItem()">
+                                <i class="fas fa-plus me-1"></i> Adicionar Item
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle" id="tabelaItensCompraObra">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:40%">Descrição</th>
+                                        <th style="width:15%">Qtd.</th>
+                                        <th style="width:20%">Preço Unit. (R$)</th>
+                                        <th style="width:18%">Subtotal</th>
+                                        <th style="width:7%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itensCompraObra">
+                                    <tr>
+                                        <td><input type="text" name="item_descricao[]" class="form-control form-control-sm" placeholder="Descrição do item" required></td>
+                                        <td><input type="number" name="item_quantidade[]" class="form-control form-control-sm compra-qtd" value="1" min="0.01" step="0.01" oninput="compraObraCalcRow(this)"></td>
+                                        <td><input type="number" name="item_preco[]" class="form-control form-control-sm compra-preco" value="0" min="0" step="0.01" oninput="compraObraCalcRow(this)"></td>
+                                        <td><input type="text" class="form-control form-control-sm compra-sub bg-light" readonly value="R$ 0,00"></td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="compraObraRemoverItem(this)" style="display:none;">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary">
+                                        <td colspan="3" class="text-end fw-bold">Total Geral:</td>
+                                        <td colspan="2"><strong id="compraObraTotalGeral" class="text-dark fs-5">R$ 0,00</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Observações -->
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Observações</label>
+                            <textarea name="observacoes" class="form-control" rows="3" placeholder="Detalhes adicionais para o cliente…"></textarea>
+                        </div>
+                        <!-- Anexo -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Anexo (PDF / Imagem)</label>
+                            <input type="file" name="anexo" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                            <small class="text-muted">Orçamento, NF ou foto da nota</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-1"></i> Criar Compra para Aprovação
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -2020,6 +2192,50 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 {% endif %}
 
+// ===== Compras Simplificadas: Nova Compra da Obra =====
+function compraObraCalcRow(el) {
+    var row = el.closest('tr');
+    var qtd = parseFloat(row.querySelector('.compra-qtd').value) || 0;
+    var preco = parseFloat(row.querySelector('.compra-preco').value) || 0;
+    var sub = qtd * preco;
+    row.querySelector('.compra-sub').value = 'R$ ' + sub.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    compraObraCalcTotal();
+}
+
+function compraObraCalcTotal() {
+    var total = 0;
+    document.querySelectorAll('#itensCompraObra .compra-qtd').forEach(function(qtdEl) {
+        var row = qtdEl.closest('tr');
+        var qtd = parseFloat(qtdEl.value) || 0;
+        var preco = parseFloat(row.querySelector('.compra-preco').value) || 0;
+        total += qtd * preco;
+    });
+    document.getElementById('compraObraTotalGeral').textContent = 'R$ ' + total.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function compraObraAdicionarItem() {
+    var tbody = document.getElementById('itensCompraObra');
+    var firstRow = tbody.querySelector('tr');
+    var newRow = document.createElement('tr');
+    newRow.innerHTML = '<td><input type="text" name="item_descricao[]" class="form-control form-control-sm" placeholder="Descrição do item" required></td>' +
+        '<td><input type="number" name="item_quantidade[]" class="form-control form-control-sm compra-qtd" value="1" min="0.01" step="0.01" oninput="compraObraCalcRow(this)"></td>' +
+        '<td><input type="number" name="item_preco[]" class="form-control form-control-sm compra-preco" value="0" min="0" step="0.01" oninput="compraObraCalcRow(this)"></td>' +
+        '<td><input type="text" class="form-control form-control-sm compra-sub bg-light" readonly value="R$ 0,00"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="compraObraRemoverItem(this)"><i class="fas fa-trash"></i></button></td>';
+    tbody.appendChild(newRow);
+    // Show remove buttons when more than 1 row
+    tbody.querySelectorAll('.btn-danger').forEach(function(btn){ btn.style.display=''; });
+}
+
+function compraObraRemoverItem(btn) {
+    var tbody = document.getElementById('itensCompraObra');
+    if (tbody.querySelectorAll('tr').length <= 1) return;
+    btn.closest('tr').remove();
+    compraObraCalcTotal();
+    if (tbody.querySelectorAll('tr').length === 1) {
+        tbody.querySelector('.btn-danger').style.display = 'none';
+    }
+}
 </script>
 
 <style>

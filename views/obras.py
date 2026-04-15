@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -1543,6 +1543,19 @@ def detalhes_obra(id):
                 'evolucao_mensal': []
             }
         
+        # Pedidos de compra vinculados à obra
+        try:
+            pedidos_compra_obra = PedidoCompra.query.filter_by(obra_id=obra_id).order_by(PedidoCompra.created_at.desc()).all()
+        except Exception:
+            pedidos_compra_obra = []
+
+        # Fornecedores disponíveis para o formulário de nova compra
+        try:
+            tenant_admin = obra.admin_id
+            fornecedores_lista = Fornecedor.query.filter_by(admin_id=tenant_admin).order_by(Fornecedor.nome).all()
+        except Exception:
+            fornecedores_lista = []
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
@@ -1561,7 +1574,9 @@ def detalhes_obra(id):
                              custos_transporte=custos_transporte,
                              custos_transporte_total=custos_transporte_total,
                              funcionarios_obra=funcionarios_obra,
-                             dados_folha=dados_folha)
+                             dados_folha=dados_folha,
+                             pedidos_compra_obra=pedidos_compra_obra,
+                             fornecedores_lista=fornecedores_lista)
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
@@ -1570,5 +1585,88 @@ def detalhes_obra(id):
         # Exibir traceback completo em modo desenvolvimento
         flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
         return redirect(url_for('main.obras'))
+
+@main_bp.route('/obras/<int:obra_id>/compras/nova', methods=['POST'])
+@login_required
+def nova_compra_obra(obra_id):
+    """Cria um pedido de compra para aprovação do cliente, diretamente da tela de obra."""
+    try:
+        obra = Obra.query.get_or_404(obra_id)
+
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', current_user.id)
+
+        fornecedor_id = request.form.get('fornecedor_id', type=int)
+        data_compra_str = request.form.get('data_compra') or date.today().isoformat()
+        observacoes = request.form.get('observacoes', '').strip()
+        numero = request.form.get('numero', '').strip()
+
+        if not fornecedor_id:
+            flash('Selecione um fornecedor para a compra.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        descricoes = request.form.getlist('item_descricao[]')
+        quantidades = request.form.getlist('item_quantidade[]')
+        precos = request.form.getlist('item_preco[]')
+
+        if not descricoes or not any(d.strip() for d in descricoes):
+            flash('Adicione ao menos um item à compra.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        # Calcular valor total
+        valor_total = sum(
+            float(q or 0) * float(p or 0)
+            for q, p in zip(quantidades, precos)
+        )
+
+        # Tratar upload de anexo
+        anexo_url = None
+        arquivo = request.files.get('anexo')
+        if arquivo and arquivo.filename:
+            from werkzeug.utils import secure_filename
+            upload_dir = os.path.join('static', 'uploads', 'pedidos_compra')
+            os.makedirs(upload_dir, exist_ok=True)
+            safe_name = secure_filename(arquivo.filename)
+            safe_name = f"obra{obra_id}_{safe_name}"
+            arquivo.save(os.path.join(upload_dir, safe_name))
+            anexo_url = f"/static/uploads/pedidos_compra/{safe_name}"
+
+        pedido = PedidoCompra(
+            fornecedor_id=fornecedor_id,
+            obra_id=obra_id,
+            data_compra=datetime.strptime(data_compra_str, '%Y-%m-%d').date(),
+            numero=numero or None,
+            observacoes=observacoes or None,
+            valor_total=valor_total,
+            status_aprovacao_cliente='PENDENTE',
+            anexo_url=anexo_url,
+            admin_id=admin_id,
+        )
+        db.session.add(pedido)
+        db.session.flush()  # get pedido.id
+
+        for desc, qtd_str, preco_str in zip(descricoes, quantidades, precos):
+            if not desc.strip():
+                continue
+            qtd = float(qtd_str or 1)
+            preco = float(preco_str or 0)
+            item = PedidoCompraItem(
+                pedido_id=pedido.id,
+                descricao=desc.strip(),
+                quantidade=qtd,
+                preco_unitario=preco,
+                subtotal=qtd * preco,
+                admin_id=admin_id,
+            )
+            db.session.add(item)
+
+        db.session.commit()
+        flash('Compra criada com sucesso e enviada para aprovação do cliente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar compra para obra {obra_id}: {e}")
+        flash(f'Erro ao criar compra: {str(e)}', 'danger')
+
+    return redirect(url_for('main.detalhes_obra', id=obra_id))
+
 
 # ===== SUPER ADMIN =====
