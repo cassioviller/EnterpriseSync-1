@@ -4585,6 +4585,42 @@ class MedicaoObra(db.Model):
         return f'<MedicaoObra #{self.numero} obra_id={self.obra_id}>'
 
 
+class MapaConcorrencia(db.Model):
+    """Mapa de concorrência — tabela comparativa de fornecedores para aprovação do cliente"""
+    __tablename__ = 'mapa_concorrencia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    descricao_item = db.Column(db.String(500), nullable=False)
+    status = db.Column(db.String(20), default='pendente', nullable=False)  # pendente / concluido
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref='mapas_concorrencia')
+    opcoes = db.relationship('OpcaoConcorrencia', backref='mapa', lazy='dynamic',
+                             cascade='all, delete-orphan', order_by='OpcaoConcorrencia.id')
+
+    def __repr__(self):
+        return f'<MapaConcorrencia #{self.id} obra={self.obra_id}>'
+
+
+class OpcaoConcorrencia(db.Model):
+    """Opção de fornecedor dentro de um Mapa de Concorrência"""
+    __tablename__ = 'opcao_concorrencia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mapa_id = db.Column(db.Integer, db.ForeignKey('mapa_concorrencia.id', ondelete='CASCADE'), nullable=False)
+    fornecedor_nome = db.Column(db.String(200), nullable=False)
+    valor_unitario = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    prazo_entrega = db.Column(db.String(100))
+    observacoes = db.Column(db.Text)
+    selecionada = db.Column(db.Boolean, default=False, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+
+    def __repr__(self):
+        return f'<OpcaoConcorrencia #{self.id} mapa={self.mapa_id}>'
+
+
 class MedicaoObraItem(db.Model):
     __tablename__ = 'medicao_obra_item'
 

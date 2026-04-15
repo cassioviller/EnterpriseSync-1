@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -1564,6 +1564,20 @@ def detalhes_obra(id):
         except Exception:
             fornecedores_lista = []
 
+        # Mapas de concorrência vinculados à obra
+        try:
+            mapas_concorrencia = (
+                MapaConcorrencia.query
+                .filter_by(obra_id=obra_id, admin_id=tenant_admin_id)
+                .order_by(MapaConcorrencia.created_at.desc())
+                .all()
+            )
+            # Eagerly load opcoes as list so template can iterate
+            for m in mapas_concorrencia:
+                m._opcoes_list = m.opcoes.all()
+        except Exception:
+            mapas_concorrencia = []
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
@@ -1584,7 +1598,8 @@ def detalhes_obra(id):
                              funcionarios_obra=funcionarios_obra,
                              dados_folha=dados_folha,
                              pedidos_compra_obra=pedidos_compra_obra,
-                             fornecedores_lista=fornecedores_lista)
+                             fornecedores_lista=fornecedores_lista,
+                             mapas_concorrencia=mapas_concorrencia)
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
@@ -1722,6 +1737,99 @@ def nova_compra_obra(obra_id):
         db.session.rollback()
         logger.error(f"Erro ao criar compra para obra {obra_id}: {e}")
         flash(f'Erro ao criar compra: {str(e)}', 'danger')
+
+    return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-concorrencia/novo', methods=['POST'])
+@login_required
+@admin_required
+def nova_mapa_concorrencia(obra_id):
+    """Cria um Mapa de Concorrência (comparativo de fornecedores) para a obra."""
+    try:
+        admin_id = get_tenant_admin_id()
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada ou sem permissão de acesso.', 'danger')
+            return redirect(url_for('main.obras'))
+
+        descricao_item = (request.form.get('descricao_item') or '').strip()
+        if not descricao_item:
+            flash('Informe a descrição do item para o mapa de concorrência.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        fornecedores_nomes = request.form.getlist('fornecedor_nome[]')
+        valores = request.form.getlist('valor_unitario[]')
+        prazos = request.form.getlist('prazo_entrega[]')
+        observacoes_list = request.form.getlist('observacoes[]')
+
+        opcoes_validas = [
+            (fn.strip(), v.strip(), p.strip(), o.strip())
+            for fn, v, p, o in zip(fornecedores_nomes, valores, prazos, observacoes_list)
+            if fn.strip()
+        ]
+        if not opcoes_validas:
+            flash('Adicione ao menos um fornecedor ao mapa de concorrência.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        def _parse_num(val):
+            try:
+                return float(val.replace('.', '').replace(',', '.'))
+            except Exception:
+                return 0.0
+
+        mapa = MapaConcorrencia(
+            obra_id=obra_id,
+            admin_id=admin_id,
+            descricao_item=descricao_item,
+            status='pendente',
+        )
+        db.session.add(mapa)
+        db.session.flush()
+
+        for fn, v, p, o in opcoes_validas:
+            opcao = OpcaoConcorrencia(
+                mapa_id=mapa.id,
+                fornecedor_nome=fn,
+                valor_unitario=_parse_num(v),
+                prazo_entrega=p or None,
+                observacoes=o or None,
+                selecionada=False,
+                admin_id=admin_id,
+            )
+            db.session.add(opcao)
+
+        db.session.commit()
+        flash('Mapa de concorrência criado e enviado para aprovação do cliente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao criar mapa de concorrência para obra {obra_id}: {e}")
+        flash(f'Erro ao criar mapa de concorrência: {str(e)}', 'danger')
+
+    return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-concorrencia/<int:mapa_id>/deletar', methods=['POST'])
+@login_required
+@admin_required
+def deletar_mapa_concorrencia(obra_id, mapa_id):
+    """Exclui um Mapa de Concorrência."""
+    try:
+        admin_id = get_tenant_admin_id()
+        mapa = MapaConcorrencia.query.filter_by(
+            id=mapa_id, obra_id=obra_id, admin_id=admin_id
+        ).first()
+        if not mapa:
+            flash('Mapa de concorrência não encontrado.', 'danger')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        db.session.delete(mapa)
+        db.session.commit()
+        flash('Mapa de concorrência excluído.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao deletar mapa {mapa_id}: {e}")
+        flash(f'Erro ao excluir: {str(e)}', 'danger')
 
     return redirect(url_for('main.detalhes_obra', id=obra_id))
 

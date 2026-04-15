@@ -22,6 +22,7 @@ from models import (
     db, Obra, TarefaCronograma, PedidoCompra, PedidoCompraItem,
     MedicaoObra, Fornecedor, ConfiguracaoEmpresa, RDO,
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
+    MapaConcorrencia, OpcaoConcorrencia,
 )
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,21 @@ def portal_obra(token: str):
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     nome_empresa = config.nome_empresa if config else 'Construtora'
 
+    mapas_pendentes = (
+        MapaConcorrencia.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id, status='pendente')
+        .order_by(MapaConcorrencia.created_at.desc())
+        .all()
+    )
+    mapas_concluidos = (
+        MapaConcorrencia.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id, status='concluido')
+        .order_by(MapaConcorrencia.created_at.desc())
+        .all()
+    )
+    for m in mapas_pendentes + mapas_concluidos:
+        m._opcoes_list = m.opcoes.all()
+
     return render_template(
         'portal/portal_obra.html',
         obra=obra,
@@ -129,6 +145,8 @@ def portal_obra(token: str):
         medicao_contas=medicao_contas,
         nome_empresa=nome_empresa,
         hoje=date.today(),
+        mapas_pendentes=mapas_pendentes,
+        mapas_concluidos=mapas_concluidos,
     )
 
 
@@ -182,6 +200,39 @@ def upload_comprovante(token: str, compra_id: int):
     db.session.commit()
     logger.info(f"[PORTAL] Comprovante enviado para compra {compra_id} — obra {obra.id}")
     flash('Comprovante enviado com sucesso!', 'success')
+    return redirect(url_for('portal_obras.portal_obra', token=token))
+
+
+@portal_obras_bp.route('/obra/<token>/mapa/<int:mapa_id>/aprovar', methods=['POST'])
+def aprovar_mapa_concorrencia(token: str, mapa_id: int):
+    """O cliente seleciona a opção preferida no Mapa de Concorrência."""
+    obra = _get_obra_by_token(token)
+    mapa = MapaConcorrencia.query.filter_by(id=mapa_id, obra_id=obra.id).first_or_404()
+
+    opcao_id = request.form.get('opcao_id', type=int)
+    if not opcao_id:
+        flash('Selecione uma opção de fornecedor.', 'warning')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    opcao = OpcaoConcorrencia.query.filter_by(id=opcao_id, mapa_id=mapa.id).first()
+    if not opcao:
+        flash('Opção não encontrada.', 'danger')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    for op in mapa.opcoes.all():
+        op.selecionada = False
+
+    opcao.selecionada = True
+    mapa.status = 'concluido'
+    try:
+        db.session.commit()
+        logger.info(f"[PORTAL] Mapa {mapa_id} aprovado pelo cliente — opção {opcao_id}, obra {obra.id}")
+        flash(f'Fornecedor "{opcao.fornecedor_nome}" selecionado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[PORTAL] Erro ao aprovar mapa {mapa_id}: {e}")
+        flash('Erro ao registrar aprovação. Tente novamente.', 'danger')
+
     return redirect(url_for('portal_obras.portal_obra', token=token))
 
 

@@ -1297,6 +1297,80 @@
             </div>
         </div>
 
+        <!-- Mapa de Concorrência -->
+        <div class="obra-card">
+            <div class="obra-card-header" style="background: linear-gradient(135deg, #065f46 0%, #047857 100%);">
+                <h3><i class="fas fa-balance-scale"></i> Mapa de Concorrência</h3>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark ms-2">{{ mapas_concorrencia|length if mapas_concorrencia else 0 }}</span>
+                    <button type="button" class="btn-modern btn-success btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#modalNovoMapaConcorrencia">
+                        <i class="fas fa-plus"></i> Novo Mapa
+                    </button>
+                </div>
+            </div>
+            <div class="obra-card-body">
+                {% if mapas_concorrencia %}
+                <div style="overflow-x:auto;">
+                    {% for mapa in mapas_concorrencia %}
+                    <div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:1.25rem;overflow:hidden;">
+                        <div style="background:#f0fdf4;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid #d1fae5;">
+                            <i class="fas fa-balance-scale" style="color:#059669;"></i>
+                            <span style="font-weight:700;color:#065f46;flex:1;">{{ mapa.descricao_item }}</span>
+                            {% if mapa.status == 'concluido' %}
+                            <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.75rem;"><i class="fas fa-check-circle me-1"></i>Aprovado pelo cliente</span>
+                            {% else %}
+                            <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.75rem;"><i class="fas fa-clock me-1"></i>Aguardando aprovação</span>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('main.deletar_mapa_concorrencia', obra_id=obra.id, mapa_id=mapa.id) }}" style="display:inline;" onsubmit="return confirm('Excluir este mapa de concorrência?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>
+                            </form>
+                        </div>
+                        <div style="padding:.75rem 1rem;">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:.88rem;">
+                                <thead style="background:#f9fafb;">
+                                    <tr>
+                                        <th>Fornecedor</th>
+                                        <th>Valor Unit.</th>
+                                        <th>Prazo</th>
+                                        <th>Obs.</th>
+                                        <th>Selecionado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for op in mapa._opcoes_list %}
+                                    <tr {% if op.selecionada %}style="background:#ecfdf5;"{% endif %}>
+                                        <td><strong>{{ op.fornecedor_nome }}</strong></td>
+                                        <td>{{ op.valor_unitario|float|brl }}</td>
+                                        <td>{{ op.prazo_entrega or '—' }}</td>
+                                        <td style="max-width:200px;white-space:normal;">{{ op.observacoes or '—' }}</td>
+                                        <td class="text-center">
+                                            {% if op.selecionada %}
+                                            <i class="fas fa-check-circle text-success"></i>
+                                            {% else %}
+                                            <i class="fas fa-circle text-muted" style="opacity:.3;"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-balance-scale fa-2x mb-2" style="color:#d1d5db;"></i>
+                    <h6 style="color:#374151;">Nenhum mapa de concorrência cadastrado</h6>
+                    <p style="font-size:.9rem;">Crie um mapa comparativo de fornecedores para aprovação do cliente no portal.</p>
+                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoMapaConcorrencia">
+                        <i class="fas fa-plus me-1"></i> Novo Mapa de Concorrência
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Ações Rápidas -->
         <div class="obra-card">
             <div class="obra-card-header">
@@ -2299,4 +2373,79 @@ function compraObraRemoverItem(btn) {
     cursor: not-allowed;
 }
 </style>
+
+<!-- Modal: Novo Mapa de Concorrência -->
+<div class="modal fade" id="modalNovoMapaConcorrencia" tabindex="-1" aria-labelledby="modalNovoMapaConcorrenciaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header" style="background:linear-gradient(135deg,#065f46,#047857);color:#fff;">
+                <h5 class="modal-title" id="modalNovoMapaConcorrenciaLabel">
+                    <i class="fas fa-balance-scale me-2"></i>Novo Mapa de Concorrência
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.nova_mapa_concorrencia', obra_id=obra.id) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="descricao_item" class="form-label fw-bold">Descrição do Item / Serviço <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="descricao_item" name="descricao_item"
+                               placeholder="Ex: Fornecimento de concreto usinado FCK 25" required>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="fw-bold mb-0" style="color:#065f46;"><i class="fas fa-list me-1"></i>Fornecedores / Opções</h6>
+                        <button type="button" class="btn btn-success btn-sm" onclick="adicionarOpcaoMapa()">
+                            <i class="fas fa-plus me-1"></i>Adicionar Fornecedor
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="tabelaOpcoesMapa">
+                            <thead style="background:#f0fdf4;">
+                                <tr>
+                                    <th>Fornecedor <span class="text-danger">*</span></th>
+                                    <th style="min-width:130px;">Valor Unitário</th>
+                                    <th style="min-width:130px;">Prazo Entrega</th>
+                                    <th>Observações</th>
+                                    <th style="width:50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="opcoesMapa">
+                                <tr>
+                                    <td><input type="text" class="form-control form-control-sm" name="fornecedor_nome[]" placeholder="Nome do fornecedor" required></td>
+                                    <td><input type="text" class="form-control form-control-sm" name="valor_unitario[]" placeholder="0,00"></td>
+                                    <td><input type="text" class="form-control form-control-sm" name="prazo_entrega[]" placeholder="Ex: 5 dias úteis"></td>
+                                    <td><input type="text" class="form-control form-control-sm" name="observacoes[]" placeholder="Observações"></td>
+                                    <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerOpcaoMapa(this)" title="Remover"><i class="fas fa-times"></i></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>Após salvar, o cliente poderá aprovar a opção preferida no portal.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save me-1"></i>Salvar Mapa de Concorrência
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function adicionarOpcaoMapa() {
+    var tbody = document.getElementById('opcoesMapa');
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="text" class="form-control form-control-sm" name="fornecedor_nome[]" placeholder="Nome do fornecedor" required></td>' +
+        '<td><input type="text" class="form-control form-control-sm" name="valor_unitario[]" placeholder="0,00"></td>' +
+        '<td><input type="text" class="form-control form-control-sm" name="prazo_entrega[]" placeholder="Ex: 5 dias úteis"></td>' +
+        '<td><input type="text" class="form-control form-control-sm" name="observacoes[]" placeholder="Observações"></td>' +
+        '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerOpcaoMapa(this)" title="Remover"><i class="fas fa-times"></i></button></td>';
+    tbody.appendChild(tr);
+}
+function removerOpcaoMapa(btn) {
+    var tbody = document.getElementById('opcoesMapa');
+    if (tbody.children.length <= 1) { return; }
+    btn.closest('tr').remove();
+}
+</script>
 {% endblock %}

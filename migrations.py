@@ -3808,6 +3808,7 @@ def executar_migracoes():
             (106, "RDO e filhos — ON DELETE CASCADE para exclusão em cascata com Obra", migration_106_rdo_obra_cascade),
             (107, "Portal do Cliente — chave_pix, status_aprovacao_cliente, medicao_obra", migration_107_portal_cliente_obra),
             (108, "Medição Quinzenal — itens comerciais, tarefas vinculadas, expansão medicao_obra", migration_108_medicao_quinzenal),
+            (109, "Mapa de Concorrência — tabelas mapa_concorrencia e opcao_concorrencia", migration_109_mapa_concorrencia),
         ]
         
         # Executar cada migração com rastreamento
@@ -8736,6 +8737,77 @@ def migration_105_fluxo_caixa_banco_id():
 
     except Exception as e:
         logger.error(f"Erro na migracao 105: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_109_mapa_concorrencia():
+    """
+    Migration 109: Mapa de Concorrência
+    Cria tabelas mapa_concorrencia e opcao_concorrencia para
+    comparação de fornecedores com aprovação do cliente no portal.
+    """
+    connection = None
+    try:
+        from app import db
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'mapa_concorrencia'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE mapa_concorrencia (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    descricao_item VARCHAR(500) NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_mapa_concorrencia_obra_id ON mapa_concorrencia(obra_id)")
+            cursor.execute("CREATE INDEX idx_mapa_concorrencia_admin_id ON mapa_concorrencia(admin_id)")
+            logger.info("MIGRACAO 109: tabela mapa_concorrencia criada")
+        else:
+            logger.info("MIGRACAO 109: tabela mapa_concorrencia já existe")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'opcao_concorrencia'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE opcao_concorrencia (
+                    id SERIAL PRIMARY KEY,
+                    mapa_id INTEGER NOT NULL REFERENCES mapa_concorrencia(id) ON DELETE CASCADE,
+                    fornecedor_nome VARCHAR(200) NOT NULL,
+                    valor_unitario NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                    prazo_entrega VARCHAR(100),
+                    observacoes TEXT,
+                    selecionada BOOLEAN NOT NULL DEFAULT FALSE,
+                    admin_id INTEGER REFERENCES usuario(id)
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_opcao_concorrencia_mapa_id ON opcao_concorrencia(mapa_id)")
+            logger.info("MIGRACAO 109: tabela opcao_concorrencia criada")
+        else:
+            logger.info("MIGRACAO 109: tabela opcao_concorrencia já existe")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 109 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 109: {e}")
         if connection:
             try:
                 connection.rollback()
