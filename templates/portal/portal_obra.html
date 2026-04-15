@@ -532,6 +532,17 @@
     </div>
     {% endif %}
 
+    <style>
+    /* Mapa V2 — estilos de highlight por CSS class (persistentes) */
+    td.cotacao-cell { text-align:center; cursor:pointer; transition:background .15s; }
+    td.cotacao-cell.cell-min-val  { background:#ecfdf5; }
+    td.cotacao-cell.cell-min-prazo { background:#eff6ff; }
+    td.cotacao-cell.cell-min-val.cell-min-prazo { background:#ecfdf5; } /* val tem prioridade */
+    td.cotacao-cell.cell-selected  { background:#d1fae5 !important; }
+    td.cotacao-cell.cell-selected .radio-visual { border-color:#059669 !important; background:#f0fdf4; }
+    td.cotacao-cell:not(.cell-selected) .radio-visual { border:2px solid #cbd5e1; background:transparent; }
+    </style>
+
     {% if mapas_v2_abertos_ctx %}
     <div class="section-title"><i class="fas fa-table"></i> Comparativo de Fornecedores — Aguardando sua Escolha</div>
     {% for ctx in mapas_v2_abertos_ctx %}
@@ -539,6 +550,8 @@
     {% set fornecedores = ctx.fornecedores %}
     {% set itens = ctx.itens %}
     {% set cotacoes_map = ctx.cotacoes_map %}
+    {% set min_val_map = ctx.min_val_map %}
+    {% set min_prazo_map = ctx.min_prazo_map %}
     <div class="card-portal mb-4">
         <div style="background:#eff6ff;padding:.9rem 1.25rem;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:.75rem;">
             <i class="fas fa-table" style="color:#1d4ed8;"></i>
@@ -548,9 +561,9 @@
         <div style="padding:1rem 1.25rem;">
             <p style="font-size:.85rem;color:#64748b;margin-bottom:.75rem;">
                 <i class="fas fa-info-circle me-1"></i>Compare os preços e selecione o fornecedor preferido para cada item.
-                Clique no cabeçalho da coluna para pré-selecionar todos os itens daquele fornecedor, ou escolha individualmente.
-                <span style="background:#ecfdf5;color:#059669;padding:.1rem .4rem;border-radius:4px;font-weight:600;">verde = menor preço</span>
-                <span style="background:#eff6ff;color:#1d4ed8;padding:.1rem .4rem;border-radius:4px;font-weight:600;margin-left:.25rem;">azul = prazo mais curto</span>
+                Clique no cabeçalho da coluna para pré-selecionar todos os itens daquele fornecedor.
+                <span style="background:#ecfdf5;color:#059669;padding:.1rem .4rem;border-radius:4px;font-weight:600;"><i class="fas fa-star me-1" style="font-size:.7rem;"></i>verde = menor preço</span>
+                <span style="background:#eff6ff;color:#1d4ed8;padding:.1rem .4rem;border-radius:4px;font-weight:600;margin-left:.25rem;"><i class="fas fa-bolt me-1" style="font-size:.7rem;"></i>azul = prazo mais curto</span>
             </p>
             <form method="POST" action="{{ url_for('portal_obras.selecionar_mapa_v2', token=obra.token_cliente, mapa_id=mapa.id) }}" id="form-mapa-{{ mapa.id }}">
                 <div class="table-responsive mb-3">
@@ -571,23 +584,8 @@
                         <tbody>
                             {% for item in itens %}
                             {% set item_cots = cotacoes_map.get(item.id, {}) %}
-                            {% set min_val = namespace(v=None, forn_id=None) %}
-                            {% set min_prazo = namespace(v=None, forn_id=None) %}
-                            {% for forn in fornecedores %}
-                                {% set cot = item_cots.get(forn.id) %}
-                                {% if cot and cot.valor_unitario and cot.valor_unitario|float > 0 %}
-                                    {% if min_val.v is none or cot.valor_unitario|float < min_val.v %}
-                                        {% set min_val.v = cot.valor_unitario|float %}
-                                        {% set min_val.forn_id = forn.id %}
-                                    {% endif %}
-                                {% endif %}
-                                {% if cot and cot.prazo and cot.prazo|trim %}
-                                    {% if min_prazo.v is none or cot.prazo < min_prazo.v %}
-                                        {% set min_prazo.v = cot.prazo %}
-                                        {% set min_prazo.forn_id = forn.id %}
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
+                            {% set mv_forn = min_val_map.get(item.id) %}
+                            {% set mp_forn = min_prazo_map.get(item.id) %}
                             <tr>
                                 <td style="font-weight:600;">{{ item.descricao }}</td>
                                 <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
@@ -595,23 +593,16 @@
                                 {% for forn in fornecedores %}
                                 {% set cot = item_cots.get(forn.id) %}
                                 {% set cur_val = cot.valor_unitario|float if cot and cot.valor_unitario else 0 %}
-                                {% set is_min_val = min_val.forn_id is not none and forn.id == min_val.forn_id and cur_val > 0 %}
-                                {% set is_min_prazo = min_prazo.forn_id is not none and forn.id == min_prazo.forn_id %}
-                                {% if is_min_val %}
-                                    {% set cell_bg = 'background:#ecfdf5;' %}
-                                {% elif is_min_prazo %}
-                                    {% set cell_bg = 'background:#eff6ff;' %}
-                                {% else %}
-                                    {% set cell_bg = '' %}
-                                {% endif %}
-                                <td class="cotacao-cell" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
-                                    style="text-align:center;cursor:pointer;transition:background .2s;{{ cell_bg }}">
+                                {% set is_min_val = mv_forn is not none and forn.id == mv_forn and cur_val > 0 %}
+                                {% set is_min_prazo = mp_forn is not none and forn.id == mp_forn %}
+                                <td class="cotacao-cell{% if is_min_val %} cell-min-val{% endif %}{% if is_min_prazo and not is_min_val %} cell-min-prazo{% endif %}"
+                                    data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}">
                                     <label style="cursor:pointer;display:block;width:100%;margin:0;">
                                         <input type="radio" name="sel_{{ item.id }}" value="{{ forn.id }}"
                                                class="cotacao-radio" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
                                                {% if is_min_val %}checked{% endif %}
                                                style="display:none;" required>
-                                        <div class="radio-visual" style="border:2px solid #cbd5e1;border-radius:6px;padding:.4rem .3rem;font-size:.82rem;transition:all .2s;">
+                                        <div class="radio-visual" style="border:2px solid #cbd5e1;border-radius:6px;padding:.4rem .3rem;font-size:.82rem;transition:border .15s;">
                                             {% if cur_val > 0 %}
                                             <div style="font-weight:700;color:{% if is_min_val %}#059669{% elif is_min_prazo %}#1d4ed8{% else %}#1e293b{% endif %};">
                                                 {{ cur_val|brl }}
@@ -622,8 +613,7 @@
                                             {% endif %}
                                             {% if cot and cot.prazo %}
                                             <div style="font-size:.72rem;margin-top:.15rem;{% if is_min_prazo %}color:#1d4ed8;font-weight:700;{% else %}color:#64748b;{% endif %}">
-                                                <i class="fas fa-clock me-1"></i>{{ cot.prazo }}
-                                                {% if is_min_prazo %}<i class="fas fa-bolt ms-1" style="font-size:.6rem;color:#f59e0b;" title="Prazo mais curto"></i>{% endif %}
+                                                <i class="fas fa-clock me-1"></i>{{ cot.prazo }}{% if is_min_prazo %}<i class="fas fa-bolt ms-1" style="font-size:.6rem;color:#f59e0b;" title="Prazo mais curto"></i>{% endif %}
                                             </div>
                                             {% endif %}
                                         </div>
@@ -837,53 +827,54 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Mapa V2 — interactive radio selection with visual highlighting
+// Mapa V2 — interactive radio selection
+// Min-value (green) and min-prazo (blue) highlights are CSS classes applied server-side
+// and MUST NOT be removed by JS. Only 'cell-selected' class is toggled by JS.
 (function() {
-    function updateCellHighlights(mapaId, itemId) {
-        var radios = document.querySelectorAll('input.cotacao-radio[data-mapa="' + mapaId + '"][data-item="' + itemId + '"]');
+    function applySelectionHighlight(mapaId, itemId) {
+        var radios = document.querySelectorAll(
+            'input.cotacao-radio[data-mapa="' + mapaId + '"][data-item="' + itemId + '"]'
+        );
         radios.forEach(function(radio) {
             var cell = radio.closest('td.cotacao-cell');
-            var visual = cell.querySelector('.radio-visual');
+            if (!cell) return;
             if (radio.checked) {
-                cell.style.background = '#ecfdf5';
-                visual.style.border = '2px solid #059669';
-                visual.style.background = '#f0fdf4';
+                cell.classList.add('cell-selected');
             } else {
-                cell.style.background = '';
-                visual.style.border = '2px solid #cbd5e1';
-                visual.style.background = '';
+                cell.classList.remove('cell-selected');
             }
         });
     }
 
-    // Handle cell click → select that radio
+    // Cell click → select that radio
     document.querySelectorAll('td.cotacao-cell').forEach(function(cell) {
         cell.addEventListener('click', function() {
             var radio = cell.querySelector('input.cotacao-radio');
-            if (radio) {
+            if (radio && !radio.disabled) {
                 radio.checked = true;
-                updateCellHighlights(radio.dataset.mapa, radio.dataset.item);
+                applySelectionHighlight(radio.dataset.mapa, radio.dataset.item);
             }
         });
     });
 
-    // Handle column header click → select all rows for that supplier
+    // Column header click → select all rows for that supplier
     document.querySelectorAll('th.forn-header').forEach(function(th) {
         th.addEventListener('click', function() {
             var mapaId = th.dataset.mapa;
             var fornId = th.dataset.forn;
-            // Find all radios in this mapa for this fornecedor
-            var radios = document.querySelectorAll('input.cotacao-radio[data-mapa="' + mapaId + '"][data-forn="' + fornId + '"]');
+            var radios = document.querySelectorAll(
+                'input.cotacao-radio[data-mapa="' + mapaId + '"][data-forn="' + fornId + '"]'
+            );
             radios.forEach(function(radio) {
                 radio.checked = true;
-                updateCellHighlights(mapaId, radio.dataset.item);
+                applySelectionHighlight(mapaId, radio.dataset.item);
             });
         });
     });
 
-    // Initialize highlights for pre-checked radios
+    // Initialize selection highlight for pre-checked radios (min-val pre-selected server-side)
     document.querySelectorAll('input.cotacao-radio:checked').forEach(function(radio) {
-        updateCellHighlights(radio.dataset.mapa, radio.dataset.item);
+        applySelectionHighlight(radio.dataset.mapa, radio.dataset.item);
     });
 })();
 </script>

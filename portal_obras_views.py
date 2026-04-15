@@ -155,18 +155,87 @@ def portal_obra(token: str):
         .order_by(MapaConcorrenciaV2.created_at.desc())
         .all()
     )
-    # Pre-load itens, fornecedores and cotacoes_map for each V2 mapa
+    # ── helpers para Mapa V2 ──────────────────────────────────────────────────
+    def _prazo_to_days(prazo_str: str) -> float:
+        """Normaliza prazo textual para número de dias (menor = melhor).
+        Suporta: '15 dias', '2 semanas', '1 mês', '30', '2026-06-01', '15/06/2026'."""
+        import re
+        if not prazo_str:
+            return float('inf')
+        s = prazo_str.strip().lower()
+        # Tentar data ISO ou BR → dias até hoje
+        try:
+            from datetime import date as _date
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', s):
+                d = _date.fromisoformat(s)
+            elif re.match(r'^\d{2}/\d{2}/\d{4}$', s):
+                day, month, year = s.split('/')
+                d = _date(int(year), int(month), int(day))
+            else:
+                d = None
+            if d:
+                return max(0, (d - _date.today()).days)
+        except Exception:
+            pass
+        # Extrair primeiro número
+        nums = re.findall(r'\d+(?:[.,]\d+)?', s)
+        if not nums:
+            return float('inf')
+        num = float(nums[0].replace(',', '.'))
+        if 'semana' in s or 'week' in s:
+            return num * 7
+        if 'mes' in s or 'mês' in s or 'month' in s:
+            return num * 30
+        return num  # assume dias
+
     def _build_v2_context(mapa_list):
+        """Constrói dicts de contexto para renderização de mapas V2.
+        Computa min_val_map e min_prazo_map em Python para comparações corretas."""
         result = []
         for mapa in mapa_list:
             cotacoes_map = {}
             for cot in mapa.cotacoes:
                 cotacoes_map.setdefault(cot.item_id, {})[cot.fornecedor_id] = cot
+
+            min_val_map = {}    # {item_id: forn_id com menor valor}
+            min_prazo_map = {}  # {item_id: forn_id com menor prazo (em dias)}
+
+            for item in mapa.itens:
+                item_cots = cotacoes_map.get(item.id, {})
+                best_val = None
+                best_val_forn = None
+                best_prazo_days = None
+                best_prazo_forn = None
+
+                for forn in mapa.fornecedores:
+                    cot = item_cots.get(forn.id)
+                    if not cot:
+                        continue
+                    # Menor valor unitário
+                    if cot.valor_unitario:
+                        v = float(cot.valor_unitario)
+                        if v > 0 and (best_val is None or v < best_val):
+                            best_val = v
+                            best_val_forn = forn.id
+                    # Menor prazo (numericamente)
+                    if cot.prazo and cot.prazo.strip():
+                        days = _prazo_to_days(cot.prazo)
+                        if days < float('inf') and (best_prazo_days is None or days < best_prazo_days):
+                            best_prazo_days = days
+                            best_prazo_forn = forn.id
+
+                if best_val_forn:
+                    min_val_map[item.id] = best_val_forn
+                if best_prazo_forn:
+                    min_prazo_map[item.id] = best_prazo_forn
+
             result.append({
                 'mapa': mapa,
                 'fornecedores': mapa.fornecedores,
                 'itens': mapa.itens,
                 'cotacoes_map': cotacoes_map,
+                'min_val_map': min_val_map,
+                'min_prazo_map': min_prazo_map,
             })
         return result
 
