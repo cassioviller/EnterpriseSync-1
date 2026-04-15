@@ -212,10 +212,6 @@ def salvar_rdo():
                 flash('RDO não encontrado ou sem permissão de acesso.', 'error')
                 return redirect(url_for('rdo_crud.listar_rdos'))
             
-            if rdo.status != 'Rascunho':
-                flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
-                return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
-            
             # Limpar dados antigos
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
@@ -268,7 +264,7 @@ def salvar_rdo():
         rdo.condicoes_trabalho = request.form.get('condicoes_trabalho', '').strip()
         rdo.observacoes_climaticas = request.form.get('observacoes_climaticas', '').strip()
         rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
-        rdo.status = 'Rascunho'
+        rdo.status = 'Finalizado'
         
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
@@ -426,10 +422,6 @@ def excluir_rdo(rdo_id):
             flash('RDO não encontrado ou sem permissão de acesso.', 'error')
             return redirect(url_for('rdo_crud.listar_rdos'))
         
-        if rdo.status != 'Rascunho':
-            flash('Apenas RDOs em rascunho podem ser excluídos.', 'warning')
-            return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
-        
         numero_rdo = rdo.numero_rdo
         
         # Excluir TODOS os dados relacionados (incluindo notificacoes e fotos!)
@@ -468,10 +460,6 @@ def finalizar_rdo(rdo_id):
         if not rdo:
             flash('RDO não encontrado ou sem permissão de acesso.', 'error')
             return redirect(url_for('rdo_crud.listar_rdos'))
-        
-        if rdo.status != 'Rascunho':
-            flash('Apenas RDOs em rascunho podem ser finalizados.', 'warning')
-            return redirect(url_for('rdo_crud.visualizar_rdo', rdo_id=rdo_id))
         
         # Verificar se tem dados mínimos
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo_id).count()

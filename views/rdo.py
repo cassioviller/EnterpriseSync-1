@@ -454,7 +454,7 @@ def criar_rdo():
         rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
         rdo.observacoes_meteorologicas = request.form.get('observacoes_meteorologicas', '')
         rdo.comentario_geral = request.form.get('comentario_geral', '')
-        rdo.status = 'Rascunho'
+        rdo.status = 'Finalizado'
         
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
@@ -1160,11 +1160,6 @@ def excluir_rdo_old(id):
             Obra.admin_id == admin_id
         ).first_or_404()
         
-        # Verificar se pode excluir (só rascunhos)
-        if rdo.status == 'Finalizado':
-            flash('RDO finalizado não pode ser excluído. Apenas rascunhos podem ser removidos.', 'warning')
-            return redirect(url_for('main.visualizar_rdo', id=id))
-        
         numero_rdo = rdo.numero_rdo
         
         # Excluir relacionamentos primeiro
@@ -1232,8 +1227,7 @@ def duplicar_rdo(id):
         novo_rdo.tempo_noite = rdo_original.tempo_noite
         novo_rdo.observacoes_meteorologicas = rdo_original.observacoes_meteorologicas
         
-        # Sempre começar como rascunho
-        novo_rdo.status = 'Rascunho'
+        novo_rdo.status = 'Finalizado'
         novo_rdo.comentario_geral = f'Duplicado de {rdo_original.numero_rdo}'
         
         db.session.add(novo_rdo)
@@ -1332,7 +1326,7 @@ def atualizar_rdo(id):
         
         # Atualizar campos
         rdo.data_relatorio = data_relatorio
-        rdo.status = request.form.get('status', rdo.status)
+        rdo.status = 'Finalizado'
         rdo.tempo_manha = request.form.get('tempo_manha', rdo.tempo_manha)
         rdo.tempo_tarde = request.form.get('tempo_tarde', rdo.tempo_tarde)
         rdo.tempo_noite = request.form.get('tempo_noite', rdo.tempo_noite)
@@ -1343,17 +1337,10 @@ def atualizar_rdo(id):
         if rdo.data_relatorio != data_relatorio:
             rdo.numero_rdo = gerar_numero_rdo(rdo.obra_id, data_relatorio)
         
-        # Verificar se deve finalizar
-        finalizar = request.form.get('finalizar') == 'true'
-        foi_finalizado = False
-        if finalizar and rdo.status == 'Rascunho':
-            rdo.status = 'Finalizado'
-            foi_finalizado = True
-        
         db.session.commit()
         
-        # [OK] NOVO: Emitir evento rdo_finalizado se acabou de finalizar
-        if foi_finalizado:
+        # Emitir evento rdo_finalizado
+        if True:
             try:
                 from event_manager import EventManager
                 EventManager.emit('rdo_finalizado', {
@@ -2031,10 +2018,6 @@ def rdo_salvar_unificado():
                 flash('RDO não encontrado ou sem permissão de acesso.', 'error')
                 return redirect('/rdo')
             
-            if rdo.status != 'Rascunho':
-                flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
-                return redirect(url_for('main.funcionario_visualizar_rdo', id=rdo_id))
-            
             # Limpar dados antigos para substituir pelos novos
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
@@ -2156,7 +2139,7 @@ def rdo_salvar_unificado():
         rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()  # Backup
         
         rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
-        rdo.status = 'Rascunho'
+        rdo.status = 'Finalizado'
         
         # Para edição, o criado_por_id já está setado, não alterar
         if not rdo_id:

@@ -44,11 +44,6 @@ def editar_rdo_form(rdo_id):
             flash('RDO não encontrado', 'error')
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         
-        # VALIDAÇÃO: Apenas RDOs em rascunho podem ser editados
-        if rdo.status != 'Rascunho':
-            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
-            return redirect(url_for('main.funcionario_rdo_consolidado'))
-        
         # Buscar todas as obras do admin
         obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
         
@@ -178,11 +173,6 @@ def salvar_edicao_rdo(rdo_id):
         rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
         if not rdo:
             flash('RDO não encontrado', 'error')
-            return redirect(url_for('main.funcionario_rdo_consolidado'))
-        
-        # VALIDAÇÃO: Apenas RDOs em rascunho podem ser editados
-        if rdo.status != 'Rascunho':
-            flash('Apenas RDOs em rascunho podem ser editados.', 'warning')
             return redirect(url_for('main.funcionario_rdo_consolidado'))
         
         # Capturar dados do formulário

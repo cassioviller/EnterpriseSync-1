@@ -818,7 +818,7 @@ console.log('Initializing RDO view with light theme...');
                 </div>
                 <div class="header-text">
                     <h1>{{ rdo.obra.nome }} | {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</h1>
-                    <p>RDO {{ rdo.numero_rdo }} | {{ rdo.status }}</p>
+                    <p>RDO {{ rdo.numero_rdo }}</p>
                 </div>
             </div>
             <div class="header-right">
@@ -898,10 +898,6 @@ console.log('Initializing RDO view with light theme...');
                 <div class="info-row">
                     <span class="info-label">Criado em:</span>
                     <span class="info-value">{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Status:</span>
-                    <span class="status-badge status-{{ rdo.status|lower|replace(' ', '-') }}">{{ rdo.status }}</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Condições Climáticas:</span>
@@ -1195,11 +1191,7 @@ console.log('Initializing RDO view with light theme...');
                     Nenhuma foto anexada a este RDO
                 </p>
                 <p style="color: var(--gray-400); font-size: 0.875rem;">
-                    {% if rdo.status == 'Rascunho' %}
-                        As fotos podem ser adicionadas durante a edição do RDO
-                    {% else %}
-                        Este RDO foi finalizado sem fotos anexadas
-                    {% endif %}
+                    As fotos podem ser adicionadas durante a edição do RDO
                 </p>
             </div>
             {% endif %}
