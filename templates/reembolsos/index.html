@@ -29,7 +29,7 @@
     <div class="card border-0 shadow-sm" style="border-left:4px solid #dc3545 !important">
       <div class="card-body py-2">
         <div class="small text-muted">Total a Reembolsar</div>
-        <div class="fw-bold fs-5 text-danger">R$ {{ "%.2f"|format(total_valor)|replace('.', ',') }}</div>
+        <div class="fw-bold fs-5 text-danger">{{ total_valor|brl }}</div>
       </div>
     </div>
   </div>
@@ -120,7 +120,7 @@
               {% endif %}
             </td>
             <td class="text-end fw-bold text-danger">
-              R$ {{ "%.2f"|format(r.valor|float)|replace('.', ',') }}
+              {{ r.valor|float|brl }}
             </td>
             <td class="text-center">
               <small>{{ r.data_despesa.strftime('%d/%m/%Y') }}</small>

@@ -131,7 +131,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
             <div class="card bg-info text-white">
                 <div class="card-body text-center">
                     <h5><i class="fas fa-wallet me-2"></i>Saldo Inicial</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.saldo_inicial|default(0)) }}</h3>
+                    <h3>{{ fluxo.saldo_inicial|default(0)|brl }}</h3>
                 </div>
             </div>
         </div>
@@ -139,7 +139,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
             <div class="card bg-success text-white">
                 <div class="card-body text-center">
                     <h5><i class="fas fa-arrow-up me-2"></i>Entradas Previstas</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.entradas_previstas|default(0)) }}</h3>
+                    <h3>{{ fluxo.entradas_previstas|default(0)|brl }}</h3>
                 </div>
             </div>
         </div>
@@ -147,7 +147,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
             <div class="card bg-danger text-white">
                 <div class="card-body text-center">
                     <h5><i class="fas fa-arrow-down me-2"></i>Saídas Previstas</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.saidas_previstas|default(0)) }}</h3>
+                    <h3>{{ fluxo.saidas_previstas|default(0)|brl }}</h3>
                 </div>
             </div>
         </div>
@@ -155,7 +155,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
             <div class="card bg-{% if fluxo.saldo_final_projetado|default(0) >= 0 %}primary{% else %}warning{% endif %} {% if fluxo.saldo_final_projetado|default(0) >= 0 %}text-white{% else %}text-dark{% endif %}">
                 <div class="card-body text-center">
                     <h5><i class="fas fa-balance-scale me-2"></i>Saldo Projetado</h5>
-                    <h3>R$ {{ "%.2f"|format(fluxo.saldo_final_projetado|default(0)) }}</h3>
+                    <h3>{{ fluxo.saldo_final_projetado|default(0)|brl }}</h3>
                 </div>
             </div>
         </div>
@@ -268,7 +268,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                                     <td class="text-end {{ 'cell-editable' if editavel else '' }}" data-field="valor">
                                         <span class="cell-text {% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %} fw-semibold">
                                             {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
-                                            R$ {{ "%.2f"|format(movimento.valor|default(0)) }}
+                                            {{ movimento.valor|default(0)|brl }}
                                             {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
                                         </span>
                                         {% if editavel %}

@@ -22,7 +22,7 @@
           <div class="d-flex justify-content-between align-items-center">
             <div>
               <div class="small opacity-75">Total filtrado</div>
-              <div class="fs-4 fw-bold">R$ {{ '%.2f'|format(total_valor) }}</div>
+              <div class="fs-4 fw-bold">{{ total_valor|brl }}</div>
             </div>
             <i class="fas fa-file-invoice-dollar fa-2x opacity-50"></i>
           </div>
@@ -106,7 +106,7 @@
                   {% if p.parcelas > 1 %} ({{ p.parcelas }}x){% endif %}
                 </span>
               </td>
-              <td class="text-end fw-semibold text-dark">{{ '%.2f'|format(p.valor_total|float) }}</td>
+              <td class="text-end fw-semibold text-dark">{{ p.valor_total|brl_raw }}</td>
               <td>
                 {% if p.anexo_url %}
                   <a href="{{ p.anexo_url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">

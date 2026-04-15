@@ -243,15 +243,15 @@
                                     </td>
                                     <td>{{ servico.quantidade }}</td>
                                     <td>{{ servico.unidade }}</td>
-                                    <td>R$ {{ "%.2f"|format(servico.valor_unitario) }}</td>
-                                    <td>R$ {{ "%.2f"|format(servico.valor_total) }}</td>
+                                    <td>{{ servico.valor_unitario|brl }}</td>
+                                    <td>{{ servico.valor_total|brl }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                             <tfoot>
                                 <tr class="table-primary">
                                     <th colspan="4">Total</th>
-                                    <th>R$ {{ "%.2f"|format(proposta.valor_total) }}</th>
+                                    <th>{{ proposta.valor_total|brl }}</th>
                                 </tr>
                             </tfoot>
                         </table>
@@ -311,7 +311,7 @@
                     
                     <hr>
                     
-                    <p><strong>Valor:</strong><br>R$ {{ "%.2f"|format(proposta.valor_total) }}</p>
+                    <p><strong>Valor:</strong><br>{{ proposta.valor_total|brl }}</p>
                     {% if proposta.criado_em %}
                     <p><strong>Criada em:</strong><br>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') }}</p>
                     {% endif %}

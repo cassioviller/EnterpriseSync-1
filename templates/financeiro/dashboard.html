@@ -30,7 +30,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Total Entradas</h6>
-                            <h4>R$ {{ "%.2f"|format(kpis.total_entradas) }}</h4>
+                            <h4>{{ kpis.total_entradas|brl }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-arrow-up fa-2x"></i>
@@ -45,7 +45,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Total Saídas</h6>
-                            <h4>R$ {{ "%.2f"|format(kpis.total_saidas) }}</h4>
+                            <h4>{{ kpis.total_saidas|brl }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-arrow-down fa-2x"></i>
@@ -60,7 +60,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Saldo Período</h6>
-                            <h4>R$ {{ "%.2f"|format(kpis.saldo_periodo) }}</h4>
+                            <h4>{{ kpis.saldo_periodo|brl }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-balance-scale fa-2x"></i>
@@ -75,7 +75,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title">Receitas Pendentes</h6>
-                            <h4>R$ {{ "%.2f"|format(kpis.receitas_pendentes) }}</h4>
+                            <h4>{{ kpis.receitas_pendentes|brl }}</h4>
                         </div>
                         <div class="align-self-center">
                             <i class="fas fa-clock fa-2x"></i>
@@ -149,7 +149,7 @@
                                     <tr>
                                         <td>{{ receita.data_vencimento.strftime('%d/%m/%Y') }}</td>
                                         <td>{{ receita.descricao }}</td>
-                                        <td>R$ {{ "%.2f"|format(receita.valor_original) }}</td>
+                                        <td>{{ receita.valor_original|brl }}</td>
                                         <td>
                                             <span class="badge bg-{% if receita.status == 'RECEBIDO' %}success{% elif receita.status == 'PENDENTE' %}warning{% else %}danger{% endif %}">
                                                 {{ receita.status }}

@@ -111,7 +111,7 @@
                                     </td>
                                     <td>{{ nf.data_emissao.strftime('%d/%m/%Y') }}</td>
                                     <td>
-                                        <strong>R$ {{ "%.2f"|format(nf.valor_total) }}</strong>
+                                        <strong>{{ nf.valor_total|brl }}</strong>
                                     </td>
                                     <td>
                                         {% if nf.status == 'Processada' %}

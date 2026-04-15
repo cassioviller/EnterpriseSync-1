@@ -219,7 +219,7 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">Orçamento:</label>
-                        <p class="mb-0">{{ "R$ {:,.2f}".format(obra.orcamento if obra.orcamento else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</p>
+                        <p class="mb-0">{{ obra.orcamento if obra.orcamento else 0|brl }}</p>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold">Responsável:</label>

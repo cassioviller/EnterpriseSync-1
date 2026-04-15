@@ -168,7 +168,7 @@
                                 </td>
                                 <td>
                                     <input type="text" class="form-control valor-total-input" 
-                                           value="R$ {{ '%.2f'|format(item.valor_total) }}" readonly>
+                                           value="{{ item.valor_total|brl }}" readonly>
                                 </td>
                                 <td>
                                     <button type="button" class="btn btn-sm btn-danger" onclick="removerServico(this)">

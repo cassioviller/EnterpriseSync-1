@@ -88,19 +88,19 @@
                             <div class="row mb-3">
                                 <div class="col-4">
                                     <div class="text-center">
-                                        <div class="h4 text-primary">R$ {{ "%.2f"|format(restaurante.preco_almoco) }}</div>
+                                        <div class="h4 text-primary">{{ restaurante.preco_almoco|brl }}</div>
                                         <small class="text-muted">Almoço</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="text-center">
-                                        <div class="h4 text-success">R$ {{ "%.2f"|format(restaurante.preco_jantar) }}</div>
+                                        <div class="h4 text-success">{{ restaurante.preco_jantar|brl }}</div>
                                         <small class="text-muted">Jantar</small>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="text-center">
-                                        <div class="h4 text-warning">R$ {{ "%.2f"|format(restaurante.preco_lanche) }}</div>
+                                        <div class="h4 text-warning">{{ restaurante.preco_lanche|brl }}</div>
                                         <small class="text-muted">Lanche</small>
                                     </div>
                                 </div>
@@ -120,7 +120,7 @@
                                     <small class="text-muted">Registros</small>
                                 </div>
                                 <div class="col-6">
-                                    <div class="h4 text-success">R$ {{ "%.2f"|format(valor_total_mes) }}</div>
+                                    <div class="h4 text-success">{{ valor_total_mes|brl }}</div>
                                     <small class="text-muted">Valor Total</small>
                                 </div>
                             </div>
@@ -156,7 +156,7 @@
                                             <td>
                                                 <span class="badge bg-secondary">{{ registro.tipo.title() }}</span>
                                             </td>
-                                            <td>R$ {{ "%.2f"|format(registro.valor) }}</td>
+                                            <td>{{ registro.valor|brl }}</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>

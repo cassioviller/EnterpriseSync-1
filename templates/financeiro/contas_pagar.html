@@ -71,7 +71,7 @@
             <div class="card bg-danger text-white">
                 <div class="card-body text-center">
                     <h6>Vencidas</h6>
-                    <h4>R$ {{ "%.2f"|format(resumo.vencidas|default(0)) }}</h4>
+                    <h4>{{ resumo.vencidas|default(0)|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -79,7 +79,7 @@
             <div class="card bg-warning text-dark">
                 <div class="card-body text-center">
                     <h6>A Vencer (7 dias)</h6>
-                    <h4>R$ {{ "%.2f"|format(resumo.a_vencer|default(0)) }}</h4>
+                    <h4>{{ resumo.a_vencer|default(0)|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -87,7 +87,7 @@
             <div class="card bg-info text-white">
                 <div class="card-body text-center">
                     <h6>Pendentes</h6>
-                    <h4>R$ {{ "%.2f"|format(resumo.pendentes|default(0)) }}</h4>
+                    <h4>{{ resumo.pendentes|default(0)|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -95,7 +95,7 @@
             <div class="card bg-success text-white">
                 <div class="card-body text-center">
                     <h6>Pagas no Mês</h6>
-                    <h4>R$ {{ "%.2f"|format(resumo.pagas_mes|default(0)) }}</h4>
+                    <h4>{{ resumo.pagas_mes|default(0)|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -132,9 +132,9 @@
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>R$ {{ "%.2f"|format(conta.valor_original) }}</td>
-                            <td>R$ {{ "%.2f"|format(conta.valor_pago) }}</td>
-                            <td>R$ {{ "%.2f"|format(conta.saldo) }}</td>
+                            <td>{{ conta.valor_original|brl }}</td>
+                            <td>{{ conta.valor_pago|brl }}</td>
+                            <td>{{ conta.saldo|brl }}</td>
                             <td>
                                 {% if conta.status == 'PENDENTE' %}
                                 <span class="badge bg-warning">Pendente</span>
@@ -169,9 +169,9 @@
                             </td>
                             <td>{{ custo.tipo_categoria }}</td>
                             <td><span class="text-muted">-</span></td>
-                            <td>R$ {{ "%.2f"|format(custo.valor_total) }}</td>
+                            <td>{{ custo.valor_total|brl }}</td>
                             <td>R$ 0,00</td>
-                            <td>R$ {{ "%.2f"|format(custo.valor_solicitado or custo.valor_total) }}</td>
+                            <td>{{ custo.valor_solicitado or custo.valor_total|brl }}</td>
                             <td>
                                 {% if custo.status == 'SOLICITADO' %}
                                 <span class="badge bg-warning text-dark">Solicitado</span>

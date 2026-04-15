@@ -70,7 +70,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4 class="mb-0">R$ {{ "%.2f"|format(custos_mes|default(0)) }}</h4>
+                            <h4 class="mb-0">{{ custos_mes|default(0)|brl }}</h4>
                             <p class="mb-0">Custos do Mês</p>
                         </div>
                         <div class="align-self-center">
@@ -179,7 +179,7 @@
                                         </td>
                                         <td>
                                             <span class="text-success">
-                                                R$ {{ "%.2f"|format(obra.valor_total|default(0)) }}
+                                                {{ obra.valor_total|default(0)|brl }}
                                             </span>
                                         </td>
                                     </tr>

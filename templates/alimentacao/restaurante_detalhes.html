@@ -509,7 +509,7 @@ console.log('Initializing Restaurant Details with light theme...');
                 <i class="fas fa-dollar-sign"></i>
             </div>
             <div class="stat-label">Total Gasto</div>
-            <div class="stat-value">R$ {{ "%.2f"|format(total_gasto) }}</div>
+            <div class="stat-value">{{ total_gasto|brl }}</div>
         </div>
         <div class="stat-card">
             <div class="stat-icon info">
@@ -544,9 +544,9 @@ console.log('Initializing Restaurant Details with light theme...');
                         <tr>
                             <td>{{ lancamento.data.strftime('%d/%m/%Y') }}</td>
                             <td>{{ lancamento.obra.nome if lancamento.obra else 'N/A' }}</td>
-                            <td><strong>R$ {{ "%.2f"|format(lancamento.valor_total) }}</strong></td>
+                            <td><strong>{{ lancamento.valor_total|brl }}</strong></td>
                             <td>{{ lancamento.funcionarios|length }}</td>
-                            <td>R$ {{ "%.2f"|format(lancamento.valor_por_funcionario) }}</td>
+                            <td>{{ lancamento.valor_por_funcionario|brl }}</td>
                             <td>{{ lancamento.descricao or '-' }}</td>
                         </tr>
                         {% endfor %}

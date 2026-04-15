@@ -189,7 +189,7 @@
                                         {% if mov.valor_unitario %}
                                         <div class="col-md-6">
                                             <label class="text-muted small">Valor Unitário</label>
-                                            <div><strong>R$ {{ "%.2f"|format(mov.valor_unitario) }}</strong></div>
+                                            <div><strong>{{ mov.valor_unitario|brl }}</strong></div>
                                         </div>
                                         {% endif %}
                                         {% if mov.funcionario %}

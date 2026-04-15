@@ -52,7 +52,7 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <div>
-                            <h4 class="mb-0">R$ {{ "%.2f"|format(kpis_geral.total_custo_geral|default(0)) }}</h4>
+                            <h4 class="mb-0">{{ kpis_geral.total_custo_geral|default(0)|brl }}</h4>
                             <p class="mb-0">Custo Total</p>
                         </div>
                         <div class="align-self-center">
@@ -119,7 +119,7 @@
                                     </td>
                                     <td>
                                         <span class="text-success">
-                                            <strong>R$ {{ "%.2f"|format(item.funcionario.salario|default(0)) }}</strong>
+                                            <strong>{{ item.funcionario.salario|default(0)|brl }}</strong>
                                         </span>
                                     </td>
                                     <td>

@@ -52,9 +52,9 @@
                                         <td>{{ restaurante.telefone or '-' }}</td>
                                         <td>
                                             <small>
-                                                Almoço: R$ {{ "%.2f"|format(restaurante.preco_almoco) }}<br>
-                                                Jantar: R$ {{ "%.2f"|format(restaurante.preco_jantar) }}<br>
-                                                Lanche: R$ {{ "%.2f"|format(restaurante.preco_lanche) }}
+                                                Almoço: {{ restaurante.preco_almoco|brl }}<br>
+                                                Jantar: {{ restaurante.preco_jantar|brl }}<br>
+                                                Lanche: {{ restaurante.preco_lanche|brl }}
                                             </small>
                                         </td>
                                         <td>

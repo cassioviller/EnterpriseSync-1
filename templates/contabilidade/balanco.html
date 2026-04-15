@@ -48,7 +48,7 @@
                 {% if balanco.balanceado %}
                     <i class="fas fa-check-circle"></i> ✓ Balanceado - Ativo = Passivo + Patrimônio Líquido
                 {% else %}
-                    <i class="fas fa-exclamation-triangle"></i> ⚠ Desbalanceado - Diferença: R$ {{ "%.2f"|format((balanco.ativo.total - balanco.total_passivo_pl)|abs|float) }}
+                    <i class="fas fa-exclamation-triangle"></i> ⚠ Desbalanceado - Diferença: {{ (balanco.ativo.total - balanco.total_passivo_pl)|abs|brl }}
                 {% endif %}
             </h6>
         </div>

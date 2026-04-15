@@ -80,7 +80,7 @@
         <div class="card-body py-3">
           <div class="fw-bold text-success" style="font-size:1.6rem;">{{ entradas|length }}</div>
           <small class="text-muted">Entradas</small>
-          <div class="fw-bold text-dark" style="font-size:.9rem;">R$ {{ '%.2f'|format(total_valor_entradas) }}</div>
+          <div class="fw-bold text-dark" style="font-size:.9rem;">{{ total_valor_entradas|brl }}</div>
         </div>
       </div>
     </div>
@@ -89,7 +89,7 @@
         <div class="card-body py-3">
           <div class="fw-bold text-primary" style="font-size:1.6rem;">{{ saidas_auto|length }}</div>
           <small class="text-muted">Saídas auto-classificadas</small>
-          <div class="fw-bold text-dark" style="font-size:.9rem;">R$ {{ '%.2f'|format(saidas_auto|sum(attribute='valor')) }}</div>
+          <div class="fw-bold text-dark" style="font-size:.9rem;">{{ saidas_auto|sum(attribute='valor')|brl }}</div>
         </div>
       </div>
     </div>
@@ -164,7 +164,7 @@
               </td>
               <td>{{ r.descricao or '—' }}</td>
               <td>{{ r.cc or '—' }}</td>
-              <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+              <td class="text-end fw-semibold">{{ r.valor|brl }}</td>
               <td>
                 {% if r.status == 'PAGO' %}
                   <span class="badge bg-success">PAGO</span>
@@ -516,7 +516,7 @@
                 <tr>
                   <td class="px-3">{{ r.data }}</td>
                   <td>{{ r.descricao or r.fornecedor or '—' }}</td>
-                  <td class="text-end fw-semibold">R$ {{ '%.2f'|format(r.valor) }}</td>
+                  <td class="text-end fw-semibold">{{ r.valor|brl }}</td>
                   <td>
                     {% if bancos %}
                     <select name="transf_origem_{{ loop.index0 }}" class="form-select form-select-sm" style="min-width:130px;font-size:.8rem;">
@@ -620,7 +620,7 @@
                        value="{{ '%.2f'|format(b.saldo_inicial) if b.saldo_inicial else '' }}">
               </div>
               {% if b.saldo_atual %}
-              <small class="text-muted">Saldo atual: R$ {{ '%.2f'|format(b.saldo_atual) }}</small>
+              <small class="text-muted">Saldo atual: {{ b.saldo_atual|brl }}</small>
               {% endif %}
             </div>
             {% endfor %}

@@ -473,19 +473,19 @@
                             <td>{{ item.descricao }}</td>
                             <td>{{ item.unidade }}</td>
                             <td>{{ "%.2f"|format(item.quantidade) }}</td>
-                            <td class="price">{{ "R$ %.2f"|format(item.preco_unitario) }}</td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(item.quantidade * item.preco_unitario) }}</strong></td>
+                            <td class="price">{{ item.preco_unitario|brl }}</td>
+                            <td class="price"><strong>{{ item.quantidade * item.preco_unitario|brl }}</strong></td>
                         </tr>
                         {% endfor %}
                         <tr>
                             <td colspan="5"><strong>VALOR TOTAL DA PROPOSTA:</strong></td>
-                            <td class="price"><strong>{{ "R$ %.2f"|format(proposta.valor_total or 0) }}</strong></td>
+                            <td class="price"><strong>{{ proposta.valor_total or 0|brl }}</strong></td>
                         </tr>
                     </tbody>
                 </table>
             {% else %}
                 <div class="highlight-box">
-                    <div class="value-highlight">VALOR TOTAL: {{ "R$ %.2f"|format(proposta.valor_total or 0) }}</div>
+                    <div class="value-highlight">VALOR TOTAL: {{ proposta.valor_total or 0|brl }}</div>
                 </div>
             {% endif %}
         </div>

@@ -135,7 +135,7 @@
                             <td>{{ alerta.observacoes[:100] }}{% if alerta.observacoes and alerta.observacoes|length > 100 %}...{% endif %}</td>
                             <td class="text-right">
                                 {% if alerta.valor_divergencia %}
-                                    R$ {{ "%.2f"|format(alerta.valor_divergencia|float) }}
+                                    {{ alerta.valor_divergencia|float|brl }}
                                 {% else %}
                                     -
                                 {% endif %}

@@ -51,19 +51,19 @@
 
   <div class="kpi-row">
     <div class="kpi-box">
-      <div class="kpi-val">R$ {{ "%.2f"|format(valor_contrato) }}</div>
+      <div class="kpi-val">{{ valor_contrato|brl }}</div>
       <div class="kpi-lbl">Valor Contrato</div>
     </div>
     <div class="kpi-box">
-      <div class="kpi-val">R$ {{ "%.2f"|format(soma_itens) }}</div>
+      <div class="kpi-val">{{ soma_itens|brl }}</div>
       <div class="kpi-lbl">Itens Cadastrados</div>
     </div>
     <div class="kpi-box">
-      <div class="kpi-val {% if saldo < 0 %}text-danger{% endif %}">R$ {{ "%.2f"|format(saldo) }}</div>
+      <div class="kpi-val {% if saldo < 0 %}text-danger{% endif %}">{{ saldo|brl }}</div>
       <div class="kpi-lbl">Saldo Disponível</div>
     </div>
     <div class="kpi-box">
-      <div class="kpi-val">R$ {{ "%.2f"|format(obra.valor_entrada|float if obra.valor_entrada else 0) }}</div>
+      <div class="kpi-val">{{ obra.valor_entrada|float if obra.valor_entrada else 0|brl }}</div>
       <div class="kpi-lbl">Entrada</div>
     </div>
     <div class="kpi-box">
@@ -98,7 +98,7 @@
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
                 <div class="item-name">{{ item.nome }}</div>
-                <div class="item-valor">R$ {{ "%.2f"|format(item.valor_comercial|float) }}</div>
+                <div class="item-valor">{{ item.valor_comercial|float|brl }}</div>
               </div>
               <div class="d-flex gap-1">
                 <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalVincular{{ item.id }}" title="Vincular tarefa">
@@ -262,9 +262,9 @@
                     {{ m.data_inicio.strftime('%d/%m') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}
                     {% else %}—{% endif %}
                   </td>
-                  <td class="fw-semibold">R$ {{ "%.2f"|format(m.valor_total_medido_periodo|float if m.valor_total_medido_periodo else m.valor_medido|float) }}</td>
-                  <td>R$ {{ "%.2f"|format(m.valor_entrada_abatido_periodo|float if m.valor_entrada_abatido_periodo else 0) }}</td>
-                  <td class="fw-bold text-primary">R$ {{ "%.2f"|format(m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0) }}</td>
+                  <td class="fw-semibold">{{ m.valor_total_medido_periodo|float if m.valor_total_medido_periodo else m.valor_medido|float|brl }}</td>
+                  <td>{{ m.valor_entrada_abatido_periodo|float if m.valor_entrada_abatido_periodo else 0|brl }}</td>
+                  <td class="fw-bold text-primary">{{ m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0|brl }}</td>
                   <td>
                     <span class="badge {% if m.status == 'APROVADO' %}bg-success{% elif m.status == 'FATURADO' %}bg-primary{% else %}bg-warning text-dark{% endif %}">
                       {{ m.status }}
@@ -360,7 +360,7 @@
           </div>
           {% if saldo > 0 %}
           <div class="alert alert-info py-2 small mb-0">
-            <i class="fas fa-info-circle me-1"></i> Saldo disponível: <strong>R$ {{ "%.2f"|format(saldo) }}</strong>
+            <i class="fas fa-info-circle me-1"></i> Saldo disponível: <strong>{{ saldo|brl }}</strong>
           </div>
           {% endif %}
         </div>

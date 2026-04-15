@@ -88,7 +88,7 @@
                             <div class="text-center p-3 bg-primary bg-opacity-10 rounded">
                                 <i class="fas fa-money-bill-wave text-primary fa-2x mb-2"></i>
                                 <h6 class="text-primary mb-1">Custo Total</h6>
-                                <h5 class="mb-0">R$ {{ "%.2f"|format(kpis.custo_total) }}</h5>
+                                <h5 class="mb-0">{{ kpis.custo_total|brl }}</h5>
                             </div>
                         </div>
                         <div class="col-6">
@@ -109,7 +109,7 @@
                             <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
                                 <i class="fas fa-calculator text-warning fa-2x mb-2"></i>
                                 <h6 class="text-warning mb-1">Média/Func.</h6>
-                                <h5 class="mb-0">R$ {{ "%.2f"|format(kpis.media_por_funcionario) }}</h5>
+                                <h5 class="mb-0">{{ kpis.media_por_funcionario|brl }}</h5>
                             </div>
                         </div>
                     </div>
@@ -154,7 +154,7 @@
                                         <span class="badge bg-secondary">{{ registro.tipo }}</span>
                                     </td>
                                     <td>
-                                        <strong class="text-success">R$ {{ "%.2f"|format(registro.valor) }}</strong>
+                                        <strong class="text-success">{{ registro.valor|brl }}</strong>
                                     </td>
                                     <td>
                                         {% if registro.obra_ref %}

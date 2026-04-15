@@ -277,8 +277,8 @@
                                 {{ estoque.quantidade }}
                                 {% endif %}
                             </td>
-                            <td>R$ {{ "%.2f"|format(estoque.valor_unitario|float if estoque.valor_unitario else 0) }}</td>
-                            <td>R$ {{ "%.2f"|format((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0)) }}</td>
+                            <td>{{ estoque.valor_unitario|float if estoque.valor_unitario else 0|brl }}</td>
+                            <td>{{ ((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0))|brl }}</td>
                             <td>
                                 {% if estoque.status == 'DISPONIVEL' %}
                                 <span class="badge bg-success">Disponível</span>
@@ -295,14 +295,14 @@
                         <!-- Subtotal -->
                         <tr class="subtotal-row">
                             <td colspan="5" class="text-end">Subtotal {{ categoria }}:</td>
-                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.subtotais[categoria]|float) }}</strong></td>
+                            <td colspan="2"><strong>{{ dados_relatorio.subtotais[categoria]|float|brl }}</strong></td>
                         </tr>
                         {% endfor %}
                         
                         <!-- Total Geral -->
                         <tr class="total-row">
                             <td colspan="5" class="text-end">TOTAL GERAL:</td>
-                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.total_geral|float) }}</strong></td>
+                            <td colspan="2"><strong>{{ dados_relatorio.total_geral|float|brl }}</strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -529,21 +529,21 @@
                             </td>
                             <td>{{ estoque.updated_at.strftime('%d/%m/%Y') }}</td>
                             <td>{{ estoque.obra.nome if estoque.obra else '-' }}</td>
-                            <td>R$ {{ "%.2f"|format(estoque.valor_unitario|float if estoque.valor_unitario else 0) }}</td>
-                            <td>R$ {{ "%.2f"|format((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0)) }}</td>
+                            <td>{{ estoque.valor_unitario|float if estoque.valor_unitario else 0|brl }}</td>
+                            <td>{{ ((estoque.valor_unitario|float if estoque.valor_unitario else 0) * (estoque.quantidade|float if estoque.quantidade else 0))|brl }}</td>
                         </tr>
                         {% endfor %}
                         <!-- Subtotal -->
                         <tr class="subtotal-row">
                             <td colspan="6" class="text-end">Subtotal {{ funcionario }}:</td>
-                            <td><strong>R$ {{ "%.2f"|format(dados_relatorio.subtotais_func[funcionario]|float) }}</strong></td>
+                            <td><strong>{{ dados_relatorio.subtotais_func[funcionario]|float|brl }}</strong></td>
                         </tr>
                         {% endfor %}
                         
                         <!-- Total Geral -->
                         <tr class="total-row">
                             <td colspan="6" class="text-end">TOTAL GERAL:</td>
-                            <td><strong>R$ {{ "%.2f"|format(dados_relatorio.total_geral|float) }}</strong></td>
+                            <td><strong>{{ dados_relatorio.total_geral|float|brl }}</strong></td>
                         </tr>
                     </tbody>
                 </table>
@@ -629,22 +629,22 @@
                             <td>{{ obra }}</td>
                             <td>{{ saida.item.codigo }} - {{ saida.item.nome }}</td>
                             <td>{{ saida.quantidade }}</td>
-                            <td>R$ {{ "%.2f"|format(saida.valor_unitario|float if saida.valor_unitario else 0) }}</td>
-                            <td>R$ {{ "%.2f"|format((saida.valor_unitario|float if saida.valor_unitario else 0) * (saida.quantidade|float if saida.quantidade else 0)) }}</td>
+                            <td>{{ saida.valor_unitario|float if saida.valor_unitario else 0|brl }}</td>
+                            <td>{{ ((saida.valor_unitario|float if saida.valor_unitario else 0) * (saida.quantidade|float if saida.quantidade else 0))|brl }}</td>
                             <td>{{ saida.data_movimento.strftime('%d/%m/%Y') }}</td>
                         </tr>
                         {% endfor %}
                         <!-- Subtotal -->
                         <tr class="subtotal-row">
                             <td colspan="4" class="text-end">Subtotal {{ obra }}:</td>
-                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.subtotais_obra[obra]|float) }}</strong></td>
+                            <td colspan="2"><strong>{{ dados_relatorio.subtotais_obra[obra]|float|brl }}</strong></td>
                         </tr>
                         {% endfor %}
                         
                         <!-- Total Geral -->
                         <tr class="total-row">
                             <td colspan="4" class="text-end">TOTAL GERAL:</td>
-                            <td colspan="2"><strong>R$ {{ "%.2f"|format(dados_relatorio.total_geral|float) }}</strong></td>
+                            <td colspan="2"><strong>{{ dados_relatorio.total_geral|float|brl }}</strong></td>
                         </tr>
                     </tbody>
                 </table>

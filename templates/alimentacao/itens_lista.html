@@ -236,7 +236,7 @@
                         </div>
                         <div class="item-description">{{ item.descricao or 'Sem descrição' }}</div>
                     </div>
-                    <div class="item-price">R$ {{ '%.2f' % item.preco_padrao }}</div>
+                    <div class="item-price">{{ item.preco_padrao|brl }}</div>
                     <span class="item-status {{ 'active' if item.ativo else 'inactive' }}">
                         {{ 'Ativo' if item.ativo else 'Inativo' }}
                     </span>

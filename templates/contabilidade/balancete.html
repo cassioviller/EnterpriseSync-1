@@ -195,22 +195,22 @@
                                 </td>
                                 <td class="text-end font-monospace small {% if conta.saldo_anterior > 0 %}text-danger{% elif conta.saldo_anterior < 0 %}text-success{% endif %}">
                                     {% if conta.saldo_anterior < 0 %}
-                                        ({{ "%.2f"|format(conta.saldo_anterior|abs|float) }})
+                                        ({{ conta.saldo_anterior|abs|brl_raw }})
                                     {% else %}
-                                        {{ "%.2f"|format(conta.saldo_anterior|float) }}
+                                        {{ conta.saldo_anterior|brl_raw }}
                                     {% endif %}
                                 </td>
                                 <td class="text-end font-monospace small">
-                                    {{ "%.2f"|format(conta.debitos|float) }}
+                                    {{ conta.debitos|brl_raw }}
                                 </td>
                                 <td class="text-end font-monospace small">
-                                    {{ "%.2f"|format(conta.creditos|float) }}
+                                    {{ conta.creditos|brl_raw }}
                                 </td>
                                 <td class="text-end font-monospace small border-start {% if conta.saldo_atual > 0 %}text-danger fw-bold{% elif conta.saldo_atual < 0 %}text-success fw-bold{% endif %}">
                                     {% if conta.saldo_atual < 0 %}
-                                        ({{ "%.2f"|format(conta.saldo_atual|abs|float) }})
+                                        ({{ conta.saldo_atual|abs|brl_raw }})
                                     {% else %}
-                                        {{ "%.2f"|format(conta.saldo_atual|float) }}
+                                        {{ conta.saldo_atual|brl_raw }}
                                     {% endif %}
                                 </td>
                             </tr>
@@ -227,10 +227,10 @@
                                 <i class="fas fa-calculator"></i> TOTAIS DO PERÍODO
                             </td>
                             <td class="text-end font-monospace">
-                                R$ {{ "%.2f"|format(totais.total_debitos|float) }}
+                                {{ totais.total_debitos|float|brl }}
                             </td>
                             <td class="text-end font-monospace">
-                                R$ {{ "%.2f"|format(totais.total_creditos|float) }}
+                                {{ totais.total_creditos|float|brl }}
                             </td>
                             <td class="text-end border-start">
                                 {% if totais.balanceado %}
@@ -240,7 +240,7 @@
                                 {% else %}
                                     <span class="badge bg-warning text-dark">
                                         <i class="fas fa-exclamation-triangle"></i> Diferença: 
-                                        R$ {{ "%.2f"|format((totais.total_debitos - totais.total_creditos)|abs|float) }}
+                                        {{ (totais.total_debitos - totais.total_creditos)|abs|brl }}
                                     </span>
                                 {% endif %}
                             </td>
@@ -248,14 +248,14 @@
                         <tr class="bg-opacity-50">
                             <td colspan="4" class="text-end small">Saldos Devedores</td>
                             <td colspan="2" class="text-end font-monospace small text-danger">
-                                R$ {{ "%.2f"|format(totais.total_saldo_devedor|float) }}
+                                {{ totais.total_saldo_devedor|float|brl }}
                             </td>
                             <td class="border-start"></td>
                         </tr>
                         <tr class="bg-opacity-50">
                             <td colspan="4" class="text-end small">Saldos Credores</td>
                             <td colspan="2" class="text-end font-monospace small text-success">
-                                R$ {{ "%.2f"|format(totais.total_saldo_credor|float) }}
+                                {{ totais.total_saldo_credor|float|brl }}
                             </td>
                             <td class="border-start"></td>
                         </tr>

@@ -33,7 +33,7 @@
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
                                 Saldo em Caixa</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "%.2f"|format(saldo_caixa|float) }}
+                                {{ saldo_caixa|float|brl }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -53,7 +53,7 @@
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
                                 Saldo Bancário</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "%.2f"|format(saldo_bancos|float) }}
+                                {{ saldo_bancos|float|brl }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -73,7 +73,7 @@
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
                                 Contas a Receber</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "%.2f"|format(saldo_clientes|float) }}
+                                {{ saldo_clientes|float|brl }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -124,31 +124,31 @@
                         <table class="table table-sm">
                             <tr>
                                 <td><strong>Receita Bruta</strong></td>
-                                <td class="text-right">R$ {{ "%.2f"|format(dre_atual.receita_bruta|float) }}</td>
+                                <td class="text-right">{{ dre_atual.receita_bruta|float|brl }}</td>
                             </tr>
                             <tr>
                                 <td>(-) Impostos sobre Vendas</td>
-                                <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre_atual.impostos_sobre_vendas|float) }})</td>
+                                <td class="text-right text-danger">{{ dre_atual.impostos_sobre_vendas|float|brl }}</td>
                             </tr>
                             <tr class="table-light">
                                 <td><strong>Receita Líquida</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format(dre_atual.receita_liquida|float) }}</strong></td>
+                                <td class="text-right"><strong>{{ dre_atual.receita_liquida|float|brl }}</strong></td>
                             </tr>
                             <tr>
                                 <td>(-) Custos</td>
-                                <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre_atual.custo_total|float) }})</td>
+                                <td class="text-right text-danger">{{ dre_atual.custo_total|float|brl }}</td>
                             </tr>
                             <tr class="table-light">
                                 <td><strong>Lucro Bruto</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format(dre_atual.lucro_bruto|float) }}</strong></td>
+                                <td class="text-right"><strong>{{ dre_atual.lucro_bruto|float|brl }}</strong></td>
                             </tr>
                             <tr>
                                 <td>(-) Despesas Operacionais</td>
-                                <td class="text-right text-danger">R$ ({{ "%.2f"|format(dre_atual.total_despesas|float) }})</td>
+                                <td class="text-right text-danger">{{ dre_atual.total_despesas|float|brl }}</td>
                             </tr>
                             <tr class="table-success">
                                 <td><strong>Lucro Líquido</strong></td>
-                                <td class="text-right"><strong>R$ {{ "%.2f"|format(dre_atual.lucro_liquido|float) }}</strong></td>
+                                <td class="text-right"><strong>{{ dre_atual.lucro_liquido|float|brl }}</strong></td>
                             </tr>
                         </table>
                     </div>

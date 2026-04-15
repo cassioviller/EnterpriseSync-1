@@ -980,7 +980,7 @@
                                 <div style="text-align: left;">
                                     <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Custo Total Mão de Obra</h6>
                                     <h4 style="margin: 0.25rem 0 0 0; color: #059669; font-weight: 700;">
-                                        R$ {{ "%.2f"|format(dados_folha.totais.custo_total|default(0))|replace('.', ',') }}
+                                        {{ dados_folha.totais.custo_total|default(0)|brl }}
                                     </h4>
                                     <small style="color: #9ca3af;">Incluindo encargos</small>
                                 </div>
@@ -1014,7 +1014,7 @@
                                 <div style="text-align: left;">
                                     <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Custo Médio/Hora</h6>
                                     <h4 style="margin: 0.25rem 0 0 0; color: #8b5cf6; font-weight: 700;">
-                                        R$ {{ "%.2f"|format(dados_folha.totais.custo_por_hora|default(0))|replace('.', ',') }}
+                                        {{ dados_folha.totais.custo_por_hora|default(0)|brl }}
                                     </h4>
                                     <small style="color: #9ca3af;">Por hora trabalhada</small>
                                 </div>
@@ -1102,9 +1102,9 @@
                                         </div>
                                     </td>
                                     <td><span class="text-muted">{{ func.cargo }}</span></td>
-                                    <td class="text-end">R$ {{ "%.2f"|format(func.salarioBruto)|replace('.', ',') }}</td>
-                                    <td class="text-end">R$ {{ "%.2f"|format(func.encargos)|replace('.', ',') }}</td>
-                                    <td class="text-end"><strong style="color: #059669;">R$ {{ "%.2f"|format(func.custoTotal)|replace('.', ',') }}</strong></td>
+                                    <td class="text-end">{{ func.salarioBruto|brl }}</td>
+                                    <td class="text-end">{{ func.encargos|brl }}</td>
+                                    <td class="text-end"><strong style="color: #059669;">{{ func.custoTotal|brl }}</strong></td>
                                     <td class="text-center">{{ "%.0f"|format(func.horasNormais) }}h</td>
                                     <td class="text-center">
                                         {% if func.he50 > 0 %}
@@ -1122,7 +1122,7 @@
                             <tfoot style="background: #e2e8f0; font-weight: 600;">
                                 <tr>
                                     <td colspan="4" class="text-end">TOTAL:</td>
-                                    <td class="text-end" style="color: #059669;">R$ {{ "%.2f"|format(dados_folha.totais.custo_total)|replace('.', ',') }}</td>
+                                    <td class="text-end" style="color: #059669;">{{ dados_folha.totais.custo_total|brl }}</td>
                                     <td class="text-center">{{ "%.0f"|format(dados_folha.totais.total_horas) }}h</td>
                                     <td colspan="2"></td>
                                 </tr>

@@ -130,7 +130,7 @@
                   {{ val }}
                 {% elif col_key in ('valor', 'valor_total', 'valor_diaria', 'valor_va', 'valor_vt') %}
                   {% if val|float > 0 %}
-                    R$ {{ '%.2f'|format(val|float) }}
+                    {{ val|float|brl }}
                   {% else %}
                     <span class="text-muted">—</span>
                   {% endif %}

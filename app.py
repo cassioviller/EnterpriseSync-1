@@ -155,6 +155,25 @@ login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
+@app.template_filter('brl')
+def brl_filter(value):
+    try:
+        v = float(value or 0)
+    except (TypeError, ValueError):
+        return 'R$ 0,00'
+    formatted = f"{v:,.2f}"
+    formatted = formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"R$ {formatted}"
+
+@app.template_filter('brl_raw')
+def brl_raw_filter(value):
+    try:
+        v = float(value or 0)
+    except (TypeError, ValueError):
+        return '0,00'
+    formatted = f"{v:,.2f}"
+    return formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
+
 # Context processor para feature flag V2
 @app.context_processor
 def inject_v2_flag():

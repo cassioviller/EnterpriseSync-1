@@ -100,7 +100,7 @@
                     </div>
                     <div class="card-body text-center">
                         <div class="valor-destaque">
-                            R$ {{ "%.2f"|format(proposta.valor_total) }}
+                            {{ proposta.valor_total|brl }}
                         </div>
                         <hr>
                         <p class="mb-0"><strong>Data de Envio:</strong><br>
@@ -143,15 +143,15 @@
                                 </td>
                                 <td class="text-center">{{ servico.quantidade }}</td>
                                 <td class="text-center">{{ servico.unidade }}</td>
-                                <td class="text-center">R$ {{ "%.2f"|format(servico.valor_unitario) }}</td>
-                                <td class="text-center"><strong>R$ {{ "%.2f"|format(servico.valor_total) }}</strong></td>
+                                <td class="text-center">{{ servico.valor_unitario|brl }}</td>
+                                <td class="text-center"><strong>{{ servico.valor_total|brl }}</strong></td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="table-success">
                             <tr>
                                 <th colspan="4" class="text-end">Total Geral:</th>
-                                <th class="text-center">R$ {{ "%.2f"|format(proposta.valor_total) }}</th>
+                                <th class="text-center">{{ proposta.valor_total|brl }}</th>
                             </tr>
                         </tfoot>
                     </table>

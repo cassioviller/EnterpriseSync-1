@@ -61,7 +61,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h6 class="card-title mb-1">Custo Total</h6>
-                            <h4 class="mb-0">R$ {{ "%.2f"|format(kpis.custo_total) }}</h4>
+                            <h4 class="mb-0">{{ kpis.custo_total|brl }}</h4>
                         </div>
                         <div class="ms-3">
                             <i class="fas fa-money-bill-wave fa-2x opacity-75"></i>
@@ -76,7 +76,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h6 class="card-title mb-1">Média Diária</h6>
-                            <h4 class="mb-0">R$ {{ "%.2f"|format(kpis.media_diaria) }}</h4>
+                            <h4 class="mb-0">{{ kpis.media_diaria|brl }}</h4>
                         </div>
                         <div class="ms-3">
                             <i class="fas fa-chart-line fa-2x opacity-75"></i>
@@ -161,7 +161,7 @@
                         <div class="col-6">
                             <div class="bg-light p-2 rounded text-center">
                                 <small class="text-muted d-block">Custo Total</small>
-                                <strong class="text-primary">R$ {{ "%.2f"|format(restaurante.kpis.custo_total) }}</strong>
+                                <strong class="text-primary">{{ restaurante.kpis.custo_total|brl }}</strong>
                             </div>
                         </div>
                         <div class="col-6">

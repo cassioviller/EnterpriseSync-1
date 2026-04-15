@@ -148,7 +148,7 @@
                             </td>
                             <td>
                                 {% if obra.orcamento %}
-                                    <span class="text-success fw-bold">R$ {{ "%.2f"|format(obra.orcamento) }}</span>
+                                    <span class="text-success fw-bold">{{ obra.orcamento|brl }}</span>
                                 {% else %}
                                     <span class="text-muted">Não informado</span>
                                 {% endif %}

@@ -99,7 +99,7 @@
                                             {% endif %}
                                         </td>
                                         <td class="text-end">
-                                            <strong>R$ {{ "%.2f"|format(receita.valor) }}</strong>
+                                            <strong>{{ receita.valor|brl }}</strong>
                                         </td>
                                         <td>
                                             <span class="badge bg-{% if receita.status == 'Recebido' %}success{% elif receita.status == 'Pendente' %}warning{% else %}danger{% endif %}">

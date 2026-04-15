@@ -28,7 +28,7 @@
           <div class="d-flex justify-content-between align-items-center">
             <div>
               <div class="small opacity-75">Total filtrado</div>
-              <div class="fs-4 fw-bold">R$ {{ '%.2f'|format(total_valor) }}</div>
+              <div class="fs-4 fw-bold">{{ total_valor|brl }}</div>
             </div>
             <i class="fas fa-wallet fa-2x opacity-50"></i>
           </div>
@@ -137,7 +137,7 @@
               </td>
               <td>{{ l.obra.nome if l.obra else '—' }}</td>
               <td>{{ l.descricao or '—' }}</td>
-              <td class="text-end fw-semibold text-dark">{{ '%.2f'|format(l.valor|float) }}</td>
+              <td class="text-end fw-semibold text-dark">{{ l.valor|brl_raw }}</td>
               <td>
                 {% if l.comprovante_url %}
                   <a href="{{ l.comprovante_url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-2">

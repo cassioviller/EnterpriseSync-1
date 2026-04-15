@@ -115,7 +115,7 @@
                             </td>
                             <td>
                                 {% if registro.valor %}
-                                    <span class="text-success fw-bold">R$ {{ "%.2f"|format(registro.valor) }}</span>
+                                    <span class="text-success fw-bold">{{ registro.valor|brl }}</span>
                                 {% else %}
                                     <span class="text-muted">R$ 0,00</span>
                                 {% endif %}

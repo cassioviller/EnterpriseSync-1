@@ -62,10 +62,10 @@
                         <i class="fas fa-ruler-combined text-primary"></i> Custo por m²
                     </h6>
                     {% if 'erro' not in kpis_financeiros.custo_por_m2 %}
-                    <h4 class="text-primary">R$ {{ "%.2f"|format(kpis_financeiros.custo_por_m2.valor) }}</h4>
+                    <h4 class="text-primary">{{ kpis_financeiros.custo_por_m2.valor|brl }}</h4>
                     <small class="text-muted">
                         Área: {{ kpis_financeiros.custo_por_m2.area_m2 }} m²<br>
-                        Benchmark: R$ {{ "%.2f"|format(kpis_financeiros.custo_por_m2.benchmark_mercado) }}
+                        Benchmark: {{ kpis_financeiros.custo_por_m2.benchmark_mercado|brl }}
                     </small>
                     <div class="mt-2">
                         <span class="badge bg-{{ 'danger' if kpis_financeiros.custo_por_m2.status == 'acima' else 'success' }}">
@@ -91,7 +91,7 @@
                         {{ "%.1f"|format(kpis_financeiros.margem_lucro.margem_percentual) }}%
                     </h4>
                     <small class="text-muted">
-                        R$ {{ "%.2f"|format(kpis_financeiros.margem_lucro.margem_absoluta) }}
+                        {{ kpis_financeiros.margem_lucro.margem_absoluta|brl }}
                     </small>
                     <div class="mt-2">
                         <span class="badge bg-{{ 'success' if kpis_financeiros.margem_lucro.classificacao in ['excelente', 'boa'] else 'warning' if kpis_financeiros.margem_lucro.classificacao == 'regular' else 'danger' }}">
@@ -117,7 +117,7 @@
                         {{ "%.1f"|format(kpis_financeiros.desvio_orcamentario.desvio_projetado) }}%
                     </h4>
                     <small class="text-muted">
-                        Projetado: R$ {{ "%.2f"|format(kpis_financeiros.desvio_orcamentario.custo_projetado) }}
+                        Projetado: {{ kpis_financeiros.desvio_orcamentario.custo_projetado|brl }}
                     </small>
                     <div class="mt-2">
                         <span class="badge bg-{{ 'success' if kpis_financeiros.desvio_orcamentario.alerta == 'normal' else 'warning' if kpis_financeiros.desvio_orcamentario.alerta in ['medio', 'alto'] else 'danger' }}">
@@ -218,7 +218,7 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="card-title">👷 Mão de Obra</h6>
-                    <h4 class="text-primary">R$ {{ "%.2f"|format(custos.mao_obra) }}</h4>
+                    <h4 class="text-primary">{{ custos.mao_obra|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -226,7 +226,7 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="card-title">🚚 Transporte</h6>
-                    <h4 class="text-warning">R$ {{ "%.2f"|format(custos.transporte) }}</h4>
+                    <h4 class="text-warning">{{ custos.transporte|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -234,7 +234,7 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="card-title">🍽️ Alimentação</h6>
-                    <h4 class="text-info">R$ {{ "%.2f"|format(custos.alimentacao) }}</h4>
+                    <h4 class="text-info">{{ custos.alimentacao|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -242,7 +242,7 @@
             <div class="card text-center">
                 <div class="card-body">
                     <h6 class="card-title">📋 Outros</h6>
-                    <h4 class="text-secondary">R$ {{ "%.2f"|format(custos.outros) }}</h4>
+                    <h4 class="text-secondary">{{ custos.outros|brl }}</h4>
                 </div>
             </div>
         </div>
@@ -265,7 +265,7 @@
                             <strong>Período:</strong> {{ estatisticas.dias_periodo }} dias
                         </div>
                         <div class="col-md-3">
-                            <strong>Custo Total:</strong> R$ {{ "%.2f"|format(custos.total) }}
+                            <strong>Custo Total:</strong> {{ custos.total|brl }}
                         </div>
                     </div>
                 </div>

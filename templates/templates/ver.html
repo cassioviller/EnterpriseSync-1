@@ -127,7 +127,7 @@
                         Itens do Template ({{ template.itens_padrao|length if template.itens_padrao else 0 }})
                     </h5>
                     <span class="badge bg-info">
-                        Total: R$ {% set total = 0 %}{% for item in template.itens_padrao %}{% set total = total + (item.quantidade * item.preco_unitario) %}{% endfor %}{{ "%.2f"|format(total) }}
+                        Total: {% set total = 0 %}{% for item in template.itens_padrao %}{% set total = total + (item.quantidade * item.preco_unitario) %}{% endfor %}{{ total|brl }}
                     </span>
                 </div>
                 <div class="card-body">
@@ -156,15 +156,15 @@
                                     </td>
                                     <td>{{ item.quantidade }}</td>
                                     <td><span class="badge bg-light text-dark">{{ item.unidade }}</span></td>
-                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                    <td><strong>R$ {{ "%.2f"|format(item.quantidade * item.preco_unitario) }}</strong></td>
+                                    <td>{{ item.preco_unitario|brl }}</td>
+                                    <td><strong>{{ item.quantidade * item.preco_unitario|brl }}</strong></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                             <tfoot>
                                 <tr class="table-info">
                                     <th colspan="5">Total do Template</th>
-                                    <th>R$ {% set total = 0 %}{% for item in template.itens_padrao %}{% set total = total + (item.quantidade * item.preco_unitario) %}{% endfor %}{{ "%.2f"|format(total) }}</th>
+                                    <th>{% set total = 0 %}{% for item in template.itens_padrao %}{% set total = total + (item.quantidade * item.preco_unitario) %}{% endfor %}{{ total|brl }}</th>
                                 </tr>
                             </tfoot>
                         </table>

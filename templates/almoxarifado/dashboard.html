@@ -85,7 +85,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="text-muted mb-1">Valor Total</h6>
-                            <h3 class="mb-0">R$ {{ "%.2f"|format(valor_total|float) }}</h3>
+                            <h3 class="mb-0">{{ valor_total|float|brl }}</h3>
                         </div>
                     </div>
                 </div>

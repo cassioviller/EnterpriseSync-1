@@ -234,7 +234,7 @@
               <i class="{{ icone }} text-white fa-lg"></i>
             </div>
             <div>
-              <div class="fw-bold text-dark">R$ {{ '%.2f'|format(resumo.get(st, {}).get('total', 0)) }}</div>
+              <div class="fw-bold text-dark">{{ resumo.get(st, {}).get('total', 0)|brl }}</div>
               <small class="text-muted">{{ resumo.get(st, {}).get('qtd', 0) }} registro(s) {{ st|title }}</small>
             </div>
           </div>
@@ -363,14 +363,14 @@
               {% endif %}
               {% endif %}
             </td>
-            <td class="text-end fw-bold">R$ {{ '%.2f'|format(reg.valor_total|float) }}</td>
+            <td class="text-end fw-bold">{{ reg.valor_total|float|brl }}</td>
             <td class="text-end text-muted">
               {% if reg.saldo is not none %}
                 <span class="{% if reg.saldo|float > 0 %}text-danger{% else %}text-success{% endif %}">
-                  R$ {{ '%.2f'|format(reg.saldo|float) }}
+                  {{ reg.saldo|float|brl }}
                 </span>
               {% elif reg.valor_solicitado %}
-                R$ {{ '%.2f'|format(reg.valor_solicitado|float) }}
+                {{ reg.valor_solicitado|float|brl }}
               {% else %}—{% endif %}
             </td>
             <td class="text-center">

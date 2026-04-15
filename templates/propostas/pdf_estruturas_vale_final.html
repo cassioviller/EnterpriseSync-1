@@ -544,14 +544,14 @@
                                 <td>{{ item.descricao }}</td>
                                 <td style="text-align: center;">{{ "%.0f"|format(item.quantidade) if item.quantidade == item.quantidade|int else "%.2f"|format(item.quantidade) }}</td>
                                 <td style="text-align: center;">{{ item.unidade }}</td>
-                                <td style="text-align: right;">R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                <td style="text-align: right;">R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                                <td style="text-align: right;">{{ item.preco_unitario|brl }}</td>
+                                <td style="text-align: right;">{{ item.subtotal|brl }}</td>
                             </tr>
                             {% set subtotal_categoria = subtotal_categoria + item.subtotal %}
                             {% endfor %}
                             <tr class="subtotal-row">
                                 <td colspan="5" style="text-align: right; font-weight: bold; background-color: #f0f0f0;">SUBTOTAL</td>
-                                <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">R$ {{ "%.2f"|format(subtotal_categoria) }}</td>
+                                <td style="text-align: right; font-weight: bold; background-color: #f0f0f0;">{{ subtotal_categoria|brl }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -562,14 +562,14 @@
                     <table style="width: 100%; margin-top: 5px;">
                         <tr>
                             <td style="text-align: right; font-size: 14pt; font-weight: bold; padding: 12px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border-radius: 5px;">
-                                VALOR TOTAL: &nbsp;&nbsp; R$ {{ "%.2f"|format(proposta.valor_total) }}
+                                VALOR TOTAL: &nbsp;&nbsp; {{ proposta.valor_total|brl }}
                             </td>
                         </tr>
                     </table>
                 </div>
             {% else %}
                 <div class="highlight-box">
-                    <div class="value-highlight">VALOR TOTAL: {{ "R$ %.2f"|format(proposta.valor_total or 0) }}</div>
+                    <div class="value-highlight">VALOR TOTAL: {{ proposta.valor_total or 0|brl }}</div>
                 </div>
             {% endif %}
         </div>

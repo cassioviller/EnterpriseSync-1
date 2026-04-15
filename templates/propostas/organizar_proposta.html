@@ -307,7 +307,7 @@
                 
                 <div class="valor-total-container">
                     <i class="fas fa-calculator"></i>
-                    VALOR TOTAL: R$ <span id="valor-total">{{ "%.2f"|format(proposta.valor_total) }}</span>
+                    VALOR TOTAL: <span id="valor-total">{{ proposta.valor_total|brl }}</span>
                 </div>
             </div>
         </div>

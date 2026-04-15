@@ -371,11 +371,11 @@ console.log('Initializing Lançamentos with light theme...');
                         <strong>{{ lancamento.funcionarios|length }}</strong>
                     </td>
                     <td>
-                        <strong style="color: #198754;">R$ {{ "%.2f"|format(lancamento.valor_total) }}</strong>
+                        <strong style="color: #198754;">{{ lancamento.valor_total|brl }}</strong>
                     </td>
                     <td>
                         {% if lancamento.funcionarios|length > 0 %}
-                        <strong>R$ {{ "%.2f"|format(lancamento.valor_total / lancamento.funcionarios|length) }}</strong>
+                        <strong>{{ lancamento.valor_total / lancamento.funcionarios|length|brl }}</strong>
                         {% else %}
                         <em style="color: #6c757d;">N/A</em>
                         {% endif %}

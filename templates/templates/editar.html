@@ -252,7 +252,7 @@
                                                             <br>
                                                             <small class="text-muted">
                                                                 {{ servico.unidade_medida }} - 
-                                                                R$ {{ "%.2f"|format(servico.custo_unitario) }}
+                                                                {{ servico.custo_unitario|brl }}
                                                             </small>
                                                         </div>
                                                         <button type="button" class="btn btn-sm btn-outline-success"

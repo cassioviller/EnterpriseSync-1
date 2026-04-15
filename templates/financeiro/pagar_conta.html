@@ -28,15 +28,15 @@
         <div class="row text-center">
           <div class="col-4">
             <small class="text-muted d-block">Valor Original</small>
-            <strong>R$ {{ "%.2f"|format(conta.valor_original) }}</strong>
+            <strong>{{ conta.valor_original|brl }}</strong>
           </div>
           <div class="col-4">
             <small class="text-muted d-block">Já Pago</small>
-            <strong class="text-success">R$ {{ "%.2f"|format(conta.valor_pago) }}</strong>
+            <strong class="text-success">{{ conta.valor_pago|brl }}</strong>
           </div>
           <div class="col-4">
             <small class="text-muted d-block">Saldo Restante</small>
-            <strong class="text-danger">R$ {{ "%.2f"|format(conta.saldo) }}</strong>
+            <strong class="text-danger">{{ conta.saldo|brl }}</strong>
           </div>
         </div>
         <hr class="my-2">
@@ -83,7 +83,7 @@
             <select class="form-select" name="banco_id">
               <option value="">— Não registrar no banco —</option>
               {% for b in bancos %}
-                <option value="{{ b.id }}">{{ b.nome_banco }} — Saldo: R$ {{ "%.2f"|format(b.saldo_atual) }}</option>
+                <option value="{{ b.id }}">{{ b.nome_banco }} — Saldo: {{ b.saldo_atual|brl }}</option>
               {% endfor %}
             </select>
           </div>

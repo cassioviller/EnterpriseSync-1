@@ -50,7 +50,7 @@
               {% if pedido.parcelas > 1 %} em {{ pedido.parcelas }}x{% endif %}
             </dd>
             <dt class="col-sm-5 fw-bold">Total</dt>
-            <dd class="col-sm-7 fw-bold text-dark fs-5">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</dd>
+            <dd class="col-sm-7 fw-bold text-dark fs-5">{{ pedido.valor_total|float|brl }}</dd>
             {% if pedido.status_aprovacao_cliente %}
             <dt class="col-sm-5">Aprovação Cliente</dt>
             <dd class="col-sm-7">
@@ -102,7 +102,7 @@
                   {% if c.pai.data_vencimento %}{{ c.pai.data_vencimento.strftime('%d/%m/%Y') }}{% else %}-{% endif %}
                 </td>
                 <td class="small">{{ c.descricao[:50] }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(c.valor|float) }}</td>
+                <td class="text-end">{{ c.valor|float|brl }}</td>
                 <td>
                   <span class="badge
                     {% if c.pai.status == 'PAGO' %}bg-success
@@ -163,8 +163,8 @@
                   {% endif %}
                 </td>
                 <td class="text-end">{{ item.quantidade }}</td>
-                <td class="text-end">R$ {{ '%.2f'|format(item.preco_unitario|float) }}</td>
-                <td class="text-end fw-semibold">R$ {{ '%.2f'|format(item.subtotal|float) }}</td>
+                <td class="text-end">{{ item.preco_unitario|float|brl }}</td>
+                <td class="text-end fw-semibold">{{ item.subtotal|float|brl }}</td>
                 <td class="text-center">
                   {% if item.almoxarifado_item_id %}
                     {% if mov_rec %}
@@ -203,7 +203,7 @@
             <tfoot class="table-light">
               <tr>
                 <td colspan="4" class="text-end fw-bold">Total</td>
-                <td class="text-end fw-bold fs-5 text-dark">R$ {{ '%.2f'|format(pedido.valor_total|float) }}</td>
+                <td class="text-end fw-bold fs-5 text-dark">{{ pedido.valor_total|float|brl }}</td>
                 <td colspan="3"></td>
               </tr>
             </tfoot>

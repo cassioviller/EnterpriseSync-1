@@ -167,14 +167,14 @@
               </td>
               <td class="text-center">{{ dados.count }}</td>
               <td class="text-end px-4 fw-semibold text-dark">
-                R$ {{ '%.2f'|format(dados.valor) }}
+                {{ dados.valor|brl }}
               </td>
             </tr>
             {% endfor %}
             <tr class="table-light fw-bold">
               <td class="px-4">Total Saídas</td>
               <td class="text-center">{{ resultado.n_saidas }}</td>
-              <td class="text-end px-4">R$ {{ '%.2f'|format(total_geral) }}</td>
+              <td class="text-end px-4">{{ total_geral|brl }}</td>
             </tr>
           </tbody>
         </table>

@@ -48,7 +48,7 @@
                     <div class="mb-3">
                         <small class="text-muted">Saldo Atual</small><br>
                         <h4 class="{% if banco.saldo_atual >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            R$ {{ "%.2f"|format(banco.saldo_atual) }}
+                            {{ banco.saldo_atual|brl }}
                         </h4>
                     </div>
                     
@@ -103,7 +103,7 @@
                             <h5 class="card-title">Saldo Total em Bancos</h5>
                             <p class="mb-0">{{ bancos|length }} conta(s) ativa(s)</p>
                         </div>
-                        <h2>R$ {{ "%.2f"|format(total_saldo|default(0)) }}</h2>
+                        <h2>{{ total_saldo|default(0)|brl }}</h2>
                     </div>
                 </div>
             </div>
