@@ -1648,15 +1648,20 @@ def nova_compra_obra(obra_id):
             for q, p in zip(quantidades, precos)
         )
 
-        # Tratar upload de anexo
+        # Tratar upload de anexo — validação de extensão obrigatória
+        _ALLOWED_ANEXO = {'png', 'jpg', 'jpeg', 'pdf', 'webp'}
         anexo_url = None
         arquivo = request.files.get('anexo')
         if arquivo and arquivo.filename:
+            ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
+            if ext not in _ALLOWED_ANEXO:
+                flash(f'Tipo de arquivo não permitido para anexo ({ext}). Use: {", ".join(sorted(_ALLOWED_ANEXO))}.', 'warning')
+                return redirect(url_for('main.detalhes_obra', id=obra_id))
             from werkzeug.utils import secure_filename
             upload_dir = os.path.join('static', 'uploads', 'pedidos_compra')
             os.makedirs(upload_dir, exist_ok=True)
-            safe_name = secure_filename(arquivo.filename)
-            safe_name = f"obra{obra_id}_{safe_name}"
+            ts = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+            safe_name = f"{ts}_{secure_filename(arquivo.filename)}"
             arquivo.save(os.path.join(upload_dir, safe_name))
             anexo_url = f"/static/uploads/pedidos_compra/{safe_name}"
 
@@ -1674,6 +1679,7 @@ def nova_compra_obra(obra_id):
         db.session.add(pedido)
         db.session.flush()  # get pedido.id
 
+        items_added = 0
         for desc, qtd_str, preco_str in zip(descricoes, quantidades, precos):
             if not desc.strip():
                 continue
@@ -1688,6 +1694,12 @@ def nova_compra_obra(obra_id):
                 admin_id=admin_id,
             )
             db.session.add(item)
+            items_added += 1
+
+        if items_added == 0:
+            db.session.rollback()
+            flash('Adicione ao menos um item válido à compra.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
 
         db.session.commit()
         flash('Compra criada com sucesso e enviada para aprovação do cliente.', 'success')
