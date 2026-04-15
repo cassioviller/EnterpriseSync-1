@@ -547,7 +547,10 @@
         </div>
         <div style="padding:1rem 1.25rem;">
             <p style="font-size:.85rem;color:#64748b;margin-bottom:.75rem;">
-                <i class="fas fa-info-circle me-1"></i>Compare os preços e selecione o fornecedor preferido para cada item. Clique em uma coluna para pré-selecionar todos os itens daquele fornecedor, ou escolha individualmente.
+                <i class="fas fa-info-circle me-1"></i>Compare os preços e selecione o fornecedor preferido para cada item.
+                Clique no cabeçalho da coluna para pré-selecionar todos os itens daquele fornecedor, ou escolha individualmente.
+                <span style="background:#ecfdf5;color:#059669;padding:.1rem .4rem;border-radius:4px;font-weight:600;">verde = menor preço</span>
+                <span style="background:#eff6ff;color:#1d4ed8;padding:.1rem .4rem;border-radius:4px;font-weight:600;margin-left:.25rem;">azul = prazo mais curto</span>
             </p>
             <form method="POST" action="{{ url_for('portal_obras.selecionar_mapa_v2', token=obra.token_cliente, mapa_id=mapa.id) }}" id="form-mapa-{{ mapa.id }}">
                 <div class="table-responsive mb-3">
@@ -569,12 +572,19 @@
                             {% for item in itens %}
                             {% set item_cots = cotacoes_map.get(item.id, {}) %}
                             {% set min_val = namespace(v=None, forn_id=None) %}
+                            {% set min_prazo = namespace(v=None, forn_id=None) %}
                             {% for forn in fornecedores %}
                                 {% set cot = item_cots.get(forn.id) %}
                                 {% if cot and cot.valor_unitario and cot.valor_unitario|float > 0 %}
                                     {% if min_val.v is none or cot.valor_unitario|float < min_val.v %}
                                         {% set min_val.v = cot.valor_unitario|float %}
                                         {% set min_val.forn_id = forn.id %}
+                                    {% endif %}
+                                {% endif %}
+                                {% if cot and cot.prazo and cot.prazo|trim %}
+                                    {% if min_prazo.v is none or cot.prazo < min_prazo.v %}
+                                        {% set min_prazo.v = cot.prazo %}
+                                        {% set min_prazo.forn_id = forn.id %}
                                     {% endif %}
                                 {% endif %}
                             {% endfor %}
@@ -585,25 +595,36 @@
                                 {% for forn in fornecedores %}
                                 {% set cot = item_cots.get(forn.id) %}
                                 {% set cur_val = cot.valor_unitario|float if cot and cot.valor_unitario else 0 %}
-                                {% set is_min = min_val.forn_id is not none and forn.id == min_val.forn_id and cur_val > 0 %}
+                                {% set is_min_val = min_val.forn_id is not none and forn.id == min_val.forn_id and cur_val > 0 %}
+                                {% set is_min_prazo = min_prazo.forn_id is not none and forn.id == min_prazo.forn_id %}
+                                {% if is_min_val %}
+                                    {% set cell_bg = 'background:#ecfdf5;' %}
+                                {% elif is_min_prazo %}
+                                    {% set cell_bg = 'background:#eff6ff;' %}
+                                {% else %}
+                                    {% set cell_bg = '' %}
+                                {% endif %}
                                 <td class="cotacao-cell" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
-                                    style="text-align:center;cursor:pointer;transition:background .2s;{% if is_min %}background:#ecfdf5;{% endif %}">
+                                    style="text-align:center;cursor:pointer;transition:background .2s;{{ cell_bg }}">
                                     <label style="cursor:pointer;display:block;width:100%;margin:0;">
                                         <input type="radio" name="sel_{{ item.id }}" value="{{ forn.id }}"
                                                class="cotacao-radio" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
-                                               {% if is_min %}checked{% endif %}
+                                               {% if is_min_val %}checked{% endif %}
                                                style="display:none;" required>
                                         <div class="radio-visual" style="border:2px solid #cbd5e1;border-radius:6px;padding:.4rem .3rem;font-size:.82rem;transition:all .2s;">
                                             {% if cur_val > 0 %}
-                                            <div style="font-weight:700;color:{% if is_min %}#059669{% else %}#1e293b{% endif %};">
+                                            <div style="font-weight:700;color:{% if is_min_val %}#059669{% elif is_min_prazo %}#1d4ed8{% else %}#1e293b{% endif %};">
                                                 {{ cur_val|brl }}
-                                                {% if is_min %}<i class="fas fa-star ms-1" style="font-size:.65rem;color:#f59e0b;"></i>{% endif %}
+                                                {% if is_min_val %}<i class="fas fa-star ms-1" style="font-size:.65rem;color:#f59e0b;" title="Menor preço"></i>{% endif %}
                                             </div>
-                                            {% if cot and cot.prazo %}
-                                            <div style="font-size:.72rem;color:#64748b;margin-top:.15rem;"><i class="fas fa-clock me-1"></i>{{ cot.prazo }}</div>
-                                            {% endif %}
                                             {% else %}
                                             <div style="color:#94a3b8;">—</div>
+                                            {% endif %}
+                                            {% if cot and cot.prazo %}
+                                            <div style="font-size:.72rem;margin-top:.15rem;{% if is_min_prazo %}color:#1d4ed8;font-weight:700;{% else %}color:#64748b;{% endif %}">
+                                                <i class="fas fa-clock me-1"></i>{{ cot.prazo }}
+                                                {% if is_min_prazo %}<i class="fas fa-bolt ms-1" style="font-size:.6rem;color:#f59e0b;" title="Prazo mais curto"></i>{% endif %}
+                                            </div>
                                             {% endif %}
                                         </div>
                                     </label>
@@ -632,8 +653,8 @@
                     </table>
                 </div>
                 <div class="text-end">
-                    <button type="submit" class="btn btn-success fw-semibold px-4" onclick="return confirm('Confirmar a seleção de fornecedores para este mapa?')">
-                        <i class="fas fa-check-circle me-2"></i>Confirmar Seleção
+                    <button type="submit" class="btn btn-success fw-semibold px-4" onclick="return confirm('Confirmar a seleção de fornecedores e gerar o relatório de aprovação?')">
+                        <i class="fas fa-file-alt me-2"></i>Salvar e Gerar Relatório
                     </button>
                 </div>
             </form>
@@ -643,7 +664,7 @@
     {% endif %}
 
     {% if mapas_v2_concluidos_ctx %}
-    <div class="section-title"><i class="fas fa-check-circle"></i> Comparativo de Fornecedores — Aprovados</div>
+    <div class="section-title"><i class="fas fa-check-circle"></i> Relatório de Fornecedores Aprovados</div>
     {% for ctx in mapas_v2_concluidos_ctx %}
     {% set mapa = ctx.mapa %}
     {% set fornecedores = ctx.fornecedores %}
@@ -655,47 +676,116 @@
             <span style="font-weight:700;color:#065f46;flex:1;">{{ mapa.nome }}</span>
             <span style="background:#d1fae5;color:#065f46;padding:.25rem .65rem;border-radius:20px;font-size:.75rem;font-weight:600;"><i class="fas fa-check me-1"></i>Aprovado</span>
         </div>
-        <div style="padding:.5rem 1.25rem 1rem;">
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm mb-0" style="font-size:.84rem;">
-                    <thead style="background:#f8fafc;">
-                        <tr>
-                            <th>Item</th>
-                            <th style="width:60px;text-align:center;">Qtd</th>
-                            <th style="width:40px;text-align:center;">Un</th>
-                            {% for forn in fornecedores %}
-                            <th style="text-align:center;">{{ forn.nome }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in itens %}
-                        {% set item_cots = cotacoes_map.get(item.id, {}) %}
-                        <tr>
-                            <td style="font-weight:600;">{{ item.descricao }}</td>
-                            <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
-                            <td style="text-align:center;">{{ item.unidade }}</td>
-                            {% for forn in fornecedores %}
-                            {% set cot = item_cots.get(forn.id) %}
-                            <td style="text-align:center;{% if cot and cot.selecionado %}background:#ecfdf5;{% endif %}">
+        <div style="padding:.75rem 1.25rem 1.25rem;">
+            <!-- Relatório agrupado por fornecedor selecionado -->
+            {% set grand_total = namespace(v=0) %}
+            {% for forn in fornecedores %}
+                {% set forn_itens = namespace(lista=[]) %}
+                {% set forn_total = namespace(v=0) %}
+                {% for item in itens %}
+                    {% set cot = cotacoes_map.get(item.id, {}).get(forn.id) %}
+                    {% if cot and cot.selecionado %}
+                        {% set subtotal = (cot.valor_unitario|float) * (item.quantidade|float) %}
+                        {% set forn_total.v = forn_total.v + subtotal %}
+                        {% set grand_total.v = grand_total.v + subtotal %}
+                    {% endif %}
+                {% endfor %}
+                {% if forn_total.v > 0 %}
+                <div style="margin-bottom:1.25rem;">
+                    <div style="background:#1e3a8a;color:#fff;padding:.5rem 1rem;border-radius:6px 6px 0 0;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:.5rem;">
+                        <i class="fas fa-building"></i>{{ forn.nome }}
+                        <span style="margin-left:auto;font-size:.82rem;font-weight:400;opacity:.85;">{{ forn_total.v|brl }}</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm mb-0" style="font-size:.83rem;border-radius:0 0 6px 6px;overflow:hidden;">
+                            <thead style="background:#f0f4ff;">
+                                <tr>
+                                    <th>Item</th>
+                                    <th style="width:60px;text-align:center;">Qtd</th>
+                                    <th style="width:40px;text-align:center;">Un</th>
+                                    <th style="text-align:right;">Preço Unit.</th>
+                                    <th style="text-align:right;">Subtotal</th>
+                                    <th style="width:100px;">Prazo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in itens %}
+                                {% set cot = cotacoes_map.get(item.id, {}).get(forn.id) %}
                                 {% if cot and cot.selecionado %}
-                                <strong style="color:#059669;">
-                                    {{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}
-                                    <i class="fas fa-check-circle ms-1" style="font-size:.75rem;"></i>
-                                </strong>
-                                {% if cot.prazo %}
-                                <div style="font-size:.72rem;color:#64748b;">{{ cot.prazo }}</div>
+                                {% set subtotal = (cot.valor_unitario|float) * (item.quantidade|float) %}
+                                <tr>
+                                    <td style="font-weight:600;">{{ item.descricao }}</td>
+                                    <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
+                                    <td style="text-align:center;">{{ item.unidade }}</td>
+                                    <td style="text-align:right;color:#1e293b;">{{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}</td>
+                                    <td style="text-align:right;font-weight:700;color:#1e3a8a;">{{ subtotal|brl }}</td>
+                                    <td style="color:#64748b;font-size:.78rem;">{{ cot.prazo or '—' }}</td>
+                                </tr>
                                 {% endif %}
-                                {% else %}
-                                <span style="color:#94a3b8;">{{ cot.valor_unitario|float|brl if cot and cot.valor_unitario else '—' }}</span>
-                                {% endif %}
-                            </td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#eff6ff;font-weight:700;">
+                                    <td colspan="4" style="text-align:right;font-size:.84rem;">Total {{ forn.nome }}</td>
+                                    <td style="text-align:right;color:#1e3a8a;">{{ forn_total.v|brl }}</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+            <!-- Total Geral -->
+            {% if grand_total.v > 0 %}
+            <div style="background:#1e3a8a;color:#fff;padding:.65rem 1rem;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;">
+                <span style="font-weight:700;"><i class="fas fa-calculator me-2"></i>Total Geral do Mapa</span>
+                <span style="font-size:1.1rem;font-weight:800;">{{ grand_total.v|brl }}</span>
             </div>
+            {% endif %}
+            <!-- Tabela completa de referência (todos os fornecedores) -->
+            <details style="margin-top:1.25rem;">
+                <summary style="cursor:pointer;color:#64748b;font-size:.84rem;padding:.4rem 0;"><i class="fas fa-table me-1"></i>Ver tabela completa de cotações</summary>
+                <div class="table-responsive mt-2">
+                    <table class="table table-bordered table-sm mb-0" style="font-size:.82rem;">
+                        <thead style="background:#f8fafc;">
+                            <tr>
+                                <th>Item</th>
+                                <th style="width:55px;text-align:center;">Qtd</th>
+                                <th style="width:38px;text-align:center;">Un</th>
+                                {% for forn in fornecedores %}
+                                <th style="text-align:center;">{{ forn.nome }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itens %}
+                            {% set item_cots = cotacoes_map.get(item.id, {}) %}
+                            <tr>
+                                <td style="font-weight:600;">{{ item.descricao }}</td>
+                                <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
+                                <td style="text-align:center;">{{ item.unidade }}</td>
+                                {% for forn in fornecedores %}
+                                {% set cot = item_cots.get(forn.id) %}
+                                <td style="text-align:center;{% if cot and cot.selecionado %}background:#ecfdf5;{% endif %}">
+                                    {% if cot and cot.selecionado %}
+                                    <strong style="color:#059669;">
+                                        {{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}
+                                        <i class="fas fa-check-circle ms-1" style="font-size:.7rem;"></i>
+                                    </strong>
+                                    {% if cot.prazo %}<div style="font-size:.7rem;color:#64748b;">{{ cot.prazo }}</div>{% endif %}
+                                    {% else %}
+                                    <span style="color:#94a3b8;">{{ cot.valor_unitario|float|brl if cot and cot.valor_unitario else '—' }}</span>
+                                    {% if cot and cot.prazo %}<div style="font-size:.7rem;color:#cbd5e1;">{{ cot.prazo }}</div>{% endif %}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
         </div>
     </div>
     {% endfor %}

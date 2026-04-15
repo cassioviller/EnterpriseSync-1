@@ -1982,7 +1982,7 @@ def _parse_brl(val):
 @login_required
 @admin_required
 def criar_mapa_v2(obra_id):
-    """Cria um novo Mapa de Concorrência V2 e redireciona para a página de edição."""
+    """Cria um novo Mapa de Concorrência V2 com fornecedores e itens opcionais."""
     try:
         admin_id = get_tenant_admin_id()
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -1997,8 +1997,66 @@ def criar_mapa_v2(obra_id):
 
         mapa = MapaConcorrenciaV2(obra_id=obra_id, admin_id=admin_id, nome=nome, status='aberto')
         db.session.add(mapa)
+        db.session.flush()  # obter mapa.id
+
+        # Fornecedores em lote (um por linha ou separados por vírgula)
+        fornecedores_txt = (request.form.get('fornecedores_batch') or '').strip()
+        nomes_forn = []
+        if fornecedores_txt:
+            for linha in fornecedores_txt.replace(',', '\n').splitlines():
+                n = linha.strip()
+                if n:
+                    nomes_forn.append(n)
+
+        forn_objs = []
+        for idx, nf in enumerate(nomes_forn):
+            forn = MapaFornecedor(mapa_id=mapa.id, admin_id=admin_id, nome=nf, ordem=idx)
+            db.session.add(forn)
+            forn_objs.append(forn)
+        if forn_objs:
+            db.session.flush()  # obter ids dos fornecedores
+
+        # Itens em lote (um por linha, formato: "Descrição | quantidade | unidade")
+        itens_txt = (request.form.get('itens_batch') or '').strip()
+        item_objs = []
+        if itens_txt:
+            for idx, linha in enumerate(itens_txt.splitlines()):
+                partes = [p.strip() for p in linha.split('|')]
+                if not partes or not partes[0]:
+                    continue
+                desc_i = partes[0]
+                try:
+                    qtd_i = float(partes[1].replace(',', '.')) if len(partes) > 1 and partes[1] else 1
+                except Exception:
+                    qtd_i = 1
+                unid_i = partes[2] if len(partes) > 2 and partes[2] else 'un'
+                item = MapaItemCotacao(
+                    mapa_id=mapa.id, admin_id=admin_id,
+                    descricao=desc_i, unidade=unid_i, quantidade=qtd_i, ordem=idx
+                )
+                db.session.add(item)
+                item_objs.append(item)
+            if item_objs:
+                db.session.flush()  # obter ids dos itens
+
+        # Criar grade de cotações vazia para combinações item × fornecedor
+        for forn_obj in forn_objs:
+            for item_obj in item_objs:
+                cot = MapaCotacao(
+                    mapa_id=mapa.id, item_id=item_obj.id,
+                    fornecedor_id=forn_obj.id, admin_id=admin_id,
+                    valor_unitario=0, selecionado=False
+                )
+                db.session.add(cot)
+
         db.session.commit()
-        flash(f'Mapa "{nome}" criado. Agora adicione fornecedores e itens.', 'success')
+        msg = f'Mapa "{nome}" criado'
+        if forn_objs:
+            msg += f' com {len(forn_objs)} fornecedor(es)'
+        if item_objs:
+            msg += f' e {len(item_objs)} item(ns)'
+        msg += '. Preencha as cotações abaixo.'
+        flash(msg, 'success')
         return redirect(url_for('main.editar_mapa_v2', obra_id=obra_id, mapa_id=mapa.id))
     except Exception as e:
         db.session.rollback()
@@ -2032,8 +2090,10 @@ def editar_mapa_v2(obra_id, mapa_id):
                     ordem_f = len(mapa.fornecedores)
                     forn = MapaFornecedor(mapa_id=mapa.id, admin_id=admin_id, nome=nome_f, ordem=ordem_f)
                     db.session.add(forn)
+                    db.session.flush()  # obter forn.id antes de criar cotações
                     # Criar células de cotação para cada item existente
-                    for item in mapa.itens:
+                    itens_existentes = list(mapa.itens)
+                    for item in itens_existentes:
                         cot = MapaCotacao(
                             mapa_id=mapa.id, item_id=item.id,
                             fornecedor_id=forn.id, admin_id=admin_id,

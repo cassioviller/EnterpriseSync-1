@@ -2516,11 +2516,10 @@ function compraObraRemoverItem(btn) {
             </div>
             <form method="POST" action="{{ url_for('main.criar_mapa_v2', obra_id=obra.id) }}">
                 <div class="modal-body">
-                    <p class="text-muted small mb-3"><i class="fas fa-info-circle me-1"></i>Após criar, você será redirecionado para a página de edição onde poderá adicionar fornecedores, itens e preencher as cotações.</p>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Nome do Mapa <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="nome"
-                               placeholder="Ex: Cotação de Esquadrias — Jul/2025" required>
+                               placeholder="Ex: Cotação de Esquadrias — Jul/2025" required autofocus>
                     </div>
                 </div>
                 <div class="modal-footer">
