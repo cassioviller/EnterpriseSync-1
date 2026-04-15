@@ -3810,6 +3810,7 @@ def executar_migracoes():
             (108, "Medição Quinzenal — itens comerciais, tarefas vinculadas, expansão medicao_obra", migration_108_medicao_quinzenal),
             (109, "Mapa de Concorrência — tabelas mapa_concorrencia e opcao_concorrencia", migration_109_mapa_concorrencia),
             (110, "OpcaoConcorrencia — enforça NOT NULL em admin_id", migration_110_opcao_concorrencia_admin_not_null),
+            (111, "CronogramaCliente — cronograma editável para portal do cliente", migration_111_cronograma_cliente),
         ]
         
         # Executar cada migração com rastreamento
@@ -8869,6 +8870,56 @@ def migration_109_mapa_concorrencia():
 
     except Exception as e:
         logger.error(f"Erro na migracao 109: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_111_cronograma_cliente():
+    """
+    Migration 111: Cria tabela cronograma_cliente — cronograma editável para o portal do cliente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'cronograma_cliente'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE cronograma_cliente (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome_tarefa VARCHAR(200) NOT NULL,
+                    data_inicio_apresentacao DATE,
+                    data_fim_apresentacao DATE,
+                    percentual_apresentacao FLOAT NOT NULL DEFAULT 0.0,
+                    ordem INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_cronograma_cliente_obra_id ON cronograma_cliente(obra_id)")
+            cursor.execute("CREATE INDEX idx_cronograma_cliente_admin_id ON cronograma_cliente(admin_id)")
+            logger.info("MIGRACAO 111: tabela cronograma_cliente criada")
+        else:
+            logger.info("MIGRACAO 111: tabela cronograma_cliente ja existe -- skip")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 111 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 111: {e}")
         if connection:
             try:
                 connection.rollback()

@@ -22,7 +22,7 @@ from models import (
     db, Obra, TarefaCronograma, PedidoCompra, PedidoCompraItem,
     MedicaoObra, Fornecedor, ConfiguracaoEmpresa, RDO,
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
-    MapaConcorrencia, OpcaoConcorrencia,
+    MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,6 +70,14 @@ def portal_obra(token: str):
         perc_geral = sum(t.percentual_concluido or 0 for t in tarefas) / total_tarefas
     else:
         perc_geral = 0.0
+
+    # Cronograma editável para o cliente (independente do cronograma interno)
+    cronograma_cliente = (
+        CronogramaCliente.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id)
+        .order_by(CronogramaCliente.ordem)
+        .all()
+    )
 
     compras_pendentes = (
         PedidoCompra.query
@@ -137,6 +145,7 @@ def portal_obra(token: str):
         'portal/portal_obra.html',
         obra=obra,
         tarefas=tarefas,
+        cronograma_cliente=cronograma_cliente,
         perc_geral=round(perc_geral, 1),
         compras_pendentes=compras_pendentes,
         compras_resolvidas=compras_resolvidas,

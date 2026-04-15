@@ -1371,6 +1371,90 @@
             </div>
         </div>
 
+        <!-- Cronograma do Cliente -->
+        <div class="obra-card">
+            <div class="obra-card-header" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
+                <h3><i class="fas fa-calendar-alt"></i> Cronograma para o Cliente</h3>
+            </div>
+            <div class="obra-card-body" style="padding: 1.5rem;">
+                <p style="font-size:.88rem;color:#64748b;margin-bottom:1rem;">
+                    Cronograma editável exibido no Portal do Cliente. Independente do cronograma interno.
+                </p>
+                <form method="POST" action="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}" class="mb-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-teal w-100"
+                            style="background:#0d9488;color:#fff;border:none;"
+                            onclick="return confirm('Isso irá substituir o cronograma do cliente atual pelas tarefas internas. Continuar?')">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Gerar Cronograma para Cliente
+                    </button>
+                </form>
+
+                {% if cronograma_cliente_items %}
+                <div style="max-height:380px;overflow-y:auto;">
+                    {% for item in cronograma_cliente_items %}
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:.75rem;margin-bottom:.5rem;background:#f8fafc;">
+                        <div style="font-weight:600;font-size:.9rem;margin-bottom:.4rem;">{{ item.nome_tarefa }}</div>
+                        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+                            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                                <div style="height:100%;border-radius:3px;width:{{ item.percentual_apresentacao|round(0) }}%;background:{% if item.percentual_apresentacao >= 100 %}#22c55e{% elif item.percentual_apresentacao >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
+                            </div>
+                            <span style="font-size:.8rem;font-weight:600;white-space:nowrap;">{{ item.percentual_apresentacao|round(1) }}%</span>
+                        </div>
+                        {% if item.data_inicio_apresentacao or item.data_fim_apresentacao %}
+                        <div style="font-size:.78rem;color:#64748b;margin-bottom:.5rem;">
+                            {% if item.data_inicio_apresentacao %}{{ item.data_inicio_apresentacao.strftime('%d/%m/%Y') }}{% endif %}
+                            {% if item.data_inicio_apresentacao and item.data_fim_apresentacao %} → {% endif %}
+                            {% if item.data_fim_apresentacao %}{{ item.data_fim_apresentacao.strftime('%d/%m/%Y') }}{% endif %}
+                        </div>
+                        {% endif %}
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                style="font-size:.75rem;"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#editItem{{ item.id }}">
+                            <i class="fas fa-edit me-1"></i>Editar
+                        </button>
+                        <div class="collapse mt-2" id="editItem{{ item.id }}">
+                            <form method="POST" action="{{ url_for('main.editar_cronograma_cliente', obra_id=obra.id, item_id=item.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="mb-2">
+                                    <input type="text" name="nome_tarefa" class="form-control form-control-sm"
+                                           value="{{ item.nome_tarefa }}" placeholder="Nome da tarefa" required>
+                                </div>
+                                <div class="row g-1 mb-2">
+                                    <div class="col-6">
+                                        <input type="date" name="data_inicio_apresentacao" class="form-control form-control-sm"
+                                               value="{{ item.data_inicio_apresentacao.strftime('%Y-%m-%d') if item.data_inicio_apresentacao else '' }}">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="date" name="data_fim_apresentacao" class="form-control form-control-sm"
+                                               value="{{ item.data_fim_apresentacao.strftime('%Y-%m-%d') if item.data_fim_apresentacao else '' }}">
+                                    </div>
+                                </div>
+                                <div class="input-group input-group-sm mb-2">
+                                    <span class="input-group-text">%</span>
+                                    <input type="number" name="percentual_apresentacao" class="form-control form-control-sm"
+                                           min="0" max="100" step="0.1"
+                                           value="{{ item.percentual_apresentacao|round(1) }}" placeholder="Percentual">
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-success w-100">
+                                    <i class="fas fa-save me-1"></i>Salvar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3" style="color:#94a3b8;">
+                    <i class="fas fa-calendar-times fa-2x mb-2" style="opacity:.4;display:block;"></i>
+                    <div style="font-size:.88rem;">Nenhuma tarefa no cronograma do cliente.</div>
+                    <div style="font-size:.8rem;">Clique em "Gerar" para copiar as tarefas internas.</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Ações Rápidas -->
         <div class="obra-card">
             <div class="obra-card-header">

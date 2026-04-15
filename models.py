@@ -4639,3 +4639,28 @@ class MedicaoObraItem(db.Model):
 
     def __repr__(self):
         return f'<MedicaoObraItem medicao={self.medicao_obra_id} item={self.item_medicao_comercial_id}>'
+
+
+class CronogramaCliente(db.Model):
+    """
+    Cronograma editável exclusivo para apresentação ao cliente no Portal.
+    Gerado a partir de TarefaCronograma mas editável independentemente,
+    sem impactar métricas internas.
+    """
+    __tablename__ = 'cronograma_cliente'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome_tarefa = db.Column(db.String(200), nullable=False)
+    data_inicio_apresentacao = db.Column(db.Date, nullable=True)
+    data_fim_apresentacao = db.Column(db.Date, nullable=True)
+    percentual_apresentacao = db.Column(db.Float, default=0.0, nullable=False)
+    ordem = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref=db.backref('cronograma_cliente_items', lazy='dynamic', cascade='all,delete-orphan'))
+
+    def __repr__(self):
+        return f'<CronogramaCliente #{self.id} obra={self.obra_id} "{self.nome_tarefa}">'

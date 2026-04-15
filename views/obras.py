@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -1578,6 +1578,17 @@ def detalhes_obra(id):
         except Exception:
             mapas_concorrencia = []
 
+        # Cronograma do cliente (apresentação no portal)
+        try:
+            cronograma_cliente_items = (
+                CronogramaCliente.query
+                .filter_by(obra_id=obra_id, admin_id=tenant_admin_id)
+                .order_by(CronogramaCliente.ordem)
+                .all()
+            )
+        except Exception:
+            cronograma_cliente_items = []
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
@@ -1599,7 +1610,8 @@ def detalhes_obra(id):
                              dados_folha=dados_folha,
                              pedidos_compra_obra=pedidos_compra_obra,
                              fornecedores_lista=fornecedores_lista,
-                             mapas_concorrencia=mapas_concorrencia)
+                             mapas_concorrencia=mapas_concorrencia,
+                             cronograma_cliente_items=cronograma_cliente_items)
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
@@ -1836,6 +1848,100 @@ def deletar_mapa_concorrencia(obra_id, mapa_id):
         db.session.rollback()
         logger.error(f"Erro ao deletar mapa {mapa_id}: {e}")
         flash(f'Erro ao excluir: {str(e)}', 'danger')
+
+    return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@main_bp.route('/obras/<int:obra_id>/cronograma-cliente/gerar', methods=['POST'])
+@login_required
+@admin_required
+def gerar_cronograma_cliente(obra_id):
+    """Gera (ou substitui) o CronogramaCliente a partir das tarefas internas da obra."""
+    try:
+        admin_id = get_tenant_admin_id()
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada.', 'danger')
+            return redirect(url_for('main.obras'))
+
+        from models import TarefaCronograma
+        tarefas = (
+            TarefaCronograma.query
+            .filter_by(obra_id=obra_id, admin_id=admin_id)
+            .order_by(TarefaCronograma.ordem)
+            .all()
+        )
+
+        # Remover cronograma anterior desta obra
+        CronogramaCliente.query.filter_by(obra_id=obra_id, admin_id=admin_id).delete()
+
+        for idx, t in enumerate(tarefas):
+            item = CronogramaCliente(
+                obra_id=obra_id,
+                admin_id=admin_id,
+                nome_tarefa=t.nome_tarefa,
+                data_inicio_apresentacao=t.data_inicio,
+                data_fim_apresentacao=t.data_fim,
+                percentual_apresentacao=t.percentual_concluido or 0.0,
+                ordem=idx,
+            )
+            db.session.add(item)
+
+        db.session.commit()
+        flash(f'Cronograma do cliente gerado com {len(tarefas)} tarefa(s).', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao gerar cronograma cliente para obra {obra_id}: {e}")
+        flash(f'Erro ao gerar cronograma: {str(e)}', 'danger')
+
+    return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+
+@main_bp.route('/obras/<int:obra_id>/cronograma-cliente/<int:item_id>/editar', methods=['POST'])
+@login_required
+@admin_required
+def editar_cronograma_cliente(obra_id, item_id):
+    """Atualiza nome, datas e percentual de uma entrada no CronogramaCliente."""
+    try:
+        admin_id = get_tenant_admin_id()
+        item = CronogramaCliente.query.filter_by(
+            id=item_id, obra_id=obra_id, admin_id=admin_id
+        ).first()
+        if not item:
+            flash('Tarefa não encontrada.', 'danger')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
+        nome = request.form.get('nome_tarefa', '').strip()
+        if nome:
+            item.nome_tarefa = nome
+
+        data_ini = request.form.get('data_inicio_apresentacao', '').strip()
+        data_fim = request.form.get('data_fim_apresentacao', '').strip()
+        from datetime import datetime as _dt
+        if data_ini:
+            try:
+                item.data_inicio_apresentacao = _dt.strptime(data_ini, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        if data_fim:
+            try:
+                item.data_fim_apresentacao = _dt.strptime(data_fim, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        perc = request.form.get('percentual_apresentacao', '').strip()
+        if perc:
+            try:
+                item.percentual_apresentacao = max(0.0, min(100.0, float(perc)))
+            except ValueError:
+                pass
+
+        db.session.commit()
+        flash('Tarefa do cronograma atualizada.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao editar cronograma cliente item {item_id}: {e}")
+        flash(f'Erro ao editar tarefa: {str(e)}', 'danger')
 
     return redirect(url_for('main.detalhes_obra', id=obra_id))
 

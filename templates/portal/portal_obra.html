@@ -246,7 +246,7 @@
             <div class="row g-3">
                 <div class="col-6 col-lg-3">
                     <div class="card-portal kpi-card">
-                        <div class="kpi-val">{{ tarefas|length }}</div>
+                        <div class="kpi-val">{{ cronograma_cliente|length }}</div>
                         <div class="kpi-lbl">Tarefas</div>
                     </div>
                 </div>
@@ -285,63 +285,38 @@
         </div>
     </div>
 
-    {% if tarefas %}
     <div class="section-title"><i class="fas fa-tasks"></i> Cronograma</div>
     <div class="card-portal mb-4">
-        {% set ns = namespace(parent_ids=[]) %}
-        {% for t in tarefas %}
-            {% if t.tarefa_pai_id and t.tarefa_pai_id not in ns.parent_ids %}
-                {% set ns.parent_ids = ns.parent_ids + [t.tarefa_pai_id] %}
-            {% endif %}
-        {% endfor %}
-
-        {% for t in tarefas %}
-            {% if not t.tarefa_pai_id %}
-                {% set pc = t.percentual_concluido or 0 %}
-                {% if t.id in ns.parent_ids %}
-                <div class="tarefa-pai-header" onclick="toggleTarefas(this)">
-                    <span class="chevron"><i class="fas fa-chevron-right"></i></span>
-                    <span class="tarefa-nome">{{ t.nome_tarefa }}</span>
-                    <div class="tarefa-bar">
-                        <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
-                    </div>
-                    <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
+        {% if cronograma_cliente %}
+            {% for t in cronograma_cliente %}
+            {% set pc = t.percentual_apresentacao or 0 %}
+            <div class="tarefa-row">
+                <span class="tarefa-nome">
+                    {{ t.nome_tarefa }}
+                    {% if t.data_inicio_apresentacao and t.data_fim_apresentacao %}
+                    <span class="text-muted" style="font-size:.78rem;display:block;">
+                        {{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }} → {{ t.data_fim_apresentacao.strftime('%d/%m/%Y') }}
+                    </span>
+                    {% elif t.data_inicio_apresentacao %}
+                    <span class="text-muted" style="font-size:.78rem;display:block;">
+                        Início: {{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }}
+                    </span>
+                    {% endif %}
+                </span>
+                <div class="tarefa-bar">
+                    <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
                 </div>
-                <div class="tarefa-filhas-container">
-                    {% for f in tarefas %}
-                        {% if f.tarefa_pai_id == t.id %}
-                        {% set fpc = f.percentual_concluido or 0 %}
-                        <div class="tarefa-row">
-                            <span class="text-muted" style="width:18px"><i class="fas fa-level-up-alt fa-rotate-90" style="font-size:.7rem"></i></span>
-                            <span class="tarefa-nome ps-1">{{ f.nome_tarefa }}</span>
-                            <div class="tarefa-bar">
-                                <div class="tarefa-bar-fill" style="width:{{ fpc }}%;background:{% if fpc >= 100 %}#22c55e{% elif fpc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
-                            </div>
-                            <span class="tarefa-perc" style="color:{% if fpc >= 100 %}#16a34a{% elif fpc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ fpc|round(1) }}%</span>
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="tarefa-row">
-                    <span class="tarefa-nome">{{ t.nome_tarefa }}</span>
-                    <div class="tarefa-bar">
-                        <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
-                    </div>
-                    <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
-                </div>
-                {% endif %}
-            {% endif %}
-        {% endfor %}
+                <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div style="padding:2rem 1.25rem;text-align:center;color:#64748b;">
+            <i class="fas fa-clock fa-2x mb-3" style="opacity:.35;display:block;"></i>
+            <div style="font-weight:600;margin-bottom:.25rem;">Cronograma em atualização</div>
+            <div style="font-size:.85rem;">O cronograma detalhado desta obra será disponibilizado em breve.</div>
+        </div>
+        {% endif %}
     </div>
-    <script>
-    function toggleTarefas(header) {
-        header.classList.toggle('open');
-        var container = header.nextElementSibling;
-        container.classList.toggle('open');
-    }
-    </script>
-    {% endif %}
 
     {% if compras_pendentes %}
     <div class="section-title"><i class="fas fa-clipboard-check"></i> Compras para Aprovação</div>
