@@ -1543,16 +1543,24 @@ def detalhes_obra(id):
                 'evolucao_mensal': []
             }
         
-        # Pedidos de compra vinculados à obra
+        # Pedidos de compra vinculados à obra (filtrado por tenant quando disponível)
         try:
-            pedidos_compra_obra = PedidoCompra.query.filter_by(obra_id=obra_id).order_by(PedidoCompra.created_at.desc()).all()
+            if admin_id is not None:
+                pedidos_compra_obra = PedidoCompra.query.filter_by(
+                    obra_id=obra_id, admin_id=admin_id
+                ).order_by(PedidoCompra.created_at.desc()).all()
+            else:
+                pedidos_compra_obra = PedidoCompra.query.filter_by(
+                    obra_id=obra_id
+                ).order_by(PedidoCompra.created_at.desc()).all()
         except Exception:
             pedidos_compra_obra = []
 
-        # Fornecedores disponíveis para o formulário de nova compra
+        # Fornecedores disponíveis para o formulário de nova compra (somente do tenant)
+        # Usa o admin_id da obra como referência segura de tenant
         try:
-            tenant_admin = obra.admin_id
-            fornecedores_lista = Fornecedor.query.filter_by(admin_id=tenant_admin).order_by(Fornecedor.nome).all()
+            tenant_admin_id = admin_id if admin_id is not None else obra.admin_id
+            fornecedores_lista = Fornecedor.query.filter_by(admin_id=tenant_admin_id).order_by(Fornecedor.nome).all()
         except Exception:
             fornecedores_lista = []
 
@@ -1588,12 +1596,17 @@ def detalhes_obra(id):
 
 @main_bp.route('/obras/<int:obra_id>/compras/nova', methods=['POST'])
 @login_required
+@admin_required
 def nova_compra_obra(obra_id):
     """Cria um pedido de compra para aprovação do cliente, diretamente da tela de obra."""
     try:
-        obra = Obra.query.get_or_404(obra_id)
+        admin_id = get_tenant_admin_id()
 
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', current_user.id)
+        # Validar que a obra pertence ao tenant do usuário logado
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada ou sem permissão de acesso.', 'danger')
+            return redirect(url_for('main.obras'))
 
         fornecedor_id = request.form.get('fornecedor_id', type=int)
         data_compra_str = request.form.get('data_compra') or date.today().isoformat()
@@ -1604,17 +1617,34 @@ def nova_compra_obra(obra_id):
             flash('Selecione um fornecedor para a compra.', 'warning')
             return redirect(url_for('main.detalhes_obra', id=obra_id))
 
+        # Validar que o fornecedor pertence ao mesmo tenant
+        fornecedor = Fornecedor.query.filter_by(id=fornecedor_id, admin_id=admin_id).first()
+        if not fornecedor:
+            flash('Fornecedor inválido ou sem permissão de acesso.', 'danger')
+            return redirect(url_for('main.detalhes_obra', id=obra_id))
+
         descricoes = request.form.getlist('item_descricao[]')
         quantidades = request.form.getlist('item_quantidade[]')
         precos = request.form.getlist('item_preco[]')
+
+        logger.debug(f"[nova_compra_obra] descricoes={descricoes} quantidades={quantidades} precos={precos}")
 
         if not descricoes or not any(d.strip() for d in descricoes):
             flash('Adicione ao menos um item à compra.', 'warning')
             return redirect(url_for('main.detalhes_obra', id=obra_id))
 
+        def _parse_num(val):
+            """Aceita ponto ou vírgula como separador decimal."""
+            if not val:
+                return 0.0
+            try:
+                return float(str(val).strip().replace(',', '.'))
+            except ValueError:
+                return 0.0
+
         # Calcular valor total
         valor_total = sum(
-            float(q or 0) * float(p or 0)
+            _parse_num(q) * _parse_num(p)
             for q, p in zip(quantidades, precos)
         )
 
@@ -1647,8 +1677,8 @@ def nova_compra_obra(obra_id):
         for desc, qtd_str, preco_str in zip(descricoes, quantidades, precos):
             if not desc.strip():
                 continue
-            qtd = float(qtd_str or 1)
-            preco = float(preco_str or 0)
+            qtd = _parse_num(qtd_str) or 1
+            preco = _parse_num(preco_str)
             item = PedidoCompraItem(
                 pedido_id=pedido.id,
                 descricao=desc.strip(),
