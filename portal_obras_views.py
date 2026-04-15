@@ -431,7 +431,7 @@ def gerar_medicao(obra_id: int):
 
 @portal_obras_bp.route('/obra/<token>/mapa-v2/<int:mapa_id>/selecionar', methods=['POST'])
 def selecionar_mapa_v2(token: str, mapa_id: int):
-    """O cliente seleciona um fornecedor preferido para cada item do Mapa V2."""
+    """O cliente confirma a seleção de fornecedores para cada item do Mapa V2."""
     obra = _get_obra_by_token(token)
     mapa = MapaConcorrenciaV2.query.filter_by(
         id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
@@ -441,21 +441,52 @@ def selecionar_mapa_v2(token: str, mapa_id: int):
         flash('Este mapa já foi aprovado e não pode ser alterado.', 'warning')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
-    try:
-        # Cada campo tem o nome "sel_<item_id>" com value = fornecedor_id
-        for key, val in request.form.items():
-            if key.startswith('sel_'):
+    # Conjuntos de IDs válidos deste mapa (previne manipulação de form)
+    itens_validos = {item.id for item in mapa.itens}
+    forns_validos = {forn.id for forn in mapa.fornecedores}
+
+    if not itens_validos:
+        flash('Este mapa não possui itens cadastrados.', 'warning')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    # Coletar seleções do formulário e validar
+    selecoes = {}  # {item_id: forn_id}
+    for key, val in request.form.items():
+        if key.startswith('sel_'):
+            try:
                 item_id = int(key[4:])
                 forn_id = int(val)
-                # Desmarcar todas as cotações deste item
-                cotacoes_item = MapaCotacao.query.filter_by(mapa_id=mapa.id, item_id=item_id).all()
-                for cot in cotacoes_item:
-                    cot.selecionado = (cot.fornecedor_id == forn_id)
+            except (ValueError, TypeError):
+                continue
+            # Validar que item e fornecedor pertencem a este mapa
+            if item_id in itens_validos and forn_id in forns_validos:
+                selecoes[item_id] = forn_id
+
+    # Exigir seleção para todos os itens com pelo menos uma cotação > 0
+    itens_com_cotacao = set()
+    for cot in mapa.cotacoes:
+        if cot.valor_unitario and float(cot.valor_unitario) > 0:
+            itens_com_cotacao.add(cot.item_id)
+
+    itens_sem_selecao = itens_com_cotacao - selecoes.keys()
+    if itens_sem_selecao:
+        flash('Selecione um fornecedor para todos os itens antes de confirmar.', 'warning')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    try:
+        # Aplicar seleções: desmarcar todas, marcar as escolhidas
+        for cot in mapa.cotacoes:
+            cot.selecionado = (
+                cot.item_id in selecoes and cot.fornecedor_id == selecoes[cot.item_id]
+            )
 
         mapa.status = 'concluido'
         db.session.commit()
-        logger.info(f"[PORTAL] Mapa V2 {mapa_id} aprovado pelo cliente — obra {obra.id}")
-        flash('Seleção confirmada! Fornecedores escolhidos registrados com sucesso.', 'success')
+        logger.info(
+            f"[PORTAL] Mapa V2 {mapa_id} aprovado pelo cliente — obra {obra.id}, "
+            f"{len(selecoes)} seleções registradas"
+        )
+        flash('Relatório gerado! Fornecedores selecionados registrados com sucesso.', 'success')
     except Exception as e:
         db.session.rollback()
         logger.error(f"[PORTAL] Erro ao selecionar mapa_v2 {mapa_id}: {e}")
