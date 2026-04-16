@@ -84,7 +84,7 @@
               <th>Data</th>
               <th>NF / Recibo</th>
               <th>Fornecedor</th>
-              <th>Centro de Custo</th>
+              <th>Tipo</th>
               <th>Obra</th>
               <th>Pagamento</th>
               <th class="text-end">Total (R$)</th>
@@ -98,7 +98,22 @@
               <td class="text-nowrap">{{ p.data_compra.strftime('%d/%m/%Y') }}</td>
               <td>{{ p.numero or '—' }}</td>
               <td>{{ p.fornecedor.nome }}</td>
-              <td>{{ p.centro_custo.nome }}</td>
+              <td>
+                {% if p.tipo_compra == 'aprovacao_cliente' %}
+                  <span class="badge bg-warning-subtle text-warning" title="Faturamento Direto — só cria custo após aprovação do cliente">
+                    <i class="fas fa-user-check me-1"></i>Aprov. Cliente
+                  </span>
+                  {% if p.status_aprovacao_cliente == 'APROVADO' %}
+                    <span class="badge bg-success-subtle text-success ms-1">Aprovada</span>
+                  {% elif p.status_aprovacao_cliente == 'RECUSADO' %}
+                    <span class="badge bg-danger-subtle text-danger ms-1">Recusada</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary ms-1">Pendente</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-primary-subtle text-primary"><i class="fas fa-cog me-1"></i>Normal</span>
+                {% endif %}
+              </td>
               <td>{{ p.obra.nome if p.obra else '—' }}</td>
               <td>
                 <span class="badge bg-secondary-subtle text-secondary">

@@ -249,10 +249,33 @@ def portal_obra(token: str):
 def aprovar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
-    compra.status_aprovacao_cliente = 'APROVADO'
-    db.session.commit()
-    logger.info(f"[PORTAL] Compra {compra_id} APROVADA pelo cliente — obra {obra.id}")
-    flash('Compra aprovada com sucesso!', 'success')
+
+    # Já aprovada? idempotente
+    if compra.status_aprovacao_cliente == 'APROVADO' and compra.processada_apos_aprovacao:
+        flash('Esta compra já foi aprovada e processada.', 'info')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    try:
+        compra.status_aprovacao_cliente = 'APROVADO'
+
+        # Se for tipo 'aprovacao_cliente' e ainda não processada, gera agora os custos
+        # (FATURAMENTO_DIRETO sem FluxoCaixa) + entrada + saída no almoxarifado.
+        if compra.tipo_compra == 'aprovacao_cliente' and not compra.processada_apos_aprovacao:
+            from compras_views import processar_compra_aprovada_cliente
+            # usuario_id = admin do tenant (portal é anônimo, não tem current_user)
+            processar_compra_aprovada_cliente(compra, usuario_id=compra.admin_id)
+
+        db.session.commit()
+        logger.info(
+            f"[PORTAL] Compra {compra_id} APROVADA pelo cliente — obra {obra.id} "
+            f"tipo={compra.tipo_compra} processada={compra.processada_apos_aprovacao}"
+        )
+        flash('Compra aprovada com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[PORTAL] Erro ao aprovar compra {compra_id}: {e}", exc_info=True)
+        flash(f'Erro ao aprovar compra: {e}', 'danger')
+
     return redirect(url_for('portal_obras.portal_obra', token=token))
 
 

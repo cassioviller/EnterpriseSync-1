@@ -4126,6 +4126,14 @@ class PedidoCompra(db.Model):
     status_aprovacao_cliente = db.Column(db.String(20), default='PENDENTE')
     comprovante_pagamento_url = db.Column(db.String(500))
 
+    # Tipo de compra:
+    #   'normal'             → cria GestaoCustoPai MATERIAL + entrada no almoxarifado (fluxo interno)
+    #   'aprovacao_cliente'  → fica pendente até cliente aprovar no portal; ao aprovar,
+    #                          cria GestaoCustoPai FATURAMENTO_DIRETO (sem FluxoCaixa) + entrada + saída
+    tipo_compra = db.Column(db.String(30), nullable=False, default='normal')
+    # Flag de idempotência: True depois que processar_compra_aprovada_cliente rodou.
+    processada_apos_aprovacao = db.Column(db.Boolean, nullable=False, default=False)
+
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

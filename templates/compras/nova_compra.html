@@ -15,6 +15,37 @@
 
   <form method="POST" action="{{ url_for('compras.nova_post') }}" enctype="multipart/form-data" id="formCompra">
 
+    <!-- TIPO DE COMPRA -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body py-3">
+        <label class="form-label fw-semibold mb-2">
+          <i class="fas fa-random me-2 text-primary"></i>Tipo de Compra
+        </label>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <div class="form-check border rounded p-3 h-100" id="optNormal">
+              <input class="form-check-input" type="radio" name="tipo_compra" id="tipoNormal"
+                     value="normal" checked onchange="atualizarTipoCompra()">
+              <label class="form-check-label w-100" for="tipoNormal">
+                <div class="fw-semibold">Compra Normal <span class="badge bg-primary-subtle text-primary ms-1">Interno</span></div>
+                <small class="text-muted d-block">Gera custo na obra, conta a pagar e entrada no almoxarifado imediatamente.</small>
+              </label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check border rounded p-3 h-100" id="optAprov">
+              <input class="form-check-input" type="radio" name="tipo_compra" id="tipoAprov"
+                     value="aprovacao_cliente" onchange="atualizarTipoCompra()">
+              <label class="form-check-label w-100" for="tipoAprov">
+                <div class="fw-semibold">Aprovação do Cliente <span class="badge bg-warning-subtle text-warning ms-1">Faturamento Direto</span></div>
+                <small class="text-muted d-block">Envia ao cliente aprovar no portal. Só cria custo (FATURAMENTO_DIRETO, sem fluxo de caixa) e consumo quando cliente aprova.</small>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row g-3">
       <!-- COLUNA ESQUERDA: Cabeçalho da compra -->
       <div class="col-lg-7">
@@ -279,6 +310,24 @@ function toggleParcelas(val) {
 
 // Inicializar com 1 item
 adicionarItem();
+
+// ── TIPO DE COMPRA ────────────────────────────────────────────
+function atualizarTipoCompra() {
+  const isAprov = document.getElementById('tipoAprov').checked;
+  // Destacar a opção selecionada
+  document.getElementById('optNormal').classList.toggle('border-primary', !isAprov);
+  document.getElementById('optAprov').classList.toggle('border-warning', isAprov);
+  // Esconder seção de reembolso em aprovacao_cliente (incompatível)
+  const secReimb = document.getElementById('secaoReembolso').parentElement;
+  if (isAprov) {
+    secReimb.style.display = 'none';
+    const tg = document.getElementById('toggleReembolso');
+    if (tg) { tg.checked = false; window.toggleSecaoReembolso(tg); }
+  } else {
+    secReimb.style.display = '';
+  }
+}
+atualizarTipoCompra();
 
 // ── REEMBOLSO ────────────────────────────────────────────────
 (function () {

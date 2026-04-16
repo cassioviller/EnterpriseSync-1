@@ -45,6 +45,274 @@ def _admin_id():
     return get_tenant_admin_id()
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# HELPERS DE PROCESSAMENTO — dois fluxos de compra
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Fluxo 1 — `processar_compra_normal`:
+#   - Gera GestaoCustoPai com tipo_categoria='MATERIAL' (uma por parcela)
+#   - Se condição 'a_vista' → status='PAGO' (e GCP autorizado/pago normalmente via
+#     o fluxo padrão da Gestão de Custos, que cria FluxoCaixa quando o usuário paga)
+#   - Cria entrada no almoxarifado (AlmoxarifadoMovimento + AlmoxarifadoEstoque)
+#     para itens vinculados ao catálogo.
+#   - Usado tanto no POST inicial (tipo_compra='normal') como em compras
+#     aprovação_cliente que tenham sido marcadas para esse fluxo alternativo
+#     futuramente (hoje, só 'normal' dispara este helper).
+#
+# Fluxo 2 — `processar_compra_aprovada_cliente`:
+#   - Só roda DEPOIS de o cliente aprovar no portal.
+#   - Gera UM GestaoCustoPai com tipo_categoria='FATURAMENTO_DIRETO', status='PAGO',
+#     valor_pago=valor_total, saldo=0. Esse GCP NÃO gera FluxoCaixa porque o
+#     dinheiro vai direto do cliente ao fornecedor (faturamento direto).
+#   - Cria entrada NO ALMOXARIFADO (movimento ENTRADA + lote de estoque) para
+#     itens vinculados ao catálogo e uma SAÍDA imediata contra a obra (obra_id
+#     do pedido, sem funcionario), reconhecendo o material como já consumido
+#     no centro de custo da obra.
+#   - Protegido por `processada_apos_aprovacao` — idempotente.
+#
+# Regras de segurança comuns:
+#   - admin_id SEMPRE = pedido.admin_id (multi-tenant)
+#   - todas as operações em uma única transação; rollback em exceção
+#   - pedido_compra_id é setado em todos os AlmoxarifadoMovimento para o
+#     handler de material_entrada do EventManager ignorar esses movimentos
+#     (ele dedup por pedido_compra_id).
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id):
+    """Cria AlmoxarifadoMovimento ENTRADA + AlmoxarifadoEstoque (lote) para cada
+    item do pedido que esteja vinculado ao catálogo do almoxarifado.
+
+    NÃO commita — o chamador é responsável pelo commit/rollback.
+    Retorna lista de tuplas (movimento, estoque) criadas.
+    """
+    itens_catalogo = [(desc, qtd, preco, almox_id, subtotal)
+                      for desc, qtd, preco, almox_id, subtotal in itens_validos
+                      if almox_id]
+    lote_ref = pedido.numero or f"PC-{pedido.id}"
+    resultado = []
+    for desc_item, qtd_item, preco_item, almox_id, _ in itens_catalogo:
+        mov = AlmoxarifadoMovimento(
+            item_id=almox_id,
+            tipo_movimento='ENTRADA',
+            quantidade=qtd_item,
+            valor_unitario=preco_item,
+            nota_fiscal=pedido.numero,
+            observacao=f"Entrada automática compra {lote_ref}: {desc_item[:100]}",
+            estoque_id=None,
+            fornecedor_id=pedido.fornecedor_id,
+            admin_id=admin_id,
+            usuario_id=usuario_id,
+            obra_id=pedido.obra_id,
+            pedido_compra_id=pedido.id,
+        )
+        db.session.add(mov)
+        db.session.flush()
+        estq = AlmoxarifadoEstoque(
+            item_id=almox_id,
+            quantidade=qtd_item,
+            quantidade_inicial=qtd_item,
+            quantidade_disponivel=qtd_item,
+            entrada_movimento_id=mov.id,
+            valor_unitario=preco_item,
+            status='DISPONIVEL',
+            lote=lote_ref,
+            obra_id=pedido.obra_id,
+            admin_id=admin_id,
+        )
+        db.session.add(estq)
+        db.session.flush()
+        mov.estoque_id = estq.id
+        resultado.append((mov, estq))
+    return resultado
+
+
+def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
+    """Processa compra tipo='normal':
+       - Cria GestaoCustoPai MATERIAL (N parcelas conforme condicao_pagamento)
+       - Cria GestaoCustoFilho vinculado à obra
+       - Cria entrada no almoxarifado para itens do catálogo
+
+    NÃO commita — o chamador cuida do commit.
+    """
+    from decimal import Decimal
+    fornecedor = Fornecedor.query.get(pedido.fornecedor_id)
+    obra = Obra.query.get(pedido.obra_id) if pedido.obra_id else None
+    vencimentos = _vencimentos(pedido.data_compra, pedido.condicao_pagamento, pedido.parcelas)
+    n_parcelas = len(vencimentos)
+    valor_total = float(pedido.valor_total)
+    valor_parcela = round(valor_total / n_parcelas, 2)
+    forn_nome = fornecedor.nome if fornecedor else 'Fornecedor'
+    entidade_nome = obra.nome if obra else 'Sem obra'
+    entidade_id = pedido.obra_id
+
+    for idx, (data_venc, _) in enumerate(vencimentos, start=1):
+        v = valor_parcela if idx < n_parcelas else round(valor_total - valor_parcela * (n_parcelas - 1), 2)
+        is_avista = (pedido.condicao_pagamento == 'a_vista')
+        status_gcp = 'PAGO' if is_avista else 'PENDENTE'
+        desc_cp = f"Compra{(' NF ' + pedido.numero) if pedido.numero else ''} - {forn_nome}"
+        if n_parcelas > 1:
+            desc_cp += f" - Parcela {idx}/{n_parcelas}"
+
+        gcp = GestaoCustoPai(
+            admin_id=admin_id,
+            tipo_categoria='MATERIAL',
+            entidade_nome=entidade_nome,
+            entidade_id=entidade_id,
+            fornecedor_id=pedido.fornecedor_id,
+            valor_total=v,
+            valor_pago=v if is_avista else 0,
+            saldo=0 if is_avista else v,
+            status=status_gcp,
+            data_emissao=pedido.data_compra,
+            data_vencimento=data_venc,
+            data_pagamento=pedido.data_compra if is_avista else None,
+            numero_documento=pedido.numero,
+            numero_parcela=idx,
+            total_parcelas=n_parcelas,
+            observacoes=desc_cp[:300],
+        )
+        db.session.add(gcp)
+        db.session.flush()
+
+        gcf = GestaoCustoFilho(
+            pai_id=gcp.id,
+            admin_id=admin_id,
+            data_referencia=pedido.data_compra,
+            descricao=desc_cp[:300],
+            valor=v,
+            obra_id=pedido.obra_id,
+            origem_tabela='pedido_compra',
+            origem_id=pedido.id,
+        )
+        db.session.add(gcf)
+
+    # Entrada automática no almoxarifado (ENTRADA + lote)
+    movs_entrada = _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id)
+
+    logger.info(
+        f"[compra normal] pedido={pedido.id} parcelas={n_parcelas} "
+        f"entradas_almox={len(movs_entrada)}"
+    )
+
+
+def processar_compra_aprovada_cliente(pedido, usuario_id):
+    """Processa compra tipo='aprovacao_cliente' APÓS aprovação do cliente.
+
+    Cria:
+      - UM GestaoCustoPai com tipo_categoria='FATURAMENTO_DIRETO', status='PAGO'
+        (NÃO gera FluxoCaixa — o dinheiro do cliente vai direto ao fornecedor)
+      - UM GestaoCustoFilho vinculado à obra
+      - ENTRADA no almoxarifado para itens de catálogo
+      - SAÍDA imediata contra a obra (consumo reconhecido no centro de custo)
+
+    Idempotente: se `pedido.processada_apos_aprovacao` já é True, retorna
+    imediatamente sem fazer nada.
+
+    NÃO commita — o chamador cuida do commit/rollback.
+    Levanta exceção em caso de erro (chamador faz rollback).
+    """
+    from decimal import Decimal
+    from datetime import datetime as _dt
+
+    if pedido.processada_apos_aprovacao:
+        logger.info(f"[compra aprovada cliente] pedido={pedido.id} já processado, noop")
+        return
+
+    if pedido.tipo_compra != 'aprovacao_cliente':
+        raise ValueError(
+            f"processar_compra_aprovada_cliente chamado com pedido tipo_compra="
+            f"{pedido.tipo_compra} (esperado 'aprovacao_cliente')"
+        )
+
+    admin_id = pedido.admin_id
+    fornecedor = Fornecedor.query.get(pedido.fornecedor_id)
+    obra = Obra.query.get(pedido.obra_id) if pedido.obra_id else None
+    forn_nome = fornecedor.nome if fornecedor else 'Fornecedor'
+    entidade_nome = obra.nome if obra else 'Sem obra'
+
+    desc_cp = (
+        f"Faturamento direto cliente"
+        f"{(' NF ' + pedido.numero) if pedido.numero else ''} — {forn_nome}"
+    )
+
+    # 1) GestaoCustoPai FATURAMENTO_DIRETO (status=PAGO, não gera FluxoCaixa)
+    gcp = GestaoCustoPai(
+        admin_id=admin_id,
+        tipo_categoria='FATURAMENTO_DIRETO',
+        entidade_nome=entidade_nome,
+        entidade_id=pedido.obra_id,
+        fornecedor_id=pedido.fornecedor_id,
+        valor_total=pedido.valor_total,
+        valor_pago=pedido.valor_total,
+        saldo=0,
+        status='PAGO',
+        data_emissao=pedido.data_compra,
+        data_vencimento=pedido.data_compra,
+        data_pagamento=pedido.data_compra,
+        numero_documento=pedido.numero,
+        numero_parcela=1,
+        total_parcelas=1,
+        observacoes=desc_cp[:300],
+    )
+    db.session.add(gcp)
+    db.session.flush()
+
+    gcf = GestaoCustoFilho(
+        pai_id=gcp.id,
+        admin_id=admin_id,
+        data_referencia=pedido.data_compra,
+        descricao=desc_cp[:300],
+        valor=pedido.valor_total,
+        obra_id=pedido.obra_id,
+        origem_tabela='pedido_compra',
+        origem_id=pedido.id,
+    )
+    db.session.add(gcf)
+
+    # 2) Reconstituir itens_validos a partir dos PedidoCompraItem para gerar movimentos
+    itens_pedido = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()
+    itens_validos = [
+        (i.descricao, float(i.quantidade), float(i.preco_unitario),
+         i.almoxarifado_item_id, float(i.subtotal))
+        for i in itens_pedido
+    ]
+    movs_entrada = _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id)
+
+    # 3) SAÍDA imediata contra a obra (reconhecendo consumo)
+    lote_ref = pedido.numero or f"PC-{pedido.id}"
+    saidas = 0
+    for mov_in, estq in movs_entrada:
+        # Marcar estoque como CONSUMIDO e zerar quantidade_disponivel
+        estq.quantidade_disponivel = 0
+        estq.status = 'CONSUMIDO'
+        estq.updated_at = _dt.utcnow()
+
+        mov_out = AlmoxarifadoMovimento(
+            item_id=mov_in.item_id,
+            tipo_movimento='SAIDA',
+            quantidade=mov_in.quantidade,
+            valor_unitario=mov_in.valor_unitario,
+            funcionario_id=None,
+            obra_id=pedido.obra_id,
+            observacao=f"Consumo faturamento direto — compra {lote_ref}",
+            estoque_id=estq.id,
+            lote=estq.lote,
+            admin_id=admin_id,
+            usuario_id=usuario_id,
+            pedido_compra_id=pedido.id,
+        )
+        db.session.add(mov_out)
+        saidas += 1
+
+    pedido.processada_apos_aprovacao = True
+    db.session.flush()
+
+    logger.info(
+        f"[compra aprovada cliente] pedido={pedido.id} GCP#{gcp.id} FATURAMENTO_DIRETO "
+        f"criado; entradas={len(movs_entrada)} saidas={saidas}"
+    )
+
+
 def _vencimentos(data_compra, condicao, parcelas):
     """Gera lista de (data_vencimento, valor_parcela) para ContaPagar."""
     if not isinstance(data_compra, date):
@@ -107,6 +375,51 @@ def index():
 
 
 # ─────────────────────────────────────────────
+# APROVAÇÃO DO CLIENTE — lista de compras aguardando
+# ─────────────────────────────────────────────
+@compras_bp.route('/aprovacao')
+@login_required
+def aprovacao():
+    """Lista compras do tipo 'aprovacao_cliente' agrupadas por status:
+       - PENDENTE  : aguardando cliente aprovar no portal
+       - APROVADO  : cliente aprovou (já processadas)
+       - RECUSADO  : cliente recusou
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    base = (
+        PedidoCompra.query
+        .filter_by(admin_id=admin_id, tipo_compra='aprovacao_cliente')
+        .order_by(PedidoCompra.created_at.desc())
+    )
+
+    pendentes = base.filter(
+        db.or_(
+            PedidoCompra.status_aprovacao_cliente == 'PENDENTE',
+            PedidoCompra.status_aprovacao_cliente.is_(None),
+        )
+    ).all()
+    aprovadas = base.filter(PedidoCompra.status_aprovacao_cliente == 'APROVADO').all()
+    recusadas = base.filter(PedidoCompra.status_aprovacao_cliente == 'RECUSADO').all()
+
+    total_pendente = sum(float(p.valor_total) for p in pendentes)
+    total_aprovada = sum(float(p.valor_total) for p in aprovadas)
+
+    return render_template(
+        'compras/aprovacao.html',
+        pendentes=pendentes,
+        aprovadas=aprovadas,
+        recusadas=recusadas,
+        total_pendente=total_pendente,
+        total_aprovada=total_aprovada,
+        CONDICOES=CONDICOES,
+    )
+
+
+# ─────────────────────────────────────────────
 # NOVA COMPRA — GET
 # ─────────────────────────────────────────────
 @compras_bp.route('/nova', methods=['GET'])
@@ -158,6 +471,19 @@ def nova_post():
         if obra_id:
             obra_id = int(obra_id)
 
+        # Tipo de compra: 'normal' (default) ou 'aprovacao_cliente'
+        tipo_compra = request.form.get('tipo_compra', 'normal').strip()
+        if tipo_compra not in ('normal', 'aprovacao_cliente'):
+            tipo_compra = 'normal'
+
+        # Reembolso é incompatível com aprovação_cliente (o dinheiro vem do cliente,
+        # ninguém está pagando do bolso)
+        is_reembolso = request.form.get('is_reembolso') == 'true'
+        if tipo_compra == 'aprovacao_cliente' and is_reembolso:
+            flash('Compras com aprovação do cliente não podem ter reembolso. '
+                  'Desmarque a opção de reembolso ou escolha tipo "Normal".', 'danger')
+            return redirect(url_for('compras.nova'))
+
         # Itens da compra
         descricoes = request.form.getlist('item_descricao[]')
         quantidades = request.form.getlist('item_quantidade[]')
@@ -196,6 +522,9 @@ def nova_post():
         valor_total = round(valor_total, 2)
 
         # --- Pedido principal ---
+        # Para tipo 'aprovacao_cliente', começa com status_aprovacao_cliente='PENDENTE'
+        # e processada_apos_aprovacao=False; nenhuma GestaoCustoPai/movimento é criado
+        # até o cliente aprovar no portal.
         pedido = PedidoCompra(
             numero=numero,
             fornecedor_id=fornecedor_id,
@@ -206,6 +535,9 @@ def nova_post():
             valor_total=valor_total,
             observacoes=observacoes,
             anexo_url=anexo_url,
+            tipo_compra=tipo_compra,
+            processada_apos_aprovacao=False,
+            status_aprovacao_cliente='PENDENTE' if tipo_compra == 'aprovacao_cliente' else None,
             admin_id=admin_id,
         )
         db.session.add(pedido)
@@ -223,142 +555,56 @@ def nova_post():
                 admin_id=admin_id,
             )
             db.session.add(item)
+        db.session.flush()
 
-        # --- Gestão de Custos (substitui ContaPagar) ---
-        # NOTA: CustoObra NÃO é criado aqui. O GestaoCustoPai abaixo é a fonte única
-        # de custo de material. entidade_nome = nome da obra (identificador principal).
-        # O fornecedor fica registrado em fornecedor_id e nas observações.
-        fornecedor = Fornecedor.query.get(fornecedor_id)
-        obra = Obra.query.get(obra_id) if obra_id else None
-        vencimentos = _vencimentos(data_compra, condicao, parcelas)
-        n_parcelas = len(vencimentos)
-        valor_parcela = round(valor_total / n_parcelas, 2)
-        forn_nome = fornecedor.nome if fornecedor else 'Fornecedor'
-        obra_nome = obra.nome if obra else 'Sem obra'
-        entidade_nome = obra_nome
-        entidade_id = obra_id
+        # --- Bifurca por tipo_compra ---
+        if tipo_compra == 'normal':
+            processar_compra_normal(pedido, itens_validos, admin_id, current_user.id)
+            db.session.commit()
 
-        for idx, (data_venc, _) in enumerate(vencimentos, start=1):
-            v = valor_parcela if idx < n_parcelas else round(valor_total - valor_parcela * (n_parcelas - 1), 2)
-            is_avista = (condicao == 'a_vista')
-            status_gcp = 'PAGO' if is_avista else 'PENDENTE'
-            desc_cp = f"Compra{(' NF ' + numero) if numero else ''} - {forn_nome}"
-            if n_parcelas > 1:
-                desc_cp += f" - Parcela {idx}/{n_parcelas}"
+            # Lançamento contábil automático V2 (só faz sentido p/ normal)
+            try:
+                from contabilidade_utils import gerar_lancamento_contabil_automatico
+                forn = Fornecedor.query.get(fornecedor_id)
+                gerar_lancamento_contabil_automatico(
+                    admin_id=admin_id,
+                    tipo_operacao='compra_material',
+                    valor=float(valor_total),
+                    data=data_compra,
+                    descricao=f"Compra{(' NF ' + numero) if numero else ''} - {forn.nome if forn else 'Fornecedor'}",
+                )
+            except Exception as _e:
+                logger.warning(f"[WARN] Lancamento contabil compra nao gerado: {_e}")
 
-            gcp = GestaoCustoPai(
-                admin_id=admin_id,
-                tipo_categoria='MATERIAL',
-                entidade_nome=entidade_nome,
-                entidade_id=entidade_id,
-                fornecedor_id=fornecedor_id,
-                valor_total=v,
-                valor_pago=v if is_avista else 0,
-                saldo=0 if is_avista else v,
-                status=status_gcp,
-                data_emissao=data_compra,
-                data_vencimento=data_venc,
-                data_pagamento=data_compra if is_avista else None,
-                numero_documento=numero,
-                numero_parcela=idx,
-                total_parcelas=n_parcelas,
-                observacoes=desc_cp[:300],
-            )
-            db.session.add(gcp)
-            db.session.flush()
+            # Reembolso a Funcionários V2 (só em compras normais)
+            try:
+                from utils.financeiro_integration import processar_reembolsos_form
+                n_reimb = processar_reembolsos_form(
+                    request_form=request.form,
+                    admin_id=admin_id,
+                    data_despesa=data_compra,
+                    descricao_origem=f"Compra{(' NF ' + numero) if numero else ''}",
+                    obra_id=obra_id,
+                    centro_custo_id=None,
+                    origem_tabela='pedido_compra',
+                    origem_id=pedido.id,
+                )
+                if n_reimb:
+                    db.session.commit()
+                    logger.info(f"[OK] {n_reimb} reembolso(s) registrado(s) na compra {pedido.id}")
+            except Exception as _re:
+                logger.warning(f"[WARN] Reembolso compra nao processado: {_re}")
 
-            gcf = GestaoCustoFilho(
-                pai_id=gcp.id,
-                admin_id=admin_id,
-                data_referencia=data_compra,
-                descricao=desc_cp[:300],
-                valor=v,
-                obra_id=obra_id,
-                origem_tabela='pedido_compra',
-                origem_id=pedido.id,
-            )
-            db.session.add(gcf)
+            flash('Compra registrada com sucesso! Custo, contas a pagar e entrada no almoxarifado geradas.', 'success')
 
-        logger.info(f"[OK] {n_parcelas} GestaoCustoPai MATERIAL criado(s) para pedido_id={pedido.id}")
+        else:  # tipo_compra == 'aprovacao_cliente'
+            # Apenas persiste o pedido + itens. Custos e movimentos só serão criados
+            # quando o cliente aprovar no portal (em portal_obras_views.aprovar_compra).
+            db.session.commit()
+            flash('Compra registrada e enviada para aprovação do cliente. '
+                  'Nenhum custo ou movimento de estoque foi criado ainda — isso acontecerá '
+                  'automaticamente quando o cliente aprovar no portal.', 'info')
 
-        # --- Entrada automática no almoxarifado (mesma transação) ---
-        # Atômico com o pedido: custo reconhecido na compra → estoque imediatamente disponível.
-        # pedido_compra_id previne duplicação no handler material_entrada do EventManager.
-        itens_catalogo = [(desc, qtd, preco, almox_id, subtotal)
-                          for desc, qtd, preco, almox_id, subtotal in itens_validos
-                          if almox_id]
-        lote_ref = numero or f"PC-{pedido.id}"
-        for desc_item, qtd_item, preco_item, almox_id, _ in itens_catalogo:
-            mov = AlmoxarifadoMovimento(
-                item_id=almox_id,
-                tipo_movimento='ENTRADA',
-                quantidade=qtd_item,
-                valor_unitario=preco_item,
-                nota_fiscal=numero,
-                observacao=f"Entrada automática compra {lote_ref}: {desc_item[:100]}",
-                estoque_id=None,
-                fornecedor_id=fornecedor_id,
-                admin_id=admin_id,
-                usuario_id=current_user.id,
-                obra_id=obra_id,
-                pedido_compra_id=pedido.id,
-            )
-            db.session.add(mov)
-            db.session.flush()
-            estq = AlmoxarifadoEstoque(
-                item_id=almox_id,
-                quantidade=qtd_item,
-                quantidade_inicial=qtd_item,
-                quantidade_disponivel=qtd_item,
-                entrada_movimento_id=mov.id,
-                valor_unitario=preco_item,
-                status='DISPONIVEL',
-                lote=lote_ref,
-                obra_id=obra_id,
-                admin_id=admin_id,
-            )
-            db.session.add(estq)
-            db.session.flush()
-            mov.estoque_id = estq.id
-
-        db.session.commit()
-        if itens_catalogo:
-            logger.info(f"[OK] {len(itens_catalogo)} entrada(s) automática(s) no almoxarifado para pedido {pedido.id}")
-
-        # Lançamento contábil automático V2
-        try:
-            from contabilidade_utils import gerar_lancamento_contabil_automatico
-            forn = Fornecedor.query.get(fornecedor_id)
-            gerar_lancamento_contabil_automatico(
-                admin_id=admin_id,
-                tipo_operacao='compra_material',
-                valor=float(valor_total),
-                data=data_compra,
-                descricao=f"Compra{(' NF ' + numero) if numero else ''} - {forn.nome if forn else 'Fornecedor'}",
-            )
-        except Exception as _e:
-            logger.warning(f"[WARN] Lancamento contabil compra nao gerado: {_e}")
-
-        # Reembolso a Funcionários V2
-        try:
-            from utils.financeiro_integration import processar_reembolsos_form
-            n_reimb = processar_reembolsos_form(
-                request_form=request.form,
-                admin_id=admin_id,
-                data_despesa=data_compra,
-                descricao_origem=f"Compra{(' NF ' + numero) if numero else ''}",
-                obra_id=obra_id,
-                centro_custo_id=centro_custo_id,
-                origem_tabela='pedido_compra',
-                origem_id=pedido.id,
-            )
-            if n_reimb:
-                db.session.commit()
-                logger.info(f"[OK] {n_reimb} reembolso(s) registrado(s) na compra {pedido.id}")
-        except Exception as _re:
-            logger.warning(f"[WARN] Reembolso compra nao processado: {_re}")
-
-        flash(f'Compra registrada com sucesso! {n_parcelas} registro(s) de custo gerado(s) na Gestão de Custos.', 'success')
         return redirect(url_for('compras.index'))
 
     except Exception as e:

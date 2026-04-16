@@ -888,6 +888,28 @@
                             </ul>
                         </li>
                         
+                        <!-- Compras V2 (menu próprio) -->
+                        {% if is_v2_active() %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="comprasDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-shopping-cart me-1"></i> Compras
+                                <span class="badge bg-success ms-1" style="font-size:.6rem">V2</span>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('compras.index') }}">
+                                    <i class="fas fa-list me-1"></i> Todas as Compras
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('compras.nova') }}">
+                                    <i class="fas fa-plus-circle me-1 text-success"></i> Nova Compra
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('compras.aprovacao') }}">
+                                    <i class="fas fa-user-check me-1 text-warning"></i> Aprovação do Cliente
+                                </a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+
                         <!-- Almoxarifado v3.0 -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="almoxarifadoDropdown" role="button" data-bs-toggle="dropdown">
@@ -903,12 +925,6 @@
                                 <li><a class="dropdown-item" href="{{ url_for('almoxarifado.categorias') }}">
                                     <i class="fas fa-tags me-1"></i> Categorias
                                 </a></li>
-                                {% if is_v2_active() %}
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('compras.index') }}">
-                                    <i class="fas fa-shopping-cart me-1 text-primary"></i> Gestão de Compras
-                                </a></li>
-                                {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('almoxarifado.entrada') }}">
                                     <i class="fas fa-plus-circle me-1 text-success"></i> Nova Entrada

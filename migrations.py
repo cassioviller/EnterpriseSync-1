@@ -3815,6 +3815,7 @@ def executar_migracoes():
             (113, "TarefaCronograma — data_entrega_real DATE para entregas/terceiros", migration_113_tarefa_cronograma_data_entrega_real),
             (114, "Subempreiteiro + RDOSubempreitadaApontamento + GestaoCustoPai.subempreiteiro_id", migration_114_subempreiteiro),
             (115, "Consolidar GestaoCustoPai duplicados por (admin_id, entidade_id, categoria normalizada)", migration_115_consolidar_gestao_custo_pai_duplicados),
+            (116, "PedidoCompra — tipo_compra (normal/aprovacao_cliente) + processada_apos_aprovacao", migration_116_pedido_compra_tipo_compra),
         ]
         
         # Executar cada migração com rastreamento
@@ -9318,6 +9319,68 @@ def migration_115_consolidar_gestao_custo_pai_duplicados():
 
     except Exception as e:
         logger.error(f"Erro na migracao 115: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+# ============================================================================
+# Migration 116 — PedidoCompra.tipo_compra + processada_apos_aprovacao (Task #65)
+# ============================================================================
+def migration_116_pedido_compra_tipo_compra():
+    """
+    Migration 116: Adiciona duas colunas em pedido_compra para suportar dois
+    fluxos distintos de compra:
+
+      tipo_compra VARCHAR(30) NOT NULL DEFAULT 'normal'
+        → 'normal'            : fluxo interno tradicional (gera GestaoCustoPai MATERIAL
+                                 + ContaPagar implícita via GCP + entrada no almoxarifado)
+        → 'aprovacao_cliente' : só processa após aprovação do cliente no portal;
+                                 gera GestaoCustoPai FATURAMENTO_DIRETO (sem FluxoCaixa)
+                                 + entrada + saída imediata no almoxarifado.
+
+      processada_apos_aprovacao BOOLEAN NOT NULL DEFAULT FALSE
+        → flag de idempotência: impede que o helper rode mais de uma vez no
+          mesmo pedido mesmo que o cliente clique "aprovar" várias vezes.
+
+    Idempotente — usa ADD COLUMN IF NOT EXISTS.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            ALTER TABLE pedido_compra
+                ADD COLUMN IF NOT EXISTS tipo_compra VARCHAR(30) NOT NULL DEFAULT 'normal'
+        """)
+        cursor.execute("""
+            ALTER TABLE pedido_compra
+                ADD COLUMN IF NOT EXISTS processada_apos_aprovacao BOOLEAN NOT NULL DEFAULT FALSE
+        """)
+
+        # Garantir que registros existentes tenham tipo_compra='normal' (já que eles
+        # foram criados no fluxo antigo). NOT NULL + DEFAULT já cuidou disto, mas
+        # reforçamos para o caso de a coluna ter sido criada NULL antes.
+        cursor.execute("""
+            UPDATE pedido_compra SET tipo_compra = 'normal'
+             WHERE tipo_compra IS NULL
+        """)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 116 CONCLUIDA: pedido_compra.tipo_compra e processada_apos_aprovacao criados")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 116: {e}")
         import traceback
         logger.error(traceback.format_exc())
         if connection:
