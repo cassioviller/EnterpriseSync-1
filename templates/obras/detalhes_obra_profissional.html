@@ -1827,11 +1827,22 @@
                 </div>
             </div>
             <div class="obra-card-body" style="padding: 1rem 1rem 1.25rem;">
-                <p style="font-size:.85rem;color:#64748b;margin-bottom:.75rem;">
-                    Visualização do cronograma apresentado ao cliente no Portal. Para editar, acesse a página
-                    <a href="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}"
-                       style="text-decoration:underline;">do Cronograma do Cliente</a>.
-                </p>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2" style="margin-bottom:.75rem;">
+                    <p style="font-size:.85rem;color:#64748b;margin:0;flex:1;min-width:240px;">
+                        Visualização do cronograma apresentado ao cliente no Portal. Para alterar tarefas, edite o
+                        <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}" style="text-decoration:underline;">Cronograma da Obra</a>
+                        e depois regenere a versão do cliente.
+                    </p>
+                    <form method="POST"
+                          action="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}"
+                          onsubmit="return confirm('Regenerar o Cronograma do Cliente a partir das tarefas internas? Isso substitui o conteúdo atual.');"
+                          style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-sync-alt me-1"></i> Regenerar do cronograma interno
+                        </button>
+                    </form>
+                </div>
 
                 <div class="cliente-cron-split" id="clienteCronSplit">
                     <div class="cliente-cron-left" id="clienteCronLeft">
