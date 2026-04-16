@@ -395,27 +395,15 @@ def novo_rdo():
         # Adicionar data atual para o template
         data_hoje = date.today().strftime('%Y-%m-%d')
 
-        # Tarefas terceiros pendentes (entregas a confirmar) para a obra selecionada
-        tarefas_terceiros = []
+        # Alertas de entregas / terceiros para a obra selecionada
+        entregas_alertas = []
         if obra_id:
             try:
-                from models import TarefaCronograma as _TC
-                from sqlalchemy import exists as _exists, and_ as _and, not_ as _not
-                TarefaFilhaT = db.aliased(_TC)
-                subq_tem_filha_t = _exists().where(_and(
-                    TarefaFilhaT.tarefa_pai_id == _TC.id,
-                    TarefaFilhaT.obra_id == obra_id,
-                ))
-                tarefas_terceiros = _TC.query.filter(
-                    _TC.obra_id == obra_id,
-                    _TC.responsavel == 'terceiros',
-                    _not(subq_tem_filha_t),
-                    _TC.data_entrega_real.is_(None),
-                    (_TC.percentual_concluido < 100),
-                ).order_by(_TC.data_fim.asc().nulls_last(), _TC.ordem.asc()).all()
+                from services.entregas_terceiros import calcular_alertas_terceiros
+                entregas_alertas = calcular_alertas_terceiros(obra_id)['detalhe']
             except Exception as _e:
-                logger.error(f"Erro carregando tarefas terceiros (novo_rdo): {_e}")
-                tarefas_terceiros = []
+                logger.error(f"Erro carregando alertas terceiros (novo_rdo): {_e}")
+                entregas_alertas = []
 
         return render_template('rdo/novo.html', 
                              obras=obras,
@@ -424,7 +412,7 @@ def novo_rdo():
                              atividades_anteriores=atividades_anteriores,
                              data_hoje=data_hoje,
                              date=date,
-                             tarefas_terceiros=tarefas_terceiros)
+                             entregas_alertas=entregas_alertas)
         
     except Exception as e:
         logger.error(f"ERRO NOVO RDO: {str(e)}")
@@ -1429,11 +1417,22 @@ def editar_rdo(id):
         except Exception as e_v2:
             logger.warning(f"[WARN] Não foi possível carregar apontamentos V2 para editar_rdo: {e_v2}")
 
+        # Alertas de entregas/terceiros para a obra do RDO
+        entregas_alertas = []
+        try:
+            from services.entregas_terceiros import calcular_alertas_terceiros
+            entregas_alertas = calcular_alertas_terceiros(rdo.obra_id)['detalhe']
+        except Exception as _e:
+            logger.error(f"Erro carregando alertas terceiros (editar_rdo): {_e}")
+            entregas_alertas = []
+
         return render_template(
             'rdo/editar_rdo.html',
             rdo=rdo,
             obras=obras,
             apontamentos_cronograma=apontamentos_cronograma,
+            entregas_alertas=entregas_alertas,
+            date=date,
         )
 
     except Exception as e:
@@ -1720,27 +1719,14 @@ def rdo_novo_unificado():
         
         from utils.tenant import is_v2_active
 
-        # Tarefas terceiros pendentes (entregas a confirmar) para a obra selecionada
-        tarefas_terceiros = []
+        entregas_alertas = []
         if obra_selecionada:
             try:
-                from models import TarefaCronograma as _TC
-                from sqlalchemy import exists as _exists, and_ as _and, not_ as _not
-                TarefaFilhaT = db.aliased(_TC)
-                subq_tem_filha_t = _exists().where(_and(
-                    TarefaFilhaT.tarefa_pai_id == _TC.id,
-                    TarefaFilhaT.obra_id == obra_selecionada.id,
-                ))
-                tarefas_terceiros = _TC.query.filter(
-                    _TC.obra_id == obra_selecionada.id,
-                    _TC.responsavel == 'terceiros',
-                    _not(subq_tem_filha_t),
-                    _TC.data_entrega_real.is_(None),
-                    (_TC.percentual_concluido < 100),
-                ).order_by(_TC.data_fim.asc().nulls_last(), _TC.ordem.asc()).all()
+                from services.entregas_terceiros import calcular_alertas_terceiros
+                entregas_alertas = calcular_alertas_terceiros(obra_selecionada.id)['detalhe']
             except Exception as _e:
-                logger.error(f"Erro carregando tarefas terceiros: {_e}")
-                tarefas_terceiros = []
+                logger.error(f"Erro carregando alertas terceiros (rdo_novo_unificado): {_e}")
+                entregas_alertas = []
 
         return render_template(template, 
                              obras=obras, 
@@ -1749,7 +1735,7 @@ def rdo_novo_unificado():
                              data_hoje=data_hoje,
                              date=date,
                              is_v2_active=is_v2_active,
-                             tarefas_terceiros=tarefas_terceiros)
+                             entregas_alertas=entregas_alertas)
         
     except Exception as e:
         logger.error(f"ERRO RDO NOVO UNIFICADO: {str(e)}")
@@ -2598,25 +2584,8 @@ def rdo_salvar_unificado():
         
         # Processar entregas/terceiros marcadas como concluídas no RDO
         try:
-            from models import TarefaCronograma as _TC_E
-            entrega_ids_raw = request.form.getlist('entrega_tarefa_ids[]') or request.form.getlist('entrega_tarefa_ids')
-            _admin_id_ent = admin_id if 'admin_id' in dir() else (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None))
-            data_entrega_ref = rdo.data_relatorio if rdo.data_relatorio else date.today()
-            qtd_marcadas = 0
-            for raw_id in entrega_ids_raw:
-                try:
-                    tid = int(raw_id)
-                except (TypeError, ValueError):
-                    continue
-                t_ent = _TC_E.query.filter_by(id=tid).first()
-                if not t_ent or (t_ent.responsavel or '').lower() != 'terceiros':
-                    continue
-                if t_ent.obra_id != rdo.obra_id:
-                    continue
-                t_ent.percentual_concluido = 100.0
-                if not t_ent.data_entrega_real:
-                    t_ent.data_entrega_real = data_entrega_ref
-                qtd_marcadas += 1
+            from services.entregas_terceiros import aplicar_entregas_no_rdo
+            qtd_marcadas = aplicar_entregas_no_rdo(rdo, request.form, admin_id=getattr(rdo.obra, 'admin_id', None))
             if qtd_marcadas > 0:
                 logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) via rdo_salvar_unificado RDO {rdo.id}")
         except Exception as e_ent:
@@ -4010,28 +3979,12 @@ def salvar_rdo_flexivel():
 
             # Processar entregas/terceiros marcadas como concluídas no RDO
             try:
-                from models import TarefaCronograma as _TC_E
-                entrega_ids_raw = request.form.getlist('entrega_tarefa_ids[]') or request.form.getlist('entrega_tarefa_ids')
+                from services.entregas_terceiros import aplicar_entregas_no_rdo
                 _admin_id_ent = admin_id or (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None))
-                data_entrega_ref = rdo.data_relatorio if hasattr(rdo, 'data_relatorio') and rdo.data_relatorio else date.today()
-                qtd_marcadas = 0
-                for raw_id in entrega_ids_raw:
-                    try:
-                        tid = int(raw_id)
-                    except (TypeError, ValueError):
-                        continue
-                    t_ent = _TC_E.query.filter_by(id=tid, admin_id=_admin_id_ent).first()
-                    if not t_ent or (t_ent.responsavel or '').lower() != 'terceiros':
-                        continue
-                    if t_ent.obra_id != rdo.obra_id:
-                        continue
-                    t_ent.percentual_concluido = 100.0
-                    if not t_ent.data_entrega_real:
-                        t_ent.data_entrega_real = data_entrega_ref
-                    qtd_marcadas += 1
+                qtd_marcadas = aplicar_entregas_no_rdo(rdo, request.form, admin_id=_admin_id_ent)
                 if qtd_marcadas > 0:
                     db.session.commit()
-                    logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) como concluída(s) via RDO {rdo.id}")
+                    logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) via salvar_rdo_flexivel RDO {rdo.id}")
             except Exception as e_ent:
                 logger.error(f"Erro processando entregas terceiros no RDO: {e_ent}")
                 db.session.rollback()

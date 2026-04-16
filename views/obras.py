@@ -1617,9 +1617,10 @@ def detalhes_obra(id):
             'prazo': {'status': 'sem_dados', 'label': 'Sem cronograma', 'qtd': 0},
             'compras': {'status': 'sem_dados', 'label': 'Sem compras', 'qtd': 0},
             'medicao_pronta': {'status': 'sem_dados', 'label': 'Sem medição pendente', 'valor': 0.0, 'qtd': 0},
-            'entregas': {'status': 'sem_dados', 'label': 'Sem entregas/terceiros', 'qtd_atrasadas': 0, 'qtd_proximas': 0, 'qtd_pendentes': 0, 'qtd_total': 0},
+            'entregas': {'status': 'sem_dados', 'label': 'Sem entregas/terceiros', 'qtd_total': 0, 'qtd_atrasadas': 0, 'qtd_vence_hoje': 0, 'qtd_amanha': 0, 'qtd_pendentes': 0, 'qtd_entregues': 0},
         }
         entregas_detalhe = []
+        from services.entregas_terceiros import NIVEIS as ENTREGAS_NIVEIS
 
         try:
             # 1. Valor do contrato
@@ -1713,95 +1714,14 @@ def detalhes_obra(id):
             logger.error(f"Erro calculando indicador de compras: {e}")
             db.session.rollback()
 
-        # 7b. Indicador de ENTREGAS / TERCEIROS (tarefas-folha com responsavel='terceiros')
+        # 7b. Indicador de ENTREGAS / TERCEIROS (engine de alertas centralizada)
         try:
-            from models import TarefaCronograma as _TC
-            from datetime import timedelta as _td
-            hoje_e = _date.today()
-            limite_proximo = hoje_e + _td(days=7)
-
-            TarefaFilhaE = db.aliased(_TC)
-            subq_tem_filha_e = exists().where(
-                and_(
-                    TarefaFilhaE.tarefa_pai_id == _TC.id,
-                    TarefaFilhaE.obra_id == obra_id,
-                )
-            )
-
-            tarefas_terc = _TC.query.filter(
-                _TC.obra_id == obra_id,
-                _TC.responsavel == 'terceiros',
-                not_(subq_tem_filha_e),
-            ).order_by(_TC.data_fim.asc().nulls_last(), _TC.ordem.asc()).all()
-
-            qtd_total_terc = len(tarefas_terc)
-            qtd_pendentes = 0
-            qtd_atrasadas = 0
-            qtd_proximas = 0
-            qtd_entregues = 0
-
-            for t in tarefas_terc:
-                entregue = (t.data_entrega_real is not None) or (float(t.percentual_concluido or 0) >= 100)
-                status_e = 'entregue'
-                dias_e = None
-                if entregue:
-                    qtd_entregues += 1
-                else:
-                    qtd_pendentes += 1
-                    if t.data_fim:
-                        dias_e = (t.data_fim - hoje_e).days
-                        if t.data_fim < hoje_e:
-                            status_e = 'atrasada'
-                            qtd_atrasadas += 1
-                        elif t.data_fim <= limite_proximo:
-                            status_e = 'proxima'
-                            qtd_proximas += 1
-                        else:
-                            status_e = 'em_prazo'
-                    else:
-                        status_e = 'sem_prazo'
-
-                entregas_detalhe.append({
-                    'id': t.id,
-                    'nome': t.nome_tarefa,
-                    'data_fim': t.data_fim,
-                    'data_entrega_real': t.data_entrega_real,
-                    'percentual': float(t.percentual_concluido or 0),
-                    'entregue': entregue,
-                    'status': status_e,
-                    'dias_para_prazo': dias_e,
-                })
-
-            if qtd_total_terc == 0:
-                painel['entregas'] = {
-                    'status': 'sem_dados',
-                    'label': 'Sem entregas/terceiros',
-                    'qtd_atrasadas': 0, 'qtd_proximas': 0,
-                    'qtd_pendentes': 0, 'qtd_total': 0,
-                }
-            elif qtd_atrasadas > 0:
-                painel['entregas'] = {
-                    'status': 'vermelho',
-                    'label': f'{qtd_atrasadas} entrega(s) atrasada(s)',
-                    'qtd_atrasadas': qtd_atrasadas, 'qtd_proximas': qtd_proximas,
-                    'qtd_pendentes': qtd_pendentes, 'qtd_total': qtd_total_terc,
-                }
-            elif qtd_proximas > 0:
-                painel['entregas'] = {
-                    'status': 'amarelo',
-                    'label': f'{qtd_proximas} entrega(s) próxima(s) (7 dias)',
-                    'qtd_atrasadas': 0, 'qtd_proximas': qtd_proximas,
-                    'qtd_pendentes': qtd_pendentes, 'qtd_total': qtd_total_terc,
-                }
-            else:
-                painel['entregas'] = {
-                    'status': 'verde',
-                    'label': f'{qtd_entregues}/{qtd_total_terc} entregue(s) — sem atraso',
-                    'qtd_atrasadas': 0, 'qtd_proximas': 0,
-                    'qtd_pendentes': qtd_pendentes, 'qtd_total': qtd_total_terc,
-                }
+            from services.entregas_terceiros import calcular_alertas_terceiros
+            _ent = calcular_alertas_terceiros(obra_id)
+            entregas_detalhe = _ent['detalhe']
+            painel['entregas'] = _ent['painel']
         except Exception as e:
-            logger.error(f"Erro calculando indicador de entregas/terceiros: {e}")
+            logger.error(f"Erro calculando alertas de entregas/terceiros: {e}")
             db.session.rollback()
 
         # 7. Indicador de MEDIÇÃO PRONTA para faturamento

@@ -387,7 +387,16 @@ def salvar_edicao_rdo(rdo_id):
                 continue
         
         logger.info(f"👥 Total de {funcionarios_salvos} funcionários salvos na edição")
-        
+
+        # Processar entregas / terceiros marcadas como concluidas no RDO
+        try:
+            from services.entregas_terceiros import aplicar_entregas_no_rdo
+            qtd_ent = aplicar_entregas_no_rdo(rdo, request.form, admin_id=getattr(rdo.obra, 'admin_id', None))
+            if qtd_ent > 0:
+                logger.info(f"✅ {qtd_ent} entrega(s) terceiros marcada(s) via salvar_edicao_rdo RDO {rdo.id}")
+        except Exception as e_ent:
+            logger.error(f"Erro processando entregas terceiros (edicao): {e_ent}")
+
         # Confirmar salvamento
         db.session.commit()
         

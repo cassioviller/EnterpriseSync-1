@@ -411,6 +411,64 @@
                 </div>
             </div>
 
+            <!-- ===== SEÇÃO DE ENTREGAS / TERCEIROS ===== -->
+            {% if entregas_alertas and entregas_alertas|length > 0 %}
+            {% set nivel_color_e = {
+                'verde':    {'bg': '#dcfce7', 'border': '#22c55e', 'text': '#166534', 'icon': 'fa-check-circle'},
+                'azul':     {'bg': '#dbeafe', 'border': '#3b82f6', 'text': '#1e40af', 'icon': 'fa-info-circle'},
+                'cinza':    {'bg': '#f1f5f9', 'border': '#94a3b8', 'text': '#475569', 'icon': 'fa-minus-circle'},
+                'amarelo':  {'bg': '#fef3c7', 'border': '#f59e0b', 'text': '#92400e', 'icon': 'fa-exclamation-circle'},
+                'laranja':  {'bg': '#ffedd5', 'border': '#f97316', 'text': '#9a3412', 'icon': 'fa-fire'},
+                'vermelho': {'bg': '#fee2e2', 'border': '#ef4444', 'text': '#991b1b', 'icon': 'fa-exclamation-triangle'}
+            } %}
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header">
+                    <h3>
+                        <i class="fas fa-truck-loading"></i>
+                        Entregas / Terceiros
+                    </h3>
+                    <span class="badge bg-info">{{ entregas_alertas|selectattr('entregue', 'equalto', false)|list|length }} pendente(s)</span>
+                </div>
+                <div class="rdo-card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle"></i>
+                        Marque as entregas / subempreitadas de terceiros confirmadas nesta data.
+                        O cronograma e os alertas do Painel Estratégico serão atualizados automaticamente.
+                    </p>
+                    <div class="list-group">
+                        {% for ent in entregas_alertas %}
+                        {% if not ent.entregue %}
+                        {% set sn = nivel_color_e[ent.nivel] %}
+                        <label class="list-group-item" style="cursor: pointer; border-left: 5px solid {{ sn.border }}; padding: 0.85rem 1rem;">
+                            <div class="d-flex align-items-start" style="gap: 0.85rem;">
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       name="entrega_tarefa_ids[]"
+                                       value="{{ ent.id }}"
+                                       form="formEditarRDO"
+                                       style="margin-top: 6px; transform: scale(1.3);">
+                                <i class="fas {{ sn.icon }}" style="color: {{ sn.border }}; font-size: 1.3rem; margin-top: 2px;"></i>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div class="d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+                                        <span style="font-weight: 700; color: #1e293b;">{{ ent.nome }}</span>
+                                        <span style="background: {{ sn.bg }}; color: {{ sn.text }}; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">{{ ent.nivel }}</span>
+                                    </div>
+                                    <div style="color: {{ sn.text }}; font-weight: 600; font-size: 0.88rem; margin-top: 3px;">{{ ent.mensagem }}</div>
+                                    <div class="small text-muted mt-1 d-flex flex-wrap" style="gap: 0.85rem;">
+                                        {% if ent.data_inicio %}<span><i class="fas fa-play-circle"></i> Início: {{ ent.data_inicio.strftime('%d/%m/%Y') }}</span>{% endif %}
+                                        {% if ent.data_fim %}<span><i class="fas fa-flag-checkered"></i> Prazo: {{ ent.data_fim.strftime('%d/%m/%Y') }}</span>{% endif %}
+                                        <span><i class="fas fa-percentage"></i> {{ '%.0f'|format(ent.percentual) }}% executado</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Seção de Observações Finais -->
             <div class="rdo-card slide-in">
                 <div class="rdo-card-header">
