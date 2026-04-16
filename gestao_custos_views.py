@@ -333,21 +333,170 @@ def filhos(pai_id):
             for oid, total in sorted(_totais_obra.items(), key=lambda x: _nome_obra[x[0]])
         ]
 
+    pode_editar = pai.status not in ('PAGO', 'RECUSADO')
+
     return jsonify({
         'status': 'ok',
+        'pai_status': pai.status,
+        'pode_editar': pode_editar,
         'obras_resumo': obras_resumo,
         'itens': [
             {
                 'id': f.id,
                 'data': f.data_referencia.strftime('%d/%m/%Y'),
+                'data_iso': f.data_referencia.strftime('%Y-%m-%d'),
                 'descricao': f.descricao,
                 'valor': float(f.valor),
                 'obra': f.obra.nome if f.obra else '—',
+                'obra_id': f.obra_id,
                 'origem': f.origem_tabela or '—',
+                'pode_editar': pode_editar,
             }
             for f in itens
         ],
     })
+
+
+# ───────────────────────────────────────────────────────────────
+# CRUD POR LINHA (FILHO) — editar / excluir individualmente
+# ───────────────────────────────────────────────────────────────
+
+def _recalcular_total_pai(pai):
+    """Recalcula valor_total + saldo do pai a partir dos filhos atuais."""
+    total = (db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
+             .filter_by(pai_id=pai.id).scalar()) or Decimal('0.00')
+    pai.valor_total = Decimal(str(total))
+    pai.saldo = pai.valor_total - Decimal(str(pai.valor_pago or 0))
+
+
+@gestao_custos_bp.route('/filho/<int:filho_id>/editar', methods=['POST'])
+@login_required
+def editar_filho(filho_id):
+    """Edita uma linha (filho) individualmente: data, descrição, valor, obra.
+    Bloqueado quando pai está em status PAGO ou RECUSADO."""
+    admin_id, err = _check_v2()
+    if err:
+        return jsonify({'status': 'error', 'message': 'V2 only'}), 403
+
+    filho = GestaoCustoFilho.query.filter_by(id=filho_id, admin_id=admin_id).first()
+    if not filho:
+        return jsonify({'status': 'error', 'message': 'Linha não encontrada'}), 404
+
+    pai = GestaoCustoPai.query.get(filho.pai_id)
+    if not pai or pai.admin_id != admin_id:
+        return jsonify({'status': 'error', 'message': 'Pai inválido'}), 404
+
+    if pai.status in ('PAGO', 'RECUSADO'):
+        return jsonify({
+            'status': 'error',
+            'message': f'Não é possível editar: registro está {pai.status}.'
+        }), 400
+
+    try:
+        data_str = (request.form.get('data_referencia') or '').strip()
+        if data_str:
+            filho.data_referencia = datetime.strptime(data_str, '%Y-%m-%d').date()
+
+        descricao = (request.form.get('descricao') or '').strip()
+        if descricao:
+            filho.descricao = descricao[:300]
+
+        valor_str = (request.form.get('valor') or '').replace(',', '.').strip()
+        if valor_str:
+            valor = Decimal(valor_str)
+            if valor <= 0:
+                return jsonify({'status': 'error', 'message': 'Valor deve ser maior que zero.'}), 400
+            filho.valor = valor
+
+        obra_id_raw = request.form.get('obra_id', '').strip()
+        if obra_id_raw == '':
+            filho.obra_id = None
+        else:
+            try:
+                filho.obra_id = int(obra_id_raw)
+            except ValueError:
+                pass
+
+        _recalcular_total_pai(pai)
+        db.session.commit()
+
+        return jsonify({
+            'status': 'ok',
+            'message': 'Linha atualizada com sucesso.',
+            'pai_valor_total': float(pai.valor_total),
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] editar_filho {filho_id}: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@gestao_custos_bp.route('/filho/<int:filho_id>/excluir', methods=['POST'])
+@login_required
+def excluir_filho(filho_id):
+    """Exclui uma linha (filho) individualmente.
+
+    Cascata:
+      • Remove o registro de origem (RegistroPonto, RDOMaoObra, etc.) quando aplicável.
+      • Recalcula valor_total do pai.
+      • Se for o último filho, exclui também o pai e o FluxoCaixa vinculado.
+    Bloqueado quando pai está em PAGO/RECUSADO.
+    """
+    admin_id, err = _check_v2()
+    if err:
+        return jsonify({'status': 'error', 'message': 'V2 only'}), 403
+
+    filho = GestaoCustoFilho.query.filter_by(id=filho_id, admin_id=admin_id).first()
+    if not filho:
+        return jsonify({'status': 'error', 'message': 'Linha não encontrada'}), 404
+
+    pai = GestaoCustoPai.query.get(filho.pai_id)
+    if not pai or pai.admin_id != admin_id:
+        return jsonify({'status': 'error', 'message': 'Pai inválido'}), 404
+
+    if pai.status in ('PAGO', 'RECUSADO'):
+        return jsonify({
+            'status': 'error',
+            'message': f'Não é possível excluir: registro está {pai.status}.'
+        }), 400
+
+    try:
+        # 1. Cascata para a origem (apaga o registro fonte se houver)
+        _excluir_origem_de_filho(filho, admin_id)
+
+        pai_id = pai.id
+        # 2. Apaga o filho
+        db.session.delete(filho)
+        db.session.flush()
+
+        # 3. Verifica se sobraram filhos
+        restantes = GestaoCustoFilho.query.filter_by(pai_id=pai_id).count()
+
+        pai_excluido = False
+        if restantes == 0:
+            # Limpa FK circular antes de deletar o FluxoCaixa
+            fc_ids = _coletar_ids_fluxo_caixa(pai, admin_id)
+            pai.fluxo_caixa_id = None
+            db.session.flush()
+            _deletar_fluxo_caixa_por_ids(fc_ids, admin_id)
+            db.session.delete(pai)
+            pai_excluido = True
+            logger.info(f"[OK] Pai {pai_id} excluído automaticamente (último filho removido)")
+        else:
+            _recalcular_total_pai(pai)
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'ok',
+            'message': 'Linha excluída com sucesso.',
+            'pai_excluido': pai_excluido,
+            'filhos_restantes': restantes,
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] excluir_filho {filho_id}: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 # ───────────────────────────────────────────────────────────────
@@ -796,45 +945,68 @@ def excluir(pai_id):
     return redirect(url_for('gestao_custos.index'))
 
 
+# Mapeamento de origem_tabela → (módulo, classe) com tabela-fonte separada.
+# Quando a linha é excluída, o registro correspondente também é apagado
+# (some do perfil do funcionário, da tela de Ponto, do RDO, etc.).
+_ORIGENS_COM_TABELA_FONTE = {
+    'rdo_mao_obra':           ('models', 'RDOMaoObra'),
+    'lancamento_transporte':  ('models', 'LancamentoTransporte'),
+    'lancamento_alimentacao': ('models', 'AlimentacaoLancamento'),
+    'reembolso_funcionario':  ('models', 'ReembolsoFuncionario'),
+    # Ponto Eletrônico — todas as variantes apontam para o mesmo RegistroPonto.
+    'registro_ponto':         ('models', 'RegistroPonto'),
+    'registro_ponto_va':      ('models', 'RegistroPonto'),
+    'registro_ponto_vt':      ('models', 'RegistroPonto'),
+}
+
+# Origens cujo lançamento "vive" na própria GestaoCustoFilho (sem tabela separada).
+# Listadas para silenciar warnings na cascata.
+_ORIGENS_SEM_TABELA_FONTE = {
+    'importacao_diaria',
+    'importacao_diaria_va',
+    'importacao_diaria_vt',
+    'diaria_manual',
+    'diaria_abril',
+    'manual',
+    'conta_pagar',
+}
+
+
+def _excluir_origem_de_filho(filho, admin_id) -> int:
+    """Remove o registro de origem (RegistroPonto, RDOMaoObra, etc.) de UM filho.
+
+    Para origens sem tabela separada (importacao_diaria, manual, etc.) é no-op.
+    Retorna 1 se removeu algo, 0 caso contrário.
+    """
+    tabela    = filho.origem_tabela
+    origem_id = filho.origem_id
+    if not tabela or not origem_id:
+        return 0
+    if tabela in _ORIGENS_SEM_TABELA_FONTE:
+        return 0
+    if tabela not in _ORIGENS_COM_TABELA_FONTE:
+        logger.warning(f"[WARN] CRUD cascata: origem desconhecida '{tabela}' (filho={filho.id})")
+        return 0
+    try:
+        import importlib
+        mod_name, class_name = _ORIGENS_COM_TABELA_FONTE[tabela]
+        mod        = importlib.import_module(mod_name)
+        ModelClass = getattr(mod, class_name)
+        registro   = ModelClass.query.filter_by(id=origem_id, admin_id=admin_id).first()
+        if registro:
+            db.session.delete(registro)
+            logger.info(f"[OK] CRUD cascata: {tabela} id={origem_id} excluído (filho={filho.id})")
+            return 1
+    except Exception as e:
+        logger.warning(f"[WARN] CRUD cascata: erro ao excluir {tabela} id={origem_id}: {e}")
+    return 0
+
+
 def _excluir_origens_vinculadas(pai, admin_id) -> int:
-    """
-    Remove os registros de origem referenciados pelos filhos do pai.
-    Suporta: rdo_mao_obra, lancamento_transporte, lancamento_alimentacao, reembolso_funcionario.
-    Retorna a quantidade de registros excluídos.
-    """
-    _TABELAS_SUPORTADAS = {
-        'rdo_mao_obra':           ('models', 'RDOMaoObra'),
-        'lancamento_transporte':  ('models', 'LancamentoTransporte'),
-        'lancamento_alimentacao': ('models', 'AlimentacaoLancamento'),
-        'reembolso_funcionario':  ('models', 'ReembolsoFuncionario'),
-    }
-
+    """Remove os registros de origem referenciados por todos os filhos do pai."""
     from models import GestaoCustoFilho
-    import importlib
-
     filhos = GestaoCustoFilho.query.filter_by(pai_id=pai.id).all()
-    total = 0
-
-    for filho in filhos:
-        tabela    = filho.origem_tabela
-        origem_id = filho.origem_id
-        if not tabela or not origem_id:
-            continue
-        if tabela not in _TABELAS_SUPORTADAS:
-            continue
-        try:
-            mod_name, class_name = _TABELAS_SUPORTADAS[tabela]
-            mod        = importlib.import_module(mod_name)
-            ModelClass = getattr(mod, class_name)
-            registro   = ModelClass.query.filter_by(id=origem_id, admin_id=admin_id).first()
-            if registro:
-                db.session.delete(registro)
-                total += 1
-                logger.info(f"[OK] CRUD cascata: {tabela} id={origem_id} excluído (pai={pai.id})")
-        except Exception as e:
-            logger.warning(f"[WARN] CRUD cascata: erro ao excluir {tabela} id={origem_id}: {e}")
-
-    return total
+    return sum(_excluir_origem_de_filho(f, admin_id) for f in filhos)
 
 
 def _coletar_ids_fluxo_caixa(pai, admin_id) -> set:

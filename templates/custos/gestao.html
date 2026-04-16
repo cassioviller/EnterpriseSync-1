@@ -505,6 +505,51 @@
   </div>
 </div>
 
+{# ══ MODAL: EDITAR LINHA (FILHO) ══════════════════════════════ #}
+<div class="modal fade" id="modalEditarFilho" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fas fa-pen me-2"></i>Editar Linha</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="formEditarFilho">
+        <input type="hidden" id="editFilhoId">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-uppercase text-muted">Data</label>
+              <input type="date" class="form-control" name="data_referencia" id="editFilhoData" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-uppercase text-muted">Valor (R$)</label>
+              <input type="number" step="0.01" min="0.01" class="form-control" name="valor" id="editFilhoValor" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold small text-uppercase text-muted">Descrição</label>
+              <input type="text" class="form-control" name="descricao" id="editFilhoDesc" maxlength="300" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold small text-uppercase text-muted">Obra</label>
+              <select class="form-select" name="obra_id" id="editFilhoObra">
+                <option value="">— Sem obra —</option>
+              </select>
+            </div>
+          </div>
+          <div class="alert alert-info mt-3 mb-0 small">
+            <i class="fas fa-info-circle me-1"></i>
+            O total do agrupador será recalculado automaticamente.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {# ══ MODAL: APROVAÇÃO (SOLICITADO → PAGO/PARCIAL ou PENDENTE) ════ #}
 <div class="modal fade" id="modalAprovar" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
@@ -644,28 +689,54 @@ document.addEventListener('DOMContentLoaded', function () {
                     html += `</div></div><hr class="my-2">`;
                 }
 
+                const podeEditar = !!json.pode_editar;
                 html += `<table class="table table-sm mb-0" style="font-size:.85rem">
                   <thead class="table-light">
                     <tr>
                       <th>Data</th><th>Descrição</th><th>Obra</th>
                       <th class="text-end">Valor</th><th>Origem</th>
+                      <th class="text-center" style="width:90px">Ações</th>
                     </tr>
                   </thead><tbody>`;
                 let total = 0;
                 json.itens.forEach(f => {
                     total += f.valor;
+                    const acoes = podeEditar
+                        ? `<div class="btn-group btn-group-sm" role="group">
+                             <button type="button" class="btn btn-outline-primary py-0 px-2 btn-edit-filho"
+                                     title="Editar linha"
+                                     data-id="${f.id}"
+                                     data-data="${f.data_iso}"
+                                     data-descricao="${(f.descricao||'').replace(/"/g,'&quot;')}"
+                                     data-valor="${f.valor.toFixed(2)}"
+                                     data-obra-id="${f.obra_id || ''}">
+                               <i class="fas fa-pen fa-xs"></i>
+                             </button>
+                             <button type="button" class="btn btn-outline-danger py-0 px-2 btn-del-filho"
+                                     title="Excluir linha"
+                                     data-id="${f.id}"
+                                     data-descricao="${(f.descricao||'').replace(/"/g,'&quot;')}"
+                                     data-valor="${f.valor.toFixed(2)}"
+                                     data-pai="${paiId}">
+                               <i class="fas fa-trash fa-xs"></i>
+                             </button>
+                           </div>`
+                        : `<span class="text-muted small" title="Bloqueado: registro ${json.pai_status}">
+                             <i class="fas fa-lock fa-xs"></i>
+                           </span>`;
                     html += `<tr>
                       <td>${f.data}</td>
                       <td>${f.descricao}</td>
                       <td><small class="text-muted">${f.obra}</small></td>
                       <td class="text-end fw-semibold">R$ ${f.valor.toFixed(2).replace('.',',')}</td>
                       <td><span class="badge bg-light text-dark border">${f.origem}</span></td>
+                      <td class="text-center">${acoes}</td>
                     </tr>`;
                 });
                 html += `<tr class="table-light fw-bold">
                   <td colspan="3" class="text-end">Total</td>
                   <td class="text-end">R$ ${total.toFixed(2).replace('.',',')}</td>
-                  <td></td></tr>`;
+                  <td colspan="2"></td></tr>`;
                 html += '</tbody></table>';
                 content.innerHTML = html;
             } catch(e) {
@@ -673,6 +744,107 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+});
+
+// ── CRUD por linha (filho) ───────────────────────────────────────
+// Lista de obras para o dropdown do modal de edição (renderizada server-side)
+window.OBRAS_LIST = [
+{% for o in obras or [] %}{ id: {{ o.id }}, nome: {{ o.nome|tojson }} },
+{% endfor %}
+];
+
+function _preencherObrasSelect(selectEl, selectedId) {
+    selectEl.innerHTML = '<option value="">— Sem obra —</option>';
+    window.OBRAS_LIST.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.nome;
+        if (String(o.id) === String(selectedId)) opt.selected = true;
+        selectEl.appendChild(opt);
+    });
+}
+
+async function _recarregarFilhos(paiId) {
+    const btn = document.querySelector(`.expand-btn[data-pai="${paiId}"]`);
+    const filhosRow = document.getElementById(`filhos-${paiId}`);
+    if (!btn || !filhosRow) { window.location.reload(); return; }
+    // Fecha e reabre para acionar o fetch novamente
+    if (!filhosRow.classList.contains('d-none')) btn.click();
+    btn.click();
+}
+
+document.addEventListener('click', async function(ev) {
+    // Editar linha
+    const editBtn = ev.target.closest('.btn-edit-filho');
+    if (editBtn) {
+        document.getElementById('editFilhoId').value = editBtn.dataset.id;
+        document.getElementById('editFilhoData').value = editBtn.dataset.data;
+        document.getElementById('editFilhoDesc').value = editBtn.dataset.descricao;
+        document.getElementById('editFilhoValor').value = editBtn.dataset.valor;
+        _preencherObrasSelect(document.getElementById('editFilhoObra'), editBtn.dataset.obraId);
+        new bootstrap.Modal(document.getElementById('modalEditarFilho')).show();
+        return;
+    }
+    // Excluir linha
+    const delBtn = ev.target.closest('.btn-del-filho');
+    if (delBtn) {
+        const id = delBtn.dataset.id;
+        const desc = delBtn.dataset.descricao;
+        const valor = parseFloat(delBtn.dataset.valor || '0');
+        const paiId = delBtn.dataset.pai;
+        const valorFmt = 'R$ ' + valor.toFixed(2).replace('.', ',');
+        if (!confirm(`Excluir esta linha?\n\n${desc}\nValor: ${valorFmt}\n\nO registro de origem (Ponto, RDO, etc.) também será apagado quando aplicável. Se for o último item do agrupador, o registro principal e o lançamento no Fluxo de Caixa também serão excluídos.`)) {
+            return;
+        }
+        try {
+            const fd = new FormData();
+            const res = await fetch(`/gestao-custos/filho/${id}/excluir`, { method: 'POST', body: fd });
+            const json = await res.json();
+            if (json.status !== 'ok') {
+                alert('Erro: ' + (json.message || 'Falha ao excluir.'));
+                return;
+            }
+            if (json.pai_excluido) {
+                window.location.reload();
+            } else {
+                _recarregarFilhos(paiId);
+            }
+        } catch (e) {
+            alert('Erro de rede: ' + e);
+        }
+        return;
+    }
+});
+
+// Submissão do modal de edição
+document.addEventListener('DOMContentLoaded', function () {
+    const formEdit = document.getElementById('formEditarFilho');
+    if (formEdit) {
+        formEdit.addEventListener('submit', async function(ev) {
+            ev.preventDefault();
+            const id = document.getElementById('editFilhoId').value;
+            const fd = new FormData(formEdit);
+            try {
+                const res = await fetch(`/gestao-custos/filho/${id}/editar`, { method: 'POST', body: fd });
+                const json = await res.json();
+                if (json.status !== 'ok') {
+                    alert('Erro: ' + (json.message || 'Falha ao salvar.'));
+                    return;
+                }
+                bootstrap.Modal.getInstance(document.getElementById('modalEditarFilho')).hide();
+                // Reabre o accordion do pai correspondente, se houver
+                const expanded = document.querySelector('.filhos-row:not(.d-none)');
+                if (expanded) {
+                    const paiId = expanded.id.replace('filhos-', '');
+                    _recarregarFilhos(paiId);
+                } else {
+                    window.location.reload();
+                }
+            } catch (e) {
+                alert('Erro de rede: ' + e);
+            }
+        });
+    }
 });
 
 // ── Confirmação de exclusão com mensagem contextual ──────────────
