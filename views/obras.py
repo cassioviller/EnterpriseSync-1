@@ -1609,6 +1609,7 @@ def detalhes_obra(id):
         from datetime import date as _date
 
         painel = {
+            'valor_orcado': float(obra.orcamento or 0),
             'valor_contrato': 0.0,
             'valor_medido': 0.0,
             'custo_acumulado': 0.0,
@@ -1642,7 +1643,8 @@ def detalhes_obra(id):
             # 4. Saldo = medido - custo
             painel['saldo'] = painel['valor_medido'] - painel['custo_acumulado']
             painel['tem_dados_financeiros'] = (
-                painel['valor_contrato'] > 0
+                painel['valor_orcado'] > 0
+                or painel['valor_contrato'] > 0
                 or painel['valor_medido'] > 0
                 or painel['custo_acumulado'] > 0
             )

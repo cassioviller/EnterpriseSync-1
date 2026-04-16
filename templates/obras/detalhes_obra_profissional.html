@@ -462,37 +462,50 @@
 
 /* ============== ABAS DE DETALHES DA OBRA ============== */
 .obra-tabs-wrapper {
-    background: transparent;
+    background: #ffffff;
     margin-top: 1rem;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    position: relative;
+    z-index: 2;
 }
 .obra-nav-tabs {
     border-bottom: 2px solid #e2e8f0;
     flex-wrap: wrap;
     gap: 0.25rem;
+    background: #ffffff;
+    border-radius: 10px 10px 0 0;
 }
 .obra-nav-tabs .nav-link {
-    color: #64748b;
+    color: #475569;
     font-weight: 600;
-    border: none;
+    border: 1px solid transparent;
     border-bottom: 3px solid transparent;
     border-radius: 8px 8px 0 0;
     padding: 0.75rem 1.25rem;
-    background: transparent;
+    background: #f8fafc;
     transition: all 0.25s ease;
     font-size: 0.95rem;
 }
 .obra-nav-tabs .nav-link:hover {
     color: #0066cc;
-    background: rgba(0, 102, 204, 0.06);
+    background: #eef4ff;
+    border-color: #e2e8f0;
+    border-bottom-color: transparent;
 }
 .obra-nav-tabs .nav-link.active {
     color: #0066cc;
-    background: white;
+    background: #ffffff;
+    border-color: #e2e8f0;
     border-bottom: 3px solid #0066cc;
     box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
 }
 .obra-tab-content {
+    background: #ffffff;
+    border-radius: 0 0 10px 10px;
     padding-top: 1.25rem;
+    position: relative;
+    z-index: 1;
 }
 .obra-tab-content > .tab-pane > .obra-card {
     margin-bottom: 1.25rem;
@@ -585,6 +598,126 @@
     font-size: 0.75rem;
     margin-top: 2px;
 }
+/* ── Cronograma do Cliente: split-pane (somente leitura) ── */
+.cliente-cron-split {
+    display: flex;
+    height: calc(100vh - 320px);
+    min-height: 420px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.cliente-cron-left {
+    width: 560px;
+    min-width: 380px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-right: 2px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+}
+.cliente-cron-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+.cliente-cron-gantt {
+    flex: 1;
+    overflow: auto;
+    background: #fafbfc;
+    transition: width .25s ease, opacity .2s ease;
+}
+.cliente-cron-divider {
+    width: 14px;
+    flex-shrink: 0;
+    background: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 5;
+}
+.cliente-cron-toggle-btn {
+    width: 22px;
+    height: 44px;
+    border: none;
+    border-radius: 4px;
+    background: #0f766e;
+    color: #fff;
+    font-size: .65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background .15s;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.cliente-cron-toggle-btn:hover { background: #0d9488; }
+.cliente-cron-split.gantt-hidden .cliente-cron-gantt {
+    flex: 0 0 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+.cliente-cron-split.gantt-hidden .cliente-cron-left {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    border-right: none;
+}
+.cliente-cron-table { font-size: .83rem; border-collapse: separate; border-spacing: 0; }
+.cliente-cron-thead th {
+    background: #0f766e;
+    color: rgba(255,255,255,.92);
+    font-weight: 600;
+    font-size: .73rem;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    position: sticky; top: 0; z-index: 10;
+    white-space: nowrap;
+    padding: 10px 10px;
+    border-bottom: 2px solid #0d5d57;
+}
+.cc-th-num   { width: 36px; text-align: center; }
+.cc-th-nome  { min-width: 220px; }
+.cc-th-date  { width: 92px; text-align: center; }
+.cc-th-perc  { width: 130px; text-align: center; }
+.cc-row td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid #f0f2f5; }
+.cc-row:last-child td { border-bottom: none; }
+.cc-row:hover td { background: #f0fdfa; }
+.cc-done td { background: #f0fdf4 !important; }
+.cc-wip  td { background: #fffbf0 !important; }
+.cc-td-num    { color: #adb5bd; font-size: .75rem; text-align: center; }
+.cc-td-center { text-align: center; }
+.cc-td-nome   { font-weight: 500; color: #1f2937; }
+.cc-date-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    color: #475569;
+    font-size: .75rem;
+}
+.cc-td-perc { padding-right: 14px !important; min-width: 130px; }
+.cc-perc-wrapper { display: flex; align-items: center; gap: 8px; }
+.cc-perc-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.cc-perc-bar-fill { height: 100%; transition: width .3s ease; }
+.cc-fill-done { background: #16a34a; }
+.cc-fill-good { background: #3b82f6; }
+.cc-fill-mid  { background: #f59e0b; }
+.cc-fill-low  { background: #cbd5e1; }
+.cc-perc-text { font-size: .75rem; font-weight: 600; color: #475569; min-width: 36px; text-align: right; }
 /* Painel estratégico compacto */
 .obra-tab-content .painel-estrategico {
     padding: 1.25rem 1.25rem !important;
@@ -723,7 +856,12 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-cronograma" type="button" role="tab" data-hash="cronograma">
-                        <i class="fas fa-calendar-alt me-2"></i>Cronograma &amp; Mapa
+                        <i class="fas fa-calendar-alt me-2"></i>Cronograma
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mapa" type="button" role="tab" data-hash="mapa">
+                        <i class="fas fa-table me-2"></i>Mapa
                     </button>
                 </li>
             </ul>
@@ -895,6 +1033,7 @@
             var ctx = canvas.getContext('2d');
 
             var valorContrato = {{ painel.valor_contrato|float }};
+            var valorOrcado   = {{ painel.valor_orcado|float }};
             var valorMedido   = {{ painel.valor_medido|float }};
             var custoAcum     = {{ painel.custo_acumulado|float }};
 
@@ -905,11 +1044,11 @@
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Contrato', 'Medido', 'Custo'],
+                    labels: ['Contrato', 'Orçado', 'Medido', 'Custo'],
                     datasets: [{
                         label: 'R$',
-                        data: [valorContrato, valorMedido, custoAcum],
-                        backgroundColor: ['#3b82f6', '#22c55e', '#ef4444'],
+                        data: [valorContrato, valorOrcado, valorMedido, custoAcum],
+                        backgroundColor: ['#3b82f6', '#a855f7', '#22c55e', '#ef4444'],
                         borderRadius: 8,
                         borderSkipped: false,
                         maxBarThickness: 80
@@ -1153,64 +1292,7 @@
         </div>
         <!-- /bloco-info-combinado -->
 
-        <!-- Seção de Serviços da Obra - Layout Horizontal -->
-        <div class="obra-card" style="margin-bottom: 2rem;">
-            <div class="obra-card-header">
-                <h3><i class="fas fa-cogs"></i> Serviços da Obra</h3>
-                <div class="header-actions">
-                    <span class="badge bg-light text-dark ms-2">{{ servicos_obra|length if servicos_obra else 0 }} serviços</span>
-                </div>
-            </div>
-            <div class="obra-card-body" style="padding: 2rem;">
-                {% if servicos_obra and servicos_obra|length > 0 %}
-                    <div class="servicos-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
-                        {% for servico in servicos_obra %}
-                        <div class="servico-card" style="background: #f8fafc; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; transition: all 0.3s ease; border-left: 4px solid #3b82f6;">
-                            <div class="servico-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                                <div class="servico-info" style="flex: 1;">
-                                    <h6 class="servico-nome" style="font-weight: 600; color: #1f2937; margin: 0 0 0.5rem 0; font-size: 1.1rem;">
-                                        <i class="fas fa-tools" style="color: #3b82f6; margin-right: 0.5rem;"></i>
-                                        {{ servico.nome }}
-                                    </h6>
-                                    {% if servico.descricao %}
-                                    <p class="servico-descricao" style="font-size: 0.9rem; color: #6b7280; margin: 0; line-height: 1.4;">
-                                        {{ servico.descricao[:80] + '...' if servico.descricao|length > 80 else servico.descricao }}
-                                    </p>
-                                    {% endif %}
-                                </div>
-                                <div class="servico-progresso" style="text-align: center; margin-left: 1rem;">
-                                    {% set progresso = (loop.index0 * 25) % 100 %}
-                                    <div class="progress-badge" style="background: {% if servico.progresso >= 100 %}#22c55e{% elif servico.progresso >= 70 %}#3b82f6{% elif servico.progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; color: white; padding: 0.5rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                                        {{ '{:.1f}'.format(servico.progresso) }}%
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="progress-bar-container" style="margin-top: 1rem;">
-                                <div class="progress-bar" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                                    <div class="progress-fill" style="width: {{ '{:.1f}'.format(servico.progresso) }}%; height: 100%; background: {% if servico.progresso >= 100 %}#22c55e{% elif servico.progresso >= 70 %}#3b82f6{% elif servico.progresso >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; border-radius: 4px; transition: width 0.5s ease;"></div>
-                                </div>
-                                <div class="progress-text" style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
-                                    <span>{% if servico.progresso == 0 %}Não iniciado{% elif servico.progresso < 40 %}Em início{% elif servico.progresso < 70 %}Em progresso{% elif servico.progresso < 100 %}Quase pronto{% else %}Concluído{% endif %}</span>
-                                    <span style="font-weight: 600;">{{ '{:.1f}'.format(servico.progresso) }}%</span>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="empty-servicos" style="text-align: center; padding: 3rem; color: #6b7280;">
-                        <i class="fas fa-tools" style="font-size: 3rem; margin-bottom: 1.5rem; opacity: 0.5; color: #3b82f6;"></i>
-                        <h5 style="margin-bottom: 1rem; color: #374151;">Nenhum serviço cadastrado</h5>
-                        <p style="margin: 0 0 2rem 0; font-size: 1rem; max-width: 400px; margin-left: auto; margin-right: auto;">Os serviços desta obra serão listados aqui conforme forem adicionados ao sistema.</p>
-                        <button type="button" id="btnGerenciarServicosObraTop" class="btn-modern btn-primary-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="display: inline-flex; align-items: center; gap: 0.5rem; border: none;">
-                            <i class="fas fa-plus"></i>
-                            Gerenciar Serviços da Obra
-                        </button>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        <!-- /Serviços da Obra -->
+        <!-- Seção "Serviços da Obra" removida (substituída pelo Cronograma na v2) -->
 
         </div>
         <!-- /tab-pane Visão Geral -->
@@ -1730,11 +1812,137 @@
         <!-- /tab-pane Compras -->
 
         <!-- ═══════════════════════════════════════════════════════════════
-             ABA: CRONOGRAMA & MAPA
+             ABA: CRONOGRAMA (cliente — read-only, split-pane + Gantt)
              ═══════════════════════════════════════════════════════════════ -->
         <div class="tab-pane fade" id="tab-cronograma" role="tabpanel">
 
-        <!-- Mapa de Concorrência -->
+        <div class="obra-card" id="card-cronograma" style="scroll-margin-top: 80px;">
+            <div class="obra-card-header" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
+                <h3><i class="fas fa-calendar-alt"></i> Cronograma do Cliente</h3>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark">{{ cronograma_cliente_items|length if cronograma_cliente_items else 0 }} tarefa(s)</span>
+                    <span class="badge" style="background:#fef3c7;color:#92400e;">
+                        <i class="fas fa-eye me-1"></i>Somente leitura
+                    </span>
+                </div>
+            </div>
+            <div class="obra-card-body" style="padding: 1rem 1rem 1.25rem;">
+                <p style="font-size:.85rem;color:#64748b;margin-bottom:.75rem;">
+                    Visualização do cronograma apresentado ao cliente no Portal. Para editar, acesse a página
+                    <a href="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}"
+                       style="text-decoration:underline;">do Cronograma do Cliente</a>.
+                </p>
+
+                <div class="cliente-cron-split" id="clienteCronSplit">
+                    <div class="cliente-cron-left" id="clienteCronLeft">
+                        <div class="cliente-cron-scroll" id="clienteCronLeftScroll">
+                            {% if cronograma_cliente_items %}
+                            <table class="table table-sm cliente-cron-table mb-0">
+                                <thead class="cliente-cron-thead">
+                                    <tr>
+                                        <th class="cc-th-num">#</th>
+                                        <th class="cc-th-nome">Nome da Tarefa</th>
+                                        <th class="cc-th-date">Início</th>
+                                        <th class="cc-th-date">Término</th>
+                                        <th class="cc-th-perc">Progresso</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in cronograma_cliente_items %}
+                                    {% set perc = (item.percentual_apresentacao or 0)|round(0)|int %}
+                                    <tr class="cc-row {% if perc >= 100 %}cc-done{% elif perc > 0 %}cc-wip{% endif %}"
+                                        data-id="{{ item.id }}"
+                                        data-perc="{{ perc }}"
+                                        data-inicio="{{ item.data_inicio_apresentacao.isoformat() if item.data_inicio_apresentacao else '' }}"
+                                        data-fim="{{ item.data_fim_apresentacao.isoformat() if item.data_fim_apresentacao else '' }}"
+                                        data-nome="{{ item.nome_tarefa|e }}">
+                                        <td class="cc-td-num text-muted">{{ loop.index }}</td>
+                                        <td class="cc-td-nome">{{ item.nome_tarefa }}</td>
+                                        <td class="cc-td-center small">
+                                            <span class="cc-date-chip">{{ item.data_inicio_apresentacao.strftime('%d/%m/%y') if item.data_inicio_apresentacao else '—' }}</span>
+                                        </td>
+                                        <td class="cc-td-center small">
+                                            <span class="cc-date-chip">{{ item.data_fim_apresentacao.strftime('%d/%m/%y') if item.data_fim_apresentacao else '—' }}</span>
+                                        </td>
+                                        <td class="cc-td-perc">
+                                            <div class="cc-perc-wrapper">
+                                                <div class="cc-perc-bar-wrap">
+                                                    <div class="cc-perc-bar-fill {% if perc >= 100 %}cc-fill-done{% elif perc >= 50 %}cc-fill-good{% elif perc > 0 %}cc-fill-mid{% else %}cc-fill-low{% endif %}"
+                                                         style="width:{{ perc }}%"></div>
+                                                </div>
+                                                <span class="cc-perc-text">{{ perc }}%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% else %}
+                            <div class="text-center py-5 text-muted">
+                                <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
+                                <p class="mb-1 fw-semibold">Nenhuma tarefa no cronograma do cliente.</p>
+                                <p class="small">Gere o cronograma do cliente para visualizar aqui.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="cliente-cron-divider" id="clienteCronDivider">
+                        <button type="button" class="cliente-cron-toggle-btn" id="clienteCronToggleBtn" title="Mostrar/ocultar Gantt">
+                            <i class="fas fa-chevron-right" id="clienteCronToggleIcon"></i>
+                        </button>
+                    </div>
+
+                    <div class="cliente-cron-gantt" id="clienteCronGantt">
+                        <div id="clienteCronGanttContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações Rápidas -->
+        <div class="obra-card">
+            <div class="obra-card-header">
+                <h3><i class="fas fa-lightning-bolt"></i> Ações Rápidas</h3>
+            </div>
+            <div class="obra-card-body" style="padding: 2rem;">
+                <div class="action-buttons">
+                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-success-modern">
+                        <i class="fas fa-plus-circle"></i>
+                        Novo RDO
+                    </a>
+                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-primary-modern">
+                        <i class="fas fa-list"></i>
+                        Ver Todos os RDOs
+                    </a>
+                    <a href="/obras/editar/{{ obra.id }}" class="btn-modern btn-warning-modern">
+                        <i class="fas fa-edit"></i>
+                        Editar Obra
+                    </a>
+
+                    <form method="POST" action="{{ url_for('main.toggle_status_obra', id=obra.id) }}" style="display: inline;">
+                        <button type="submit" class="btn-modern {% if obra.ativo %}btn-success-modern{% else %}btn-secondary{% endif %}">
+                            <i class="fas {% if obra.ativo %}fa-check-circle{% else %}fa-power-off{% endif %}"></i>
+                            {% if obra.ativo %}ATIVO{% else %}FINALIZADO{% endif %}
+                        </button>
+                    </form>
+
+                    <a href="/funcionarios" class="btn-modern btn-outline-modern">
+                        <i class="fas fa-users"></i>
+                        Funcionários
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        </div>
+        <!-- /tab-pane Cronograma -->
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: MAPA (Mapa de Concorrência)
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="tab-mapa" role="tabpanel">
+
         <div class="obra-card">
             <div class="obra-card-header" style="background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);">
                 <h3><i class="fas fa-table"></i> Mapa de Concorrência</h3>
@@ -1780,131 +1988,8 @@
             </div>
         </div>
 
-        <!-- Cronograma do Cliente -->
-        <div class="obra-card" id="card-cronograma" style="scroll-margin-top: 80px;">
-            <div class="obra-card-header" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
-                <h3><i class="fas fa-calendar-alt"></i> Cronograma para o Cliente</h3>
-            </div>
-            <div class="obra-card-body" style="padding: 1.5rem;">
-                <p style="font-size:.88rem;color:#64748b;margin-bottom:1rem;">
-                    Cronograma editável exibido no Portal do Cliente. Independente do cronograma interno.
-                </p>
-                <form method="POST" action="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}" class="mb-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-sm btn-teal w-100"
-                            style="background:#0d9488;color:#fff;border:none;"
-                            onclick="return confirm('Isso irá substituir o cronograma do cliente atual pelas tarefas internas. Continuar?')">
-                        <i class="fas fa-sync-alt me-1"></i>
-                        Gerar Cronograma para Cliente
-                    </button>
-                </form>
-
-                {% if cronograma_cliente_items %}
-                <div style="max-height:380px;overflow-y:auto;">
-                    {% for item in cronograma_cliente_items %}
-                    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:.75rem;margin-bottom:.5rem;background:#f8fafc;">
-                        <div style="font-weight:600;font-size:.9rem;margin-bottom:.4rem;">{{ item.nome_tarefa }}</div>
-                        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
-                            <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
-                                <div style="height:100%;border-radius:3px;width:{{ item.percentual_apresentacao|round(0) }}%;background:{% if item.percentual_apresentacao >= 100 %}#22c55e{% elif item.percentual_apresentacao >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
-                            </div>
-                            <span style="font-size:.8rem;font-weight:600;white-space:nowrap;">{{ item.percentual_apresentacao|round(1) }}%</span>
-                        </div>
-                        {% if item.data_inicio_apresentacao or item.data_fim_apresentacao %}
-                        <div style="font-size:.78rem;color:#64748b;margin-bottom:.5rem;">
-                            {% if item.data_inicio_apresentacao %}{{ item.data_inicio_apresentacao.strftime('%d/%m/%Y') }}{% endif %}
-                            {% if item.data_inicio_apresentacao and item.data_fim_apresentacao %} → {% endif %}
-                            {% if item.data_fim_apresentacao %}{{ item.data_fim_apresentacao.strftime('%d/%m/%Y') }}{% endif %}
-                        </div>
-                        {% endif %}
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                                style="font-size:.75rem;"
-                                data-bs-toggle="collapse"
-                                data-bs-target="#editItem{{ item.id }}">
-                            <i class="fas fa-edit me-1"></i>Editar
-                        </button>
-                        <div class="collapse mt-2" id="editItem{{ item.id }}">
-                            <form method="POST" action="{{ url_for('main.editar_cronograma_cliente', obra_id=obra.id, item_id=item.id) }}">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <div class="mb-2">
-                                    <input type="text" name="nome_tarefa" class="form-control form-control-sm"
-                                           value="{{ item.nome_tarefa }}" placeholder="Nome da tarefa" required>
-                                </div>
-                                <div class="row g-1 mb-2">
-                                    <div class="col-6">
-                                        <input type="date" name="data_inicio_apresentacao" class="form-control form-control-sm"
-                                               value="{{ item.data_inicio_apresentacao.strftime('%Y-%m-%d') if item.data_inicio_apresentacao else '' }}">
-                                    </div>
-                                    <div class="col-6">
-                                        <input type="date" name="data_fim_apresentacao" class="form-control form-control-sm"
-                                               value="{{ item.data_fim_apresentacao.strftime('%Y-%m-%d') if item.data_fim_apresentacao else '' }}">
-                                    </div>
-                                </div>
-                                <div class="input-group input-group-sm mb-2">
-                                    <span class="input-group-text">%</span>
-                                    <input type="number" name="percentual_apresentacao" class="form-control form-control-sm"
-                                           min="0" max="100" step="0.1"
-                                           value="{{ item.percentual_apresentacao|round(1) }}" placeholder="Percentual">
-                                </div>
-                                <button type="submit" class="btn btn-sm btn-success w-100">
-                                    <i class="fas fa-save me-1"></i>Salvar
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="text-center py-3" style="color:#94a3b8;">
-                    <i class="fas fa-calendar-times fa-2x mb-2" style="opacity:.4;display:block;"></i>
-                    <div style="font-size:.88rem;">Nenhuma tarefa no cronograma do cliente.</div>
-                    <div style="font-size:.8rem;">Clique em "Gerar" para copiar as tarefas internas.</div>
-                </div>
-                {% endif %}
-            </div>
         </div>
-
-        <!-- Ações Rápidas -->
-        <div class="obra-card">
-            <div class="obra-card-header">
-                <h3><i class="fas fa-lightning-bolt"></i> Ações Rápidas</h3>
-            </div>
-            <div class="obra-card-body" style="padding: 2rem;">
-                <div class="action-buttons">
-                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-success-modern">
-                        <i class="fas fa-plus-circle"></i>
-                        Novo RDO
-                    </a>
-                    <a href="/funcionario/rdo/consolidado?obra_id={{ obra.id }}" class="btn-modern btn-primary-modern">
-                        <i class="fas fa-list"></i>
-                        Ver Todos os RDOs
-                    </a>
-                    <a href="/obras/editar/{{ obra.id }}" class="btn-modern btn-warning-modern">
-                        <i class="fas fa-edit"></i>
-                        Editar Obra
-                    </a>
-                    
-                    <form method="POST" action="{{ url_for('main.toggle_status_obra', id=obra.id) }}" style="display: inline;">
-                        <button type="submit" class="btn-modern {% if obra.ativo %}btn-success-modern{% else %}btn-secondary{% endif %}">
-                            <i class="fas {% if obra.ativo %}fa-check-circle{% else %}fa-power-off{% endif %}"></i>
-                            {% if obra.ativo %}ATIVO{% else %}FINALIZADO{% endif %}
-                        </button>
-                    </form>
-                    
-                    <button type="button" id="btnGerenciarServicosObra" class="btn-modern btn-outline-modern" data-bs-toggle="modal" data-bs-target="#modalGerenciarServicos" style="border: none;">
-                        <i class="fas fa-cogs"></i>
-                        Gerenciar Serviços da Obra
-                    </button>
-                    <a href="/funcionarios" class="btn-modern btn-outline-modern">
-                        <i class="fas fa-users"></i>
-                        Funcionários
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        </div>
-        <!-- /tab-pane Cronograma & Mapa -->
+        <!-- /tab-pane Mapa -->
 
         </div>
         <!-- /tab-content -->
@@ -1913,115 +1998,6 @@
     </div>
 </div>
 
-<!-- Modal para Gerenciar Serviços da Obra -->
-<div class="modal fade" id="modalGerenciarServicos" tabindex="-1" aria-labelledby="modalGerenciarServicosLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="modalGerenciarServicosLabel">
-                    <i class="fas fa-cogs me-2"></i>
-                    Gerenciar Serviços da Obra: {{ obra.nome }}
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Botão para Criar Novo Serviço -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h6 class="text-primary mb-0">
-                        <i class="fas fa-list me-2"></i>
-                        Gerenciar Serviços da Obra
-                    </h6>
-                    <a href="/servicos/novo" class="btn btn-success btn-sm">
-                        <i class="fas fa-plus me-1"></i>
-                        Criar Novo Serviço
-                    </a>
-                </div>
-                
-                <!-- Serviços Disponíveis -->
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="text-muted mb-0" style="font-size: 0.95rem;">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Selecionar Serviços Existentes
-                        </h6>
-                        <div>
-                            <button type="button" class="btn btn-outline-success btn-sm me-2" onclick="selecionarTodosServicos()">
-                                <i class="fas fa-check-double me-1"></i>
-                                Selecionar Todos
-                            </button>
-                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="limparSelecaoServicos()">
-                                <i class="fas fa-times me-1"></i>
-                                Limpar Seleção
-                            </button>
-                        </div>
-                    </div>
-                    <div id="servicosDisponiveis" class="row">
-                        <!-- Carregado via JavaScript -->
-                    </div>
-                    <div id="servicosSelecionados" class="mt-3 p-3 bg-light rounded d-none">
-                        <h6 class="text-primary mb-2">
-                            <i class="fas fa-shopping-cart me-2"></i>
-                            Serviços Selecionados (<span id="contadorSelecionados">0</span>)
-                        </h6>
-                        <div id="listaSelecionados"></div>
-                    </div>
-                </div>
-                
-                <!-- Serviços Atuais da Obra -->
-                <div class="mb-4">
-                    <h6 class="text-success mb-3">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Serviços Atuais da Obra
-                    </h6>
-                    <div id="servicosObra" class="row">
-                        {% if servicos_obra %}
-                            {% for servico in servicos_obra %}
-                            <div class="col-md-6 mb-3" id="servico-obra-{{ servico.id }}">
-                                <div class="card border-success">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <h6 class="card-title mb-1">{{ servico.nome }}</h6>
-                                                {% if servico.descricao %}
-                                                <small class="text-muted">{{ servico.descricao[:80] + '...' if servico.descricao|length > 80 else servico.descricao }}</small>
-                                                {% endif %}
-                                            </div>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServicoObra({{ servico.id }})">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="col-12" id="noServicosObra">
-                                <div class="text-center text-muted py-4">
-                                    <i class="fas fa-tools fa-2x mb-3 opacity-50"></i>
-                                    <p>Nenhum serviço associado a esta obra ainda.</p>
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>
-                    Fechar
-                </button>
-                <a href="/servicos" class="btn btn-outline-primary" target="_blank">
-                    <i class="fas fa-plus me-2"></i>
-                    Cadastrar Novo Serviço
-                </a>
-                <button type="button" id="btnSalvarServicos" class="btn btn-success" onclick="salvarServicosSelecionados()" disabled>
-                    <i class="fas fa-save me-2"></i>
-                    Salvar Serviços (<span id="contadorBotao">0</span>)
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Modal: Nova Compra para Aprovação do Cliente -->
 <div class="modal fade" id="modalNovaCompraObra" tabindex="-1" aria-labelledby="modalNovaCompraObraLabel" aria-hidden="true">
@@ -2141,497 +2117,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-    
-    // Carregar serviços disponíveis quando abrir o modal
-    const modalGerenciarServicos = document.getElementById('modalGerenciarServicos');
-    console.log('🔍 Modal element found:', modalGerenciarServicos);
-    console.log('🔍 Bootstrap version:', typeof bootstrap !== 'undefined' ? 'Loaded' : 'Not loaded');
-    
-    if (modalGerenciarServicos) {
-        modalGerenciarServicos.addEventListener('show.bs.modal', function() {
-            console.log('🚀 Modal sendo aberto - carregando serviços...');
-            carregarServicosDisponiveis();
-        });
-        
-        // Configurar eventos para TODOS os botões que devem abrir o modal
-        const todosOsBotoesModal = document.querySelectorAll('[data-bs-target="#modalGerenciarServicos"]');
-        
-        console.log('🔗 Botões modal encontrados:', todosOsBotoesModal.length);
-        
-        function abrirModalServicos(e) {
-            console.log('🚀 Abrindo modal gerenciar serviços...');
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Abrir modal manualmente
-            const modal = new bootstrap.Modal(modalGerenciarServicos);
-            modal.show();
-            
-            // Carregar serviços após um pequeno delay
-            setTimeout(() => {
-                carregarServicosDisponiveis();
-            }, 300);
-        }
-        
-        // Adicionar evento a todos os botões encontrados
-        todosOsBotoesModal.forEach((botao, index) => {
-            console.log(`🔍 Configurando botão ${index + 1}:`, botao);
-            botao.addEventListener('click', abrirModalServicos);
-        });
-    } else {
-        console.error('❌ Modal não encontrado no DOM!');
-    }
 });
 
-// Carregar serviços disponíveis para adicionar à obra
-function carregarServicosDisponiveis() {
-    console.log('🔄 Iniciando carregamento de serviços...');
-    const container = document.getElementById('servicosDisponiveis');
-    container.innerHTML = '<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> Carregando serviços...</div>';
-    
-    fetch('/api/servicos-disponiveis-obra/{{ obra.id }}')
-        .then(response => {
-            console.log('📡 Resposta da API:', response.status);
-            return response.json();
-        })
-        .then(data => {
-            console.log('📊 Dados recebidos:', data);
-            console.log('📊 Quantidade de serviços:', data.servicos ? data.servicos.length : 0);
-            container.innerHTML = '';
-            
-            if (data.servicos && data.servicos.length > 0) {
-                // Filtrar serviços que já estão na obra
-                const servicosObraIds = Array.from(document.querySelectorAll('[id^="servico-obra-"]'))
-                    .map(el => parseInt(el.id.replace('servico-obra-', '')));
-                
-                console.log('🔍 DEBUG: Elementos servico-obra encontrados:', document.querySelectorAll('[id^="servico-obra-"]').length);
-                console.log('🔍 DEBUG: IDs dos serviços na obra:', servicosObraIds);
-                
-                console.log('📊 Serviços empresa:', data.servicos.length, '| Já na obra:', servicosObraIds.length);
-                
-                const servicosDisponiveis = data.servicos.filter(servico => 
-                    !servicosObraIds.includes(servico.id)
-                );
-                
-                console.log('✅ Disponíveis para adicionar:', servicosDisponiveis.length);
-                
-                if (servicosDisponiveis.length > 0) {
-                    servicosDisponiveis.forEach(servico => {
-                        const servicoCard = `
-                            <div class="col-md-6 mb-3" id="servico-disponivel-${servico.id}">
-                                <div class="card border-primary servico-card-selecao" data-servico-id="${servico.id}">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <h6 class="card-title mb-1">${servico.nome}</h6>
-                                                ${servico.descricao ? `<small class="text-muted">${servico.descricao.length > 80 ? servico.descricao.substring(0, 80) + '...' : servico.descricao}</small>` : ''}
-                                                ${servico.categoria ? `<br><span class="badge bg-info mt-2">${servico.categoria}</span>` : ''}
-                                            </div>
-                                            <div class="form-check">
-                                                <input type="checkbox" class="form-check-input servico-checkbox" 
-                                                       id="checkbox-${servico.id}"
-                                                       data-servico-id="${servico.id}" 
-                                                       data-servico-nome="${servico.nome.replace(/'/g, "\\'")}"
-                                                       onchange="toggleServicoSelecao(this)">
-                                                <label class="form-check-label" for="checkbox-${servico.id}" style="cursor: pointer;">
-                                                    Selecionar
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                        container.innerHTML += servicoCard;
-                    });
-                } else {
-                    container.innerHTML = `
-                        <div class="col-12">
-                            <div class="text-center text-muted py-4">
-                                <i class="fas fa-check-circle fa-2x mb-3 text-success opacity-50"></i>
-                                <p>Todos os serviços disponíveis já estão associados a esta obra.</p>
-                            </div>
-                        </div>
-                    `;
-                }
-            } else {
-                container.innerHTML = `
-                    <div class="col-12">
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-tools fa-2x mb-3 opacity-50"></i>
-                            <p>Nenhum serviço cadastrado no sistema.</p>
-                            <a href="/servicos" class="btn btn-outline-primary btn-sm mt-2">
-                                <i class="fas fa-plus me-1"></i> Cadastrar Primeiro Serviço
-                            </a>
-                        </div>
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('❌ Erro ao carregar serviços:', error);
-            container.innerHTML = `
-                <div class="col-12">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Erro ao carregar serviços. Tente novamente.
-                        <br><small>Erro: ${error.message}</small>
-                    </div>
-                </div>
-            `;
-        });
-}
-
-// Array para armazenar serviços selecionados
-let servicosSelecionados = [];
-
-// Função para alternar seleção de serviço
-function toggleServicoSelecao(checkbox) {
-    const servicoId = parseInt(checkbox.dataset.servicoId);
-    const servicoNome = checkbox.dataset.servicoNome;
-    
-    if (checkbox.checked) {
-        // Adicionar à seleção
-        if (!servicosSelecionados.find(s => s.id === servicoId)) {
-            servicosSelecionados.push({
-                id: servicoId,
-                nome: servicoNome
-            });
-            
-            // Destacar o card
-            const card = checkbox.closest('.servico-card-selecao');
-            if (card) {
-                card.classList.add('border-success');
-                card.classList.remove('border-primary');
-            }
-        }
-    } else {
-        // Remover da seleção
-        servicosSelecionados = servicosSelecionados.filter(s => s.id !== servicoId);
-        
-        // Remover destaque do card
-        const card = checkbox.closest('.servico-card-selecao');
-        if (card) {
-            card.classList.add('border-primary');
-            card.classList.remove('border-success');
-        }
-    }
-    
-    atualizarInterfaceSelecao();
-}
-
-// Função para atualizar interface de seleção
-function atualizarInterfaceSelecao() {
-    const contador = servicosSelecionados.length;
-    const contadorSelecionados = document.getElementById('contadorSelecionados');
-    const contadorBotao = document.getElementById('contadorBotao');
-    const btnSalvar = document.getElementById('btnSalvarServicos');
-    const areaSelecionados = document.getElementById('servicosSelecionados');
-    const listaSelecionados = document.getElementById('listaSelecionados');
-    
-    // Atualizar contadores
-    contadorSelecionados.textContent = contador;
-    contadorBotao.textContent = contador;
-    
-    // Habilitar/desabilitar botão salvar
-    btnSalvar.disabled = contador === 0;
-    
-    if (contador > 0) {
-        // Mostrar área de selecionados
-        areaSelecionados.classList.remove('d-none');
-        
-        // Atualizar lista de selecionados
-        listaSelecionados.innerHTML = servicosSelecionados.map(servico => 
-            `<span class="badge bg-primary me-2 mb-2">${servico.nome}</span>`
-        ).join('');
-    } else {
-        // Ocultar área de selecionados
-        areaSelecionados.classList.add('d-none');
-    }
-}
-
-// Função para selecionar todos os serviços
-function selecionarTodosServicos() {
-    const checkboxes = document.querySelectorAll('.servico-checkbox');
-    checkboxes.forEach(checkbox => {
-        if (!checkbox.checked) {
-            checkbox.checked = true;
-            toggleServicoSelecao(checkbox);
-        }
-    });
-}
-
-// Função para limpar seleção
-function limparSelecaoServicos() {
-    const checkboxes = document.querySelectorAll('.servico-checkbox');
-    checkboxes.forEach(checkbox => {
-        if (checkbox.checked) {
-            checkbox.checked = false;
-            toggleServicoSelecao(checkbox);
-        }
-    });
-}
-
-// Função para salvar serviços selecionados
-function salvarServicosSelecionados() {
-    if (servicosSelecionados.length === 0) {
-        mostrarMensagem('Nenhum serviço selecionado!', 'error');
-        return;
-    }
-    
-    const obraId = {{ obra.id }};
-    const btnSalvar = document.getElementById('btnSalvarServicos');
-    
-    // Desabilitar botão durante o salvamento
-    btnSalvar.disabled = true;
-    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
-    
-    console.log('🚀 Salvando serviços selecionados:', servicosSelecionados.length);
-    
-    // Salvar todos os serviços em paralelo
-    const promises = servicosSelecionados.map(servico => 
-        fetch('/api/obras/servicos-rdo', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                obra_id: obraId,
-                servico_id: servico.id
-            })
-        }).then(response => response.json())
-    );
-    
-    Promise.all(promises)
-        .then(results => {
-            const sucessos = results.filter(r => r.success).length;
-            const erros = results.filter(r => !r.success).length;
-            
-            if (sucessos > 0) {
-                mostrarMensagem(`${sucessos} serviço(s) adicionado(s) com sucesso!`, 'success');
-                
-                // Recarregar página após sucesso
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            }
-            
-            if (erros > 0) {
-                mostrarMensagem(`${erros} serviço(s) falharam ao salvar`, 'error');
-            }
-            
-            // Limpar seleção
-            servicosSelecionados = [];
-            atualizarInterfaceSelecao();
-        })
-        .catch(error => {
-            console.error('❌ Erro ao salvar serviços:', error);
-            mostrarMensagem('Erro ao salvar serviços', 'error');
-        })
-        .finally(() => {
-            // Reabilitar botão
-            btnSalvar.disabled = false;
-            btnSalvar.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Serviços (<span id="contadorBotao">0</span>)';
-        });
-}
-
-// Adicionar serviço à obra (função antiga mantida para compatibilidade)
-function adicionarServicoObra(servicoId, servicoNome) {
-    const obraId = {{ obra.id }};
-    
-    fetch('/api/obras/servicos-rdo', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            obra_id: obraId,
-            servico_id: servicoId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Remover da lista de disponíveis
-            const servicoDisponivel = document.getElementById(`servico-disponivel-${servicoId}`);
-            if (servicoDisponivel) {
-                servicoDisponivel.remove();
-            }
-            
-            // Adicionar à lista de serviços da obra
-            adicionarServicoNaLista(servicoId, servicoNome, data.servico);
-            
-            // Remover mensagem de "nenhum serviço" se existir
-            const noServicosObra = document.getElementById('noServicosObra');
-            if (noServicosObra) {
-                noServicosObra.remove();
-            }
-            
-            // Mostrar mensagem de sucesso
-            mostrarMensagem('Serviço adicionado com sucesso!', 'success');
-            
-            // Recarregar a página após 1 segundo para atualizar a visualização
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-            
-        } else {
-            mostrarMensagem(data.message || 'Erro ao adicionar serviço', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        mostrarMensagem('Erro ao adicionar serviço', 'error');
-    });
-}
-
-// Remover serviço da obra
-function removerServicoObra(servicoId) {
-    const obraId = {{ obra.id }};
-    
-    if (!confirm('Tem certeza que deseja remover este serviço da obra?')) {
-        return;
-    }
-    
-    fetch('/api/obras/servicos', {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            obra_id: obraId,
-            servico_id: servicoId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Remover da lista de serviços da obra
-            const servicoObra = document.getElementById(`servico-obra-${servicoId}`);
-            if (servicoObra) {
-                servicoObra.remove();
-            }
-            
-            // Verificar se não há mais serviços na obra
-            const servicosObra = document.querySelectorAll('[id^="servico-obra-"]');
-            if (servicosObra.length === 0) {
-                const containerServicosObra = document.getElementById('servicosObra');
-                containerServicosObra.innerHTML = `
-                    <div class="col-12" id="noServicosObra">
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-tools fa-2x mb-3 opacity-50"></i>
-                            <p>Nenhum serviço associado a esta obra ainda.</p>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // Recarregar serviços disponíveis
-            carregarServicosDisponiveis();
-            
-            // Mostrar mensagem de sucesso
-            mostrarMensagem('Serviço removido com sucesso!', 'success');
-            
-            // Recarregar a página após 1 segundo para atualizar a visualização
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-            
-        } else {
-            mostrarMensagem(data.message || 'Erro ao remover serviço', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        mostrarMensagem('Erro ao remover serviço', 'error');
-    });
-}
-
-// Adicionar serviço na lista visual
-function adicionarServicoNaLista(servicoId, servicoNome, servicoData) {
-    const container = document.getElementById('servicosObra');
-    
-    const servicoCard = `
-        <div class="col-md-6 mb-3" id="servico-obra-${servicoId}">
-            <div class="card border-success">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="card-title mb-1">${servicoNome}</h6>
-                            ${servicoData && servicoData.descricao ? `<small class="text-muted">${servicoData.descricao.length > 80 ? servicoData.descricao.substring(0, 80) + '...' : servicoData.descricao}</small>` : ''}
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerServicoObra(${servicoId})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML += servicoCard;
-}
-
-// Renderizar serviço RDO com progresso das subatividades
-function renderizarServicoRDO(servico) {
-    return `
-        <div class="servico-rdo card border-primary mb-3" style="background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6;">
-            <div class="card-body" style="padding: 1.5rem;">
-                <div class="servico-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                    <div class="servico-info" style="flex: 1;">
-                        <h4 class="servico-nome" style="font-weight: 600; color: #1f2937; margin: 0 0 0.5rem 0; font-size: 1.1rem;">
-                            <i class="fas fa-tools" style="color: #3b82f6; margin-right: 0.5rem;"></i>
-                            ${servico.nome}
-                        </h4>
-                        <p class="servico-categoria" style="margin: 0; font-size: 0.9rem; color: #6b7280;">
-                            <strong>Categoria:</strong> ${servico.categoria || 'Geral'}
-                        </p>
-                        <p class="servico-subatividades" style="margin: 0.5rem 0; font-size: 0.9rem; color: #6b7280;">
-                            <strong>Subatividades:</strong> ${servico.total_subatividades_ativas || 0}/${servico.total_subatividades_possiveis || 0}
-                        </p>
-                    </div>
-                    <div class="servico-progresso-badge" style="text-align: center; margin-left: 1rem;">
-                        <div class="progress-badge" style="background: ${servico.progresso >= 100 ? '#22c55e' : servico.progresso >= 70 ? '#3b82f6' : servico.progresso >= 40 ? '#f59e0b' : '#ef4444'}; color: white; padding: 0.5rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.9rem;">
-                            ${(servico.progresso || 0).toFixed(1)}%
-                        </div>
-                    </div>
-                </div>
-                <div class="progress" style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                    <div class="progress-bar" style="width: ${(servico.progresso || 0).toFixed(1)}%; height: 100%; background: ${servico.progresso >= 100 ? '#22c55e' : servico.progresso >= 70 ? '#3b82f6' : servico.progresso >= 40 ? '#f59e0b' : '#ef4444'}; transition: width 0.5s ease;">
-                    </div>
-                </div>
-                <div class="progress-text" style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">
-                    <span>${servico.progresso == 0 ? 'Não iniciado' : servico.progresso < 40 ? 'Em início' : servico.progresso < 70 ? 'Em progresso' : servico.progresso < 100 ? 'Quase pronto' : 'Concluído'}</span>
-                    <span style="font-weight: 600;">${(servico.progresso || 0).toFixed(1)}%</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// Mostrar mensagem de feedback
-function mostrarMensagem(mensagem, tipo) {
-    const alertClass = tipo === 'success' ? 'alert-success' : 'alert-danger';
-    const iconClass = tipo === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle';
-    
-    const alert = document.createElement('div');
-    alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alert.innerHTML = `
-        <i class="fas ${iconClass} me-2"></i>
-        ${mensagem}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-    
-    document.body.appendChild(alert);
-    
-    // Auto remover após 3 segundos
-    setTimeout(() => {
-        if (alert.parentNode) {
-            alert.remove();
-        }
-    }, 3000);
-}
 
 // Função para alternar visualização de funcionários
 function toggleAllFuncionarios() {
@@ -2810,7 +2297,172 @@ function compraObraRemoverItem(btn) {
         tbody.querySelector('.btn-danger').style.display = 'none';
     }
 }
+
+// ── Cronograma do Cliente: Gantt read-only ──
+(function () {
+    var split = document.getElementById('clienteCronSplit');
+    if (!split) return;
+    var container = document.getElementById('clienteCronGanttContainer');
+    var toggleBtn = document.getElementById('clienteCronToggleBtn');
+    var toggleIcon = document.getElementById('clienteCronToggleIcon');
+    var DAY_W = 24;
+
+    function gatherTasks() {
+        var rows = document.querySelectorAll('#clienteCronSplit .cc-row');
+        var tasks = [];
+        rows.forEach(function (r) {
+            var inicio = r.dataset.inicio;
+            var fim = r.dataset.fim;
+            if (!inicio || !fim) return;
+            tasks.push({
+                id: r.dataset.id,
+                nome: r.dataset.nome || '',
+                inicio: inicio,
+                fim: fim,
+                perc: parseInt(r.dataset.perc || '0', 10) || 0
+            });
+        });
+        return tasks;
+    }
+
+    function fmtDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso + 'T00:00:00');
+        return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + String(d.getFullYear()).slice(-2);
+    }
+
+    function renderGantt() {
+        if (!container) return;
+        var tasks = gatherTasks();
+        if (!tasks.length) {
+            container.innerHTML = '<p class="text-muted small p-4 text-center"><i class="fas fa-chart-gantt fa-2x mb-2 d-block opacity-25"></i>Sem datas para exibir no Gantt.</p>';
+            return;
+        }
+        var dMin = new Date(tasks.reduce(function (a, b) { return a.inicio < b.inicio ? a : b; }).inicio + 'T00:00:00');
+        var dMax = new Date(tasks.reduce(function (a, b) { return a.fim > b.fim ? a : b; }).fim + 'T00:00:00');
+        dMin.setDate(dMin.getDate() - 2);
+        dMax.setDate(dMax.getDate() + 6);
+        var totalDays = Math.round((dMax - dMin) / 86400000) + 1;
+        var totalW = totalDays * DAY_W;
+
+        var months = [];
+        var cur = new Date(dMin);
+        while (cur <= dMax) {
+            var y = cur.getFullYear(), m = cur.getMonth();
+            var label = cur.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+            var s = Math.max(new Date(y, m, 1), dMin);
+            var e2 = Math.min(new Date(y, m + 1, 0), dMax);
+            months.push({ label: label, span: Math.round((e2 - s) / 86400000) + 1 });
+            cur = new Date(y, m + 1, 1);
+        }
+        var monthHtml = months.map(function (mm) {
+            return '<div class="ccg-month-cell" style="width:' + (mm.span * DAY_W) + 'px;min-width:' + (mm.span * DAY_W) + 'px">' + mm.label + '</div>';
+        }).join('');
+
+        var dayHtml = '';
+        for (var i = 0; i < totalDays; i++) {
+            var d = new Date(dMin); d.setDate(d.getDate() + i);
+            var wk = (d.getDay() === 0 || d.getDay() === 6);
+            dayHtml += '<div class="ccg-day-cell' + (wk ? ' ccg-day-weekend' : '') + '" style="width:' + DAY_W + 'px;min-width:' + DAY_W + 'px">' + d.getDate() + '</div>';
+        }
+
+        var todayD = new Date(); todayD.setHours(0, 0, 0, 0);
+        var todayLeft = Math.round((todayD - dMin) / 86400000) * DAY_W;
+
+        var rowHtml = '';
+        tasks.forEach(function (t) {
+            var dI = new Date(t.inicio + 'T00:00:00');
+            var dF = new Date(t.fim + 'T00:00:00');
+            var leftPx = Math.round((dI - dMin) / 86400000) * DAY_W;
+            var widPx = (Math.round((dF - dI) / 86400000) + 1) * DAY_W;
+            var progW = Math.round(t.perc / 100 * widPx);
+            var barClass = t.perc >= 100 ? 'ccg-bar-done' : t.perc > 0 ? 'ccg-bar-leaf' : 'ccg-bar-low';
+            var todayMarker = (todayLeft >= 0 && todayLeft <= totalW)
+                ? '<div class="ccg-today" style="left:' + todayLeft + 'px"></div>' : '';
+            var label = (widPx > 60) ? '<span class="ccg-bar-label">' + t.perc + '%</span>' : '';
+            rowHtml += '<div class="ccg-row" style="width:' + totalW + 'px;min-width:' + totalW + 'px">' +
+                todayMarker +
+                '<div class="ccg-bar ' + barClass + '" style="left:' + leftPx + 'px;width:' + widPx + 'px" ' +
+                'title="' + (t.nome || '').replace(/"/g, '&quot;') + ' — ' + t.perc + '% — ' + fmtDate(t.inicio) + ' → ' + fmtDate(t.fim) + '">' +
+                '<div class="ccg-progress" style="width:' + progW + 'px"></div>' + label +
+                '</div></div>';
+        });
+
+        container.innerHTML =
+            '<div style="width:' + totalW + 'px;min-width:' + totalW + 'px">' +
+                '<div class="ccg-header-months">' + monthHtml + '</div>' +
+                '<div class="ccg-header-days">' + dayHtml + '</div>' +
+                '<div>' + rowHtml + '</div>' +
+            '</div>';
+    }
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function () {
+            split.classList.toggle('gantt-hidden');
+            var hidden = split.classList.contains('gantt-hidden');
+            if (toggleIcon) {
+                toggleIcon.classList.toggle('fa-chevron-right', !hidden);
+                toggleIcon.classList.toggle('fa-chevron-left', hidden);
+            }
+            if (!hidden) setTimeout(renderGantt, 50);
+        });
+    }
+
+    // Render when Cronograma tab becomes visible (event fires on the trigger button, not the pane)
+    var cronogramaTabBtn = document.querySelector('#obraDetailTabs button[data-bs-target="#tab-cronograma"]');
+    if (cronogramaTabBtn) {
+        cronogramaTabBtn.addEventListener('shown.bs.tab', function () {
+            setTimeout(renderGantt, 50);
+        });
+    }
+
+    // Initial render if the tab is already active on load (or activated via hash)
+    function maybeInitialRender() {
+        var pane = document.getElementById('tab-cronograma');
+        if (pane && pane.classList.contains('active')) {
+            setTimeout(renderGantt, 100);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', maybeInitialRender);
+    } else {
+        maybeInitialRender();
+    }
+    // Also handle hash-based activation that may happen after DOMContentLoaded
+    window.addEventListener('load', maybeInitialRender);
+    window.addEventListener('hashchange', function () {
+        if (window.location.hash === '#cronograma') {
+            setTimeout(renderGantt, 150);
+        }
+    });
+
+    // Expose for debugging
+    window.renderClienteCronGantt = renderGantt;
+})();
 </script>
+
+<style>
+/* ── Cliente Cron Gantt (read-only) styles ── */
+#clienteCronGanttContainer { min-width: 100%; user-select: none; }
+.ccg-header-months { display: flex; background: #0f766e; color: #fff; font-size: .72rem; }
+.ccg-header-days   { display: flex; background: #115e59; color: #cbd5e1; font-size: .68rem; border-bottom: 1px solid #dee2e6; }
+.ccg-month-cell { text-align: center; padding: 5px 0; border-right: 1px solid #134e4a; font-weight: 600; }
+.ccg-day-cell   { text-align: center; padding: 3px 0; border-right: 1px solid #134e4a; flex-shrink: 0; }
+.ccg-day-weekend { color: #f59e0b !important; }
+.ccg-row { display: flex; align-items: center; height: 37px; border-bottom: 1px solid #f0f2f5; position: relative; }
+.ccg-row:hover { background: #f0fdfa; }
+.ccg-bar {
+    position: absolute; height: 18px; border-radius: 4px; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.18); display: flex; align-items: center;
+    color: #fff; font-size: .7rem; font-weight: 600;
+}
+.ccg-bar-leaf { background: linear-gradient(90deg,#0ea5e9,#38bdf8); }
+.ccg-bar-done { background: linear-gradient(90deg,#16a34a,#22c55e); }
+.ccg-bar-low  { background: linear-gradient(90deg,#94a3b8,#cbd5e1); color: #1f2937; }
+.ccg-progress { height: 100%; background: rgba(255,255,255,.3); }
+.ccg-bar-label { position: relative; z-index: 2; padding-left: 6px; text-shadow: 0 1px 1px rgba(0,0,0,.25); }
+.ccg-today { position: absolute; top: 0; bottom: 0; width: 2px; background: #e53935; z-index: 5; pointer-events: none; }
+</style>
 
 <style>
 @keyframes fade-in {
@@ -2828,50 +2480,6 @@ function compraObraRemoverItem(btn) {
     animation: fade-in 0.6s ease forwards;
 }
 
-/* Estilos para sistema de seleção múltipla */
-.servico-card-selecao {
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.servico-card-selecao:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.servico-card-selecao.border-success {
-    border-color: #22c55e !important;
-    background-color: rgba(34, 197, 94, 0.05);
-}
-
-.servico-card-selecao.border-success .card-body {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(34, 197, 94, 0.02) 100%);
-}
-
-.servico-checkbox {
-    transform: scale(1.2);
-    margin-right: 8px;
-}
-
-.servico-checkbox:checked {
-    background-color: #22c55e;
-    border-color: #22c55e;
-}
-
-#servicosSelecionados {
-    border: 2px dashed #3b82f6;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%);
-}
-
-#servicosSelecionados .badge {
-    font-size: 0.85rem;
-    padding: 0.5rem 0.75rem;
-}
-
-#btnSalvarServicos:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
 </style>
 
 <!-- Modal: Novo Mapa de Concorrência -->
