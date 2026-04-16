@@ -3814,6 +3814,7 @@ def executar_migracoes():
             (112, "MapaConcorrenciaV2 — tabela multi-fornecedor com cotações por item", migration_112_mapa_concorrencia_v2),
             (113, "TarefaCronograma — data_entrega_real DATE para entregas/terceiros", migration_113_tarefa_cronograma_data_entrega_real),
             (114, "Subempreiteiro + RDOSubempreitadaApontamento + GestaoCustoPai.subempreiteiro_id", migration_114_subempreiteiro),
+            (115, "Consolidar GestaoCustoPai duplicados por (admin_id, entidade_id, categoria normalizada)", migration_115_consolidar_gestao_custo_pai_duplicados),
         ]
         
         # Executar cada migração com rastreamento
@@ -9173,6 +9174,152 @@ def migration_114_subempreiteiro():
 
     except Exception as e:
         logger.error(f"Erro na migracao 114: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+# ============================================================================
+# Migration 115 — Consolidar GestaoCustoPai duplicados (Task #60)
+# ============================================================================
+_CATEGORIA_LEGADA_MAP_M115 = {
+    'COMPRA':        'MATERIAL',
+    'VEICULO':       'EQUIPAMENTO',
+    'SALARIO':       'MAO_OBRA_DIRETA',
+    'REEMBOLSO':     'OUTROS',
+    'DESPESA_GERAL': 'OUTROS',
+}
+
+
+def migration_115_consolidar_gestao_custo_pai_duplicados():
+    """
+    Migration 115: Consolida GestaoCustoPai duplicados em aberto.
+
+    Para cada (admin_id, entidade_id, categoria_normalizada) com mais de um pai
+    em aberto (status NOT IN PAGO/RECUSADO/PARCIAL), elege o pai mais antigo
+    como canônico, repassa todos os filhos dos demais para ele, recalcula o
+    valor_total e remove os pais que ficaram vazios.
+
+    NÃO toca em pais com status PAGO, RECUSADO ou PARCIAL.
+    Idempotente: pode rodar múltiplas vezes.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        STATUS_PROTEGIDOS = ('PAGO', 'RECUSADO', 'PARCIAL')
+
+        # CASE para normalizar categoria diretamente em SQL
+        case_normaliza = (
+            "CASE tipo_categoria "
+            + " ".join(
+                f"WHEN '{legada}' THEN '{nova}'"
+                for legada, nova in _CATEGORIA_LEGADA_MAP_M115.items()
+            )
+            + " ELSE tipo_categoria END"
+        )
+
+        # 1) Grupos com entidade_id (chave canônica)
+        cursor.execute(f"""
+            SELECT admin_id, entidade_id, {case_normaliza} AS cat_norm,
+                   array_agg(id ORDER BY id ASC) AS pai_ids
+            FROM gestao_custo_pai
+            WHERE entidade_id IS NOT NULL
+              AND status NOT IN %s
+            GROUP BY admin_id, entidade_id, cat_norm
+            HAVING COUNT(*) > 1
+        """, (STATUS_PROTEGIDOS,))
+        grupos_com_id = cursor.fetchall()
+
+        # 2) Grupos sem entidade_id (fallback por entidade_nome)
+        cursor.execute(f"""
+            SELECT admin_id, entidade_nome, {case_normaliza} AS cat_norm,
+                   array_agg(id ORDER BY id ASC) AS pai_ids
+            FROM gestao_custo_pai
+            WHERE entidade_id IS NULL
+              AND status NOT IN %s
+            GROUP BY admin_id, entidade_nome, cat_norm
+            HAVING COUNT(*) > 1
+        """, (STATUS_PROTEGIDOS,))
+        grupos_sem_id = cursor.fetchall()
+
+        total_grupos = len(grupos_com_id) + len(grupos_sem_id)
+        total_pais_removidos = 0
+        total_filhos_movidos = 0
+
+        def _consolidar(pai_ids, label):
+            nonlocal total_pais_removidos, total_filhos_movidos
+            canonical_id = pai_ids[0]
+            duplicados = pai_ids[1:]
+            if not duplicados:
+                return
+
+            # Mover filhos dos duplicados para o canônico
+            cursor.execute(
+                "UPDATE gestao_custo_filho SET pai_id = %s WHERE pai_id = ANY(%s)",
+                (canonical_id, duplicados),
+            )
+            filhos_movidos = cursor.rowcount or 0
+            total_filhos_movidos += filhos_movidos
+
+            # Garantir que duplicados não tenham mais filhos antes do delete
+            cursor.execute(
+                "SELECT id FROM gestao_custo_pai WHERE id = ANY(%s) "
+                "AND id NOT IN (SELECT DISTINCT pai_id FROM gestao_custo_filho WHERE pai_id = ANY(%s))",
+                (duplicados, duplicados),
+            )
+            removiveis = [r[0] for r in cursor.fetchall()]
+            if removiveis:
+                cursor.execute(
+                    "DELETE FROM gestao_custo_pai WHERE id = ANY(%s)",
+                    (removiveis,),
+                )
+                total_pais_removidos += cursor.rowcount or 0
+
+            # Recalcular valor_total do canônico
+            cursor.execute(
+                "UPDATE gestao_custo_pai SET valor_total = "
+                "COALESCE((SELECT SUM(valor) FROM gestao_custo_filho WHERE pai_id = %s), 0) "
+                "WHERE id = %s",
+                (canonical_id, canonical_id),
+            )
+
+            logger.info(
+                f"MIGRACAO 115: consolidado {label} → pai canônico={canonical_id}, "
+                f"filhos movidos={filhos_movidos}, duplicados removidos={len(removiveis)}"
+            )
+
+        for admin_id, entidade_id, cat_norm, pai_ids in grupos_com_id:
+            _consolidar(
+                pai_ids,
+                f"admin={admin_id} entidade_id={entidade_id} cat={cat_norm}",
+            )
+
+        for admin_id, entidade_nome, cat_norm, pai_ids in grupos_sem_id:
+            _consolidar(
+                pai_ids,
+                f"admin={admin_id} entidade_nome='{entidade_nome}' cat={cat_norm}",
+            )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        logger.info(
+            f"MIGRACAO 115 CONCLUIDA: {total_grupos} grupos consolidados, "
+            f"{total_filhos_movidos} filhos movidos, {total_pais_removidos} pais duplicados removidos"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 115: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         if connection:
             try:
                 connection.rollback()

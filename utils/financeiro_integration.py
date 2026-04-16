@@ -50,20 +50,46 @@ def registrar_custo_automatico(
         if isinstance(data, str):
             data = datetime.strptime(data, '%Y-%m-%d').date()
 
+        # Normaliza categoria (legada → nova) ANTES de buscar/gravar.
+        # Ex.: SALARIO → MAO_OBRA_DIRETA, COMPRA → MATERIAL, VEICULO → EQUIPAMENTO,
+        #      REEMBOLSO/DESPESA_GERAL → OUTROS
+        legada_map = GestaoCustoPai._CATEGORIA_LEGADA_MAP
+        categoria_normalizada = legada_map.get(tipo_categoria, tipo_categoria)
+
+        # Lista de categorias equivalentes para casar pais antigos que ficaram
+        # gravados com o nome legado no banco (antes desta normalização).
+        categorias_equivalentes = {categoria_normalizada}
+        for legada, nova in legada_map.items():
+            if nova == categoria_normalizada:
+                categorias_equivalentes.add(legada)
+
         # Busca pai em aberto (não PAGO/RECUSADO) para a mesma categoria+entidade
-        # → 1 dropdown por (categoria + entidade), independente da data
-        pai = GestaoCustoPai.query.filter(
+        # → 1 dropdown por (categoria + entidade), independente da data.
+        # Quando entidade_id está presente (funcionário, fornecedor canônico),
+        # usamos ele como chave canônica e ignoramos diferenças de entidade_nome
+        # (caixa/espacos). Quando NÃO há entidade_id, fallback em entidade_nome.
+        filtros = [
             GestaoCustoPai.admin_id == admin_id,
-            GestaoCustoPai.tipo_categoria == tipo_categoria,
-            GestaoCustoPai.entidade_id == (entidade_id if entidade_id else None),
-            GestaoCustoPai.entidade_nome == entidade_nome,
+            GestaoCustoPai.tipo_categoria.in_(list(categorias_equivalentes)),
             GestaoCustoPai.status.notin_(['PAGO', 'RECUSADO']),
-        ).order_by(GestaoCustoPai.id.desc()).first()
+        ]
+        if entidade_id:
+            filtros.append(GestaoCustoPai.entidade_id == entidade_id)
+        else:
+            filtros.append(GestaoCustoPai.entidade_id.is_(None))
+            filtros.append(GestaoCustoPai.entidade_nome == entidade_nome)
+
+        pai = (
+            GestaoCustoPai.query
+            .filter(*filtros)
+            .order_by(GestaoCustoPai.id.asc())
+            .first()
+        )
 
         if not pai:
             pai = GestaoCustoPai(
                 admin_id=admin_id,
-                tipo_categoria=tipo_categoria,
+                tipo_categoria=categoria_normalizada,
                 entidade_nome=entidade_nome,
                 entidade_id=entidade_id,
                 valor_total=Decimal('0.00'),

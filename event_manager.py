@@ -694,7 +694,9 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                 .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
                 .filter(
                     GestaoCustoPai.entidade_id == func_id,
-                    GestaoCustoPai.tipo_categoria == 'SALARIO',
+                    # Aceita tanto a categoria legada (SALARIO) quanto a normalizada
+                    # (MAO_OBRA_DIRETA) — pais antigos podem estar em qualquer forma.
+                    GestaoCustoPai.tipo_categoria.in_(['SALARIO', 'MAO_OBRA_DIRETA']),
                     GestaoCustoPai.admin_id == admin_id,
                 )
                 .first()
