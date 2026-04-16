@@ -1,0 +1,218 @@
+Você vai atuar no repositório atual do SIGE e implementar uma reorganização do módulo de Compras, mantendo compatibilidade com a base existente.
+
+CONTEXTO DO CÓDIGO ATUAL
+- Hoje “Gestão de Compras” está dentro do dropdown de “Almoxarifado” no menu principal em `templates/base_completo.html`.
+- Hoje a criação de compra está concentrada em `compras_views.py`, e o fluxo atual já cria pedido + custo + entrada automática no almoxarifado no mesmo processo.
+- Hoje o portal do cliente aprova compra em `portal_obras_views.py`, mas a aprovação só altera `status_aprovacao_cliente` e não executa a nova lógica de negócio.
+
+OBJETIVO
+Separar visualmente Compras de Almoxarifado e implementar dois fluxos distintos:
+1. Compra normal
+2. Compra para aprovação do cliente (faturamento direto)
+
+IMPORTANTE
+- NÃO refatore o sistema inteiro.
+- Faça a menor intervenção possível, mas com boa organização.
+- Preserve o máximo possível da estrutura atual.
+- Não quebre o fluxo atual de portal, obra e almoxarifado.
+- Onde precisar criar campos novos, faça migration/model update de forma limpa.
+- Se houver qualquer ambiguidade, siga exatamente as regras abaixo, sem inventar contas a pagar onde eu proibi.
+
+REGRAS DE NEGÓCIO OFICIAIS
+
+1) MENU
+Separar “Compras” de “Almoxarifado”.
+
+Desejo no menu principal:
+- Compras
+  - Dashboard / Lista
+  - Nova Compra
+  - Compras para Aprovação
+- Almoxarifado
+  - Dashboard
+  - Catálogo de Itens
+  - Categorias
+  - Nova Entrada
+  - Nova Saída
+  - Devolução
+  - Movimentações
+  - Relatórios
+
+Remover “Gestão de Compras” de dentro do dropdown de Almoxarifado.
+
+2) TIPOS DE COMPRA
+Adicionar no formulário de compra um campo obrigatório para definir o tipo:
+- `normal`
+- `aprovacao_cliente`
+
+Sugestão de label visível:
+- Compra normal
+- Compra para aprovação do cliente
+
+3) REGRA DA COMPRA NORMAL
+Na compra normal:
+- pode existir obra vinculada OU não
+- se houver obra vinculada:
+  - criar/cadastrar os itens no almoxarifado se necessário
+  - lançar ENTRADA no almoxarifado
+  - lançar SAÍDA imediata para a obra vinculada
+  - o campo responsável da saída deve ficar vazio/null
+- se NÃO houver obra vinculada:
+  - criar/cadastrar os itens no almoxarifado se necessário
+  - lançar apenas ENTRADA no almoxarifado
+  - não criar saída
+
+Se a compra normal hoje já cria registros financeiros/custos, preserve a lógica atual na medida do possível, desde que não conflite com as novas regras abaixo para aprovação do cliente.
+
+4) REGRA DA COMPRA PARA APROVAÇÃO DO CLIENTE
+Na compra do tipo `aprovacao_cliente`:
+- a obra é obrigatória
+- a compra deve aparecer corretamente:
+  - no Portal do Cliente
+  - na tela de detalhes da obra
+  - na listagem interna de compras para aprovação
+- ao salvar a compra para aprovação:
+  - NÃO criar contas a pagar
+  - NÃO criar obrigação financeira da empresa
+  - NÃO movimentar almoxarifado ainda
+  - NÃO criar entrada
+  - NÃO criar saída
+- salvar com status coerente de aprovação do cliente, por exemplo:
+  - `PENDENTE`
+ou
+  - `AGUARDANDO_APROVACAO_CLIENTE`
+
+5) QUANDO O CLIENTE APROVAR
+Ao aprovar a compra no portal:
+- NÃO criar contas a pagar
+- NÃO criar obrigação financeira da empresa
+- criar um custo de `faturamento_direto` vinculado à obra
+- depois da aprovação:
+  - cadastrar/criar os itens no almoxarifado se necessário
+  - lançar ENTRADA no almoxarifado
+  - lançar SAÍDA para a obra vinculada
+  - deixar responsável vazio/null
+- manter rastreabilidade de que esta compra foi aprovada pelo cliente e processada como faturamento direto
+
+6) QUANDO O CLIENTE RECUSAR
+Ao recusar:
+- não movimentar almoxarifado
+- não criar custo
+- manter status de recusado
+- continuar visível no histórico da compra/obra/portal conforme fizer sentido
+
+7) DETALHES IMPORTANTES
+- Sempre que a compra for do tipo `aprovacao_cliente`, a obra deve ser obrigatória no backend e no frontend.
+- Sempre que a compra for do tipo `normal`, a obra pode ser opcional.
+- Para compra normal com obra:
+  - o item não deve “ficar em estoque” como saldo disponível final, porque entrou e saiu para a obra no mesmo fluxo.
+- Para compra normal sem obra:
+  - o item deve permanecer em estoque.
+- Para aprovação do cliente:
+  - a movimentação física só acontece após aprovação.
+- O nome “faturamento direto” precisa aparecer em algum ponto compreensível para usuário/admin.
+
+O QUE ESPERO QUE VOCÊ ALTERE
+
+A) MENU / NAVEGAÇÃO
+- Atualizar `templates/base_completo.html` para separar Compras de Almoxarifado.
+
+B) MODELS / CAMPOS
+Adicionar no modelo de compra (ou estrutura equivalente já existente) campos como:
+- `tipo_compra` = `normal` | `aprovacao_cliente`
+- `processada_apos_aprovacao` boolean, se necessário
+- `tipo_custo_gerado` ou equivalente, se necessário
+- qualquer campo mínimo necessário para rastrear faturamento direto
+
+Não crie campos desnecessários se der para resolver com status e origem.
+
+C) FORMULÁRIO DE COMPRA
+Atualizar a tela/form de nova compra para:
+- escolher tipo de compra
+- exigir obra quando for aprovação do cliente
+- manter UX clara
+
+D) BACKEND DE CRIAÇÃO DE COMPRA
+Alterar `compras_views.py` para:
+- implementar a bifurcação correta entre compra normal e compra para aprovação
+- não movimentar almoxarifado prematuramente nas compras de aprovação
+- respeitar as regras acima
+
+E) PORTAL DO CLIENTE
+Alterar `portal_obras_views.py` para que a aprovação da compra:
+- não apenas mude o status
+- mas execute o processamento da compra aprovada:
+  - criar custo de faturamento direto
+  - entrada no almoxarifado
+  - saída para obra
+- fazer isso de forma idempotente para não duplicar processamento se a rota for acionada duas vezes
+
+F) DETALHES DA OBRA
+Garantir que compras para aprovação apareçam corretamente em detalhes da obra e continuem coerentes com o portal.
+
+G) LISTAGENS
+Criar ou ajustar:
+- lista de compras normais
+- lista de compras para aprovação
+ou, se preferir, uma lista única com filtros e badges claros
+
+REQUISITOS TÉCNICOS
+- Fazer implementação segura para multi-tenant / `admin_id`
+- Manter consistência transacional
+- Evitar duplicação de entrada/saída/custo
+- Criar helpers internos se isso simplificar a lógica
+- Evitar espalhar regra duplicada em muitos pontos
+- Se possível, encapsular o processamento da compra aprovada em uma função reutilizável, algo como:
+  - `processar_compra_normal(...)`
+  - `processar_compra_aprovada_cliente(...)`
+
+IDEMPOTÊNCIA
+A aprovação do cliente não pode gerar:
+- duas entradas
+- duas saídas
+- dois custos de faturamento direto
+
+Se a compra já tiver sido processada após aprovação, a rota deve detectar isso e não duplicar.
+
+CUSTO DE FATURAMENTO DIRETO
+Criar esse custo de forma coerente com a estrutura já existente no sistema.
+Se já existir um módulo/tabela de custos que faça sentido reutilizar, reutilize.
+Mas siga esta regra:
+- é custo vinculado à obra
+- é de faturamento direto
+- não gera contas a pagar da empresa
+
+NÃO FAZER
+- Não criar contas a pagar para compras do tipo `aprovacao_cliente`
+- Não mover estoque antes da aprovação do cliente
+- Não deixar Compras dentro do dropdown de Almoxarifado
+- Não reescrever o sistema inteiro
+- Não remover funcionalidades existentes sem necessidade
+
+ENTREGA ESPERADA
+Quero que você:
+1. implemente as mudanças
+2. mostre os arquivos alterados
+3. explique resumidamente a lógica nova
+4. destaque qualquer migration criada
+5. informe como testar os 4 cenários:
+
+CENÁRIOS DE TESTE
+1. Compra normal com obra
+   - entrada + saída para obra
+   - responsável vazio
+
+2. Compra normal sem obra
+   - só entrada em estoque
+
+3. Compra para aprovação antes da aprovação
+   - aparece no portal e na obra
+   - sem contas a pagar
+   - sem movimentação de estoque
+
+4. Compra para aprovação após aprovação do cliente
+   - cria custo de faturamento direto
+   - entrada no almoxarifado
+   - saída para a obra
+   - sem contas a pagar
+   - sem duplicação se aprovar novamente
