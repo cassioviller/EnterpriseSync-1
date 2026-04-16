@@ -75,8 +75,13 @@
               </div>
 
               <div class="col-md-12">
-                <label class="form-label fw-semibold">Obra <span class="text-danger">*</span></label>
-                <select name="obra_id" class="form-select" required>
+                <label class="form-label fw-semibold">
+                  Obra <span class="text-danger" id="obraRequiredMark">*</span>
+                  <small class="text-muted ms-1" id="obraHint">
+                    (opcional para Compra Normal — se vazia, material vai só para o estoque)
+                  </small>
+                </label>
+                <select name="obra_id" id="obraSelect" class="form-select">
                   <option value="">Selecione a obra...</option>
                   {% for o in obras %}
                     <option value="{{ o.id }}">{{ o.nome }}</option>
@@ -325,6 +330,21 @@ function atualizarTipoCompra() {
     if (tg) { tg.checked = false; window.toggleSecaoReembolso(tg); }
   } else {
     secReimb.style.display = '';
+  }
+  // Obra: required em aprovacao_cliente; opcional em normal
+  const obraSel  = document.getElementById('obraSelect');
+  const obraMark = document.getElementById('obraRequiredMark');
+  const obraHint = document.getElementById('obraHint');
+  if (obraSel) {
+    if (isAprov) {
+      obraSel.required = true;
+      if (obraMark) obraMark.style.display = '';
+      if (obraHint) obraHint.textContent = '(obrigatória — cliente aprovará pelo portal da obra)';
+    } else {
+      obraSel.required = false;
+      if (obraMark) obraMark.style.display = 'none';
+      if (obraHint) obraHint.textContent = '(opcional para Compra Normal — se vazia, material vai só para o estoque)';
+    }
   }
 }
 atualizarTipoCompra();

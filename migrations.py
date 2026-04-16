@@ -9365,6 +9365,13 @@ def migration_116_pedido_compra_tipo_compra():
                 ADD COLUMN IF NOT EXISTS processada_apos_aprovacao BOOLEAN NOT NULL DEFAULT FALSE
         """)
 
+        # Aumentar status_aprovacao_cliente de VARCHAR(20) -> VARCHAR(40) para
+        # caber o novo valor 'AGUARDANDO_APROVACAO_CLIENTE' (28 chars).
+        cursor.execute("""
+            ALTER TABLE pedido_compra
+                ALTER COLUMN status_aprovacao_cliente TYPE VARCHAR(40)
+        """)
+
         # Garantir que registros existentes tenham tipo_compra='normal' (já que eles
         # foram criados no fluxo antigo). NOT NULL + DEFAULT já cuidou disto, mas
         # reforçamos para o caso de a coluna ter sido criada NULL antes.
@@ -9373,10 +9380,26 @@ def migration_116_pedido_compra_tipo_compra():
              WHERE tipo_compra IS NULL
         """)
 
+        # Backfill crítico de idempotência: qualquer pedido LEGADO com
+        # status_aprovacao_cliente='APROVADO' já foi "aprovado" antes desta
+        # task existir; portanto NÃO deve ser reprocessado se alguém clicar
+        # aprovar de novo (o helper FATURAMENTO_DIRETO usa processada_apos_aprovacao
+        # como guarda). Marcamos como já processado para evitar duplicidade.
+        cursor.execute("""
+            UPDATE pedido_compra
+               SET processada_apos_aprovacao = TRUE
+             WHERE status_aprovacao_cliente = 'APROVADO'
+               AND processada_apos_aprovacao = FALSE
+        """)
+        backfill_approved = cursor.rowcount or 0
+
         connection.commit()
         cursor.close()
         connection.close()
-        logger.info("MIGRACAO 116 CONCLUIDA: pedido_compra.tipo_compra e processada_apos_aprovacao criados")
+        logger.info(
+            f"MIGRACAO 116 CONCLUIDA: pedido_compra.tipo_compra e processada_apos_aprovacao "
+            f"criados; backfill idempotencia={backfill_approved} pedidos APROVADO legados"
+        )
         return True
 
     except Exception as e:

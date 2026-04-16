@@ -126,11 +126,48 @@ def _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id):
     return resultado
 
 
+def _gerar_saida_almoxarifado(pedido, movs_entrada, admin_id, usuario_id, descricao):
+    """Gera SAÍDA imediata para os estoques criados pela ENTRADA, baixando o
+    saldo e marcando o lote como CONSUMIDO. Usado tanto em 'normal com obra'
+    (consumo direto na obra) quanto em 'aprovacao_cliente' (faturamento direto).
+
+    NÃO commita — o chamador cuida do commit.
+    Retorna número de saídas geradas.
+    """
+    from datetime import datetime as _dt
+    saidas = 0
+    for mov_in, estq in movs_entrada:
+        estq.quantidade_disponivel = 0
+        estq.status = 'CONSUMIDO'
+        estq.updated_at = _dt.utcnow()
+
+        mov_out = AlmoxarifadoMovimento(
+            item_id=mov_in.item_id,
+            tipo_movimento='SAIDA',
+            quantidade=mov_in.quantidade,
+            valor_unitario=mov_in.valor_unitario,
+            funcionario_id=None,
+            obra_id=pedido.obra_id,
+            observacao=descricao,
+            estoque_id=estq.id,
+            lote=estq.lote,
+            admin_id=admin_id,
+            usuario_id=usuario_id,
+            pedido_compra_id=pedido.id,
+        )
+        db.session.add(mov_out)
+        saidas += 1
+    return saidas
+
+
 def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
     """Processa compra tipo='normal':
        - Cria GestaoCustoPai MATERIAL (N parcelas conforme condicao_pagamento)
-       - Cria GestaoCustoFilho vinculado à obra
-       - Cria entrada no almoxarifado para itens do catálogo
+       - Cria GestaoCustoFilho vinculado à obra (se obra_id)
+       - Cria ENTRADA no almoxarifado para itens do catálogo
+       - Se obra_id está definido → também cria SAÍDA imediata contra a obra
+         (material reconhecido como consumido na obra).
+         Sem obra_id → material fica em estoque (entrada only).
 
     NÃO commita — o chamador cuida do commit.
     """
@@ -189,9 +226,19 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
     # Entrada automática no almoxarifado (ENTRADA + lote)
     movs_entrada = _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id)
 
+    # Se a compra tem obra, o material é imediatamente consumido nela
+    # (saída automática contra a obra). Sem obra, fica em estoque.
+    saidas = 0
+    if pedido.obra_id and movs_entrada:
+        lote_ref = pedido.numero or f"PC-{pedido.id}"
+        saidas = _gerar_saida_almoxarifado(
+            pedido, movs_entrada, admin_id, usuario_id,
+            descricao=f"Consumo direto na obra — compra {lote_ref}",
+        )
+
     logger.info(
         f"[compra normal] pedido={pedido.id} parcelas={n_parcelas} "
-        f"entradas_almox={len(movs_entrada)}"
+        f"entradas_almox={len(movs_entrada)} saidas_obra={saidas}"
     )
 
 
@@ -278,31 +325,12 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
     ]
     movs_entrada = _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id)
 
-    # 3) SAÍDA imediata contra a obra (reconhecendo consumo)
+    # 3) SAÍDA imediata contra a obra (reconhecendo consumo faturamento direto)
     lote_ref = pedido.numero or f"PC-{pedido.id}"
-    saidas = 0
-    for mov_in, estq in movs_entrada:
-        # Marcar estoque como CONSUMIDO e zerar quantidade_disponivel
-        estq.quantidade_disponivel = 0
-        estq.status = 'CONSUMIDO'
-        estq.updated_at = _dt.utcnow()
-
-        mov_out = AlmoxarifadoMovimento(
-            item_id=mov_in.item_id,
-            tipo_movimento='SAIDA',
-            quantidade=mov_in.quantidade,
-            valor_unitario=mov_in.valor_unitario,
-            funcionario_id=None,
-            obra_id=pedido.obra_id,
-            observacao=f"Consumo faturamento direto — compra {lote_ref}",
-            estoque_id=estq.id,
-            lote=estq.lote,
-            admin_id=admin_id,
-            usuario_id=usuario_id,
-            pedido_compra_id=pedido.id,
-        )
-        db.session.add(mov_out)
-        saidas += 1
+    saidas = _gerar_saida_almoxarifado(
+        pedido, movs_entrada, admin_id, usuario_id,
+        descricao=f"Consumo faturamento direto — compra {lote_ref}",
+    )
 
     pedido.processada_apos_aprovacao = True
     db.session.flush()
@@ -476,6 +504,12 @@ def nova_post():
         if tipo_compra not in ('normal', 'aprovacao_cliente'):
             tipo_compra = 'normal'
 
+        # Regra: 'aprovacao_cliente' EXIGE obra (o cliente aprova no portal da obra).
+        if tipo_compra == 'aprovacao_cliente' and not obra_id:
+            flash('Compras do tipo "Aprovação do Cliente" exigem uma obra '
+                  '(o cliente aprova pelo portal da obra). Selecione uma obra.', 'danger')
+            return redirect(url_for('compras.nova'))
+
         # Reembolso é incompatível com aprovação_cliente (o dinheiro vem do cliente,
         # ninguém está pagando do bolso)
         is_reembolso = request.form.get('is_reembolso') == 'true'
@@ -537,7 +571,7 @@ def nova_post():
             anexo_url=anexo_url,
             tipo_compra=tipo_compra,
             processada_apos_aprovacao=False,
-            status_aprovacao_cliente='PENDENTE' if tipo_compra == 'aprovacao_cliente' else None,
+            status_aprovacao_cliente='AGUARDANDO_APROVACAO_CLIENTE' if tipo_compra == 'aprovacao_cliente' else None,
             admin_id=admin_id,
         )
         db.session.add(pedido)

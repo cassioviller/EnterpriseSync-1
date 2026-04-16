@@ -4123,7 +4123,7 @@ class PedidoCompra(db.Model):
     anexo_url = db.Column(db.String(500))
 
     # Portal do Cliente — aprovação e comprovante
-    status_aprovacao_cliente = db.Column(db.String(20), default='PENDENTE')
+    status_aprovacao_cliente = db.Column(db.String(40), default='AGUARDANDO_APROVACAO_CLIENTE')
     comprovante_pagamento_url = db.Column(db.String(500))
 
     # Tipo de compra:

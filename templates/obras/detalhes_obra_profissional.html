@@ -1459,6 +1459,7 @@
                             <tr>
                                 <th>Fornecedor</th>
                                 <th>Data</th>
+                                <th>Tipo</th>
                                 <th>Itens</th>
                                 <th>Valor Total</th>
                                 <th>Status Cliente</th>
@@ -1474,16 +1475,32 @@
                                 </td>
                                 <td>{{ p.data_compra.strftime('%d/%m/%Y') if p.data_compra else '—' }}</td>
                                 <td>
+                                    {% if p.tipo_compra == 'aprovacao_cliente' %}
+                                        <span class="badge bg-warning text-dark" title="Faturamento Direto">
+                                            <i class="fas fa-user-check me-1"></i>Aprov. Cliente
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-primary"><i class="fas fa-cog me-1"></i>Normal</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     <span class="badge bg-secondary">{{ p.itens.count() }} itens</span>
                                 </td>
                                 <td><strong class="text-dark">{{ p.valor_total|brl }}</strong></td>
                                 <td>
-                                    {% if p.status_aprovacao_cliente == 'APROVADO' %}
-                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Aprovado</span>
-                                    {% elif p.status_aprovacao_cliente == 'REJEITADO' %}
-                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Rejeitado</span>
+                                    {% if p.tipo_compra != 'aprovacao_cliente' %}
+                                        <span class="badge bg-light text-muted">—</span>
+                                    {% elif p.status_aprovacao_cliente == 'APROVADO' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Aprovado
+                                            {% if p.processada_apos_aprovacao %}<small class="ms-1">(processado)</small>{% endif %}
+                                        </span>
+                                    {% elif p.status_aprovacao_cliente in ('REJEITADO','RECUSADO') %}
+                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Recusado</span>
                                     {% else %}
-                                        <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pendente</span>
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-clock me-1"></i>Aguardando cliente
+                                        </span>
                                     {% endif %}
                                 </td>
                                 <td>
