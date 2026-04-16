@@ -1,0 +1,433 @@
+OBJETIVO GERAL
+Quero criar uma estrutura técnica e estratégica para calcular o custo remanescente de cada obra, de forma operacional, prática e aderente ao uso real do sistema.
+
+Esse módulo deve alimentar um bloco de resumo chamado:
+
+RESUMO DE CUSTOS
+
+Esse resumo deve aparecer no painel estratégico já existente do sistema, junto do dashboard que já possui gráficos. NÃO quero criar um dashboard separado se for possível reaproveitar o painel estratégico atual.
+
+IMPORTANTE
+- Não cite planilha.
+- Não trate isso como uma simples transcrição de um arquivo externo.
+- Explique a lógica no código, nos nomes dos campos e na interface como se fosse uma funcionalidade nativa do sistema.
+- A implementação deve ser autônoma e compreensível sem depender de contexto externo.
+- Quero algo técnico, consistente e preparado para crescer.
+
+==================================================
+VISÃO DE NEGÓCIO
+==================================================
+
+O sistema já consegue registrar parte do realizado da obra, mas falta uma camada de previsão do que ainda falta executar.
+
+O problema que quero resolver é:
+- saber quanto a obra já consumiu
+- saber quanto ainda falta gastar para concluir
+- saber qual será o custo real projetado
+- saber se a obra ainda está dentro da verba de custo prevista
+
+Para isso, cada serviço da obra deve passar a ter três blocos de informação:
+
+1. ORÇADO
+2. REALIZADO
+3. A REALIZAR
+
+O sistema deve calcular o resumo consolidado da obra a partir desses serviços.
+
+==================================================
+RESULTADO FINAL QUE EU QUERO NO PAINEL ESTRATÉGICO
+==================================================
+
+Criar um bloco visual no painel estratégico chamado:
+
+RESUMO DE CUSTOS
+
+Com os seguintes indicadores:
+
+- TOTAL PROPOSTA ORÇ.
+- VALOR CUSTO ORÇ.
+- TOTAL REALIZADO
+- TOTAL A REALIZAR
+- CUSTO REAL DA OBRA
+- VERBA DISPONÍVEL
+- FATURAMENTO DIRETO
+- VALOR RECEBIDO
+- VALOR A RECEBER
+- LUCRO LÍQUIDO
+- ADMINISTRAÇÃO
+
+Esse bloco pode ser apresentado em formato de card/tabela-resumo dentro do painel estratégico já existente.
+
+Se possível, manter destaque visual para:
+- custo real da obra
+- verba disponível
+- valor custo orçado
+
+==================================================
+FÓRMULAS OFICIAIS
+==================================================
+
+As fórmulas devem seguir exatamente esta lógica:
+
+1) TOTAL REALIZADO
+É a soma do que já foi efetivamente executado/lançado nos serviços da obra.
+
+2) TOTAL A REALIZAR
+É a soma do custo restante previsto de todos os serviços ainda não concluídos.
+
+3) CUSTO REAL DA OBRA
+custo_real_obra = total_realizado + total_a_realizar
+
+4) VERBA DISPONÍVEL
+verba_disponivel = valor_custo_orcado - custo_real_obra
+
+5) VALOR A RECEBER
+valor_a_receber = total_proposta_orcada - valor_recebido
+
+6) LUCRO LÍQUIDO
+lucro_liquido = total_proposta_orcada - custo_real_obra - administracao
+
+7) ADMINISTRAÇÃO
+A administração deve ser calculada a partir da regra já usada no sistema, se existir.
+Se não existir regra pronta, implementar campo/configuração com base percentual por obra.
+Sugestão inicial:
+administracao = total_proposta_orcada * percentual_administracao
+
+==================================================
+ARQUITETURA FUNCIONAL DO MÓDULO
+==================================================
+
+Cada obra deve possuir uma lista de serviços de custo.
+
+Cada serviço precisa armazenar:
+
+A) BLOCO ORÇADO
+- valor_orcado_venda_material
+- valor_orcado_venda_mao_obra
+- valor_orcado_custo_material
+- valor_orcado_custo_mao_obra
+- total_orcado_venda
+- total_orcado_custo
+
+B) BLOCO REALIZADO
+- material_realizado
+- mao_obra_realizada
+- total_realizado
+
+C) BLOCO A REALIZAR
+- material_a_realizar
+- mao_obra_a_realizar
+- outros_a_realizar
+- total_a_realizar
+- saldo
+
+==================================================
+REGRAS DO A REALIZAR
+==================================================
+
+1) MATERIAL A REALIZAR
+O material a realizar do serviço deve ser tratado inicialmente como um TOTAL por serviço.
+
+Não quero obrigatoriedade de composição física detalhada no MVP.
+
+Quero esta lógica:
+- o serviço tem um campo chamado `material_a_realizar`
+- esse campo guarda o valor total estimado do material restante daquele serviço
+- esse valor pode ser:
+  a) digitado manualmente
+  b) ou preenchido por um módulo interno de cotação
+
+2) COTAÇÃO INTERNA
+Quero um módulo interno auxiliar, separado do módulo de mapa de concorrência do cliente.
+
+A ideia pode ser parecida, mas NÃO é o mesmo módulo.
+
+Esse módulo interno deve servir para:
+- montar estimativas/cotações de material de um serviço
+- comparar opções internas
+- escolher um total
+- alimentar o campo `material_a_realizar`
+
+Esse módulo:
+- não vai para o portal do cliente
+- não participa de aprovação do cliente
+- não deve depender do fluxo comercial externo
+- é apenas apoio interno para formação do custo restante
+
+3) MÃO DE OBRA A REALIZAR
+A mão de obra a realizar deve ser calculada por equipe planejada do serviço.
+
+Cada serviço deve ter uma tabela de equipe planejada com linhas por funcionário.
+
+Cada linha deve conter:
+- funcionário
+- diária
+- almoço e café
+- transporte
+- subtotal por dia
+- dias planejados
+- total da linha
+
+Fórmulas:
+- subtotal_dia = diaria + almoco_e_cafe + transporte
+- total_linha = subtotal_dia * dias_planejados
+- mao_obra_a_realizar = soma(total_linha de todas as linhas do serviço)
+
+IMPORTANTE:
+- VT/VA/alimentação/transporte não devem ser média diária genérica da obra
+- cada funcionário deve carregar seu próprio custo diário completo
+- essa lógica é obrigatória
+
+4) OUTROS A REALIZAR
+Criar um campo opcional manual:
+- outros_a_realizar
+
+Esse campo servirá para:
+- frete restante
+- locação restante
+- serviços variados
+- custos pendentes que não entram em material nem equipe
+
+5) TOTAL A REALIZAR DO SERVIÇO
+total_a_realizar = material_a_realizar + mao_obra_a_realizar + outros_a_realizar
+
+6) SALDO DO SERVIÇO
+saldo = total_orcado_custo - total_realizado - total_a_realizar
+
+==================================================
+MODELOS / TABELAS
+==================================================
+
+Implemente usando a estrutura atual do projeto, mas siga esta modelagem lógica.
+
+Tabela principal sugerida:
+`obra_servico_custo`
+Campos:
+- id
+- admin_id
+- obra_id
+- nome_servico
+- ordem
+- valor_orcado_venda_material
+- valor_orcado_venda_mao_obra
+- valor_orcado_custo_material
+- valor_orcado_custo_mao_obra
+- total_orcado_venda
+- total_orcado_custo
+- material_realizado
+- mao_obra_realizada
+- total_realizado
+- material_a_realizar
+- mao_obra_a_realizar
+- outros_a_realizar
+- total_a_realizar
+- saldo
+- observacoes
+- created_at
+- updated_at
+
+Tabela de equipe planejada:
+`obra_servico_equipe_planejada`
+Campos:
+- id
+- admin_id
+- servico_custo_id
+- funcionario_id
+- nome_funcionario_snapshot
+- diaria
+- almoco_e_cafe
+- transporte
+- subtotal_dia
+- dias_planejados
+- total_linha
+- observacoes
+
+Tabela da cotação interna:
+`obra_servico_cotacao_interna`
+Campos:
+- id
+- admin_id
+- servico_custo_id
+- nome
+- status
+- total_cotado
+- total_escolhido
+- selecionada
+- observacoes
+
+Tabela opcional de linhas da cotação interna:
+`obra_servico_cotacao_interna_linha`
+Campos:
+- id
+- admin_id
+- cotacao_interna_id
+- fornecedor_id
+- descricao
+- valor_total
+- observacoes
+
+Você pode adaptar nomenclatura ao padrão do projeto, mas deve manter esta lógica.
+
+==================================================
+RECALCULO AUTOMÁTICO
+==================================================
+
+Sempre que um serviço for salvo ou alterado:
+- recalcular total_realizado
+- recalcular mao_obra_a_realizar a partir da equipe planejada
+- recalcular total_a_realizar
+- recalcular saldo
+
+Sempre que a obra for carregada:
+- recalcular o resumo consolidado da obra
+
+Sempre que o painel estratégico for carregado:
+- exibir o resumo consolidado atualizado
+
+==================================================
+INTEGRAÇÃO COM O SISTEMA ATUAL
+==================================================
+
+Quero aproveitar o que já existe no sistema, sem quebrar módulos.
+
+Se já houver dados existentes de:
+- valor recebido
+- faturamento direto
+- proposta/orçamento
+- custos realizados
+- dashboard estratégico com gráficos
+
+reutilize esses dados e integre o novo resumo ao painel estratégico atual.
+
+Se alguma informação ainda não estiver pronta para integração total, implemente um MVP consistente com fallback manual, sem bloquear a entrega.
+
+Prioridade:
+1. estrutura do serviço
+2. cálculo do a realizar
+3. resumo consolidado
+4. bloco no painel estratégico
+
+==================================================
+TELAS E EXPERIÊNCIA
+==================================================
+
+Quero pelo menos estas entregas visuais:
+
+1) Tela da obra com aba ou seção:
+- Planejamento do A Realizar
+
+2) Grade/lista de serviços da obra com colunas como:
+- serviço
+- total orçado custo
+- total realizado
+- total a realizar
+- saldo
+
+3) Tela de edição do serviço com blocos:
+- Orçado
+- Realizado
+- A Realizar
+
+4) Tabela da equipe planejada do serviço
+
+5) Tela auxiliar de cotação interna do serviço
+- para preencher o total de material a realizar
+
+6) Inclusão do bloco “Resumo de Custos” no painel estratégico existente com gráficos
+- não criar dashboard separado se não for necessário
+
+==================================================
+PAINEL ESTRATÉGICO
+==================================================
+
+Quero que o painel estratégico já existente passe a mostrar o bloco:
+
+RESUMO DE CUSTOS
+
+Esse bloco deve exibir:
+
+- TOTAL PROPOSTA ORÇ.
+- VALOR CUSTO ORÇ.
+- TOTAL REALIZADO
+- TOTAL A REALIZAR
+- CUSTO REAL DA OBRA
+- VERBA DISPONÍVEL
+
+e também:
+
+- FATURAMENTO DIRETO
+- VALOR RECEBIDO
+- VALOR A RECEBER
+- LUCRO LÍQUIDO
+- ADMINISTRAÇÃO
+
+Quero esse bloco integrado visualmente ao painel já existente, de forma executiva/estratégica.
+
+Se já existirem gráficos no painel, não remover.
+Apenas incorporar esse resumo de forma clara.
+
+==================================================
+MVP DE REALIZADO
+==================================================
+
+No MVP:
+- permita edição manual de material_realizado
+- permita edição manual de mao_obra_realizada
+- total_realizado pode ser calculado pela soma desses campos
+
+Se conseguir integrar com dados reais já existentes de custos/almoxarifado sem quebrar nada, ótimo.
+Mas entregue primeiro uma versão robusta e simples.
+
+==================================================
+NÃO FAZER
+==================================================
+
+- Não citar planilha em textos da interface
+- Não depender de contexto externo para explicar a funcionalidade
+- Não reutilizar diretamente o mapa de concorrência do cliente
+- Não misturar este módulo com portal do cliente
+- Não usar média genérica para VT/VA/transporte/alimentação
+- Não exigir composição física detalhada obrigatória no MVP
+- Não criar um dashboard novo se o painel estratégico atual puder ser reaproveitado
+- Não quebrar módulos já existentes
+
+==================================================
+ENTREGA ESPERADA
+==================================================
+
+Quero que você:
+1. implemente o módulo
+2. crie/ajuste models, rotas, templates e migrations
+3. integre o resumo ao painel estratégico existente
+4. mostre os arquivos alterados
+5. explique a lógica implementada
+6. detalhe como testar
+
+==================================================
+CENÁRIOS DE TESTE OBRIGATÓRIOS
+==================================================
+
+Cenário 1 — serviço com material a realizar manual
+- usuário preenche material_a_realizar
+- cria equipe planejada
+- sistema calcula mao_obra_a_realizar
+- sistema calcula total_a_realizar
+- sistema calcula saldo
+
+Cenário 2 — serviço com cotação interna
+- usuário cria cotação interna
+- seleciona uma cotação
+- sistema preenche material_a_realizar com o total escolhido
+- saldo recalcula
+
+Cenário 3 — equipe com custos individuais
+- cada funcionário possui sua própria diária, alimentação e transporte
+- sistema soma corretamente linha por linha
+- mao_obra_a_realizar reflete a soma exata
+
+Cenário 4 — resumo no painel estratégico
+- painel mostra total_realizado
+- painel mostra total_a_realizar
+- painel mostra custo_real_obra
+- painel mostra verba_disponivel
+- painel mantém os gráficos existentes
