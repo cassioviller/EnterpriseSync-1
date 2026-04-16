@@ -1,0 +1,71 @@
+Você deve refatorar o módulo de Propostas do sistema SIGE para que os itens/serviços da proposta não sejam mais digitados manualmente, mas selecionados a partir de um catálogo de serviços orçado pelo novo módulo de orçamento que você criará.
+
+## Contexto atual
+
+- `propostas_consolidated.py` define rotas para criar e editar propostas. Hoje, ao criar uma proposta, ele simplesmente lê listas de "descrição", "quantidade", "unidade" e "preço unitário" do formulário e cria objetos `PropostaItem` sem vinculação a serviços ou orçamentos:contentReference[oaicite:0]{index=0}.
+- Itens de medição (`ItemMedicaoComercial`) também são criados com nome e valor comercial soltos, sem referência ao serviço técnico:contentReference[oaicite:1]{index=1}.
+- O sistema possui modelos de serviços e composições (`Servico`, `ServicoMestre`, `TabelaComposicao`), mas hoje essas estruturas não são utilizadas na proposta nem na medição.
+
+## Objetivo
+
+- Criar um **módulo de orçamento** onde cada **serviço técnico** do catálogo tem:
+  - Descrição e unidade
+  - Uma composição de materiais e mão de obra (coeficientes de consumo)
+  - Custo unitário calculado com base em uma tabela de preços base
+  - Preço de venda unitário calculado a partir de custos mais margens e impostos
+- Refatorar o fluxo de criação/edição de propostas para que os itens sejam selecionados a partir desse catálogo de serviços orçados, e não mais digitados manualmente.
+- Vincular cada `PropostaItem` e cada `ItemMedicaoComercial` a um `servico_id`, garantindo que o orçamento seja definido uma única vez e reaproveitado em todo o sistema.
+
+## Passo a passo de implementação
+
+1. **Modelos**
+   - Adicionar campo `servico_id` ao modelo `PropostaItem` (chave estrangeira para `Servico`).
+   - Adicionar campo `servico_id` ao modelo `ItemMedicaoComercial`.
+   - Criar/expandir o modelo `Servico` (ou `ServicoMestre`) para incluir:
+     - Campos de custo e preço unitário (pelo menos `custo_unitario`, `preco_unitario`, `unidade`).
+     - Relação com uma tabela de composição (`TabelaComposicao` e `ItemTabelaComposicao`) que guarda consumos de materiais e mão de obra (coeficientes).
+   - Criar modelo `TabelaPrecoBase` (ou similar) para preços base de materiais/mão de obra (catálogo de preços).
+
+2. **Módulo de Orçamento**
+   - Criar um serviço (módulo Python) que:
+     - Recebe um `Servico` e calcula seu custo unitário multiplicando os coeficientes de consumo pelos preços base de cada insumo.
+     - Aplica as margens e impostos configuráveis para calcular o preço de venda unitário.
+     - Permite atualizar coeficientes de consumo manualmente (para começar) e, no futuro, com métricas reais.
+
+3. **Alteração no Formulário de Proposta**
+   - Substituir no template (`proposta_form.html` e `organizar_proposta.html`) os campos livres de descrição, quantidade e preço por um seletor de serviço:
+     - O usuário escolhe um serviço do catálogo.
+     - O formulário exibe a unidade e o preço unitário calculado pelo módulo de orçamento.
+     - O usuário informa apenas a quantidade (pode vir de cálculo geométrico em módulos futuros).
+   - Incluir no formulário campos ocultos `servico_id` e `preco_unitario` para cada item.
+
+4. **Alteração nas Rotas**
+   - Em `propostas_consolidated.py`, modificar as rotas `nova` e `criar` para:
+     - Buscar o catálogo de serviços orçados.
+     - Processar o formulário criando `PropostaItem` a partir de `servico_id`, quantidade e preço unitário trazido pelo módulo de orçamento.
+     - Remover a lógica que calcula o preço a partir de campos de texto livre:contentReference[oaicite:2]{index=2}.
+   - Modificar a rota `atualizar` de forma semelhante para editar itens baseados em serviços.
+
+5. **Vinculação com Medição**
+   - Em `medicao_views.py`, alterar a criação e edição de `ItemMedicaoComercial` para que:
+     - Exija a seleção de um serviço existente (`servico_id`).
+     - Calcule automaticamente `valor_comercial` como quantidade executada × `preco_unitario` do serviço.
+     - Armazene apenas o percentual executado ou valor executado, mantendo a referência ao serviço.
+
+6. **Integração e Compatibilidade**
+   - Garantir que propostas antigas continuem visíveis; itens sem `servico_id` podem ser tratados como legados.
+   - Adicionar migrações para as novas colunas.
+   - Atualizar templates para lidar com seleção de serviço.
+
+7. **Explicação para o usuário final (documentação interna)**
+   - Documentar que agora as propostas e medições utilizam um catálogo de serviços orçados, evitando digitação repetida de itens.
+   - Explicar que os coeficientes de consumo e os preços base ficam em tabelas separadas; quando atualizados, recalculam os custos dos serviços automaticamente.
+   - Mostrar que, ao selecionar um serviço, o sistema já apresenta unidade e preço unitário; o usuário só informa a quantidade.
+
+## Resultado esperado
+
+- Propostas passam a ser formadas por itens vinculados a serviços do catálogo, com preços calculados automaticamente.
+- Medições utilizam os mesmos serviços, possibilitando medir percentual executado e comparar com o orçamento.
+- O custo planejado e o custo real passam a ser comparáveis por serviço, e a empresa pode atualizar coeficientes e preços no catálogo uma única vez para refletir em todos os orçamentos futuros.
+
+Implemente as alterações no código existente (models, controllers, templates) com o menor número de quebras possível, mantendo rotas e permissões atuais. Descreva na entrega como testar a criação de proposta, a edição e a medição com o novo fluxo.

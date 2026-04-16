@@ -1,0 +1,67 @@
+Você irá implementar o mecanismo de fórmulas do novo módulo de orçamento do SIGE. A lógica de cálculo, hoje embutida em tabelas ou códigos soltos, precisa ser estruturada para que cada serviço possa ter seus próprios coeficientes de consumo e preços base, de forma editável e reutilizável.
+
+## 1. Estrutura das fórmulas
+
+1. **Coeficientes de consumo**
+   - Para cada serviço técnico (por exemplo, “Fechamento externo com chapa X” ou “Laje maciça”), são definidos coeficientes de consumo de materiais e mão de obra.  
+   - Cada coeficiente representa quantas unidades de um insumo são necessárias para executar uma unidade do serviço. Exemplo: um serviço que consome 2,16 m² de chapa por m² de parede terá um coeficiente de consumo de 1 / 2,16 ≈ 0,463 peças de chapa por m².
+   - Os coeficientes devem ser armazenados em uma tabela (`ItemTabelaComposicao`) ligada ao serviço. Campos mínimos: serviço_id, insumo_id, coeficiente_consumo, unidade_consumo.
+
+2. **Preços base**
+   - Cada insumo (material, equipamento ou função de mão de obra) possui um preço unitário definido em uma tabela de preços (`TabelaPrecoBase`). Campos: insumo_id, unidade, preco_unitario, vigencia.
+   - O módulo deve consultar o preço vigente no momento do cálculo. Permita cadastrar preços diferentes para datas diferentes (histórico).
+
+3. **Fórmulas de custo**
+   - O **custo unitário de material** de um serviço é a soma dos coeficientes de consumo multiplicados pelos preços base:  
+     `custo_material_servico = Σ (coeficiente_consumo_i × preco_base_i)`  
+     onde `i` varia sobre todos os insumos associados ao serviço.
+   - O **custo unitário de mão de obra** pode ser calculado analogamente, multiplicando coeficientes de tempo ou produtividade pelo custo horário ou diário de cada função.
+   - O **custo total do serviço** é a soma dos custos unitários de material e mão de obra multiplicada pela quantidade prevista.
+
+4. **Fórmulas de venda**
+   - Após obter o custo unitário, aplique percentuais de imposto e de lucro configuráveis:  
+     `preco_venda_unitario = custo_unitario / (1 - imposto_percentual - lucro_percentual)`  
+   - Esses percentuais podem ser definidos por categoria (material e mão de obra podem ter markups diferentes) e armazenados em um modelo de configuração.
+
+5. **Fórmulas de quantidade**
+   - A quantidade de serviço a ser orçada pode vir diretamente do usuário ou ser calculada a partir de parâmetros geométricos da obra (área, volume, perímetro etc.). Para fins de módulo, assuma que a quantidade será passada ao serviço.
+
+## 2. Implementação técnica
+
+1. **Modelos**
+   - Crie ou ajuste o modelo `ItemTabelaComposicao` para incluir `coeficiente_consumo` e `unidade_consumo`.  
+   - Crie um modelo `TabelaPrecoBase` se ainda não existir, com `insumo_id`, `unidade`, `preco_unitario` e `vigencia`.  
+   - Ajuste o modelo `Servico` (ou `ServicoMestre`) para incluir métodos de cálculo: `calcular_custo_unitario()` e `calcular_preco_unitario()` que utilizem as fórmulas acima.
+
+2. **Serviço de cálculo**
+   - Crie uma classe ou módulo (`orcamento_service.py`, por exemplo) responsável por:
+     - Receber um serviço e uma data de vigência;
+     - Buscar na `TabelaPrecoBase` os preços dos insumos com vigência mais recente para cada insumo;
+     - Multiplicar cada coeficiente pelo respectivo preço base;
+     - Somar resultados para obter `custo_unitario_material` e `custo_unitario_mao_obra`;
+     - Aplicar impostos e lucro configurados para calcular `preco_unitario`.
+   - Retornar um dicionário com os valores calculados.
+
+3. **Edição de fórmulas**
+   - Permita que os coeficientes de consumo sejam editados por meio de uma interface de administração. Exemplo: ao acessar o cadastro de um serviço, o usuário poderá ver uma lista de insumos com seus coeficientes e poderá alterar ou adicionar novos.  
+   - Permita que os preços base sejam atualizados em uma tela de “tabela de preços”, registrando a vigência de cada alteração.  
+   - Permita alterar os percentuais de imposto e lucro via tela de configuração (por empresa ou por serviço, se necessário).
+
+4. **Integração com o fluxo de propostas**
+   - Quando o usuário selecionar um serviço para adicionar à proposta, o sistema chamará o serviço de cálculo para obter `preco_unitario`.  
+   - Ao alterar coeficientes ou preços base, as novas propostas usarão os valores atualizados automaticamente; propostas antigas permanecem com os valores salvos.
+
+5. **Exemplo de cálculo (sem citar planilha)**
+   - Suponha o serviço “Vedação externa com chapa A”: o cadastro indica que consome 0,463 chapas e 0,020 sacos de massa por m².  
+   - O preço base da chapa é R$ 90,00 por peça; o preço do saco de massa é R$ 50,00.  
+   - Custo material unitário = (0,463 × 90,00) + (0,020 × 50,00) = 41,67 + 1,00 = R$ 42,67.  
+   - Se a mão de obra for R$ 15,00 por m², custo total = R$ 42,67 + 15,00 = R$ 57,67.  
+   - Se imposto = 8 % e lucro = 10 %, preço de venda unitário = 57,67 ÷ (1 – 0,08 – 0,10) ≈ R$ 72,09.  
+   - Essas fórmulas devem ser implementadas de forma parametrizada no serviço de cálculo.
+
+## 3. Testes e validação
+
+- Escreva testes unitários para as funções de cálculo, verificando que a soma dos coeficientes e preços resulta no custo unitário correto, e que a aplicação de impostos e lucro gera o preço de venda esperado.
+- Teste a interface de edição de coeficientes e preços para garantir que as alterações reflitam nos cálculos de novas propostas.
+
+Implemente esse mecanismo de fórmulas de maneira desacoplada (em classes e serviços), para que futuros ajustes de coeficientes ou da lógica fiscal sejam fáceis de aplicar em um único local.
