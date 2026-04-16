@@ -408,7 +408,8 @@ def novo_rdo():
                         data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
                     except (ValueError, TypeError):
                         data_ref = date.today()
-                entregas_alertas = calcular_alertas_terceiros(obra_id, hoje=data_ref)['detalhe']
+                _aid = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None)
+                entregas_alertas = calcular_alertas_terceiros(obra_id, hoje=data_ref, admin_id=_aid)['detalhe']
             except Exception as _e:
                 logger.error(f"Erro carregando alertas terceiros (novo_rdo): {_e}")
                 entregas_alertas = []
@@ -1431,7 +1432,7 @@ def editar_rdo(id):
         try:
             from services.entregas_terceiros import calcular_alertas_terceiros
             data_ref = rdo.data_relatorio if rdo.data_relatorio else date.today()
-            entregas_alertas = calcular_alertas_terceiros(rdo.obra_id, hoje=data_ref)['detalhe']
+            entregas_alertas = calcular_alertas_terceiros(rdo.obra_id, hoje=data_ref, admin_id=getattr(rdo.obra, 'admin_id', None))['detalhe']
         except Exception as _e:
             logger.error(f"Erro carregando alertas terceiros (editar_rdo): {_e}")
             entregas_alertas = []
@@ -1740,7 +1741,8 @@ def rdo_novo_unificado():
                         data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
                     except (ValueError, TypeError):
                         data_ref = date.today()
-                entregas_alertas = calcular_alertas_terceiros(obra_selecionada.id, hoje=data_ref)['detalhe']
+                _aid = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None)
+                entregas_alertas = calcular_alertas_terceiros(obra_selecionada.id, hoje=data_ref, admin_id=_aid)['detalhe']
             except Exception as _e:
                 logger.error(f"Erro carregando alertas terceiros (rdo_novo_unificado): {_e}")
                 entregas_alertas = []

@@ -151,28 +151,35 @@ def _classificar_tarefa(tarefa, hoje=None):
     }
 
 
-def listar_tarefas_terceiros(obra_id):
-    """Retorna apenas tarefas-folha (sem filhas) com responsavel='terceiros'."""
+def listar_tarefas_terceiros(obra_id, admin_id=None):
+    """
+    Retorna apenas tarefas-folha (sem filhas) com responsavel='terceiros'.
+    Defesa em profundidade multi-tenant: se admin_id for informado,
+    filtra também por admin_id (além do escopo natural por obra_id).
+    """
     TarefaFilha = db.aliased(TarefaCronograma)
     subq_tem_filha = exists().where(and_(
         TarefaFilha.tarefa_pai_id == TarefaCronograma.id,
         TarefaFilha.obra_id == obra_id,
     ))
-    return TarefaCronograma.query.filter(
+    q = TarefaCronograma.query.filter(
         TarefaCronograma.obra_id == obra_id,
         TarefaCronograma.responsavel == 'terceiros',
         not_(subq_tem_filha),
-    ).order_by(TarefaCronograma.data_fim.asc().nulls_last(),
-               TarefaCronograma.ordem.asc()).all()
+    )
+    if admin_id is not None:
+        q = q.filter(TarefaCronograma.admin_id == admin_id)
+    return q.order_by(TarefaCronograma.data_fim.asc().nulls_last(),
+                      TarefaCronograma.ordem.asc()).all()
 
 
-def listar_tarefas_terceiros_pendentes(obra_id):
+def listar_tarefas_terceiros_pendentes(obra_id, admin_id=None):
     """Tarefas terceiros ainda nao entregues (para dropdown no RDO)."""
-    todas = listar_tarefas_terceiros(obra_id)
+    todas = listar_tarefas_terceiros(obra_id, admin_id=admin_id)
     return [t for t in todas if t.data_entrega_real is None and float(t.percentual_concluido or 0) < 100]
 
 
-def calcular_alertas_terceiros(obra_id, hoje=None):
+def calcular_alertas_terceiros(obra_id, hoje=None, admin_id=None):
     """
     Retorna dict:
         {
@@ -184,7 +191,7 @@ def calcular_alertas_terceiros(obra_id, hoje=None):
     if hoje is None:
         hoje = date.today()
 
-    tarefas = listar_tarefas_terceiros(obra_id)
+    tarefas = listar_tarefas_terceiros(obra_id, admin_id=admin_id)
     detalhe = []
     qtd_atrasadas = 0
     qtd_vence_hoje = 0

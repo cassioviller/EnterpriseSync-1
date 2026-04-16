@@ -1620,7 +1620,6 @@ def detalhes_obra(id):
             'entregas': {'status': 'sem_dados', 'label': 'Sem entregas/terceiros', 'qtd_total': 0, 'qtd_atrasadas': 0, 'qtd_vence_hoje': 0, 'qtd_amanha': 0, 'qtd_pendentes': 0, 'qtd_entregues': 0},
         }
         entregas_detalhe = []
-        from services.entregas_terceiros import NIVEIS as ENTREGAS_NIVEIS
 
         try:
             # 1. Valor do contrato
@@ -1717,7 +1716,7 @@ def detalhes_obra(id):
         # 7b. Indicador de ENTREGAS / TERCEIROS (engine de alertas centralizada)
         try:
             from services.entregas_terceiros import calcular_alertas_terceiros
-            _ent = calcular_alertas_terceiros(obra_id)
+            _ent = calcular_alertas_terceiros(obra_id, admin_id=admin_id)
             entregas_detalhe = _ent['detalhe']
             painel['entregas'] = _ent['painel']
         except Exception as e:
