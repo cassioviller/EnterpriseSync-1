@@ -313,14 +313,6 @@
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-comment"></i>
-                            Observações Gerais
-                        </label>
-                        <textarea class="form-control" id="observacoes_gerais" name="observacoes_gerais" 
-                                  rows="4" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc.">{{ rdo.observacoes_gerais or '' }}</textarea>
-                    </div>
                 </div>
             </div>
 
@@ -333,9 +325,17 @@
                         Apontamento de Produção — Cronograma
                         <span class="badge bg-light text-primary ms-2" style="font-size:.65rem">V2</span>
                     </h3>
-                    <button type="button" class="btn btn-sm btn-light" onclick="carregarTarefasRDOEdit()" title="Atualizar">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-light" onclick="expandirTodosCronogramaEdit(true)" title="Expandir todas">
+                            <i class="fas fa-angle-double-down"></i> Expandir todas
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light" onclick="expandirTodosCronogramaEdit(false)" title="Recolher todas">
+                            <i class="fas fa-angle-double-up"></i> Recolher todas
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light" onclick="carregarTarefasRDOEdit()" title="Atualizar">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="rdo-card-body p-0">
                     <div id="cronogramaLoadingEdit" class="text-center p-4 text-muted d-none">
@@ -448,32 +448,6 @@
             </div>
             {% endif %}
 
-            <!-- Seção de Serviços e Atividades -->
-            <div class="rdo-card slide-in">
-                <div class="rdo-card-header">
-                    <h3>
-                        <i class="fas fa-tasks"></i>
-                        Serviços e Atividades
-                    </h3>
-                    <button type="button" class="btn-modern btn-success" onclick="carregarServicosParaEdicao()">
-                        <i class="fas fa-sync"></i>
-                        Recarregar Serviços
-                    </button>
-                </div>
-                <div class="rdo-card-body">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Editando RDO:</strong> Os percentuais atuais são carregados automaticamente. Modifique conforme necessário.
-                    </div>
-                    <div id="servicos-container">
-                        <div class="text-center p-4">
-                            <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
-                            <p class="text-muted">Carregando serviços da obra...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Seção de Funcionários -->
             <div class="rdo-card slide-in">
                 <div class="rdo-card-header">
@@ -558,7 +532,7 @@
             </div>
             {% endif %}
 
-            <!-- Seção de Observações Finais -->
+            <!-- Seção de Observações -->
             <div class="rdo-card slide-in">
                 <div class="rdo-card-header">
                     <h3>
@@ -570,23 +544,19 @@
                     <div class="form-group">
                         <label class="form-label">
                             <i class="fas fa-comment-dots"></i>
-                            Observações Finais
+                            Observações
                         </label>
-                        <textarea class="form-control" id="observacoes_finais" name="observacoes_finais" 
-                                  rows="3" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc.">{{ rdo.observacoes_finais or '' }}</textarea>
+                        <textarea class="form-control" id="observacoes_gerais" name="observacoes_gerais"
+                                  rows="4" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc.">{{ rdo.comentario_geral or rdo.observacoes_gerais or rdo.observacoes_finais or '' }}</textarea>
                     </div>
-                    
+
                     <div class="d-flex justify-content-between align-items-center mt-4">
                         <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn-modern btn-secondary">
                             <i class="fas fa-arrow-left"></i>
                             Cancelar
                         </a>
-                        
+
                         <div class="d-flex gap-3">
-                            <button type="button" class="btn-modern btn-secondary" onclick="carregarServicosParaEdicao()">
-                                <i class="fas fa-sync"></i>
-                                Recarregar
-                            </button>
                             <button type="submit" class="btn-modern btn-success" id="btnSalvarEdicao">
                                 <i class="fas fa-save"></i>
                                 Salvar Alterações
@@ -755,274 +725,7 @@ function toggleSubFuncHoras(subMestreId, funcId, checked) {
     }
 }
 
-function carregarServicosParaEdicao() {
-    const obraId = document.getElementById('obra_id').value || obraIdAtual;
-    const container = document.getElementById('servicos-container');
-    
-    container.innerHTML = `
-        <div class="text-center p-4">
-            <div class="spinner-border text-success" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="mt-2 text-muted">Carregando serviços da obra para edição...</p>
-        </div>
-    `;
-    
-    // Carregar serviços da obra com dados atuais
-    fetch(`/api/ultimo-rdo-dados/${obraId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                renderizarServicosParaEdicao(data);
-            } else {
-                // Carregar serviços sem dados específicos
-                carregarServicosLimposDaObra(obraId);
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar serviços:', error);
-            renderizarErroCarregamento();
-        });
-}
-
-function renderizarServicosParaEdicao(data) {
-    const container = document.getElementById('servicos-container');
-
-    // Suporta tanto data.servicos (legado) quanto data.ultima_rdo.servicos (API V2)
-    const servicos = data.servicos || (data.ultima_rdo && data.ultima_rdo.servicos) || [];
-    const totalServicos = data.total || (data.ultima_rdo && data.ultima_rdo.total_servicos) || servicos.length;
-
-    let html = `
-        <div class="alert alert-info mb-4">
-            <i class="fas fa-edit"></i> <strong>Modo Edição:</strong><br>
-            Os valores atuais do RDO foram carregados. Modifique conforme necessário.
-        </div>
-        <div class="small text-muted mb-3">
-            ${totalServicos} serviço(s) carregado(s)
-        </div>
-    `;
-    
-    if (servicos.length > 0) {
-        servicos.forEach((servico, index) => {
-            const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-            
-            html += `
-                <div class="servico-card mb-3">
-                    <div class="servico-header" onclick="toggleServico('${servicoId}')">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="mb-0">${servico.nome}</h5>
-                                <span class="badge bg-success">${servico.categoria || 'Geral'}</span>
-                            </div>
-                            <div>
-                                <span class="text-muted me-2">${(servico.subatividades || []).length} subatividades</span>
-                                <i class="fas fa-chevron-down" id="chevron-${servicoId}"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="servico-body" id="body-${servicoId}">
-                        <div class="row">
-            `;
-            
-            (servico.subatividades || []).forEach((subatividade) => {
-                const valorAtual = subatividade.percentual_executado ?? subatividade.percentual ?? 0;
-                const temMeta = subatividade.subatividade_mestre_id != null;
-                const unidade = subatividade.unidade_medida || '';
-                const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
-
-                const empField = temMeta ? renderCamposEmpregadosPorSubatividade(subatividade.id) : '';
-
-                const qtdField = temMeta ? `
-                    <div class="mt-2">
-                        <label class="form-label small text-success fw-semibold mb-1">
-                            <i class="fas fa-ruler me-1"></i>Quantidade Produzida
-                        </label>
-                        <div class="input-group input-group-sm">
-                            <input type="number"
-                                   class="form-control form-control-sm"
-                                   name="qtd_${subatividade.id}"
-                                   value="${qtdAtual}"
-                                   step="0.01"
-                                   min="0"
-                                   placeholder="0,00"
-                                   form="formEditarRDO"
-                                   title="Meta: ${subatividade.meta_produtividade} ${unidade}/h">
-                            ${unidade ? `<span class="input-group-text">${unidade}</span>` : ''}
-                        </div>
-                        <div class="text-muted" style="font-size:.7rem">
-                            Meta: ${subatividade.meta_produtividade} ${unidade}/h
-                        </div>
-                    </div>
-                ` : '';
-
-                html += `
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">${subatividade.nome}</label>
-                        <div class="input-group">
-                            <input type="number" 
-                                   class="form-control" 
-                                   name="subatividade_${subatividade.id}"
-                                   value="${valorAtual}" 
-                                   step="0.1" 
-                                   min="0" 
-                                   max="100"
-                                   form="formEditarRDO">
-                            <span class="input-group-text">%</span>
-                        </div>
-                        ${qtdField}
-                        ${empField}
-                    </div>
-                `;
-            });
-            
-            html += `
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-    } else if (subatividadesSalvas && subatividadesSalvas.length > 0) {
-        // Fallback V2: renderizar subatividades já salvas no RDO sem precisar de ServicoObraReal
-        html += `
-            <div class="alert alert-info mb-3">
-                <i class="fas fa-edit"></i> <strong>Subatividades do RDO:</strong>
-                Mostrando ${subatividadesSalvas.length} subatividade(s) já registrada(s).
-            </div>
-            <div class="servico-card mb-3">
-                <div class="servico-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-tasks me-1"></i> Subatividades Executadas</h5>
-                        <span class="badge bg-primary">${subatividadesSalvas.length} subatividade(s)</span>
-                    </div>
-                </div>
-                <div class="servico-body">
-                    <div class="row">
-        `;
-
-        subatividadesSalvas.forEach((subatividade) => {
-            const valorAtual = subatividade.percentual_conclusao ?? 0;
-            const temMeta = subatividade.subatividade_mestre_id != null;
-            const unidade = subatividade.unidade_medida_snapshot || '';
-            const qtdAtual = subatividade.quantidade_produzida != null ? subatividade.quantidade_produzida : '';
-
-            const empField = temMeta ? renderCamposEmpregadosPorSubatividade(subatividade.id) : '';
-
-            const qtdField = temMeta ? `
-                <div class="mt-2">
-                    <label class="form-label small text-success fw-semibold mb-1">
-                        <i class="fas fa-ruler me-1"></i>Quantidade Produzida
-                    </label>
-                    <div class="input-group input-group-sm">
-                        <input type="number"
-                               class="form-control form-control-sm"
-                               name="qtd_${subatividade.id}"
-                               value="${qtdAtual}"
-                               step="0.01"
-                               min="0"
-                               placeholder="0,00"
-                               form="formEditarRDO"
-                               title="Meta: ${subatividade.meta_produtividade_snapshot} ${unidade}/h">
-                        ${unidade ? `<span class="input-group-text">${unidade}</span>` : ''}
-                    </div>
-                    <div class="text-muted" style="font-size:.7rem">
-                        Meta: ${subatividade.meta_produtividade_snapshot} ${unidade}/h
-                    </div>
-                </div>
-            ` : '';
-
-            html += `
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">${subatividade.nome}</label>
-                    <div class="input-group">
-                        <input type="number"
-                               class="form-control"
-                               name="subatividade_${subatividade.id}"
-                               value="${valorAtual}"
-                               step="0.1"
-                               min="0"
-                               max="100"
-                               form="formEditarRDO">
-                        <span class="input-group-text">%</span>
-                    </div>
-                    ${qtdField}
-                    ${empField}
-                </div>
-            `;
-        });
-
-        html += `
-                    </div>
-                </div>
-            </div>
-        `;
-    } else {
-        html += `
-            <div class="text-center p-4">
-                <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
-                <p class="text-muted">Nenhum serviço encontrado para esta obra</p>
-            </div>
-        `;
-    }
-    
-    container.innerHTML = html;
-    
-    // Expandir todos os serviços por padrão
-    servicos.forEach((servico) => {
-        const servicoId = servico.nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-        const body = document.getElementById(`body-${servicoId}`);
-        const chevron = document.getElementById(`chevron-${servicoId}`);
-        if (body && chevron) {
-            body.classList.remove('collapse');
-            chevron.classList.remove('fa-chevron-down');
-            chevron.classList.add('fa-chevron-up');
-        }
-    });
-}
-
-function carregarServicosLimposDaObra(obraId) {
-    fetch(`/api/test/rdo/servicos-obra/${obraId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                data.tem_ultimo_rdo = false;
-                renderizarServicosParaEdicao(data);
-            } else {
-                renderizarErroCarregamento();
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar serviços:', error);
-            renderizarErroCarregamento();
-        });
-}
-
-function renderizarErroCarregamento() {
-    const container = document.getElementById('servicos-container');
-    container.innerHTML = `
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Erro ao carregar serviços:</strong> Não foi possível carregar os serviços da obra. 
-            Verifique se a obra possui serviços cadastrados.
-        </div>
-    `;
-}
-
-function toggleServico(servicoId) {
-    const body = document.getElementById(`body-${servicoId}`);
-    const chevron = document.getElementById(`chevron-${servicoId}`);
-    
-    if (body && chevron) {
-        if (body.classList.contains('collapse')) {
-            body.classList.remove('collapse');
-            chevron.classList.remove('fa-chevron-down');
-            chevron.classList.add('fa-chevron-up');
-        } else {
-            body.classList.add('collapse');
-            chevron.classList.remove('fa-chevron-up');
-            chevron.classList.add('fa-chevron-down');
-        }
-    }
-}
+// (removido) carregarServicosParaEdicao e funções relacionadas — RDO V2 usa apenas o painel de Cronograma.
 
 function carregarFuncionariosParaEdicao() {
     const container = document.getElementById('funcionarios-container');
@@ -1482,83 +1185,155 @@ async function carregarTarefasRDOEdit() {
     }
 }
 
+// Estado dos pais expandidos (mantido entre re-renderizações)
+const _rdoV2EditPaisExpandidos = new Set();
+
+function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
+    const perc_plan = t.percentual_planejado ?? 0;
+    const perc_real = t.percentual_realizado ?? 0;
+    const status_cor   = perc_real >= perc_plan ? '#28a745' : '#dc3545';
+    const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
+    const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
+    const qty_acum  = t.quantidade_acumulada
+        ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}`
+        : `0 ${t.unidade_medida}`;
+    const qty_hoje  = t.quantidade_executada_hoje ?? rdoV2QtdAnterior[t.id] ?? 0;
+    const indent  = ehFilho ? 'ms-4' : '';
+    const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
+    const boldCls = isPai ? 'fw-bold' : '';
+    const hasInput = !isPai && t.quantidade_total > 0;
+    const expandido = _rdoV2EditPaisExpandidos.has(t.id);
+    const chevronIcon = expandido ? 'fa-chevron-down' : 'fa-chevron-right';
+
+    const headerInner = `
+      <div class="d-flex align-items-center gap-2 p-2 ps-3 flex-wrap ${isPai ? 'rdo-tarefa-pai-header-edit' : ''}"
+           ${isPai ? `style="cursor:pointer" data-pai-id="${t.id}"` : ''}>
+        ${isPai ? `<i class="fas ${chevronIcon} text-primary me-1" id="chev-pai-edit-${t.id}" style="width:14px"></i>` : ''}
+        <span class="flex-grow-1 ${boldCls}">
+          ${isPai
+            ? '<i class="fas fa-folder-open text-primary me-1"></i>'
+            : '<i class="fas fa-tasks text-secondary me-1"></i>'}
+          ${t.nome_tarefa}
+        </span>
+        ${isPai ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle">${contadorFilhos} ${contadorFilhos === 1 ? 'subtarefa' : 'subtarefas'}</span>` : ''}
+        ${t.quantidade_total
+          ? `<small class="text-muted">Total: ${qty_total}</small>`
+          : (isPai ? '' : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`)}
+        ${hasInput ? `
+        <div class="d-flex align-items-center gap-1" style="min-width:200px" onclick="event.stopPropagation()">
+          <small class="text-muted">Acum: ${qty_acum}</small>
+          <input type="number"
+                 id="qty_edit_${t.id}"
+                 class="form-control form-control-sm"
+                 style="width:85px;transition:background .3s"
+                 min="0" step="0.01"
+                 placeholder="Hoje"
+                 value="${qty_hoje > 0 ? qty_hoje : ''}"
+                 title="Quantidade executada hoje">
+          <button id="btn_save_${t.id}" class="btn btn-primary btn-sm px-2"
+                  onclick="event.stopPropagation(); salvarApontamentoEdit(${t.id})"
+                  title="Salvar apontamento">
+            <i class="fas fa-save fa-xs"></i>
+          </button>
+          <span class="text-muted small">${t.unidade_medida || ''}</span>
+        </div>` : ''}
+      </div>`;
+
+    const progresso = hasInput ? `
+      <div class="px-3 pb-2">
+        <div class="d-flex justify-content-between small text-muted mb-1">
+          <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
+        </div>
+        <div class="progress mb-1" style="height:6px;background:#e9ecef">
+          <div class="progress-bar bg-secondary" style="width:${Math.min(perc_plan,100)}%"></div>
+        </div>
+        <div class="d-flex justify-content-between small mb-1">
+          <span style="color:${status_cor};font-weight:600">
+            Realizado &mdash; <small>${status_label}</small>
+          </span>
+          <span id="percReal_${t.id}" style="color:${status_cor};font-weight:600">${perc_real.toFixed(1)}%</span>
+        </div>
+        <div class="progress" style="height:6px;background:#e9ecef">
+          <div class="progress-bar" id="barReal_${t.id}"
+               style="width:${Math.min(perc_real,100)}%;background:${status_cor}"></div>
+        </div>
+      </div>` : '';
+
+    return `
+      <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
+        ${headerInner}
+        ${progresso}
+      </div>`;
+}
+
 function renderizarTarefasEdit(tarefas) {
     const container = document.getElementById('cronogramaTarefasEdit');
     if (!container) return;
-    const paiIds = new Set(tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+
+    const filhosPorPai = {};
+    tarefas.forEach(t => {
+        if (t.tarefa_pai_id) {
+            (filhosPorPai[t.tarefa_pai_id] = filhosPorPai[t.tarefa_pai_id] || []).push(t);
+        }
+    });
+    const paiIds = new Set(Object.keys(filhosPorPai).map(Number));
 
     let html = '<div class="p-3">';
     tarefas.forEach(t => {
+        if (t.tarefa_pai_id && paiIds.has(t.tarefa_pai_id)) return;
         const isPai = paiIds.has(t.id);
-        const perc_plan = t.percentual_planejado ?? 0;
-        const perc_real = t.percentual_realizado ?? 0;
-        const status_cor   = perc_real >= perc_plan ? '#28a745' : '#dc3545';
-        const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
-        const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
-        const qty_acum  = t.quantidade_acumulada
-            ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}`
-            : `0 ${t.unidade_medida}`;
-        const qty_hoje  = t.quantidade_executada_hoje ?? rdoV2QtdAnterior[t.id] ?? 0;
-        const indent  = t.tarefa_pai_id ? 'ms-4' : '';
-        const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
-        const boldCls = isPai ? 'fw-bold' : '';
-        // Input só aparece para tarefas folha COM quantidade_total definida
-        const hasInput = !isPai && t.quantidade_total > 0;
-
-        html += `
-        <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
-          <div class="d-flex align-items-center gap-2 p-2 ps-3 flex-wrap">
-            <span class="flex-grow-1 ${boldCls}">
-              ${isPai
-                ? '<i class="fas fa-folder-open text-primary me-1"></i>'
-                : '<i class="fas fa-tasks text-secondary me-1"></i>'}
-              ${t.nome_tarefa}
-            </span>
-            ${t.quantidade_total
-              ? `<small class="text-muted">Total: ${qty_total}</small>`
-              : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`}
-            ${hasInput ? `
-            <div class="d-flex align-items-center gap-1" style="min-width:200px">
-              <small class="text-muted">Acum: ${qty_acum}</small>
-              <input type="number"
-                     id="qty_edit_${t.id}"
-                     class="form-control form-control-sm"
-                     style="width:85px;transition:background .3s"
-                     min="0" step="0.01"
-                     placeholder="Hoje"
-                     value="${qty_hoje > 0 ? qty_hoje : ''}"
-                     title="Quantidade executada hoje">
-              <button id="btn_save_${t.id}" class="btn btn-primary btn-sm px-2"
-                      onclick="salvarApontamentoEdit(${t.id})"
-                      title="Salvar apontamento">
-                <i class="fas fa-save fa-xs"></i>
-              </button>
-              <span class="text-muted small">${t.unidade_medida || ''}</span>
-            </div>` : ''}
-          </div>
-          ${hasInput ? `
-          <div class="px-3 pb-2">
-            <div class="d-flex justify-content-between small text-muted mb-1">
-              <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
-            </div>
-            <div class="progress mb-1" style="height:6px;background:#e9ecef">
-              <div class="progress-bar bg-secondary" style="width:${Math.min(perc_plan,100)}%"></div>
-            </div>
-            <div class="d-flex justify-content-between small mb-1">
-              <span style="color:${status_cor};font-weight:600">
-                Realizado &mdash; <small>${status_label}</small>
-              </span>
-              <span id="percReal_${t.id}" style="color:${status_cor};font-weight:600">${perc_real.toFixed(1)}%</span>
-            </div>
-            <div class="progress" style="height:6px;background:#e9ecef">
-              <div class="progress-bar" id="barReal_${t.id}"
-                   style="width:${Math.min(perc_real,100)}%;background:${status_cor}"></div>
-            </div>
-          </div>` : ''}
-        </div>`;
+        if (isPai) {
+            const filhos = filhosPorPai[t.id] || [];
+            const expandido = _rdoV2EditPaisExpandidos.has(t.id);
+            html += _rdoV2EditRenderTarefaCard(t, true, false, filhos.length);
+            html += `<div class="rdo-tarefa-filhos-edit ms-3" data-filhos-edit-de="${t.id}" style="${expandido ? '' : 'display:none'}">`;
+            filhos.forEach(f => { html += _rdoV2EditRenderTarefaCard(f, false, true, 0); });
+            html += `</div>`;
+        } else {
+            html += _rdoV2EditRenderTarefaCard(t, false, false, 0);
+        }
     });
     html += '</div>';
     container.innerHTML = html;
+
+    container.querySelectorAll('.rdo-tarefa-pai-header-edit').forEach(el => {
+        el.addEventListener('click', () => {
+            const paiId = Number(el.getAttribute('data-pai-id'));
+            togglePaiCronogramaEdit(paiId);
+        });
+    });
+}
+
+function togglePaiCronogramaEdit(paiId) {
+    const wrap = document.querySelector(`[data-filhos-edit-de="${paiId}"]`);
+    const chev = document.getElementById(`chev-pai-edit-${paiId}`);
+    if (!wrap) return;
+    const isHidden = wrap.style.display === 'none';
+    if (isHidden) {
+        wrap.style.display = '';
+        _rdoV2EditPaisExpandidos.add(paiId);
+        if (chev) { chev.classList.remove('fa-chevron-right'); chev.classList.add('fa-chevron-down'); }
+    } else {
+        wrap.style.display = 'none';
+        _rdoV2EditPaisExpandidos.delete(paiId);
+        if (chev) { chev.classList.remove('fa-chevron-down'); chev.classList.add('fa-chevron-right'); }
+    }
+}
+
+function expandirTodosCronogramaEdit(expandir) {
+    document.querySelectorAll('[data-filhos-edit-de]').forEach(wrap => {
+        const paiId = Number(wrap.getAttribute('data-filhos-edit-de'));
+        const chev = document.getElementById(`chev-pai-edit-${paiId}`);
+        if (expandir) {
+            wrap.style.display = '';
+            _rdoV2EditPaisExpandidos.add(paiId);
+            if (chev) { chev.classList.remove('fa-chevron-right'); chev.classList.add('fa-chevron-down'); }
+        } else {
+            wrap.style.display = 'none';
+            _rdoV2EditPaisExpandidos.delete(paiId);
+            if (chev) { chev.classList.remove('fa-chevron-down'); chev.classList.add('fa-chevron-right'); }
+        }
+    });
 }
 
 async function salvarApontamentoEdit(tarefaId) {
@@ -1732,7 +1507,6 @@ async function excluirSubempreitada(id) {
 // Carregar serviços e funcionários automaticamente ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de edição carregada - iniciando carregamento');
-    carregarServicosParaEdicao();
     carregarFuncionariosParaEdicao();
     carregarGaleria(); // Carregar fotos também
     {% if is_v2_active is defined and is_v2_active() %}

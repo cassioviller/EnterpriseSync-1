@@ -305,14 +305,6 @@
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-comment"></i>
-                            Observações Gerais
-                        </label>
-                        <textarea class="form-control" id="observacoes_gerais" name="observacoes_gerais" 
-                                  rows="4" placeholder="Descreva observações importantes, problemas encontrados, entregas recebidas, etc."></textarea>
-                    </div>
             </div>
         </div>
 
@@ -325,9 +317,17 @@
                     Apontamento de Produção — Cronograma
                     <span class="badge bg-light text-primary ms-2" style="font-size:.65rem">V2</span>
                 </h3>
-                <button type="button" class="btn btn-sm btn-light" onclick="carregarTarefasRDO()" title="Atualizar">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-light" onclick="expandirTodosCronogramaRDO(true)" title="Expandir todas">
+                        <i class="fas fa-angle-double-down"></i> Expandir todas
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" onclick="expandirTodosCronogramaRDO(false)" title="Recolher todas">
+                        <i class="fas fa-angle-double-up"></i> Recolher todas
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" onclick="carregarTarefasRDO()" title="Atualizar">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
             <div class="rdo-card-body p-0">
                 <div id="cronogramaLoadingRDO" class="text-center p-4 text-muted d-none">
@@ -400,28 +400,6 @@
             </div>
         </div>
         {% endif %}
-
-        <!-- Seção de Serviços e Atividades -->
-        <div class="rdo-card slide-in">
-            <div class="rdo-card-header">
-                <h3>
-                    <i class="fas fa-tasks"></i>
-                    Serviços e Atividades
-                </h3>
-                <button type="button" class="btn-modern btn-success" onclick="testarUltimoRDO()">
-                    <i class="fas fa-magic"></i>
-                    Testar Último RDO
-                </button>
-            </div>
-            <div class="rdo-card-body">
-                <div id="servicos-container">
-                    <div class="text-center p-4">
-                        <i class="fas fa-cogs fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">Selecione uma obra para carregar os serviços disponíveis</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Mão de obra por subatividade: seletores embutidos nos cards de subatividade -->
 
@@ -562,10 +540,6 @@
                     </a>
                     
                     <div class="d-flex gap-3">
-                        <button type="button" class="btn-modern btn-outline" onclick="carregarDadosUltimoRDO()">
-                            <i class="fas fa-history"></i>
-                            Carregar Dados do Último RDO
-                        </button>
                         <button type="submit" form="formNovoRDO" class="btn-modern btn-success" id="btnFinalizarRDO">
                             <i class="fas fa-check"></i>
                             Finalizar RDO
@@ -582,354 +556,7 @@
 console.log('Initializing RDO with light theme...');
 
 // === CARREGAMENTO DE DADOS DO ÚLTIMO RDO ===
-function carregarDadosUltimoRDO() {
-    const obraId = document.getElementById('obra_id').value;
-    if (!obraId) {
-        alert('⚠️ Selecione uma obra primeiro para carregar dados do último RDO');
-        return;
-    }
-    
-    console.log(`🔄 Carregando dados do último RDO para obra ${obraId}`);
-    
-    const servicosContainer = document.getElementById('servicos-container');
-    servicosContainer.innerHTML = `
-        <div class="text-center p-4">
-            <div class="spinner-border text-success" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="mt-2 text-muted">Buscando dados do último RDO...</p>
-        </div>
-    `;
-    
-    fetch(`/api/rdo/ultima-dados/${obraId}`)
-        .then(response => response.json())
-        .then(data => {
-            console.log('📊 Dados recebidos:', data);
-            
-            if (data.success) {
-                if (data.primeira_rdo && data.ultima_rdo) {
-                    console.log('🆕 Primeira RDO detectada');
-                    exibirDadosPrimeiraRDO(data.ultima_rdo);
-                } else if (data.ultima_rdo) {
-                    console.log('🔄 RDO existente encontrada');
-                    exibirDadosUltimoRDO(data.ultima_rdo);
-                } else {
-                    console.log('ℹ️ Nenhum RDO anterior encontrado para esta obra');
-                    exibirMensagemSemRDOAnterior();
-                }
-            } else {
-                console.log('ℹ️ Nenhum RDO anterior encontrado para esta obra');
-                exibirMensagemSemRDOAnterior();
-            }
-        })
-        .catch(error => {
-            console.error('❌ Erro ao carregar último RDO:', error);
-            exibirErroCarregamento();
-        });
-}
-
-// === FUNÇÃO PARA TESTAR ÚLTIMO RDO ===
-function testarUltimoRDO() {
-    console.log('🔄 Testando último RDO via função global...');
-    carregarDadosUltimoRDO();
-}
-
-// === PRIMEIRA RDO ===
-function exibirMensagemSemRDOAnterior() {
-    console.log('🚀 PRIMEIRA RDO: Carregando serviços da obra...');
-    const obraId = document.getElementById('obra_id').value;
-    if (obraId) {
-        console.log(`🔍 PRIMEIRA RDO: Buscando serviços para obra ${obraId}`);
-        carregarServicosParaPrimeiraRDO(obraId);
-    } else {
-        console.log('⚠️ Nenhuma obra selecionada');
-        const servicosContainer = document.getElementById('servicos-container');
-        servicosContainer.innerHTML = `
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i>
-                <strong>Selecione uma obra</strong>
-                <br>Selecione uma obra primeiro para ver os serviços disponíveis.
-            </div>
-        `;
-    }
-}
-
-function carregarServicosParaPrimeiraRDO(obraId) {
-    // Exibir loading primeiro
-    const servicosContainer = document.getElementById('servicos-container');
-    servicosContainer.innerHTML = `
-        <div class="text-center p-4">
-            <div class="spinner-border text-success" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="mt-2 text-muted">Carregando serviços da obra...</p>
-        </div>
-    `;
-
-    fetch(`/api/servicos-obra-primeira-rdo/${obraId}`)
-        .then(response => response.json())
-        .then(data => {
-            console.log('📊 Serviços da obra recebidos:', data);
-            
-            if (data.success && data.v2_cronograma) {
-                // V2: obra usa cronograma como fonte de serviços
-                console.log('🗓️ Obra V2 — usando cronograma para apontamento de produção');
-                const servicosContainer = document.getElementById('servicos-container');
-                if (servicosContainer) {
-                    servicosContainer.innerHTML = `
-                        <div class="alert alert-info">
-                            <i class="fas fa-calendar-check me-2"></i>
-                            <strong>Obra com Cronograma V2</strong><br>
-                            <small>O apontamento de produção é feito pelo painel <b>Cronograma</b> abaixo. Preencha as quantidades executadas por tarefa.</small>
-                        </div>`;
-                }
-                // Mostrar card do cronograma e carregar tarefas
-                const cardCronograma = document.getElementById('cardCronogramaV2');
-                if (cardCronograma) {
-                    cardCronograma.style.display = '';
-                    if (typeof carregarTarefasRDO === 'function') carregarTarefasRDO();
-                }
-            } else if (data.success && data.servicos && data.servicos.length > 0) {
-                console.log(`✅ ${data.servicos.length} serviços encontrados para primeira RDO`);
-                exibirServicosParaPrimeiraRDO(data.servicos);
-            } else {
-                console.log('ℹ️ Nenhum serviço encontrado para esta obra');
-                exibirMensagemSemServicos();
-            }
-        })
-        .catch(error => {
-            console.error('❌ Erro ao carregar serviços da obra:', error);
-            exibirErroCarregamento();
-        });
-}
-
-function exibirServicosParaPrimeiraRDO(servicos) {
-    console.log(`🎯 Exibindo ${servicos.length} serviços para primeira RDO`);
-    
-    const servicosContainer = document.getElementById('servicos-container');
-    
-    let html = `
-        <div class="alert alert-success">
-            <i class="fas fa-rocket"></i>
-            <strong>Primeira RDO da Obra!</strong> ${servicos.length} serviços carregados com percentual 0%
-            <br><small>Ajuste os percentuais conforme o progresso da obra</small>
-        </div>
-        <div class="row">
-    `;
-    
-    servicos.forEach((servico, index) => {
-        html += `
-            <div class="col-md-12 mb-3">
-                <div class="card">
-                    <div class="card-header bg-success text-white">
-                        <h6 class="card-title mb-0">
-                            <i class="fas fa-tools"></i>
-                            ${servico.nome || `Serviço ${index + 1}`}
-                        </h6>
-                        <small>Categoria: ${servico.categoria || 'Geral'}</small>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-        `;
-        
-        if (servico.subatividades && servico.subatividades.length > 0) {
-            servico.subatividades.forEach((subatividade) => {
-                html += `
-                    <div class="col-md-6 mb-3">
-                        <div class="card border-light">
-                            <div class="card-body">
-                                <h6 class="card-subtitle mb-2 text-muted">
-                                    <i class="fas fa-cog"></i> ${subatividade.nome}
-                                </h6>
-                                <div class="mb-2">
-                                    <label class="form-label">Percentual (%)</label>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="subatividade_${servico.id}_${subatividade.id}_percentual"
-                                           min="0" 
-                                           max="100" 
-                                           value="0"
-                                           placeholder="0"
-                                           form="formNovoRDO">
-                                </div>
-                                <div class="mb-2">
-                                    <label class="form-label">Observações</label>
-                                    <textarea class="form-control" 
-                                              name="subatividade_${servico.id}_${subatividade.id}_observacoes"
-                                              rows="2" 
-                                              placeholder="${subatividade.descricao || 'Observações da subatividade...'}"
-                                              form="formNovoRDO"></textarea>
-                                </div>
-                                <input type="hidden" 
-                                       name="nome_subatividade_${servico.id}_${subatividade.id}" 
-                                       value="${subatividade.nome}"
-                                       form="formNovoRDO">
-                                ${htmlEquipeSubatividade(subatividade.id)}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-        
-        html += `
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    servicosContainer.innerHTML = html;
-}
-
-// === EXIBIR DADOS DO ÚLTIMO RDO ===
-function exibirDadosUltimoRDO(ultimoRDO) {
-    console.log('🎯 Processando dados do último RDO:', ultimoRDO.numero_rdo);
-    
-    const container = document.getElementById('servicos-container');
-    
-    let html = `
-        <div class="alert alert-success border-0 shadow-sm mb-4">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-check-circle fa-2x text-success me-3"></i>
-                <div>
-                    <h6 class="mb-1 fw-bold">✅ Dados Carregados com Sucesso</h6>
-                    <p class="mb-0 text-muted">RDO: <strong>${ultimoRDO.numero_rdo}</strong> • Data: ${ultimoRDO.data_relatorio}</p>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    if (ultimoRDO.servicos && ultimoRDO.servicos.length > 0) {
-        html += `
-            <div class="row">
-                <div class="col-12">
-                    <h5 class="mb-3"><i class="fas fa-cogs me-2"></i>Serviços e Subatividades</h5>
-                </div>
-            </div>
-        `;
-        
-        ultimoRDO.servicos.forEach((servico, index) => {
-            const servicoId = `servico-${servico.id}`;
-            
-            html += `
-                <div class="card mb-3 border-0 shadow-sm">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center" 
-                         style="cursor: pointer;" onclick="toggleServico('${servicoId}')">
-                        <div>
-                            <h6 class="mb-0">
-                                <i class="fas fa-wrench text-primary"></i>
-                                ${servico.nome}
-                            </h6>
-                            <small class="text-muted">${servico.categoria || 'Categoria não definida'}</small>
-                        </div>
-                        <div class="d-flex align-items-center gap-3">
-                            <span class="badge bg-secondary">${servico.subatividades?.length || 0} subatividades</span>
-                            <i class="fas fa-chevron-down" id="icon-${servicoId}"></i>
-                        </div>
-                    </div>
-                    
-                    <input type="hidden" name="servico_id_correto" value="${servico.id}" form="formNovoRDO">
-                    
-                    <div class="card-body collapse" id="${servicoId}">
-                        <div class="row">
-            `;
-            
-            if (servico.subatividades && servico.subatividades.length > 0) {
-                servico.subatividades.forEach(subatividade => {
-                    const percentualAtual = subatividade.percentual || 0;
-                    
-                    html += `
-                        <div class="col-md-6 mb-3">
-                            <div class="card border-light h-100">
-                                <div class="card-body p-2">
-                                    <label class="form-label fw-bold small">
-                                        ${subatividade.nome}
-                                        ${percentualAtual > 0 ? 
-                                          `<span class="badge bg-info ms-2">${percentualAtual}%</span>` : ''}
-                                    </label>
-                                    <div class="input-group mb-2">
-                                        <input type="number" 
-                                               class="form-control form-control-sm" 
-                                               name="subatividade_${servico.id}_${subatividade.id}_percentual"
-                                               value="${percentualAtual}"
-                                               min="0" 
-                                               max="100" 
-                                               step="0.1"
-                                               form="formNovoRDO">
-                                        <span class="input-group-text">%</span>
-                                    </div>
-                                    <small class="form-text text-muted d-block mb-2">
-                                        Última RDO: ${percentualAtual}%
-                                    </small>
-                                    ${htmlEquipeSubatividade(subatividade.id)}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            
-            html += `
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-    }
-    
-    container.innerHTML = html;
-}
-
-// === PRIMEIRA RDO ===
-function exibirDadosPrimeiraRDO(primeiraRDO) {
-    console.log('🆕 Exibindo dados para primeira RDO');
-    exibirServicosParaPrimeiraRDO(primeiraRDO.servicos || []);
-}
-
-// === FUNÇÕES AUXILIARES ===
-function toggleServico(servicoId) {
-    const elemento = document.getElementById(servicoId);
-    const icone = document.getElementById(`icon-${servicoId}`);
-    
-    if (elemento.classList.contains('collapse')) {
-        elemento.classList.remove('collapse');
-        icone.classList.remove('fa-chevron-down');
-        icone.classList.add('fa-chevron-up');
-    } else {
-        elemento.classList.add('collapse');
-        icone.classList.remove('fa-chevron-up');
-        icone.classList.add('fa-chevron-down');
-    }
-}
-
-function exibirMensagemSemServicos() {
-    const servicosContainer = document.getElementById('servicos-container');
-    servicosContainer.innerHTML = `
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Nenhum serviço cadastrado</strong>
-            <br>Esta obra não possui serviços cadastrados.
-            <br><br>
-            <a href="/servicos" class="btn btn-warning btn-sm">
-                <i class="fas fa-plus"></i> Cadastrar Serviços
-            </a>
-        </div>
-    `;
-}
-
-function exibirErroCarregamento() {
-    const servicosContainer = document.getElementById('servicos-container');
-    servicosContainer.innerHTML = `
-        <div class="alert alert-danger">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Erro ao carregar dados</strong>
-            <br>Não foi possível carregar dados do último RDO. Tente novamente.
-        </div>
-    `;
-}
+// (removido) Carregamento/render de Serviços do RDO V2 — agora apenas o painel de Cronograma é usado.
 
 // === SISTEMA DE MÃO DE OBRA POR SUBATIVIDADE ===
 // Cache global de funcionários (carregado uma vez por obra selecionada)
@@ -1163,7 +790,6 @@ document.addEventListener('DOMContentLoaded', function() {
         obraSelect.addEventListener('change', function() {
             if (this.value) {
                 console.log(`Obra selecionada: ${this.value}`);
-                carregarDadosUltimoRDO();
                 {% if is_v2_active is defined and is_v2_active() %}
                 carregarTarefasRDO();
                 {% endif %}
@@ -1234,81 +860,155 @@ async function carregarTarefasRDO() {
     }
 }
 
-function renderizarTarefasRDO(tarefas) {
-    const container = document.getElementById('cronogramaTarefasRDO');
-    if (!container) return;
+// Estado dos pais expandidos (preservado entre re-renderizações na mesma página)
+const _rdoV2PaisExpandidos = new Set();
 
-    // Identificar tarefas pai
-    const paiIds = new Set(tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+function _rdoV2RenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
+    const perc_plan = t.percentual_planejado ?? 0;
+    const perc_real = t.percentual_realizado ?? 0;
+    const status_cor = perc_real >= perc_plan ? '#28a745' : '#dc3545';
+    const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
+    const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
+    const qty_acum = t.quantidade_acumulada ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}` : `0 ${t.unidade_medida}`;
+    const qty_hoje = t.quantidade_executada_hoje ?? 0;
+    const indent = ehFilho ? 'ms-4' : '';
+    const bgCard = isPai ? '#f0f7ff' : '#ffffff';
+    const boldClass = isPai ? 'fw-bold' : '';
+    const hasInput = !isPai;
+    const expandido = _rdoV2PaisExpandidos.has(t.id);
+    const chevronIcon = expandido ? 'fa-chevron-down' : 'fa-chevron-right';
+    const nomeTarefaEsc = t.nome_tarefa.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-    let html = '<div class="p-3">';
-    tarefas.forEach(t => {
-        const isPai = paiIds.has(t.id);
-        const isFilho = !!t.tarefa_pai_id;
-        const perc_plan = t.percentual_planejado ?? 0;
-        const perc_real = t.percentual_realizado ?? 0;
-        const status_cor = perc_real >= perc_plan ? '#28a745' : '#dc3545';
-        const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
-        const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
-        const qty_acum = t.quantidade_acumulada ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}` : `0 ${t.unidade_medida}`;
-        const qty_hoje = t.quantidade_executada_hoje ?? 0;
-        const indent = isFilho ? 'ms-4' : '';
-        const bgCard = isPai ? '#f0f7ff' : '#ffffff';
-        const boldClass = isPai ? 'fw-bold' : '';
-
-        // Só habilitar input em tarefas folha (sem filhas)
-        const hasInput = !isPai;
-
-        const nomeTarefaEsc = t.nome_tarefa.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        html += `
-        <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
-          <div class="d-flex align-items-center gap-2 p-2 ps-3">
+    const headerInner = `
+        <div class="d-flex align-items-center gap-2 p-2 ps-3 ${isPai ? 'rdo-tarefa-pai-header' : ''}"
+             ${isPai ? `style="cursor:pointer" data-pai-id="${t.id}"` : ''}>
+            ${isPai ? `<i class="fas ${chevronIcon} text-primary me-1" id="chev-pai-${t.id}" style="width:14px"></i>` : ''}
             <span class="flex-grow-1 ${boldClass}">${isPai ? '<i class="fas fa-folder-open text-primary me-1"></i>' : '<i class="fas fa-tasks text-secondary me-1"></i>'}${t.nome_tarefa}</span>
+            ${isPai ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle">${contadorFilhos} ${contadorFilhos === 1 ? 'subtarefa' : 'subtarefas'}</span>` : ''}
             ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
             ${hasInput ? `
-            <div class="d-flex align-items-center gap-1" style="min-width:180px">
-              <small class="text-muted">Acum: ${qty_acum}</small>
-              <input type="number"
-                     id="qty_tarefa_${t.id}"
-                     class="form-control form-control-sm"
-                     style="width:80px"
-                     min="0" step="0.01"
-                     placeholder="Hoje"
-                     value="${qty_hoje > 0 ? qty_hoje : ''}"
-                     onchange="apontarProducaoRDO(${t.id}, this.value)"
-                     title="Quantidade executada hoje">
-              <span class="text-muted small">${t.unidade_medida || ''}</span>
+            <div class="d-flex align-items-center gap-1" style="min-width:180px" onclick="event.stopPropagation()">
+                <small class="text-muted">Acum: ${qty_acum}</small>
+                <input type="number"
+                       id="qty_tarefa_${t.id}"
+                       class="form-control form-control-sm"
+                       style="width:80px"
+                       min="0" step="0.01"
+                       placeholder="Hoje"
+                       value="${qty_hoje > 0 ? qty_hoje : ''}"
+                       onchange="apontarProducaoRDO(${t.id}, this.value)"
+                       title="Quantidade executada hoje">
+                <span class="text-muted small">${t.unidade_medida || ''}</span>
             </div>` : ''}
-            <!-- Botão equipe por atividade -->
             <button type="button"
                     class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 px-2"
                     id="btn-equipe-${t.id}"
-                    onclick="abrirModalEquipeTarefa(${t.id}, '${nomeTarefaEsc}')"
+                    onclick="event.stopPropagation(); abrirModalEquipeTarefa(${t.id}, '${nomeTarefaEsc}')"
                     title="Alocar equipe nesta atividade">
                 <i class="fas fa-users"></i>
                 <span class="badge rounded-pill bg-primary ms-1" id="badge-equipe-${t.id}" style="display:none;font-size:.7rem">0</span>
             </button>
-          </div>
-          ${hasInput ? `
-          <div class="px-3 pb-2">
+        </div>`;
+
+    const progresso = hasInput ? `
+        <div class="px-3 pb-2">
             <div class="d-flex justify-content-between small text-muted mb-1">
-              <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
+                <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
             </div>
             <div class="progress mb-1" style="height:6px;background:#e9ecef">
-              <div class="progress-bar bg-secondary" style="width:${perc_plan}%" title="Planejado: ${perc_plan.toFixed(1)}%"></div>
+                <div class="progress-bar bg-secondary" style="width:${perc_plan}%" title="Planejado: ${perc_plan.toFixed(1)}%"></div>
             </div>
             <div class="d-flex justify-content-between small mb-1">
-              <span style="color:${status_cor};font-weight:600">Realizado &mdash; <small>${status_label}</small></span>
-              <span style="color:${status_cor};font-weight:600">${perc_real.toFixed(1)}%</span>
+                <span style="color:${status_cor};font-weight:600">Realizado &mdash; <small>${status_label}</small></span>
+                <span style="color:${status_cor};font-weight:600">${perc_real.toFixed(1)}%</span>
             </div>
             <div class="progress" style="height:6px;background:#e9ecef">
-              <div class="progress-bar" style="width:${perc_real}%;background:${status_cor}" title="Realizado: ${perc_real.toFixed(1)}%"></div>
+                <div class="progress-bar" style="width:${perc_real}%;background:${status_cor}" title="Realizado: ${perc_real.toFixed(1)}%"></div>
             </div>
-          </div>` : ''}
+        </div>` : '';
+
+    return `
+        <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
+            ${headerInner}
+            ${progresso}
         </div>`;
+}
+
+function renderizarTarefasRDO(tarefas) {
+    const container = document.getElementById('cronogramaTarefasRDO');
+    if (!container) return;
+
+    // Agrupar por pai
+    const filhosPorPai = {};
+    tarefas.forEach(t => {
+        if (t.tarefa_pai_id) {
+            (filhosPorPai[t.tarefa_pai_id] = filhosPorPai[t.tarefa_pai_id] || []).push(t);
+        }
+    });
+    const paiIds = new Set(Object.keys(filhosPorPai).map(Number));
+
+    let html = '<div class="p-3">';
+    tarefas.forEach(t => {
+        // Filhos serão renderizados dentro do bloco do pai
+        if (t.tarefa_pai_id && paiIds.has(t.tarefa_pai_id)) return;
+
+        const isPai = paiIds.has(t.id);
+        if (isPai) {
+            const filhos = filhosPorPai[t.id] || [];
+            const expandido = _rdoV2PaisExpandidos.has(t.id);
+            html += _rdoV2RenderTarefaCard(t, true, false, filhos.length);
+            html += `<div class="rdo-tarefa-filhos ms-3" data-filhos-de="${t.id}" style="${expandido ? '' : 'display:none'}">`;
+            filhos.forEach(f => {
+                html += _rdoV2RenderTarefaCard(f, false, true, 0);
+            });
+            html += `</div>`;
+        } else {
+            // Tarefa folha de nível raiz
+            html += _rdoV2RenderTarefaCard(t, false, false, 0);
+        }
     });
     html += '</div>';
     container.innerHTML = html;
+
+    // Bind click nos cabeçalhos pai
+    container.querySelectorAll('.rdo-tarefa-pai-header').forEach(el => {
+        el.addEventListener('click', () => {
+            const paiId = Number(el.getAttribute('data-pai-id'));
+            togglePaiCronogramaRDO(paiId);
+        });
+    });
+}
+
+function togglePaiCronogramaRDO(paiId) {
+    const filhosWrap = document.querySelector(`[data-filhos-de="${paiId}"]`);
+    const chev = document.getElementById(`chev-pai-${paiId}`);
+    if (!filhosWrap) return;
+    const isHidden = filhosWrap.style.display === 'none';
+    if (isHidden) {
+        filhosWrap.style.display = '';
+        _rdoV2PaisExpandidos.add(paiId);
+        if (chev) { chev.classList.remove('fa-chevron-right'); chev.classList.add('fa-chevron-down'); }
+    } else {
+        filhosWrap.style.display = 'none';
+        _rdoV2PaisExpandidos.delete(paiId);
+        if (chev) { chev.classList.remove('fa-chevron-down'); chev.classList.add('fa-chevron-right'); }
+    }
+}
+
+function expandirTodosCronogramaRDO(expandir) {
+    document.querySelectorAll('[data-filhos-de]').forEach(wrap => {
+        const paiId = Number(wrap.getAttribute('data-filhos-de'));
+        const chev = document.getElementById(`chev-pai-${paiId}`);
+        if (expandir) {
+            wrap.style.display = '';
+            _rdoV2PaisExpandidos.add(paiId);
+            if (chev) { chev.classList.remove('fa-chevron-right'); chev.classList.add('fa-chevron-down'); }
+        } else {
+            wrap.style.display = 'none';
+            _rdoV2PaisExpandidos.delete(paiId);
+            if (chev) { chev.classList.remove('fa-chevron-down'); chev.classList.add('fa-chevron-right'); }
+        }
+    });
 }
 
 async function apontarProducaoRDO(tarefaId, valor) {

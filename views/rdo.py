@@ -474,12 +474,17 @@ def criar_rdo():
         rdo.tempo_tarde = request.form.get('tempo_tarde', 'Bom')
         rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
         rdo.observacoes_meteorologicas = request.form.get('observacoes_meteorologicas', '')
-        rdo.comentario_geral = request.form.get('comentario_geral', '')
+        # RDO V2: campo único de observações; aceita observacoes_gerais (novo), com fallbacks legados
+        rdo.comentario_geral = (
+            request.form.get('observacoes_gerais', '').strip()
+            or request.form.get('observacoes_finais', '').strip()
+            or request.form.get('comentario_geral', '').strip()
+        )
         rdo.status = 'Finalizado'
-        
+
         db.session.add(rdo)
         db.session.flush()  # Para obter o ID
-        
+
         # Processar atividades (corrigido para funcionar corretamente)
         atividades_json = request.form.get('atividades', '[]')
         logger.debug(f"DEBUG: Atividades JSON recebido: {atividades_json}")
@@ -2191,7 +2196,12 @@ def rdo_salvar_unificado():
         rdo.temperatura = request.form.get('temperatura', '').strip()  # Backup
         rdo.condicoes_climaticas = request.form.get('condicoes_climaticas', '').strip()  # Backup
         
-        rdo.comentario_geral = request.form.get('comentario_geral', '').strip()
+        # RDO V2: campo único de observações; aceita observacoes_gerais (novo), com fallbacks legados
+        rdo.comentario_geral = (
+            request.form.get('observacoes_gerais', '').strip()
+            or request.form.get('observacoes_finais', '').strip()
+            or request.form.get('comentario_geral', '').strip()
+        )
         rdo.status = 'Finalizado'
         
         # Para edição, o criado_por_id já está setado, não alterar

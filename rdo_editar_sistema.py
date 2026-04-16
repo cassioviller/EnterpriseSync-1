@@ -179,8 +179,10 @@ def salvar_edicao_rdo(rdo_id):
         obra_id = request.form.get('obra_id', type=int)
         data_relatorio = request.form.get('data_relatorio')
         clima = request.form.get('clima', '').strip()
+        # RDO V2: campo único de observações; mantém compat com observacoes_finais legado
         observacoes_gerais = request.form.get('observacoes_gerais', '').strip()
         observacoes_finais = request.form.get('observacoes_finais', '').strip()
+        observacoes_unificadas = observacoes_gerais or observacoes_finais
         
         # Validar dados básicos
         if not obra_id or not data_relatorio:
@@ -198,8 +200,11 @@ def salvar_edicao_rdo(rdo_id):
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
         rdo.clima_geral = clima
-        rdo.observacoes_gerais = observacoes_gerais
-        rdo.observacoes_finais = observacoes_finais
+        # Persistir o conteúdo unificado na coluna real (`comentario_geral`)
+        rdo.comentario_geral = observacoes_unificadas
+        # Manter atributos legados em memória para compatibilidade com código a jusante
+        rdo.observacoes_gerais = observacoes_unificadas
+        rdo.observacoes_finais = observacoes_unificadas
         
         # DEBUG: Verificar TODOS os dados do formulário
         logger.info(f"📋 TOTAL DE CAMPOS RECEBIDOS: {len(request.form)}")
