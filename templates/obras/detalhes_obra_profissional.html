@@ -459,6 +459,177 @@
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     }
 }
+
+/* ============== ABAS DE DETALHES DA OBRA ============== */
+.obra-tabs-wrapper {
+    background: transparent;
+    margin-top: 1rem;
+}
+.obra-nav-tabs {
+    border-bottom: 2px solid #e2e8f0;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.obra-nav-tabs .nav-link {
+    color: #64748b;
+    font-weight: 600;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 8px 8px 0 0;
+    padding: 0.75rem 1.25rem;
+    background: transparent;
+    transition: all 0.25s ease;
+    font-size: 0.95rem;
+}
+.obra-nav-tabs .nav-link:hover {
+    color: #0066cc;
+    background: rgba(0, 102, 204, 0.06);
+}
+.obra-nav-tabs .nav-link.active {
+    color: #0066cc;
+    background: white;
+    border-bottom: 3px solid #0066cc;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+}
+.obra-tab-content {
+    padding-top: 1.25rem;
+}
+.obra-tab-content > .tab-pane > .obra-card {
+    margin-bottom: 1.25rem;
+}
+/* Compactar paddings de cards dentro das abas */
+.obra-tab-content .obra-card-body {
+    padding: 1.25rem !important;
+}
+.obra-tab-content .obra-card-header {
+    padding: 1rem 1.25rem;
+}
+.obra-tab-content .obra-card-header h3 {
+    font-size: 1.15rem;
+}
+/* Info-item em grid 2 colunas (label | valor) */
+.obra-tab-content .info-item {
+    display: grid;
+    grid-template-columns: minmax(180px, 220px) 1fr;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.obra-tab-content .info-item:last-child { border-bottom: none; }
+.obra-tab-content .info-label {
+    margin-bottom: 0;
+    font-size: 0.82rem;
+}
+.obra-tab-content .info-value {
+    font-size: 1rem;
+    word-break: break-word;
+}
+/* Bloco combinado: Informações + Datas + Portal */
+.bloco-info-combinado {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+}
+.bloco-info-combinado > .info-coluna {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border: 1px solid #e2e8f0;
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+}
+.bloco-info-combinado .info-coluna h4 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 0.75rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.bloco-info-combinado .info-coluna h4 i { color: #0066cc; }
+.bloco-info-combinado .info-coluna .info-item {
+    grid-template-columns: minmax(140px, 170px) 1fr;
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+}
+/* KPIs faixa horizontal compacta */
+.obra-tab-content .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+.obra-tab-content .kpi-grid .kpi-card {
+    padding: 1rem 1.1rem;
+    text-align: left;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: center;
+}
+.obra-tab-content .kpi-grid .kpi-icon {
+    font-size: 1.6rem;
+    margin: 0;
+}
+.obra-tab-content .kpi-grid .kpi-value {
+    font-size: 1.3rem;
+    margin: 0;
+    line-height: 1.1;
+}
+.obra-tab-content .kpi-grid .kpi-label {
+    font-size: 0.75rem;
+    margin-top: 2px;
+}
+/* Painel estratégico compacto */
+.obra-tab-content .painel-estrategico {
+    padding: 1.25rem 1.25rem !important;
+    margin-bottom: 1.25rem !important;
+}
+/* Em telas largas, painel + KPIs lado a lado */
+@media (min-width: 1400px) {
+    .visao-geral-topo {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    .visao-geral-topo > .painel-estrategico { margin-bottom: 0 !important; }
+    .visao-geral-topo > .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        margin-bottom: 0;
+        align-content: start;
+    }
+}
+/* Estados vazios discretos dentro das abas */
+.obra-tab-content .empty-state-compact {
+    text-align: center;
+    padding: 1.75rem 1rem;
+    color: #94a3b8;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+}
+.obra-tab-content .empty-state-compact i {
+    font-size: 2rem;
+    opacity: 0.5;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+@media (max-width: 575px) {
+    .obra-nav-tabs .nav-link {
+        padding: 0.55rem 0.85rem;
+        font-size: 0.85rem;
+    }
+    .obra-tab-content .info-item {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
+}
 </style>
 {% endblock %}
 
@@ -521,11 +692,53 @@
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════════
-             PAINEL ESTRATÉGICO DA OBRA
-             Gráfico de saúde financeira + 3 indicadores semáforo
+             ABAS DE NAVEGAÇÃO DA OBRA
              ═══════════════════════════════════════════════════════════════ -->
+        <div class="container-fluid obra-tabs-wrapper" style="padding: 1rem 15px 0;">
+            <ul class="nav nav-tabs obra-nav-tabs" id="obraDetailTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-visao-geral" type="button" role="tab" data-hash="visao-geral">
+                        <i class="fas fa-chart-pie me-2"></i>Visão Geral
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-financeiro" type="button" role="tab" data-hash="financeiro">
+                        <i class="fas fa-dollar-sign me-2"></i>Financeiro
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mao-obra" type="button" role="tab" data-hash="mao-obra">
+                        <i class="fas fa-users-cog me-2"></i>Mão de Obra
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rdos" type="button" role="tab" data-hash="rdos">
+                        <i class="fas fa-clipboard-list me-2"></i>RDOs
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-compras" type="button" role="tab" data-hash="compras">
+                        <i class="fas fa-shopping-cart me-2"></i>Compras
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-cronograma" type="button" role="tab" data-hash="cronograma">
+                        <i class="fas fa-calendar-alt me-2"></i>Cronograma &amp; Mapa
+                    </button>
+                </li>
+            </ul>
+        </div>
+
         <div class="container-fluid" style="padding: 0 15px;">
-        <div class="painel-estrategico obra-card" style="padding: 1.75rem 2rem; margin-bottom: 1.5rem;">
+        <div class="tab-content obra-tab-content" id="obraDetailTabsContent">
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: VISÃO GERAL
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade show active" id="tab-visao-geral" role="tabpanel">
+
+        <div class="visao-geral-topo">
+        <div class="painel-estrategico obra-card" style="padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 0.75rem;">
                 <h3 style="margin: 0; font-size: 1.35rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.6rem;">
                     <i class="fas fa-chart-line" style="color: #0066cc;"></i>
@@ -668,7 +881,7 @@
                 </div>
             </div>
         </div>
-        </div>
+        <!-- /painel-estrategico -->
 
         <style>
             .semaforo-card:hover { transform: translateX(4px); }
@@ -732,315 +945,213 @@
         })();
         </script>
 
-        <!-- KPIs da Obra -->
-        <div class="container-fluid" style="padding: 0 15px;">
+        <!-- KPIs da Obra (faixa horizontal compacta) -->
         <div class="kpi-grid">
             <div class="kpi-card" style="--kpi-color: #3b82f6; --kpi-color-light: #60a5fa;">
                 <i class="fas fa-dollar-sign kpi-icon"></i>
-                <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                <div class="kpi-label">Custo Total</div>
+                <div>
+                    <div class="kpi-value">R$ {{ '{:,.2f}'.format(kpis.custo_total if kpis and kpis.custo_total else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    <div class="kpi-label">Custo Total</div>
+                </div>
             </div>
-            
+            {% if obra.valor_contrato and obra.valor_contrato > 0 %}
+            <div class="kpi-card" style="--kpi-color: #06b6d4; --kpi-color-light: #22d3ee;">
+                <i class="fas fa-file-contract kpi-icon"></i>
+                <div>
+                    <div class="kpi-value">R$ {{ '{:,.2f}'.format(obra.valor_contrato).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    <div class="kpi-label">Contrato</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if obra.valor_contrato and kpis and kpis.custo_total > 0 %}
+            {% set _margem = ((obra.valor_contrato - kpis.custo_total) / obra.valor_contrato * 100) if obra.valor_contrato > 0 else 0 %}
+            <div class="kpi-card" style="--kpi-color: {% if _margem >= 20 %}#22c55e{% elif _margem >= 10 %}#f59e0b{% else %}#ef4444{% endif %}; --kpi-color-light: #94a3b8;">
+                <i class="fas fa-percentage kpi-icon"></i>
+                <div>
+                    <div class="kpi-value">{{ '{:.1f}'.format(_margem) }}%</div>
+                    <div class="kpi-label">Margem Atual</div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="kpi-card" style="--kpi-color: #6366f1; --kpi-color-light: #818cf8;">
+                <i class="fas fa-clipboard-list kpi-icon"></i>
+                <div>
+                    <div class="kpi-value">{{ rdos|length if rdos else 0 }}</div>
+                    <div class="kpi-label">RDOs</div>
+                </div>
+            </div>
             <div class="kpi-card" style="--kpi-color: #22c55e; --kpi-color-light: #4ade80;">
                 <i class="fas fa-calendar-check kpi-icon"></i>
-                <div class="kpi-value">{{ kpis.dias_trabalhados if kpis else 0 }}</div>
-                <div class="kpi-label">Dias Trabalhados</div>
+                <div>
+                    <div class="kpi-value">{{ kpis.dias_trabalhados if kpis else 0 }}</div>
+                    <div class="kpi-label">Dias Trabalhados</div>
+                </div>
             </div>
-            
-            <div class="kpi-card" style="--kpi-color: #f59e0b; --kpi-color-light: #fbbf24;">
-                <i class="fas fa-clock kpi-icon"></i>
-                <div class="kpi-value">{{ '{:.1f}'.format(kpis.total_horas if kpis and kpis.total_horas else 0) }}h</div>
-                <div class="kpi-label">Total de Horas</div>
-            </div>
-            
             <div class="kpi-card" style="--kpi-color: #8b5cf6; --kpi-color-light: #a78bfa;">
                 <i class="fas fa-users kpi-icon"></i>
-                <div class="kpi-value">{{ kpis.funcionarios_periodo if kpis else 0 }}</div>
-                <div class="kpi-label">Funcionários</div>
+                <div>
+                    <div class="kpi-value">{{ kpis.funcionarios_periodo if kpis else 0 }}</div>
+                    <div class="kpi-label">Funcionários</div>
+                </div>
             </div>
+            {% if obra.data_inicio %}
+            <div class="kpi-card" style="--kpi-color: #f59e0b; --kpi-color-light: #fbbf24;">
+                <i class="fas fa-hourglass-half kpi-icon"></i>
+                <div>
+                    <div class="kpi-value">{{ (date.today() - obra.data_inicio).days }}</div>
+                    <div class="kpi-label">Dias Decorridos</div>
+                </div>
+            </div>
+            {% endif %}
         </div>
+        </div>
+        <!-- /visao-geral-topo -->
 
-        <!-- Informações Detalhadas -->
-        <div class="info-grid">
-            <!-- Informações Gerais -->
-            <div class="obra-card">
-                <div class="obra-card-header">
-                    <h3><i class="fas fa-info-circle"></i> Informações Gerais</h3>
+        <!-- Bloco combinado: Informações Gerais + Datas + Portal do Cliente -->
+        <div class="bloco-info-combinado">
+            <!-- Coluna 1: Informações Gerais -->
+            <div class="info-coluna">
+                <h4><i class="fas fa-info-circle"></i> Informações Gerais</h4>
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-building"></i> Nome da Obra</div>
+                    <div class="info-value">{{ obra.nome }}</div>
                 </div>
-                <div class="obra-card-body" style="padding: 2rem;">
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-building"></i>
-                            Nome da Obra
-                        </div>
-                        <div class="info-value">{{ obra.nome }}</div>
-                    </div>
-                    
-                    {% if obra.codigo %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-hashtag"></i>
-                            Código
-                        </div>
-                        <div class="info-value">{{ obra.codigo }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-flag"></i>
-                            Status
-                        </div>
-                        <div class="info-value">
-                            <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
-                                <i class="fas fa-circle"></i>
-                                {{ obra.status }}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    {% if obra.endereco %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-map-marker-alt"></i>
-                            Endereço
-                        </div>
-                        <div class="info-value">{{ obra.endereco }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Cliente movido para informações gerais -->
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-user-tie"></i>
-                            Cliente
-                        </div>
-                        <div class="info-value">{{ obra.cliente_nome if obra.cliente_nome else (obra.cliente if obra.cliente else 'Cliente Teste LTDA') }}</div>
-                    </div>
-                    
-                    {% if obra.area_total_m2 and obra.area_total_m2 > 0 %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-ruler-combined"></i>
-                            Área Total
-                        </div>
-                        <div class="info-value">{{ '{:,.2f}'.format(obra.area_total_m2).replace(',', ' ').replace('.', ',').replace(' ', '.') }} m²</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.responsavel %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-user-hard-hat"></i>
-                            Responsável
-                        </div>
-                        <div class="info-value">{{ obra.responsavel.nome }}</div>
-                    </div>
-                    {% endif %}
+                {% if obra.codigo %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-hashtag"></i> Código</div>
+                    <div class="info-value">{{ obra.codigo }}</div>
                 </div>
+                {% endif %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-flag"></i> Status</div>
+                    <div class="info-value">
+                        <span class="status-badge status-{{ obra.status.lower().replace(' ', '-') }}">
+                            <i class="fas fa-circle"></i> {{ obra.status }}
+                        </span>
+                    </div>
+                </div>
+                {% if obra.endereco %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-map-marker-alt"></i> Endereço</div>
+                    <div class="info-value">{{ obra.endereco }}</div>
+                </div>
+                {% endif %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-user-tie"></i> Cliente</div>
+                    <div class="info-value">{{ obra.cliente_nome if obra.cliente_nome else (obra.cliente if obra.cliente else 'Cliente Teste LTDA') }}</div>
+                </div>
+                {% if obra.area_total_m2 and obra.area_total_m2 > 0 %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-ruler-combined"></i> Área Total</div>
+                    <div class="info-value">{{ '{:,.2f}'.format(obra.area_total_m2).replace(',', ' ').replace('.', ',').replace(' ', '.') }} m²</div>
+                </div>
+                {% endif %}
+                {% if obra.responsavel %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-user-hard-hat"></i> Responsável</div>
+                    <div class="info-value">{{ obra.responsavel.nome }}</div>
+                </div>
+                {% endif %}
             </div>
 
-            <!-- Datas da Obra -->
-            <div class="obra-card">
-                <div class="obra-card-header">
-                    <h3><i class="fas fa-calendar-alt"></i> Datas da Obra</h3>
+            <!-- Coluna 2: Datas -->
+            <div class="info-coluna">
+                <h4><i class="fas fa-calendar-alt"></i> Datas da Obra</h4>
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-play"></i> Data de Início</div>
+                    <div class="info-value">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
                 </div>
-                <div class="obra-card-body" style="padding: 2rem;">
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-play"></i>
-                            Data de Início
-                        </div>
-                        <div class="info-value">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
-                    </div>
-                    
-                    {% if obra.data_previsao_fim %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-flag-checkered"></i>
-                            Previsão de Conclusão
-                        </div>
-                        <div class="info-value">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.data_inicio %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-hourglass-half"></i>
-                            Dias Decorridos
-                        </div>
-                        <div class="info-value">{{ (date.today() - obra.data_inicio).days }} dias</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.data_previsao_fim and obra.data_inicio %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-calendar-day"></i>
-                            Duração Prevista
-                        </div>
-                        <div class="info-value">{{ (obra.data_previsao_fim - obra.data_inicio).days }} dias</div>
-                    </div>
-                    {% endif %}
-
-                    {% if is_v2_active is defined and is_v2_active() %}
-                    <div class="mt-3 pt-3" style="border-top:1px solid rgba(0,0,0,.08)">
-                        <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}"
-                           class="btn btn-sm btn-primary w-100">
-                            <i class="fas fa-project-diagram me-2"></i>
-                            Abrir Cronograma Detalhado (Gantt)
-                        </a>
-                    </div>
-                    {% endif %}
+                {% if obra.data_previsao_fim %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-flag-checkered"></i> Previsão de Conclusão</div>
+                    <div class="info-value">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') }}</div>
                 </div>
+                {% endif %}
+                {% if obra.data_inicio %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-hourglass-half"></i> Dias Decorridos</div>
+                    <div class="info-value">{{ (date.today() - obra.data_inicio).days }} dias</div>
+                </div>
+                {% endif %}
+                {% if obra.data_previsao_fim and obra.data_inicio %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-calendar-day"></i> Duração Prevista</div>
+                    <div class="info-value">{{ (obra.data_previsao_fim - obra.data_inicio).days }} dias</div>
+                </div>
+                {% endif %}
+                {% if is_v2_active is defined and is_v2_active() %}
+                <div style="margin-top: auto; padding-top: 0.75rem;">
+                    <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}"
+                       class="btn btn-sm btn-primary w-100">
+                        <i class="fas fa-project-diagram me-2"></i>
+                        Cronograma Detalhado (Gantt)
+                    </a>
+                </div>
+                {% endif %}
             </div>
 
-            <!-- Portal do Cliente -->
-            <div class="obra-card">
-                <div class="obra-card-header" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);">
-                    <h3><i class="fas fa-globe"></i> Portal do Cliente</h3>
-                </div>
-                <div class="obra-card-body" style="padding: 2rem;">
-                    <div class="info-item">
-                        <div class="info-label"><i class="fas fa-toggle-on"></i> Status</div>
-                        <div class="info-value d-flex align-items-center gap-2">
-                            {% if obra.portal_ativo %}
-                            <span class="badge bg-success">Ativo</span>
-                            {% else %}
-                            <span class="badge bg-secondary">Inativo</span>
-                            {% endif %}
-                            <form method="POST" action="{{ url_for('portal_obras.toggle_portal', obra_id=obra.id) }}" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm {% if obra.portal_ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
-                                        onclick="return confirm('{% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %} o portal do cliente?')">
-                                    <i class="fas fa-{% if obra.portal_ativo %}toggle-off{% else %}toggle-on{% endif %} me-1"></i>
-                                    {% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    {% if obra.token_cliente %}
-                    <div class="info-item">
-                        <div class="info-label"><i class="fas fa-link"></i> Link do Portal</div>
-                        <div class="info-value">
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control form-control-sm" id="portalLink"
-                                       value="{{ request.host_url }}portal/obra/{{ obra.token_cliente }}" readonly
-                                       style="font-size:.78rem">
-                                <button class="btn btn-outline-primary btn-sm" type="button"
-                                        onclick="navigator.clipboard.writeText(document.getElementById('portalLink').value).then(()=>alert('Link copiado!'))">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3">
-                        <a href="{{ url_for('portal_obras.portal_obra', token=obra.token_cliente) }}"
-                           target="_blank" class="btn btn-sm btn-primary w-100">
-                            <i class="fas fa-external-link-alt me-2"></i>Abrir Portal
-                        </a>
-                    </div>
-                    {% else %}
-                    <div class="text-muted small mt-2">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Gere um token ao editar a obra com portal ativo e e-mail do cliente preenchido.
-                    </div>
-                    {% endif %}
-                    {% if obra.portal_ativo and obra.token_cliente %}
-                    <div class="mt-3 pt-3" style="border-top:1px solid rgba(0,0,0,.08)">
-                        <form method="POST" action="{{ url_for('portal_obras.gerar_medicao', obra_id=obra.id) }}">
+            <!-- Coluna 3: Portal do Cliente -->
+            <div class="info-coluna">
+                <h4><i class="fas fa-globe" style="color:#7c3aed !important;"></i> Portal do Cliente</h4>
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-toggle-on"></i> Status</div>
+                    <div class="info-value d-flex align-items-center gap-2 flex-wrap">
+                        {% if obra.portal_ativo %}
+                        <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('portal_obras.toggle_portal', obra_id=obra.id) }}" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-outline-primary w-100"
-                                    onclick="return confirm('Gerar nova medição para esta obra?')">
-                                <i class="fas fa-ruler-combined me-2"></i>Gerar Medição
+                            <button type="submit" class="btn btn-sm {% if obra.portal_ativo %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                    onclick="return confirm('{% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %} o portal do cliente?')">
+                                <i class="fas fa-{% if obra.portal_ativo %}toggle-off{% else %}toggle-on{% endif %} me-1"></i>
+                                {% if obra.portal_ativo %}Desativar{% else %}Ativar{% endif %}
                             </button>
                         </form>
                     </div>
-                    {% endif %}
                 </div>
+                {% if obra.token_cliente %}
+                <div class="info-item">
+                    <div class="info-label"><i class="fas fa-link"></i> Link do Portal</div>
+                    <div class="info-value">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control form-control-sm" id="portalLink"
+                                   value="{{ request.host_url }}portal/obra/{{ obra.token_cliente }}" readonly
+                                   style="font-size:.78rem">
+                            <button class="btn btn-outline-primary btn-sm" type="button"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('portalLink').value).then(()=>alert('Link copiado!'))">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 0.75rem;">
+                    <a href="{{ url_for('portal_obras.portal_obra', token=obra.token_cliente) }}"
+                       target="_blank" class="btn btn-sm btn-primary w-100">
+                        <i class="fas fa-external-link-alt me-2"></i>Abrir Portal
+                    </a>
+                </div>
+                {% else %}
+                <div class="text-muted small mt-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Gere um token ao editar a obra com portal ativo e e-mail do cliente preenchido.
+                </div>
+                {% endif %}
+                {% if obra.portal_ativo and obra.token_cliente %}
+                <div style="margin-top: 0.75rem;">
+                    <form method="POST" action="{{ url_for('portal_obras.gerar_medicao', obra_id=obra.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary w-100"
+                                onclick="return confirm('Gerar nova medição para esta obra?')">
+                            <i class="fas fa-ruler-combined me-2"></i>Gerar Medição
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
-
-            <!-- Valores Financeiros -->
-            <div class="obra-card">
-                <div class="obra-card-header">
-                    <h3><i class="fas fa-chart-line"></i> Valores Financeiros</h3>
-                </div>
-                <div class="obra-card-body" style="padding: 2rem;">
-                    {% if obra.orcamento and obra.orcamento > 0 %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-calculator"></i>
-                            Orçamento
-                        </div>
-                        <div class="info-value">R$ {{ '{:,.2f}'.format(obra.orcamento).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.valor_contrato and obra.valor_contrato > 0 %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-file-contract"></i>
-                            Valor do Contrato
-                        </div>
-                        <div class="info-value">R$ {{ '{:,.2f}'.format(obra.valor_contrato).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if kpis and kpis.custo_total > 0 %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-coins"></i>
-                            Custo Realizado Total
-                        </div>
-                        <div class="info-value">R$ {{ '{:,.2f}'.format(kpis.custo_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Custos Detalhados -->
-                    {% if kpis %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-hammer"></i>
-                            Custo Mão de Obra
-                        </div>
-                        <div class="info-value" style="color: #3b82f6;">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-utensils"></i>
-                            Custo Alimentação
-                        </div>
-                        <div class="info-value" style="color: #f59e0b;">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    </div>
-                    
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-bus"></i>
-                            Custo Transporte
-                        </div>
-                        <div class="info-value" style="color: #ef4444;">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if obra.valor_contrato and kpis and kpis.custo_total > 0 %}
-                    <div class="info-item">
-                        <div class="info-label">
-                            <i class="fas fa-percentage"></i>
-                            Margem Atual
-                        </div>
-                        {% set margem = ((obra.valor_contrato - kpis.custo_total) / obra.valor_contrato * 100) if obra.valor_contrato > 0 else 0 %}
-                        <div class="info-value" style="color: {% if margem >= 20 %}#22c55e{% elif margem >= 10 %}#f59e0b{% else %}#ef4444{% endif %};">
-                            {{ '{:.1f}'.format(margem) }}%
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-
         </div>
+        <!-- /bloco-info-combinado -->
 
         <!-- Seção de Serviços da Obra - Layout Horizontal -->
         <div class="obra-card" style="margin-bottom: 2rem;">
@@ -1099,6 +1210,79 @@
                 {% endif %}
             </div>
         </div>
+        <!-- /Serviços da Obra -->
+
+        </div>
+        <!-- /tab-pane Visão Geral -->
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: FINANCEIRO
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="tab-financeiro" role="tabpanel">
+            <div class="obra-card">
+                <div class="obra-card-header">
+                    <h3><i class="fas fa-chart-line"></i> Valores Financeiros</h3>
+                </div>
+                <div class="obra-card-body">
+                    {% if obra.orcamento and obra.orcamento > 0 %}
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-calculator"></i> Orçamento</div>
+                        <div class="info-value">R$ {{ '{:,.2f}'.format(obra.orcamento).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    {% if obra.valor_contrato and obra.valor_contrato > 0 %}
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-file-contract"></i> Valor do Contrato</div>
+                        <div class="info-value">R$ {{ '{:,.2f}'.format(obra.valor_contrato).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    {% if kpis and kpis.custo_total > 0 %}
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-coins"></i> Custo Realizado Total</div>
+                        <div class="info-value">R$ {{ '{:,.2f}'.format(kpis.custo_total).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    {% if kpis %}
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-hammer"></i> Custo Mão de Obra</div>
+                        <div class="info-value" style="color: #3b82f6;">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra if kpis.custo_mao_obra else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-utensils"></i> Custo Alimentação</div>
+                        <div class="info-value" style="color: #f59e0b;">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao if kpis.custo_alimentacao else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-bus"></i> Custo Transporte</div>
+                        <div class="info-value" style="color: #ef4444;">R$ {{ '{:,.2f}'.format(kpis.custo_transporte if kpis.custo_transporte else 0).replace(',', ' ').replace('.', ',').replace(' ', '.') }}</div>
+                    </div>
+                    {% endif %}
+                    {% if obra.valor_contrato and kpis and kpis.custo_total > 0 %}
+                    {% set _margem_fin = ((obra.valor_contrato - kpis.custo_total) / obra.valor_contrato * 100) if obra.valor_contrato > 0 else 0 %}
+                    <div class="info-item">
+                        <div class="info-label"><i class="fas fa-percentage"></i> Margem Atual</div>
+                        <div class="info-value" style="color: {% if _margem_fin >= 20 %}#22c55e{% elif _margem_fin >= 10 %}#f59e0b{% else %}#ef4444{% endif %};">
+                            {{ '{:.1f}'.format(_margem_fin) }}%
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex flex-wrap gap-2 mt-3 pt-3" style="border-top: 1px solid #f1f5f9;">
+                        <a href="{{ url_for('medicao.gestao_itens', obra_id=obra.id) }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-ruler-combined me-1"></i> Gestão de Custos / Medição
+                        </a>
+                        <a href="/obras/editar/{{ obra.id }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-edit me-1"></i> Editar Valores Contratados
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /tab-pane Financeiro -->
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: MÃO DE OBRA
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="tab-mao-obra" role="tabpanel">
 
         <!-- Funcionários que Trabalharam -->
         {% if funcionarios_obra %}
@@ -1360,6 +1544,14 @@
             </div>
         </div>
 
+        </div>
+        <!-- /tab-pane Mão de Obra -->
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: RDOS
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="tab-rdos" role="tabpanel">
+
         <!-- RDOs Recentes -->
         {% if rdos %}
         <div class="obra-card">
@@ -1439,6 +1631,14 @@
             </div>
         </div>
         {% endif %}
+
+        </div>
+        <!-- /tab-pane RDOs -->
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: COMPRAS
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="tab-compras" role="tabpanel">
 
         <!-- Compras para Aprovação do Cliente -->
         <div class="obra-card" id="card-compras" style="scroll-margin-top: 80px;">
@@ -1525,6 +1725,14 @@
                 {% endif %}
             </div>
         </div>
+
+        </div>
+        <!-- /tab-pane Compras -->
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ABA: CRONOGRAMA & MAPA
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="tab-cronograma" role="tabpanel">
 
         <!-- Mapa de Concorrência -->
         <div class="obra-card">
@@ -1694,7 +1902,14 @@
                 </div>
             </div>
         </div>
+
         </div>
+        <!-- /tab-pane Cronograma & Mapa -->
+
+        </div>
+        <!-- /tab-content -->
+        </div>
+        <!-- /container-fluid -->
     </div>
 </div>
 
@@ -2687,5 +2902,60 @@ function compraObraRemoverItem(btn) {
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        var tabButtons = document.querySelectorAll('#obraDetailTabs button[data-bs-toggle="tab"]');
+        if (!tabButtons.length || typeof bootstrap === 'undefined') return;
+
+        var hashToBtn = {};
+        tabButtons.forEach(function (btn) {
+            var h = btn.getAttribute('data-hash');
+            if (h) hashToBtn[h] = btn;
+        });
+
+        var initial = (window.location.hash || '').replace('#', '');
+        if (initial && hashToBtn[initial]) {
+            try { bootstrap.Tab.getOrCreateInstance(hashToBtn[initial]).show(); } catch (e) {}
+        }
+
+        tabButtons.forEach(function (btn) {
+            btn.addEventListener('shown.bs.tab', function (ev) {
+                var h = ev.target.getAttribute('data-hash');
+                if (!h) return;
+                if (history.replaceState) {
+                    history.replaceState(null, '', '#' + h);
+                } else {
+                    window.location.hash = h;
+                }
+                window.dispatchEvent(new Event('resize'));
+            });
+        });
+
+        // Links internos (#card-xxx) ativam a aba de destino antes de rolar
+        document.querySelectorAll('a[href^="#card-"]').forEach(function (link) {
+            link.addEventListener('click', function (ev) {
+                var targetId = link.getAttribute('href').slice(1);
+                var targetEl = document.getElementById(targetId);
+                if (!targetEl) return;
+                var pane = targetEl.closest('.tab-pane');
+                if (pane && !pane.classList.contains('active')) {
+                    var tabBtn = document.querySelector('button[data-bs-target="#' + pane.id + '"]');
+                    if (tabBtn) {
+                        ev.preventDefault();
+                        var inst = bootstrap.Tab.getOrCreateInstance(tabBtn);
+                        tabBtn.addEventListener('shown.bs.tab', function once () {
+                            tabBtn.removeEventListener('shown.bs.tab', once);
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
+                        inst.show();
+                    }
+                }
+            });
+        });
+    });
+})();
+</script>
 
 {% endblock %}
