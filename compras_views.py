@@ -424,14 +424,18 @@ def aprovacao():
         .order_by(PedidoCompra.created_at.desc())
     )
 
+    # Pendentes: AGUARDANDO_APROVACAO_CLIENTE (novo) + PENDENTE (legado) + NULL
     pendentes = base.filter(
         db.or_(
+            PedidoCompra.status_aprovacao_cliente == 'AGUARDANDO_APROVACAO_CLIENTE',
             PedidoCompra.status_aprovacao_cliente == 'PENDENTE',
             PedidoCompra.status_aprovacao_cliente.is_(None),
         )
     ).all()
     aprovadas = base.filter(PedidoCompra.status_aprovacao_cliente == 'APROVADO').all()
-    recusadas = base.filter(PedidoCompra.status_aprovacao_cliente == 'RECUSADO').all()
+    recusadas = base.filter(
+        PedidoCompra.status_aprovacao_cliente.in_(['RECUSADO', 'REJEITADO'])
+    ).all()
 
     total_pendente = sum(float(p.valor_total) for p in pendentes)
     total_aprovada = sum(float(p.valor_total) for p in aprovadas)
@@ -619,7 +623,8 @@ def nova_post():
                     data_despesa=data_compra,
                     descricao_origem=f"Compra{(' NF ' + numero) if numero else ''}",
                     obra_id=obra_id,
-                    centro_custo_id=None,
+                    centro_custo_id=(int(request.form.get('centro_custo_id'))
+                                     if request.form.get('centro_custo_id') else None),
                     origem_tabela='pedido_compra',
                     origem_id=pedido.id,
                 )

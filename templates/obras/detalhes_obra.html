@@ -1386,6 +1386,59 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endif %}
     </div>
 </div>
+
+{# === Compras para Aprovação do Cliente === #}
+{% if pedidos_compra_obra is defined and pedidos_compra_obra %}
+<div class="card mt-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-shopping-cart"></i> Compras
+            <span class="badge bg-light text-dark ms-2">{{ pedidos_compra_obra|length }}</span>
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Nº</th><th>Tipo</th><th>Fornecedor</th><th>Data</th>
+                        <th class="text-end">Valor</th><th>Status Aprov.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in pedidos_compra_obra %}
+                    <tr>
+                        <td><a href="{{ url_for('compras.detalhe', pedido_id=p.id) }}">{{ p.numero or p.id }}</a></td>
+                        <td>
+                            {% if p.tipo_compra == 'aprovacao_cliente' %}
+                                <span class="badge bg-warning text-dark">Aprov. Cliente</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Normal</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.fornecedor.nome if p.fornecedor else '-' }}</td>
+                        <td>{{ p.data_compra.strftime('%d/%m/%Y') if p.data_compra else '-' }}</td>
+                        <td class="text-end">R$ {{ '%.2f'|format(p.valor_total or 0) }}</td>
+                        <td>
+                            {% if p.tipo_compra == 'aprovacao_cliente' %}
+                                {% if p.status_aprovacao_cliente == 'AGUARDANDO_APROVACAO_CLIENTE' or p.status_aprovacao_cliente == 'PENDENTE' or not p.status_aprovacao_cliente %}
+                                    <span class="badge bg-warning text-dark">Aguardando</span>
+                                {% elif p.status_aprovacao_cliente == 'APROVADO' %}
+                                    <span class="badge bg-success">Aprovado{% if p.processada_apos_aprovacao %} ✓{% endif %}</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Recusado</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block styles %}
