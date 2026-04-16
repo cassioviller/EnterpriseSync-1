@@ -396,11 +396,19 @@ def novo_rdo():
         data_hoje = date.today().strftime('%Y-%m-%d')
 
         # Alertas de entregas / terceiros para a obra selecionada
+        # Referência temporal = data do RDO (param ?data=YYYY-MM-DD) ou hoje
         entregas_alertas = []
         if obra_id:
             try:
                 from services.entregas_terceiros import calcular_alertas_terceiros
-                entregas_alertas = calcular_alertas_terceiros(obra_id)['detalhe']
+                data_ref_str = request.args.get('data') or request.form.get('data_relatorio')
+                data_ref = date.today()
+                if data_ref_str:
+                    try:
+                        data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        data_ref = date.today()
+                entregas_alertas = calcular_alertas_terceiros(obra_id, hoje=data_ref)['detalhe']
             except Exception as _e:
                 logger.error(f"Erro carregando alertas terceiros (novo_rdo): {_e}")
                 entregas_alertas = []
@@ -1418,10 +1426,12 @@ def editar_rdo(id):
             logger.warning(f"[WARN] Não foi possível carregar apontamentos V2 para editar_rdo: {e_v2}")
 
         # Alertas de entregas/terceiros para a obra do RDO
+        # Referência temporal = data_relatorio do RDO sendo editado
         entregas_alertas = []
         try:
             from services.entregas_terceiros import calcular_alertas_terceiros
-            entregas_alertas = calcular_alertas_terceiros(rdo.obra_id)['detalhe']
+            data_ref = rdo.data_relatorio if rdo.data_relatorio else date.today()
+            entregas_alertas = calcular_alertas_terceiros(rdo.obra_id, hoje=data_ref)['detalhe']
         except Exception as _e:
             logger.error(f"Erro carregando alertas terceiros (editar_rdo): {_e}")
             entregas_alertas = []
@@ -1723,7 +1733,14 @@ def rdo_novo_unificado():
         if obra_selecionada:
             try:
                 from services.entregas_terceiros import calcular_alertas_terceiros
-                entregas_alertas = calcular_alertas_terceiros(obra_selecionada.id)['detalhe']
+                data_ref_str = request.args.get('data') or request.form.get('data_relatorio')
+                data_ref = date.today()
+                if data_ref_str:
+                    try:
+                        data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        data_ref = date.today()
+                entregas_alertas = calcular_alertas_terceiros(obra_selecionada.id, hoje=data_ref)['detalhe']
             except Exception as _e:
                 logger.error(f"Erro carregando alertas terceiros (rdo_novo_unificado): {_e}")
                 entregas_alertas = []

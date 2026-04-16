@@ -234,20 +234,20 @@ def calcular_alertas_terceiros(obra_id, hoje=None):
             'qtd_vence_hoje': qtd_vence_hoje, 'qtd_amanha': qtd_amanha,
             'qtd_pendentes': qtd_pendentes, 'qtd_entregues': qtd_entregues,
         }
-    elif qtd_vence_hoje > 0:
-        painel = {
-            'status': 'laranja',
-            'label': f'{qtd_vence_hoje} entrega(s) vencendo HOJE',
-            'qtd_total': qtd_total, 'qtd_atrasadas': 0,
-            'qtd_vence_hoje': qtd_vence_hoje, 'qtd_amanha': qtd_amanha,
-            'qtd_pendentes': qtd_pendentes, 'qtd_entregues': qtd_entregues,
-        }
-    elif qtd_amanha > 0:
+    elif qtd_vence_hoje > 0 or qtd_amanha > 0:
+        # Spec: "vence hoje" + "vence amanhã" sem confirmação => amarelo no painel.
+        # (No detalhe item, "vence hoje" segue laranja como urgência individual.)
+        if qtd_vence_hoje > 0 and qtd_amanha > 0:
+            label = f'{qtd_vence_hoje} entrega(s) vencendo HOJE e {qtd_amanha} amanhã'
+        elif qtd_vence_hoje > 0:
+            label = f'{qtd_vence_hoje} entrega(s) vencendo HOJE'
+        else:
+            label = f'{qtd_amanha} entrega(s) para amanhã'
         painel = {
             'status': 'amarelo',
-            'label': f'{qtd_amanha} entrega(s) para amanhã',
-            'qtd_total': qtd_total, 'qtd_atrasadas': 0, 'qtd_vence_hoje': 0,
-            'qtd_amanha': qtd_amanha,
+            'label': label,
+            'qtd_total': qtd_total, 'qtd_atrasadas': 0,
+            'qtd_vence_hoje': qtd_vence_hoje, 'qtd_amanha': qtd_amanha,
             'qtd_pendentes': qtd_pendentes, 'qtd_entregues': qtd_entregues,
         }
     elif qtd_pendentes > 0:
