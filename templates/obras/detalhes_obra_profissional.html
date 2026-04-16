@@ -864,6 +864,11 @@
                         <i class="fas fa-table me-2"></i>Mapa
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('planejamento_custos.lista', obra_id=obra.id) }}">
+                        <i class="fas fa-calculator me-2"></i>Planejamento de Custos
+                    </a>
+                </li>
             </ul>
         </div>
 
@@ -876,6 +881,59 @@
         <div class="tab-pane fade show active" id="tab-visao-geral" role="tabpanel">
 
         <div class="visao-geral-topo">
+
+        {# ═══════════════════════════════════════════════════════════════ #}
+        {# TASK #70 — RESUMO DE CUSTOS DA OBRA (12 indicadores)            #}
+        {# ═══════════════════════════════════════════════════════════════ #}
+        {% if resumo %}
+        {% set i = resumo.indicadores %}
+        <div class="obra-card" style="padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 0.75rem;">
+                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fas fa-calculator" style="color: #8b5cf6;"></i>
+                    Resumo de Custos da Obra
+                </h3>
+                <a href="{{ url_for('planejamento_custos.lista', obra_id=obra.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt me-1"></i>Planejamento de Custos
+                </a>
+            </div>
+            <div class="row g-2">
+                {% set cards = [
+                    ('Total Proposta Orçada',  i.total_proposta_orcada, '#3b82f6', 'fa-file-contract'),
+                    ('Valor Custo Orçado',     i.valor_custo_orcado,    '#8b5cf6', 'fa-bullseye'),
+                    ('Total Realizado',        i.total_realizado,       '#ef4444', 'fa-fire'),
+                    ('Total A Realizar',       i.total_a_realizar,      '#f59e0b', 'fa-hourglass-half'),
+                    ('Custo Real da Obra',     i.custo_real_da_obra,    '#9333ea', 'fa-coins'),
+                    ('Verba Disponível',       i.verba_disponivel,      (i.verba_disponivel >= 0) and '#22c55e' or '#dc2626', 'fa-piggy-bank'),
+                    ('Faturamento Direto',     i.faturamento_direto,    '#0ea5e9', 'fa-bolt'),
+                    ('Valor Medido',           i.valor_medido,          '#14b8a6', 'fa-ruler-combined'),
+                    ('Valor Recebido',         i.valor_recebido,        '#10b981', 'fa-hand-holding-usd'),
+                    ('Valor a Receber',        i.valor_a_receber,       '#f97316', 'fa-wallet'),
+                    ('Lucro Líquido',          i.lucro_liquido,         (i.lucro_liquido >= 0) and '#16a34a' or '#dc2626', 'fa-chart-line'),
+                    ('Administração',          i.administracao,         '#64748b', 'fa-briefcase'),
+                ] %}
+                {% for label, val, cor, icon in cards %}
+                <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                    <div style="background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid {{ cor }}; border-radius: 8px; padding: 0.65rem 0.85rem; height: 100%;">
+                        <div style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">
+                            <i class="fas {{ icon }} me-1" style="color: {{ cor }};"></i>{{ label }}
+                        </div>
+                        <div style="color: {{ cor }}; font-size: 1.05rem; font-weight: 700; margin-top: 0.2rem;">
+                            R$ {{ '{:,.2f}'.format(val|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not resumo.tem_dados_novos %}
+            <div class="small text-muted mt-2">
+                <i class="fas fa-info-circle"></i>
+                Sem planejamento de custos cadastrado — mostrando dados legados. Use <strong>Planejamento de Custos</strong> para habilitar o detalhamento completo.
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <div class="painel-estrategico obra-card" style="padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 0.75rem;">
                 <h3 style="margin: 0; font-size: 1.35rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.6rem;">
@@ -891,7 +949,18 @@
                     <div style="background: #f8fafc; border-radius: 12px; padding: 1.25rem; height: 100%;">
                         <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap" style="gap: 0.5rem;">
                             <strong style="color: #334155; font-size: 0.95rem;">Saúde Financeira da Obra</strong>
-                            {% if painel.tem_dados_financeiros %}
+                            {% if resumo and resumo.tem_dados_novos %}
+                                {% set verba = resumo.indicadores.verba_disponivel %}
+                                {% if verba >= 0 %}
+                                <span style="background: #dcfce7; color: #15803d; padding: 0.3rem 0.8rem; border-radius: 20px; font-weight: 700; font-size: 0.9rem;">
+                                    <i class="fas fa-piggy-bank"></i> Verba Disponível: R$ {{ '{:,.2f}'.format(verba).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                </span>
+                                {% else %}
+                                <span style="background: #fee2e2; color: #b91c1c; padding: 0.3rem 0.8rem; border-radius: 20px; font-weight: 700; font-size: 0.9rem;">
+                                    <i class="fas fa-exclamation-triangle"></i> Verba Estourada: -R$ {{ '{:,.2f}'.format(verba|abs).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                </span>
+                                {% endif %}
+                            {% elif painel.tem_dados_financeiros %}
                                 {% if painel.saldo >= 0 %}
                                 <span style="background: #dcfce7; color: #15803d; padding: 0.3rem 0.8rem; border-radius: 20px; font-weight: 700; font-size: 0.9rem;">
                                     <i class="fas fa-arrow-up"></i> Saldo: R$ {{ '{:,.2f}'.format(painel.saldo).replace(',', 'X').replace('.', ',').replace('X', '.') }}
@@ -1040,6 +1109,74 @@
             var formatBRL = function (v) {
                 return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             };
+
+            {% if resumo and resumo.grafico_barras and resumo.tem_dados_novos %}
+            // TASK #70 — modo estendido: 2 grupos (Receita vs Custo) + barra Real Projetado (tracejada)
+            var gb = {{ resumo.grafico_barras | tojson }};
+            var chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: ['Receita', 'Custo'],
+                    datasets: [
+                        {
+                            label: 'Contrato / Orçado',
+                            data: [gb.receita.contrato, gb.custo.orcado],
+                            backgroundColor: ['#3b82f6', '#a855f7'],
+                            borderRadius: 6,
+                            maxBarThickness: 48,
+                        },
+                        {
+                            label: 'Medido / Realizado',
+                            data: [gb.receita.medido, gb.custo.realizado],
+                            backgroundColor: ['#14b8a6', '#ef4444'],
+                            borderRadius: 6,
+                            maxBarThickness: 48,
+                        },
+                        {
+                            label: 'Recebido / A Realizar',
+                            data: [gb.receita.recebido, gb.custo.a_realizar],
+                            backgroundColor: ['#10b981', '#f59e0b'],
+                            borderRadius: 6,
+                            maxBarThickness: 48,
+                        },
+                        {
+                            label: 'Real Projetado',
+                            data: [null, gb.custo.real_projetado],
+                            backgroundColor: 'rgba(147, 51, 234, 0.15)',
+                            borderColor: '#9333ea',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            borderRadius: 6,
+                            maxBarThickness: 48,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: function (ctx) { return ctx.dataset.label + ': ' + formatBRL(ctx.parsed.y); } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (v) {
+                                    if (v >= 1000000) return 'R$ ' + (v / 1000000).toFixed(1) + 'M';
+                                    if (v >= 1000)    return 'R$ ' + (v / 1000).toFixed(0) + 'k';
+                                    return 'R$ ' + v;
+                                }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            };
+            new Chart(ctx, chartConfig);
+            return;
+            {% endif %}
 
             new Chart(ctx, {
                 type: 'bar',
@@ -2136,7 +2273,52 @@ document.addEventListener('DOMContentLoaded', function() {
     // Dados de composição do custo
     const composicaoData = {{ dados_folha.composicao | tojson | safe }};
     
+    {% if resumo and resumo.grafico_composicao and resumo.tem_dados_novos %}
+    // TASK #70 — 2 anéis: Realizado (interno) + A Realizar (externo)
+    var gc = {{ resumo.grafico_composicao | tojson | safe }};
+    var realizado = (gc.realizado || []).filter(function (c) { return c.valor > 0; });
+    var aRealizar = (gc.a_realizar || []).filter(function (c) { return c.valor > 0; });
+    if ((realizado.length > 0 || aRealizar.length > 0) && document.getElementById('chartComposicaoCusto')) {
+        new Chart(document.getElementById('chartComposicaoCusto'), {
+            type: 'doughnut',
+            data: {
+                labels: realizado.map(function(c){return 'Realizado · ' + c.categoria;})
+                         .concat(aRealizar.map(function(c){return 'A Realizar · ' + c.categoria;})),
+                datasets: [
+                    {
+                        label: 'Realizado',
+                        data: realizado.map(function(c){return c.valor;}).concat(aRealizar.map(function(){return 0;})),
+                        backgroundColor: realizado.map(function(c){return c.cor;}).concat(aRealizar.map(function(){return 'rgba(0,0,0,0)';})),
+                        borderWidth: 2, borderColor: '#fff'
+                    },
+                    {
+                        label: 'A Realizar',
+                        data: realizado.map(function(){return 0;}).concat(aRealizar.map(function(c){return c.valor;})),
+                        backgroundColor: realizado.map(function(){return 'rgba(0,0,0,0)';}).concat(aRealizar.map(function(c){return c.cor;})),
+                        borderWidth: 2, borderColor: '#fff'
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { padding: 10, boxWidth: 12, font: { size: 10 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                var v = ctx.parsed || 0;
+                                if (v === 0) return null;
+                                return ctx.chart.data.labels[ctx.dataIndex] + ': R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else if (composicaoData && composicaoData.length > 0 && document.getElementById('chartComposicaoCusto')) {
+    {% else %}
     if (composicaoData && composicaoData.length > 0 && document.getElementById('chartComposicaoCusto')) {
+    {% endif %}
         new Chart(document.getElementById('chartComposicaoCusto'), {
             type: 'doughnut',
             data: {

@@ -595,6 +595,14 @@ with app.app_context():
         logging.info("[OK] Blueprint landing page registrado")
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint landing: {e}")
+
+    # Task #70 — Planejamento de Custos
+    try:
+        from views.planejamento_custos_views import planejamento_custos_bp
+        app.register_blueprint(planejamento_custos_bp)
+        logging.info("[OK] Blueprint planejamento_custos registrado")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint planejamento_custos: {e}")
     
     # Sistema avançado de veículos removido (código obsoleto limpo)
     
@@ -616,6 +624,9 @@ try:
     from diagnosticar_fotos_cli import diagnosticar_fotos_faciais
     app.cli.add_command(diagnosticar_fotos_faciais)
     logging.info("[OK] Comando CLI diagnosticar-fotos-faciais registrado")
+    from init_planejamento_custos_cli import init_planejamento_custos
+    app.cli.add_command(init_planejamento_custos)
+    logging.info("[OK] Comando CLI init-planejamento-custos registrado")
 except ImportError as e:
     logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
 

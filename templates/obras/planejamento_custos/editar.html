@@ -1,0 +1,118 @@
+{% extends "base_completo.html" %}
+{% block title %}{{ svc and 'Editar Serviço de Custo' or 'Novo Serviço de Custo' }} — {{ obra.nome }}{% endblock %}
+{% block content %}
+{% macro brl(v) -%}
+R$ {{ '{:,.2f}'.format((v or 0)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+{%- endmacro %}
+<div class="container-fluid py-3">
+  <nav class="mb-3">
+    <a href="{{ url_for('planejamento_custos.lista', obra_id=obra.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Voltar à lista
+    </a>
+  </nav>
+  <h2 class="mb-3"><i class="fas fa-{{ svc and 'edit' or 'plus' }} me-2"></i>{{ svc and 'Editar Serviço de Custo' or 'Novo Serviço de Custo' }}</h2>
+
+  <form method="POST" action="{{ url_for('planejamento_custos.editar', obra_id=obra.id, svc_id=svc.id) if svc else url_for('planejamento_custos.novo', obra_id=obra.id) }}">
+    <div class="row g-2 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">Nome do serviço</label>
+        <input type="text" name="nome" class="form-control" required value="{{ svc.nome if svc else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Vincular a item comercial (opcional)</label>
+        <select name="item_medicao_comercial_id" class="form-select">
+          <option value="">— sem vínculo —</option>
+          {% for it in itens_medicao %}
+            <option value="{{ it.id }}" {% if svc and svc.item_medicao_comercial_id == it.id %}selected{% endif %}>
+              #{{ it.id }} {{ it.nome }} (R$ {{ '{:,.2f}'.format(it.valor_comercial|float).replace(',', 'X').replace('.', ',').replace('X', '.') }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- Orçado -->
+      <div class="col-md-4">
+        <div class="card border-primary h-100">
+          <div class="card-header bg-primary text-white"><i class="fas fa-bullseye me-1"></i>Orçado</div>
+          <div class="card-body">
+            <label class="form-label">Valor orçado (meta interna)</label>
+            <input type="number" step="0.01" name="valor_orcado" class="form-control"
+                   value="{{ svc.valor_orcado|float if svc else 0 }}">
+          </div>
+        </div>
+      </div>
+
+      <!-- Realizado -->
+      <div class="col-md-4">
+        <div class="card border-danger h-100">
+          <div class="card-header bg-danger text-white"><i class="fas fa-fire me-1"></i>Realizado</div>
+          <div class="card-body">
+            {% if svc %}
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" name="override_realizado_manual" id="ovr"
+                     {% if svc.override_realizado_manual %}checked{% endif %}>
+              <label class="form-check-label" for="ovr">Sobrescrever manualmente</label>
+            </div>
+            <div class="small text-muted mb-2">Auto: soma agrupada de GestaoCustoFilho por categoria.</div>
+            <label class="form-label small">Material</label>
+            <input type="number" step="0.01" name="realizado_material" class="form-control form-control-sm"
+                   value="{{ svc.realizado_material|float }}">
+            <label class="form-label small mt-1">Mão de obra</label>
+            <input type="number" step="0.01" name="realizado_mao_obra" class="form-control form-control-sm"
+                   value="{{ svc.realizado_mao_obra|float }}">
+            <label class="form-label small mt-1">Outros</label>
+            <input type="number" step="0.01" name="realizado_outros" class="form-control form-control-sm"
+                   value="{{ svc.realizado_outros|float }}">
+            <div class="mt-2"><strong>Total: {{ brl(svc.realizado_total) }}</strong></div>
+            {% else %}
+            <div class="text-muted">Salve o serviço para começar a acumular realizado.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- A Realizar -->
+      <div class="col-md-4">
+        <div class="card border-warning h-100">
+          <div class="card-header bg-warning"><i class="fas fa-hourglass-half me-1"></i>A Realizar</div>
+          <div class="card-body">
+            <label class="form-label">Material a realizar</label>
+            <input type="number" step="0.01" name="material_a_realizar" class="form-control"
+                   value="{{ svc.material_a_realizar|float if svc else 0 }}">
+            <div class="form-text">Preenchido automaticamente se houver cotação SELECIONADA.</div>
+
+            {% if svc %}
+            <label class="form-label mt-2">Mão de obra a realizar</label>
+            <input type="text" class="form-control" value="{{ brl(svc.mao_obra_a_realizar) }}" disabled>
+            <div class="form-text">
+              Somatório da <a href="{{ url_for('planejamento_custos.equipe', obra_id=obra.id, svc_id=svc.id) }}">equipe planejada</a>.
+            </div>
+            {% endif %}
+
+            <label class="form-label mt-2">Outros a realizar</label>
+            <input type="number" step="0.01" name="outros_a_realizar" class="form-control"
+                   value="{{ svc.outros_a_realizar|float if svc else 0 }}">
+
+            {% if svc %}
+            <div class="mt-2"><strong>Total A Realizar: {{ brl(svc.a_realizar_total) }}</strong></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3 mt-3">
+      <label class="form-label">Observações</label>
+      <textarea name="observacoes" class="form-control" rows="2">{{ svc.observacoes if svc else '' }}</textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
+    {% if svc %}
+    <a href="{{ url_for('planejamento_custos.equipe', obra_id=obra.id, svc_id=svc.id) }}" class="btn btn-success"><i class="fas fa-users"></i> Equipe Planejada</a>
+    <a href="{{ url_for('planejamento_custos.cotacoes', obra_id=obra.id, svc_id=svc.id) }}" class="btn btn-warning"><i class="fas fa-tags"></i> Cotações Internas</a>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

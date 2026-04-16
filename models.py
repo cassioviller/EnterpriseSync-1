@@ -269,6 +269,9 @@ class Obra(db.Model):
     valor_entrada = db.Column(db.Numeric(15, 2), default=0)
     data_entrada = db.Column(db.Date, nullable=True)
 
+    # Task #70 — Percentual de administração para cálculo de custo fixo da obra
+    percentual_administracao = db.Column(db.Numeric(5, 2), default=0, nullable=False)
+
     # Campos de Geofencing (Cerca Virtual)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
@@ -4844,3 +4847,329 @@ class RDOSubempreitadaApontamento(db.Model):
 @_sa_event.listens_for(RDOSubempreitadaApontamento, 'before_update')
 def _auto_calc_homem_hora(mapper, connection, target):
     target.calcular_homem_hora()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# TASK #70 — RESUMO DE CUSTOS DA OBRA (Migration 118)
+# ═══════════════════════════════════════════════════════════════════════
+
+class ObraServicoCusto(db.Model):
+    """Planejamento de custo por serviço da obra.
+
+    Cada linha representa a visão INTERNA (custo) da mesma linha de serviço
+    tratada comercialmente por ItemMedicaoComercial. A FK
+    item_medicao_comercial_id é opcional e UNIQUE (1-pra-1) quando preenchida.
+    """
+    __tablename__ = 'obra_servico_custo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False, index=True)
+
+    item_medicao_comercial_id = db.Column(
+        db.Integer,
+        db.ForeignKey('item_medicao_comercial.id', ondelete='SET NULL'),
+        nullable=True,
+        unique=True,
+    )
+    servico_obra_real_id = db.Column(
+        db.Integer,
+        db.ForeignKey('servico_obra_real.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+
+    nome = db.Column(db.String(200), nullable=False)
+
+    # Orçado — digitado manualmente pelo gestor
+    valor_orcado = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+
+    # Realizado — snapshot agregado de GestaoCustoFilho por categoria;
+    # pode ser sobrescrito manualmente via override_realizado_manual.
+    realizado_material = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    realizado_mao_obra = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    realizado_outros = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    override_realizado_manual = db.Column(db.Boolean, default=False, nullable=False)
+
+    # A Realizar — material (manual ou vindo de cotação selecionada) + mão de obra
+    # planejada (soma das linhas de equipe) + outros.
+    material_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    cotacao_selecionada_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_servico_cotacao_interna.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    mao_obra_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    outros_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref=db.backref('servicos_custo', cascade='all, delete-orphan'))
+    item_medicao = db.relationship('ItemMedicaoComercial', foreign_keys=[item_medicao_comercial_id])
+    servico_real = db.relationship('ServicoObraReal', foreign_keys=[servico_obra_real_id])
+    equipe_planejada = db.relationship(
+        'ObraServicoEquipePlanejada',
+        backref='servico_custo',
+        cascade='all, delete-orphan',
+        foreign_keys='ObraServicoEquipePlanejada.obra_servico_custo_id',
+    )
+    cotacoes = db.relationship(
+        'ObraServicoCotacaoInterna',
+        backref='servico_custo',
+        cascade='all, delete-orphan',
+        foreign_keys='ObraServicoCotacaoInterna.obra_servico_custo_id',
+    )
+
+    @property
+    def realizado_total(self):
+        return float(self.realizado_material or 0) + float(self.realizado_mao_obra or 0) + float(self.realizado_outros or 0)
+
+    @property
+    def a_realizar_total(self):
+        return float(self.material_a_realizar or 0) + float(self.mao_obra_a_realizar or 0) + float(self.outros_a_realizar or 0)
+
+    @property
+    def saldo(self):
+        return float(self.valor_orcado or 0) - (self.realizado_total + self.a_realizar_total)
+
+    def __repr__(self):
+        return f'<ObraServicoCusto #{self.id} obra={self.obra_id} {self.nome}>'
+
+
+class ObraServicoEquipePlanejada(db.Model):
+    """Linha de equipe planejada por serviço: funcionário + quantidade dias +
+    custos diários snapshot (diária, alimentação, transporte)."""
+    __tablename__ = 'obra_servico_equipe_planejada'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    obra_servico_custo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_servico_custo.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)
+    funcionario_nome = db.Column(db.String(120), nullable=False)
+    quantidade_dias = db.Column(db.Numeric(10, 2), default=0, nullable=False)
+    diaria = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    almoco_e_cafe = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    transporte = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id])
+
+    @property
+    def custo_dia(self):
+        return float(self.diaria or 0) + float(self.almoco_e_cafe or 0) + float(self.transporte or 0)
+
+    @property
+    def subtotal(self):
+        return self.custo_dia * float(self.quantidade_dias or 0)
+
+    def __repr__(self):
+        return f'<EquipePlanejada func={self.funcionario_nome} dias={self.quantidade_dias}>'
+
+
+class ObraServicoCotacaoInterna(db.Model):
+    """Cotação interna de material por serviço (isolado do Mapa de Concorrência
+    do cliente). Apenas 1 cotação SELECIONADA por serviço."""
+    __tablename__ = 'obra_servico_cotacao_interna'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    obra_servico_custo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_servico_custo.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    fornecedor_nome = db.Column(db.String(200), nullable=False)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
+    prazo_entrega = db.Column(db.String(100))
+    condicao_pagamento = db.Column(db.String(100))
+    observacoes = db.Column(db.Text)
+    selecionada = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    linhas = db.relationship(
+        'ObraServicoCotacaoInternaLinha',
+        backref='cotacao',
+        cascade='all, delete-orphan',
+    )
+
+    @property
+    def valor_total(self):
+        return sum(float(l.subtotal) for l in self.linhas)
+
+    def __repr__(self):
+        return f'<CotacaoInterna #{self.id} {self.fornecedor_nome} sel={self.selecionada}>'
+
+
+class ObraServicoCotacaoInternaLinha(db.Model):
+    """Linha de material dentro de uma cotação interna."""
+    __tablename__ = 'obra_servico_cotacao_interna_linha'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True, index=True)
+    cotacao_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_servico_cotacao_interna.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    descricao = db.Column(db.String(300), nullable=False)
+    unidade = db.Column(db.String(20))
+    quantidade = db.Column(db.Numeric(15, 4), default=0, nullable=False)
+    valor_unitario = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+
+    @property
+    def subtotal(self):
+        return float(self.quantidade or 0) * float(self.valor_unitario or 0)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Task #70 — Listeners de recálculo automático
+# ─────────────────────────────────────────────────────────────────────────
+
+_RESUMO_PENDING_KEY = '_resumo_custos_pending'
+_RESUMO_REENTRANT_KEY = '_resumo_custos_recalc_running'
+
+
+def _resumo_pending_bag(session):
+    """Retorna/inicializa o bag de trabalho pendente na session.info.
+    Nenhum acesso a DB é feito aqui — apenas coleta em memória."""
+    bag = session.info.get(_RESUMO_PENDING_KEY)
+    if bag is None:
+        bag = {'servicos': set(), 'obras': {}}
+        session.info[_RESUMO_PENDING_KEY] = bag
+    return bag
+
+
+def _agendar_via_target(target, obra=False):
+    """Registra o target para recálculo posterior (no before_commit),
+    sem emitir queries ou flush dentro do ciclo de flush atual."""
+    try:
+        from sqlalchemy.orm import object_session
+        sess = object_session(target) or db.session()
+        bag = _resumo_pending_bag(sess)
+        if obra and getattr(target, 'obra_id', None):
+            bag['obras'][target.obra_id] = getattr(target, 'admin_id', None)
+        else:
+            svc_id = getattr(target, 'obra_servico_custo_id', None)
+            if svc_id is not None:
+                bag['servicos'].add(svc_id)
+    except Exception:
+        import logging as _lg
+        _lg.getLogger(__name__).warning(
+            "resumo_custos: falha ao agendar recálculo (target=%r)", target,
+            exc_info=True,
+        )
+
+
+@_sa_event.listens_for(ObraServicoEquipePlanejada, 'after_insert')
+@_sa_event.listens_for(ObraServicoEquipePlanejada, 'after_update')
+@_sa_event.listens_for(ObraServicoEquipePlanejada, 'after_delete')
+def _equipe_planejada_changed(mapper, connection, target):
+    _agendar_via_target(target, obra=False)
+
+
+@_sa_event.listens_for(ObraServicoCotacaoInterna, 'after_insert')
+@_sa_event.listens_for(ObraServicoCotacaoInterna, 'after_update')
+def _cotacao_interna_changed(mapper, connection, target):
+    if target.selecionada:
+        _agendar_via_target(target, obra=False)
+
+
+@_sa_event.listens_for(GestaoCustoFilho, 'after_insert')
+@_sa_event.listens_for(GestaoCustoFilho, 'after_update')
+@_sa_event.listens_for(GestaoCustoFilho, 'after_delete')
+def _gestao_custo_filho_changed(mapper, connection, target):
+    if target.obra_id:
+        _agendar_via_target(target, obra=True)
+
+
+@_sa_event.listens_for(db.session, 'after_flush_postexec')
+def _resumo_custos_after_flush(session, flush_context):
+    """Processa o recálculo agendado logo após o término do flush atual.
+
+    after_flush_postexec executa depois que todas as operações de INSERT/
+    UPDATE do flush já foram emitidas, fora do ciclo crítico de unit-of-work.
+    As mutações feitas aqui são incluídas no próximo flush (que acontece como
+    parte do commit em curso), garantindo que o snapshot de realizado/a_realizar
+    persista junto com a transação original. Erros são logados em WARNING
+    (nunca silenciados).
+    """
+    bag = session.info.pop(_RESUMO_PENDING_KEY, None)
+    if not bag:
+        return
+    servicos = list(bag.get('servicos') or [])
+    obras = dict(bag.get('obras') or {})
+    if not servicos and not obras:
+        return
+    if session.info.get(_RESUMO_REENTRANT_KEY):
+        return
+    session.info[_RESUMO_REENTRANT_KEY] = True
+    try:
+        from services.resumo_custos_obra import (
+            recalcular_servico,
+            recalcular_obra,
+        )
+        for svc_id in servicos:
+            ok = recalcular_servico(svc_id)
+            if not ok:
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "resumo_custos: recalcular_servico(%s) retornou False", svc_id,
+                )
+        for obra_id, admin_id in obras.items():
+            ok = recalcular_obra(obra_id, admin_id=admin_id)
+            if not ok:
+                import logging as _lg
+                _lg.getLogger(__name__).warning(
+                    "resumo_custos: recalcular_obra(%s) retornou False", obra_id,
+                )
+    except Exception:
+        import logging as _lg
+        _lg.getLogger(__name__).warning(
+            "resumo_custos: falha no recálculo pré-commit "
+            "(svcs=%s obras=%s)",
+            servicos, list(obras.keys()),
+            exc_info=True,
+        )
+    finally:
+        session.info.pop(_RESUMO_REENTRANT_KEY, None)
+
+
+@_sa_event.listens_for(ItemMedicaoComercial, 'after_insert')
+def _item_medicao_auto_cria_custo(mapper, connection, target):
+    """Ao criar um ItemMedicaoComercial, cria automaticamente o par
+    ObraServicoCusto vinculado (se ainda não existir)."""
+    try:
+        tbl = ObraServicoCusto.__table__
+        existing = connection.execute(
+            tbl.select().where(tbl.c.item_medicao_comercial_id == target.id)
+        ).first()
+        if existing:
+            return
+        connection.execute(
+            tbl.insert().values(
+                admin_id=target.admin_id,
+                obra_id=target.obra_id,
+                item_medicao_comercial_id=target.id,
+                nome=target.nome,
+                valor_orcado=0,
+                realizado_material=0,
+                realizado_mao_obra=0,
+                realizado_outros=0,
+                override_realizado_manual=False,
+                material_a_realizar=0,
+                mao_obra_a_realizar=0,
+                outros_a_realizar=0,
+            )
+        )
+    except Exception:
+        import logging as _lg
+        _lg.getLogger(__name__).exception("Erro ao auto-criar ObraServicoCusto para ItemMedicaoComercial")

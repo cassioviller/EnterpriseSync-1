@@ -3817,6 +3817,7 @@ def executar_migracoes():
             (115, "Consolidar GestaoCustoPai duplicados por (admin_id, entidade_id, categoria normalizada)", migration_115_consolidar_gestao_custo_pai_duplicados),
             (116, "PedidoCompra — tipo_compra (normal/aprovacao_cliente) + processada_apos_aprovacao", migration_116_pedido_compra_tipo_compra),
             (117, "TarefaCronograma — is_cliente BOOLEAN (paridade total no editor cliente)", migration_117_tarefa_cronograma_is_cliente),
+            (118, "Task #70 — Resumo de Custos da Obra (obra_servico_custo + equipe + cotação + percentual_administracao)", migration_118_resumo_custos_obra),
         ]
         
         # Executar cada migração com rastreamento
@@ -9414,6 +9415,169 @@ def migration_116_pedido_compra_tipo_compra():
             except Exception:
                 pass
         return False
+
+
+def migration_118_resumo_custos_obra():
+    """
+    Migration 118 (Task #70): Resumo de Custos da Obra.
+
+    Cria tabelas:
+      - obra_servico_custo (FK UNIQUE item_medicao_comercial_id quando preenchida)
+      - obra_servico_equipe_planejada (snapshot por funcionário)
+      - obra_servico_cotacao_interna (constraint: só 1 SELECIONADA por serviço)
+      - obra_servico_cotacao_interna_linha
+
+    Adiciona coluna em obra:
+      - percentual_administracao NUMERIC(5,2) NOT NULL DEFAULT 0
+
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            ALTER TABLE obra
+                ADD COLUMN IF NOT EXISTS percentual_administracao NUMERIC(5,2) NOT NULL DEFAULT 0
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_servico_custo (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                item_medicao_comercial_id INTEGER UNIQUE REFERENCES item_medicao_comercial(id) ON DELETE SET NULL,
+                servico_obra_real_id INTEGER REFERENCES servico_obra_real(id) ON DELETE SET NULL,
+                nome VARCHAR(200) NOT NULL,
+                valor_orcado NUMERIC(15,2) NOT NULL DEFAULT 0,
+                realizado_material NUMERIC(15,2) NOT NULL DEFAULT 0,
+                realizado_mao_obra NUMERIC(15,2) NOT NULL DEFAULT 0,
+                realizado_outros NUMERIC(15,2) NOT NULL DEFAULT 0,
+                override_realizado_manual BOOLEAN NOT NULL DEFAULT FALSE,
+                material_a_realizar NUMERIC(15,2) NOT NULL DEFAULT 0,
+                cotacao_selecionada_id INTEGER,
+                mao_obra_a_realizar NUMERIC(15,2) NOT NULL DEFAULT 0,
+                outros_a_realizar NUMERIC(15,2) NOT NULL DEFAULT 0,
+                observacoes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_obra_servico_custo_obra ON obra_servico_custo(obra_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_obra_servico_custo_admin ON obra_servico_custo(admin_id)")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_servico_equipe_planejada (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                obra_servico_custo_id INTEGER NOT NULL REFERENCES obra_servico_custo(id) ON DELETE CASCADE,
+                funcionario_id INTEGER REFERENCES funcionario(id),
+                funcionario_nome VARCHAR(120) NOT NULL,
+                quantidade_dias NUMERIC(10,2) NOT NULL DEFAULT 0,
+                diaria NUMERIC(15,2) NOT NULL DEFAULT 0,
+                almoco_e_cafe NUMERIC(15,2) NOT NULL DEFAULT 0,
+                transporte NUMERIC(15,2) NOT NULL DEFAULT 0,
+                observacoes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_equipe_planejada_servico
+                ON obra_servico_equipe_planejada(obra_servico_custo_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_equipe_planejada_admin
+                ON obra_servico_equipe_planejada(admin_id)
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_servico_cotacao_interna (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                obra_servico_custo_id INTEGER NOT NULL REFERENCES obra_servico_custo(id) ON DELETE CASCADE,
+                fornecedor_nome VARCHAR(200) NOT NULL,
+                fornecedor_id INTEGER REFERENCES fornecedor(id),
+                prazo_entrega VARCHAR(100),
+                condicao_pagamento VARCHAR(100),
+                observacoes TEXT,
+                selecionada BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cotacao_interna_servico
+                ON obra_servico_cotacao_interna(obra_servico_custo_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cotacao_interna_admin
+                ON obra_servico_cotacao_interna(admin_id)
+        """)
+        # Garante só 1 SELECIONADA por serviço (partial unique index)
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_cotacao_interna_selecionada_por_servico
+                ON obra_servico_cotacao_interna(obra_servico_custo_id)
+                WHERE selecionada = TRUE
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_servico_cotacao_interna_linha (
+                id SERIAL PRIMARY KEY,
+                cotacao_id INTEGER NOT NULL REFERENCES obra_servico_cotacao_interna(id) ON DELETE CASCADE,
+                admin_id INTEGER,
+                descricao VARCHAR(300) NOT NULL,
+                unidade VARCHAR(20),
+                quantidade NUMERIC(15,4) NOT NULL DEFAULT 0,
+                valor_unitario NUMERIC(15,2) NOT NULL DEFAULT 0
+            )
+        """)
+        # Patch idempotente: adiciona admin_id em DBs que já tinham a tabela
+        cursor.execute("""
+            ALTER TABLE obra_servico_cotacao_interna_linha
+                ADD COLUMN IF NOT EXISTS admin_id INTEGER
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cotacao_linha_cotacao
+                ON obra_servico_cotacao_interna_linha(cotacao_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cotacao_linha_admin
+                ON obra_servico_cotacao_interna_linha(admin_id)
+        """)
+
+        # FK cotacao_selecionada_id só depois da tabela-alvo existir
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'fk_obra_servico_custo_cotacao_sel'
+                ) THEN
+                    ALTER TABLE obra_servico_custo
+                    ADD CONSTRAINT fk_obra_servico_custo_cotacao_sel
+                    FOREIGN KEY (cotacao_selecionada_id)
+                    REFERENCES obra_servico_cotacao_interna(id)
+                    ON DELETE SET NULL;
+                END IF;
+            END$$;
+        """)
+
+        connection.commit()
+        cursor.close()
+        logger.info("MIGRACAO 118: Resumo de Custos da Obra aplicada (tabelas criadas + percentual_administracao)")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 118: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
 
 
 def migration_117_tarefa_cronograma_is_cliente():

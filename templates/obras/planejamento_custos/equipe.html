@@ -1,0 +1,125 @@
+{% extends "base_completo.html" %}
+{% block title %}Equipe Planejada — {{ svc.nome }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <nav class="mb-3">
+    <a href="{{ url_for('planejamento_custos.editar', obra_id=obra.id, svc_id=svc.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Voltar ao serviço
+    </a>
+  </nav>
+  <h2 class="mb-3"><i class="fas fa-users me-2 text-success"></i>Equipe Planejada — {{ svc.nome }}</h2>
+
+  <div class="card mb-3">
+    <div class="card-header bg-light">Adicionar linha de equipe</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('planejamento_custos.equipe', obra_id=obra.id, svc_id=svc.id) }}" id="eqpForm">
+        <input type="hidden" name="acao" value="add">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Funcionário</label>
+            <select name="funcionario_id" id="selFunc" class="form-select">
+              <option value="">— selecione ou deixe livre —</option>
+              {% for f in funcionarios %}
+                <option value="{{ f.id }}"
+                        data-diaria="{{ f.valor_diaria or 0 }}"
+                        data-va="{{ f.valor_va or 0 }}"
+                        data-vt="{{ f.valor_vt or 0 }}"
+                        data-nome="{{ f.nome }}">{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Nome (se livre)</label>
+            <input type="text" name="funcionario_nome" id="txtNome" class="form-control">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label">Dias</label>
+            <input type="number" step="0.5" min="0" name="quantidade_dias" class="form-control" required>
+          </div>
+          <div class="col-md-1">
+            <label class="form-label">Diária</label>
+            <input type="number" step="0.01" name="diaria" id="inpDiaria" class="form-control">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label">Alim.</label>
+            <input type="number" step="0.01" name="almoco_e_cafe" id="inpAlim" class="form-control">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label">Transp.</label>
+            <input type="number" step="0.01" name="transporte" id="inpTransp" class="form-control">
+          </div>
+          <div class="col-md-1 d-flex align-items-end">
+            <button class="btn btn-success w-100"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-striped mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Funcionário</th>
+            <th class="text-end">Dias</th>
+            <th class="text-end">Diária</th>
+            <th class="text-end">Alim.</th>
+            <th class="text-end">Transp.</th>
+            <th class="text-end">Custo Dia</th>
+            <th class="text-end">Subtotal</th>
+            <th class="text-center">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in svc.equipe_planejada %}
+          <tr>
+            <td>{{ l.funcionario_nome }}</td>
+            <td class="text-end">{{ l.quantidade_dias|float }}</td>
+            <td class="text-end">R$ {{ '{:,.2f}'.format(l.diaria|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end">R$ {{ '{:,.2f}'.format(l.almoco_e_cafe|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end">R$ {{ '{:,.2f}'.format(l.transporte|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end">R$ {{ '{:,.2f}'.format(l.custo_dia).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end fw-bold">R$ {{ '{:,.2f}'.format(l.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-center">
+              <form method="POST" action="{{ url_for('planejamento_custos.equipe', obra_id=obra.id, svc_id=svc.id) }}" onsubmit="return confirm('Remover linha?');" class="d-inline">
+                <input type="hidden" name="acao" value="del">
+                <input type="hidden" name="linha_id" value="{{ l.id }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-3">Nenhuma linha cadastrada.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <td colspan="6" class="text-end fw-bold">Total Mão de Obra A Realizar:</td>
+            <td class="text-end fw-bold text-warning">R$ {{ '{:,.2f}'.format(svc.mao_obra_a_realizar|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var sel = document.getElementById('selFunc');
+  if (!sel) return;
+  sel.addEventListener('change', function () {
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    document.getElementById('txtNome').value = opt.dataset.nome || '';
+    var diaria = document.getElementById('inpDiaria');
+    var alim = document.getElementById('inpAlim');
+    var transp = document.getElementById('inpTransp');
+    if (diaria && !diaria.value) diaria.value = opt.dataset.diaria || 0;
+    if (alim && !alim.value) alim.value = opt.dataset.va || 0;
+    if (transp && !transp.value) transp.value = opt.dataset.vt || 0;
+  });
+})();
+</script>
+{% endblock %}

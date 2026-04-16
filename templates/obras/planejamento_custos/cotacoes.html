@@ -1,0 +1,125 @@
+{% extends "base_completo.html" %}
+{% block title %}Cotações Internas — {{ svc.nome }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <nav class="mb-3">
+    <a href="{{ url_for('planejamento_custos.editar', obra_id=obra.id, svc_id=svc.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Voltar ao serviço
+    </a>
+  </nav>
+  <h2 class="mb-3"><i class="fas fa-tags me-2 text-warning"></i>Cotações Internas — {{ svc.nome }}</h2>
+
+  <div class="card mb-3">
+    <div class="card-header bg-light">Nova cotação interna</div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('planejamento_custos.cotacoes', obra_id=obra.id, svc_id=svc.id) }}">
+        <input type="hidden" name="acao" value="add">
+        <div class="row g-2 mb-2">
+          <div class="col-md-3">
+            <label class="form-label">Fornecedor (nome livre)</label>
+            <input type="text" name="fornecedor_nome" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fornecedor cadastrado</label>
+            <select name="fornecedor_id" class="form-select">
+              <option value="">—</option>
+              {% for f in fornecedores %}
+                <option value="{{ f.id }}">{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Prazo de entrega</label>
+            <input type="text" name="prazo_entrega" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Condição de pagamento</label>
+            <input type="text" name="condicao_pagamento" class="form-control">
+          </div>
+        </div>
+
+        <table class="table table-bordered table-sm" id="tblLinhas">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 45%">Descrição</th><th style="width: 10%">Unid.</th>
+              <th style="width: 15%">Qtd</th><th style="width: 20%">Valor Unit.</th>
+              <th style="width: 10%">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="linhasBody">
+            <tr>
+              <td><input type="text" name="linha_descricao[]" class="form-control form-control-sm"></td>
+              <td><input type="text" name="linha_unidade[]" class="form-control form-control-sm"></td>
+              <td><input type="number" step="0.01" name="linha_quantidade[]" class="form-control form-control-sm"></td>
+              <td><input type="number" step="0.01" name="linha_valor_unitario[]" class="form-control form-control-sm"></td>
+              <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove();"><i class="fas fa-times"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addLinhaCotacao()"><i class="fas fa-plus"></i> Adicionar linha</button>
+
+        <div class="mt-3">
+          <label class="form-label">Observações</label>
+          <textarea name="observacoes" class="form-control" rows="2"></textarea>
+        </div>
+        <button class="btn btn-warning mt-2"><i class="fas fa-save"></i> Salvar cotação</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header bg-light"><strong>Cotações cadastradas</strong> — apenas 1 pode estar SELECIONADA</div>
+    <div class="card-body p-0">
+      <table class="table table-striped mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Fornecedor</th><th>Prazo</th><th>Pgto</th>
+            <th class="text-end"># linhas</th><th class="text-end">Total</th>
+            <th class="text-center">Selecionada</th><th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in svc.cotacoes %}
+          <tr class="{{ 'table-success' if c.selecionada else '' }}">
+            <td>{{ c.fornecedor_nome }}</td>
+            <td>{{ c.prazo_entrega or '—' }}</td>
+            <td>{{ c.condicao_pagamento or '—' }}</td>
+            <td class="text-end">{{ c.linhas|length }}</td>
+            <td class="text-end fw-bold">R$ {{ '{:,.2f}'.format(c.valor_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-center">
+              {% if c.selecionada %}<span class="badge bg-success">SELECIONADA</span>{% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              <form method="POST" action="{{ url_for('planejamento_custos.cotacoes', obra_id=obra.id, svc_id=svc.id) }}" class="d-inline">
+                <input type="hidden" name="acao" value="selecionar">
+                <input type="hidden" name="cotacao_id" value="{{ c.id }}">
+                <button class="btn btn-sm btn-outline-success" {% if c.selecionada %}disabled{% endif %}><i class="fas fa-check"></i></button>
+              </form>
+              <form method="POST" action="{{ url_for('planejamento_custos.cotacoes', obra_id=obra.id, svc_id=svc.id) }}" class="d-inline" onsubmit="return confirm('Remover?');">
+                <input type="hidden" name="acao" value="del">
+                <input type="hidden" name="cotacao_id" value="{{ c.id }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-3">Nenhuma cotação.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+function addLinhaCotacao() {
+  var tbody = document.getElementById('linhasBody');
+  var tr = document.createElement('tr');
+  tr.innerHTML = '<td><input type="text" name="linha_descricao[]" class="form-control form-control-sm"></td>' +
+                 '<td><input type="text" name="linha_unidade[]" class="form-control form-control-sm"></td>' +
+                 '<td><input type="number" step="0.01" name="linha_quantidade[]" class="form-control form-control-sm"></td>' +
+                 '<td><input type="number" step="0.01" name="linha_valor_unitario[]" class="form-control form-control-sm"></td>' +
+                 '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'tr\').remove();"><i class="fas fa-times"></i></button></td>';
+  tbody.appendChild(tr);
+}
+</script>
+{% endblock %}

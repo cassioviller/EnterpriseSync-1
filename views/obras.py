@@ -1756,8 +1756,17 @@ def detalhes_obra(id):
             logger.error(f"Erro calculando indicador de medição: {e}")
             db.session.rollback()
 
+        # Task #70 — Resumo de Custos (12 indicadores + datasets dos gráficos)
+        try:
+            from services.resumo_custos_obra import calcular_resumo_obra
+            resumo_custos = calcular_resumo_obra(obra.id, admin_id=admin_id)
+        except Exception as _e_resumo:
+            logger.error(f"Erro no resumo de custos: {_e_resumo}")
+            resumo_custos = None
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
+                             resumo=resumo_custos,
                              kpis=kpis_obra,
                              data_inicio=data_inicio,
                              data_fim=data_fim,

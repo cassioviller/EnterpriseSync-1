@@ -1,0 +1,89 @@
+{% extends "base_completo.html" %}
+{% block title %}Planejamento de Custos — {{ obra.nome }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <nav class="mb-3">
+    <a href="{{ url_for('main.detalhes_obra', id=obra.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Voltar à obra
+    </a>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h2 class="m-0"><i class="fas fa-calculator me-2 text-primary"></i>Planejamento de Custos — {{ obra.nome }}</h2>
+    <a href="{{ url_for('planejamento_custos.novo', obra_id=obra.id) }}" class="btn btn-primary">
+      <i class="fas fa-plus"></i> Novo Serviço de Custo
+    </a>
+  </div>
+
+  {% set i = resumo.indicadores %}
+  <div class="row g-2 mb-3">
+    {% for label, val, cor in [
+      ('Total Proposta Orç.', i.total_proposta_orcada, '#3b82f6'),
+      ('Valor Custo Orç.',    i.valor_custo_orcado,    '#8b5cf6'),
+      ('Total Realizado',     i.total_realizado,       '#ef4444'),
+      ('Total A Realizar',    i.total_a_realizar,      '#f59e0b'),
+      ('Custo Real da Obra',  i.custo_real_da_obra,    '#9333ea'),
+      ('Verba Disponível',    i.verba_disponivel,      (i.verba_disponivel >= 0) and '#22c55e' or '#dc2626'),
+    ] %}
+    <div class="col-md-2 col-6">
+      <div class="p-2 border rounded shadow-sm h-100" style="border-left: 4px solid {{ cor }} !important;">
+        <div class="text-muted small">{{ label }}</div>
+        <div class="fw-bold" style="color: {{ cor }};">R$ {{ '{:,.2f}'.format(val).replace(',', 'X').replace('.', ',').replace('X', '.') }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-striped table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Serviço</th>
+            <th>Item Comercial</th>
+            <th class="text-end">Orçado</th>
+            <th class="text-end">Realizado</th>
+            <th class="text-end">A Realizar</th>
+            <th class="text-end">Saldo</th>
+            <th class="text-end">Valor Medido</th>
+            <th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in servicos %}
+          <tr>
+            <td>{{ s.nome }}</td>
+            <td>
+              {% if s.item_medicao %}
+                <span class="badge bg-info">#{{ s.item_medicao.id }} {{ s.item_medicao.nome }}</span>
+              {% else %}
+                <span class="text-muted small">— sem vínculo —</span>
+              {% endif %}
+            </td>
+            <td class="text-end">R$ {{ '{:,.2f}'.format(s.valor_orcado|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end text-danger">R$ {{ '{:,.2f}'.format(s.realizado_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end text-warning">R$ {{ '{:,.2f}'.format(s.a_realizar_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end {{ 'text-success' if s.saldo >= 0 else 'text-danger' }}">R$ {{ '{:,.2f}'.format(s.saldo).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+            <td class="text-end">
+              {% if s.item_medicao %}
+                R$ {{ '{:,.2f}'.format(s.item_medicao.valor_executado_acumulado|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('planejamento_custos.editar', obra_id=obra.id, svc_id=s.id) }}"><i class="fas fa-pen"></i></a>
+              <a class="btn btn-sm btn-outline-success" href="{{ url_for('planejamento_custos.equipe', obra_id=obra.id, svc_id=s.id) }}"><i class="fas fa-users"></i></a>
+              <a class="btn btn-sm btn-outline-warning" href="{{ url_for('planejamento_custos.cotacoes', obra_id=obra.id, svc_id=s.id) }}"><i class="fas fa-tags"></i></a>
+              <form method="POST" action="{{ url_for('planejamento_custos.excluir', obra_id=obra.id, svc_id=s.id) }}" class="d-inline" onsubmit="return confirm('Remover este serviço?');">
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">Nenhum serviço de custo cadastrado. Clique em "Novo Serviço de Custo".</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
