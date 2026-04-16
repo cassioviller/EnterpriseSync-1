@@ -4259,6 +4259,8 @@ class TarefaCronograma(db.Model):
     percentual_concluido = db.Column(db.Float, default=0.0, nullable=False)
     # 'empresa' = conta na produtividade; 'terceiros' = só check de conclusão
     responsavel = db.Column(db.String(20), default='empresa', nullable=False)
+    # Para entregas/terceiros: data efetiva da entrega/conclusao (Migration 113)
+    data_entrega_real = db.Column(db.Date, nullable=True)
     admin_id = db.Column(
         db.Integer,
         db.ForeignKey('usuario.id'),

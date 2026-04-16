@@ -419,6 +419,55 @@
 
         <!-- Mão de obra por subatividade: seletores embutidos nos cards de subatividade -->
 
+        <!-- ===== SEÇÃO DE ENTREGAS / TERCEIROS ===== -->
+        {% if tarefas_terceiros and tarefas_terceiros|length > 0 %}
+        <div class="rdo-card slide-in">
+            <div class="rdo-card-header">
+                <h3>
+                    <i class="fas fa-truck-loading"></i>
+                    Entregas / Terceiros
+                </h3>
+                <span class="badge bg-info">{{ tarefas_terceiros|length }} pendente(s)</span>
+            </div>
+            <div class="rdo-card-body">
+                <p class="text-muted small mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    Marque as tarefas de terceiros (entregas, subempreitadas) que foram concluídas
+                    nesta data. Elas serão registradas como entregues e o cronograma será atualizado.
+                </p>
+                <div class="list-group">
+                    {% for t in tarefas_terceiros %}
+                    {% set hoje_t = date.today() %}
+                    {% set atrasada = t.data_fim and t.data_fim < hoje_t %}
+                    <label class="list-group-item d-flex align-items-center" style="gap: 0.85rem; cursor: pointer;">
+                        <input type="checkbox"
+                               class="form-check-input"
+                               name="entrega_tarefa_ids[]"
+                               value="{{ t.id }}"
+                               form="formNovoRDO"
+                               style="margin: 0; transform: scale(1.3);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #1e293b;">{{ t.nome_tarefa }}</div>
+                            <div class="small text-muted">
+                                {% if t.data_fim %}
+                                <i class="fas fa-calendar"></i> Prazo: {{ t.data_fim.strftime('%d/%m/%Y') }}
+                                {% if atrasada %}
+                                <span class="badge bg-danger ms-2"><i class="fas fa-exclamation-triangle"></i> Atrasada</span>
+                                {% endif %}
+                                {% else %}
+                                <i class="fas fa-calendar"></i> Sem prazo definido
+                                {% endif %}
+                                &nbsp;&middot;&nbsp;
+                                <i class="fas fa-percentage"></i> {{ '%.0f'|format(t.percentual_concluido or 0) }}% executado
+                            </div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ===== SEÇÃO DE FOTOS DO RDO v9.0 ===== -->
         <div class="rdo-card slide-in">
             <div class="rdo-card-header">

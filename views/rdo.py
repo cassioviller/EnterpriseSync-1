@@ -394,13 +394,37 @@ def novo_rdo():
         
         # Adicionar data atual para o template
         data_hoje = date.today().strftime('%Y-%m-%d')
-        
+
+        # Tarefas terceiros pendentes (entregas a confirmar) para a obra selecionada
+        tarefas_terceiros = []
+        if obra_id:
+            try:
+                from models import TarefaCronograma as _TC
+                from sqlalchemy import exists as _exists, and_ as _and, not_ as _not
+                TarefaFilhaT = db.aliased(_TC)
+                subq_tem_filha_t = _exists().where(_and(
+                    TarefaFilhaT.tarefa_pai_id == _TC.id,
+                    TarefaFilhaT.obra_id == obra_id,
+                ))
+                tarefas_terceiros = _TC.query.filter(
+                    _TC.obra_id == obra_id,
+                    _TC.responsavel == 'terceiros',
+                    _not(subq_tem_filha_t),
+                    _TC.data_entrega_real.is_(None),
+                    (_TC.percentual_concluido < 100),
+                ).order_by(_TC.data_fim.asc().nulls_last(), _TC.ordem.asc()).all()
+            except Exception as _e:
+                logger.error(f"Erro carregando tarefas terceiros (novo_rdo): {_e}")
+                tarefas_terceiros = []
+
         return render_template('rdo/novo.html', 
                              obras=obras,
                              funcionarios=funcionarios,
                              obra_selecionada=obra_id,
                              atividades_anteriores=atividades_anteriores,
-                             data_hoje=data_hoje)
+                             data_hoje=data_hoje,
+                             date=date,
+                             tarefas_terceiros=tarefas_terceiros)
         
     except Exception as e:
         logger.error(f"ERRO NOVO RDO: {str(e)}")
@@ -1695,13 +1719,37 @@ def rdo_novo_unificado():
         data_hoje = date.today().strftime('%Y-%m-%d')
         
         from utils.tenant import is_v2_active
+
+        # Tarefas terceiros pendentes (entregas a confirmar) para a obra selecionada
+        tarefas_terceiros = []
+        if obra_selecionada:
+            try:
+                from models import TarefaCronograma as _TC
+                from sqlalchemy import exists as _exists, and_ as _and, not_ as _not
+                TarefaFilhaT = db.aliased(_TC)
+                subq_tem_filha_t = _exists().where(_and(
+                    TarefaFilhaT.tarefa_pai_id == _TC.id,
+                    TarefaFilhaT.obra_id == obra_selecionada.id,
+                ))
+                tarefas_terceiros = _TC.query.filter(
+                    _TC.obra_id == obra_selecionada.id,
+                    _TC.responsavel == 'terceiros',
+                    _not(subq_tem_filha_t),
+                    _TC.data_entrega_real.is_(None),
+                    (_TC.percentual_concluido < 100),
+                ).order_by(_TC.data_fim.asc().nulls_last(), _TC.ordem.asc()).all()
+            except Exception as _e:
+                logger.error(f"Erro carregando tarefas terceiros: {_e}")
+                tarefas_terceiros = []
+
         return render_template(template, 
                              obras=obras, 
                              funcionarios=funcionarios_dict,
                              obra_selecionada=obra_selecionada,
                              data_hoje=data_hoje,
                              date=date,
-                             is_v2_active=is_v2_active)
+                             is_v2_active=is_v2_active,
+                             tarefas_terceiros=tarefas_terceiros)
         
     except Exception as e:
         logger.error(f"ERRO RDO NOVO UNIFICADO: {str(e)}")
@@ -2548,6 +2596,32 @@ def rdo_salvar_unificado():
         total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
         logger.debug(f"DEBUG FINAL: RDO {rdo.numero_rdo} - {total_subatividades} subatividades, {total_funcionarios} funcionários")
         
+        # Processar entregas/terceiros marcadas como concluídas no RDO
+        try:
+            from models import TarefaCronograma as _TC_E
+            entrega_ids_raw = request.form.getlist('entrega_tarefa_ids[]') or request.form.getlist('entrega_tarefa_ids')
+            _admin_id_ent = admin_id if 'admin_id' in dir() else (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None))
+            data_entrega_ref = rdo.data_relatorio if rdo.data_relatorio else date.today()
+            qtd_marcadas = 0
+            for raw_id in entrega_ids_raw:
+                try:
+                    tid = int(raw_id)
+                except (TypeError, ValueError):
+                    continue
+                t_ent = _TC_E.query.filter_by(id=tid).first()
+                if not t_ent or (t_ent.responsavel or '').lower() != 'terceiros':
+                    continue
+                if t_ent.obra_id != rdo.obra_id:
+                    continue
+                t_ent.percentual_concluido = 100.0
+                if not t_ent.data_entrega_real:
+                    t_ent.data_entrega_real = data_entrega_ref
+                qtd_marcadas += 1
+            if qtd_marcadas > 0:
+                logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) via rdo_salvar_unificado RDO {rdo.id}")
+        except Exception as e_ent:
+            logger.error(f"Erro processando entregas terceiros (unificado): {e_ent}")
+
         db.session.commit()
         
         if rdo_id:
@@ -3933,6 +4007,34 @@ def salvar_rdo_flexivel():
             db.session.commit()
             logger.info(f"[OK] [COMMIT] Commit executado com sucesso!")
             success = True
+
+            # Processar entregas/terceiros marcadas como concluídas no RDO
+            try:
+                from models import TarefaCronograma as _TC_E
+                entrega_ids_raw = request.form.getlist('entrega_tarefa_ids[]') or request.form.getlist('entrega_tarefa_ids')
+                _admin_id_ent = admin_id or (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None))
+                data_entrega_ref = rdo.data_relatorio if hasattr(rdo, 'data_relatorio') and rdo.data_relatorio else date.today()
+                qtd_marcadas = 0
+                for raw_id in entrega_ids_raw:
+                    try:
+                        tid = int(raw_id)
+                    except (TypeError, ValueError):
+                        continue
+                    t_ent = _TC_E.query.filter_by(id=tid, admin_id=_admin_id_ent).first()
+                    if not t_ent or (t_ent.responsavel or '').lower() != 'terceiros':
+                        continue
+                    if t_ent.obra_id != rdo.obra_id:
+                        continue
+                    t_ent.percentual_concluido = 100.0
+                    if not t_ent.data_entrega_real:
+                        t_ent.data_entrega_real = data_entrega_ref
+                    qtd_marcadas += 1
+                if qtd_marcadas > 0:
+                    db.session.commit()
+                    logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) como concluída(s) via RDO {rdo.id}")
+            except Exception as e_ent:
+                logger.error(f"Erro processando entregas terceiros no RDO: {e_ent}")
+                db.session.rollback()
 
             # V2: Processar apontamentos de produção do cronograma
             try:

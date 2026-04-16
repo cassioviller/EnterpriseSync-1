@@ -361,6 +361,17 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
             tarefa.percentual_concluido = min(100.0, max(0.0, float(data['percentual_concluido'])))
         except (ValueError, TypeError):
             pass
+        # Auto-sync data_entrega_real para tarefas de terceiros
+        if (tarefa.responsavel or '').lower() == 'terceiros':
+            from datetime import date as _date_today
+            if tarefa.percentual_concluido >= 100.0 and not tarefa.data_entrega_real:
+                tarefa.data_entrega_real = _date_today.today()
+            elif tarefa.percentual_concluido < 100.0:
+                tarefa.data_entrega_real = None
+
+    if 'data_entrega_real' in data:
+        d = _parse_date(data['data_entrega_real']) if data.get('data_entrega_real') else None
+        tarefa.data_entrega_real = d
 
     if 'predecessora_id' in data:
         pred_val = data['predecessora_id']

@@ -3812,6 +3812,7 @@ def executar_migracoes():
             (110, "OpcaoConcorrencia — enforça NOT NULL em admin_id", migration_110_opcao_concorrencia_admin_not_null),
             (111, "CronogramaCliente — cronograma editável para portal do cliente", migration_111_cronograma_cliente),
             (112, "MapaConcorrenciaV2 — tabela multi-fornecedor com cotações por item", migration_112_mapa_concorrencia_v2),
+            (113, "TarefaCronograma — data_entrega_real DATE para entregas/terceiros", migration_113_tarefa_cronograma_data_entrega_real),
         ]
         
         # Executar cada migração com rastreamento
@@ -9033,6 +9034,49 @@ def migration_112_mapa_concorrencia_v2():
 
     except Exception as e:
         logger.error(f"Erro na migracao 112: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_113_tarefa_cronograma_data_entrega_real():
+    """
+    Migration 113: Adiciona coluna data_entrega_real (DATE NULL) em tarefa_cronograma.
+
+    Usada para tarefas com responsavel='terceiros' (entregas, subempreitadas)
+    para registrar a data efetiva da entrega/conclusao e gerar alertas
+    temporais no Painel Estrategico da Obra.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'tarefa_cronograma'
+              AND column_name = 'data_entrega_real'
+        """)
+        if cursor.fetchone() is None:
+            cursor.execute("""
+                ALTER TABLE tarefa_cronograma
+                ADD COLUMN data_entrega_real DATE NULL
+            """)
+            logger.info("MIGRACAO 113: coluna data_entrega_real adicionada em tarefa_cronograma")
+        else:
+            logger.info("MIGRACAO 113: coluna data_entrega_real ja existe -- skip")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 113 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 113: {e}")
         if connection:
             try:
                 connection.rollback()
