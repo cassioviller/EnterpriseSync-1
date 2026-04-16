@@ -89,20 +89,22 @@ def _classificar_tarefa(tarefa, hoje=None):
             'dias_para_fim': 0,
         }
 
-    # 5) Vence amanhã (amarelo)
+    # 5) Vence amanhã (amarelo) - urgência de VENCIMENTO
     if dias_fim == 1:
         return {
             'nivel': 'amarelo',
+            'motivo': 'vence_amanha',
             'mensagem': f"Vence AMANHÃ ({_format_data(df)}) — confirmar conclusão",
             'ordem_urgencia': NIVEIS['amarelo']['ordem'],
             'dias_para_inicio': dias_inicio,
             'dias_para_fim': 1,
         }
 
-    # 6) Início amanhã (amarelo)
+    # 6) Início amanhã (amarelo no item, mas NÃO conta como urgência de vencimento no painel)
     if di and dias_inicio == 1:
         return {
             'nivel': 'amarelo',
+            'motivo': 'inicio_amanha',
             'mensagem': f"Início AMANHÃ ({_format_data(di)}) — confirmar com fornecedor",
             'ordem_urgencia': NIVEIS['amarelo']['ordem'] + 1,
             'dias_para_inicio': 1,
@@ -213,7 +215,10 @@ def calcular_alertas_terceiros(obra_id, hoje=None):
                 qtd_atrasadas += 1
             elif cls['nivel'] == 'laranja':
                 qtd_vence_hoje += 1
-            elif cls['nivel'] == 'amarelo':
+            elif cls['nivel'] == 'amarelo' and cls.get('motivo') == 'vence_amanha':
+                # Painel: amarelo SO conta itens cujo motivo é vencimento amanhã.
+                # "Início amanhã" segue amarelo no detalhe do item (urgência operacional)
+                # mas NÃO escala o painel — não há vencimento crítico ainda.
                 qtd_amanha += 1
 
     detalhe.sort(key=lambda d: d['ordem_urgencia'])
@@ -298,8 +303,9 @@ def aplicar_entregas_no_rdo(rdo, form_data, admin_id=None):
             if t.obra_id != rdo.obra_id:
                 continue
             t.percentual_concluido = 100.0
-            if not t.data_entrega_real:
-                t.data_entrega_real = data_ref
+            # Sempre alinha data_entrega_real com a data do RDO (também para
+            # correções retroativas em RDOs editados).
+            t.data_entrega_real = data_ref
             qtd += 1
         return qtd
     except Exception as e:
