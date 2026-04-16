@@ -1821,92 +1821,49 @@
                 <h3><i class="fas fa-calendar-alt"></i> Cronograma do Cliente</h3>
                 <div class="ms-auto d-flex align-items-center gap-2">
                     <span class="badge bg-light text-dark">{{ cronograma_cliente_items|length if cronograma_cliente_items else 0 }} tarefa(s)</span>
-                    <span class="badge" style="background:#fef3c7;color:#92400e;">
-                        <i class="fas fa-eye me-1"></i>Somente leitura
+                    <span class="badge" style="background:#dbeafe;color:#1e40af;">
+                        <i class="fas fa-edit me-1"></i>Edição independente
                     </span>
                 </div>
             </div>
             <div class="obra-card-body" style="padding: 1rem 1rem 1.25rem;">
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2" style="margin-bottom:.75rem;">
                     <p style="font-size:.85rem;color:#64748b;margin:0;flex:1;min-width:240px;">
-                        Visualização do cronograma apresentado ao cliente no Portal. Para alterar tarefas, edite o
-                        <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}" style="text-decoration:underline;">Cronograma da Obra</a>
-                        e depois regenere a versão do cliente.
+                        Editor completo do cronograma apresentado ao cliente no Portal — pai/filho, predecessoras,
+                        Gantt, drag&amp;drop. Edições aqui <strong>não afetam o cronograma interno</strong>. Use
+                        "Regenerar do cronograma interno" para sobrescrever esta versão a partir do plano real.
                     </p>
-                    <form method="POST"
-                          action="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}"
-                          onsubmit="return confirm('Regenerar o Cronograma do Cliente a partir das tarefas internas? Isso substitui o conteúdo atual.');"
-                          style="margin:0;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-sm btn-outline-success">
-                            <i class="fas fa-sync-alt me-1"></i> Regenerar do cronograma interno
-                        </button>
-                    </form>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}"
+                           target="_blank"
+                           class="btn btn-sm btn-outline-secondary"
+                           title="Abrir o cronograma INTERNO em nova aba">
+                            <i class="fas fa-external-link-alt me-1"></i> Cronograma interno
+                        </a>
+                        <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}?cliente=1"
+                           target="_blank"
+                           class="btn btn-sm btn-outline-primary"
+                           title="Abrir o cronograma do CLIENTE em nova aba (página inteira)">
+                            <i class="fas fa-expand me-1"></i> Tela cheia
+                        </a>
+                        <form method="POST"
+                              action="{{ url_for('main.gerar_cronograma_cliente', obra_id=obra.id) }}"
+                              onsubmit="return confirm('Regenerar o Cronograma do Cliente a partir do cronograma interno? Isso substitui TODAS as tarefas atuais do cliente.');"
+                              style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-sync-alt me-1"></i> Regenerar do interno
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
-                <div class="cliente-cron-split" id="clienteCronSplit">
-                    <div class="cliente-cron-left" id="clienteCronLeft">
-                        <div class="cliente-cron-scroll" id="clienteCronLeftScroll">
-                            {% if cronograma_cliente_items %}
-                            <table class="table table-sm cliente-cron-table mb-0">
-                                <thead class="cliente-cron-thead">
-                                    <tr>
-                                        <th class="cc-th-num">#</th>
-                                        <th class="cc-th-nome">Nome da Tarefa</th>
-                                        <th class="cc-th-date">Início</th>
-                                        <th class="cc-th-date">Término</th>
-                                        <th class="cc-th-perc">Progresso</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in cronograma_cliente_items %}
-                                    {% set perc = (item.percentual_apresentacao or 0)|round(0)|int %}
-                                    <tr class="cc-row {% if perc >= 100 %}cc-done{% elif perc > 0 %}cc-wip{% endif %}"
-                                        data-id="{{ item.id }}"
-                                        data-perc="{{ perc }}"
-                                        data-inicio="{{ item.data_inicio_apresentacao.isoformat() if item.data_inicio_apresentacao else '' }}"
-                                        data-fim="{{ item.data_fim_apresentacao.isoformat() if item.data_fim_apresentacao else '' }}"
-                                        data-nome="{{ item.nome_tarefa|e }}">
-                                        <td class="cc-td-num text-muted">{{ loop.index }}</td>
-                                        <td class="cc-td-nome">{{ item.nome_tarefa }}</td>
-                                        <td class="cc-td-center small">
-                                            <span class="cc-date-chip">{{ item.data_inicio_apresentacao.strftime('%d/%m/%y') if item.data_inicio_apresentacao else '—' }}</span>
-                                        </td>
-                                        <td class="cc-td-center small">
-                                            <span class="cc-date-chip">{{ item.data_fim_apresentacao.strftime('%d/%m/%y') if item.data_fim_apresentacao else '—' }}</span>
-                                        </td>
-                                        <td class="cc-td-perc">
-                                            <div class="cc-perc-wrapper">
-                                                <div class="cc-perc-bar-wrap">
-                                                    <div class="cc-perc-bar-fill {% if perc >= 100 %}cc-fill-done{% elif perc >= 50 %}cc-fill-good{% elif perc > 0 %}cc-fill-mid{% else %}cc-fill-low{% endif %}"
-                                                         style="width:{{ perc }}%"></div>
-                                                </div>
-                                                <span class="cc-perc-text">{{ perc }}%</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% else %}
-                            <div class="text-center py-5 text-muted">
-                                <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
-                                <p class="mb-1 fw-semibold">Nenhuma tarefa no cronograma do cliente.</p>
-                                <p class="small">Gere o cronograma do cliente para visualizar aqui.</p>
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="cliente-cron-divider" id="clienteCronDivider">
-                        <button type="button" class="cliente-cron-toggle-btn" id="clienteCronToggleBtn" title="Mostrar/ocultar Gantt">
-                            <i class="fas fa-chevron-right" id="clienteCronToggleIcon"></i>
-                        </button>
-                    </div>
-
-                    <div class="cliente-cron-gantt" id="clienteCronGantt">
-                        <div id="clienteCronGanttContainer"></div>
-                    </div>
+                <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">
+                    <iframe src="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}?cliente=1"
+                            id="cronogramaClienteIframe"
+                            style="width:100%;height:780px;border:0;display:block;"
+                            loading="lazy"
+                            title="Editor do Cronograma do Cliente"></iframe>
                 </div>
             </div>
         </div>

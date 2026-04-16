@@ -4274,6 +4274,8 @@ class TarefaCronograma(db.Model):
         db.ForeignKey('usuario.id'),
         nullable=False,
     )
+    # Migration 117: separa cronograma INTERNO (False) do cronograma do CLIENTE (True)
+    is_cliente = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

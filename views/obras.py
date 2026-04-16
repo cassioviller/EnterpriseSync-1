@@ -1589,12 +1589,15 @@ def detalhes_obra(id):
         except Exception:
             mapas_v2 = []
 
-        # Cronograma do cliente (apresentação no portal)
+        # Cronograma do cliente: agora vive em TarefaCronograma com is_cliente=True
+        # (migration #117). Mantemos a variável `cronograma_cliente_items` apenas
+        # para o badge de contagem na aba; o conteúdo é exibido via iframe do editor.
         try:
+            from models import TarefaCronograma as _TC_Cli
             cronograma_cliente_items = (
-                CronogramaCliente.query
-                .filter_by(obra_id=obra_id, admin_id=tenant_admin_id)
-                .order_by(CronogramaCliente.ordem)
+                _TC_Cli.query
+                .filter_by(obra_id=obra_id, admin_id=tenant_admin_id, is_cliente=True)
+                .order_by(_TC_Cli.ordem)
                 .all()
             )
         except Exception:
@@ -2023,7 +2026,18 @@ def deletar_mapa_concorrencia(obra_id, mapa_id):
 @login_required
 @admin_required
 def gerar_cronograma_cliente(obra_id):
-    """Gera (ou substitui) o CronogramaCliente a partir das tarefas internas da obra."""
+    """
+    Regenera o cronograma do cliente clonando o cronograma INTERNO da obra.
+
+    Migration #117: cronograma do cliente agora vive na própria TarefaCronograma
+    com is_cliente=True. Esta rota:
+      1. Apaga TODAS as TarefaCronograma is_cliente=True desta obra (overwrite total).
+      2. Clona cada TarefaCronograma is_cliente=False (interno) em uma nova com
+         is_cliente=True, preservando todos os campos relevantes.
+      3. Faz uma 2ª passagem para remapear `tarefa_pai_id` e `predecessora_id`
+         dos IDs antigos (interno) para os novos IDs (cliente), mantendo a
+         hierarquia pai/filho e a rede de predecessoras intactas.
+    """
     try:
         admin_id = get_tenant_admin_id()
         obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -2032,30 +2046,73 @@ def gerar_cronograma_cliente(obra_id):
             return redirect(url_for('main.obras'))
 
         from models import TarefaCronograma
-        tarefas = (
+
+        # 1) Tarefas-fonte: cronograma interno da obra
+        tarefas_internas = (
             TarefaCronograma.query
-            .filter_by(obra_id=obra_id, admin_id=admin_id)
+            .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
             .order_by(TarefaCronograma.ordem)
             .all()
         )
 
-        # Remover cronograma anterior desta obra
-        CronogramaCliente.query.filter_by(obra_id=obra_id, admin_id=admin_id).delete()
+        # 2) Apagar cronograma do cliente anterior (overwrite total)
+        TarefaCronograma.query.filter_by(
+            obra_id=obra_id, admin_id=admin_id, is_cliente=True
+        ).delete(synchronize_session=False)
+        db.session.flush()
 
-        for idx, t in enumerate(tarefas):
-            item = CronogramaCliente(
+        # Legacy: limpa também a tabela antiga (não é mais lida pelo portal)
+        try:
+            CronogramaCliente.query.filter_by(
+                obra_id=obra_id, admin_id=admin_id
+            ).delete(synchronize_session=False)
+        except Exception:
+            pass
+
+        # 3) Clonar — primeiro passo: criar todas as tarefas SEM pai/predecessora
+        old_to_new: dict[int, int] = {}
+        clones_seq: list[tuple[int, TarefaCronograma]] = []
+
+        for t in tarefas_internas:
+            clone = TarefaCronograma(
                 obra_id=obra_id,
                 admin_id=admin_id,
+                is_cliente=True,
                 nome_tarefa=t.nome_tarefa,
-                data_inicio_apresentacao=t.data_inicio,
-                data_fim_apresentacao=t.data_fim,
-                percentual_apresentacao=t.percentual_concluido or 0.0,
-                ordem=idx,
+                duracao_dias=t.duracao_dias,
+                data_inicio=t.data_inicio,
+                data_fim=t.data_fim,
+                quantidade_total=t.quantidade_total,
+                unidade_medida=t.unidade_medida,
+                subatividade_mestre_id=getattr(t, 'subatividade_mestre_id', None),
+                percentual_concluido=t.percentual_concluido or 0.0,
+                responsavel=getattr(t, 'responsavel', 'empresa') or 'empresa',
+                ordem=t.ordem,
+                # pai/predecessora setados na 2ª passagem (após termos os novos IDs)
+                tarefa_pai_id=None,
+                predecessora_id=None,
             )
-            db.session.add(item)
+            db.session.add(clone)
+            clones_seq.append((t.id, clone))
+
+        # Flush para obter IDs gerados
+        db.session.flush()
+        for old_id, clone in clones_seq:
+            old_to_new[old_id] = clone.id
+
+        # 4) 2ª passagem — remapear pai/predecessora usando old_to_new
+        for old_t, (_, clone) in zip(tarefas_internas, clones_seq):
+            if old_t.tarefa_pai_id and old_t.tarefa_pai_id in old_to_new:
+                clone.tarefa_pai_id = old_to_new[old_t.tarefa_pai_id]
+            if old_t.predecessora_id and old_t.predecessora_id in old_to_new:
+                clone.predecessora_id = old_to_new[old_t.predecessora_id]
 
         db.session.commit()
-        flash(f'Cronograma do cliente gerado com {len(tarefas)} tarefa(s).', 'success')
+        flash(
+            f'Cronograma do cliente regenerado com {len(clones_seq)} tarefa(s) '
+            f'(hierarquia e predecessoras preservadas).',
+            'success'
+        )
     except Exception as e:
         db.session.rollback()
         logger.error(f"Erro ao gerar cronograma cliente para obra {obra_id}: {e}")

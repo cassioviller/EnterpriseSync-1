@@ -3816,6 +3816,7 @@ def executar_migracoes():
             (114, "Subempreiteiro + RDOSubempreitadaApontamento + GestaoCustoPai.subempreiteiro_id", migration_114_subempreiteiro),
             (115, "Consolidar GestaoCustoPai duplicados por (admin_id, entidade_id, categoria normalizada)", migration_115_consolidar_gestao_custo_pai_duplicados),
             (116, "PedidoCompra — tipo_compra (normal/aprovacao_cliente) + processada_apos_aprovacao", migration_116_pedido_compra_tipo_compra),
+            (117, "TarefaCronograma — is_cliente BOOLEAN (paridade total no editor cliente)", migration_117_tarefa_cronograma_is_cliente),
         ]
         
         # Executar cada migração com rastreamento
@@ -9404,6 +9405,51 @@ def migration_116_pedido_compra_tipo_compra():
 
     except Exception as e:
         logger.error(f"Erro na migracao 116: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_117_tarefa_cronograma_is_cliente():
+    """
+    Migration 117: Adiciona is_cliente BOOLEAN NOT NULL DEFAULT FALSE em tarefa_cronograma.
+
+    Permite que a mesma tabela armazene as duas faces do cronograma:
+      - is_cliente = FALSE (default): cronograma INTERNO (planejamento real)
+      - is_cliente = TRUE          : cronograma do CLIENTE (versao para o portal)
+
+    O editor /cronograma/obra/<id>?cliente=1 opera apenas em is_cliente=TRUE.
+    Edicoes no editor cliente NAO afetam o plano interno.
+
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            ALTER TABLE tarefa_cronograma
+                ADD COLUMN IF NOT EXISTS is_cliente BOOLEAN NOT NULL DEFAULT FALSE
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tarefa_cronograma_obra_cliente
+                ON tarefa_cronograma(obra_id, is_cliente)
+        """)
+
+        connection.commit()
+        cursor.close()
+        logger.info("MIGRACAO 117: tarefa_cronograma.is_cliente adicionada com indice composto")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 117: {e}")
         import traceback
         logger.error(traceback.format_exc())
         if connection:

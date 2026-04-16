@@ -77,6 +77,28 @@ def _parse_date(s: str | None) -> date | None:
         return None
 
 
+def _modo_cliente() -> bool:
+    """
+    Retorna True quando a operação está no modo "cronograma do cliente".
+    Acionado por ?cliente=1 (querystring) OU pelo campo cliente=1 no body
+    (form/JSON). Em modo cliente, todas as queries operam apenas sobre
+    TarefaCronograma com is_cliente=True; o plano interno fica intocado.
+    """
+    val = request.values.get('cliente')
+    if val is None:
+        try:
+            payload = request.get_json(silent=True) or {}
+            val = payload.get('cliente')
+        except Exception:
+            val = None
+    return str(val or '').strip() in ('1', 'true', 'True', 'on')
+
+
+def _qs_cliente(cliente: bool) -> str:
+    """Sufixo de querystring para preservar o modo entre redirects/links."""
+    return '?cliente=1' if cliente else ''
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ÍNDICE — Lista de obras com cronograma
 # ─────────────────────────────────────────────────────────────────────────────
@@ -129,13 +151,15 @@ def cronograma_obra(obra_id: int):
 
     admin_id = _admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    cliente_mode = _modo_cliente()
 
     # Sincroniza percentual_concluido com o último apontamento do RDO antes de exibir
-    sincronizar_percentuais_obra(obra_id, admin_id)
+    # (No modo cliente, sincroniza apenas o bottom-up dos pais; RDO não toca tarefas-cliente)
+    sincronizar_percentuais_obra(obra_id, admin_id, cliente=cliente_mode)
 
     tarefas = (
         TarefaCronograma.query
-        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
         .order_by(TarefaCronograma.ordem)
         .all()
     )
@@ -172,6 +196,7 @@ def cronograma_obra(obra_id: int):
         planejados_map=planejados_map,
         hoje=hoje,
         nome_empresa=nome_empresa,
+        modo_cliente=cliente_mode,
     )
 
 
@@ -188,6 +213,7 @@ def criar_tarefa(obra_id: int):
 
     admin_id = _admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    cliente_mode = _modo_cliente()
 
     data = request.get_json(silent=True) or request.form.to_dict()
 
@@ -204,9 +230,9 @@ def criar_tarefa(obra_id: int):
     tarefa_pai_id = data.get('tarefa_pai_id') or None
     if tarefa_pai_id:
         tarefa_pai_id = int(tarefa_pai_id)
-        # Validar que a tarefa pai existe e pertence à mesma obra/tenant
+        # Validar que a tarefa pai existe e pertence à mesma obra/tenant/modo
         pai = TarefaCronograma.query.filter_by(
-            id=tarefa_pai_id, obra_id=obra_id, admin_id=admin_id
+            id=tarefa_pai_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
         ).first()
         if not pai:
             return jsonify({
@@ -217,9 +243,9 @@ def criar_tarefa(obra_id: int):
     predecessora_id = data.get('predecessora_id') or None
     if predecessora_id:
         predecessora_id = int(predecessora_id)
-        # Validar que a predecessora existe e pertence à mesma obra/tenant
+        # Validar que a predecessora existe e pertence à mesma obra/tenant/modo
         pred_check = TarefaCronograma.query.filter_by(
-            id=predecessora_id, obra_id=obra_id, admin_id=admin_id
+            id=predecessora_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
         ).first()
         if not pred_check:
             return jsonify({
@@ -232,7 +258,7 @@ def criar_tarefa(obra_id: int):
     # Próxima ordem
     ultima = (
         TarefaCronograma.query
-        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
         .order_by(TarefaCronograma.ordem.desc())
         .first()
     )
@@ -286,6 +312,7 @@ def criar_tarefa(obra_id: int):
         percentual_concluido=0.0,
         responsavel=responsavel,
         admin_id=admin_id,
+        is_cliente=cliente_mode,
     )
     db.session.add(tarefa)
     db.session.commit()
@@ -306,8 +333,9 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
 
     admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
     tarefa = TarefaCronograma.query.filter_by(
-        id=tarefa_id, obra_id=obra_id, admin_id=admin_id
+        id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).first_or_404()
 
     data = request.get_json(silent=True) or {}
@@ -382,9 +410,9 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
                 pred_id = int(pred_val)
             except (ValueError, TypeError):
                 return jsonify({'status': 'error', 'msg': 'predecessora_id inválido'}), 400
-            # Validar existência e pertencimento à obra (igual a criar_tarefa)
+            # Validar existência e pertencimento à obra/modo (igual a criar_tarefa)
             pred_tarefa = TarefaCronograma.query.filter_by(
-                id=pred_id, obra_id=obra_id, admin_id=admin_id
+                id=pred_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
             ).first()
             if not pred_tarefa:
                 return jsonify({
@@ -431,7 +459,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
             pass
 
     if _SCHEDULING_FIELDS & set(data.keys()):
-        recalcular_cronograma(obra_id, admin_id)
+        recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
         # Re-aplicar o percentual manual caso o recálculo tenha sobrescrito
         if perc_manual is not None:
             tarefa.percentual_concluido = perc_manual
@@ -440,7 +468,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     # Devolver tarefa atualizada + lista completa após recalc para redesenho do Gantt
     db.session.refresh(tarefa)
     todas = TarefaCronograma.query.filter_by(
-        obra_id=obra_id, admin_id=admin_id
+        obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).order_by(TarefaCronograma.ordem, TarefaCronograma.id).all()
     return jsonify({
         'status': 'ok',
@@ -461,8 +489,9 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
 
     admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
     tarefa = TarefaCronograma.query.filter_by(
-        id=tarefa_id, obra_id=obra_id, admin_id=admin_id
+        id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).first_or_404()
 
     # Desvincular filhas e tarefas que dependem desta como predecessora
@@ -471,7 +500,7 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
 
     db.session.delete(tarefa)
     db.session.commit()
-    logger.info(f"[OK] TarefaCronograma excluída id={tarefa_id}")
+    logger.info(f"[OK] TarefaCronograma excluída id={tarefa_id} cliente={cliente_mode}")
     return jsonify({'status': 'ok'})
 
 
@@ -487,15 +516,16 @@ def recalcular(obra_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
 
     admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
     Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
 
-    ok = recalcular_cronograma(obra_id, admin_id)
+    ok = recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
     if not ok:
         return jsonify({'status': 'error', 'msg': 'Erro ao recalcular cronograma'}), 500
 
     tarefas = (
         TarefaCronograma.query
-        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
         .order_by(TarefaCronograma.ordem)
         .all()
     )
@@ -514,12 +544,13 @@ def reordenar(obra_id: int):
         return jsonify({'status': 'error'}), 403
 
     admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
     data = request.get_json(silent=True) or {}
     ordem_ids = data.get('ordem', [])  # lista de IDs na nova ordem
 
     for idx, tid in enumerate(ordem_ids):
         TarefaCronograma.query.filter_by(
-            id=int(tid), obra_id=obra_id, admin_id=admin_id
+            id=int(tid), obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
         ).update({'ordem': idx})
 
     db.session.commit()
@@ -1552,26 +1583,28 @@ def aplicar_template(obra_id: int):
         return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
 
     admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    qs = _qs_cliente(cliente_mode)
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
 
     template_id = request.form.get('template_id', type=int)
     if not template_id:
         flash('Selecione um template.', 'warning')
-        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id) + qs)
 
     tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=admin_id).first()
     if not tmpl:
         flash('Template não encontrado.', 'error')
-        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+        return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id) + qs)
 
     # Data de início: form ou hoje
     data_inicio_str = request.form.get('data_inicio_template') or ''
     data_inicio = _parse_date(data_inicio_str) or date.today()
 
-    # Offset de ordem para não sobrescrever tarefas existentes
+    # Offset de ordem para não sobrescrever tarefas existentes (no mesmo modo)
     max_ordem_row = (
         db.session.query(db.func.max(TarefaCronograma.ordem))
-        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
         .scalar()
     )
     ordem_base = (max_ordem_row or 0) + 10
@@ -1627,6 +1660,7 @@ def aplicar_template(obra_id: int):
                     tarefa_pai_id=pai_tarefa_id,
                     ordem=ordem_base + ordem_seq[0] * 10,
                     admin_id=admin_id,
+                    is_cliente=cliente_mode,
                 )
                 ordem_seq[0] += 1
                 db.session.add(tarefa)
@@ -1653,8 +1687,8 @@ def aplicar_template(obra_id: int):
         _criar_tarefas(arvore_template, None, data_inicio)
         db.session.commit()
 
-        # Recalcular datas do cronograma
-        recalcular_cronograma(obra_id, admin_id)
+        # Recalcular datas do cronograma (no mesmo modo)
+        recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
 
         flash(
             f'Template "{tmpl.nome}" aplicado com sucesso! {criadas} tarefa(s) criada(s).',
@@ -1662,10 +1696,10 @@ def aplicar_template(obra_id: int):
         )
     except Exception as e:
         db.session.rollback()
-        logger.error(f"ERRO APLICAR TEMPLATE obra={obra_id} tmpl={template_id}: {e}")
+        logger.error(f"ERRO APLICAR TEMPLATE obra={obra_id} tmpl={template_id} cliente={cliente_mode}: {e}")
         flash(f'Erro ao aplicar template: {str(e)}', 'error')
 
-    return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id))
+    return redirect(url_for('cronograma.cronograma_obra', obra_id=obra_id) + qs)
 
 
 @cronograma_bp.route('/api/templates/<int:template_id>')

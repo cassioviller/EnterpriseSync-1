@@ -138,18 +138,23 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int) -> None:
         tarefa.percentual_concluido = min(100.0, float(ultimo.percentual_realizado or 0))
 
 
-def sincronizar_percentuais_obra(obra_id: int, admin_id: int) -> None:
+def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = False) -> None:
     """
     Sincroniza percentual_concluido de todas as tarefas da obra
     com o último apontamento do RDO, em uma única transação.
     Mais leve que recalcular_cronograma (não toca nas datas).
+
+    `cliente=True` opera apenas em tarefas do cronograma do cliente
+    (TarefaCronograma.is_cliente=True). Tarefas-cliente NÃO recebem sync
+    do RDO (RDO aponta no cronograma interno apenas), então neste modo
+    a função apenas recalcula bottom-up dos pais a partir dos filhos.
     """
     from models import TarefaCronograma, RDOApontamentoCronograma, RDO, db
     from sqlalchemy import func as sqlfunc
 
     tarefas = (
         TarefaCronograma.query
-        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente)
         .all()
     )
     if not tarefas:
@@ -230,7 +235,7 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int) -> None:
         db.session.rollback()
 
 
-def recalcular_cronograma(obra_id: int, admin_id: int) -> bool:
+def recalcular_cronograma(obra_id: int, admin_id: int, cliente: bool = False) -> bool:
     """
     Recalcula as datas de todas as tarefas de uma obra.
 
@@ -253,7 +258,7 @@ def recalcular_cronograma(obra_id: int, admin_id: int) -> bool:
 
         tarefas = (
             TarefaCronograma.query
-            .filter_by(obra_id=obra_id, admin_id=admin_id)
+            .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente)
             .order_by(TarefaCronograma.ordem)
             .all()
         )

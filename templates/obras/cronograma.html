@@ -799,6 +799,9 @@
 <script>
 const OBRA_ID  = {{ obra.id }};
 const URL_BASE = '/cronograma/obra/' + OBRA_ID;
+const MODO_CLIENTE = {{ 'true' if modo_cliente else 'false' }};
+const QS_CLIENTE = MODO_CLIENTE ? '?cliente=1' : '';
+function apiUrl(suffix) { return URL_BASE + suffix + QS_CLIENTE; }
 const DAY_W    = 26;
 
 let tarefas = {{ tarefas_dict | tojson }};
@@ -1044,7 +1047,7 @@ async function salvarCampoQty(tarefaId, qtdStr, un, el) {
       quantidade_total: qtdStr === '' ? null : parseFloat(qtdStr) || null,
       unidade_medida: un || null,
     };
-    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}${QS_CLIENTE}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
@@ -1071,7 +1074,7 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
     else if (campo === 'data_inicio') body[campo] = valor || null;
     else body[campo] = valor === '' ? null : Number(valor);
 
-    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}${QS_CLIENTE}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
@@ -1208,7 +1211,7 @@ async function recalcularTudo(showToast=true) {
   const btn = document.getElementById('btnRecalcular');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>'; }
   try {
-    const res = await fetch(`${URL_BASE}/recalcular`, { method: 'POST' });
+    const res = await fetch(`${URL_BASE}/recalcular${QS_CLIENTE}`, { method: 'POST' });
     const data = await res.json();
     if (data.status === 'ok') {
       tarefas = data.tarefas;
@@ -1418,7 +1421,7 @@ async function salvarNovaTarefa() {
     subatividade_mestre_id:  catId ? parseInt(catId) : null,
   };
   try {
-    const res = await fetch(`${URL_BASE}/tarefa`, {
+    const res = await fetch(`${URL_BASE}/tarefa${QS_CLIENTE}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
@@ -1522,7 +1525,7 @@ async function salvarEditar() {
   if (!body.nome_tarefa) { toast('Nome da tarefa obrigatório', 'warning'); return; }
 
   try {
-    const res = await fetch(`${URL_BASE}/tarefa/${id}`, {
+    const res = await fetch(`${URL_BASE}/tarefa/${id}${QS_CLIENTE}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
@@ -1622,7 +1625,7 @@ function adicionarLinhaTabela(t) {
 async function excluirTarefa(id, nome) {
   if (!confirm(`Excluir a tarefa "${nome}"?\nEsta ação não pode ser desfeita.`)) return;
   try {
-    const res = await fetch(`${URL_BASE}/tarefa/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${URL_BASE}/tarefa/${id}${QS_CLIENTE}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.status === 'ok') {
       document.querySelector(`[data-id="${id}"]`)?.remove();
@@ -1639,7 +1642,7 @@ async function excluirTarefa(id, nome) {
 async function toggleTerceiros(tarefaId, concluido) {
   const perc = concluido ? 100 : 0;
   try {
-    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}${QS_CLIENTE}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ percentual_concluido: perc }),
     });
@@ -1707,7 +1710,7 @@ document.addEventListener('mouseup', async e => {
   const newInicio = d.toISOString().slice(0, 10);
 
   try {
-    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}`, {
+    const res = await fetch(`${URL_BASE}/tarefa/${tarefaId}${QS_CLIENTE}`, {
       method: 'PUT', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ data_inicio: newInicio }),
     });
@@ -1871,7 +1874,7 @@ function initRowDrag() {
     const newOrder = Array.from(tbody.querySelectorAll('.tarefa-row')).map(r => parseInt(r.dataset.id));
 
     try {
-      const res = await fetch(`${URL_BASE}/reordenar`, {
+      const res = await fetch(`${URL_BASE}/reordenar${QS_CLIENTE}`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ ordem: newOrder }),
       });

@@ -72,13 +72,28 @@ def portal_obra(token: str):
     else:
         perc_geral = 0.0
 
-    # Cronograma editável para o cliente (independente do cronograma interno)
-    cronograma_cliente = (
-        CronogramaCliente.query
-        .filter_by(obra_id=obra.id, admin_id=admin_id)
-        .order_by(CronogramaCliente.ordem)
+    # Cronograma do cliente: agora vive em TarefaCronograma com is_cliente=True
+    # (migration #117). Mapeamos os nomes de campo para o formato que o template
+    # do portal espera (percentual_apresentacao / data_inicio_apresentacao /
+    # data_fim_apresentacao) usando SimpleNamespace.
+    from types import SimpleNamespace
+    _tarefas_cliente = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra.id, admin_id=admin_id, is_cliente=True)
+        .order_by(TarefaCronograma.ordem)
         .all()
     )
+    cronograma_cliente = [
+        SimpleNamespace(
+            id=t.id,
+            nome_tarefa=t.nome_tarefa,
+            percentual_apresentacao=t.percentual_concluido or 0.0,
+            data_inicio_apresentacao=t.data_inicio,
+            data_fim_apresentacao=t.data_fim,
+            ordem=t.ordem,
+        )
+        for t in _tarefas_cliente
+    ]
 
     compras_pendentes = (
         PedidoCompra.query
