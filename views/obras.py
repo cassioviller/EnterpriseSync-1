@@ -1600,6 +1600,145 @@ def detalhes_obra(id):
         except Exception:
             cronograma_cliente_items = []
 
+        # ─────────────────────────────────────────────────────────────────
+        # PAINEL ESTRATÉGICO DA OBRA
+        # Gráfico de barras (Contrato x Medido x Custo) + 3 indicadores semáforo
+        # Calculado SEMPRE acumulado (sem filtro de período)
+        # ─────────────────────────────────────────────────────────────────
+        from sqlalchemy import func as _sqlfunc, and_, not_, exists
+        from datetime import date as _date
+
+        painel = {
+            'valor_contrato': 0.0,
+            'valor_medido': 0.0,
+            'custo_acumulado': 0.0,
+            'saldo': 0.0,
+            'tem_dados_financeiros': False,
+            'prazo': {'status': 'sem_dados', 'label': 'Sem cronograma', 'qtd': 0},
+            'compras': {'status': 'sem_dados', 'label': 'Sem compras', 'qtd': 0},
+            'medicao_pronta': {'status': 'sem_dados', 'label': 'Sem medição pendente', 'valor': 0.0, 'qtd': 0},
+        }
+
+        try:
+            # 1. Valor do contrato
+            painel['valor_contrato'] = float(obra.valor_contrato or 0)
+
+            # 2. Valor medido acumulado (todas as medições da obra, qualquer status)
+            from models import MedicaoObra
+            medido_total = db.session.query(
+                _sqlfunc.coalesce(_sqlfunc.sum(MedicaoObra.valor_medido), 0)
+            ).filter(MedicaoObra.obra_id == obra_id).scalar()
+            painel['valor_medido'] = float(medido_total or 0)
+
+            # 3. Custo acumulado (GestaoCustoFilho da obra, sem filtro de data)
+            from models import GestaoCustoFilho
+            custo_total = db.session.query(
+                _sqlfunc.coalesce(_sqlfunc.sum(GestaoCustoFilho.valor), 0)
+            ).filter(GestaoCustoFilho.obra_id == obra_id).scalar()
+            painel['custo_acumulado'] = float(custo_total or 0)
+
+            # 4. Saldo = medido - custo
+            painel['saldo'] = painel['valor_medido'] - painel['custo_acumulado']
+            painel['tem_dados_financeiros'] = (
+                painel['valor_contrato'] > 0
+                or painel['valor_medido'] > 0
+                or painel['custo_acumulado'] > 0
+            )
+        except Exception as e:
+            logger.error(f"Erro calculando dados financeiros do painel estratégico: {e}")
+            db.session.rollback()
+
+        # 5. Indicador de PRAZO (tarefas-folha atrasadas)
+        try:
+            from models import TarefaCronograma
+            hoje = _date.today()
+            # Tarefa-folha: nenhuma outra tarefa tem tarefa_pai_id = self.id
+            TarefaFilha = db.aliased(TarefaCronograma)
+            subq_tem_filha = exists().where(
+                and_(
+                    TarefaFilha.tarefa_pai_id == TarefaCronograma.id,
+                    TarefaFilha.obra_id == obra_id,
+                )
+            )
+
+            # Total de tarefas-folha
+            total_folhas = db.session.query(_sqlfunc.count(TarefaCronograma.id)).filter(
+                TarefaCronograma.obra_id == obra_id,
+                not_(subq_tem_filha)
+            ).scalar() or 0
+
+            # Atrasadas: data_fim < hoje e percentual_concluido < 100
+            atrasadas = db.session.query(_sqlfunc.count(TarefaCronograma.id)).filter(
+                TarefaCronograma.obra_id == obra_id,
+                TarefaCronograma.data_fim != None,  # noqa: E711
+                TarefaCronograma.data_fim < hoje,
+                _sqlfunc.coalesce(TarefaCronograma.percentual_concluido, 0) < 100,
+                not_(subq_tem_filha)
+            ).scalar() or 0
+
+            if total_folhas == 0:
+                painel['prazo'] = {'status': 'sem_dados', 'label': 'Sem cronograma cadastrado', 'qtd': 0}
+            elif atrasadas == 0:
+                painel['prazo'] = {'status': 'verde', 'label': 'No prazo', 'qtd': 0}
+            elif atrasadas <= 2:
+                painel['prazo'] = {'status': 'amarelo', 'label': f'{atrasadas} tarefa(s) atrasada(s)', 'qtd': atrasadas}
+            else:
+                painel['prazo'] = {'status': 'vermelho', 'label': f'Crítico: {atrasadas} tarefas vencidas', 'qtd': atrasadas}
+        except Exception as e:
+            logger.error(f"Erro calculando indicador de prazo: {e}")
+            db.session.rollback()
+
+        # 6. Indicador de COMPRAS pendentes de aprovação do cliente
+        try:
+            qtd_compras_pend = db.session.query(_sqlfunc.count(PedidoCompra.id)).filter(
+                PedidoCompra.obra_id == obra_id,
+                PedidoCompra.status_aprovacao_cliente == 'PENDENTE'
+            ).scalar() or 0
+
+            qtd_compras_total = db.session.query(_sqlfunc.count(PedidoCompra.id)).filter(
+                PedidoCompra.obra_id == obra_id
+            ).scalar() or 0
+
+            if qtd_compras_total == 0:
+                painel['compras'] = {'status': 'sem_dados', 'label': 'Sem compras cadastradas', 'qtd': 0}
+            elif qtd_compras_pend == 0:
+                painel['compras'] = {'status': 'verde', 'label': 'Sem pendência', 'qtd': 0}
+            elif qtd_compras_pend <= 2:
+                painel['compras'] = {'status': 'amarelo', 'label': f'{qtd_compras_pend} compra(s) aguardando cliente', 'qtd': qtd_compras_pend}
+            else:
+                painel['compras'] = {'status': 'vermelho', 'label': f'{qtd_compras_pend} compras aguardando cliente', 'qtd': qtd_compras_pend}
+        except Exception as e:
+            logger.error(f"Erro calculando indicador de compras: {e}")
+            db.session.rollback()
+
+        # 7. Indicador de MEDIÇÃO PRONTA para faturamento
+        try:
+            from models import MedicaoObra as _MedicaoObra
+            medicoes_pendentes = _MedicaoObra.query.filter(
+                _MedicaoObra.obra_id == obra_id,
+                _MedicaoObra.status == 'PENDENTE'
+            ).all()
+
+            valor_pronto = sum(float(m.valor_a_faturar_periodo or m.valor_medido or 0) for m in medicoes_pendentes)
+            qtd_pend = len(medicoes_pendentes)
+
+            qtd_med_total = _MedicaoObra.query.filter(_MedicaoObra.obra_id == obra_id).count()
+
+            if qtd_med_total == 0:
+                painel['medicao_pronta'] = {'status': 'sem_dados', 'label': 'Sem medições geradas', 'valor': 0.0, 'qtd': 0}
+            elif qtd_pend == 0:
+                painel['medicao_pronta'] = {'status': 'verde', 'label': 'Tudo faturado', 'valor': 0.0, 'qtd': 0}
+            else:
+                painel['medicao_pronta'] = {
+                    'status': 'amarelo',
+                    'label': f'{qtd_pend} medição(ões) pronta(s)',
+                    'valor': valor_pronto,
+                    'qtd': qtd_pend,
+                }
+        except Exception as e:
+            logger.error(f"Erro calculando indicador de medição: {e}")
+            db.session.rollback()
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              kpis=kpis_obra,
@@ -1623,7 +1762,8 @@ def detalhes_obra(id):
                              fornecedores_lista=fornecedores_lista,
                              mapas_concorrencia=mapas_concorrencia,
                              mapas_v2=mapas_v2,
-                             cronograma_cliente_items=cronograma_cliente_items)
+                             cronograma_cliente_items=cronograma_cliente_items,
+                             painel=painel)
     except Exception as e:
         import traceback
         error_traceback = traceback.format_exc()
