@@ -1,0 +1,135 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ sub.nome }} - Subempreiteiro{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-1"><i class="fas fa-hammer text-primary me-2"></i>{{ sub.nome }}</h1>
+            <div class="text-muted small">
+                {{ sub.especialidade or 'Sem especialidade' }} • CNPJ: {{ sub.cnpj or '—' }}
+                {% if not sub.ativo %}<span class="badge bg-secondary ms-2">Inativo</span>{% endif %}
+            </div>
+        </div>
+        <div>
+            <a href="{{ url_for('subempreiteiros.editar', sub_id=sub.id) }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i> Editar</a>
+            <a href="{{ url_for('subempreiteiros.listar') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary"><div class="card-body">
+                <div class="text-muted small">Apontamentos</div>
+                <div class="h3 mb-0">{{ indicadores.n_apontamentos }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info"><div class="card-body">
+                <div class="text-muted small">Tarefas atendidas</div>
+                <div class="h3 mb-0">{{ indicadores.n_tarefas }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success"><div class="card-body">
+                <div class="text-muted small">Homem-hora total</div>
+                <div class="h3 mb-0">{{ '%.1f'|format(indicadores.hh_total) }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning"><div class="card-body">
+                <div class="text-muted small">Produtividade média (qtd/HH)</div>
+                <div class="h3 mb-0">{{ '%.3f'|format(indicadores.produtividade_media) }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card"><div class="card-body">
+                <div class="text-muted small">Custo total lançado</div>
+                <div class="h4 mb-0">R$ {{ '{:,.2f}'.format(indicadores.custo_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card"><div class="card-body">
+                <div class="text-muted small">Custo médio por unidade</div>
+                <div class="h4 mb-0">R$ {{ '{:,.2f}'.format(indicadores.custo_unitario_medio).replace(',', 'X').replace('.', ',').replace('X', '.') }}</div>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card"><div class="card-body">
+                <div class="text-muted small">Última obra</div>
+                <div class="h6 mb-0">{{ indicadores.ultima_obra or '—' }}</div>
+                <div class="small text-muted">{{ indicadores.ultima_data.strftime('%d/%m/%Y') if indicadores.ultima_data else '' }}</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><i class="fas fa-history me-1"></i> Histórico de produção (últimos 200)</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>RDO</th>
+                        <th>Obra</th>
+                        <th>Tarefa</th>
+                        <th class="text-end">Pessoas</th>
+                        <th class="text-end">Horas</th>
+                        <th class="text-end">Quantidade</th>
+                        <th class="text-end">HH</th>
+                        <th class="text-end">Produt. (qtd/HH)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for apt, data, num, obra_nome, nome_tarefa, unidade in historico %}
+                    <tr>
+                        <td>{{ data.strftime('%d/%m/%Y') if data else '-' }}</td>
+                        <td>{{ num or '-' }}</td>
+                        <td>{{ obra_nome }}</td>
+                        <td>{{ nome_tarefa }}</td>
+                        <td class="text-end">{{ apt.qtd_pessoas }}</td>
+                        <td class="text-end">{{ '%.1f'|format(apt.horas_trabalhadas or 0) }}</td>
+                        <td class="text-end">{{ '%.2f'|format(apt.quantidade_produzida or 0) }} {{ unidade or '' }}</td>
+                        <td class="text-end">{{ '%.1f'|format((apt.qtd_pessoas or 0) * (apt.horas_trabalhadas or 0)) }}</td>
+                        <td class="text-end">{{ '%.3f'|format(apt.homem_hora or 0) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="text-center text-muted py-3">Nenhum apontamento registrado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><i class="fas fa-dollar-sign me-1"></i> Custos lançados</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Categoria</th>
+                        <th>Descrição</th>
+                        <th class="text-end">Valor</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in custos %}
+                    <tr>
+                        <td>{{ c.data_lancamento.strftime('%d/%m/%Y') if c.data_lancamento else '-' }}</td>
+                        <td>{{ c.categoria }}</td>
+                        <td>{{ c.descricao or '-' }}</td>
+                        <td class="text-end">R$ {{ '{:,.2f}'.format(c.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                        <td>{{ c.status or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-3">Nenhum custo vinculado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

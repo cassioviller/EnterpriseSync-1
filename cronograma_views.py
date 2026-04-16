@@ -256,7 +256,7 @@ def criar_tarefa(obra_id: int):
     )
 
     responsavel = (data.get('responsavel') or 'empresa').strip().lower()
-    if responsavel not in ('empresa', 'terceiros'):
+    if responsavel not in ('empresa', 'terceiros', 'subempreitada'):
         responsavel = 'empresa'
 
     sub_mestre_id = data.get('subatividade_mestre_id')
@@ -353,7 +353,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
     if 'responsavel' in data:
         resp = str(data['responsavel']).strip().lower()
-        if resp in ('empresa', 'terceiros'):
+        if resp in ('empresa', 'terceiros', 'subempreitada'):
             tarefa.responsavel = resp
 
     if 'percentual_concluido' in data:
@@ -624,9 +624,194 @@ def tarefas_rdo(obra_id: int):
             'quantidade_acumulada': progresso['quantidade_acumulada'],
             'quantidade_executada_hoje': qty_hoje,
             'apontamento_id': apontamento_id,
+            'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
         })
 
     return jsonify({'status': 'ok', 'tarefas': resultado})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUBEMPREITADA — Apontamentos diários (pessoas × horas × quantidade)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/rdo/<int:rdo_id>/apontar-subempreitada', methods=['POST'])
+@login_required
+def apontar_subempreitada(rdo_id: int):
+    """
+    Cria/atualiza um apontamento de equipe de subempreitada para uma tarefa em um RDO.
+    Body JSON: {
+        id (opcional, para update), tarefa_cronograma_id, subempreiteiro_id,
+        qtd_pessoas, horas_trabalhadas, quantidade_produzida, observacoes
+    }
+    Atualiza o percentual da tarefa do cronograma como soma dos apontamentos
+    (homem-empresa + subempreitada).
+    """
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error', 'msg': 'V2 only'}), 403
+
+    from models import RDO, RDOSubempreitadaApontamento, Subempreiteiro
+
+    admin_id = _admin_id()
+    data = request.get_json(silent=True) or {}
+
+    apt_id = data.get('id')
+    tarefa_id = data.get('tarefa_cronograma_id')
+    sub_id = data.get('subempreiteiro_id')
+    qtd_pessoas = int(data.get('qtd_pessoas', 0) or 0)
+    horas = float(data.get('horas_trabalhadas', 0) or 0)
+    qtd_prod = float(data.get('quantidade_produzida', 0) or 0)
+    obs = (data.get('observacoes') or '').strip() or None
+
+    if not tarefa_id or not sub_id:
+        return jsonify({'status': 'error', 'msg': 'tarefa_cronograma_id e subempreiteiro_id obrigatórios'}), 400
+
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+    if not rdo:
+        return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
+
+    tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
+    if not tarefa:
+        return jsonify({'status': 'error', 'msg': 'Tarefa não encontrada'}), 404
+
+    sub = Subempreiteiro.query.filter_by(id=sub_id, admin_id=admin_id).first()
+    if not sub:
+        return jsonify({'status': 'error', 'msg': 'Subempreiteiro não encontrado'}), 404
+
+    if apt_id:
+        apt = RDOSubempreitadaApontamento.query.filter_by(id=apt_id, admin_id=admin_id).first()
+        if not apt:
+            return jsonify({'status': 'error', 'msg': 'Apontamento não encontrado'}), 404
+    else:
+        apt = RDOSubempreitadaApontamento(
+            rdo_id=rdo_id, admin_id=admin_id,
+            tarefa_cronograma_id=tarefa_id, subempreiteiro_id=sub_id,
+        )
+        db.session.add(apt)
+
+    apt.tarefa_cronograma_id = tarefa_id
+    apt.subempreiteiro_id = sub_id
+    apt.qtd_pessoas = qtd_pessoas
+    apt.horas_trabalhadas = horas
+    apt.quantidade_produzida = qtd_prod
+    apt.observacoes = obs
+    apt.calcular_homem_hora()
+
+    db.session.commit()
+
+    # Recalcular percentual da tarefa somando empresa + subempreitada (acumulado por data)
+    _atualizar_percentual_com_subempreitada(tarefa_id, admin_id)
+
+    return jsonify({
+        'status': 'ok',
+        'apontamento': {
+            'id': apt.id,
+            'tarefa_cronograma_id': apt.tarefa_cronograma_id,
+            'subempreiteiro_id': apt.subempreiteiro_id,
+            'subempreiteiro_nome': sub.nome,
+            'qtd_pessoas': apt.qtd_pessoas,
+            'horas_trabalhadas': apt.horas_trabalhadas,
+            'quantidade_produzida': apt.quantidade_produzida,
+            'homem_hora': apt.homem_hora,
+            'observacoes': apt.observacoes,
+        },
+    })
+
+
+@cronograma_bp.route('/rdo/<int:rdo_id>/apontamentos-subempreitada')
+@login_required
+def listar_apontamentos_subempreitada(rdo_id: int):
+    """Lista todos os apontamentos de subempreitada deste RDO."""
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error'}), 403
+
+    from models import RDO, RDOSubempreitadaApontamento, Subempreiteiro
+
+    admin_id = _admin_id()
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+    if not rdo:
+        return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
+
+    rows = (
+        db.session.query(RDOSubempreitadaApontamento, Subempreiteiro)
+        .join(Subempreiteiro, Subempreiteiro.id == RDOSubempreitadaApontamento.subempreiteiro_id)
+        .filter(RDOSubempreitadaApontamento.rdo_id == rdo_id,
+                RDOSubempreitadaApontamento.admin_id == admin_id)
+        .all()
+    )
+
+    return jsonify({
+        'status': 'ok',
+        'apontamentos': [
+            {
+                'id': apt.id,
+                'tarefa_cronograma_id': apt.tarefa_cronograma_id,
+                'subempreiteiro_id': apt.subempreiteiro_id,
+                'subempreiteiro_nome': sub.nome,
+                'qtd_pessoas': apt.qtd_pessoas,
+                'horas_trabalhadas': apt.horas_trabalhadas,
+                'quantidade_produzida': apt.quantidade_produzida,
+                'homem_hora': apt.homem_hora,
+                'observacoes': apt.observacoes,
+            }
+            for apt, sub in rows
+        ],
+    })
+
+
+@cronograma_bp.route('/rdo/apontamento-subempreitada/<int:apt_id>', methods=['DELETE'])
+@login_required
+def excluir_apontamento_subempreitada(apt_id: int):
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error'}), 403
+
+    from models import RDOSubempreitadaApontamento
+
+    admin_id = _admin_id()
+    apt = RDOSubempreitadaApontamento.query.filter_by(id=apt_id, admin_id=admin_id).first()
+    if not apt:
+        return jsonify({'status': 'error', 'msg': 'Não encontrado'}), 404
+
+    tarefa_id = apt.tarefa_cronograma_id
+    db.session.delete(apt)
+    db.session.commit()
+    _atualizar_percentual_com_subempreitada(tarefa_id, admin_id)
+    return jsonify({'status': 'ok'})
+
+
+def _atualizar_percentual_com_subempreitada(tarefa_id: int, admin_id: int):
+    """
+    Recalcula percentual_concluido da tarefa considerando produção total
+    (apontamentos da empresa + apontamentos de subempreitada).
+    """
+    from sqlalchemy import func as sqlfunc
+    from models import RDOSubempreitadaApontamento
+
+    tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
+    if not tarefa:
+        return
+
+    qtd_empresa = (
+        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+        .filter(RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+                RDOApontamentoCronograma.admin_id == admin_id)
+        .scalar()
+    ) or 0.0
+
+    qtd_sub = (
+        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOSubempreitadaApontamento.quantidade_produzida), 0.0))
+        .filter(RDOSubempreitadaApontamento.tarefa_cronograma_id == tarefa_id,
+                RDOSubempreitadaApontamento.admin_id == admin_id)
+        .scalar()
+    ) or 0.0
+
+    qtd_total = float(qtd_empresa) + float(qtd_sub)
+
+    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        tarefa.percentual_concluido = min(100.0, round(qtd_total / tarefa.quantidade_total * 100, 2))
+    db.session.commit()
 
 
 @cronograma_bp.route('/rdo/<int:rdo_id>/apontar', methods=['POST'])

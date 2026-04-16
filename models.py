@@ -4351,6 +4351,8 @@ class GestaoCustoPai(db.Model):
 
     # Novos campos para absorver ContaPagar
     fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
+    # Favorecido alternativo quando categoria=SUBEMPREITADA
+    subempreiteiro_id = db.Column(db.Integer, db.ForeignKey('subempreiteiro.id'), nullable=True)
     forma_pagamento = db.Column(db.String(30), nullable=True)
     # Boleto, PIX, Transferencia, Dinheiro, Cheque
     valor_pago = db.Column(db.Numeric(15, 2), nullable=True)
@@ -4367,6 +4369,7 @@ class GestaoCustoPai(db.Model):
     itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
                             cascade='all, delete-orphan')
     fornecedor = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
+    subempreiteiro = db.relationship('Subempreiteiro', foreign_keys=[subempreiteiro_id], backref='custos_lancados')
     # conta_contabil: sem relationship ORM pois não há FK DB-level (veja nota acima).
     # Consultar PlanoContas.query.filter_by(codigo=self.conta_contabil_codigo) quando necessário.
 
@@ -4740,3 +4743,94 @@ class CronogramaCliente(db.Model):
 
     def __repr__(self):
         return f'<CronogramaCliente #{self.id} obra={self.obra_id} "{self.nome_tarefa}">'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUBEMPREITEIRO — Cadastro, alocação no RDO e custos vinculados (Migration 113)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Subempreiteiro(db.Model):
+    """Equipe terceirizada gerida pela própria empresa, com produtividade mensurável."""
+    __tablename__ = 'subempreiteiro'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    cnpj = db.Column(db.String(20), nullable=True)
+    especialidade = db.Column(db.String(150), nullable=True)
+    contato_responsavel = db.Column(db.String(150), nullable=True)
+    telefone = db.Column(db.String(30), nullable=True)
+    email = db.Column(db.String(150), nullable=True)
+    chave_pix = db.Column(db.String(255), nullable=True)
+    observacoes = db.Column(db.Text, nullable=True)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('cnpj', 'admin_id', name='uk_subempreiteiro_cnpj_admin'),
+        db.Index('idx_subempreiteiro_admin_ativo', 'admin_id', 'ativo'),
+    )
+
+    def __repr__(self):
+        return f'<Subempreiteiro {self.nome}>'
+
+
+class RDOSubempreitadaApontamento(db.Model):
+    """
+    Apontamento diário de uma equipe de subempreitada em uma tarefa do cronograma.
+    Permite múltiplos subempreiteiros por tarefa em um mesmo RDO (várias equipes em paralelo).
+    """
+    __tablename__ = 'rdo_subempreitada_apontamento'
+
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=False)
+    tarefa_cronograma_id = db.Column(
+        db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'), nullable=False
+    )
+    subempreiteiro_id = db.Column(
+        db.Integer, db.ForeignKey('subempreiteiro.id', ondelete='RESTRICT'), nullable=False
+    )
+    qtd_pessoas = db.Column(db.Integer, nullable=False, default=0)
+    horas_trabalhadas = db.Column(db.Float, nullable=False, default=0.0)
+    quantidade_produzida = db.Column(db.Float, nullable=False, default=0.0)
+    homem_hora = db.Column(db.Float, nullable=True)  # qtd / (pessoas * horas)
+    observacoes = db.Column(db.Text, nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    rdo = db.relationship(
+        'RDO', backref=db.backref('subempreitada_apontamentos', cascade='all, delete-orphan')
+    )
+    tarefa = db.relationship('TarefaCronograma', backref='subempreitada_apontamentos')
+    subempreiteiro = db.relationship('Subempreiteiro', backref='apontamentos_rdo')
+
+    __table_args__ = (
+        db.Index('idx_rdo_sub_apontamento_rdo', 'rdo_id'),
+        db.Index('idx_rdo_sub_apontamento_tarefa', 'tarefa_cronograma_id'),
+        db.Index('idx_rdo_sub_apontamento_sub', 'subempreiteiro_id'),
+    )
+
+    def calcular_homem_hora(self):
+        try:
+            denom = (self.qtd_pessoas or 0) * (self.horas_trabalhadas or 0)
+            if denom > 0:
+                self.homem_hora = round(float(self.quantidade_produzida or 0) / denom, 4)
+            else:
+                self.homem_hora = None
+        except Exception:
+            self.homem_hora = None
+        return self.homem_hora
+
+    def __repr__(self):
+        return (
+            f'<RDOSubempreitadaApontamento rdo={self.rdo_id} '
+            f'tarefa={self.tarefa_cronograma_id} sub={self.subempreiteiro_id}>'
+        )
+
+
+@_sa_event.listens_for(RDOSubempreitadaApontamento, 'before_insert')
+@_sa_event.listens_for(RDOSubempreitadaApontamento, 'before_update')
+def _auto_calc_homem_hora(mapper, connection, target):
+    target.calcular_homem_hora()

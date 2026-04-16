@@ -357,6 +357,95 @@
                     <div id="cronogramaTarefasEdit"></div>
                 </div>
             </div>
+
+            <!-- ===== SUBEMPREITADA: Apontamento Diário ===== -->
+            <div class="rdo-card slide-in d-none" id="cardSubempreitadaEdit">
+                <div class="rdo-card-header" style="background:linear-gradient(135deg,#7e3ff2 0%,#5b29b8 100%);color:#fff;">
+                    <h3 style="color:#fff;">
+                        <i class="fas fa-hammer"></i>
+                        Subempreitada — Produção do Dia
+                        <span class="badge bg-light text-dark ms-2" style="font-size:.65rem">V2</span>
+                    </h3>
+                    <button type="button" class="btn btn-sm btn-light" onclick="abrirNovoSubempreitada()">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+                <div class="rdo-card-body p-0">
+                    <div id="subempreitadaEmptyEdit" class="text-center p-4 text-muted">
+                        <i class="fas fa-hammer fa-2x mb-2 opacity-50"></i><br>
+                        Nenhum apontamento de subempreitada para este RDO.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 d-none" id="tabelaSubempreitadaEdit">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tarefa</th>
+                                    <th>Subempreiteiro</th>
+                                    <th class="text-end">Pessoas</th>
+                                    <th class="text-end">Horas</th>
+                                    <th class="text-end">Quantidade</th>
+                                    <th class="text-end">HH</th>
+                                    <th class="text-end">Produt.</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodySubempreitadaEdit"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Modal: Apontamento de Subempreitada ── -->
+            <div class="modal fade" id="modalSubempreitada" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg">
+                  <div class="modal-header text-white" style="background:linear-gradient(135deg,#7e3ff2 0%,#5b29b8 100%)">
+                    <h5 class="modal-title"><i class="fas fa-hammer me-2"></i>Apontamento de Subempreitada</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <input type="hidden" id="sub_apt_id">
+                    <div class="row g-3">
+                      <div class="col-md-12">
+                        <label class="form-label">Tarefa do cronograma <span class="text-danger">*</span></label>
+                        <select id="sub_tarefa_id" class="form-select" required></select>
+                        <div class="form-text">Apenas tarefas com responsável "Subempreitada" são listadas.</div>
+                      </div>
+                      <div class="col-md-12">
+                        <label class="form-label">Subempreiteiro <span class="text-danger">*</span></label>
+                        <select id="sub_subempreiteiro_id" class="form-select" required></select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label">Pessoas</label>
+                        <input type="number" id="sub_qtd_pessoas" class="form-control" min="0" value="0" oninput="recalcSubHH()">
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label">Horas</label>
+                        <input type="number" id="sub_horas" class="form-control" min="0" step="0.5" value="0" oninput="recalcSubHH()">
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label">Quantidade produzida</label>
+                        <input type="number" id="sub_qtd_prod" class="form-control" min="0" step="any" value="0" oninput="recalcSubHH()">
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label">Produt. (qtd/HH)</label>
+                        <input type="text" id="sub_hh_calc" class="form-control" readonly value="—">
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label">Observações</label>
+                        <textarea id="sub_obs" class="form-control" rows="2"></textarea>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" style="background:#7e3ff2;border-color:#7e3ff2" onclick="salvarSubempreitada()">
+                      <i class="fas fa-save"></i> Salvar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
             {% endif %}
 
             <!-- Seção de Serviços e Atividades -->
@@ -1378,7 +1467,14 @@ async function carregarTarefasRDOEdit() {
             empty?.classList.remove('d-none');
             return;
         }
-        renderizarTarefasEdit(json.tarefas);
+        window.__tarefasRDOAll = json.tarefas;
+        const tarefasEmpresa = json.tarefas.filter(t => (t.responsavel || 'empresa') !== 'subempreitada');
+        const temSub = json.tarefas.some(t => (t.responsavel || '') === 'subempreitada');
+        const cardSub = document.getElementById('cardSubempreitadaEdit');
+        if (cardSub) cardSub.classList.toggle('d-none', !temSub);
+        if (temSub) { carregarSubempreitadaList(); carregarSubempreiteirosCombo(); }
+        if (!tarefasEmpresa.length) empty?.classList.remove('d-none');
+        renderizarTarefasEdit(tarefasEmpresa);
     } catch(e) {
         loading?.classList.add('d-none');
         empty?.classList.remove('d-none');
@@ -1501,6 +1597,135 @@ async function salvarApontamentoEdit(tarefaId) {
     } catch(e) {
         alert('Erro de rede ao salvar apontamento');
     }
+}
+
+// ── Subempreitada — apontamento de produção ────────────────────────────────
+let _subCacheLista = [];
+
+async function carregarSubempreiteirosCombo() {
+    try {
+        const r = await fetch('/subempreiteiros/api/lista');
+        const j = await r.json();
+        if (j.status === 'ok') _subCacheLista = j.subempreiteiros || [];
+    } catch (e) { console.error(e); }
+}
+
+async function carregarSubempreitadaList() {
+    try {
+        const r = await fetch(`/cronograma/rdo/${rdoId}/apontamentos-subempreitada`);
+        const j = await r.json();
+        if (j.status !== 'ok') return;
+        const tbody = document.getElementById('bodySubempreitadaEdit');
+        const empty = document.getElementById('subempreitadaEmptyEdit');
+        const tabela = document.getElementById('tabelaSubempreitadaEdit');
+        const tarefasMap = {};
+        (window.__tarefasRDOAll || []).forEach(t => tarefasMap[t.id] = t);
+        const apts = j.apontamentos || [];
+        if (!apts.length) {
+            empty?.classList.remove('d-none');
+            tabela?.classList.add('d-none');
+            tbody.innerHTML = '';
+            return;
+        }
+        empty?.classList.add('d-none');
+        tabela?.classList.remove('d-none');
+        tbody.innerHTML = apts.map(a => {
+            const t = tarefasMap[a.tarefa_cronograma_id] || {};
+            const hh = (a.qtd_pessoas || 0) * (a.horas_trabalhadas || 0);
+            const prod = hh > 0 ? ((a.quantidade_produzida || 0) / hh).toFixed(3) : '—';
+            return `<tr>
+                <td><small>${t.nome_tarefa || '—'}</small></td>
+                <td>${a.subempreiteiro_nome}</td>
+                <td class="text-end">${a.qtd_pessoas}</td>
+                <td class="text-end">${(a.horas_trabalhadas || 0).toFixed(1)}</td>
+                <td class="text-end">${(a.quantidade_produzida || 0).toFixed(2)} ${t.unidade_medida || ''}</td>
+                <td class="text-end">${hh.toFixed(1)}</td>
+                <td class="text-end">${prod}</td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick='editarSubempreitada(${JSON.stringify(a)})'><i class="fas fa-edit"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirSubempreitada(${a.id})"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) { console.error(e); }
+}
+
+function _popularSubModalCombos() {
+    const tarefas = (window.__tarefasRDOAll || []).filter(t => (t.responsavel || '') === 'subempreitada');
+    const selT = document.getElementById('sub_tarefa_id');
+    selT.innerHTML = '<option value="">— Selecione —</option>' +
+        tarefas.map(t => `<option value="${t.id}">${t.nome_tarefa} ${t.unidade_medida ? '('+t.unidade_medida+')' : ''}</option>`).join('');
+    const selS = document.getElementById('sub_subempreiteiro_id');
+    selS.innerHTML = '<option value="">— Selecione —</option>' +
+        _subCacheLista.map(s => `<option value="${s.id}">${s.nome}${s.especialidade ? ' — '+s.especialidade : ''}</option>`).join('');
+}
+
+function abrirNovoSubempreitada() {
+    _popularSubModalCombos();
+    document.getElementById('sub_apt_id').value = '';
+    document.getElementById('sub_qtd_pessoas').value = 0;
+    document.getElementById('sub_horas').value = 0;
+    document.getElementById('sub_qtd_prod').value = 0;
+    document.getElementById('sub_obs').value = '';
+    document.getElementById('sub_hh_calc').value = '—';
+    new bootstrap.Modal(document.getElementById('modalSubempreitada')).show();
+}
+
+function editarSubempreitada(apt) {
+    _popularSubModalCombos();
+    document.getElementById('sub_apt_id').value = apt.id;
+    document.getElementById('sub_tarefa_id').value = apt.tarefa_cronograma_id;
+    document.getElementById('sub_subempreiteiro_id').value = apt.subempreiteiro_id;
+    document.getElementById('sub_qtd_pessoas').value = apt.qtd_pessoas;
+    document.getElementById('sub_horas').value = apt.horas_trabalhadas;
+    document.getElementById('sub_qtd_prod').value = apt.quantidade_produzida;
+    document.getElementById('sub_obs').value = apt.observacoes || '';
+    recalcSubHH();
+    new bootstrap.Modal(document.getElementById('modalSubempreitada')).show();
+}
+
+function recalcSubHH() {
+    const p = parseFloat(document.getElementById('sub_qtd_pessoas').value) || 0;
+    const h = parseFloat(document.getElementById('sub_horas').value) || 0;
+    const q = parseFloat(document.getElementById('sub_qtd_prod').value) || 0;
+    const denom = p * h;
+    document.getElementById('sub_hh_calc').value = denom > 0 ? (q / denom).toFixed(3) : '—';
+}
+
+async function salvarSubempreitada() {
+    const payload = {
+        id: document.getElementById('sub_apt_id').value || null,
+        tarefa_cronograma_id: parseInt(document.getElementById('sub_tarefa_id').value) || null,
+        subempreiteiro_id: parseInt(document.getElementById('sub_subempreiteiro_id').value) || null,
+        qtd_pessoas: parseInt(document.getElementById('sub_qtd_pessoas').value) || 0,
+        horas_trabalhadas: parseFloat(document.getElementById('sub_horas').value) || 0,
+        quantidade_produzida: parseFloat(document.getElementById('sub_qtd_prod').value) || 0,
+        observacoes: document.getElementById('sub_obs').value || ''
+    };
+    if (!payload.tarefa_cronograma_id || !payload.subempreiteiro_id) {
+        alert('Selecione a tarefa e o subempreiteiro.'); return;
+    }
+    try {
+        const r = await fetch(`/cronograma/rdo/${rdoId}/apontar-subempreitada`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const j = await r.json();
+        if (j.status !== 'ok') { alert(j.msg || 'Erro ao salvar'); return; }
+        bootstrap.Modal.getInstance(document.getElementById('modalSubempreitada')).hide();
+        carregarSubempreitadaList();
+    } catch(e) { alert('Erro de rede.'); }
+}
+
+async function excluirSubempreitada(id) {
+    if (!confirm('Excluir este apontamento?')) return;
+    try {
+        const r = await fetch(`/cronograma/rdo/apontamento-subempreitada/${id}`, { method: 'DELETE' });
+        const j = await r.json();
+        if (j.status === 'ok') carregarSubempreitadaList();
+        else alert(j.msg || 'Erro');
+    } catch(e) { alert('Erro de rede.'); }
 }
 {% endif %}
 

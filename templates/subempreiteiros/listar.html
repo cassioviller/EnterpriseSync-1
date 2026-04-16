@@ -1,0 +1,84 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Subempreiteiros{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-hammer text-primary me-2"></i>Subempreiteiros
+        </h1>
+        <a href="{{ url_for('subempreiteiros.criar') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Novo Subempreiteiro
+        </a>
+    </div>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-6">
+            <input type="text" name="busca" class="form-control" placeholder="Buscar por nome, CNPJ ou especialidade..." value="{{ busca or '' }}">
+        </div>
+        <div class="col-md-3 d-flex align-items-center">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="inativos" name="inativos" value="1" {% if mostrar_inativos %}checked{% endif %}>
+                <label class="form-check-label" for="inativos">Mostrar inativos</label>
+            </div>
+        </div>
+        <div class="col-md-3 text-end">
+            <button class="btn btn-outline-primary"><i class="fas fa-search"></i> Filtrar</button>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nome</th>
+                        <th>Especialidade</th>
+                        <th>CNPJ</th>
+                        <th class="text-end">Apontamentos</th>
+                        <th class="text-end">HH Total</th>
+                        <th class="text-end">Produtividade Méd.</th>
+                        <th>Status</th>
+                        <th class="text-end" style="width:200px;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in subs %}
+                    {% set ind = indicadores.get(s.id, {}) %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('subempreiteiros.detalhe', sub_id=s.id) }}" class="fw-semibold text-decoration-none">{{ s.nome }}</a>
+                            {% if ind.ultima_obra %}<div class="small text-muted">Última: {{ ind.ultima_obra }}</div>{% endif %}
+                        </td>
+                        <td>{{ s.especialidade or '-' }}</td>
+                        <td><span class="font-monospace small">{{ s.cnpj or '-' }}</span></td>
+                        <td class="text-end">{{ ind.n_apontamentos or 0 }}</td>
+                        <td class="text-end">{{ '%.1f'|format(ind.hh_total or 0) }}</td>
+                        <td class="text-end">{{ '%.3f'|format(ind.produtividade_media or 0) }}</td>
+                        <td>
+                            {% if s.ativo %}
+                                <span class="badge bg-success">Ativo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('subempreiteiros.detalhe', sub_id=s.id) }}" class="btn btn-sm btn-outline-info" title="Detalhes"><i class="fas fa-chart-line"></i></a>
+                            <a href="{{ url_for('subempreiteiros.editar', sub_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
+                            <form method="post" action="{{ url_for('subempreiteiros.inativar', sub_id=s.id) }}" class="d-inline" onsubmit="return confirm('Confirmar alteração de status?')">
+                                <button class="btn btn-sm btn-outline-{{ 'warning' if s.ativo else 'success' }}" title="{{ 'Inativar' if s.ativo else 'Reativar' }}">
+                                    <i class="fas fa-{{ 'ban' if s.ativo else 'undo' }}"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="text-center text-muted py-4">Nenhum subempreiteiro cadastrado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

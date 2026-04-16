@@ -3813,6 +3813,7 @@ def executar_migracoes():
             (111, "CronogramaCliente — cronograma editável para portal do cliente", migration_111_cronograma_cliente),
             (112, "MapaConcorrenciaV2 — tabela multi-fornecedor com cotações por item", migration_112_mapa_concorrencia_v2),
             (113, "TarefaCronograma — data_entrega_real DATE para entregas/terceiros", migration_113_tarefa_cronograma_data_entrega_real),
+            (114, "Subempreiteiro + RDOSubempreitadaApontamento + GestaoCustoPai.subempreiteiro_id", migration_114_subempreiteiro),
         ]
         
         # Executar cada migração com rastreamento
@@ -9077,6 +9078,101 @@ def migration_113_tarefa_cronograma_data_entrega_real():
 
     except Exception as e:
         logger.error(f"Erro na migracao 113: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        return False
+
+
+def migration_114_subempreiteiro():
+    """
+    Migration 114: cria tabelas `subempreiteiro` e `rdo_subempreitada_apontamento`
+    e adiciona coluna `subempreiteiro_id` em `gestao_custo_pai`.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'subempreiteiro'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE subempreiteiro (
+                    id SERIAL PRIMARY KEY,
+                    nome VARCHAR(200) NOT NULL,
+                    cnpj VARCHAR(20),
+                    especialidade VARCHAR(150),
+                    contato_responsavel VARCHAR(150),
+                    telefone VARCHAR(30),
+                    email VARCHAR(150),
+                    chave_pix VARCHAR(255),
+                    observacoes TEXT,
+                    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW(),
+                    CONSTRAINT uk_subempreiteiro_cnpj_admin UNIQUE (cnpj, admin_id)
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_subempreiteiro_admin_ativo ON subempreiteiro(admin_id, ativo)")
+            logger.info("MIGRACAO 114: tabela subempreiteiro criada")
+        else:
+            logger.info("MIGRACAO 114: subempreiteiro ja existe -- skip")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_name = 'rdo_subempreitada_apontamento'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE rdo_subempreitada_apontamento (
+                    id SERIAL PRIMARY KEY,
+                    rdo_id INTEGER NOT NULL REFERENCES rdo(id) ON DELETE CASCADE,
+                    tarefa_cronograma_id INTEGER NOT NULL REFERENCES tarefa_cronograma(id) ON DELETE CASCADE,
+                    subempreiteiro_id INTEGER NOT NULL REFERENCES subempreiteiro(id) ON DELETE RESTRICT,
+                    qtd_pessoas INTEGER NOT NULL DEFAULT 0,
+                    horas_trabalhadas DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    quantidade_produzida DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    homem_hora DOUBLE PRECISION,
+                    observacoes TEXT,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_rdo_sub_apontamento_rdo ON rdo_subempreitada_apontamento(rdo_id)")
+            cursor.execute("CREATE INDEX idx_rdo_sub_apontamento_tarefa ON rdo_subempreitada_apontamento(tarefa_cronograma_id)")
+            cursor.execute("CREATE INDEX idx_rdo_sub_apontamento_sub ON rdo_subempreitada_apontamento(subempreiteiro_id)")
+            logger.info("MIGRACAO 114: tabela rdo_subempreitada_apontamento criada")
+        else:
+            logger.info("MIGRACAO 114: rdo_subempreitada_apontamento ja existe -- skip")
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_name = 'gestao_custo_pai' AND column_name = 'subempreiteiro_id'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                ALTER TABLE gestao_custo_pai
+                ADD COLUMN subempreiteiro_id INTEGER REFERENCES subempreiteiro(id)
+            """)
+            logger.info("MIGRACAO 114: coluna gestao_custo_pai.subempreiteiro_id adicionada")
+        else:
+            logger.info("MIGRACAO 114: coluna gestao_custo_pai.subempreiteiro_id ja existe -- skip")
+
+        connection.commit()
+        connection.close()
+        logger.info("MIGRACAO 114 CONCLUIDA")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erro na migracao 114: {e}")
         if connection:
             try:
                 connection.rollback()

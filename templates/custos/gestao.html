@@ -35,6 +35,7 @@
   {% macro form_campos(is_edit) %}
     {% set v_cat   = pai.tipo_categoria if is_edit else request.args.get('tipo','') %}
     {% set v_forn  = pai.fornecedor_id  if is_edit else '' %}
+    {% set v_sub   = pai.subempreiteiro_id if is_edit else '' %}
     {% set v_nome  = pai.entidade_nome  if is_edit else '' %}
     {% set v_emis  = pai.data_emissao.strftime('%Y-%m-%d')   if (is_edit and pai.data_emissao)  else '' %}
     {% set v_doc   = pai.numero_documento if is_edit else '' %}
@@ -72,6 +73,31 @@
       </select>
       <div class="form-text">Vincule ao fornecedor ou preencha o nome manualmente abaixo.</div>
     </div>
+
+    <div class="mb-3" id="subempreiteiro-field" style="display:none;">
+      <label class="form-label fw-semibold"><i class="fas fa-hammer me-1"></i> Subempreiteiro</label>
+      <select name="subempreiteiro_id" class="form-select">
+        <option value="">— Selecione —</option>
+        {% for s in (subempreiteiros or []) %}
+        <option value="{{ s.id }}" {% if v_sub == s.id %}selected{% endif %}>{{ s.nome }}{% if s.especialidade %} — {{ s.especialidade }}{% endif %}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Visível apenas para a categoria <strong>Subempreitada</strong>.</div>
+    </div>
+    <script>
+      (function(){
+        function _toggleSub() {
+          var sel = document.querySelector('select[name="tipo_categoria"]');
+          var box = document.getElementById('subempreiteiro-field');
+          if (!sel || !box) return;
+          box.style.display = (sel.value === 'SUBEMPREITADA') ? '' : 'none';
+        }
+        document.addEventListener('DOMContentLoaded', function(){
+          var sel = document.querySelector('select[name="tipo_categoria"]');
+          if (sel) { sel.addEventListener('change', _toggleSub); _toggleSub(); }
+        });
+      })();
+    </script>
 
     <div class="mb-3">
       <label class="form-label fw-semibold">Entidade / Nome *</label>

@@ -220,6 +220,10 @@
                     <span class="badge bg-warning text-dark" style="font-size:.7rem">
                       <i class="fas fa-hard-hat me-1"></i>Terceiros
                     </span>
+                  {% elif resp == 'subempreitada' %}
+                    <span class="badge" style="font-size:.7rem; background-color:#7e3ff2; color:#fff;">
+                      <i class="fas fa-hammer me-1"></i>Subempreitada
+                    </span>
                   {% else %}
                     <span class="badge bg-info text-dark" style="font-size:.7rem">
                       <i class="fas fa-building me-1"></i>Empresa
@@ -381,6 +385,7 @@
             <select id="nt_resp" class="form-select">
               <option value="empresa">🏢 {{ nome_empresa }} (conta na produtividade)</option>
               <option value="terceiros">👷 Terceiros (somente confirmação)</option>
+              <option value="subempreitada">🔨 Subempreitada (equipe terceirizada)</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -467,6 +472,7 @@
         <select id="ed_resp" class="form-select">
           <option value="empresa">🏢 {{ nome_empresa }} (conta na produtividade)</option>
           <option value="terceiros">👷 Terceiros (somente confirmação)</option>
+          <option value="subempreitada">🔨 Subempreitada (equipe terceirizada)</option>
         </select>
       </div>
       <div class="col-6 d-none" id="ed_qtd_row">
@@ -861,7 +867,8 @@ function iniciarEdicao(el, tarefaId, campo) {
     sel.style.cssText = 'width:auto;min-width:120px;font-size:.78rem';
     sel.innerHTML = `
       <option value="empresa"   ${current === 'empresa'   ? 'selected' : ''}>🏢 Empresa</option>
-      <option value="terceiros" ${current === 'terceiros' ? 'selected' : ''}>👷 Terceiros</option>`;
+      <option value="terceiros" ${current === 'terceiros' ? 'selected' : ''}>👷 Terceiros</option>
+      <option value="subempreitada" ${current === 'subempreitada' ? 'selected' : ''}>🔨 Subempreitada</option>`;
     el.innerHTML = '';
     el.appendChild(sel);
     sel.focus();
@@ -1002,6 +1009,9 @@ function restaurarCelula(el, campo, val, tarefaId) {
 function buildRespBadge(resp) {
   if (resp === 'terceiros') {
     return `<span class="badge bg-warning text-dark" style="font-size:.7rem"><i class="fas fa-hard-hat me-1"></i>Terceiros</span>`;
+  }
+  if (resp === 'subempreitada') {
+    return `<span class="badge" style="font-size:.7rem; background-color:#7e3ff2; color:#fff;"><i class="fas fa-hammer me-1"></i>Subempreitada</span>`;
   }
   return `<span class="badge bg-info text-dark" style="font-size:.7rem"><i class="fas fa-building me-1"></i>Empresa</span>`;
 }

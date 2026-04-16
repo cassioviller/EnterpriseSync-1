@@ -194,8 +194,10 @@ def novo():
     if err:
         return err
 
+    from models import Subempreiteiro
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.nome).all()
+    subempreiteiros = Subempreiteiro.query.filter_by(admin_id=admin_id, ativo=True).order_by(Subempreiteiro.nome).all()
     today = date.today().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
@@ -213,6 +215,7 @@ def novo():
             data_venc = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
             numero_doc = request.form.get('numero_documento', '').strip() or None
             fornecedor_id = request.form.get('fornecedor_id', type=int)
+            subempreiteiro_id = request.form.get('subempreiteiro_id', type=int)
             forma_pagamento = request.form.get('forma_pagamento', '').strip() or None
             data_emissao_str = request.form.get('data_emissao', '').strip()
             data_emissao = datetime.strptime(data_emissao_str, '%Y-%m-%d').date() if data_emissao_str else None
@@ -225,6 +228,7 @@ def novo():
                 return render_template('custos/gestao.html',
                                        modo='novo', obras=obras,
                                        fornecedores=fornecedores,
+                                       subempreiteiros=subempreiteiros,
                                        categoria_labels=CATEGORIA_LABELS,
                                        categorias_grupos=CATEGORIAS_GRUPOS,
                                        status_badges=STATUS_BADGES,
@@ -235,6 +239,12 @@ def novo():
                 forn = Fornecedor.query.get(fornecedor_id)
                 if forn and not entidade_nome:
                     entidade_nome = forn.nome
+
+            # Para SUBEMPREITADA, usa o subempreiteiro como fonte do nome
+            if tipo_categoria == 'SUBEMPREITADA' and subempreiteiro_id:
+                sub = Subempreiteiro.query.filter_by(id=subempreiteiro_id, admin_id=admin_id).first()
+                if sub and not entidade_nome:
+                    entidade_nome = sub.nome
 
             pai = GestaoCustoPai(
                 admin_id=admin_id,
@@ -248,6 +258,7 @@ def novo():
                 data_vencimento=data_venc,
                 numero_documento=numero_doc,
                 fornecedor_id=fornecedor_id,
+                subempreiteiro_id=subempreiteiro_id if tipo_categoria == 'SUBEMPREITADA' else None,
                 forma_pagamento=forma_pagamento,
                 data_emissao=data_emissao,
                 numero_parcela=numero_parcela,
@@ -280,6 +291,7 @@ def novo():
         modo='novo',
         obras=obras,
         fornecedores=fornecedores,
+        subempreiteiros=subempreiteiros,
         today=today,
         categoria_labels=CATEGORIA_LABELS,
         categorias_grupos=CATEGORIAS_GRUPOS,
@@ -639,8 +651,10 @@ def editar(pai_id):
         flash('Apenas registros PENDENTES ou RECUSADOS podem ser editados.', 'warning')
         return redirect(url_for('gestao_custos.index'))
 
+    from models import Subempreiteiro
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.nome).all()
+    subempreiteiros = Subempreiteiro.query.filter_by(admin_id=admin_id, ativo=True).order_by(Subempreiteiro.nome).all()
 
     # Filho principal (o primeiro, se existir)
     filho_principal = GestaoCustoFilho.query.filter_by(pai_id=pai.id).order_by(
@@ -656,6 +670,7 @@ def editar(pai_id):
             data_venc       = datetime.strptime(data_venc_str, '%Y-%m-%d').date() if data_venc_str else None
             numero_doc      = request.form.get('numero_documento', '').strip() or None
             fornecedor_id   = request.form.get('fornecedor_id', type=int)
+            subempreiteiro_id = request.form.get('subempreiteiro_id', type=int)
             forma_pagamento = request.form.get('forma_pagamento', '').strip() or None
             data_emissao_str= request.form.get('data_emissao', '').strip()
             data_emissao    = datetime.strptime(data_emissao_str, '%Y-%m-%d').date() if data_emissao_str else None
@@ -680,6 +695,7 @@ def editar(pai_id):
                 pai.data_vencimento      = data_venc
                 pai.numero_documento     = numero_doc
                 pai.fornecedor_id        = fornecedor_id
+                pai.subempreiteiro_id    = subempreiteiro_id if tipo_categoria == 'SUBEMPREITADA' else None
                 pai.forma_pagamento      = forma_pagamento
                 pai.data_emissao         = data_emissao
                 pai.numero_parcela       = numero_parcela
@@ -720,6 +736,7 @@ def editar(pai_id):
         filho=filho_principal,
         obras=obras,
         fornecedores=fornecedores,
+        subempreiteiros=subempreiteiros,
         today=date.today().strftime('%Y-%m-%d'),
         categoria_labels=CATEGORIA_LABELS,
         categorias_grupos=CATEGORIAS_GRUPOS,

@@ -568,6 +568,16 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}")
 
+    # Registrar blueprint SUBEMPREITEIROS (Task 57)
+    try:
+        from subempreiteiros_views import subempreiteiros_bp
+        app.register_blueprint(subempreiteiros_bp)
+        logging.info("[OK] Blueprint SUBEMPREITEIROS registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint SUBEMPREITEIROS não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint SUBEMPREITEIROS: {e}")
+
     # Registrar blueprint REEMBOLSOS V2
     try:
         from reembolso_views import reembolso_bp

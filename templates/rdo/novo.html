@@ -342,6 +342,12 @@
             </div>
         </div>
 
+        <!-- Subempreitada: disponível na edição do RDO (após salvar) -->
+        <div class="alert alert-secondary small mb-3 d-none" id="avisoSubempreitada">
+          <i class="fas fa-info-circle me-1"></i>
+          Após salvar este RDO, abra-o em modo edição para apontar a produção das equipes de subempreitada.
+        </div>
+
         <!-- ── Modal: Equipe por Atividade (Cronograma V2) ── -->
         <div class="modal fade" id="modalEquipeTarefa" tabindex="-1" aria-labelledby="modalEquipeTarefaLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -1212,7 +1218,14 @@ async function carregarTarefasRDO() {
         }
 
         rdoV2TarefasCache = json.tarefas;
-        renderizarTarefasRDO(json.tarefas);
+        const tarefasEmpresa = json.tarefas.filter(t => (t.responsavel || 'empresa') !== 'subempreitada');
+        const temSubempreitada = json.tarefas.some(t => (t.responsavel || '') === 'subempreitada');
+        const aviso = document.getElementById('avisoSubempreitada');
+        if (aviso) aviso.classList.toggle('d-none', !temSubempreitada);
+        if (!tarefasEmpresa.length) {
+            empty?.classList.remove('d-none');
+        }
+        renderizarTarefasRDO(tarefasEmpresa);
         _carregarFuncCache(); // pré-carregar cache para o modal
     } catch(e) {
         loading?.classList.add('d-none');
