@@ -41,6 +41,9 @@ CATEGORIA_LABELS = {
     'DESPESA_FINANCEIRA': ('Despesa Financeira',       'fas fa-percentage',          'dark'),
     'OUTROS':             ('Outros',                   'fas fa-receipt',             'secondary'),
     'RETIRADA_SOCIOS':    ('Retirada de Sócios',       'fas fa-hand-holding-usd',    'danger'),
+    # ── Faturamento Direto (compra repassada ao cliente — não vira obrigação financeira) ──
+    'FATURAMENTO_DIRETO': ('Faturamento Direto',       'fas fa-file-invoice',        'success'),
+    'COMPRA_FATURADA':    ('Compra Faturada',          'fas fa-file-invoice',        'success'),
     # ── Categorias legadas (retrocompatibilidade — lidas mas não oferecidas no dropdown) ──
     'SALARIO':            ('Pagamento Salário (legado)','fas fa-user-tie',           'primary'),
     'VEICULO':            ('Despesa de Frota (legado)', 'fas fa-truck',              'dark'),

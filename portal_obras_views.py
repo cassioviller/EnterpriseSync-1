@@ -83,8 +83,10 @@ def portal_obra(token: str):
     compras_pendentes = (
         PedidoCompra.query
         .filter_by(obra_id=obra.id, admin_id=admin_id)
+        .filter(PedidoCompra.tipo_compra == 'aprovacao_cliente')
         .filter(
             db.or_(
+                PedidoCompra.status_aprovacao_cliente == 'AGUARDANDO_APROVACAO_CLIENTE',
                 PedidoCompra.status_aprovacao_cliente == 'PENDENTE',
                 PedidoCompra.status_aprovacao_cliente.is_(None),
             )
