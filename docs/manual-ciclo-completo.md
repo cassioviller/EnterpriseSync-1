@@ -139,6 +139,48 @@ fases do ciclo financeiro novo:
 > `OBR-MED-00398` evoluiu PENDENTE@500 → PENDENTE@1000 → PARCIAL@700 →
 > QUITADA@0 sem nunca duplicar.
 
+## E2E Orçamento + Proposta (`tests/test_e2e_orcamento_proposta.py`)
+
+Bateria nova introduzida pela Task #95: **35 PASS / 0 FAIL**. Roda em
+`python tests/test_e2e_orcamento_proposta.py` e cobre o ciclo do
+catálogo paramétrico até a aprovação da proposta — pega o trecho que o
+ciclo Proposta→CR (acima) **não** cobre, porque aquele só começa
+depois da aprovação.
+
+1. **Setup catálogo paramétrico** — cria `Insumo` (mão de obra +
+   material), `PrecoBaseInsumo`, `Servico` (8% imposto + 12% lucro) e
+   duas `ComposicaoServico`. Valida `custo_unitario=R$ 90,00` e
+   `preco_venda=R$ 112,50`. Quando `imposto+lucro ≥ 100%`, o cálculo
+   sinaliza `erro` e zera o preço (proteção contra divisão por zero).
+2. **Proposta rascunho com explosão de insumos** — chama
+   `explodir_servico_para_quantidade(svc, 10)` e grava o `PropostaItem`
+   com `servico_id`, `quantidade_medida=10`, `custo_unitario=90.0000`,
+   `lucro_unitario=22.5000` e `subtotal=R$ 1.125,00`.
+3. **Recálculo do Servico** — `recalcular_servico_preco(svc)` persiste
+   `Servico.preco_venda_unitario`; o `PropostaItem` antigo **não** é
+   alterado.
+4. **Snapshot imutável** — encerra os `PrecoBaseInsumo` antigos (com
+   `vigencia_fim`), insere preços novos vigentes, recalcula o serviço
+   (custo sobe para R$ 180 / preço para R$ 225) e confirma que o
+   `PropostaItem` original mantém custo R$ 90 / subtotal R$ 1.125. É a
+   regra de negócio do orçamento paramétrico: o que valeu na hora da
+   proposta vira foto.
+5. **Transição rascunho → enviada + portal** — muda o status da
+   proposta para `enviada`, popula `data_envio` e valida que
+   `GET /propostas/cliente/<token>` responde **200**. Token inválido
+   não resolve para nenhuma `Proposta`.
+6. **Aprovação portal cliente + isolamento multi-tenant** —
+   `POST /propostas/cliente/<token>/aprovar` retorna 302; o status vira
+   `APROVADA`, `convertida_em_obra=True`, `obra_id` populado, a `Obra`
+   nasce com `OBRxxxx` e `token_cliente`, o `ItemMedicaoComercial` é
+   propagado 1:1 herdando o `servico_id` do catálogo. Outro `admin_id`
+   consultando a mesma proposta recebe `None` — sem leak entre tenants.
+
+> **Resultado real do último run**: proposta `P-E2E95-…`, `Servico`
+> id=360, `Obra` id=404 com código `OBR0007`. Snapshot do `PropostaItem`
+> resistiu à mudança de preço do insumo (`custo=R$ 90,00` enquanto o
+> `Servico` foi para `R$ 225,00`).
+
 ### Bug regressivo descoberto e corrigido pelo teste
 
 O e2e UI inicial expôs uma `IntegrityError` em

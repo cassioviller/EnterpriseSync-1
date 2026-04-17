@@ -92,6 +92,27 @@ um registro pré-existente. A correção em
 inserir. Confirmado: na execução do e2e backend foi gerado `OBR0005`
 sem colisão.
 
+### E2E Orçamento + Proposta (2026-04-17, Task #95)
+
+Arquivo: `tests/test_e2e_orcamento_proposta.py`. Resultado:
+**35/35 PASS, 0 FAIL**. Cobre o ciclo orçamento paramétrico → proposta
+de ponta a ponta, complementando o `test_ciclo_proposta_obra_medido_cr`
+que começa só na aprovação:
+
+| Fase | O que valida | Resultado |
+| --- | --- | --- |
+| 1. Catálogo paramétrico | Cria `Insumo` (MAO_OBRA + MATERIAL) com `PrecoBaseInsumo`, `Servico` 8% imposto + 12% lucro e duas `ComposicaoServico`. `calcular_precos_servico` retorna `custo=R$ 90,00` e `preco_venda=R$ 112,50`. Imposto+lucro≥100% sinaliza `erro` e zera o preço. | ✔ |
+| 2. Proposta rascunho com explosão | `explodir_servico_para_quantidade(svc, 10)` devolve `subtotal=R$ 1.125,00`. `PropostaItem` salvo carrega `servico_id`, `quantidade_medida=10`, `custo_unitario=90.0000`, `lucro_unitario=22.5000`, `subtotal=R$ 1.125,00`. | ✔ |
+| 3. Recálculo via serviço | `recalcular_servico_preco(svc)` persiste `Servico.preco_venda_unitario=R$ 112,50`. O `PropostaItem` original mantém `custo_unitario` e `subtotal` originais. | ✔ |
+| 4. Snapshot imutável | `PrecoBaseInsumo` antigos recebem `vigencia_fim`; novos preços vigentes elevam custo para `R$ 180,00` e preço para `R$ 225,00` no `Servico`. O `PropostaItem` da proposta antiga **continua** com `custo=90.0000` e `subtotal=1125,00`. | ✔ |
+| 5. Transição rascunho → enviada | `proposta.status='enviada'` + `data_envio` setada. `GET /propostas/cliente/<token>` responde **200**. Token inválido não resolve para nenhuma `Proposta`. | ✔ |
+| 6. Aprovação portal + multi-tenant | `POST /propostas/cliente/<token>/aprovar` → 302; status vira `APROVADA`, `convertida_em_obra=True`, `obra_id` populado, `Obra` criada com código `OBRxxxx` e `token_cliente`, `ItemMedicaoComercial` propagado 1:1 com `servico_id` herdado do catálogo. Outro `admin_id` consultando `Proposta.query.filter_by(id=…, admin_id=outro)` recebe `None` (sem leak entre tenants). | ✔ |
+
+> **Resultado real do último run**: proposta `P-E2E95-739723-1254`,
+> `Servico` id=360, `Obra` id=404 com código `OBR0007`. Snapshot do
+> `PropostaItem` resistiu à mudança de preço do insumo
+> (custo `R$ 90,00` enquanto o `Servico` foi para `R$ 225,00`).
+
 ## Itens deixados como follow-up (não bloqueantes)
 
 - Sub #9: indicador "Medido / Recebido / A receber" no painel da obra
