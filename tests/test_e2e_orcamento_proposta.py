@@ -282,6 +282,28 @@ def main():
             ).first()
             check(leak is None,
                   f"admin {outro_admin_id} NÃO enxerga proposta de admin {admin_id} (sem leak)")
+
+            # Authz HTTP-level: outro_admin logado tenta GET /propostas/<id>
+            # Deve receber 302 (redirect com flash) — visualizar() captura
+            # NotFound de first_or_404 e redireciona para propostas.index.
+            # O importante: não pode devolver 200 com os dados.
+            from models import Usuario as _U
+            u_outro = _U.query.filter(
+                ((_U.id == outro_admin_id) | (_U.admin_id == outro_admin_id))
+                & (_U.ativo == True)  # noqa: E712
+            ).first()
+            if u_outro:
+                with client.session_transaction() as sess:
+                    sess['_user_id'] = str(u_outro.id)
+                    sess['_fresh'] = True
+                r_authz = client.get(f'/propostas/{proposta_id}',
+                                     follow_redirects=False)
+                check(r_authz.status_code != 200,
+                      f"GET /propostas/{proposta_id} como outro tenant "
+                      f"→ {r_authz.status_code} != 200 (sem leak via HTTP)")
+            else:
+                print(f"  [skip] sem Usuario ativo no tenant {outro_admin_id} "
+                      "para teste HTTP de authz")
         else:
             print("  [skip] sem outro admin para validar isolamento (apenas 1 admin no banco)")
 

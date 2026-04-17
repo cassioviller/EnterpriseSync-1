@@ -95,7 +95,7 @@ sem colisão.
 ### E2E Orçamento + Proposta (2026-04-17, Task #95)
 
 Arquivo: `tests/test_e2e_orcamento_proposta.py`. Resultado:
-**35/35 PASS, 0 FAIL**. Cobre o ciclo orçamento paramétrico → proposta
+**36/36 PASS, 0 FAIL**. Cobre o ciclo orçamento paramétrico → proposta
 de ponta a ponta, complementando o `test_ciclo_proposta_obra_medido_cr`
 que começa só na aprovação:
 
@@ -106,7 +106,7 @@ que começa só na aprovação:
 | 3. Recálculo via serviço | `recalcular_servico_preco(svc)` persiste `Servico.preco_venda_unitario=R$ 112,50`. O `PropostaItem` original mantém `custo_unitario` e `subtotal` originais. | ✔ |
 | 4. Snapshot imutável | `PrecoBaseInsumo` antigos recebem `vigencia_fim`; novos preços vigentes elevam custo para `R$ 180,00` e preço para `R$ 225,00` no `Servico`. O `PropostaItem` da proposta antiga **continua** com `custo=90.0000` e `subtotal=1125,00`. | ✔ |
 | 5. Transição rascunho → enviada | `proposta.status='enviada'` + `data_envio` setada. `GET /propostas/cliente/<token>` responde **200**. Token inválido não resolve para nenhuma `Proposta`. | ✔ |
-| 6. Aprovação portal + multi-tenant | `POST /propostas/cliente/<token>/aprovar` → 302; status vira `APROVADA`, `convertida_em_obra=True`, `obra_id` populado, `Obra` criada com código `OBRxxxx` e `token_cliente`, `ItemMedicaoComercial` propagado 1:1 com `servico_id` herdado do catálogo. Outro `admin_id` consultando `Proposta.query.filter_by(id=…, admin_id=outro)` recebe `None` (sem leak entre tenants). | ✔ |
+| 6. Aprovação portal + multi-tenant | `POST /propostas/cliente/<token>/aprovar` → 302; status vira `APROVADA`, `convertida_em_obra=True`, `obra_id` populado, `Obra` criada com código `OBRxxxx` e `token_cliente`, `ItemMedicaoComercial` propagado 1:1 com `servico_id` herdado do catálogo. Outro `admin_id` consultando `Proposta.query.filter_by(id=…, admin_id=outro)` recebe `None`, **e** logado como usuário do outro tenant `GET /propostas/<id>` retorna 302 (redirect) — sem leak via HTTP. | ✔ |
 
 > **Resultado real do último run**: proposta `P-E2E95-739723-1254`,
 > `Servico` id=360, `Obra` id=404 com código `OBR0007`. Snapshot do

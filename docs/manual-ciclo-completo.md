@@ -141,7 +141,7 @@ fases do ciclo financeiro novo:
 
 ## E2E Orçamento + Proposta (`tests/test_e2e_orcamento_proposta.py`)
 
-Bateria nova introduzida pela Task #95: **35 PASS / 0 FAIL**. Roda em
+Bateria nova introduzida pela Task #95: **36 PASS / 0 FAIL**. Roda em
 `python tests/test_e2e_orcamento_proposta.py` e cobre o ciclo do
 catálogo paramétrico até a aprovação da proposta — pega o trecho que o
 ciclo Proposta→CR (acima) **não** cobre, porque aquele só começa
@@ -175,6 +175,9 @@ depois da aprovação.
    nasce com `OBRxxxx` e `token_cliente`, o `ItemMedicaoComercial` é
    propagado 1:1 herdando o `servico_id` do catálogo. Outro `admin_id`
    consultando a mesma proposta recebe `None` — sem leak entre tenants.
+   Confirmação HTTP: logado como usuário do outro tenant,
+   `GET /propostas/<id>` devolve **302** (redirect com flash), nunca
+   200 com os dados.
 
 > **Resultado real do último run**: proposta `P-E2E95-…`, `Servico`
 > id=360, `Obra` id=404 com código `OBR0007`. Snapshot do `PropostaItem`
