@@ -251,6 +251,23 @@ def editar_item(obra_id, item_id):
         except Exception:
             pass
 
+    # Task #82 — sincroniza ObraServicoCusto pareado com as alterações
+    # de servico_id e/ou valor_comercial (consistente com a rota dedicada
+    # vincular_medicao_item; evita histórico cross-obra defasado em
+    # edições manuais via formulário padrão).
+    try:
+        from models import ObraServicoCusto
+        par = ObraServicoCusto.query.filter_by(
+            item_medicao_comercial_id=item.id, admin_id=admin_id
+        ).first()
+        if par:
+            par.servico_catalogo_id = item.servico_id
+            if item.valor_comercial is not None:
+                par.valor_orcado = item.valor_comercial
+    except Exception as e:
+        import logging
+        logging.warning(f"[Task#82] sync ObraServicoCusto falhou (item={item.id}): {e}")
+
     db.session.commit()
     flash('Item atualizado.', 'success')
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
