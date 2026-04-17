@@ -234,6 +234,23 @@ def editar_item(obra_id, item_id):
             except Exception:
                 pass
 
+    # Task #82 — fallback server-side: se o operador não informou
+    # valor_comercial mas há servico_id + quantidade válidos, calcula
+    # automaticamente (qtd × preco_venda_unitario). O JS do template já
+    # faz isso quando o checkbox está marcado, mas garantimos consistência
+    # para qualquer cliente (curl, mobile, integrações).
+    valor_form_raw = (request.form.get('valor_comercial') or '').strip()
+    if (not valor_form_raw or valor <= 0) and item.servico_id and item.quantidade:
+        try:
+            from models import Servico
+            svc = Servico.query.filter_by(id=item.servico_id, admin_id=admin_id).first()
+            if svc and svc.preco_venda_unitario and Decimal(str(svc.preco_venda_unitario)) > 0:
+                item.valor_comercial = (
+                    Decimal(str(item.quantidade)) * Decimal(str(svc.preco_venda_unitario))
+                ).quantize(Decimal('0.01'))
+        except Exception:
+            pass
+
     db.session.commit()
     flash('Item atualizado.', 'success')
     return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
