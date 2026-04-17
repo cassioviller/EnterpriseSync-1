@@ -196,32 +196,102 @@ def fechar_medicao(medicao_id, admin_id):
     return medicao, None
 
 
-def recalcular_medicao_obra(obra_id, admin_id):
-    """Task #94 — UPSERT da ContaReceber única por obra (origem_tipo='OBRA_MEDICAO').
+def _recalcular_imc_avanco(obra_id, admin_id):
+    """Task #94 — recalcula `percentual_executado_acumulado` e
+    `valor_executado_acumulado` de cada `ItemMedicaoComercial` da obra a
+    partir do estado vivo do cronograma e dos RDOs.
 
-    Soma todos os ItemMedicaoComercial.valor_executado_acumulado da obra
-    (single source of truth do "medido"), desconta a entrada já recebida e:
-      • cria a ContaReceber se ainda não existir e total medido > 0;
-      • atualiza valor_original/saldo se já existir;
-      • marca status apropriado (RECEBIDA quando saldo<=0, PARCIAL quando
-        recebido>0, PENDENTE caso contrário).
+    Fontes (em ordem de precedência):
+      1) Vínculos `ItemMedicaoCronogramaTarefa` → média ponderada de
+         `TarefaCronograma.percentual_concluido` (mesma regra usada em
+         `gerar_medicao_quinzenal`).
+      2) Fallback por `IMC.servico_id`: maior `RDOServicoSubatividade
+         .percentual_conclusao` registrado para aquele servico em RDOs
+         **finalizados** da obra (RDO.status in {'Finalizado','FINALIZADO'}).
 
-    Retorna a ContaReceber resultante, ou None se nada precisou ser criado.
+    Persiste os campos diretamente no IMC. Retorna o total medido acumulado
+    da obra (Decimal).
     """
-    from sqlalchemy import func as _f
-    from models import Obra, ItemMedicaoComercial as _IMC
+    from models import (
+        ItemMedicaoComercial as _IMC, RDOServicoSubatividade as _RSS, RDO as _RDO,
+    )
+
+    itens = _IMC.query.filter_by(obra_id=obra_id, admin_id=admin_id).all()
+    total_medido = Decimal('0')
+
+    for item in itens:
+        perc_atual = calcular_percentual_item(item)
+
+        # Fallback por servico_id quando não há vínculos no cronograma
+        if perc_atual <= 0 and getattr(item, 'servico_id', None):
+            try:
+                max_perc = (
+                    db.session.query(db.func.max(_RSS.percentual_conclusao))
+                    .join(_RDO, _RDO.id == _RSS.rdo_id)
+                    .filter(
+                        _RSS.servico_id == item.servico_id,
+                        _RSS.admin_id == admin_id,
+                        _RDO.obra_id == obra_id,
+                        _RDO.status.in_(['Finalizado', 'FINALIZADO', 'finalizado']),
+                    )
+                    .scalar()
+                )
+                if max_perc is not None:
+                    perc_atual = Decimal(str(max_perc)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            except Exception as e:
+                logger.warning(f"_recalcular_imc_avanco fallback RDO falhou item={item.id}: {e}")
+
+        # Cap em 100
+        if perc_atual > Decimal('100'):
+            perc_atual = Decimal('100')
+        if perc_atual < Decimal('0'):
+            perc_atual = Decimal('0')
+
+        valor_comercial = Decimal(str(item.valor_comercial or 0))
+        valor_acum = (perc_atual / Decimal('100')) * valor_comercial
+        valor_acum = valor_acum.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        item.percentual_executado_acumulado = perc_atual
+        item.valor_executado_acumulado = valor_acum
+        if perc_atual >= Decimal('100') and getattr(item, 'status', None) != 'CONCLUIDO':
+            try:
+                item.status = 'CONCLUIDO'
+            except Exception:
+                pass
+
+        total_medido += valor_acum
+
+    return total_medido.quantize(Decimal('0.01'))
+
+
+def recalcular_medicao_obra(obra_id, admin_id):
+    """Task #94 — recalcula avanço dos IMC + UPSERT da ContaReceber única
+    por obra (`origem_tipo='OBRA_MEDICAO'`, `origem_id=obra.id`,
+    `numero_documento='OBR-MED-#####'`).
+
+    Fluxo:
+      1) `_recalcular_imc_avanco` atualiza `percentual_executado_acumulado`
+         e `valor_executado_acumulado` por IMC (cronograma ponderado, com
+         fallback por `RDOServicoSubatividade.servico_id`).
+      2) Soma o medido acumulado, desconta `obra.valor_entrada` (quando
+         `data_entrada` está preenchida) e calcula `valor_a_faturar`.
+      3) Cria ou atualiza a `ContaReceber` única com status
+         `PENDENTE`/`PARCIAL`/`QUITADA` conforme `valor_recebido`.
+
+    Retorna a `ContaReceber` resultante, ou None se ainda não havia o que
+    cobrar e nenhuma CR pré-existia.
+    """
+    from models import Obra
 
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
     if not obra:
         logger.warning(f"recalcular_medicao_obra: obra {obra_id} não encontrada (admin={admin_id})")
         return None
 
-    medido_total = db.session.query(
-        _f.coalesce(_f.sum(_IMC.valor_executado_acumulado), 0)
-    ).filter(_IMC.obra_id == obra_id, _IMC.admin_id == admin_id).scalar() or 0
-    medido_total = Decimal(str(medido_total)).quantize(Decimal('0.01'))
+    # 1) Recalcular avanço por IMC (cronograma + fallback RDO)
+    medido_total = _recalcular_imc_avanco(obra_id, admin_id)
 
-    # Entrada já recebida (não vira ContaReceber — é abatida do "a faturar")
+    # 2) Entrada já recebida abate o "a faturar"
     entrada = Decimal(str(obra.valor_entrada or 0)) if obra.data_entrada else Decimal('0')
     valor_a_faturar = (medido_total - entrada)
     if valor_a_faturar < 0:
@@ -232,7 +302,8 @@ def recalcular_medicao_obra(obra_id, admin_id):
     ).first()
 
     if valor_a_faturar <= 0 and not cr:
-        # Nada medido ainda e nada a criar
+        # Persistir o recálculo do avanço mesmo sem CR a criar
+        db.session.commit()
         return None
 
     cliente_nome = obra.cliente or obra.cliente_nome or obra.nome or 'Cliente'
@@ -250,7 +321,7 @@ def recalcular_medicao_obra(obra_id, admin_id):
             saldo=valor_a_faturar,
             data_emissao=hoje,
             data_vencimento=hoje + timedelta(days=30),
-            status='PENDENTE' if valor_a_faturar > 0 else 'RECEBIDA',
+            status='PENDENTE' if valor_a_faturar > 0 else 'QUITADA',
             origem_tipo='OBRA_MEDICAO',
             origem_id=obra_id,
             admin_id=admin_id,
@@ -259,7 +330,7 @@ def recalcular_medicao_obra(obra_id, admin_id):
         db.session.flush()
         logger.info(
             f"[OK] ContaReceber OBRA_MEDICAO criada (id={cr.id}) obra={obra_id} "
-            f"valor_a_faturar=R$ {float(valor_a_faturar):.2f}"
+            f"medido_total=R$ {float(medido_total):.2f} valor_a_faturar=R$ {float(valor_a_faturar):.2f}"
         )
     else:
         cr.cliente_nome = cliente_nome
@@ -271,15 +342,15 @@ def recalcular_medicao_obra(obra_id, admin_id):
             novo_saldo = Decimal('0')
         cr.saldo = novo_saldo
         if novo_saldo <= 0 and recebido > 0:
-            cr.status = 'RECEBIDA'
+            cr.status = 'QUITADA'
         elif recebido > 0:
             cr.status = 'PARCIAL'
         else:
             cr.status = 'PENDENTE'
         logger.info(
             f"[OK] ContaReceber OBRA_MEDICAO atualizada (id={cr.id}) obra={obra_id} "
-            f"valor_original=R$ {float(valor_a_faturar):.2f} saldo=R$ {float(novo_saldo):.2f} "
-            f"status={cr.status}"
+            f"medido_total=R$ {float(medido_total):.2f} valor_original=R$ {float(valor_a_faturar):.2f} "
+            f"saldo=R$ {float(novo_saldo):.2f} status={cr.status}"
         )
 
     db.session.commit()

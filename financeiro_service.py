@@ -506,11 +506,13 @@ class FinanceiroService:
             # Detalhes por dia
             detalhes = []
             for conta in contas_receber:
+                # Task #94: tolerar saldo NULL — fallback para valor_original
+                _saldo = conta.saldo if conta.saldo is not None else (conta.valor_original or 0)
                 detalhes.append({
                     'data': conta.data_vencimento,
                     'tipo': 'ENTRADA',
                     'descricao': conta.descricao,
-                    'valor': float(conta.saldo),
+                    'valor': float(_saldo or 0),
                     'origem': 'Conta a Receber'
                 })
             
