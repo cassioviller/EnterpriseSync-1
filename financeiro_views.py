@@ -131,18 +131,24 @@ def listar_contas_pagar():
     
     # Resumo financeiro
     hoje = date.today()
-    vencidas = sum(c.saldo for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
+    # Task #94: tolerar saldo NULL — fallback para valor_original
+    def _saldo_seguro(c):
+        if c.saldo is not None:
+            return c.saldo
+        return getattr(c, 'valor_original', None) or getattr(c, 'valor_total', 0) or 0
+
+    vencidas = sum(_saldo_seguro(c) for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
         ContaPagar.data_vencimento < hoje,
         ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
     ).all())
     
-    a_vencer = sum(c.saldo for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
+    a_vencer = sum(_saldo_seguro(c) for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
         ContaPagar.data_vencimento >= hoje,
         ContaPagar.data_vencimento <= hoje + timedelta(days=7),
         ContaPagar.status.in_(['PENDENTE', 'PARCIAL'])
     ).all())
     
-    pendentes = sum(c.saldo for c in ContaPagar.query.filter_by(admin_id=admin_id, status='PENDENTE').all())
+    pendentes = sum(_saldo_seguro(c) for c in ContaPagar.query.filter_by(admin_id=admin_id, status='PENDENTE').all())
     
     pagas_mes = sum(c.valor_pago for c in ContaPagar.query.filter_by(admin_id=admin_id).filter(
         ContaPagar.data_pagamento >= date(hoje.year, hoje.month, 1),
@@ -281,18 +287,24 @@ def listar_contas_receber():
     
     # Resumo financeiro
     hoje = date.today()
-    vencidas = sum(c.saldo for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
+    # Task #94: tolerar saldo NULL — fallback para valor_original
+    def _saldo_seguro_cr(c):
+        if c.saldo is not None:
+            return c.saldo
+        return c.valor_original or 0
+
+    vencidas = sum(_saldo_seguro_cr(c) for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
         ContaReceber.data_vencimento < hoje,
         ContaReceber.status.in_(['PENDENTE', 'PARCIAL'])
     ).all())
     
-    a_vencer = sum(c.saldo for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
+    a_vencer = sum(_saldo_seguro_cr(c) for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
         ContaReceber.data_vencimento >= hoje,
         ContaReceber.data_vencimento <= hoje + timedelta(days=7),
         ContaReceber.status.in_(['PENDENTE', 'PARCIAL'])
     ).all())
     
-    pendentes = sum(c.saldo for c in ContaReceber.query.filter_by(admin_id=admin_id, status='PENDENTE').all())
+    pendentes = sum(_saldo_seguro_cr(c) for c in ContaReceber.query.filter_by(admin_id=admin_id, status='PENDENTE').all())
     
     recebidas_mes = sum(c.valor_recebido for c in ContaReceber.query.filter_by(admin_id=admin_id).filter(
         ContaReceber.data_recebimento >= date(hoje.year, hoje.month, 1),

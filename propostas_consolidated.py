@@ -1045,12 +1045,15 @@ def deletar(id):
 @login_required
 @admin_required
 def aprovar(id):
-    """Aprovar proposta"""
+    """Aprovar proposta — Task #94: emite evento proposta_aprovada para
+    materializar Obra + IMC + OSC (sem criar ContaReceber).
+    """
     try:
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
-        proposta.status = 'aprovada'
+        proposta.status = 'APROVADA'
+        proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
         
         # Registrar no histórico
         historico = PropostaHistorico(
@@ -1064,7 +1067,21 @@ def aprovar(id):
         
         # Commit transacional único (tudo ou nada)
         db.session.commit()
-        
+
+        # Task #94: emitir evento proposta_aprovada — handlers criam Obra,
+        # token_cliente, ItemMedicaoComercial e ObraServicoCusto (sem ContaReceber).
+        try:
+            from event_manager import EventManager
+            EventManager.emit('proposta_aprovada', {
+                'proposta_id': proposta.id,
+                'cliente_nome': proposta.cliente_nome,
+                'cliente_cpf_cnpj': None,
+                'valor_total': float(proposta.valor_total or 0),
+                'data_aprovacao': date.today().isoformat(),
+            }, admin_id)
+        except Exception as ev_err:
+            logger.error(f"[ERROR] Falha ao emitir proposta_aprovada: {ev_err}")
+
         logger.debug(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
         flash('Proposta aprovada com sucesso!', 'success')
         
@@ -1165,16 +1182,32 @@ def portal_cliente(token):
 
 @propostas_bp.route('/cliente/<token>/aprovar', methods=['POST'])
 def aprovar_proposta_cliente(token):
-    """Cliente aprova a proposta"""
+    """Cliente aprova a proposta — Task #94: emite evento proposta_aprovada."""
     proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
     
     try:
-        proposta.status = 'aprovada'
+        proposta.status = 'APROVADA'
         proposta.data_resposta_cliente = datetime.utcnow()
         proposta.observacoes_cliente = request.form.get('observacoes', '')
         
         db.session.commit()
-        
+
+        # Task #94: emitir evento proposta_aprovada (mesmo handler do fluxo admin)
+        try:
+            admin_id = proposta.admin_id or proposta.criado_por
+            if admin_id:
+                from event_manager import EventManager
+                EventManager.emit('proposta_aprovada', {
+                    'proposta_id': proposta.id,
+                    'cliente_nome': proposta.cliente_nome,
+                    'cliente_cpf_cnpj': None,
+                    'valor_total': float(proposta.valor_total or 0),
+                    'data_aprovacao': date.today().isoformat(),
+                }, admin_id)
+        except Exception as ev_err:
+            import logging as _lg
+            _lg.getLogger(__name__).error(f"Falha ao emitir proposta_aprovada (cliente): {ev_err}")
+
         flash('Proposta aprovada com sucesso!', 'success')
         return render_template('propostas/aprovada.html', proposta=proposta)
         

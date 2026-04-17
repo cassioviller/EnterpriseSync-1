@@ -758,58 +758,55 @@ def lancar_custos_rdo(data: dict, admin_id: int):
 
 
 @event_handler('proposta_aprovada')
-def gerar_contas_receber_proposta(data: dict, admin_id: int):
-    """Handler: Gerar contas a receber quando proposta é aprovada"""
+def propagar_proposta_para_obra(data: dict, admin_id: int):
+    """Handler Task #94: ao aprovar proposta, garantir Obra + token_cliente +
+    back-link Proposta.obra_id/convertida_em_obra. **NÃO cria ContaReceber**
+    (regra v2: ContaReceber nasce/atualiza apenas via avanço de medição
+    com origem_tipo='OBRA_MEDICAO' a partir de RDO/fechamento de medição).
+
+    Itens de medição (IMC) e snapshots de custo (OSC) são criados pelo
+    handler `handlers.propostas_handlers.handle_proposta_aprovada` que roda
+    em sequência (ver app.py, ordem de import).
+    """
     try:
-        from models import db, Proposta, ContaReceber, Obra
-        from datetime import datetime, timedelta
-        from decimal import Decimal
+        from models import db, Proposta, Obra
+        from datetime import datetime
         from sqlalchemy import func
-        from sqlalchemy.exc import IntegrityError
-        
+        import secrets
+
         proposta_id = data.get('proposta_id')
-        
         if not proposta_id:
-            logger.warning(f"⚠️ proposta_id não fornecido no evento proposta_aprovada")
+            logger.warning("⚠️ proposta_id não fornecido no evento proposta_aprovada")
             return
-        
-        # Buscar proposta
-        proposta = Proposta.query.filter_by(
-            id=proposta_id,
-            admin_id=admin_id
-        ).first()
-        
+
+        proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
         if not proposta:
             logger.error(f"❌ Proposta {proposta_id} não encontrada para admin {admin_id}")
             return
-        
-        # Validar valor total
+
         valor_total = float(proposta.valor_total or 0)
-        
-        if valor_total <= 0:
-            logger.info(f"⏭️ Conta a receber não criada: proposta {proposta_id} com valor zerado")
-            return
-        
-        # Obter cliente_nome real da proposta
         cliente_nome = proposta.cliente_nome or 'Cliente não identificado'
-        
-        # Verificar se já existe obra vinculada à proposta
-        obra = Obra.query.filter_by(
-            proposta_origem_id=proposta_id,
-            admin_id=admin_id
-        ).first()
-        
-        # Se não existe, criar obra para a proposta
+
+        # 1) Localizar (ou criar) a Obra vinculada à proposta
+        obra = None
+        if proposta.obra_id:
+            obra = Obra.query.filter_by(id=proposta.obra_id, admin_id=admin_id).first()
         if not obra:
-            # Gerar código único para a obra
+            obra = Obra.query.filter_by(
+                proposta_origem_id=proposta_id, admin_id=admin_id
+            ).first()
+
+        if not obra:
             ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter_by(admin_id=admin_id).scalar()
             if ultimo_codigo and ultimo_codigo.startswith('OBR'):
-                numero = int(ultimo_codigo[3:]) + 1
+                try:
+                    numero = int(ultimo_codigo[3:]) + 1
+                except ValueError:
+                    numero = 1
             else:
                 numero = 1
-            
             codigo_obra = f"OBR{numero:04d}"
-            
+
             obra = Obra(
                 nome=f"Obra - {proposta.titulo or proposta.numero}",
                 codigo=codigo_obra,
@@ -824,52 +821,42 @@ def gerar_contas_receber_proposta(data: dict, admin_id: int):
                 status='Em andamento',
                 proposta_origem_id=proposta_id,
                 admin_id=admin_id,
-                ativo=True
+                ativo=True,
+                portal_ativo=True,
             )
-            
             db.session.add(obra)
-            db.session.flush()  # CRITICAL: Gerar obra.id antes de criar ContaReceber
+            db.session.flush()
             logger.info(f"📋 Obra {codigo_obra} criada para proposta {proposta.numero}")
-        
-        # Criar conta a receber
-        # Nota: Se houver necessidade de dividir em parcelas, isso pode ser implementado
-        # parseando o campo condicoes_pagamento da proposta
-        
-        conta = ContaReceber(
-            cliente_nome=cliente_nome,
-            cliente_cpf_cnpj=None,  # Pode ser adicionado se disponível
-            obra_id=obra.id,
-            numero_documento=proposta.numero,
-            descricao=f"Recebimento - Proposta {proposta.numero} - {proposta.titulo or 'Serviços'}",
-            valor_original=Decimal(str(valor_total)),
-            valor_recebido=Decimal('0'),
-            saldo=Decimal(str(valor_total)),
-            data_emissao=datetime.now().date(),
-            data_vencimento=(datetime.now() + timedelta(days=proposta.prazo_entrega_dias or 30)).date(),
-            status='PENDENTE',
-            origem_tipo='PROPOSTA',
-            origem_id=proposta_id,
-            admin_id=admin_id
-        )
-        
-        db.session.add(conta)
-        
-        # Atualizar status da proposta para APROVADA
-        proposta.status = 'APROVADA'
-        
+        else:
+            # Manter obra existente atualizada com cliente + valor da proposta
+            if not obra.cliente:
+                obra.cliente = cliente_nome
+            if not obra.cliente_nome:
+                obra.cliente_nome = cliente_nome
+            if (obra.valor_contrato or 0) <= 0 and valor_total > 0:
+                obra.valor_contrato = valor_total
+            if (obra.orcamento or 0) <= 0 and valor_total > 0:
+                obra.orcamento = valor_total
+
+        # 2) Garantir token_cliente para portal público
+        if not obra.token_cliente:
+            obra.token_cliente = secrets.token_urlsafe(32)
+
+        # 3) Back-link Proposta → Obra
+        proposta.obra_id = obra.id
+        proposta.convertida_em_obra = True
+        if proposta.status not in ('APROVADA', 'aprovada'):
+            proposta.status = 'APROVADA'
+
         db.session.commit()
-        
-        logger.info(f"✅ Conta a receber criada: R$ {valor_total:.2f} - {cliente_nome}")
-        logger.info(f"   📄 Proposta: {proposta.numero} | Obra: {obra.codigo} | Status: APROVADA")
-        
-    except IntegrityError as e:
-        logger.error(f"❌ Erro de integridade ao criar conta a receber: {e}")
-        db.session.rollback()
-    except ValueError as e:
-        logger.error(f"❌ Erro de validação ao criar conta a receber: {e}")
-        db.session.rollback()
+        logger.info(
+            f"✅ Proposta {proposta.numero} propagada para Obra {obra.codigo} "
+            f"(token_cliente={'ok' if obra.token_cliente else 'AUSENTE'}, "
+            f"valor_contrato={float(obra.valor_contrato or 0):.2f})"
+        )
+
     except Exception as e:
-        logger.error(f"❌ Erro ao criar conta a receber: {e}", exc_info=True)
+        logger.error(f"❌ Erro ao propagar proposta para obra: {e}", exc_info=True)
         db.session.rollback()
 
 
@@ -1159,6 +1146,26 @@ def criar_conta_pagar_alimentacao(data: dict, admin_id: int):
         logger.error(f"❌ Erro ao criar conta a pagar para lançamento {data.get('lancamento_id')}: {e}")
         import traceback
         logger.error(traceback.format_exc())
+
+
+@event_handler('rdo_finalizado')
+def recalcular_medicao_apos_rdo(data: dict, admin_id: int):
+    """Task #94 — após RDO finalizado, atualiza a ContaReceber única da obra
+    (origem_tipo='OBRA_MEDICAO') refletindo o avanço do medido.
+
+    Roda em paralelo a `lancar_custos_rdo` (mesmo evento) sem interferir:
+    o handler de custos cria GestaoCustoFilho + CustoObra; este aqui só
+    olha para os ItemMedicaoComercial.valor_executado_acumulado da obra.
+    """
+    try:
+        obra_id = data.get('obra_id')
+        if not obra_id:
+            logger.warning("⚠️ obra_id ausente em rdo_finalizado — recalcular_medicao_obra pulado")
+            return
+        from services.medicao_service import recalcular_medicao_obra
+        recalcular_medicao_obra(obra_id, admin_id)
+    except Exception as e:
+        logger.error(f"❌ Erro em recalcular_medicao_apos_rdo: {e}", exc_info=True)
 
 
 # Log de inicialização

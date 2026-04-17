@@ -4,7 +4,7 @@ Integração automática: Propostas → Contabilidade → Contas a Receber
 """
 
 from event_manager import event_handler
-from models import db, LancamentoContabil, PartidaContabil, ContaReceber
+from models import db, LancamentoContabil, PartidaContabil
 from decimal import Decimal
 from datetime import date, datetime
 import logging
@@ -97,14 +97,10 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
             logger.warning(f"⚠️ proposta_id não fornecido no evento proposta_aprovada")
             return
         
-        if valor_total <= 0:
-            logger.warning(f"⚠️ Valor total inválido ou zerado: {valor_total}")
-            return
-        
         if not cliente_nome:
             logger.warning(f"⚠️ cliente_nome não fornecido no evento proposta_aprovada")
             cliente_nome = "Cliente não identificado"
-        
+
         # Converter data_aprovacao se for string
         if isinstance(data_aprovacao, str):
             try:
@@ -113,7 +109,19 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
                 data_aprovacao = date.today()
         elif not isinstance(data_aprovacao, date):
             data_aprovacao = date.today()
-        
+
+        # Task #94: lançamento contábil + ContaReceber só fazem sentido para
+        # propostas com valor > 0. Mesmo com valor 0, propagamos os itens
+        # comerciais para a obra (operador pode ajustar valores depois).
+        if valor_total <= 0:
+            logger.info(
+                f"⏭️ Proposta {proposta_id}: valor zerado — pulando lançamento contábil; "
+                f"propagação proposta→obra continua."
+            )
+            _propagar_proposta_para_obra(proposta_id, admin_id)
+            db.session.commit()
+            return
+
         # 1. Criar lançamento contábil
         lancamento = LancamentoContabil(
             numero=gerar_numero_lancamento(admin_id),
@@ -153,34 +161,14 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         db.session.add(partida_credito)
         
         logger.info(f"✅ Partidas contábeis criadas - Débito: R$ {float(valor_total):.2f} (1.1.02.001), Crédito: R$ {float(valor_total):.2f} (4.1.01.001)")
-        
-        # 3. Criar entrada em Contas a Receber
-        # Calcular data de vencimento (30 dias após aprovação por padrão)
-        from datetime import timedelta
-        data_vencimento = data_aprovacao + timedelta(days=30)
-        
-        conta_receber = ContaReceber(
-            cliente_nome=cliente_nome,
-            cliente_cpf_cnpj=data.get('cliente_cpf_cnpj', ''),
-            obra_id=data.get('obra_id'),
-            numero_documento=f"PROP-{proposta_id}",
-            descricao=f"Proposta comercial #{proposta_id} aprovada",
-            valor_original=float(valor_total),
-            valor_recebido=0,
-            saldo=float(valor_total),
-            data_emissao=data_aprovacao,
-            data_vencimento=data_vencimento,
-            status='PENDENTE',
-            conta_contabil_codigo='1.1.02.001',
-            origem_tipo='PROPOSTA',
-            origem_id=proposta_id,
-            admin_id=admin_id
-        )
-        db.session.add(conta_receber)
-        
-        logger.info(f"✅ Conta a receber criada: R$ {float(valor_total):.2f} - Vencimento: {data_vencimento.strftime('%d/%m/%Y')}")
 
-        # 4. Task #82: propagar para obra (ItemMedicaoComercial → ObraServicoCusto)
+        # Task #94: ContaReceber NÃO é mais criada na aprovação. Ela é
+        # gerada/atualizada automaticamente via UPSERT em
+        # `services.medicao_service.recalcular_medicao_obra` à medida que o
+        # avanço de obra é registrado (RDO finalizado ou medição quinzenal
+        # fechada). origem_tipo='OBRA_MEDICAO', origem_id=obra.id.
+
+        # Task #82: propagar para obra (ItemMedicaoComercial → ObraServicoCusto)
         # Propagação é MANDATÓRIA — se falhar, a aprovação inteira é revertida
         # pelo except externo. Isso garante o ciclo proposta → custos para
         # qualquer admin que use o catálogo. Caller pode tratar o ValueError.

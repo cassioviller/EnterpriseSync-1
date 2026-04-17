@@ -422,7 +422,7 @@ class FinanceiroService:
                 admin_id=admin_id,
                 ativo=True
             ).all()
-            saldo_inicial = sum(b.saldo_atual for b in bancos)
+            saldo_inicial = sum((b.saldo_atual or 0) for b in bancos)
             
             # Contas a receber (entradas)
             contas_receber = ContaReceber.query.filter(
@@ -434,7 +434,10 @@ class FinanceiroService:
                 )
             ).all()
             
-            entradas_previstas = sum(c.saldo for c in contas_receber)
+            entradas_previstas = sum(
+                (c.saldo if c.saldo is not None else (c.valor_original or 0))
+                for c in contas_receber
+            )
             
             # Saídas previstas — GestaoCustoPai em aberto (PENDENTE, SOLICITADO, AUTORIZADO, PARCIAL)
             dt_inicio = datetime.combine(data_inicio, datetime.min.time())
@@ -610,9 +613,9 @@ class FinanceiroService:
             total_pagar = Decimal('0')
             vencidas_pagar = 0
             
-            # Contas a receber
+            # Contas a receber — coalesce saldo→valor_original para tolerar NULL
             total_receber = db.session.query(
-                func.sum(ContaReceber.saldo)
+                func.sum(func.coalesce(ContaReceber.saldo, ContaReceber.valor_original))
             ).filter(
                 and_(
                     ContaReceber.admin_id == admin_id,
@@ -632,7 +635,7 @@ class FinanceiroService:
             
             # Saldo bancário
             saldo_bancos = db.session.query(
-                func.sum(BancoEmpresa.saldo_atual)
+                func.sum(func.coalesce(BancoEmpresa.saldo_atual, 0))
             ).filter(
                 and_(
                     BancoEmpresa.admin_id == admin_id,

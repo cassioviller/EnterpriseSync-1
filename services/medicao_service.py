@@ -162,26 +162,17 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
         soma_acum = sum(Decimal(str(i.valor_executado_acumulado or 0)) for i in itens_comerciais)
         medicao.percentual_executado = float((soma_acum / valor_contrato * 100).quantize(Decimal('0.01')))
 
-    if valor_a_faturar > 0:
-        cr = ContaReceber(
-            cliente_nome=obra.cliente or obra.nome,
-            obra_id=obra.id,
-            numero_documento=f"MED-{proximo_numero:03d}",
-            descricao=f"Medição #{proximo_numero} — {obra.nome} ({periodo_inicio.strftime('%d/%m')} a {periodo_fim.strftime('%d/%m/%Y')})",
-            valor_original=valor_a_faturar.quantize(Decimal('0.01')),
-            data_emissao=date.today(),
-            data_vencimento=date.today() + timedelta(days=30),
-            status='PENDENTE',
-            origem_tipo='MEDICAO',
-            origem_id=medicao.id,
-            admin_id=admin_id,
-        )
-        db.session.add(cr)
-        db.session.flush()
-        medicao.conta_receber_id = cr.id
-        logger.info(f"[OK] ContaReceber id={cr.id} criada para medição #{proximo_numero}")
-
+    # Task #94: ContaReceber NÃO é mais criada por medição. Em vez disso,
+    # `recalcular_medicao_obra` faz UPSERT de UMA ContaReceber por obra
+    # (origem_tipo='OBRA_MEDICAO', origem_id=obra.id) refletindo o total
+    # medido acumulado descontado da entrada já recebida.
     db.session.commit()
+
+    cr = recalcular_medicao_obra(obra_id, admin_id)
+    if cr is not None:
+        medicao.conta_receber_id = cr.id
+        db.session.commit()
+
     logger.info(f"[OK] Medição #{proximo_numero} gerada para obra {obra_id}")
     return medicao, None
 
@@ -195,7 +186,104 @@ def fechar_medicao(medicao_id, admin_id):
 
     medicao.status = 'APROVADO'
     db.session.commit()
+
+    # Task #94: ao fechar a medição, atualizar a ContaReceber única da obra
+    cr = recalcular_medicao_obra(medicao.obra_id, admin_id)
+    if cr is not None and not medicao.conta_receber_id:
+        medicao.conta_receber_id = cr.id
+        db.session.commit()
+
     return medicao, None
+
+
+def recalcular_medicao_obra(obra_id, admin_id):
+    """Task #94 — UPSERT da ContaReceber única por obra (origem_tipo='OBRA_MEDICAO').
+
+    Soma todos os ItemMedicaoComercial.valor_executado_acumulado da obra
+    (single source of truth do "medido"), desconta a entrada já recebida e:
+      • cria a ContaReceber se ainda não existir e total medido > 0;
+      • atualiza valor_original/saldo se já existir;
+      • marca status apropriado (RECEBIDA quando saldo<=0, PARCIAL quando
+        recebido>0, PENDENTE caso contrário).
+
+    Retorna a ContaReceber resultante, ou None se nada precisou ser criado.
+    """
+    from sqlalchemy import func as _f
+    from models import Obra, ItemMedicaoComercial as _IMC
+
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if not obra:
+        logger.warning(f"recalcular_medicao_obra: obra {obra_id} não encontrada (admin={admin_id})")
+        return None
+
+    medido_total = db.session.query(
+        _f.coalesce(_f.sum(_IMC.valor_executado_acumulado), 0)
+    ).filter(_IMC.obra_id == obra_id, _IMC.admin_id == admin_id).scalar() or 0
+    medido_total = Decimal(str(medido_total)).quantize(Decimal('0.01'))
+
+    # Entrada já recebida (não vira ContaReceber — é abatida do "a faturar")
+    entrada = Decimal(str(obra.valor_entrada or 0)) if obra.data_entrada else Decimal('0')
+    valor_a_faturar = (medido_total - entrada)
+    if valor_a_faturar < 0:
+        valor_a_faturar = Decimal('0')
+
+    cr = ContaReceber.query.filter_by(
+        admin_id=admin_id, origem_tipo='OBRA_MEDICAO', origem_id=obra_id
+    ).first()
+
+    if valor_a_faturar <= 0 and not cr:
+        # Nada medido ainda e nada a criar
+        return None
+
+    cliente_nome = obra.cliente or obra.cliente_nome or obra.nome or 'Cliente'
+    descricao = f"Medição da obra {obra.codigo or obra.nome} — saldo a faturar acumulado"
+    hoje = date.today()
+
+    if cr is None:
+        cr = ContaReceber(
+            cliente_nome=cliente_nome,
+            obra_id=obra_id,
+            numero_documento=f"OBR-MED-{obra_id:05d}",
+            descricao=descricao,
+            valor_original=valor_a_faturar,
+            valor_recebido=Decimal('0'),
+            saldo=valor_a_faturar,
+            data_emissao=hoje,
+            data_vencimento=hoje + timedelta(days=30),
+            status='PENDENTE' if valor_a_faturar > 0 else 'RECEBIDA',
+            origem_tipo='OBRA_MEDICAO',
+            origem_id=obra_id,
+            admin_id=admin_id,
+        )
+        db.session.add(cr)
+        db.session.flush()
+        logger.info(
+            f"[OK] ContaReceber OBRA_MEDICAO criada (id={cr.id}) obra={obra_id} "
+            f"valor_a_faturar=R$ {float(valor_a_faturar):.2f}"
+        )
+    else:
+        cr.cliente_nome = cliente_nome
+        cr.descricao = descricao
+        cr.valor_original = valor_a_faturar
+        recebido = Decimal(str(cr.valor_recebido or 0))
+        novo_saldo = valor_a_faturar - recebido
+        if novo_saldo < 0:
+            novo_saldo = Decimal('0')
+        cr.saldo = novo_saldo
+        if novo_saldo <= 0 and recebido > 0:
+            cr.status = 'RECEBIDA'
+        elif recebido > 0:
+            cr.status = 'PARCIAL'
+        else:
+            cr.status = 'PENDENTE'
+        logger.info(
+            f"[OK] ContaReceber OBRA_MEDICAO atualizada (id={cr.id}) obra={obra_id} "
+            f"valor_original=R$ {float(valor_a_faturar):.2f} saldo=R$ {float(novo_saldo):.2f} "
+            f"status={cr.status}"
+        )
+
+    db.session.commit()
+    return cr
 
 
 def gerar_pdf_extrato_medicao(medicao_id, admin_id):
