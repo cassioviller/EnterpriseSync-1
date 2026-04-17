@@ -190,6 +190,51 @@ def test_handle_proposta_aprovada_propagacao_falha_aborta_tudo(monkeypatch):
             db.session.commit()
 
 
+def test_proposta_atualizar_novo_item_persiste_servico_id():
+    """Regressão Task #82: PropostaItem criado no fluxo `atualizar` (edição
+    de proposta com novo item adicionado) deve persistir servico_id, não
+    apenas itens existentes. Bug detectado no review #6."""
+    import inspect
+    from propostas_consolidated import atualizar
+
+    src = inspect.getsource(atualizar)
+    # Encontra o bloco 'novo_item = PropostaItem(...)' (criação de item novo
+    # durante edição da proposta) e valida que servico_id é passado.
+    idx = src.find('novo_item = PropostaItem(')
+    assert idx != -1, 'bloco de criação de novo item não encontrado em atualizar()'
+    bloco = src[idx: src.find(')', idx) + 1]
+    assert 'servico_id=' in bloco, (
+        f'PropostaItem novo em atualizar() deve persistir servico_id '
+        f'(Task #82). Bloco atual:\n{bloco}'
+    )
+
+
+def test_propagacao_propaga_servico_id_para_item_medicao(setup_obra_proposta):
+    """Reforça contrato Task #82: servico_id do PropostaItem propaga para
+    ItemMedicaoComercial.servico_id e cria ObraServicoCusto pareado.
+    Cobre o fluxo: editar proposta → adicionar novo item com servico_id →
+    aprovar → medição comercial e custo planejado refletem catálogo."""
+    ctx = setup_obra_proposta
+    aid = ctx['admin_id']
+    obra = ctx['obra']
+    proposta = ctx['proposta']
+
+    _propagar_proposta_para_obra(proposta.id, aid)
+
+    # it1 foi criado com svc1.id; verifica vínculo end-to-end
+    im = ItemMedicaoComercial.query.filter_by(
+        admin_id=aid, obra_id=obra.id, proposta_item_id=ctx['itens'][0].id
+    ).first()
+    assert im is not None
+    assert im.servico_id == ctx['svc1'].id, \
+        f'servico_id do PropostaItem deve propagar para ItemMedicaoComercial; obtido {im.servico_id}'
+
+    osc = ObraServicoCusto.query.filter_by(
+        admin_id=aid, obra_id=obra.id, servico_catalogo_id=ctx['svc1'].id
+    ).first()
+    assert osc is not None, 'ObraServicoCusto deve ser criado pelo listener com servico_catalogo_id'
+
+
 def test_propagacao_idempotente_por_proposta_item_id(setup_obra_proposta):
     ctx = setup_obra_proposta
     aid = ctx['admin_id']

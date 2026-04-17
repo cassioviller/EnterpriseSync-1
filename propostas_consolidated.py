@@ -915,7 +915,8 @@ def atualizar(id):
                     ordem=i + 1,
                     template_origem_nome=template_nome,
                     template_origem_id=template_id_int,
-                    categoria_titulo=categoria
+                    categoria_titulo=categoria,
+                    servico_id=servico_id_int,  # Task #82
                 )
                 db.session.add(novo_item)
                 logger.info(f" [OK] Item {i+1} criado: {descricao[:30]}...")
