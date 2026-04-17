@@ -43,12 +43,15 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
     for it in itens:
         if it.id in ids_existentes:
             continue
+        # Strict 1:1: criar SEMPRE um ItemMedicaoComercial por PropostaItem.
+        # Se nome estiver vazio, fallback para "Item N"; se valor for 0,
+        # cria assim mesmo (operador pode ajustar depois).
         nome_item = (getattr(it, 'descricao', None) or getattr(it, 'item', None) or '').strip()
         if not nome_item:
-            continue
+            nome_item = f'Item {getattr(it, "item_numero", None) or getattr(it, "ordem", None) or it.id}'
         valor_total = Decimal(str(it.subtotal or 0))
-        if valor_total <= 0:
-            continue
+        if valor_total < 0:
+            valor_total = Decimal('0')
         novo = ItemMedicaoComercial(
             admin_id=admin_id,
             obra_id=obra_id,

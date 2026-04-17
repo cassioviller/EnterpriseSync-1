@@ -100,6 +100,50 @@ def test_calcular_precos_falha_quando_imposto_mais_lucro_excede_100(servico_cano
     assert str(r['preco_venda']) == '0.00'
 
 
+def test_calcular_precos_servico_sem_composicao(admin_id):
+    """Edge case: serviço sem ComposicaoServico → custo=0, preco=0, sem erro."""
+    svc = Servico(
+        admin_id=admin_id, nome='__test_svc_vazio',
+        categoria='Teste', unidade_medida='un',
+        imposto_pct=8, margem_lucro_pct=12,
+    )
+    db.session.add(svc)
+    db.session.flush()
+    r = calcular_precos_servico(svc)
+    assert str(r['custo_unitario']) == '0.00'
+    assert str(r['preco_venda']) == '0.00'
+    assert r['detalhes'] == []
+    assert r['erro'] is None
+    # split também deve ser 0
+    assert str(r['custo_material']) == '0.00'
+    assert str(r['custo_mao_obra']) == '0.00'
+
+
+def test_calcular_precos_servico_sem_preco_vigente(admin_id):
+    """Edge case: insumo sem PrecoBaseInsumo → preco_vigente=0 → custo=0."""
+    ins = Insumo(admin_id=admin_id, nome='__test_sem_preco', tipo='MATERIAL', unidade='un')
+    db.session.add(ins)
+    db.session.flush()
+    svc = Servico(
+        admin_id=admin_id, nome='__test_svc_sem_preco',
+        categoria='Teste', unidade_medida='un',
+        imposto_pct=8, margem_lucro_pct=12,
+    )
+    db.session.add(svc)
+    db.session.flush()
+    db.session.add(ComposicaoServico(
+        admin_id=admin_id, servico_id=svc.id, insumo_id=ins.id, coeficiente='2.0',
+    ))
+    db.session.flush()
+    r = calcular_precos_servico(svc)
+    assert str(r['custo_unitario']) == '0.00', f"sem preço vigente, custo deve ser 0; obtido {r['custo_unitario']}"
+    assert str(r['preco_venda']) == '0.00'
+    assert len(r['detalhes']) == 1
+    assert r['detalhes'][0]['preco_unitario'] == 0
+    assert r['detalhes'][0]['subtotal'] == 0
+    assert r['erro'] is None
+
+
 def test_recalcular_servico_persiste_preco(servico_canonico):
     servico_canonico.imposto_pct = 8
     servico_canonico.margem_lucro_pct = 12

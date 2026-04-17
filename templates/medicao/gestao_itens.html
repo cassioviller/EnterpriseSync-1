@@ -343,7 +343,7 @@
 <div class="modal fade" id="modalNovoItem" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post" action="{{ url_for('medicao.criar_item', obra_id=obra.id) }}">
+      <form method="post" action="{{ url_for('medicao.criar_item', obra_id=obra.id) }}" id="formNovoItemMedicao">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header" style="background:linear-gradient(135deg,#1976d2,#42a5f5);color:#fff">
           <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Novo Item Comercial</h5>
@@ -351,13 +351,51 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Nome do Item</label>
-            <input type="text" name="nome" class="form-control" placeholder="Ex: Fundação, Alvenaria..." required>
+            <label class="form-label fw-semibold">Serviço do Catálogo <span class="text-muted small">(opcional)</span></label>
+            <select name="servico_id" id="novoItemServicoId" class="form-select">
+              <option value="">— Sem vínculo (item livre) —</option>
+              {% for s in (servicos_catalogo or []) %}
+              <option value="{{ s.id }}"
+                data-preco="{{ '%.2f'|format(s.preco_venda_unitario|float if s.preco_venda_unitario else 0) }}"
+                data-nome="{{ s.nome }}">
+                {{ s.nome }} ({{ s.unidade_medida or 'un' }} — R$ {{ '%.2f'|format(s.preco_venda_unitario|float if s.preco_venda_unitario else 0) }})
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Selecione um serviço para auto-calcular valor comercial = quantidade × preço de venda.</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Valor Comercial (R$)</label>
-            <input type="text" name="valor_comercial" class="form-control" placeholder="Ex: 50000.00" required>
+            <label class="form-label fw-semibold">Nome do Item</label>
+            <input type="text" name="nome" id="novoItemNome" class="form-control" placeholder="Ex: Fundação, Alvenaria... (auto-preenche do serviço)">
           </div>
+          <div class="row">
+            <div class="col-5 mb-3">
+              <label class="form-label fw-semibold">Quantidade</label>
+              <input type="text" name="quantidade" id="novoItemQuantidade" class="form-control" placeholder="Ex: 10">
+            </div>
+            <div class="col-7 mb-3">
+              <label class="form-label fw-semibold">Valor Comercial (R$)</label>
+              <input type="text" name="valor_comercial" id="novoItemValor" class="form-control" placeholder="Ex: 50000.00">
+            </div>
+          </div>
+          <script>
+          (function(){
+            var $sel = document.getElementById('novoItemServicoId');
+            var $qtd = document.getElementById('novoItemQuantidade');
+            var $val = document.getElementById('novoItemValor');
+            var $nm  = document.getElementById('novoItemNome');
+            function recalc(){
+              var opt = $sel.options[$sel.selectedIndex];
+              if(!opt || !opt.value) return;
+              var preco = parseFloat(opt.dataset.preco || '0');
+              var q = parseFloat(($qtd.value||'').replace(',','.'));
+              if(!$nm.value) $nm.value = opt.dataset.nome || '';
+              if(preco>0 && q>0) $val.value = (q*preco).toFixed(2);
+            }
+            if($sel){ $sel.addEventListener('change', recalc); }
+            if($qtd){ $qtd.addEventListener('input', recalc); }
+          })();
+          </script>
           {% if saldo > 0 %}
           <div class="alert alert-info py-2 small mb-0">
             <i class="fas fa-info-circle me-1"></i> Saldo disponível: <strong>{{ saldo|brl }}</strong>

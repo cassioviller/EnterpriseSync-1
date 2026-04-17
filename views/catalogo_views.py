@@ -180,6 +180,19 @@ def insumo_excluir(insumo_id):
 # ──────────────────────────────────────────────────────────────────────
 # SERVIÇOS — Composição + Preço
 # ──────────────────────────────────────────────────────────────────────
+@catalogo_bp.route('/servicos')
+@login_required
+def servicos_list():
+    """Catálogo de Serviços — lista paramétrica com preço de venda."""
+    aid = _admin_id()
+    q = (request.args.get('q') or '').strip()
+    qry = Servico.query.filter_by(admin_id=aid, ativo=True)
+    if q:
+        qry = qry.filter(Servico.nome.ilike(f'%{q}%'))
+    servicos = qry.order_by(Servico.nome).all()
+    return render_template('catalogo/servicos_list.html', servicos=servicos, q=q)
+
+
 @catalogo_bp.route('/servicos/<int:servico_id>/composicao', methods=['GET'])
 @login_required
 def servico_composicao(servico_id):

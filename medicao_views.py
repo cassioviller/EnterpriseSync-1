@@ -61,6 +61,12 @@ def gestao_itens(obra_id):
 
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
 
+    # Task #82: catálogo de serviços para o select do modal "Novo Item"
+    from models import Servico
+    servicos_catalogo = Servico.query.filter_by(
+        admin_id=admin_id, ativo=True
+    ).order_by(Servico.nome).all()
+
     valor_contrato = float(obra.valor_contrato or 0)
     soma_itens = sum(float(i.valor_comercial or 0) for i in itens)
     saldo = valor_contrato - soma_itens
@@ -92,6 +98,7 @@ def gestao_itens(obra_id):
         item_realtime_perc=item_realtime_perc,
         item_peso_total=item_peso_total,
         medicao_contas=medicao_contas,
+        servicos_catalogo=servicos_catalogo,
     )
 
 

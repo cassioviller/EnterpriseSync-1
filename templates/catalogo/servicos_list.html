@@ -1,0 +1,59 @@
+{% extends "base_completo.html" %}
+{% block title %}Catálogo de Serviços{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0"><i class="fas fa-clipboard-list me-2 text-primary"></i>Catálogo de Serviços</h2>
+    <a href="{{ url_for('catalogo.insumos_list') }}" class="btn btn-outline-secondary">
+      <i class="fas fa-cubes me-1"></i> Catálogo de Insumos
+    </a>
+  </div>
+  <form method="get" class="mb-3">
+    <div class="input-group">
+      <input type="text" name="q" class="form-control" placeholder="Buscar serviço por nome..." value="{{ q or '' }}">
+      <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i></button>
+    </div>
+  </form>
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Nome</th>
+            <th>Categoria</th>
+            <th>Unidade</th>
+            <th class="text-end">Custo Unit. (R$)</th>
+            <th class="text-end">Imp. %</th>
+            <th class="text-end">Lucro %</th>
+            <th class="text-end">Preço Venda (R$)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in servicos %}
+          <tr>
+            <td><strong>{{ s.nome }}</strong></td>
+            <td>{{ s.categoria or '—' }}</td>
+            <td>{{ s.unidade_medida or '—' }}</td>
+            <td class="text-end">{{ '%.2f'|format(s.custo_unitario|float if s.custo_unitario else 0) }}</td>
+            <td class="text-end">{{ '%.2f'|format(s.imposto_pct|float if s.imposto_pct is not none else 0) }}</td>
+            <td class="text-end">{{ '%.2f'|format(s.margem_lucro_pct|float if s.margem_lucro_pct is not none else 0) }}</td>
+            <td class="text-end"><strong class="text-success">{{ '%.2f'|format(s.preco_venda_unitario|float if s.preco_venda_unitario else 0) }}</strong></td>
+            <td class="text-end">
+              <a href="{{ url_for('catalogo.servico_composicao', servico_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Composição">
+                <i class="fas fa-cogs"></i>
+              </a>
+              <a href="{{ url_for('catalogo.servico_historico', servico_id=s.id) }}" class="btn btn-sm btn-outline-secondary" title="Histórico cross-obra">
+                <i class="fas fa-history"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">Nenhum serviço encontrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
