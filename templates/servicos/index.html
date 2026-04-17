@@ -787,6 +787,22 @@
                         ">{{ servico.categoria or 'Outros' }}</div>
                         
                         <div style="display: flex; gap: 0.5rem;">
+                            <a href="{{ url_for('catalogo.servico_composicao', servico_id=servico.id) }}" title="Composição & Preço (Catálogo Task #82)" style="
+                                background: rgba(25, 118, 210, 0.1);
+                                color: #1976d2;
+                                border: none;
+                                width: 36px;
+                                height: 36px;
+                                border-radius: 8px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                                text-decoration: none;
+                            " onmouseover="this.style.background='rgba(25, 118, 210, 0.2)'" onmouseout="this.style.background='rgba(25, 118, 210, 0.1)'">
+                                <i class="fas fa-calculator"></i>
+                            </a>
                             <button onclick="editarServico({{ servico.id }})" title="Editar" style="
                                 background: rgba(45, 90, 39, 0.1);
                                 color: #2d5a27;

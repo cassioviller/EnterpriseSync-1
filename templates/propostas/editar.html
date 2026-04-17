@@ -85,6 +85,21 @@
                     {% for item in proposta.itens %}
                     <div class="servico-item border rounded p-3 mb-3">
                         <input type="hidden" name="item_id" value="{{ item.id }}">
+                        <div class="row mb-2">
+                            <div class="col-12">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-info text-white"><i class="fas fa-search me-1"></i> Catálogo</span>
+                                    <input type="text" class="form-control servico-catalogo-search"
+                                           list="catalogo_servicos_dl"
+                                           placeholder="Buscar do catálogo (vincula servico_id e auto-preenche)"
+                                           value="{% if item.servico_id %}{{ item.servico_id }} — {{ item.descricao }}{% endif %}">
+                                    <input type="hidden" name="item_servico_id" class="servico-catalogo-id" value="{{ item.servico_id or '' }}">
+                                </div>
+                                {% if item.servico_id %}
+                                <small class="text-success"><i class="fas fa-link"></i> Vinculado ao serviço de catálogo #{{ item.servico_id }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="mb-3">
@@ -211,6 +226,17 @@ function adicionarServico() {
     const novoServico = document.createElement('div');
     novoServico.className = 'servico-item border rounded p-3 mb-3';
     novoServico.innerHTML = `
+        <div class="row mb-2">
+            <div class="col-12">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-info text-white"><i class="fas fa-search me-1"></i> Catálogo</span>
+                    <input type="text" class="form-control servico-catalogo-search"
+                           list="catalogo_servicos_dl"
+                           placeholder="Buscar do catálogo">
+                    <input type="hidden" name="item_servico_id" class="servico-catalogo-id" value="">
+                </div>
+            </div>
+        </div>
         <div class="row">
             <div class="col-md-4">
                 <div class="mb-3">
@@ -292,5 +318,69 @@ function calcularTotal() {
 document.addEventListener('DOMContentLoaded', function() {
     calcularTotal();
 });
+</script>
+
+<!-- Task #82/#86: Catálogo de Serviços — datalist global + autofill por delegação -->
+<datalist id="catalogo_servicos_dl"></datalist>
+<script>
+(function(){
+  let catalogoServicosCache = [];
+
+  function carregarCatalogoServicos(){
+    fetch('/catalogo/api/servicos/buscar?limit=500', {credentials: 'same-origin'})
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        const lista = Array.isArray(data) ? data : (data.servicos || data.items || []);
+        catalogoServicosCache = lista;
+        const dl = document.getElementById('catalogo_servicos_dl');
+        if (!dl) return;
+        dl.innerHTML = lista.map(s => {
+          const preco = (s.preco_venda != null ? s.preco_venda : (s.preco_venda_unitario || 0));
+          const unidade = s.unidade || s.unidade_medida || 'un';
+          const label = `${s.id} — ${s.nome} (${unidade} | R$ ${Number(preco).toFixed(2)})`;
+          return `<option value="${label.replace(/"/g,'&quot;')}"></option>`;
+        }).join('');
+      })
+      .catch(err => console.warn('[Catálogo] falha:', err));
+  }
+
+  function aplicarServicoNaLinha(row, svc){
+    if (!row || !svc) return;
+    const preco = Number(svc.preco_venda != null ? svc.preco_venda : (svc.preco_venda_unitario || 0));
+    const unidade = svc.unidade || svc.unidade_medida || 'un';
+    const desc = row.querySelector('.servico-descricao, input[name="item_descricao"]');
+    if (desc && !desc.value) desc.value = svc.nome;
+    const hidden = row.querySelector('.servico-catalogo-id, input[name="item_servico_id"]');
+    if (hidden) hidden.value = svc.id;
+    const uniSel = row.querySelector('.servico-unidade, select[name="item_unidade"]');
+    if (uniSel && uniSel.tagName === 'SELECT') {
+      const has = Array.from(uniSel.options).some(o => o.value === unidade);
+      if (!has) {
+        const opt = document.createElement('option');
+        opt.value = unidade; opt.textContent = unidade;
+        uniSel.appendChild(opt);
+      }
+      uniSel.value = unidade;
+    }
+    const precoIn = row.querySelector('.servico-valor-unitario, input[name="item_preco"]');
+    if (precoIn && (!precoIn.value || parseFloat(precoIn.value) === 0)) {
+      precoIn.value = preco.toFixed(2);
+      if (typeof calcularServico === 'function') { try { calcularServico(precoIn); } catch(e){} }
+    }
+  }
+
+  document.addEventListener('input', function(e){
+    if (!e.target.classList || !e.target.classList.contains('servico-catalogo-search')) return;
+    const val = (e.target.value || '').trim();
+    const m = val.match(/^(\d+)\s+—/);
+    if (!m) return;
+    const id = parseInt(m[1], 10);
+    const svc = catalogoServicosCache.find(s => Number(s.id) === id);
+    if (!svc) return;
+    aplicarServicoNaLinha(e.target.closest('.servico-item, tr'), svc);
+  });
+
+  document.addEventListener('DOMContentLoaded', carregarCatalogoServicos);
+})();
 </script>
 {% endblock %}

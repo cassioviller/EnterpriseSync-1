@@ -1,0 +1,56 @@
+Você vai trabalhar no projeto SIGE v9.0 e precisa:
+
+### 1. Corrigir bugs críticos identificados
+
+1. **Evento de aprovação de proposta:**
+   - Nas rotas de status e de aprovação de `propostas` (`propostas_consolidated.py`), quando o status passa para `APROVADA`, chame `EventManager.emit('proposta_aprovada', ...)` com os argumentos necessários (ex.: `{'proposta_id': id, 'admin_id': admin_id}`).
+   - Ajuste `aprovar()` para usar o mesmo status uppercase (`APROVADA`).
+   - Garanta que, após aprovar, os handlers em `event_manager.py` criem a Obra, a ContaReceber, os `ItemMedicaoComercial` e os `ObraServicoCusto`.
+
+2. **Contas a receber e fluxo de caixa (Bugs #1 e #2):**
+   - Em `financeiro_views.py` e `financeiro_service.py`, onde há `sum(c.saldo ...)`, altere para `sum((c.saldo or 0) ...)` para evitar `TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'`.
+   - Adote o mesmo tratamento nulo em qualquer função que some valores que possam ser `None`.
+
+3. **Token do cliente e obra:**
+   - Em `event_manager.py::gerar_contas_receber_proposta`, depois de criar a Obra, atribua `token_cliente = secrets.token_urlsafe(16)` e salve no banco.
+   - Atualize também `proposta.obra_id` e `proposta.convertida_em_obra = True` antes de commitar.  
+   - Isso garante que o portal do cliente funcione sem necessidade de edição via SQL.
+
+4. **servico_id em PropostaItem (Bug #5):**
+   - Audit the form “Nova Proposta” para ter um `<input type="hidden" name="servico_id">` para cada item proveniente do catálogo.
+   - Na rota de criação/edição de proposta, salve esse `servico_id` em `PropostaItem.servico_id`.
+   - Ajuste a UI para garantir que, ao selecionar um serviço do catálogo, o ID seja enviado e persistido.
+
+5. **Rota do Mapa de Concorrência V2 (Bug #6):**
+   - Verifique se a rota `/obras/<id>/mapa-v2/<mapa_id>/editar` existe em outro blueprint ou está com path diferente.  
+   - Se estiver faltando, implemente-a conforme documentado ou atualize a documentação (`replit.md`) para refletir o caminho correto.
+
+### 2. Consolidar o módulo de orçamento e serviços
+
+1. **Catálogo de Serviços com Fórmulas:**
+   - Cada serviço deve ter uma lista de coeficientes de consumo por insumo e por função de mão de obra.  
+   - Crie ou use modelos que armazenem esses coeficientes (quantidade de insumo por unidade de serviço) e permita editá-los via UI.  
+   - Garanta que há um modelo de preços base (`PreçoBaseInsumo`) para materiais e mão de obra, com vigência.
+
+2. **Cálculo automático de custos e preços:**
+   - No serviço `orcamento_service.py`, implemente função que recebe `servico_id` e quantidade (m², m³ ou outra unidade) e retorna: quantidades de insumos, custo unitário (somando material, mão de obra e outros), preço de venda unitário (aplicando imposto e margem configurável) e lucro unitário.
+   - Esse cálculo deve considerar o coeficiente de consumo × preço base.  
+   - Atualize as rotas de proposta para, ao selecionar um serviço e informar a quantidade, preencher automaticamente os campos de preço e custo.
+
+3. **Integração com Propostas e Medições:**
+   - Modifique o formulário de propostas para que os itens sempre utilizem um `servico_id` e uma quantidade de medida.  
+   - Ao salvar a proposta, chame `orcamento_service.calcular_servico` para calcular preços e gravar `PropostaItem` com `servico_id`, `quantidade_medida`, `preco_unitario`, `custo_unitario`, `lucro_unitario` e `subtotal`.
+   - Na criação de medição, carregue esses itens (`ItemMedicaoComercial`) com `servico_id` e calcule `valor_comercial` automaticamente como `preco_unitario × quantidade_executada`.
+
+4. **Resumo financeiro e relatório:**
+   - Após aprovação e propagação, garanta que `ObraServicoCusto` reflita o `valor_orcado` e que os custos realizados (RDO, almoxarifado, compras) alimentem `realizado_material`, `realizado_mao_obra` etc.
+   - O módulo de Resumo de Custos deve somar `total_realizado`, `total_a_realizar` (planejado no planejamento de custos) e exibir `custo_real_da_obra` e `verba_disponivel` no painel estratégico.
+
+### 3. Testar o ciclo completo
+
+1. **Criar insumos e serviços** no catálogo, com coeficientes e preços base.
+2. **Criar uma proposta** a partir desses serviços, aprovar e verificar se Obra, ContaReceber, IMC e OSC são gerados automaticamente.
+3. **Criar RDO e Medição**, conferindo que os itens de medição usam o `servico_id` e que o valor comercial é calculado.
+4. **Verificar painel de custos e financeiro**; as listagens devem abrir sem erro e mostrar saldos corretos.
+
+Implemente essas correções e melhorias de forma incremental, cuidando para que rotas existentes continuem funcionais e para que dados legados sejam tratados (por exemplo, itens de propostas antigas que ainda não têm `servico_id`). Descreva os arquivos modificados e os pontos de integração na entrega.

@@ -1,0 +1,76 @@
+Você vai refatorar o módulo de propostas e integrar plenamente o novo módulo de orçamento. O objetivo é que, ao elaborar uma proposta, o usuário selecione um serviço, informe apenas a medida geométrica (por exemplo, área ou volume) e o sistema calcule automaticamente:
+
+  • a quantidade de cada insumo (material e mão de obra) conforme coeficientes de consumo do serviço;  
+  • o custo unitário total (matéria, mão de obra e outros);  
+  • o preço de venda unitário, aplicando os percentuais de imposto e margem definidos;  
+  • o lucro unitário;  
+  • o subtotal por item (preço de venda × medida).  
+
+Além disso, os itens de medição devem se basear nos mesmos serviços, para evitar duplicidade de lançamentos.
+
+### 1. Estrutura de dados
+
+1. **Serviço técnico** (`Servico`): deve armazenar, além de nome e unidade de medida, uma lista de coeficientes de consumo (`Coeficiente`), definindo quanto de cada insumo (material ou função de mão de obra) é necessário para executar uma unidade do serviço.
+
+2. **Coeficiente** (`ItemTabelaComposicao` ou modelo novo): campos essenciais:
+   - `servico_id`  
+   - `insumo_id` (material ou função de mão de obra)  
+   - `coeficiente_consumo` (ex.: 0,463 chapas por m²)  
+   - `unidade` (m², peça, kg, dia, etc.)  
+
+3. **Insumo**: já deve existir; precisa incluir preço unitário vigente e tipo (`MATERIAL`, `MAO_OBRA`, `OUTROS`).
+
+4. **Configuração de preço**: tabela ou campos em `ConfiguracaoEmpresa` para percentuais padrão de imposto e margem.
+
+5. **PropostaItem**: adicione campos `servico_id`, `quantidade_medida`, `custo_unitario`, `preco_unitario`, `lucro_unitario` e `subtotal`. `quantidade_medida` é a medida geométrica informada pelo usuário.
+
+6. **ItemMedicaoComercial**: adicione `servico_id` e `quantidade_medida` para que a medição utilize o mesmo serviço e calcule o valor comercial automaticamente.
+
+### 2. Lógica de cálculo
+
+1. **Função de cálculo (`orcamento_service.calcular_servico`)**:
+   - Recebe `servico_id` e `quantidade_medida`.
+   - Para cada coeficiente do serviço, calcula a quantidade de insumo: `quantidade_insumo = coeficiente_consumo × quantidade_medida`.
+   - Busca o preço unitário vigente do insumo.
+   - Calcula o custo parcial: `custo_insumo = quantidade_insumo × preço_unitario`.
+   - Soma custos de todos os insumos e separa por categoria (material, mão de obra, outros).
+   - Aplica os percentuais de imposto e margem configurados para obter `preco_venda_unitario`:
+     ```
+     preco_venda_unitario = custo_unitario / (1 - imposto_pct/100 - margem_pct/100)
+     ```
+   - Calcula `lucro_unitario = preco_venda_unitario - custo_unitario`.
+   - Calcula `subtotal = preco_venda_unitario × quantidade_medida`.
+   - Retorna um dicionário com todas essas informações.
+
+2. **Interface de edição de coeficientes**:
+   - Permite cadastrar/editar coeficientes de consumo de cada serviço sem alterar código. Assim, quando houver métricas reais, basta ajustar os coeficientes na interface.
+
+3. **Formulário de proposta**:
+   - Ao adicionar um item, o usuário seleciona um serviço (via `servico_id`) e informa `quantidade_medida`.
+   - A função de cálculo preenche automaticamente os campos de quantidade de insumos, custo, preço unitário e lucro; o usuário apenas confirma.
+   - Armazene `servico_id` e `quantidade_medida` para posterior referência.
+
+4. **Medição**:
+   - Na criação de `ItemMedicaoComercial`, exiba os serviços planejados. O usuário informa a quantidade executada ou percentual. O sistema calcula `valor_comercial = preco_unitario × quantidade_executada`.
+
+5. **Resumo final da proposta**:
+   - Some `subtotal` de todos os itens para obter o valor de venda total.
+   - Some custos e lucros unitários multiplicados pelas quantidades para obter custo total e lucro total.
+
+### 3. Passos de implementação
+
+1. Adapte os modelos (`Servico`, `ItemTabelaComposicao`, `PropostaItem`, `ItemMedicaoComercial`) para incluir os campos acima.
+2. Crie ou refatore `orcamento_service.calcular_servico` para aceitar a medida de entrada e calcular quantidades, custos e preços.
+3. Modifique as rotas de criação e edição de propostas para processar `servico_id` e `quantidade_medida`, invocar `calcular_servico` e salvar os campos de cálculo no banco.
+4. Atualize templates para mostrar seletores de serviço e exibir o resultado do cálculo em tempo real (via AJAX ou após o submit).
+5. Refatore o módulo de medição para vincular cada item de medição a um `servico_id` e calcular o valor automaticamente.
+6. Revise as páginas de resumo de obras e propostas para exibir custo total, valor de venda total e lucro total.
+
+### 4. Testes
+
+- Crie um serviço com coeficientes de material e mão de obra, cadastre preços base de insumos e percentuais de imposto/margem.
+- Crie uma proposta selecionando o serviço e informando uma medida; verifique se o item da proposta mostra quantidades de insumo, custo, preço e lucro automaticamente.
+- Execute medições usando esse mesmo serviço e confirme se o valor comercial é calculado automaticamente.
+- Edite coeficientes ou preços base e verifique se novas propostas refletem as alterações.
+
+Implemente essas mudanças de forma incremental, mantendo compatibilidade com dados existentes. O objetivo é acabar com a necessidade de preencher itens manualmente e garantir que o orçamento planejado, a proposta comercial e a medição compartilhem a mesma base de serviços e fórmulas.

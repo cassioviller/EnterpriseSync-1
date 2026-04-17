@@ -117,6 +117,17 @@
                     <h6 class="text-secondary mb-3">Serviços Adicionais</h6>
                     <div id="servicosContainer">
                     <div class="servico-item border rounded p-3 mb-3">
+                        <div class="row mb-2">
+                            <div class="col-12">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-info text-white"><i class="fas fa-search me-1"></i> Catálogo</span>
+                                    <input type="text" class="form-control servico-catalogo-search"
+                                           list="catalogo_servicos_dl"
+                                           placeholder="Digite para buscar serviço do catálogo (preenche descrição/unidade/preço e vincula servico_id)">
+                                    <input type="hidden" name="item_servico_id" class="servico-catalogo-id" value="">
+                                </div>
+                            </div>
+                        </div>
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="mb-3">
@@ -340,9 +351,12 @@ function adicionarServico() {
     
     // Limpar valores e garantir que os campos tenham os nomes corretos
     novoServico.querySelectorAll('input, textarea, select').forEach(field => {
-        if (field.type !== 'hidden') field.value = '';
-        
-        // Garantir que os campos tenham os nomes corretos
+        // Limpar TUDO no clone, inclusive hidden (item_servico_id, item_template_*, etc.)
+        // Preserva selects ficando no primeiro option.
+        field.value = '';
+        if (field.tagName === 'SELECT' && field.options.length) field.selectedIndex = 0;
+
+        // Garantir que os campos tenham os nomes corretos (defesa contra cloneNode quirks)
         if (field.classList.contains('servico-descricao')) {
             field.name = 'item_descricao';
         } else if (field.classList.contains('servico-quantidade')) {
@@ -351,6 +365,8 @@ function adicionarServico() {
             field.name = 'item_unidade';
         } else if (field.classList.contains('servico-valor-unitario')) {
             field.name = 'item_preco';
+        } else if (field.classList.contains('servico-catalogo-id')) {
+            field.name = 'item_servico_id';
         }
     });
     
@@ -547,6 +563,7 @@ function criarTabelaTemplate(template) {
                         <input type="hidden" name="item_template_nome" value="${template.nome || ''}">
                         <input type="hidden" name="item_template_id" value="${template.id || ''}">
                         <input type="hidden" name="item_categoria" value="${template.categoria || ''}">
+                        <input type="hidden" name="item_servico_id" value="">
                     </td>
                     <td class="text-center">
                         <input type="number" 
@@ -737,6 +754,7 @@ function adicionarItemTemplate(templateId) {
                 <input type="hidden" name="item_template_nome" value="${template.nome || ''}">
                 <input type="hidden" name="item_template_id" value="${template.id || ''}">
                 <input type="hidden" name="item_categoria" value="${template.categoria || ''}">
+                <input type="hidden" name="item_servico_id" value="">
             </td>
             <td class="text-center">
                 <input type="number" 
@@ -1039,6 +1057,17 @@ function carregarTemplateComValor(templateId) {
                         const servicoDiv = document.createElement('div');
                         servicoDiv.className = 'servico-item border rounded p-3 mb-3';
                         servicoDiv.innerHTML = `
+                            <div class="row mb-2">
+                                <div class="col-12">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-info text-white"><i class="fas fa-search me-1"></i> Catálogo</span>
+                                        <input type="text" class="form-control servico-catalogo-search"
+                                               list="catalogo_servicos_dl"
+                                               placeholder="Buscar serviço do catálogo">
+                                        <input type="hidden" name="item_servico_id" class="servico-catalogo-id" value="">
+                                    </div>
+                                </div>
+                            </div>
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="mb-3">
@@ -1300,5 +1329,78 @@ function limparServicos() {
     `;
     calcularTotal();
 }
+</script>
+
+<!-- Task #82/#86: Catálogo de Serviços — datalist global + autofill por delegação -->
+<datalist id="catalogo_servicos_dl"></datalist>
+<script>
+(function(){
+  let catalogoServicosCache = [];
+
+  function carregarCatalogoServicos(){
+    fetch('/catalogo/api/servicos/buscar?limit=500', {credentials: 'same-origin'})
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        const lista = Array.isArray(data) ? data : (data.servicos || data.items || []);
+        catalogoServicosCache = lista;
+        const dl = document.getElementById('catalogo_servicos_dl');
+        if (!dl) return;
+        dl.innerHTML = lista.map(s => {
+          const preco = (s.preco_venda != null ? s.preco_venda : (s.preco_venda_unitario || 0));
+          const unidade = s.unidade || s.unidade_medida || 'un';
+          const label = `${s.id} — ${s.nome} (${unidade} | R$ ${Number(preco).toFixed(2)})`;
+          return `<option value="${label.replace(/"/g,'&quot;')}"></option>`;
+        }).join('');
+        console.log('[Catálogo] ' + lista.length + ' serviços carregados.');
+      })
+      .catch(err => console.warn('[Catálogo] falha ao carregar:', err));
+  }
+
+  function aplicarServicoNaLinha(row, svc){
+    if (!row || !svc) return;
+    const preco = Number(svc.preco_venda != null ? svc.preco_venda : (svc.preco_venda_unitario || 0));
+    const unidade = svc.unidade || svc.unidade_medida || 'un';
+
+    const desc = row.querySelector('.servico-descricao, input[name="item_descricao"]');
+    if (desc && !desc.value) desc.value = svc.nome;
+
+    const hidden = row.querySelector('.servico-catalogo-id, input[name="item_servico_id"]');
+    if (hidden) hidden.value = svc.id;
+
+    const uniSel = row.querySelector('.servico-unidade, select[name="item_unidade"]');
+    if (uniSel && uniSel.tagName === 'SELECT') {
+      const has = Array.from(uniSel.options).some(o => o.value === unidade);
+      if (!has) {
+        const opt = document.createElement('option');
+        opt.value = unidade; opt.textContent = unidade;
+        uniSel.appendChild(opt);
+      }
+      uniSel.value = unidade;
+    }
+
+    const precoIn = row.querySelector('.servico-valor-unitario, input[name="item_preco"]');
+    if (precoIn && (!precoIn.value || parseFloat(precoIn.value) === 0)) {
+      precoIn.value = preco.toFixed(2);
+      if (typeof calcularServico === 'function') {
+        try { calcularServico(precoIn); } catch(e){}
+      }
+    }
+  }
+
+  document.addEventListener('input', function(e){
+    if (!e.target.classList || !e.target.classList.contains('servico-catalogo-search')) return;
+    const val = (e.target.value || '').trim();
+    if (!val) return;
+    const m = val.match(/^(\d+)\s+—/);
+    if (!m) return;
+    const id = parseInt(m[1], 10);
+    const svc = catalogoServicosCache.find(s => Number(s.id) === id);
+    if (!svc) return;
+    const row = e.target.closest('.servico-item, tr');
+    aplicarServicoNaLinha(row, svc);
+  });
+
+  document.addEventListener('DOMContentLoaded', carregarCatalogoServicos);
+})();
 </script>
 {% endblock %}
