@@ -368,31 +368,73 @@ def api_buscar_insumos():
 @catalogo_bp.route('/proposta-itens/<int:item_id>/vincular-servico', methods=['POST'])
 @login_required
 def vincular_proposta_item(item_id):
+    """Vincula um PropostaItem (legado) a um Servico do catálogo.
+
+    Form params:
+        servico_id (int, obrigatório p/ vincular; vazio para desvincular)
+        atualizar_preco (bool/'1','true','on'): se truthy, recalcula
+            snapshot do item (preco_unitario = servico.preco_venda_unitario,
+            unidade do servico) — útil ao mover item legado para o catálogo.
+    """
     aid = _admin_id()
     it = PropostaItem.query.get_or_404(item_id)
-    # Validar tenancy via proposta
     if not it.proposta or getattr(it.proposta, 'admin_id', None) != aid:
         abort(403)
     servico_id = request.form.get('servico_id', type=int)
     svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404() if servico_id else None
     it.servico_id = svc.id if svc else None
+
+    atualizar = (request.form.get('atualizar_preco') or '').strip().lower() in ('1', 'true', 'on', 'yes')
+    if atualizar and svc is not None:
+        if svc.preco_venda_unitario is not None:
+            it.preco_unitario = svc.preco_venda_unitario
+        if getattr(svc, 'unidade_medida', None):
+            it.unidade = svc.unidade_medida
     db.session.commit()
-    return jsonify({'ok': True, 'servico_id': it.servico_id})
+    return jsonify({
+        'ok': True, 'servico_id': it.servico_id,
+        'preco_unitario': float(it.preco_unitario or 0),
+        'unidade': it.unidade,
+        'atualizado': bool(atualizar and svc is not None),
+    })
 
 
 @catalogo_bp.route('/medicao-itens/<int:item_id>/vincular-servico', methods=['POST'])
 @login_required
 def vincular_medicao_item(item_id):
+    """Vincula um ItemMedicaoComercial (legado) a um Servico do catálogo.
+
+    Form params:
+        servico_id (int)
+        atualizar_preco (bool): se truthy E o item tem `quantidade>0`,
+            recalcula valor_comercial = quantidade × servico.preco_venda_unitario.
+    """
+    from decimal import Decimal as _D
     aid = _admin_id()
     it = ItemMedicaoComercial.query.filter_by(id=item_id, admin_id=aid).first_or_404()
     servico_id = request.form.get('servico_id', type=int)
     svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404() if servico_id else None
     it.servico_id = svc.id if svc else None
-    # Propaga para o ObraServicoCusto pareado
+
+    atualizar = (request.form.get('atualizar_preco') or '').strip().lower() in ('1', 'true', 'on', 'yes')
+    valor_atualizado = False
+    if atualizar and svc is not None and it.quantidade and svc.preco_venda_unitario:
+        qtd = _D(str(it.quantidade))
+        preco = _D(str(svc.preco_venda_unitario))
+        if qtd > 0 and preco > 0:
+            it.valor_comercial = (qtd * preco).quantize(_D('0.01'))
+            valor_atualizado = True
+
     par = ObraServicoCusto.query.filter_by(
         item_medicao_comercial_id=it.id, admin_id=aid
     ).first()
     if par:
         par.servico_catalogo_id = it.servico_id
+        if valor_atualizado:
+            par.valor_orcado = it.valor_comercial
     db.session.commit()
-    return jsonify({'ok': True, 'servico_id': it.servico_id})
+    return jsonify({
+        'ok': True, 'servico_id': it.servico_id,
+        'valor_comercial': float(it.valor_comercial or 0),
+        'atualizado': valor_atualizado,
+    })

@@ -161,18 +161,19 @@ def test_handle_proposta_aprovada_propagacao_falha_aborta_tudo(monkeypatch):
         monkeypatch.setattr(ph, '_propagar_proposta_para_obra', _boom)
 
         try:
-            ph.handle_proposta_aprovada(
-                {
-                    'proposta_id': proposta_id,
-                    'cliente_nome': 'Cliente Falha #82',
-                    'cliente_cpf_cnpj': '',
-                    'obra_id': obra.id,
-                    'valor_total': 500.00,
-                    'data_vencimento': (date.today()).isoformat(),
-                    'data_aprovacao': date.today().isoformat(),
-                },
-                aid,
-            )
+            with pytest.raises(RuntimeError, match='falha simulada'):
+                ph.handle_proposta_aprovada(
+                    {
+                        'proposta_id': proposta_id,
+                        'cliente_nome': 'Cliente Falha #82',
+                        'cliente_cpf_cnpj': '',
+                        'obra_id': obra.id,
+                        'valor_total': 500.00,
+                        'data_vencimento': (date.today()).isoformat(),
+                        'data_aprovacao': date.today().isoformat(),
+                    },
+                    aid,
+                )
 
             cr_depois = ContaReceber.query.filter_by(
                 admin_id=aid, origem_tipo='PROPOSTA', origem_id=proposta_id

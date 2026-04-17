@@ -191,6 +191,10 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ Erro ao processar evento proposta_aprovada: {e}", exc_info=True)
+        # Re-raise para o caller (event manager) ter visibilidade da falha;
+        # propagação proposta→obra é parte do contrato e não deve falhar
+        # silenciosamente. Quem dispara o evento pode capturar e alertar.
+        raise
 
 
 def gerar_numero_lancamento(admin_id: int) -> int:
