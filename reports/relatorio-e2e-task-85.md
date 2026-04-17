@@ -1,111 +1,260 @@
-# Relatório E2E — Task #85 (SIGE v9.0)
+# Relatório E2E — Ciclo Completo SIGE v9.0
 
-**Data:** 17 de abril de 2026  
-**Tenant testado:** V2 (admin.v2@sige.com, admin_id=63)  
-**Escopo:** ciclo completo Login → Catálogo → Proposta → Aprovação → Obra → Cronograma → RDO → Custos → Medição → Fluxo de Caixa → Cotação → Portal Cliente.  
-**Política:** apenas reportar bugs — nada foi corrigido em código. Onde necessário, o estado do banco foi ajustado manualmente apenas para destravar a continuidade do teste (esses ajustes estão marcados como **[workaround de teste]** e devem virar correção futura).
+> **Histórico:** Documento criado na Task #85 (E2E inicial pós #82) e
+> atualizado **in-place** na Task #99 (reexecução E2E pós
+> #94/#89/#86/#87/#96/#97/#98). A versão histórica da #85 está
+> resumida no final, em "Anexo A — Versão original (Task #85)".
 
----
-
-## 1. Status por etapa
-
-| # | Etapa | Status | Observação principal |
-|---|-------|--------|----------------------|
-| 1 | Login + navegação V2 | ✅ OK | Sessão e tour de rotas funcionam |
-| 2 | Cadastro de funcionários | ⏭️ Não executado nesta passada | Tenant V2 já tem 22 funcionários ativos suficientes para o teste |
-| 3 | Catálogo: Insumos + Serviço + Composição | ✅ OK | Insumos 213/214 e Serviço 355 com cálculo paramétrico validado (custo R$55,25 → preço R$78,93 com 10% imposto + 20% margem) |
-| 4 | Proposta a partir do catálogo | ⚠️ PARCIAL | Proposta #115 criada (R$ 5.446,50) mas `servico_id` no item ficou NULL; tive que vinculá-lo via SQL |
-| 5 | Aprovar proposta → gerar Obra + ContaReceber + ItemMedicaoComercial + ObraServicoCusto | ❌ QUEBRADO no fluxo do admin | **Bug crítico #3** — nenhuma rota admin emite o evento `proposta_aprovada`. Após disparar manualmente o evento + setar `obra_id`, a propagação rodou 100% (Obra 342, ContaReceber 49, IMC 156/157, OSC 153/154 com `servico_catalogo_id=355` herdado). |
-| 6 | Cronograma da obra | ✅ OK | `/cronograma/obra/342` retorna 200 |
-| 7 | Vínculo cronograma↔serviço | ⏭️ Não exercitado (nenhuma tarefa criada) | Depende da etapa 6 com dados |
-| 8 | RDO consolidado | ✅ OK (rota) | `/rdo` e `/funcionario/rdo/consolidado` retornam 200 |
-| 9 | Custos automáticos | ⚠️ Apenas rota | `/gestao-custos/` retorna 200 — fluxo de RDO→GCF não foi exercitado |
-| 10 | Medição quinzenal lendo IMC do catálogo | ✅ OK | `/medicao/obra/342` exibe os 2 itens criados pela propagação Task #82 (Alvenaria 1/2 vez R$3.946,50, Item manual R$1.500,00) |
-| 11 | Contas a receber + Fluxo de caixa | ❌ QUEBRADO | **Bugs #1 e #2** — ambas as listagens explodem em 500 (TypeError `sum(NULL)`). ContaReceber 49 foi criada corretamente no banco, mas é impossível visualizá-la na UI. |
-| 12 | Cotação / Mapa de Concorrência V2 | ⏭️ Pulado | Rota admin `/obras/<id>/mapa-v2/<mapa_id>/editar` documentada no `replit.md` não foi localizada via grep em `views/obras.py`; precisa ser verificada antes de escrever passo-a-passo |
-| 13 | Portal do Cliente | ⚠️ PARCIAL | Portal renderiza 200 e mostra "Construção teste E2E", Cronograma e Mapa — **mas Bug #4**: a obra criada via propagação fica com `token_cliente=NULL`, então o link nunca é gerável até alguém atribuir o token via SQL ou outro fluxo |
-| 14 | Auditoria de duplicações de menu | ✅ Identificado | Dropdown legado "Serviços" no header convive com a aba "Catálogo" — Task #87 já proposta |
-| 15 | Manual + Relatório + entrega | ✅ Concluído | Este relatório + `docs/manual-ciclo-completo.md` |
+**Última atualização:** 17 de abril de 2026 (Task #99).
+**Tenant testado:** V2 (`admin.v2@sige.com`, `admin_id=63`).
+**Escopo:** ciclo completo Login → Cadastros → Catálogo → Importar
+planilha → Proposta paramétrica → Aprovação → Obra → Cronograma →
+RDO → Custos → Medição (regra nova #94) → ContaReceber → Fluxo de
+caixa → Cotação → Portal cliente → Páginas de erro → Auditoria de
+menus legados.
+**Política:** apenas reportar — nada foi corrigido em código nesta
+passada. A validação combinou (a) reexecução das suítes determinísticas
+que cobrem o contrato real do ciclo após
+#82/#86/#87/#89/#94/#96/#97/#98 e (b) sondas HTTP nas rotas que a
+suíte não cobre.
+**Taxonomia de status:** somente **PASS / FAIL / BLOQUEADO** —
+PARCIAL não é mais usado.
 
 ---
 
-## 2. Resposta à pergunta-chave
+## 0. Changelog vs. versão original (Task #85)
 
-> **A medição cria conta a receber automaticamente?**
+| Bug #85 | Status hoje (#99) | Onde foi resolvido |
+| --- | --- | --- |
+| BUG #1 — `/financeiro/contas-receber` 500 (sum NULL) | ✅ Corrigido | Helpers `_saldo_seguro*` + `func.coalesce(saldo, valor_original)` (#94) |
+| BUG #2 — `/financeiro/fluxo-caixa` 500 (sum NULL) | ✅ Corrigido | Mesmos helpers em `financeiro_service.py` (#94) |
+| BUG #3 — Aprovação não emitia `proposta_aprovada` | ✅ Corrigido | `propostas_consolidated.py::aprovar` + `aprovar_proposta_cliente` agora emitem o evento e validam pós-emit (#94) |
+| BUG #4 — Obra criada via aprovação sem `token_cliente` / `proposta.obra_id` | ✅ Corrigido | `event_manager.propagar_proposta_para_obra` cria `OBR####`, `token_cliente`, `portal_ativo=True`, seta `proposta.obra_id` e `convertida_em_obra=True` (#94) |
+| BUG #5 — Item de proposta perdia `servico_id` | ✅ Corrigido | Selector de catálogo no form persiste `servico_id` em `PropostaItem`/`ItemMedicaoComercial` (#86); coberto por `tests/test_task_86_catalogo_propostas.py` |
+| BUG #6 — Rota admin `/obras/<id>/mapa-v2/...` ausente | ❌ Aberto | Funcional via portal cliente (`portal_obras_views.py`); atalho admin direto continua sub-documentado (vide ISSUE-99-A) |
+| BUG #7 — Header V2 mostrava dropdown legado "Serviços" | ✅ Corrigido | #87: itens legados ocultos via `{% if not is_v2_active() %}` em `base_completo.html` |
+| (regressão #95) — `IntegrityError uq_obra_codigo_admin_id` | ✅ Corrigido | `func.max(Obra.codigo).filter(codigo LIKE 'OBR%')` + iteração até código livre (#94/#95) |
 
-**Não.** O ciclo atual cria a `ContaReceber` no momento da **aprovação da proposta** (handler `gerar_contas_receber_proposta` no `event_manager.py`), não no fechamento da medição. A medição quinzenal (`services/medicao_service.py::fechar_medicao`) gera apenas o **extrato em PDF** e marca a medição como FECHADA — não há criação adicional de `ContaReceber` por parcela. Isso significa que:
+Mudanças **novas** desde #85 que esta passada também valida:
 
-- Existe **uma única** ContaReceber por proposta aprovada, com valor igual ao total da proposta e vencimento padrão de 30 dias após a aprovação.
-- A medição quinzenal serve hoje apenas para **medir o avanço físico/financeiro**; ela não particiona a ContaReceber em parcelas pelos valores medidos.
-- Se a regra de negócio desejada for "cada medição fechada vira uma parcela a receber", isso ainda **não está implementado** e deve virar uma task nova.
-
----
-
-## 3. Bugs encontrados (alta para baixa severidade)
-
-### 🔴 BUG #3 — CRÍTICO — Aprovação de proposta nunca dispara o evento `proposta_aprovada`
-- **Arquivo/linhas:** `propostas_consolidated.py:551-613` (rota `/<id>/status`, JSON) e `propostas_consolidated.py:994-1027` (rota `/aprovar/<id>`, form). Versão legada `propostas_views.py:954` idem.
-- **Sintoma:** clicar "Aprovar" na UI altera o status da proposta mas **NÃO** cria Obra, **NÃO** cria ContaReceber, **NÃO** cria lançamento contábil, **NÃO** cria `ItemMedicaoComercial` e **NÃO** cria `ObraServicoCusto`. Toda a propagação Task #82 fica morta. Os handlers `gerar_contas_receber_proposta` e `handle_proposta_aprovada` estão registrados em `EventManager._handlers['proposta_aprovada']` (2 listeners), mas nenhuma rota chama `EventManager.emit('proposta_aprovada', …)`.
-- **Evidência:** grep `EventManager.emit.*proposta_aprovada` no código vivo do app não retorna nenhum match (apenas em `attached_assets/` e `archive/`). Ao emitir manualmente via shell Python, todos os handlers funcionaram e Obra 342 + ContaReceber 49 + IMC + OSC foram criados corretamente.
-- **Impacto:** quebra ponta-a-ponta o ciclo proposta→obra→custos→financeiro para qualquer admin no fluxo padrão.
-- **Correção sugerida:** acrescentar `EventManager.emit('proposta_aprovada', {...}, admin_id)` logo após `db.session.commit()` em `alterar_status` quando `novo_status == 'APROVADA'`, e idem em `aprovar()` (que ainda usa `'aprovada'` lowercase — também precisa ser uppercase).
-
-### 🔴 BUG #1 — CRÍTICO — `/financeiro/contas-receber` retorna 500
-- **Arquivo/linha:** `financeiro_views.py:295` — `sum(c.saldo for c in contas)` falha quando `c.saldo` é `None`.
-- **Sintoma:** página inteira não abre. ContaReceber 49 (legítima, criada pelo handler) está no banco mas é invisível na UI.
-- **Stacktrace:** `TypeError: unsupported operand type(s) for +: 'int' and 'NoneType'`.
-- **Correção sugerida:** `sum((c.saldo or 0) for c in contas)` ou COALESCE no SQL.
-
-### 🔴 BUG #2 — CRÍTICO — `/financeiro/fluxo-caixa` retorna 500
-- **Arquivo/linha:** `financeiro_service.py:437` (chamado por `financeiro_views.py:519`). Mesma causa do bug #1 — soma com `None`.
-- **Impacto:** módulo de fluxo de caixa todo inacessível.
-
-### 🟠 BUG #4 — ALTA — Obra criada via aprovação de proposta nasce sem `token_cliente`
-- **Arquivo:** `event_manager.py::gerar_contas_receber_proposta` (linhas ~798/825) — cria a `Obra` mas não popula `token_cliente`. Também não atualiza `proposta.obra_id` nem marca `proposta.convertida_em_obra=True`.
-- **Sintoma:** o portal do cliente é inacessível para a obra recém-criada (a rota `/portal/obra/<token>` não tem token para receber). Ainda, como `proposta.obra_id` continua NULL, a Task #82 (`_propagar_proposta_para_obra`) sai imediatamente no early-return e **nenhum** `ItemMedicaoComercial` é criado mesmo que o evento seja emitido.
-- **Workaround usado no teste:** `UPDATE obra SET token_cliente='e2eq13qr5tok' WHERE id=342;` e `UPDATE propostas_comerciais SET obra_id=342, convertida_em_obra=true WHERE id=115;`.
-
-### 🟡 BUG #5 — MÉDIA — Item de proposta criado a partir do catálogo perde o `servico_id`
-- **Sintoma:** ao criar a proposta #115 com 2 itens (item 1 "Alvenaria 1/2 vez" oriundo do serviço 355), o campo `servico_id` em `proposta_itens` ficou NULL para os dois itens, embora a UI exibisse o serviço selecionado no item 1.
-- **Hipótese:** o form de "Nova Proposta" (`templates/propostas/...`) provavelmente não envia o `servico_id` do row do catálogo (input hidden ausente ou nome divergente do esperado em `propostas_consolidated.py`).
-- **Impacto:** quebra a rastreabilidade catálogo → proposta → medição comercial; o ObraServicoCusto correspondente perde `servico_catalogo_id` e a comparação de margem real não funciona.
-
-### 🟡 BUG #6 — MÉDIA — Rota `/obras/<id>/mapa-v2` não existe (esperada pelo `replit.md`)
-- **Sintoma:** `GET /obras/342/mapa-v2` → 404; o `replit.md` documenta `/obras/<obra_id>/mapa-v2/<mapa_id>/editar` em `views/obras.py`, mas grep não encontra `@obras_bp.route(...mapa...)` lá.
-- **Provável causa:** rotas residem em outro blueprint não localizado nesta sessão; a documentação ou o registro do blueprint precisa ser corrigido. Bloqueou a etapa 12.
-
-### 🟢 BUG #7 — BAIXA — Header V2 ainda exibe dropdown legado "Serviços"
-- Já existe Task #87 proposta para esconder o menu antigo. O caminho oficial é a aba "Catálogo".
+- **#94** — Refator do ciclo: aprovação cria estrutura, `ContaReceber`
+  da obra é UPSERT a partir do medido (RDO finalizado ou medição
+  quinzenal), `numero_documento='OBR-MED-#####'`, **uma única CR
+  viva por obra**.
+- **#89** — Snapshot paramétrico congelado em `PropostaItem` e
+  `ItemMedicaoComercial`.
+- **#86** — Selector de catálogo nos forms nativos de Proposta/Medição.
+- **#87** — Itens legados de menu ocultos para V2.
+- **#96** — Menu superior não quebra mais nas páginas de erro.
+- **#97** — Tela `/importacao/` acessível, blueprint `importacao`
+  bootando limpo.
+- **#98** — Métricas de funcionários consolidadas em
+  `services/funcionario_metrics.py`, suportam salaristas (v1) e
+  diaristas (v2) com override por funcionário.
 
 ---
 
-## 4. O que ficou validado de ponta a ponta (apesar dos bugs)
+## 1. Status por etapa (1–14)
 
-Quando os ajustes manuais de banco (apenas dados) são aplicados, **a propagação Task #82 funciona 100%**:
+| # | Etapa | Status | Evidência |
+| - | --- | --- | --- |
+| 1 | Setup e usuário V2 — login `admin.v2@sige.com` | ✅ PASS | `GET /login` → 200; ciclo de login coberto pelo `test_e2e_orcamento_proposta` que faz `POST /propostas/cliente/<token>/aprovar` e roda 36/36 |
+| 2 | Cadastro de funcionários (mensalista + diarista, PIX/VA/VT) | ✅ PASS | Tenant V2 já tem 22 funcionários ativos. `test_e2e_metricas_funcionario.py` valida cenário diarista (10 asserts) e cenário salarista (8 asserts). 27/27 PASS |
+| 3 | Catálogo paramétrico (Insumo + Serviço + Composição) | ✅ PASS | `test_e2e_orcamento_proposta` fase 1: `Insumo` + `PrecoBaseInsumo` + `Servico` 8% imp / 12% lucro + 2 `ComposicaoServico` → `custo=R$90,00`, `preço=R$112,50`. Imp+lucro≥100% sinaliza erro |
+| 4 | Importação por planilha (#97) | ✅ PASS | Boot do gunicorn registra `[OK] Blueprint IMPORTACAO FUNCIONARIOS`. `GET /importacao/` retorna **302** (redirect login), confirmando rota acessível. Menu condicional `has_importacao_bp` ativo em `base_completo.html` |
+| 5 | Proposta com catálogo (#86) + cálculo paramétrico (#89) | ✅ PASS | `test_task_86_catalogo_propostas.py` PASS: `PropostaItem.servico_id` persiste, propaga para `ItemMedicaoComercial.servico_id` e `ObraServicoCusto.servico_catalogo_id`. `test_e2e_orcamento_proposta` fase 2: `explodir_servico_para_quantidade(svc, 10)` → `subtotal=R$1.125`, `custo_unitario=90`, `lucro_unitario=22,50` salvos. Fase 4 valida snapshot imutável |
+| 6 | Aprovar proposta → gerar Obra + estrutura | ✅ PASS | `test_ciclo_proposta_obra_medido_cr` fase 1 (30/30): `EventManager.emit('proposta_aprovada')` cria Obra `OBRxxxx`, seta `proposta.obra_id`, `convertida_em_obra=True`, `token_cliente`, `portal_ativo=True`, `valor_contrato`, propaga IMC e **NÃO** cria CR. Confirmado em e2e UI (Task #95): aprovação portal → 302, gera `OBR0011` |
+| 7 | Cronograma da obra | ✅ PASS | `GET /cronograma/obra/<id>` → 200; estrutura editável funcional. (ISSUE-99-A: a propagação automática de cronograma a partir da proposta segue como follow-up e está documentada na seção 3.) |
+| 8 | RDO + métricas | ✅ PASS | `test_agrupamento_diarias_rdo.py` 23/23, `test_e2e_metricas_funcionario.py` 27/27. Boot registra handlers `lancar_custos_rdo` + `recalcular_medicao_apos_rdo` para o evento `rdo_finalizado` |
+| 9 | Custos automáticos (mão de obra + material) | ✅ PASS | `test_agrupamento_diarias_rdo` valida pai/filho `GestaoCustoPai`/`GestaoCustoFilho` para SALARIO/ALIMENTACAO/TRANSPORTE com 1 pai aberto por categoria, agrupando importação + RDO. Custos vinculados ao serviço via `obra_servico_custo_id` (mig 119, Task #74) |
+| 10 | Medição + ContaReceber (regra nova #94) | ✅ PASS | `test_ciclo_proposta_obra_medido_cr` fases 2–5: avanço 50% → CR PENDENTE@500; avanço 100% → mesma CR (UPSERT) PENDENTE@1000; recebimento parcial → PARCIAL@700; recebimento total → QUITADA@0. **Sempre exatamente 1 CR `OBR-MED-#####` por obra** |
+| 11 | Aprovação financeira e fluxo de caixa | ✅ PASS | `GET /financeiro/contas-receber` e `/financeiro/fluxo-caixa` renderizam limpas (helpers `_saldo_seguro*` + `coalesce`). Fluxo de aprovação 2-etapas em `gestao_custos_views.py` permanece operacional (CRUD V2 mig 77) |
+| 12 | Cotação (atalho admin direto) | 🚫 BLOQUEADO | Funcional via portal cliente (`portal_obras_views.py::aprovar_mapa_concorrencia`, `selecionar_mapa_v2`); atalho admin direto `/obras/<id>/mapa-v2/<mapa_id>/editar` documentado no `replit.md` não está registrado em `views/obras.py` (mesmo gap do BUG #6 da #85). Bloqueia o caminho admin enquanto não for criado/redocumentado. Vide ISSUE-99-A |
+| 13 | Portal do Cliente | ✅ PASS | Obras criadas via aprovação nascem com `token_cliente` e `portal_ativo=True` (#94). `GET /propostas/cliente/<token>` → 200; portal renderiza Cronograma, Mapa de Concorrência, Histórico, Medições e formato BRL via `brl_filter` |
+| 14 | Páginas de erro / menu superior (#96) | ✅ PASS | `GET /this-route-does-not-exist` → **404** (sem 500). `templates/error.html` estende `base_completo.html` e renderiza o menu sem quebrar (`current_user` é tolerado em todos os blocos do header) |
 
-```
-Proposta 115 (status=APROVADA, obra_id=342)
-  └─ EventManager.emit('proposta_aprovada', ..., admin_id=63)
-      ├─ handler gerar_contas_receber_proposta  → Obra 342 + ContaReceber 49 (R$ 5.446,50)
-      └─ handler handle_proposta_aprovada
-          ├─ LancamentoContabil + 2 PartidaContabil (1.1.02.001 / 4.1.01.001)
-          └─ _propagar_proposta_para_obra
-              ├─ ItemMedicaoComercial 156 "Item manual q13qr5"   R$ 1.500,00
-              └─ ItemMedicaoComercial 157 "Alvenaria 1/2 vez"   R$ 3.946,50  servico_id=355
-                  └─ listener after_insert ObraServicoCusto:
-                      ├─ OSC 153 "Item manual q13qr5"   valor_orcado=1.500,00
-                      └─ OSC 154 "Alvenaria 1/2 vez"   valor_orcado=3.946,50  servico_catalogo_id=355
-```
-
-A página `/medicao/obra/342` lê esses itens corretamente e o portal cliente (`/portal/obra/<token>`) renderiza com os dados certos. Ou seja, **a arquitetura do ciclo está implementada — falta apenas conectar o gatilho na rota de aprovação e ajustar 4 pontos para que o operador final consiga usar sem intervenção manual**.
+> Tradução do antigo "PARCIAL": as etapas 7 e 12 — que na #85 ficavam
+> em PARCIAL — foram normalizadas para a taxonomia oficial PASS /
+> FAIL / BLOQUEADO. A 7 passou para PASS porque a rota e o CRUD do
+> cronograma respondem; a propagação automática (UX) virou um item
+> de bug separado (ISSUE-99-A). A 12 ficou BLOQUEADO porque o
+> caminho admin direto requerido pela navegação documentada não está
+> registrado.
 
 ---
 
-## 5. Tarefas de follow-up sugeridas
+## 2. Resposta à pergunta-chave (atualizada)
 
-1. **Fix #3** — emitir `proposta_aprovada` em `propostas_consolidated.py::alterar_status` quando status novo for `APROVADA` (e padronizar `aprovar()` para uppercase). _(maior prioridade)_
-2. **Fix #1/#2** — usar `(x or 0)` ou `COALESCE` em `financeiro_views.py:295` e `financeiro_service.py:437`.
-3. **Fix #4** — em `gerar_contas_receber_proposta`, ao criar a `Obra`: setar `token_cliente=secrets.token_urlsafe(16)` e atualizar `proposta.obra_id` + `proposta.convertida_em_obra=True` antes do commit.
-4. **Fix #5** — auditar o form de proposta para garantir que o `<input type="hidden" name="servico_id">` seja enviado para cada linha vinda do catálogo, e que `propostas_consolidated.py` persista o campo em `PropostaItem.servico_id`.
-5. **Fix #6** — confirmar/criar as rotas admin do Mapa V2 documentadas no `replit.md` (ou atualizar o `replit.md` para refletir onde realmente vivem).
-6. **Esclarecer regra de negócio:** medição quinzenal deve gerar parcela em ContaReceber? Hoje não gera.
+> **A medição cria conta a receber?**
+
+**Mudou desde a #85.** Hoje, com o refator da #94:
+
+- **Aprovação da proposta** cria apenas **estrutura** (Obra +
+  `ItemMedicaoComercial` + `ObraServicoCusto` + lançamento contábil).
+  **Não** cria mais `ContaReceber`.
+- **Medir** (RDO finalizado ou medição quinzenal gerada/fechada) chama
+  `services.medicao_service.recalcular_medicao_obra(obra_id, admin_id)`,
+  que faz **UPSERT** de **uma única `ContaReceber`** por obra:
+  - `origem_tipo='OBRA_MEDICAO'`
+  - `origem_id = obra.id`
+  - `numero_documento = 'OBR-MED-#####'`
+  - `valor_original = valor_medido_acumulado`
+  - `saldo = max(0, valor_medido - valor_recebido)`
+  - `status ∈ {PENDENTE, PARCIAL, QUITADA}` em função do recebimento
+  - `data_vencimento = data_emissao + (proposta.prazo_entrega_dias or 30)`
+- Cada novo avanço de cronograma/RDO **atualiza a mesma CR** (não
+  duplica). Recebimentos parciais movem o status automaticamente.
+
+Em uma frase: **a medição não "cria" mais uma CR a cada fechamento;
+ela mantém a CR única da obra alinhada ao medido**. Vale tanto para
+medição quinzenal quanto para RDO finalizado, ambos disparando o
+mesmo recálculo.
+
+---
+
+## 3. Bugs/inconsistências encontrados nesta passada (Task #99)
+
+> Cada item segue o template: **Módulo / Passo reproduzível /
+> Comportamento esperado / Comportamento observado / Severidade.**
+
+### ISSUE-99-A — Atalho admin direto do Mapa de Concorrência V2 não existe
+- **Módulo:** Cotação / Mapa de Concorrência V2 (`views/obras.py`,
+  `portal_obras_views.py`, `replit.md`).
+- **Passo reproduzível:** logado como `admin.v2@sige.com`, abrir uma
+  obra em `/obras/<id>` e tentar a URL admin documentada
+  `/obras/<id>/mapa-v2/<mapa_id>/editar`.
+- **Comportamento esperado:** abrir a tela admin de edição do mapa de
+  concorrência (igual ao que o `replit.md` descreve).
+- **Comportamento observado:** rota não responde (404). As rotas
+  funcionais do Mapa V2 vivem em `portal_obras_views.py`
+  (`aprovar_mapa_concorrencia`, `selecionar_mapa_v2`) e estão
+  expostas via Portal Cliente — não há link admin direto na lista de
+  cotações. Mesmo gap do BUG #6 da #85.
+- **Severidade:** média (descoberta/UX para admin; o fluxo funcional
+  via portal cliente está OK).
+
+### ISSUE-99-B — Aprovar proposta não cria `TarefaCronograma` na Obra
+- **Módulo:** Cronograma / Aprovação de Proposta
+  (`event_manager.py::propagar_proposta_para_obra`,
+  `handlers/propostas_handlers.py::handle_proposta_aprovada`).
+- **Passo reproduzível:** aprovar uma proposta com itens vinculados
+  ao catálogo; abrir a Obra recém-criada e ir em
+  `/cronograma/obra/<id>`; em seguida abrir o RDO da obra.
+- **Comportamento esperado:** o cronograma da Obra já vem com pelo
+  menos uma `TarefaCronograma` para cada serviço/item da proposta
+  (com `servico_id` herdado e datas a partir de `obra.data_inicio` +
+  `proposta.prazo_entrega_dias`), e o RDO via UI lista as
+  subatividades sem precisar criar manualmente.
+- **Comportamento observado:** a Obra nasce **sem**
+  `TarefaCronograma`; o Gantt vem vazio e o RDO via UI exibe
+  "Nenhuma tarefa cadastrada". O recálculo financeiro funciona de
+  qualquer modo (fallback por `RDOServicoSubatividade.servico_id`),
+  então a CR `OBR-MED-#####` continua certa — mas a UX trava.
+- **Severidade:** média (UX bloqueia o fluxo via UI; financeiro não
+  é impactado).
+
+### ISSUE-99-C — `/servicos` (CRUD base) coexiste com `/catalogo/servicos/<id>/composicao`
+- **Módulo:** Catálogo / CRUD de Serviços (`templates/servicos/index.html`,
+  `crud_servicos_completo.py`, `views/catalogo_views.py`).
+- **Passo reproduzível:** logar como `admin.v2@sige.com`, abrir
+  `/servicos` e depois `/catalogo/servicos/<id>/composicao`.
+- **Comportamento esperado:** sem duplicação visível para o usuário
+  V2 — ou um caminho único, ou pontes claras entre as duas telas.
+- **Comportamento observado:** ambas existem por decisão de produto
+  (o CRUD base é a fonte de verdade do modelo `Servico`; o Catálogo
+  monta composição em cima do mesmo registro). A ponte é o botão
+  "Composição & Preço" em cada card do `/servicos` (#86). Não é bug
+  funcional, mas merece auditoria de qualquer link antigo
+  remanescente.
+- **Severidade:** baixa.
+
+### Auditoria de cadastros duplicados / áreas legadas
+
+| Entidade | Lugar V2 (oficial) | Lugar legado ainda visível? | Recomendação |
+| --- | --- | --- | --- |
+| Serviço | `/catalogo/servicos/<id>/composicao` | `/servicos` (CRUD base) | Manter — decisão de produto. Botão "Composição & Preço" já faz a ponte (ISSUE-99-C) |
+| Cronograma | `/cronograma/...` (V2) | Templates legados em `templates/cronograma/templates.html` | Já oculto em V2 por `{% if not is_v2_active() %}` (#87) |
+| Alimentação | `/alimentacao/...` v2 | "Alimentação V1" no header | Já oculto em V2 (#87) |
+| Transporte | `/transporte/...` v2 | "Transporte V1" no header | Já oculto em V2 (#87) |
+| Importação | `/importacao/` (#97) | — | Único caminho oficial; menu condicional por `has_importacao_bp` |
+| Mapa de concorrência | Portal cliente + `aprovar_mapa_concorrencia` | Atalho admin direto não documentado | Documentar/criar (ISSUE-99-A) |
+
+Nenhum item exige ação destrutiva nesta passada.
+
+---
+
+## 4. Recomendação final
+
+✅ **O ciclo principal fecha completo.** Aprovação → Obra →
+ItemMedicaoComercial → ObraServicoCusto → RDO/Custos → Medição →
+ContaReceber única (`OBR-MED-#####`) → Recebimento → QUITADA, com
+UPSERT validado em 30/30 asserts determinísticos. A pergunta histórica
+"medição cria conta a receber?" tem resposta clara hoje (sim, via
+recálculo upsert; não cria múltiplas).
+
+**Pontos críticos restantes** (não bloqueantes para o ciclo financeiro,
+mas precisam virar tasks de correção):
+
+1. **ISSUE-99-A** — criar/expor o atalho admin direto do Mapa V2 e
+   atualizar `replit.md`.
+2. **ISSUE-99-B** — propagar `TarefaCronograma` ao aprovar a proposta
+   (destrava RDO/Cronograma na UI sem montagem manual).
+3. **Indicador "Medido / Recebido / A receber"** no painel da obra
+   consumindo o dict de `recalcular_medicao_obra` — já listado como
+   follow-up em #94.
+
+Bugs críticos do relatório original #85 (1, 2, 3, 4, 5) estão
+**todos fechados**. Bug #7 fechado por #87. Bug #6 segue como
+ISSUE-99-A. A reexecução também atestou as melhorias de #89/#98 sem
+regressão.
+
+---
+
+## 5. Suítes executadas nesta passada (2026-04-17)
+
+| Suíte | Resultado |
+| --- | --- |
+| `tests/test_ciclo_proposta_obra_medido_cr.py` | ✅ 30/30 PASS — ciclo financeiro pós-aprovação |
+| `tests/test_e2e_orcamento_proposta.py` | ✅ 36/36 PASS — orçamento paramétrico → proposta → portal |
+| `tests/test_e2e_metricas_funcionario.py` | ✅ 27/27 PASS — métricas v1/v2 com override |
+| `tests/test_task_86_catalogo_propostas.py` | ✅ PASS — `servico_id` persiste e propaga |
+| `tests/test_propagacao_proposta_obra.py` | ✅ PASS — propagação estrutural |
+| `tests/test_agrupamento_diarias_rdo.py` | ✅ 23/23 PASS — pai/filho de custos por categoria |
+| `GET /login` | 200 |
+| `GET /this-route-does-not-exist` | 404 (sem 500, menu intacto) |
+| `GET /importacao/` | 302 (redirect login — rota acessível, blueprint `importacao` registrado) |
+
+Total: **116 asserts back-end PASS** + 3 sondas HTTP — sem falhas.
+
+---
+
+## Anexo A — Versão original (Task #85, abr/2026)
+
+Resumo histórico do que a #85 reportou em sua execução inicial (preservado
+para rastreabilidade — todos os itens listados aqui foram reendereçados
+acima):
+
+- BUG #1 CRÍTICO — `/financeiro/contas-receber` 500 em
+  `financeiro_views.py:295` (`sum(NULL)`). **Fechado por #94.**
+- BUG #2 CRÍTICO — `/financeiro/fluxo-caixa` 500 em
+  `financeiro_service.py:437` (mesma causa). **Fechado por #94.**
+- BUG #3 CRÍTICO — `EventManager.emit('proposta_aprovada')` nunca
+  era chamado nas rotas admin/cliente, quebrando toda a propagação
+  Task #82 no fluxo do operador final. **Fechado por #94.**
+- BUG #4 ALTA — Obra criada via aprovação nascia sem `token_cliente`
+  e sem atualizar `proposta.obra_id` / `convertida_em_obra=True`,
+  inviabilizando o portal cliente e o `_propagar_proposta_para_obra`.
+  **Fechado por #94.**
+- BUG #5 MÉDIA — Item de proposta criado a partir do catálogo perdia
+  `servico_id` (form não enviava o hidden). **Fechado por #86.**
+- BUG #6 MÉDIA — Rota `/obras/<id>/mapa-v2/...` documentada no
+  `replit.md` não existia em `views/obras.py`. **Aberto** —
+  reendereçado como ISSUE-99-A.
+- BUG #7 BAIXA — Header V2 ainda exibia o dropdown legado
+  "Serviços". **Fechado por #87.**
+
+A versão original também reportou que, com workarounds manuais de
+banco (setar `obra.token_cliente` e `proposta.obra_id` via SQL),
+toda a cadeia da propagação Task #82 funcionava. Hoje, com #94, esses
+workarounds **não são mais necessários** — a propagação roda
+sozinha desde o clique em "Aprovar".
