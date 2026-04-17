@@ -340,6 +340,15 @@
               </option>
               {% endfor %}
             </select>
+            {% if item.servico_id %}
+            <div class="form-text mt-1">
+              <i class="fas fa-link text-success"></i>
+              Vinculado ao catálogo —
+              <a href="{{ url_for('catalogo.servico_composicao', servico_id=item.servico_id) }}" target="_blank" rel="noopener">
+                ver composição & preço (Task #82)
+              </a>
+            </div>
+            {% endif %}
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">Nome</label>

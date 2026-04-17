@@ -1,0 +1,329 @@
+Você vai refatorar o ciclo comercial, operacional e financeiro do SIGE para mudar a regra de negócio de faturamento da obra.
+
+IMPORTANTE:
+A regra antiga documentada no sistema atual era:
+- aprovar proposta => cria Obra + ContaReceber + ItemMedicaoComercial + ObraServicoCusto
+
+ESSA REGRA NÃO É MAIS A DESEJADA.
+
+NOVA REGRA OFICIAL:
+- Aprovar proposta NÃO deve criar ContaReceber.
+- Aprovar proposta deve criar a Obra e toda a estrutura operacional/comercial necessária.
+- O valor medido deve crescer conforme o avanço da obra.
+- Esse avanço deve ser atualizado a partir do RDO / progresso dos serviços da obra.
+- O que a obra “tem a receber” deve ser derivado do valor medido.
+- A ContaReceber deve nascer ou ser atualizada a partir da medição / avanço real da obra, e não da aprovação da proposta.
+- O gráfico “medido” em Detalhes da Obra deve atualizar também ao lançar/finalizar RDO daquela obra.
+
+Quero que você implemente isso de forma coerente, sem duplicidade e sem manter a lógica antiga em paralelo.
+
+==================================================
+OBJETIVO DE NEGÓCIO
+==================================================
+
+Hoje a proposta aprovada representa apenas o contrato/orçamento comercial da obra.
+
+Ela NÃO deve mais virar automaticamente faturamento financeiro.
+
+O financeiro deve refletir o avanço real da obra.
+
+Portanto:
+
+1. PROPOSTA APROVADA
+- vira base comercial/orçada
+- cria Obra
+- cria ItemMedicaoComercial
+- cria ObraServicoCusto
+- cria vínculo com serviços do catálogo
+- cria estrutura para cronograma / medição / custos
+- NÃO cria ContaReceber
+
+2. RDO / AVANÇO
+- o lançamento/finalização do RDO deve atualizar o avanço executado da obra
+- isso deve refletir no valor medido acumulado
+- esse valor medido deve atualizar os indicadores da obra
+
+3. CONTAS A RECEBER
+- devem ser geradas ou atualizadas com base no valor medido
+- nunca mais com base apenas na aprovação da proposta
+
+==================================================
+REGRA FUNCIONAL NOVA
+==================================================
+
+### A. Aprovação da proposta
+Ao aprovar proposta:
+
+DEVE:
+- criar Obra
+- preencher obra.proposta_origem_id
+- preencher obra.valor_contrato com o total da proposta
+- gerar token_cliente
+- marcar proposta.convertida_em_obra = true
+- preencher proposta.obra_id
+- criar um ItemMedicaoComercial para cada PropostaItem
+- criar um ObraServicoCusto para cada ItemMedicaoComercial
+- preservar servico_id / servico_catalogo_id quando o item veio do catálogo
+
+NÃO DEVE:
+- criar ContaReceber
+- criar título financeiro automático do valor total da proposta
+
+### B. Medido da obra
+O valor medido da obra deve representar o avanço financeiro executado.
+
+Esse valor deve ser atualizado:
+- ao fechar medição
+- e também quando o RDO daquela obra alterar avanço executado
+
+Se o sistema já possui engine que calcula percentual executado por:
+- cronograma
+- ItemMedicaoComercial
+- ItemMedicaoCronogramaTarefa
+- vínculo de serviço
+
+reutilize essa base.
+
+Objetivo:
+- o valor medido exibido nos detalhes da obra deve ser sempre o acumulado mais atual possível
+- não quero depender apenas de “fechar medição” para enxergar avanço
+- o RDO pode e deve atualizar isso
+
+### C. Contas a receber
+A ContaReceber deve refletir o valor medido, não o contrato total.
+
+Quero esta lógica:
+
+- valor_medido = quanto a obra já executou comercialmente
+- valor_recebido = quanto já entrou no financeiro
+- valor_a_receber = valor_medido - valor_recebido
+
+A ContaReceber deve nascer e/ou ser atualizada com base nesse delta.
+
+IMPLEMENTAÇÃO DESEJADA:
+- não criar uma nova ContaReceber a cada pequeno lançamento de RDO
+- evitar duplicidade
+- usar uma lógica de UPSERT / atualização inteligente
+
+Sugestão de comportamento:
+- manter 1 ContaReceber aberta por obra para “MEDIÇÃO ACUMULADA”
+OU
+- manter 1 ContaReceber aberta por ciclo de medição (se já existir esse conceito consolidado)
+
+Mas a regra principal é:
+- não duplicar títulos
+- não gerar financeiro em cascata a cada clique
+- atualizar o saldo a receber conforme o medido evolui
+
+Se optar por 1 título acumulado por obra, a lógica deve ser:
+
+conta_receber_medicao.valor_original = valor_medido_atual
+conta_receber_medicao.valor_recebido = total já recebido
+conta_receber_medicao.saldo = valor_medido_atual - valor_recebido
+
+Se o saldo for 0, o título pode ficar quitado/baixado.
+Se o valor medido subir, o título é atualizado.
+Se ainda não existir título para aquela obra, ele é criado no primeiro avanço medido relevante.
+
+==================================================
+REGRAS DE ATUALIZAÇÃO
+==================================================
+
+### 1. Ao aprovar proposta
+- criar estrutura operacional/comercial
+- NÃO criar ContaReceber
+
+### 2. Ao lançar/finalizar RDO
+- recalcular avanço dos serviços da obra
+- recalcular percentual executado dos itens medidos
+- recalcular valor_medido da obra
+- recalcular valor_a_receber
+- atualizar painel / detalhes da obra
+- atualizar gráfico “medido”
+- criar ou atualizar ContaReceber correspondente à medição acumulada
+
+### 3. Ao fechar medição
+- manter compatibilidade com o fluxo de medição já existente
+- se o fechamento recalcula medido, reaproveitar
+- mas o sistema não pode depender só da medição fechada para mostrar o “medido” atualizado
+
+==================================================
+PONTOS CRÍTICOS A CORRIGIR NO CÓDIGO
+==================================================
+
+### 1. Remover lógica antiga de ContaReceber na aprovação
+Hoje existe documentação/teste mostrando que o sistema tenta criar ContaReceber na aprovação da proposta.
+Isso deve ser removido/refatorado.
+
+Procure o handler/evento responsável e altere a regra:
+- aprovação da proposta NÃO gera ContaReceber
+
+### 2. Preservar a propagação boa
+O que está certo e deve continuar:
+- proposta aprovada gera Obra
+- ItemMedicaoComercial
+- ObraServicoCusto
+- vínculo com catálogo/serviço
+- token do cliente
+- lançamentos necessários para estrutura da obra
+
+### 3. Recalcular “medido” ao RDO
+Precisamos de um ponto único de atualização.
+
+Crie/refatore uma função de domínio, algo como:
+- recalcular_medicao_obra(obra_id)
+ou
+- atualizar_avanco_e_financeiro_obra(obra_id)
+
+Essa função deve:
+- recalcular percentuais executados
+- recalcular valor_medido acumulado
+- recalcular valor_a_receber
+- atualizar ContaReceber da medição
+- retornar dados consolidados para dashboard
+
+Essa função deve ser chamada:
+- ao finalizar RDO
+- ao fechar medição
+- sempre que necessário em pontos críticos do fluxo
+
+### 4. Atualizar painel/detalhes da obra
+O painel estratégico e os detalhes da obra devem ler essa nova fonte de verdade.
+
+Quero que o gráfico/indicador de:
+- valor medido
+- valor recebido
+- valor a receber
+
+reflita o avanço atualizado após o RDO.
+
+==================================================
+ARQUITETURA DESEJADA
+==================================================
+
+Fonte de verdade por domínio:
+
+- PROPOSTA = valor contratado / orçamento comercial
+- OBRA = execução real do contrato
+- ITEM MEDIÇÃO COMERCIAL = itens comerciais medíveis da obra
+- OBRA SERVIÇO CUSTO = controle por serviço
+- RDO = avanço operacional diário
+- MEDIDO = valor comercial executado acumulado
+- CONTA RECEBER = reflexo financeiro do medido
+
+Em outras palavras:
+
+proposta aprovada
+→ cria a estrutura da obra
+
+rdo / avanço
+→ atualiza medido
+
+medido
+→ atualiza o que tem a receber
+
+recebimento financeiro
+→ baixa saldo a receber
+
+==================================================
+CÁLCULOS
+==================================================
+
+Definir com clareza:
+
+1. total_proposta_orcada
+- vem da proposta / contrato
+
+2. valor_medido
+- soma acumulada do executado comercial da obra
+- derivada do avanço dos itens medidos / serviços vinculados
+
+3. valor_recebido
+- soma dos recebimentos já lançados
+
+4. valor_a_receber
+- valor_medido - valor_recebido
+- nunca negativo
+
+5. conta a receber da obra
+- deve refletir o valor medido ainda não recebido
+- sem duplicação
+
+==================================================
+NÃO FAZER
+==================================================
+
+- Não criar ContaReceber na aprovação da proposta
+- Não manter duas regras concorrentes (aprovação cria + medição atualiza)
+- Não criar títulos duplicados a cada RDO
+- Não deixar o gráfico “medido” parado até fechar medição
+- Não perder servico_id dos itens vindos do catálogo
+- Não quebrar a propagação proposta → obra → IMC → OSC
+
+==================================================
+O QUE ESPERO DE IMPLEMENTAÇÃO
+==================================================
+
+1. revisar os handlers/eventos da aprovação
+2. remover a criação indevida de ContaReceber na aprovação
+3. manter a criação da Obra e estruturas relacionadas
+4. criar/refatorar rotina única de:
+   - recalcular medido
+   - recalcular a receber
+   - criar/atualizar ContaReceber por medição acumulada
+5. chamar essa rotina ao finalizar/lançar RDO
+6. chamar também no fechamento da medição, se aplicável
+7. atualizar os detalhes da obra e o painel estratégico
+8. corrigir possíveis bugs de servico_id e integração catálogo → proposta → medição
+
+==================================================
+ENTREGA ESPERADA
+==================================================
+
+Quero que você:
+1. implemente as mudanças
+2. liste os arquivos alterados
+3. explique a nova regra final do sistema
+4. explique como ficou o gatilho do RDO
+5. explique como ficou a criação/atualização da ContaReceber
+6. mostre como testar
+
+==================================================
+CENÁRIOS DE TESTE OBRIGATÓRIOS
+==================================================
+
+Cenário 1 — Aprovação da proposta
+- aprovar proposta
+- obra criada
+- itens de medição criados
+- serviços de custo criados
+- token do cliente criado
+- nenhuma ContaReceber criada
+
+Cenário 2 — Lançamento/finalização de RDO
+- lançar avanço na obra
+- valor medido aumenta
+- gráfico medido nos detalhes da obra atualiza
+- valor a receber atualiza
+- ContaReceber nasce ou é atualizada corretamente sem duplicidade
+
+Cenário 3 — Novo RDO aumentando avanço
+- novo avanço lançado
+- valor medido acumulado aumenta
+- ContaReceber é atualizada, não duplicada
+- saldo acompanha o novo medido
+
+Cenário 4 — Recebimento financeiro
+- lançar recebimento
+- valor_recebido aumenta
+- saldo a receber diminui
+- detalhes da obra/painel mostram o valor correto
+
+Cenário 5 — Fechamento de medição
+- manter compatibilidade
+- sem quebrar geração de PDF/extrato
+- medido e a receber continuam coerentes
+
+COMECE AGORA.
+Não responda com teoria.
+Implemente a nova regra de negócio no projeto atual.
