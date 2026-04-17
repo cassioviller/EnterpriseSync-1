@@ -141,8 +141,13 @@ def insumo_novo_preco(insumo_id):
         PrecoBaseInsumo.query.filter_by(insumo_id=ins.id, vigencia_fim=None)
         .order_by(PrecoBaseInsumo.vigencia_inicio.desc()).first()
     )
-    if atual and atual.vigencia_inicio < vig:
-        atual.vigencia_fim = vig - timedelta(days=1)
+    if atual:
+        if atual.vigencia_inicio < vig:
+            atual.vigencia_fim = vig - timedelta(days=1)
+        else:
+            # Mesma data ou retroativa: fecha imediatamente o anterior na
+            # própria data (evita sobreposição/ambiguidade histórica).
+            atual.vigencia_fim = atual.vigencia_inicio
     db.session.add(PrecoBaseInsumo(
         admin_id=aid, insumo_id=ins.id, valor=valor,
         vigencia_inicio=vig,
@@ -470,3 +475,25 @@ def api_alias_servicos():
 @login_required
 def api_alias_insumos():
     return api_buscar_insumos()
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Aliases sob /propostas/* e /medicao/obra/* (alinhamento com spec original)
+# ──────────────────────────────────────────────────────────────────────
+catalogo_legacy_bp = Blueprint('catalogo_legacy', __name__)
+
+
+@catalogo_legacy_bp.route(
+    '/propostas/itens/<int:item_id>/vincular-servico', methods=['POST']
+)
+@login_required
+def alias_vincular_proposta_item(item_id):
+    return vincular_proposta_item(item_id)
+
+
+@catalogo_legacy_bp.route(
+    '/medicao/obra/itens/<int:item_id>/vincular-servico', methods=['POST']
+)
+@login_required
+def alias_vincular_medicao_item(item_id):
+    return vincular_medicao_item(item_id)
