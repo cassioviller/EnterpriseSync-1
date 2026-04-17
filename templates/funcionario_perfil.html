@@ -306,47 +306,64 @@
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card border-success">
-                            <div class="card-header bg-success text-white">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">
                                     <i class="fas fa-dollar-sign"></i> Resumo Financeiro Completo
                                 </h6>
+                                {% if kpis.modo_remuneracao == 'diaria' %}
+                                    <span class="badge bg-info text-dark" title="Diarista — fórmula valor_diaria × dias pagos">
+                                        Diária × {{ kpis.dias_pagos or 0 }} dia(s)
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-light text-success" title="Salarista — fórmula horas × valor_hora">
+                                        Salário (R$ {{ '{:,.2f}'.format(kpis.valor_hora_atual or 0) }}/h)
+                                    </span>
+                                {% endif %}
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-2">
+                                    <div class="col-md-3 col-lg-2">
                                         <div class="text-center p-3 border rounded">
-                                            <h5 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra) if kpis.custo_mao_obra is defined else '0,00' }}</h5>
-                                            <small class="text-muted fw-bold">Custo Mão de Obra</small>
+                                            <h5 class="text-success mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_mao_obra or 0) }}</h5>
+                                            <small class="text-muted fw-bold">
+                                                {% if kpis.modo_remuneracao == 'diaria' %}MO (Diária × Dias){% else %}MO (Horas × R$/h){% endif %}
+                                            </small>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-3 col-lg-2">
                                         <div class="text-center p-3 border rounded">
-                                            <h5 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao) if kpis.custo_alimentacao is defined else '0,00' }}</h5>
-                                            <small class="text-muted fw-bold">Custo Alimentação</small>
+                                            <h5 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_va or 0) }}</h5>
+                                            <small class="text-muted fw-bold">VA × {{ kpis.dias_pagos or 0 }} dia(s)</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-3 col-lg-2">
                                         <div class="text-center p-3 border rounded">
-                                            <h5 class="text-warning mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_transporte) if kpis.custo_transporte is defined else '0,00' }}</h5>
-                                            <small class="text-muted fw-bold">Custo Transporte</small>
+                                            <h5 class="text-warning mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_vt or 0) }}</h5>
+                                            <small class="text-muted fw-bold">VT × {{ kpis.dias_pagos or 0 }} dia(s)</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-3 col-lg-2">
                                         <div class="text-center p-3 border rounded">
-                                            <h5 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.outros_custos if kpis.outros_custos is defined else 0) }}</h5>
-                                            <small class="text-muted fw-bold">Outros Custos</small>
+                                            <h5 class="text-primary mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_alimentacao_real or 0) }}</h5>
+                                            <small class="text-muted fw-bold">Alimentação real</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-3 col-lg-2">
                                         <div class="text-center p-3 border rounded">
-                                            <h5 class="text-danger mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_faltas_justificadas if kpis.custo_faltas_justificadas is defined else 0) }}</h5>
-                                            <small class="text-muted fw-bold">Custo Faltas Just.</small>
+                                            <h5 class="text-info mb-1">R$ {{ '{:,.2f}'.format(kpis.custo_reembolsos or 0) }}</h5>
+                                            <small class="text-muted fw-bold">Reembolsos</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    <div class="col-md-3 col-lg-2">
+                                        <div class="text-center p-3 border rounded">
+                                            <h5 class="text-secondary mb-1">R$ {{ '{:,.2f}'.format((kpis.custo_almoxarifado if kpis.custo_almoxarifado is defined else kpis.custo_almoxarifado_posse) or 0) }}</h5>
+                                            <small class="text-muted fw-bold">Almox. em posse</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-3">
                                         <div class="text-center p-3 border rounded bg-primary text-white">
-                                            <h4 class="mb-1 fw-bold text-white">R$ {{ '{:,.2f}'.format(kpis.custo_total) if kpis.custo_total is defined else '0,00' }}</h4>
-                                            <small class="text-white fw-bold">💰 CUSTO TOTAL</small>
+                                            <h4 class="mb-1 fw-bold text-white">R$ {{ '{:,.2f}'.format(kpis.custo_total or 0) }}</h4>
+                                            <small class="text-white fw-bold">💰 CUSTO TOTAL = MO + VA + VT + Alim. real + Reemb. + Almox. em posse</small>
                                         </div>
                                     </div>
                                 </div>

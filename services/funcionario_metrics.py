@@ -76,19 +76,19 @@ def get_modo_remuneracao(funcionario: Funcionario) -> str:
 
 
 def calcular_valor_hora(funcionario: Funcionario, data_referencia: Optional[date] = None) -> float:
-    """Valor/hora apenas para salaristas (mantém fórmula existente do utils.py)."""
+    """Valor/hora apenas para salaristas (mantém fórmula existente do utils.py).
+
+    Para diaristas retorna 0.0 (a fórmula de custo usa `valor_diaria/8`).
+    Erros do helper externo são logados e propagam — não silenciar
+    (KPI corrompido sem visibilidade é pior que erro 500 detectado).
+    """
     if get_modo_remuneracao(funcionario) != "salario":
         return 0.0
-    try:
-        # Reaproveita helper já existente para preservar dias-úteis do mês exato.
-        from utils import calcular_valor_hora_periodo
+    if not funcionario.salario:
+        return 0.0
+    from utils import calcular_valor_hora_periodo  # import tardio (evita ciclo)
 
-        return float(calcular_valor_hora_periodo(funcionario, data_referencia, data_referencia) or 0.0)
-    except Exception:
-        # Fallback simples
-        if not funcionario.salario:
-            return 0.0
-        return float(funcionario.salario) / 220.0
+    return float(calcular_valor_hora_periodo(funcionario, data_referencia, data_referencia) or 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -427,6 +427,7 @@ def calcular_metricas_funcionario(
         "custo_alimentacao_real": custo_alim_real,
         "custo_reembolsos": custo_reemb,
         "custo_almoxarifado_posse": custo_almox,
+        "custo_almoxarifado": custo_almox,  # alias do contrato (Task #98)
         "breakdown": breakdown,
     }
 
@@ -441,33 +442,57 @@ def calcular_metricas_lista(
 
     Útil para a tela `/funcionarios` (cards e KPIs gerais agregados).
     """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
     resultado = []
     for f in funcionarios:
-        try:
-            funcao_nome = f.funcao_ref.nome if getattr(f, "funcao_ref", None) else "N/A"
-        except Exception:
-            db.session.rollback()
-            funcao_nome = "N/A"
+        funcao_nome = f.funcao_ref.nome if getattr(f, "funcao_ref", None) else "N/A"
+        # Não silenciar erros de cálculo: logamos com contexto (id) e seguimos
+        # com zeros para o funcionário problemático, preservando a página.
         try:
             m = calcular_metricas_funcionario(f, data_inicio, data_fim, admin_id)
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             db.session.rollback()
+            _log.error(
+                "calcular_metricas_funcionario falhou para funcionario_id=%s admin_id=%s: %s",
+                getattr(f, "id", None), admin_id, e, exc_info=True,
+            )
             m = {
                 "horas_trabalhadas": 0, "horas_extras": 0, "faltas": 0,
-                "faltas_justificadas": 0, "custo_total": 0, "custo_mao_obra": 0,
-                "custo_alimentacao": 0, "custo_transporte": 0, "outros_custos": 0,
+                "faltas_justificadas": 0, "dias_pagos": 0,
+                "custo_mao_obra": 0, "custo_va": 0, "custo_vt": 0,
+                "custo_alimentacao": 0, "custo_alimentacao_real": 0,
+                "custo_transporte": 0, "custo_reembolsos": 0,
+                "custo_almoxarifado": 0, "custo_almoxarifado_posse": 0,
+                "outros_custos": 0, "custo_total": 0,
+                "valor_hora_atual": 0,
                 "modo_remuneracao": get_modo_remuneracao(f),
+                "_erro": str(e),
             }
         item = {
             "funcionario": f,
             "funcao_nome": funcao_nome,
+            # contrato exigido pela Task #98 — todas as métricas no item da lista
+            "modo_remuneracao": m.get("modo_remuneracao"),
+            "horas_trabalhadas": m.get("horas_trabalhadas", 0),
+            "horas_extras": m.get("horas_extras", 0),
+            "faltas": m.get("faltas", 0),
+            "faltas_justificadas": m.get("faltas_justificadas", 0),
+            "dias_pagos": m.get("dias_pagos", 0),
+            "valor_hora_atual": m.get("valor_hora_atual", 0),
+            "custo_mao_obra": m.get("custo_mao_obra", 0),
+            "custo_va": m.get("custo_va", 0),
+            "custo_vt": m.get("custo_vt", 0),
+            "custo_alimentacao_real": m.get("custo_alimentacao_real", 0),
+            "custo_reembolsos": m.get("custo_reembolsos", 0),
+            "custo_almoxarifado": m.get("custo_almoxarifado", m.get("custo_almoxarifado_posse", 0)),
+            "custo_total": m.get("custo_total", 0),
+            # aliases de retro-compat usados pelo template antigo
             "total_horas": m.get("horas_trabalhadas", 0),
             "total_extras": m.get("horas_extras", 0),
             "total_faltas": m.get("faltas", 0),
             "total_faltas_justificadas": m.get("faltas_justificadas", 0),
-            "horas_trabalhadas": m.get("horas_trabalhadas", 0),
-            "custo_total": m.get("custo_total", 0),
-            "modo_remuneracao": m.get("modo_remuneracao"),
         }
         resultado.append(item)
     return resultado
