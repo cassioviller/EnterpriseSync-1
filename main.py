@@ -183,7 +183,17 @@ try:
     app.register_blueprint(importacao_bp)
     logger.info("[OK] Blueprint IMPORTACAO FUNCIONARIOS registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Importação Funcionários: {e}")
+    import sys
+    logger.exception("[ERROR] Erro ao registrar Importação Funcionários")
+    # Tornar a falha visível no boot (não fica apenas em log silencioso).
+    # O menu "Importar por Planilha" será ocultado automaticamente quando
+    # o blueprint 'importacao' não estiver disponível (ver base_completo.html).
+    print(
+        f"[BOOT ERROR] Blueprint 'importacao' NAO foi registrado: {e}. "
+        "A tela /importacao/ ficara indisponivel ate que o erro seja corrigido.",
+        file=sys.stderr,
+        flush=True,
+    )
 
 from app import csrf
 main_py_exempt_blueprints = [

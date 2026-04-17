@@ -174,6 +174,19 @@ def brl_raw_filter(value):
     formatted = f"{v:,.2f}"
     return formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
 
+# Context processor: disponibilidade de blueprints opcionais nos templates
+@app.context_processor
+def inject_blueprint_flags():
+    """Expõe flags booleanas indicando se blueprints opcionais estão registrados.
+
+    Permite que templates ocultem links para módulos que falharam ao registrar
+    no boot (ex.: o blueprint 'importacao' carregado em try/except no main.py).
+    """
+    return {
+        'has_importacao_bp': 'importacao' in app.blueprints,
+    }
+
+
 # Context processor para feature flag V2
 @app.context_processor
 def inject_v2_flag():

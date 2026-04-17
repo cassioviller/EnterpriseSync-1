@@ -723,10 +723,12 @@
                                 <li><a class="dropdown-item" href="{{ url_for('main.funcionarios') }}">
                                     <i class="fas fa-users me-1"></i> Lista de Funcionários
                                 </a></li>
+                                {% if has_importacao_bp %}
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/importacao/">
+                                <li><a class="dropdown-item" href="{{ url_for('importacao.index') }}">
                                     <i class="fas fa-file-excel me-1 text-success"></i> Importar por Planilha
                                 </a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         
