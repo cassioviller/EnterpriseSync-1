@@ -166,6 +166,45 @@ class MetricasTestRunner:
         self._assert(self._almost(m['custo_total'], esperado_min),
                      f"v1 salarista: custo_total=MO+VA+VT")
 
+    # ── Cenário 1b: DIARISTA OVERRIDE em tenant v1 (override vence) ─────
+    def cenario_diarista_override_em_v1(self):
+        """Tenant v1 — funcionário com tipo_remuneracao='diaria' deve
+        aplicar modo diarista (override por funcionário vence o tenant).
+        """
+        adm = self._criar_admin('v1')  # tenant v1
+        diarista = self._criar_funcionario(
+            adm, tipo='diaria', valor_diaria=200.00,
+            valor_va=10.00, valor_vt=5.00, nome_extra='override_v1',
+        )
+        obra = self._criar_obra(adm)
+        di = date.today().replace(day=1)
+        df = date.today()
+        dias = [di + timedelta(days=i) for i in range(4)]
+        # 3 dias trabalhados + 1 falta_justificada (diarista NÃO paga essa)
+        self._registrar_dias_trabalhados(diarista, obra, dias[:3])
+        db.session.add(RegistroPonto(
+            funcionario_id=diarista.id, obra_id=obra.id, admin_id=adm.id,
+            data=dias[3], horas_trabalhadas=0, horas_extras=0,
+            tipo_registro='falta_justificada',
+        ))
+        db.session.commit()
+
+        m = calcular_metricas_funcionario(diarista, di, df, adm.id)
+        self._assert(m['modo_remuneracao'] == 'diaria',
+                     f"v1+override diarista: modo='diaria' (got {m['modo_remuneracao']})")
+        self._assert(m['dias_pagos'] == 3,
+                     f"v1+override diarista: dias_pagos=3 (NÃO paga falta_just) (got {m['dias_pagos']})")
+        self._assert(m['faltas_justificadas'] == 1,
+                     f"v1+override diarista: 1 falta justificada contada (got {m['faltas_justificadas']})")
+        self._assert(self._almost(m['custo_mao_obra'], 3 * 200.0),
+                     f"v1+override diarista: MO=3×200=600 (got {m['custo_mao_obra']})")
+        self._assert(self._almost(m['custo_va'], 3 * 10.0),
+                     f"v1+override diarista: VA=3×10=30, NÃO 4×10 (got {m['custo_va']})")
+        self._assert(self._almost(m['custo_vt'], 3 * 5.0),
+                     f"v1+override diarista: VT=3×5=15, NÃO 4×5 (got {m['custo_vt']})")
+        self._assert(get_modo_remuneracao(diarista) == 'diaria',
+                     "v1+override: helper retorna 'diaria' apesar do tenant v1")
+
     # ── Cenário 2: DIARIA em tenant v2 + override + componentes ─────────
     def cenario_diarista_v2_completo(self):
         adm = self._criar_admin('v2')
@@ -351,6 +390,7 @@ class MetricasTestRunner:
         with app.app_context():
             try:
                 self.cenario_salarista_v1()
+                self.cenario_diarista_override_em_v1()
                 self.cenario_diarista_v2_completo()
             finally:
                 self.teardown()

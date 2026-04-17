@@ -126,11 +126,12 @@ def _resumo_ponto(funcionario_id: int, data_inicio: date, data_fim: date, admin_
             faltas += 1
         elif tipo == "falta_justificada":
             faltas_justificadas += 1
-            dias_pagos += 1  # falta justificada paga
         elif horas > 0 or extras > 0:
             dias_trabalhados += 1
-            dias_pagos += 1
 
+    # `dias_pagos` é resolvido depois conforme o modo (salarista paga falta
+    # justificada — CLT —; diarista não paga). Mantemos os contadores brutos
+    # e a função pública combina conforme o modo.
     return {
         "registros_count": len(registros),
         "horas_trabalhadas": total_horas,
@@ -139,7 +140,6 @@ def _resumo_ponto(funcionario_id: int, data_inicio: date, data_fim: date, admin_
         "faltas": faltas,
         "faltas_justificadas": faltas_justificadas,
         "dias_trabalhados": dias_trabalhados,
-        "dias_pagos": dias_pagos,
     }
 
 
@@ -313,9 +313,8 @@ def _custo_mo_salarista(funcionario: Funcionario, ponto: dict, data_inicio: date
     }
 
 
-def _custo_mo_diarista(funcionario: Funcionario, ponto: dict) -> dict:
+def _custo_mo_diarista(funcionario: Funcionario, ponto: dict, dias_pagos: int) -> dict:
     valor_diaria = float(funcionario.valor_diaria or 0)
-    dias_pagos = ponto["dias_pagos"]
     custo_mo = valor_diaria * dias_pagos
     # Diarista: hora extra ainda paga via diária/horas configurada — fórmula simples:
     # 1.5 × (valor_diaria / 8) × horas_extras (assume jornada 8h).
@@ -349,13 +348,16 @@ def calcular_metricas_funcionario(
     modo = get_modo_remuneracao(funcionario)
     ponto = _resumo_ponto(funcionario.id, data_inicio, data_fim, admin_id)
 
-    # Custos de mão de obra (depende do modo)
+    # Resolução de `dias_pagos` por modo:
+    #   • Salarista (CLT): paga falta justificada → dias_trab + faltas_just
+    #   • Diarista: NÃO paga falta justificada → apenas dias trabalhados
     if modo == "diaria":
-        mo = _custo_mo_diarista(funcionario, ponto)
+        dias_pagos = ponto["dias_trabalhados"]
+        mo = _custo_mo_diarista(funcionario, ponto, dias_pagos)
     else:
+        dias_pagos = ponto["dias_trabalhados"] + ponto["faltas_justificadas"]
         mo = _custo_mo_salarista(funcionario, ponto, data_inicio)
 
-    dias_pagos = ponto["dias_pagos"]
     custo_va = float(funcionario.valor_va or 0) * dias_pagos
     custo_vt = float(funcionario.valor_vt or 0) * dias_pagos
     custo_alim_real = _custo_alimentacao_real(funcionario.id, data_inicio, data_fim, admin_id)

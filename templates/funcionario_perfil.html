@@ -238,13 +238,22 @@
                         </div>
                     </div>
                 </div>
-                <!-- Grid 4-4-4-3 de KPIs v4.0 -->
+                <!-- Grid 4-4-4-3 de KPIs v4.0 — labels mode-aware (Task #98) -->
+                {% set _is_diaria = (kpis.modo_remuneracao == 'diaria') %}
                 <!-- Linha 1: KPIs Básicos -->
                 <div class="row mb-3">
                     <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_trabalhadas) }}</h4>
-                            <small class="text-muted">Horas Trabalhadas</small>
+                            {% if _is_diaria %}
+                                <h4 class="text-primary mb-1">{{ kpis.dias_pagos or 0 }}</h4>
+                                <small class="text-muted">Dias trabalhados</small>
+                                <div class="text-muted" style="font-size: 10px;">
+                                    Diária × R$ {{ '{:,.2f}'.format(funcionario.valor_diaria or 0) }}
+                                </div>
+                            {% else %}
+                                <h4 class="text-primary mb-1">{{ '{:.1f}h'.format(kpis.horas_trabalhadas) }}</h4>
+                                <small class="text-muted">Horas Trabalhadas</small>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -253,7 +262,9 @@
                             {% if kpis.valor_horas_extras is defined and kpis.valor_horas_extras > 0 %}
                             <div class="text-success fw-bold">R$ {{ '{:,.2f}'.format(kpis.valor_horas_extras) }}</div>
                             {% endif %}
-                            <small class="text-muted">Horas Extras</small>
+                            <small class="text-muted">
+                                {% if _is_diaria %}Horas extras (×1,5 da diária/8){% else %}Horas Extras{% endif %}
+                            </small>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -261,15 +272,22 @@
                             <h4 class="text-danger mb-1">{{ kpis.faltas }}</h4>
                             {% if kpis.valor_faltas is defined and kpis.valor_faltas > 0 %}
                             <div class="text-danger fw-bold">-R$ {{ '{:,.2f}'.format(kpis.valor_faltas) }}</div>
-                            <div class="text-muted" style="font-size: 10px;">Lei 605/49 (DSR estrito)</div>
+                            <div class="text-muted" style="font-size: 10px;">
+                                {% if _is_diaria %}Falta = -1 diária (não paga){% else %}Lei 605/49 (DSR estrito){% endif %}
+                            </div>
                             {% endif %}
                             <small class="text-muted">Faltas</small>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="text-center p-3 border rounded">
-                            <h4 class="text-info mb-1">{{ '{:.1f}'.format(kpis.atrasos if kpis.atrasos is defined else 0) }}</h4>
-                            <small class="text-muted">Atrasos</small>
+                            {% if _is_diaria %}
+                                <h4 class="text-info mb-1">R$ {{ '{:,.2f}'.format(funcionario.valor_diaria or 0) }}</h4>
+                                <small class="text-muted">Valor da Diária</small>
+                            {% else %}
+                                <h4 class="text-info mb-1">{{ '{:.1f}'.format(kpis.atrasos if kpis.atrasos is defined else 0) }}</h4>
+                                <small class="text-muted">Atrasos (h)</small>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
