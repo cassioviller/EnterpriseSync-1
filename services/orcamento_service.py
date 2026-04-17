@@ -127,3 +127,8 @@ def recalcular_servico_preco(servico, data_ref: Optional[_date] = None,
         servico.preco_venda_unitario = resultado['preco_venda']
         db.session.flush()
     return resultado
+
+
+# Compatibility alias (Task #82 review #9): preserva contrato original
+# do spec, que usava `recalcular_servico` como nome canônico.
+recalcular_servico = recalcular_servico_preco
