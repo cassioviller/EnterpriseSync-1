@@ -6,14 +6,39 @@
   <h2 class="my-3"><i class="fas fa-chart-line text-primary"></i> Histórico em obras — {{ servico.nome }}</h2>
   <p class="text-muted">Performance real do serviço em todas as obras onde foi utilizado.</p>
 
+  {% if medias and medias.total_obras > 0 %}
+  <div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
+      <div class="small text-muted">Obras</div>
+      <div class="h5 mb-0">{{ medias.total_obras }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
+      <div class="small text-muted">Custo médio realizado / unidade</div>
+      <div class="h5 mb-0 text-primary">{% if medias.custo_medio_realizado_por_unidade is not none %}R$ {{ '%.2f'|format(medias.custo_medio_realizado_por_unidade) }}{% else %}—{% endif %}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
+      <div class="small text-muted">Realizado médio / obra</div>
+      <div class="h5 mb-0">R$ {{ '%.2f'|format(medias.realizado_medio_por_obra) }}</div>
+    </div></div></div>
+    <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
+      <div class="small text-muted">Δ Realizado vs Orçado (global)</div>
+      <div class="h5 mb-0 {% if medias.delta_pct_global is not none and medias.delta_pct_global > 0 %}text-danger{% elif medias.delta_pct_global is not none %}text-success{% endif %}">
+        {% if medias.delta_pct_global is not none %}{{ '%+.1f'|format(medias.delta_pct_global) }}%{% else %}—{% endif %}
+      </div>
+    </div></div></div>
+  </div>
+  {% endif %}
+
   <div class="card shadow-sm">
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-light">
           <tr>
             <th>Obra</th>
+            <th class="text-end">Quantidade</th>
             <th class="text-end">Orçado (R$)</th>
             <th class="text-end">Realizado (R$)</th>
+            <th class="text-end">Custo Unit. Real (R$)</th>
             <th class="text-end">Δ (%)</th>
             <th class="text-end">% Executado</th>
           </tr>
@@ -22,8 +47,10 @@
           {% for l in linhas %}
           <tr>
             <td>{{ l.obra.nome if l.obra else '—' }}</td>
+            <td class="text-end">{{ '%.2f'|format(l.quantidade) if l.quantidade else '—' }}</td>
             <td class="text-end">{{ '%.2f'|format(l.orcado) }}</td>
             <td class="text-end text-dark"><strong>{{ '%.2f'|format(l.realizado) }}</strong></td>
+            <td class="text-end">{% if l.custo_unitario_realizado is not none %}{{ '%.2f'|format(l.custo_unitario_realizado) }}{% else %}—{% endif %}</td>
             <td class="text-end {% if l.delta_pct is not none and l.delta_pct > 0 %}text-danger{% elif l.delta_pct is not none %}text-success{% endif %}">
               {% if l.delta_pct is not none %}{{ '%+.1f'|format(l.delta_pct) }}%{% else %}—{% endif %}
             </td>
@@ -32,7 +59,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="text-center text-muted py-4">Serviço ainda não foi vinculado a nenhuma obra.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4">Serviço ainda não foi vinculado a nenhuma obra.</td></tr>
           {% endfor %}
         </tbody>
       </table>

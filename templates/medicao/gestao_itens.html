@@ -201,12 +201,46 @@
                   </div>
                   <div class="modal-body">
                     <div class="mb-3">
+                      <label class="form-label fw-semibold">
+                        Serviço do Catálogo
+                        {% if not item.servico_id %}
+                          <span class="badge bg-warning text-dark ms-1" title="Item legado sem vínculo de catálogo">LEGADO</span>
+                        {% endif %}
+                      </label>
+                      <select name="servico_id" class="form-select edit-svc-sel" data-item="{{ item.id }}">
+                        <option value="">— Sem vínculo (item livre) —</option>
+                        {% for s in servicos_catalogo %}
+                        <option value="{{ s.id }}"
+                          data-preco="{{ '%.2f'|format(s.preco_venda_unitario|float if s.preco_venda_unitario else 0) }}"
+                          {% if item.servico_id == s.id %}selected{% endif %}>
+                          {{ s.nome }} ({{ s.unidade_medida or 'un' }} — R$ {{ '%.2f'|format(s.preco_venda_unitario|float if s.preco_venda_unitario else 0) }})
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="mb-3">
                       <label class="form-label fw-semibold">Nome</label>
                       <input type="text" name="nome" class="form-control" value="{{ item.nome }}" required>
                     </div>
-                    <div class="mb-3">
-                      <label class="form-label fw-semibold">Valor Comercial (R$)</label>
-                      <input type="text" name="valor_comercial" class="form-control" value="{{ '%.2f'|format(item.valor_comercial|float) }}" required>
+                    <div class="row">
+                      <div class="col-5 mb-3">
+                        <label class="form-label fw-semibold">Quantidade</label>
+                        <input type="text" name="quantidade" class="form-control edit-qtd"
+                               data-item="{{ item.id }}"
+                               value="{{ '%.2f'|format(item.quantidade|float) if item.quantidade else '' }}">
+                      </div>
+                      <div class="col-7 mb-3">
+                        <label class="form-label fw-semibold">Valor Comercial (R$)</label>
+                        <input type="text" name="valor_comercial" class="form-control edit-val"
+                               data-item="{{ item.id }}"
+                               value="{{ '%.2f'|format(item.valor_comercial|float) }}" required>
+                      </div>
+                    </div>
+                    <div class="form-check small mb-2">
+                      <input class="form-check-input edit-auto" type="checkbox" id="autoEdit{{ item.id }}" data-item="{{ item.id }}">
+                      <label class="form-check-label" for="autoEdit{{ item.id }}">
+                        Recalcular valor automaticamente (quantidade × preço de venda)
+                      </label>
                     </div>
                   </div>
                   <div class="modal-footer">
@@ -395,6 +429,28 @@
             if($sel){ $sel.addEventListener('change', recalc); }
             if($qtd){ $qtd.addEventListener('input', recalc); }
           })();
+          // Auto-recalc nos modais de edição
+          document.addEventListener('DOMContentLoaded', function(){
+            document.querySelectorAll('.edit-svc-sel').forEach(function(sel){
+              var id = sel.dataset.item;
+              function recalcEdit(){
+                var auto = document.getElementById('autoEdit'+id);
+                if(!auto || !auto.checked) return;
+                var opt = sel.options[sel.selectedIndex];
+                if(!opt || !opt.value) return;
+                var preco = parseFloat(opt.dataset.preco || '0');
+                var qIn = document.querySelector('.edit-qtd[data-item="'+id+'"]');
+                var vIn = document.querySelector('.edit-val[data-item="'+id+'"]');
+                var q = parseFloat(((qIn && qIn.value)||'').replace(',','.'));
+                if(preco>0 && q>0 && vIn) vIn.value = (q*preco).toFixed(2);
+              }
+              sel.addEventListener('change', recalcEdit);
+              var qIn = document.querySelector('.edit-qtd[data-item="'+id+'"]');
+              if(qIn) qIn.addEventListener('input', recalcEdit);
+              var auto = document.getElementById('autoEdit'+id);
+              if(auto) auto.addEventListener('change', recalcEdit);
+            });
+          });
           </script>
           {% if saldo > 0 %}
           <div class="alert alert-info py-2 small mb-0">
