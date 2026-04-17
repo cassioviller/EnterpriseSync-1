@@ -423,19 +423,45 @@
               <input type="text" name="valor_comercial" id="novoItemValor" class="form-control" placeholder="Ex: 50000.00">
             </div>
           </div>
+          <div id="novoItemExplosao" class="small bg-light border rounded p-2 mb-2" style="display:none;"></div>
           <script>
           (function(){
             var $sel = document.getElementById('novoItemServicoId');
             var $qtd = document.getElementById('novoItemQuantidade');
             var $val = document.getElementById('novoItemValor');
             var $nm  = document.getElementById('novoItemNome');
+            var $exp = document.getElementById('novoItemExplosao');
+            var _t = null;
+            function brl(n){ return 'R$ ' + Number(n||0).toFixed(2).replace('.', ','); }
+            function explodir(){
+              if(!$sel.value){ $exp.style.display='none'; return; }
+              var q = parseFloat(($qtd.value||'').replace(',','.'));
+              if(!(q>0)){ $exp.style.display='none'; return; }
+              $exp.style.display='block';
+              $exp.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculando explosão...';
+              fetch('/catalogo/api/servicos/'+$sel.value+'/explodir?quantidade='+encodeURIComponent(q),
+                    {credentials:'same-origin'})
+                .then(function(r){return r.ok?r.json():null;})
+                .then(function(d){
+                  if(!d){ $exp.innerHTML=''; return; }
+                  var c = d.categorias||{};
+                  $exp.innerHTML = '<div class="row g-2">'+
+                    '<div class="col-3"><strong>Material</strong><br>'+brl((c.MATERIAL||{}).custo_total)+'</div>'+
+                    '<div class="col-3"><strong>Mão de obra</strong><br>'+brl((c.MAO_OBRA||{}).custo_total)+'</div>'+
+                    '<div class="col-3"><strong>Outros</strong><br>'+brl((c.OUTROS||{}).custo_total)+'</div>'+
+                    '<div class="col-3"><strong>Subtotal</strong><br><span class="text-success">'+brl(d.subtotal)+'</span><br>'+
+                    '<small>lucro '+brl(d.lucro_total)+'</small></div></div>';
+                }).catch(function(){ $exp.innerHTML=''; });
+            }
+            function debExplodir(){ clearTimeout(_t); _t = setTimeout(explodir, 250); }
             function recalc(){
               var opt = $sel.options[$sel.selectedIndex];
-              if(!opt || !opt.value) return;
+              if(!opt || !opt.value){ $exp.style.display='none'; return; }
               var preco = parseFloat(opt.dataset.preco || '0');
               var q = parseFloat(($qtd.value||'').replace(',','.'));
               if(!$nm.value) $nm.value = opt.dataset.nome || '';
               if(preco>0 && q>0) $val.value = (q*preco).toFixed(2);
+              debExplodir();
             }
             if($sel){ $sel.addEventListener('change', recalc); }
             if($qtd){ $qtd.addEventListener('input', recalc); }

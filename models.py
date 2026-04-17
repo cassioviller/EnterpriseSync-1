@@ -2793,15 +2793,27 @@ class PropostaItem(db.Model):
     # Task #82 — vínculo com catálogo de serviços (opcional, snapshot fica em preco_unitario)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True, index=True)
 
+    # Task #89 — snapshot do cálculo paramétrico (explosão de insumos)
+    quantidade_medida = db.Column(db.Numeric(15, 4), nullable=True)
+    custo_unitario = db.Column(db.Numeric(15, 4), nullable=True)
+    lucro_unitario = db.Column(db.Numeric(15, 4), nullable=True)
+    subtotal = db.Column(db.Numeric(15, 2), nullable=True)
+
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relacionamento com template (opcional)
     template_origem = db.relationship('PropostaTemplate', backref='itens_utilizados')
     servico = db.relationship('Servico', foreign_keys=[servico_id])
-    
+
     @property
-    def subtotal(self):
-        return self.quantidade * self.preco_unitario
+    def subtotal_calculado(self):
+        """Subtotal efetivo: persistido (snapshot) ou fallback qty×preço."""
+        if self.subtotal is not None:
+            return self.subtotal
+        try:
+            return (self.quantidade or 0) * (self.preco_unitario or 0)
+        except Exception:
+            return 0
     
     def to_dict(self):
         return {
@@ -4572,6 +4584,12 @@ class ItemMedicaoComercial(db.Model):
     quantidade = db.Column(db.Numeric(15, 4), nullable=True)
     # Task #82 — origem determinística para dedupe na propagação de proposta
     proposta_item_id = db.Column(db.Integer, db.ForeignKey('proposta_itens.id', ondelete='SET NULL'), nullable=True, index=True, unique=True)
+    # Task #89 — snapshot do cálculo paramétrico (explosão de insumos)
+    quantidade_medida = db.Column(db.Numeric(15, 4), nullable=True)
+    custo_unitario = db.Column(db.Numeric(15, 4), nullable=True)
+    preco_unitario = db.Column(db.Numeric(15, 4), nullable=True)
+    lucro_unitario = db.Column(db.Numeric(15, 4), nullable=True)
+    subtotal = db.Column(db.Numeric(15, 2), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra', backref='itens_medicao_comercial')
@@ -5220,6 +5238,51 @@ class NotificacaoOrcamento(db.Model):
 
     def __repr__(self):
         return f'<NotificacaoOrcamento svc={self.obra_servico_custo_id} ativa={self.ativa}>'
+
+
+def _calc_proposta_item_snapshot(target):
+    """Task #89: garante snapshot mínimo (subtotal=qtd×preço) em PropostaItem."""
+    try:
+        if target.subtotal is None:
+            q = target.quantidade or 0
+            p = target.preco_unitario or 0
+            target.subtotal = (q * p)
+    except Exception:
+        pass
+
+
+def _calc_item_medicao_snapshot(target):
+    """Task #89: garante snapshot mínimo em ItemMedicaoComercial.
+
+    - Se preco_unitario faltar mas houver quantidade>0 e valor_comercial,
+      deriva preco_unitario = valor_comercial / quantidade.
+    - subtotal = valor_comercial (sempre).
+    """
+    try:
+        if (target.preco_unitario is None
+                and target.quantidade and target.valor_comercial):
+            try:
+                q = float(target.quantidade)
+                if q > 0:
+                    target.preco_unitario = float(target.valor_comercial) / q
+            except Exception:
+                pass
+        if target.subtotal is None and target.valor_comercial is not None:
+            target.subtotal = target.valor_comercial
+    except Exception:
+        pass
+
+
+@_sa_event.listens_for(PropostaItem, 'before_insert')
+@_sa_event.listens_for(PropostaItem, 'before_update')
+def _proposta_item_before_save(mapper, connection, target):
+    _calc_proposta_item_snapshot(target)
+
+
+@_sa_event.listens_for(ItemMedicaoComercial, 'before_insert')
+@_sa_event.listens_for(ItemMedicaoComercial, 'before_update')
+def _item_medicao_before_save(mapper, connection, target):
+    _calc_item_medicao_snapshot(target)
 
 
 @_sa_event.listens_for(ItemMedicaoComercial, 'after_insert')

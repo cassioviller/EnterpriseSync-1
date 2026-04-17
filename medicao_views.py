@@ -176,6 +176,25 @@ def criar_item(obra_id):
         flash('Nome e valor comercial são obrigatórios (ou informe serviço + quantidade com preço de venda).', 'danger')
         return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
+    # Task #89 — snapshot paramétrico
+    custo_unit_snap = None
+    preco_unit_snap = None
+    lucro_unit_snap = None
+    if servico_obj is not None and quantidade and quantidade > 0:
+        try:
+            from services.orcamento_service import explodir_servico_para_quantidade as _explodir
+            _r = _explodir(servico_obj, quantidade)
+            custo_unit_snap = _r['custo_unitario']
+            preco_unit_snap = _r['preco_unitario']
+            lucro_unit_snap = _r['lucro_unitario']
+        except Exception:
+            pass
+    if preco_unit_snap is None and quantidade and quantidade > 0 and valor > 0:
+        try:
+            preco_unit_snap = (Decimal(str(valor)) / Decimal(str(quantidade)))
+        except Exception:
+            pass
+
     item = ItemMedicaoComercial(
         admin_id=admin_id,
         obra_id=obra_id,
@@ -183,6 +202,11 @@ def criar_item(obra_id):
         valor_comercial=valor,
         servico_id=servico_id,
         quantidade=quantidade,
+        quantidade_medida=quantidade,
+        custo_unitario=custo_unit_snap,
+        preco_unitario=preco_unit_snap,
+        lucro_unitario=lucro_unit_snap,
+        subtotal=valor,
     )
     db.session.add(item)
     db.session.commit()
@@ -250,6 +274,29 @@ def editar_item(obra_id, item_id):
                 ).quantize(Decimal('0.01'))
         except Exception:
             pass
+
+    # Task #89 — recalcula snapshot paramétrico (ou deriva preço unitário)
+    try:
+        from models import Servico
+        if item.servico_id and item.quantidade and Decimal(str(item.quantidade)) > 0:
+            svc = Servico.query.filter_by(id=item.servico_id, admin_id=admin_id).first()
+            if svc is not None:
+                from services.orcamento_service import explodir_servico_para_quantidade as _explodir
+                _r = _explodir(svc, item.quantidade)
+                item.custo_unitario = _r['custo_unitario']
+                item.preco_unitario = _r['preco_unitario']
+                item.lucro_unitario = _r['lucro_unitario']
+        elif item.quantidade and Decimal(str(item.quantidade)) > 0 and item.valor_comercial:
+            item.preco_unitario = (
+                Decimal(str(item.valor_comercial)) / Decimal(str(item.quantidade))
+            )
+        if item.quantidade is not None:
+            item.quantidade_medida = item.quantidade
+        if item.valor_comercial is not None:
+            item.subtotal = item.valor_comercial
+    except Exception as _e:
+        import logging
+        logging.warning(f"[Task#89] snapshot recalc falhou (item={item.id}): {_e}")
 
     # Task #82 — sincroniza ObraServicoCusto pareado com as alterações
     # de servico_id e/ou valor_comercial (consistente com a rota dedicada

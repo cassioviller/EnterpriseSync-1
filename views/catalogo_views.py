@@ -26,6 +26,7 @@ from models import (
 )
 from services.orcamento_service import (
     calcular_precos_servico, recalcular_servico_preco,
+    explodir_servico_para_quantidade,
 )
 
 logger = logging.getLogger(__name__)
@@ -256,6 +257,30 @@ def servico_composicao_excluir(servico_id, comp_id):
     return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
 
 
+@catalogo_bp.route('/servicos/<int:servico_id>/composicao/<int:comp_id>/editar', methods=['POST'])
+@login_required
+def servico_composicao_editar(servico_id, comp_id):
+    """Task #89: edita o coeficiente / observação de uma linha de composição."""
+    aid = _admin_id()
+    svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
+    comp = ComposicaoServico.query.filter_by(
+        id=comp_id, servico_id=svc.id, admin_id=aid
+    ).first_or_404()
+    coef = _to_decimal(request.form.get('coeficiente'), '0')
+    if coef <= 0:
+        flash('Coeficiente deve ser > 0.', 'error')
+        return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
+    comp.coeficiente = coef
+    obs = request.form.get('observacao')
+    if obs is not None:
+        comp.observacao = obs.strip() or None
+    db.session.flush()
+    recalcular_servico_preco(svc)
+    db.session.commit()
+    flash('Coeficiente atualizado.', 'success')
+    return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
+
+
 @catalogo_bp.route('/servicos/<int:servico_id>/preco', methods=['POST'])
 @login_required
 def servico_atualizar_preco(servico_id):
@@ -362,6 +387,63 @@ def api_buscar_servicos():
         'custo': float(s.custo_unitario or 0),
         'categoria': s.categoria,
     } for s in rows])
+
+
+@catalogo_bp.route('/api/servicos/<int:servico_id>/explodir')
+@login_required
+def api_explodir_servico(servico_id):
+    """Task #89: explosão paramétrica de um serviço para uma quantidade.
+
+    Query params:
+        quantidade (float, default 1)
+        data_ref   (YYYY-MM-DD, opcional — default hoje)
+    Retorna o dict de `explodir_servico_para_quantidade` em JSON.
+    """
+    from datetime import datetime as _dt
+    aid = _admin_id()
+    svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
+    try:
+        qtd = float(request.args.get('quantidade', '1') or '1')
+    except (TypeError, ValueError):
+        qtd = 1.0
+    data_ref = None
+    dr = (request.args.get('data_ref') or '').strip()
+    if dr:
+        try:
+            data_ref = _dt.strptime(dr, '%Y-%m-%d').date()
+        except ValueError:
+            data_ref = None
+    r = explodir_servico_para_quantidade(svc, qtd, data_ref)
+
+    def _f(v):
+        try:
+            return float(v) if v is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    return jsonify({
+        'servico_id': svc.id,
+        'servico_nome': svc.nome,
+        'unidade': svc.unidade_medida,
+        'quantidade': _f(r['quantidade']),
+        'custo_unitario': _f(r['custo_unitario']),
+        'preco_unitario': _f(r['preco_unitario']),
+        'lucro_unitario': _f(r['lucro_unitario']),
+        'subtotal': _f(r['subtotal']),
+        'custo_total': _f(r['custo_total']),
+        'lucro_total': _f(r['lucro_total']),
+        'imposto_pct': _f(r.get('imposto_pct')),
+        'margem_lucro_pct': _f(r.get('margem_lucro_pct')),
+        'erro': r.get('erro'),
+        'categorias': {
+            k: {
+                'custo_unitario': _f(v['custo_unitario']),
+                'custo_total': _f(v['custo_total']),
+                'itens': v['itens'],
+            } for k, v in r['categorias'].items()
+        },
+        'detalhamento': r['detalhamento'],
+    })
 
 
 @catalogo_bp.route('/api/insumos/buscar')

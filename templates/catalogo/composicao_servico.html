@@ -93,7 +93,21 @@
             <td><span class="badge bg-secondary">{{ d.tipo }}</span></td>
             <td>{{ d.unidade }}</td>
             <td class="text-end">{{ '%.4f'|format(d.preco_unitario) }}</td>
-            <td class="text-end">{{ '%.4f'|format(d.coeficiente) }}</td>
+            <td class="text-end" style="min-width:170px;">
+              {% if comp %}
+              <form method="POST" action="{{ url_for('catalogo.servico_composicao_editar', servico_id=servico.id, comp_id=comp.id) }}" class="d-flex gap-1 justify-content-end">
+                {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                <input name="coeficiente" type="number" step="0.0001" min="0.0001" required
+                       class="form-control form-control-sm text-end" style="max-width:110px;"
+                       value="{{ '%.4f'|format(d.coeficiente) }}">
+                <button class="btn btn-sm btn-outline-primary" title="Salvar coeficiente">
+                  <i class="fas fa-check"></i>
+                </button>
+              </form>
+              {% else %}
+                {{ '%.4f'|format(d.coeficiente) }}
+              {% endif %}
+            </td>
             <td class="text-end text-dark"><strong>{{ '%.2f'|format(d.subtotal) }}</strong></td>
             <td class="text-end">
               {% if comp %}

@@ -452,6 +452,26 @@ def criar():
                 except (ValueError, TypeError):
                     servico_id_int = None
 
+            # Task #89 — snapshot paramétrico quando vinculado ao catálogo
+            custo_unit_snap = None
+            preco_unit_final = item_data['preco_unitario']
+            lucro_unit_snap = None
+            subtotal_snap = None
+            qtd_medida = item_data['quantidade']
+            if servico_id_int:
+                try:
+                    from models import Servico as _Svc
+                    from services.orcamento_service import explodir_servico_para_quantidade as _explodir
+                    _svc = _Svc.query.get(servico_id_int)
+                    _r = _explodir(_svc, qtd_medida)
+                    custo_unit_snap = _r['custo_unitario']
+                    if not preco_unit_final or float(preco_unit_final) <= 0:
+                        preco_unit_final = _r['preco_unitario']
+                    lucro_unit_snap = _r['lucro_unitario']
+                    subtotal_snap = _r['subtotal']
+                except Exception as _e:
+                    logger.warning(f"Task #89: explosão falhou no item {idx+1}: {_e}")
+
             item = PropostaItem(
                 admin_id=admin_id,
                 proposta_id=proposta.id,
@@ -459,12 +479,16 @@ def criar():
                 descricao=item_data['descricao'],
                 quantidade=item_data['quantidade'],
                 unidade=item_data['unidade'],
-                preco_unitario=item_data['preco_unitario'],
+                preco_unitario=preco_unit_final,
                 ordem=idx + 1,
                 template_origem_nome=template_nome,
                 template_origem_id=template_id_int,
                 categoria_titulo=categoria,
                 servico_id=servico_id_int,
+                quantidade_medida=qtd_medida,
+                custo_unitario=custo_unit_snap,
+                lucro_unitario=lucro_unit_snap,
+                subtotal=subtotal_snap,
             )
             db.session.add(item)
             logger.info(f" [OK] Item {idx+1} criado: {item_data['descricao'][:30]}...")
@@ -887,6 +911,24 @@ def atualizar(id):
                 except (ValueError, TypeError):
                     servico_id_int = None
             
+            # Task #89 — snapshot paramétrico se vinculado ao catálogo
+            custo_unit_snap = None
+            lucro_unit_snap = None
+            subtotal_snap = None
+            if servico_id_int:
+                try:
+                    from models import Servico as _Svc
+                    from services.orcamento_service import explodir_servico_para_quantidade as _explodir
+                    _svc = _Svc.query.get(servico_id_int)
+                    _r = _explodir(_svc, quantidade)
+                    custo_unit_snap = _r['custo_unitario']
+                    if not preco_unitario or float(preco_unitario) <= 0:
+                        preco_unitario = float(_r['preco_unitario'])
+                    lucro_unit_snap = _r['lucro_unitario']
+                    subtotal_snap = _r['subtotal']
+                except Exception as _e:
+                    logger.warning(f"Task #89: explosão falhou no item {i+1}: {_e}")
+
             # Verificar se é item existente ou novo
             if i < len(item_ids) and item_ids[i]:
                 # Atualizar item existente
@@ -901,6 +943,10 @@ def atualizar(id):
                     item.template_origem_id = template_id_int
                     item.categoria_titulo = categoria
                     item.servico_id = servico_id_int
+                    item.quantidade_medida = quantidade
+                    item.custo_unitario = custo_unit_snap
+                    item.lucro_unitario = lucro_unit_snap
+                    item.subtotal = subtotal_snap
                     logger.debug(f" [OK] Item {i+1} atualizado: {descricao[:30]}...")
             else:
                 # Criar novo item
@@ -917,6 +963,10 @@ def atualizar(id):
                     template_origem_id=template_id_int,
                     categoria_titulo=categoria,
                     servico_id=servico_id_int,  # Task #82
+                    quantidade_medida=quantidade,
+                    custo_unitario=custo_unit_snap,
+                    lucro_unitario=lucro_unit_snap,
+                    subtotal=subtotal_snap,
                 )
                 db.session.add(novo_item)
                 logger.info(f" [OK] Item {i+1} criado: {descricao[:30]}...")

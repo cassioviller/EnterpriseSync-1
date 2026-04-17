@@ -3823,6 +3823,7 @@ def executar_migracoes():
             (121, "Task #82 — Catálogo de Insumos + Composição de Serviços + Orçamento Paramétrico", migration_121_catalogo_servicos_orcamento),
             (122, "Task #82 — ItemMedicaoComercial.proposta_item_id (dedupe determinístico de propagação)", migration_122_item_medicao_proposta_item_id),
             (123, "Task #82 — ComposicaoServico.unidade (snapshot da unidade do insumo)", migration_123_composicao_servico_unidade),
+            (124, "Task #89 — Snapshot de cálculo paramétrico em PropostaItem e ItemMedicaoComercial", migration_124_snapshot_calculo_parametrico),
         ]
         
         # Executar cada migração com rastreamento
@@ -9963,4 +9964,110 @@ def migration_123_composicao_servico_unidade():
             except Exception:
                 pass
         logging.error(f"Migration 123 falhou: {e}")
+        raise
+
+
+def migration_124_snapshot_calculo_parametrico():
+    """Migration 124 (Task #89): adiciona snapshot de cálculo paramétrico
+    em PropostaItem e ItemMedicaoComercial.
+
+    Colunas (todas NULL para compatibilidade):
+        proposta_itens.quantidade_medida   NUMERIC(15,4)
+        proposta_itens.custo_unitario      NUMERIC(15,4)
+        proposta_itens.lucro_unitario      NUMERIC(15,4)
+        proposta_itens.subtotal            NUMERIC(15,2)
+
+        item_medicao_comercial.quantidade_medida NUMERIC(15,4)
+        item_medicao_comercial.custo_unitario    NUMERIC(15,4)
+        item_medicao_comercial.preco_unitario    NUMERIC(15,4)
+        item_medicao_comercial.lucro_unitario    NUMERIC(15,4)
+        item_medicao_comercial.subtotal          NUMERIC(15,2)
+
+    Backfill:
+        - proposta_itens.subtotal = quantidade * preco_unitario quando NULL
+        - item_medicao_comercial.subtotal = valor_comercial quando NULL
+        - quantidade_medida = quantidade quando NULL e quantidade não-NULL.
+
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)  # AUTOCOMMIT
+        cursor = connection.cursor()
+        cursor.execute("""
+        DO $$
+        BEGIN
+            -- proposta_itens
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='proposta_itens') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='proposta_itens' AND column_name='quantidade_medida') THEN
+                    ALTER TABLE proposta_itens ADD COLUMN quantidade_medida NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='proposta_itens' AND column_name='custo_unitario') THEN
+                    ALTER TABLE proposta_itens ADD COLUMN custo_unitario NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='proposta_itens' AND column_name='lucro_unitario') THEN
+                    ALTER TABLE proposta_itens ADD COLUMN lucro_unitario NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='proposta_itens' AND column_name='subtotal') THEN
+                    ALTER TABLE proposta_itens ADD COLUMN subtotal NUMERIC(15,2) NULL;
+                END IF;
+                UPDATE proposta_itens
+                   SET subtotal = COALESCE(quantidade,0) * COALESCE(preco_unitario,0)
+                 WHERE subtotal IS NULL;
+                UPDATE proposta_itens
+                   SET quantidade_medida = quantidade
+                 WHERE quantidade_medida IS NULL AND quantidade IS NOT NULL;
+            END IF;
+
+            -- item_medicao_comercial
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='item_medicao_comercial') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='item_medicao_comercial' AND column_name='quantidade_medida') THEN
+                    ALTER TABLE item_medicao_comercial ADD COLUMN quantidade_medida NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='item_medicao_comercial' AND column_name='custo_unitario') THEN
+                    ALTER TABLE item_medicao_comercial ADD COLUMN custo_unitario NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='item_medicao_comercial' AND column_name='preco_unitario') THEN
+                    ALTER TABLE item_medicao_comercial ADD COLUMN preco_unitario NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='item_medicao_comercial' AND column_name='lucro_unitario') THEN
+                    ALTER TABLE item_medicao_comercial ADD COLUMN lucro_unitario NUMERIC(15,4) NULL;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='item_medicao_comercial' AND column_name='subtotal') THEN
+                    ALTER TABLE item_medicao_comercial ADD COLUMN subtotal NUMERIC(15,2) NULL;
+                END IF;
+                UPDATE item_medicao_comercial
+                   SET subtotal = valor_comercial
+                 WHERE subtotal IS NULL AND valor_comercial IS NOT NULL;
+                UPDATE item_medicao_comercial
+                   SET quantidade_medida = quantidade
+                 WHERE quantidade_medida IS NULL AND quantidade IS NOT NULL;
+                UPDATE item_medicao_comercial
+                   SET preco_unitario = (valor_comercial / quantidade)
+                 WHERE preco_unitario IS NULL
+                   AND quantidade IS NOT NULL AND quantidade > 0
+                   AND valor_comercial IS NOT NULL;
+            END IF;
+        END$$;
+        """)
+        cursor.close()
+        connection.close()
+        logging.info("Migration 124: snapshot Task #89 OK")
+    except Exception as e:
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
+        logging.error(f"Migration 124 falhou: {e}")
         raise

@@ -116,7 +116,7 @@
                 <div class="mt-4">
                     <h6 class="text-secondary mb-3">Serviços Adicionais</h6>
                     <div id="servicosContainer">
-                    <div class="servico-item border rounded p-3 mb-3">
+                    <div class="servico-item border rounded p-3 mb-3" data-custo-unitario="0">
                         <div class="row mb-2">
                             <div class="col-12">
                                 <div class="input-group input-group-sm">
@@ -184,6 +184,8 @@
                         <i class="fas fa-plus"></i> Adicionar Serviço
                     </button>
                     <div class="text-end">
+                        <div class="small text-muted">Custo total: <span id="custoTotalProposta">R$ 0,00</span></div>
+                        <div class="small text-success">Lucro total: <span id="lucroTotalProposta">R$ 0,00</span> (<span id="margemProposta">0,0</span>%)</div>
                         <h5>Total da Proposta: <span id="totalProposta">R$ 0,00</span></h5>
                     </div>
                 </div>
@@ -386,9 +388,80 @@ function calcularServico(input) {
     const quantidade = parseFloat(servicoItem.querySelector('.servico-quantidade').value) || 0;
     const valorUnitario = parseFloat(servicoItem.querySelector('.servico-valor-unitario').value) || 0;
     const total = quantidade * valorUnitario;
-    
+
     servicoItem.querySelector('.servico-total').value = 'R$ ' + total.toFixed(2).replace('.', ',');
     calcularTotal();
+    // Task #89 — explosão paramétrica de insumos quando há servico_id
+    try { explodirServicoLinha(servicoItem); } catch(e) { console.warn(e); }
+}
+
+// Task #89 — chama API e injeta painel de explosão por linha
+function explodirServicoLinha(row) {
+    if (!row) return;
+    const hidden = row.querySelector('input[name="item_servico_id"]');
+    const qtdIn = row.querySelector('.servico-quantidade, input[name="item_quantidade"]');
+    if (!hidden || !hidden.value) return;
+    const qtd = parseFloat((qtdIn && qtdIn.value) || '0');
+    if (!(qtd > 0)) return;
+    const sid = parseInt(hidden.value, 10);
+    let panel = row.querySelector('.explosao-insumos');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.className = 'explosao-insumos mt-2 p-2 small bg-light border rounded';
+        row.appendChild(panel);
+    }
+    panel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculando explosão de insumos...';
+    fetch(`/catalogo/api/servicos/${sid}/explodir?quantidade=${encodeURIComponent(qtd)}`,
+          { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+          if (!d) { panel.innerHTML = '<span class="text-muted">Sem dados de composição.</span>'; return; }
+          const f = (n) => 'R$ ' + Number(n||0).toFixed(2).replace('.', ',');
+          const cats = d.categorias || {};
+          const catTpl = (label, c) => `<div class="col-md-3"><div><strong>${label}</strong></div>
+              <div>Custo unit.: ${f(c.custo_unitario)}</div>
+              <div>Custo total: <strong>${f(c.custo_total)}</strong></div></div>`;
+          let det = '';
+          if ((d.detalhamento || []).length) {
+              det = `<details class="mt-1"><summary class="text-primary" style="cursor:pointer;">
+                  Ver detalhamento (${d.detalhamento.length} insumos)</summary>
+                  <table class="table table-sm mt-1 mb-0">
+                  <thead><tr><th>Insumo</th><th>Tipo</th>
+                    <th class="text-end">Coef.</th><th class="text-end">Qtd total</th>
+                    <th class="text-end">Preço un.</th><th class="text-end">Subtotal</th></tr></thead>
+                  <tbody>${d.detalhamento.map(it => `<tr>
+                    <td>${it.nome}</td><td><span class="badge bg-secondary">${it.tipo}</span></td>
+                    <td class="text-end">${Number(it.coeficiente).toFixed(4)}</td>
+                    <td class="text-end">${Number(it.quantidade_total).toFixed(4)} ${it.unidade||''}</td>
+                    <td class="text-end">${f(it.preco_unitario)}</td>
+                    <td class="text-end"><strong>${f(it.subtotal_total)}</strong></td>
+                  </tr>`).join('')}</tbody></table></details>`;
+          }
+          panel.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="text-secondary">
+                <i class="fas fa-cubes"></i> Explosão paramétrica — <strong>${d.servico_nome}</strong>
+              </span>
+              <span class="text-muted">qtd: ${Number(d.quantidade).toFixed(4)} ${d.unidade||''}</span>
+            </div>
+            <div class="row g-2">
+              ${catTpl('Material', cats.MATERIAL || {})}
+              ${catTpl('Mão de obra', cats.MAO_OBRA || {})}
+              ${catTpl('Outros', cats.OUTROS || {})}
+              <div class="col-md-3">
+                <div><strong>Resumo</strong></div>
+                <div>Custo un.: ${f(d.custo_unitario)} · Preço un.: ${f(d.preco_unitario)}</div>
+                <div>Lucro un.: ${f(d.lucro_unitario)}</div>
+                <div class="text-success"><strong>Subtotal: ${f(d.subtotal)}</strong></div>
+              </div>
+            </div>${det}`;
+          row.dataset.custoUnitario = String(d.custo_unitario || 0);
+          if (typeof atualizarTotalGeral === 'function') atualizarTotalGeral();
+      })
+      .catch(err => {
+          panel.innerHTML = '<span class="text-danger">Erro ao calcular explosão.</span>';
+          console.warn('Explosão falhou', err);
+      });
 }
 
 function calcularTotal() {
@@ -918,7 +991,8 @@ function recriarTabelaTemplate(templateId) {
 function atualizarTotalGeral() {
     let totalTemplates = 0;
     let totalServicos = 0;
-    
+    let custoTotal = 0;
+
     // Somar todos os templates carregados
     templatesCarregadosData.forEach(template => {
         if (template.itens_padrao) {
@@ -927,26 +1001,30 @@ function atualizarTotalGeral() {
             });
         }
     });
-    
-    // Somar serviços adicionais
+
+    // Somar serviços adicionais (Task #89: usa custo do snapshot quando disponível)
     document.querySelectorAll('#servicosContainer .servico-item').forEach(item => {
         const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
         const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
+        const custoUnit = parseFloat(item.dataset.custoUnitario || '0') || 0;
         totalServicos += quantidade * valorUnitario;
+        custoTotal += quantidade * custoUnit;
     });
-    
+
     const totalGeral = totalTemplates + totalServicos;
-    
-    // Atualizar display do total
-    document.getElementById('totalProposta').textContent = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
-    
-    // Atualizar input hidden para o formulário
+    const lucro = totalGeral - custoTotal;
+    const margem = totalGeral > 0 ? (lucro / totalGeral) * 100 : 0;
+    const fmt = (n) => 'R$ ' + Number(n||0).toFixed(2).replace('.', ',');
+
+    document.getElementById('totalProposta').textContent = fmt(totalGeral);
+    const ce = document.getElementById('custoTotalProposta'); if (ce) ce.textContent = fmt(custoTotal);
+    const le = document.getElementById('lucroTotalProposta'); if (le) le.textContent = fmt(lucro);
+    const me = document.getElementById('margemProposta'); if (me) me.textContent = margem.toFixed(1).replace('.', ',');
+
     const inputValor = document.querySelector('input[name="valor_total"]');
     if (inputValor) {
         inputValor.value = totalGeral.toFixed(2);
     }
-    
-    console.log(`Totais: Templates R$ ${totalTemplates.toFixed(2)} + Serviços R$ ${totalServicos.toFixed(2)} = Total R$ ${totalGeral.toFixed(2)}`);
 }
 
 function carregarTemplateDebug() {
@@ -1056,6 +1134,7 @@ function carregarTemplateComValor(templateId) {
                         // Criar elemento de serviço
                         const servicoDiv = document.createElement('div');
                         servicoDiv.className = 'servico-item border rounded p-3 mb-3';
+                        servicoDiv.dataset.custoUnitario = '0';
                         servicoDiv.innerHTML = `
                             <div class="row mb-2">
                                 <div class="col-12">
