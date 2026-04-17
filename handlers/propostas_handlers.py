@@ -12,6 +12,58 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
+    """Task #82: ao aprovar proposta, materializar cada PropostaItem como
+    ItemMedicaoComercial na obra vinculada (se houver). O listener after_insert
+    em ItemMedicaoComercial cria automaticamente o ObraServicoCusto pareado
+    (valor_orcado = valor_comercial; servico_catalogo_id = servico_id).
+
+    Idempotente: se a obra já possui itens de medição vindos desta proposta,
+    não duplica.
+    """
+    from models import Proposta, PropostaItem, ItemMedicaoComercial
+    proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
+    if not proposta or not getattr(proposta, 'obra_id', None):
+        logger.info(f"#82: proposta {proposta_id} sem obra vinculada — pular propagação")
+        return 0
+    obra_id = proposta.obra_id
+
+    # Idempotência: se já existe item desta proposta (pelo nome), pular
+    itens = PropostaItem.query.filter_by(proposta_id=proposta_id).all()
+    if not itens:
+        return 0
+    nomes_existentes = {
+        i.nome for i in ItemMedicaoComercial.query.filter_by(
+            admin_id=admin_id, obra_id=obra_id
+        ).all()
+    }
+    criados = 0
+    for it in itens:
+        nome_item = (getattr(it, 'descricao', None) or getattr(it, 'item', None) or '').strip()
+        if not nome_item:
+            continue
+        if nome_item in nomes_existentes:
+            continue
+        valor_total = Decimal(str(it.subtotal or 0))
+        if valor_total <= 0:
+            continue
+        novo = ItemMedicaoComercial(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            nome=nome_item[:200],
+            valor_comercial=valor_total,
+            servico_id=getattr(it, 'servico_id', None),
+            quantidade=Decimal(str(it.quantidade or 0)) if getattr(it, 'quantidade', None) is not None else None,
+            status='PENDENTE',
+        )
+        db.session.add(novo)
+        criados += 1
+    if criados:
+        db.session.flush()
+        logger.info(f"#82: {criados} ItemMedicaoComercial criados para obra {obra_id} (proposta {proposta_id})")
+    return criados
+
+
 @event_handler('proposta_aprovada')
 def handle_proposta_aprovada(data: dict, admin_id: int):
     """
@@ -121,7 +173,14 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         db.session.add(conta_receber)
         
         logger.info(f"✅ Conta a receber criada: R$ {float(valor_total):.2f} - Vencimento: {data_vencimento.strftime('%d/%m/%Y')}")
-        
+
+        # 4. Task #82: propagar para obra (ItemMedicaoComercial → ObraServicoCusto)
+        try:
+            _propagar_proposta_para_obra(proposta_id, admin_id)
+        except Exception as e_prop:
+            logger.error(f"#82: erro ao propagar proposta {proposta_id} para obra: {e_prop}", exc_info=True)
+            # Não derruba a transação principal — propagação é opcional
+
         # Commit das alterações
         db.session.commit()
         

@@ -383,6 +383,10 @@ class Servico(db.Model):
     complexidade = db.Column(db.Integer, default=3)  # 1-5 para análise futura
     requer_especializacao = db.Column(db.Boolean, default=False)
     ativo = db.Column(db.Boolean, default=True)
+    # Task #82 — Orçamento paramétrico
+    imposto_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    margem_lucro_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    preco_venda_unitario = db.Column(db.Numeric(15, 2), default=0)
     # Multi-tenant obrigatório
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -391,6 +395,7 @@ class Servico(db.Model):
     # Relacionamentos
     # Removido: subatividades obsoletas - agora usamos SubatividadeMestre
     historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
+    composicoes = db.relationship('ComposicaoServico', backref='servico', cascade='all, delete-orphan', lazy=True)
     servicos_obra = db.relationship('ServicoObra', backref='servico', lazy=True)
     servicos_reais = db.relationship('ServicoObraReal', backref='servico_real', lazy=True)
     admin = db.relationship('Usuario', backref='servicos_criados')
@@ -2784,11 +2789,15 @@ class PropostaItem(db.Model):
     template_origem_nome = db.Column(db.String(100))  # Nome do template quando foi carregado
     grupo_ordem = db.Column(db.Integer, default=1)  # Ordem do grupo/categoria
     item_ordem_no_grupo = db.Column(db.Integer, default=1)  # Ordem do item dentro do grupo
-    
+
+    # Task #82 — vínculo com catálogo de serviços (opcional, snapshot fica em preco_unitario)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True, index=True)
+
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relacionamento com template (opcional)
     template_origem = db.relationship('PropostaTemplate', backref='itens_utilizados')
+    servico = db.relationship('Servico', foreign_keys=[servico_id])
     
     @property
     def subtotal(self):
@@ -3044,6 +3053,9 @@ class ConfiguracaoEmpresa(db.Model):
     prazo_entrega_padrao = db.Column(db.Integer, default=90)
     validade_padrao = db.Column(db.Integer, default=7)
     percentual_nota_fiscal_padrao = db.Column(db.Numeric(5,2), default=13.5)
+    # Task #82 — defaults de orçamento
+    imposto_pct_padrao = db.Column(db.Numeric(5, 2), default=8.0)
+    lucro_pct_padrao = db.Column(db.Numeric(5, 2), default=10.0)
     
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -4555,9 +4567,13 @@ class ItemMedicaoComercial(db.Model):
     percentual_executado_acumulado = db.Column(db.Numeric(5, 2), default=0)
     valor_executado_acumulado = db.Column(db.Numeric(15, 2), default=0)
     status = db.Column(db.String(20), default='PENDENTE')
+    # Task #82 — vínculo opcional com catálogo
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True, index=True)
+    quantidade = db.Column(db.Numeric(15, 4), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra', backref='itens_medicao_comercial')
+    servico = db.relationship('Servico', foreign_keys=[servico_id])
     tarefas_vinculadas = db.relationship('ItemMedicaoCronogramaTarefa', backref='item_medicao', cascade='all, delete-orphan')
 
     def __repr__(self):
@@ -4884,6 +4900,13 @@ class ObraServicoCusto(db.Model):
         db.ForeignKey('servico_obra_real.id', ondelete='SET NULL'),
         nullable=True,
     )
+    # Task #82 — vínculo com catálogo (analítico cross-obra)
+    servico_catalogo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('servico.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
 
     nome = db.Column(db.String(200), nullable=False)
 
@@ -4915,6 +4938,7 @@ class ObraServicoCusto(db.Model):
     obra = db.relationship('Obra', backref=db.backref('servicos_custo', cascade='all, delete-orphan'))
     item_medicao = db.relationship('ItemMedicaoComercial', foreign_keys=[item_medicao_comercial_id])
     servico_real = db.relationship('ServicoObraReal', foreign_keys=[servico_obra_real_id])
+    servico_catalogo = db.relationship('Servico', foreign_keys=[servico_catalogo_id])
     equipe_planejada = db.relationship(
         'ObraServicoEquipePlanejada',
         backref='servico_custo',
@@ -5198,7 +5222,12 @@ class NotificacaoOrcamento(db.Model):
 @_sa_event.listens_for(ItemMedicaoComercial, 'after_insert')
 def _item_medicao_auto_cria_custo(mapper, connection, target):
     """Ao criar um ItemMedicaoComercial, cria automaticamente o par
-    ObraServicoCusto vinculado (se ainda não existir)."""
+    ObraServicoCusto vinculado (se ainda não existir).
+
+    Task #82: herda valor_comercial → valor_orcado e servico_id →
+    servico_catalogo_id quando presentes, fechando o ciclo
+    catálogo → proposta → medição comercial → planejamento de custo.
+    """
     try:
         tbl = ObraServicoCusto.__table__
         existing = connection.execute(
@@ -5206,13 +5235,16 @@ def _item_medicao_auto_cria_custo(mapper, connection, target):
         ).first()
         if existing:
             return
+        valor_orcado = target.valor_comercial or 0
+        servico_catalogo_id = getattr(target, 'servico_id', None)
         connection.execute(
             tbl.insert().values(
                 admin_id=target.admin_id,
                 obra_id=target.obra_id,
                 item_medicao_comercial_id=target.id,
+                servico_catalogo_id=servico_catalogo_id,
                 nome=target.nome,
-                valor_orcado=0,
+                valor_orcado=valor_orcado,
                 realizado_material=0,
                 realizado_mao_obra=0,
                 realizado_outros=0,
@@ -5225,3 +5257,106 @@ def _item_medicao_auto_cria_custo(mapper, connection, target):
     except Exception:
         import logging as _lg
         _lg.getLogger(__name__).exception("Erro ao auto-criar ObraServicoCusto para ItemMedicaoComercial")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Task #82 — Catálogo de Insumos + Composição de Serviços
+# ─────────────────────────────────────────────────────────────────────────
+class Insumo(db.Model):
+    """Item base reutilizável usado na composição de serviços.
+
+    Tipo: MATERIAL | MAO_OBRA | EQUIPAMENTO. O preço base é versionado em
+    PrecoBaseInsumo (vigência por data); o cálculo do serviço usa o vigente
+    na data de referência.
+    """
+    __tablename__ = 'insumo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    nome = db.Column(db.String(200), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False, default='MATERIAL')
+    unidade = db.Column(db.String(20), nullable=False, default='un')
+    descricao = db.Column(db.Text)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    precos = db.relationship(
+        'PrecoBaseInsumo',
+        backref='insumo',
+        cascade='all, delete-orphan',
+        order_by='PrecoBaseInsumo.vigencia_inicio.desc()',
+    )
+    composicoes = db.relationship(
+        'ComposicaoServico',
+        backref='insumo',
+        cascade='all, delete-orphan',
+    )
+
+    def preco_vigente(self, data_ref=None):
+        """Retorna o preço unitário vigente em data_ref (ou hoje), ou 0."""
+        from datetime import date as _date
+        d = data_ref or _date.today()
+        for p in sorted(self.precos, key=lambda x: x.vigencia_inicio, reverse=True):
+            if p.vigencia_inicio and p.vigencia_inicio > d:
+                continue
+            if p.vigencia_fim and p.vigencia_fim < d:
+                continue
+            return float(p.valor or 0)
+        return 0.0
+
+    def __repr__(self):
+        return f'<Insumo #{self.id} {self.nome}>'
+
+
+class PrecoBaseInsumo(db.Model):
+    """Histórico de preço base de um insumo, com vigência."""
+    __tablename__ = 'preco_base_insumo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    insumo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('insumo.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    valor = db.Column(db.Numeric(15, 4), nullable=False, default=0)
+    vigencia_inicio = db.Column(db.Date, nullable=False, default=date.today)
+    vigencia_fim = db.Column(db.Date, nullable=True)
+    observacao = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<PrecoBaseInsumo #{self.id} insumo={self.insumo_id} R$ {self.valor}>'
+
+
+class ComposicaoServico(db.Model):
+    """Linha de composição: serviço × insumo × coeficiente de consumo
+    (quanto de insumo por unidade do serviço)."""
+    __tablename__ = 'composicao_servico'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    servico_id = db.Column(
+        db.Integer,
+        db.ForeignKey('servico.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    insumo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('insumo.id', ondelete='RESTRICT'),
+        nullable=False,
+        index=True,
+    )
+    coeficiente = db.Column(db.Numeric(15, 6), nullable=False, default=0)
+    observacao = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('servico_id', 'insumo_id', name='uq_composicao_servico_insumo'),
+    )
+
+    def __repr__(self):
+        return f'<ComposicaoServico svc={self.servico_id} ins={self.insumo_id} coef={self.coeficiente}>'

@@ -478,6 +478,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint propostas: {e}")
     
+    # Task #82 — Catálogo de Insumos + Composição/Orçamento de Serviços
+    try:
+        from views.catalogo_views import catalogo_bp
+        app.register_blueprint(catalogo_bp)
+        logging.info("[OK] Blueprint CATALOGO (insumos+composicao+orcamento) registrado")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint catalogo: {e}")
+
     # Registrar API de organização
     try:
         from api_organizer import api_organizer

@@ -1,0 +1,71 @@
+{% extends "base_completo.html" %}
+{% block title %}Catálogo de Insumos{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1"><i class="fas fa-cubes text-primary"></i> Catálogo de Insumos</h2>
+      <p class="text-muted mb-0">Itens base para composição de serviços (mão de obra, material, equipamento)</p>
+    </div>
+    <a href="{{ url_for('catalogo.insumo_novo') }}" class="btn btn-primary">
+      <i class="fas fa-plus"></i> Novo Insumo
+    </a>
+  </div>
+
+  <form method="GET" class="card card-body mb-3 shadow-sm">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label small mb-1">Buscar</label>
+        <input name="q" value="{{ q }}" class="form-control" placeholder="Nome do insumo">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-1">Tipo</label>
+        <select name="tipo" class="form-select">
+          <option value="">Todos</option>
+          <option value="MATERIAL"     {% if tipo=='MATERIAL' %}selected{% endif %}>Material</option>
+          <option value="MAO_OBRA"     {% if tipo=='MAO_OBRA' %}selected{% endif %}>Mão de Obra</option>
+          <option value="EQUIPAMENTO"  {% if tipo=='EQUIPAMENTO' %}selected{% endif %}>Equipamento</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-primary w-100"><i class="fas fa-search"></i> Filtrar</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nome</th>
+            <th>Tipo</th>
+            <th>Unidade</th>
+            <th class="text-end">Preço vigente</th>
+            <th class="text-end">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in insumos %}
+          <tr>
+            <td><strong>{{ i.nome }}</strong>{% if i.descricao %}<br><small class="text-muted">{{ i.descricao }}</small>{% endif %}</td>
+            <td><span class="badge bg-secondary">{{ i.tipo }}</span></td>
+            <td>{{ i.unidade }}</td>
+            <td class="text-end text-dark"><strong>R$ {{ '%.4f'|format(i.preco_vigente()) }}</strong></td>
+            <td class="text-end">
+              <a href="{{ url_for('catalogo.insumo_editar', insumo_id=i.id) }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
+              <form method="POST" action="{{ url_for('catalogo.insumo_excluir', insumo_id=i.id) }}" class="d-inline" onsubmit="return confirm('Excluir/desativar insumo?')">
+                {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">Nenhum insumo cadastrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

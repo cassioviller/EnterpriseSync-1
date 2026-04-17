@@ -3820,6 +3820,7 @@ def executar_migracoes():
             (118, "Task #70 — Resumo de Custos da Obra (obra_servico_custo + equipe + cotação + percentual_administracao)", migration_118_resumo_custos_obra),
             (119, "Task #74 — GestaoCustoFilho.obra_servico_custo_id (vínculo direto custo→serviço)", migration_119_gestao_custo_filho_obra_servico),
             (120, "Task #76 — NotificacaoOrcamento (alertas de estouro de orçamento por serviço)", migration_120_notificacao_orcamento),
+            (121, "Task #82 — Catálogo de Insumos + Composição de Serviços + Orçamento Paramétrico", migration_121_catalogo_servicos_orcamento),
         ]
         
         # Executar cada migração com rastreamento
@@ -9722,6 +9723,153 @@ def migration_120_notificacao_orcamento():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 119: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_121_catalogo_servicos_orcamento():
+    """Migration 121 (Task #82): Catálogo de Insumos + Composição de Serviços.
+
+    Cria:
+      - tabela `insumo` (catálogo de itens base)
+      - tabela `preco_base_insumo` (vigência de preços)
+      - tabela `composicao_servico` (serviço × insumo × coeficiente)
+      - colunas em `servico`: imposto_pct, margem_lucro_pct, preco_venda_unitario
+      - coluna `proposta_item.servico_id` (FK servico, SET NULL)
+      - colunas `item_medicao_comercial.servico_id` (FK servico, SET NULL)
+                + `quantidade` NUMERIC(15,4)
+      - coluna `obra_servico_custo.servico_catalogo_id` (FK servico, SET NULL)
+      - colunas em `configuracao_empresa`: imposto_pct_padrao, lucro_pct_padrao
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # ── 1. Insumo
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS insumo (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                nome VARCHAR(200) NOT NULL,
+                tipo VARCHAR(20) NOT NULL DEFAULT 'MATERIAL',
+                unidade VARCHAR(20) NOT NULL DEFAULT 'un',
+                descricao TEXT,
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_insumo_admin ON insumo(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_insumo_admin_ativo ON insumo(admin_id, ativo)")
+
+        # ── 2. PrecoBaseInsumo
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS preco_base_insumo (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                insumo_id INTEGER NOT NULL REFERENCES insumo(id) ON DELETE CASCADE,
+                valor NUMERIC(15,4) NOT NULL DEFAULT 0,
+                vigencia_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
+                vigencia_fim DATE,
+                observacao VARCHAR(300),
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_preco_base_insumo_admin ON preco_base_insumo(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_preco_base_insumo_insumo ON preco_base_insumo(insumo_id)")
+
+        # ── 3. ComposicaoServico
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS composicao_servico (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                servico_id INTEGER NOT NULL REFERENCES servico(id) ON DELETE CASCADE,
+                insumo_id INTEGER NOT NULL REFERENCES insumo(id) ON DELETE RESTRICT,
+                coeficiente NUMERIC(15,6) NOT NULL DEFAULT 0,
+                observacao VARCHAR(300),
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_composicao_servico_insumo UNIQUE (servico_id, insumo_id)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_composicao_servico_admin ON composicao_servico(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_composicao_servico_svc ON composicao_servico(servico_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_composicao_servico_ins ON composicao_servico(insumo_id)")
+
+        # ── 4. Servico — campos de orçamento
+        cursor.execute("ALTER TABLE servico ADD COLUMN IF NOT EXISTS imposto_pct NUMERIC(5,2)")
+        cursor.execute("ALTER TABLE servico ADD COLUMN IF NOT EXISTS margem_lucro_pct NUMERIC(5,2)")
+        cursor.execute("ALTER TABLE servico ADD COLUMN IF NOT EXISTS preco_venda_unitario NUMERIC(15,2) DEFAULT 0")
+
+        # ── 5. PropostaItem.servico_id (tabela real: proposta_itens)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'proposta_itens') THEN
+                    ALTER TABLE proposta_itens ADD COLUMN IF NOT EXISTS servico_id INTEGER;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'fk_proposta_itens_servico'
+                    ) THEN
+                        ALTER TABLE proposta_itens
+                            ADD CONSTRAINT fk_proposta_itens_servico
+                            FOREIGN KEY (servico_id) REFERENCES servico(id) ON DELETE SET NULL;
+                    END IF;
+                    CREATE INDEX IF NOT EXISTS idx_proposta_itens_servico ON proposta_itens(servico_id);
+                END IF;
+            END$$;
+        """)
+
+        # ── 6. ItemMedicaoComercial.servico_id + quantidade
+        cursor.execute("ALTER TABLE item_medicao_comercial ADD COLUMN IF NOT EXISTS servico_id INTEGER")
+        cursor.execute("ALTER TABLE item_medicao_comercial ADD COLUMN IF NOT EXISTS quantidade NUMERIC(15,4)")
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_item_medicao_servico'
+                ) THEN
+                    ALTER TABLE item_medicao_comercial
+                        ADD CONSTRAINT fk_item_medicao_servico
+                        FOREIGN KEY (servico_id) REFERENCES servico(id) ON DELETE SET NULL;
+                END IF;
+            END$$;
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_item_medicao_servico ON item_medicao_comercial(servico_id)")
+
+        # ── 7. ObraServicoCusto.servico_catalogo_id
+        cursor.execute("ALTER TABLE obra_servico_custo ADD COLUMN IF NOT EXISTS servico_catalogo_id INTEGER")
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_obra_servico_custo_catalogo'
+                ) THEN
+                    ALTER TABLE obra_servico_custo
+                        ADD CONSTRAINT fk_obra_servico_custo_catalogo
+                        FOREIGN KEY (servico_catalogo_id) REFERENCES servico(id) ON DELETE SET NULL;
+                END IF;
+            END$$;
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_obra_servico_custo_catalogo ON obra_servico_custo(servico_catalogo_id)")
+
+        # ── 8. ConfiguracaoEmpresa — defaults
+        cursor.execute("ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS imposto_pct_padrao NUMERIC(5,2) DEFAULT 8.0")
+        cursor.execute("ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS lucro_pct_padrao NUMERIC(5,2) DEFAULT 10.0")
+
+        connection.commit()
+        cursor.close()
+        logger.info("MIGRACAO 121: catálogo de insumos, composição e campos de orçamento criados")
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 121: {e}")
         import traceback
         logger.error(traceback.format_exc())
         if connection:

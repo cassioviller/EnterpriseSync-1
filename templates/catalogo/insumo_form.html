@@ -1,0 +1,87 @@
+{% extends "base_completo.html" %}
+{% block title %}{% if insumo %}Editar{% else %}Novo{% endif %} Insumo{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <a href="{{ url_for('catalogo.insumos_list') }}" class="text-decoration-none small"><i class="fas fa-arrow-left"></i> Voltar ao catálogo</a>
+  <h2 class="my-3"><i class="fas fa-cube text-primary"></i> {% if insumo %}Editar Insumo{% else %}Novo Insumo{% endif %}</h2>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="POST">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nome <span class="text-danger">*</span></label>
+            <input name="nome" required class="form-control" value="{{ insumo.nome if insumo else '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" class="form-select">
+              {% set t = insumo.tipo if insumo else 'MATERIAL' %}
+              <option value="MATERIAL"    {% if t=='MATERIAL' %}selected{% endif %}>Material</option>
+              <option value="MAO_OBRA"    {% if t=='MAO_OBRA' %}selected{% endif %}>Mão de Obra</option>
+              <option value="EQUIPAMENTO" {% if t=='EQUIPAMENTO' %}selected{% endif %}>Equipamento</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Unidade</label>
+            <input name="unidade" class="form-control" value="{{ insumo.unidade if insumo else 'un' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descrição</label>
+            <textarea name="descricao" class="form-control" rows="2">{{ insumo.descricao if insumo else '' }}</textarea>
+          </div>
+          {% if not insumo %}
+          <div class="col-md-4">
+            <label class="form-label">Preço inicial (R$)</label>
+            <input name="preco" type="number" step="0.0001" class="form-control" value="0">
+          </div>
+          {% endif %}
+        </div>
+        <button class="btn btn-primary mt-3"><i class="fas fa-save"></i> Salvar</button>
+      </form>
+    </div>
+  </div>
+
+  {% if insumo %}
+  <div class="card shadow-sm">
+    <div class="card-header bg-light"><strong><i class="fas fa-tags"></i> Histórico de Preços</strong></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('catalogo.insumo_novo_preco', insumo_id=insumo.id) }}" class="row g-2 align-items-end mb-3">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Novo valor (R$)</label>
+          <input name="valor" type="number" step="0.0001" required class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-1">Início vigência</label>
+          <input name="vigencia_inicio" type="date" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-1">Observação</label>
+          <input name="observacao" class="form-control">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-success w-100"><i class="fas fa-plus"></i> Aplicar</button>
+        </div>
+      </form>
+      <table class="table table-sm">
+        <thead><tr><th>Início</th><th>Fim</th><th class="text-end">Valor (R$)</th><th>Obs.</th></tr></thead>
+        <tbody>
+          {% for p in precos %}
+          <tr>
+            <td>{{ p.vigencia_inicio.strftime('%d/%m/%Y') }}</td>
+            <td>{{ p.vigencia_fim.strftime('%d/%m/%Y') if p.vigencia_fim else '<span class="badge bg-success">vigente</span>'|safe }}</td>
+            <td class="text-end text-dark"><strong>{{ '%.4f'|format(p.valor) }}</strong></td>
+            <td class="text-muted small">{{ p.observacao or '' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted">Sem histórico.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
