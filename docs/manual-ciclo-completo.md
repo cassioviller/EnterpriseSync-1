@@ -204,3 +204,51 @@ código livre. Após a correção, o e2e backend acima passa 30/30.
 | `ContaReceber` da obra com valor desatualizado | RDO não chegou a `Finalizado` ou IMC sem cronograma/serviço | Conferir status do RDO e vínculos no cronograma; chamar `recalcular_medicao_obra` manualmente |
 | `data_vencimento` "errada" | Proposta sem `prazo_entrega_dias` | Sistema cai no default de 30 dias |
 | Status ainda `PARCIAL` após receber tudo | `saldo` ficou positivo por arredondamento | `recalcular_medicao_obra` ajusta no próximo gatilho; status vira `QUITADA` |
+
+## Métricas de Funcionários (v1+v2)
+
+Serviço único `services/funcionario_metrics.py` consolida todas as
+métricas de funcionários, suportando **salaristas (v1)** e
+**diaristas (v2)** em paralelo. A decisão de modo respeita o override
+por funcionário (`Funcionario.tipo_remuneracao`) sobre o tenant
+(`is_v2_active(admin_id)`).
+
+### API pública
+
+- `get_modo_remuneracao(funcionario)` → `'salario'` ou `'diaria'`.
+- `calcular_valor_hora(funcionario)` → valor/hora atual (0 para diarista).
+- `calcular_metricas_funcionario(funcionario, data_ini, data_fim)` →
+  dict com `modo`, `horas_trabalhadas`, `horas_extras`, `dias_pagos`,
+  `faltas`, `custo_mao_obra`, `custo_va`, `custo_vt`, `custo_alimentacao`,
+  `custo_reembolsos`, `custo_almoxarifado`, `custo_total`, `valor_hora_atual`.
+- `calcular_metricas_lista(funcionarios, ...)` — em massa.
+- `agregar_kpis_geral(metricas_list)` — totais por tenant.
+
+### Fórmulas
+
+| Modo | Mão de obra |
+| --- | --- |
+| `salario` (v1) | `horas_trabalhadas × valor_hora + horas_extras × valor_hora × 1.5` |
+| `diaria` (v2)  | `valor_diaria × dias_pagos + (horas_extras / 8) × valor_diaria × 1.5` |
+
+**Custo total** = MO + VA (× dias_pagos) + VT (× dias_pagos) +
+Alimentação real híbrida (RegistroAlimentacao + AlimentacaoLancamento
+com rateio M2M) + Reembolsos aprovados + Almoxarifado em posse
+(consumível e serializado, valor_unitario × quantidade ativa).
+
+### Consumidores
+
+- `views/employees.py` — lista, perfil e PDF holerite (bloco legado removido).
+- `views/dashboard.py` — loop por funcionário usa apenas `custo_mao_obra`
+  para evitar double-count com agregações de tenant.
+- `api_funcionarios.py` — helper `_valor_hora_api` substitui
+  `salario / 160` em todos os pontos da API.
+- `relatorios_funcionais.py` — relatório de horas extras suporta diaristas.
+
+### Cobertura de testes
+
+`tests/test_e2e_metricas_funcionario.py` — 27/27 PASS:
+- Cenário v1 (salarista puro) — 8 asserts.
+- Cenário v2 (diarista com VA/VT/alimentação/reembolso/almoxarifado) — 10 asserts.
+- Override v2 → salarista — 3 asserts.
+- Helpers + agregação geral — 6 asserts.

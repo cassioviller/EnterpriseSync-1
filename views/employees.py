@@ -4,6 +4,11 @@ from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, 
 from auth import admin_required, funcionario_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
+from services.funcionario_metrics import (
+    calcular_metricas_funcionario,
+    calcular_metricas_lista,
+    agregar_kpis_geral,
+)
 from utils.database_diagnostics import capture_db_errors
 from views.helpers import safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
@@ -218,156 +223,14 @@ def funcionarios():
     
     # Tratamento de erro robusto para KPIs
     try:
-        # KPIs básicos por funcionário (INCLUIR INATIVOS)
-        funcionarios_kpis = []
-        # Combinar funcionários ativos e inativos para KPIs
+        # KPIs por funcionário via serviço único v1+v2 (Task #98).
+        # Substitui o cálculo inline antigo (formula salario/160h) e suporta
+        # diaristas, VA/VT, alimentação real, reembolsos e itens em posse.
         todos_funcionarios = funcionarios + funcionarios_inativos
-        for func in todos_funcionarios:
-            try:
-                registros = RegistroPonto.query.filter(
-                    RegistroPonto.funcionario_id == func.id,
-                    RegistroPonto.data >= data_inicio,
-                    RegistroPonto.data <= data_fim
-                ).all()
-                
-                # Calcular horas (usa valor salvo ou calcula em tempo real)
-                total_horas = 0
-                for r in registros:
-                    if r.horas_trabalhadas and r.horas_trabalhadas > 0:
-                        # Usa o valor já calculado
-                        total_horas += r.horas_trabalhadas
-                    elif r.hora_entrada and r.hora_saida:
-                        # Calcula em tempo real se não tiver valor (fallback para dados antigos)
-                        hoje = datetime.today().date()
-                        dt_entrada = datetime.combine(hoje, r.hora_entrada)
-                        dt_saida = datetime.combine(hoje, r.hora_saida)
-                        
-                        # Se saída é antes da entrada, passou da meia-noite
-                        if dt_saida < dt_entrada:
-                            dt_saida += timedelta(days=1)
-                        
-                        horas = (dt_saida - dt_entrada).total_seconds() / 3600
-                        
-                        # Desconta 1h de almoço se trabalhou mais de 6h
-                        if horas > 6:
-                            horas -= 1
-                        
-                        total_horas += horas
-
-                # Horas extras (mantém cálculo original)
-                total_extras = sum(r.horas_extras or 0 for r in registros)
-                # Detectar faltas de múltiplas formas (tipo_registro ou ausência de horas)
-                total_faltas = 0
-                total_faltas_justificadas = 0
-
-                for r in registros:
-                    # Método 1: tipo_registro explícito
-                    if r.tipo_registro == 'falta':
-                        total_faltas += 1
-                    elif r.tipo_registro == 'falta_justificada':
-                        total_faltas_justificadas += 1
-                    # Método 2: detectar falta implícita (sem horas em dia útil)
-                    elif ((r.horas_trabalhadas == 0 or r.horas_trabalhadas is None) and 
-                          not r.hora_entrada and 
-                          not r.hora_saida and
-                          r.data.weekday() < 5 and  # Segunda a sexta
-                          r.tipo_registro not in ['feriado', 'feriado_trabalhado', 'sabado_horas_extras', 'domingo_horas_extras']):
-                        # Falta não marcada explicitamente - verificar se é justificada
-                        if r.observacoes and ('justificad' in r.observacoes.lower() or 'atestado' in r.observacoes.lower()):
-                            total_faltas_justificadas += 1
-                        else:
-                            total_faltas += 1
-                
-                # [OK] CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
-                # Fallback removido - se não há registros de ponto, custo = R$ 0.00
-                # Isso evita estimativas incorretas quando período está vazio
-                
-                # [LOCK] PROTEÇÃO: Acessar funcao_ref com proteção contra erro de schema (Migração 48)
-                try:
-                    funcao_nome = func.funcao_ref.nome if hasattr(func, 'funcao_ref') and func.funcao_ref else "N/A"
-                except Exception as e:
-                    logger.warning(f"Erro ao acessar funcao_ref para {func.nome}: {e}. Migração 48 pode não ter sido executada.")
-                    funcao_nome = "N/A (erro de schema)"
-                    db.session.rollback()  # Evitar InFailedSqlTransaction
-                
-                if len(registros) == 0:
-                    funcionarios_kpis.append({
-                        'funcionario': func,
-                        'funcao_nome': funcao_nome,
-                        'horas_trabalhadas': 0,
-                        'total_horas': 0,
-                        'total_extras': 0,
-                        'total_faltas': 0,
-                        'total_faltas_justificadas': 0,
-                        'custo_total': 0
-                    })
-                else:
-                    # Caminho normal com registros
-                    funcionarios_kpis.append({
-                        'funcionario': func,
-                        'funcao_nome': funcao_nome,
-                        'horas_trabalhadas': total_horas,
-                        'total_horas': total_horas,
-                        'total_extras': total_extras,
-                        'total_faltas': total_faltas,
-                        'total_faltas_justificadas': total_faltas_justificadas,
-                        'custo_total': (total_horas + total_extras * 1.5) * (calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0)
-                    })
-            except Exception as e:
-                logger.error(f"Erro KPI funcionário {func.nome}: {str(e)}")
-                db.session.rollback()  # CRÍTICO: Fechar transação após erro
-                # Em caso de erro real, retornar zeros
-                funcionarios_kpis.append({
-                    'funcionario': func,
-                    'funcao_nome': "N/A (erro)",
-                    'horas_trabalhadas': 0,
-                    'total_horas': 0,
-                    'total_extras': 0,
-                    'total_faltas': 0,
-                    'total_faltas_justificadas': 0,
-                    'custo_total': 0
-                })
-        
-        # KPIs gerais
-        total_horas_geral = sum(k['total_horas'] for k in funcionarios_kpis)
-        total_extras_geral = sum(k['total_extras'] for k in funcionarios_kpis)
-        total_faltas_geral = sum(k['total_faltas'] for k in funcionarios_kpis)
-        total_faltas_justificadas_geral = sum(k.get('total_faltas_justificadas', 0) for k in funcionarios_kpis)
-        total_custo_geral = sum(k['custo_total'] for k in funcionarios_kpis)
-        
-        # Calcular custo das faltas justificadas
-        total_custo_faltas_geral = 0
-        for k in funcionarios_kpis:
-            func = k['funcionario']
-            if func.salario and k.get('total_faltas_justificadas', 0) > 0:
-                # Calcular dias úteis reais do mês
-                mes = data_inicio.month
-                ano = data_inicio.year
-                dias_uteis = sum(1 for dia in range(1, calendar.monthrange(ano, mes)[1] + 1) 
-                                if date(ano, mes, dia).weekday() < 5)
-                custo_dia = func.salario / dias_uteis
-                total_custo_faltas_geral += k['total_faltas_justificadas'] * custo_dia
-        
-        # Calcular taxa de absenteísmo correta
-        total_faltas_todas = total_faltas_geral + total_faltas_justificadas_geral
-        total_dias_trabalho_possivel = len(funcionarios) * 22  # 22 dias úteis por mês
-        taxa_absenteismo = (total_faltas_todas / total_dias_trabalho_possivel * 100) if total_dias_trabalho_possivel > 0 else 0
-        
-        # Debug do cálculo
-        logger.debug(f"DEBUG ABSENTEÍSMO: {total_faltas_todas} faltas / {total_dias_trabalho_possivel} dias possíveis = {taxa_absenteismo:.2f}%")
-        
-        kpis_geral = {
-            'total_funcionarios': len(funcionarios),
-            'funcionarios_ativos': len(funcionarios),
-            'total_horas_geral': total_horas_geral,
-            'total_extras_geral': total_extras_geral,
-            'total_faltas_geral': total_faltas_geral,
-            'total_faltas_justificadas_geral': total_faltas_justificadas_geral,
-            'total_custo_geral': total_custo_geral,
-            'total_custo_faltas_geral': total_custo_faltas_geral,
-            'taxa_absenteismo_geral': round(taxa_absenteismo, 2)
-        }
-    
+        funcionarios_kpis = calcular_metricas_lista(
+            todos_funcionarios, data_inicio, data_fim, admin_id
+        )
+        kpis_geral = agregar_kpis_geral(funcionarios_kpis, len(funcionarios))
     except Exception as e:
         import traceback
         db.session.rollback()  # CRÍTICO: Fechar transação abortada
@@ -465,67 +328,30 @@ def funcionario_perfil(id):
             dias_uteis_esperados += 1
         dia_atual += timedelta(days=1)
     
-    # Calcular KPIs
-    total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
-    total_extras = sum(r.horas_extras or 0 for r in registros)
-    total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
-    faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
-    total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)  # Campo correto do modelo
-    
-    # Calcular valores monetários detalhados
-    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim) if funcionario.salario else 0
-    valor_horas_extras = total_extras * valor_hora * 1.5
-    
-    # Calcular DSR sobre horas extras (Lei 605/49)
+    # Calcular KPIs via serviço único v1+v2 (Task #98)
+    kpis = calcular_metricas_funcionario(funcionario, data_inicio, data_fim)
+    # Campos extras esperados pelo template antigo (DSR, sábados/domingos/feriados)
+    total_horas = kpis['horas_trabalhadas']
+    total_extras = kpis['horas_extras']
+    total_faltas = kpis['faltas']
+    valor_hora = kpis['valor_hora_atual']
     if dias_uteis_esperados > 0 and domingos_feriados > 0 and total_extras > 0:
-        valor_dsr_he = (valor_horas_extras / dias_uteis_esperados) * domingos_feriados
+        valor_dsr_he = (kpis['valor_horas_extras'] / dias_uteis_esperados) * domingos_feriados
     else:
         valor_dsr_he = 0
-    
-    # Faltas e descontos
-    valor_faltas = total_faltas * valor_hora * 8  # Desconto de 8h por falta
-    valor_faltas_justificadas = faltas_justificadas * valor_hora * 8  # Faltas justificadas
-    dsr_perdido_dias = total_faltas / 6 if total_faltas > 0 else 0  # Proporção de DSR perdido
-    valor_dsr_perdido = dsr_perdido_dias * valor_hora * 8  # Valor do DSR perdido
-    
-    # Calcular estatísticas adicionais
-    dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])
-    taxa_absenteismo = (total_faltas / dias_uteis_esperados * 100) if dias_uteis_esperados > 0 else 0
-    
-    kpis = {
-        'horas_trabalhadas': total_horas,
-        'horas_extras': total_extras,
-        'faltas': total_faltas,
-        'faltas_justificadas': faltas_justificadas,
-        'atrasos': total_atrasos,
-        'valor_horas_extras': valor_horas_extras,
-        'valor_dsr_he': valor_dsr_he,  # DSR sobre horas extras
-        'valor_faltas': valor_faltas,
-        'valor_faltas_justificadas': valor_faltas_justificadas,
+    dsr_perdido_dias = total_faltas / 6 if total_faltas > 0 else 0
+    kpis.update({
+        'valor_dsr_he': valor_dsr_he,
+        'valor_faltas_justificadas': kpis['custo_faltas_justificadas'],
         'dsr_perdido_dias': round(dsr_perdido_dias, 2),
-        'valor_dsr_perdido': valor_dsr_perdido,
+        'valor_dsr_perdido': dsr_perdido_dias * valor_hora * 8,
         'dias_uteis_esperados': dias_uteis_esperados,
         'domingos_feriados': domingos_feriados,
         'sabados': sabados,
-        'taxa_eficiencia': (total_horas / (dias_trabalhados * 8) * 100) if dias_trabalhados > 0 else 0,
-        'custo_total': (total_horas * valor_hora) + valor_horas_extras + valor_dsr_he,
-        'absenteismo': taxa_absenteismo,
-        'produtividade': 85.0,  # Valor calculado baseado no desempenho
-        'pontualidade': max(0, 100 - (total_atrasos * 5)),  # Reduz 5% por hora de atraso
-        'dias_trabalhados': dias_trabalhados,
-        'media_horas_dia': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
-        # Campos adicionais para compatibilidade com template
-        'media_diaria': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
-        'dias_faltas_justificadas': faltas_justificadas,
-        'custo_mao_obra': (total_horas * valor_hora) + valor_horas_extras + valor_dsr_he,
-        'custo_alimentacao': 0.0,
-        'custo_transporte': 0.0,
-        'outros_custos': 0.0,
-        'custo_total_geral': (total_horas * valor_hora) + valor_horas_extras + valor_dsr_he,
-        'horas_perdidas_total': total_faltas * 8 + total_atrasos,
-        'valor_hora_atual': valor_hora,
-        'custo_faltas_justificadas': valor_faltas_justificadas
-    }
+        'taxa_eficiencia': kpis['eficiencia'],
+        'pontualidade': max(0, 100 - (kpis['atrasos'] * 5)),
+        'media_horas_dia': kpis['media_diaria'],
+    })
     
     # Dados para gráficos (dados básicos para evitar erros)
     graficos = {
@@ -806,46 +632,11 @@ def funcionario_perfil_pdf(id):
         query = query.filter(RegistroPonto.admin_id == admin_id)
     registros = query.order_by(RegistroPonto.data).all()
     
-    # Calcular KPIs (mesmo código da função perfil)
-    total_horas = sum(r.horas_trabalhadas or 0 for r in registros)
-    total_extras = sum(r.horas_extras or 0 for r in registros)
-    total_faltas = len([r for r in registros if r.tipo_registro == 'falta'])
-    faltas_justificadas = len([r for r in registros if r.tipo_registro == 'falta_justificada'])
-    total_atrasos = sum(r.total_atraso_horas or 0 for r in registros)
-    
-    valor_hora = calcular_valor_hora_periodo(funcionario, data_inicio, data_fim) if funcionario.salario else 0
-    valor_horas_extras = total_extras * valor_hora * 1.5
-    valor_faltas = total_faltas * valor_hora * 8
-    
-    dias_trabalhados = len([r for r in registros if r.horas_trabalhadas and r.horas_trabalhadas > 0])
-    taxa_absenteismo = (total_faltas / len(registros) * 100) if registros else 0
-    
-    kpis = {
-        'horas_trabalhadas': total_horas,
-        'horas_extras': total_extras,
-        'faltas': total_faltas,
-        'faltas_justificadas': faltas_justificadas,
-        'atrasos': total_atrasos,
-        'valor_horas_extras': valor_horas_extras,
-        'valor_faltas': valor_faltas,
-        'taxa_eficiencia': (total_horas / (dias_trabalhados * 8) * 100) if dias_trabalhados > 0 else 0,
-        'custo_total': (total_horas + total_extras * 1.5) * valor_hora,
-        'absenteismo': taxa_absenteismo,
-        'produtividade': 85.0,
-        'pontualidade': max(0, 100 - (total_atrasos * 5)),
-        'dias_trabalhados': dias_trabalhados,
-        'media_horas_dia': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
-        'media_diaria': total_horas / dias_trabalhados if dias_trabalhados > 0 else 0,
-        'dias_faltas_justificadas': faltas_justificadas,
-        'custo_mao_obra': (total_horas + total_extras * 1.5) * valor_hora,
-        'custo_alimentacao': 0.0,
-        'custo_transporte': 0.0,
-        'outros_custos': 0.0,
-        'custo_total_geral': (total_horas + total_extras * 1.5) * valor_hora,
-        'horas_perdidas_total': total_faltas * 8 + total_atrasos,
-        'valor_hora_atual': valor_hora,
-        'custo_faltas_justificadas': faltas_justificadas * valor_hora * 8
-    }
+    # Calcular KPIs via serviço único v1+v2 (Task #98)
+    kpis = calcular_metricas_funcionario(funcionario, data_inicio, data_fim, admin_id)
+    kpis.setdefault('taxa_eficiencia', kpis.get('eficiencia', 0))
+    kpis.setdefault('pontualidade', max(0, 100 - (kpis.get('atrasos', 0) * 5)))
+    kpis.setdefault('media_horas_dia', kpis.get('media_diaria', 0))
     
     # Gerar PDF
     try:

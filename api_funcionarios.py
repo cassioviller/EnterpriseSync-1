@@ -4,7 +4,19 @@ API para funcionários - Sistema RDO
 
 from flask import Blueprint, jsonify, request
 from models import db, Funcionario, TipoUsuario
+from services.funcionario_metrics import calcular_valor_hora, get_modo_remuneracao
 import logging
+
+
+def _valor_hora_api(func):
+    """Resolve valor/hora considerando v1 (salário) e v2 (diária)."""
+    modo = get_modo_remuneracao(func)
+    if modo == 'diaria':
+        return float(func.valor_diaria or 0) / 8.0 if func.valor_diaria else 0.0
+    vh = calcular_valor_hora(func)
+    if vh:
+        return vh
+    return float(func.salario / 220.0) if func.salario else 0.0
 
 # Configurar logging
 logger = logging.getLogger(__name__)
@@ -53,7 +65,7 @@ def funcionarios_ativos():
                 'id': func.id,
                 'nome': func.nome,
                 'cargo': 'Funcionário',  # Campo padrão
-                'valor_hora': float(func.salario / 160) if func.salario else 15.0,  # Salário/160h
+                'valor_hora': _valor_hora_api(func),  # Salário/160h
                 'telefone': func.telefone,
                 'email': func.email
             })
@@ -104,7 +116,7 @@ def buscar_funcionarios():
                 'id': func.id,
                 'nome': func.nome,
                 'cargo': 'Funcionário',  # Campo padrão
-                'valor_hora': float(func.salario / 160) if func.salario else 15.0,  # Salário/160h
+                'valor_hora': _valor_hora_api(func),  # Salário/160h
                 'telefone': func.telefone,
                 'email': func.email,
                 'text': f"{func.nome} - Funcionário" # Para autocomplete
@@ -148,7 +160,7 @@ def obter_funcionario(funcionario_id):
                 'id': funcionario.id,
                 'nome': funcionario.nome,
                 'cargo': 'Funcionário',  # Campo padrão
-                'valor_hora': float(funcionario.salario / 160) if funcionario.salario else 15.0,  # Salário/160h
+                'valor_hora': _valor_hora_api(funcionario),  # Salário/160h
                 'telefone': funcionario.telefone,
                 'email': funcionario.email
             }

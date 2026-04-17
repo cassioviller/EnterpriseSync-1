@@ -652,31 +652,17 @@ def dashboard():
             funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
             logger.info(f"[OK] APÓS ROLLBACK: {len(funcionarios_dashboard)} funcionários encontrados")
             
+            from services.funcionario_metrics import calcular_metricas_funcionario
             for func in funcionarios_dashboard:
                 try:
-                    # Buscar registros de ponto com proteção
-                    registros = RegistroPonto.query.filter(
-                        RegistroPonto.funcionario_id == func.id,
-                        RegistroPonto.data >= data_inicio,
-                        RegistroPonto.data <= data_fim
-                    ).all()
-                    
-                    # Calcular valores por funcionário
-                    horas_func = sum(r.horas_trabalhadas or 0 for r in registros)
-                    extras_func = sum(r.horas_extras or 0 for r in registros)
-                    faltas_func = len([r for r in registros if r.tipo_registro == 'falta'])
-                    
-                    # [OK] CORREÇÃO CRÍTICA: Sem registros = Sem custo (não usar fallback)
-                    # Fallback removido - se não há registros de ponto, custo = R$ 0.00
-                    # Isso evita estimativas incorretas quando período está vazio
-                    if len(registros) == 0:
-                        custo_func = 0
-                        horas_func = 0
-                        extras_func = 0
-                    else:
-                        # Cálculo normal com registros de ponto
-                        valor_hora = calcular_valor_hora_periodo(func, data_inicio, data_fim) if func.salario else 0
-                        custo_func = (horas_func + extras_func * 1.5) * valor_hora
+                    # Métricas via serviço único v1+v2 (Task #98).
+                    # Usamos APENAS custo_mao_obra para evitar duplicar com agregações
+                    # de tenant (alimentação, GCF) que ocorrem mais abaixo.
+                    m = calcular_metricas_funcionario(func, data_inicio, data_fim, admin_id)
+                    horas_func = m['horas_trabalhadas']
+                    extras_func = m['horas_extras']
+                    faltas_func = m['faltas']
+                    custo_func = m['custo_mao_obra']
                     
                     # Acumular totais
                     total_custo_real += custo_func

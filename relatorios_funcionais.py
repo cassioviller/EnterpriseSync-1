@@ -136,7 +136,14 @@ def _relatorio_horas_extras(data_inicio, data_fim, obra_id=None, departamento_id
         # Calcular valor/hora baseado no período do registro
         periodo_inicio = r.data
         periodo_fim = r.data
-        valor_hora_base = calcular_valor_hora_periodo(r.funcionario, periodo_inicio, periodo_fim) if r.funcionario.salario else 0
+        # Task #98: usa serviço único para suportar diaristas (valor/hora equiv = diária/8)
+        from services.funcionario_metrics import calcular_valor_hora, get_modo_remuneracao
+        if get_modo_remuneracao(r.funcionario) == 'diaria':
+            valor_hora_base = float(r.funcionario.valor_diaria or 0) / 8.0
+        else:
+            valor_hora_base = calcular_valor_hora(r.funcionario, periodo_inicio) or (
+                calcular_valor_hora_periodo(r.funcionario, periodo_inicio, periodo_fim) if r.funcionario.salario else 0
+            )
         valor_hora = valor_hora_base * 1.5
         valor_extras = r.horas_extras * valor_hora
         total_horas += r.horas_extras
