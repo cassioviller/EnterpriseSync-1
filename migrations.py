@@ -3822,6 +3822,7 @@ def executar_migracoes():
             (120, "Task #76 — NotificacaoOrcamento (alertas de estouro de orçamento por serviço)", migration_120_notificacao_orcamento),
             (121, "Task #82 — Catálogo de Insumos + Composição de Serviços + Orçamento Paramétrico", migration_121_catalogo_servicos_orcamento),
             (122, "Task #82 — ItemMedicaoComercial.proposta_item_id (dedupe determinístico de propagação)", migration_122_item_medicao_proposta_item_id),
+            (123, "Task #82 — ComposicaoServico.unidade (snapshot da unidade do insumo)", migration_123_composicao_servico_unidade),
         ]
         
         # Executar cada migração com rastreamento
@@ -9925,4 +9926,41 @@ def migration_122_item_medicao_proposta_item_id():
             except Exception:
                 pass
         logging.error(f"Migration 122 falhou: {e}")
+        raise
+
+
+def migration_123_composicao_servico_unidade():
+    """Migration 123 (Task #82): adiciona ComposicaoServico.unidade.
+
+    Coluna VARCHAR(20) opcional para snapshot da unidade do insumo na
+    composição (ex: "h", "kg", "un"), facilitando relatórios. Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)
+        cursor = connection.cursor()
+        cursor.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='composicao_servico') THEN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='composicao_servico' AND column_name='unidade'
+                ) THEN
+                    ALTER TABLE composicao_servico ADD COLUMN unidade VARCHAR(20) NULL;
+                END IF;
+            END IF;
+        END$$;
+        """)
+        cursor.close()
+        connection.close()
+        logging.info("Migration 123: ComposicaoServico.unidade OK")
+    except Exception as e:
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
+        logging.error(f"Migration 123 falhou: {e}")
         raise

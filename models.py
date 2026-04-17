@@ -5354,6 +5354,7 @@ class ComposicaoServico(db.Model):
         index=True,
     )
     coeficiente = db.Column(db.Numeric(15, 6), nullable=False, default=0)
+    unidade = db.Column(db.String(20), nullable=True)  # snapshot opcional da unidade do insumo (ex: "h", "kg", "un")
     observacao = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

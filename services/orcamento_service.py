@@ -61,16 +61,26 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
     margem_pct = Decimal(str(margem_pct or 0))
 
     custo_total = Decimal('0')
+    custo_material = Decimal('0')
+    custo_mao_obra = Decimal('0')
+    custo_outros = Decimal('0')
     detalhamento = []
     for comp in servico.composicoes:
         preco_vig = Decimal(str(comp.insumo.preco_vigente(data_ref)))
         coef = Decimal(str(comp.coeficiente or 0))
         sub = (coef * preco_vig).quantize(Decimal('0.0001'))
         custo_total += sub
+        tipo = (comp.insumo.tipo or '').upper()
+        if tipo == 'MATERIAL':
+            custo_material += sub
+        elif tipo == 'MAO_OBRA':
+            custo_mao_obra += sub
+        else:
+            custo_outros += sub
         detalhamento.append({
             'insumo_id': comp.insumo_id,
             'nome': comp.insumo.nome,
-            'unidade': comp.insumo.unidade,
+            'unidade': comp.unidade or comp.insumo.unidade,
             'tipo': comp.insumo.tipo,
             'coeficiente': float(coef),
             'preco_unitario': float(preco_vig),
@@ -78,6 +88,9 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
         })
 
     custo_unit_q = _q2(float(custo_total))
+    custo_material_q = _q2(float(custo_material))
+    custo_mao_obra_q = _q2(float(custo_mao_obra))
+    custo_outros_q = _q2(float(custo_outros))
 
     divisor = Decimal('1') - (imposto_pct / Decimal('100')) - (margem_pct / Decimal('100'))
     erro = None
@@ -88,12 +101,20 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
         preco_venda = (custo_total / divisor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     return {
+        # chaves originais (back-compat)
         'custo_unitario': custo_unit_q,
         'preco_venda': preco_venda,
         'imposto_pct': imposto_pct,
         'margem_lucro_pct': margem_pct,
         'detalhamento': detalhamento,
         'erro': erro,
+        # contrato Task #82 (split de categorias + alias)
+        'custo_material': custo_material_q,
+        'custo_mao_obra': custo_mao_obra_q,
+        'custo_outros': custo_outros_q,
+        'custo_total': custo_unit_q,
+        'preco_venda_unitario': preco_venda,
+        'detalhes': detalhamento,
     }
 
 

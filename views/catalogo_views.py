@@ -277,20 +277,51 @@ def servico_historico(servico_id):
     )
     obras_map = {o.id: o for o in Obra.query.filter_by(admin_id=aid).all()}
     linhas = []
+    soma_realizado = 0.0
+    soma_orcado = 0.0
+    soma_qtd = 0.0  # soma de quantidade total (de medições) por obra para custo médio por unidade
     for c in custos:
         realizado = float(c.realizado_material or 0) + float(c.realizado_mao_obra or 0) + float(c.realizado_outros or 0)
         orcado = float(c.valor_orcado or 0)
         delta_pct = ((realizado - orcado) / orcado * 100.0) if orcado > 0 else None
+        # quantidade da obra: soma quantidade dos ItemMedicaoComercial vinculados ao serviço naquela obra
+        from models import ItemMedicaoComercial
+        qtd_obra = db.session.query(db.func.coalesce(db.func.sum(ItemMedicaoComercial.quantidade), 0)).filter(
+            ItemMedicaoComercial.admin_id == aid,
+            ItemMedicaoComercial.obra_id == c.obra_id,
+            ItemMedicaoComercial.servico_id == svc.id,
+        ).scalar() or 0
+        try:
+            qtd_obra_f = float(qtd_obra)
+        except Exception:
+            qtd_obra_f = 0.0
+        custo_unit = (realizado / qtd_obra_f) if qtd_obra_f > 0 else None
         linhas.append({
             'obra': obras_map.get(c.obra_id),
             'custo': c,
             'realizado': realizado,
             'orcado': orcado,
             'delta_pct': delta_pct,
+            'quantidade': qtd_obra_f,
+            'custo_unitario_realizado': custo_unit,
         })
+        soma_realizado += realizado
+        soma_orcado += orcado
+        soma_qtd += qtd_obra_f
+
+    medias = {
+        'total_obras': len(linhas),
+        'soma_realizado': soma_realizado,
+        'soma_orcado': soma_orcado,
+        'soma_quantidade': soma_qtd,
+        'custo_medio_realizado_por_unidade': (soma_realizado / soma_qtd) if soma_qtd > 0 else None,
+        'realizado_medio_por_obra': (soma_realizado / len(linhas)) if linhas else 0.0,
+        'orcado_medio_por_obra': (soma_orcado / len(linhas)) if linhas else 0.0,
+        'delta_pct_global': ((soma_realizado - soma_orcado) / soma_orcado * 100.0) if soma_orcado > 0 else None,
+    }
     return render_template(
         'catalogo/servico_historico.html',
-        servico=svc, linhas=linhas,
+        servico=svc, linhas=linhas, medias=medias,
     )
 
 

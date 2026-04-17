@@ -130,23 +130,20 @@ def criar_item(obra_id):
 
     nome = request.form.get('nome', '').strip()
     try:
-        valor = Decimal(request.form.get('valor_comercial', '0').replace(',', '.'))
+        valor = Decimal((request.form.get('valor_comercial') or '0').replace(',', '.'))
     except Exception:
-        flash('Valor comercial inválido.', 'danger')
-        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
-
-    if not nome or valor <= 0:
-        flash('Nome e valor comercial são obrigatórios.', 'danger')
-        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
+        valor = Decimal('0')
 
     # Task #82 — vínculo opcional com catálogo de serviços
     servico_id_raw = (request.form.get('servico_id') or '').strip()
     servico_id = None
+    servico_obj = None
     if servico_id_raw:
         try:
             from models import Servico
             sid = int(servico_id_raw)
-            if Servico.query.filter_by(id=sid, admin_id=admin_id).first():
+            servico_obj = Servico.query.filter_by(id=sid, admin_id=admin_id).first()
+            if servico_obj:
                 servico_id = sid
         except (ValueError, TypeError):
             servico_id = None
@@ -157,6 +154,20 @@ def criar_item(obra_id):
             quantidade = Decimal(quantidade_raw)
         except Exception:
             quantidade = None
+
+    # Task #82: se serviço + quantidade vieram e valor_comercial não foi preenchido,
+    # calcular automaticamente valor_comercial = quantidade × preco_venda_unitario.
+    if valor <= 0 and servico_obj is not None and quantidade and quantidade > 0:
+        preco = Decimal(str(servico_obj.preco_venda_unitario or 0))
+        if preco > 0:
+            valor = (quantidade * preco).quantize(Decimal('0.01'))
+    # Se ainda sem nome e veio serviço, herdar nome do serviço.
+    if not nome and servico_obj is not None:
+        nome = servico_obj.nome
+
+    if not nome or valor <= 0:
+        flash('Nome e valor comercial são obrigatórios (ou informe serviço + quantidade com preço de venda).', 'danger')
+        return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
     item = ItemMedicaoComercial(
         admin_id=admin_id,
