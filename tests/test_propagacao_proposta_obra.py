@@ -235,6 +235,28 @@ def test_propagacao_propaga_servico_id_para_item_medicao(setup_obra_proposta):
     assert osc is not None, 'ObraServicoCusto deve ser criado pelo listener com servico_catalogo_id'
 
 
+def test_aliases_legacy_vinculacao_routes_resolvem():
+    """Garante que TODOS os 4 aliases de vinculação legado resolvem
+    (não retornam 404), incluindo os paths EXATOS do spec da Task #82
+    com o parâmetro <id> intermediário (proposta_id / obra_id):
+      - POST /propostas/<id>/itens/<item_id>/vincular-servico
+      - POST /medicao/obra/<id>/itens/<item_id>/vincular-servico
+    Bloqueio CSRF/login (302/4xx) é aceitável; 404 reprovaria."""
+    with app.test_client() as c:
+        urls = [
+            '/propostas/1/itens/1/vincular-servico',
+            '/medicao/obra/1/itens/1/vincular-servico',
+            '/propostas/itens/1/vincular-servico',
+            '/medicao/obra/itens/1/vincular-servico',
+        ]
+        for url in urls:
+            resp = c.post(url, follow_redirects=False)
+            assert resp.status_code != 404, (
+                f'rota {url} não está registrada (404). '
+                f'Aliases EXATOS do spec Task #82 são obrigatórios.'
+            )
+
+
 def test_propagacao_idempotente_por_proposta_item_id(setup_obra_proposta):
     ctx = setup_obra_proposta
     aid = ctx['admin_id']
