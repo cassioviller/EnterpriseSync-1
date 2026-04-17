@@ -484,6 +484,25 @@ catalogo_legacy_bp = Blueprint('catalogo_legacy', __name__)
 
 
 @catalogo_legacy_bp.route(
+    '/propostas/<int:id>/itens/<int:item_id>/vincular-servico', methods=['POST']
+)
+@login_required
+def alias_vincular_proposta_item_spec(id, item_id):
+    """Alias EXATO do spec Task #82: /propostas/<id>/itens/<item_id>/vincular-servico"""
+    return vincular_proposta_item(item_id)
+
+
+@catalogo_legacy_bp.route(
+    '/medicao/obra/<int:id>/itens/<int:item_id>/vincular-servico', methods=['POST']
+)
+@login_required
+def alias_vincular_medicao_item_spec(id, item_id):
+    """Alias EXATO do spec Task #82: /medicao/obra/<id>/itens/<item_id>/vincular-servico"""
+    return vincular_medicao_item(item_id)
+
+
+# Aliases curtos (extras, mantidos por compatibilidade com revs anteriores)
+@catalogo_legacy_bp.route(
     '/propostas/itens/<int:item_id>/vincular-servico', methods=['POST']
 )
 @login_required
