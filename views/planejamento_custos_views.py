@@ -41,6 +41,11 @@ from services.resumo_custos_obra import (
     calcular_resumo_obra,
 )
 from utils.tenant import get_tenant_admin_id
+from utils.notifications import (
+    verificar_estouros_obra,
+    listar_notificacoes_ativas,
+    marcar_resolvida,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -89,12 +94,35 @@ def lista(obra_id):
     servicos = ObraServicoCusto.query.filter_by(
         obra_id=obra_id, admin_id=admin_id
     ).order_by(ObraServicoCusto.id).all()
+    # Task #76: sincroniza notificações de estouro e expõe os IDs estourados
+    estouros = verificar_estouros_obra(obra_id, admin_id=admin_id)
+    estouros_por_svc = {e['obra_servico_custo_id']: e for e in estouros}
+    notificacoes = listar_notificacoes_ativas(admin_id, obra_id=obra_id)
     return render_template(
         'obras/planejamento_custos/lista.html',
         obra=obra,
         servicos=servicos,
         resumo=resumo,
+        estouros_por_svc=estouros_por_svc,
+        notificacoes=notificacoes,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 8. (Task #76) Resolver notificação de estouro de orçamento
+# ─────────────────────────────────────────────────────────────────────────
+@planejamento_custos_bp.route(
+    '/notificacoes/<int:notif_id>/resolver', methods=['POST']
+)
+@login_required
+def resolver_notificacao(obra_id, notif_id):
+    admin_id = get_tenant_admin_id()
+    _get_obra(obra_id, admin_id)
+    if marcar_resolvida(notif_id, admin_id):
+        flash('Notificação marcada como resolvida.', 'success')
+    else:
+        flash('Notificação não encontrada.', 'warning')
+    return redirect(url_for('planejamento_custos.lista', obra_id=obra_id))
 
 
 # ─────────────────────────────────────────────────────────────────────────

@@ -15,6 +15,30 @@
     </a>
   </div>
 
+  {% if notificacoes %}
+  <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" role="alert">
+    <i class="fas fa-exclamation-triangle mt-1"></i>
+    <div class="flex-grow-1">
+      <strong>{{ notificacoes|length }} serviço(s) estouraram o orçamento:</strong>
+      <ul class="mb-0 mt-1">
+        {% for n in notificacoes %}
+        <li>
+          <strong>{{ n.servico.nome if n.servico else ('#' ~ n.obra_servico_custo_id) }}</strong>
+          — projetado R$ {{ '{:,.2f}'.format(n.valor_projetado|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+          / orçado R$ {{ '{:,.2f}'.format(n.valor_orcado|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+          <span class="badge bg-danger ms-1">{{ '%.1f'|format(n.percentual|float) }}%</span>
+          <form method="POST" action="{{ url_for('planejamento_custos.resolver_notificacao', obra_id=obra.id, notif_id=n.id) }}" class="d-inline ms-2">
+            <button class="btn btn-sm btn-link text-danger p-0" title="Marcar como resolvida">
+              <i class="fas fa-check"></i> resolver
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
   {% set i = resumo.indicadores %}
   <div class="row g-2 mb-3">
     {% for label, val, cor in [
@@ -51,8 +75,16 @@
         </thead>
         <tbody>
           {% for s in servicos %}
-          <tr>
-            <td>{{ s.nome }}</td>
+          {% set est = estouros_por_svc.get(s.id) if estouros_por_svc else None %}
+          <tr {% if est %}class="table-danger"{% endif %}>
+            <td>
+              {{ s.nome }}
+              {% if est %}
+              <span class="badge bg-danger ms-1" title="Projetado R$ {{ '{:,.2f}'.format(est.valor_projetado).replace(',', 'X').replace('.', ',').replace('X', '.') }} ({{ '%.1f'|format(est.percentual) }}% do orçado)">
+                <i class="fas fa-exclamation-triangle"></i> Estourado {{ '%.1f'|format(est.percentual) }}%
+              </span>
+              {% endif %}
+            </td>
             <td>
               {% if s.item_medicao %}
                 <span class="badge bg-info">#{{ s.item_medicao.id }} {{ s.item_medicao.nome }}</span>

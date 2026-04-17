@@ -3819,6 +3819,7 @@ def executar_migracoes():
             (117, "TarefaCronograma — is_cliente BOOLEAN (paridade total no editor cliente)", migration_117_tarefa_cronograma_is_cliente),
             (118, "Task #70 — Resumo de Custos da Obra (obra_servico_custo + equipe + cotação + percentual_administracao)", migration_118_resumo_custos_obra),
             (119, "Task #74 — GestaoCustoFilho.obra_servico_custo_id (vínculo direto custo→serviço)", migration_119_gestao_custo_filho_obra_servico),
+            (120, "Task #76 — NotificacaoOrcamento (alertas de estouro de orçamento por serviço)", migration_120_notificacao_orcamento),
         ]
         
         # Executar cada migração com rastreamento
@@ -9677,3 +9678,56 @@ def migration_117_tarefa_cronograma_is_cliente():
             except Exception:
                 pass
         return False
+
+
+def migration_120_notificacao_orcamento():
+    """Migration 120 (Task #76): tabela notificacao_orcamento.
+
+    Cria a tabela que armazena alertas persistentes (1 por serviço) quando
+    (realizado + a_realizar) ultrapassa o valor_orcado de um ObraServicoCusto.
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notificacao_orcamento (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                obra_servico_custo_id INTEGER NOT NULL REFERENCES obra_servico_custo(id) ON DELETE CASCADE,
+                percentual NUMERIC(7,2) NOT NULL DEFAULT 0,
+                valor_excesso NUMERIC(15,2) NOT NULL DEFAULT 0,
+                valor_orcado NUMERIC(15,2) NOT NULL DEFAULT 0,
+                valor_projetado NUMERIC(15,2) NOT NULL DEFAULT 0,
+                mensagem TEXT NOT NULL DEFAULT '',
+                ativa BOOLEAN NOT NULL DEFAULT TRUE,
+                resolvida_em TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_notif_orcamento_servico
+                    UNIQUE (admin_id, obra_id, obra_servico_custo_id)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notif_orc_admin ON notificacao_orcamento(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notif_orc_obra  ON notificacao_orcamento(obra_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notif_orc_svc   ON notificacao_orcamento(obra_servico_custo_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notif_orc_ativa ON notificacao_orcamento(ativa)")
+
+        connection.commit()
+        cursor.close()
+        logger.info("MIGRACAO 119: notificacao_orcamento criada")
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 119: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise

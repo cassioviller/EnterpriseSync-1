@@ -1764,9 +1764,24 @@ def detalhes_obra(id):
             logger.error(f"Erro no resumo de custos: {_e_resumo}")
             resumo_custos = None
 
+        # Task #76 — Notificações de estouro de orçamento por serviço
+        try:
+            from utils.notifications import (
+                verificar_estouros_obra,
+                listar_notificacoes_ativas,
+            )
+            verificar_estouros_obra(obra.id, admin_id=admin_id)
+            notificacoes_orcamento = listar_notificacoes_ativas(
+                admin_id, obra_id=obra.id
+            )
+        except Exception as _e_notif:
+            logger.error(f"Erro nas notificações de orçamento: {_e_notif}")
+            notificacoes_orcamento = []
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
                              resumo=resumo_custos,
+                             notificacoes_orcamento=notificacoes_orcamento,
                              kpis=kpis_obra,
                              data_inicio=data_inicio,
                              data_fim=data_fim,

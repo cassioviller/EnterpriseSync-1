@@ -5150,6 +5150,51 @@ def _resumo_custos_after_flush(session, flush_context):
         session.info.pop(_RESUMO_REENTRANT_KEY, None)
 
 
+class NotificacaoOrcamento(db.Model):
+    """Task #76 — Notificação persistente de estouro de orçamento por serviço.
+
+    Há 1 registro por (admin_id, obra_id, obra_servico_custo_id). Quando o
+    serviço estoura novamente após resolução, a mesma linha é reativada
+    (ativa=True, resolvida_em=NULL). Quando o serviço volta para dentro do
+    orçado, a linha é marcada como resolvida.
+    """
+    __tablename__ = 'notificacao_orcamento'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False, index=True)
+    obra_servico_custo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_servico_custo.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+
+    percentual = db.Column(db.Numeric(7, 2), nullable=False, default=0)
+    valor_excesso = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    valor_orcado = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    valor_projetado = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    mensagem = db.Column(db.Text, nullable=False, default='')
+
+    ativa = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    resolvida_em = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    obra = db.relationship('Obra', backref=db.backref('notificacoes_orcamento', cascade='all, delete-orphan'))
+    servico = db.relationship('ObraServicoCusto', backref=db.backref('notificacoes_orcamento', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'admin_id', 'obra_id', 'obra_servico_custo_id',
+            name='uq_notif_orcamento_servico',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<NotificacaoOrcamento svc={self.obra_servico_custo_id} ativa={self.ativa}>'
+
+
 @_sa_event.listens_for(ItemMedicaoComercial, 'after_insert')
 def _item_medicao_auto_cria_custo(mapper, connection, target):
     """Ao criar um ItemMedicaoComercial, cria automaticamente o par
