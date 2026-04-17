@@ -1070,19 +1070,22 @@ def aprovar(id):
 
         # Task #94: emitir evento proposta_aprovada — handlers criam Obra,
         # token_cliente, ItemMedicaoComercial e ObraServicoCusto (sem ContaReceber).
-        # Emit retorna False quando algum handler falha; tratamos como erro.
+        # Como EventManager.emit retorna True quando QUALQUER handler vinga,
+        # validamos pós-emit que a estrutura ficou de pé (proposta.obra_id setado
+        # pelo handler propagar_proposta_para_obra).
         from event_manager import EventManager
-        ok = EventManager.emit('proposta_aprovada', {
+        EventManager.emit('proposta_aprovada', {
             'proposta_id': proposta.id,
             'cliente_nome': proposta.cliente_nome,
             'cliente_cpf_cnpj': None,
             'valor_total': float(proposta.valor_total or 0),
             'data_aprovacao': date.today().isoformat(),
         }, admin_id)
-        if ok is False:
+        db.session.refresh(proposta)
+        if not proposta.obra_id:
             logger.error(
-                f"[ERROR] proposta_aprovada falhou para proposta {proposta.id} — "
-                "estrutura operacional pode estar incompleta"
+                f"[ERROR] proposta_aprovada não materializou Obra para proposta {proposta.id} — "
+                "estrutura operacional incompleta"
             )
             flash(
                 'Proposta marcada como aprovada, mas houve falha na geração da obra/itens. '
@@ -1227,17 +1230,17 @@ def aprovar_proposta_cliente(token):
             return render_template('propostas/aprovada.html', proposta=proposta)
 
         from event_manager import EventManager
-        ok = EventManager.emit('proposta_aprovada', {
+        EventManager.emit('proposta_aprovada', {
             'proposta_id': proposta.id,
             'cliente_nome': proposta.cliente_nome,
             'cliente_cpf_cnpj': None,
             'valor_total': float(proposta.valor_total or 0),
             'data_aprovacao': date.today().isoformat(),
         }, admin_id)
-        if ok is False:
+        db.session.refresh(proposta)
+        if not proposta.obra_id:
             _log.error(
-                f"proposta_aprovada (cliente) falhou para proposta {proposta.id} — "
-                "estrutura operacional pode estar incompleta"
+                f"proposta_aprovada (cliente) não materializou Obra para proposta {proposta.id}"
             )
             flash(
                 'Proposta marcada como aprovada, mas houve falha na geração da obra/itens. '

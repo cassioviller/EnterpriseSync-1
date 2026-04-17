@@ -170,7 +170,7 @@ def gerar_medicao_quinzenal(obra_id, admin_id, periodo_inicio=None, periodo_fim=
 
     cr = recalcular_medicao_obra(obra_id, admin_id)
     if cr is not None:
-        medicao.conta_receber_id = cr.id
+        medicao.conta_receber_id = cr.get('conta_receber_id')
         db.session.commit()
 
     logger.info(f"[OK] Medição #{proximo_numero} gerada para obra {obra_id}")
@@ -190,7 +190,7 @@ def fechar_medicao(medicao_id, admin_id):
     # Task #94: ao fechar a medição, atualizar a ContaReceber única da obra
     cr = recalcular_medicao_obra(medicao.obra_id, admin_id)
     if cr is not None and not medicao.conta_receber_id:
-        medicao.conta_receber_id = cr.id
+        medicao.conta_receber_id = cr.get('conta_receber_id')
         db.session.commit()
 
     return medicao, None
@@ -278,10 +278,11 @@ def recalcular_medicao_obra(obra_id, admin_id):
       3) Cria ou atualiza a `ContaReceber` única com status
          `PENDENTE`/`PARCIAL`/`QUITADA` conforme `valor_recebido`.
 
-    Retorna a `ContaReceber` resultante, ou None se ainda não havia o que
-    cobrar e nenhuma CR pré-existia.
+    Retorna um dict `{valor_medido, valor_recebido, valor_a_receber,
+    conta_receber_id}` (consumível pelo painel/dashboard da obra) ou
+    `None` se a obra não existe / não há nada medido nem CR pré-existente.
     """
-    from models import Obra
+    from models import Obra, Proposta
 
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
     if not obra:
@@ -309,6 +310,17 @@ def recalcular_medicao_obra(obra_id, admin_id):
     descricao = f"Medição da obra {obra.codigo or obra.nome} — saldo a faturar acumulado"
     hoje = date.today()
 
+    # Vencimento: usar prazo_entrega_dias da proposta vinculada quando disponível
+    prazo_dias = 30
+    proposta_origem_id = getattr(obra, 'proposta_origem_id', None)
+    if proposta_origem_id:
+        prop = Proposta.query.filter_by(id=proposta_origem_id, admin_id=admin_id).first()
+        if prop and getattr(prop, 'prazo_entrega_dias', None):
+            try:
+                prazo_dias = int(prop.prazo_entrega_dias) or 30
+            except (TypeError, ValueError):
+                prazo_dias = 30
+
     if cr is None:
         cr = ContaReceber(
             cliente_nome=cliente_nome,
@@ -319,7 +331,7 @@ def recalcular_medicao_obra(obra_id, admin_id):
             valor_recebido=Decimal('0'),
             saldo=valor_medido,
             data_emissao=hoje,
-            data_vencimento=hoje + timedelta(days=30),
+            data_vencimento=hoje + timedelta(days=prazo_dias),
             status='PENDENTE' if valor_medido > 0 else 'QUITADA',
             origem_tipo='OBRA_MEDICAO',
             origem_id=obra_id,
@@ -353,7 +365,17 @@ def recalcular_medicao_obra(obra_id, admin_id):
         )
 
     db.session.commit()
-    return cr
+
+    valor_recebido = Decimal(str(cr.valor_recebido or 0))
+    valor_a_receber = (valor_medido - valor_recebido)
+    if valor_a_receber < 0:
+        valor_a_receber = Decimal('0')
+    return {
+        'valor_medido': valor_medido,
+        'valor_recebido': valor_recebido,
+        'valor_a_receber': valor_a_receber,
+        'conta_receber_id': cr.id,
+    }
 
 
 def gerar_pdf_extrato_medicao(medicao_id, admin_id):
