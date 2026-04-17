@@ -83,6 +83,32 @@ A função:
   lidas pelos painéis (`dashboard.py`, `resumo_custos_obra.py`); novas
   aprovações usam `'APROVADA'` (uppercase).
 
+## Rotas relevantes (verificadas em 2026-04-17)
+
+| Função | Método/rota |
+| --- | --- |
+| Login | `POST /login` (campos `email`, `password`) |
+| Listagem de propostas | `GET /propostas` |
+| Aprovar proposta (admin) | `POST /propostas/aprovar/<id>` |
+| Aprovar proposta (cliente) | `POST /propostas/cliente/<token>/aprovar` |
+| Listagem de obras | `GET /obras` |
+| Detalhe de obra | `GET /obras/<id>` |
+| Contas a receber | `GET /financeiro/contas-receber` *(atenção: rota é `contas-receber`, não `contas-a-receber`)* |
+
+## Smoke test e2e (confirmado)
+
+Cenário read-only executado pelo runner Playwright após o refator:
+
+1. Login admin → dashboard, sem 500.
+2. `/propostas` renderiza limpa.
+3. `/financeiro/contas-receber` renderiza limpa, **sem TypeError de
+   `saldo` NULL** (helpers `_saldo_seguro*` + `func.coalesce` ativos).
+4. `/obras` renderiza limpa.
+5. Detalhe da primeira obra carrega sem erro.
+
+Resultado: **success**. Veja `reports/relatorio-e2e-task-94.md` para a
+matriz completa.
+
 ## Solução de problemas comuns
 
 | Sintoma | Causa provável | Ação |

@@ -41,15 +41,41 @@ agora **uma e apenas uma** `ContaReceber` viva por obra com
 
 ## Validações
 
+### Automáticas
+
 - Boot do gunicorn limpo (`HTTP 200` em `/login`).
 - `python tests/test_agrupamento_diarias_rdo.py`: 23/23 PASS.
 - Eventos confirmados na inicialização: `propagar_proposta_para_obra`,
   `handle_proposta_aprovada`, `lancar_custos_rdo`,
   `recalcular_medicao_apos_rdo`.
 
+### E2E read-only (Playwright, login `admin.v2@sige.com`)
+
+Executado em 2026-04-17 contra o ambiente de desenvolvimento. Status:
+**success**.
+
+| # | Passo | Resultado |
+| - | --- | --- |
+| 1 | `POST /login` (admin.v2) | Redirect para dashboard, sem erro 500 |
+| 2 | `GET /propostas` | Lista renderiza limpa |
+| 3 | `GET /financeiro/contas-receber` | Renderiza limpa, **sem `TypeError` de saldo NULL** (confirma helpers `_saldo_seguro*` + `func.coalesce`) |
+| 4 | `GET /obras` | Lista renderiza limpa |
+| 5 | `GET /obras/<id>` (primeira obra) | Detalhe carrega sem erro |
+
+Achado pequeno (não bloqueante): a rota canônica do financeiro é
+`/financeiro/contas-receber` (sem o "a-"). Documentação atualizada para
+refletir a rota real registrada no menu.
+
+Observação: a base de desenvolvimento ainda não tem `ContaReceber` com
+`numero_documento` `OBR-MED-#####` (zero ocorrências encontradas no
+HTML), o que é coerente — não há registros legados desse padrão e a CR
+nova só nasce em obras com avanço de medição/RDO finalizados após o
+deploy do refator.
+
 ## Itens deixados como follow-up (não bloqueantes)
 
 - Sub #9: indicador "Medido / Recebido / A receber" no painel da obra
   consumindo o dict retornado por `recalcular_medicao_obra`.
-- Sub #11: bateria runTest e2e dos 5 cenários (aprovar admin, aprovar
-  portal, RDO+CR, fechamento de medição, recebimento parcial).
+- Sub #11: bateria runTest e2e dos 5 cenários de escrita (aprovar admin,
+  aprovar portal, RDO+CR, fechamento de medição, recebimento parcial).
+  O smoke read-only acima cobre o caminho de leitura/render.
