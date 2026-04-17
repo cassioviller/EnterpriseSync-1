@@ -451,3 +451,22 @@ def vincular_medicao_item(item_id):
         'valor_comercial': float(it.valor_comercial or 0),
         'atualizado': valor_atualizado,
     })
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Alias /api/catalogo/* — endpoints AJAX padronizados
+# (mantém compatibilidade com o spec original da Task #82)
+# ──────────────────────────────────────────────────────────────────────
+catalogo_api_bp = Blueprint('catalogo_api', __name__, url_prefix='/api/catalogo')
+
+
+@catalogo_api_bp.route('/servicos/buscar')
+@login_required
+def api_alias_servicos():
+    return api_buscar_servicos()
+
+
+@catalogo_api_bp.route('/insumos/buscar')
+@login_required
+def api_alias_insumos():
+    return api_buscar_insumos()

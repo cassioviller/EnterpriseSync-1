@@ -480,8 +480,9 @@ with app.app_context():
     
     # Task #82 — Catálogo de Insumos + Composição/Orçamento de Serviços
     try:
-        from views.catalogo_views import catalogo_bp
+        from views.catalogo_views import catalogo_bp, catalogo_api_bp
         app.register_blueprint(catalogo_bp)
+        app.register_blueprint(catalogo_api_bp)  # alias /api/catalogo/*
         logging.info("[OK] Blueprint CATALOGO (insumos+composicao+orcamento) registrado")
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint catalogo: {e}")
