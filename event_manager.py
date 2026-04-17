@@ -797,7 +797,10 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             ).first()
 
         if not obra:
-            ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter_by(admin_id=admin_id).scalar()
+            ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter(
+                Obra.admin_id == admin_id,
+                Obra.codigo.like('OBR%'),
+            ).scalar()
             if ultimo_codigo and ultimo_codigo.startswith('OBR'):
                 try:
                     numero = int(ultimo_codigo[3:]) + 1
@@ -806,6 +809,17 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             else:
                 numero = 1
             codigo_obra = f"OBR{numero:04d}"
+            # Defesa contra códigos órfãos com mesmo padrão (e.g. OBR0001 já
+            # existente sem sair do max devido a strings vazias). Avança até
+            # encontrar um código livre dentro de um limite razoável.
+            for _ in range(50):
+                exists = db.session.query(Obra.id).filter_by(
+                    admin_id=admin_id, codigo=codigo_obra
+                ).first()
+                if not exists:
+                    break
+                numero += 1
+                codigo_obra = f"OBR{numero:04d}"
 
             obra = Obra(
                 nome=f"Obra - {proposta.titulo or proposta.numero}",

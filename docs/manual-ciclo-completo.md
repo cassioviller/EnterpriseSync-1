@@ -109,6 +109,48 @@ Cenário read-only executado pelo runner Playwright após o refator:
 Resultado: **success**. Veja `reports/relatorio-e2e-task-94.md` para a
 matriz completa.
 
+## E2E backend determinístico do ciclo (`tests/test_ciclo_proposta_obra_medido_cr.py`)
+
+Bateria executada após o refator: **30 PASS / 0 FAIL**. Roda em
+`python tests/test_ciclo_proposta_obra_medido_cr.py` e cobre as 5
+fases do ciclo financeiro novo:
+
+1. **Aprovação cria estrutura, não dinheiro**: emite `proposta_aprovada`
+   e valida que Obra (`OBRxxxx`), `token_cliente`, `portal_ativo`,
+   `valor_contrato`, `proposta.obra_id` e o `ItemMedicaoComercial` da
+   proposta foram criados — e que **nenhuma** `ContaReceber OBRA_MEDICAO`
+   apareceu nesse momento.
+2. **Avanço 50% via cronograma**: cria `TarefaCronograma` com
+   `percentual_concluido=50` ligada ao IMC (peso 100). Chama
+   `recalcular_medicao_obra` e valida que a CR `OBR-MED-#####` nasceu
+   com `valor_original=R$ 500`, `saldo=R$ 500`, `status='PENDENTE'` e o
+   payload retornado contém `valor_medido=500` / `valor_a_receber=500`.
+3. **Avanço 100% (UPSERT)**: tarefa vai para 100%, `recalcular_medicao_obra`
+   é chamado de novo e a função atualiza a **mesma** CR (id idêntico)
+   para `valor_original=R$ 1.000`/`saldo=R$ 1.000`. Continua com **uma
+   única** linha `OBR-MED-#####` para a obra (UPSERT, não duplica).
+4. **Recebimento parcial → PARCIAL**: setando `valor_recebido=R$ 300`,
+   o recálculo aplica `saldo=R$ 700` e `status='PARCIAL'`.
+5. **Recebimento total → QUITADA**: com `valor_recebido=R$ 1.000`, o
+   recálculo zera o saldo e marca `status='QUITADA'`. A obra continua
+   com exatamente uma CR `OBR-MED-#####`.
+
+> **Resultado real do último run**: obra `OBR0005` (id=398), CR
+> `OBR-MED-00398` evoluiu PENDENTE@500 → PENDENTE@1000 → PARCIAL@700 →
+> QUITADA@0 sem nunca duplicar.
+
+### Bug regressivo descoberto e corrigido pelo teste
+
+O e2e UI inicial expôs uma `IntegrityError` em
+`uq_obra_codigo_admin_id`: o gerador de `codigo` em
+`event_manager.propagar_proposta_para_obra` usava
+`func.max(Obra.codigo)` sem filtrar pelo padrão `OBR%`. Quando o admin
+tinha alguma `Obra` com `codigo` NULL/vazio, o `max` não retornava
+nenhum `OBR####`, o gerador caía em `numero=1` e tentava inserir
+`OBR0001` — colidindo com um registro pré-existente. Corrigido
+filtrando `Obra.codigo.like('OBR%')` e iterando até encontrar um
+código livre. Após a correção, o e2e backend acima passa 30/30.
+
 ## Solução de problemas comuns
 
 | Sintoma | Causa provável | Ação |

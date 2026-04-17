@@ -66,16 +66,39 @@ Achado pequeno (não bloqueante): a rota canônica do financeiro é
 `/financeiro/contas-receber` (sem o "a-"). Documentação atualizada para
 refletir a rota real registrada no menu.
 
-Observação: a base de desenvolvimento ainda não tem `ContaReceber` com
-`numero_documento` `OBR-MED-#####` (zero ocorrências encontradas no
-HTML), o que é coerente — não há registros legados desse padrão e a CR
-nova só nasce em obras com avanço de medição/RDO finalizados após o
-deploy do refator.
+### E2E backend determinístico do ciclo (2026-04-17)
+
+Arquivo: `tests/test_ciclo_proposta_obra_medido_cr.py`. Resultado:
+**30/30 PASS, 0 FAIL**. Cobre o contrato real do refator de ponta a
+ponta sem depender de fluxos UI:
+
+| Fase | O que valida | Resultado |
+| --- | --- | --- |
+| 1. Aprovação | `EventManager.emit('proposta_aprovada')` cria Obra (`OBRxxxx`), seta `proposta.obra_id` + `convertida_em_obra=True`, `status='APROVADA'`, gera `token_cliente`, ativa `portal_ativo`, fixa `valor_contrato`, propaga IMC e **não** cria CR | ✔ |
+| 2. Avanço 50% | `TarefaCronograma=50%` ponderada via `ItemMedicaoCronogramaTarefa`; `recalcular_medicao_obra` cria CR com `numero_documento='OBR-MED-#####'`, `valor_original=R$ 500`, `saldo=R$ 500`, `status='PENDENTE'` | ✔ |
+| 3. Avanço 100% (UPSERT) | Mesma tarefa a 100%; recálculo atualiza a **mesma** CR (id idêntico) para `valor_original=R$ 1.000`, `saldo=R$ 1.000`; total de CRs OBR_MEDICAO da obra = 1 | ✔ |
+| 4. Recebimento parcial | `valor_recebido=R$ 300`; recálculo aplica `saldo=R$ 700`, `status='PARCIAL'` | ✔ |
+| 5. Recebimento total | `valor_recebido=R$ 1.000`; recálculo aplica `saldo=R$ 0`, `status='QUITADA'`, total CRs ainda = 1 | ✔ |
+
+### Bug encontrado e corrigido durante o teste
+
+Antes desta validação, o handler `propagar_proposta_para_obra` falhava
+silenciosamente quando o admin já tinha alguma `Obra` com `codigo`
+NULL/vazio: `func.max(Obra.codigo)` não retornava nenhum padrão `OBR%`,
+o gerador caía em `numero=1` e tentava inserir `OBR0001` colidindo com
+um registro pré-existente. A correção em
+`event_manager.propagar_proposta_para_obra` filtra o `func.max` por
+`codigo LIKE 'OBR%'` e itera até encontrar um código livre antes de
+inserir. Confirmado: na execução do e2e backend foi gerado `OBR0005`
+sem colisão.
 
 ## Itens deixados como follow-up (não bloqueantes)
 
 - Sub #9: indicador "Medido / Recebido / A receber" no painel da obra
   consumindo o dict retornado por `recalcular_medicao_obra`.
-- Sub #11: bateria runTest e2e dos 5 cenários de escrita (aprovar admin,
-  aprovar portal, RDO+CR, fechamento de medição, recebimento parcial).
-  O smoke read-only acima cobre o caminho de leitura/render.
+- Propagação de cronograma a partir da proposta: hoje a Obra nasce sem
+  `TarefaCronograma`, então o RDO via UI mostra "Nenhuma tarefa
+  cadastrada"; o usuário precisa criar o cronograma manualmente. O
+  recálculo financeiro funciona desde que haja vínculos
+  `ItemMedicaoCronogramaTarefa` (cronograma) **ou** RDO finalizado com
+  `RDOServicoSubatividade` ligado ao `IMC.servico_id`.
