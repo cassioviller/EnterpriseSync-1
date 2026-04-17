@@ -4570,10 +4570,13 @@ class ItemMedicaoComercial(db.Model):
     # Task #82 — vínculo opcional com catálogo
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True, index=True)
     quantidade = db.Column(db.Numeric(15, 4), nullable=True)
+    # Task #82 — origem determinística para dedupe na propagação de proposta
+    proposta_item_id = db.Column(db.Integer, db.ForeignKey('proposta_itens.id', ondelete='SET NULL'), nullable=True, index=True, unique=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra', backref='itens_medicao_comercial')
     servico = db.relationship('Servico', foreign_keys=[servico_id])
+    proposta_item = db.relationship('PropostaItem', foreign_keys=[proposta_item_id])
     tarefas_vinculadas = db.relationship('ItemMedicaoCronogramaTarefa', backref='item_medicao', cascade='all, delete-orphan')
 
     def __repr__(self):

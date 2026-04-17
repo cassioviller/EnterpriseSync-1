@@ -424,6 +424,7 @@ def criar():
         templates_nomes = request.form.getlist('item_template_nome')
         templates_ids = request.form.getlist('item_template_id')
         categorias = request.form.getlist('item_categoria')
+        servicos_ids = request.form.getlist('item_servico_id')  # Task #82
         
         # Criar itens da proposta
         for idx, item_data in enumerate(itens_validos):
@@ -440,6 +441,17 @@ def criar():
                 except ValueError:
                     pass
             
+            # Task #82 — vínculo opcional com catálogo de serviços
+            servico_id_int = None
+            if idx < len(servicos_ids) and servicos_ids[idx] and servicos_ids[idx].strip():
+                try:
+                    sid = int(servicos_ids[idx])
+                    from models import Servico
+                    if Servico.query.filter_by(id=sid, admin_id=admin_id).first():
+                        servico_id_int = sid
+                except (ValueError, TypeError):
+                    servico_id_int = None
+
             item = PropostaItem(
                 admin_id=admin_id,
                 proposta_id=proposta.id,
@@ -451,7 +463,8 @@ def criar():
                 ordem=idx + 1,
                 template_origem_nome=template_nome,
                 template_origem_id=template_id_int,
-                categoria_titulo=categoria
+                categoria_titulo=categoria,
+                servico_id=servico_id_int,
             )
             db.session.add(item)
             logger.info(f" [OK] Item {idx+1} criado: {item_data['descricao'][:30]}...")
@@ -849,6 +862,7 @@ def atualizar(id):
             templates_nomes = request.form.getlist('item_template_nome')
             templates_ids = request.form.getlist('item_template_id')
             categorias = request.form.getlist('item_categoria')
+            servicos_ids = request.form.getlist('item_servico_id')  # Task #82
             
             template_nome = templates_nomes[i] if i < len(templates_nomes) and templates_nomes[i] else None
             template_id = templates_ids[i] if i < len(templates_ids) and templates_ids[i] else None
@@ -861,6 +875,17 @@ def atualizar(id):
                     template_id_int = int(template_id)
                 except ValueError:
                     pass
+
+            # Task #82 — vínculo opcional com catálogo
+            servico_id_int = None
+            if i < len(servicos_ids) and servicos_ids[i] and servicos_ids[i].strip():
+                try:
+                    sid = int(servicos_ids[i])
+                    from models import Servico
+                    if Servico.query.filter_by(id=sid, admin_id=admin_id).first():
+                        servico_id_int = sid
+                except (ValueError, TypeError):
+                    servico_id_int = None
             
             # Verificar se é item existente ou novo
             if i < len(item_ids) and item_ids[i]:
@@ -875,6 +900,7 @@ def atualizar(id):
                     item.template_origem_nome = template_nome
                     item.template_origem_id = template_id_int
                     item.categoria_titulo = categoria
+                    item.servico_id = servico_id_int
                     logger.debug(f" [OK] Item {i+1} atualizado: {descricao[:30]}...")
             else:
                 # Criar novo item

@@ -139,11 +139,32 @@ def criar_item(obra_id):
         flash('Nome e valor comercial são obrigatórios.', 'danger')
         return redirect(url_for('medicao.gestao_itens', obra_id=obra_id))
 
+    # Task #82 — vínculo opcional com catálogo de serviços
+    servico_id_raw = (request.form.get('servico_id') or '').strip()
+    servico_id = None
+    if servico_id_raw:
+        try:
+            from models import Servico
+            sid = int(servico_id_raw)
+            if Servico.query.filter_by(id=sid, admin_id=admin_id).first():
+                servico_id = sid
+        except (ValueError, TypeError):
+            servico_id = None
+    quantidade_raw = (request.form.get('quantidade') or '').strip().replace(',', '.')
+    quantidade = None
+    if quantidade_raw:
+        try:
+            quantidade = Decimal(quantidade_raw)
+        except Exception:
+            quantidade = None
+
     item = ItemMedicaoComercial(
         admin_id=admin_id,
         obra_id=obra_id,
         nome=nome,
         valor_comercial=valor,
+        servico_id=servico_id,
+        quantidade=quantidade,
     )
     db.session.add(item)
     db.session.commit()
@@ -171,6 +192,29 @@ def editar_item(obra_id, item_id):
         item.nome = nome
     if valor > 0:
         item.valor_comercial = valor
+
+    # Task #82 — atualização opcional do vínculo com catálogo
+    if 'servico_id' in request.form:
+        servico_id_raw = (request.form.get('servico_id') or '').strip()
+        if not servico_id_raw:
+            item.servico_id = None
+        else:
+            try:
+                from models import Servico
+                sid = int(servico_id_raw)
+                if Servico.query.filter_by(id=sid, admin_id=admin_id).first():
+                    item.servico_id = sid
+            except (ValueError, TypeError):
+                pass
+    if 'quantidade' in request.form:
+        q_raw = (request.form.get('quantidade') or '').strip().replace(',', '.')
+        if not q_raw:
+            item.quantidade = None
+        else:
+            try:
+                item.quantidade = Decimal(q_raw)
+            except Exception:
+                pass
 
     db.session.commit()
     flash('Item atualizado.', 'success')

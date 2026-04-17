@@ -3821,6 +3821,7 @@ def executar_migracoes():
             (119, "Task #74 — GestaoCustoFilho.obra_servico_custo_id (vínculo direto custo→serviço)", migration_119_gestao_custo_filho_obra_servico),
             (120, "Task #76 — NotificacaoOrcamento (alertas de estouro de orçamento por serviço)", migration_120_notificacao_orcamento),
             (121, "Task #82 — Catálogo de Insumos + Composição de Serviços + Orçamento Paramétrico", migration_121_catalogo_servicos_orcamento),
+            (122, "Task #82 — ItemMedicaoComercial.proposta_item_id (dedupe determinístico de propagação)", migration_122_item_medicao_proposta_item_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -9878,4 +9879,50 @@ def migration_121_catalogo_servicos_orcamento():
                 connection.close()
             except Exception:
                 pass
+        raise
+
+
+def migration_122_item_medicao_proposta_item_id():
+    """Migration 122 (Task #82): adiciona ItemMedicaoComercial.proposta_item_id.
+
+    Coluna FK opcional + UNIQUE para garantir dedupe determinístico
+    quando a aprovação de uma proposta propaga seus itens para a obra.
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)  # AUTOCOMMIT
+        cursor = connection.cursor()
+        cursor.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='item_medicao_comercial')
+               AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='proposta_itens') THEN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='item_medicao_comercial' AND column_name='proposta_item_id'
+                ) THEN
+                    ALTER TABLE item_medicao_comercial
+                        ADD COLUMN proposta_item_id INTEGER NULL
+                        REFERENCES proposta_itens(id) ON DELETE SET NULL;
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_item_medicao_proposta_item
+                        ON item_medicao_comercial(proposta_item_id)
+                        WHERE proposta_item_id IS NOT NULL;
+                    CREATE INDEX IF NOT EXISTS ix_item_medicao_proposta_item_id
+                        ON item_medicao_comercial(proposta_item_id);
+                END IF;
+            END IF;
+        END$$;
+        """)
+        cursor.close()
+        connection.close()
+        logging.info("Migration 122: ItemMedicaoComercial.proposta_item_id OK")
+    except Exception as e:
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
+        logging.error(f"Migration 122 falhou: {e}")
         raise

@@ -28,21 +28,23 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
         return 0
     obra_id = proposta.obra_id
 
-    # Idempotência: se já existe item desta proposta (pelo nome), pular
+    # Idempotência: dedupe determinístico por proposta_item_id (não por nome)
     itens = PropostaItem.query.filter_by(proposta_id=proposta_id).all()
     if not itens:
         return 0
-    nomes_existentes = {
-        i.nome for i in ItemMedicaoComercial.query.filter_by(
-            admin_id=admin_id, obra_id=obra_id
+    ids_existentes = {
+        row[0] for row in db.session.query(ItemMedicaoComercial.proposta_item_id).filter(
+            ItemMedicaoComercial.admin_id == admin_id,
+            ItemMedicaoComercial.obra_id == obra_id,
+            ItemMedicaoComercial.proposta_item_id.in_([i.id for i in itens]),
         ).all()
     }
     criados = 0
     for it in itens:
+        if it.id in ids_existentes:
+            continue
         nome_item = (getattr(it, 'descricao', None) or getattr(it, 'item', None) or '').strip()
         if not nome_item:
-            continue
-        if nome_item in nomes_existentes:
             continue
         valor_total = Decimal(str(it.subtotal or 0))
         if valor_total <= 0:
@@ -54,6 +56,7 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
             valor_comercial=valor_total,
             servico_id=getattr(it, 'servico_id', None),
             quantidade=Decimal(str(it.quantidade or 0)) if getattr(it, 'quantidade', None) is not None else None,
+            proposta_item_id=it.id,
             status='PENDENTE',
         )
         db.session.add(novo)
