@@ -1361,8 +1361,9 @@ function limparServicos() {
     const preco = Number(svc.preco_venda != null ? svc.preco_venda : (svc.preco_venda_unitario || 0));
     const unidade = svc.unidade || svc.unidade_medida || 'un';
 
+    // Sempre sobrescreve (selecionar serviço deve refletir descrição/unidade/preço atuais).
     const desc = row.querySelector('.servico-descricao, input[name="item_descricao"]');
-    if (desc && !desc.value) desc.value = svc.nome;
+    if (desc) desc.value = svc.nome;
 
     const hidden = row.querySelector('.servico-catalogo-id, input[name="item_servico_id"]');
     if (hidden) hidden.value = svc.id;
@@ -1379,7 +1380,7 @@ function limparServicos() {
     }
 
     const precoIn = row.querySelector('.servico-valor-unitario, input[name="item_preco"]');
-    if (precoIn && (!precoIn.value || parseFloat(precoIn.value) === 0)) {
+    if (precoIn) {
       precoIn.value = preco.toFixed(2);
       if (typeof calcularServico === 'function') {
         try { calcularServico(precoIn); } catch(e){}
