@@ -11,6 +11,51 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 
+def resolver_obra_servico_custo_id(obra_id, servico_id, admin_id):
+    """Tenta resolver o ``ObraServicoCusto`` correspondente a um par
+    (obra_id, servico_id) — usado para auto-vincular custos gerados a partir
+    do RDO ao serviço da obra que está sendo executado.
+
+    Estratégia:
+      1. Procura um ``ServicoObraReal`` com (obra_id, servico_id) — se houver
+         um único ``ObraServicoCusto`` apontando para ele, usa-o.
+      2. Se nada acima resolver, retorna ``None`` (sem chute).
+
+    Retorna o ``id`` do ``ObraServicoCusto`` ou ``None``.
+    """
+    if not obra_id or not servico_id or not admin_id:
+        return None
+    try:
+        from models import ObraServicoCusto, ServicoObraReal
+
+        sor = (
+            ServicoObraReal.query
+            .filter_by(obra_id=obra_id, servico_id=servico_id, admin_id=admin_id)
+            .first()
+        )
+        if not sor:
+            return None
+
+        candidatos = (
+            ObraServicoCusto.query
+            .filter_by(
+                obra_id=obra_id,
+                admin_id=admin_id,
+                servico_obra_real_id=sor.id,
+            )
+            .all()
+        )
+        if len(candidatos) == 1:
+            return candidatos[0].id
+        return None
+    except Exception:
+        logger.exception(
+            "resolver_obra_servico_custo_id(obra=%s, servico=%s) falhou",
+            obra_id, servico_id,
+        )
+        return None
+
+
 def registrar_custo_automatico(
     admin_id: int,
     tipo_categoria: str,
@@ -23,6 +68,7 @@ def registrar_custo_automatico(
     centro_custo_id=None,
     origem_tabela: str = None,
     origem_id: int = None,
+    obra_servico_custo_id=None,
 ):
     """
     Coração da integração: registra automaticamente um custo no módulo
@@ -107,6 +153,31 @@ def registrar_custo_automatico(
             .scalar()
         ) or Decimal('0.00')
 
+        # Valida vínculo direto custo→serviço (Task #78). Só persiste o
+        # ``obra_servico_custo_id`` quando ele pertence ao mesmo tenant e à
+        # mesma obra do lançamento — caso contrário, ignora silenciosamente.
+        svc_custo_id_validado = None
+        if obra_servico_custo_id and obra_id:
+            try:
+                from models import ObraServicoCusto
+                svc = ObraServicoCusto.query.filter_by(
+                    id=obra_servico_custo_id,
+                    admin_id=admin_id,
+                    obra_id=obra_id,
+                ).first()
+                if svc:
+                    svc_custo_id_validado = svc.id
+                else:
+                    logger.info(
+                        "[INFO] obra_servico_custo_id=%s não pertence à obra=%s/admin=%s — ignorando vínculo",
+                        obra_servico_custo_id, obra_id, admin_id,
+                    )
+            except Exception:
+                logger.exception(
+                    "Falha ao validar obra_servico_custo_id=%s",
+                    obra_servico_custo_id,
+                )
+
         filho = GestaoCustoFilho(
             pai_id=pai.id,
             data_referencia=data,
@@ -114,6 +185,7 @@ def registrar_custo_automatico(
             valor=valor_dec,
             obra_id=obra_id,
             centro_custo_id=centro_custo_id,
+            obra_servico_custo_id=svc_custo_id_validado,
             origem_tabela=origem_tabela,
             origem_id=origem_id,
             admin_id=admin_id,

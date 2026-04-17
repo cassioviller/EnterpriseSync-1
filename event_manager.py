@@ -584,7 +584,10 @@ def lancar_custos_rdo(data: dict, admin_id: int):
     try:
         from models import db, RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario, CustoObra, GestaoCustoPai, GestaoCustoFilho
         from decimal import Decimal
-        from utils.financeiro_integration import registrar_custo_automatico
+        from utils.financeiro_integration import (
+            registrar_custo_automatico,
+            resolver_obra_servico_custo_id,
+        )
 
         rdo_id = data.get('rdo_id')
         if not rdo_id:
@@ -631,15 +634,32 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                 continue
 
             # Coletar nomes de subatividades trabalhadas por este funcionário
+            # e os ``servico_id`` distintos — usados para auto-vincular o
+            # custo gerado ao ``ObraServicoCusto`` correspondente.
             sub_nomes = []
+            servico_ids_distintos = set()
             for mo in mo_list:
                 if mo.subatividade_id:
                     try:
                         sub = RDOServicoSubatividade.query.get(mo.subatividade_id)
                         if sub and sub.nome_subatividade and sub.nome_subatividade not in sub_nomes:
                             sub_nomes.append(sub.nome_subatividade)
+                        if sub and sub.servico_id:
+                            servico_ids_distintos.add(sub.servico_id)
                     except Exception as sub_err:
                         logger.warning(f"⚠️ Erro ao ler subatividade {mo.subatividade_id} para {funcionario.nome}: {sub_err}")
+
+            # Auto-vínculo custo→serviço (Task #78): só preenche quando o
+            # funcionário trabalhou em UM único serviço no RDO — caso
+            # contrário, o custo fica sem vínculo e segue para rateio.
+            obra_servico_custo_id_auto = None
+            if len(servico_ids_distintos) == 1:
+                (servico_id_unico,) = tuple(servico_ids_distintos)
+                obra_servico_custo_id_auto = resolver_obra_servico_custo_id(
+                    obra_id=rdo.obra_id,
+                    servico_id=servico_id_unico,
+                    admin_id=admin_id,
+                )
 
             funcao = 'Diarista'
             try:
@@ -714,6 +734,7 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     obra_id=rdo.obra_id,
                     origem_tabela='rdo_mao_obra',
                     origem_id=rdo.id,
+                    obra_servico_custo_id=obra_servico_custo_id_auto,
                 )
                 if filho:
                     gestao_criados += 1
