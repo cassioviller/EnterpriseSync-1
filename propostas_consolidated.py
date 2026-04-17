@@ -1070,21 +1070,29 @@ def aprovar(id):
 
         # Task #94: emitir evento proposta_aprovada — handlers criam Obra,
         # token_cliente, ItemMedicaoComercial e ObraServicoCusto (sem ContaReceber).
-        try:
-            from event_manager import EventManager
-            EventManager.emit('proposta_aprovada', {
-                'proposta_id': proposta.id,
-                'cliente_nome': proposta.cliente_nome,
-                'cliente_cpf_cnpj': None,
-                'valor_total': float(proposta.valor_total or 0),
-                'data_aprovacao': date.today().isoformat(),
-            }, admin_id)
-        except Exception as ev_err:
-            logger.error(f"[ERROR] Falha ao emitir proposta_aprovada: {ev_err}")
+        # Emit retorna False quando algum handler falha; tratamos como erro.
+        from event_manager import EventManager
+        ok = EventManager.emit('proposta_aprovada', {
+            'proposta_id': proposta.id,
+            'cliente_nome': proposta.cliente_nome,
+            'cliente_cpf_cnpj': None,
+            'valor_total': float(proposta.valor_total or 0),
+            'data_aprovacao': date.today().isoformat(),
+        }, admin_id)
+        if ok is False:
+            logger.error(
+                f"[ERROR] proposta_aprovada falhou para proposta {proposta.id} — "
+                "estrutura operacional pode estar incompleta"
+            )
+            flash(
+                'Proposta marcada como aprovada, mas houve falha na geração da obra/itens. '
+                'Verifique os logs e tente reaprovar.',
+                'warning',
+            )
+        else:
+            flash('Proposta aprovada com sucesso!', 'success')
 
         logger.debug(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
-        flash('Proposta aprovada com sucesso!', 'success')
-        
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
     except Exception as e:
@@ -1192,23 +1200,52 @@ def aprovar_proposta_cliente(token):
         
         db.session.commit()
 
-        # Task #94: emitir evento proposta_aprovada (mesmo handler do fluxo admin)
-        try:
-            admin_id = proposta.admin_id or proposta.criado_por
-            if admin_id:
-                from event_manager import EventManager
-                EventManager.emit('proposta_aprovada', {
-                    'proposta_id': proposta.id,
-                    'cliente_nome': proposta.cliente_nome,
-                    'cliente_cpf_cnpj': None,
-                    'valor_total': float(proposta.valor_total or 0),
-                    'data_aprovacao': date.today().isoformat(),
-                }, admin_id)
-        except Exception as ev_err:
-            import logging as _lg
-            _lg.getLogger(__name__).error(f"Falha ao emitir proposta_aprovada (cliente): {ev_err}")
+        # Task #94: emitir evento proposta_aprovada (mesmo handler do fluxo admin).
+        # Resolução de admin_id alinhada com portal_cliente() — Usuario.admin_id
+        # ou usuario.id como fallback, depois proposta.admin_id.
+        admin_id = None
+        if proposta.criado_por:
+            from models import Usuario
+            usuario = Usuario.query.get(proposta.criado_por)
+            if usuario:
+                admin_id = usuario.admin_id or usuario.id
+        if not admin_id and proposta.admin_id:
+            admin_id = proposta.admin_id
 
-        flash('Proposta aprovada com sucesso!', 'success')
+        import logging as _lg
+        _log = _lg.getLogger(__name__)
+        if not admin_id:
+            _log.error(
+                f"Falha ao emitir proposta_aprovada (cliente): admin_id não resolvido "
+                f"para proposta {proposta.id}"
+            )
+            flash(
+                'Proposta aprovada, mas a estrutura da obra não pôde ser gerada (tenant não identificado). '
+                'O administrador foi notificado.',
+                'warning',
+            )
+            return render_template('propostas/aprovada.html', proposta=proposta)
+
+        from event_manager import EventManager
+        ok = EventManager.emit('proposta_aprovada', {
+            'proposta_id': proposta.id,
+            'cliente_nome': proposta.cliente_nome,
+            'cliente_cpf_cnpj': None,
+            'valor_total': float(proposta.valor_total or 0),
+            'data_aprovacao': date.today().isoformat(),
+        }, admin_id)
+        if ok is False:
+            _log.error(
+                f"proposta_aprovada (cliente) falhou para proposta {proposta.id} — "
+                "estrutura operacional pode estar incompleta"
+            )
+            flash(
+                'Proposta marcada como aprovada, mas houve falha na geração da obra/itens. '
+                'O administrador foi notificado.',
+                'warning',
+            )
+        else:
+            flash('Proposta aprovada com sucesso!', 'success')
         return render_template('propostas/aprovada.html', proposta=proposta)
         
     except Exception as e:

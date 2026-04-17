@@ -291,17 +291,16 @@ def recalcular_medicao_obra(obra_id, admin_id):
     # 1) Recalcular avanço por IMC (cronograma + fallback RDO)
     medido_total = _recalcular_imc_avanco(obra_id, admin_id)
 
-    # 2) Entrada já recebida abate o "a faturar"
-    entrada = Decimal(str(obra.valor_entrada or 0)) if obra.data_entrada else Decimal('0')
-    valor_a_faturar = (medido_total - entrada)
-    if valor_a_faturar < 0:
-        valor_a_faturar = Decimal('0')
+    # 2) Task #94: a CR acumulada da obra reflete o **medido**:
+    #    valor_original = valor_medido (sem abater entrada — entrada é
+    #    paga em CR separada se houver) e saldo = max(0, medido - recebido).
+    valor_medido = medido_total
 
     cr = ContaReceber.query.filter_by(
         admin_id=admin_id, origem_tipo='OBRA_MEDICAO', origem_id=obra_id
     ).first()
 
-    if valor_a_faturar <= 0 and not cr:
+    if valor_medido <= 0 and not cr:
         # Persistir o recálculo do avanço mesmo sem CR a criar
         db.session.commit()
         return None
@@ -316,12 +315,12 @@ def recalcular_medicao_obra(obra_id, admin_id):
             obra_id=obra_id,
             numero_documento=f"OBR-MED-{obra_id:05d}",
             descricao=descricao,
-            valor_original=valor_a_faturar,
+            valor_original=valor_medido,
             valor_recebido=Decimal('0'),
-            saldo=valor_a_faturar,
+            saldo=valor_medido,
             data_emissao=hoje,
             data_vencimento=hoje + timedelta(days=30),
-            status='PENDENTE' if valor_a_faturar > 0 else 'QUITADA',
+            status='PENDENTE' if valor_medido > 0 else 'QUITADA',
             origem_tipo='OBRA_MEDICAO',
             origem_id=obra_id,
             admin_id=admin_id,
@@ -330,14 +329,14 @@ def recalcular_medicao_obra(obra_id, admin_id):
         db.session.flush()
         logger.info(
             f"[OK] ContaReceber OBRA_MEDICAO criada (id={cr.id}) obra={obra_id} "
-            f"medido_total=R$ {float(medido_total):.2f} valor_a_faturar=R$ {float(valor_a_faturar):.2f}"
+            f"valor_medido=R$ {float(valor_medido):.2f}"
         )
     else:
         cr.cliente_nome = cliente_nome
         cr.descricao = descricao
-        cr.valor_original = valor_a_faturar
+        cr.valor_original = valor_medido
         recebido = Decimal(str(cr.valor_recebido or 0))
-        novo_saldo = valor_a_faturar - recebido
+        novo_saldo = valor_medido - recebido
         if novo_saldo < 0:
             novo_saldo = Decimal('0')
         cr.saldo = novo_saldo
@@ -349,8 +348,8 @@ def recalcular_medicao_obra(obra_id, admin_id):
             cr.status = 'PENDENTE'
         logger.info(
             f"[OK] ContaReceber OBRA_MEDICAO atualizada (id={cr.id}) obra={obra_id} "
-            f"medido_total=R$ {float(medido_total):.2f} valor_original=R$ {float(valor_a_faturar):.2f} "
-            f"saldo=R$ {float(novo_saldo):.2f} status={cr.status}"
+            f"valor_medido=R$ {float(valor_medido):.2f} saldo=R$ {float(novo_saldo):.2f} "
+            f"recebido=R$ {float(recebido):.2f} status={cr.status}"
         )
 
     db.session.commit()
