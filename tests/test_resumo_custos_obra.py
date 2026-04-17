@@ -473,5 +473,90 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         )
 
 
+class TestRecalcularObraVinculoDireto(ResumoCustosObraBaseTest):
+    """Task #74 — vínculo direto custo→serviço em recalcular_obra."""
+
+    def _setup(self, nome):
+        from datetime import date
+        from models import Usuario, Obra, ObraServicoCusto, GestaoCustoPai
+        admin = Usuario.query.first()
+        if not admin:
+            self.skipTest('Nenhum Usuario admin no banco')
+        obra = Obra(
+            nome=nome, admin_id=admin.id,
+            data_inicio=date.today(),
+            valor_contrato=Decimal('100000'),
+            orcamento=Decimal('100000'),
+            percentual_administracao=Decimal('0'),
+        )
+        db.session.add(obra)
+        db.session.commit()
+        svc_a = ObraServicoCusto(admin_id=admin.id, obra_id=obra.id,
+                                 nome='Serviço A', valor_orcado=Decimal('10000'))
+        svc_b = ObraServicoCusto(admin_id=admin.id, obra_id=obra.id,
+                                 nome='Serviço B', valor_orcado=Decimal('10000'))
+        db.session.add_all([svc_a, svc_b])
+        db.session.commit()
+        pai = GestaoCustoPai(
+            admin_id=admin.id, tipo_categoria='MATERIAL',
+            entidade_nome='Fornecedor X',
+            valor_total=Decimal('0'),
+        )
+        db.session.add(pai)
+        db.session.commit()
+        return admin, obra, svc_a, svc_b, pai
+
+    def _add_filho(self, admin, obra, pai, valor, svc=None):
+        from datetime import date
+        from models import GestaoCustoFilho
+        f = GestaoCustoFilho(
+            pai_id=pai.id, obra_id=obra.id, admin_id=admin.id,
+            data_referencia=date.today(),
+            valor=Decimal(str(valor)), descricao='lanc',
+            obra_servico_custo_id=svc.id if svc else None,
+        )
+        db.session.add(f)
+        db.session.commit()
+        return f
+
+    def test_vinculo_direto_aloca_no_servico_correto(self):
+        from services.resumo_custos_obra import recalcular_obra
+        admin, obra, a, b, pai = self._setup('Obra #74-1')
+        # R$ 600 vinculado direto ao serviço A; nada para B; nada solto.
+        self._add_filho(admin, obra, pai, 600, svc=a)
+        recalcular_obra(obra.id, admin_id=admin.id)
+        db.session.refresh(a); db.session.refresh(b)
+        self.assertAlmostEqual(float(a.realizado_material), 600.0, places=2)
+        self.assertAlmostEqual(float(b.realizado_material), 0.0, places=2)
+
+    def test_restante_e_rateado_proporcional(self):
+        from services.resumo_custos_obra import recalcular_obra
+        admin, obra, a, b, pai = self._setup('Obra #74-2')
+        # 300 direto em A; 200 sem vínculo (deve ser rateado igualmente — orçados iguais)
+        self._add_filho(admin, obra, pai, 300, svc=a)
+        self._add_filho(admin, obra, pai, 200, svc=None)
+        recalcular_obra(obra.id, admin_id=admin.id)
+        db.session.refresh(a); db.session.refresh(b)
+        # A: 300 direto + 100 (metade dos 200) = 400; B: 100
+        self.assertAlmostEqual(float(a.realizado_material), 400.0, places=2)
+        self.assertAlmostEqual(float(b.realizado_material), 100.0, places=2)
+
+    def test_servico_com_override_nao_e_sobrescrito(self):
+        from services.resumo_custos_obra import recalcular_obra
+        admin, obra, a, b, pai = self._setup('Obra #74-3')
+        a.override_realizado_manual = True
+        a.realizado_material = Decimal('999')
+        db.session.commit()
+        # 500 direto em B; 100 solto
+        self._add_filho(admin, obra, pai, 500, svc=b)
+        self._add_filho(admin, obra, pai, 100, svc=None)
+        recalcular_obra(obra.id, admin_id=admin.id)
+        db.session.refresh(a); db.session.refresh(b)
+        self.assertAlmostEqual(float(a.realizado_material), 999.0, places=2,
+                               msg='Override em A deve permanecer intacto')
+        # B (único alvo do rateio) recebe direto + todo o restante
+        self.assertAlmostEqual(float(b.realizado_material), 600.0, places=2)
+
+
 if __name__ == '__main__':
     unittest.main()

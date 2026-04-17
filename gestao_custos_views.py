@@ -15,7 +15,8 @@ from sqlalchemy import func
 
 from app import db
 from models import (GestaoCustoPai, GestaoCustoFilho,
-                    FluxoCaixa, Obra, TipoUsuario, ContaPagar, Fornecedor, BancoEmpresa)
+                    FluxoCaixa, Obra, TipoUsuario, ContaPagar, Fornecedor, BancoEmpresa,
+                    ObraServicoCusto)
 from utils.tenant import is_v2_active
 
 logger = logging.getLogger(__name__)
@@ -308,6 +309,27 @@ def novo():
 # DETALHES / FILHOS (AJAX)
 # ───────────────────────────────────────────────────────────────
 
+@gestao_custos_bp.route('/obra/<int:obra_id>/servicos')
+@login_required
+def servicos_da_obra(obra_id):
+    """Retorna os serviços orçados (ObraServicoCusto) de uma obra do tenant.
+    Usado pelo modal de edição em Gestão de Custos para popular o dropdown
+    de serviço quando o usuário muda a obra do lançamento."""
+    admin_id, err = _check_v2()
+    if err:
+        return jsonify({'status': 'error', 'message': 'V2 only'}), 403
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if not obra:
+        return jsonify({'status': 'error', 'message': 'Obra não encontrada'}), 404
+    servicos = ObraServicoCusto.query.filter_by(
+        obra_id=obra.id, admin_id=admin_id
+    ).order_by(ObraServicoCusto.nome.asc()).all()
+    return jsonify({
+        'status': 'ok',
+        'servicos': [{'id': s.id, 'nome': s.nome} for s in servicos],
+    })
+
+
 @gestao_custos_bp.route('/<int:pai_id>/filhos')
 @login_required
 def filhos(pai_id):
@@ -338,11 +360,35 @@ def filhos(pai_id):
 
     pode_editar = pai.status not in ('PAGO', 'RECUSADO')
 
+    # Serviços disponíveis por obra (para popular dropdown de vínculo direto
+    # custo→serviço — Task #74).
+    obra_ids = {f.obra_id for f in itens if f.obra_id}
+    servicos_por_obra: dict = {}
+    if obra_ids:
+        svcs = (ObraServicoCusto.query
+                .filter(ObraServicoCusto.admin_id == admin_id,
+                        ObraServicoCusto.obra_id.in_(obra_ids))
+                .order_by(ObraServicoCusto.nome)
+                .all())
+        for s in svcs:
+            servicos_por_obra.setdefault(s.obra_id, []).append({
+                'id': s.id,
+                'nome': s.nome,
+            })
+
+    # Mapa filho_id → nome do serviço vinculado (para exibir na tabela)
+    nome_servico_por_id: dict = {
+        s['id']: s['nome']
+        for lista in servicos_por_obra.values()
+        for s in lista
+    }
+
     return jsonify({
         'status': 'ok',
         'pai_status': pai.status,
         'pode_editar': pode_editar,
         'obras_resumo': obras_resumo,
+        'servicos_por_obra': servicos_por_obra,
         'itens': [
             {
                 'id': f.id,
@@ -352,6 +398,8 @@ def filhos(pai_id):
                 'valor': float(f.valor),
                 'obra': f.obra.nome if f.obra else '—',
                 'obra_id': f.obra_id,
+                'obra_servico_custo_id': f.obra_servico_custo_id,
+                'servico_nome': nome_servico_por_id.get(f.obra_servico_custo_id),
                 'origem': f.origem_tabela or '—',
                 'pode_editar': pode_editar,
             }
@@ -412,15 +460,68 @@ def editar_filho(filho_id):
             filho.valor = valor
 
         obra_id_raw = request.form.get('obra_id', '').strip()
+        obra_alterada = False
+        obras_afetadas = set()
+        if filho.obra_id:
+            obras_afetadas.add(filho.obra_id)
         if obra_id_raw == '':
+            if filho.obra_id is not None:
+                obra_alterada = True
             filho.obra_id = None
         else:
             try:
-                filho.obra_id = int(obra_id_raw)
+                novo_obra_id = int(obra_id_raw)
+                if novo_obra_id != filho.obra_id:
+                    obra_alterada = True
+                filho.obra_id = novo_obra_id
             except ValueError:
                 pass
 
+        # Vínculo direto custo→serviço (Task #74).
+        # Aceita string vazia para "Sem serviço".
+        if 'obra_servico_custo_id' in request.form:
+            svc_raw = (request.form.get('obra_servico_custo_id') or '').strip()
+            if svc_raw == '':
+                filho.obra_servico_custo_id = None
+            else:
+                try:
+                    svc_id = int(svc_raw)
+                except ValueError:
+                    return jsonify({'status': 'error',
+                                    'message': 'Serviço inválido.'}), 400
+                svc = ObraServicoCusto.query.filter_by(
+                    id=svc_id, admin_id=admin_id
+                ).first()
+                if not svc:
+                    return jsonify({'status': 'error',
+                                    'message': 'Serviço não encontrado.'}), 404
+                if not filho.obra_id or svc.obra_id != filho.obra_id:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'O serviço selecionado não pertence à obra do lançamento.'
+                    }), 400
+                filho.obra_servico_custo_id = svc.id
+        # Se a obra mudou e o serviço antigo não pertence mais à nova obra,
+        # limpa o vínculo para evitar inconsistência.
+        if obra_alterada and filho.obra_servico_custo_id:
+            svc = db.session.get(ObraServicoCusto, filho.obra_servico_custo_id)
+            if not svc or svc.obra_id != filho.obra_id:
+                filho.obra_servico_custo_id = None
+
+        if filho.obra_id:
+            obras_afetadas.add(filho.obra_id)
+
         _recalcular_total_pai(pai)
+        db.session.flush()
+
+        # Recalcula realizado dos serviços nas obras impactadas.
+        try:
+            from services.resumo_custos_obra import recalcular_obra
+            for oid in obras_afetadas:
+                recalcular_obra(oid, admin_id=admin_id)
+        except Exception:
+            logger.exception("editar_filho %s: falha ao recalcular obra", filho_id)
+
         db.session.commit()
 
         return jsonify({
@@ -464,6 +565,8 @@ def excluir_filho(filho_id):
         }), 400
 
     try:
+        obra_afetada = filho.obra_id
+
         # 1. Cascata para a origem (apaga o registro fonte se houver)
         _excluir_origem_de_filho(filho, admin_id)
 
@@ -487,6 +590,14 @@ def excluir_filho(filho_id):
             logger.info(f"[OK] Pai {pai_id} excluído automaticamente (último filho removido)")
         else:
             _recalcular_total_pai(pai)
+
+        # Recalcula realizado dos serviços da obra impactada (Task #74).
+        if obra_afetada:
+            try:
+                from services.resumo_custos_obra import recalcular_obra
+                recalcular_obra(obra_afetada, admin_id=admin_id)
+            except Exception:
+                logger.exception("excluir_filho %s: falha ao recalcular obra", filho_id)
 
         db.session.commit()
 

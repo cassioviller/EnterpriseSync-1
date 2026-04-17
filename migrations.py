@@ -3818,6 +3818,7 @@ def executar_migracoes():
             (116, "PedidoCompra — tipo_compra (normal/aprovacao_cliente) + processada_apos_aprovacao", migration_116_pedido_compra_tipo_compra),
             (117, "TarefaCronograma — is_cliente BOOLEAN (paridade total no editor cliente)", migration_117_tarefa_cronograma_is_cliente),
             (118, "Task #70 — Resumo de Custos da Obra (obra_servico_custo + equipe + cotação + percentual_administracao)", migration_118_resumo_custos_obra),
+            (119, "Task #74 — GestaoCustoFilho.obra_servico_custo_id (vínculo direto custo→serviço)", migration_119_gestao_custo_filho_obra_servico),
         ]
         
         # Executar cada migração com rastreamento
@@ -9569,6 +9570,59 @@ def migration_118_resumo_custos_obra():
 
     except Exception as e:
         logger.error(f"Erro na migracao 118: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_119_gestao_custo_filho_obra_servico():
+    """
+    Migration 119 (Task #74): vincular custos reais a cada serviço da obra.
+
+    Adiciona coluna gestao_custo_filho.obra_servico_custo_id (FK SET NULL)
+    + índice. Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            ALTER TABLE gestao_custo_filho
+                ADD COLUMN IF NOT EXISTS obra_servico_custo_id INTEGER
+        """)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'fk_gestao_custo_filho_obra_servico_custo'
+                ) THEN
+                    ALTER TABLE gestao_custo_filho
+                    ADD CONSTRAINT fk_gestao_custo_filho_obra_servico_custo
+                    FOREIGN KEY (obra_servico_custo_id)
+                    REFERENCES obra_servico_custo(id)
+                    ON DELETE SET NULL;
+                END IF;
+            END$$;
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_gestao_custo_filho_obra_servico
+                ON gestao_custo_filho(obra_servico_custo_id)
+        """)
+
+        connection.commit()
+        cursor.close()
+        logger.info("MIGRACAO 119: gestao_custo_filho.obra_servico_custo_id criado")
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 119: {e}")
         import traceback
         logger.error(traceback.format_exc())
         if connection:

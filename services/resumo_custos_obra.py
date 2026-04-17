@@ -91,15 +91,31 @@ def recalcular_servico(obra_servico_custo_id: int) -> bool:
 # ─────────────────────────────────────────────────────────────────────────
 # Recálculo por obra (realizado a partir de GestaoCustoFilho)
 # ─────────────────────────────────────────────────────────────────────────
+def _bucket_categoria(cat: str) -> str | None:
+    """Mapeia tipo_categoria → bucket: 'material' | 'mao_obra' | 'outros' | None."""
+    c = (cat or '').upper()
+    if c in _CATEGORIA_FATURAMENTO_DIRETO:
+        return None
+    if c in _CATEGORIA_MATERIAL:
+        return 'material'
+    if c in _CATEGORIA_MAO_OBRA:
+        return 'mao_obra'
+    return 'outros'
+
+
 def recalcular_obra(obra_id: int, admin_id=None) -> bool:
     """Atualiza o 'Realizado' de cada serviço com base em GestaoCustoFilho,
     agregado por categoria.
 
-    Distribuição proporcional:
-      - Quando houver ao menos um serviço com valor_orcado > 0, o realizado
-        é rateado proporcionalmente ao valor_orcado de cada serviço.
-      - Caso contrário, aplica rateio uniforme (fallback).
-      - Serviços com override_realizado_manual=True nunca são sobrescritos.
+    Estratégia (Task #74):
+      - Quando um filho está vinculado diretamente a um serviço via
+        ``obra_servico_custo_id``, o valor é somado ao realizado daquele
+        serviço (na categoria correspondente — material/mão de obra/outros).
+      - O restante (filhos não vinculados) é rateado entre os demais
+        serviços proporcionalmente ao ``valor_orcado``; quando não há
+        orçado, aplica rateio uniforme.
+      - Serviços com ``override_realizado_manual=True`` nunca são
+        sobrescritos (nem por vínculo direto nem por rateio).
     """
     try:
         from models import (
@@ -116,54 +132,74 @@ def recalcular_obra(obra_id: int, admin_id=None) -> bool:
         if not svcs:
             return True
 
-        # Total agregado por categoria normalizada para a obra
+        svc_ids = {s.id for s in svcs}
+
+        # Soma todos os filhos da obra agrupados por (servico, categoria),
+        # incluindo os não vinculados (NULL).
         q = (
             db.session.query(
+                GestaoCustoFilho.obra_servico_custo_id,
                 GestaoCustoPai.tipo_categoria,
                 sqlfunc.coalesce(sqlfunc.sum(GestaoCustoFilho.valor), 0),
             )
             .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
             .filter(GestaoCustoFilho.obra_id == obra_id)
-            .group_by(GestaoCustoPai.tipo_categoria)
+            .group_by(
+                GestaoCustoFilho.obra_servico_custo_id,
+                GestaoCustoPai.tipo_categoria,
+            )
         )
         if admin_id is not None:
             q = q.filter(GestaoCustoPai.admin_id == admin_id)
 
-        tot_material = 0.0
-        tot_mao_obra = 0.0
-        tot_outros = 0.0
-        for cat, total in q.all():
-            v = _f(total)
-            if (cat or '').upper() in _CATEGORIA_FATURAMENTO_DIRETO:
+        # direto[svc_id] = {'material':.., 'mao_obra':.., 'outros':..}
+        direto: dict[int, dict[str, float]] = {
+            sid: {'material': 0.0, 'mao_obra': 0.0, 'outros': 0.0}
+            for sid in svc_ids
+        }
+        rest_material = 0.0
+        rest_mao_obra = 0.0
+        rest_outros = 0.0
+
+        for svc_id, cat, total in q.all():
+            bucket = _bucket_categoria(cat)
+            if bucket is None:
                 continue
-            if (cat or '').upper() in _CATEGORIA_MATERIAL:
-                tot_material += v
-            elif (cat or '').upper() in _CATEGORIA_MAO_OBRA:
-                tot_mao_obra += v
+            v = _f(total)
+            # Vínculo válido apenas se o serviço pertence à obra (e tenant)
+            if svc_id and svc_id in svc_ids:
+                direto[svc_id][bucket] += v
             else:
-                tot_outros += v
+                if bucket == 'material':
+                    rest_material += v
+                elif bucket == 'mao_obra':
+                    rest_mao_obra += v
+                else:
+                    rest_outros += v
 
         alvos = [s for s in svcs if not s.override_realizado_manual]
+
+        # Filhos diretamente vinculados a serviços com override são ignorados
+        # (o serviço mantém o valor manual). Não jogamos esse valor no rateio
+        # para não distorcer os demais.
+
         if not alvos:
             db.session.flush()
             return True
 
-        # Estratégia proporcional ao valor_orcado quando disponível
         total_orcado = sum(_f(s.valor_orcado) for s in alvos)
         use_proporcional = total_orcado > 0
+        n_alvos = len(alvos)
 
-        if use_proporcional:
-            for s in alvos:
+        for s in alvos:
+            if use_proporcional:
                 w = _f(s.valor_orcado) / total_orcado
-                s.realizado_material = Decimal(str(round(tot_material * w, 2)))
-                s.realizado_mao_obra = Decimal(str(round(tot_mao_obra * w, 2)))
-                s.realizado_outros = Decimal(str(round(tot_outros * w, 2)))
-        else:
-            n = max(len(alvos), 1)
-            for s in alvos:
-                s.realizado_material = Decimal(str(round(tot_material / n, 2)))
-                s.realizado_mao_obra = Decimal(str(round(tot_mao_obra / n, 2)))
-                s.realizado_outros = Decimal(str(round(tot_outros / n, 2)))
+            else:
+                w = 1.0 / n_alvos
+            d = direto.get(s.id, {'material': 0.0, 'mao_obra': 0.0, 'outros': 0.0})
+            s.realizado_material = Decimal(str(round(d['material'] + rest_material * w, 2)))
+            s.realizado_mao_obra = Decimal(str(round(d['mao_obra'] + rest_mao_obra * w, 2)))
+            s.realizado_outros = Decimal(str(round(d['outros'] + rest_outros * w, 2)))
         # Sem flush explícito: persiste no próximo flush do caller.
         return True
     except Exception as e:

@@ -535,10 +535,21 @@
                 <option value="">— Sem obra —</option>
               </select>
             </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold small text-uppercase text-muted">Serviço da obra</label>
+              <select class="form-select" name="obra_servico_custo_id" id="editFilhoServico" disabled>
+                <option value="">— Sem serviço (rateio automático) —</option>
+              </select>
+              <small class="text-muted">
+                Vincule este custo a um serviço para refletir no Realizado dele.
+                Caso não vincule, o valor será rateado entre os serviços da obra.
+              </small>
+            </div>
           </div>
           <div class="alert alert-info mt-3 mb-0 small">
             <i class="fas fa-info-circle me-1"></i>
-            O total do agrupador será recalculado automaticamente.
+            O total do agrupador e o realizado dos serviços serão recalculados
+            automaticamente.
           </div>
         </div>
         <div class="modal-footer">
@@ -690,10 +701,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 const podeEditar = !!json.pode_editar;
+                // Mapa de serviços por obra para popular o modal de edição
+                window.SERVICOS_POR_OBRA = json.servicos_por_obra || {};
                 html += `<table class="table table-sm mb-0" style="font-size:.85rem">
                   <thead class="table-light">
                     <tr>
-                      <th>Data</th><th>Descrição</th><th>Obra</th>
+                      <th>Data</th><th>Descrição</th><th>Obra</th><th>Serviço</th>
                       <th class="text-end">Valor</th><th>Origem</th>
                       <th class="text-center" style="width:90px">Ações</th>
                     </tr>
@@ -701,6 +714,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 let total = 0;
                 json.itens.forEach(f => {
                     total += f.valor;
+                    const servicoCell = f.servico_nome
+                        ? `<small class="text-primary"><i class="fas fa-link fa-xs me-1"></i>${f.servico_nome}</small>`
+                        : `<small class="text-muted fst-italic">— rateio —</small>`;
                     const acoes = podeEditar
                         ? `<div class="btn-group btn-group-sm" role="group">
                              <button type="button" class="btn btn-outline-primary py-0 px-2 btn-edit-filho"
@@ -709,7 +725,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                      data-data="${f.data_iso}"
                                      data-descricao="${(f.descricao||'').replace(/"/g,'&quot;')}"
                                      data-valor="${f.valor.toFixed(2)}"
-                                     data-obra-id="${f.obra_id || ''}">
+                                     data-obra-id="${f.obra_id || ''}"
+                                     data-servico-id="${f.obra_servico_custo_id || ''}">
                                <i class="fas fa-pen fa-xs"></i>
                              </button>
                              <button type="button" class="btn btn-outline-danger py-0 px-2 btn-del-filho"
@@ -728,13 +745,14 @@ document.addEventListener('DOMContentLoaded', function () {
                       <td>${f.data}</td>
                       <td>${f.descricao}</td>
                       <td><small class="text-muted">${f.obra}</small></td>
+                      <td>${servicoCell}</td>
                       <td class="text-end fw-semibold">R$ ${f.valor.toFixed(2).replace('.',',')}</td>
                       <td><span class="badge bg-light text-dark border">${f.origem}</span></td>
                       <td class="text-center">${acoes}</td>
                     </tr>`;
                 });
                 html += `<tr class="table-light fw-bold">
-                  <td colspan="3" class="text-end">Total</td>
+                  <td colspan="4" class="text-end">Total</td>
                   <td class="text-end">R$ ${total.toFixed(2).replace('.',',')}</td>
                   <td colspan="2"></td></tr>`;
                 html += '</tbody></table>';
@@ -753,6 +771,40 @@ window.OBRAS_LIST = [
 {% endfor %}
 ];
 
+// Cache global de serviços por obra (preenchido sob demanda).
+window.SERVICOS_POR_OBRA = window.SERVICOS_POR_OBRA || {};
+window._servicosFetched = window._servicosFetched || {};
+
+async function _carregarServicosObraAjax(selectEl, obraId, selectedId) {
+    if (!obraId) {
+        _preencherServicosSelect(selectEl, '', '');
+        return;
+    }
+    if (window.SERVICOS_POR_OBRA[obraId]) {
+        _preencherServicosSelect(selectEl, obraId, selectedId);
+        return;
+    }
+    if (window._servicosFetched[obraId]) {
+        _preencherServicosSelect(selectEl, obraId, selectedId);
+        return;
+    }
+    selectEl.disabled = true;
+    selectEl.innerHTML = '<option value="">Carregando…</option>';
+    try {
+        const res = await fetch(`/gestao-custos/obra/${obraId}/servicos`);
+        const json = await res.json();
+        if (json.status === 'ok') {
+            window.SERVICOS_POR_OBRA[obraId] = json.servicos || [];
+        } else {
+            window.SERVICOS_POR_OBRA[obraId] = [];
+        }
+    } catch (e) {
+        window.SERVICOS_POR_OBRA[obraId] = [];
+    }
+    window._servicosFetched[obraId] = true;
+    _preencherServicosSelect(selectEl, obraId, selectedId);
+}
+
 function _preencherObrasSelect(selectEl, selectedId) {
     selectEl.innerHTML = '<option value="">— Sem obra —</option>';
     window.OBRAS_LIST.forEach(o => {
@@ -760,6 +812,23 @@ function _preencherObrasSelect(selectEl, selectedId) {
         opt.value = o.id;
         opt.textContent = o.nome;
         if (String(o.id) === String(selectedId)) opt.selected = true;
+        selectEl.appendChild(opt);
+    });
+}
+
+function _preencherServicosSelect(selectEl, obraId, selectedId) {
+    selectEl.innerHTML = '<option value="">— Sem serviço (rateio automático) —</option>';
+    const lista = (window.SERVICOS_POR_OBRA || {})[obraId] || [];
+    if (!obraId || lista.length === 0) {
+        selectEl.disabled = true;
+        return;
+    }
+    selectEl.disabled = false;
+    lista.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.nome;
+        if (String(s.id) === String(selectedId)) opt.selected = true;
         selectEl.appendChild(opt);
     });
 }
@@ -781,7 +850,10 @@ document.addEventListener('click', async function(ev) {
         document.getElementById('editFilhoData').value = editBtn.dataset.data;
         document.getElementById('editFilhoDesc').value = editBtn.dataset.descricao;
         document.getElementById('editFilhoValor').value = editBtn.dataset.valor;
-        _preencherObrasSelect(document.getElementById('editFilhoObra'), editBtn.dataset.obraId);
+        const obraSel = document.getElementById('editFilhoObra');
+        const svcSel = document.getElementById('editFilhoServico');
+        _preencherObrasSelect(obraSel, editBtn.dataset.obraId);
+        _carregarServicosObraAjax(svcSel, editBtn.dataset.obraId, editBtn.dataset.servicoId);
         new bootstrap.Modal(document.getElementById('modalEditarFilho')).show();
         return;
     }
@@ -813,6 +885,17 @@ document.addEventListener('click', async function(ev) {
             alert('Erro de rede: ' + e);
         }
         return;
+    }
+});
+
+// Reage à mudança de obra: refaz a lista de serviços disponíveis.
+document.addEventListener('DOMContentLoaded', function () {
+    const obraSel = document.getElementById('editFilhoObra');
+    const svcSel = document.getElementById('editFilhoServico');
+    if (obraSel && svcSel) {
+        obraSel.addEventListener('change', function () {
+            _carregarServicosObraAjax(svcSel, obraSel.value, '');
+        });
     }
 });
 

@@ -4415,12 +4415,19 @@ class GestaoCustoFilho(db.Model):
     valor = db.Column(db.Numeric(15, 2), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
+    obra_servico_custo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra_servico_custo.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     origem_tabela = db.Column(db.String(80), nullable=True)
     origem_id = db.Column(db.Integer, nullable=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra', foreign_keys=[obra_id])
+    obra_servico_custo = db.relationship('ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
 
     def __repr__(self):
         return f'<GestaoCustoFilho pai={self.pai_id} R${self.valor} {self.descricao[:30]}>'
