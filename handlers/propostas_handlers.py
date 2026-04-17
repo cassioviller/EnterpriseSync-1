@@ -178,11 +178,10 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         logger.info(f"✅ Conta a receber criada: R$ {float(valor_total):.2f} - Vencimento: {data_vencimento.strftime('%d/%m/%Y')}")
 
         # 4. Task #82: propagar para obra (ItemMedicaoComercial → ObraServicoCusto)
-        try:
-            _propagar_proposta_para_obra(proposta_id, admin_id)
-        except Exception as e_prop:
-            logger.error(f"#82: erro ao propagar proposta {proposta_id} para obra: {e_prop}", exc_info=True)
-            # Não derruba a transação principal — propagação é opcional
+        # Propagação é MANDATÓRIA — se falhar, a aprovação inteira é revertida
+        # pelo except externo. Isso garante o ciclo proposta → custos para
+        # qualquer admin que use o catálogo. Caller pode tratar o ValueError.
+        _propagar_proposta_para_obra(proposta_id, admin_id)
 
         # Commit das alterações
         db.session.commit()

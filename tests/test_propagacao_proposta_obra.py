@@ -123,6 +123,72 @@ def test_propagacao_cria_itens_e_custos(setup_obra_proposta):
         f'valor_orcado deve herdar valor_comercial; obtido {osc_alpha.valor_orcado}'
 
 
+def test_handle_proposta_aprovada_propagacao_falha_aborta_tudo(monkeypatch):
+    """Garantia: se propagação falhar, handle_proposta_aprovada faz rollback
+    completo (não cria ContaReceber órfã)."""
+    from handlers import propostas_handlers as ph
+    from models import ContaReceber
+
+    with app.app_context():
+        u = Usuario.query.filter_by(tipo_usuario='ADMIN').first() or Usuario.query.first()
+        if u is None:
+            pytest.skip('Sem usuário admin no banco')
+        aid = u.id
+        obra = Obra.query.filter_by(admin_id=aid).first()
+        if not obra:
+            pytest.skip('Sem obra para tenant — teste pula')
+
+        proposta = Proposta(
+            admin_id=aid,
+            numero=f'__T82F-{datetime.utcnow().strftime("%H%M%S%f")}',
+            cliente_nome='Cliente Falha #82',
+            obra_id=obra.id,
+            valor_total=Decimal('500.00'),
+            status='APROVADA',
+        )
+        db.session.add(proposta)
+        db.session.commit()
+        proposta_id = proposta.id
+
+        cr_antes = ContaReceber.query.filter_by(
+            admin_id=aid, origem_tipo='PROPOSTA', origem_id=proposta_id
+        ).count()
+
+        # Força propagação a explodir
+        def _boom(*a, **kw):
+            raise RuntimeError('falha simulada na propagação')
+
+        monkeypatch.setattr(ph, '_propagar_proposta_para_obra', _boom)
+
+        try:
+            ph.handle_proposta_aprovada(
+                {
+                    'proposta_id': proposta_id,
+                    'cliente_nome': 'Cliente Falha #82',
+                    'cliente_cpf_cnpj': '',
+                    'obra_id': obra.id,
+                    'valor_total': 500.00,
+                    'data_vencimento': (date.today()).isoformat(),
+                    'data_aprovacao': date.today().isoformat(),
+                },
+                aid,
+            )
+
+            cr_depois = ContaReceber.query.filter_by(
+                admin_id=aid, origem_tipo='PROPOSTA', origem_id=proposta_id
+            ).count()
+            assert cr_depois == cr_antes, (
+                'ContaReceber não deve ser criada quando propagação falha (rollback completo)'
+            )
+        finally:
+            # Cleanup — remove proposta criada
+            ContaReceber.query.filter_by(
+                admin_id=aid, origem_tipo='PROPOSTA', origem_id=proposta_id
+            ).delete(synchronize_session=False)
+            Proposta.query.filter_by(id=proposta_id).delete(synchronize_session=False)
+            db.session.commit()
+
+
 def test_propagacao_idempotente_por_proposta_item_id(setup_obra_proposta):
     ctx = setup_obra_proposta
     aid = ctx['admin_id']
