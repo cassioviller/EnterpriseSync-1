@@ -316,8 +316,7 @@ ul.cron-tree .node-sub > .node-label {
             </a>
             <div class="d-flex gap-2 ms-auto">
                 <button type="button" id="btnSalvarPreconfig"
-                        class="btn btn-outline-primary"
-                        formaction="{{ url_for('propostas.salvar_cronograma_default', id=proposta.id) }}">
+                        class="btn btn-outline-primary">
                     <i class="fas fa-save me-1"></i>
                     Salvar pré-configuração (sem aprovar)
                 </button>
@@ -327,6 +326,13 @@ ul.cron-tree .node-sub > .node-label {
                 </button>
             </div>
         </div>
+    </form>
+
+    {# Form auxiliar para POST de pré-configuração — JS preenche e submete #}
+    <form id="formPreconfig" method="POST"
+          action="{{ url_for('propostas.salvar_cronograma_default', id=proposta.id) }}"
+          style="display:none;">
+        <input type="hidden" name="cronograma_marcado_json" id="preconfigJson" value="">
     </form>
 </div>
 
@@ -470,10 +476,9 @@ function _serializeNode(card, originalNode, liElement) {
     };
 }
 
-document.getElementById('formAprovar').addEventListener('submit', function(ev) {
-    // Construir JSON final a partir da árvore server + estado do DOM
+function _construirArvoreFinal() {
     const cards = document.querySelectorAll('.tree-card');
-    const out = arvoreServer.map((item, idx) => {
+    return arvoreServer.map((item, idx) => {
         const card = cards[idx];
         const raiz = card.querySelector('.chk-raiz');
         const marcadoRaiz = raiz ? raiz.checked : !!item.marcado;
@@ -494,7 +499,16 @@ document.getElementById('formAprovar').addEventListener('submit', function(ev) {
             filhos: filhosOut,
         };
     });
-    document.getElementById('cronogramaJson').value = JSON.stringify(out);
+}
+
+document.getElementById('formAprovar').addEventListener('submit', function(ev) {
+    document.getElementById('cronogramaJson').value = JSON.stringify(_construirArvoreFinal());
+});
+
+// Task #102 rev4: botão "Salvar pré-configuração" — POST sem aprovar
+document.getElementById('btnSalvarPreconfig').addEventListener('click', function() {
+    document.getElementById('preconfigJson').value = JSON.stringify(_construirArvoreFinal());
+    document.getElementById('formPreconfig').submit();
 });
 
 _recalcular();

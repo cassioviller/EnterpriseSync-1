@@ -1060,6 +1060,29 @@ def cronograma_revisar(id):
     )
 
 
+@propostas_bp.route('/<int:id>/cronograma-preview', methods=['GET'])
+@login_required
+@admin_required
+def cronograma_preview_json(id):
+    """Task #102 (rev4) — endpoint JSON dedicado que retorna a árvore
+    consolidada (Serviço→Grupo→Subatividade) derivada dos templates dos
+    serviços vinculados aos itens da proposta. Útil para integrações,
+    testes e portal cliente. Aplica snapshot de `cronograma_default_json`
+    se já houver pré-configuração salva.
+    """
+    admin_id = get_admin_id()
+    proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    from services.cronograma_proposta import montar_arvore_preview
+    arvore = montar_arvore_preview(proposta, admin_id)
+    return jsonify({
+        'status': 'ok',
+        'proposta_id': proposta.id,
+        'proposta_numero': proposta.numero,
+        'tem_preconfig': bool(proposta.cronograma_default_json),
+        'arvore': arvore,
+    })
+
+
 @propostas_bp.route('/<int:id>/cronograma-default', methods=['POST'])
 @login_required
 @admin_required

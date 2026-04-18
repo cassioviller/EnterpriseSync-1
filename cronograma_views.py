@@ -65,6 +65,9 @@ def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> d
         'percentual_concluido': t.percentual_concluido or 0.0,
         'percentual_planejado': round(percentual_planejado, 1),
         'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
+        # Task #102: marcador para o front exibir aviso ao editar/excluir tarefas
+        # geradas automaticamente pela aprovação de proposta.
+        'gerada_por_proposta_item_id': getattr(t, 'gerada_por_proposta_item_id', None),
     }
 
 

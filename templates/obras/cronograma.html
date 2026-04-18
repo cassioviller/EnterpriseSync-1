@@ -1514,7 +1514,7 @@ function abrirEditar(tarefaId) {
   // Delete button
   document.getElementById('ed_btn_del').onclick = () => {
     bootstrap.Offcanvas.getInstance(document.getElementById('offcanvasEditar'))?.hide();
-    excluirTarefa(t.id, t.nome_tarefa);
+    excluirTarefa(t.id, t.nome_tarefa, !!t.gerada_por_proposta_item_id);
   };
 
   bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvasEditar')).show();
