@@ -356,6 +356,71 @@ class CronogramaAprovacaoRunner:
         self._assert(antes == depois,
                      f'contagem inalterada {antes}→{depois}')
 
+    def teste_free_text_sem_servico_id(self):
+        """Task #102 — PropostaItem livre (sem servico_id) deve aparecer
+        no preview marcado como sem_template (não bloqueia aprovação)."""
+        novo_item = PropostaItem(
+            admin_id=self.admin.id,
+            proposta_id=self.proposta.id,
+            item_numero=99,
+            descricao='Descrição livre sem serviço vinculado',
+            quantidade=Decimal('1'),
+            unidade='un',
+            preco_unitario=Decimal('500.00'),
+            ordem=99,
+            servico_id=None,  # FREE-TEXT
+        )
+        db.session.add(novo_item)
+        db.session.flush()
+
+        arvore = montar_arvore_preview(self.proposta, self.admin.id)
+        livre = next((e for e in arvore if e['proposta_item_id'] == novo_item.id), None)
+        self._assert(livre is not None, 'free-text item aparece no preview')
+        if livre:
+            self._assert(livre['sem_template'] is True, 'free-text item marcado como sem_template')
+            self._assert(livre['servico_id'] is None, 'free-text item tem servico_id=None')
+            self._assert(livre['marcado'] is False, 'free-text item desmarcado por default')
+            self._assert(len(livre['filhos']) == 0, 'free-text item não tem filhos')
+
+        # Materializar não deve criar tarefas para o item livre
+        antes = TarefaCronograma.query.filter_by(obra_id=self.proposta.obra_id).count()
+        criadas = materializar_cronograma(
+            self.proposta, self.admin.id, self.proposta.obra_id, arvore_marcada=arvore
+        )
+        depois = TarefaCronograma.query.filter_by(obra_id=self.proposta.obra_id).count()
+        self._assert(depois == antes,
+                     f'free-text não cria tarefas extras ({antes}→{depois})')
+
+    def teste_portal_preconfig_replay(self):
+        """Task #102 rev4 — quando admin pré-configura cronograma
+        (cronograma_default_json), o preview reabre fielmente os overrides
+        de marcação/horas/duração (replay)."""
+        arvore = montar_arvore_preview(self.proposta, self.admin.id)
+        # Edita: marca raiz, desmarca a primeira folha, ajusta horas da 2a
+        if not arvore or not arvore[0]['filhos']:
+            self._assert(False, 'precondição: árvore tem filhos')
+            return
+        grupo = arvore[0]['filhos'][0]
+        if len(grupo['filhos']) < 2:
+            self._assert(False, 'precondição: grupo tem 2 folhas')
+            return
+        grupo['filhos'][0]['marcado'] = False
+        grupo['filhos'][1]['horas_estimadas'] = 12.5
+        grupo['filhos'][1]['duracao_dias'] = 7
+        # Salva como preconfig
+        self.proposta.cronograma_default_json = arvore
+        db.session.commit()
+
+        # Re-monta o preview — deve aplicar os overrides
+        novo = montar_arvore_preview(self.proposta, self.admin.id)
+        f0 = novo[0]['filhos'][0]['filhos'][0]
+        f1 = novo[0]['filhos'][0]['filhos'][1]
+        self._assert(f0['marcado'] is False, 'preconfig replay: 1a folha desmarcada')
+        self._assert(abs(float(f1['horas_estimadas'] or 0) - 12.5) < 0.01,
+                     f'preconfig replay: 2a folha horas=12.5 (achou {f1["horas_estimadas"]})')
+        self._assert(int(f1['duracao_dias'] or 0) == 7,
+                     f'preconfig replay: 2a folha duracao=7 (achou {f1["duracao_dias"]})')
+
     def teardown(self):
         try:
             db.session.rollback()
@@ -372,6 +437,8 @@ class CronogramaAprovacaoRunner:
                 self.teste_dois_servicos_um_sem_template()
                 self.teste_desmarcar_grupo_omite_filhos()
                 self.teste_idempotencia()
+                self.teste_free_text_sem_servico_id()
+                self.teste_portal_preconfig_replay()
             finally:
                 self.teardown()
 

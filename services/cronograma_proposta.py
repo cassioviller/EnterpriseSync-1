@@ -92,8 +92,56 @@ def _expandir_template_para_arvore(template: CronogramaTemplate, admin_id: int) 
     return raizes
 
 
+def _index_preconfig(preconfig: list[dict] | None) -> dict:
+    """Indexa o snapshot `cronograma_default_json` por proposta_item_id e,
+    dentro de cada item, por (subatividade_mestre_id, nome) para reaplicação
+    de marcações/horas/dias quando o admin já pré-configurou."""
+    if not preconfig:
+        return {}
+    out = {}
+    for it in preconfig:
+        pi = it.get('proposta_item_id')
+        if pi is None:
+            continue
+        out[pi] = it
+    return out
+
+
+def _aplicar_overrides(no_default: dict, no_pre: dict | None) -> dict:
+    """Mescla um nó default da árvore com os campos do snapshot pré-configurado
+    (marcado, horas_estimadas, duracao_dias). Mantém demais campos do default."""
+    if not no_pre:
+        return no_default
+    if 'marcado' in no_pre:
+        no_default['marcado'] = bool(no_pre.get('marcado'))
+    if no_pre.get('horas_estimadas') is not None:
+        no_default['horas_estimadas'] = float(no_pre.get('horas_estimadas') or 0)
+    if no_pre.get('duracao_dias') is not None:
+        try:
+            no_default['duracao_dias'] = int(no_pre.get('duracao_dias') or 1)
+        except (TypeError, ValueError):
+            pass
+    # recursivo nos filhos casando por (subatividade_mestre_id, nome)
+    filhos_default = no_default.get('filhos') or []
+    filhos_pre = no_pre.get('filhos') or []
+    if filhos_default and filhos_pre:
+        # casamento por chave (subatividade_mestre_id, nome) — fallback ordem
+        key = lambda n: (n.get('subatividade_mestre_id'), n.get('nome'))
+        pre_idx = {key(n): n for n in filhos_pre}
+        for i, fd in enumerate(filhos_default):
+            fp = pre_idx.get(key(fd)) or (filhos_pre[i] if i < len(filhos_pre) else None)
+            _aplicar_overrides(fd, fp)
+    return no_default
+
+
 def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
     """Monta a árvore consolidada Serviço→Grupo→Subatividade da proposta.
+
+    Se `proposta.cronograma_default_json` estiver presente (admin já
+    pré-configurou via "Salvar pré-configuração"), os campos `marcado`,
+    `horas_estimadas` e `duracao_dias` do snapshot SÃO APLICADOS sobre a
+    árvore default — assim a tela de revisão e o portal cliente reabrem
+    fielmente a configuração salva.
 
     Estrutura retornada (lista, uma entrada por PropostaItem):
         [{
@@ -106,6 +154,7 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
             'filhos': [ ...nós do template... ]
         }, ...]
     """
+    preconfig_idx = _index_preconfig(getattr(proposta, 'cronograma_default_json', None))
     itens = (
         PropostaItem.query
         .filter_by(proposta_id=proposta.id)
@@ -134,20 +183,33 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
         tmpl = templates.get(servico.template_padrao_id) if (servico and servico.template_padrao_id) else None
 
         nome_serv = (servico.nome if servico else (it.descricao or f'Item {it.item_numero or it.id}'))
+        pre = preconfig_idx.get(it.id)
         if tmpl:
             filhos = _expandir_template_para_arvore(tmpl, admin_id)
-            horas_totais = _somar_horas_folhas(filhos)
-            arvore.append({
+            entrada = {
                 'proposta_item_id': it.id,
                 'servico_id': servico.id if servico else None,
                 'servico_nome': nome_serv,
                 'template_id': tmpl.id,
                 'template_nome': tmpl.nome,
                 'sem_template': False,
-                'horas_totais_estimadas': horas_totais,
+                'horas_totais_estimadas': 0.0,  # será recalculado após overrides
                 'marcado': True,
                 'filhos': filhos,
-            })
+            }
+            if pre:
+                # Mescla overrides nas folhas/grupos e na raiz
+                if 'marcado' in pre:
+                    entrada['marcado'] = bool(pre.get('marcado'))
+                pre_filhos = pre.get('filhos') or []
+                if pre_filhos and filhos:
+                    key = lambda n: (n.get('subatividade_mestre_id'), n.get('nome'))
+                    pre_idx = {key(n): n for n in pre_filhos}
+                    for i, fd in enumerate(filhos):
+                        fp = pre_idx.get(key(fd)) or (pre_filhos[i] if i < len(pre_filhos) else None)
+                        _aplicar_overrides(fd, fp)
+            entrada['horas_totais_estimadas'] = _somar_horas_folhas(filhos)
+            arvore.append(entrada)
         else:
             arvore.append({
                 'proposta_item_id': it.id,
@@ -157,7 +219,7 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
                 'template_nome': None,
                 'sem_template': True,
                 'horas_totais_estimadas': 0.0,
-                'marcado': False,
+                'marcado': bool(pre.get('marcado')) if pre else False,
                 'filhos': [],
             })
     return arvore

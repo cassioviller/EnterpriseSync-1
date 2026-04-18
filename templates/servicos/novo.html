@@ -242,17 +242,37 @@
                         Template padrão de cronograma
                     </label>
                     <div class="input-group">
-                        <select class="form-control form-control-modern" id="template_padrao_id" name="template_padrao_id">
+                        <select class="form-control form-control-modern" id="template_padrao_id" name="template_padrao_id"
+                                onchange="atualizarLinkEditarTemplate(this.value)">
                             <option value="">— Sem template (cliente preencherá manualmente) —</option>
                             {% for tpl in templates_cronograma or [] %}
                                 <option value="{{ tpl.id }}">{{ tpl.nome }}</option>
                             {% endfor %}
                         </select>
+                        <a id="lnk_editar_template" href="#"
+                           class="btn btn-outline-secondary disabled" target="_blank"
+                           title="Editar template selecionado"
+                           data-base-url="{{ url_for('cronograma.editar_template', template_id=0).rsplit('/', 1)[0] }}/">
+                            <i class="fas fa-pen-to-square"></i>
+                        </a>
                         <a href="{{ url_for('cronograma.novo_template') }}"
                            class="btn btn-outline-primary" target="_blank" title="Criar novo template de cronograma">
                             <i class="fas fa-plus"></i>
                         </a>
                     </div>
+                    <script>
+                    function atualizarLinkEditarTemplate(val) {
+                        const lnk = document.getElementById('lnk_editar_template');
+                        if (!lnk) return;
+                        if (val) {
+                            lnk.href = lnk.dataset.baseUrl + val;
+                            lnk.classList.remove('disabled');
+                        } else {
+                            lnk.href = '#';
+                            lnk.classList.add('disabled');
+                        }
+                    }
+                    </script>
                     <div class="help-text">
                         Quando uma proposta com este serviço for aprovada, este template gera automaticamente
                         as tarefas de cronograma (Serviço → Grupo → Subatividade) para revisão.
