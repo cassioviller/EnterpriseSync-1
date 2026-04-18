@@ -1075,7 +1075,14 @@ def aprovar(id):
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
 
-        # Task #102: persistir snapshot do cronograma antes do emit do evento
+        # Task #102 (atomicidade): NÃO setar status='APROVADA' antes do emit.
+        # propagar_proposta_para_obra (handler) cuida de: (a) criar Obra,
+        # (b) setar status='APROVADA', (c) commitar. Se essa cadeia falhar,
+        # nada é persistido como "aprovada". A única coisa pré-emit é o
+        # snapshot do cronograma (consumido pelo handler de cronograma) —
+        # se o emit falhar, este snapshot fica "órfão" no objeto não-commitado
+        # da sessão e é descartado pelo rollback abaixo.
+        status_anterior = proposta.status
         cronograma_json_raw = request.form.get('cronograma_marcado_json')
         if cronograma_json_raw:
             try:
@@ -1084,27 +1091,7 @@ def aprovar(id):
             except Exception as _e:
                 logger.warning(f"#102: cronograma_marcado_json inválido na aprovação {id}: {_e}")
 
-        proposta.status = 'APROVADA'
-        proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
-        
-        # Registrar no histórico
-        historico = PropostaHistorico(
-            proposta_id=proposta.id,
-            usuario_id=current_user.id,
-            acao='aprovada',
-            observacao=request.form.get('observacao', ''),
-            admin_id=admin_id
-        )
-        db.session.add(historico)
-        
-        # Commit transacional único (tudo ou nada)
-        db.session.commit()
-
-        # Task #94: emitir evento proposta_aprovada — handlers criam Obra,
-        # token_cliente, ItemMedicaoComercial e ObraServicoCusto (sem ContaReceber).
-        # Como EventManager.emit retorna True quando QUALQUER handler vinga,
-        # validamos pós-emit que a estrutura ficou de pé (proposta.obra_id setado
-        # pelo handler propagar_proposta_para_obra).
+        # Emite evento — handlers internamente commitam (criam Obra/IMC/OSC/Cronograma).
         from event_manager import EventManager
         EventManager.emit('proposta_aprovada', {
             'proposta_id': proposta.id,
@@ -1114,19 +1101,43 @@ def aprovar(id):
             'data_aprovacao': date.today().isoformat(),
         }, admin_id)
         db.session.refresh(proposta)
+
         if not proposta.obra_id:
+            # Falha completa: handler propagar_proposta_para_obra não conseguiu
+            # criar a obra. Se status mudou parcialmente, reverter.
             logger.error(
                 f"[ERROR] proposta_aprovada não materializou Obra para proposta {proposta.id} — "
-                "estrutura operacional incompleta"
+                "estrutura operacional incompleta; revertendo status para '{status_anterior}'"
             )
+            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
+                proposta.status = status_anterior
+                db.session.commit()
             flash(
-                'Proposta marcada como aprovada, mas houve falha na geração da obra/itens. '
-                'Verifique os logs e tente reaprovar.',
-                'warning',
+                'Falha ao aprovar a proposta: a obra/cronograma não pôde ser gerada. '
+                'O status foi mantido. Verifique os logs e tente novamente.',
+                'error',
             )
-        else:
-            flash('Proposta aprovada com sucesso!', 'success')
+            return redirect(url_for('propostas.visualizar', id=proposta.id))
 
+        # Sucesso: registrar histórico e data_resposta_cliente (pós-emit) num
+        # commit dedicado. Se o histórico falhar, a obra já existe — apenas
+        # logamos; não revertimos a aprovação (operacionalmente inconsistente).
+        try:
+            proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
+            historico = PropostaHistorico(
+                proposta_id=proposta.id,
+                usuario_id=current_user.id,
+                acao='aprovada',
+                observacao=request.form.get('observacao', ''),
+                admin_id=admin_id,
+            )
+            db.session.add(historico)
+            db.session.commit()
+        except Exception as _e_hist:
+            logger.warning(f"Aprovação OK mas falha ao registrar histórico: {_e_hist}")
+            db.session.rollback()
+
+        flash('Proposta aprovada com sucesso!', 'success')
         logger.debug(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
         return redirect(url_for('propostas.visualizar', id=proposta.id))
         
@@ -1229,15 +1240,12 @@ def aprovar_proposta_cliente(token):
     proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
     
     try:
-        proposta.status = 'APROVADA'
-        proposta.data_resposta_cliente = datetime.utcnow()
+        # Task #102 (atomicidade no portal cliente): NÃO commitar status antes do emit.
+        # propagar_proposta_para_obra é responsável por status + commit.
+        status_anterior = proposta.status
         proposta.observacoes_cliente = request.form.get('observacoes', '')
-        
-        db.session.commit()
 
-        # Task #94: emitir evento proposta_aprovada (mesmo handler do fluxo admin).
-        # Resolução de admin_id alinhada com portal_cliente() — Usuario.admin_id
-        # ou usuario.id como fallback, depois proposta.admin_id.
+        # Resolução de admin_id alinhada com portal_cliente().
         admin_id = None
         if proposta.criado_por:
             from models import Usuario
@@ -1254,12 +1262,13 @@ def aprovar_proposta_cliente(token):
                 f"Falha ao emitir proposta_aprovada (cliente): admin_id não resolvido "
                 f"para proposta {proposta.id}"
             )
+            db.session.rollback()
             flash(
-                'Proposta aprovada, mas a estrutura da obra não pôde ser gerada (tenant não identificado). '
+                'Não foi possível processar a aprovação no momento (tenant não identificado). '
                 'O administrador foi notificado.',
                 'warning',
             )
-            return render_template('propostas/aprovada.html', proposta=proposta)
+            return redirect(url_for('propostas.portal_cliente', token=token))
 
         from event_manager import EventManager
         EventManager.emit('proposta_aprovada', {
@@ -1270,18 +1279,36 @@ def aprovar_proposta_cliente(token):
             'data_aprovacao': date.today().isoformat(),
         }, admin_id)
         db.session.refresh(proposta)
+
         if not proposta.obra_id:
             _log.error(
-                f"proposta_aprovada (cliente) não materializou Obra para proposta {proposta.id}"
+                f"proposta_aprovada (cliente) não materializou Obra para proposta {proposta.id}; "
+                f"revertendo status para {status_anterior}"
             )
+            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
+                proposta.status = status_anterior
+                db.session.commit()
             flash(
-                'Proposta marcada como aprovada, mas houve falha na geração da obra/itens. '
-                'O administrador foi notificado.',
-                'warning',
+                'Houve uma falha ao gerar a obra. Sua aprovação não foi efetivada — tente novamente em instantes.',
+                'error',
             )
-        else:
-            flash('Proposta aprovada com sucesso!', 'success')
-        return render_template('propostas/aprovada.html', proposta=proposta)
+            return redirect(url_for('propostas.portal_cliente', token=token))
+
+        # Sucesso — registrar data_resposta_cliente e observações (commit auxiliar)
+        try:
+            proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        # Task #102: sinalizar para a tela "aprovada" se cronograma foi gerado
+        cronograma_pendente = not bool(proposta.cronograma_default_json)
+        flash('Proposta aprovada com sucesso!', 'success')
+        return render_template(
+            'propostas/aprovada.html',
+            proposta=proposta,
+            cronograma_pendente=cronograma_pendente,
+        )
         
     except Exception as e:
         db.session.rollback()

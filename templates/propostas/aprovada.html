@@ -1,0 +1,44 @@
+{% extends "base_completo.html" %}
+{% block title %}Proposta Aprovada{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width:720px">
+  <div class="card shadow-sm">
+    <div class="card-body text-center p-5">
+      <div class="mb-3" style="font-size:3.5rem; color:#28a745">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <h2 class="fw-bold mb-3">Proposta Aprovada!</h2>
+      <p class="text-muted">
+        Sua aprovação para a proposta <strong>#{{ proposta.numero }}</strong> foi registrada.
+      </p>
+
+      {# Task #102: aviso quando o cronograma do contrato ainda não foi materializado #}
+      {% if cronograma_pendente %}
+      <div class="alert alert-warning mt-4 text-start" role="alert">
+        <h6 class="alert-heading mb-2">
+          <i class="fas fa-clock me-2"></i>Cronograma do contrato em finalização
+        </h6>
+        <p class="mb-1 small">
+          O cronograma detalhado dos serviços contratados está sendo gerado automaticamente
+          a partir dos templates vinculados. Em alguns instantes ele estará disponível no
+          portal da obra para acompanhamento.
+        </p>
+        <p class="mb-0 small text-muted">
+          Se após alguns minutos ainda não aparecer, entre em contato com o nosso time —
+          o administrador foi notificado.
+        </p>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-4 text-start" role="alert">
+        <i class="fas fa-tasks me-2"></i>
+        O cronograma do contrato foi gerado e está disponível no portal da obra.
+      </div>
+      {% endif %}
+
+      <div class="mt-4 text-muted small">
+        Nossa equipe entrará em contato em breve com os próximos passos.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

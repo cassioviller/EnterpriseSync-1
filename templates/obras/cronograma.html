@@ -1452,6 +1452,17 @@ function abrirEditar(tarefaId) {
   const t = tarefas.find(x => x.id === tarefaId);
   if (!t) return;
 
+  // Task #102: aviso ao editar tarefa originada de aprovação de proposta
+  if (t.gerada_por_proposta_item_id) {
+    const ok = confirm(
+      `⚠ A tarefa "${t.nome_tarefa}" foi gerada pela aprovação de uma proposta (📋 do contrato).\n\n` +
+      `Alterar nome, duração ou datas pode descalibrar pesos da medição quinzenal e\n` +
+      `divergir do escopo contratado com o cliente.\n\n` +
+      `Deseja continuar a edição?`
+    );
+    if (!ok) return;
+  }
+
   document.getElementById('ed_id').value      = t.id;
   document.getElementById('ed_nome').value     = t.nome_tarefa;
   document.getElementById('ed_duracao').value  = t.duracao_dias;

@@ -303,9 +303,25 @@ def novo_servico():
                 'Outros'
             ]
         
+        # Task #102: carregar templates de cronograma para o select "Template padrão"
+        try:
+            from models import CronogramaTemplate
+            templates_cronograma = (
+                CronogramaTemplate.query
+                .filter_by(admin_id=admin_id, ativo=True)
+                .order_by(CronogramaTemplate.nome.asc())
+                .all()
+            )
+        except Exception:
+            templates_cronograma = []
+
         # Verificar se template existe, senão usar inline
         try:
-            return render_template('servicos/novo.html', categorias=categorias)
+            return render_template(
+                'servicos/novo.html',
+                categorias=categorias,
+                templates_cronograma=templates_cronograma,
+            )
         except Exception as template_error:
             logger.warning(f"⚠️ Template servicos/novo.html não encontrado: {template_error}")
             logger.info("🔄 Usando template inline como fallback")

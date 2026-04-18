@@ -235,6 +235,29 @@
                               rows="3" placeholder="Descreva o serviço de forma detalhada..."></textarea>
                     <div class="help-text">Descrição técnica do serviço (opcional)</div>
                 </div>
+
+                {# Task #102: vincular template padrão de cronograma — usado na aprovação da proposta #}
+                <div class="mb-3">
+                    <label for="template_padrao_id" class="form-label fw-bold">
+                        Template padrão de cronograma
+                    </label>
+                    <div class="input-group">
+                        <select class="form-control form-control-modern" id="template_padrao_id" name="template_padrao_id">
+                            <option value="">— Sem template (cliente preencherá manualmente) —</option>
+                            {% for tpl in templates_cronograma or [] %}
+                                <option value="{{ tpl.id }}">{{ tpl.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <a href="{{ url_for('templates_cronograma.novo') if 'templates_cronograma.novo' in (current_app.view_functions or {}) else '#' }}"
+                           class="btn btn-outline-primary" target="_blank" title="Criar novo template">
+                            <i class="fas fa-plus"></i>
+                        </a>
+                    </div>
+                    <div class="help-text">
+                        Quando uma proposta com este serviço for aprovada, este template gera automaticamente
+                        as tarefas de cronograma (Serviço → Grupo → Subatividade) para revisão.
+                    </div>
+                </div>
             </div>
         </div>
 

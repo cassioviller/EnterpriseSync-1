@@ -1,0 +1,20 @@
+{% extends "base_completo.html" %}
+{% block title %}Proposta Rejeitada{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width:720px">
+  <div class="card shadow-sm">
+    <div class="card-body text-center p-5">
+      <div class="mb-3" style="font-size:3.5rem; color:#6c757d">
+        <i class="fas fa-times-circle"></i>
+      </div>
+      <h2 class="fw-bold mb-3">Proposta Rejeitada</h2>
+      <p class="text-muted">
+        Sua resposta para a proposta <strong>#{{ proposta.numero }}</strong> foi registrada.
+      </p>
+      <div class="mt-4 text-muted small">
+        Obrigado pelo retorno. Entraremos em contato em breve.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
