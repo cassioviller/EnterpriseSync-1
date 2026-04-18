@@ -571,6 +571,18 @@ def criar_servico():
             flash(f'Serviço "{nome}" já existe', 'error')
             return redirect(url_for('servicos_crud.index'))
             
+        # Task #102: Template padrão de cronograma (opcional)
+        template_padrao_id_raw = request.form.get('template_padrao_id') or ''
+        template_padrao_id = None
+        if template_padrao_id_raw.strip():
+            try:
+                tpid = int(template_padrao_id_raw)
+                from models import CronogramaTemplate as _CT
+                if _CT.query.filter_by(id=tpid, admin_id=admin_id).first():
+                    template_padrao_id = tpid
+            except (ValueError, TypeError):
+                template_padrao_id = None
+
         # Criar novo serviço
         novo_servico = Servico(
             nome=nome,
@@ -581,6 +593,7 @@ def criar_servico():
             custo_unitario=custo_unitario,
             complexidade=complexidade,
             requer_especializacao=requer_especializacao,
+            template_padrao_id=template_padrao_id,
             admin_id=admin_id,
             ativo=True
         )
@@ -690,10 +703,23 @@ def editar_servico(servico_id):
         
         logger.info(f"✅ Serviço carregado: {servico.nome} com {len(subatividades)} subatividades")
         
+        # Task #102: lista de templates do tenant para o select de "template padrão"
+        try:
+            from models import CronogramaTemplate as _CT
+            templates_cronograma = (
+                _CT.query
+                .filter_by(admin_id=admin_id, ativo=True)
+                .order_by(_CT.nome)
+                .all()
+            )
+        except Exception:
+            templates_cronograma = []
+
         return render_template('servicos/editar.html',
                              servico=servico,
                              subatividades=subatividades,
-                             categorias=categorias)
+                             categorias=categorias,
+                             templates_cronograma=templates_cronograma)
         
     except Exception as e:
         logger.error(f"❌ Erro ao editar serviço: {str(e)}")
@@ -734,6 +760,20 @@ def atualizar_servico(servico_id):
         servico.nome = nome
         servico.descricao = descricao
         servico.categoria = categoria
+
+        # Task #102: Template padrão de cronograma (opcional)
+        template_padrao_id_raw = request.form.get('template_padrao_id') or ''
+        if template_padrao_id_raw.strip():
+            try:
+                tpid = int(template_padrao_id_raw)
+                from models import CronogramaTemplate as _CT
+                if _CT.query.filter_by(id=tpid, admin_id=admin_id).first():
+                    servico.template_padrao_id = tpid
+            except (ValueError, TypeError):
+                pass
+        else:
+            servico.template_padrao_id = None
+
         servico.updated_at = datetime.utcnow()
         
         # Atualizar subatividades

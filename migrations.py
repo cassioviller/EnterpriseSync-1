@@ -3824,6 +3824,7 @@ def executar_migracoes():
             (122, "Task #82 — ItemMedicaoComercial.proposta_item_id (dedupe determinístico de propagação)", migration_122_item_medicao_proposta_item_id),
             (123, "Task #82 — ComposicaoServico.unidade (snapshot da unidade do insumo)", migration_123_composicao_servico_unidade),
             (124, "Task #89 — Snapshot de cálculo paramétrico em PropostaItem e ItemMedicaoComercial", migration_124_snapshot_calculo_parametrico),
+            (125, "Task #102 — Cronograma automático na aprovação (servico.template_padrao_id, propostas.cronograma_default_json, tarefa_cronograma.gerada_por_proposta_item_id)", migration_125_cronograma_automatico_aprovacao),
         ]
         
         # Executar cada migração com rastreamento
@@ -10070,4 +10071,70 @@ def migration_124_snapshot_calculo_parametrico():
             except Exception:
                 pass
         logging.error(f"Migration 124 falhou: {e}")
+        raise
+
+
+def migration_125_cronograma_automatico_aprovacao():
+    """Migration 125 (Task #102): habilita cronograma automático na aprovação
+    de proposta.
+
+    Colunas adicionadas (todas NULL — backward compatible):
+        servico.template_padrao_id              FK → cronograma_template(id) ON DELETE SET NULL
+        propostas_comerciais.cronograma_default_json  JSONB
+        tarefa_cronograma.gerada_por_proposta_item_id FK → proposta_itens(id) ON DELETE SET NULL
+
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        connection.set_isolation_level(0)  # AUTOCOMMIT
+        cursor = connection.cursor()
+        cursor.execute("""
+        DO $$
+        BEGIN
+            -- servico.template_padrao_id
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='servico') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='servico' AND column_name='template_padrao_id') THEN
+                    ALTER TABLE servico
+                        ADD COLUMN template_padrao_id INTEGER NULL
+                        REFERENCES cronograma_template(id) ON DELETE SET NULL;
+                    CREATE INDEX IF NOT EXISTS idx_servico_template_padrao
+                        ON servico(template_padrao_id);
+                END IF;
+            END IF;
+
+            -- propostas_comerciais.cronograma_default_json
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='propostas_comerciais') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='propostas_comerciais' AND column_name='cronograma_default_json') THEN
+                    ALTER TABLE propostas_comerciais
+                        ADD COLUMN cronograma_default_json JSONB NULL;
+                END IF;
+            END IF;
+
+            -- tarefa_cronograma.gerada_por_proposta_item_id
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='tarefa_cronograma') THEN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name='tarefa_cronograma' AND column_name='gerada_por_proposta_item_id') THEN
+                    ALTER TABLE tarefa_cronograma
+                        ADD COLUMN gerada_por_proposta_item_id INTEGER NULL
+                        REFERENCES proposta_itens(id) ON DELETE SET NULL;
+                    CREATE INDEX IF NOT EXISTS idx_tarefa_cron_gerada_por_pi
+                        ON tarefa_cronograma(gerada_por_proposta_item_id);
+                END IF;
+            END IF;
+        END$$;
+        """)
+        cursor.close()
+        connection.close()
+        logging.info("Migration 125: Task #102 cronograma automático OK")
+    except Exception as e:
+        if connection:
+            try:
+                connection.close()
+            except Exception:
+                pass
+        logging.error(f"Migration 125 falhou: {e}")
         raise

@@ -1041,17 +1041,49 @@ def deletar(id):
         flash(f'Erro ao excluir proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
 
+@propostas_bp.route('/<int:id>/cronograma-revisar', methods=['GET'])
+@login_required
+@admin_required
+def cronograma_revisar(id):
+    """Task #102 — exibe a árvore consolidada (Serviço→Grupo→Subatividade)
+    derivada dos templates vinculados aos serviços. Admin pode marcar/desmarcar
+    nós antes de aprovar.
+    """
+    admin_id = get_admin_id()
+    proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    from services.cronograma_proposta import montar_arvore_preview
+    arvore = montar_arvore_preview(proposta, admin_id)
+    return render_template(
+        'propostas/cronograma_revisar.html',
+        proposta=proposta,
+        arvore=arvore,
+    )
+
+
 @propostas_bp.route('/aprovar/<int:id>', methods=['POST'])
 @login_required
 @admin_required
 def aprovar(id):
     """Aprovar proposta — Task #94: emite evento proposta_aprovada para
     materializar Obra + IMC + OSC (sem criar ContaReceber).
+
+    Task #102: aceita campo `cronograma_marcado_json` (JSON da árvore revisada);
+    quando presente, é persistido em `Proposta.cronograma_default_json` e usado
+    pelo handler para materializar TarefaCronograma.
     """
     try:
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
-        
+
+        # Task #102: persistir snapshot do cronograma antes do emit do evento
+        cronograma_json_raw = request.form.get('cronograma_marcado_json')
+        if cronograma_json_raw:
+            try:
+                import json as _json
+                proposta.cronograma_default_json = _json.loads(cronograma_json_raw)
+            except Exception as _e:
+                logger.warning(f"#102: cronograma_marcado_json inválido na aprovação {id}: {_e}")
+
         proposta.status = 'APROVADA'
         proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
         

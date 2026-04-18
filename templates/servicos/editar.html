@@ -120,6 +120,42 @@
                 <label for="descricao" class="form-label" style="font-weight: 600; color: #495057;">Descrição</label>
                 <textarea class="form-control" id="descricao" name="descricao" rows="3">{{ servico.descricao or '' }}</textarea>
             </div>
+
+            {# Task #102 — Template padrão de cronograma #}
+            <div class="mb-3">
+                <label for="template_padrao_id" class="form-label" style="font-weight: 600; color: #495057;">
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    Template padrão de cronograma
+                    <small class="text-muted fw-normal">(usado automaticamente ao aprovar propostas com este serviço)</small>
+                </label>
+                <div class="input-group">
+                    <select class="form-select" id="template_padrao_id" name="template_padrao_id">
+                        <option value="">— Nenhum (sem cronograma automático) —</option>
+                        {% for t in (templates_cronograma or []) %}
+                        <option value="{{ t.id }}" {% if servico.template_padrao_id == t.id %}selected{% endif %}>
+                            {{ t.nome }}{% if t.categoria %} — {{ t.categoria }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if servico.template_padrao_id %}
+                    <a href="{{ url_for('cronograma.editar_template', template_id=servico.template_padrao_id) }}"
+                       target="_blank"
+                       class="btn btn-outline-warning"
+                       title="Editar template selecionado">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('cronograma.novo_template') }}"
+                       target="_blank"
+                       class="btn btn-outline-primary"
+                       title="Criar novo template de cronograma">
+                        <i class="fas fa-plus"></i> Novo
+                    </a>
+                </div>
+                <small class="text-muted">
+                    Ao aprovar uma proposta, o admin poderá revisar e marcar/desmarcar grupos e subatividades antes de gerar o cronograma da obra.
+                </small>
+            </div>
         </div>
         
         <!-- Subatividades -->

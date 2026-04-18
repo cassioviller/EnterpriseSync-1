@@ -119,6 +119,20 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
                 f"propagação proposta→obra continua."
             )
             _propagar_proposta_para_obra(proposta_id, admin_id)
+            # Task #102: cronograma também é materializado em propostas zeradas.
+            try:
+                from models import Proposta as _Proposta
+                from services.cronograma_proposta import materializar_cronograma
+                _proposta_obj = _Proposta.query.filter_by(
+                    id=proposta_id, admin_id=admin_id
+                ).first()
+                if _proposta_obj and _proposta_obj.obra_id:
+                    materializar_cronograma(
+                        _proposta_obj, admin_id, _proposta_obj.obra_id, arvore_marcada=None
+                    )
+            except Exception as _e:
+                logger.error(f"#102: falha ao materializar cronograma (proposta zerada) {proposta_id}: {_e}")
+                raise
             db.session.commit()
             return
 
@@ -173,6 +187,25 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         # pelo except externo. Isso garante o ciclo proposta → custos para
         # qualquer admin que use o catálogo. Caller pode tratar o ValueError.
         _propagar_proposta_para_obra(proposta_id, admin_id)
+
+        # Task #102: materializar cronograma automático na obra a partir do
+        # snapshot revisado (`Proposta.cronograma_default_json`) ou — caso
+        # ausente — a partir da árvore default derivada de
+        # `Servico.template_padrao_id`. Idempotente: tarefas já criadas para
+        # um proposta_item_id são puladas. Falha aqui também reverte tudo.
+        try:
+            from models import Proposta as _Proposta
+            from services.cronograma_proposta import materializar_cronograma
+            _proposta_obj = _Proposta.query.filter_by(
+                id=proposta_id, admin_id=admin_id
+            ).first()
+            if _proposta_obj and _proposta_obj.obra_id:
+                materializar_cronograma(
+                    _proposta_obj, admin_id, _proposta_obj.obra_id, arvore_marcada=None
+                )
+        except Exception as _e:
+            logger.error(f"#102: falha ao materializar cronograma da proposta {proposta_id}: {_e}")
+            raise
 
         # Commit das alterações
         db.session.commit()

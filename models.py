@@ -387,6 +387,14 @@ class Servico(db.Model):
     imposto_pct = db.Column(db.Numeric(5, 2), nullable=True)
     margem_lucro_pct = db.Column(db.Numeric(5, 2), nullable=True)
     preco_venda_unitario = db.Column(db.Numeric(15, 2), default=0)
+    # Task #102 — Template padrão de cronograma (usado na aprovação da proposta)
+    template_padrao_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_template.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    template_padrao = db.relationship('CronogramaTemplate', foreign_keys=[template_padrao_id])
     # Multi-tenant obrigatório
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -2702,7 +2710,12 @@ class Proposta(db.Model):
     # Integração com Obras
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     convertida_em_obra = db.Column(db.Boolean, default=False)
-    
+
+    # Task #102 — snapshot do cronograma revisado pelo admin antes de aprovar.
+    # Estrutura: lista de Serviços, cada um com filhos (grupos/subatividades),
+    # com flag `marcado` por nó. Usado pelo portal do cliente como fonte da verdade.
+    cronograma_default_json = db.Column(JSON, nullable=True)
+
     # Relacionamentos
     cliente = db.relationship('Cliente', backref='propostas')
     itens = db.relationship('PropostaItem', backref='proposta', lazy=True, cascade='all, delete-orphan')
@@ -4303,6 +4316,13 @@ class TarefaCronograma(db.Model):
     )
     # Migration 117: separa cronograma INTERNO (False) do cronograma do CLIENTE (True)
     is_cliente = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    # Task #102 (Migration 125) — rastreia tarefas geradas pela aprovação de proposta
+    gerada_por_proposta_item_id = db.Column(
+        db.Integer,
+        db.ForeignKey('proposta_itens.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

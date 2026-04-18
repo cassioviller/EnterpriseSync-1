@@ -1,0 +1,375 @@
+"""
+Task #102 — Cronograma automático na aprovação da proposta.
+
+Funções:
+    - montar_arvore_preview(proposta, admin_id): monta a árvore consolidada
+      Serviço → Grupo → Subatividade derivada do CronogramaTemplate vinculado a
+      cada Serviço (Servico.template_padrao_id), com flag `marcado=True` por
+      padrão.
+    - materializar_cronograma(proposta, admin_id, obra_id, arvore_marcada=None):
+      cria TarefaCronograma (3 níveis) + ItemMedicaoCronogramaTarefa com peso
+      por horas para cada nó marcado. Idempotente: nunca duplica para o mesmo
+      proposta_item_id (chave gerada_por_proposta_item_id).
+    - tem_conteudo_para_revisar(proposta, admin_id): True se ao menos um
+      PropostaItem tem servico com template_padrao_id.
+
+Decisões:
+    - Peso é calculado por `duracao_estimada_horas` da SubatividadeMestre
+      vinculada (fallback: divisão igual entre folhas marcadas).
+    - PropostaItem sem servico/template é exibido na árvore como
+      `sem_template=True` e marcação default = False (não materializa tarefa).
+    - Atomicidade é responsabilidade do caller (handler) — funções operam
+      via db.session sem commit explícito.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import date, timedelta
+from decimal import Decimal
+from typing import Any
+
+from app import db
+from models import (
+    CronogramaTemplate,
+    CronogramaTemplateItem,
+    ItemMedicaoComercial,
+    ItemMedicaoCronogramaTarefa,
+    PropostaItem,
+    Servico,
+    SubatividadeMestre,
+    TarefaCronograma,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers internos
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _expandir_template_para_arvore(template: CronogramaTemplate, admin_id: int) -> list[dict]:
+    """Converte itens do template em árvore de nós {grupo|subatividade}.
+    Cada nó traz: nome, tipo, subatividade_mestre_id, duracao_dias,
+    horas_estimadas, quantidade_prevista, unidade_medida, marcado=True, filhos.
+    """
+    itens = list(template.itens)
+    by_id: dict[int, dict] = {}
+    for item in itens:
+        sub = item.subatividade if item.subatividade and item.subatividade.admin_id == admin_id else None
+        horas = float(sub.duracao_estimada_horas) if (sub and sub.duracao_estimada_horas) else 0.0
+        by_id[item.id] = {
+            'template_item_id': item.id,
+            'tipo': (sub.tipo if sub and getattr(sub, 'tipo', None) else 'subatividade'),
+            'nome': item.nome_tarefa,
+            'subatividade_mestre_id': sub.id if sub else None,
+            'duracao_dias': item.duracao_dias or 1,
+            'horas_estimadas': horas,
+            'quantidade_prevista': item.quantidade_prevista,
+            'unidade_medida': sub.unidade_medida if sub else None,
+            'responsavel': item.responsavel or 'empresa',
+            'marcado': True,
+            'parent_item_id': getattr(item, 'parent_item_id', None),
+            'ordem': item.ordem or 0,
+            'filhos': [],
+        }
+    raizes: list[dict] = []
+    for node in by_id.values():
+        pid = node['parent_item_id']
+        if pid and pid in by_id:
+            by_id[pid]['filhos'].append(node)
+        else:
+            raizes.append(node)
+
+    def _ord(nodes: list[dict]) -> None:
+        nodes.sort(key=lambda n: n['ordem'])
+        for n in nodes:
+            _ord(n['filhos'])
+            if n['filhos']:
+                n['tipo'] = 'grupo'
+
+    _ord(raizes)
+    return raizes
+
+
+def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
+    """Monta a árvore consolidada Serviço→Grupo→Subatividade da proposta.
+
+    Estrutura retornada (lista, uma entrada por PropostaItem):
+        [{
+            'proposta_item_id': int,
+            'servico_id': int | None,
+            'servico_nome': str,
+            'sem_template': bool,   # True quando não há template para materializar
+            'horas_totais_estimadas': float,
+            'marcado': bool,
+            'filhos': [ ...nós do template... ]
+        }, ...]
+    """
+    itens = (
+        PropostaItem.query
+        .filter_by(proposta_id=proposta.id)
+        .order_by(PropostaItem.ordem.asc(), PropostaItem.id.asc())
+        .all()
+    )
+    if not itens:
+        return []
+
+    # Cache servico → template
+    serv_ids = {it.servico_id for it in itens if it.servico_id}
+    servicos = {s.id: s for s in Servico.query.filter(
+        Servico.id.in_(serv_ids), Servico.admin_id == admin_id
+    ).all()} if serv_ids else {}
+
+    tmpl_ids = {s.template_padrao_id for s in servicos.values() if s.template_padrao_id}
+    templates = {t.id: t for t in CronogramaTemplate.query.filter(
+        CronogramaTemplate.id.in_(tmpl_ids),
+        CronogramaTemplate.admin_id == admin_id,
+        CronogramaTemplate.ativo == True,  # noqa: E712
+    ).all()} if tmpl_ids else {}
+
+    arvore: list[dict] = []
+    for it in itens:
+        servico = servicos.get(it.servico_id) if it.servico_id else None
+        tmpl = templates.get(servico.template_padrao_id) if (servico and servico.template_padrao_id) else None
+
+        nome_serv = (servico.nome if servico else (it.descricao or f'Item {it.item_numero or it.id}'))
+        if tmpl:
+            filhos = _expandir_template_para_arvore(tmpl, admin_id)
+            horas_totais = _somar_horas_folhas(filhos)
+            arvore.append({
+                'proposta_item_id': it.id,
+                'servico_id': servico.id if servico else None,
+                'servico_nome': nome_serv,
+                'template_id': tmpl.id,
+                'template_nome': tmpl.nome,
+                'sem_template': False,
+                'horas_totais_estimadas': horas_totais,
+                'marcado': True,
+                'filhos': filhos,
+            })
+        else:
+            arvore.append({
+                'proposta_item_id': it.id,
+                'servico_id': it.servico_id,
+                'servico_nome': nome_serv,
+                'template_id': None,
+                'template_nome': None,
+                'sem_template': True,
+                'horas_totais_estimadas': 0.0,
+                'marcado': False,
+                'filhos': [],
+            })
+    return arvore
+
+
+def _somar_horas_folhas(nos: list[dict]) -> float:
+    """Soma horas_estimadas considerando apenas folhas (subatividades)."""
+    total = 0.0
+    for n in nos:
+        if n['filhos']:
+            total += _somar_horas_folhas(n['filhos'])
+        else:
+            total += float(n.get('horas_estimadas') or 0)
+    return total
+
+
+def tem_conteudo_para_revisar(proposta, admin_id: int) -> bool:
+    """True se há pelo menos um PropostaItem cujo servico tem template_padrao_id."""
+    q = (
+        db.session.query(Servico.id)
+        .join(PropostaItem, PropostaItem.servico_id == Servico.id)
+        .filter(
+            PropostaItem.proposta_id == proposta.id,
+            Servico.admin_id == admin_id,
+            Servico.template_padrao_id.isnot(None),
+        )
+        .limit(1)
+    )
+    return q.first() is not None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Materialização
+# ─────────────────────────────────────────────────────────────────────────────
+
+def materializar_cronograma(
+    proposta,
+    admin_id: int,
+    obra_id: int,
+    arvore_marcada: list[dict] | None = None,
+) -> int:
+    """Materializa árvore de cronograma + pesos como TarefaCronograma +
+    ItemMedicaoCronogramaTarefa para a obra.
+
+    Idempotente por proposta_item_id: se já existe TarefaCronograma com
+    `gerada_por_proposta_item_id == it.id`, todo o subtree dessa proposta é
+    pulado (no-op).
+
+    Retorna número de TarefaCronograma criadas.
+    """
+    if arvore_marcada is None:
+        # Fallback: usa cronograma_default_json salvo na proposta, ou
+        # constrói árvore default (tudo marcado).
+        arvore_marcada = (
+            getattr(proposta, 'cronograma_default_json', None)
+            or montar_arvore_preview(proposta, admin_id)
+        )
+    if not arvore_marcada:
+        return 0
+
+    # Idempotência: descobrir quais proposta_item_id já materializados
+    pi_ids = [n.get('proposta_item_id') for n in arvore_marcada if n.get('proposta_item_id')]
+    if pi_ids:
+        ja_existem = {
+            row[0] for row in db.session.query(
+                TarefaCronograma.gerada_por_proposta_item_id
+            ).filter(
+                TarefaCronograma.obra_id == obra_id,
+                TarefaCronograma.admin_id == admin_id,
+                TarefaCronograma.gerada_por_proposta_item_id.in_(pi_ids),
+            ).all()
+        }
+    else:
+        ja_existem = set()
+
+    # Mapa proposta_item_id -> ItemMedicaoComercial (para vincular pesos)
+    imc_por_pi = {
+        imc.proposta_item_id: imc for imc in ItemMedicaoComercial.query.filter(
+            ItemMedicaoComercial.obra_id == obra_id,
+            ItemMedicaoComercial.admin_id == admin_id,
+            ItemMedicaoComercial.proposta_item_id.in_(pi_ids) if pi_ids else False,
+        ).all()
+    }
+
+    # Offset de ordem para não colidir com tarefas existentes (mesmo modo)
+    max_ordem = (
+        db.session.query(db.func.max(TarefaCronograma.ordem))
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .scalar()
+    ) or 0
+    ordem_seq = [int(max_ordem) + 10]
+
+    data_corrente = date.today()
+    total_criadas = 0
+
+    for nivel0 in arvore_marcada:
+        pi_id = nivel0.get('proposta_item_id')
+        if not nivel0.get('marcado'):
+            continue
+        if nivel0.get('sem_template'):
+            continue
+        if pi_id in ja_existem:
+            logger.info(f"#102: proposta_item_id={pi_id} já materializado em obra={obra_id} — skip")
+            continue
+
+        # Nível 0 = nó raiz "Serviço" (grupo agregador)
+        tarefa_serv = TarefaCronograma(
+            obra_id=obra_id,
+            nome_tarefa=nivel0.get('servico_nome') or 'Serviço',
+            duracao_dias=1,
+            data_inicio=data_corrente,
+            tarefa_pai_id=None,
+            ordem=ordem_seq[0],
+            admin_id=admin_id,
+            is_cliente=False,
+            responsavel='empresa',
+            gerada_por_proposta_item_id=pi_id,
+        )
+        ordem_seq[0] += 10
+        db.session.add(tarefa_serv)
+        db.session.flush()
+        total_criadas += 1
+
+        # IMC para vincular pesos
+        imc = imc_por_pi.get(pi_id)
+
+        # Coletar folhas marcadas com horas para cálculo de peso
+        folhas_marcadas: list[tuple[TarefaCronograma, float]] = []
+
+        # Recursivo nos filhos (grupos e subatividades)
+        def _rec(nos: list[dict], pai_id: int, data_ref: date) -> date:
+            nonlocal total_criadas
+            data_atual = data_ref
+            for n in nos:
+                if not n.get('marcado'):
+                    continue
+                is_grupo = bool(n.get('filhos'))
+                sub_id = n.get('subatividade_mestre_id')
+                # validar sub pertence ao tenant
+                if sub_id:
+                    sm = SubatividadeMestre.query.filter_by(id=sub_id, admin_id=admin_id).first()
+                    if not sm:
+                        sub_id = None
+                duracao = max(1, int(n.get('duracao_dias') or 1))
+                qty = n.get('quantidade_prevista')
+                tarefa = TarefaCronograma(
+                    obra_id=obra_id,
+                    nome_tarefa=n.get('nome') or 'Tarefa',
+                    duracao_dias=duracao,
+                    data_inicio=data_atual,
+                    quantidade_total=None if is_grupo else qty,
+                    unidade_medida=None if is_grupo else n.get('unidade_medida'),
+                    responsavel=n.get('responsavel') or 'empresa',
+                    tarefa_pai_id=pai_id,
+                    ordem=ordem_seq[0],
+                    admin_id=admin_id,
+                    is_cliente=False,
+                    subatividade_mestre_id=sub_id,
+                    gerada_por_proposta_item_id=pi_id,
+                )
+                ordem_seq[0] += 10
+                db.session.add(tarefa)
+                db.session.flush()
+                total_criadas += 1
+
+                if is_grupo:
+                    _rec(n['filhos'], tarefa.id, data_atual)
+                    # Avança data pela soma da duração das folhas
+                    total_dias_filhos = sum(
+                        max(1, int(f.get('duracao_dias') or 1))
+                        for f in n['filhos'] if f.get('marcado')
+                    )
+                    data_atual = data_atual + timedelta(days=max(total_dias_filhos, duracao))
+                else:
+                    horas = float(n.get('horas_estimadas') or 0)
+                    folhas_marcadas.append((tarefa, horas))
+                    data_atual = data_atual + timedelta(days=duracao)
+            return data_atual
+
+        data_corrente = _rec(nivel0.get('filhos') or [], tarefa_serv.id, data_corrente)
+
+        # Atualizar duracao do nó-raiz para somatório
+        if folhas_marcadas:
+            try:
+                duracao_total = sum(int(t.duracao_dias or 1) for t, _ in folhas_marcadas)
+                tarefa_serv.duracao_dias = max(1, duracao_total)
+            except Exception:
+                pass
+
+        # ── Vincular pesos via ItemMedicaoCronogramaTarefa ──
+        if imc and folhas_marcadas:
+            soma_horas = sum(h for _, h in folhas_marcadas)
+            n_folhas = len(folhas_marcadas)
+            for tarefa_folha, horas in folhas_marcadas:
+                if soma_horas > 0:
+                    peso = (horas / soma_horas) * 100.0
+                else:
+                    peso = 100.0 / n_folhas
+                # Arredonda para 2 decimais
+                peso_dec = Decimal(str(round(peso, 2)))
+                vinculo = ItemMedicaoCronogramaTarefa(
+                    item_medicao_id=imc.id,
+                    cronograma_tarefa_id=tarefa_folha.id,
+                    peso=peso_dec,
+                    admin_id=admin_id,
+                )
+                db.session.add(vinculo)
+
+    if total_criadas:
+        db.session.flush()
+        logger.info(
+            f"#102: {total_criadas} TarefaCronograma + pesos materializados "
+            f"para obra={obra_id} proposta={proposta.id}"
+        )
+    return total_criadas

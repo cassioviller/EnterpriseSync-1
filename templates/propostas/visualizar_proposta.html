@@ -61,9 +61,11 @@
                 <i class="fas fa-clock"></i> Em Análise
             </button>
             {% elif proposta.status == 'em_analise' %}
-            <button class="btn btn-success btn-sm" onclick="alterarStatus('aprovada')">
-                <i class="fas fa-check"></i> Aprovar
-            </button>
+            {# Task #102: aprovação passa pela tela de revisão do cronograma #}
+            <a href="{{ url_for('propostas.cronograma_revisar', id=proposta.id) }}"
+               class="btn btn-success btn-sm">
+                <i class="fas fa-check"></i> Revisar Cronograma e Aprovar
+            </a>
             <button class="btn btn-danger btn-sm" onclick="alterarStatus('rejeitada')">
                 <i class="fas fa-times"></i> Rejeitar
             </button>
