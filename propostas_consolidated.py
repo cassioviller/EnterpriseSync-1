@@ -1091,30 +1091,42 @@ def aprovar(id):
             except Exception as _e:
                 logger.warning(f"#102: cronograma_marcado_json inválido na aprovação {id}: {_e}")
 
-        # Emite evento — handlers internamente commitam (criam Obra/IMC/OSC/Cronograma).
+        # Emite evento em modo atômico — qualquer falha de handler é propagada
+        # e revertida pelo except externo (Task #102).
         from event_manager import EventManager
-        EventManager.emit('proposta_aprovada', {
-            'proposta_id': proposta.id,
-            'cliente_nome': proposta.cliente_nome,
-            'cliente_cpf_cnpj': None,
-            'valor_total': float(proposta.valor_total or 0),
-            'data_aprovacao': date.today().isoformat(),
-        }, admin_id)
+        try:
+            EventManager.emit('proposta_aprovada', {
+                'proposta_id': proposta.id,
+                'cliente_nome': proposta.cliente_nome,
+                'cliente_cpf_cnpj': None,
+                'valor_total': float(proposta.valor_total or 0),
+                'data_aprovacao': date.today().isoformat(),
+            }, admin_id, raise_on_error=True)
+        except Exception as _eh:
+            db.session.rollback()
+            # Reverter status se algum handler conseguiu commitar APROVADA antes
+            # da falha do próximo handler.
+            db.session.refresh(proposta)
+            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
+                proposta.status = status_anterior
+                db.session.commit()
+            logger.error(f"#102: aprovação atômica falhou — handler exception: {_eh}")
+            flash(
+                f'Falha ao aprovar a proposta: {_eh}. Status revertido.',
+                'error',
+            )
+            return redirect(url_for('propostas.visualizar', id=proposta.id))
         db.session.refresh(proposta)
 
         if not proposta.obra_id:
-            # Falha completa: handler propagar_proposta_para_obra não conseguiu
-            # criar a obra. Se status mudou parcialmente, reverter.
             logger.error(
-                f"[ERROR] proposta_aprovada não materializou Obra para proposta {proposta.id} — "
-                "estrutura operacional incompleta; revertendo status para '{status_anterior}'"
+                f"[ERROR] proposta_aprovada não materializou Obra para proposta {proposta.id}"
             )
             if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
                 proposta.status = status_anterior
                 db.session.commit()
             flash(
-                'Falha ao aprovar a proposta: a obra/cronograma não pôde ser gerada. '
-                'O status foi mantido. Verifique os logs e tente novamente.',
+                'Falha ao aprovar a proposta: a obra não pôde ser gerada. Status revertido.',
                 'error',
             )
             return redirect(url_for('propostas.visualizar', id=proposta.id))
@@ -1271,13 +1283,23 @@ def aprovar_proposta_cliente(token):
             return redirect(url_for('propostas.portal_cliente', token=token))
 
         from event_manager import EventManager
-        EventManager.emit('proposta_aprovada', {
-            'proposta_id': proposta.id,
-            'cliente_nome': proposta.cliente_nome,
-            'cliente_cpf_cnpj': None,
-            'valor_total': float(proposta.valor_total or 0),
-            'data_aprovacao': date.today().isoformat(),
-        }, admin_id)
+        try:
+            EventManager.emit('proposta_aprovada', {
+                'proposta_id': proposta.id,
+                'cliente_nome': proposta.cliente_nome,
+                'cliente_cpf_cnpj': None,
+                'valor_total': float(proposta.valor_total or 0),
+                'data_aprovacao': date.today().isoformat(),
+            }, admin_id, raise_on_error=True)
+        except Exception as _eh:
+            db.session.rollback()
+            db.session.refresh(proposta)
+            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
+                proposta.status = status_anterior
+                db.session.commit()
+            _log.error(f"#102: aprovação atômica (cliente) falhou: {_eh}")
+            flash('Houve uma falha ao processar sua aprovação. Tente novamente em instantes.', 'error')
+            return redirect(url_for('propostas.portal_cliente', token=token))
         db.session.refresh(proposta)
 
         if not proposta.obra_id:

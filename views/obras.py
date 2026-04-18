@@ -1778,8 +1778,27 @@ def detalhes_obra(id):
             logger.error(f"Erro nas notificações de orçamento: {_e_notif}")
             notificacoes_orcamento = []
 
+        # Task #102: detectar "cronograma pendente" — obra originada de proposta
+        # mas sem nenhuma TarefaCronograma com gerada_por_proposta_item_id setado.
+        cronograma_pendente = False
+        try:
+            if getattr(obra, 'proposta_origem_id', None):
+                from models import TarefaCronograma
+                _existe = (
+                    db.session.query(TarefaCronograma.id)
+                    .filter(
+                        TarefaCronograma.obra_id == obra.id,
+                        TarefaCronograma.admin_id == admin_id,
+                        TarefaCronograma.gerada_por_proposta_item_id.isnot(None),
+                    ).first()
+                )
+                cronograma_pendente = _existe is None
+        except Exception as _e_cp:
+            logger.warning(f"#102 cronograma_pendente check falhou: {_e_cp}")
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
+                             cronograma_pendente=cronograma_pendente,
                              resumo=resumo_custos,
                              notificacoes_orcamento=notificacoes_orcamento,
                              kpis=kpis_obra,

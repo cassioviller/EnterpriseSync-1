@@ -769,6 +769,25 @@
 {% block content %}
 <div class="obra-container" style="padding: 0;">
     <div class="container-fluid" style="padding: 0;">
+        {# Task #102: banner "cronograma pendente" — obra criada por aprovação
+           de proposta sem snapshot de cronograma revisado pelo admin.
+           Flag `cronograma_pendente` é injetada pela view. #}
+        {% if cronograma_pendente %}
+            <div class="alert alert-warning d-flex align-items-start gap-2 mb-0"
+                 style="border-radius:0; border-left:5px solid #f59e0b;">
+                <i class="fas fa-clock fa-lg mt-1"></i>
+                <div>
+                    <strong>Cronograma do contrato pendente.</strong>
+                    Esta obra foi criada pela aprovação de uma proposta, mas o cronograma
+                    automático ainda não foi gerado. Acesse a proposta de origem e use
+                    "Aprovar com Cronograma" ou crie tarefas manualmente abaixo.
+                    {% if obra.proposta_origem_id %}
+                    <a href="{{ url_for('propostas.visualizar', id=obra.proposta_origem_id) }}"
+                       class="alert-link ms-1">Abrir proposta #{{ obra.proposta_origem_id }}</a>.
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
         <!-- Header Principal da Obra -->
         <div class="obra-card" style="margin: 0; border-radius: 0;">
             <div class="obra-header-main">

@@ -25,8 +25,13 @@ class EventManager:
         logger.info(f"📝 Handler {handler.__name__} registrado para evento '{event_name}'")
     
     @classmethod
-    def emit(cls, event_name: str, data: dict, admin_id: int):
-        """Emitir evento para todos os handlers registrados"""
+    def emit(cls, event_name: str, data: dict, admin_id: int, raise_on_error: bool = False):
+        """Emitir evento para todos os handlers registrados.
+
+        Task #102: parâmetro `raise_on_error=True` propaga a primeira exceção
+        de handler para o caller (modo atômico). Default mantém comportamento
+        legado (engole exceções e retorna sucesso parcial).
+        """
         try:
             logger.info(f"🔔 EVENTO: {event_name} | Admin: {admin_id} | Data: {list(data.keys())}")
             
@@ -43,12 +48,16 @@ class EventManager:
                     logger.info(f"✅ Handler {handler.__name__} executado")
                 except Exception as e:
                     logger.error(f"❌ Erro no handler {handler.__name__}: {e}", exc_info=True)
+                    if raise_on_error:
+                        raise
             
             logger.info(f"📊 Evento {event_name}: {success_count}/{len(handlers)} handlers OK")
             return success_count > 0
             
         except Exception as e:
             logger.error(f"❌ Erro ao emitir evento {event_name}: {e}", exc_info=True)
+            if raise_on_error:
+                raise
             return False
     
     @classmethod
