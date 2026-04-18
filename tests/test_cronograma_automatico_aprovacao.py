@@ -222,6 +222,120 @@ class CronogramaAprovacaoRunner:
             self._assert(abs(soma - 100.0) < 0.5,
                          f'pesos somam ~100 (achou {soma})')
 
+    def teste_recalcular_datas_e_obra_seed(self):
+        """Verifica que recalcular_cronograma rodou: tarefas têm data_fim setada
+        e datas começam a partir de obra.data_inicio (não de date.today())."""
+        from models import Obra
+        obra = Obra.query.get(self.proposta.obra_id)
+        tarefas = TarefaCronograma.query.filter_by(
+            obra_id=self.proposta.obra_id, admin_id=self.admin.id,
+            gerada_por_proposta_item_id=self.proposta_item.id,
+        ).all()
+        com_fim = [t for t in tarefas if t.data_fim is not None]
+        self._assert(len(com_fim) >= 3, f'tarefas tem data_fim após recalcular ({len(com_fim)} de {len(tarefas)})')
+        if obra and obra.data_inicio:
+            datas_inicio = [t.data_inicio for t in tarefas if t.data_inicio]
+            min_inicio = min(datas_inicio) if datas_inicio else None
+            self._assert(
+                min_inicio is None or min_inicio >= obra.data_inicio,
+                f'datas iniciam em obra.data_inicio={obra.data_inicio} (mínimo={min_inicio})',
+            )
+
+    def teste_dois_servicos_um_sem_template(self):
+        """Adicionar 2º item à proposta: um Serviço SEM template_padrao_id.
+        Materializar de novo (proposta-item NOVO) → só o item com template gera tarefas;
+        item sem template é ignorado (sem_template=True na árvore)."""
+        suf = self._suffix()
+        servico_sem_tpl = Servico(
+            nome=f'Servico Sem Tpl {suf}',
+            categoria='Outros',
+            unidade_medida='unidade',
+            unidade_simbolo='un',
+            custo_unitario=50.0,
+            admin_id=self.admin.id,
+            ativo=True,
+            template_padrao_id=None,
+        )
+        db.session.add(servico_sem_tpl)
+        db.session.flush()
+
+        novo_item = PropostaItem(
+            admin_id=self.admin.id,
+            proposta_id=self.proposta.id,
+            item_numero=2,
+            descricao=servico_sem_tpl.nome,
+            quantidade=Decimal('1'),
+            unidade='un',
+            preco_unitario=Decimal('500.00'),
+            ordem=2,
+            servico_id=servico_sem_tpl.id,
+        )
+        db.session.add(novo_item)
+        db.session.commit()
+
+        # Preview agora deve ter 2 entradas, segunda com sem_template=True
+        arvore = montar_arvore_preview(self.proposta, self.admin.id)
+        self._assert(len(arvore) == 2, f'preview tem 2 entradas (achou {len(arvore)})')
+        sem_tpl = [n for n in arvore if n['sem_template']]
+        self._assert(len(sem_tpl) == 1, f'1 item marcado sem_template (achou {len(sem_tpl)})')
+        self._assert(sem_tpl[0]['marcado'] is False, 'item sem_template default=desmarcado')
+
+        # Materialização: apenas item com template — o outro é skipado
+        antes = TarefaCronograma.query.filter_by(
+            obra_id=self.proposta.obra_id, admin_id=self.admin.id,
+        ).count()
+        materializar_cronograma(
+            self.proposta, self.admin.id, self.proposta.obra_id, arvore_marcada=arvore
+        )
+        depois = TarefaCronograma.query.filter_by(
+            obra_id=self.proposta.obra_id, admin_id=self.admin.id,
+        ).count()
+        self._assert(antes == depois,
+                     f'item sem_template não criou tarefas extras ({antes}→{depois})')
+
+    def teste_desmarcar_grupo_omite_filhos(self):
+        """Cria proposta+item NOVO; chama materializar com a árvore default
+        mas desmarcando o grupo → 0 tarefas criadas para esse item."""
+        suf = self._suffix()
+        nova_prop = Proposta(
+            numero=f'P2{suf[:8]}',
+            cliente_nome='Cliente Desmarcar',
+            titulo='Teste desmarcar',
+            status='enviada',
+            admin_id=self.admin.id,
+            criado_por=self.admin.id,
+            valor_total=Decimal('500.00'),
+        )
+        db.session.add(nova_prop)
+        db.session.flush()
+        novo_item = PropostaItem(
+            admin_id=self.admin.id, proposta_id=nova_prop.id,
+            item_numero=1, descricao=self.servico.nome,
+            quantidade=Decimal('1'), unidade='un',
+            preco_unitario=Decimal('500.00'), ordem=1,
+            servico_id=self.servico.id,
+        )
+        db.session.add(novo_item)
+        db.session.commit()
+
+        arvore = montar_arvore_preview(nova_prop, self.admin.id)
+        # Desmarcar grupo (e subir nada): nenhum nó marcado em filhos
+        for n in arvore:
+            for f in n['filhos']:
+                f['marcado'] = False
+                for s in f.get('filhos', []):
+                    s['marcado'] = False
+        # Materializar — sem obra_id real, só verificamos que rotina não quebra e
+        # não cria nada além da raiz (que poderia ser pulada por não ter folhas).
+        # Atribuir obra_id dummy: usar a mesma obra existente para evitar criar nova.
+        criadas = materializar_cronograma(
+            nova_prop, self.admin.id, self.proposta.obra_id, arvore_marcada=arvore
+        )
+        # Apenas o nó-raiz "Serviço" pode ter sido criado (já que todos os filhos
+        # estão desmarcados, _rec retorna sem adicionar). Aceitamos 0 ou 1.
+        self._assert(criadas <= 1,
+                     f'desmarcar tudo cria no máximo a raiz (criadas={criadas})')
+
     def teste_idempotencia(self):
         antes = TarefaCronograma.query.filter_by(
             obra_id=self.proposta.obra_id,
@@ -250,6 +364,9 @@ class CronogramaAprovacaoRunner:
                 self.setup()
                 self.teste_arvore_preview()
                 self.teste_materializacao()
+                self.teste_recalcular_datas_e_obra_seed()
+                self.teste_dois_servicos_um_sem_template()
+                self.teste_desmarcar_grupo_omite_filhos()
                 self.teste_idempotencia()
             finally:
                 self.teardown()

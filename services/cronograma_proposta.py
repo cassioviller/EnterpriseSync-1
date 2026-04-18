@@ -250,7 +250,14 @@ def materializar_cronograma(
     ) or 0
     ordem_seq = [int(max_ordem) + 10]
 
-    data_corrente = date.today()
+    # Data inicial = obra.data_inicio (ou hoje); detalhamento de datas
+    # sequenciais é delegado a `utils.cronograma_engine.recalcular_cronograma`
+    # ao final desta função para respeitar calendário de empresa, predecessoras
+    # etc. Aqui apenas seedamos a data_inicio das folhas com a referência da obra.
+    from models import Obra as _Obra
+    _obra = _Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    data_corrente = (_obra.data_inicio if _obra and _obra.data_inicio else date.today())
+    data_seed = data_corrente
     total_criadas = 0
 
     for nivel0 in arvore_marcada:
@@ -268,7 +275,7 @@ def materializar_cronograma(
             obra_id=obra_id,
             nome_tarefa=nivel0.get('servico_nome') or 'Serviço',
             duracao_dias=1,
-            data_inicio=data_corrente,
+            data_inicio=data_seed,
             tarefa_pai_id=None,
             ordem=ordem_seq[0],
             admin_id=admin_id,
@@ -287,16 +294,17 @@ def materializar_cronograma(
         # Coletar folhas marcadas com horas para cálculo de peso
         folhas_marcadas: list[tuple[TarefaCronograma, float]] = []
 
-        # Recursivo nos filhos (grupos e subatividades)
-        def _rec(nos: list[dict], pai_id: int, data_ref: date) -> date:
+        # Recursivo nos filhos (grupos e subatividades).
+        # NOTA: data_inicio das folhas é setada apenas como SEED (igual à da
+        # obra). O cálculo sequencial real (respeitando calendário/predecessoras)
+        # é responsabilidade de `recalcular_cronograma` chamado ao final.
+        def _rec(nos: list[dict], pai_id: int) -> None:
             nonlocal total_criadas
-            data_atual = data_ref
             for n in nos:
                 if not n.get('marcado'):
                     continue
                 is_grupo = bool(n.get('filhos'))
                 sub_id = n.get('subatividade_mestre_id')
-                # validar sub pertence ao tenant
                 if sub_id:
                     sm = SubatividadeMestre.query.filter_by(id=sub_id, admin_id=admin_id).first()
                     if not sm:
@@ -307,7 +315,7 @@ def materializar_cronograma(
                     obra_id=obra_id,
                     nome_tarefa=n.get('nome') or 'Tarefa',
                     duracao_dias=duracao,
-                    data_inicio=data_atual,
+                    data_inicio=data_seed if not is_grupo else None,
                     quantidade_total=None if is_grupo else qty,
                     unidade_medida=None if is_grupo else n.get('unidade_medida'),
                     responsavel=n.get('responsavel') or 'empresa',
@@ -324,20 +332,12 @@ def materializar_cronograma(
                 total_criadas += 1
 
                 if is_grupo:
-                    _rec(n['filhos'], tarefa.id, data_atual)
-                    # Avança data pela soma da duração das folhas
-                    total_dias_filhos = sum(
-                        max(1, int(f.get('duracao_dias') or 1))
-                        for f in n['filhos'] if f.get('marcado')
-                    )
-                    data_atual = data_atual + timedelta(days=max(total_dias_filhos, duracao))
+                    _rec(n['filhos'], tarefa.id)
                 else:
                     horas = float(n.get('horas_estimadas') or 0)
                     folhas_marcadas.append((tarefa, horas))
-                    data_atual = data_atual + timedelta(days=duracao)
-            return data_atual
 
-        data_corrente = _rec(nivel0.get('filhos') or [], tarefa_serv.id, data_corrente)
+        _rec(nivel0.get('filhos') or [], tarefa_serv.id)
 
         # Atualizar duracao do nó-raiz para somatório
         if folhas_marcadas:
@@ -368,6 +368,16 @@ def materializar_cronograma(
 
     if total_criadas:
         db.session.flush()
+        # Recalcular datas via engine oficial (respeita calendário, predecessoras
+        # e propaga datas dos pais a partir das folhas).
+        try:
+            from utils.cronograma_engine import recalcular_cronograma
+            recalcular_cronograma(obra_id, admin_id, cliente=False)
+        except Exception as _e:
+            logger.warning(
+                f"#102: recalcular_cronograma falhou após materialização "
+                f"obra={obra_id}: {_e} — datas seed permanecem"
+            )
         logger.info(
             f"#102: {total_criadas} TarefaCronograma + pesos materializados "
             f"para obra={obra_id} proposta={proposta.id}"

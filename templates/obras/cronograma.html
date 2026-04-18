@@ -153,6 +153,14 @@
                         title="Duplo-clique para editar">
                     {{ t.nome_tarefa }}
                   </span>
+                  {% if t.gerada_por_proposta_item_id %}
+                  {# Task #102 — tarefa originada da aprovação de proposta #}
+                  <span class="badge bg-info text-dark ms-2"
+                        style="font-size:.65rem"
+                        title="Tarefa criada automaticamente pela aprovação de proposta. Editar/excluir afeta o cronograma do contrato.">
+                    📋 do contrato
+                  </span>
+                  {% endif %}
                 </div>
               </td>
 
@@ -284,8 +292,8 @@
                     <i class="fas fa-pen-to-square"></i>
                   </button>
                   <button class="btn-act btn-del"
-                          onclick="excluirTarefa({{ t.id }}, '{{ t.nome_tarefa | replace("'","") }}')"
-                          title="Excluir tarefa">
+                          onclick="excluirTarefa({{ t.id }}, '{{ t.nome_tarefa | replace("'","") }}', {{ 'true' if t.gerada_por_proposta_item_id else 'false' }})"
+                          title="{% if t.gerada_por_proposta_item_id %}⚠ Tarefa do contrato — exclusão impacta o cronograma da proposta{% else %}Excluir tarefa{% endif %}">
                     <i class="fas fa-trash-can"></i>
                   </button>
                 </div>
@@ -1622,8 +1630,15 @@ function adicionarLinhaTabela(t) {
 }
 
 // ── Excluir ──
-async function excluirTarefa(id, nome) {
-  if (!confirm(`Excluir a tarefa "${nome}"?\nEsta ação não pode ser desfeita.`)) return;
+async function excluirTarefa(id, nome, doContrato) {
+  // Task #102: confirmação extra para tarefas geradas por aprovação de proposta
+  let msg = `Excluir a tarefa "${nome}"?\nEsta ação não pode ser desfeita.`;
+  if (doContrato) {
+    msg = `⚠ ATENÇÃO: a tarefa "${nome}" foi gerada pela aprovação de uma proposta (📋 do contrato).\n\n` +
+          `Excluí-la pode descalibrar pesos da medição quinzenal e remover o vínculo contratual.\n\n` +
+          `Tem certeza que deseja excluir mesmo assim?`;
+  }
+  if (!confirm(msg)) return;
   try {
     const res = await fetch(`${URL_BASE}/tarefa/${id}${QS_CLIENTE}`, { method: 'DELETE' });
     const data = await res.json();
