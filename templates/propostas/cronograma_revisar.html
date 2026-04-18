@@ -2,6 +2,39 @@
 
 {% block title %}Revisar Cronograma — Proposta #{{ proposta.numero }} - SIGE{% endblock %}
 
+{# Task #102: macro definida no topo para evitar UndefinedError quando chamada
+   recursivamente dentro do {% block content %} mais abaixo. #}
+{% macro render_nodes(nodes, pi_id) %}
+    {% for n in nodes %}
+    <li class="{% if n.filhos %}node-grupo{% else %}node-sub{% endif %}"
+        data-tipo="{{ n.tipo }}"
+        data-horas="{{ n.horas_estimadas or 0 }}"
+        data-dias="{{ n.duracao_dias or 1 }}"
+        data-sub-id="{{ n.subatividade_mestre_id or '' }}">
+        <span class="node-label">
+            <input type="checkbox" class="form-check-input chk-node"
+                   data-pi-id="{{ pi_id }}"
+                   {% if n.marcado %}checked{% endif %}>
+            {% if n.filhos %}<i class="fas fa-folder-open me-1 text-primary"></i>
+            {% else %}<i class="fas fa-tasks me-1 text-muted"></i>{% endif %}
+            {{ n.nome }}
+            {% if n.horas_estimadas %}<span class="badge-horas">{{ '%.1f'|format(n.horas_estimadas) }}h</span>{% endif %}
+            {% if n.duracao_dias %}<span class="badge-dias">{{ n.duracao_dias }}d</span>{% endif %}
+            {% if n.quantidade_prevista %}
+            <span class="text-muted small ms-2">
+                qtd: {{ n.quantidade_prevista }}{% if n.unidade_medida %} {{ n.unidade_medida }}{% endif %}
+            </span>
+            {% endif %}
+        </span>
+        {% if n.filhos %}
+        <ul class="cron-tree">
+            {{ render_nodes(n.filhos, pi_id) }}
+        </ul>
+        {% endif %}
+    </li>
+    {% endfor %}
+{% endmacro %}
+
 {% block extra_css %}
 <style>
 .page-header-rev {
@@ -198,36 +231,7 @@ ul.cron-tree .node-sub > .node-label {
     </form>
 </div>
 
-{% macro render_nodes(nodes, pi_id) %}
-    {% for n in nodes %}
-    <li class="{% if n.filhos %}node-grupo{% else %}node-sub{% endif %}"
-        data-tipo="{{ n.tipo }}"
-        data-horas="{{ n.horas_estimadas or 0 }}"
-        data-dias="{{ n.duracao_dias or 1 }}"
-        data-sub-id="{{ n.subatividade_mestre_id or '' }}">
-        <span class="node-label">
-            <input type="checkbox" class="form-check-input chk-node"
-                   data-pi-id="{{ pi_id }}"
-                   {% if n.marcado %}checked{% endif %}>
-            {% if n.filhos %}<i class="fas fa-folder-open me-1 text-primary"></i>
-            {% else %}<i class="fas fa-tasks me-1 text-muted"></i>{% endif %}
-            {{ n.nome }}
-            {% if n.horas_estimadas %}<span class="badge-horas">{{ '%.1f'|format(n.horas_estimadas) }}h</span>{% endif %}
-            {% if n.duracao_dias %}<span class="badge-dias">{{ n.duracao_dias }}d</span>{% endif %}
-            {% if n.quantidade_prevista %}
-            <span class="text-muted small ms-2">
-                qtd: {{ n.quantidade_prevista }}{% if n.unidade_medida %} {{ n.unidade_medida }}{% endif %}
-            </span>
-            {% endif %}
-        </span>
-        {% if n.filhos %}
-        <ul class="cron-tree">
-            {{ render_nodes(n.filhos, pi_id) }}
-        </ul>
-        {% endif %}
-    </li>
-    {% endfor %}
-{% endmacro %}
+{# macro render_nodes movida para o topo do template #}
 
 {% endblock %}
 

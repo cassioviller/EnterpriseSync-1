@@ -163,6 +163,10 @@ class CronogramaAprovacaoRunner:
             self._assert(grupo['tipo'] == 'grupo', "tipo do nó com filhos é 'grupo'")
 
     def teste_materializacao(self):
+        # Task #102 (rev): handler só materializa se houver snapshot do admin.
+        # Simula a revisão: persiste cronograma_default_json antes do emit.
+        arvore_default = montar_arvore_preview(self.proposta, self.admin.id)
+        self.proposta.cronograma_default_json = arvore_default
         # Aprova a proposta — handler dispara propagação + materialização.
         self.proposta.status = 'aprovada'
         db.session.commit()

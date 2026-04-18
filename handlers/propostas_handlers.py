@@ -126,9 +126,19 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
                 _proposta_obj = _Proposta.query.filter_by(
                     id=proposta_id, admin_id=admin_id
                 ).first()
-                if _proposta_obj and _proposta_obj.obra_id:
+                # Task #102 (rev): só materializa quando há snapshot revisado
+                # pelo admin (cronograma_default_json). Se ausente (ex.: aprovação
+                # do cliente sem revisão prévia), a obra fica em estado
+                # "cronograma pendente" — admin completa depois.
+                if _proposta_obj and _proposta_obj.obra_id and _proposta_obj.cronograma_default_json:
                     materializar_cronograma(
-                        _proposta_obj, admin_id, _proposta_obj.obra_id, arvore_marcada=None
+                        _proposta_obj, admin_id, _proposta_obj.obra_id,
+                        arvore_marcada=_proposta_obj.cronograma_default_json,
+                    )
+                elif _proposta_obj and _proposta_obj.obra_id:
+                    logger.info(
+                        f"#102: proposta {proposta_id} aprovada SEM cronograma_default_json — "
+                        "obra criada em estado 'cronograma pendente'."
                     )
             except Exception as _e:
                 logger.error(f"#102: falha ao materializar cronograma (proposta zerada) {proposta_id}: {_e}")
@@ -199,9 +209,16 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
             _proposta_obj = _Proposta.query.filter_by(
                 id=proposta_id, admin_id=admin_id
             ).first()
-            if _proposta_obj and _proposta_obj.obra_id:
+            # Task #102 (rev): mesma regra — só materializa com snapshot revisado.
+            if _proposta_obj and _proposta_obj.obra_id and _proposta_obj.cronograma_default_json:
                 materializar_cronograma(
-                    _proposta_obj, admin_id, _proposta_obj.obra_id, arvore_marcada=None
+                    _proposta_obj, admin_id, _proposta_obj.obra_id,
+                    arvore_marcada=_proposta_obj.cronograma_default_json,
+                )
+            elif _proposta_obj and _proposta_obj.obra_id:
+                logger.info(
+                    f"#102: proposta {proposta_id} aprovada SEM cronograma_default_json — "
+                    "obra criada em estado 'cronograma pendente'."
                 )
         except Exception as _e:
             logger.error(f"#102: falha ao materializar cronograma da proposta {proposta_id}: {_e}")

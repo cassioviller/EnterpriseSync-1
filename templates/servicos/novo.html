@@ -248,8 +248,8 @@
                                 <option value="{{ tpl.id }}">{{ tpl.nome }}</option>
                             {% endfor %}
                         </select>
-                        <a href="{{ url_for('templates_cronograma.novo') if 'templates_cronograma.novo' in (current_app.view_functions or {}) else '#' }}"
-                           class="btn btn-outline-primary" target="_blank" title="Criar novo template">
+                        <a href="{{ url_for('cronograma.novo_template') }}"
+                           class="btn btn-outline-primary" target="_blank" title="Criar novo template de cronograma">
                             <i class="fas fa-plus"></i>
                         </a>
                     </div>

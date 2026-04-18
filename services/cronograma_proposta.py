@@ -369,15 +369,11 @@ def materializar_cronograma(
     if total_criadas:
         db.session.flush()
         # Recalcular datas via engine oficial (respeita calendário, predecessoras
-        # e propaga datas dos pais a partir das folhas).
-        try:
-            from utils.cronograma_engine import recalcular_cronograma
-            recalcular_cronograma(obra_id, admin_id, cliente=False)
-        except Exception as _e:
-            logger.warning(
-                f"#102: recalcular_cronograma falhou após materialização "
-                f"obra={obra_id}: {_e} — datas seed permanecem"
-            )
+        # e propaga datas dos pais a partir das folhas). Task #102 (rev):
+        # falha aqui DEVE propagar — sessão será revertida pelo caller, evitando
+        # cronograma persistido com datas seed inconsistentes.
+        from utils.cronograma_engine import recalcular_cronograma
+        recalcular_cronograma(obra_id, admin_id, cliente=False)
         logger.info(
             f"#102: {total_criadas} TarefaCronograma + pesos materializados "
             f"para obra={obra_id} proposta={proposta.id}"
