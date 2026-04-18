@@ -351,6 +351,19 @@ def materializar_cronograma(
         if imc and folhas_marcadas:
             soma_horas = sum(h for _, h in folhas_marcadas)
             n_folhas = len(folhas_marcadas)
+            if soma_horas <= 0:
+                # Task #102: aviso explícito quando NENHUMA folha marcada tem
+                # `duracao_estimada_horas` configurada — peso é distribuído
+                # igualmente entre as folhas (fallback). Operador deve revisar
+                # SubatividadeMestre para garantir cálculo de medição correto.
+                logger.warning(
+                    f"#102 FALLBACK: proposta_item_id={pi_id} (obra={obra_id}) "
+                    f"— {n_folhas} folha(s) sem horas estimadas; aplicando "
+                    f"divisão igual de peso (100/{n_folhas} = "
+                    f"{round(100.0 / n_folhas, 2)}%). Configure "
+                    f"SubatividadeMestre.duracao_estimada_horas para usar "
+                    f"peso ponderado por horas."
+                )
             for tarefa_folha, horas in folhas_marcadas:
                 if soma_horas > 0:
                     peso = (horas / soma_horas) * 100.0

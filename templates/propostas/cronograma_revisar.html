@@ -18,11 +18,26 @@
             {% if n.filhos %}<i class="fas fa-folder-open me-1 text-primary"></i>
             {% else %}<i class="fas fa-tasks me-1 text-muted"></i>{% endif %}
             {{ n.nome }}
-            {% if n.horas_estimadas %}<span class="badge-horas">{{ '%.1f'|format(n.horas_estimadas) }}h</span>{% endif %}
-            {% if n.duracao_dias %}<span class="badge-dias">{{ n.duracao_dias }}d</span>{% endif %}
             {% if n.quantidade_prevista %}
             <span class="text-muted small ms-2">
                 qtd: {{ n.quantidade_prevista }}{% if n.unidade_medida %} {{ n.unidade_medida }}{% endif %}
+            </span>
+            {% endif %}
+            {% if not n.filhos %}
+            {# Task #102 (rev4): edição inline de horas/duração nas folhas #}
+            <span class="inline-edit ms-2">
+                <label class="small text-muted">horas</label>
+                <input type="number" min="0" step="0.5"
+                       class="form-control form-control-sm inp-horas"
+                       value="{{ '%.1f'|format(n.horas_estimadas or 0) }}">
+                <label class="small text-muted ms-1">dur. (dias)</label>
+                <input type="number" min="1" step="1"
+                       class="form-control form-control-sm inp-dias"
+                       value="{{ n.duracao_dias or 1 }}">
+                <span class="badge-warn-zero" style="display:none;"
+                      title="Sem horas — usa fallback de divisão igual">
+                    <i class="fas fa-triangle-exclamation"></i> sem horas (fallback)
+                </span>
             </span>
             {% endif %}
         </span>
@@ -132,6 +147,55 @@ ul.cron-tree .node-sub > .node-label {
     font-weight: 500;
 }
 .summary-pill strong { color: #0d6efd; }
+.inline-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+}
+.inline-edit input.form-control-sm {
+    width: 5.5rem;
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.8rem;
+}
+.badge-warn-zero {
+    background: #fff3cd;
+    color: #92400e;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    margin-left: 0.4rem;
+    border: 1px solid #fde68a;
+}
+.fallback-alert {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    color: #78350f;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    display: none;
+}
+.forecast-footer {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 1px solid #6ee7b7;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    align-items: center;
+}
+.forecast-footer .pill {
+    background: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    border: 1px solid #6ee7b7;
+}
+.forecast-footer .pill strong { color: #047857; }
 </style>
 {% endblock %}
 
@@ -182,6 +246,14 @@ ul.cron-tree .node-sub > .node-label {
         </div>
         {% endif %}
 
+        <div class="fallback-alert" id="fallbackAlert">
+            <i class="fas fa-triangle-exclamation me-2"></i>
+            <strong>Aviso:</strong>
+            <span id="fallbackCount">0</span> tarefa(s) marcada(s) sem horas estimadas.
+            O peso para medição será distribuído por <strong>divisão igual entre folhas</strong>
+            (em vez de proporcional por horas). Configure as horas para usar peso ponderado.
+        </div>
+
         {% for item in arvore %}
         <div class="tree-card {% if item.sem_template %}no-template{% endif %}"
              data-pi-id="{{ item.proposta_item_id }}">
@@ -219,14 +291,41 @@ ul.cron-tree .node-sub > .node-label {
         </div>
         {% endfor %}
 
-        <div class="d-flex justify-content-between align-items-center mt-4">
+        <div class="forecast-footer" id="forecastFooter">
+            <div class="pill">
+                <i class="fas fa-clock text-success me-1"></i>
+                Total horas: <strong id="footHoras">0</strong>h
+            </div>
+            <div class="pill">
+                <i class="fas fa-calendar-day text-success me-1"></i>
+                Duração total: <strong id="footDias">0</strong> dia(s)
+            </div>
+            <div class="pill">
+                <i class="fas fa-flag-checkered text-success me-1"></i>
+                Término previsto: <strong id="footTermino">—</strong>
+            </div>
+            <div class="ms-auto small text-muted">
+                Previsão simples (hoje + soma de durações). O cálculo final
+                respeita calendário/predecessoras após gravar.
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
             <a href="{{ url_for('propostas.visualizar', id=proposta.id) }}" class="btn btn-outline-secondary">
                 <i class="fas fa-times me-1"></i> Cancelar
             </a>
-            <button type="submit" class="btn btn-aprovar-final">
-                <i class="fas fa-check-double me-2"></i>
-                Aprovar Proposta e Gerar Cronograma
-            </button>
+            <div class="d-flex gap-2 ms-auto">
+                <button type="button" id="btnSalvarPreconfig"
+                        class="btn btn-outline-primary"
+                        formaction="{{ url_for('propostas.salvar_cronograma_default', id=proposta.id) }}">
+                    <i class="fas fa-save me-1"></i>
+                    Salvar pré-configuração (sem aprovar)
+                </button>
+                <button type="submit" class="btn btn-aprovar-final">
+                    <i class="fas fa-check-double me-2"></i>
+                    Aprovar Proposta e Gerar Cronograma
+                </button>
+            </div>
         </div>
     </form>
 </div>
@@ -262,24 +361,59 @@ function _atualizarRaiz(card) {
     raiz.checked = Array.from(filhos).some(c => c.checked);
 }
 
-// Sincronização visual + recálculo do resumo
+// Sincronização visual + recálculo do resumo (Task #102 rev4)
+function _formatarData(d) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+}
 function _recalcular() {
     let totMarcados = 0;
     let totHoras = 0;
+    let totDias = 0;
+    let foldersFallback = 0;
     document.querySelectorAll('.tree-card').forEach(card => {
         const isNoTemplate = card.classList.contains('no-template');
         if (isNoTemplate) return;
         const folhas = card.querySelectorAll('li.node-sub');
         folhas.forEach(li => {
             const ck = li.querySelector(':scope > .node-label > .chk-node');
-            if (ck && ck.checked) {
+            const inpH = li.querySelector(':scope > .node-label > .inline-edit > .inp-horas');
+            const inpD = li.querySelector(':scope > .node-label > .inline-edit > .inp-dias');
+            const warn = li.querySelector(':scope > .node-label > .inline-edit > .badge-warn-zero');
+            const horas = inpH ? parseFloat(inpH.value || '0') : parseFloat(li.dataset.horas || '0');
+            const dias  = inpD ? parseInt(inpD.value || '1', 10) : parseInt(li.dataset.dias || '1', 10);
+            // Atualiza data-attrs para serialização posterior
+            li.dataset.horas = String(horas);
+            li.dataset.dias = String(dias);
+            const checked = ck && ck.checked;
+            const semHoras = (horas <= 0);
+            if (warn) warn.style.display = (checked && semHoras) ? 'inline-block' : 'none';
+            if (checked) {
                 totMarcados += 1;
-                totHoras += parseFloat(li.dataset.horas || '0');
+                totHoras += horas;
+                totDias += isNaN(dias) ? 1 : dias;
+                if (semHoras) foldersFallback += 1;
             }
         });
     });
     document.getElementById('totMarcados').textContent = totMarcados;
     document.getElementById('totHoras').textContent = totHoras.toFixed(1);
+    document.getElementById('footHoras').textContent = totHoras.toFixed(1);
+    document.getElementById('footDias').textContent = totDias;
+    // Previsão simples: hoje + soma de durações (dias corridos)
+    const dt = new Date();
+    if (totDias > 0) {
+        dt.setDate(dt.getDate() + totDias);
+        document.getElementById('footTermino').textContent = _formatarData(dt);
+    } else {
+        document.getElementById('footTermino').textContent = '—';
+    }
+    // Aviso de fallback
+    const alerta = document.getElementById('fallbackAlert');
+    document.getElementById('fallbackCount').textContent = foldersFallback;
+    alerta.style.display = foldersFallback > 0 ? 'block' : 'none';
 }
 
 // Listeners
@@ -301,11 +435,20 @@ document.querySelectorAll('.chk-raiz').forEach(ck => {
         _recalcular();
     });
 });
+// Edição inline de horas/dias nas folhas
+document.querySelectorAll('.inp-horas, .inp-dias').forEach(inp => {
+    inp.addEventListener('input', _recalcular);
+});
 
 // Helper recursivo para serializar nós aplicando o estado dos checkboxes
+// e os valores editados de horas/duração (Task #102 rev4)
 function _serializeNode(card, originalNode, liElement) {
     const ck = liElement && liElement.querySelector(':scope > .node-label > .chk-node');
     const marcado = ck ? ck.checked : !!originalNode.marcado;
+    const inpH = liElement && liElement.querySelector(':scope > .node-label > .inline-edit > .inp-horas');
+    const inpD = liElement && liElement.querySelector(':scope > .node-label > .inline-edit > .inp-dias');
+    const horasEditadas = inpH ? parseFloat(inpH.value || '0') : originalNode.horas_estimadas;
+    const diasEditados  = inpD ? parseInt(inpD.value || '1', 10) : originalNode.duracao_dias;
     const filhosOriginais = originalNode.filhos || [];
     const filhosLi = liElement
         ? Array.from(liElement.querySelectorAll(':scope > ul > li'))
@@ -317,8 +460,8 @@ function _serializeNode(card, originalNode, liElement) {
         tipo: originalNode.tipo,
         nome: originalNode.nome,
         subatividade_mestre_id: originalNode.subatividade_mestre_id,
-        duracao_dias: originalNode.duracao_dias,
-        horas_estimadas: originalNode.horas_estimadas,
+        duracao_dias: filhosOut.length ? originalNode.duracao_dias : diasEditados,
+        horas_estimadas: filhosOut.length ? originalNode.horas_estimadas : horasEditadas,
         quantidade_prevista: originalNode.quantidade_prevista,
         unidade_medida: originalNode.unidade_medida,
         responsavel: originalNode.responsavel,

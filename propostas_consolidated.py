@@ -1060,6 +1060,49 @@ def cronograma_revisar(id):
     )
 
 
+@propostas_bp.route('/<int:id>/cronograma-default', methods=['POST'])
+@login_required
+@admin_required
+def salvar_cronograma_default(id):
+    """Task #102 (rev4) — admin pré-configura o snapshot
+    `Proposta.cronograma_default_json` SEM aprovar a proposta. Útil para que o
+    cliente, ao aprovar pelo portal, materialize o cronograma exatamente como o
+    admin pré-configurou (em vez de cair em estado "cronograma pendente").
+
+    Aceita o JSON da árvore via campo `cronograma_marcado_json` (form ou JSON).
+    """
+    admin_id = get_admin_id()
+    proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+    cronograma_json_raw = (
+        request.form.get('cronograma_marcado_json')
+        or (request.get_json(silent=True) or {}).get('cronograma_marcado_json')
+    )
+    if not cronograma_json_raw:
+        flash('Nenhum cronograma enviado para salvar.', 'warning')
+        return redirect(url_for('propostas.cronograma_revisar', id=proposta.id))
+
+    try:
+        import json as _json
+        if isinstance(cronograma_json_raw, str):
+            arvore = _json.loads(cronograma_json_raw)
+        else:
+            arvore = cronograma_json_raw
+        proposta.cronograma_default_json = arvore
+        db.session.commit()
+        flash(
+            'Cronograma pré-configurado salvo. Quando o cliente aprovar pelo portal, '
+            'o cronograma será gerado automaticamente conforme esta configuração.',
+            'success',
+        )
+    except Exception as _e:
+        db.session.rollback()
+        logger.error(f"#102: falha ao salvar cronograma_default proposta {id}: {_e}")
+        flash(f'Falha ao salvar pré-configuração: {_e}', 'error')
+
+    return redirect(url_for('propostas.visualizar', id=proposta.id))
+
+
 @propostas_bp.route('/aprovar/<int:id>', methods=['POST'])
 @login_required
 @admin_required
@@ -1075,14 +1118,11 @@ def aprovar(id):
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
 
-        # Task #102 (atomicidade): NÃO setar status='APROVADA' antes do emit.
-        # propagar_proposta_para_obra (handler) cuida de: (a) criar Obra,
-        # (b) setar status='APROVADA', (c) commitar. Se essa cadeia falhar,
-        # nada é persistido como "aprovada". A única coisa pré-emit é o
-        # snapshot do cronograma (consumido pelo handler de cronograma) —
-        # se o emit falhar, este snapshot fica "órfão" no objeto não-commitado
-        # da sessão e é descartado pelo rollback abaixo.
-        status_anterior = proposta.status
+        # Task #102 (atomicidade real, rev4): TRANSAÇÃO ÚNICA. Os handlers
+        # (propagar_proposta_para_obra + handle_proposta_aprovada) não fazem
+        # mais commit/rollback internos — esta rota é a única dona da
+        # transação. Tudo (Obra + IMC + lançamento contábil + cronograma +
+        # snapshot + histórico) commita junto, ou nada commita.
         cronograma_json_raw = request.form.get('cronograma_marcado_json')
         if cronograma_json_raw:
             try:
@@ -1091,8 +1131,6 @@ def aprovar(id):
             except Exception as _e:
                 logger.warning(f"#102: cronograma_marcado_json inválido na aprovação {id}: {_e}")
 
-        # Emite evento em modo atômico — qualquer falha de handler é propagada
-        # e revertida pelo except externo (Task #102).
         from event_manager import EventManager
         try:
             EventManager.emit('proposta_aprovada', {
@@ -1104,50 +1142,26 @@ def aprovar(id):
             }, admin_id, raise_on_error=True)
         except Exception as _eh:
             db.session.rollback()
-            # Reverter status se algum handler conseguiu commitar APROVADA antes
-            # da falha do próximo handler.
-            db.session.refresh(proposta)
-            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
-                proposta.status = status_anterior
-                db.session.commit()
             logger.error(f"#102: aprovação atômica falhou — handler exception: {_eh}")
-            flash(
-                f'Falha ao aprovar a proposta: {_eh}. Status revertido.',
-                'error',
-            )
+            flash(f'Falha ao aprovar a proposta: {_eh}. Nada foi gravado.', 'error')
             return redirect(url_for('propostas.visualizar', id=proposta.id))
-        db.session.refresh(proposta)
 
         if not proposta.obra_id:
-            logger.error(
-                f"[ERROR] proposta_aprovada não materializou Obra para proposta {proposta.id}"
-            )
-            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
-                proposta.status = status_anterior
-                db.session.commit()
-            flash(
-                'Falha ao aprovar a proposta: a obra não pôde ser gerada. Status revertido.',
-                'error',
-            )
+            db.session.rollback()
+            logger.error(f"[ERROR] proposta_aprovada não materializou Obra para proposta {proposta.id}")
+            flash('Falha ao aprovar a proposta: a obra não pôde ser gerada. Nada foi gravado.', 'error')
             return redirect(url_for('propostas.visualizar', id=proposta.id))
 
-        # Sucesso: registrar histórico e data_resposta_cliente (pós-emit) num
-        # commit dedicado. Se o histórico falhar, a obra já existe — apenas
-        # logamos; não revertimos a aprovação (operacionalmente inconsistente).
-        try:
-            proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
-            historico = PropostaHistorico(
-                proposta_id=proposta.id,
-                usuario_id=current_user.id,
-                acao='aprovada',
-                observacao=request.form.get('observacao', ''),
-                admin_id=admin_id,
-            )
-            db.session.add(historico)
-            db.session.commit()
-        except Exception as _e_hist:
-            logger.warning(f"Aprovação OK mas falha ao registrar histórico: {_e_hist}")
-            db.session.rollback()
+        # Histórico + data_resposta_cliente fazem parte da MESMA transação.
+        proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
+        db.session.add(PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='aprovada',
+            observacao=request.form.get('observacao', ''),
+            admin_id=admin_id,
+        ))
+        db.session.commit()
 
         flash('Proposta aprovada com sucesso!', 'success')
         logger.debug(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
@@ -1252,12 +1266,12 @@ def aprovar_proposta_cliente(token):
     proposta = Proposta.query.filter_by(token_cliente=token).first_or_404()
     
     try:
-        # Task #102 (atomicidade no portal cliente): NÃO commitar status antes do emit.
-        # propagar_proposta_para_obra é responsável por status + commit.
-        status_anterior = proposta.status
+        # Task #102 rev4 (atomicidade real, portal cliente): TRANSAÇÃO ÚNICA.
+        # Handlers não commitam mais — esta rota é a única dona da transação.
+        # Tudo (Obra + IMC + lançamento + cronograma + observações) commita
+        # junto, ou nada commita.
         proposta.observacoes_cliente = request.form.get('observacoes', '')
 
-        # Resolução de admin_id alinhada com portal_cliente().
         admin_id = None
         if proposta.criado_por:
             from models import Usuario
@@ -1276,8 +1290,7 @@ def aprovar_proposta_cliente(token):
             )
             db.session.rollback()
             flash(
-                'Não foi possível processar a aprovação no momento (tenant não identificado). '
-                'O administrador foi notificado.',
+                'Não foi possível processar a aprovação no momento (tenant não identificado).',
                 'warning',
             )
             return redirect(url_for('propostas.portal_cliente', token=token))
@@ -1293,37 +1306,23 @@ def aprovar_proposta_cliente(token):
             }, admin_id, raise_on_error=True)
         except Exception as _eh:
             db.session.rollback()
-            db.session.refresh(proposta)
-            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
-                proposta.status = status_anterior
-                db.session.commit()
             _log.error(f"#102: aprovação atômica (cliente) falhou: {_eh}")
             flash('Houve uma falha ao processar sua aprovação. Tente novamente em instantes.', 'error')
             return redirect(url_for('propostas.portal_cliente', token=token))
-        db.session.refresh(proposta)
 
         if not proposta.obra_id:
-            _log.error(
-                f"proposta_aprovada (cliente) não materializou Obra para proposta {proposta.id}; "
-                f"revertendo status para {status_anterior}"
-            )
-            if proposta.status in ('APROVADA', 'aprovada') and status_anterior not in ('APROVADA', 'aprovada'):
-                proposta.status = status_anterior
-                db.session.commit()
+            db.session.rollback()
+            _log.error(f"proposta_aprovada (cliente) não materializou Obra para proposta {proposta.id}")
             flash(
-                'Houve uma falha ao gerar a obra. Sua aprovação não foi efetivada — tente novamente em instantes.',
+                'Houve uma falha ao gerar a obra. Sua aprovação não foi efetivada.',
                 'error',
             )
             return redirect(url_for('propostas.portal_cliente', token=token))
 
-        # Sucesso — registrar data_resposta_cliente e observações (commit auxiliar)
-        try:
-            proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+        # Sucesso — finalizar metadados e commit ÚNICO de toda a transação.
+        proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
+        db.session.commit()
 
-        # Task #102: sinalizar para a tela "aprovada" se cronograma foi gerado
         cronograma_pendente = not bool(proposta.cronograma_default_json)
         flash('Proposta aprovada com sucesso!', 'success')
         return render_template(

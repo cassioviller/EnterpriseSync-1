@@ -776,111 +776,109 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
     Itens de medição (IMC) e snapshots de custo (OSC) são criados pelo
     handler `handlers.propostas_handlers.handle_proposta_aprovada` que roda
     em sequência (ver app.py, ordem de import).
+
+    Task #102 (atomicidade real): este handler NÃO commita nem faz rollback.
+    A rota chamadora é dona da transação e decide commit/rollback após o
+    `EventManager.emit(..., raise_on_error=True)` retornar com sucesso.
+    Qualquer exceção é propagada para a rota fazer rollback completo
+    (Obra + IMC + lançamento contábil + cronograma — tudo ou nada).
     """
-    try:
-        from models import db, Proposta, Obra
-        from datetime import datetime
-        from sqlalchemy import func
-        import secrets
+    from models import db, Proposta, Obra
+    from datetime import datetime
+    from sqlalchemy import func
+    import secrets
 
-        proposta_id = data.get('proposta_id')
-        if not proposta_id:
-            logger.warning("⚠️ proposta_id não fornecido no evento proposta_aprovada")
-            return
+    proposta_id = data.get('proposta_id')
+    if not proposta_id:
+        logger.warning("⚠️ proposta_id não fornecido no evento proposta_aprovada")
+        return
 
-        proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
-        if not proposta:
-            logger.error(f"❌ Proposta {proposta_id} não encontrada para admin {admin_id}")
-            return
+    proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
+    if not proposta:
+        logger.error(f"❌ Proposta {proposta_id} não encontrada para admin {admin_id}")
+        return
 
-        valor_total = float(proposta.valor_total or 0)
-        cliente_nome = proposta.cliente_nome or 'Cliente não identificado'
+    valor_total = float(proposta.valor_total or 0)
+    cliente_nome = proposta.cliente_nome or 'Cliente não identificado'
 
-        # 1) Localizar (ou criar) a Obra vinculada à proposta
-        obra = None
-        if proposta.obra_id:
-            obra = Obra.query.filter_by(id=proposta.obra_id, admin_id=admin_id).first()
-        if not obra:
-            obra = Obra.query.filter_by(
-                proposta_origem_id=proposta_id, admin_id=admin_id
-            ).first()
+    # 1) Localizar (ou criar) a Obra vinculada à proposta
+    obra = None
+    if proposta.obra_id:
+        obra = Obra.query.filter_by(id=proposta.obra_id, admin_id=admin_id).first()
+    if not obra:
+        obra = Obra.query.filter_by(
+            proposta_origem_id=proposta_id, admin_id=admin_id
+        ).first()
 
-        if not obra:
-            ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter(
-                Obra.admin_id == admin_id,
-                Obra.codigo.like('OBR%'),
-            ).scalar()
-            if ultimo_codigo and ultimo_codigo.startswith('OBR'):
-                try:
-                    numero = int(ultimo_codigo[3:]) + 1
-                except ValueError:
-                    numero = 1
-            else:
+    if not obra:
+        ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter(
+            Obra.admin_id == admin_id,
+            Obra.codigo.like('OBR%'),
+        ).scalar()
+        if ultimo_codigo and ultimo_codigo.startswith('OBR'):
+            try:
+                numero = int(ultimo_codigo[3:]) + 1
+            except ValueError:
                 numero = 1
-            codigo_obra = f"OBR{numero:04d}"
-            # Defesa contra códigos órfãos com mesmo padrão (e.g. OBR0001 já
-            # existente sem sair do max devido a strings vazias). Avança até
-            # encontrar um código livre dentro de um limite razoável.
-            for _ in range(50):
-                exists = db.session.query(Obra.id).filter_by(
-                    admin_id=admin_id, codigo=codigo_obra
-                ).first()
-                if not exists:
-                    break
-                numero += 1
-                codigo_obra = f"OBR{numero:04d}"
-
-            obra = Obra(
-                nome=f"Obra - {proposta.titulo or proposta.numero}",
-                codigo=codigo_obra,
-                cliente=cliente_nome,
-                cliente_nome=cliente_nome,
-                cliente_email=proposta.cliente_email,
-                cliente_telefone=proposta.cliente_telefone,
-                endereco=proposta.cliente_endereco,
-                data_inicio=datetime.now().date(),
-                valor_contrato=valor_total,
-                orcamento=valor_total,
-                status='Em andamento',
-                proposta_origem_id=proposta_id,
-                admin_id=admin_id,
-                ativo=True,
-                portal_ativo=True,
-            )
-            db.session.add(obra)
-            db.session.flush()
-            logger.info(f"📋 Obra {codigo_obra} criada para proposta {proposta.numero}")
         else:
-            # Manter obra existente atualizada com cliente + valor da proposta
-            if not obra.cliente:
-                obra.cliente = cliente_nome
-            if not obra.cliente_nome:
-                obra.cliente_nome = cliente_nome
-            if (obra.valor_contrato or 0) <= 0 and valor_total > 0:
-                obra.valor_contrato = valor_total
-            if (obra.orcamento or 0) <= 0 and valor_total > 0:
-                obra.orcamento = valor_total
+            numero = 1
+        codigo_obra = f"OBR{numero:04d}"
+        for _ in range(50):
+            exists = db.session.query(Obra.id).filter_by(
+                admin_id=admin_id, codigo=codigo_obra
+            ).first()
+            if not exists:
+                break
+            numero += 1
+            codigo_obra = f"OBR{numero:04d}"
 
-        # 2) Garantir token_cliente para portal público
-        if not obra.token_cliente:
-            obra.token_cliente = secrets.token_urlsafe(32)
-
-        # 3) Back-link Proposta → Obra
-        proposta.obra_id = obra.id
-        proposta.convertida_em_obra = True
-        if proposta.status not in ('APROVADA', 'aprovada'):
-            proposta.status = 'APROVADA'
-
-        db.session.commit()
-        logger.info(
-            f"✅ Proposta {proposta.numero} propagada para Obra {obra.codigo} "
-            f"(token_cliente={'ok' if obra.token_cliente else 'AUSENTE'}, "
-            f"valor_contrato={float(obra.valor_contrato or 0):.2f})"
+        obra = Obra(
+            nome=f"Obra - {proposta.titulo or proposta.numero}",
+            codigo=codigo_obra,
+            cliente=cliente_nome,
+            cliente_nome=cliente_nome,
+            cliente_email=proposta.cliente_email,
+            cliente_telefone=proposta.cliente_telefone,
+            endereco=proposta.cliente_endereco,
+            data_inicio=datetime.now().date(),
+            valor_contrato=valor_total,
+            orcamento=valor_total,
+            status='Em andamento',
+            proposta_origem_id=proposta_id,
+            admin_id=admin_id,
+            ativo=True,
+            portal_ativo=True,
         )
+        db.session.add(obra)
+        db.session.flush()
+        logger.info(f"📋 Obra {codigo_obra} criada para proposta {proposta.numero}")
+    else:
+        if not obra.cliente:
+            obra.cliente = cliente_nome
+        if not obra.cliente_nome:
+            obra.cliente_nome = cliente_nome
+        if (obra.valor_contrato or 0) <= 0 and valor_total > 0:
+            obra.valor_contrato = valor_total
+        if (obra.orcamento or 0) <= 0 and valor_total > 0:
+            obra.orcamento = valor_total
 
-    except Exception as e:
-        logger.error(f"❌ Erro ao propagar proposta para obra: {e}", exc_info=True)
-        db.session.rollback()
+    # 2) Garantir token_cliente para portal público
+    if not obra.token_cliente:
+        obra.token_cliente = secrets.token_urlsafe(32)
+
+    # 3) Back-link Proposta → Obra
+    proposta.obra_id = obra.id
+    proposta.convertida_em_obra = True
+    if proposta.status not in ('APROVADA', 'aprovada'):
+        proposta.status = 'APROVADA'
+
+    db.session.flush()
+    logger.info(
+        f"✅ Proposta {proposta.numero} propagada para Obra {obra.codigo} "
+        f"(token_cliente={'ok' if obra.token_cliente else 'AUSENTE'}, "
+        f"valor_contrato={float(obra.valor_contrato or 0):.2f}) — "
+        f"aguardando commit da rota chamadora"
+    )
 
 
 # ================================

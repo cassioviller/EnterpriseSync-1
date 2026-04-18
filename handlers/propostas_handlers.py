@@ -84,158 +84,100 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         admin_id: ID do administrador/tenant
     """
     
-    try:
-        proposta_id = data.get('proposta_id')
-        cliente_nome = data.get('cliente_nome')
-        valor_total = Decimal(str(data.get('valor_total', 0)))
-        data_aprovacao = data.get('data_aprovacao')
-        
-        logger.info(f"🔔 Processando evento proposta_aprovada - Proposta: {proposta_id}, Cliente: {cliente_nome}")
-        
-        # Validações básicas
-        if not proposta_id:
-            logger.warning(f"⚠️ proposta_id não fornecido no evento proposta_aprovada")
-            return
-        
-        if not cliente_nome:
-            logger.warning(f"⚠️ cliente_nome não fornecido no evento proposta_aprovada")
-            cliente_nome = "Cliente não identificado"
+    # Task #102 (atomicidade real): este handler NÃO commita nem faz rollback.
+    # A rota chamadora (propostas_consolidated.aprovar e .aprovar_proposta_cliente)
+    # é dona da transação e só commita após `EventManager.emit(..., raise_on_error=True)`
+    # retornar com sucesso. Qualquer exceção propaga para a rota fazer rollback
+    # completo de Obra + IMC + lançamento contábil + cronograma — tudo ou nada.
+    proposta_id = data.get('proposta_id')
+    cliente_nome = data.get('cliente_nome')
+    valor_total = Decimal(str(data.get('valor_total', 0)))
+    data_aprovacao = data.get('data_aprovacao')
 
-        # Converter data_aprovacao se for string
-        if isinstance(data_aprovacao, str):
-            try:
-                data_aprovacao = datetime.strptime(data_aprovacao, '%Y-%m-%d').date()
-            except ValueError:
-                data_aprovacao = date.today()
-        elif not isinstance(data_aprovacao, date):
-            data_aprovacao = date.today()
+    logger.info(f"🔔 Processando evento proposta_aprovada - Proposta: {proposta_id}, Cliente: {cliente_nome}")
 
-        # Task #94: lançamento contábil + ContaReceber só fazem sentido para
-        # propostas com valor > 0. Mesmo com valor 0, propagamos os itens
-        # comerciais para a obra (operador pode ajustar valores depois).
-        if valor_total <= 0:
-            logger.info(
-                f"⏭️ Proposta {proposta_id}: valor zerado — pulando lançamento contábil; "
-                f"propagação proposta→obra continua."
-            )
-            _propagar_proposta_para_obra(proposta_id, admin_id)
-            # Task #102: cronograma também é materializado em propostas zeradas.
-            try:
-                from models import Proposta as _Proposta
-                from services.cronograma_proposta import materializar_cronograma
-                _proposta_obj = _Proposta.query.filter_by(
-                    id=proposta_id, admin_id=admin_id
-                ).first()
-                # Task #102 (rev): só materializa quando há snapshot revisado
-                # pelo admin (cronograma_default_json). Se ausente (ex.: aprovação
-                # do cliente sem revisão prévia), a obra fica em estado
-                # "cronograma pendente" — admin completa depois.
-                if _proposta_obj and _proposta_obj.obra_id and _proposta_obj.cronograma_default_json:
-                    materializar_cronograma(
-                        _proposta_obj, admin_id, _proposta_obj.obra_id,
-                        arvore_marcada=_proposta_obj.cronograma_default_json,
-                    )
-                elif _proposta_obj and _proposta_obj.obra_id:
-                    logger.info(
-                        f"#102: proposta {proposta_id} aprovada SEM cronograma_default_json — "
-                        "obra criada em estado 'cronograma pendente'."
-                    )
-            except Exception as _e:
-                logger.error(f"#102: falha ao materializar cronograma (proposta zerada) {proposta_id}: {_e}")
-                raise
-            db.session.commit()
-            return
+    if not proposta_id:
+        logger.warning(f"⚠️ proposta_id não fornecido no evento proposta_aprovada")
+        return
 
-        # 1. Criar lançamento contábil
-        lancamento = LancamentoContabil(
-            numero=gerar_numero_lancamento(admin_id),
-            data_lancamento=data_aprovacao,
-            historico=f"Proposta aprovada #{proposta_id} - {cliente_nome}",
-            valor_total=float(valor_total),
-            origem='PROPOSTAS',
-            origem_id=proposta_id,
-            admin_id=admin_id
-        )
-        db.session.add(lancamento)
-        db.session.flush()
-        
-        logger.info(f"✅ Lançamento contábil #{lancamento.numero} criado")
-        
-        # 2. Criar partidas contábeis (débito e crédito)
-        # Débito: Clientes a Receber (Ativo)
-        partida_debito = PartidaContabil(
-            lancamento_id=lancamento.id,
-            sequencia=1,
-            conta_codigo='1.1.02.001',  # Clientes (Contas a Receber)
-            tipo_partida='DEBITO',
-            valor=float(valor_total),
-            admin_id=admin_id
-        )
-        db.session.add(partida_debito)
-        
-        # Crédito: Receita de Serviços
-        partida_credito = PartidaContabil(
-            lancamento_id=lancamento.id,
-            sequencia=2,
-            conta_codigo='4.1.01.001',  # Receita de Serviços
-            tipo_partida='CREDITO',
-            valor=float(valor_total),
-            admin_id=admin_id
-        )
-        db.session.add(partida_credito)
-        
-        logger.info(f"✅ Partidas contábeis criadas - Débito: R$ {float(valor_total):.2f} (1.1.02.001), Crédito: R$ {float(valor_total):.2f} (4.1.01.001)")
+    if not cliente_nome:
+        logger.warning(f"⚠️ cliente_nome não fornecido no evento proposta_aprovada")
+        cliente_nome = "Cliente não identificado"
 
-        # Task #94: ContaReceber NÃO é mais criada na aprovação. Ela é
-        # gerada/atualizada automaticamente via UPSERT em
-        # `services.medicao_service.recalcular_medicao_obra` à medida que o
-        # avanço de obra é registrado (RDO finalizado ou medição quinzenal
-        # fechada). origem_tipo='OBRA_MEDICAO', origem_id=obra.id.
-
-        # Task #82: propagar para obra (ItemMedicaoComercial → ObraServicoCusto)
-        # Propagação é MANDATÓRIA — se falhar, a aprovação inteira é revertida
-        # pelo except externo. Isso garante o ciclo proposta → custos para
-        # qualquer admin que use o catálogo. Caller pode tratar o ValueError.
-        _propagar_proposta_para_obra(proposta_id, admin_id)
-
-        # Task #102: materializar cronograma automático na obra a partir do
-        # snapshot revisado (`Proposta.cronograma_default_json`) ou — caso
-        # ausente — a partir da árvore default derivada de
-        # `Servico.template_padrao_id`. Idempotente: tarefas já criadas para
-        # um proposta_item_id são puladas. Falha aqui também reverte tudo.
+    if isinstance(data_aprovacao, str):
         try:
-            from models import Proposta as _Proposta
-            from services.cronograma_proposta import materializar_cronograma
-            _proposta_obj = _Proposta.query.filter_by(
-                id=proposta_id, admin_id=admin_id
-            ).first()
-            # Task #102 (rev): mesma regra — só materializa com snapshot revisado.
-            if _proposta_obj and _proposta_obj.obra_id and _proposta_obj.cronograma_default_json:
-                materializar_cronograma(
-                    _proposta_obj, admin_id, _proposta_obj.obra_id,
-                    arvore_marcada=_proposta_obj.cronograma_default_json,
-                )
-            elif _proposta_obj and _proposta_obj.obra_id:
-                logger.info(
-                    f"#102: proposta {proposta_id} aprovada SEM cronograma_default_json — "
-                    "obra criada em estado 'cronograma pendente'."
-                )
-        except Exception as _e:
-            logger.error(f"#102: falha ao materializar cronograma da proposta {proposta_id}: {_e}")
-            raise
+            data_aprovacao = datetime.strptime(data_aprovacao, '%Y-%m-%d').date()
+        except ValueError:
+            data_aprovacao = date.today()
+    elif not isinstance(data_aprovacao, date):
+        data_aprovacao = date.today()
 
-        # Commit das alterações
-        db.session.commit()
-        
-        logger.info(f"✅ Handler proposta_aprovada executado com sucesso - Proposta #{proposta_id}")
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ Erro ao processar evento proposta_aprovada: {e}", exc_info=True)
-        # Re-raise para o caller (event manager) ter visibilidade da falha;
-        # propagação proposta→obra é parte do contrato e não deve falhar
-        # silenciosamente. Quem dispara o evento pode capturar e alertar.
-        raise
+    def _materializar_cronograma_se_houver():
+        """Materializa cronograma se proposta tem obra + snapshot revisado."""
+        from models import Proposta as _Proposta
+        from services.cronograma_proposta import materializar_cronograma
+        _proposta_obj = _Proposta.query.filter_by(
+            id=proposta_id, admin_id=admin_id
+        ).first()
+        if _proposta_obj and _proposta_obj.obra_id and _proposta_obj.cronograma_default_json:
+            materializar_cronograma(
+                _proposta_obj, admin_id, _proposta_obj.obra_id,
+                arvore_marcada=_proposta_obj.cronograma_default_json,
+            )
+        elif _proposta_obj and _proposta_obj.obra_id:
+            logger.info(
+                f"#102: proposta {proposta_id} aprovada SEM cronograma_default_json — "
+                "obra criada em estado 'cronograma pendente'."
+            )
+
+    # Task #94: lançamento contábil só faz sentido para valor > 0.
+    # Para valor zerado, propaga itens comerciais e cronograma sem lançamento.
+    if valor_total <= 0:
+        logger.info(
+            f"⏭️ Proposta {proposta_id}: valor zerado — pulando lançamento contábil; "
+            f"propagação proposta→obra continua."
+        )
+        _propagar_proposta_para_obra(proposta_id, admin_id)
+        _materializar_cronograma_se_houver()
+        return
+
+    # 1. Criar lançamento contábil
+    lancamento = LancamentoContabil(
+        numero=gerar_numero_lancamento(admin_id),
+        data_lancamento=data_aprovacao,
+        historico=f"Proposta aprovada #{proposta_id} - {cliente_nome}",
+        valor_total=float(valor_total),
+        origem='PROPOSTAS',
+        origem_id=proposta_id,
+        admin_id=admin_id
+    )
+    db.session.add(lancamento)
+    db.session.flush()
+    logger.info(f"✅ Lançamento contábil #{lancamento.numero} criado")
+
+    # 2. Partidas contábeis dobradas
+    db.session.add(PartidaContabil(
+        lancamento_id=lancamento.id, sequencia=1,
+        conta_codigo='1.1.02.001', tipo_partida='DEBITO',
+        valor=float(valor_total), admin_id=admin_id,
+    ))
+    db.session.add(PartidaContabil(
+        lancamento_id=lancamento.id, sequencia=2,
+        conta_codigo='4.1.01.001', tipo_partida='CREDITO',
+        valor=float(valor_total), admin_id=admin_id,
+    ))
+    logger.info(
+        f"✅ Partidas contábeis criadas - Débito R$ {float(valor_total):.2f} "
+        f"(1.1.02.001), Crédito R$ {float(valor_total):.2f} (4.1.01.001)"
+    )
+
+    # Task #82: propagar para obra (IMC → OSC). Falha propaga.
+    _propagar_proposta_para_obra(proposta_id, admin_id)
+
+    # Task #102: materializar cronograma. Falha propaga (rota faz rollback).
+    _materializar_cronograma_se_houver()
+
+    logger.info(f"✅ Handler proposta_aprovada executado - Proposta #{proposta_id} (commit pendente)")
 
 
 def gerar_numero_lancamento(admin_id: int) -> int:
