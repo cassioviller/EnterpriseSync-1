@@ -1317,36 +1317,47 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 
 ## A.4 — Mapas "Rótulo → name/id → tipo" para os formulários centrais
 
-### A.4.1 — Funcionário (modal "Novo" em `/funcionarios` + form completo)
+### A.4.1 — Funcionário (template real `templates/funcionarios.html` — modal `#funcionarioModal`, form `#funcionarioForm`, action `POST /funcionarios`, `enctype=multipart/form-data`)
 
 | Rótulo na tela                | `name` / `id`              | Tipo HTML            | Observações                                  |
 |-------------------------------|----------------------------|----------------------|----------------------------------------------|
 | Nome completo                 | `nome`                     | `text` (required)    |                                              |
 | CPF                           | `cpf`                      | `text` (required)    | mask 999.999.999-99                          |
 | Foto                          | `foto`                     | `file`               | jpg/png, opcional                            |
+| RG                            | `rg`                       | `text`               |                                              |
+| Data de nascimento            | `data_nascimento`          | `date`               |                                              |
+| Endereço                      | `endereco`                 | `textarea`           |                                              |
+| Telefone                      | `telefone`                 | `text`               |                                              |
+| E-mail                        | `email`                    | `email`              |                                              |
 | Data de admissão              | `data_admissao`            | `date`               |                                              |
 | **Tipo de remuneração**       | `tipo_remuneracao`         | `select`             | opções: `salario`, `diaria`                  |
 | Salário fixo (mensalistas)    | `salario`                  | `number step=0.01`   | visível quando `tipo_remuneracao=salario`    |
 | Valor da diária (diaristas)   | `valor_diaria`             | `number step=0.01`   | visível quando `tipo_remuneracao=diaria`     |
-| Vale-Alimentação (R$/dia)     | `valor_va`                 | `number step=0.01`   |                                              |
-| Vale-Transporte (R$/dia)      | `valor_vt`                 | `number step=0.01`   |                                              |
-| Chave PIX                     | `chave_pix`                | `text`               | aceita CPF/e-mail/telefone                   |
 | Função                        | `funcao_id`                | `select`             | FK funcao                                    |
 | Horário de trabalho           | `horario_trabalho_id`      | `select`             | FK horario_trabalho                          |
 | Ativo                         | `ativo`                    | `checkbox`           | default checked                              |
 
-### A.4.2 — Serviço (catálogo)
+> Observação: `valor_va`, `valor_vt` e `chave_pix` existem como
+> colunas na tabela `funcionario` e são exibidos nas listas/cards, mas
+> **não estão no modal** — para preenchê-los o agente deve usar
+> `services/funcionario_service.py` ou um update direto pós-criação.
+
+### A.4.2 — Serviço (template real `templates/servicos/editar.html`, mesmo form usado em "novo" e "editar" — endpoint `POST /servicos` / `POST /servicos/<id>/atualizar` via `crud_servicos_completo.py`)
 
 | Rótulo                         | `name`                      | Tipo            |
 |--------------------------------|-----------------------------|-----------------|
-| Nome                           | `nome`                      | `text`          |
-| Categoria                      | `categoria`                 | `text`          |
-| Unidade                        | `unidade_medida`            | `select`        |
-| Custo unitário                 | `custo_unitario`            | `number`        |
-| Imposto (%)                    | `imposto_pct`               | `number`        |
-| Margem de lucro (%)            | `margem_lucro_pct`          | `number`        |
-| Preço de venda                 | `preco_venda_unitario`      | `number`        |
+| Nome                           | `nome`                      | `text` required |
+| Categoria                      | `categoria`                 | `select`        |
+| Descrição                      | `descricao`                 | `textarea`      |
 | **Template padrão (cronograma)** | `template_padrao_id`      | `select`        |
+| Subatividades (linha repetida) | `subatividades[]`           | `text`          |
+
+> Observação: `unidade_medida`, `custo_unitario`, `imposto_pct`,
+> `margem_lucro_pct` e `preco_venda_unitario` existem como colunas em
+> `servico` (consumidas pelo cálculo paramétrico em
+> `services/orcamento_parametrico.py`), porém **não fazem parte do form
+> real**; são populadas via composição (insumo × coeficiente) no
+> template `templates/catalogo/composicao_servico.html`.
 
 ### A.4.3 — Proposta (template real `templates/propostas/nova_proposta.html` — form `#formNovaProposta`, action `POST /propostas/criar`)
 

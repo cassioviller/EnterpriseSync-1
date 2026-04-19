@@ -692,12 +692,42 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    # Guarda de produção
+    # ------------------------------------------------------------------
+    # Auto-detecção de produção (fail-closed)
+    # ------------------------------------------------------------------
+    # Mesmo que o operador rode sem `--ambiente prod`, se houver QUALQUER
+    # sinal de que estamos rodando contra um ambiente produtivo, tratamos
+    # como prod e exigimos o opt-in `SIGE_ALLOW_PROD_SEED=1`. Isso fecha
+    # o buraco de "rodei o script no shell de prod sem o flag".
+    prod_signals = []
+    if (os.environ.get("FLASK_ENV") or "").lower() == "production":
+        prod_signals.append("FLASK_ENV=production")
+    if (os.environ.get("APP_ENV") or "").lower() in ("prod", "production"):
+        prod_signals.append("APP_ENV=prod")
+    if (os.environ.get("ENVIRONMENT") or "").lower() in ("prod", "production"):
+        prod_signals.append("ENVIRONMENT=prod")
+    if os.environ.get("REPLIT_DEPLOYMENT") == "1":
+        prod_signals.append("REPLIT_DEPLOYMENT=1")
+    db_url = (os.environ.get("DATABASE_URL") or "").lower()
+    if any(tok in db_url for tok in (
+        "easypanel", "prod", "production", "live", "rds.amazonaws", "neon.tech",
+    )):
+        prod_signals.append("DATABASE_URL parece produtivo")
+
+    if prod_signals and args.ambiente != "prod":
+        log.warning(
+            "ambiente produtivo detectado pelos sinais "
+            f"{prod_signals!r} — escalando para modo prod automaticamente"
+        )
+        args.ambiente = "prod"
+
+    # Guarda de produção (vale para flag explícita OU auto-escalada)
     if args.ambiente == "prod":
         if os.environ.get("SIGE_ALLOW_PROD_SEED") != "1":
             log.error(
                 "execução em produção bloqueada — defina "
-                "SIGE_ALLOW_PROD_SEED=1 e re-execute"
+                "SIGE_ALLOW_PROD_SEED=1 e re-execute. Sinais detectados: "
+                f"{prod_signals or ['flag --ambiente prod']!r}"
             )
             return 2
 
