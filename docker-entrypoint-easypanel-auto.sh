@@ -321,6 +321,25 @@ echo "   🏥 Health check: $HEALTH_LOG" | tee -a "$LOG_FILE"
 echo "   📊 Health result: /tmp/health_check_result.json" | tee -a "$LOG_FILE"
 
 echo "" | tee -a "$LOG_FILE"
+
+# FASE 3.7: SEED DEMO "Construtora Alfa" (Task #108)
+# - Idempotente: chave natural = email admin@construtoraalfa.com.br
+# - Implantações subsequentes detectam o admin e saem em silêncio (no-op)
+# - Falhas NÃO derrubam o container — log e segue
+echo "🌱 FASE 3.7: SEED DEMO ALFA (idempotente)" | tee -a "$LOG_FILE"
+echo "==========================================" | tee -a "$LOG_FILE"
+if [ "${SIGE_SKIP_DEMO_SEED:-false}" = "true" ]; then
+    echo "⏭️ SIGE_SKIP_DEMO_SEED=true — pulando seed do dataset Alfa" | tee -a "$LOG_FILE"
+else
+    if [ -f /app/scripts/seed_demo_alfa.py ]; then
+        SEED_LOG="/tmp/sige_seed_demo_alfa.log"
+        timeout 60 python3 /app/scripts/seed_demo_alfa.py 2>&1 | tee -a "$SEED_LOG" | tee -a "$LOG_FILE" || \
+            echo "⚠️ seed demo Alfa falhou (continuando deploy) — ver $SEED_LOG" | tee -a "$LOG_FILE"
+    else
+        echo "ℹ️ scripts/seed_demo_alfa.py ausente — seed pulado" | tee -a "$LOG_FILE"
+    fi
+fi
+
 echo "🚀 SIGE v10.0 PRONTO PARA PRODUÇÃO!" | tee -a "$LOG_FILE"
 echo "🌐 Iniciando aplicação em modo produção..." | tee -a "$LOG_FILE"
 
