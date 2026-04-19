@@ -1311,7 +1311,7 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | 12| Detalhe da obra                | GET    | `/obras/<obra_id>`                               | título com "Residencial Bela Vista"                 |
 | 13| Cronograma da obra (Gantt)     | GET    | `/cronograma/obra/<obra_id>`                     | barras Gantt ≥9; árvore Serviço→Grupo→Subatividade  |
 | 14| Lista de RDOs                  | GET    | `/rdo`                                           | linhas de RDO finalizado ≥ 2                        |
-| 15| Novo RDO / Finalizar           | GET / POST | `GET /rdo/novo` ; `POST /rdo/<rdo_id>/finalizar` | toast `RDO finalizado`; status na lista = `Finalizado` |
+| 15| Novo RDO / Salvar              | GET / POST | `GET /rdo/novo` ; `POST /salvar-rdo-flexivel` (form `#formNovoRDO` enctype `multipart/form-data`) | toast de sucesso; novo RDO aparece em `/rdo` (status pode ficar `Rascunho` até finalização explícita via POST `/rdo/<rdo_id>/finalizar`) |
 | 16| Tela de medições + aprovação   | GET / POST | `GET /obras/<obra_id>/medicao` (alias `/medicao/obra/<obra_id>`); `POST /obras/<obra_id>/medicao/fechar` (gerar) e `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (aprovar) | medição #001 visível e com status `APROVADO` |
 | 17| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
 
@@ -1348,32 +1348,44 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Preço de venda                 | `preco_venda_unitario`      | `number`        |
 | **Template padrão (cronograma)** | `template_padrao_id`      | `select`        |
 
-### A.4.3 — Proposta (template real `templates/propostas/nova_proposta.html`)
+### A.4.3 — Proposta (template real `templates/propostas/nova_proposta.html` — form `#formNovaProposta`, action `POST /propostas/criar`)
 
-| Rótulo                  | `name`                  | Tipo            |
-|-------------------------|-------------------------|-----------------|
-| Cliente — nome          | `cliente_nome`          | `text` required |
-| Cliente — telefone      | `cliente_telefone`      | `text`          |
-| Cliente — e-mail        | `cliente_email`         | `email`         |
-| Cliente — endereço      | `cliente_endereco`      | `textarea`      |
-| Número da proposta      | `numero_proposta`       | `text` required |
-| Assunto                 | `assunto`               | `text`          |
-| Objeto / descrição      | `objeto`                | `textarea`      |
-| Documentos de referência| `documentos_referencia` | `textarea`      |
-| Item — descrição        | `item_descricao`        | `text` (linha)  |
-| Item — quantidade       | `item_quantidade`       | `number` (linha)|
-| Item — unidade          | `item_unidade`          | `select` (linha)|
-| Item — preço unitário   | `item_preco`            | `number` (linha)|
-| Itens inclusos          | `itens_inclusos`        | `checkbox[]`    |
-| Itens exclusos          | `itens_exclusos`        | `checkbox[]`    |
-| Prazo de entrega (dias) | `prazo_entrega_dias`    | `number`        |
-| % Nota fiscal           | `percentual_nota_fiscal`| `number`        |
-| Condições de pagamento  | `condicoes_pagamento`   | `textarea`      |
+| Rótulo                       | `name`                       | Tipo                |
+|------------------------------|------------------------------|---------------------|
+| Cliente — nome               | `cliente_nome`               | `text` required     |
+| Cliente — e-mail             | `cliente_email`              | `email`             |
+| Cliente — telefone           | `cliente_telefone`           | `text`              |
+| Cliente — CPF/CNPJ           | `cliente_cpf_cnpj`           | `text`              |
+| Número da proposta           | `numero_proposta`            | `text` required     |
+| Assunto                      | `assunto`                    | `text`              |
+| Objeto / descrição           | `objeto`                     | `textarea`          |
+| Endereço da obra             | `endereco_obra`              | `textarea`          |
+| Área total (m²)              | `area_total_m2`              | `number step=0.01`  |
+| Prazo de execução (dias)     | `prazo_execucao`             | `number`            |
+| Item — serviço (FK oculto)   | `item_servico_id`            | `hidden` (linha)    |
+| Item — template (FK oculto)  | `item_template_id`           | `hidden` (linha)    |
+| Item — descrição             | `item_descricao`             | `text` (linha)      |
+| Item — quantidade            | `item_quantidade`            | `number step=0.01`  |
+| Item — unidade               | `item_unidade`               | `select` (linha)    |
+| Item — preço unitário        | `item_preco`                 | `number step=0.01`  |
+| Seção especificações         | `secao_especificacoes`       | `textarea`          |
+| Seção materiais              | `secao_materiais`            | `textarea`          |
+| Seção fabricação             | `secao_fabricacao`           | `textarea`          |
+| Seção logística              | `secao_logistica`            | `textarea`          |
+| Seção montagem               | `secao_montagem`             | `textarea`          |
+| Seção qualidade              | `secao_qualidade`            | `textarea`          |
+| Seção segurança              | `secao_seguranca`            | `textarea`          |
+| Seção assistência técnica    | `secao_assistencia`          | `textarea`          |
+| Seção considerações          | `secao_consideracoes`        | `textarea`          |
+| % Nota fiscal                | `percentual_nota_fiscal`     | `number`            |
+| Valor total                  | `valor_total`                | `number step=0.01`  |
+| Itens (JSON serializado)     | `servicos_json`              | `hidden`            |
 
 > Observação: o template alternativo `templates/propostas/editar.html`
-> (rota `GET /propostas/editar/<id>`) usa os nomes `numero`, `titulo` e
-> `descricao` em vez de `numero_proposta`, `assunto` e `objeto` —
-> verifique qual template a rota acessada renderiza antes de mapear.
+> (rota `GET/POST /propostas/editar/<id>`) usa nomes diferentes
+> (`numero`, `titulo`, `descricao`, `cliente_endereco`,
+> `prazo_entrega_dias`, `condicoes_pagamento`) — verifique qual
+> template a rota acessada renderiza antes de mapear.
 
 ### A.4.4 — Cronograma (revisão pré-aprovação)
 
@@ -1384,31 +1396,44 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Duração em dias (override)  | `duracao_<proposta_item_id>_<no_id>`         | `number`   |
 | Confirmar e aprovar         | `button[type=submit][name=acao][value=aprovar]` | `submit` |
 
-### A.4.5 — RDO (`/rdo/novo`)
+### A.4.5 — RDO (template real `templates/rdo/novo.html` — form `#formNovoRDO`, action `POST /salvar-rdo-flexivel`, `enctype=multipart/form-data`)
 
-| Rótulo                      | `name`                     | Tipo            |
-|-----------------------------|----------------------------|-----------------|
-| Obra                        | `obra_id`                  | `select`        |
-| Data do relatório           | `data_relatorio`           | `date`          |
-| Clima                       | `clima_geral`              | `select`        |
-| Temperatura média           | `temperatura_media`        | `text`          |
-| Local                       | `local`                    | `select` (`Campo`/`Oficina`) |
-| Comentário geral            | `comentario_geral`         | `textarea`      |
-| Funcionário (linha de mão de obra) | `mao_obra[<i>][funcionario_id]` | `select` |
-| Horas trabalhadas (linha)   | `mao_obra[<i>][horas_trabalhadas]` | `number`  |
-| Tarefa do cronograma (linha)| `mao_obra[<i>][tarefa_cronograma_id]` | `select` |
-| % conclusão da subatividade | `subatividade[<i>][percentual_conclusao]` | `number` |
-| Finalizar RDO               | `button[type=submit][name=acao][value=finalizar]` | `submit` |
+> O RDO usa um fluxo flexível: a tela é populada via JavaScript a partir
+> das tarefas do cronograma da obra selecionada, e os campos de mão de
+> obra são gerados dinamicamente por subatividade/funcionário. Os
+> seletores estáveis para automação são os listados abaixo.
 
-### A.4.6 — Medição quinzenal (`/obras/<obra_id>/medicao`)
+| Rótulo / função                        | `name` / `id`                                  | Tipo                |
+|----------------------------------------|------------------------------------------------|---------------------|
+| Funcionário logado (oculto)            | `funcionario_id`                               | `hidden`            |
+| Admin (oculto)                         | `admin_id_form`                                | `hidden`            |
+| Obra                                   | `obra_id` (`select#obra_id`)                   | `select`            |
+| Data do relatório                      | `data_relatorio` (`input#data_relatorio`)      | `date`              |
+| Tarefas do cronograma (gerado por JS)  | `cronograma_tarefa_<tarefa_id>`                | `checkbox`/`number` |
+| Tarefas para entrega (multi-select)    | `entrega_tarefa_ids[]`                         | `select multiple`   |
+| Horas por funcionário × subatividade   | `func_<subId>_<funcId>_horas`                  | `number step=0.5`   |
+| Fotos (câmera)                         | `fotos[]` (`#fileInputNovoCam`)                | `file multiple`     |
+| Fotos (galeria)                        | `fotos[]` (`#fileInputNovoGal`)                | `file multiple`     |
+| Legenda da foto                        | `legenda_foto_<i>`                             | `text`              |
 
-| Rótulo                  | `name`                | Tipo                 |
-|-------------------------|-----------------------|----------------------|
-| Período — início        | `periodo_inicio`      | `date`               |
-| Período — fim           | `periodo_fim`         | `date`               |
-| Observações             | `observacoes`         | `textarea`           |
-| Gerar medição           | `button[type=submit][formaction$="/medicao/fechar"]` | `submit` (POST `/obras/<obra_id>/medicao/fechar`) |
-| Aprovar medição (#nnn)  | `button[type=submit][formaction$="/<medicao_id>/aprovar"]` | `submit` (POST `/obras/<obra_id>/medicao/<medicao_id>/aprovar`) |
+Para **finalizar um RDO já salvo** (mudar `status` para `Finalizado`),
+o agente faz `POST /rdo/<rdo_id>/finalizar` (sem corpo).
+
+### A.4.6 — Medição quinzenal (template real `templates/medicao/gestao_itens.html`)
+
+> No template real, cada ação está num `<form method="post" action="...">`
+> dedicado, com botões de envio simples (`type="submit"`). Para automação,
+> selecione o formulário pela `action` e clique no submit dentro dele.
+
+| Rótulo / ação                     | Localização (selector)                                                         | Endpoint Flask                          |
+|-----------------------------------|--------------------------------------------------------------------------------|------------------------------------------|
+| Período — início (gerar)          | `form[action*="/medicao/fechar"] input[name=periodo_inicio]`                   | POST `/obras/<obra_id>/medicao/fechar` (endpoint `medicao.gerar_medicao`) |
+| Período — fim (gerar)             | `form[action*="/medicao/fechar"] input[name=periodo_fim]`                      | idem                                    |
+| Observações (gerar)               | `form[action*="/medicao/fechar"] textarea[name=observacoes]`                   | idem                                    |
+| Botão "Gerar medição"             | `form[action*="/medicao/fechar"] button[type=submit]`                          | idem                                    |
+| Botão "Aprovar medição #N"        | `form[action*="/medicao/<medicao_id>/aprovar"] button[type=submit]`            | POST `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (endpoint `medicao.fechar`) |
+| Configuração da obra (data inicial / valor de entrada) | `form[action*="/medicao/config"]` com `data_inicio_medicao`, `valor_entrada`, `data_entrada` | POST `/obras/<obra_id>/medicao/config` (endpoint `medicao.config_obra_medicao`) |
+| Novo item de medição (modal)      | `form#formNovoItemMedicao` com `servico_id`, `nome`, `quantidade`, `valor_comercial` | POST `/obras/<obra_id>/medicao/itens` (endpoint `medicao.criar_item`) |
 
 ## A.5 — Critério de aceite verificável por etapa
 
