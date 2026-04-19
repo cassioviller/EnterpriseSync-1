@@ -1289,7 +1289,7 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Proposta            | nº `001.26` (4 itens, R$ 62.250,00)    |
 | Obra                | `OBR-2026-001` — Residencial Bela Vista|
 
-## A.3 — URL por etapa (18 etapas do ciclo)
+## A.3 — URL por etapa (17 etapas do ciclo)
 
 > Os IDs `<proposta_id>`, `<obra_id>`, `<medicao_id>` são impressos no
 > bloco `DEMO PRONTA` no fim da execução do seed. Em todas as rotas,
@@ -1312,9 +1312,8 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | 13| Cronograma da obra (Gantt)     | GET    | `/cronograma/obra/<obra_id>`                     | barras Gantt ≥9; árvore Serviço→Grupo→Subatividade  |
 | 14| Lista de RDOs                  | GET    | `/rdo`                                           | linhas de RDO finalizado ≥ 2                        |
 | 15| Novo RDO / Finalizar           | GET / POST | `GET /rdo/novo` ; `POST /rdo/<rdo_id>/finalizar` | toast `RDO finalizado`; status na lista = `Finalizado` |
-| 16| Tela de medições da obra       | GET    | `/obras/<obra_id>/medicao` (alias `/medicao/obra/<obra_id>`) | linha da medição #001 com status `APROVADA`         |
-| 17| Aprovar nova medição           | POST   | `/obras/<obra_id>/medicao/fechar` (gerar) e `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (aprovar) | medição muda para `APROVADA`; CR atualizada         |
-| 18| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
+| 16| Tela de medições + aprovação   | GET / POST | `GET /obras/<obra_id>/medicao` (alias `/medicao/obra/<obra_id>`); `POST /obras/<obra_id>/medicao/fechar` (gerar) e `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (aprovar) | medição #001 visível e com status `APROVADO` |
+| 17| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
 
 ## A.4 — Mapas "Rótulo → name/id → tipo" para os formulários centrais
 
@@ -1349,7 +1348,7 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Preço de venda                 | `preco_venda_unitario`      | `number`        |
 | **Template padrão (cronograma)** | `template_padrao_id`      | `select`        |
 
-### A.4.3 — Proposta (`/propostas/nova`, `/propostas/<id>` editar)
+### A.4.3 — Proposta (template real `templates/propostas/nova_proposta.html`)
 
 | Rótulo                  | `name`                  | Tipo            |
 |-------------------------|-------------------------|-----------------|
@@ -1357,18 +1356,24 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Cliente — telefone      | `cliente_telefone`      | `text`          |
 | Cliente — e-mail        | `cliente_email`         | `email`         |
 | Cliente — endereço      | `cliente_endereco`      | `textarea`      |
-| Cliente — CPF/CNPJ      | `cliente_cpf_cnpj`      | `text`          |
-| Número da proposta      | `numero`                | `text` required |
-| Título                  | `titulo`                | `text`          |
-| Descrição / objeto      | `descricao` / `objeto`  | `textarea`      |
-| Valor total             | `valor_total`           | `number`        |
+| Número da proposta      | `numero_proposta`       | `text` required |
+| Assunto                 | `assunto`               | `text`          |
+| Objeto / descrição      | `objeto`                | `textarea`      |
+| Documentos de referência| `documentos_referencia` | `textarea`      |
 | Item — descrição        | `item_descricao`        | `text` (linha)  |
 | Item — quantidade       | `item_quantidade`       | `number` (linha)|
 | Item — unidade          | `item_unidade`          | `select` (linha)|
 | Item — preço unitário   | `item_preco`            | `number` (linha)|
+| Itens inclusos          | `itens_inclusos`        | `checkbox[]`    |
+| Itens exclusos          | `itens_exclusos`        | `checkbox[]`    |
 | Prazo de entrega (dias) | `prazo_entrega_dias`    | `number`        |
 | % Nota fiscal           | `percentual_nota_fiscal`| `number`        |
 | Condições de pagamento  | `condicoes_pagamento`   | `textarea`      |
+
+> Observação: o template alternativo `templates/propostas/editar.html`
+> (rota `GET /propostas/editar/<id>`) usa os nomes `numero`, `titulo` e
+> `descricao` em vez de `numero_proposta`, `assunto` e `objeto` —
+> verifique qual template a rota acessada renderiza antes de mapear.
 
 ### A.4.4 — Cronograma (revisão pré-aprovação)
 
@@ -1429,9 +1434,8 @@ impresso no bloco `DEMO PRONTA`.
 |13 | Cronograma materializado | `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:o AND admin_id=:a` ≥ 9 | barras Gantt count ≥ 9                  |
 |14 | RDOs finalizados       | `SELECT count(*) FROM rdo WHERE obra_id=:o AND status='Finalizado'` = 2 | 2 linhas com status "Finalizado"                |
 |15 | RDO mão de obra        | `SELECT count(DISTINCT funcionario_id) FROM rdo_mao_obra rmo JOIN rdo r ON rmo.rdo_id=r.id WHERE r.obra_id=:o` = 2 | toast `RDO finalizado`         |
-|16 | Tela de medições       | `SELECT count(*) FROM medicao_obra WHERE obra_id=:o` ≥ 1            | tabela em `/obras/<obra_id>/medicao` com a medição #001 |
-|17 | Medição aprovada       | `SELECT status,numero FROM medicao_obra WHERE obra_id=:o` retorna `('APROVADA',1)` | medição #001 com status APROVADA           |
-|18 | Conta a Receber        | `SELECT valor_original,status FROM conta_receber WHERE origem_tipo='OBRA_MEDICAO' AND origem_id=:o` retorna `(32250.00,'PENDENTE')` | linha `OBR-MED-<obra_id>` valor `R$ 32.250,00` |
+|16 | Medição aprovada       | `SELECT status,numero FROM medicao_obra WHERE obra_id=:o` retorna `('APROVADO',1)` | em `/obras/<obra_id>/medicao`, medição #001 exibida com badge `APROVADO` |
+|17 | Conta a Receber        | `SELECT valor_original,status FROM conta_receber WHERE origem_tipo='OBRA_MEDICAO' AND origem_id=:o` retorna `(32250.00,'PENDENTE')` | linha `OBR-MED-<obra_id>` valor `R$ 32.250,00` |
 
 ## A.6 — Ordem recomendada para um agente E2E
 
@@ -1440,7 +1444,7 @@ impresso no bloco `DEMO PRONTA`.
 2. Capturar do stdout os IDs (`<admin_id>`, `<proposta_id>`,
    `<obra_id>`, `<medicao_id>`).
 3. Executar a etapa 1 (login) e validar o critério da linha 1.
-4. Para cada etapa N (2..18), abrir a URL listada em A.3 e validar
+4. Para cada etapa N (2..17), abrir a URL listada em A.3 e validar
    o critério da linha N em A.5. Se o critério falhar, capturar
    screenshot e logs e parar.
 5. Ao final, conferir que `SELECT count(*) FROM conta_receber WHERE
