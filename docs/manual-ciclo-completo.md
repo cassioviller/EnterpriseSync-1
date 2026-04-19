@@ -1289,7 +1289,7 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Proposta            | nº `001.26` (4 itens, R$ 62.250,00)    |
 | Obra                | `OBR-2026-001` — Residencial Bela Vista|
 
-## A.3 — URL por etapa (17 etapas do ciclo)
+## A.3 — URL por etapa (18 etapas do ciclo)
 
 > Os IDs `<proposta_id>`, `<obra_id>`, `<medicao_id>` são impressos no
 > bloco `DEMO PRONTA` no fim da execução do seed. Em todas as rotas,
@@ -1297,27 +1297,28 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 
 | # | Etapa                          | Método | URL                                              | DOM esperado (seletor)                              |
 |---|--------------------------------|--------|--------------------------------------------------|------------------------------------------------------|
-| 1 | Login                          | POST   | `/login`                                         | redireciona para `/dashboard`; `body[data-page=dashboard]` |
-| 2 | Dashboard inicial              | GET    | `/dashboard`                                     | `h1:contains("Dashboard")`, `.kpi-card` (≥4)        |
-| 3 | Lista de funcionários          | GET    | `/funcionarios`                                  | `table#tabelaFuncionarios tr[data-funcionario-id]` ≥2 |
-| 4 | Cadastro de funcionário        | GET/POST | `/funcionarios/novo`                           | `form#formFuncionario`, `select[name=tipo_remuneracao]` |
-| 5 | Catálogo de serviços           | GET    | `/catalogo/servicos`                             | `table#tabelaServicos`; 3 linhas (Alvenaria/Contrapiso/Mobilização) |
-| 6 | Detalhe de serviço (template)  | GET    | `/catalogo/servicos/<servico_id>`                | `select[name=template_padrao_id]` com valor != ""   |
-| 7 | Lista de propostas             | GET    | `/propostas/`                                    | `table#tabelaPropostas tr[data-proposta-id]`        |
-| 8 | Nova proposta                  | GET/POST | `/propostas/nova`                              | `form#formProposta`, `tbody#itensProposta tr` ≥1   |
-| 9 | Detalhe da proposta            | GET    | `/propostas/<proposta_id>`                       | `.proposta-status:contains("Aprovada")`             |
-| 10| Revisão do cronograma da proposta | GET/POST | `/propostas/<proposta_id>/cronograma-revisar` | `ul.arvore-cronograma li input[type=checkbox]` ≥1   |
-| 11| Aprovação da proposta          | POST   | `/propostas/<proposta_id>/aprovar`               | redireciona para `/obras/<obra_id>`                 |
-| 12| Detalhe da obra                | GET    | `/obras/<obra_id>`                               | `h1:contains("Residencial Bela Vista")`             |
-| 13| Cronograma da obra (Gantt)     | GET    | `/cronograma/obra/<obra_id>`                     | `.gantt-container`, `.gantt-task` ≥9                |
-| 14| Lista de RDOs                  | GET    | `/rdo`                                           | `tr[data-rdo-id]` ≥2                                |
-| 15| Novo RDO / Finalizar           | GET/POST | `/rdo/novo` → `/rdo/<rdo_id>/finalizar`        | toast `RDO finalizado`; status na lista = `Finalizado` |
-| 16| Medição quinzenal              | GET/POST | `/obras/<obra_id>/medicao`                     | linha da medição #001 com badge `APROVADA`          |
-| 17| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
+| 1 | Login                          | GET / POST | `/login`                                     | sucesso → redireciona para `/dashboard`             |
+| 2 | Dashboard inicial              | GET    | `/dashboard`                                     | `h1` com "Dashboard"; cards de KPI (≥4)             |
+| 3 | Lista de funcionários          | GET    | `/funcionarios`                                  | linhas de funcionário ≥ 2 (Carlos + Pedro)          |
+| 4 | Cadastro de funcionário        | POST   | `/funcionarios` (modal "Novo Funcionário" na própria página) | `select[name=tipo_remuneracao]` no modal; toast de sucesso |
+| 5 | Catálogo de serviços           | GET    | `/catalogo/servicos`                             | 3 linhas de serviço (Alvenaria / Contrapiso / Mobilização) |
+| 6 | Detalhe de serviço + composição| GET    | `/catalogo/servicos/<servico_id>/composicao`     | tabela de composição visível; bloco "Template padrão" preenchido para Alvenaria/Contrapiso |
+| 7 | Lista de propostas             | GET    | `/propostas/`                                    | linha com nº `001.26` e badge `Aprovada`            |
+| 8 | Nova proposta                  | GET / POST | `GET /propostas/nova` ; `POST /propostas/criar` | form de proposta; após salvar, redireciona para o detalhe |
+| 9 | Detalhe da proposta            | GET    | `/propostas/<proposta_id>`                       | status visível = `Aprovada`; 4 itens listados       |
+| 10| Revisão do cronograma da proposta | GET | `/propostas/<proposta_id>/cronograma-revisar`    | árvore com checkboxes (≥9 nós) renderizada         |
+| 11| Aprovação da proposta          | POST   | `/propostas/aprovar/<proposta_id>`               | redireciona para `/obras/<obra_id>`                 |
+| 12| Detalhe da obra                | GET    | `/obras/<obra_id>`                               | título com "Residencial Bela Vista"                 |
+| 13| Cronograma da obra (Gantt)     | GET    | `/cronograma/obra/<obra_id>`                     | barras Gantt ≥9; árvore Serviço→Grupo→Subatividade  |
+| 14| Lista de RDOs                  | GET    | `/rdo`                                           | linhas de RDO finalizado ≥ 2                        |
+| 15| Novo RDO / Finalizar           | GET / POST | `GET /rdo/novo` ; `POST /rdo/<rdo_id>/finalizar` | toast `RDO finalizado`; status na lista = `Finalizado` |
+| 16| Tela de medições da obra       | GET    | `/obras/<obra_id>/medicao` (alias `/medicao/obra/<obra_id>`) | linha da medição #001 com status `APROVADA`         |
+| 17| Aprovar nova medição           | POST   | `/obras/<obra_id>/medicao/fechar` (gerar) e `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (aprovar) | medição muda para `APROVADA`; CR atualizada         |
+| 18| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
 
 ## A.4 — Mapas "Rótulo → name/id → tipo" para os formulários centrais
 
-### A.4.1 — Funcionário (`/funcionarios/novo`, modal e form completo)
+### A.4.1 — Funcionário (modal "Novo" em `/funcionarios` + form completo)
 
 | Rótulo na tela                | `name` / `id`              | Tipo HTML            | Observações                                  |
 |-------------------------------|----------------------------|----------------------|----------------------------------------------|
@@ -1401,8 +1402,8 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Período — início        | `periodo_inicio`      | `date`               |
 | Período — fim           | `periodo_fim`         | `date`               |
 | Observações             | `observacoes`         | `textarea`           |
-| Gerar medição           | `button[type=submit][formaction$="/gerar"]` | `submit` |
-| Aprovar medição (#nnn)  | `button[type=submit][formaction$="/<medicao_id>/fechar"]` | `submit` |
+| Gerar medição           | `button[type=submit][formaction$="/medicao/fechar"]` | `submit` (POST `/obras/<obra_id>/medicao/fechar`) |
+| Aprovar medição (#nnn)  | `button[type=submit][formaction$="/<medicao_id>/aprovar"]` | `submit` (POST `/obras/<obra_id>/medicao/<medicao_id>/aprovar`) |
 
 ## A.5 — Critério de aceite verificável por etapa
 
@@ -1414,22 +1415,23 @@ impresso no bloco `DEMO PRONTA`.
 | # | Etapa                  | Critério SQL (preferencial)                                         | Seletor CSS / DOM (alternativa E2E)                  |
 |---|------------------------|---------------------------------------------------------------------|------------------------------------------------------|
 | 1 | Login                  | `SELECT 1 FROM usuario WHERE email='admin@construtoraalfa.com.br'`  | URL final = `/dashboard`                             |
-| 2 | Dashboard              | n/a                                                                 | `.kpi-card` count ≥ 4                                |
-| 3 | Lista funcionários     | `SELECT count(*) FROM funcionario WHERE admin_id=:a` ≥ 2            | `tr[data-funcionario-id]` count = 2                  |
-| 4 | Cadastro funcionário   | `SELECT tipo_remuneracao,valor_diaria FROM funcionario WHERE cpf='900.901.002-02'` retorna `('diaria',180.00)` | toast "Funcionário cadastrado"     |
-| 5 | Catálogo serviços      | `SELECT count(*) FROM servico WHERE admin_id=:a` = 3                | `tr[data-servico-id]` count = 3                      |
-| 6 | Serviço com template   | `SELECT template_padrao_id IS NOT NULL FROM servico WHERE nome='Alvenaria de bloco cerâmico' AND admin_id=:a` retorna `t` | `select[name=template_padrao_id] option[selected]` ≠ vazio |
+| 2 | Dashboard              | n/a                                                                 | cards de KPI count ≥ 4                               |
+| 3 | Lista funcionários     | `SELECT count(*) FROM funcionario WHERE admin_id=:a` ≥ 2            | linhas de funcionário ≥ 2                            |
+| 4 | Cadastro funcionário   | `SELECT tipo_remuneracao,valor_diaria FROM funcionario WHERE cpf='900.901.002-02'` retorna `('diaria',180.00)` | toast "Funcionário cadastrado" após POST `/funcionarios` |
+| 5 | Catálogo serviços      | `SELECT count(*) FROM servico WHERE admin_id=:a` = 3                | tabela com 3 linhas de serviço                       |
+| 6 | Serviço com template   | `SELECT template_padrao_id IS NOT NULL FROM servico WHERE nome='Alvenaria de bloco cerâmico' AND admin_id=:a` retorna `t` | em `/catalogo/servicos/<id>/composicao`, bloco "Template padrão" preenchido |
 | 7 | Lista propostas        | `SELECT numero,status FROM propostas_comerciais WHERE admin_id=:a`  | linha com `001.26` + badge `Aprovada`                |
-| 8 | Itens da proposta      | `SELECT count(*) FROM proposta_itens WHERE proposta_id=:p` = 4      | `tbody#itensProposta tr` count = 4                   |
-| 9 | Detalhe proposta       | `SELECT status FROM propostas_comerciais WHERE id=:p` = `'aprovada'`| `.proposta-status:contains("Aprovada")`              |
-|10 | Revisão cronograma     | `SELECT cronograma_default_json IS NOT NULL FROM propostas_comerciais WHERE id=:p` retorna `t` | árvore renderizada com checkboxes |
-|11 | Aprovação              | `SELECT id FROM obra WHERE proposta_origem_id=:p` retorna 1 linha   | redirect `/obras/<obra_id>`                          |
-|12 | Detalhe obra           | `SELECT codigo FROM obra WHERE id=:o` = `'OBR-2026-001'`            | `h1:contains("Residencial Bela Vista")`              |
-|13 | Cronograma materializado | `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:o AND admin_id=:a` ≥ 9 | `.gantt-task` count ≥ 9                  |
-|14 | RDOs finalizados       | `SELECT count(*) FROM rdo WHERE obra_id=:o AND status='Finalizado'` = 2 | `tr[data-rdo-id] td:contains("Finalizado")` count = 2 |
-|15 | RDO mão de obra        | `SELECT count(DISTINCT funcionario_id) FROM rdo_mao_obra rmo JOIN rdo r ON rmo.rdo_id=r.id WHERE r.obra_id=:o` = 2 | toast `RDO finalizado` |
-|16 | Medição aprovada       | `SELECT status,numero FROM medicao_obra WHERE obra_id=:o` retorna `('APROVADA',1)` | badge `APROVADA` na linha #001              |
-|17 | Conta a Receber        | `SELECT valor_original,status FROM conta_receber WHERE origem_tipo='OBRA_MEDICAO' AND origem_id=:o` retorna `(32250.00,'PENDENTE')` | linha `OBR-MED-<obra_id>` valor `R$ 32.250,00` |
+| 8 | Itens da proposta      | `SELECT count(*) FROM proposta_itens WHERE proposta_id=:p` = 4      | tabela de itens da proposta com 4 linhas             |
+| 9 | Detalhe proposta       | `SELECT status FROM propostas_comerciais WHERE id=:p` = `'aprovada'`| status visível "Aprovada"                            |
+|10 | Revisão cronograma     | `SELECT cronograma_default_json IS NOT NULL FROM propostas_comerciais WHERE id=:p` retorna `t` | árvore renderizada com checkboxes  |
+|11 | Aprovação              | `SELECT id FROM obra WHERE proposta_origem_id=:p` retorna 1 linha   | POST `/propostas/aprovar/<p>` redireciona para `/obras/<obra_id>` |
+|12 | Detalhe obra           | `SELECT codigo FROM obra WHERE id=:o` = `'OBR-2026-001'`            | título "Residencial Bela Vista"                      |
+|13 | Cronograma materializado | `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:o AND admin_id=:a` ≥ 9 | barras Gantt count ≥ 9                  |
+|14 | RDOs finalizados       | `SELECT count(*) FROM rdo WHERE obra_id=:o AND status='Finalizado'` = 2 | 2 linhas com status "Finalizado"                |
+|15 | RDO mão de obra        | `SELECT count(DISTINCT funcionario_id) FROM rdo_mao_obra rmo JOIN rdo r ON rmo.rdo_id=r.id WHERE r.obra_id=:o` = 2 | toast `RDO finalizado`         |
+|16 | Tela de medições       | `SELECT count(*) FROM medicao_obra WHERE obra_id=:o` ≥ 1            | tabela em `/obras/<obra_id>/medicao` com a medição #001 |
+|17 | Medição aprovada       | `SELECT status,numero FROM medicao_obra WHERE obra_id=:o` retorna `('APROVADA',1)` | medição #001 com status APROVADA           |
+|18 | Conta a Receber        | `SELECT valor_original,status FROM conta_receber WHERE origem_tipo='OBRA_MEDICAO' AND origem_id=:o` retorna `(32250.00,'PENDENTE')` | linha `OBR-MED-<obra_id>` valor `R$ 32.250,00` |
 
 ## A.6 — Ordem recomendada para um agente E2E
 
@@ -1438,7 +1440,7 @@ impresso no bloco `DEMO PRONTA`.
 2. Capturar do stdout os IDs (`<admin_id>`, `<proposta_id>`,
    `<obra_id>`, `<medicao_id>`).
 3. Executar a etapa 1 (login) e validar o critério da linha 1.
-4. Para cada etapa N (2..17), abrir a URL listada em A.3 e validar
+4. Para cada etapa N (2..18), abrir a URL listada em A.3 e validar
    o critério da linha N em A.5. Se o critério falhar, capturar
    screenshot e logs e parar.
 5. Ao final, conferir que `SELECT count(*) FROM conta_receber WHERE

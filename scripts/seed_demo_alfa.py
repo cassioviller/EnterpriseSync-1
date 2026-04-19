@@ -629,7 +629,7 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
     )
     log.info("")
     log.info("=" * 72)
-    log.info(" DEMO CONSTRUTORA ALFA — PRONTA PARA APRESENTAÇÃO")
+    log.info(" DEMO CONSTRUTORA ALFA — Credenciais e estado pronto")
     log.info("=" * 72)
     log.info(f"  URL de login : {base_url}/login")
     log.info(f"  E-mail       : {ADMIN_EMAIL}")
