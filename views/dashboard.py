@@ -262,32 +262,15 @@ def dashboard():
                 except Exception as e:
                     logger.error(f"[ERROR] DEBUG DASHBOARD PROD: Erro ao buscar na tabela usuarios: {e}")
         
-        # Se ainda não encontrou admin_id, detectar automaticamente
+        # 🔒 SEGURANÇA MULTI-TENANT: NUNCA auto-detectar admin_id de outros tenants.
+        # Se chegou aqui sem admin_id, o usuário não tem tenant válido — abortar.
         if admin_id is None:
-            try:
-                # Buscar admin_id com mais funcionários ativos (desenvolvimento e produção)
-                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
-                logger.info(f"[STATS] DADOS DISPONÍVEIS POR ADMIN_ID: {[(row[0], row[1]) for row in admin_counts]}")
-                
-                if admin_counts and len(admin_counts) > 0:
-                    admin_id = admin_counts[0][0]
-                    logger.debug(f"[SYNC] DETECÇÃO AUTOMÁTICA: Usando admin_id={admin_id} (tem {admin_counts[0][1]} funcionários)")
-                else:
-                    # Buscar qualquer admin_id existente na tabela usuarios
-                    try:
-                        primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
-                        if primeiro_admin:
-                            admin_id = primeiro_admin.id
-                            logger.debug(f"[DEBUG] ADMIN ENCONTRADO NA TABELA USUARIOS: admin_id={admin_id}")
-                        else:
-                            admin_id = 1  # Fallback absoluto
-                            logger.debug(f"🆘 FALLBACK FINAL: admin_id={admin_id}")
-                    except Exception as e2:
-                        logger.error(f"[ERROR] Erro ao buscar admin na tabela usuarios: {e2}")
-                        admin_id = 1  # Fallback absoluto
-            except Exception as e:
-                logger.error(f"[ERROR] Erro ao detectar admin_id automaticamente: {e}")
-                admin_id = 1  # Fallback absoluto
+            logger.error(
+                f"[SECURITY] Dashboard sem admin_id resolvido para usuário "
+                f"{getattr(current_user, 'email', '?')}. Bloqueando acesso."
+            )
+            from flask import abort
+            abort(403)
         
         logger.info(f"[OK] PERÍODO DASHBOARD: {data_inicio} → {data_fim}")
         
@@ -530,24 +513,24 @@ def dashboard():
         # Imports necessários (date e datetime já importados no topo)
         from models import RegistroPonto, RegistroAlimentacao
         
-        # Garantir que admin_id está definido - usar valor do usuário atual
+        # 🔒 SEGURANÇA MULTI-TENANT: admin_id deve estar definido nesta altura.
+        # Se não estiver, usar APENAS o usuário autenticado — nunca auto-detectar.
         if 'admin_id' not in locals() or admin_id is None:
-            # Usar sistema automático de detecção
             if current_user.is_authenticated:
                 if current_user.tipo_usuario == TipoUsuario.ADMIN:
                     admin_id = current_user.id
+                elif current_user.admin_id:
+                    admin_id = current_user.admin_id
                 else:
-                    admin_id = current_user.admin_id or current_user.id
+                    logger.error(
+                        f"[SECURITY] KPIs sem admin_id válido para "
+                        f"{getattr(current_user, 'email', '?')}"
+                    )
+                    from flask import abort
+                    abort(403)
             else:
-                # Fallback: detectar automaticamente baseado em funcionários ativos
-                funcionarios_admin = db.session.execute(
-                    text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-                ).fetchone()
-                admin_id = funcionarios_admin[0] if funcionarios_admin else 1
-            
-                logger.debug(f"[OK] DEBUG DASHBOARD KPIs: Usando admin_id={admin_id} para cálculos")
-                logger.debug(f"[DATE] PERÍODO SELECIONADO: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
-                logger.info(f"[STATS] PERÍODO EM DIAS: {(data_fim - data_inicio).days + 1} dias")
+                from flask import abort
+                abort(401)
         
         # Verificar estrutura completa do banco para diagnóstico
         try:
@@ -622,20 +605,14 @@ def dashboard():
         funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
         logger.debug(f"[OK] DEBUG DASHBOARD KPIs: Encontrados {len(funcionarios_dashboard)} funcionários para admin_id={admin_id}")
         
-        # Se não encontrou funcionários, buscar o admin_id com mais dados
+        # 🔒 SEGURANÇA MULTI-TENANT: se este tenant não tem funcionários ainda
+        # (ex.: admin recém-criado), manter lista vazia. NUNCA substituir admin_id
+        # por outro tenant — isso vazaria dados entre empresas.
         if len(funcionarios_dashboard) == 0:
-            logger.warning(f"[WARN] AVISO PRODUÇÃO: Nenhum funcionário encontrado para admin_id={admin_id}")
-            try:
-                todos_admins = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC")).fetchall()
-                logger.info(f"[STATS] TODOS OS ADMINS DISPONÍVEIS: {[(row[0], row[1]) for row in todos_admins]}")
-                if todos_admins and len(todos_admins) > 0:
-                    admin_correto = todos_admins[0][0]
-                    logger.debug(f"[SYNC] CORREÇÃO AUTOMÁTICA: Mudando de admin_id={admin_id} para admin_id={admin_correto} (tem {todos_admins[0][1]} funcionários)")
-                    admin_id = admin_correto
-                    funcionarios_dashboard = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-                    logger.info(f"[OK] APÓS CORREÇÃO: {len(funcionarios_dashboard)} funcionários encontrados")
-            except Exception as e:
-                logger.error(f"[ERROR] ERRO ao detectar admin_id correto: {e}")
+            logger.info(
+                f"[INFO] Tenant admin_id={admin_id} sem funcionários ativos "
+                f"(provavelmente novo) — dashboard exibirá estado vazio."
+            )
         
         # Calcular KPIs reais com proteção de transação
         total_custo_real = 0
@@ -891,10 +868,8 @@ def dashboard():
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
         
         # Dados calculados reais
-        # Inicializar admin_id se não definido
-        if 'admin_id' not in locals():
-            admin_id = 10  # Admin padrão com mais dados
-            
+        # 🔒 admin_id já garantido pelas validações acima — nunca usar fallback fixo.
+        
         # [OK] CORREÇÃO 4: Veículos já calculados no início (linha 535) - removido daqui
         # Converter todos para float antes de somar (corrige erro float + Decimal)
         custos_mes = (float(total_custo_real) + float(custo_alimentacao_real) +
