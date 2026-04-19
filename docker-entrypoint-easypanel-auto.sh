@@ -323,21 +323,31 @@ echo "   📊 Health result: /tmp/health_check_result.json" | tee -a "$LOG_FILE"
 echo "" | tee -a "$LOG_FILE"
 
 # FASE 3.7: SEED DEMO "Construtora Alfa" (Task #108)
-# - Idempotente: chave natural = email admin@construtoraalfa.com.br
-# - Implantações subsequentes detectam o admin e saem em silêncio (no-op)
-# - Falhas NÃO derrubam o container — log e segue
-echo "🌱 FASE 3.7: SEED DEMO ALFA (idempotente)" | tee -a "$LOG_FILE"
-echo "==========================================" | tee -a "$LOG_FILE"
-if [ "${SIGE_SKIP_DEMO_SEED:-false}" = "true" ]; then
-    echo "⏭️ SIGE_SKIP_DEMO_SEED=true — pulando seed do dataset Alfa" | tee -a "$LOG_FILE"
-else
+# DESLIGADO POR PADRÃO em produção — auto-seed em prod é risco de
+# segurança (escreve credenciais conhecidas + dataset visível para
+# qualquer um com a URL). O operador deve rodar manualmente:
+#
+#     SIGE_ALLOW_PROD_SEED=1 \
+#       python3 /app/scripts/seed_demo_alfa.py --ambiente prod
+#
+# Para re-habilitar o auto-seed (NÃO recomendado), defina ambas as flags:
+#     SIGE_ENABLE_DEMO_SEED=true
+#     SIGE_ALLOW_PROD_SEED=1
+echo "🌱 FASE 3.7: SEED DEMO ALFA (manual / opt-in)" | tee -a "$LOG_FILE"
+echo "==============================================" | tee -a "$LOG_FILE"
+if [ "${SIGE_ENABLE_DEMO_SEED:-false}" = "true" ] && \
+   [ "${SIGE_ALLOW_PROD_SEED:-0}" = "1" ]; then
     if [ -f /app/scripts/seed_demo_alfa.py ]; then
         SEED_LOG="/tmp/sige_seed_demo_alfa.log"
-        timeout 60 python3 /app/scripts/seed_demo_alfa.py 2>&1 | tee -a "$SEED_LOG" | tee -a "$LOG_FILE" || \
+        timeout 60 python3 /app/scripts/seed_demo_alfa.py --ambiente prod \
+            2>&1 | tee -a "$SEED_LOG" | tee -a "$LOG_FILE" || \
             echo "⚠️ seed demo Alfa falhou (continuando deploy) — ver $SEED_LOG" | tee -a "$LOG_FILE"
     else
         echo "ℹ️ scripts/seed_demo_alfa.py ausente — seed pulado" | tee -a "$LOG_FILE"
     fi
+else
+    echo "⏭️ auto-seed desabilitado (default em prod). Para rodar manualmente:" | tee -a "$LOG_FILE"
+    echo "   SIGE_ALLOW_PROD_SEED=1 python3 /app/scripts/seed_demo_alfa.py --ambiente prod" | tee -a "$LOG_FILE"
 fi
 
 echo "🚀 SIGE v10.0 PRONTO PARA PRODUÇÃO!" | tee -a "$LOG_FILE"

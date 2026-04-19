@@ -1238,3 +1238,209 @@ Alimentação real + Reembolsos aprovados + Almoxarifado em posse.
   paramétrico → aprovação cliente).
 - `tests/test_e2e_metricas_funcionario.py` — 27/27 PASS (cobre
   v1+v2 de métricas).
+
+---
+
+# Anexo A — Modo Agente (operação dirigida via dataset Alfa)
+
+> **Propósito.** Permitir que um operador (humano ou agente
+> automatizado) reproduza o ciclo de ponta a ponta deste manual a
+> partir de um estado conhecido, sem intervir no banco. O dataset
+> "Construtora Alfa" é semeado por `scripts/seed_demo_alfa.py` e expõe
+> URL/método/seletor verificáveis em cada uma das 17 etapas.
+
+## A.1 — Como rodar o seed
+
+### Em desenvolvimento (Replit / local)
+```bash
+# Plantar (no-op se admin Alfa já existe)
+python3 scripts/seed_demo_alfa.py
+
+# Forçar replantio (apaga e refaz)
+python3 scripts/seed_demo_alfa.py --reset
+```
+O script imprime, no final, um bloco `DEMO PRONTA` com URL de login,
+credenciais e os IDs principais (admin, cliente, funcionários, serviços,
+templates, proposta, obra, medição, conta a receber).
+
+### Em produção (acionamento consciente)
+Auto-seed em produção está **desligado por padrão** desde a Task #108.
+Para acionar manualmente:
+```bash
+SIGE_ALLOW_PROD_SEED=1 \
+  python3 /app/scripts/seed_demo_alfa.py --ambiente prod
+```
+Se o admin Alfa já existir e `--reset` não for passado, o script aborta
+com **exit 2** — ato consciente é exigido. Para re-habilitar o auto-seed
+no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
+`SIGE_ENABLE_DEMO_SEED=true` **e** `SIGE_ALLOW_PROD_SEED=1`.
+
+## A.2 — Credenciais publicadas (Construtora Alfa)
+
+| Campo               | Valor                                  |
+|---------------------|----------------------------------------|
+| URL de login (dev)  | `http://localhost:5000/login`          |
+| URL de login (prod) | `https://construtoraalfa.estruturasdoval.com.br/login` |
+| E-mail              | `admin@construtoraalfa.com.br`         |
+| Senha               | `Alfa@2026`                            |
+| Cliente PF          | João da Silva — CPF `123.456.789-09`   |
+| Funcionário 1       | Carlos Pereira — mensalista R$ 2.800   |
+| Funcionário 2       | Pedro Souza   — diarista  R$ 180/dia   |
+| Proposta            | nº `001.26` (4 itens, R$ 62.250,00)    |
+| Obra                | `OBR-2026-001` — Residencial Bela Vista|
+
+## A.3 — URL por etapa (17 etapas do ciclo)
+
+> Os IDs `<proposta_id>`, `<obra_id>`, `<medicao_id>` são impressos no
+> bloco `DEMO PRONTA` no fim da execução do seed. Em todas as rotas,
+> o agente deve estar logado com a sessão do admin Alfa.
+
+| # | Etapa                          | Método | URL                                              | DOM esperado (seletor)                              |
+|---|--------------------------------|--------|--------------------------------------------------|------------------------------------------------------|
+| 1 | Login                          | POST   | `/login`                                         | redireciona para `/dashboard`; `body[data-page=dashboard]` |
+| 2 | Dashboard inicial              | GET    | `/dashboard`                                     | `h1:contains("Dashboard")`, `.kpi-card` (≥4)        |
+| 3 | Lista de funcionários          | GET    | `/funcionarios`                                  | `table#tabelaFuncionarios tr[data-funcionario-id]` ≥2 |
+| 4 | Cadastro de funcionário        | GET/POST | `/funcionarios/novo`                           | `form#formFuncionario`, `select[name=tipo_remuneracao]` |
+| 5 | Catálogo de serviços           | GET    | `/catalogo/servicos`                             | `table#tabelaServicos`; 3 linhas (Alvenaria/Contrapiso/Mobilização) |
+| 6 | Detalhe de serviço (template)  | GET    | `/catalogo/servicos/<servico_id>`                | `select[name=template_padrao_id]` com valor != ""   |
+| 7 | Lista de propostas             | GET    | `/propostas/`                                    | `table#tabelaPropostas tr[data-proposta-id]`        |
+| 8 | Nova proposta                  | GET/POST | `/propostas/nova`                              | `form#formProposta`, `tbody#itensProposta tr` ≥1   |
+| 9 | Detalhe da proposta            | GET    | `/propostas/<proposta_id>`                       | `.proposta-status:contains("Aprovada")`             |
+| 10| Revisão do cronograma da proposta | GET/POST | `/propostas/<proposta_id>/cronograma-revisar` | `ul.arvore-cronograma li input[type=checkbox]` ≥1   |
+| 11| Aprovação da proposta          | POST   | `/propostas/<proposta_id>/aprovar`               | redireciona para `/obras/<obra_id>`                 |
+| 12| Detalhe da obra                | GET    | `/obras/<obra_id>`                               | `h1:contains("Residencial Bela Vista")`             |
+| 13| Cronograma da obra (Gantt)     | GET    | `/cronograma/obra/<obra_id>`                     | `.gantt-container`, `.gantt-task` ≥9                |
+| 14| Lista de RDOs                  | GET    | `/rdo`                                           | `tr[data-rdo-id]` ≥2                                |
+| 15| Novo RDO / Finalizar           | GET/POST | `/rdo/novo` → `/rdo/<rdo_id>/finalizar`        | toast `RDO finalizado`; status na lista = `Finalizado` |
+| 16| Medição quinzenal              | GET/POST | `/obras/<obra_id>/medicao`                     | linha da medição #001 com badge `APROVADA`          |
+| 17| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
+
+## A.4 — Mapas "Rótulo → name/id → tipo" para os formulários centrais
+
+### A.4.1 — Funcionário (`/funcionarios/novo`, modal e form completo)
+
+| Rótulo na tela                | `name` / `id`              | Tipo HTML            | Observações                                  |
+|-------------------------------|----------------------------|----------------------|----------------------------------------------|
+| Nome completo                 | `nome`                     | `text` (required)    |                                              |
+| CPF                           | `cpf`                      | `text` (required)    | mask 999.999.999-99                          |
+| Foto                          | `foto`                     | `file`               | jpg/png, opcional                            |
+| Data de admissão              | `data_admissao`            | `date`               |                                              |
+| **Tipo de remuneração**       | `tipo_remuneracao`         | `select`             | opções: `salario`, `diaria`                  |
+| Salário fixo (mensalistas)    | `salario`                  | `number step=0.01`   | visível quando `tipo_remuneracao=salario`    |
+| Valor da diária (diaristas)   | `valor_diaria`             | `number step=0.01`   | visível quando `tipo_remuneracao=diaria`     |
+| Vale-Alimentação (R$/dia)     | `valor_va`                 | `number step=0.01`   |                                              |
+| Vale-Transporte (R$/dia)      | `valor_vt`                 | `number step=0.01`   |                                              |
+| Chave PIX                     | `chave_pix`                | `text`               | aceita CPF/e-mail/telefone                   |
+| Função                        | `funcao_id`                | `select`             | FK funcao                                    |
+| Horário de trabalho           | `horario_trabalho_id`      | `select`             | FK horario_trabalho                          |
+| Ativo                         | `ativo`                    | `checkbox`           | default checked                              |
+
+### A.4.2 — Serviço (catálogo)
+
+| Rótulo                         | `name`                      | Tipo            |
+|--------------------------------|-----------------------------|-----------------|
+| Nome                           | `nome`                      | `text`          |
+| Categoria                      | `categoria`                 | `text`          |
+| Unidade                        | `unidade_medida`            | `select`        |
+| Custo unitário                 | `custo_unitario`            | `number`        |
+| Imposto (%)                    | `imposto_pct`               | `number`        |
+| Margem de lucro (%)            | `margem_lucro_pct`          | `number`        |
+| Preço de venda                 | `preco_venda_unitario`      | `number`        |
+| **Template padrão (cronograma)** | `template_padrao_id`      | `select`        |
+
+### A.4.3 — Proposta (`/propostas/nova`, `/propostas/<id>` editar)
+
+| Rótulo                  | `name`                  | Tipo            |
+|-------------------------|-------------------------|-----------------|
+| Cliente — nome          | `cliente_nome`          | `text` required |
+| Cliente — telefone      | `cliente_telefone`      | `text`          |
+| Cliente — e-mail        | `cliente_email`         | `email`         |
+| Cliente — endereço      | `cliente_endereco`      | `textarea`      |
+| Cliente — CPF/CNPJ      | `cliente_cpf_cnpj`      | `text`          |
+| Número da proposta      | `numero`                | `text` required |
+| Título                  | `titulo`                | `text`          |
+| Descrição / objeto      | `descricao` / `objeto`  | `textarea`      |
+| Valor total             | `valor_total`           | `number`        |
+| Item — descrição        | `item_descricao`        | `text` (linha)  |
+| Item — quantidade       | `item_quantidade`       | `number` (linha)|
+| Item — unidade          | `item_unidade`          | `select` (linha)|
+| Item — preço unitário   | `item_preco`            | `number` (linha)|
+| Prazo de entrega (dias) | `prazo_entrega_dias`    | `number`        |
+| % Nota fiscal           | `percentual_nota_fiscal`| `number`        |
+| Condições de pagamento  | `condicoes_pagamento`   | `textarea`      |
+
+### A.4.4 — Cronograma (revisão pré-aprovação)
+
+| Rótulo                      | `name` / `id`                                | Tipo       |
+|-----------------------------|----------------------------------------------|------------|
+| Marcar / desmarcar nó       | `marcado_<proposta_item_id>_<no_id>`         | `checkbox` |
+| Horas estimadas (override)  | `horas_<proposta_item_id>_<no_id>`           | `number`   |
+| Duração em dias (override)  | `duracao_<proposta_item_id>_<no_id>`         | `number`   |
+| Confirmar e aprovar         | `button[type=submit][name=acao][value=aprovar]` | `submit` |
+
+### A.4.5 — RDO (`/rdo/novo`)
+
+| Rótulo                      | `name`                     | Tipo            |
+|-----------------------------|----------------------------|-----------------|
+| Obra                        | `obra_id`                  | `select`        |
+| Data do relatório           | `data_relatorio`           | `date`          |
+| Clima                       | `clima_geral`              | `select`        |
+| Temperatura média           | `temperatura_media`        | `text`          |
+| Local                       | `local`                    | `select` (`Campo`/`Oficina`) |
+| Comentário geral            | `comentario_geral`         | `textarea`      |
+| Funcionário (linha de mão de obra) | `mao_obra[<i>][funcionario_id]` | `select` |
+| Horas trabalhadas (linha)   | `mao_obra[<i>][horas_trabalhadas]` | `number`  |
+| Tarefa do cronograma (linha)| `mao_obra[<i>][tarefa_cronograma_id]` | `select` |
+| % conclusão da subatividade | `subatividade[<i>][percentual_conclusao]` | `number` |
+| Finalizar RDO               | `button[type=submit][name=acao][value=finalizar]` | `submit` |
+
+### A.4.6 — Medição quinzenal (`/obras/<obra_id>/medicao`)
+
+| Rótulo                  | `name`                | Tipo                 |
+|-------------------------|-----------------------|----------------------|
+| Período — início        | `periodo_inicio`      | `date`               |
+| Período — fim           | `periodo_fim`         | `date`               |
+| Observações             | `observacoes`         | `textarea`           |
+| Gerar medição           | `button[type=submit][formaction$="/gerar"]` | `submit` |
+| Aprovar medição (#nnn)  | `button[type=submit][formaction$="/<medicao_id>/fechar"]` | `submit` |
+
+## A.5 — Critério de aceite verificável por etapa
+
+Cada etapa pode ser validada por **uma consulta SQL** (no banco do
+tenant Alfa) **ou** por **um seletor CSS** (em testes E2E Playwright).
+A coluna `admin_id` deve sempre ser filtrada pelo ID do admin Alfa
+impresso no bloco `DEMO PRONTA`.
+
+| # | Etapa                  | Critério SQL (preferencial)                                         | Seletor CSS / DOM (alternativa E2E)                  |
+|---|------------------------|---------------------------------------------------------------------|------------------------------------------------------|
+| 1 | Login                  | `SELECT 1 FROM usuario WHERE email='admin@construtoraalfa.com.br'`  | URL final = `/dashboard`                             |
+| 2 | Dashboard              | n/a                                                                 | `.kpi-card` count ≥ 4                                |
+| 3 | Lista funcionários     | `SELECT count(*) FROM funcionario WHERE admin_id=:a` ≥ 2            | `tr[data-funcionario-id]` count = 2                  |
+| 4 | Cadastro funcionário   | `SELECT tipo_remuneracao,valor_diaria FROM funcionario WHERE cpf='900.901.002-02'` retorna `('diaria',180.00)` | toast "Funcionário cadastrado"     |
+| 5 | Catálogo serviços      | `SELECT count(*) FROM servico WHERE admin_id=:a` = 3                | `tr[data-servico-id]` count = 3                      |
+| 6 | Serviço com template   | `SELECT template_padrao_id IS NOT NULL FROM servico WHERE nome='Alvenaria de bloco cerâmico' AND admin_id=:a` retorna `t` | `select[name=template_padrao_id] option[selected]` ≠ vazio |
+| 7 | Lista propostas        | `SELECT numero,status FROM propostas_comerciais WHERE admin_id=:a`  | linha com `001.26` + badge `Aprovada`                |
+| 8 | Itens da proposta      | `SELECT count(*) FROM proposta_itens WHERE proposta_id=:p` = 4      | `tbody#itensProposta tr` count = 4                   |
+| 9 | Detalhe proposta       | `SELECT status FROM propostas_comerciais WHERE id=:p` = `'aprovada'`| `.proposta-status:contains("Aprovada")`              |
+|10 | Revisão cronograma     | `SELECT cronograma_default_json IS NOT NULL FROM propostas_comerciais WHERE id=:p` retorna `t` | árvore renderizada com checkboxes |
+|11 | Aprovação              | `SELECT id FROM obra WHERE proposta_origem_id=:p` retorna 1 linha   | redirect `/obras/<obra_id>`                          |
+|12 | Detalhe obra           | `SELECT codigo FROM obra WHERE id=:o` = `'OBR-2026-001'`            | `h1:contains("Residencial Bela Vista")`              |
+|13 | Cronograma materializado | `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:o AND admin_id=:a` ≥ 9 | `.gantt-task` count ≥ 9                  |
+|14 | RDOs finalizados       | `SELECT count(*) FROM rdo WHERE obra_id=:o AND status='Finalizado'` = 2 | `tr[data-rdo-id] td:contains("Finalizado")` count = 2 |
+|15 | RDO mão de obra        | `SELECT count(DISTINCT funcionario_id) FROM rdo_mao_obra rmo JOIN rdo r ON rmo.rdo_id=r.id WHERE r.obra_id=:o` = 2 | toast `RDO finalizado` |
+|16 | Medição aprovada       | `SELECT status,numero FROM medicao_obra WHERE obra_id=:o` retorna `('APROVADA',1)` | badge `APROVADA` na linha #001              |
+|17 | Conta a Receber        | `SELECT valor_original,status FROM conta_receber WHERE origem_tipo='OBRA_MEDICAO' AND origem_id=:o` retorna `(32250.00,'PENDENTE')` | linha `OBR-MED-<obra_id>` valor `R$ 32.250,00` |
+
+## A.6 — Ordem recomendada para um agente E2E
+
+1. Rodar `python3 scripts/seed_demo_alfa.py --reset` para garantir
+   estado conhecido.
+2. Capturar do stdout os IDs (`<admin_id>`, `<proposta_id>`,
+   `<obra_id>`, `<medicao_id>`).
+3. Executar a etapa 1 (login) e validar o critério da linha 1.
+4. Para cada etapa N (2..17), abrir a URL listada em A.3 e validar
+   o critério da linha N em A.5. Se o critério falhar, capturar
+   screenshot e logs e parar.
+5. Ao final, conferir que `SELECT count(*) FROM conta_receber WHERE
+   origem_tipo='OBRA_MEDICAO' AND origem_id=:o` é exatamente **1**
+   (regra da CR única do ciclo).
