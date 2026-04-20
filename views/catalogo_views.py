@@ -45,10 +45,27 @@ def _admin_id():
 
 
 def _to_decimal(value, default='0'):
+    """Aceita entrada em pt-BR: '1.234,56', '1234,56', '1234.56', '20'.
+
+    - Se houver '.' E ',', '.' é separador de milhar e ',' é decimal.
+    - Se houver só ',', é separador decimal.
+    - Se houver só '.', é separador decimal (ex.: '1234.56').
+    - Sem nenhum, número inteiro puro.
+    """
     if value is None or value == '':
         return Decimal(default)
+    s = str(value).strip()
+    if not s:
+        return Decimal(default)
+    s = s.replace('R$', '').replace('r$', '').replace(' ', '').replace('\xa0', '')
+    has_comma = ',' in s
+    has_dot = '.' in s
+    if has_comma and has_dot:
+        s = s.replace('.', '').replace(',', '.')
+    elif has_comma:
+        s = s.replace(',', '.')
     try:
-        return Decimal(str(value).replace(',', '.'))
+        return Decimal(s)
     except (InvalidOperation, ValueError):
         return Decimal(default)
 
@@ -197,6 +214,40 @@ def servicos_list():
         qry = qry.filter(Servico.nome.ilike(f'%{q}%'))
     servicos = qry.order_by(Servico.nome).all()
     return render_template('catalogo/servicos_list.html', servicos=servicos, q=q)
+
+
+@catalogo_bp.route('/servicos/novo', methods=['GET', 'POST'])
+@login_required
+def servico_novo():
+    """Cadastra um novo serviço e redireciona para a tela de composição."""
+    aid = _admin_id()
+    if request.method == 'POST':
+        nome = (request.form.get('nome') or '').strip()
+        categoria = (request.form.get('categoria') or '').strip()
+        unidade = (request.form.get('unidade_medida') or '').strip()
+        if not nome:
+            flash('Nome é obrigatório.', 'error')
+            return redirect(url_for('catalogo.servico_novo'))
+        if not categoria:
+            categoria = 'Geral'
+        if not unidade:
+            unidade = 'un'
+        imp = request.form.get('imposto_pct')
+        luc = request.form.get('margem_lucro_pct')
+        svc = Servico(
+            admin_id=aid,
+            nome=nome,
+            categoria=categoria,
+            unidade_medida=unidade,
+            descricao=request.form.get('descricao') or None,
+            imposto_pct=_to_decimal(imp) if imp not in (None, '') else None,
+            margem_lucro_pct=_to_decimal(luc) if luc not in (None, '') else None,
+        )
+        db.session.add(svc)
+        db.session.commit()
+        flash(f'Serviço "{svc.nome}" criado. Adicione os insumos da composição.', 'success')
+        return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
+    return render_template('catalogo/servico_form.html')
 
 
 @catalogo_bp.route('/servicos/<int:servico_id>/composicao', methods=['GET'])

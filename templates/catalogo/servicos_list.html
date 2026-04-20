@@ -4,9 +4,14 @@
 <div class="container-fluid py-3">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0"><i class="fas fa-clipboard-list me-2 text-primary"></i>Catálogo de Serviços</h2>
-    <a href="{{ url_for('catalogo.insumos_list') }}" class="btn btn-outline-secondary">
-      <i class="fas fa-cubes me-1"></i> Catálogo de Insumos
-    </a>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('catalogo.insumos_list') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-cubes me-1"></i> Catálogo de Insumos
+      </a>
+      <a href="{{ url_for('catalogo.servico_novo') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i> Novo Serviço
+      </a>
+    </div>
   </div>
   <form method="get" class="mb-3">
     <div class="input-group">
@@ -22,10 +27,10 @@
             <th>Nome</th>
             <th>Categoria</th>
             <th>Unidade</th>
-            <th class="text-end">Custo Unit. (R$)</th>
+            <th class="text-end">Custo Unit.</th>
             <th class="text-end">Imp. %</th>
             <th class="text-end">Lucro %</th>
-            <th class="text-end">Preço Venda (R$)</th>
+            <th class="text-end">Preço Venda</th>
             <th></th>
           </tr>
         </thead>
@@ -35,10 +40,10 @@
             <td><strong>{{ s.nome }}</strong></td>
             <td>{{ s.categoria or '—' }}</td>
             <td>{{ s.unidade_medida or '—' }}</td>
-            <td class="text-end">{{ '%.2f'|format(s.custo_unitario|float if s.custo_unitario else 0) }}</td>
+            <td class="text-end">{{ s.custo_unitario|brl }}</td>
             <td class="text-end">{{ '%.2f'|format(s.imposto_pct|float if s.imposto_pct is not none else 0) }}</td>
             <td class="text-end">{{ '%.2f'|format(s.margem_lucro_pct|float if s.margem_lucro_pct is not none else 0) }}</td>
-            <td class="text-end"><strong class="text-success">{{ '%.2f'|format(s.preco_venda_unitario|float if s.preco_venda_unitario else 0) }}</strong></td>
+            <td class="text-end"><strong class="text-success">{{ s.preco_venda_unitario|brl }}</strong></td>
             <td class="text-end">
               <a href="{{ url_for('catalogo.servico_composicao', servico_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Composição">
                 <i class="fas fa-cogs"></i>

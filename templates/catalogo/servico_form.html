@@ -1,0 +1,46 @@
+{% extends "base_completo.html" %}
+{% block title %}Novo Serviço{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <a href="{{ url_for('catalogo.servicos_list') }}" class="text-decoration-none small"><i class="fas fa-arrow-left"></i> Voltar ao catálogo</a>
+  <h2 class="my-3"><i class="fas fa-clipboard-list text-primary"></i> Novo Serviço</h2>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="POST">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nome <span class="text-danger">*</span></label>
+            <input name="nome" required class="form-control" placeholder="Ex.: Alvenaria de bloco cerâmico">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Categoria</label>
+            <input name="categoria" class="form-control" placeholder="Ex.: Estrutura" value="Geral">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Unidade de medida</label>
+            <input name="unidade_medida" class="form-control" placeholder="m2, m3, kg, un, h..." value="un">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descrição</label>
+            <textarea name="descricao" class="form-control" rows="2"></textarea>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Imposto (%)</label>
+            <input name="imposto_pct" class="form-control" inputmode="decimal" placeholder="Ex.: 8,00">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Margem de lucro (%)</label>
+            <input name="margem_lucro_pct" class="form-control" inputmode="decimal" placeholder="Ex.: 20,00">
+          </div>
+        </div>
+        <div class="alert alert-info small mt-3 mb-0">
+          <i class="fas fa-info-circle"></i> Após salvar, você será levado direto à tela de composição para atrelar os insumos do serviço.
+        </div>
+        <button class="btn btn-primary mt-3"><i class="fas fa-save"></i> Salvar e ir para composição</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

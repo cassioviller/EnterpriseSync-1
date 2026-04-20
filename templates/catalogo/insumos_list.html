@@ -51,7 +51,7 @@
             <td><strong>{{ i.nome }}</strong>{% if i.descricao %}<br><small class="text-muted">{{ i.descricao }}</small>{% endif %}</td>
             <td><span class="badge bg-secondary">{{ i.tipo }}</span></td>
             <td>{{ i.unidade }}</td>
-            <td class="text-end text-dark"><strong>R$ {{ '%.4f'|format(i.preco_vigente()) }}</strong></td>
+            <td class="text-end text-dark"><strong>{{ i.preco_vigente()|brl }}</strong></td>
             <td class="text-end">
               <a href="{{ url_for('catalogo.insumo_editar', insumo_id=i.id) }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
               <form method="POST" action="{{ url_for('catalogo.insumo_excluir', insumo_id=i.id) }}" class="d-inline" onsubmit="return confirm('Excluir/desativar insumo?')">
