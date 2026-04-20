@@ -30,21 +30,14 @@ def get_admin_id():
 
 @categorias_bp.route('/', methods=['GET'])
 def index():
-    """Página principal de gestão de categorias"""
-    try:
-        admin_id = get_admin_id()
-        categorias = CategoriaServico.query.filter_by(
-            admin_id=admin_id,
-            ativo=True
-        ).order_by(CategoriaServico.nome).all()
-        
-        return render_template('servicos/categorias.html',
-                             categorias=categorias)
-        
-    except Exception as e:
-        logger.error(f"❌ Erro ao carregar página de categorias: {str(e)}")
-        flash(f'Erro ao carregar categorias: {str(e)}', 'error')
-        return redirect('/servicos')
+    """Página principal de gestão de categorias.
+
+    Task #128: a UI antiga (templates/servicos/categorias.html) foi removida
+    junto com o CRUD legado de Serviços. A gestão de categorias hoje acontece
+    via modal dentro do Catálogo de Serviços, então esta rota apenas redireciona
+    para o catálogo, mantendo a API JSON abaixo intacta.
+    """
+    return redirect(url_for('catalogo.servicos_list'))
 
 # ================================
 # ROTAS API PARA CATEGORIAS

@@ -179,7 +179,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-0">
-          <iframe src="{{ url_for('servicos_crud.novo_servico') }}?embedded=1"
+          <iframe src="{{ url_for('catalogo.servicos_list') }}"
                   style="width:100%; min-height:70vh; border:0;"
                   title="Novo serviço"></iframe>
         </div>
@@ -534,7 +534,7 @@ function resetServicoModal() {
   const titleEl = document.querySelector('#novoServicoModal .modal-title');
   if (titleEl) titleEl.innerHTML =
     '<i class="fas fa-plus-circle me-2"></i>Cadastrar novo serviço no Catálogo';
-  if (iframe) iframe.src = '{{ url_for("servicos_crud.novo_servico") }}?embedded=1';
+  if (iframe) iframe.src = '{{ url_for("catalogo.servicos_list") }}';
 }
 document.addEventListener('DOMContentLoaded', () => {
   const m = document.getElementById('novoServicoModal');
@@ -553,7 +553,7 @@ function abrirEditarServico() {
   const iframe = document.querySelector('#novoServicoModal iframe');
   const titleEl = document.querySelector('#novoServicoModal .modal-title');
   if (titleEl) titleEl.innerHTML = '<i class="fas fa-pen me-2"></i>Editar serviço';
-  if (iframe) iframe.src = `/servicos/${sid}/editar?embedded=1`;
+  if (iframe) iframe.src = `/catalogo/servicos/${sid}/composicao`;
   new bootstrap.Modal(document.getElementById('novoServicoModal')).show();
 }
 

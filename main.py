@@ -102,13 +102,13 @@ try:
 except Exception as e:
     logger.error(f"[ERROR] Erro ao registrar API Funcionários: {e}")
 
-# Registrar CRUD de Serviços (único - sem duplicação)
-try:
-    from crud_servicos_completo import servicos_crud_bp
-    app.register_blueprint(servicos_crud_bp)
-    logger.info("[OK] CRUD de Serviços registrado com sucesso")
-except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar CRUD de Serviços: {e}")
+# CRUD antigo de Serviços removido (Task #128) — uso exclusivo do Catálogo de Serviços.
+# Mantemos um redirect das rotas /servicos* para o Catálogo para não quebrar
+# bookmarks ou links externos antigos.
+@app.route('/servicos', defaults={'_path': ''})
+@app.route('/servicos/<path:_path>')
+def _servicos_legacy_redirect(_path):
+    return redirect(url_for('catalogo.servicos_list'))
 
 # Registrar sistema de cadastro de serviços na obra
 try:
@@ -197,7 +197,7 @@ except Exception as e:
 
 from app import csrf
 main_py_exempt_blueprints = [
-    'rdo_editar', 'rdo_crud', 'servicos_crud', 'cadastrar_servico',
+    'rdo_editar', 'rdo_crud', 'cadastrar_servico',
     'analytics_preditivos', 'dashboards_especificos',
     'exportacao_relatorios', 'relatorios_financeiros',
     'api_funcionarios', 'api_buscar_funcionarios', 'health',
