@@ -1,0 +1,29 @@
+#129 - Catálogo: criar serviço + formato R$ pt-BR
+What & Why
+Dois problemas no Catálogo:
+
+Catálogo de Serviços não tem botão "Novo Serviço" — só lista os existentes. O usuário precisa conseguir cadastrar um serviço novo direto pela tela, do mesmo jeito que já dá pra cadastrar um insumo novo no Catálogo de Insumos.
+Catálogo de Insumos exibe/salva preço no formato errado — o usuário cadastra "20 reais" e o sistema mostra "R$ 20.0000". No padrão brasileiro . é separador de milhar e , é separador de centavos, então "20.0000" parece "20 mil reais". O número precisa ser exibido e aceito no formato pt-BR (ex.: R$ 20,00 / R$ 1.234,56).
+Done looks like
+Na tela "Catálogo de Serviços" aparece um botão "Novo Serviço" (visualmente equivalente ao "Novo Insumo" do Catálogo de Insumos).
+Clicar nesse botão abre um formulário onde o usuário cadastra um serviço novo (nome, categoria, unidade, e os campos de imposto/lucro que já existem no modelo). Ao salvar, o usuário é redirecionado direto para a tela de composição do serviço recém-criado (/servicos/<id>/composicao), pra já atrelar os insumos sem passo intermediário pela lista.
+A edição já existente continua funcionando; o novo cadastro reaproveita o mesmo padrão visual e de validação.
+No Catálogo de Insumos, ao cadastrar um insumo com preço "20", a lista mostra R$ 20,00 (não R$ 20.0000 nem R$ 20.000).
+Valores com centavos aparecem como R$ 1.234,56 (ponto no milhar, vírgula nos centavos).
+O usuário consegue digitar 1.234,56 ou 1234,56 no campo de preço e o sistema salva 1234.56. Digitar 20 continua salvando 20.
+Campos de preço/custo em outros lugares do Catálogo (ex.: novo preço no histórico do insumo) seguem a mesma regra.
+Out of scope
+Mexer na tela antiga "Serviços" (essa remoção já está coberta em outra task).
+Mudar o formato de moeda em telas fora do Catálogo (orçamento, RDO, dashboard etc.).
+Mudar o modelo de dados de Insumo / PrecoBaseInsumo / Servico — apenas formulário, parsing e exibição.
+Alterar a composição de serviços (insumos x serviço) — só o cadastro do serviço em si.
+Steps
+Botão e formulário "Novo Serviço" no Catálogo de Serviços. Adicionar o botão no topo da listagem e a rota + template do formulário de criação, espelhando o padrão já usado em "Novo Insumo". Após salvar, redirecionar direto para catalogo.servico_composicao do serviço recém-criado (em vez de voltar pra lista), pra o usuário já cair na tela de atrelar insumos. O admin_id precisa vir do helper já existente, nunca hard-coded.
+Exibição em pt-BR no Catálogo de Insumos. Trocar a renderização do "Preço vigente" (e qualquer outro valor monetário da mesma tela e do histórico de preços) para o formato R$ 1.234,56. Centralizar num filtro Jinja reutilizável (ex.: |brl) pra não duplicar lógica.
+Aceitar entrada em pt-BR nos campos de preço. Trocar os inputs de preço do Catálogo de type="number" para um input de texto com máscara/placeholder em pt-BR, e ajustar o parser do backend pra entender corretamente 1.234,56, 1234,56, 1234.56 e 20. Cuidado: o helper atual só faz replace(',', '.'), o que quebra quando vem 1.234,56.
+Validar manualmente o ciclo: cadastrar um serviço novo pelo botão, cadastrar um insumo a R$ 20,00 e outro a R$ 1.234,56, conferir que aparecem certos na lista e que a edição/novo preço respeitam o mesmo formato.
+Relevant files
+views/catalogo_views.py
+templates/catalogo/servicos_list.html
+templates/catalogo/insumos_list.html
+templates/catalogo/insumo_form.html
