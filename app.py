@@ -411,23 +411,24 @@ with app.app_context():
                 )
                 return
 
-            def _runner(_app, _fd):
+            def _runner(_fd):
+                # Roda o seed em subprocesso isolado. Vantagens:
+                # - NÃO mexe em sys.stdout/stderr do processo gunicorn
+                #   (que é global e poderia capturar saída de outras threads).
+                # - Garante que erros do seed (até OOM) não derrubem o worker.
+                # - Stdout/stderr do seed vão direto pro arquivo de log.
+                import subprocess
+                import sys as _sys
+                log_path = "/tmp/sige_seed_demo_alfa.log"
                 try:
-                    log_path = "/tmp/sige_seed_demo_alfa.log"
-                    import sys
                     with open(log_path, "a", buffering=1) as logf:
-                        old_out, old_err = sys.stdout, sys.stderr
-                        sys.stdout = logf
-                        sys.stderr = logf
-                        try:
-                            from scripts.seed_demo_alfa import main as _seed_main
-                            with _app.app_context():
-                                rc = _seed_main([])
-                            print(f"[seed-demo-alfa] terminou rc={rc}",
-                                  file=logf, flush=True)
-                        finally:
-                            sys.stdout = old_out
-                            sys.stderr = old_err
+                        rc = subprocess.call(
+                            [_sys.executable, "-u",
+                             "scripts/seed_demo_alfa.py"],
+                            stdout=logf, stderr=subprocess.STDOUT,
+                            cwd=os.path.dirname(os.path.abspath(__file__)) or ".",
+                        )
+                        logf.write(f"[seed-demo-alfa] terminou rc={rc}\n")
                 except Exception as inner:
                     logger.error(
                         f"[seed-demo-alfa] runner falhou: {inner!r}"
@@ -440,7 +441,7 @@ with app.app_context():
                         pass
 
             t = threading.Thread(
-                target=_runner, args=(app, lock_fd),
+                target=_runner, args=(lock_fd,),
                 name="seed-demo-alfa", daemon=True,
             )
             t.start()
