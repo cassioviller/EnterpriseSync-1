@@ -1,0 +1,1502 @@
+# 📘 Manual Completo do SIGE - Sistema Integrado de Gestão Empresarial
+
+> **Para você que vai usar o sistema no dia a dia** — engenheiro, dono de obra, administrador de empresa de construção. Este manual não exige conhecimento de informática. Todos os passos têm exemplos reais da **Construtora Alfa**, cliente **João da Silva**, obra **Residencial Bela Vista**.
+
+---
+
+## 🎯 O que você vai aprender neste manual
+
+Este manual mostra o **ciclo completo** de uma obra no SIGE, desde o login até o fluxo de caixa. Você vai entender:
+
+1. Como fazer login e navegar no sistema
+2. Como cadastrar funcionários
+3. Como criar catálogos (insumos, serviços, clientes)
+4. Como fazer orçamentos e propostas
+5. Como aprovar propostas e gerar obras
+6. Como preencher RDOs (Relatórios Diários de Obra)
+7. Como lançar custos (alimentação, transporte, reembolsos, compras)
+8. Como fazer medições e gerar contas a receber
+9. Como acompanhar o fluxo de caixa
+
+---
+
+## 💡 Como o sistema funciona (leitura importante)
+
+Imagine o SIGE como uma **máquina de dinheiro**:
+
+```
+Você cadastra tudo → Sistema calcula automaticamente → Dinheiro entra e sai certo
+```
+
+**Exemplo real:**
+- Você cadastra o Carlos como pedreiro (R$ 2.800/mês)
+- Carlos trabalha 20 dias no mês
+- O sistema calcula automaticamente quanto pagar a ele
+- Gera a conta a pagar
+- Tudo aparece no fluxo de caixa
+
+**O fluxo é assim:**
+
+```
+ANTES DA OBRA
+    ↓
+Catálogo (insumos, serviços) 
+    ↓
+Orçamento (interno, sem cliente ver)
+    ↓
+Proposta (PDF para o cliente)
+    ↓
+Aprovação (cliente aprova, obra nasce)
+    ↓
+DURANTE A OBRA
+    ↓
+RDO (o que foi feito cada dia)
+    ↓
+Custos (mão de obra, material, alimentação)
+    ↓
+Medição (quanto foi executado)
+    ↓
+Contas a Pagar (o que você deve)
+    ↓
+Contas a Receber (o que o cliente deve)
+    ↓
+Fluxo de Caixa (resumo de tudo)
+```
+
+---
+
+# PARTE 1: COMEÇANDO (Etapas 1-5)
+
+## 📌 Etapa 1: Fazer Login
+
+### O que você está fazendo
+Você está entrando no sistema com suas credenciais. O SIGE é multi-empresa, então cada login mostra apenas os dados da sua empresa.
+
+### Onde clicar
+Abra o navegador e vá para: **https://www.sige.cassioviller.tech/login**
+
+### O que aparece na tela
+
+![Tela de Login](https://private-us-east-1.manuscdn.com/sessionFile/Xlg8SAJu3R8hLVNkjDyo7R/sandbox/iSweWpN9tIL5ppFEmpjH47-images_1776691773545_na1fn_L2hvbWUvdWJ1bnR1L21hbnVhbF9zY3JlZW5zaG90c19jb21wbGV0by8wMV9sb2dpbg.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvWGxnOFNBSnUzUjhoTFZOa2pEeW83Ui9zYW5kYm94L2lTd2VXcE45dElMNXBwRkVtcGpINDctaW1hZ2VzXzE3NzY2OTE3NzM1NDVfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMWhiblZoYkY5elkzSmxaVzV6YUc5MGMxOWpiMjF3YkdWMGJ5OHdNVjlzYjJkcGJnLnBuZyIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=U~a1BsVCFoSn5-2Ox0bwbJNTvRZBQA0~ZuMfj2Y3ZiTZDeTaEjGszb1Ls5gCaTQ20A~2Hl4g7zYJT9c-LVqmUvOasDBxwsXdqNUsodGmg8x3zsPsd7nMnp8ZEeFP9jMujPfB42SefRp8s9nmsq7wlBlfhnr2eb3nezgyrn5al8G-f5WfacY78Iz3ioZNoOGiJEfX1O0K7-lBCi7zzeldCgCHAS1W4wXhX2lXOYtofkQnlsskrAvC-qBng2cGZ682EbZvNeTQz5NIygCVentevuU57bpbXg~SsfnReMmS7hhWEGAFCb1RHI4ll9uZO0~-p7c2MdzjufGuNQ~p0QhzSw__)
+
+A tela mostra:
+- Logo do SIGE no topo
+- Campo "Username" (seu usuário)
+- Campo "Senha" (sua senha)
+- Botão azul "Entrar"
+
+### O que preencher
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Username** | Seu usuário | `teste` |
+| **Senha** | Sua senha | `teste123` |
+
+### Depois que você clica em "Entrar"
+
+O sistema carrega o **Dashboard** — a tela principal com um resumo de tudo:
+- Quanto você faturou este mês
+- Quanto você gastou
+- Quantas propostas estão abertas
+- Quantas obras estão em andamento
+
+### ⚠️ Atenção
+
+- Se a senha estiver errada, aparece: **"Usuário ou senha inválidos"**
+- Se você ficar muito tempo sem usar, a sessão fecha sozinha
+- Se isso acontecer, é só fazer login de novo — nada foi perdido
+
+---
+
+## 📌 Etapa 2: Conhecer o Dashboard
+
+### O que você está fazendo
+Você está vendo um resumo de tudo que está acontecendo na sua empresa neste mês.
+
+### Onde clicar
+Após fazer login, você já está no Dashboard. Se quiser voltar depois, clique em "Dashboard" no menu lateral.
+
+### O que aparece na tela
+
+![Dashboard Principal](https://private-us-east-1.manuscdn.com/sessionFile/Xlg8SAJu3R8hLVNkjDyo7R/sandbox/iSweWpN9tIL5ppFEmpjH47-images_1776691773545_na1fn_L2hvbWUvdWJ1bnR1L21hbnVhbF9zY3JlZW5zaG90c19jb21wbGV0by8wMl9kYXNoYm9hcmQ.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvWGxnOFNBSnUzUjhoTFZOa2pEeW83Ui9zYW5kYm94L2lTd2VXcE45dElMNXBwRkVtcGpINDctaW1hZ2VzXzE3NzY2OTE3NzM1NDVfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMWhiblZoYkY5elkzSmxaVzV6YUc5MGMxOWpiMjF3YkdWMGJ5OHdNbDlrWVhOb1ltOWhjbVEucG5nIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=h4zbYonwcyOW8YrajCbDeIZgn6EgIGcOVOtNbbVXzx819yb2su6F6XeECly5~nByd7NFGGDZQSKXS~df9oVtTuDZ3SFSrSATJS5XB5a4wtorqx3lqQJaqzFi-tW7JjBdIs4MnFKW5rMWqtkiCRITYOB-1DhcJRhY8ayXe-umw6kJFIqWgggLZ4dENJ9AVwec4u53MXh9~cPeWoNjodRLHJcDBe2UEjsjqJzrhk6kKYoaxcxAunbgNJVql~pOSMuCza8KdkIiaOXjvrjzqtY1EuRoEqCCCQmOubgo5AKd9qa0rUZF0Ek1GLq8J5rtpnm273tdkUq-u4CZc42ERzEDcw__)
+
+O Dashboard mostra:
+
+| Seção | O que significa |
+|-------|-----------------|
+| **Financeiro e Custos** | Quanto você gastou com alimentação, transporte, mão de obra, material, etc. |
+| **Visão Geral** | Quantos funcionários ativos, quantas obras, quantos veículos, total de custos |
+| **Recursos Humanos** | Gráfico de funcionários por função |
+| **Obras e RDO** | Progresso das obras (baseado no último RDO) |
+| **Propostas Comerciais** | Quantas propostas aprovadas, enviadas, em rascunho, rejeitadas |
+
+### O que fazer aqui
+
+- **Filtrar por data**: Use os campos "Data Inicial" e "Data Final" para ver dados de um período específico
+- **Botões rápidos**: "Mês Atual", "Último Mês", "3 Meses", "Ano Atual"
+- **Navegar**: Use o menu lateral para ir para outras seções
+
+### 💡 Dica
+
+No Dashboard, você vê tudo em números. Mas os detalhes estão nas outras seções (Funcionários, Obras, Propostas, etc.). Use o Dashboard para ter uma visão geral e depois clique em cada seção para detalhar.
+
+---
+
+## 📌 Etapa 3: Cadastrar Funcionários
+
+### O que você está fazendo
+Você está registrando as pessoas que vão trabalhar nas suas obras. Cada funcionário tem informações de pagamento, benefícios e contato.
+
+### Onde clicar
+Menu lateral → **Funcionários** → Botão verde **"Novo Funcionário"**
+
+### O que aparece na tela
+
+![Lista de Funcionários](https://private-us-east-1.manuscdn.com/sessionFile/Xlg8SAJu3R8hLVNkjDyo7R/sandbox/iSweWpN9tIL5ppFEmpjH47-images_1776691773545_na1fn_L2hvbWUvdWJ1bnR1L21hbnVhbF9zY3JlZW5zaG90c19jb21wbGV0by8wM19mdW5jaW9uYXJpb3NfbGlzdGE.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvWGxnOFNBSnUzUjhoTFZOa2pEeW83Ui9zYW5kYm94L2lTd2VXcE45dElMNXBwRkVtcGpINDctaW1hZ2VzXzE3NzY2OTE3NzM1NDVfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMWhiblZoYkY5elkzSmxaVzV6YUc5MGMxOWpiMjF3YkdWMGJ5OHdNMTltZFc1amFXOXVZWEpwYjNOZmJHbHpkR0UucG5nIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=gNAR1hrW72C4TdFBtaKr0YVbGzd2vY0MiXpIoWrDFPvGtFfRwSto7NlahcR~L4LxjsPCCDUQ4irubNxLIa8dQqV6cyO1jZS7BrSetiAzQD-y~oxdysj6iSlEEbuX~v08TM9fdaPOAmY0-XJVIVQWuMDDLaeeAiFkYyfIg-pgocmtajl74FVimjbW~rK0nRoCOViblj5BJzwA-QEE9TUcQ6PC4FnpAsc7qJ3KxQgZB3h1tKDANwjkvoA~PxwVQ7ZWx--0MxHqwReovT1x80OvUxb0Va-JYGdJxbpoXNYTcMP9gFZ99I52E7mLCRlsOl61K0qjo5G3Ao2FDJs7y~snNw__)
+
+A tela mostra:
+- Lista de todos os funcionários cadastrados
+- Filtros por período e status (Ativos/Inativos)
+- Botão "Novo Funcionário" (verde)
+- Métricas: Funcionários Ativos, Custo Total, Total de Horas, Faltas
+
+### Clicando em "Novo Funcionário"
+
+![Modal Novo Funcionário](https://private-us-east-1.manuscdn.com/sessionFile/Xlg8SAJu3R8hLVNkjDyo7R/sandbox/iSweWpN9tIL5ppFEmpjH47-images_1776691773545_na1fn_L2hvbWUvdWJ1bnR1L21hbnVhbF9zY3JlZW5zaG90c19jb21wbGV0by8wNF9ub3ZvX2Z1bmNpb25hcmlvX21vZGFs.png?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvWGxnOFNBSnUzUjhoTFZOa2pEeW83Ui9zYW5kYm94L2lTd2VXcE45dElMNXBwRkVtcGpINDctaW1hZ2VzXzE3NzY2OTE3NzM1NDVfbmExZm5fTDJodmJXVXZkV0oxYm5SMUwyMWhiblZoYkY5elkzSmxaVzV6YUc5MGMxOWpiMjF3YkdWMGJ5OHdORjl1YjNadlgyWjFibU5wYjI1aGNtbHZYMjF2WkdGcy5wbmciLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTg3NjE2MDB9fX1dfQ__&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=PCsI2gzX3fPQHhf6PGs2wmK3KcB8npaNldnr21K~2nRD8Yk4kglXp-P5HyphgHXoEvxfisqxylmHuhe9RKnFTACSKah44irIogiltJs8h13mdBPTc7GnGju4VgsVhvtAxk3rF3N23~zfiDcPLq0KvUhhXHGFkQCH5w6WhV~9B5HC-O8Z0IOAdgR12LNs6ijl7FZj38AQdfPFsrzTssSR6dJKv0eMpUNRq2LzcTuXbn2nkwz5EvejeAuLFE3Y-b3ldqnP-IwlnwywZ93Ey7JlaHJe~VknF1e01g3QXqHGEZgK509V1nQiq1p8CWb26C0hWIzg~F0EafF~juAE1qwX7A__)
+
+Aparece um formulário com vários campos organizados em blocos:
+
+| Bloco | Campos |
+|-------|--------|
+| **Dados Pessoais** | Nome, CPF, RG, Data de Nascimento, Telefone, Email |
+| **Dados Profissionais** | Data de Admissão, Função, Horário de Trabalho |
+| **Pagamento** | Tipo de Remuneração (Salário ou Diária), Valor |
+| **Benefícios** | Vale-Alimentação, Vale-Transporte |
+
+### Preenchendo o formulário - Exemplo 1: Carlos (Mensalista)
+
+**Carlos é um pedreiro que recebe salário fixo.**
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Nome** | Nome completo | `Carlos da Silva Pereira` |
+| **CPF** | CPF com pontos | `123.456.789-00` |
+| **Data de Nascimento** | Data de nascimento | `15/03/1985` |
+| **Telefone** | Telefone com DDD | `(11) 98765-4321` |
+| **Email** | Email para contato | `carlos@email.com` |
+| **Data de Admissão** | Quando começou | `01/05/2026` |
+| **Função** | Selecione a função | `Pedreiro` |
+| **Tipo de Remuneração** | Escolha "Salário Fixo Mensal" | `Salário Fixo Mensal` |
+| **Salário Mensal** | Quanto ganha por mês | `R$ 2.800,00` |
+| **Horário de Trabalho** | Selecione o horário | `Segunda a Sexta, 8h-17h` |
+| **Vale-Alimentação** | Valor por dia trabalhado | `R$ 25,00` |
+| **Vale-Transporte** | Valor por dia trabalhado | `R$ 12,00` |
+
+### Preenchendo o formulário - Exemplo 2: Pedro (Diarista)
+
+**Pedro é um pedreiro que recebe por dia trabalhado.**
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Nome** | Nome completo | `Pedro Oliveira` |
+| **CPF** | CPF com pontos | `987.654.321-00` |
+| **Data de Nascimento** | Data de nascimento | `22/07/1990` |
+| **Telefone** | Telefone com DDD | `(11) 99876-5432` |
+| **Email** | Email para contato | `pedro@email.com` |
+| **Data de Admissão** | Quando começou | `01/05/2026` |
+| **Função** | Selecione a função | `Pedreiro` |
+| **Tipo de Remuneração** | Escolha "Diária" | `Diária` |
+| **Valor da Diária** | Quanto ganha por dia | `R$ 180,00` |
+| **Horário de Trabalho** | Selecione o horário | `Segunda a Sexta, 8h-17h` |
+| **Vale-Alimentação** | Valor por dia trabalhado | `R$ 25,00` |
+| **Vale-Transporte** | Valor por dia trabalhado | `R$ 12,00` |
+
+### Passo a passo para preencher
+
+1. **Clique em "Novo Funcionário"** (botão verde)
+2. **Preencha o Nome** — digite o nome completo
+3. **Preencha o CPF** — o sistema aceita com ou sem pontos
+4. **Preencha os dados pessoais** — telefone, email, data de nascimento
+5. **Escolha a Data de Admissão** — quando o funcionário começou
+6. **Escolha a Função** — pedreiro, encanador, eletricista, etc.
+7. **Escolha o Tipo de Remuneração** — Salário (mensal) ou Diária
+8. **Preencha o Salário ou Diária** — o valor que ele recebe
+9. **Preencha Vale-Alimentação e Vale-Transporte** — valores por dia
+10. **Clique em "Salvar Funcionário"** (botão verde)
+
+### Depois que você clica em "Salvar"
+
+- O funcionário aparece na lista
+- Ele pode ser escolhido em RDOs, folhas de pagamento, etc.
+- O sistema usa essas informações para calcular automaticamente quanto pagar
+
+### ⚠️ Atenção
+
+- **Para diarista, é obrigatório preencher "Valor da Diária"** — senão o custo fica zero
+- **Vale-Alimentação e Vale-Transporte são por dia trabalhado** — o sistema multiplica automaticamente
+- **O CPF é único** — não pode cadastrar o mesmo CPF duas vezes
+- **Se deixar campos vazios**, o sistema mostra avisos em vermelho
+
+---
+
+## 📌 Etapa 4: Cadastrar Insumos (Ingredientes)
+
+### O que você está fazendo
+Você está criando a "receita" dos serviços. Insumo é qualquer coisa que entra num serviço: cimento, bloco, areia, hora de pedreiro, etc.
+
+### Onde clicar
+Menu lateral → **Catálogo** (ou clique no ícone de caixa) → **Insumos** → Botão **"Novo Insumo"**
+
+### O que aparece na tela
+
+A tela mostra uma lista de insumos já cadastrados. Cada insumo tem:
+- Nome
+- Unidade (m², kg, hora, etc.)
+- Preço unitário
+- Data de última atualização
+
+### Clicando em "Novo Insumo"
+
+Aparece um formulário simples com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Nome** | Nome do insumo | `Bloco Cerâmico 14x19x29` |
+| **Unidade** | Como mede | `Unidade` ou `kg` ou `m²` |
+| **Preço Unitário** | Preço de uma unidade | `R$ 1,50` |
+| **Descrição** | Detalhes (opcional) | `Bloco para alvenaria estrutural` |
+
+### Exemplos de insumos para a Construtora Alfa
+
+| Nome | Unidade | Preço |
+|------|---------|-------|
+| Bloco Cerâmico 14x19x29 | Unidade | R$ 1,50 |
+| Cimento Portland 50kg | Saco | R$ 35,00 |
+| Areia Média | m³ | R$ 120,00 |
+| Hora de Pedreiro | Hora | R$ 50,00 |
+| Contrapiso Desempenado | m² | R$ 25,00 |
+
+### Depois que você clica em "Salvar"
+
+- O insumo aparece na lista
+- Você pode usar esse insumo para compor um serviço
+- O sistema usa o preço para calcular o custo do serviço
+
+### 💡 Dica
+
+Crie insumos que você usa frequentemente. Depois, quando criar um serviço, você monta a "receita" usando esses insumos.
+
+---
+
+## 📌 Etapa 5: Cadastrar Clientes
+
+### O que você está fazendo
+Você está registrando as pessoas que vão contratar suas obras. Cada cliente tem informações de contato e endereço.
+
+### Onde clicar
+Menu lateral → **Catálogo** → **Clientes** → Botão **"Novo Cliente"**
+
+### O que aparece na tela
+
+A tela mostra uma lista de clientes já cadastrados. Cada cliente tem:
+- Nome
+- CPF ou CNPJ
+- Telefone
+- Email
+- Endereço
+
+### Clicando em "Novo Cliente"
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Nome** | Nome completo ou razão social | `João da Silva` |
+| **CPF/CNPJ** | CPF ou CNPJ | `123.456.789-00` |
+| **Telefone** | Telefone com DDD | `(11) 98765-4321` |
+| **Email** | Email para contato | `joao@email.com` |
+| **Endereço** | Rua, número, complemento | `Rua das Flores, 123, Apt 456` |
+| **Cidade** | Cidade | `São Paulo` |
+| **Estado** | Estado | `SP` |
+| **CEP** | CEP | `01234-567` |
+
+### Exemplo: João da Silva
+
+| Campo | Valor |
+|-------|-------|
+| **Nome** | `João da Silva` |
+| **CPF** | `111.222.333-44` |
+| **Telefone** | `(11) 99999-8888` |
+| **Email** | `joao.silva@email.com` |
+| **Endereço** | `Rua Bela Vista, 250` |
+| **Cidade** | `São Paulo` |
+| **Estado** | `SP` |
+| **CEP** | `01234-567` |
+
+### Depois que você clica em "Salvar"
+
+- O cliente aparece na lista
+- Você pode criar propostas para esse cliente
+- O cliente pode acessar o portal para acompanhar a obra
+
+---
+
+# PARTE 2: CRIANDO A OBRA (Etapas 6-9)
+
+## 📌 Etapa 6: Cadastrar Serviços (com Composição)
+
+### O que você está fazendo
+Você está criando o "cardápio" da sua empresa. Um serviço é algo que você vende: "Alvenaria de bloco cerâmico", "Contrapiso desempenado", etc.
+
+Cada serviço tem uma "receita" — uma lista de insumos que entram nele, com quantidades.
+
+### Onde clicar
+Menu lateral → **Catálogo** → **Serviços** → Botão **"Novo Serviço"**
+
+### O que aparece na tela
+
+A tela mostra uma lista de serviços já cadastrados. Cada serviço tem:
+- Nome
+- Unidade (m², unidade, etc.)
+- Preço de venda
+- Composição (insumos que entram)
+
+### Clicando em "Novo Serviço"
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Nome** | Nome do serviço | `Alvenaria de Bloco Cerâmico` |
+| **Unidade** | Como mede | `m²` |
+| **Descrição** | Detalhes (opcional) | `Alvenaria estrutural com bloco 14x19x29` |
+
+### Adicionando a Composição (Insumos)
+
+Após preencher o nome, você adiciona os insumos que entram nesse serviço:
+
+| Insumo | Coeficiente | Unidade | Preço Unitário |
+|--------|------------|---------|-----------------|
+| Bloco Cerâmico | 12,5 | Unidade | R$ 1,50 |
+| Cimento Portland | 0,35 | Saco | R$ 35,00 |
+| Areia Média | 0,08 | m³ | R$ 120,00 |
+| Hora de Pedreiro | 2 | Hora | R$ 50,00 |
+
+**O que significa "Coeficiente":**
+- Para cada 1 m² de alvenaria, você precisa de 12,5 blocos
+- Para cada 1 m² de alvenaria, você precisa de 0,35 sacos de cimento
+- Para cada 1 m² de alvenaria, você precisa de 2 horas de pedreiro
+
+### Exemplo: Alvenaria de Bloco Cerâmico
+
+| Campo | Valor |
+|-------|-------|
+| **Nome** | `Alvenaria de Bloco Cerâmico` |
+| **Unidade** | `m²` |
+| **Descrição** | `Alvenaria estrutural com bloco 14x19x29, argamassa de assentamento e acabamento` |
+
+**Composição:**
+| Insumo | Coeficiente |
+|--------|------------|
+| Bloco Cerâmico 14x19x29 | 12,5 |
+| Cimento Portland 50kg | 0,35 |
+| Areia Média | 0,08 |
+| Hora de Pedreiro | 2,0 |
+
+### Exemplo: Contrapiso Desempenado
+
+| Campo | Valor |
+|-------|-------|
+| **Nome** | `Contrapiso Desempenado` |
+| **Unidade** | `m²` |
+| **Descrição** | `Contrapiso com espessura de 5cm, desempenado e pronto para revestimento` |
+
+**Composição:**
+| Insumo | Coeficiente |
+|--------|------------|
+| Cimento Portland 50kg | 0,5 |
+| Areia Média | 0,15 |
+| Hora de Pedreiro | 1,5 |
+
+### Passo a passo para criar um serviço
+
+1. **Clique em "Novo Serviço"**
+2. **Preencha o Nome** — ex: "Alvenaria de Bloco Cerâmico"
+3. **Escolha a Unidade** — ex: "m²"
+4. **Clique em "Adicionar Insumo"**
+5. **Selecione o insumo** — ex: "Bloco Cerâmico 14x19x29"
+6. **Preencha o Coeficiente** — ex: "12,5"
+7. **Repita os passos 4-6** para cada insumo
+8. **Clique em "Salvar Serviço"**
+
+### Depois que você clica em "Salvar"
+
+- O serviço aparece na lista
+- O sistema calcula automaticamente o custo de cada m² (soma de todos os insumos)
+- Você pode usar esse serviço em orçamentos e propostas
+
+### 💡 Dica
+
+Crie serviços que você vende frequentemente. Depois, quando criar um orçamento, você escolhe os serviços do dropdown e o sistema calcula tudo automaticamente.
+
+---
+
+## 📌 Etapa 7: Criar Orçamento
+
+### O que você está fazendo
+Você está montando o cálculo interno de uma obra antes de enviar para o cliente. No orçamento, você pode:
+- Escolher quais serviços vão entrar
+- Ajustar quantidades e preços
+- Adicionar itens avulsos (mobilização, honorários, etc.)
+- Customizar a composição de cada serviço (sem alterar o catálogo)
+
+### Onde clicar
+Menu lateral → **Propostas** → Botão **"Novo Orçamento"**
+
+### O que aparece na tela
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Cliente** | Selecione o cliente | `João da Silva` |
+| **Descrição** | Descrição da obra | `Reforma residencial - Residencial Bela Vista` |
+
+### Adicionando Linhas de Orçamento
+
+Após preencher cliente e descrição, você adiciona as linhas (os serviços que vão entrar):
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Serviço** | Selecione do catálogo | `Alvenaria de Bloco Cerâmico` |
+| **Quantidade** | Quanto de cada serviço | `250` |
+| **Unidade** | Vem do serviço | `m²` |
+| **Preço Unitário** | Preço por unidade | `R$ 150,00` |
+
+### Exemplo: Orçamento para João da Silva
+
+**Obra: Residencial Bela Vista - 250 m² de reforma**
+
+| Serviço | Quantidade | Unidade | Preço Unitário | Subtotal |
+|---------|-----------|---------|-----------------|----------|
+| Alvenaria de Bloco Cerâmico | 250 | m² | R$ 150,00 | R$ 37.500,00 |
+| Contrapiso Desempenado | 250 | m² | R$ 80,00 | R$ 20.000,00 |
+| Mobilização de Obra | 1 | Unidade | R$ 5.000,00 | R$ 5.000,00 |
+| Honorário de Projeto | 1 | Unidade | R$ 5.000,00 | R$ 5.000,00 |
+| | | | **TOTAL** | **R$ 67.500,00** |
+
+### Customizando a Composição (Opcional)
+
+Se você quer ajustar os insumos de um serviço **só para este orçamento** (sem alterar o catálogo):
+
+1. **Clique em "Editar Composição"** na linha do serviço
+2. **Adicione ou remova insumos**
+3. **Ajuste os coeficientes**
+4. **Clique em "Salvar"**
+
+O sistema recalcula o preço automaticamente.
+
+### Passo a passo para criar um orçamento
+
+1. **Clique em "Novo Orçamento"**
+2. **Selecione o Cliente** — ex: "João da Silva"
+3. **Preencha a Descrição** — ex: "Reforma residencial - Residencial Bela Vista"
+4. **Clique em "Adicionar Linha"**
+5. **Selecione o Serviço** — ex: "Alvenaria de Bloco Cerâmico"
+6. **Preencha a Quantidade** — ex: "250"
+7. **Verifique o Preço Unitário** — o sistema sugere, mas você pode mudar
+8. **Repita os passos 4-7** para cada serviço
+9. **Clique em "Salvar Orçamento"**
+
+### Depois que você clica em "Salvar"
+
+- O orçamento aparece na lista
+- O sistema mostra o Custo Total, Preço de Venda e Lucro
+- Você pode editar, duplicar ou gerar proposta
+
+### 💡 Dica
+
+O orçamento é **interno** — o cliente não vê. Use para fechar o preço com tranquilidade antes de enviar a proposta.
+
+---
+
+## 📌 Etapa 8: Gerar Proposta
+
+### O que você está fazendo
+Você está convertendo o orçamento interno em uma proposta comercial — um documento PDF que vai para o cliente.
+
+### Onde clicar
+Na tela do orçamento → Botão verde **"Gerar Proposta"**
+
+### O que acontece
+
+O sistema:
+1. Cria uma Proposta vinculada ao orçamento
+2. Congela os valores (mudanças futuras não afetam a proposta)
+3. Gera um número de proposta (ex: "PROP-2026-001")
+4. Ativa um link público para o cliente
+
+### Depois que você clica em "Gerar Proposta"
+
+A tela muda para o detalhe da proposta, mostrando:
+
+| Informação | Exemplo |
+|------------|---------|
+| **Número** | `PROP-2026-001` |
+| **Status** | `Rascunho` |
+| **Cliente** | `João da Silva` |
+| **Data de Criação** | `20/04/2026` |
+| **Linhas** | Alvenaria, Contrapiso, Mobilização, Honorário |
+| **Total** | `R$ 67.500,00` |
+
+### Botões disponíveis
+
+- **Editar Proposta** — muda os valores (cria nova versão)
+- **Enviar ao Cliente** — libera o link público
+- **Gerar PDF** — exporta o documento
+- **Aprovar** — vai para a próxima etapa
+
+### 💡 Dica
+
+Você pode gerar várias propostas do mesmo orçamento. Cada uma é um documento separado.
+
+---
+
+## 📌 Etapa 9: Aprovar Proposta e Gerar Obra
+
+### O que você está fazendo
+Você está dizendo: "O cliente topou. Pode criar a obra, gerar o cronograma e abrir o portal."
+
+Quando você aprova, o sistema **automaticamente**:
+1. Cria a Obra
+2. Gera o Cronograma (tarefas de cada serviço)
+3. Cria os Itens de Medição
+4. Ativa o Portal do Cliente
+
+### Onde clicar
+Menu lateral → **Propostas** → Linha da proposta → Botão verde **"Aprovar e Gerar Cronograma"**
+
+### O que aparece na tela
+
+Aparece uma tela de **Revisão do Cronograma** com a árvore de tarefas:
+
+```
+☑ Alvenaria de Bloco Cerâmico (250 m²)
+    ☑ Grupo: Preparação
+        ☑ Marcar bloco e linha de prumo | 2 dias
+        ☑ Argamassa de assentamento | 1 dia
+    ☑ Grupo: Execução
+        ☑ Levantar paredes | 5 dias
+        ☐ Reforço de vergas | 1 dia (opcional)
+        ☑ Limpeza pós-execução | 1 dia
+
+☑ Contrapiso Desempenado (250 m²)
+    ☑ Grupo: Execução
+        ☑ Nivelamento / Lançamento / Acabamento | 3 dias
+
+⚠ Mobilização de Obra — sem template
+    Apenas item de medição será criado.
+
+ⓘ Honorário de Projeto — sem serviço
+    Não vai virar tarefa do cronograma.
+```
+
+### O que você pode fazer aqui
+
+- **Desmarcar tarefas** que não vão entrar na obra
+- **Mudar a duração** de cada tarefa (em dias)
+- **Salvar pré-configuração** para que o cliente herde essa configuração se aprovar pelo portal
+
+### Passo a passo para aprovar
+
+1. **Clique em "Aprovar e Gerar Cronograma"**
+2. **Revise a árvore de tarefas**
+3. **Desmarque tarefas que não vão entrar** (se houver)
+4. **Ajuste as durações** (se necessário)
+5. **Clique em "Confirmar Aprovação e Gerar Cronograma"** (botão verde grande)
+
+### Depois que você clica em "Confirmar"
+
+- A Proposta vira "Aprovada"
+- Nasce uma **Obra** com código `OBR-####` (ex: `OBR-2026-001`)
+- Nasce o **Cronograma** com todas as tarefas
+- Nasce um **Item de Medição** para cada serviço
+- O **Portal do Cliente** fica ativo
+- O cliente recebe um link para acompanhar
+
+### 💡 Dica
+
+Aprovação é **única e indivisível** — se algo der errado, tudo é desfeito. Mas você pode reaprovar a mesma proposta sem duplicar tarefas.
+
+---
+
+# PARTE 3: DURANTE A OBRA (Etapas 10-20)
+
+## 📌 Etapa 10: Preencher RDO (Relatório Diário de Obra)
+
+### O que você está fazendo
+Você está registrando o que foi feito em cada dia da obra. RDO = Relatório Diário de Obra.
+
+No RDO você registra:
+- Qual tarefa foi executada
+- Quanto foi feito (percentual ou quantidade)
+- Quais funcionários trabalharam
+- Quais materiais foram usados
+
+### Onde clicar
+Menu lateral → **RDOs** → Botão **"Novo RDO"**
+
+### O que aparece na tela
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Obra** | Selecione a obra | `Residencial Bela Vista` |
+| **Data** | Data do RDO | `01/05/2026` |
+| **Descrição** | O que foi feito | `Preparação do terreno e marcação` |
+
+### Adicionando Tarefas Executadas
+
+Você adiciona as tarefas que foram feitas neste dia:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Tarefa** | Selecione do cronograma | `Marcar bloco e linha de prumo` |
+| **Percentual Executado** | Quanto foi feito (%) | `100%` |
+| **Funcionários** | Quem trabalhou | `Carlos, Pedro` |
+
+### Exemplo: RDO do Dia 01/05/2026
+
+| Campo | Valor |
+|-------|-------|
+| **Obra** | `Residencial Bela Vista` |
+| **Data** | `01/05/2026` |
+| **Descrição** | `Preparação do terreno, marcação de bloco e linha de prumo` |
+
+**Tarefas Executadas:**
+| Tarefa | Percentual | Funcionários |
+|--------|-----------|--------------|
+| Marcar bloco e linha de prumo | 100% | Carlos, Pedro |
+
+### Passo a passo para preencher um RDO
+
+1. **Clique em "Novo RDO"**
+2. **Selecione a Obra** — ex: "Residencial Bela Vista"
+3. **Preencha a Data** — ex: "01/05/2026"
+4. **Preencha a Descrição** — ex: "Preparação do terreno"
+5. **Clique em "Adicionar Tarefa"**
+6. **Selecione a Tarefa** — ex: "Marcar bloco e linha de prumo"
+7. **Preencha o Percentual** — ex: "100%"
+8. **Selecione os Funcionários** — ex: "Carlos, Pedro"
+9. **Clique em "Salvar RDO"**
+
+### Depois que você clica em "Salvar"
+
+- O RDO aparece na lista
+- O sistema calcula automaticamente:
+  - Quanto cada funcionário trabalhou (horas)
+  - Quanto custa cada funcionário (salário ou diária)
+  - Quanto foi executado da tarefa (%)
+- Essas informações vão para a Medição e para o Fluxo de Caixa
+
+### ⚠️ Atenção
+
+- **Percentual é cumulativo** — se você já marcou 50% e marca mais 50%, fica 100%
+- **Funcionários são obrigatórios** — o sistema precisa saber quem trabalhou para calcular o custo
+- **Data não pode ser no futuro** — só pode preencher RDO de dias passados
+
+### 💡 Dica
+
+Preencha o RDO **todos os dias** ou **no final da semana**. Quanto mais atualizado, melhor o acompanhamento da obra.
+
+---
+
+## 📌 Etapa 11: Registrar Ponto (Ponto Facial)
+
+### O que você está fazendo
+Você está registrando a presença de cada funcionário. O sistema usa isso para calcular:
+- Horas trabalhadas
+- Horas extras
+- Dias pagos
+- Vale-alimentação e vale-transporte
+
+### Onde clicar
+Menu lateral → **Ponto** → Botão **"Novo Ponto"** ou **"Bater Ponto"**
+
+### O que aparece na tela
+
+Aparece um formulário simples:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Funcionário** | Selecione o funcionário | `Carlos` |
+| **Data** | Data do ponto | `01/05/2026` |
+| **Hora Entrada** | Hora que chegou | `08:00` |
+| **Hora Saída** | Hora que saiu | `17:00` |
+
+### Exemplo: Ponto do Carlos
+
+| Campo | Valor |
+|-------|-------|
+| **Funcionário** | `Carlos da Silva Pereira` |
+| **Data** | `01/05/2026` |
+| **Hora Entrada** | `08:00` |
+| **Hora Saída** | `17:00` |
+| **Horas Trabalhadas** | `9 horas` (o sistema calcula) |
+
+### Passo a passo para registrar ponto
+
+1. **Clique em "Novo Ponto"**
+2. **Selecione o Funcionário** — ex: "Carlos"
+3. **Preencha a Data** — ex: "01/05/2026"
+4. **Preencha a Hora de Entrada** — ex: "08:00"
+5. **Preencha a Hora de Saída** — ex: "17:00"
+6. **Clique em "Salvar Ponto"**
+
+### Depois que você clica em "Salvar"
+
+- O ponto aparece na lista
+- O sistema calcula automaticamente as horas trabalhadas
+- Se passou de 8 horas, calcula como hora extra
+- Essas informações vão para a Folha de Pagamento
+
+### 💡 Dica
+
+Registre o ponto **todos os dias** para que o sistema tenha dados corretos para a folha de pagamento.
+
+---
+
+## 📌 Etapa 12: Lançar Alimentação
+
+### O que você está fazendo
+Você está registrando os gastos com alimentação dos funcionários na obra (café, almoço, etc.).
+
+### Onde clicar
+Menu lateral → **Alimentação** → Botão **"Novo Lançamento"**
+
+### O que aparece na tela
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Data** | Data do lançamento | `01/05/2026` |
+| **Descrição** | O que foi gasto | `Café da manhã para a equipe` |
+| **Valor** | Quanto foi gasto | `R$ 150,00` |
+| **Obra** | Qual obra | `Residencial Bela Vista` |
+| **Funcionários** | Quem comeu | `Carlos, Pedro` |
+
+### Exemplo: Lançamento de Alimentação
+
+| Campo | Valor |
+|-------|-------|
+| **Data** | `01/05/2026` |
+| **Descrição** | `Café da manhã para a equipe` |
+| **Valor Total** | `R$ 150,00` |
+| **Obra** | `Residencial Bela Vista` |
+| **Funcionários** | `Carlos, Pedro` |
+| **Valor por Funcionário** | `R$ 75,00` (o sistema divide) |
+
+### Passo a passo para lançar alimentação
+
+1. **Clique em "Novo Lançamento"**
+2. **Preencha a Data** — ex: "01/05/2026"
+3. **Preencha a Descrição** — ex: "Café da manhã"
+4. **Preencha o Valor Total** — ex: "R$ 150,00"
+5. **Selecione a Obra** — ex: "Residencial Bela Vista"
+6. **Selecione os Funcionários** — ex: "Carlos, Pedro"
+7. **Clique em "Salvar Lançamento"**
+
+### Depois que você clica em "Salvar"
+
+- O lançamento aparece na lista
+- O sistema divide o valor entre os funcionários
+- Essas informações vão para a Conta a Pagar
+
+### 💡 Dica
+
+Guarde os recibos de alimentação. Isso ajuda na auditoria depois.
+
+---
+
+## 📌 Etapa 13: Lançar Transporte (Vale-Transporte)
+
+### O que você está fazendo
+Você está registrando os gastos com transporte dos funcionários (combustível, passagem, etc.).
+
+### Onde clicar
+Menu lateral → **Transporte** → Botão **"Novo Lançamento"**
+
+### O que aparece na tela
+
+Similar ao lançamento de alimentação:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Data** | Data do lançamento | `01/05/2026` |
+| **Descrição** | O que foi gasto | `Combustível para van` |
+| **Valor** | Quanto foi gasto | `R$ 200,00` |
+| **Obra** | Qual obra | `Residencial Bela Vista` |
+| **Funcionários** | Quem usou | `Carlos, Pedro` |
+
+### Passo a passo para lançar transporte
+
+1. **Clique em "Novo Lançamento"**
+2. **Preencha a Data** — ex: "01/05/2026"
+3. **Preencha a Descrição** — ex: "Combustível para van"
+4. **Preencha o Valor Total** — ex: "R$ 200,00"
+5. **Selecione a Obra** — ex: "Residencial Bela Vista"
+6. **Selecione os Funcionários** — ex: "Carlos, Pedro"
+7. **Clique em "Salvar Lançamento"**
+
+### Depois que você clica em "Salvar"
+
+- O lançamento aparece na lista
+- O sistema divide o valor entre os funcionários
+- Essas informações vão para a Conta a Pagar
+
+---
+
+## 📌 Etapa 14: Lançar Reembolsos
+
+### O que você está fazendo
+Você está registrando gastos que um funcionário fez com o dinheiro dele e quer ser reembolsado (compra de material, ferramentas, etc.).
+
+### Onde clicar
+Menu lateral → **Financeiro** → **Reembolsos** → Botão **"Novo Reembolso"**
+
+### O que aparece na tela
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Funcionário** | Quem fez o gasto | `Carlos` |
+| **Data** | Data do gasto | `01/05/2026` |
+| **Descrição** | O que foi comprado | `Cimento para a obra` |
+| **Valor** | Quanto foi gasto | `R$ 350,00` |
+| **Obra** | Qual obra | `Residencial Bela Vista` |
+| **Status** | Aprovado ou Pendente | `Pendente` |
+
+### Exemplo: Reembolso para Carlos
+
+| Campo | Valor |
+|-------|-------|
+| **Funcionário** | `Carlos da Silva Pereira` |
+| **Data** | `01/05/2026` |
+| **Descrição** | `Cimento Portland 50kg (7 sacos)` |
+| **Valor** | `R$ 245,00` |
+| **Obra** | `Residencial Bela Vista` |
+| **Status** | `Pendente` |
+
+### Passo a passo para lançar reembolso
+
+1. **Clique em "Novo Reembolso"**
+2. **Selecione o Funcionário** — ex: "Carlos"
+3. **Preencha a Data** — ex: "01/05/2026"
+4. **Preencha a Descrição** — ex: "Cimento para a obra"
+5. **Preencha o Valor** — ex: "R$ 350,00"
+6. **Selecione a Obra** — ex: "Residencial Bela Vista"
+7. **Clique em "Salvar Reembolso"**
+
+### Depois que você clica em "Salvar"
+
+- O reembolso aparece na lista com status "Pendente"
+- Você pode aprovar depois
+- Quando aprovado, vira uma Conta a Pagar
+
+### ⚠️ Atenção
+
+- **Guarde o recibo** — você vai precisar para auditoria
+- **Aprove apenas reembolsos legítimos** — com documentação
+
+---
+
+## 📌 Etapa 15: Lançar Compras (Pedido de Compra)
+
+### O que você está fazendo
+Você está criando um Pedido de Compra (PO) para um fornecedor. Quando a mercadoria chegar, você registra o recebimento e o sistema:
+1. Entra o material no almoxarifado
+2. Cria uma Conta a Pagar
+3. Lança o custo na obra
+
+### Onde clicar
+Menu lateral → **Compras V2** → Botão **"Novo Pedido"**
+
+### O que aparece na tela
+
+Aparece um formulário com:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Fornecedor** | Selecione o fornecedor | `Fornecedor de Materiais ABC` |
+| **Data** | Data do pedido | `01/05/2026` |
+| **Descrição** | Descrição do pedido | `Materiais para alvenaria` |
+
+### Adicionando Itens ao Pedido
+
+Você adiciona os itens que quer comprar:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Insumo** | Selecione do catálogo | `Bloco Cerâmico 14x19x29` |
+| **Quantidade** | Quanto quer | `3125` |
+| **Unidade** | Vem do insumo | `Unidade` |
+| **Preço Unitário** | Preço negociado | `R$ 1,20` |
+
+### Exemplo: Pedido de Compra para Alvenaria
+
+| Insumo | Quantidade | Unidade | Preço Unitário | Subtotal |
+|--------|-----------|---------|-----------------|----------|
+| Bloco Cerâmico 14x19x29 | 3.125 | Unidade | R$ 1,20 | R$ 3.750,00 |
+| Cimento Portland 50kg | 88 | Saco | R$ 35,00 | R$ 3.080,00 |
+| Areia Média | 20 | m³ | R$ 120,00 | R$ 2.400,00 |
+| | | | **TOTAL** | **R$ 9.230,00** |
+
+### Passo a passo para criar um pedido
+
+1. **Clique em "Novo Pedido"**
+2. **Selecione o Fornecedor** — ex: "Fornecedor ABC"
+3. **Preencha a Data** — ex: "01/05/2026"
+4. **Preencha a Descrição** — ex: "Materiais para alvenaria"
+5. **Clique em "Adicionar Item"**
+6. **Selecione o Insumo** — ex: "Bloco Cerâmico"
+7. **Preencha a Quantidade** — ex: "3125"
+8. **Preencha o Preço Unitário** — ex: "R$ 1,20"
+9. **Repita os passos 5-8** para cada item
+10. **Clique em "Salvar Pedido"**
+
+### Depois que você clica em "Salvar"
+
+- O pedido aparece na lista com status "Pendente"
+- Você pode enviar para o fornecedor
+- Quando a mercadoria chegar, você registra o recebimento
+
+### Registrando o Recebimento
+
+Quando a mercadoria chegar:
+
+1. **Clique no Pedido** na lista
+2. **Clique em "Registrar Recebimento"**
+3. **Confirme os itens recebidos**
+4. **Clique em "Confirmar Recebimento"**
+
+O sistema automaticamente:
+- Entra os itens no almoxarifado
+- Cria uma Conta a Pagar
+- Lança o custo na obra
+
+---
+
+## 📌 Etapa 16: Consultar Almoxarifado
+
+### O que você está fazendo
+Você está vendo o estoque de materiais que você tem em posse. O almoxarifado mostra:
+- Quais materiais você tem
+- Quanto de cada um
+- Quem tem em posse (qual funcionário)
+- Quando foi recebido
+
+### Onde clicar
+Menu lateral → **Almoxarifado** → **Itens em Posse**
+
+### O que aparece na tela
+
+Uma tabela mostrando todos os itens em estoque:
+
+| Insumo | Quantidade | Unidade | Quem Tem | Data Recebimento |
+|--------|-----------|---------|----------|-----------------|
+| Bloco Cerâmico 14x19x29 | 3.125 | Unidade | Carlos | 01/05/2026 |
+| Cimento Portland 50kg | 88 | Saco | Pedro | 01/05/2026 |
+| Areia Média | 20 | m³ | Almoxarife | 01/05/2026 |
+
+### O que você pode fazer aqui
+
+- **Ver detalhes** — clique em um item para ver mais informações
+- **Registrar saída** — quando um material sai do almoxarifado
+- **Transferir** — passar um material de um funcionário para outro
+- **Gerar relatório** — exportar em PDF
+
+### 💡 Dica
+
+Consulte o almoxarifado regularmente para saber o que você tem em estoque e evitar compras desnecessárias.
+
+---
+
+## 📌 Etapa 17: Fazer Cotação (Comparar Fornecedores)
+
+### O que você está fazendo
+Você está comparando preços de vários fornecedores para o mesmo material. O sistema mostra uma grade com:
+- Linhas = Materiais
+- Colunas = Fornecedores
+- Células = Preços
+
+O menor preço fica destacado em verde.
+
+### Onde clicar
+Menu lateral → **Compras V2** → **Cotação** → Botão **"Nova Cotação"**
+
+### O que aparece na tela
+
+Aparece um formulário para criar uma nova cotação:
+
+| Campo | O que colocar | Exemplo |
+|-------|--------------|---------|
+| **Descrição** | Descrição da cotação | `Cotação de materiais para alvenaria` |
+| **Itens** | Quais materiais | `Bloco, Cimento, Areia` |
+| **Fornecedores** | Quais fornecedores | `ABC, XYZ, 123` |
+
+### Exemplo: Cotação de Materiais
+
+| Material | Fornecedor ABC | Fornecedor XYZ | Fornecedor 123 |
+|----------|---|---|---|
+| Bloco Cerâmico | R$ 1,20 | R$ 1,30 | **R$ 1,15** ✓ |
+| Cimento Portland | R$ 35,00 | **R$ 33,00** ✓ | R$ 36,00 |
+| Areia Média | **R$ 110,00** ✓ | R$ 125,00 | R$ 120,00 |
+
+### Passo a passo para criar uma cotação
+
+1. **Clique em "Nova Cotação"**
+2. **Preencha a Descrição** — ex: "Cotação de materiais"
+3. **Clique em "Adicionar Item"** e selecione os materiais
+4. **Clique em "Adicionar Fornecedor"** e selecione os fornecedores
+5. **Preencha os preços** de cada fornecedor
+6. **Clique em "Salvar Cotação"**
+
+### Depois que você clica em "Salvar"
+
+- A cotação aparece na lista
+- Os menores preços ficam destacados em verde
+- Você pode usar essa informação para negociar com fornecedores
+
+---
+
+## 📌 Etapa 18: Fazer Medição (Medir o Progresso)
+
+### O que você está fazendo
+Você está medindo quanto da obra foi executado. A medição é feita **quinzenalmente** (a cada 15 dias) e serve para:
+- Calcular quanto cobrar do cliente
+- Atualizar o progresso da obra
+- Criar a Conta a Receber
+
+### Onde clicar
+Menu lateral → **Obras** → Linha da obra → Aba **"Medição Comercial"** → Botão **"Nova Medição"**
+
+### O que aparece na tela
+
+Aparece uma tabela com todos os itens de medição da obra:
+
+| Item | Quantidade Contratada | Percentual Executado | Quantidade Medida | Valor Unitário | Subtotal |
+|------|----------------------|----------------------|-------------------|-----------------|----------|
+| Alvenaria de Bloco Cerâmico | 250 m² | 40% | 100 m² | R$ 150,00 | R$ 15.000,00 |
+| Contrapiso Desempenado | 250 m² | 0% | 0 m² | R$ 80,00 | R$ 0,00 |
+| Mobilização | 1 un | 100% | 1 un | R$ 5.000,00 | R$ 5.000,00 |
+| Honorário | 1 un | 0% | 0 un | R$ 5.000,00 | R$ 0,00 |
+| | | | | **TOTAL** | **R$ 20.000,00** |
+
+### Preenchendo a Medição
+
+Para cada item, você preencha o percentual executado:
+
+| Item | Percentual Executado | Motivo |
+|------|----------------------|--------|
+| Alvenaria | 40% | Foram feitos 100 m² de 250 m² |
+| Contrapiso | 0% | Ainda não começou |
+| Mobilização | 100% | Já foi feita no início |
+| Honorário | 0% | Será cobrado no final |
+
+### Passo a passo para fazer uma medição
+
+1. **Clique em "Nova Medição"**
+2. **Selecione a Obra** — ex: "Residencial Bela Vista"
+3. **Preencha a Data** — ex: "15/05/2026"
+4. **Para cada item, preencha o Percentual Executado** — ex: "40%"
+5. **Clique em "Salvar Medição"**
+
+### Depois que você clica em "Salvar"
+
+- A medição aparece na lista
+- O sistema calcula automaticamente:
+  - Quanto foi executado (em quantidade)
+  - Quanto cobrar do cliente (Conta a Receber)
+  - Quanto falta executar
+- A Conta a Receber é criada automaticamente
+
+### 💡 Dica
+
+Faça medição **a cada 15 dias** para que o cliente receba regularmente e você tenha fluxo de caixa previsível.
+
+---
+
+# PARTE 4: FECHANDO A OBRA (Etapas 19-25)
+
+## 📌 Etapa 19: Visualizar Contas a Pagar
+
+### O que você está fazendo
+Você está vendo tudo que você deve pagar:
+- Funcionários (salários, diárias)
+- Fornecedores (materiais)
+- Outros (alimentação, transporte, reembolsos)
+
+### Onde clicar
+Menu lateral → **Financeiro** → **Contas a Pagar**
+
+### O que aparece na tela
+
+Uma tabela mostrando todas as contas a pagar:
+
+| Descrição | Fornecedor/Funcionário | Data Vencimento | Valor | Status |
+|-----------|----------------------|-----------------|-------|--------|
+| Salário - Maio | Carlos | 31/05/2026 | R$ 2.800,00 | Pendente |
+| Diária - 10 dias | Pedro | 31/05/2026 | R$ 1.800,00 | Pendente |
+| Materiais - Alvenaria | Fornecedor ABC | 15/05/2026 | R$ 9.230,00 | Pago |
+| Alimentação - Maio | Diversos | 31/05/2026 | R$ 1.500,00 | Pendente |
+| Transporte - Maio | Diversos | 31/05/2026 | R$ 2.000,00 | Pendente |
+
+### O que você pode fazer aqui
+
+- **Filtrar** — por data, fornecedor, status
+- **Marcar como Pago** — quando você pagar
+- **Gerar relatório** — exportar em PDF
+- **Exportar** — para Excel ou outro programa
+
+### 💡 Dica
+
+Revise as Contas a Pagar regularmente para saber quanto você deve e quando vence.
+
+---
+
+## 📌 Etapa 20: Visualizar Contas a Receber
+
+### O que você está fazendo
+Você está vendo tudo que o cliente deve pagar:
+- Medições (o que foi executado)
+- Itens avulsos (mobilização, honorários)
+
+### Onde clicar
+Menu lateral → **Financeiro** → **Contas a Receber**
+
+### O que aparece na tela
+
+Uma tabela mostrando todas as contas a receber:
+
+| Descrição | Cliente | Data Vencimento | Valor | Status |
+|-----------|---------|-----------------|-------|--------|
+| OBR-MED-001 - 1ª Medição | João da Silva | 15/05/2026 | R$ 20.000,00 | Pendente |
+| OBR-MED-001 - 2ª Medição | João da Silva | 31/05/2026 | R$ 20.000,00 | Pendente |
+
+### O que você pode fazer aqui
+
+- **Filtrar** — por data, cliente, status
+- **Marcar como Pago** — quando o cliente pagar
+- **Gerar boleto** — para cobrar do cliente
+- **Enviar ao cliente** — via email
+- **Gerar relatório** — exportar em PDF
+
+### ⚠️ Atenção
+
+- **Uma única Conta a Receber por obra** — ela é alimentada pelas medições
+- **Medições geram automaticamente a Conta a Receber** — você não precisa criar manualmente
+
+---
+
+## 📌 Etapa 21: Acompanhar Fluxo de Caixa
+
+### O que você está fazendo
+Você está vendo o resumo de tudo: quanto entra, quanto sai, quanto sobra.
+
+### Onde clicar
+Menu lateral → **Financeiro** → **Fluxo de Caixa**
+
+### O que aparece na tela
+
+Um gráfico e uma tabela mostrando:
+
+| Período | Entradas | Saídas | Saldo |
+|---------|----------|--------|-------|
+| Maio 2026 | R$ 20.000,00 | R$ 18.330,00 | R$ 1.670,00 |
+| Junho 2026 | R$ 20.000,00 | R$ 18.330,00 | R$ 1.670,00 |
+| Julho 2026 | R$ 27.500,00 | R$ 18.330,00 | R$ 9.170,00 |
+
+### Detalhando as Entradas
+
+- **Medições da Obra 1** — R$ 20.000,00
+- **Medições da Obra 2** — R$ 7.500,00
+- **Outras** — R$ 0,00
+
+### Detalhando as Saídas
+
+- **Mão de Obra** — R$ 4.600,00 (Carlos + Pedro)
+- **Materiais** — R$ 9.230,00
+- **Alimentação** — R$ 1.500,00
+- **Transporte** — R$ 2.000,00
+- **Outras** — R$ 1.000,00
+
+### O que você pode fazer aqui
+
+- **Filtrar por período** — mês, trimestre, ano
+- **Filtrar por categoria** — mão de obra, material, etc.
+- **Gerar relatório** — exportar em PDF
+- **Exportar** — para Excel
+
+### 💡 Dica
+
+Acompanhe o Fluxo de Caixa regularmente para saber se você está com dinheiro em caixa ou se precisa de empréstimo.
+
+---
+
+## 📌 Etapa 22: Portal do Cliente
+
+### O que você está fazendo
+Você está acessando a visão que o cliente tem da obra. O cliente pode:
+- Ver o progresso da obra
+- Ver as medições
+- Baixar documentos
+- Aprovar propostas
+
+### Onde clicar
+Menu lateral → **Obras** → Linha da obra → Botão **"Abrir Portal do Cliente"**
+
+### O que aparece na tela
+
+Uma página com:
+
+| Seção | O que mostra |
+|-------|-------------|
+| **Resumo** | Cliente, valor, datas, progresso |
+| **Cronograma** | Tarefas planejadas e executadas |
+| **Medições** | Histórico de medições e valores |
+| **Documentos** | Propostas, RDOs, relatórios |
+| **Comunicação** | Mensagens entre você e o cliente |
+
+### Exemplo: Portal do Cliente - João da Silva
+
+**Obra: Residencial Bela Vista**
+- Valor do Contrato: R$ 67.500,00
+- Progresso: 40% executado
+- Próxima Medição: 31/05/2026
+
+**Cronograma:**
+- ✅ Marcar bloco e linha de prumo (Concluído)
+- ✅ Argamassa de assentamento (Concluído)
+- 🔄 Levantar paredes (Em andamento - 40%)
+- ⏳ Reforço de vergas (Não iniciado)
+- ⏳ Limpeza pós-execução (Não iniciado)
+
+**Medições:**
+- 1ª Medição (15/05/2026): R$ 20.000,00 ✓ Pago
+- 2ª Medição (31/05/2026): R$ 20.000,00 ⏳ Pendente
+
+### 💡 Dica
+
+Mantenha o Portal do Cliente sempre atualizado. Isso aumenta a confiança e reduz dúvidas.
+
+---
+
+## 📌 Etapa 23: Gerar Relatórios
+
+### O que você está fazendo
+Você está gerando relatórios para análise e auditoria:
+- Relatório de Folha de Pagamento
+- Relatório de Horas Extras
+- Relatório de Medições
+- Relatório de Custos por Obra
+
+### Onde clicar
+Menu lateral → **Relatórios** → Selecione o tipo de relatório
+
+### Tipos de Relatórios Disponíveis
+
+| Relatório | O que mostra | Para quem |
+|-----------|-------------|----------|
+| **Folha de Pagamento** | Salários, diárias, descontos | RH, Contabilidade |
+| **Horas Extras** | Quem fez, quanto, valor | RH, Financeiro |
+| **Medições** | Progresso de cada obra | Cliente, Financeiro |
+| **Custos por Obra** | Quanto foi gasto em cada obra | Gerenciamento |
+| **Fluxo de Caixa** | Entradas e saídas | Financeiro, Gerenciamento |
+
+### Exemplo: Relatório de Folha de Pagamento - Maio 2026
+
+| Funcionário | Dias Trabalhados | Horas | Salário/Diária | Alimentação | Transporte | Total |
+|-------------|-----------------|-------|---|---|---|---|
+| Carlos | 20 | 160 | R$ 2.800,00 | R$ 500,00 | R$ 240,00 | R$ 3.540,00 |
+| Pedro | 18 | 144 | R$ 3.240,00 | R$ 450,00 | R$ 216,00 | R$ 3.906,00 |
+| | | | | | **TOTAL** | **R$ 7.446,00** |
+
+### Passo a passo para gerar um relatório
+
+1. **Clique em "Relatórios"**
+2. **Selecione o tipo de relatório** — ex: "Folha de Pagamento"
+3. **Selecione o período** — ex: "Maio 2026"
+4. **Clique em "Gerar"**
+5. **Escolha o formato** — PDF ou Excel
+6. **Clique em "Baixar"**
+
+### 💡 Dica
+
+Gere relatórios regularmente para acompanhar o desempenho e detectar problemas cedo.
+
+---
+
+## 📌 Etapa 24: Encerrar Obra
+
+### O que você está fazendo
+Você está marcando a obra como concluída. Quando você encerra:
+- A obra muda de status para "Concluída"
+- Você não pode mais adicionar RDOs ou medições
+- O histórico fica disponível para consulta
+
+### Onde clicar
+Menu lateral → **Obras** → Linha da obra → Botão **"Encerrar Obra"**
+
+### O que você precisa fazer antes de encerrar
+
+1. **Todas as medições feitas** — 100% da obra medida
+2. **Todas as Contas a Pagar pagas** — nenhuma pendência
+3. **Todas as Contas a Receber recebidas** — cliente pagou tudo
+4. **RDOs atualizados** — último RDO do dia de conclusão
+
+### Passo a passo para encerrar
+
+1. **Clique em "Encerrar Obra"**
+2. **Confirme que tudo está pronto**
+3. **Clique em "Confirmar Encerramento"**
+
+### Depois que você clica em "Confirmar"
+
+- A obra muda para status "Concluída"
+- O histórico fica disponível para consulta
+- Você pode gerar relatórios finais
+- A obra não aparece mais em "Obras Ativas"
+
+### 💡 Dica
+
+Antes de encerrar, revise tudo. Depois de encerrado, é mais difícil corrigir erros.
+
+---
+
+## 📌 Etapa 25: Analisar Resultados
+
+### O que você está fazendo
+Você está analisando se a obra foi lucrativa e o que pode melhorar.
+
+### Onde clicar
+Menu lateral → **Relatórios** → **Análise de Resultados**
+
+### O que você vê
+
+| Métrica | Valor | Análise |
+|---------|-------|---------|
+| **Valor do Contrato** | R$ 67.500,00 | O que o cliente pagou |
+| **Custos Totais** | R$ 55.000,00 | Quanto você gastou |
+| **Lucro Bruto** | R$ 12.500,00 | Contrato - Custos |
+| **Margem de Lucro** | 18,5% | Lucro / Contrato |
+
+### Detalhando os Custos
+
+| Categoria | Valor | % do Total |
+|-----------|-------|-----------|
+| **Mão de Obra** | R$ 28.000,00 | 50,9% |
+| **Materiais** | R$ 20.000,00 | 36,4% |
+| **Alimentação** | R$ 3.000,00 | 5,5% |
+| **Transporte** | R$ 2.000,00 | 3,6% |
+| **Outros** | R$ 2.000,00 | 3,6% |
+| **TOTAL** | R$ 55.000,00 | 100% |
+
+### Perguntas para você fazer
+
+1. **Margem de lucro está boa?** — Esperava mais ou menos?
+2. **Mão de obra custou mais que o orçado?** — Por quê?
+3. **Materiais tiveram desperdício?** — Precisa melhorar?
+4. **Quanto tempo levou?** — Mais ou menos que o planejado?
+5. **O cliente ficou satisfeito?** — Voltaria a contratar?
+
+### 💡 Dica
+
+Use essas análises para melhorar seus orçamentos futuros. Se uma obra sempre custa mais que o orçado, aumente a margem nos próximos orçamentos.
+
+---
+
+# 📚 RESUMO DO CICLO COMPLETO
+
+Você aprendeu o ciclo completo do SIGE:
+
+1. **Login** — Entra no sistema
+2. **Funcionários** — Cadastra quem vai trabalhar
+3. **Insumos** — Cadastra os "ingredientes"
+4. **Clientes** — Cadastra quem vai contratar
+5. **Serviços** — Cria o "cardápio" com composição
+6. **Orçamento** — Monta o cálculo interno
+7. **Proposta** — Gera o documento para o cliente
+8. **Aprovação** — Cliente aprova, obra nasce
+9. **RDO** — Registra o que foi feito cada dia
+10. **Ponto** — Registra presença dos funcionários
+11. **Alimentação** — Registra gastos com alimentação
+12. **Transporte** — Registra gastos com transporte
+13. **Reembolsos** — Registra gastos dos funcionários
+14. **Compras** — Cria pedidos para fornecedores
+15. **Almoxarifado** — Consulta estoque
+16. **Cotação** — Compara preços de fornecedores
+17. **Medição** — Mede o progresso da obra
+18. **Contas a Pagar** — Vê o que deve pagar
+19. **Contas a Receber** — Vê o que o cliente deve
+20. **Fluxo de Caixa** — Vê o resumo de tudo
+21. **Portal do Cliente** — Cliente acompanha a obra
+22. **Relatórios** — Gera análises
+23. **Encerramento** — Marca a obra como concluída
+24. **Análise de Resultados** — Vê se foi lucrativo
+
+---
+
+# 🆘 PERGUNTAS FREQUENTES
+
+## P: Posso editar um RDO depois de salvar?
+**R:** Sim! Clique no RDO na lista, clique em "Editar" e faça as mudanças. O sistema recalcula tudo automaticamente.
+
+## P: E se eu errar a data de um RDO?
+**R:** Você pode editar. Mas cuidado — se você mudar a data, a medição pode ficar errada.
+
+## P: Posso ter dois funcionários com o mesmo nome?
+**R:** Sim, mas não é recomendado. Prefira adicionar um sobrenome ou iniciais para diferenciar.
+
+## P: O que acontece se eu não preencher o RDO?
+**R:** O sistema não calcula o progresso da obra. A medição fica zerada e você não consegue cobrar o cliente.
+
+## P: Posso deletar um RDO?
+**R:** Sim, mas cuidado — isso afeta a medição e o fluxo de caixa. Melhor editar do que deletar.
+
+## P: Como faço para exportar dados para Excel?
+**R:** Na maioria das telas, tem um botão "Exportar" ou "Baixar". Clique lá.
+
+## P: Posso usar o SIGE no celular?
+**R:** Sim! O sistema é responsivo. Mas algumas funcionalidades são melhores no computador.
+
+## P: E se eu esquecer a senha?
+**R:** Na tela de login, clique em "Esqueci a senha". O sistema envia um link para você resetar.
+
+## P: Posso ter múltiplas obras ao mesmo tempo?
+**R:** Sim! O SIGE foi feito para isso. Você pode ter quantas obras quiser.
+
+## P: O sistema faz backup dos dados?
+**R:** Sim! O sistema faz backup automático. Mas é bom fazer backup manual também.
+
+## P: Posso compartilhar dados com outro usuário?
+**R:** Sim! Menu → Equipe → Adicionar Usuário. Você pode dar permissões diferentes para cada um.
+
+---
+
+# 📞 PRECISA DE AJUDA?
+
+Se você tiver dúvidas:
+
+1. **Releia este manual** — A resposta provavelmente está aqui
+2. **Assista os vídeos** — No site do SIGE tem tutoriais em vídeo
+3. **Contate o suporte** — Email: suporte@sige.com.br
+4. **Consulte a comunidade** — Tem um grupo no WhatsApp com outros usuários
+
+---
+
+**Parabéns! Você agora sabe usar o SIGE do começo ao fim! 🎉**
+
+Boa sorte com suas obras!
