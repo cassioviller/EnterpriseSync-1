@@ -319,7 +319,7 @@
                          name="comp_coeficiente" value="{{ c.coeficiente }}"></td>
               <td><input class="form-control form-control-sm" type="number" step="0.0001"
                          name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
-              <td class="text-end text-muted">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
+              <td class="text-end text-muted js-subtotal-unit">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
@@ -395,7 +395,7 @@
     <td><input class="form-control form-control-sm" name="comp_unidade" value="un"></td>
     <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_coeficiente" value="0"></td>
     <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_preco_unitario" value="0"></td>
-    <td class="text-end text-muted">—</td>
+    <td class="text-end text-muted js-subtotal-unit">—</td>
     <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
       <i class="fas fa-times"></i></button></td>
   </tr>
@@ -409,26 +409,36 @@ function addCompRow(btn) {
 }
 
 // Task #115 — recálculo em tempo real (espelha services/orcamento_view_service.py).
-const ORC = {
-  imp_global: parseFloat(document.querySelector('input[name="imposto_pct_global"]').value) || 0,
-  mar_global: parseFloat(document.querySelector('input[name="margem_pct_global"]').value) || 0,
-};
+const ORC = { imp_global: 0, mar_global: 0 };
 const fmt = n => Number(n||0).toFixed(2);
-function getNum(el){ return parseFloat(el && el.value) || 0; }
+// Task #124 — leitura robusta de número para inputs do orçamento.
+// Em navegadores pt-BR, `<input type="number">` pode aceitar vírgula como
+// separador decimal mas devolver `.value === ''` (inválido), zerando o cálculo
+// silenciosamente. Tentamos `valueAsNumber` primeiro e, em fallback, normalizamos
+// vírgula → ponto antes do parseFloat para suportar tanto "0,04" quanto "0.04".
+function getNum(el){
+  if (!el) return 0;
+  if (typeof el.valueAsNumber === 'number' && !Number.isNaN(el.valueAsNumber)) {
+    return el.valueAsNumber;
+  }
+  const raw = (el.value == null ? '' : String(el.value)).trim().replace(',', '.');
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function recalcItem(form){
   const qtd = getNum(form.querySelector('input[name="quantidade"]'));
-  const impItem = form.querySelector('input[name="imposto_pct"]').value;
-  const marItem = form.querySelector('input[name="margem_pct"]').value;
-  const imp = impItem !== '' ? parseFloat(impItem) : ORC.imp_global;
-  const mar = marItem !== '' ? parseFloat(marItem) : ORC.mar_global;
+  const impEl = form.querySelector('input[name="imposto_pct"]');
+  const marEl = form.querySelector('input[name="margem_pct"]');
+  const imp = (impEl && String(impEl.value).trim() !== '') ? getNum(impEl) : ORC.imp_global;
+  const mar = (marEl && String(marEl.value).trim() !== '') ? getNum(marEl) : ORC.mar_global;
 
   let custoUnit = 0;
   form.querySelectorAll('.comp-tbody tr').forEach(tr => {
     const coef = getNum(tr.querySelector('input[name="comp_coeficiente"]'));
     const preco = getNum(tr.querySelector('input[name="comp_preco_unitario"]'));
     const sub = coef * preco;
-    const subCell = tr.children[5];
+    const subCell = tr.querySelector('.js-subtotal-unit') || tr.children[5];
     if (subCell) subCell.textContent = 'R$ ' + sub.toFixed(4);
     custoUnit += sub;
   });
@@ -458,8 +468,8 @@ function recalcItem(form){
 
 function recalcAll(){
   let cT=0, vT=0, lT=0;
-  ORC.imp_global = parseFloat(document.querySelector('input[name="imposto_pct_global"]').value) || 0;
-  ORC.mar_global = parseFloat(document.querySelector('input[name="margem_pct_global"]').value) || 0;
+  ORC.imp_global = getNum(document.querySelector('input[name="imposto_pct_global"]'));
+  ORC.mar_global = getNum(document.querySelector('input[name="margem_pct_global"]'));
   document.querySelectorAll('.item-form').forEach(f => {
     const r = recalcItem(f);
     cT += r.custo; vT += r.venda; lT += r.lucro;
@@ -605,7 +615,7 @@ async function buscarInsumos() {
 function _addInsumoRow(insumo) {
   if (!_pickerTbody) return;
   const tipo = document.getElementById('insumoPickerTipo').value || 'MATERIAL';
-  const coef = parseFloat(document.getElementById('insumoPickerCoef').value) || 1;
+  const coef = getNum(document.getElementById('insumoPickerCoef')) || 1;
   const tmpl = document.getElementById('comp-row-tmpl');
   const node = tmpl.content.cloneNode(true);
   node.querySelector('select[name="comp_tipo"]').value = tipo;
