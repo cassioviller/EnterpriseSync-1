@@ -188,7 +188,7 @@ def _seed():
         password_hash=generate_password_hash(ADMIN_PASSWORD),
         tipo_usuario=TipoUsuario.ADMIN,
         ativo=True,
-        versao_sistema="v1",
+        versao_sistema="v2",
     )
     db.session.add(admin); db.session.flush()
     aid = admin.id
@@ -677,6 +677,60 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
 # ---------------------------------------------------------------------------
 # Entry point com guarda de produção
 # ---------------------------------------------------------------------------
+def _backfill_custos_rdo_demo(admin_id):
+    """Roda gerar_custos_mao_obra_rdo() em todos os RDOs finalizados da
+    obra OBR-2026-001 do admin Alfa. Idempotente — só insere o que falta.
+    Também promove o admin Alfa para versao_sistema='v2' (a demo usa
+    diaristas + Gestão de Custos V2, recursos exclusivos do v2).
+    """
+    try:
+        from app import db
+        from models import Usuario, Obra, RDO
+        from services.rdo_custos import gerar_custos_mao_obra_rdo
+
+        admin = Usuario.query.get(admin_id)
+        if admin and getattr(admin, 'versao_sistema', None) != 'v2':
+            log.info(
+                f"backfill: promovendo admin Alfa (id={admin_id}) "
+                f"de {admin.versao_sistema!r} para 'v2'"
+            )
+            admin.versao_sistema = 'v2'
+            db.session.commit()
+
+        obra = (
+            Obra.query
+            .filter_by(admin_id=admin_id, codigo=OBRA_CODIGO)
+            .first()
+        )
+        if not obra:
+            log.info(f"backfill custos RDO: obra {OBRA_CODIGO} não encontrada")
+            return
+
+        rdos = (
+            RDO.query
+            .filter_by(obra_id=obra.id, status="Finalizado")
+            .all()
+        )
+        total = 0
+        for rdo in rdos:
+            try:
+                total += gerar_custos_mao_obra_rdo(rdo, admin_id) or 0
+            except Exception as e:
+                log.warning(f"backfill RDO {rdo.numero_rdo} falhou: {e}")
+        if total:
+            log.info(
+                f"backfill custos RDO: {total} lançamento(s) inserido(s) "
+                f"em {len(rdos)} RDO(s) da obra {OBRA_CODIGO}"
+            )
+        else:
+            log.info(
+                f"backfill custos RDO: nada a inserir "
+                f"({len(rdos)} RDO(s) já com custos)"
+            )
+    except Exception:
+        log.exception("backfill custos RDO falhou")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Seed demo Construtora Alfa (idempotente)."
@@ -755,6 +809,11 @@ def main(argv=None):
                     f"admin Alfa já populado (id={existente.id}) — no-op "
                     "idempotente em dev. Use --reset para replantar."
                 )
+                # Backfill idempotente: garante que os custos de mão-de-obra
+                # dos RDOs finalizados da demo estão lançados em
+                # GestaoCustoFilho. Necessário para deploys que plantaram a
+                # demo ANTES da geração automática existir.
+                _backfill_custos_rdo_demo(existente.id)
                 return 0
 
             log.info(

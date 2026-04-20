@@ -69,6 +69,7 @@ def registrar_custo_automatico(
     origem_tabela: str = None,
     origem_id: int = None,
     obra_servico_custo_id=None,
+    force_v2: bool = False,
 ):
     """
     Coração da integração: registra automaticamente um custo no módulo
@@ -81,12 +82,17 @@ def registrar_custo_automatico(
     4. Recalcula o valor_total do Pai
     5. Faz flush (sem commit — o módulo chamador faz o commit)
 
+    ``force_v2``: chamadores em contexto background (sem ``current_user``)
+    devem validar a versão do tenant antes e passar ``force_v2=True`` para
+    pular o check baseado em sessão.
+
     Retorna o objeto GestaoCustoFilho criado, ou None em caso de erro.
     """
     try:
-        from utils.tenant import is_v2_active
-        if not is_v2_active():
-            return None
+        if not force_v2:
+            from utils.tenant import is_v2_active
+            if not is_v2_active():
+                return None
 
         from app import db
         from models import GestaoCustoPai, GestaoCustoFilho

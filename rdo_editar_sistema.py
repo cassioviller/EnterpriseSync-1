@@ -332,6 +332,12 @@ def salvar_edicao_rdo(rdo_id):
         
         # Limpar funcionários existentes do RDO
         from models import RDOMaoObra
+        # Antes, remover os custos automáticos atrelados às linhas que vão sair.
+        try:
+            from services.rdo_custos import remover_custos_rdo
+            remover_custos_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
         RDOMaoObra.query.filter_by(rdo_id=rdo_id).delete()
         
         import re as _re
@@ -404,7 +410,14 @@ def salvar_edicao_rdo(rdo_id):
 
         # Confirmar salvamento
         db.session.commit()
-        
+
+        # Gera/atualiza custos de mão-de-obra desta edição (idempotente)
+        try:
+            from services.rdo_custos import gerar_custos_mao_obra_rdo
+            gerar_custos_mao_obra_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
+
         logger.info(f"✅ RDO editado com sucesso: {rdo.numero_rdo}")
         flash(f'RDO {rdo.numero_rdo} editado com sucesso!', 'success')
         

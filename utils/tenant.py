@@ -69,7 +69,12 @@ def is_v2_active():
     from flask_login import current_user
     from models import Usuario, TipoUsuario
 
-    if not current_user.is_authenticated:
+    # Em contexto background (seed, threads, jobs) current_user pode ser None
+    # ou um proxy sem request context — não quebrar.
+    try:
+        if current_user is None or not current_user.is_authenticated:
+            return False
+    except Exception:
         return False
 
     if current_user.tipo_usuario == TipoUsuario.ADMIN:

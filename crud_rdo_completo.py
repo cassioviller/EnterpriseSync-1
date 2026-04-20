@@ -213,6 +213,13 @@ def salvar_rdo():
                 return redirect(url_for('rdo_crud.listar_rdos'))
             
             # Limpar dados antigos
+            # Antes de remover RDOMaoObra, remover os custos atrelados
+            # (precisamos dos IDs para casar origem_id).
+            try:
+                from services.rdo_custos import remover_custos_rdo
+                remover_custos_rdo(rdo, admin_id)
+            except Exception as _e:
+                logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
             RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).delete()
             RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
             RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
@@ -374,7 +381,16 @@ def salvar_rdo():
                 logger.error(f"Erro ao processar ocorrências: {e}")
         
         db.session.commit()
-        
+
+        # Geração automática de custos de mão-de-obra (Gestão de Custos V2 →
+        # Realizado no dashboard + ContaPagar). Falhas aqui NÃO podem quebrar
+        # o salvamento do RDO.
+        try:
+            from services.rdo_custos import gerar_custos_mao_obra_rdo
+            gerar_custos_mao_obra_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
+
         # Mensagem de sucesso
         acao = "editado" if rdo_id else "criado"
         flash(f'RDO {rdo.numero_rdo} {acao} com sucesso! '
@@ -472,6 +488,13 @@ def finalizar_rdo(rdo_id):
         rdo.status = 'Finalizado'
         rdo.finalizado_em = datetime.utcnow()
         rdo.finalizado_por_id = current_user.id
+        # Gera os custos da mão-de-obra do RDO no fechamento. A função abaixo
+        # é idempotente; rodar de novo num RDO já lançado não duplica nada.
+        try:
+            from services.rdo_custos import gerar_custos_mao_obra_rdo
+            gerar_custos_mao_obra_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
 
         # Calcular produtividade por funcionário (V2) — parte da mesma transação
         subs_com_meta = RDOServicoSubatividade.query.filter(
