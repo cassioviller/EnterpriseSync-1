@@ -323,20 +323,27 @@ echo "   📊 Health result: /tmp/health_check_result.json" | tee -a "$LOG_FILE"
 echo "" | tee -a "$LOG_FILE"
 
 # FASE 3.7: SEED DEMO "Construtora Alfa" (Task #108)
-# DESLIGADO POR PADRÃO em produção — auto-seed em prod é risco de
-# segurança (escreve credenciais conhecidas + dataset visível para
-# qualquer um com a URL). O operador deve rodar manualmente:
 #
+# ┌──────────────────────────────────────────────────────────────────┐
+# │ ⚠️  ATENÇÃO — AUTO-SEED TEMPORARIAMENTE LIGADO POR PADRÃO  ⚠️    │
+# │                                                                   │
+# │ Os defaults abaixo foram invertidos PROPOSITALMENTE para o        │
+# │ próximo deploy plantar a demo Construtora Alfa sem precisar       │
+# │ configurar variável de ambiente no painel.                        │
+# │                                                                   │
+# │ DEPOIS DO PRÓXIMO DEPLOY BEM-SUCEDIDO, REVERTER:                  │
+# │   - SIGE_ENABLE_DEMO_SEED:-false                                  │
+# │   - SIGE_ALLOW_PROD_SEED:-0                                       │
+# │ (ou definir SIGE_ENABLE_DEMO_SEED=false no painel)                │
+# └──────────────────────────────────────────────────────────────────┘
+#
+# Em modo manual o operador pode forçar a qualquer momento via:
 #     SIGE_ALLOW_PROD_SEED=1 \
 #       python3 /app/scripts/seed_demo_alfa.py --ambiente prod
-#
-# Para re-habilitar o auto-seed (NÃO recomendado), defina ambas as flags:
-#     SIGE_ENABLE_DEMO_SEED=true
-#     SIGE_ALLOW_PROD_SEED=1
-echo "🌱 FASE 3.7: SEED DEMO ALFA (manual / opt-in)" | tee -a "$LOG_FILE"
+echo "🌱 FASE 3.7: SEED DEMO ALFA (auto-seed TEMPORARIAMENTE LIGADO)" | tee -a "$LOG_FILE"
 echo "==============================================" | tee -a "$LOG_FILE"
-if [ "${SIGE_ENABLE_DEMO_SEED:-false}" = "true" ] && \
-   [ "${SIGE_ALLOW_PROD_SEED:-0}" = "1" ]; then
+if [ "${SIGE_ENABLE_DEMO_SEED:-true}" = "true" ] && \
+   [ "${SIGE_ALLOW_PROD_SEED:-1}" = "1" ]; then
     if [ -f /app/scripts/seed_demo_alfa.py ]; then
         SEED_LOG="/tmp/sige_seed_demo_alfa.log"
         timeout 60 python3 /app/scripts/seed_demo_alfa.py --ambiente prod \
