@@ -1,0 +1,63 @@
+{% extends "base_completo.html" %}
+{% block title %}Orçamentos{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="fas fa-calculator me-2"></i> Orçamentos</h4>
+    <a href="{{ url_for('orcamentos.novo') }}" class="btn btn-primary">
+      <i class="fas fa-plus me-1"></i> Novo Orçamento
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Número</th><th>Título</th><th>Cliente</th>
+            <th class="text-end">Custo</th><th class="text-end">Venda</th>
+            <th class="text-end">Lucro</th><th>Status</th><th>Propostas</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for o in orcamentos %}
+          <tr>
+            <td><strong>{{ o.numero }}</strong></td>
+            <td>{{ o.titulo }}</td>
+            <td>{{ o.cliente_nome or '—' }}</td>
+            <td class="text-end text-muted">R$ {{ '%.2f'|format(o.custo_total or 0) }}</td>
+            <td class="text-end">R$ {{ '%.2f'|format(o.venda_total or 0) }}</td>
+            <td class="text-end text-success">R$ {{ '%.2f'|format(o.lucro_total or 0) }}</td>
+            <td><span class="badge bg-secondary">{{ o.status }}</span></td>
+            <td>
+              {% set _props = o.propostas_geradas %}
+              {% if _props %}
+                <span class="badge bg-info">{{ _props|length }}</span>
+                {% for p in _props[:2] %}
+                  <a href="{{ url_for('propostas.visualizar', id=p.id) }}" class="small">#{{ p.numero }}</a>{% if not loop.last %},{% endif %}
+                {% endfor %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{{ url_for('orcamentos.editar', id=o.id) }}" class="btn btn-sm btn-outline-primary" title="Editar">
+                <i class="fas fa-edit"></i>
+              </a>
+              <form method="POST" action="{{ url_for('orcamentos.duplicar', id=o.id) }}" class="d-inline"
+                    onsubmit="return confirm('Duplicar orçamento {{ o.numero }}?');">
+                <button class="btn btn-sm btn-outline-secondary" title="Duplicar"><i class="fas fa-copy"></i></button>
+              </form>
+              <form method="POST" action="{{ url_for('orcamentos.excluir', id=o.id) }}" class="d-inline"
+                    onsubmit="return confirm('Excluir orçamento {{ o.numero }}?');">
+                <button class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-4">Nenhum orçamento cadastrado.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

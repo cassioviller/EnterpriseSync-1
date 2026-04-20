@@ -1,0 +1,369 @@
+{% extends "base_completo.html" %}
+{% block title %}Orçamento {{ orcamento.numero }}{% endblock %}
+{% block content %}
+{% set o = orcamento %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-1">
+        <i class="fas fa-calculator me-2"></i> Orçamento {{ o.numero }}
+        <span class="badge bg-secondary ms-2">{{ o.status }}</span>
+      </h4>
+      <small class="text-muted">{{ o.titulo }}</small>
+    </div>
+    <div>
+      <a href="{{ url_for('orcamentos.listar') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Voltar
+      </a>
+      <form method="POST" action="{{ url_for('orcamentos.duplicar', id=o.id) }}" class="d-inline">
+        <button class="btn btn-outline-secondary"
+                onclick="return confirm('Duplicar este orçamento como nova revisão?');">
+          <i class="fas fa-copy me-1"></i> Duplicar
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('orcamentos.gerar_proposta', id=o.id) }}" class="d-inline">
+        <button class="btn btn-success"
+                onclick="return confirm('Gerar nova Proposta a partir deste orçamento? O cliente verá apenas descrição e preço de venda.');">
+          <i class="fas fa-file-export me-1"></i> Gerar Proposta a partir do Orçamento
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% if o.propostas_geradas %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Propostas geradas</strong>
+      <span class="text-muted small">({{ o.propostas_geradas|length }})</span>
+    </div>
+    <ul class="list-group list-group-flush">
+      {% for p in o.propostas_geradas %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <a href="{{ url_for('propostas.visualizar', id=p.id) }}">
+            <strong>#{{ p.numero }}</strong></a>
+          — {{ p.titulo or '—' }}
+          <span class="badge bg-secondary ms-1">{{ p.status }}</span>
+        </div>
+        <small class="text-muted">{{ p.criado_em.strftime('%d/%m/%Y %H:%M') if p.criado_em }}</small>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Cabeçalho -->
+  <div class="card mb-3">
+    <div class="card-header"><strong>Dados do Orçamento</strong></div>
+    <form method="POST" action="{{ url_for('orcamentos.atualizar', id=o.id) }}" class="card-body">
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label">Título</label>
+          <input class="form-control" name="titulo" value="{{ o.titulo }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Cliente</label>
+          <input class="form-control" name="cliente_nome" value="{{ o.cliente_nome or '' }}">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Descrição</label>
+          <textarea class="form-control" name="descricao" rows="2">{{ o.descricao or '' }}</textarea>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Imposto global (%)</label>
+          <input class="form-control" type="number" step="0.01" name="imposto_pct_global"
+                 value="{{ o.imposto_pct_global if o.imposto_pct_global is not none else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Margem global (%)</label>
+          <input class="form-control" type="number" step="0.01" name="margem_pct_global"
+                 value="{{ o.margem_pct_global if o.margem_pct_global is not none else '' }}">
+        </div>
+        <div class="col-md-6 d-flex align-items-end justify-content-end">
+          <button class="btn btn-primary"><i class="fas fa-save me-1"></i> Salvar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Totais -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Custo total</div>
+      <h5 class="mb-0">R$ {{ '%.2f'|format(o.custo_total or 0) }}</h5>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Preço de venda</div>
+      <h5 class="mb-0 text-primary">R$ {{ '%.2f'|format(o.venda_total or 0) }}</h5>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Lucro estimado</div>
+      <h5 class="mb-0 text-success">R$ {{ '%.2f'|format(o.lucro_total or 0) }}</h5>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <div class="text-muted small">Margem efetiva</div>
+      <h5 class="mb-0">
+        {% if o.venda_total and o.venda_total|float > 0 %}
+          {{ '%.1f'|format((o.lucro_total or 0)|float / o.venda_total|float * 100) }}%
+        {% else %}—{% endif %}
+      </h5>
+    </div></div></div>
+  </div>
+
+  <!-- Adicionar item -->
+  <div class="card mb-3">
+    <div class="card-header"><strong>Adicionar Item</strong></div>
+    <form method="POST" action="{{ url_for('orcamentos.adicionar_item', id=o.id) }}" class="card-body">
+      <div class="row g-2">
+        <div class="col-md-5">
+          <label class="form-label small">Serviço do catálogo</label>
+          <select class="form-select" name="servico_id">
+            <option value="">— item livre —</option>
+            {% for s in servicos %}
+              <option value="{{ s.id }}">{{ s.nome }} ({{ s.unidade_medida }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">Descrição (se livre)</label>
+          <input class="form-control" name="descricao">
+        </div>
+        <div class="col-md-1">
+          <label class="form-label small">Un.</label>
+          <input class="form-control" name="unidade" value="un">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Quantidade</label>
+          <input class="form-control" name="quantidade" type="number" step="0.0001" value="1">
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+          <button class="btn btn-primary w-100"><i class="fas fa-plus"></i></button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Itens -->
+  {% for it in o.itens %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        <strong>Item #{{ it.ordem }} — {{ it.descricao }}</strong>
+        {% if it.servico %}
+          <span class="badge bg-info text-dark ms-2" title="Serviço do catálogo">
+            <i class="fas fa-link me-1"></i>{{ it.servico.nome }}
+          </span>
+          {% if it.servico.template_padrao_id %}
+            <span class="badge bg-warning text-dark ms-1"
+                  title="Cronograma padrão vinculado (Task #102)">
+              <i class="fas fa-calendar-check me-1"></i>
+              cronograma: {{ it.servico.template_padrao.nome if it.servico.template_padrao else ('#' ~ it.servico.template_padrao_id) }}
+            </span>
+          {% else %}
+            <span class="badge bg-light text-muted ms-1">sem cronograma padrão</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      <form method="POST" action="{{ url_for('orcamentos.remover_item', item_id=it.id) }}"
+            onsubmit="return confirm('Remover este item?');" class="m-0">
+        <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+      </form>
+    </div>
+    <form method="POST" action="{{ url_for('orcamentos.atualizar_item', item_id=it.id) }}" class="card-body item-form" data-item-id="{{ it.id }}">
+      <div class="row g-2 mb-3">
+        <div class="col-md-5">
+          <label class="form-label small">Descrição</label>
+          <input class="form-control" name="descricao" value="{{ it.descricao }}">
+        </div>
+        <div class="col-md-1">
+          <label class="form-label small">Un.</label>
+          <input class="form-control" name="unidade" value="{{ it.unidade }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Quantidade</label>
+          <input class="form-control" type="number" step="0.0001" name="quantidade" value="{{ it.quantidade }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Imposto % (item)</label>
+          <input class="form-control" type="number" step="0.01" name="imposto_pct"
+                 value="{{ it.imposto_pct if it.imposto_pct is not none else '' }}"
+                 placeholder="usa global">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small">Margem % (item)</label>
+          <input class="form-control" type="number" step="0.01" name="margem_pct"
+                 value="{{ it.margem_pct if it.margem_pct is not none else '' }}"
+                 placeholder="usa global">
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2">
+          <thead class="table-light">
+            <tr>
+              <th style="width:130px">Tipo</th>
+              <th>Insumo / componente</th>
+              <th style="width:80px">Un.</th>
+              <th style="width:120px">Coeficiente</th>
+              <th style="width:140px">Preço unit. (R$)</th>
+              <th style="width:140px" class="text-end">Subtotal/un.</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody class="comp-tbody">
+            {% set _comp = it.composicao_snapshot or [] %}
+            {% for c in _comp %}
+            <tr>
+              <td>
+                <select class="form-select form-select-sm" name="comp_tipo">
+                  <option value="MAO_OBRA" {{ 'selected' if c.tipo=='MAO_OBRA' }}>Mão de obra</option>
+                  <option value="MATERIAL" {{ 'selected' if c.tipo=='MATERIAL' }}>Material</option>
+                  <option value="EQUIPAMENTO" {{ 'selected' if c.tipo=='EQUIPAMENTO' }}>Equipamento</option>
+                  <option value="OUTROS" {{ 'selected' if c.tipo not in ['MAO_OBRA','MATERIAL','EQUIPAMENTO'] }}>Outros</option>
+                </select>
+                <input type="hidden" name="comp_insumo_id" value="{{ c.insumo_id or '' }}">
+              </td>
+              <td><input class="form-control form-control-sm" name="comp_nome" value="{{ c.nome }}"></td>
+              <td><input class="form-control form-control-sm" name="comp_unidade" value="{{ c.unidade }}"></td>
+              <td><input class="form-control form-control-sm" type="number" step="0.0001"
+                         name="comp_coeficiente" value="{{ c.coeficiente }}"></td>
+              <td><input class="form-control form-control-sm" type="number" step="0.0001"
+                         name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
+              <td class="text-end text-muted">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
+              <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="this.closest('tr').remove();">
+                <i class="fas fa-times"></i></button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="addCompRow(this)">
+          <i class="fas fa-plus me-1"></i> Adicionar componente
+        </button>
+      </div>
+
+      <div class="row g-2 mt-3">
+        <div class="col-md-9">
+          <label class="form-label small">Observação interna</label>
+          <input class="form-control form-control-sm" name="observacao" value="{{ it.observacao or '' }}">
+        </div>
+        <div class="col-md-3 text-end">
+          <div class="small text-muted">Custo: R$ <span class="js-custo">{{ '%.2f'|format(it.custo_total or 0) }}</span></div>
+          <div class="small">Venda: <strong>R$ <span class="js-venda">{{ '%.2f'|format(it.venda_total or 0) }}</span></strong></div>
+          <div class="small text-success">Lucro: R$ <span class="js-lucro">{{ '%.2f'|format(it.lucro_total or 0) }}</span></div>
+          <div class="small text-muted js-preview-flag" style="display:none">
+            <i class="fas fa-circle-notch fa-spin me-1"></i>prévia (não salvo)
+          </div>
+        </div>
+      </div>
+      <div class="text-end mt-2">
+        <button class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Salvar item</button>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <div class="alert alert-info">Nenhum item ainda. Adicione um serviço do catálogo acima.</div>
+  {% endfor %}
+
+</div>
+
+<template id="comp-row-tmpl">
+  <tr>
+    <td>
+      <select class="form-select form-select-sm" name="comp_tipo">
+        <option value="MAO_OBRA">Mão de obra</option>
+        <option value="MATERIAL" selected>Material</option>
+        <option value="EQUIPAMENTO">Equipamento</option>
+        <option value="OUTROS">Outros</option>
+      </select>
+      <input type="hidden" name="comp_insumo_id" value="">
+    </td>
+    <td><input class="form-control form-control-sm" name="comp_nome" placeholder="Descrição"></td>
+    <td><input class="form-control form-control-sm" name="comp_unidade" value="un"></td>
+    <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_coeficiente" value="0"></td>
+    <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_preco_unitario" value="0"></td>
+    <td class="text-end text-muted">—</td>
+    <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="this.closest('tr').remove();">
+      <i class="fas fa-times"></i></button></td>
+  </tr>
+</template>
+<script>
+function addCompRow(btn) {
+  const tbody = btn.previousElementSibling.querySelector('.comp-tbody');
+  const tmpl = document.getElementById('comp-row-tmpl');
+  tbody.appendChild(tmpl.content.cloneNode(true));
+  recalcAll();
+}
+
+// Task #115 — recálculo em tempo real (espelha services/orcamento_view_service.py).
+const ORC = {
+  imp_global: parseFloat(document.querySelector('input[name="imposto_pct_global"]').value) || 0,
+  mar_global: parseFloat(document.querySelector('input[name="margem_pct_global"]').value) || 0,
+};
+const fmt = n => Number(n||0).toFixed(2);
+function getNum(el){ return parseFloat(el && el.value) || 0; }
+
+function recalcItem(form){
+  const qtd = getNum(form.querySelector('input[name="quantidade"]'));
+  const impItem = form.querySelector('input[name="imposto_pct"]').value;
+  const marItem = form.querySelector('input[name="margem_pct"]').value;
+  const imp = impItem !== '' ? parseFloat(impItem) : ORC.imp_global;
+  const mar = marItem !== '' ? parseFloat(marItem) : ORC.mar_global;
+
+  let custoUnit = 0;
+  form.querySelectorAll('.comp-tbody tr').forEach(tr => {
+    const coef = getNum(tr.querySelector('input[name="comp_coeficiente"]'));
+    const preco = getNum(tr.querySelector('input[name="comp_preco_unitario"]'));
+    const sub = coef * preco;
+    const subCell = tr.children[5];
+    if (subCell) subCell.textContent = 'R$ ' + sub.toFixed(4);
+    custoUnit += sub;
+  });
+  // Fórmula canônica idêntica a services/orcamento_view_service.py:
+  //   preco_unit = custo_unit / (1 - imp/100 - mar/100)
+  const divisor = 1 - (imp||0)/100 - (mar||0)/100;
+  const erro = divisor <= 0;
+  // Espelha quantize(0.0001) do backend antes de multiplicar por qtd.
+  const precoUnit = erro ? 0 : Math.round((custoUnit / divisor) * 10000) / 10000;
+  const custoTot  = Math.round(custoUnit * qtd * 100) / 100;
+  const vendaTot  = Math.round(precoUnit * qtd * 100) / 100;
+  const lucroTot  = Math.round((vendaTot - custoTot) * 100) / 100;
+  form.querySelector('.js-custo').textContent = fmt(custoTot);
+  form.querySelector('.js-venda').textContent = fmt(vendaTot);
+  form.querySelector('.js-lucro').textContent = fmt(lucroTot);
+  const flag = form.querySelector('.js-preview-flag');
+  if (erro) {
+    flag.innerHTML = '<i class="fas fa-exclamation-triangle text-danger me-1"></i>imposto + margem ≥ 100% — preço inválido';
+    flag.style.color = '#dc3545';
+  } else {
+    flag.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>prévia (não salvo)';
+    flag.style.color = '';
+  }
+  flag.style.display = '';
+  return { custo: custoTot, venda: vendaTot, lucro: lucroTot };
+}
+
+function recalcAll(){
+  let cT=0, vT=0, lT=0;
+  ORC.imp_global = parseFloat(document.querySelector('input[name="imposto_pct_global"]').value) || 0;
+  ORC.mar_global = parseFloat(document.querySelector('input[name="margem_pct_global"]').value) || 0;
+  document.querySelectorAll('.item-form').forEach(f => {
+    const r = recalcItem(f);
+    cT += r.custo; vT += r.venda; lT += r.lucro;
+  });
+  // Atualiza cards de totais
+  const cards = document.querySelectorAll('.row.g-3.mb-3 h5');
+  if (cards.length >= 4) {
+    cards[0].textContent = 'R$ ' + fmt(cT);
+    cards[1].textContent = 'R$ ' + fmt(vT);
+    cards[2].textContent = 'R$ ' + fmt(lT);
+    cards[3].textContent = vT > 0 ? ((lT/vT)*100).toFixed(1) + '%' : '—';
+  }
+}
+
+document.addEventListener('input', e => {
+  if (e.target.matches('input,select,textarea')) recalcAll();
+});
+document.addEventListener('DOMContentLoaded', recalcAll);
+</script>
+{% endblock %}

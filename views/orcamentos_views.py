@@ -1,0 +1,422 @@
+"""
+views/orcamentos_views.py — Task #115
+
+Blueprint do módulo de Orçamentos (camada interna que gera Propostas).
+Apenas usuários administradores podem ver/editar orçamentos.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, date
+from decimal import Decimal
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required, current_user
+from sqlalchemy import desc
+
+from app import db
+from auth import admin_required
+from models import (
+    Orcamento, OrcamentoItem, Servico, Cliente, Proposta, PropostaItem,
+    PropostaHistorico, ConfiguracaoEmpresa,
+)
+from services.orcamento_view_service import (
+    snapshot_from_servico, recalcular_item, recalcular_orcamento,
+)
+
+logger = logging.getLogger(__name__)
+
+orcamentos_bp = Blueprint('orcamentos', __name__, url_prefix='/orcamentos')
+
+
+def _admin_id() -> int:
+    return current_user.admin_id if getattr(current_user, 'admin_id', None) else current_user.id
+
+
+def _gerar_numero(admin_id: int) -> str:
+    ano = date.today().year
+    base = f"ORC-{ano}-"
+    count = Orcamento.query.filter_by(admin_id=admin_id).count() + 1
+    while True:
+        candidato = f"{base}{count:04d}"
+        if not Orcamento.query.filter_by(admin_id=admin_id, numero=candidato).first():
+            return candidato
+        count += 1
+
+
+# ───────────────────────────── LISTAR ─────────────────────────────
+@orcamentos_bp.route('/')
+@login_required
+@admin_required
+def listar():
+    admin_id = _admin_id()
+    orcamentos = Orcamento.query.filter_by(admin_id=admin_id) \
+        .order_by(desc(Orcamento.criado_em)).all()
+    return render_template('orcamentos/listar.html', orcamentos=orcamentos)
+
+
+# ───────────────────────────── NOVO ─────────────────────────────
+@orcamentos_bp.route('/novo', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def novo():
+    admin_id = _admin_id()
+    if request.method == 'POST':
+        try:
+            titulo = (request.form.get('titulo') or '').strip()
+            if not titulo:
+                flash('Título é obrigatório', 'error')
+                return redirect(url_for('orcamentos.novo'))
+            cliente_id = request.form.get('cliente_id') or None
+            cliente_nome = (request.form.get('cliente_nome') or '').strip()
+            if cliente_id:
+                cli = Cliente.query.filter_by(id=int(cliente_id), admin_id=admin_id).first()
+                if not cli:
+                    flash('Cliente inválido.', 'error')
+                    return redirect(url_for('orcamentos.novo'))
+                if not cliente_nome:
+                    cliente_nome = cli.nome
+            cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+            imp_g = request.form.get('imposto_pct_global') or (cfg.imposto_pct_padrao if cfg else None)
+            mar_g = request.form.get('margem_pct_global') or (cfg.lucro_pct_padrao if cfg else None)
+
+            orc = Orcamento(
+                admin_id=admin_id,
+                numero=_gerar_numero(admin_id),
+                titulo=titulo,
+                descricao=request.form.get('descricao') or None,
+                cliente_id=int(cliente_id) if cliente_id else None,
+                cliente_nome=cliente_nome or None,
+                imposto_pct_global=Decimal(str(imp_g)) if imp_g not in (None, '') else None,
+                margem_pct_global=Decimal(str(mar_g)) if mar_g not in (None, '') else None,
+                criado_por=current_user.id,
+                status='rascunho',
+            )
+            db.session.add(orc)
+            db.session.commit()
+            flash(f'Orçamento {orc.numero} criado.', 'success')
+            return redirect(url_for('orcamentos.editar', id=orc.id))
+        except Exception as e:
+            db.session.rollback()
+            logger.exception('erro ao criar orcamento')
+            flash(f'Erro ao criar: {e}', 'error')
+            return redirect(url_for('orcamentos.novo'))
+
+    clientes = Cliente.query.filter_by(admin_id=admin_id).order_by(Cliente.nome).all()
+    cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    return render_template('orcamentos/novo.html', clientes=clientes, config=cfg)
+
+
+# ───────────────────────────── EDITAR ─────────────────────────────
+@orcamentos_bp.route('/<int:id>/editar', methods=['GET'])
+@login_required
+@admin_required
+def editar(id):
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True) \
+        .order_by(Servico.nome).all()
+    return render_template('orcamentos/editar.html', orcamento=orc, servicos=servicos)
+
+
+@orcamentos_bp.route('/<int:id>/atualizar', methods=['POST'])
+@login_required
+@admin_required
+def atualizar(id):
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    try:
+        orc.titulo = (request.form.get('titulo') or orc.titulo).strip()
+        orc.descricao = request.form.get('descricao') or None
+        cliente_id = request.form.get('cliente_id') or None
+        if cliente_id:
+            cli = Cliente.query.filter_by(id=int(cliente_id), admin_id=admin_id).first()
+            if not cli:
+                raise ValueError('Cliente inválido')
+            orc.cliente_id = cli.id
+        else:
+            orc.cliente_id = None
+        orc.cliente_nome = (request.form.get('cliente_nome') or orc.cliente_nome or '').strip() or None
+        imp_g = request.form.get('imposto_pct_global')
+        mar_g = request.form.get('margem_pct_global')
+        orc.imposto_pct_global = Decimal(imp_g) if imp_g not in (None, '') else None
+        orc.margem_pct_global = Decimal(mar_g) if mar_g not in (None, '') else None
+        recalcular_orcamento(orc)
+        db.session.commit()
+        flash('Orçamento atualizado.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('erro ao atualizar orcamento')
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('orcamentos.editar', id=id))
+
+
+# ───────────────────────────── ITENS ─────────────────────────────
+@orcamentos_bp.route('/<int:id>/itens', methods=['POST'])
+@login_required
+@admin_required
+def adicionar_item(id):
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    try:
+        servico_id = request.form.get('servico_id') or None
+        quantidade = Decimal(str(request.form.get('quantidade') or '1'))
+        servico = None
+        snap = []
+        descricao = (request.form.get('descricao') or '').strip()
+        unidade = (request.form.get('unidade') or 'un').strip()
+        if servico_id:
+            servico = Servico.query.filter_by(id=int(servico_id), admin_id=admin_id).first()
+            if servico:
+                snap = snapshot_from_servico(servico)
+                if not descricao:
+                    descricao = servico.nome
+                unidade = servico.unidade_medida or unidade
+        if not descricao:
+            flash('Descrição obrigatória.', 'error')
+            return redirect(url_for('orcamentos.editar', id=id))
+
+        ordem = (db.session.query(db.func.coalesce(db.func.max(OrcamentoItem.ordem), 0))
+                 .filter_by(orcamento_id=orc.id).scalar() or 0) + 1
+        item = OrcamentoItem(
+            admin_id=admin_id,
+            orcamento_id=orc.id,
+            ordem=ordem,
+            servico_id=servico.id if servico else None,
+            descricao=descricao,
+            unidade=unidade,
+            quantidade=quantidade,
+            composicao_snapshot=snap,
+        )
+        db.session.add(item)
+        db.session.flush()
+        recalcular_item(item, orc)
+        recalcular_orcamento(orc)
+        db.session.commit()
+        flash('Item adicionado.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('erro ao adicionar item')
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('orcamentos.editar', id=id))
+
+
+@orcamentos_bp.route('/itens/<int:item_id>/atualizar', methods=['POST'])
+@login_required
+@admin_required
+def atualizar_item(item_id):
+    admin_id = _admin_id()
+    item = OrcamentoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
+    orc = item.orcamento
+    try:
+        item.descricao = (request.form.get('descricao') or item.descricao).strip()
+        item.unidade = (request.form.get('unidade') or item.unidade).strip()
+        item.quantidade = Decimal(str(request.form.get('quantidade') or '0'))
+        imp = request.form.get('imposto_pct')
+        mar = request.form.get('margem_pct')
+        item.imposto_pct = Decimal(imp) if imp not in (None, '') else None
+        item.margem_pct = Decimal(mar) if mar not in (None, '') else None
+        item.observacao = request.form.get('observacao') or None
+
+        # Composição (campos paralelos)
+        tipos = request.form.getlist('comp_tipo')
+        nomes = request.form.getlist('comp_nome')
+        unids = request.form.getlist('comp_unidade')
+        coefs = request.form.getlist('comp_coeficiente')
+        precos = request.form.getlist('comp_preco_unitario')
+        ins_ids = request.form.getlist('comp_insumo_id')
+        snap = []
+        for i in range(len(nomes)):
+            nm = (nomes[i] or '').strip()
+            if not nm:
+                continue
+            try:
+                snap.append({
+                    'tipo': (tipos[i] if i < len(tipos) else 'MATERIAL') or 'MATERIAL',
+                    'insumo_id': int(ins_ids[i]) if i < len(ins_ids) and ins_ids[i] else None,
+                    'nome': nm,
+                    'unidade': (unids[i] if i < len(unids) else 'un') or 'un',
+                    'coeficiente': float(coefs[i] or 0) if i < len(coefs) else 0.0,
+                    'preco_unitario': float(precos[i] or 0) if i < len(precos) else 0.0,
+                    'subtotal_unitario': 0.0,
+                })
+            except (ValueError, IndexError):
+                continue
+        item.composicao_snapshot = snap
+        recalcular_item(item, orc)
+        recalcular_orcamento(orc)
+        db.session.commit()
+        flash('Item atualizado.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('erro ao atualizar item')
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('orcamentos.editar', id=orc.id))
+
+
+@orcamentos_bp.route('/itens/<int:item_id>/remover', methods=['POST'])
+@login_required
+@admin_required
+def remover_item(item_id):
+    admin_id = _admin_id()
+    item = OrcamentoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
+    orc_id = item.orcamento_id
+    orc = item.orcamento
+    db.session.delete(item)
+    db.session.flush()
+    recalcular_orcamento(orc)
+    db.session.commit()
+    flash('Item removido.', 'success')
+    return redirect(url_for('orcamentos.editar', id=orc_id))
+
+
+# ───────────────────────────── EXCLUIR ─────────────────────────────
+@orcamentos_bp.route('/<int:id>/excluir', methods=['POST'])
+@login_required
+@admin_required
+def excluir(id):
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    db.session.delete(orc)
+    db.session.commit()
+    flash('Orçamento excluído.', 'success')
+    return redirect(url_for('orcamentos.listar'))
+
+
+# ───────────────────── DUPLICAR ─────────────────────
+@orcamentos_bp.route('/<int:id>/duplicar', methods=['POST'])
+@login_required
+@admin_required
+def duplicar(id):
+    """Cria uma cópia integral do orçamento (rev) preservando composições e overrides.
+
+    Útil para gerar revisões V2/V3 antes de uma nova proposta.
+    """
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    try:
+        novo = Orcamento(
+            admin_id=admin_id,
+            numero=_gerar_numero(admin_id),
+            titulo=f"{orc.titulo} (cópia)",
+            descricao=orc.descricao,
+            cliente_id=orc.cliente_id,
+            cliente_nome=orc.cliente_nome,
+            imposto_pct_global=orc.imposto_pct_global,
+            margem_pct_global=orc.margem_pct_global,
+            criado_por=current_user.id,
+            status='rascunho',
+        )
+        db.session.add(novo)
+        db.session.flush()
+
+        for it in orc.itens:
+            novo_it = OrcamentoItem(
+                admin_id=admin_id,
+                orcamento_id=novo.id,
+                ordem=it.ordem,
+                servico_id=it.servico_id,
+                descricao=it.descricao,
+                unidade=it.unidade,
+                quantidade=it.quantidade,
+                imposto_pct=it.imposto_pct,
+                margem_pct=it.margem_pct,
+                composicao_snapshot=it.composicao_snapshot or [],
+                observacao=it.observacao,
+            )
+            db.session.add(novo_it)
+        db.session.flush()
+        recalcular_orcamento(novo)
+        db.session.commit()
+        flash(f'Orçamento duplicado como {novo.numero}.', 'success')
+        return redirect(url_for('orcamentos.editar', id=novo.id))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('erro ao duplicar orcamento')
+        flash(f'Erro ao duplicar: {e}', 'error')
+        return redirect(url_for('orcamentos.editar', id=id))
+
+
+# ───────────────────── GERAR PROPOSTA ─────────────────────
+@orcamentos_bp.route('/<int:id>/gerar-proposta', methods=['POST'])
+@login_required
+@admin_required
+def gerar_proposta(id):
+    """Cria uma Proposta cliente-facing a partir do orçamento.
+
+    Apenas descricao/quantidade/unidade/preco_venda são propagados.
+    Custos, composição, margem e imposto NÃO são copiados para a Proposta.
+    """
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    try:
+        recalcular_orcamento(orc)
+
+        proposta = Proposta()
+        proposta.titulo = orc.titulo
+        proposta.descricao = orc.descricao
+        proposta.cliente_id = orc.cliente_id
+        proposta.cliente_nome = orc.cliente_nome or 'Cliente'
+        proposta.admin_id = admin_id
+        proposta.criado_por = current_user.id
+        proposta.status = 'rascunho'
+        proposta.valor_total = orc.venda_total or 0
+        proposta.orcamento_id = orc.id  # vínculo 1→N (Task #115 v2)
+        db.session.add(proposta)
+        db.session.flush()
+
+        for idx, it in enumerate(orc.itens, start=1):
+            pi = PropostaItem(
+                admin_id=admin_id,
+                proposta_id=proposta.id,
+                item_numero=idx,
+                ordem=idx,
+                descricao=it.descricao,
+                quantidade=it.quantidade,
+                unidade=it.unidade,
+                preco_unitario=it.preco_venda_unitario or 0,
+                subtotal=it.venda_total or 0,
+                # vínculo com catálogo preservado para cronograma (Task #102)
+                servico_id=it.servico_id,
+                quantidade_medida=it.quantidade,
+            )
+            db.session.add(pi)
+
+        db.session.add(PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='criada',
+            observacao=f'Proposta gerada do Orçamento {orc.numero}',
+            admin_id=admin_id,
+        ))
+
+        # Mantém referência informativa da última proposta gerada,
+        # mas NÃO bloqueia gerar novas (1 orçamento → N propostas).
+        orc.ultima_proposta_id = proposta.id
+        if orc.status == 'rascunho':
+            orc.status = 'fechado'
+        db.session.commit()
+        flash(f'Proposta {proposta.numero} gerada a partir do orçamento.', 'success')
+        return redirect(url_for('propostas.visualizar', id=proposta.id))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('erro ao gerar proposta do orcamento')
+        flash(f'Erro ao gerar proposta: {e}', 'error')
+        return redirect(url_for('orcamentos.editar', id=id))
+
+
+# ───────────────────── API: composição prévia do serviço ─────────────────────
+@orcamentos_bp.route('/api/servicos/<int:servico_id>/composicao')
+@login_required
+@admin_required
+def api_composicao_servico(servico_id):
+    admin_id = _admin_id()
+    svc = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first_or_404()
+    return jsonify({
+        'servico_id': svc.id,
+        'nome': svc.nome,
+        'unidade': svc.unidade_medida,
+        'imposto_pct': float(svc.imposto_pct) if svc.imposto_pct is not None else None,
+        'margem_pct': float(svc.margem_lucro_pct) if svc.margem_lucro_pct is not None else None,
+        'composicao': snapshot_from_servico(svc),
+    })

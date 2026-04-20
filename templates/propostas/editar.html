@@ -83,7 +83,7 @@
                 <h6 class="text-primary mb-3">Serviços</h6>
                 <div id="servicosContainer">
                     {% for item in proposta.itens %}
-                    <div class="servico-item border rounded p-3 mb-3" data-custo-unitario="{{ item.custo_unitario or 0 }}">
+                    <div class="servico-item border rounded p-3 mb-3">
                         <input type="hidden" name="item_id" value="{{ item.id }}">
                         <div class="row mb-2">
                             <div class="col-12">
@@ -154,8 +154,6 @@
                         <i class="fas fa-plus"></i> Adicionar Serviço
                     </button>
                     <div class="text-end">
-                        <div class="small text-muted">Custo total: <span id="custoTotalProposta">R$ 0,00</span></div>
-                        <div class="small text-success">Lucro total: <span id="lucroTotalProposta">R$ 0,00</span> (<span id="margemProposta">0,0</span>%)</div>
                         <h5>Total da Proposta: <span id="totalProposta">R$ {{ '{:,.2f}'.format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span></h5>
                     </div>
                 </div>
@@ -173,12 +171,8 @@
                                     <input type="number" class="form-control" name="prazo_entrega_dias" value="{{ proposta.prazo_entrega_dias }}" min="1">
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Percentual Nota Fiscal (%)</label>
-                                    <input type="number" class="form-control" name="percentual_nota_fiscal" value="{{ proposta.percentual_nota_fiscal }}" step="0.01" min="0" max="100">
-                                </div>
-                            </div>
+                            <!-- Task #115: % Nota Fiscal removido — pertence ao Orçamento interno -->
+                            <input type="hidden" name="percentual_nota_fiscal" value="{{ proposta.percentual_nota_fiscal or 0 }}">
                         </div>
                         
                         <div class="mb-3">
@@ -303,60 +297,17 @@ function calcularServico(input) {
 
     servicoItem.querySelector('.servico-total').value = 'R$ ' + total.toFixed(2).replace('.', ',');
     calcularTotal();
-    try { explodirServicoLinha(servicoItem); } catch(e) { console.warn(e); }
-}
-
-// Task #89 — explosão paramétrica por linha
-function explodirServicoLinha(row) {
-    if (!row) return;
-    const hidden = row.querySelector('input[name="item_servico_id"]');
-    const qtdIn = row.querySelector('.servico-quantidade, input[name="item_quantidade"]');
-    if (!hidden || !hidden.value) return;
-    const qtd = parseFloat((qtdIn && qtdIn.value) || '0');
-    if (!(qtd > 0)) return;
-    const sid = parseInt(hidden.value, 10);
-    let panel = row.querySelector('.explosao-insumos');
-    if (!panel) {
-        panel = document.createElement('div');
-        panel.className = 'explosao-insumos mt-2 p-2 small bg-light border rounded';
-        row.appendChild(panel);
-    }
-    panel.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculando...';
-    fetch(`/catalogo/api/servicos/${sid}/explodir?quantidade=${encodeURIComponent(qtd)}`,
-          { credentials: 'same-origin' })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-          if (!d) { panel.innerHTML = ''; return; }
-          const f = (n) => 'R$ ' + Number(n||0).toFixed(2).replace('.', ',');
-          const c = d.categorias || {};
-          panel.innerHTML = `<div class="row g-2">
-            <div class="col-md-3"><strong>Material</strong><br>${f((c.MATERIAL||{}).custo_total)}</div>
-            <div class="col-md-3"><strong>Mão de obra</strong><br>${f((c.MAO_OBRA||{}).custo_total)}</div>
-            <div class="col-md-3"><strong>Outros</strong><br>${f((c.OUTROS||{}).custo_total)}</div>
-            <div class="col-md-3"><strong>Subtotal</strong><br>
-              <span class="text-success">${f(d.subtotal)}</span> ·
-              lucro ${f(d.lucro_total)}</div></div>`;
-          row.dataset.custoUnitario = String(d.custo_unitario || 0);
-          calcularTotal();
-      }).catch(() => { panel.innerHTML = ''; });
 }
 
 function calcularTotal() {
-    let total = 0, custoTotal = 0;
+    let total = 0;
     document.querySelectorAll('.servico-item').forEach(item => {
         const quantidade = parseFloat(item.querySelector('.servico-quantidade').value) || 0;
         const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
-        const custoUnit = parseFloat(item.dataset.custoUnitario || '0') || 0;
         total += quantidade * valorUnitario;
-        custoTotal += quantidade * custoUnit;
     });
-    const lucro = total - custoTotal;
-    const margem = total > 0 ? (lucro / total) * 100 : 0;
     const fmt = (n) => 'R$ ' + Number(n||0).toFixed(2).replace('.', ',');
     document.getElementById('totalProposta').textContent = fmt(total);
-    const ce = document.getElementById('custoTotalProposta'); if (ce) ce.textContent = fmt(custoTotal);
-    const le = document.getElementById('lucroTotalProposta'); if (le) le.textContent = fmt(lucro);
-    const me = document.getElementById('margemProposta'); if (me) me.textContent = margem.toFixed(1).replace('.', ',');
 }
 
 // Calcular total inicial

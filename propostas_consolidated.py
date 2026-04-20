@@ -56,7 +56,7 @@ except ImportError as e:
 # Importar modelos necessários
 from app import db
 from models import (
-    Proposta, PropostaItem, PropostaTemplate, PropostaHistorico, PropostaArquivo,
+    Proposta, PropostaItem, PropostaHistorico, PropostaArquivo,
     ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico, Cliente
 )
 
@@ -263,22 +263,14 @@ def nova():
     try:
         admin_id = get_admin_id()
         
-        # Buscar templates disponíveis
-        templates = safe_db_operation(
-            lambda: PropostaTemplate.query.filter_by(admin_id=admin_id, ativo=True).all(),
-            []
-        )
-        
-        # Buscar configuração da empresa
+        # Task #115 — templates legados removidos. Use Orçamento → Gerar Proposta.
         config = safe_db_operation(
             lambda: ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first(),
             None
         )
         
-        logger.debug(f"DEBUG NOVA PROPOSTA: {len(templates)} templates disponíveis")
-        
         return render_template('propostas/nova_proposta.html', 
-                             templates=templates,
+                             templates=[],
                              config=config)
         
     except Exception as e:
@@ -697,9 +689,7 @@ def gerar_pdf(id):
         
             logger.debug(f"DEBUG PDF: Usando template: {template_name}")
         
-        template_proposta = None
-        if hasattr(proposta, 'template_id') and proposta.template_id:
-            template_proposta = PropostaTemplate.query.get(proposta.template_id)
+        template_proposta = None  # Task #115 — templates legados removidos
         
         # Organizar itens por template e categoria
         if hasattr(proposta, 'itens') and proposta.itens:
@@ -769,35 +759,7 @@ def criar_proposta():
 
 # ===== ROTAS API =====
 
-@propostas_bp.route('/api/template/<int:template_id>')
-@login_required
-@admin_required
-def get_template_data(template_id):
-    """API para obter dados de template"""
-    try:
-        admin_id = get_admin_id()
-        
-        template = PropostaTemplate.query.filter_by(
-            id=template_id, admin_id=admin_id
-        ).first_or_404()
-        
-        return jsonify({
-            'success': True,
-            'template': {
-                'id': template.id,
-                'nome': template.nome,
-                'categoria': template.categoria,
-                'descricao': template.descricao,
-                'itens_padrao': template.itens_padrao or [],
-                'prazo_entrega_dias': template.prazo_entrega_dias,
-                'validade_dias': template.validade_dias,
-                'percentual_nota_fiscal': float(template.percentual_nota_fiscal) if template.percentual_nota_fiscal else 13.5
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"ERRO API TEMPLATE: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 400
+# Task #115 — API de templates legados removida. Use rotas de Orçamento.
 
 # ===== ROTAS DE EDIÇÃO E GESTÃO =====
 

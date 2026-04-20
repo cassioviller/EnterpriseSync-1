@@ -530,13 +530,13 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint gestao_custos: {e}")
     
-    # Blueprint templates de propostas
+    # Blueprint Orçamentos (Task #115 — substitui módulo legado de Templates)
     try:
-        from templates_views import templates_bp
-        app.register_blueprint(templates_bp, url_prefix='/templates')
-        logging.info("[OK] Blueprint templates registrado")
+        from views.orcamentos_views import orcamentos_bp
+        app.register_blueprint(orcamentos_bp)
+        logging.info("[OK] Blueprint orcamentos registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint templates: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint orcamentos: {e}")
     
     # Blueprint de serviços será registrado em main.py para evitar conflitos
     
@@ -559,13 +559,7 @@ with app.app_context():
         app.register_blueprint(propostas_bp, url_prefix='/propostas')
         logging.info("[OK] Blueprint propostas consolidado registrado")
     except ImportError as e:
-        # Fallback para blueprint antigo
-        try:
-            from propostas_views import propostas_bp
-            app.register_blueprint(propostas_bp, url_prefix='/propostas')
-            logging.info("[OK] Blueprint propostas (fallback) registrado")
-        except ImportError as e2:
-            logging.warning(f"[WARN] Blueprint propostas não encontrado: {e} | {e2}")
+        logging.warning(f"[WARN] Blueprint propostas consolidado não encontrado: {e}")
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint propostas: {e}")
     
@@ -740,7 +734,7 @@ csrf_exempt_blueprints = [
     'servico_obra_real', 'production', 'relatorios',
     'almoxarifado', 'alimentacao', 'folha', 'contabilidade',
     'financeiro', 'custos', 'propostas', 'configuracoes',
-    'categorias_servicos', 'equipe', 'frota', 'templates',
+    'categorias_servicos', 'equipe', 'frota', 'orcamentos',
 ]
 for bp_name in csrf_exempt_blueprints:
     bp = app.blueprints.get(bp_name)

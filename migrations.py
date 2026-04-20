@@ -3825,6 +3825,8 @@ def executar_migracoes():
             (123, "Task #82 — ComposicaoServico.unidade (snapshot da unidade do insumo)", migration_123_composicao_servico_unidade),
             (124, "Task #89 — Snapshot de cálculo paramétrico em PropostaItem e ItemMedicaoComercial", migration_124_snapshot_calculo_parametrico),
             (125, "Task #102 — Cronograma automático na aprovação (servico.template_padrao_id, propostas.cronograma_default_json, tarefa_cronograma.gerada_por_proposta_item_id)", migration_125_cronograma_automatico_aprovacao),
+            (126, "Task #115 — Orçamento + OrcamentoItem (camada interna que gera Proposta)", migration_126_orcamento),
+            (127, "Task #115 v2 — propostas_comerciais.orcamento_id (Orçamento → N Propostas)", migration_127_proposta_orcamento_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -10137,4 +10139,119 @@ def migration_125_cronograma_automatico_aprovacao():
             except Exception:
                 pass
         logging.error(f"Migration 125 falhou: {e}")
+        raise
+
+
+def migration_126_orcamento():
+    """Migration 126 (Task #115): cria tabelas `orcamento` e `orcamento_item`.
+
+    Camada interna de orçamento (custo + composição) que gera Propostas
+    para o cliente sem expor cálculos internos. Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS orcamento (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                numero VARCHAR(50) NOT NULL,
+                titulo VARCHAR(255) NOT NULL,
+                descricao TEXT,
+                cliente_id INTEGER REFERENCES cliente(id),
+                cliente_nome VARCHAR(255),
+                imposto_pct_global NUMERIC(5,2),
+                margem_pct_global NUMERIC(5,2),
+                custo_total NUMERIC(15,2) DEFAULT 0,
+                venda_total NUMERIC(15,2) DEFAULT 0,
+                lucro_total NUMERIC(15,2) DEFAULT 0,
+                status VARCHAR(30) DEFAULT 'rascunho',
+                proposta_id INTEGER REFERENCES propostas_comerciais(id) ON DELETE SET NULL,
+                criado_por INTEGER REFERENCES usuario(id),
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_orcamento_numero_tenant UNIQUE (admin_id, numero)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orcamento_admin ON orcamento(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orcamento_status ON orcamento(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orcamento_proposta ON orcamento(proposta_id)")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS orcamento_item (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                orcamento_id INTEGER NOT NULL REFERENCES orcamento(id) ON DELETE CASCADE,
+                ordem INTEGER NOT NULL DEFAULT 1,
+                servico_id INTEGER REFERENCES servico(id) ON DELETE SET NULL,
+                descricao VARCHAR(500) NOT NULL,
+                unidade VARCHAR(20) NOT NULL DEFAULT 'un',
+                quantidade NUMERIC(15,4) NOT NULL DEFAULT 0,
+                imposto_pct NUMERIC(5,2),
+                margem_pct NUMERIC(5,2),
+                composicao_snapshot JSON,
+                custo_unitario NUMERIC(15,4) DEFAULT 0,
+                preco_venda_unitario NUMERIC(15,4) DEFAULT 0,
+                custo_total NUMERIC(15,2) DEFAULT 0,
+                venda_total NUMERIC(15,2) DEFAULT 0,
+                lucro_total NUMERIC(15,2) DEFAULT 0,
+                observacao TEXT,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orc_item_admin ON orcamento_item(admin_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orc_item_orc ON orcamento_item(orcamento_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orc_item_svc ON orcamento_item(servico_id)")
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 126: orcamento + orcamento_item criados")
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 126: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_127_proposta_orcamento_id():
+    """Migration 127 (Task #115 v2): adiciona propostas_comerciais.orcamento_id (1→N).
+
+    O campo legado `orcamento.proposta_id` (renomeado no ORM para
+    `ultima_proposta_id`) permanece para compatibilidade de dados existentes,
+    mas a relação canônica passa a ser Orcamento (1) → Proposta (N) via
+    `propostas_comerciais.orcamento_id`. Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            ALTER TABLE propostas_comerciais
+            ADD COLUMN IF NOT EXISTS orcamento_id INTEGER
+            REFERENCES orcamento(id) ON DELETE SET NULL
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_proposta_orcamento_id "
+            "ON propostas_comerciais(orcamento_id)"
+        )
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 127: propostas_comerciais.orcamento_id criado")
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 127: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
         raise

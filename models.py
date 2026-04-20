@@ -2711,6 +2711,10 @@ class Proposta(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     convertida_em_obra = db.Column(db.Boolean, default=False)
 
+    # Task #115 — origem (Orçamento interno que gerou esta proposta), 1→N
+    orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id', ondelete='SET NULL'),
+                             nullable=True, index=True)
+
     # Task #102 — snapshot do cronograma revisado pelo admin antes de aprovar.
     # Estrutura: lista de Serviços, cada um com filhos (grupos/subatividades),
     # com flag `marcado` por nó. Usado pelo portal do cliente como fonte da verdade.
@@ -5447,3 +5451,93 @@ class ComposicaoServico(db.Model):
 
     def __repr__(self):
         return f'<ComposicaoServico svc={self.servico_id} ins={self.insumo_id} coef={self.coeficiente}>'
+
+
+# ===================================================================
+# Task #115 — Orçamento (camada interna) → Proposta (camada cliente)
+# ===================================================================
+
+class Orcamento(db.Model):
+    """Orçamento interno (camada de custo/preço). Gera Proposta para o cliente."""
+    __tablename__ = 'orcamento'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    numero = db.Column(db.String(50), nullable=False)
+    titulo = db.Column(db.String(255), nullable=False)
+    descricao = db.Column(db.Text)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True)
+    cliente_nome = db.Column(db.String(255))
+
+    # Globais (sobrescrevem o serviço quando definidos)
+    imposto_pct_global = db.Column(db.Numeric(5, 2), nullable=True)
+    margem_pct_global = db.Column(db.Numeric(5, 2), nullable=True)
+
+    # Totais snapshot
+    custo_total = db.Column(db.Numeric(15, 2), default=0)
+    venda_total = db.Column(db.Numeric(15, 2), default=0)
+    lucro_total = db.Column(db.Numeric(15, 2), default=0)
+
+    status = db.Column(db.String(30), default='rascunho', index=True)  # rascunho, fechado, convertido
+    # DEPRECATED (Task #115 v2): mantido apenas para compatibilidade com dados existentes.
+    # Use a relação 1→N via Proposta.orcamento_id (`propostas_geradas` abaixo).
+    ultima_proposta_id = db.Column('proposta_id', db.Integer,
+                                   db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
+                                   nullable=True, index=True)
+
+    criado_por = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cliente = db.relationship('Cliente')
+    ultima_proposta = db.relationship('Proposta', foreign_keys=[ultima_proposta_id])
+    propostas_geradas = db.relationship('Proposta', foreign_keys='Proposta.orcamento_id',
+                                        backref='orcamento_origem',
+                                        order_by='Proposta.criado_em.desc()')
+    itens = db.relationship('OrcamentoItem', backref='orcamento', cascade='all, delete-orphan',
+                            order_by='OrcamentoItem.ordem')
+
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'numero', name='uq_orcamento_numero_tenant'),
+    )
+
+    def __repr__(self):
+        return f'<Orcamento {self.numero}>'
+
+
+class OrcamentoItem(db.Model):
+    """Item do orçamento — snapshot da composição do serviço com overrides editáveis."""
+    __tablename__ = 'orcamento_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id', ondelete='CASCADE'),
+                             nullable=False, index=True)
+    ordem = db.Column(db.Integer, nullable=False, default=1)
+
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id', ondelete='SET NULL'), nullable=True, index=True)
+    descricao = db.Column(db.String(500), nullable=False)
+    unidade = db.Column(db.String(20), nullable=False, default='un')
+    quantidade = db.Column(db.Numeric(15, 4), nullable=False, default=0)
+
+    # Overrides per-item (sobrescrevem global e serviço)
+    imposto_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    margem_pct = db.Column(db.Numeric(5, 2), nullable=True)
+
+    # Snapshot da composição editado: lista de
+    # {tipo, insumo_id, nome, unidade, coeficiente, preco_unitario, subtotal_unitario}
+    composicao_snapshot = db.Column(JSON, default=list)
+
+    custo_unitario = db.Column(db.Numeric(15, 4), default=0)
+    preco_venda_unitario = db.Column(db.Numeric(15, 4), default=0)
+    custo_total = db.Column(db.Numeric(15, 2), default=0)
+    venda_total = db.Column(db.Numeric(15, 2), default=0)
+    lucro_total = db.Column(db.Numeric(15, 2), default=0)
+
+    observacao = db.Column(db.Text)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    servico = db.relationship('Servico', foreign_keys=[servico_id])
+
+    def __repr__(self):
+        return f'<OrcamentoItem {self.id} svc={self.servico_id}>'

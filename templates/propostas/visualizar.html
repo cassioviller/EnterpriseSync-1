@@ -160,22 +160,6 @@
                                 {% endfor %}
                             </tbody>
                             <tfoot>
-                                {% set _custo_total = namespace(v=0) %}
-                                {% set _venda_total = namespace(v=0) %}
-                                {% for it in proposta.itens %}
-                                  {% set _custo_total.v = _custo_total.v + ((it.custo_unitario or 0) * (it.quantidade or 0)) %}
-                                  {% set _venda_total.v = _venda_total.v + (it.subtotal or ((it.preco_unitario or 0) * (it.quantidade or 0))) %}
-                                {% endfor %}
-                                {% set _lucro_total = _venda_total.v - _custo_total.v %}
-                                {% set _margem = (_lucro_total / _venda_total.v * 100) if _venda_total.v > 0 else 0 %}
-                                <tr class="table-light">
-                                    <td colspan="5" class="text-end text-muted">Custo total (insumos):</td>
-                                    <td class="text-end text-muted">R$ {{ "{:,.2f}".format(_custo_total.v).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                </tr>
-                                <tr class="table-light">
-                                    <td colspan="5" class="text-end text-success">Lucro total ({{ "{:.1f}".format(_margem).replace('.', ',') }}%):</td>
-                                    <td class="text-end text-success">R$ {{ "{:,.2f}".format(_lucro_total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                </tr>
                                 <tr class="table-success">
                                     <td colspan="5" class="text-end"><strong>VALOR TOTAL:</strong></td>
                                     <td class="text-end"><strong>R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
@@ -254,8 +238,6 @@
                     <p style="white-space: pre-line;">{{ proposta.observacoes_entrega }}</p>
                     {% endif %}
                     
-                    <h6 class="text-muted">Percentual Nota Fiscal</h6>
-                    <p>{{ proposta.percentual_nota_fiscal }}%</p>
                 </div>
             </div>
 

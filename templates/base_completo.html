@@ -770,8 +770,12 @@
                                 <li><a class="dropdown-item" href="{{ url_for('propostas.nova_proposta') }}">
                                     <i class="fas fa-plus me-1"></i> Nova Proposta
                                 </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('templates.listar_templates') }}">
-                                    <i class="fas fa-templates me-1"></i> Templates
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('orcamentos.listar') }}">
+                                    <i class="fas fa-calculator me-1"></i> Orçamentos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('orcamentos.novo') }}">
+                                    <i class="fas fa-plus-square me-1"></i> Novo Orçamento
                                 </a></li>
                             </ul>
                         </li>
