@@ -24,6 +24,10 @@ args = "Start application"
 task = "workflow.run"
 args = "test-agrupamento"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-orcamento-override"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -43,6 +47,17 @@ args = "python tests/test_agrupamento_diarias_rdo.py"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "test-orcamento-override"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_orcamento_override_e2e.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
