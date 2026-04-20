@@ -178,13 +178,13 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-0">
-          <iframe src="{{ url_for('servicos_crud.criar_servico') }}?embedded=1"
+          <iframe src="{{ url_for('servicos_crud.novo_servico') }}?embedded=1"
                   style="width:100%; min-height:70vh; border:0;"
                   title="Novo serviço"></iframe>
         </div>
         <div class="modal-footer">
           <small class="text-muted me-auto">
-            Após salvar, recarregue esta tela para escolher o serviço novo no orçamento.
+            Ao salvar, o novo serviço aparece automaticamente no seletor abaixo.
           </small>
           <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
           <button class="btn btn-primary"
@@ -334,15 +334,14 @@
           <i class="fas fa-search me-1"></i> Adicionar do Catálogo
         </button>
         {% if it.servico_id %}
-        <form method="POST"
-              action="{{ url_for('orcamentos.reset_composicao', item_id=it.id) }}"
-              class="d-inline ms-1"
-              onsubmit="return confirm('Reverter a composição desta linha para o padrão do serviço? Mudanças locais serão perdidas.');">
-          <button class="btn btn-sm btn-outline-warning" type="submit"
-                  title="Voltar à composição padrão do serviço (Catálogo)">
-            <i class="fas fa-undo me-1"></i> Voltar à composição padrão
-          </button>
-        </form>
+        {# HTML5 `form` attribute associa o submit ao <form> externo de reset
+           (declarado abaixo, fora do form item-form, evitando nested forms). #}
+        <button class="btn btn-sm btn-outline-warning ms-1"
+                type="submit"
+                form="reset-comp-form-{{ it.id }}"
+                title="Voltar à composição padrão do serviço (Catálogo)">
+          <i class="fas fa-undo me-1"></i> Voltar à composição padrão
+        </button>
         {% endif %}
       </div>
 
@@ -364,6 +363,15 @@
         <button class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Salvar item</button>
       </div>
     </form>
+    {% if it.servico_id %}
+    {# Form externo (fora do item-form) para o botão "voltar à composição padrão" #}
+    <form id="reset-comp-form-{{ it.id }}"
+          method="POST"
+          action="{{ url_for('orcamentos.reset_composicao', item_id=it.id) }}"
+          onsubmit="return confirm('Reverter a composição desta linha para o padrão do serviço? Mudanças locais serão perdidas.');"
+          class="d-none">
+    </form>
+    {% endif %}
   </div>
   {% else %}
   <div class="alert alert-info">Nenhum item ainda. Adicione um serviço do catálogo acima.</div>
@@ -475,22 +483,32 @@ document.addEventListener('DOMContentLoaded', recalcAll);
 window.addEventListener('message', function(ev) {
   if (ev.origin !== window.location.origin) return;
   const msg = ev.data || {};
-  if (msg.type !== 'sige:servico_criado' || !msg.servico) return;
+  const isCriado = msg.type === 'sige:servico_criado';
+  const isAtualizado = msg.type === 'sige:servico_atualizado';
+  if ((!isCriado && !isAtualizado) || !msg.servico) return;
   const sv = msg.servico;
+  const label = `${sv.nome} (${sv.unidade || 'un'})`;
   document.querySelectorAll('select[name="servico_id"]').forEach(sel => {
-    if (![...sel.options].some(o => o.value === String(sv.id))) {
-      const opt = new Option(`${sv.nome} (${sv.unidade || 'un'})`, String(sv.id));
+    const existing = [...sel.options].find(o => o.value === String(sv.id));
+    if (existing) {
+      // Atualiza rótulo (caso edição tenha mudado nome/unidade)
+      existing.text = label;
+      existing.dataset.unidade = sv.unidade || 'un';
+    } else {
+      const opt = new Option(label, String(sv.id));
       opt.dataset.unidade = sv.unidade || 'un';
       sel.add(opt);
     }
   });
-  // Seleciona no formulário "Adicionar item" (preserva edições nas demais linhas)
-  const addSel = document.getElementById('add-servico-select');
-  if (addSel) {
-    addSel.value = String(sv.id);
-    addSel.dispatchEvent(new Event('change', {bubbles:true}));
+  // Em criação, seleciona no formulário "Adicionar item" (preserva edições nas demais linhas)
+  if (isCriado) {
+    const addSel = document.getElementById('add-servico-select');
+    if (addSel) {
+      addSel.value = String(sv.id);
+      addSel.dispatchEvent(new Event('change', {bubbles:true}));
+    }
   }
-  // Fecha modal de "novo serviço"
+  // Fecha modal
   const modalEl = document.getElementById('novoServicoModal');
   if (modalEl && window.bootstrap) {
     const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);

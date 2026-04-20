@@ -187,7 +187,8 @@
 </div>
 
 <div class="container">
-    <form method="POST" action="{{ url_for('servicos_crud.criar_servico') }}">
+    <form method="POST" action="{{ url_for('servicos_crud.criar_servico') }}{% if request.args.get('embedded') %}?embedded=1{% endif %}">
+        {% if request.args.get('embedded') %}<input type="hidden" name="embedded" value="1">{% endif %}
         <!-- Dados Básicos -->
         <div class="form-card">
             <div class="form-card-header">

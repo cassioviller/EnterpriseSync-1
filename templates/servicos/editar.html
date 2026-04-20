@@ -90,7 +90,8 @@
 </div>
 
 <div class="container-fluid">
-    <form method="POST" action="{{ url_for('servicos_crud.atualizar_servico', servico_id=servico.id) }}">
+    <form method="POST" action="{{ url_for('servicos_crud.atualizar_servico', servico_id=servico.id) }}{% if request.args.get('embedded') %}?embedded=1{% endif %}">
+        {% if request.args.get('embedded') %}<input type="hidden" name="embedded" value="1">{% endif %}
         <!-- Informações Básicas -->
         <div class="form-section">
             <h6 style="color: #fd7e14; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
