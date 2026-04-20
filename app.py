@@ -378,6 +378,83 @@ with app.app_context():
     
     db.create_all()
     logging.info("Database tables created/verified")
+
+    # ------------------------------------------------------------------
+    # Auto-seed demo Construtora Alfa (Task #113)
+    # ------------------------------------------------------------------
+    # Roda em background em qualquer tipo de deploy (EasyPanel, Replit
+    # Deployments, Reserved VM, Autoscale), pois NÃO depende do
+    # docker-entrypoint-easypanel-auto.sh ser executado. É idempotente
+    # (no-op se admin Alfa já existir) e file-locked (apenas 1 worker
+    # do gunicorn dispara). Para desligar, basta `SIGE_ENABLE_DEMO_SEED=false`.
+    def _maybe_run_demo_seed():
+        try:
+            enable = (os.environ.get("SIGE_ENABLE_DEMO_SEED", "true") or "").lower()
+            allow_prod = os.environ.get("SIGE_ALLOW_PROD_SEED", "1")
+            if enable != "true" or allow_prod != "1":
+                logger.info(
+                    f"[seed-demo-alfa] auto-seed desligado "
+                    f"(SIGE_ENABLE_DEMO_SEED={enable!r}, "
+                    f"SIGE_ALLOW_PROD_SEED={allow_prod!r})"
+                )
+                return
+
+            import fcntl
+            import threading
+            lock_path = "/tmp/sige_demo_alfa_seed.lock"
+            try:
+                lock_fd = open(lock_path, "w")
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (BlockingIOError, OSError):
+                logger.info(
+                    "[seed-demo-alfa] outro worker já está com o lock — pulando"
+                )
+                return
+
+            def _runner(_app, _fd):
+                try:
+                    log_path = "/tmp/sige_seed_demo_alfa.log"
+                    import sys
+                    with open(log_path, "a", buffering=1) as logf:
+                        old_out, old_err = sys.stdout, sys.stderr
+                        sys.stdout = logf
+                        sys.stderr = logf
+                        try:
+                            from scripts.seed_demo_alfa import main as _seed_main
+                            with _app.app_context():
+                                rc = _seed_main([])
+                            print(f"[seed-demo-alfa] terminou rc={rc}",
+                                  file=logf, flush=True)
+                        finally:
+                            sys.stdout = old_out
+                            sys.stderr = old_err
+                except Exception as inner:
+                    logger.error(
+                        f"[seed-demo-alfa] runner falhou: {inner!r}"
+                    )
+                finally:
+                    try:
+                        fcntl.flock(_fd.fileno(), fcntl.LOCK_UN)
+                        _fd.close()
+                    except Exception:
+                        pass
+
+            t = threading.Thread(
+                target=_runner, args=(app, lock_fd),
+                name="seed-demo-alfa", daemon=True,
+            )
+            t.start()
+            logger.info(
+                "[seed-demo-alfa] auto-seed iniciado em background "
+                "(log: /tmp/sige_seed_demo_alfa.log)"
+            )
+        except Exception as outer:
+            # NUNCA derrubar o boot do gunicorn por causa do seed.
+            logger.error(
+                f"[seed-demo-alfa] hook falhou (boot continua): {outer!r}"
+            )
+
+    _maybe_run_demo_seed()
     
     # [OK] MIGRAÇÕES AUTOMÁTICAS SEMPRE ATIVAS - SIMPLICIDADE MÁXIMA
     logger.info("[SYNC] Executando migrações automáticas do banco de dados...")
