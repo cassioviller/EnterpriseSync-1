@@ -145,6 +145,9 @@ aparece sozinha quando você ainda não está logado.
 campos verticais (e-mail e senha), botão azul largo embaixo, link
 "Esqueci a senha" abaixo do botão.
 
+
+![Tela de login do SIGE](img/manual-ciclo/e01-login.jpg)
+
 **5. Cada campo do formulário.**
 
 | Campo | Tipo | Obrigatório? | Exemplo | Se ficar vazio |
@@ -197,6 +200,9 @@ tem destinatário.
 **4. O que aparece na tela do insumo.** Form simples com nome,
 unidade, categoria, preço base. Após salvar, o histórico de preços
 aparece na ficha (cada alteração vira uma versão `PrecoBaseInsumo`).
+
+
+![Catálogo de insumos](img/manual-ciclo/e02-catalogos-insumos.jpg)
 
 **5. Cada campo do insumo (exemplo "Bloco cerâmico 9x19x19").**
 
@@ -255,6 +261,9 @@ nível do tenant — o mesmo template serve para vários serviços.
 **4. O que aparece na tela.** Form com campo de nome e construtor
 visual abaixo (lista de grupos arrastáveis, cada um com lista de
 subatividades arrastáveis).
+
+
+![Templates de cronograma](img/manual-ciclo/e03-templates-cronograma.jpg)
 
 **5. Cada campo (exemplo "Alvenaria — passo a passo").**
 
@@ -329,6 +338,9 @@ calcular tudo.
 - **Rodapé** — preço calculado: custo unitário, imposto, lucro,
   **preço de venda**.
 
+
+![Catálogo de serviços](img/manual-ciclo/e04-catalogo-servicos.jpg)
+
 **5. Cada campo (exemplos do "Alvenaria de bloco cerâmico").**
 
 | Campo | Tipo | Obrigatório? | Exemplo |
@@ -386,6 +398,9 @@ folha, VT, VA e PIX.
 **4. O que aparece na tela.** Modal em duas colunas, agrupado em
 quatro blocos: Dados pessoais, Dados profissionais, Pagamento e
 Foto.
+
+
+![Lista de funcionários com modal de cadastro](img/manual-ciclo/e05-funcionarios.jpg)
 
 **5. Cada campo do formulário.**
 
@@ -453,6 +468,9 @@ de edição em `/orcamentos/<id>/editar`.
   linha** (override).
 - **Rodapé** — totais: Custo total / Venda total / Lucro total
   (recalculam em tempo real).
+
+
+![Tela de edição do orçamento](img/manual-ciclo/e06-orcamento-editar.jpg)
 
 **5. Cada campo do item.**
 
@@ -538,6 +556,9 @@ proposta"** no topo (POST `/orcamentos/<id>/gerar-proposta`).
 para o detalhe da proposta recém-criada (`/propostas/<id>`), com
 status "Rascunho" ou "Enviada".
 
+
+![Proposta comercial gerada](img/manual-ciclo/e07-proposta-gerada.jpg)
+
 **5. O que é propagado do orçamento para a proposta.**
 
 | Campo do `OrcamentoItem` | Vai para `PropostaItem` |
@@ -621,6 +642,9 @@ Esta é sua chance de ajustar antes de tudo virar pedra.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+
+![Tela de revisão do cronograma](img/manual-ciclo/e08-cronograma-revisar.jpg)
+
 **5. Cada elemento.**
 
 | Elemento | Como funciona | Exemplo |
@@ -683,6 +707,9 @@ Vista".
 Resumo, Cronograma, Medição comercial, Custos, Contas a Receber,
 RDOs, Almoxarifado, Cotação, Compras, Portal.
 
+
+![Painel da obra](img/manual-ciclo/e09-obra-detalhe.jpg)
+
 **5. Cada aba e o que conferir.**
 
 | Aba | O que conferir | O que esperar |
@@ -728,6 +755,9 @@ do Carlos ou Pedro → aba "Métricas".
 **4. O que aparece na tela.** Cards de KPI no topo (horas trabalhadas,
 horas extras, dias pagos, custo MO, custo total) e tabela
 detalhando cada origem do custo.
+
+
+![Perfil do funcionário com métricas](img/manual-ciclo/e10-funcionario-perfil.jpg)
 
 **5. Cada KPI.**
 
@@ -778,6 +808,9 @@ RDO" (rota `/rdo/novo`, form `#formNovoRDO`, action POST
 **4. O que aparece na tela.** Cabeçalho com data + obra; **Mão de
 obra** (lista de funcionários com horas) e **Avanço de
 subatividade** (lista de tarefas com quantidade produzida no dia).
+
+
+![Relatório Diário de Obra (RDO)](img/manual-ciclo/e11-rdo-detalhe.jpg)
 
 **5. Cada campo.**
 
@@ -866,6 +899,9 @@ construtoras com folha CLT robusta, os dois rodam juntos.
 vivo, retângulo verde no rosto detectado, botão grande "Bater ponto",
 indicador de GPS (verde dentro do raio, vermelho fora).
 
+
+![Tela do ponto facial](img/manual-ciclo/e12-ponto-facial.jpg)
+
 **5. Cada elemento.**
 
 | Elemento | Função |
@@ -933,6 +969,9 @@ obra (autocomplete). Meio: lista dinâmica de itens, cada item com
 funcionário (busca), tipo (almoço/café/etc), quantidade e
 valor unitário.
 
+
+![Lançamento de alimentação v2](img/manual-ciclo/e13-alimentacao-novo-v2.jpg)
+
 **5. Cada campo do item.**
 
 | Campo | Tipo | Obrigatório? | Exemplo |
@@ -997,6 +1036,9 @@ lançamento" (`/transporte/novo`) ou "+ Novo em massa"
 competência, obra (opcional). Tabela com funcionário, dias úteis,
 valor/dia, total.
 
+
+![Lançamento de transporte](img/manual-ciclo/e14-transporte-novo.jpg)
+
 **5. Cada campo.**
 
 | Campo | Tipo | Obrigatório? | Exemplo |
@@ -1044,6 +1086,9 @@ autorizado → pago) evita pagamento esquecido ou duplicado.
 
 **4. O que aparece na tela.** Form simples: funcionário, data,
 descrição, valor, anexo (foto/recibo), obra (opcional), categoria.
+
+
+![Novo reembolso](img/manual-ciclo/e15-reembolso-novo.jpg)
 
 **5. Cada campo.**
 
@@ -1103,6 +1148,9 @@ fornecedor e custo lançado na obra.
 **4. O que aparece na tela do pedido.** Cabeçalho (fornecedor, obra,
 data, condições). Tabela dinâmica de itens (insumo, quantidade,
 preço unitário, subtotal). Total no rodapé.
+
+
+![Pedido de compra novo](img/manual-ciclo/e16-compras-nova.jpg)
 
 **5. Cada campo.**
 
@@ -1171,6 +1219,9 @@ Custos V2".
 obra, funcionário responsável). Tabela de itens com seleção de
 lote/serial quando aplicável.
 
+
+![Saída de almoxarifado](img/manual-ciclo/e17-almoxarifado-saida.jpg)
+
 **5. Cada campo.**
 
 | Campo | Tipo | Obrigatório? | Exemplo |
@@ -1221,6 +1272,9 @@ v2" (POST `/obras/<obra_id>/mapa-v2/criar`). Editar:
 **4. O que aparece na tela.** Tabela com linhas (itens) e colunas
 (fornecedores). Cada célula tem preço unit. e prazo (dias). Mínimo
 da linha em verde.
+
+
+![Painel da obra (entrada para o mapa de concorrência)](img/manual-ciclo/e18-obra-mapa-concorrencia.jpg)
 
 **5. Cada campo.**
 
@@ -1284,6 +1338,9 @@ travam o fluxo.
 (Rascunho / Solicitado / Autorizado / Pago). Cada cartão mostra
 valor, fornecedor/funcionário, obra e origem.
 
+
+![Painel de contas a pagar](img/manual-ciclo/e19-contas-pagar.jpg)
+
 **5. Tabela "origem → conta a pagar" (referência rápida).**
 
 | Origem (etapa) | Evento disparado | Handler | O que vira CP |
@@ -1332,6 +1389,9 @@ a receber viva da obra, atualizada automaticamente pelas medições.
 (`OBR-MED-####`), com valor original (acumulado medido), saldo,
 status e histórico de recebimentos.
 
+
+![Painel de contas a receber](img/manual-ciclo/e20-contas-receber.jpg)
+
 **5. Cada coluna.**
 
 | Coluna | O que mostra |
@@ -1374,6 +1434,9 @@ real — Contas a Pagar/Receber são previsões, Fluxo é o realizado.
 **4. O que aparece na tela.** Tabela cronológica com
 data/origem/categoria/banco/valor. Filtros por banco, categoria,
 período. Gráfico mensal no topo.
+
+
+![Fluxo de caixa](img/manual-ciclo/e21-fluxo-caixa.jpg)
 
 **5. Funcionalidades novas.**
 
@@ -1420,6 +1483,9 @@ a única conta a receber viva** — não cria nova.
 **4. O que aparece na tela.** Lista de itens de medição com colunas:
 contratada, % desta medição, valor desta medição, % acumulado, valor
 acumulado.
+
+
+![Medição quinzenal da obra](img/manual-ciclo/e22-medicao-quinzenal.jpg)
 
 **5. Cada coluna (exemplo alvenaria).**
 
@@ -1472,6 +1538,9 @@ comprovantes.
 cabeçalho da obra, cronograma com %, mapa de concorrência (se
 liberado), histórico de evolução, medições, painel estratégico,
 **aprovação de compras** (novo), **upload de comprovante** (novo).
+
+
+![Portal do cliente (token público)](img/manual-ciclo/e23-portal-cliente.jpg)
 
 **5. Cada seção e ação.**
 
@@ -1534,6 +1603,9 @@ dashboard, viram dados.
 **4. O que aparece em cada um.** Cards de KPI no topo + gráficos +
 tabela detalhada com filtros.
 
+
+![Dashboard geral](img/manual-ciclo/e24-dashboard.jpg)
+
 **5. Cada KPI principal do dashboard geral.**
 
 | KPI | De onde vem | Atualização |
@@ -1589,6 +1661,9 @@ dashboard, ele tem cabeçalho, assinatura e versão arquivada.
 | **Resumo de medições do ano** | Hoje só medição por medição; falta o agregado anual | TODO |
 | **Conciliação bancária por banco** | Fluxo já tem `banco_id` mas não o relatório dedicado | TODO |
 | **Auditoria do portal do cliente** | Quando o cliente aprovou o quê, no portal | TODO |
+
+
+![Painel de relatórios da folha](img/manual-ciclo/e25-relatorios-folha.jpg)
 
 **5. Cada campo do gerador.** Cada relatório tem seus filtros (mês,
 obra, funcionário, período). PDFs são gerados via
