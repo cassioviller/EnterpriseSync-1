@@ -120,6 +120,7 @@
             <span>Serviço do catálogo</span>
             <button type="button" class="btn btn-link btn-sm p-0"
                     data-bs-toggle="modal" data-bs-target="#novoServicoModal"
+                    onclick="resetServicoModal()"
                     title="Cadastrar novo serviço sem sair desta tela">
               <i class="fas fa-plus-circle me-1"></i>novo serviço
             </button>
@@ -319,7 +320,7 @@
               <td><input class="form-control form-control-sm" type="number" step="0.0001"
                          name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
               <td class="text-end text-muted">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
-              <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="this.closest('tr').remove();">
+              <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
             {% endfor %}
@@ -395,7 +396,7 @@
     <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_coeficiente" value="0"></td>
     <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_preco_unitario" value="0"></td>
     <td class="text-end text-muted">—</td>
-    <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="this.closest('tr').remove();">
+    <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
       <i class="fas fa-times"></i></button></td>
   </tr>
 </template>
@@ -514,6 +515,20 @@ window.addEventListener('message', function(ev) {
     const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
     inst.hide();
   }
+});
+
+function resetServicoModal() {
+  // Reseta iframe + título para o estado "novo serviço" (evita estado obsoleto
+  // quando o modal foi usado anteriormente para editar).
+  const iframe = document.querySelector('#novoServicoModal iframe');
+  const titleEl = document.querySelector('#novoServicoModal .modal-title');
+  if (titleEl) titleEl.innerHTML =
+    '<i class="fas fa-plus-circle me-2"></i>Cadastrar novo serviço no Catálogo';
+  if (iframe) iframe.src = '{{ url_for("servicos_crud.novo_servico") }}?embedded=1';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const m = document.getElementById('novoServicoModal');
+  if (m) m.addEventListener('hidden.bs.modal', resetServicoModal);
 });
 
 function abrirEditarServico() {
