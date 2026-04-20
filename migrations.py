@@ -3827,6 +3827,7 @@ def executar_migracoes():
             (125, "Task #102 — Cronograma automático na aprovação (servico.template_padrao_id, propostas.cronograma_default_json, tarefa_cronograma.gerada_por_proposta_item_id)", migration_125_cronograma_automatico_aprovacao),
             (126, "Task #115 — Orçamento + OrcamentoItem (camada interna que gera Proposta)", migration_126_orcamento),
             (127, "Task #115 v2 — propostas_comerciais.orcamento_id (Orçamento → N Propostas)", migration_127_proposta_orcamento_id),
+            (128, "Task #118 — cronograma_template_override_id em orcamento_item e proposta_itens + composicao_snapshot em proposta_itens", migration_128_orcamento_item_cronograma_override),
         ]
         
         # Executar cada migração com rastreamento
@@ -10248,6 +10249,66 @@ def migration_127_proposta_orcamento_id():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 127: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_128_orcamento_item_cronograma_override():
+    """Migration 128 (Task #118): override de cronograma e snapshot de composição.
+
+    Adiciona:
+      - orcamento_item.cronograma_template_override_id (FK CronogramaTemplate, ON DELETE SET NULL)
+      - proposta_itens.cronograma_template_override_id (FK CronogramaTemplate, ON DELETE SET NULL)
+      - proposta_itens.composicao_snapshot (JSON) — snapshot da composição efetiva
+        propagado do OrcamentoItem (com adições/remoções/coeficientes da linha).
+
+    NULL no override significa "usar o template padrão do serviço". Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            ALTER TABLE orcamento_item
+            ADD COLUMN IF NOT EXISTS cronograma_template_override_id INTEGER
+            REFERENCES cronograma_template(id) ON DELETE SET NULL
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_orcamento_item_cronograma_override "
+            "ON orcamento_item(cronograma_template_override_id)"
+        )
+
+        cursor.execute("""
+            ALTER TABLE proposta_itens
+            ADD COLUMN IF NOT EXISTS cronograma_template_override_id INTEGER
+            REFERENCES cronograma_template(id) ON DELETE SET NULL
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_proposta_itens_cronograma_override "
+            "ON proposta_itens(cronograma_template_override_id)"
+        )
+
+        cursor.execute(
+            "ALTER TABLE proposta_itens "
+            "ADD COLUMN IF NOT EXISTS composicao_snapshot JSON"
+        )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 128: override de cronograma + composicao_snapshot adicionados "
+            "em orcamento_item e proposta_itens"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 128: {e}")
         if connection:
             try:
                 connection.rollback()

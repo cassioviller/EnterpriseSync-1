@@ -115,8 +115,15 @@
     <div class="card-header"><strong>Adicionar Item</strong></div>
     <form method="POST" action="{{ url_for('orcamentos.adicionar_item', id=o.id) }}" class="card-body">
       <div class="row g-2">
-        <div class="col-md-5">
-          <label class="form-label small">Serviço do catálogo</label>
+        <div class="col-md-4">
+          <label class="form-label small d-flex justify-content-between align-items-center">
+            <span>Serviço do catálogo</span>
+            <button type="button" class="btn btn-link btn-sm p-0"
+                    data-bs-toggle="modal" data-bs-target="#novoServicoModal"
+                    title="Cadastrar novo serviço sem sair desta tela">
+              <i class="fas fa-plus-circle me-1"></i>novo serviço
+            </button>
+          </label>
           <select class="form-select" name="servico_id">
             <option value="">— item livre —</option>
             {% for s in servicos %}
@@ -136,11 +143,51 @@
           <label class="form-label small">Quantidade</label>
           <input class="form-control" name="quantidade" type="number" step="0.0001" value="1">
         </div>
-        <div class="col-md-1 d-flex align-items-end">
-          <button class="btn btn-primary w-100"><i class="fas fa-plus"></i></button>
+        <div class="col-md-2">
+          <label class="form-label small" title="Vazio = usa o template padrão do serviço">
+            Cronograma (override)
+          </label>
+          <select class="form-select form-select-sm" name="cronograma_template_override_id">
+            <option value="">— usar padrão —</option>
+            {% for t in templates_cronograma or [] %}
+              <option value="{{ t.id }}">{{ t.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-12 text-end">
+          <button class="btn btn-primary"><i class="fas fa-plus me-1"></i>Adicionar item</button>
         </div>
       </div>
     </form>
+  </div>
+
+  <!-- Modal: Novo Serviço (Catálogo embedado) — Task #118 Passo 6 -->
+  <div class="modal fade" id="novoServicoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="fas fa-plus-circle me-2"></i>Cadastrar novo serviço no Catálogo
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0">
+          <iframe src="{{ url_for('servicos_crud.criar_servico') }}?embedded=1"
+                  style="width:100%; min-height:70vh; border:0;"
+                  title="Novo serviço"></iframe>
+        </div>
+        <div class="modal-footer">
+          <small class="text-muted me-auto">
+            Após salvar, recarregue esta tela para escolher o serviço novo no orçamento.
+          </small>
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+          <button class="btn btn-primary"
+                  onclick="window.location.reload()">
+            <i class="fas fa-sync me-1"></i>Recarregar orçamento
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Itens -->
@@ -153,14 +200,29 @@
           <span class="badge bg-info text-dark ms-2" title="Serviço do catálogo">
             <i class="fas fa-link me-1"></i>{{ it.servico.nome }}
           </span>
-          {% if it.servico.template_padrao_id %}
-            <span class="badge bg-warning text-dark ms-1"
-                  title="Cronograma padrão vinculado (Task #102)">
+          {# Cronograma efetivo: override → padrão #}
+          {% if it.cronograma_template_override %}
+            <span class="badge bg-primary ms-1"
+                  title="Override de cronograma para esta linha (Task #118)">
               <i class="fas fa-calendar-check me-1"></i>
-              cronograma: {{ it.servico.template_padrao.nome if it.servico.template_padrao else ('#' ~ it.servico.template_padrao_id) }}
+              cronograma override: {{ it.cronograma_template_override.nome }}
+            </span>
+          {% elif it.servico.template_padrao_id %}
+            <span class="badge bg-warning text-dark ms-1"
+                  title="Cronograma padrão herdado do serviço (Task #102)">
+              <i class="fas fa-calendar-check me-1"></i>
+              cronograma padrão: {{ it.servico.template_padrao.nome if it.servico.template_padrao else ('#' ~ it.servico.template_padrao_id) }}
             </span>
           {% else %}
-            <span class="badge bg-light text-muted ms-1">sem cronograma padrão</span>
+            <span class="badge bg-light text-muted ms-1">sem cronograma</span>
+          {% endif %}
+          {# Customização da composição (snapshot != padrão) #}
+          {% set _padrao = composicao_padrao_por_item.get(it.id) %}
+          {% if _padrao is not none and (it.composicao_snapshot or []) != _padrao %}
+            <span class="badge bg-secondary ms-1"
+                  title="Composição desta linha foi customizada (difere do catálogo)">
+              <i class="fas fa-pen me-1"></i>composição customizada
+            </span>
           {% endif %}
         {% endif %}
       </div>
@@ -194,6 +256,27 @@
           <input class="form-control" type="number" step="0.01" name="margem_pct"
                  value="{{ it.margem_pct if it.margem_pct is not none else '' }}"
                  placeholder="usa global">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label small d-flex align-items-center gap-2">
+            <span>Cronograma (override desta linha)</span>
+            {% if it.cronograma_template_override_id %}
+              <button type="button" class="btn btn-link btn-sm p-0 text-danger"
+                      onclick="this.closest('.row').querySelector('select[name=cronograma_template_override_id]').value=''; this.closest('form').dispatchEvent(new Event('input',{bubbles:true}));"
+                      title="Voltar ao template padrão do serviço">
+                <i class="fas fa-undo me-1"></i>voltar ao padrão
+              </button>
+            {% endif %}
+            <span class="text-muted small">— vazio = usa o padrão do serviço{% if it.servico and it.servico.template_padrao %} ({{ it.servico.template_padrao.nome }}){% endif %}</span>
+          </label>
+          <select class="form-select form-select-sm" name="cronograma_template_override_id">
+            <option value="">— usar padrão do serviço —</option>
+            {% for t in templates_cronograma or [] %}
+              <option value="{{ t.id }}" {{ 'selected' if it.cronograma_template_override_id == t.id }}>
+                {{ t.nome }}
+              </option>
+            {% endfor %}
+          </select>
         </div>
       </div>
 

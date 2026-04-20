@@ -173,7 +173,10 @@ def _seed():
         CronogramaTemplateItem, Servico, ComposicaoServico,
         Proposta, PropostaItem, Obra, ItemMedicaoComercial,
         TarefaCronograma, RDO, RDOMaoObra, RDOServicoSubatividade,
-        ContaReceber,
+        ContaReceber, Orcamento, OrcamentoItem,
+    )
+    from services.orcamento_view_service import (
+        snapshot_from_servico, recalcular_item, recalcular_orcamento,
     )
     from services.cronograma_proposta import (
         montar_arvore_preview, materializar_cronograma,
@@ -569,6 +572,124 @@ def _seed():
             folha.percentual_concluido = perc_destino
         db.session.flush()
         log.info(f"RDO #{idx} ({dt.isoformat()}) finalizado — folhas a {perc_destino:.0f}%")
+
+    # 11.5) Task #118 — Demo: Orçamento com 4 cenários de override -----
+    # (a) item com template padrão do serviço, sem override
+    # (b) serviço novo (criado "como se fosse" pelo modal embedado) com
+    #     template padrão escolhido na criação
+    # (c) item com override de cronograma por linha (template ≠ padrão)
+    # (d) item com composição customizada (1 add + 1 remove vs catálogo)
+    tmpl_alv_expresso = CronogramaTemplate(
+        nome="Alvenaria — execução expressa",
+        descricao="Variante acelerada (3 etapas paralelas) — Task #118",
+        admin_id=aid, ativo=True,
+    )
+    db.session.add(tmpl_alv_expresso); db.session.flush()
+    g_exp = CronogramaTemplateItem(
+        admin_id=aid, template_id=tmpl_alv_expresso.id, parent_item_id=None,
+        nome="Alvenaria expressa", ordem=1, horas_estimadas=Decimal("0"),
+    )
+    db.session.add(g_exp); db.session.flush()
+    db.session.add_all([
+        CronogramaTemplateItem(
+            admin_id=aid, template_id=tmpl_alv_expresso.id,
+            parent_item_id=g_exp.id, nome="Marcação + 1ª fiada",
+            ordem=1, horas_estimadas=Decimal("16"),
+        ),
+        CronogramaTemplateItem(
+            admin_id=aid, template_id=tmpl_alv_expresso.id,
+            parent_item_id=g_exp.id, nome="Elevação até cinta",
+            ordem=2, horas_estimadas=Decimal("24"),
+        ),
+    ]); db.session.flush()
+
+    # Cenário (b): "novo serviço" criado pelo fluxo do modal, com template padrão.
+    serv_reboco = Servico(
+        nome="Reboco interno (criado pelo modal)",
+        descricao="Demonstração do modal de Novo Serviço dentro do Orçamento",
+        categoria="Acabamento", unidade_medida="m2", unidade_simbolo="m²",
+        custo_unitario=38.00, complexidade=2, ativo=True,
+        imposto_pct=Decimal("8.0"), margem_lucro_pct=Decimal("25.0"),
+        preco_venda_unitario=Decimal("65.00"),
+        template_padrao_id=tmpl_pis.id,  # template escolhido no modal
+        admin_id=aid,
+    )
+    db.session.add(serv_reboco); db.session.flush()
+    db.session.add(ComposicaoServico(
+        admin_id=aid, servico_id=serv_reboco.id,
+        insumo_id=insumos_obj["Cimento CP II 50kg"].id,
+        coeficiente=Decimal("0.08"),
+    )); db.session.flush()
+
+    orc = Orcamento(
+        admin_id=aid,
+        numero=f"ORC-2026-0001",
+        titulo="Orçamento demo — cenários de override (Task #118)",
+        descricao=(
+            "Demonstra: (a) padrão herdado, (b) serviço criado no modal, "
+            "(c) override de cronograma por linha, (d) composição customizada."
+        ),
+        cliente_id=cliente.id, cliente_nome=CLIENTE_NOME,
+        imposto_pct_global=Decimal("8.0"),
+        margem_pct_global=Decimal("25.0"),
+        criado_por=aid, status="rascunho",
+    )
+    db.session.add(orc); db.session.flush()
+
+    # (a) padrão herdado
+    it_a = OrcamentoItem(
+        admin_id=aid, orcamento_id=orc.id, ordem=1,
+        servico_id=serv_alv.id, descricao="Alvenaria — Bloco A (cenário A: padrão)",
+        unidade="m2", quantidade=Decimal("180"),
+        composicao_snapshot=snapshot_from_servico(serv_alv),
+        cronograma_template_override_id=None,
+    )
+    # (b) serviço criado no modal — usa o template do serviço (=padrão)
+    it_b = OrcamentoItem(
+        admin_id=aid, orcamento_id=orc.id, ordem=2,
+        servico_id=serv_reboco.id,
+        descricao="Reboco interno (cenário B: serviço criado no modal)",
+        unidade="m2", quantidade=Decimal("120"),
+        composicao_snapshot=snapshot_from_servico(serv_reboco),
+        cronograma_template_override_id=None,
+    )
+    # (c) override por linha (template_alv_expresso ≠ tmpl_alv padrão)
+    it_c = OrcamentoItem(
+        admin_id=aid, orcamento_id=orc.id, ordem=3,
+        servico_id=serv_alv.id,
+        descricao="Alvenaria — Bloco B (cenário C: cronograma override = expresso)",
+        unidade="m2", quantidade=Decimal("80"),
+        composicao_snapshot=snapshot_from_servico(serv_alv),
+        cronograma_template_override_id=tmpl_alv_expresso.id,
+    )
+    # (d) composição customizada (1 add + 1 remove)
+    snap_d = list(snapshot_from_servico(serv_pis))
+    if snap_d:
+        snap_d.pop()  # remove o último insumo
+    snap_d.append({
+        "tipo": "MATERIAL",
+        "insumo_id": insumos_obj["Cimento CP II 50kg"].id,
+        "nome": "Cimento extra (cenário D: insumo adicionado)",
+        "unidade": "kg", "coeficiente": 0.5,
+        "preco_unitario": 0.85, "subtotal_unitario": 0.0,
+    })
+    it_d = OrcamentoItem(
+        admin_id=aid, orcamento_id=orc.id, ordem=4,
+        servico_id=serv_pis.id,
+        descricao="Contrapiso — Bloco A (cenário D: composição customizada)",
+        unidade="m2", quantidade=Decimal("180"),
+        composicao_snapshot=snap_d,
+        cronograma_template_override_id=None,
+    )
+    db.session.add_all([it_a, it_b, it_c, it_d]); db.session.flush()
+    for _it in (it_a, it_b, it_c, it_d):
+        recalcular_item(_it, orc)
+    recalcular_orcamento(orc)
+    log.info(
+        "Task #118 demo: Orçamento %s criado com 4 cenários "
+        "(custo R$ %.2f, venda R$ %.2f)",
+        orc.numero, float(orc.custo_total or 0), float(orc.venda_total or 0),
+    )
 
     db.session.commit()
 

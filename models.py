@@ -2816,11 +2816,24 @@ class PropostaItem(db.Model):
     lucro_unitario = db.Column(db.Numeric(15, 4), nullable=True)
     subtotal = db.Column(db.Numeric(15, 2), nullable=True)
 
+    # Task #118 — override de cronograma e snapshot da composição efetiva
+    # propagados a partir do OrcamentoItem que originou esta linha. NULL no
+    # override significa "usar o template padrão do serviço (Servico.template_padrao_id)".
+    cronograma_template_override_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_template.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    composicao_snapshot = db.Column(JSON, nullable=True)
+
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relacionamento com template (opcional)
     template_origem = db.relationship('PropostaTemplate', backref='itens_utilizados')
     servico = db.relationship('Servico', foreign_keys=[servico_id])
+    cronograma_template_override = db.relationship(
+        'CronogramaTemplate', foreign_keys=[cronograma_template_override_id]
+    )
 
     @property
     def subtotal_calculado(self):
@@ -5528,6 +5541,15 @@ class OrcamentoItem(db.Model):
     # {tipo, insumo_id, nome, unidade, coeficiente, preco_unitario, subtotal_unitario}
     composicao_snapshot = db.Column(JSON, default=list)
 
+    # Task #118 — override do template de cronograma SÓ para esta linha do
+    # orçamento (não altera Servico.template_padrao_id no Catálogo).
+    # NULL = "usar template padrão do serviço".
+    cronograma_template_override_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_template.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+
     custo_unitario = db.Column(db.Numeric(15, 4), default=0)
     preco_venda_unitario = db.Column(db.Numeric(15, 4), default=0)
     custo_total = db.Column(db.Numeric(15, 2), default=0)
@@ -5538,6 +5560,9 @@ class OrcamentoItem(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     servico = db.relationship('Servico', foreign_keys=[servico_id])
+    cronograma_template_override = db.relationship(
+        'CronogramaTemplate', foreign_keys=[cronograma_template_override_id]
+    )
 
     def __repr__(self):
         return f'<OrcamentoItem {self.id} svc={self.servico_id}>'

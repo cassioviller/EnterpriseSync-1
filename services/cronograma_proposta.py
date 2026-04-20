@@ -170,7 +170,14 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
         Servico.id.in_(serv_ids), Servico.admin_id == admin_id
     ).all()} if serv_ids else {}
 
+    # Task #118: precedência override → padrão. Coleta TODOS os IDs candidatos
+    # (overrides por linha + padrões dos serviços) numa única query.
     tmpl_ids = {s.template_padrao_id for s in servicos.values() if s.template_padrao_id}
+    tmpl_ids |= {
+        getattr(it, 'cronograma_template_override_id', None)
+        for it in itens
+        if getattr(it, 'cronograma_template_override_id', None)
+    }
     templates = {t.id: t for t in CronogramaTemplate.query.filter(
         CronogramaTemplate.id.in_(tmpl_ids),
         CronogramaTemplate.admin_id == admin_id,
@@ -180,7 +187,12 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
     arvore: list[dict] = []
     for it in itens:
         servico = servicos.get(it.servico_id) if it.servico_id else None
-        tmpl = templates.get(servico.template_padrao_id) if (servico and servico.template_padrao_id) else None
+        # Task #118: override por linha tem precedência sobre o padrão do serviço.
+        override_id = getattr(it, 'cronograma_template_override_id', None)
+        template_efetivo_id = override_id or (servico.template_padrao_id if servico else None)
+        tmpl = templates.get(template_efetivo_id) if template_efetivo_id else None
+        origem_template = ('override' if override_id and tmpl else
+                           ('padrao' if tmpl else None))
 
         nome_serv = (servico.nome if servico else (it.descricao or f'Item {it.item_numero or it.id}'))
         pre = preconfig_idx.get(it.id)
@@ -192,6 +204,7 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
                 'servico_nome': nome_serv,
                 'template_id': tmpl.id,
                 'template_nome': tmpl.nome,
+                'origem_template': origem_template,  # 'override' | 'padrao'
                 'sem_template': False,
                 'horas_totais_estimadas': 0.0,  # será recalculado após overrides
                 'marcado': True,
@@ -237,7 +250,20 @@ def _somar_horas_folhas(nos: list[dict]) -> float:
 
 
 def tem_conteudo_para_revisar(proposta, admin_id: int) -> bool:
-    """True se há pelo menos um PropostaItem cujo servico tem template_padrao_id."""
+    """True se há pelo menos um PropostaItem com template efetivo:
+    override por linha (Task #118) OU padrão do serviço (Task #102)."""
+    # Task #118: override tem precedência → basta um item com override.
+    has_override = (
+        db.session.query(PropostaItem.id)
+        .filter(
+            PropostaItem.proposta_id == proposta.id,
+            PropostaItem.cronograma_template_override_id.isnot(None),
+        )
+        .limit(1)
+        .first()
+    )
+    if has_override:
+        return True
     q = (
         db.session.query(Servico.id)
         .join(PropostaItem, PropostaItem.servico_id == Servico.id)

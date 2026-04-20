@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, date
 from decimal import Decimal
+from typing import Optional
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
@@ -18,7 +19,7 @@ from app import db
 from auth import admin_required
 from models import (
     Orcamento, OrcamentoItem, Servico, Cliente, Proposta, PropostaItem,
-    PropostaHistorico, ConfiguracaoEmpresa,
+    PropostaHistorico, ConfiguracaoEmpresa, CronogramaTemplate,
 )
 from services.orcamento_view_service import (
     snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -31,6 +32,26 @@ orcamentos_bp = Blueprint('orcamentos', __name__, url_prefix='/orcamentos')
 
 def _admin_id() -> int:
     return current_user.admin_id if getattr(current_user, 'admin_id', None) else current_user.id
+
+
+def _parse_template_override(raw: Optional[str], admin_id: int) -> Optional[int]:
+    """Task #118: valida e devolve um cronograma_template_override_id seguro.
+
+    Vazio/None → None (= usa o template padrão do serviço).
+    Valida ownership pelo admin_id (multi-tenant). ID inválido → None silencioso.
+    """
+    if not raw:
+        return None
+    try:
+        tid = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if tid <= 0:
+        return None
+    exists = db.session.query(CronogramaTemplate.id).filter_by(
+        id=tid, admin_id=admin_id
+    ).first()
+    return tid if exists else None
 
 
 def _gerar_numero(admin_id: int) -> str:
@@ -116,7 +137,27 @@ def editar(id):
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True) \
         .order_by(Servico.nome).all()
-    return render_template('orcamentos/editar.html', orcamento=orc, servicos=servicos)
+    # Task #118: templates do tenant para o seletor de override por linha e
+    # para o modal embedado de "Novo serviço" (campo Template padrão).
+    templates_cronograma = (
+        CronogramaTemplate.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(CronogramaTemplate.nome)
+        .all()
+    )
+    # Calcula, por item, a composição "padrão do serviço" para detecção de
+    # customização (snapshot != padrão → linha customizada).
+    composicao_padrao_por_item = {}
+    for it in orc.itens:
+        if it.servico:
+            composicao_padrao_por_item[it.id] = snapshot_from_servico(it.servico)
+    return render_template(
+        'orcamentos/editar.html',
+        orcamento=orc,
+        servicos=servicos,
+        templates_cronograma=templates_cronograma,
+        composicao_padrao_por_item=composicao_padrao_por_item,
+    )
 
 
 @orcamentos_bp.route('/<int:id>/atualizar', methods=['POST'])
@@ -178,6 +219,10 @@ def adicionar_item(id):
 
         ordem = (db.session.query(db.func.coalesce(db.func.max(OrcamentoItem.ordem), 0))
                  .filter_by(orcamento_id=orc.id).scalar() or 0) + 1
+        # Task #118: override de cronograma (opcional, NULL = padrão do serviço)
+        override_id = _parse_template_override(
+            request.form.get('cronograma_template_override_id'), admin_id
+        )
         item = OrcamentoItem(
             admin_id=admin_id,
             orcamento_id=orc.id,
@@ -187,6 +232,7 @@ def adicionar_item(id):
             unidade=unidade,
             quantidade=quantidade,
             composicao_snapshot=snap,
+            cronograma_template_override_id=override_id,
         )
         db.session.add(item)
         db.session.flush()
@@ -243,6 +289,11 @@ def atualizar_item(item_id):
             except (ValueError, IndexError):
                 continue
         item.composicao_snapshot = snap
+        # Task #118: override de cronograma na linha
+        if 'cronograma_template_override_id' in request.form:
+            item.cronograma_template_override_id = _parse_template_override(
+                request.form.get('cronograma_template_override_id'), admin_id
+            )
         recalcular_item(item, orc)
         recalcular_orcamento(orc)
         db.session.commit()
@@ -323,6 +374,7 @@ def duplicar(id):
                 margem_pct=it.margem_pct,
                 composicao_snapshot=it.composicao_snapshot or [],
                 observacao=it.observacao,
+                cronograma_template_override_id=it.cronograma_template_override_id,
             )
             db.session.add(novo_it)
         db.session.flush()
@@ -379,6 +431,12 @@ def gerar_proposta(id):
                 # vínculo com catálogo preservado para cronograma (Task #102)
                 servico_id=it.servico_id,
                 quantidade_medida=it.quantidade,
+                # Task #118: propaga override de cronograma e snapshot de composição
+                # para a Proposta. Override toma precedência sobre o template padrão
+                # do serviço na materialização. composicao_snapshot preserva eventuais
+                # add/remove/coeficientes feitos na linha do orçamento.
+                cronograma_template_override_id=it.cronograma_template_override_id,
+                composicao_snapshot=it.composicao_snapshot or [],
             )
             db.session.add(pi)
 
