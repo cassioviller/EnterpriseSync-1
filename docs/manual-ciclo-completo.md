@@ -1,4 +1,4 @@
-# Manual do Ciclo Completo do Sistema
+# Manual do Ciclo Completo do Sistema (SIGE v10.0)
 
 > **Para você que vai usar o sistema no dia a dia** — engenheiro, dono
 > de obra, administrador de empresa de construção. Este manual não
@@ -9,28 +9,31 @@
 
 ---
 
-## Changelog (o que mudou desde a versão anterior — diferenças desde a Task #99)
+## Changelog (o que mudou desde a versão anterior — Tasks #102 → #118)
 
-> Esta versão do manual reflete o sistema **após a entrega da Task #102**
-> (cronograma automático na aprovação). A versão anterior do manual
-> documentou o estado do sistema na Task #99 — abaixo estão **todas as
-> mudanças entre #99 e #107**.
+> A versão anterior do manual documentou o sistema na Task #102
+> (cronograma automático na aprovação). Esta versão (v10.0) cobre tudo
+> o que entrou entre a #103 e a #118.
 
 | Bloco | O que mudou | Por que importa para você |
 | --- | --- | --- |
-| Cadastro de Serviço (etapa 3) | Apareceu um campo novo chamado **"Template padrão"** | É a "receita" que diz para o sistema, na hora da aprovação da proposta, quais grupos e quais subtarefas vão virar cronograma da obra |
-| Aprovação da proposta (etapa 6) | O botão "Aprovar" passou a abrir uma **tela de revisão do cronograma** antes de tudo ser efetivado | Você decide — antes de fechar a obra — quais tarefas o cronograma vai ter e ajusta horas/dias de cada uma |
-| Pós-aprovação (etapa 7) | A obra já nasce com cronograma de **3 níveis** (Serviço → Grupo → Subtarefa). Tarefas vindas do contrato têm a etiqueta "📋 do contrato" | O engenheiro de campo abre a obra e já encontra tudo organizado, sem precisar montar cronograma na mão |
-| Reaprovar a mesma proposta | Não duplica nada | Você pode aprovar, perceber que faltou ajuste, e reaprovar sem virar tudo de cabeça para baixo |
-| Aprovar (etapa 6) | Virou uma operação **única e indivisível**: ou tudo entra junto (obra + itens de medição + cronograma) ou nada entra | Acabou o caso "obra criada mas sem cronograma" |
-| Regras herdadas | Continua valendo: aprovar **não** cria conta a receber. Existe **uma única** conta a receber por obra (`OBR-MED-#####`), alimentada pelas medições e RDOs finalizados | Se você abrir a tela de Contas a Receber e ver só uma linha por obra, é o esperado |
+| **Orçamento (novo capítulo, E06)** | Apareceu uma tela intermediária entre Catálogo e Proposta. Você monta o cálculo internamente, ajusta linha a linha, e só então clica "Gerar proposta". | Você fecha preço com tranquilidade antes de exportar PDF para o cliente. Pode duplicar orçamentos, manter histórico interno. |
+| **Override de cronograma por linha do orçamento (Task #118)** | Cada linha do orçamento tem um seletor "Cronograma para esta linha", ao lado do template padrão do serviço. | Quando o serviço do catálogo tem 5 grupos mas esta obra específica só usa 3, você troca o template direto na linha — sem precisar criar um serviço novo. A escolha é propagada para a proposta e materializada quando a obra é criada. |
+| **Composição customizada por linha (Task #118)** | Cada linha do orçamento agora abre uma tabelinha onde você pode adicionar/remover insumos e mexer no coeficiente, **sem alterar o catálogo**. | Quando este cliente tem desconto especial num insumo, ou inclui um item extra que não estava na receita-padrão, você ajusta só nesta proposta. Botão "Voltar à composição padrão" desfaz tudo. |
+| **Modal "Novo serviço" inline (Task #118)** | Dentro do orçamento, botão "+" abre um pop-up para cadastrar um serviço novo do catálogo sem perder o orçamento aberto. | Se você descobriu no meio do orçamento que falta um serviço (ex.: "Pintura latex"), cria ali e o orçamento já recarrega com o item disponível. |
+| **Recálculo em tempo real do orçamento (Task #124)** | Mexeu em coeficiente/preço/quantidade? A coluna "Subtotal/un." e os totais Custo/Venda/Lucro atualizam na hora. | Acabou aquele caso de "alterei o coeficiente mas o subtotal não mexeu" — agora bate na mesma linha. |
+| **Alimentação v2 (E13)** | Tela mobile-first com lançamento multi-item, busca de funcionário e rateio entre obras. | Dispara `alimentacao_lancamento_criado` → cria conta a pagar automática. Acabou o lançamento manual em Excel. |
+| **Reembolsos v2 (E15)** | CRUD completo para reembolsos integrado ao painel "Gestão de Custos V2". | Cada reembolso aprovado vira conta a pagar sem digitação dupla. |
+| **Compras v2 (E16)** | Pedido de compra (PO) com tabela dinâmica de itens; rota separada "Registrar Recebimento". | Receber a mercadoria gera 3 coisas de uma vez: entrada no almoxarifado, conta a pagar para o fornecedor e custo lançado na obra. |
+| **Mapa de Concorrência v2 (E18)** | Grade N itens × N fornecedores com edição inline; mínimo destacado em verde. | Comparar 5 fornecedores ficou possível na mesma tela. Cliente pode escolher pelo portal. |
+| **Catálogo paramétrico (E04)** | Cada serviço pode ter composição (insumo × coeficiente) versionada e o preço calculado fica visível no rodapé. | Foi a base para o Orçamento. O preço de venda do serviço é calculado a partir dos insumos + imposto + lucro. |
+| **Fluxo de Caixa novo (E21)** | Coluna `banco_id` opcional, tela de import preview com categorias agrupadas, edição inline e modal "Novo movimento". | Você importa o extrato bancário, confere as categorias sugeridas, edita o que precisar e confirma. |
+| **Ponto Facial (E12)** | Sistema compartilhado de ponto eletrônico por foto, com GPS e geofencing. | Disparado por bater ponto, o evento `ponto_registrado` chama `calcular_horas_folha`, que consolida a folha mensal e gera contas a pagar. |
+| Regras herdadas | Continuam valendo: aprovar **não** cria conta a receber. Existe **uma única** conta a receber por obra (`OBR-MED-#####`), alimentada pelas medições. | Se você abrir Contas a Receber e ver só uma linha por obra, é o esperado. |
 
 ---
 
 ## Como o sistema pensa (leitura obrigatória — 2 minutos)
-
-Antes de entrar nos passos, vale entender a "espinha dorsal" do sistema.
-Ele foi construído em torno de uma única ideia:
 
 > *Tudo que você cadastra hoje vai virar dinheiro depois — ou no caixa
 > de entrada (cliente paga você) ou no caixa de saída (você paga
@@ -38,71 +41,73 @@ Ele foi construído em torno de uma única ideia:
 > consiga, sozinho, somar e classificar esse dinheiro nos lugares
 > certos.*
 
-A jornada vai mais ou menos assim:
+A jornada agora passa por **três fases**, com Orçamento entre Catálogo
+e Proposta:
 
 ```
-  ┌──────────────┐    ┌────────────┐    ┌──────────┐
-  │  Catálogo    │───▶│  Proposta  │───▶│  Obra    │
-  │ (receitas    │    │ (orçamento │    │  (real)  │
-  │  prontas)    │    │  p/ cliente│    │          │
-  └──────────────┘    └────────────┘    └────┬─────┘
-                                              │
-                            ┌─────────────────┼──────────────┐
-                            ▼                 ▼              ▼
-                       ┌─────────┐      ┌─────────┐   ┌──────────────┐
-                       │Cronograma│     │   RDO   │   │   Custos     │
-                       │(planejado)│◀──▶│(execução│──▶│ (mão de obra │
-                       └────┬─────┘     │  diária)│   │  + material) │
-                            │           └────┬────┘   └──────┬───────┘
-                            ▼                ▼               │
-                       ┌─────────────────────────┐           │
-                       │     Medição quinzenal   │           │
-                       │  (% executado × valor)  │           │
-                       └────────────┬────────────┘           │
-                                    │                        │
-                                    ▼                        ▼
-                       ┌─────────────────────────┐   ┌──────────────┐
-                       │   Conta a Receber única │   │ Conta a Pagar│
-                       │ "OBR-MED-#####"         │   │              │
-                       │ (atualiza sozinha)      │   │              │
-                       └────────────┬────────────┘   └──────┬───────┘
-                                    └──────┬─────────────────┘
-                                           ▼
-                                  ┌──────────────────┐
-                                  │  Fluxo de Caixa  │
-                                  └──────────────────┘
+PRÉ-OBRA ─────────────────────────────────────────────────────────────────
+  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌────────────┐  ┌──────┐
+  │ Catálogo │─▶│ Orçamento  │─▶│ Proposta │─▶│ Aprovação  │─▶│ Obra │
+  │ (insumos │  │ (interno,  │  │ (PDF p/  │  │ + revisão  │  │ nasce│
+  │ + servi- │  │  override  │  │ cliente) │  │ cronograma │  │ com  │
+  │ ços)     │  │  + custom) │  │          │  │ (Task #102)│  │tudo)│
+  └──────────┘  └────────────┘  └──────────┘  └────────────┘  └───┬──┘
+                                                                  │
+DURANTE A OBRA ───────────────────────────────────────────────────┼──────
+            ┌─────────┬──────────┬─────────────┬─────────┬───────┤
+            ▼         ▼          ▼             ▼         ▼       ▼
+        ┌───────┐ ┌───────┐ ┌──────────┐ ┌──────────┐ ┌────┐ ┌─────────┐
+        │ RDO   │ │ Ponto │ │Alimenta- │ │Transporte│ │Reem│ │Compras  │
+        │       │ │facial │ │ção v2    │ │   (VT)   │ │bol-│ │/Almoxa- │
+        │       │ │       │ │          │ │          │ │so  │ │rifado   │
+        └───┬───┘ └───┬───┘ └────┬─────┘ └────┬─────┘ └─┬──┘ └────┬────┘
+            │         │          │            │         │         │
+            ▼         ▼          ▼            ▼         ▼         ▼
+        ┌────────────────────────────────────────────────────────────┐
+        │           CONTAS A PAGAR (consolida todas as origens)      │
+        │  evento → handler → CP/CustoObra automático                │
+        └────────────────────────────────┬───────────────────────────┘
+                                         │
+            ┌────────────┐               │
+            │  Medição   │   Conta a     │
+            │ quinzenal  │──Receber única│      ┌──────────────────┐
+            │ (% × valor)│  OBR-MED-####─┴─────▶│  Fluxo de Caixa  │
+            └────────────┘                      └──────────────────┘
+
+VISÃO & ANÁLISE ──────────────────────────────────────────────────────────
+  ┌────────────┐         ┌──────────────────────────┐
+  │ Dashboards │         │ Relatórios (folha,       │
+  │ (geral, RH,│         │  horas extras, holerite, │
+  │ obra, fin) │         │  extrato medição PDF)    │
+  └────────────┘         └──────────────────────────┘
 ```
 
-**Em uma frase:** você cadastra uma "receita pronta" no catálogo (com
-preço, composição de insumos e cronograma-padrão). Quando essa receita
-entra numa proposta, o sistema sabe orçar. Quando a proposta é
-aprovada, ele cria a obra com tudo montado: lista de itens a medir,
-cronograma de tarefas e ficha de custos. À medida que as tarefas
-avançam (via RDO e medição), uma única conta a receber da obra cresce
-e vira saldo no fluxo de caixa. Os custos lançados (funcionários,
-material, almoxarifado) viram contas a pagar e descontam do mesmo
-fluxo.
+**Em uma frase:** você cadastra "receitas prontas" no Catálogo (insumos
+e serviços com composição). Monta o **Orçamento** internamente (com
+overrides). Gera a **Proposta** para o cliente. Aprova → nasce a
+**Obra** com cronograma já montado. Durante a obra, RDO, Ponto Facial,
+Alimentação, Transporte, Reembolso, Compras e Almoxarifado disparam
+automaticamente **Contas a Pagar**. As Medições quinzenais alimentam
+a **única Conta a Receber** da obra. Tudo cai no Fluxo de Caixa.
 
 **Por que importa entender isso:** se em algum momento um número
-estiver "errado" (ex.: "fiz medição mas não vi conta a receber nova"),
-quase sempre o sistema fez exatamente o esperado — só que a intuição
-do usuário antigo era de um fluxo diferente. O que vale é o desenho
-acima.
+estiver "errado", quase sempre o sistema fez exatamente o esperado —
+só que a intuição do usuário antigo era de um fluxo diferente. O que
+vale é o desenho acima.
 
 ---
 
-## Sequência completa do ciclo (com a Construtora Alfa)
+## Sequência completa do ciclo — 25 etapas em 3 partes
 
 > **Cenário-mãe que vai aparecer em todos os passos:**
 >
-> *A Construtora Alfa acabou de fechar verbalmente com o senhor João
-> da Silva a obra do "Residencial Bela Vista" — uma reforma residencial
-> de 250 m², com início previsto em 01/05/2026 e contrato de
-> R$ 250.000,00. A Alfa tem dois pedreiros: o Carlos (mensalista,
-> R$ 2.800,00/mês) e o Pedro (diarista, R$ 180,00/dia). Vai usar dois
-> serviços do catálogo (alvenaria e contrapiso), cobrar uma taxa de
-> mobilização avulsa e ainda colocar R$ 5.000,00 de honorário de
-> projeto digitado livre.*
+> *A Construtora Alfa fechou com o senhor João da Silva a obra do
+> "Residencial Bela Vista" — reforma residencial de 250 m², início em
+> 01/05/2026, contrato de R$ 250.000,00. A Alfa tem dois pedreiros:
+> Carlos (mensalista, R$ 2.800/mês) e Pedro (diarista, R$ 180/dia).
+> Vai usar dois serviços do catálogo (alvenaria e contrapiso), cobrar
+> uma taxa de mobilização avulsa e ainda colocar R$ 5.000,00 de
+> honorário de projeto.*
 
 Cada etapa abaixo segue o mesmo formato fixo de **8 blocos**:
 
@@ -117,354 +122,477 @@ Cada etapa abaixo segue o mesmo formato fixo de **8 blocos**:
 
 ---
 
+# PARTE I — PRÉ-OBRA (E01–E09)
+
+A "fase fria" — você está no escritório, com café, montando a base
+para a obra existir.
+
+---
+
 ### Etapa 1 — Login do administrador
 
-**1. O que você está fazendo de verdade.** Você está dizendo ao sistema
-que é o dono ou o administrador da Construtora Alfa, para que ele
-libere só as informações dela e bloqueie o que pertence a outras
-empresas.
+**1. O que você está fazendo de verdade.** Está dizendo ao sistema que
+é o administrador da Construtora Alfa, para que ele libere só os dados
+dela.
 
 **2. Por que o sistema pede isso.** Várias empresas usam o mesmo
-sistema. Cada uma só pode ver os próprios dados. Por isso o e-mail e
-senha são a sua chave para entrar na "sala" da Construtora Alfa.
+sistema (multi-tenant). O e-mail e senha são a chave da "sala" da Alfa.
 
 **3. Onde clicar.** Abrir o sistema no navegador → tela de login que
 aparece sozinha quando você ainda não está logado.
 
-**4. O que aparece na tela.** Cartão centralizado com o logo da empresa
-no topo, dois campos verticais (e-mail e senha), um botão azul largo
-embaixo. Existe ainda uma linha pequena "Esqueci a senha" abaixo do
-botão.
+**4. O que aparece na tela.** Cartão centralizado: logo no topo, dois
+campos verticais (e-mail e senha), botão azul largo embaixo, link
+"Esqueci a senha" abaixo do botão.
 
 **5. Cada campo do formulário.**
 
 | Campo | Tipo | Obrigatório? | Exemplo | Se ficar vazio |
 | --- | --- | :---: | --- | --- |
-| E-mail | Texto | Sim | `joao.alfa@construtoraalfa.com` | Volta com aviso vermelho "Por favor, faça login para acessar esta página" |
+| E-mail | Texto | Sim | `admin@construtoraalfa.com.br` | Volta com aviso "Por favor, faça login para acessar esta página" |
 | Senha | Senha (oculta) | Sim | `Alfa@2026` | Idem |
 
 **6. Botões disponíveis.**
 
-- **Entrar** (azul, ocupando toda a largura): manda os dados ao
-  sistema. Se estiverem certos, leva você ao Dashboard. Se errados, o
-  sistema mostra "Usuário ou senha inválidos".
+- **Entrar** (azul, largura total): se o login bater, leva ao
+  Dashboard. Se errar, mostra "Usuário ou senha inválidos".
 
 **7. O que muda depois que você clica em Entrar.** O sistema carrega o
-painel inicial (Dashboard) com os indicadores da Construtora Alfa do
-mês atual: faturamento, custos, propostas em aberto, obras ativas. A
-partir daqui, todos os menus laterais ficam liberados.
+Dashboard com os indicadores da Construtora Alfa do mês atual.
+Todos os menus laterais ficam liberados.
 
 **8. Notas de atenção.**
 
-- Em produção, a sessão fecha sozinha por inatividade — se isso
-  acontecer, a próxima ação devolve você para esta tela.
-- Se aparecer "Sessão expirada. Por favor, tente novamente.", é a
-  mesma coisa: faça login de novo, nada foi perdido.
+- A sessão fecha sozinha por inatividade.
+- "Sessão expirada. Por favor, tente novamente." → faça login de
+  novo, nada foi perdido.
 
 ---
 
-### Etapa 2 — Cadastro dos funcionários
+### Etapa 2 — Catálogos básicos (insumos, fornecedores, clientes)
 
-> *Para tocar o Bela Vista, a Alfa precisa cadastrar o Carlos
-> (pedreiro mensalista, R$ 2.800/mês) e o Pedro (pedreiro diarista,
-> R$ 180/dia). Os dois recebem por PIX e têm vale-alimentação de
-> R$ 25/dia trabalhado e vale-transporte de R$ 12/dia.*
+> *Antes de orçar, a Alfa precisa cadastrar os "ingredientes" que
+> entram nos serviços (cimento, bloco cerâmico, hora de pedreiro), os
+> fornecedores e os clientes.*
 
-**1. O que você está fazendo de verdade.** Cadastrando as pessoas que
-vão trabalhar nas obras da Alfa, junto com a forma de pagamento de
-cada uma.
+**1. O que você está fazendo de verdade.** Está montando os três
+catálogos básicos que alimentam o resto: **Insumos** (matérias-primas
+com preço e versionamento), **Fornecedores** (cadastros para Compras,
+Cotação e Almoxarifado) e **Clientes** (para as propostas e portais).
 
-**2. Por que o sistema pede isso.** O cadastro do funcionário é o ponto
-de partida para tudo que envolve mão de obra: ponto, RDO, folha,
-vale-transporte, vale-alimentação e PIX. Sem cadastro, o sistema não
-sabe quem está na obra nem quanto custa cada hora.
-
-**3. Onde clicar.** Menu lateral → "Funcionários" → botão verde
-"+ Novo Funcionário" no canto superior direito.
-
-**4. O que aparece na tela.** Formulário em duas colunas, agrupado em
-quatro blocos verticais:
-
-1. **Dados pessoais** — nome, CPF, RG, nascimento, telefone, e-mail.
-2. **Dados profissionais** — admissão, função, departamento, jornada.
-3. **Pagamento e benefícios** — tipo de remuneração, salário OU
-   diária, chave PIX, vale-alimentação, vale-transporte.
-4. **Foto** — campo de upload + foto facial opcional.
-
-**5. Cada campo do formulário (apenas os que importam para o ciclo).**
-
-| Campo | Tipo | Obrigatório? | Exemplo do Carlos | Exemplo do Pedro |
-| --- | --- | :---: | --- | --- |
-| Nome | Texto | Sim | `Carlos da Silva Pereira` | `Pedro Oliveira` |
-| CPF | Texto (com máscara) | Sim | `123.456.789-00` | `987.654.321-00` |
-| Data de admissão | Data | Sim | `01/05/2026` | `01/05/2026` |
-| Tipo de remuneração | Dropdown ("Salário" / "Diária") | Sim | `Salário` | `Diária` |
-| Salário | Numérico (R$) | Só se "Salário" | `R$ 2.800,00` | — |
-| Valor da diária | Numérico (R$) | Só se "Diária" | — | `R$ 180,00` |
-| Chave PIX | Texto | Não, mas recomendado | `123.456.789-00` | `pedro@gmail.com` |
-| Vale-Alimentação por dia | Numérico (R$) | Não | `R$ 25,00` | `R$ 25,00` |
-| Vale-Transporte por dia | Numérico (R$) | Não | `R$ 12,00` | `R$ 12,00` |
-
-**6. Botões disponíveis.**
-
-- **Salvar** (verde, embaixo): grava o funcionário e volta para a
-  lista.
-- **Cancelar** (cinza): volta sem salvar.
-
-**7. O que muda depois que você clica em Salvar.**
-
-- O funcionário aparece na listagem com uma etiqueta "Mensalista" ou
-  "Diarista" (cor diferente).
-- Ele já pode ser escolhido como mão de obra em qualquer RDO.
-- Quando o RDO for finalizado, o sistema usa esse cadastro para
-  calcular automaticamente o custo da mão de obra e jogar no Fluxo de
-  Caixa como conta a pagar.
-
-**8. Notas de atenção.**
-
-- Para diarista, é obrigatório preencher "Valor da diária"; senão, o
-  custo de mão de obra sai zero — é o erro mais comum hoje.
-- O VA e o VT são por **dia trabalhado**: o sistema multiplica
-  automaticamente quando vê o ponto.
-- O CPF é único — se você tentar cadastrar um CPF que já existe (até
-  em outra empresa do mesmo sistema), aparece erro vermelho.
-
----
-
-### Etapa 3 — Catálogo de serviços com Template padrão
-
-> *A Alfa quer cadastrar dois serviços: "Alvenaria de bloco cerâmico"
-> e "Contrapiso desempenado". Cada um já tem uma "receita" de
-> cronograma — um conjunto de subtarefas que normalmente faz parte
-> dele. É essa receita que vai virar o cronograma da obra
-> automaticamente quando uma proposta com esses serviços for aprovada.*
-
-**1. O que você está fazendo de verdade.** Você está montando o
-"cardápio" da empresa: para cada serviço que ela costuma vender, está
-dizendo (a) quanto custa fazer 1 m² (ou 1 unidade), (b) quais insumos
-entram na receita e (c) **qual é o cronograma-padrão** que esse serviço
-vira quando for aprovado em uma obra.
-
-**2. Por que o sistema pede isso.** Sem catálogo, cada proposta vira
-trabalho braçal de digitação e cada obra vira uma planilha do zero.
-Com catálogo, fazer uma proposta nova vira escolher do dropdown e
-deixar o sistema calcular tudo. Com a "receita" de cronograma
-preenchida, aprovar a proposta já gera o cronograma da obra — você
-economiza horas de trabalho.
+**2. Por que o sistema pede isso.** Sem insumos, o serviço não tem
+composição → o preço de venda não é calculado. Sem fornecedor, o
+pedido de compra não tem para quem ir. Sem cliente, a proposta não
+tem destinatário.
 
 **3. Onde clicar.**
 
-- Para criar/editar um Template de cronograma: menu lateral →
-  "Cronograma" → "Templates" → botão verde "+ Novo template".
-- Para criar/editar um Serviço: menu lateral → "Catálogo" → aba
-  "Serviços" → botão verde "+ Novo Serviço".
+- **Insumos:** menu lateral → "Catálogo" → "Insumos" → botão verde
+  "+ Novo insumo".
+- **Fornecedores:** menu lateral → "Almoxarifado" → "Fornecedores" →
+  botão verde "+ Novo fornecedor".
+- **Clientes:** menu lateral → "Clientes" → botão verde "+ Novo
+  cliente".
+
+**4. O que aparece na tela do insumo.** Form simples com nome,
+unidade, categoria, preço base. Após salvar, o histórico de preços
+aparece na ficha (cada alteração vira uma versão `PrecoBaseInsumo`).
+
+**5. Cada campo do insumo (exemplo "Bloco cerâmico 9x19x19").**
+
+| Campo | Tipo | Obrigatório? | Exemplo |
+| --- | --- | :---: | --- |
+| Nome | Texto | Sim | `Bloco cerâmico 9x19x19` |
+| Unidade | Dropdown | Sim | `un` |
+| Categoria | Dropdown/Texto | Sim | `Material` |
+| Preço base (R$) | Numérico | Sim | `1,80` |
+| Fornecedor preferencial | Dropdown | Não | `Cerâmica Forte` |
+
+Para fornecedor: nome/razão, CNPJ, contato, e-mail, telefone,
+condições padrão de pagamento. Para cliente: nome, CPF/CNPJ, contato,
+endereço.
+
+**6. Botões disponíveis.**
+
+- **Salvar** (verde) e **Cancelar** (cinza).
+- Na ficha do insumo: **Atualizar preço** (azul) — gera uma versão
+  nova do preço sem perder o histórico.
+
+**7. O que muda depois que você salva.**
+
+- O insumo passa a aparecer no autocomplete da composição de
+  serviços e da edição de orçamento.
+- O fornecedor passa a aparecer em Compras, Mapa de Concorrência
+  v2 e Almoxarifado.
+- O cliente passa a aparecer em Propostas e Orçamentos.
+
+**8. Notas de atenção.**
+
+- Atualizar preço **não** muda orçamentos antigos — o cálculo é
+  congelado por linha quando você grava a composição customizada.
+- CNPJ duplicado é rejeitado (regra de unicidade por tenant).
+
+---
+
+### Etapa 3 — Templates de cronograma
+
+> *A Alfa quer reutilizar o "passo a passo" da alvenaria em várias
+> obras. Em vez de redesenhar para cada serviço, cria um template
+> "Alvenaria — passo a passo" que vira a base do cronograma.*
+
+**1. O que você está fazendo de verdade.** Está criando um molde
+hierárquico **Grupo → Subatividade** que será reutilizado por
+serviços (e, mais tarde, materializado dentro da obra).
+
+**2. Por que o sistema pede isso.** A Task #102 trouxe a regra
+"aprovar a proposta gera o cronograma da obra". Para isso funcionar,
+cada serviço precisa apontar para um template. Templates ficam no
+nível do tenant — o mesmo template serve para vários serviços.
+
+**3. Onde clicar.** Menu lateral → "Cronograma" → "Templates" → botão
+"+ Novo template" (rota `/cronograma/templates/novo`).
+
+**4. O que aparece na tela.** Form com campo de nome e construtor
+visual abaixo (lista de grupos arrastáveis, cada um com lista de
+subatividades arrastáveis).
+
+**5. Cada campo (exemplo "Alvenaria — passo a passo").**
+
+| Campo | Tipo | Obrigatório? | Exemplo |
+| --- | --- | :---: | --- |
+| Nome do template | Texto | Sim | `Alvenaria — passo a passo` |
+| Descrição | Textarea | Não | `Aplicado a alvenaria padrão de bloco cerâmico` |
+| Grupo (nó) | Inline | Sim | `Preparação` / `Execução` |
+| Subatividade (folha) | Inline | Sim | `Marcar bloco` / `Levantar paredes` |
+| Horas estimadas/folha | Numérico | Recomendado | `8` |
+| Dias estimados/folha | Numérico | Recomendado | `1` |
+
+**6. Botões disponíveis.**
+
+- **Salvar template** (verde): grava a árvore.
+- **+ Novo grupo** / **+ Nova subatividade** (azul claro): adiciona
+  itens à árvore.
+- **Excluir nó** (vermelho ao passar o mouse).
+- **Duplicar** (cinza, na lista de templates).
+
+**7. O que muda depois que você salva.**
+
+- O template passa a aparecer no dropdown "Template padrão" ao
+  cadastrar/editar serviço (E04) e no dropdown "Cronograma para esta
+  linha" do orçamento (E06).
+- Templates são **versionáveis na prática**: depois de usados em
+  uma obra, o ideal é não editar — duplique e crie uma versão nova.
+
+**8. Notas de atenção.**
+
+- Folha sem horas estimadas → o sistema divide o peso da medição em
+  partes iguais entre as folhas marcadas (warning aparece na
+  aprovação).
+- O mesmo template pode ser usado por vários serviços diferentes —
+  reutilize.
+
+---
+
+### Etapa 4 — Catálogo de serviços (composição + template padrão)
+
+> *Cada serviço da Alfa tem três coisas: a "receita" de quanto custa
+> fazer 1 m² (composição de insumos), a faixa de imposto/lucro e o
+> cronograma-padrão que esse serviço vira quando uma proposta é
+> aprovada.*
+
+**1. O que você está fazendo de verdade.** Está montando o
+"cardápio" da empresa: para cada serviço, está dizendo (a) quanto
+custa fazer 1 m² (a partir dos insumos), (b) qual é a margem e (c)
+qual é o cronograma-padrão.
+
+**2. Por que o sistema pede isso.** Sem catálogo, cada proposta vira
+trabalho braçal de digitação. Com catálogo + composição + template,
+fazer um orçamento novo vira escolher do dropdown e deixar o sistema
+calcular tudo.
+
+**3. Onde clicar.**
+
+- Para cadastrar serviço: menu lateral → "Catálogo" → "Serviços" →
+  botão verde "+ Novo Serviço".
+- Para editar a composição: na lista, clicar no nome → tela
+  `/catalogo/servicos/<id>/composicao`.
 
 **4. O que aparece na tela do serviço.**
 
-- **Topo** — dados do serviço (nome, unidade de medida, categoria,
-  imposto%, lucro%).
-- **Meio** — composição: lista de insumos com coeficiente (ex.: para
-  1 m² de alvenaria, quantos blocos, quantos kg de cimento, quantas
-  horas de pedreiro).
-- **Bloco novo** — seção "Cronograma":
-  - Campo **"Template padrão"** (dropdown com busca) — você escolhe
-    qual template do tenant será usado quando uma proposta com esse
-    serviço for aprovada.
-  - Botão **"Editar template"** (azul, abre o construtor visual em
-    uma nova aba).
-  - Botão **"Criar novo template"** (verde, abre o construtor visual
-    vazio em uma nova aba).
-- **Rodapé** — preço calculado automaticamente: custo unitário,
-  imposto, lucro, **preço de venda**.
+- **Topo** — dados básicos (nome, unidade, categoria, imposto%, lucro%).
+- **Meio** — bloco "Composição": tabela de insumos com coeficiente
+  (ex.: para 1 m² de alvenaria, 14 blocos, 0,02 m³ de argamassa, 0,75
+  h de pedreiro).
+- **Bloco "Cronograma":** campo **"Template padrão"** (dropdown com
+  busca) + botões **"Editar template"** e **"Criar novo template"**
+  (abrem o construtor em outra aba).
+- **Rodapé** — preço calculado: custo unitário, imposto, lucro,
+  **preço de venda**.
 
 **5. Cada campo (exemplos do "Alvenaria de bloco cerâmico").**
 
-| Campo | Tipo | Obrigatório? | Exemplo | Se ficar vazio |
-| --- | --- | :---: | --- | --- |
-| Nome | Texto | Sim | `Alvenaria de bloco cerâmico 9x19x19` | Bloqueia o salvar |
-| Unidade de medida | Dropdown | Sim | `m²` | Bloqueia |
-| Categoria | Texto/Dropdown | Sim | `Estrutura` | Bloqueia |
-| Imposto (%) | Numérico | Não | `8` | Sistema usa 0 |
-| Margem de lucro (%) | Numérico | Não | `15` | Sistema usa 0 |
-| Composição (insumos) | Tabela | Recomendado | `Bloco × 14 un/m²; Argamassa × 0,02 m³/m²; Pedreiro × 0,75 h/m²` | Sai sem custo unitário |
-| **Template padrão** | Dropdown com busca | **Não, mas altamente recomendado** | `Alvenaria — passo a passo` | A proposta aprova mas a obra **nasce sem cronograma** desse serviço (apenas o item de medição é criado). Aparece aviso na tela de revisão da etapa 6. |
+| Campo | Tipo | Obrigatório? | Exemplo |
+| --- | --- | :---: | --- |
+| Nome | Texto | Sim | `Alvenaria de bloco cerâmico 9x19x19` |
+| Unidade | Dropdown | Sim | `m²` |
+| Categoria | Texto/Dropdown | Sim | `Estrutura` |
+| Imposto (%) | Numérico | Não | `8` |
+| Margem de lucro (%) | Numérico | Não | `15` |
+| Composição (insumos) | Tabela | Recomendado | `Bloco × 14 un/m²; Argamassa × 0,02 m³/m²; Pedreiro × 0,75 h/m²` |
+| **Template padrão** | Dropdown com busca | **Recomendado** | `Alvenaria — passo a passo` |
 
 **6. Botões disponíveis.**
 
-- **Salvar** (verde): grava e volta para a lista de serviços.
-- **Recalcular preço** (azul claro): recalcula o "Preço de venda
-  unitário" na hora, com base na composição e no imposto+lucro.
-- **Editar template** / **Criar novo template**: abrem o construtor
-  visual de cronograma-padrão em outra aba (você pode trocar de aba,
-  desenhar a árvore Grupo→Subtarefa arrastando os itens, salvar, e
-  voltar para finalizar o serviço).
+- **Salvar** (verde): grava e volta para a lista.
+- **Recalcular preço** (azul claro): refaz o "Preço de venda
+  unitário" com base na composição.
+- **+ Adicionar insumo** (verde claro, na composição).
+- **Editar/Criar template** (azuis): abrem o construtor em outra aba.
+
+**7. O que muda depois que você salva.**
+
+- O serviço aparece nos autocompletes de Orçamento, Proposta e
+  Medição.
+- Quando uma proposta com esse serviço for aprovada, o sistema usa
+  o "Template padrão" para sugerir o cronograma da obra (a menos
+  que o orçamento tenha override).
+
+**8. Notas de atenção.**
+
+- Imposto + Lucro ≥ 100% → erro matemático, preço sai zero.
+- Serviço sem template padrão → a obra nasce sem cronograma desse
+  ramo (apenas item de medição).
+- O mesmo template pode ser usado por vários serviços.
+
+---
+
+### Etapa 5 — Cadastro de funcionários
+
+> *Para tocar o Bela Vista, a Alfa precisa cadastrar Carlos
+> (mensalista, R$ 2.800/mês) e Pedro (diarista, R$ 180/dia). Os dois
+> recebem por PIX e têm vale-alimentação de R$ 25/dia trabalhado e
+> vale-transporte de R$ 12/dia.*
+
+**1. O que você está fazendo de verdade.** Cadastrando as pessoas que
+vão trabalhar nas obras, junto com a forma de pagamento de cada uma.
+
+**2. Por que o sistema pede isso.** O cadastro do funcionário é o
+ponto de partida para tudo que envolve mão de obra: ponto, RDO,
+folha, VT, VA e PIX.
+
+**3. Onde clicar.** Menu lateral → "Funcionários" → botão verde
+"+ Novo Funcionário" no canto superior direito (modal `#funcionarioModal`).
+
+**4. O que aparece na tela.** Modal em duas colunas, agrupado em
+quatro blocos: Dados pessoais, Dados profissionais, Pagamento e
+Foto.
+
+**5. Cada campo do formulário.**
+
+| Campo | Tipo | Obrigatório? | Exemplo Carlos | Exemplo Pedro |
+| --- | --- | :---: | --- | --- |
+| Nome | Texto | Sim | `Carlos da Silva` | `Pedro Oliveira` |
+| CPF | Texto | Sim | `123.456.789-00` | `987.654.321-00` |
+| Data de admissão | Data | Sim | `01/05/2026` | `01/05/2026` |
+| Tipo de remuneração | Dropdown | Sim | `Salário` | `Diária` |
+| Salário | Numérico (R$) | Só se "Salário" | `R$ 2.800,00` | — |
+| Valor da diária | Numérico (R$) | Só se "Diária" | — | `R$ 180,00` |
+| Função | Dropdown (FK) | Sim | `Pedreiro` | `Pedreiro` |
+| Horário de trabalho | Dropdown (FK) | Recomendado | `08h–17h` | `08h–17h` |
+
+**6. Botões disponíveis.** **Salvar** (verde) / **Cancelar** (cinza).
 
 **7. O que muda depois que você clica em Salvar.**
 
-- O serviço passa a aparecer no autocomplete dos formulários de
-  Proposta e Medição.
-- Quando uma proposta com esse serviço for aprovada, o sistema vai
-  consultar o "Template padrão" para sugerir o cronograma da obra.
+- O funcionário aparece na lista com etiqueta "Mensalista" ou
+  "Diarista".
+- Já pode ser escolhido como mão de obra em RDO, Ponto Facial,
+  Alimentação, Transporte e Reembolso.
 
 **8. Notas de atenção.**
 
-- Se Imposto + Lucro chegar a 100% ou mais, o sistema sinaliza erro
-  e zera o preço (proteção matemática).
-- O mesmo Template pode ser usado por vários serviços diferentes —
-  reutilize.
-- Itens que não são serviço técnico (mobilização, limpeza final,
-  entrega de chaves) podem ser cadastrados como serviços fictícios
-  no catálogo, com seu próprio template — é o que a Alfa fará com a
-  "Mobilização de obra".
+- Diarista sem "Valor da diária" → custo sai zero. Erro mais comum.
+- VA/VT são por dia trabalhado: o sistema multiplica automaticamente
+  conforme o ponto.
+- VA, VT e chave PIX existem como colunas de `funcionario` mas o
+  modal não os expõe — preencha via tela de detalhe ou serviço.
+- CPF é único por sistema.
 
 ---
 
-### Etapa 4 — Importar funcionários por planilha (opcional)
+### Etapa 6 — Orçamento (interno: override + composição customizada)
 
-**1. O que você está fazendo de verdade.** Em vez de cadastrar um por
-um, está jogando uma planilha Excel com vários funcionários de uma
-vez.
+> *Antes de mandar a proposta para o senhor João, a Alfa monta um
+> orçamento interno com 4 itens: 250 m² de alvenaria (com cronograma
+> herdado do serviço), 250 m² de contrapiso, uma "Mobilização de obra"
+> (cadastrada no modal inline porque não existia no catálogo) e
+> R$ 5.000 de honorário de projeto. No item da alvenaria, ela troca
+> o template para uma versão expressa e remove um insumo da composição
+> (porque negociou com fornecedor próprio).*
 
-**2. Por que o sistema pede isso.** Construtoras com 30+ funcionários
-não querem digitar tudo na mão.
+**1. O que você está fazendo de verdade.** Está montando o cálculo
+interno da venda. O orçamento serve para você fechar o preço com
+calma — mexendo em margem, override de cronograma e composição
+customizada — antes de gerar o PDF para o cliente.
 
-**3. Onde clicar.** Menu lateral → "Importar por Planilha". Se esse
-item não aparecer no menu, é porque a tela teve um problema no boot —
-o sistema esconde o link automaticamente para evitar erro.
+**2. Por que o sistema pede isso.** Antes do v10, ir direto da
+proposta para o cliente impedia ajustes finos. O orçamento
+intermediário separa "fechar o preço" de "mostrar para o cliente".
 
-**4. O que aparece na tela.** Em sequência vertical: (1) Botão "Baixar
-template Excel oficial". (2) Campo de upload. (3) Tabela com
-pré-visualização do que vai ser importado. (4) Botão verde
-"Confirmar importação".
+**3. Onde clicar.** Menu lateral → "Orçamentos" → botão verde
+"+ Novo orçamento" (rota `/orcamentos/novo`). Após criar, abre a tela
+de edição em `/orcamentos/<id>/editar`.
 
-**5. Cada coluna esperada na planilha.**
+**4. O que aparece na tela.**
 
-| Coluna | Obrigatória? | Exemplo |
-| --- | :---: | --- |
-| Nome | Sim | `Carlos da Silva Pereira` |
-| CPF | Sim | `123.456.789-00` |
-| Tipo de remuneração | Sim | `Salário` ou `Diária` |
-| Salário | Sim se Mensalista | `2800,00` |
-| Diária | Sim se Diarista | `180,00` |
-| Chave PIX | Não | `123.456.789-00` |
-| VA | Não | `25,00` |
-| VT | Não | `12,00` |
-| Data admissão | Sim | `01/05/2026` |
-| Função | Sim | `Pedreiro` |
+- **Topo** — cabeçalho (cliente, número, data, observações, imposto
+  global, margem global).
+- **Meio** — tabela de itens, com colunas: Serviço, Descrição, Qtd,
+  Unidade, Preço unit., **Subtotal/un.**, Imposto%, Margem%,
+  **Composição** (sub-tabela expansível), **Cronograma para esta
+  linha** (override).
+- **Rodapé** — totais: Custo total / Venda total / Lucro total
+  (recalculam em tempo real).
+
+**5. Cada campo do item.**
+
+| Campo | Tipo | Exemplo (alvenaria) | Exemplo (mobilização) |
+| --- | --- | --- | --- |
+| Serviço | Combobox com busca | `Alvenaria de bloco cerâmico` | `Mobilização` (criado pelo modal) |
+| Descrição | Texto | preenchida automaticamente | preenchida automaticamente |
+| Quantidade | Numérico | `250` | `1` |
+| Unidade | Dropdown | `m²` (auto) | `un` (auto) |
+| Preço unit. | Numérico (R$) | `145,00` (auto, recalcula) | `1.500,00` |
+| Imposto% | Numérico | `8` (herda do serviço) | `8` |
+| Margem% | Numérico | `15` (herda do serviço) | `15` |
+| **Cronograma para esta linha** | Dropdown com busca | `Alvenaria — versão expressa` (override) | `(usar padrão do serviço)` |
+
+**Composição customizada por linha:** clique no botão "▾ Composição"
+da linha. Aparece uma sub-tabela com os insumos do serviço. Você pode:
+
+- **+ Adicionar insumo** (verde claro): inclui um insumo extra só
+  nesta linha (ex.: "Aditivo plastificante").
+- **Remover insumo** (vermelho na linha): retira o insumo desta
+  linha. Pede confirmação.
+- **Editar coeficiente**: numérico. Mexer aqui recalcula
+  Subtotal/un. e os totais na hora (Task #124).
+- **Voltar à composição padrão** (cinza): desfaz todas as alterações
+  e volta à composição do catálogo. Pede confirmação.
 
 **6. Botões disponíveis.**
 
-- **Baixar template** (cinza): traz o arquivo Excel oficial.
-- **Enviar arquivo** (azul): sobe a planilha preenchida.
-- **Confirmar importação** (verde, só ativa após o upload).
+- **Salvar orçamento** (verde): grava o cabeçalho.
+- **+ Adicionar item** (verde claro): adiciona linha vazia.
+- **+ Novo serviço** (modal inline, azul): abre pop-up com o form
+  de novo serviço (`/servicos/novo?embedded=1`). Após salvar,
+  o orçamento recarrega e o serviço já aparece no autocomplete.
+- **Duplicar item** (cinza): copia a linha atual.
+- **Remover item** (vermelho): apaga a linha. Pede confirmação.
+- **Duplicar orçamento** (azul, no topo): cria uma cópia inteira
+  para variantes.
+- **Excluir orçamento** (vermelho, no topo): apaga o orçamento.
+- **Gerar proposta** (verde grande, no topo): leva à E07.
 
-**7. O que muda depois que você confirma.** Linhas válidas viram
-funcionários. Linhas com erro aparecem destacadas em vermelho com a
-coluna problemática. Os custos importados (diárias, VA, VT) vão para
-um único pai mensal por categoria.
+**7. O que muda depois que você salva ou edita um item.**
 
-**8. Notas de atenção.** Sempre baixe o template oficial — formatos
-diferentes não são aceitos. CPFs duplicados são rejeitados linha a
-linha; o resto da planilha continua sendo importado.
+- Cada `OrcamentoItem` guarda o `cronograma_template_override_id`
+  (se você escolheu um diferente do padrão do serviço) e o
+  `composicao_snapshot` (se você mexeu na composição).
+- O preço unit. é recalculado por trás (a partir da composição
+  customizada × preço base do insumo na data + imposto + margem).
+- Subtotal/un. e os totais Custo/Venda/Lucro atualizam em tempo
+  real (Task #124).
+
+**8. Notas de atenção.**
+
+- Modal "+ Novo serviço" usa form aninhado resolvido com o atributo
+  HTML5 `form=` — você pode salvar o serviço sem perder o orçamento.
+- Override de cronograma é **por linha** — duas linhas do mesmo
+  serviço podem ter cronogramas diferentes.
+- "Voltar à composição padrão" desfaz add/remove/coeficiente desta
+  linha. Não afeta override.
+- Mudar preço base do insumo no catálogo **depois** **não** muda
+  orçamentos já salvos — o snapshot está congelado.
+- Coberto por `tests/test_e2e_orcamento_proposta.py` e
+  `tests/test_orcamento_override_e2e.py`.
 
 ---
 
-### Etapa 5 — Nova proposta com catálogo + cálculo automático
+### Etapa 7 — Gerar Proposta a partir do Orçamento
 
-> *A Alfa vai montar a proposta para o senhor João: 250 m² de
-> alvenaria + 250 m² de contrapiso (ambos com Template padrão), uma
-> taxa de mobilização (serviço sem template) e mais R$ 5.000,00 de
-> "honorário de projeto" digitado livre (sem serviço de catálogo,
-> só texto).*
+> *A Alfa fechou o preço internamente. Agora clica "Gerar proposta"
+> para virar o documento que vai por e-mail para o senhor João.*
 
-**1. O que você está fazendo de verdade.** Está montando o orçamento
-que vai para o cliente. O sistema consulta o catálogo, calcula tudo
-automaticamente, congela esse cálculo na proposta e gera um link
-público para o cliente aprovar.
+**1. O que você está fazendo de verdade.** Está convertendo o
+orçamento interno em uma proposta comercial — com PDF, link público
+do cliente e número oficial.
 
 **2. Por que o sistema pede isso.** A proposta é o documento
-contratual; congelar o cálculo no momento da gravação garante que
-mudanças futuras de preço de insumo não bagunçam propostas antigas (o
-sistema guarda uma "foto" do que valia naquele dia).
+contratual; congelar o cálculo no momento da geração garante que
+mudanças futuras de preço não bagunçam propostas antigas.
 
-**3. Onde clicar.** Menu lateral → "Propostas" → botão verde "+ Nova
-Proposta" no canto superior direito.
+**3. Onde clicar.** Na tela do orçamento → botão verde **"Gerar
+proposta"** no topo (POST `/orcamentos/<id>/gerar-proposta`).
 
-**4. O que aparece na tela.** Cabeçalho com dados do cliente; corpo
-com itens da proposta (uma linha por item, repetível); rodapé com
-BDI, total geral e botões.
+**4. O que aparece na tela.** Após o POST, o sistema redireciona
+para o detalhe da proposta recém-criada (`/propostas/<id>`), com
+status "Rascunho" ou "Enviada".
 
-**5. Cada campo do cabeçalho e dos itens.**
+**5. O que é propagado do orçamento para a proposta.**
 
-| Campo (cabeçalho) | Tipo | Obrigatório? | Exemplo |
-| --- | --- | :---: | --- |
-| Cliente | Texto | Sim | `João da Silva` |
-| Documento (CPF/CNPJ) | Texto | Recomendado | `111.222.333-44` |
-| Endereço da obra | Texto | Recomendado | `Rua das Flores, 100, São Paulo/SP` |
-| Prazo de entrega (dias) | Numérico | Recomendado | `90` |
+| Campo do `OrcamentoItem` | Vai para `PropostaItem` |
+| --- | --- |
+| `servico_id`, `descricao`, `quantidade`, `unidade`, `preco_unitario` | Idem |
+| `cronograma_template_override_id` | Mesmo nome (preserva override) |
+| `composicao_snapshot` | Mesmo nome (preserva add/remove/coef) |
+| `imposto_pct`, `margem_pct` | Idem |
 
-| Campo (item) | Tipo | Exemplo (alvenaria) | Exemplo (mobilização) | Exemplo (honorário) |
-| --- | --- | --- | --- | --- |
-| Serviço (catálogo) | Combobox com busca | `Alvenaria de bloco cerâmico` | `Mobilização de obra` | (deixar vazio) |
-| Descrição | Texto | (preenchido automaticamente) | (idem) | `Honorário de projeto executivo` |
-| Quantidade | Numérico | `250` | `1` | `1` |
-| Unidade | Texto | `m²` (auto) | `un` (auto) | `un` (digitado) |
-| Preço unitário | Numérico (R$) | `R$ 145,00` (auto) | `R$ 1.500,00` (auto) | `R$ 5.000,00` (digitado) |
-| Subtotal | Calculado | `R$ 36.250,00` | `R$ 1.500,00` | `R$ 5.000,00` |
+**6. Botões disponíveis na proposta.**
 
-**6. Botões disponíveis.**
+- **Editar proposta** (azul).
+- **Enviar ao cliente** (azul forte): libera o link público.
+- **Gerar PDF** (cinza): exporta o documento.
+- **Aprovar** (verde): leva à E08.
 
-- **+ Adicionar item** (verde claro): adiciona uma nova linha.
-- **Salvar rascunho** (cinza): grava sem enviar ao cliente.
-- **Enviar ao cliente** (azul): grava e libera o link público para o
-  João abrir.
+**7. O que muda depois que você gera.**
 
-**7. O que muda depois que você salva.** A proposta entra na lista com
-status "Enviada"; o cliente recebe o link; o sistema congela o custo,
-lucro e subtotal de cada item; o total geral aparece no cabeçalho.
+- Nasce uma `Proposta` vinculada ao orçamento.
+- O cliente pode receber o link e visualizar (sem login).
+- O orçamento original continua existindo (auditoria) e fica
+  marcado como "convertido em proposta".
 
 **8. Notas de atenção.**
 
+- Gerar de novo a partir do mesmo orçamento cria uma proposta
+  **nova**, não substitui a anterior — confira antes de duplicar.
 - Itens com serviço de catálogo geram cronograma na hora da
-  aprovação (próxima etapa). Itens **sem serviço** ou **com serviço
-  sem Template padrão** **não** geram tarefas — só item de medição.
-- Mudar o preço do insumo no catálogo **depois** não altera propostas
-  já gravadas. É de propósito.
+  aprovação (E08); itens **sem serviço** ou **sem template** não
+  geram tarefas.
 
 ---
 
-### Etapa 6 — Aprovar a proposta e revisar o cronograma
+### Etapa 8 — Aprovação da proposta + revisão do cronograma
 
-> *O senhor João topou o orçamento. Antes de a Alfa fechar a aprovação
-> no sistema, ela quer ajustar o cronograma sugerido — tirar uma
-> subtarefa que não cabe no escopo dele e aumentar as horas de uma
-> outra que ela sabe que vai demorar mais.*
+> *O senhor João topou. A Alfa quer ajustar o cronograma sugerido
+> antes de fechar — tirar uma subtarefa que não cabe e aumentar as
+> horas de outra.*
 
-Esta é a etapa que **mais mudou** desde a versão anterior do manual.
-Em vez do botão "Aprovar" antigo (que aprovava direto), agora você
-passa por uma tela de revisão.
+**1. O que você está fazendo de verdade.** Está dizendo: "Pode criar
+a obra, gerar o cronograma deste jeito específico e abrir o portal."
 
-**1. O que você está fazendo de verdade.** Você está dizendo ao
-sistema: "Sim, está tudo certo com a proposta — pode criar a obra,
-gerar o cronograma desta forma específica e abrir o portal do
-cliente."
-
-**2. Por que o sistema pede a tela de revisão.** Cada serviço do
-catálogo tem uma receita-padrão de cronograma. Mas cada obra é única.
-A tela de revisão é o seu momento de ajustar a receita à realidade
-desta obra antes de tudo virar pedra.
+**2. Por que o sistema pede tela de revisão.** Cada serviço tem uma
+receita-padrão (ou override do orçamento). Mas cada obra é única.
+Esta é sua chance de ajustar antes de tudo virar pedra.
 
 **3. Onde clicar.**
 
-- **Caminho admin:** menu lateral → "Propostas" → linha da proposta →
-  botão verde **"Aprovar e gerar cronograma"** no canto superior
-  direito.
-- **Caminho cliente (senhor João):** ele recebe o link público da
-  proposta por e-mail, vê a proposta completa e clica no botão verde
-  no rodapé "Aprovar proposta". Se você (admin) já tinha
-  pré-configurado o cronograma na tela de revisão **antes**, o
-  sistema usa essa configuração; senão, ele usa a sugestão padrão
-  (tudo marcado).
+- **Caminho admin:** menu → "Propostas" → linha → botão verde
+  **"Aprovar e gerar cronograma"** (rota
+  `/propostas/<id>/cronograma-revisar`).
+- **Caminho cliente (João):** ele recebe o link público e clica
+  "Aprovar proposta" no rodapé. Se você (admin) tinha
+  pré-configurado, o sistema usa essa configuração; senão usa a
+  default (tudo marcado).
 
 **4. O que aparece na tela de revisão.**
 
@@ -472,7 +600,7 @@ desta obra antes de tudo virar pedra.
 ┌──────────────────────────────────────────────────────────────────┐
 │ Revisão do cronograma — Proposta #2026-001 / João da Silva       │
 ├──────────────────────────────────────────────────────────────────┤
-│ ▼ ☑ Alvenaria de bloco cerâmico  (250 m²) — 80 h estimadas       │
+│ ▼ ☑ Alvenaria de bloco cerâmico  (250 m²) [override: expressa]   │
 │       ▼ ☑ Grupo: Preparação                                       │
 │             ☑ Marcar bloco e linha de prumo  | 2 dias | 16 h     │
 │             ☑ Argamassa de assentamento      | 1 dia  |  8 h     │
@@ -480,384 +608,822 @@ desta obra antes de tudo virar pedra.
 │             ☑ Levantar paredes               | 5 dias | 40 h     │
 │             ☐ Reforço de vergas              | 1 dia  |  8 h     │
 │             ☑ Limpeza pós-execução           | 1 dia  |  8 h     │
-│ ▼ ☑ Contrapiso desempenado (250 m²) — 40 h estimadas              │
+│ ▼ ☑ Contrapiso desempenado (250 m²) [padrão]                      │
 │       ▼ ☑ Grupo: Execução                                         │
-│             ☑ Nivelamento                    | 2 dias | 16 h     │
-│             ☑ Lançamento                     | 2 dias | 16 h     │
-│             ☑ Acabamento                     | 1 dia  |  8 h     │
+│             ☑ Nivelamento / Lançamento / Acabamento               │
 │ ⚠ Mobilização de obra — sem template                              │
 │       Apenas item de medição será criado.                         │
-│ ⓘ Honorário de projeto executivo — sem serviço                    │
-│       Não vai virar tarefa do cronograma. Adicione manualmente    │
-│       depois se precisar.                                         │
+│ ⓘ Honorário de projeto — sem serviço                              │
+│       Não vai virar tarefa do cronograma.                         │
 ├──────────────────────────────────────────────────────────────────┤
-│ Resumo: 7 tarefas marcadas | 112 h total | término previsto:     │
-│         28/05/2026                                                │
-│                                                                  │
 │  [ Cancelar ]  [ Salvar pré-configuração ]  [ Confirmar aprovação│
 │                                                e gerar cronograma]│
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**5. Cada elemento da tela.**
+**5. Cada elemento.**
 
-| Elemento | Tipo | Como funciona | Exemplo |
-| --- | --- | --- | --- |
-| Checkbox do Serviço (raiz) | Caixa de seleção | Desmarcar tira o ramo todo | Desmarque "Contrapiso" e a obra nasce só com cronograma de alvenaria |
-| Checkbox do Grupo | Caixa de seleção | Cascata: desmarca todas as subtarefas filhas | Desmarque "Grupo: Execução" e some o trio Levantar/Reforço/Limpeza |
-| Checkbox da Subtarefa | Caixa de seleção | Marca/desmarca uma folha | Desmarque "Reforço de vergas" porque a obra do João não tem |
-| Campo "dias" | Numérico inline | Clique e edite | De `1` para `2` |
-| Campo "horas" | Numérico inline | Clique e edite | De `8` para `16` |
-| Aviso amarelo (folha sem horas) | Texto | Indica que o sistema vai dividir o peso da medição em partes iguais entre as folhas marcadas | Recomenda voltar à etapa 3 e configurar horas estimadas |
-| Aviso laranja (serviço sem template) | Texto | Item criado para medição, mas sem cronograma | "Mobilização de obra" no exemplo |
-| Aviso azul (item sem serviço) | Texto | Não cria nada no cronograma | "Honorário de projeto" no exemplo |
+| Elemento | Como funciona | Exemplo |
+| --- | --- | --- |
+| Checkbox do Serviço (raiz) | Desmarcar tira o ramo todo | Desmarque "Contrapiso" e a obra nasce só com alvenaria |
+| Checkbox do Grupo | Cascata: desmarca subtarefas | Desmarque "Execução" e somem 3 folhas |
+| Checkbox da Subtarefa | Marca/desmarca uma folha | Desmarque "Reforço de vergas" |
+| Campo "dias" / "horas" | Numérico inline | De `1` para `2` |
+| Tag "[override: ...]" | Indica que veio do orçamento | "expressa" no exemplo da alvenaria |
+| Aviso amarelo | Folha sem horas → sistema divide o peso por igual | — |
+| Aviso laranja | Serviço sem template → só item de medição | "Mobilização" |
+| Aviso azul | Item sem serviço → não gera tarefa | "Honorário" |
 
 **6. Botões disponíveis.**
 
-- **Cancelar** (cinza): volta para a proposta sem aprovar.
-- **Salvar pré-configuração** (azul claro, opcional): se a Alfa ainda
-  não quer aprovar agora mas quer deixar a configuração pronta para
-  o cliente aprovar pelo portal, este botão grava a árvore atual.
-  Quando o cliente clicar "Aprovar proposta" no portal, ele herda
-  exatamente esta configuração.
-- **Confirmar aprovação e gerar cronograma** (verde grande): executa
-  tudo de uma vez (criar obra, item de medição, cronograma de 3
-  níveis, vínculo Item de Medição × tarefa-folha com peso, lançamento
-  contábil). É uma operação **única e indivisível** — se qualquer
-  coisa falhar, o sistema desfaz tudo e mostra "Falha ao aprovar a
-  proposta. Nada foi gravado".
+- **Cancelar** (cinza).
+- **Salvar pré-configuração** (azul claro): grava a árvore para
+  que, se o cliente aprovar pelo portal, herde esta configuração.
+- **Confirmar aprovação e gerar cronograma** (verde grande):
+  executa tudo de uma vez (criar obra + itens de medição +
+  cronograma 3 níveis + lançamento contábil). Operação **única e
+  indivisível** — se algo falhar, tudo é desfeito.
 
 **7. O que muda depois que você confirma.**
 
-- A proposta vira status "Aprovada".
-- Nasce uma **Obra** com código `OBR####`, vinculada à proposta, com
-  o nome do cliente ("João da Silva"), valor de contrato (no
-  exemplo, R$ 42.750,00), link público do portal e portal já ativo.
-- Nasce **um item de medição** por item de proposta (4 itens no
-  exemplo: alvenaria, contrapiso, mobilização e honorário).
-- Nasce o **cronograma da obra** com 7 tarefas marcadas, organizadas
-  em 3 níveis (Serviço → Grupo → Subtarefa).
-- Cada item de medição ganha vínculos de peso para suas
-  subtarefas-folha (no exemplo: a alvenaria tem 4 folhas marcadas, e
-  o peso de cada uma é proporcional às horas).
-- O sistema lança contabilmente a aprovação — mas **não** cria conta
-  a receber neste momento.
-- Tela final: aviso verde "Proposta aprovada com sucesso" + link
-  para a obra recém-criada.
+- Proposta vira "Aprovada".
+- Nasce uma **Obra** com código `OBR-####`, vinculada à proposta,
+  link público do portal já ativo.
+- Nasce **um item de medição** por item de proposta.
+- Nasce o **cronograma de 3 níveis** (Serviço → Grupo →
+  Subatividade), respeitando o override do orçamento por linha.
+- Cada item de medição ganha vínculo de peso para suas folhas.
+- O sistema lança contabilmente a aprovação — mas **não** cria
+  conta a receber neste momento.
 
 **8. Notas de atenção.**
 
-- A aprovação é uma operação **única e indivisível** — se algo der
-  ruim no meio, **nada** é gravado. Não vai existir o caso "obra
-  criada mas cronograma vazio".
-- Reaprovar a mesma proposta não duplica tarefas (ver etapa 8).
-- Se você desmarcar **tudo** em um serviço, ele ainda cria o item
-  de medição (para você cobrar do cliente), mas o cronograma fica
-  sem aquele ramo.
-- Se a aprovação vier pelo portal do cliente **sem** pré-configuração
-  salva, o sistema usa a árvore default (tudo marcado) — então é
-  boa prática você revisar e usar "Salvar pré-configuração" antes
-  de enviar a proposta ao cliente.
+- Aprovação é **única e indivisível** — não existe "obra criada
+  mas cronograma vazio".
+- Reaprovar a mesma proposta não duplica tarefas (tarefas excluídas
+  manualmente **não** são recriadas).
+- Aprovação pelo portal sem pré-configuração → árvore default.
+- Coberto por `tests/test_cronograma_automatico_aprovacao.py` e
+  `tests/test_orcamento_override_e2e.py`.
 
 ---
 
-### Etapa 7 — Verificação pós-aprovação
+### Etapa 9 — Pós-aprovação: verificação da obra
 
-**1. O que você está fazendo de verdade.** Está conferindo se tudo o
-que era para ser criado pela aprovação realmente foi criado.
+**1. O que você está fazendo de verdade.** Conferindo se tudo o que
+era para ser criado realmente foi criado.
 
-**2. Por que isso importa.** É o seu checklist para garantir que o
+**2. Por que importa.** É seu checklist para garantir que o
 engenheiro de campo vai abrir a obra e encontrar tudo certo.
 
 **3. Onde clicar.** Menu lateral → "Obras" → linha "Residencial Bela
-Vista" (que apareceu sozinha após a aprovação). O painel da obra abre
-com várias abas: Resumo, Cronograma, Medição comercial, Custos,
-Contas a Receber, RDOs, Almoxarifado, Cotação.
+Vista".
 
-**4. O que aparece na tela.** Aba "Resumo" no topo com card de cliente,
-valor de contrato, código `OBR####`, status "Em andamento" e link do
-portal do cliente.
+**4. O que aparece na tela.** Painel da obra com várias abas:
+Resumo, Cronograma, Medição comercial, Custos, Contas a Receber,
+RDOs, Almoxarifado, Cotação, Compras, Portal.
 
 **5. Cada aba e o que conferir.**
 
-| Aba | O que conferir | O que esperar (exemplo) |
+| Aba | O que conferir | O que esperar |
 | --- | --- | --- |
-| Resumo | Cliente, valor, código, link | Cliente "João da Silva", R$ 42.750,00, `OBR0012`, link preenchido |
-| Cronograma | 7 tarefas em 3 níveis, etiqueta "📋 do contrato", datas começando em 01/05/2026 | Alvenaria como raiz, Preparação/Execução como grupos, subtarefas como folhas |
-| Medição comercial | 4 itens; alvenaria/contrapiso com vínculos para as folhas; mobilização e honorário sem vínculo de cronograma | 250 m² de alvenaria, 250 m² de contrapiso, 1 mobilização, 1 honorário |
+| Resumo | Cliente, valor, código, link | Cliente "João da Silva", valor de contrato, `OBR-####`, link preenchido |
+| Cronograma | Tarefas em 3 níveis com etiqueta "📋 do contrato" | Datas começando em 01/05/2026, alvenaria com template "expressa" (override do orçamento) |
+| Medição comercial | 4 itens, com vínculo de peso para folhas | Alvenaria/contrapiso ligados; mobilização/honorário sem cronograma |
 | Custos | Zerada — não há lançamentos ainda | Tabela vazia |
-| Contas a Receber | Zerada — porque a aprovação não cria conta a receber | Tabela vazia (nascerá só na primeira medição) |
+| Contas a Receber | Zerada (aprovação não cria CR) | Tabela vazia (nascerá só na 1ª medição) |
 
-**6. Botões disponíveis nesta tela.**
+**6. Botões disponíveis.** **Editar obra** / **Abrir portal do
+cliente** / **+ Novo RDO** / **Reaprovar proposta** (idempotente).
 
-- **Editar obra** (azul): abrir formulário de obra para ajustar
-  endereço, datas, etc.
-- **Abrir portal do cliente** (cinza): abre em outra aba como o
-  senhor João vê.
-- **+ Novo RDO** (verde, na aba RDOs): inicia o relatório do dia
-  (etapa 10).
-
-**7. O que muda depois que você verifica.** Nada — esta é uma etapa
-de leitura, não escreve nada no sistema.
+**7. O que muda depois.** Nada — esta etapa só lê.
 
 **8. Notas de atenção.**
 
-- O "Honorário de projeto" aparece como item de medição mas sem
-  cronograma — se você quiser cobrar isso por etapa, lance uma
-  tarefa avulsa no cronograma e vincule manualmente ao item.
-- Se aparecer aviso laranja "cronograma pendente" no topo da aba
-  Cronograma, é uma obra antiga (anterior à atualização da etapa 6).
-  Aprovações novas não cairão nesse caso.
+- "Honorário" aparece como item de medição mas sem cronograma. Se
+  quiser cobrar por etapa, lance tarefa avulsa e vincule manual.
+- Reaprovar não duplica tarefas existentes; tarefas excluídas
+  manualmente **não** são recriadas.
 
 ---
 
-### Etapa 8 — Reaprovar (idempotência)
+# PARTE II — DURANTE A OBRA (E10–E23)
 
-**1. O que você está fazendo de verdade.** Testando que, se você
-clicar de novo em "Aprovar e gerar cronograma" para a mesma proposta,
-o sistema não vai duplicar nada.
-
-**2. Por que importa.** Acontece muito do usuário achar que o clique
-não foi registrado e clicar de novo. O sistema tem que ser robusto a
-isso.
-
-**3. Onde clicar.** Mesma tela da etapa 6 — botão "Aprovar e gerar
-cronograma" outra vez.
-
-**4. O que aparece na tela.** Mesma tela de revisão, com a árvore já
-preenchida do jeito que você marcou da última vez.
-
-**5. Cada elemento (igual à etapa 6).** Não muda — o sistema só
-reabre a árvore com a configuração salva.
-
-**6. Botões disponíveis.** Os mesmos da etapa 6 — Cancelar, Salvar
-pré-configuração, Confirmar aprovação.
-
-**7. O que muda depois que você confirma de novo.**
-
-- A obra continua com 7 tarefas (não vira 14).
-- A conta a receber continua igual.
-- Aparece aviso informativo "Proposta já está aprovada. Nenhuma
-  alteração foi feita".
-
-**8. Notas de atenção.**
-
-- A não-duplicação vale para tudo o que **ainda existe** na obra. Se
-  você excluiu uma tarefa "📋 do contrato" manualmente entre as duas
-  aprovações, ela **não** é recriada na segunda aprovação (ver etapa
-  9). Para forçar recriação, ajuste manualmente o cronograma da obra.
+A "fase quente" — pessoas no campo, dinheiro entrando e saindo.
 
 ---
 
-### Etapa 9 — Cronograma da obra
+### Etapa 10 — Funcionários (alocação e métricas v1/v2)
 
-**1. O que você está fazendo de verdade.** Refinando o cronograma já
-criado: ajustando datas, adicionando predecessoras, criando tarefas
-extras se precisar.
+**1. O que você está fazendo de verdade.** Conferindo as métricas
+mensais de cada funcionário (custo, horas, dias trabalhados,
+extras, alimentação, reembolsos, almoxarifado em posse).
 
-**2. Por que importa.** Mesmo o melhor template de catálogo não
-adivinha a realidade da obra do João — chuva, atraso de fornecedor,
-mudança de pedido do cliente. O cronograma da obra é o lugar onde a
-vida real entra.
+**2. Por que importa.** É a única tela que mostra o "custo real
+total" de cada funcionário, agregando todas as origens.
 
-**3. Onde clicar.** Aba "Cronograma" da obra.
+**3. Onde clicar.** Menu lateral → "Funcionários" → clique no nome
+do Carlos ou Pedro → aba "Métricas".
 
-**4. O que aparece na tela.** Gantt interativo: lista de tarefas
-hierárquica à esquerda (com seta de expandir/recolher por grupo),
-barras temporais à direita. Cada tarefa do contrato exibe a etiqueta
-**"📋 do contrato"** com tooltip dizendo de qual item da proposta ela
-veio.
+**4. O que aparece na tela.** Cards de KPI no topo (horas trabalhadas,
+horas extras, dias pagos, custo MO, custo total) e tabela
+detalhando cada origem do custo.
 
-**5. Cada coluna e cada interação.**
+**5. Cada KPI.**
 
-| Coluna / Interação | Tipo | Para que serve |
+| KPI | Cálculo (modo `salario`) | Cálculo (modo `diaria`) |
 | --- | --- | --- |
-| Nome da tarefa | Texto editável (clique) | Renomear |
-| Início / Fim | Data editável | Ajustar prazo |
-| Dias | Numérico | Aumentar/diminuir duração |
-| Predecessora | Dropdown | Escolher tarefa que precisa terminar antes |
-| Responsável | Dropdown | Empresa ou cliente |
-| % concluído | Numérico (0–100) | Avanço manual (no dia a dia, vem do RDO) |
-| Etiqueta "📋 do contrato" | Indicador | Mostra que a tarefa veio da aprovação da proposta |
+| Custo mão de obra | `horas × valor_hora + HE × valor_hora × 1,5` | `valor_diaria × dias_pagos + (HE/8) × valor_diaria × 1,5` |
+| VA | `valor_va × dias_pagos` | idem |
+| VT | `valor_vt × dias_pagos` | idem |
+| Alimentação real | Soma de `RegistroAlimentacao` + `AlimentacaoLancamento` + rateio M2M | idem |
+| Reembolsos | Soma de reembolsos aprovados | idem |
+| Almoxarifado em posse | Saldo de itens consumíveis e serializados em posse | idem |
+| **Custo total** | MO + VA + VT + Alimentação + Reembolsos + Almoxarifado | idem |
 
-**6. Botões disponíveis.**
+**6. Botões disponíveis.** **Gerar PDF** (relatório do mês) /
+**Filtrar por mês**.
 
-- **+ Nova tarefa** (verde): inserir tarefa avulsa.
-- **Importar** (azul): importar de planilha.
-- **Recalcular predecessoras** (cinza): refaz datas em cascata
-  respeitando calendário e predecessoras.
-- **Excluir** (vermelho, ao passar o mouse na linha): remove a
-  tarefa.
-
-**7. O que muda depois que você edita.**
-
-- Mudar duração ou predecessora dispara recálculo automático das
-  datas das tarefas dependentes.
-- Avanço manual em % atualiza a barra do Gantt na hora.
-- Excluir tarefa "📋 do contrato" remove o vínculo dela com o item de
-  medição — peso da medição se redistribui automaticamente.
+**7. O que muda depois.** Nada — só leitura. Os cálculos rodam
+sob demanda em `services/funcionario_metrics.py`.
 
 **8. Notas de atenção.**
 
-- Ao tentar **editar** ou **excluir** uma tarefa que tem a etiqueta
-  "📋 do contrato", o sistema mostra um aviso extra:
-  > *"Esta tarefa veio do contrato (proposta #2026-001). Mexer nela
-  > pode afetar o cálculo da medição. Confirma mesmo assim?"*
-- Tarefas adicionadas manualmente **depois** da aprovação não têm
-  essa etiqueta e podem ser editadas livremente.
+- O modo (salário vs diária) respeita override do funcionário sobre
+  o tenant (`is_v2_active()`).
+- Para evitar double-count, o dashboard usa só `custo_mao_obra` no
+  loop por funcionário e agrega os outros componentes via
+  agregações de tenant.
+- Coberto por `tests/test_e2e_metricas_funcionario.py`.
 
 ---
 
-### Etapa 10 — RDO + métricas
+### Etapa 11 — RDO (lança custo de mão de obra automático)
 
-> *Hoje é 02/05/2026, segundo dia da obra. O Carlos e o Pedro
-> trabalharam 8 horas cada um na subtarefa "Marcar bloco e linha de
-> prumo". Produziram 30 m² da marcação.*
+> *Hoje é 02/05/2026. Carlos e Pedro trabalharam 8 h cada na
+> subtarefa "Marcar bloco e linha de prumo". Produziram 30 m².*
 
 **1. O que você está fazendo de verdade.** O encarregado preenche
-diariamente o "Relatório Diário de Obra" — quem trabalhou, em qual
-subtarefa, por quantas horas e quanto produziu.
+o "Relatório Diário de Obra" — quem trabalhou, em qual subtarefa,
+por quantas horas e quanto produziu.
 
-**2. Por que importa.** O RDO é o gatilho que faz o sistema recalcular
-a medição (e portanto a conta a receber) e os custos da obra
+**2. Por que importa.** O RDO é o gatilho que faz o sistema
+recalcular medição (e, portanto, conta a receber) e custos da obra
 automaticamente.
 
-**3. Onde clicar.** Menu lateral → "RDO" → botão verde "+ Novo RDO".
+**3. Onde clicar.** Menu lateral → "RDO" → botão verde "+ Novo
+RDO" (rota `/rdo/novo`, form `#formNovoRDO`, action POST
+`/salvar-rdo-flexivel`).
 
-**4. O que aparece na tela.** Cabeçalho com data + obra. Em seguida,
-duas seções: **(a) Mão de obra** (lista de funcionários alocados com
-horas trabalhadas) e **(b) Avanço de subatividade** (lista de
-subtarefas com quantidade produzida no dia).
+**4. O que aparece na tela.** Cabeçalho com data + obra; **Mão de
+obra** (lista de funcionários com horas) e **Avanço de
+subatividade** (lista de tarefas com quantidade produzida no dia).
 
-**5. Cada campo do RDO.**
+**5. Cada campo.**
 
 | Campo | Tipo | Obrigatório? | Exemplo |
 | --- | --- | :---: | --- |
 | Data | Data | Sim | `02/05/2026` |
 | Obra | Dropdown | Sim | `Residencial Bela Vista` |
-| Funcionário | Dropdown | Sim | `Carlos da Silva Pereira` |
+| Funcionário | Dropdown | Sim | `Carlos da Silva` |
 | Horas trabalhadas | Numérico | Sim | `8` |
 | Hora extra | Numérico | Não | `0` |
-| Subatividade do cronograma | Dropdown | Sim | `Marcar bloco e linha de prumo` |
+| Subatividade | Dropdown | Sim | `Marcar bloco e linha de prumo` |
 | Quantidade produzida | Numérico | Sim | `30` (m²) |
-| Observação | Texto | Não | `Marcação concluída no quarto 1` |
 
-**6. Botões disponíveis.**
-
-- **Salvar rascunho** (cinza): pode editar depois.
-- **Finalizar** (verde): dispara recálculo de custo + medição.
-- **Cancelar** (cinza claro).
+**6. Botões disponíveis.** **Salvar rascunho** / **Finalizar**
+(POST `/rdo/<id>/finalizar`) / **Cancelar**.
 
 **7. O que muda depois de finalizar o RDO.**
 
-- O sistema cria automaticamente um custo de mão de obra para cada
-  funcionário do RDO (Carlos pelo valor-hora do salário; Pedro pelo
-  valor da diária + adicional de hora extra se houver).
-- A subtarefa do cronograma avança em % conforme a quantidade
-  produzida.
-- A conta a receber única da obra (`OBR-MED-#####`) é atualizada
-  com o novo valor medido — sem criar uma linha nova.
+```
+RDO finalizado
+    │
+    ▼
+evento "rdo_finalizado"
+    │
+    ▼
+handler "lancar_custos_rdo" (event_manager.py)
+    │
+    ├─▶ cria CustoObra (MO) com vínculo ao serviço
+    ├─▶ cria entrada em Gestão de Custos V2 (CP) por funcionário
+    └─▶ recalcula medição da obra
+    │
+    ▼
+handler "recalcular_medicao_apos_rdo"
+    │
+    └─▶ atualiza Conta a Receber única OBR-MED-#####
+```
+
+- O sistema cria custo de MO para cada funcionário do RDO.
+- A subtarefa avança em % conforme produção.
+- Conta a receber única da obra é atualizada — sem nova linha.
 
 **8. Notas de atenção.**
 
-- RDO em rascunho não dispara nada. Só a transição para
-  **"Finalizado"** dispara o cálculo.
-- Diaristas usam fórmula `valor_diaria × dias_pagos + (HE/8) ×
-  valor_diaria × 1,5`; mensalistas usam `horas × valor_hora + HE ×
-  valor_hora × 1,5`.
-- Se o funcionário foi cadastrado sem salário/diária (etapa 2), o
-  custo sai zero. Volte na ficha do funcionário e arrume.
+- RDO em rascunho não dispara nada. Só "Finalizado" dispara.
+- Funcionário sem salário/diária → custo zero.
+- Coberto por `tests/test_agrupamento_diarias_rdo.py`.
 
 ---
 
-### Etapa 11 — Custos automáticos (mão de obra + material)
+### Etapa 12 — Ponto Facial (folha → conta a pagar)
 
-> *O encarregado tirou 14 sacos de cimento e 200 blocos do almoxarifado
-> para a obra do Bela Vista. Cada saco custou R$ 30,00 e cada bloco
-> R$ 1,80.*
+> *Carlos chega na obra às 7h58, abre o app no celular do encarregado,
+> bate ponto pela foto. O sistema reconhece, valida GPS, registra
+> entrada. No fim do mês, a folha consolida todas as marcações em
+> contas a pagar.*
 
-**1. O que você está fazendo de verdade.** Está garantindo que o
-sistema some sozinho todo gasto da obra: salário do funcionário (via
-RDO) + material (via almoxarifado ou compras) + serviços terceirizados.
+**1. O que você está fazendo de verdade.** Está usando o sistema de
+ponto eletrônico compartilhado: um único dispositivo (tablet/celular
+da obra) registra a entrada e saída de qualquer funcionário pela
+foto do rosto.
 
-**2. Por que importa.** Sem este cálculo automático, a margem da obra
-no fim do mês é só chute. Com ele, você compara em tempo real
-"recebido" × "gasto".
+**2. Por que importa.** O ponto é a fonte oficial das horas
+trabalhadas para a folha mensal — diferente do RDO, que registra
+**execução por tarefa**, o ponto registra a **jornada de presença**.
+Os dois alimentam contas a pagar, mas por caminhos diferentes:
+
+| Origem | O que mede | Vira CP por… |
+| --- | --- | --- |
+| **RDO finalizado** | Horas alocadas a uma subtarefa específica | `lancar_custos_rdo` (cria CP por funcionário, vinculado à obra/serviço) |
+| **Ponto facial** | Horas de presença na empresa (ou em uma obra específica) | `calcular_horas_folha` no fechamento mensal (cria lançamento de folha → CP consolidado) |
+
+Em construtoras pequenas, RDO sozinho costuma bastar. Em
+construtoras com folha CLT robusta, os dois rodam juntos.
 
 **3. Onde clicar.**
 
-- Mão de obra: nada a fazer aqui — vem sozinha do RDO finalizado
-  (etapa 10).
-- Material por almoxarifado: menu lateral → "Almoxarifado" →
-  "Saídas" → botão "+ Nova saída" → selecione obra + serviço + item +
-  quantidade.
-- Material por compra direta: menu lateral → "Compras" → "+ Novo
-  pedido" → selecione obra + serviço + fornecedor + itens.
+- **Bater ponto:** `/ponto/facial` no dispositivo compartilhado
+  (mobile-first).
+- **Configurar GPS/geofencing por obra:** `/ponto/configuracao/obra/<obra_id>`.
+- **Ver registros:** `/ponto/funcionario/<funcionario_id>` ou
+  `/ponto/obra/<obra_id>`.
+- **Gerar folha mensal:** menu → "Folha de Pagamento" → "Dashboard"
+  (rota `/folha/dashboard`).
 
-**4. O que aparece na tela.** Em "Custos" (menu lateral → "Custos" →
-"Gestão de Custos V2") aparecem dois níveis: pais (categorias) e
-filhos (lançamentos individuais), filtráveis por obra, por funcionário
-e por mês.
+**4. O que aparece na tela do ponto facial.** Visão de câmera ao
+vivo, retângulo verde no rosto detectado, botão grande "Bater ponto",
+indicador de GPS (verde dentro do raio, vermelho fora).
 
-**5. Cada campo de uma saída de almoxarifado.**
+**5. Cada elemento.**
+
+| Elemento | Função |
+| --- | --- |
+| Visor da câmera | Captura imagem para reconhecimento (DeepFace) |
+| Indicador GPS | Verde se dentro do geofence da obra, vermelho fora |
+| Botão "Bater ponto" | POST `/ponto/api/registrar-facial` com a foto |
+| Mensagem "Carlos da Silva — entrada registrada às 07:58" | Confirmação |
+
+**6. Botões disponíveis.** **Bater ponto** / **Tirar nova foto**.
+
+**7. O que muda depois que você bate o ponto.**
+
+```
+Ponto registrado
+    │
+    ▼
+evento "ponto_registrado"
+    │
+    ▼
+(ao fechar o mês) handler "calcular_horas_folha"
+    │
+    ├─▶ cria FolhaPagamento por funcionário
+    └─▶ chama "criar_lancamento_folha_pagamento"
+            │
+            └─▶ cria CP consolidado (salário + VA + VT + extras)
+```
+
+- A foto fica salva como evidência (auditoria).
+- O sistema recusa a foto se a qualidade for baixa ou se o GPS
+  estiver fora do geofence (configurável por obra).
+
+**8. Notas de atenção.**
+
+- Geofencing é opcional — desligado por padrão, configure em
+  `/ponto/configuracao/obra/<obra_id>`.
+- O Ponto Facial **não substitui** o RDO — eles convivem (ponto
+  para a jornada CLT, RDO para a alocação por tarefa).
+- Funcionário precisa ter pelo menos 1 foto facial cadastrada
+  (rota `/ponto/funcionario/<id>/fotos-faciais`).
+
+---
+
+### Etapa 13 — Alimentação v2 (multi-item → CP)
+
+> *Na semana, Carlos e Pedro almoçaram 5 vezes no Restaurante do
+> Zé (R$ 22 cada refeição). A Alfa lança tudo de uma vez no fim da
+> semana.*
+
+**1. O que você está fazendo de verdade.** Lançando refeições
+fornecidas pela empresa (almoço, café, jantar) com rateio entre
+obras e/ou funcionários, e gerando a conta a pagar para o
+restaurante.
+
+**2. Por que importa.** Sem essa tela, o lançamento de alimentação
+ficava em planilha solta. O sistema agora consolida tudo, calcula
+o rateio e gera a CP automática.
+
+**3. Onde clicar.** Menu lateral → "Alimentação" → "Lançamentos" →
+"+ Novo lançamento" (rota `/alimentacao/lancamentos/novo-v2`, a v2
+mobile-first).
+
+**4. O que aparece na tela.** Topo: data, restaurante (autocomplete),
+obra (autocomplete). Meio: lista dinâmica de itens, cada item com
+funcionário (busca), tipo (almoço/café/etc), quantidade e
+valor unitário.
+
+**5. Cada campo do item.**
+
+| Campo | Tipo | Obrigatório? | Exemplo |
+| --- | --- | :---: | --- |
+| Data | Data | Sim | `08/05/2026` |
+| Restaurante | Dropdown | Sim | `Restaurante do Zé` |
+| Obra (rateio) | Dropdown | Sim | `Residencial Bela Vista` |
+| Funcionário | Combobox com busca | Sim | `Carlos da Silva` |
+| Tipo | Dropdown | Sim | `Almoço` |
+| Quantidade | Numérico | Sim | `5` |
+| Valor unitário (R$) | Numérico | Sim | `22,00` |
+
+**6. Botões disponíveis.**
+
+- **+ Adicionar item** (verde claro).
+- **Remover item** (vermelho).
+- **Salvar** (verde): efetiva o lançamento.
+
+**7. O que muda depois que você salva.**
+
+```
+AlimentacaoLancamento criado
+    │
+    ▼
+evento "alimentacao_lancamento_criado"
+    │
+    ▼
+handler "criar_conta_pagar_alimentacao" (event_manager.py:1084)
+    │
+    ├─▶ cria CP no nome do restaurante
+    └─▶ rateia o custo entre obras/funcionários
+```
+
+- A despesa entra no custo agregado de cada funcionário envolvido
+  (E10).
+- O restaurante vira credor automático em "Contas a Pagar".
+
+**8. Notas de atenção.**
+
+- O modal aceita rateio M2M (vários funcionários no mesmo
+  lançamento).
+- Restaurante novo? Cadastre antes em `/alimentacao/restaurantes/novo`.
+- A v1 (`/alimentacao/lancamentos/novo`) ainda existe, mas para
+  novos lançamentos use a v2.
+
+---
+
+### Etapa 14 — Transporte (vale-transporte → CP)
+
+**1. O que você está fazendo de verdade.** Lançando o
+vale-transporte mensal ou diário dos funcionários (por obra ou em
+massa).
+
+**2. Por que importa.** O VT vira despesa fixa que entra na folha e
+nas contas a pagar.
+
+**3. Onde clicar.** Menu lateral → "Transporte" → "+ Novo
+lançamento" (`/transporte/novo`) ou "+ Novo em massa"
+(`/transporte/novo-massa`) para lançar várias linhas de uma vez.
+
+**4. O que aparece na tela.** Cabeçalho com data, mês de
+competência, obra (opcional). Tabela com funcionário, dias úteis,
+valor/dia, total.
+
+**5. Cada campo.**
+
+| Campo | Tipo | Obrigatório? | Exemplo |
+| --- | --- | :---: | --- |
+| Data | Data | Sim | `01/05/2026` |
+| Mês de competência | Dropdown | Sim | `Mai/2026` |
+| Funcionário | Dropdown | Sim | `Carlos da Silva` |
+| Dias úteis | Numérico | Sim | `22` |
+| Valor/dia (R$) | Numérico | Sim | `12,00` |
+| Categoria | Dropdown (CRUD em `/transporte/categorias`) | Sim | `VT mensal` |
+
+**6. Botões disponíveis.** **Salvar** / **Cancelar** /
+**Excluir** (POST `/transporte/excluir/<id>`).
+
+**7. O que muda depois.**
+
+- Cria entrada em Gestão de Custos V2 vinculada ao funcionário e
+  ao mês.
+- Vira CP consolidada quando a folha é fechada.
+- Aparece no card de "VT" da E10 (métricas do funcionário).
+
+**8. Notas de atenção.**
+
+- Lançamento "em massa" copia o mesmo valor/dia para vários
+  funcionários — útil no início do mês.
+- Mudar a categoria depois de pago não muda a CP; cancele e
+  refaça.
+
+---
+
+### Etapa 15 — Reembolsos v2 (workflow aprovação → CP)
+
+> *Pedro pegou Uber para buscar peça urgente — R$ 45. A Alfa quer
+> reembolsar.*
+
+**1. O que você está fazendo de verdade.** Está registrando uma
+despesa pessoal que o funcionário pagou em nome da empresa, com
+aprovação em duas etapas, e gerando a conta a pagar.
+
+**2. Por que importa.** Workflow auditável (rascunho → solicitado →
+autorizado → pago) evita pagamento esquecido ou duplicado.
+
+**3. Onde clicar.** Menu lateral → "Reembolsos" → "+ Novo"
+(`/reembolso/novo`).
+
+**4. O que aparece na tela.** Form simples: funcionário, data,
+descrição, valor, anexo (foto/recibo), obra (opcional), categoria.
+
+**5. Cada campo.**
+
+| Campo | Tipo | Obrigatório? | Exemplo |
+| --- | --- | :---: | --- |
+| Funcionário | Dropdown | Sim | `Pedro Oliveira` |
+| Data | Data | Sim | `12/05/2026` |
+| Descrição | Texto | Sim | `Uber p/ buscar válvula urgente` |
+| Valor (R$) | Numérico | Sim | `45,00` |
+| Obra | Dropdown | Recomendado | `Residencial Bela Vista` |
+| Categoria | Dropdown | Sim | `Transporte (urgência)` |
+| Anexo | Upload | Recomendado | foto do recibo |
+
+**6. Botões disponíveis.** **Salvar** / **Solicitar aprovação** /
+**Editar** (POST `/reembolso/<id>/editar`) / **Excluir** (POST
+`/reembolso/<id>/excluir`).
+
+**7. O que muda depois que você aprova/paga.**
+
+- A entrada vai para Gestão de Custos V2 (4 etapas: solicitar →
+  autorizar → pagar).
+- Quando paga, vira CP no nome do funcionário (PIX cadastrado em
+  E05).
+- Entra no card "Reembolsos" da E10.
+
+**8. Notas de atenção.**
+
+- Sem anexo, fica no rascunho (regra interna recomendada, não
+  obrigatória pelo sistema).
+- Reembolso recusado pode ser editado e reenviado.
+
+---
+
+### Etapa 16 — Compras de Materiais v2 (PO + Recebimento → CP + Custo + Estoque)
+
+> *A Alfa precisa de 5.000 blocos. Faz o pedido na Cerâmica Forte
+> (R$ 1,80/un, prazo 10 dias). Quando chega, registra o
+> recebimento — o sistema gera CP, entrada no almoxarifado e custo
+> da obra de uma vez.*
+
+**1. O que você está fazendo de verdade.** Está gerando um pedido
+de compra (PO) com tabela dinâmica de itens, e depois registrando
+o recebimento físico.
+
+**2. Por que importa.** É o único caminho do v10 que gera, **em uma
+única operação**, três coisas: entrada no estoque, CP para o
+fornecedor e custo lançado na obra.
+
+**3. Onde clicar.**
+
+- **Novo pedido:** menu lateral → "Compras" → "+ Nova"
+  (`/compras/nova`).
+- **Aprovação:** `/compras/aprovacao`.
+- **Registrar recebimento:** `/compras/<pedido_id>` → botão
+  "Registrar recebimento" (POST `/compras/receber/<pedido_id>`).
+
+**4. O que aparece na tela do pedido.** Cabeçalho (fornecedor, obra,
+data, condições). Tabela dinâmica de itens (insumo, quantidade,
+preço unitário, subtotal). Total no rodapé.
+
+**5. Cada campo.**
+
+| Campo | Tipo | Exemplo |
+| --- | --- | --- |
+| Fornecedor | Dropdown | `Cerâmica Forte` |
+| Obra | Dropdown | `Residencial Bela Vista` |
+| Data | Data | `05/05/2026` |
+| Condições de pagamento | Texto | `30 dias` |
+| Item — insumo | Combobox com busca | `Bloco cerâmico 9x19x19` |
+| Item — quantidade | Numérico | `5000` |
+| Item — preço unit. | Numérico | `1,80` |
+
+**6. Botões disponíveis.**
+
+- **+ Adicionar item** (verde claro).
+- **Salvar pedido** (verde).
+- **Solicitar aprovação** (azul).
+- **Registrar recebimento** (verde, na tela do pedido aprovado).
+- **Excluir pedido** (vermelho, POST `/compras/excluir/<id>`).
+
+**7. O que muda depois de Registrar Recebimento.**
+
+```
+Recebimento registrado
+    │
+    ├─▶ Almoxarifado: cria entrada de estoque
+    │       └─ evento "estoque_entrada_material"
+    │           └─▶ handler "lancar_custo_material_obra" (custo na obra)
+    │           └─▶ handler "criar_conta_pagar_entrada_material" (CP)
+    │
+    └─▶ Pedido fica com status "Recebido"
+```
+
+- Estoque do almoxarifado cresce (entrada).
+- CP do fornecedor é criada com vencimento conforme as condições.
+- Custo da obra recebe lançamento vinculado ao serviço.
+
+**8. Notas de atenção.**
+
+- Recebimento parcial: registre só a quantidade que chegou; o
+  pedido continua aberto para o restante.
+- Excluir um pedido **recebido** não desfaz CP nem estoque —
+  cancele a CP e a movimentação manualmente se for o caso.
+
+---
+
+### Etapa 17 — Almoxarifado (saída → custo da obra)
+
+> *O encarregado tirou 14 sacos de cimento do estoque para a obra.
+> Cada saco custou R$ 30,00.*
+
+**1. O que você está fazendo de verdade.** Está retirando material
+do estoque e vinculando à obra. O sistema gera o custo da obra
+automaticamente.
+
+**2. Por que importa.** Sem este lançamento, a margem da obra fica
+no chute. Com ele, o custo cai automaticamente em "Gestão de
+Custos V2".
+
+**3. Onde clicar.** Menu lateral → "Almoxarifado" → "Saída"
+(`/almoxarifado/saida`) → submit POST `/almoxarifado/processar-saida`
+(ou `/almoxarifado/processar-saida-multipla` para várias linhas).
+
+**4. O que aparece na tela.** Cabeçalho (data, obra, serviço da
+obra, funcionário responsável). Tabela de itens com seleção de
+lote/serial quando aplicável.
+
+**5. Cada campo.**
 
 | Campo | Tipo | Obrigatório? | Exemplo |
 | --- | --- | :---: | --- |
 | Obra | Dropdown | Sim | `Residencial Bela Vista` |
 | Serviço da obra | Dropdown | Recomendado | `Alvenaria de bloco cerâmico` |
-| Item | Dropdown | Sim | `Cimento CP-II 50 kg` |
+| Funcionário (em posse) | Dropdown | Não | `Carlos da Silva` |
+| Item | Combobox com busca | Sim | `Cimento CP-II 50 kg` |
 | Quantidade | Numérico | Sim | `14` |
-| Data | Data | Sim | `02/05/2026` |
+| Lote/Serial | Dropdown | Se item lotado/serializado | seleção do lote |
 
-**6. Botões disponíveis.**
+**6. Botões disponíveis.** **Salvar saída** / **+ Nova linha**
+(saída múltipla) / **Cancelar**.
 
-- **Salvar** (verde): efetiva a saída.
-- **Cancelar** (cinza).
+**7. O que muda depois.**
 
-**7. O que muda depois que você confirma.**
-
-- O estoque do almoxarifado diminui.
-- Um custo de material é criado e vinculado à obra (e ao serviço, se
-  você selecionou).
-- O custo aparece automaticamente nos painéis "Custos" e "Fluxo de
-  Caixa".
+- Estoque diminui (com locking otimista para evitar conflito).
+- Cria custo de material vinculado à obra/serviço.
+- Se for "em posse de funcionário", entra no card "Almoxarifado em
+  posse" da E10.
 
 **8. Notas de atenção.**
 
-- Se você lançar uma saída **antes** de cadastrar o serviço da obra
-  correspondente, o custo entra **sem** vínculo ao serviço. Existe
-  um plano de melhoria para corrigir essa lacuna.
-- Custos antigos de RDO (antes da última grande atualização) podem
-  estar sem vínculo de serviço — também há plano de melhoria
-  específico para isso.
+- Saída sem serviço da obra → custo entra sem vínculo de serviço
+  (existe plano de melhoria para corrigir).
+- Devolução: rota `/almoxarifado/devolucao`.
+- Para CRUD completo de fornecedores: `/almoxarifado/fornecedores`.
+- Guia detalhado: `docs/GUIA_NAVEGACAO_ALMOXARIFADO.md`.
 
 ---
 
-### Etapa 12 — Medição quinzenal e a Conta a Receber única
+### Etapa 18 — Cotação + Mapa de Concorrência v2 (N×N + portal)
 
-> *Quinze dias depois do início da obra (15/05/2026), a Alfa quer
-> fazer a primeira medição para enviar a fatura ao senhor João. Já
-> foram executados 70 m² de alvenaria.*
+> *A Alfa quer cotar 5.000 blocos com três fornecedores e mostrar
+> para o senhor João escolher qual prefere.*
 
-**1. O que você está fazendo de verdade.** Está consolidando quanto
-da obra foi executado nestes 15 dias e gerando o documento oficial de
-medição para enviar ao cliente.
+**1. O que você está fazendo de verdade.** Está montando uma grade
+**N itens × N fornecedores** com preços e prazos. O mínimo de cada
+linha é destacado em verde. O cliente pode até escolher pelo portal.
 
-**2. Por que importa.** A medição é o que vira fatura. Mas — e é a
-parte mais importante para entender — a medição **não cria uma nova
-conta a receber**: ela atualiza a **única** conta a receber viva da
-obra.
+**2. Por que importa.** Sem mapa, a escolha fica em e-mail/WhatsApp.
+Com ele, há histórico auditável e cliente participa.
 
-**3. Onde clicar.** Aba "Medição" da obra → botão "Nova medição
-quinzenal".
+**3. Onde clicar.** Aba da obra → "Cotação" → botão "+ Novo mapa
+v2" (POST `/obras/<obra_id>/mapa-v2/criar`). Editar:
+`/obras/<obra_id>/mapa-v2/<mapa_id>/editar`.
 
-**4. O que aparece na tela.** Lista de itens de medição com colunas:
-"Quantidade contratada", "% acumulado", "Valor executado acumulado",
-"Saldo", campo "Quantidade desta medição" (editável).
+**4. O que aparece na tela.** Tabela com linhas (itens) e colunas
+(fornecedores). Cada célula tem preço unit. e prazo (dias). Mínimo
+da linha em verde.
+
+**5. Cada campo.**
+
+| Campo | Tipo | Exemplo |
+| --- | --- | --- |
+| Item | Dropdown / texto | `Bloco cerâmico 9x19x19` |
+| Quantidade | Numérico | `5000` |
+| Fornecedor 1/2/3 | Dropdown + R$ + dias | `Cerâmica Forte / R$ 1,75 / 10 d` |
+| Observação por célula | Texto | `Frete CIF incluído` |
+
+**6. Botões disponíveis.**
+
+- **+ Item** / **+ Fornecedor** (verde claro).
+- **Salvar** (verde).
+- **Liberar para cliente** (azul): habilita o link do portal.
+- **Aprovar fornecedor** (verde escuro).
+- **Excluir mapa** (vermelho, POST `/obras/<obra_id>/mapa-v2/<id>/deletar`).
+
+**7. O que muda depois que você aprova.**
+
+- O fornecedor escolhido vira pedido de compra (E16).
+- Se foi pelo portal, o cliente recebe confirmação e o admin é
+  notificado.
+
+**8. Notas de atenção.**
+
+- O Mapa v1 ainda existe em `/obras/<obra_id>/mapa-concorrencia/novo`
+  — para novos mapas, use sempre o v2.
+- Cliente escolhe pelo portal via POST
+  `/portal/obra/<token>/mapa-v2/<id>/selecionar`.
+
+---
+
+### Etapa 19 — Contas a Pagar (consolida todas as origens)
+
+> *No final do mês, a Alfa abre Contas a Pagar para conferir tudo o
+> que precisa ser quitado. Ela vê CP da Cerâmica Forte (compra), do
+> Restaurante do Zé (alimentação), do Pedro (reembolso), de cada
+> funcionário (folha do ponto facial) e de cada RDO finalizado.*
+
+**1. O que você está fazendo de verdade.** Está visualizando a
+consolidação automática de tudo o que virou CP nas etapas
+anteriores, e seguindo o workflow de 4 etapas (rascunho →
+solicitado → autorizado → pago).
+
+**2. Por que importa.** Em construtoras com vários departamentos, a
+pessoa que lança nem sempre é quem aprova nem quem paga. As 4 etapas
+travam o fluxo.
+
+**3. Onde clicar.**
+
+- **Lista consolidada:** menu → "Financeiro" → "Contas a Pagar"
+  (`/financeiro/contas-pagar`).
+- **Painel Gestão de Custos V2 (workflow):** menu → "Custos" →
+  "Gestão de Custos V2" (`/gestao-custos/`).
+- **Pagar uma conta:** `/financeiro/contas-pagar/<id>/pagar`.
+- **Aprovar/Pagar/Estornar no V2:** botões na linha do pai
+  (`/gestao-custos/<pai_id>/solicitar`, `/autorizar`, `/pagar`).
+
+**4. O que aparece na tela.** Painel kanban com 4 colunas
+(Rascunho / Solicitado / Autorizado / Pago). Cada cartão mostra
+valor, fornecedor/funcionário, obra e origem.
+
+**5. Tabela "origem → conta a pagar" (referência rápida).**
+
+| Origem (etapa) | Evento disparado | Handler | O que vira CP |
+| --- | --- | --- | --- |
+| RDO finalizado (E11) | `rdo_finalizado` | `lancar_custos_rdo` | CP de MO por funcionário |
+| Ponto facial (E12) | `ponto_registrado` (no fechamento mensal) | `calcular_horas_folha` → `criar_lancamento_folha_pagamento` | CP consolidado da folha |
+| Alimentação v2 (E13) | `alimentacao_lancamento_criado` | `criar_conta_pagar_alimentacao` | CP no nome do restaurante |
+| Transporte (E14) | (no fechamento mensal) | folha consolida | CP no nome do funcionário |
+| Reembolso (E15) | aprovação no V2 | workflow Gestão Custos | CP no nome do funcionário |
+| Compra recebida (E16) | `estoque_entrada_material` | `criar_conta_pagar_entrada_material` | CP no nome do fornecedor |
+
+**6. Botões disponíveis.**
+
+- **Solicitar** / **Autorizar** / **Pagar** / **Estornar**
+  (kanban).
+- **Editar** / **Excluir** (só rascunhos).
+- **Filtros** por obra, fornecedor, mês, categoria.
+
+**7. O que muda depois que você aprova/paga.**
+
+- Aprovar: o lançamento aparece na previsão do Fluxo de Caixa.
+- Pagar: sai da previsão e entra no realizado, baixando do banco.
+
+**8. Notas de atenção.**
+
+- CP sem `banco_id` ainda paga normalmente — o `banco_id` é
+  opcional e usado para conciliar com extrato bancário.
+- Excluir uma CP que tem origem em RDO/Compra/Alimentação **não**
+  desfaz a entrada original — desfaça pela tela de origem.
+
+---
+
+### Etapa 20 — Contas a Receber (única `OBR-MED-#####`)
+
+**1. O que você está fazendo de verdade.** Conferindo a única conta
+a receber viva da obra, atualizada automaticamente pelas medições.
+
+**2. Por que importa.** É a regra mais importante do sistema:
+**uma e apenas uma** CR por obra, alimentada cumulativamente.
+
+**3. Onde clicar.** Menu → "Financeiro" → "Contas a Receber"
+(`/financeiro/contas-receber`). Para registrar recebimento parcial:
+`/financeiro/contas-receber/<id>/receber`.
+
+**4. O que aparece na tela.** Tabela com 1 linha por obra
+(`OBR-MED-####`), com valor original (acumulado medido), saldo,
+status e histórico de recebimentos.
 
 **5. Cada coluna.**
 
-| Coluna | Tipo | Exemplo (alvenaria) |
+| Coluna | O que mostra |
+| --- | --- |
+| Número | `OBR-MED-####` |
+| Cliente | Nome do cliente da obra |
+| Valor original | Soma medida acumulada |
+| Recebido | Soma dos pagamentos parciais |
+| Saldo | `max(0, valor_original − recebido)` |
+| Status | PENDENTE → PARCIAL → QUITADA (transição automática) |
+
+**6. Botões disponíveis.** **Receber pagamento** / **Editar** /
+**Histórico**.
+
+**7. O que muda depois que você registra recebimento.**
+
+- Saldo diminui.
+- Status anda automaticamente.
+- Aparece no Fluxo de Caixa (E21) como entrada realizada.
+
+**8. Notas de atenção.**
+
+- Se você ver duas linhas para a mesma obra, é bug — abra ticket.
+- Coberto por `tests/test_ciclo_proposta_obra_medido_cr.py`.
+
+---
+
+### Etapa 21 — Fluxo de Caixa (entradas + saídas + import)
+
+**1. O que você está fazendo de verdade.** Olhando o caixa
+consolidado: tudo o que entrou (CR pagas pelo cliente) e tudo o
+que saiu (CP pagas).
+
+**2. Por que importa.** É o único lugar onde "saldo de caixa" é
+real — Contas a Pagar/Receber são previsões, Fluxo é o realizado.
+
+**3. Onde clicar.** Menu → "Financeiro" → "Fluxo de Caixa"
+(`/financeiro/fluxo-caixa`).
+
+**4. O que aparece na tela.** Tabela cronológica com
+data/origem/categoria/banco/valor. Filtros por banco, categoria,
+período. Gráfico mensal no topo.
+
+**5. Funcionalidades novas.**
+
+| Funcionalidade | Onde usar |
+| --- | --- |
+| Filtro por banco | Dropdown no topo (campo `banco_id` opcional na tabela) |
+| Modal "Novo movimento" | Botão "+ Novo movimento" → POST `/financeiro/fluxo-caixa/novo` |
+| Edição inline | Clique no campo, edite, salva via POST `/financeiro/fluxo-caixa/<id>/editar` |
+| Import preview | Menu → "Importação" → "Fluxo de caixa upload" → POST `/importacao/fluxo-caixa/upload` |
+| Import confirmar | Após preview, POST `/importacao/fluxo-caixa/confirmar` |
+| Rollback de import | POST `/importacao/fluxo-caixa/rollback/<batch_id>` |
+
+**6. Botões disponíveis.** **+ Novo movimento** / **Importar
+extrato** / **Editar inline** / **Excluir**.
+
+**7. O que muda depois.**
+
+- Movimento manual entra no realizado.
+- Import gera lote (`batch_id`) que pode ser revertido.
+- Edição inline atualiza categoria/descrição sem recarregar a página.
+
+**8. Notas de atenção.**
+
+- Formato BRL obrigatório (R$ 1.234,56 com vírgula decimal e ponto
+  milhar).
+- Import preview agrupa por categoria sugerida — confira antes de
+  confirmar.
+
+---
+
+### Etapa 22 — Medição quinzenal (% × valor → atualiza CR)
+
+> *15/05/2026, primeira medição: 70 m² de alvenaria executados.*
+
+**1. O que você está fazendo de verdade.** Consolidando quanto da
+obra foi executado nestes 15 dias e gerando a fatura para o cliente.
+
+**2. Por que importa.** A medição é o que vira fatura. E **atualiza
+a única conta a receber viva** — não cria nova.
+
+**3. Onde clicar.** Aba "Medição" da obra
+(`/obras/<obra_id>/medicao` ou alias `/medicao/obra/<obra_id>`).
+
+**4. O que aparece na tela.** Lista de itens de medição com colunas:
+contratada, % desta medição, valor desta medição, % acumulado, valor
+acumulado.
+
+**5. Cada coluna (exemplo alvenaria).**
+
+| Coluna | Tipo | Exemplo |
 | --- | --- | --- |
 | Item | Texto | `Alvenaria de bloco cerâmico` |
 | Quantidade contratada | Numérico | `250 m²` |
@@ -869,246 +1435,176 @@ quinzenal".
 
 **6. Botões disponíveis.**
 
-- **Salvar rascunho** (cinza): edita depois.
-- **Fechar medição** (verde): efetiva e atualiza a conta a receber.
-- **Gerar PDF** (azul, depois de fechada): produz o boletim oficial.
+- **Configurar período da obra:** POST `/obras/<obra_id>/medicao/config`.
+- **Gerar medição:** POST `/obras/<obra_id>/medicao/fechar`.
+- **Aprovar medição:** POST
+  `/obras/<obra_id>/medicao/<medicao_id>/aprovar`.
+- **Gerar PDF** (extrato).
 
-**7. O que muda depois de fechar a medição.**
+**7. O que muda depois de aprovar a medição.**
 
-- O sistema soma o valor medido acumulado de todos os itens.
-- A conta a receber única `OBR-MED-#####` é atualizada:
-  - Valor da conta = novo valor medido acumulado.
-  - Saldo = valor medido − valor já recebido (mínimo zero).
-  - Status anda sozinho: PENDENTE → PARCIAL → QUITADA conforme o
-    senhor João vai pagando.
-- A medição quinzenal fica vinculada a essa mesma conta — **não há
-  uma conta separada por medição** (regra mais importante de
-  entender).
-
-**8. Notas de atenção — a dúvida mais comum.**
-
-> *"Lancei medição mas não vi conta a receber nova. Está errado?"*
->
-> **Não.** É exatamente o esperado. Existe **uma única** conta a
-> receber viva por obra. Olhe a linha `OBR-MED-#####` da obra: o
-> valor dela aumentou. Para saber "quanto medi neste fechamento", use
-> o histórico de itens de medição por período (a aba "Medição
-> comercial" mostra o acumulado por data).
-
----
-
-### Etapa 13 — Aprovação financeira em 2 etapas + Fluxo de Caixa
-
-**1. O que você está fazendo de verdade.** Cada custo (compras, mão
-de obra) e cada receita passa por dois olhos: rascunho → aprovado →
-pago. Isso evita pagamento duplicado ou esquecido.
-
-**2. Por que importa.** Em construtoras com vários departamentos, a
-pessoa que lança o pedido nem sempre é a que aprova o pagamento. A
-divisão em duas etapas trava esse fluxo.
-
-**3. Onde clicar.** Menu lateral → "Financeiro" → "Aprovação em 2
-etapas" (painel de gestão de custos). Para o caixa: menu lateral →
-"Financeiro" → "Fluxo de Caixa".
-
-**4. O que aparece na tela.** Painel de aprovação com três colunas
-(Rascunho / Aprovado / Pago) estilo Kanban; cada cartão mostra valor,
-fornecedor, obra. Tela de Fluxo de Caixa traz tabela com agregação por
-banco/origem em formato BRL (R$ com vírgula decimal e ponto milhar) +
-gráfico mensal.
-
-**5. Cada elemento.**
-
-| Elemento | Tipo | O que faz |
-| --- | --- | --- |
-| Cartão "Rascunho" | Card | Lançado, mas ainda não aprovado |
-| Botão "Aprovar" | Verde | Move para "Aprovado" |
-| Botão "Pagar" | Azul | Move para "Pago" e baixa do caixa |
-| Filtro por obra | Dropdown | Restringe os cartões à obra escolhida |
-| Filtro por mês | Dropdown | Restringe ao mês escolhido |
-
-**6. Botões disponíveis.** Aprovar, Pagar, Estornar (volta um passo),
-Editar, Excluir (só rascunhos).
-
-**7. O que muda depois que você aprova ou paga.**
-
-- Aprovar: o lançamento aparece na previsão do fluxo de caixa.
-- Pagar: o lançamento sai da previsão e entra no realizado, baixando
-  do banco.
+- Soma o valor medido acumulado de todos os itens.
+- A CR única `OBR-MED-####` é atualizada (UPSERT — atualiza, não
+  duplica).
+- Status anda PENDENTE → PARCIAL → QUITADA conforme o cliente paga.
 
 **8. Notas de atenção.**
 
-- Contas a Receber/Pagar antigas que ficaram com valor "vazio"
-  continuam aparecendo sem quebrar a tela (correção introduzida na
-  versão anterior).
-- O formato BRL é obrigatório em todas as exibições de valor.
+- *"Lancei medição mas não vi CR nova."* É o esperado — a linha
+  única teve o valor aumentado.
+- O extrato PDF tem cabeçalho personalizado com o logo da empresa.
 
 ---
 
-### Etapa 14 — Cotação (Mapa de Concorrência)
+### Etapa 23 — Portal do Cliente (token: cronograma + mapa + recibos)
 
-> *A Alfa quer comprar 5.000 blocos cerâmicos. Pediu cotação a três
-> fornecedores diferentes e quer mostrar para o senhor João escolher
-> qual prefere.*
+**1. O que você está fazendo de verdade.** Validando o que o senhor
+João vê no link público que recebeu por e-mail.
 
-**1. O que você está fazendo de verdade.** Está pedindo orçamento de
-fornecedores diferentes para o mesmo material/serviço da obra e
-escolhendo o mais vantajoso.
+**2. Por que importa.** É o "rosto" da Alfa para o cliente — e o
+canal pelo qual ele aprova compras, escolhe fornecedores e envia
+comprovantes.
 
-**2. Por que importa.** Sem mapa de concorrência, a escolha do
-fornecedor fica no e-mail e no WhatsApp; com ele, você tem histórico
-auditável e o cliente pode até participar da decisão pelo portal.
+**3. Onde acessar.** Link gerado na aprovação (E08), copiável do
+"Resumo" da obra. Rota base: `/portal/obra/<token>`.
 
-**3. Onde clicar.** Aba da obra → "Mapa de Concorrência" → botão "+
-Novo mapa".
+**4. O que aparece para o cliente.** Página única vertical:
+cabeçalho da obra, cronograma com %, mapa de concorrência (se
+liberado), histórico de evolução, medições, painel estratégico,
+**aprovação de compras** (novo), **upload de comprovante** (novo).
 
-**4. O que aparece na tela.** Tabela com itens nas linhas e
-fornecedores nas colunas. Cada célula recebe preço unitário e prazo de
-entrega.
+**5. Cada seção e ação.**
 
-**5. Cada campo.**
+| Seção | Interação |
+| --- | --- |
+| Cabeçalho | Apenas leitura |
+| Cronograma | Apenas leitura |
+| Mapa de Concorrência v2 | POST `/portal/obra/<token>/mapa-v2/<id>/selecionar` |
+| Mapa v1 (legado) | POST `/portal/obra/<token>/mapa/<id>/aprovar` |
+| Compras | POST `/portal/obra/<token>/compra/<id>/aprovar` ou `/recusar` |
+| Comprovante de pagamento | POST `/portal/obra/<token>/compra/<id>/comprovante` (upload) |
+| Medições | Botão "Baixar PDF" |
+| RDO público | GET `/portal/obra/<token>/rdo/<id>` |
 
-| Campo | Tipo | Exemplo |
-| --- | --- | --- |
-| Item | Dropdown / texto | `Bloco cerâmico 9x19x19` |
-| Quantidade | Numérico | `5000` |
-| Fornecedor 1 / 2 / 3 | Texto + R$ + dias | `Cerâmica Forte / R$ 1,75 / 10 dias` |
-| Observação | Texto | `Frete CIF incluído` |
+**6. Botões disponíveis para o cliente.** Aprovar/Recusar compra,
+Selecionar fornecedor, Upload de comprovante, Baixar PDF.
 
-**6. Botões disponíveis.**
+**7. O que muda quando o cliente interage.**
 
-- **Salvar** (verde).
-- **Enviar para o cliente** (azul): libera o mapa no portal do
-  cliente para o senhor João escolher.
-- **Aprovar fornecedor** (verde escuro): efetiva a escolha e gera
-  pedido de compra.
-
-**7. O que muda depois que você aprova.** O fornecedor escolhido vira
-pedido de compra na tela "Compras"; o item entra no almoxarifado
-quando recebido.
-
-**8. Notas de atenção.** O atalho de edição direta pelo admin ainda
-está sub-documentado — para a versão atual, prefira sempre o caminho
-"Aba da obra → Mapa de Concorrência".
-
----
-
-### Etapa 15 — Portal do Cliente
-
-**1. O que você está fazendo de verdade.** Está validando o que o
-senhor João vê quando entra no link público que recebeu por e-mail.
-
-**2. Por que importa.** É o "rosto" da Construtora Alfa para o
-cliente. Se algum bloco aparecer quebrado, é uma dor de imagem.
-
-**3. Onde acessar.** O link é gerado sozinho na aprovação (etapa 6).
-Você pode copiar do "Resumo" da obra e abrir em uma janela anônima
-para simular o cliente.
-
-**4. O que aparece para o cliente.** Página única vertical com seções:
-(a) Cabeçalho da obra; (b) Cronograma com dropdown (escolher entre
-vários cronogramas se houver); (c) Mapa de Concorrência; (d) Histórico
-de evolução; (e) Medições; (f) Painel estratégico.
-
-**5. Cada seção.**
-
-| Seção | O que mostra | Interação |
-| --- | --- | --- |
-| Cabeçalho | Nome da obra, valor de contrato, % avanço, dias decorridos | Apenas leitura |
-| Cronograma | Lista hierárquica de tarefas com % executado | Dropdown para alternar entre cronogramas (planejado, executado, etc.) |
-| Mapa de Concorrência | Fornecedores lado a lado | Botão "Escolher" (se você liberou para o cliente decidir) |
-| Histórico de evolução | Foto + texto por dia | Apenas leitura |
-| Medições | Lista de medições fechadas com PDF | Botão "Baixar PDF" por medição |
-| Painel estratégico | Indicadores de saldo a receber, prazo, % avanço | Apenas leitura |
-
-**6. Botões disponíveis para o cliente.** "Aprovar proposta" (só
-aparece antes de a obra existir), "Escolher fornecedor" (no mapa),
-"Baixar PDF" (na medição).
-
-**7. O que muda quando o cliente interage.** Aprovar proposta → mesma
-sequência da etapa 6 (caminho cliente). Escolher fornecedor → grava a
-escolha e notifica o admin. Baixar PDF → apenas leitura.
+- Aprovação de compra → notificação para o admin, libera para
+  recebimento (E16).
+- Comprovante → fica anexo na CR e dispara fluxo de baixa.
 
 **8. Notas de atenção.**
 
-- O link público é único e não exige login do cliente — ele recebe
-  por e-mail uma vez. Não compartilhe em grupos abertos.
-- Valores são exibidos em formato BRL (R$ 1.234,56).
+- O link é único e não exige login do cliente — não compartilhe em
+  grupos abertos.
+- Para ligar/desligar o portal: POST
+  `/portal/obra/<obra_id>/portal-toggle`.
 
 ---
 
-### Etapa 16 — Páginas de erro / menu superior
+# PARTE III — VISÃO E ANÁLISE (E24–E25)
 
-**1. O que você está fazendo de verdade.** Verificando que, quando
-algo dá errado (um link quebrado, um clique em página que não existe),
-o usuário não fica preso.
-
-**2. Por que importa.** Antigamente, ao acessar uma URL que não
-existe, a página de erro tirava o menu superior — o usuário ficava
-isolado e tinha que fazer login de novo.
-
-**3. Onde reproduzir.** Digite na barra de endereço uma URL
-inexistente (ex.: `/teste-nao-existe-mesmo`).
-
-**4. O que aparece na tela.** Página com a mensagem de erro centrada
-("404 — Página não encontrada"), **com o menu lateral e o menu
-superior intactos** ao redor.
-
-**5. Cada elemento.**
-
-| Elemento | Tipo | O que faz |
-| --- | --- | --- |
-| Mensagem de erro | Texto grande | Explica o erro |
-| Botão "Voltar ao Dashboard" | Verde | Leva para a tela inicial |
-| Menu lateral | Idem ao restante do sistema | Continua navegável |
-| Menu superior | Idem ao restante do sistema | Continua navegável |
-
-**6. Botões disponíveis.** "Voltar ao Dashboard" + qualquer item do
-menu lateral funciona normalmente.
-
-**7. O que muda depois que você clica em qualquer menu.** Sai da
-página de erro sem precisar refazer login.
-
-**8. Notas de atenção.** Se mesmo assim o menu sumir, é um problema
-real — abra um ticket interno.
+A "fase de leitura" — onde você toma decisão a partir dos números.
 
 ---
 
-### Etapa 17 — Auditoria de cadastros duplicados / áreas legadas
+### Etapa 24 — Dashboards (geral, financeiro, RH, obra)
 
-**1. O que você está fazendo de verdade.** Olhando o sistema com olho
-crítico para dizer ao time o que ainda está duplicado ou obsoleto.
+**1. O que você está fazendo de verdade.** Lendo os indicadores
+consolidados da empresa, da obra e dos funcionários.
 
-**2. Por que importa.** Tela duplicada confunde o usuário novo. Tela
-legada acumula dados que não conversam com a versão atual.
+**2. Por que importa.** Sem dashboard, decisões viram opinião. Com
+dashboard, viram dados.
 
-**3. Onde verificar.** Percorrer o menu lateral inteiro (de cima até
-embaixo) procurando: (a) itens com sufixo "V1" ou "Legado"; (b) duas
-telas que parecem cadastrar a mesma coisa; (c) itens que não abrem ou
-abrem com erro.
+**3. Onde clicar (cada dashboard tem sua rota).**
 
-**4. O que aparece na tela atual.** Para o tenant V2 (a Construtora
-Alfa), o menu já não exibe itens legados — eles foram escondidos
-automaticamente na versão anterior do sistema. Você só os veria como
-superadmin.
-
-**5. Cada item já tratado.**
-
-| Item antigo | Item oficial novo | Status |
+| Dashboard | Rota | O que mostra |
 | --- | --- | --- |
-| "Cronograma legado" | "Cronograma → Templates" | Oculto |
-| Dropdown "Serviços" no header | "Catálogo" no menu lateral | Oculto |
-| "Alimentação V1" | Almoxarifado V2 | Oculto |
-| "Transporte V1" | Despesas Gerais V2 | Oculto |
+| **Geral** | `/dashboard` | KPIs do tenant: faturamento, custos, propostas em aberto, obras ativas |
+| **Financeiro** | `/financeiro/contas-pagar` (filtros) e `/financeiro/fluxo-caixa` | CP/CR, fluxo realizado vs previsto |
+| **Folha** | `/folha/dashboard` | Custo de folha por mês, comparativo |
+| **Alimentação** | `/alimentacao/dashboard` | Gasto por restaurante / por funcionário |
+| **Frota** | `/frota/dashboard` | TCO por veículo, alertas de manutenção |
+| **Almoxarifado** | `/almoxarifado/` | Saldo de itens, itens em posse, estoque mínimo |
+| **Contabilidade** | `/contabilidade/dashboard` | Lançamentos contábeis, balancete |
+| **Custos** | `/gestao-custos/` | Workflow 4 etapas, filtros por obra |
 
-**6. Botões disponíveis.** Não se aplica — esta etapa é só de
-verificação visual.
+**4. O que aparece em cada um.** Cards de KPI no topo + gráficos +
+tabela detalhada com filtros.
 
-**7. O que muda depois.** Nada — esta etapa não escreve no sistema.
+**5. Cada KPI principal do dashboard geral.**
 
-**8. Notas de atenção.** Se algum dia um item legado reaparecer no
-menu para um tenant V2, abra ticket interno: significa que a regra de
-ocultação quebrou.
+| KPI | De onde vem | Atualização |
+| --- | --- | --- |
+| Faturamento do mês | Soma das CR recebidas | Tempo real |
+| Custos do mês | Soma das CP pagas | Tempo real |
+| Propostas em aberto | Contagem de propostas com status `enviada` ou `rascunho` | Tempo real |
+| Obras ativas | Contagem de obras com status `em_andamento` | Tempo real |
+| Margem do mês | Faturamento − Custos | Tempo real |
+
+**6. Botões disponíveis.** Filtros por mês, obra, funcionário.
+Exportações (alguns dashboards têm botão "Exportar Excel").
+
+**7. O que muda depois.** Nada — dashboards são leitura.
+
+**8. Notas de atenção.**
+
+- O dashboard geral usa apenas `custo_mao_obra` no loop por
+  funcionário e agrega VA/VT/Alimentação/Almoxarifado em camada
+  separada (evita double-count).
+- Coberto pela proteção `UnboundLocalError: propostas_aprovadas`
+  (correção em planejamento na lista de tarefas atuais).
+
+---
+
+### Etapa 25 — Relatórios (existentes + a criar)
+
+**1. O que você está fazendo de verdade.** Gerando documentos
+oficiais (PDF/Excel) que vão para o cliente, contador ou auditoria.
+
+**2. Por que importa.** Relatório é a saída formal — diferente do
+dashboard, ele tem cabeçalho, assinatura e versão arquivada.
+
+**3. Relatórios que já existem.**
+
+| Relatório | Rota | O que entrega |
+| --- | --- | --- |
+| **Holerite individual** | `/folha/relatorios/holerite/<folha_id>` | PDF do holerite mensal do funcionário |
+| **Folha analítica** | `/folha/relatorios/analitico/<ano>/<mes>` | Excel com todos os funcionários |
+| **Folha — listagem** | `/folha/relatorios` | Painel para escolher mês e funcionário |
+| **Extrato de medição** | botão "Gerar PDF" na E22 | PDF assinável com fotos e itens medidos |
+| **Almoxarifado — relatórios** | `/almoxarifado/relatorios` | Saldo, movimentação, em posse |
+| **Ponto — relatório por obra** | `/ponto/relatorio/obra/<obra_id>` | Marcações + horas no período |
+| **Contabilidade** | `/contabilidade/relatorios` | DRE, balancete, livro diário |
+| **Horas extras (funcional)** | `relatorios_funcionais.py` | Horas extras por funcionário no período |
+
+**4. Relatórios a criar (TODO — escopo definido, falta implementar).**
+
+| Relatório | Justificativa | Status |
+| --- | --- | --- |
+| **Análise de margem por obra (PDF)** | Hoje só existe o dashboard; cliente final pede PDF arquivável | TODO |
+| **Comparativo orçado vs realizado por serviço** | Existe a tela de custos mas não o PDF assinável | TODO |
+| **Resumo de medições do ano** | Hoje só medição por medição; falta o agregado anual | TODO |
+| **Conciliação bancária por banco** | Fluxo já tem `banco_id` mas não o relatório dedicado | TODO |
+| **Auditoria do portal do cliente** | Quando o cliente aprovou o quê, no portal | TODO |
+
+**5. Cada campo do gerador.** Cada relatório tem seus filtros (mês,
+obra, funcionário, período). PDFs são gerados via
+`pdf_generator.py` com cabeçalho dinâmico (logo + cores da empresa).
+
+**6. Botões disponíveis.** **Gerar PDF** / **Gerar Excel** /
+**Filtrar**.
+
+**7. O que muda depois.** Nada (geração é leitura).
+
+**8. Notas de atenção.**
+
+- PDFs ficam no servidor por algum tempo, mas é boa prática salvar
+  uma cópia local depois de baixar.
+- Para criar um relatório novo, o caminho é via `relatorios.html`
+  ou subdiretório `templates/relatorios/`.
 
 ---
 
@@ -1117,137 +1613,175 @@ ocultação quebrou.
 **1. Lancei o RDO mas o custo de mão de obra não apareceu, e agora?**
 
 Verifique se o RDO foi efetivamente colocado em **"Finalizado"** (não
-basta salvar como rascunho). Só essa transição dispara o lançamento.
-Se o RDO já está finalizado e o custo continua zerado, abra o
-funcionário e confirme: para mensalistas, precisa ter "Salário"
-preenchido; para diaristas, precisa ter "Valor da diária".
+basta salvar como rascunho). Só essa transição dispara o lançamento
+(evento `rdo_finalizado` → handler `lancar_custos_rdo`). Se o RDO já
+está finalizado e o custo continua zerado, abra o funcionário e
+confirme: para mensalistas, precisa ter "Salário"; para diaristas,
+precisa ter "Valor da diária".
 
 **2. Por que a medição não criou uma conta a receber nova?**
 
-Porque é exatamente o esperado. Existe **uma única** conta a receber
-viva por obra (`OBR-MED-#####`). A medição **atualiza** essa linha
-única — ela não cria outra. Olhe na tela de Contas a Receber: o
-valor da linha da sua obra aumentou.
+Porque é o esperado. Existe **uma única** CR viva por obra
+(`OBR-MED-####`). A medição **atualiza** essa linha — não cria
+outra.
 
 **3. Aprovei a proposta sem revisar o cronograma — como ajustar
 depois?**
 
-A obra já foi criada com a árvore default (tudo marcado). Vá na aba
-"Cronograma" da obra, exclua as tarefas que não fazem sentido (o
-sistema vai pedir confirmação extra porque elas têm a etiqueta "📋 do
-contrato") e/ou crie tarefas novas com "+ Nova tarefa". Mudanças não
-desfazem o vínculo de medição já criado, mas excluir uma folha
-remove o peso correspondente — refaça o vínculo se precisar.
+A obra já foi criada com a árvore default. Vá na aba "Cronograma" da
+obra, exclua as tarefas que não fazem sentido (com a etiqueta
+"📋 do contrato" o sistema pede confirmação extra) e/ou crie tarefas
+novas. Mudanças não desfazem o vínculo de medição já criado.
 
-**4. Cliente aprovou pelo portal antes de eu revisar o cronograma —
-o que acontece?**
+**4. Cliente aprovou pelo portal antes de eu revisar — o que
+acontece?**
 
-A obra é criada com a árvore default (tudo marcado). Para evitar
-isso, na próxima vez use "Salvar pré-configuração" na tela de
-revisão **antes** de mandar o link ao cliente.
+A obra é criada com a árvore default. Da próxima vez, use "Salvar
+pré-configuração" na tela de revisão **antes** de mandar o link.
 
 **5. Tentei aprovar e apareceu "Falha ao aprovar a proposta. Nada
 foi gravado." — perdi tudo?**
 
-Não. A mensagem significa que a aprovação foi feita como uma operação
-única e indivisível: como algum passo falhou (pode ser uma
-subatividade que sumiu do mestre, um template excluído, etc.), o
-sistema desfez tudo. Sua proposta continua em aberto. Olhe a árvore
-na tela de revisão — provavelmente um nó está com aviso. Ajuste e
-tente de novo.
+Não. A aprovação é atômica: como algum passo falhou (subatividade
+sumiu, template excluído, etc.), o sistema desfez tudo. A proposta
+continua em aberto.
 
 **6. Mudei o preço de um insumo no catálogo e propostas antigas
 ficaram com valor errado?**
 
-Não ficaram. Por design, o sistema guarda uma "foto" do cálculo no
-momento da gravação da proposta. Mudar o insumo agora afeta apenas
-**propostas novas** ou serviços recalculados. As antigas mantêm o
-custo original.
+Não ficaram. O sistema guarda uma "foto" do cálculo no momento da
+gravação. Mudar agora afeta apenas propostas novas.
 
 **7. Onde vejo "quanto recebi" desta obra?**
 
-Aba "Medição comercial" da obra → coluna "Valor recebido". Ou na
-tela "Financeiro → Contas a Receber" → linha `OBR-MED-#####` da
-obra → campo "Valor recebido".
+Aba "Medição comercial" da obra → coluna "Valor recebido". Ou
+"Financeiro → Contas a Receber" → linha `OBR-MED-####` → "Valor
+recebido".
 
-**8. Cadastrei o template do cronograma, mas a aprovação não criou
-tarefas para um serviço específico — por quê?**
+**8. Cadastrei o template, mas a aprovação não criou tarefas para
+um serviço específico — por quê?**
 
-Três motivos possíveis: (a) o serviço **não tem o "Template padrão"
-preenchido** (volte na etapa 3 e configure); (b) você **desmarcou
-tudo** desse serviço na tela de revisão; (c) o item da proposta foi
-digitado livre, sem escolher o serviço do catálogo. O sistema mostra
-um aviso na tela de revisão para cada um desses casos.
+Três motivos: (a) o serviço **não tem "Template padrão"** preenchido;
+(b) você **desmarcou tudo** desse serviço na tela de revisão; (c) o
+item da proposta foi digitado livre, sem escolher serviço.
 
-**9. Como faço a Alfa importar 30 funcionários de uma vez?**
+**9. (Novo) Mexi na composição customizada por linha do orçamento e
+quero voltar ao padrão do catálogo. Como faço?**
 
-Etapa 4 — menu "Importar por Planilha", baixe o template oficial,
-preencha em casa, suba o arquivo, confira a pré-visualização e
-"Confirmar importação". Linhas com erro vêm destacadas em vermelho.
+Na linha do orçamento → expanda a sub-tabela "Composição" → botão
+**"Voltar à composição padrão"** (cinza). Pede confirmação. Desfaz
+todas as alterações de add/remove/coeficiente **só dessa linha**.
+Não afeta override de cronograma nem outras linhas.
 
-**10. Excluí uma tarefa "📋 do contrato" sem querer. Quebrei o
+**10. (Novo) Por que o RDO e o Ponto Facial geram contas a pagar?
+São lançamentos duplicados?**
+
+Não, são complementares:
+
+- **RDO** (E11) = custo da **execução por tarefa**: dispara CP por
+  funcionário/serviço. Útil para saber "quanto custou cada
+  subatividade".
+- **Ponto Facial** (E12) = custo da **jornada de presença**: vai
+  para a folha mensal e dispara CP consolidado da folha (salário +
+  VA + VT + extras). Útil para a contabilidade CLT.
+
+Construtoras pequenas costumam usar só RDO. Construtoras com folha
+robusta usam os dois — sem double-count, porque o handler de folha
+consolida a jornada e o handler de RDO consolida a alocação por
+obra.
+
+**11. (Novo) Recebi parcial uma compra (chegaram 3.000 dos 5.000
+blocos). Como registrar?**
+
+Em "Compras" → entre no pedido → "Registrar recebimento": informe
+**3.000** como quantidade recebida. O pedido continua aberto para
+os 2.000 restantes. Cada recebimento gera entrada de estoque + CP
+parcial + custo da obra parcial.
+
+**12. (Novo) Lancei uma saída de almoxarifado mas não virou conta a
+pagar — está errado?**
+
+Não. **Saída de almoxarifado é custo da obra, não conta a pagar.**
+A CP foi gerada lá atrás, no recebimento da compra (E16). A saída
+apenas tira do estoque e lança como custo na obra. Quem virou CP
+para o fornecedor foi o recebimento.
+
+**13. Como faço a Alfa importar 30 funcionários de uma vez?**
+
+Menu → "Importação" → baixe o template oficial, preencha em casa,
+suba o arquivo, confira a pré-visualização e "Confirmar importação".
+Linhas com erro vêm destacadas em vermelho.
+
+**14. Excluí uma tarefa "📋 do contrato" sem querer. Quebrei o
 sistema?**
 
 Não. A medição daquele serviço pode ficar com peso desbalanceado
-(menos folhas, peso da folha excluída se redistribui automaticamente
-nas próximas medições). Se quiser voltar tudo, reaprove a proposta —
-mas atenção: a regra de não duplicação só vale para o que ainda
-existe; tarefas excluídas **não** são recriadas pela reaprovação.
-Para forçar recriação, ajuste manualmente o cronograma da obra.
+(menos folhas, peso da folha excluída se redistribui). Reaprove a
+proposta — mas atenção: a regra de não duplicação só vale para o
+que ainda existe; tarefas excluídas **não** são recriadas.
 
 ---
 
 ## Anexo técnico (opcional, para o time de TI)
 
-> Este bloco é um cartão de referência rápida para administradores
-> técnicos do sistema; **não é necessário ler para usar o sistema**.
+> Este bloco é referência rápida para administradores técnicos;
+> **não é necessário ler para usar o sistema**.
 
-### Eventos automáticos do sistema
+### Eventos automáticos do sistema (`event_manager.py`)
 
-| Quando acontece | O que o sistema faz sozinho |
-| --- | --- |
-| Você clica "Confirmar aprovação e gerar cronograma" | Cria Obra (`OBR####`), `token_cliente`, `valor_contrato`, abre o portal do cliente, cria itens de medição, cria o cronograma de 3 níveis, lança contábil. **Não cria conta a receber.** |
-| RDO vai para "Finalizado" | Cria custos automáticos de mão de obra; recalcula a medição; atualiza a conta a receber única da obra. |
-| Você gera/fecha medição quinzenal | Recalcula a conta a receber única da obra (UPSERT — atualiza, não duplica). |
+| Quando acontece | Evento | Handler | O que o sistema faz |
+| --- | --- | --- | --- |
+| Aprovação confirmada (E08) | `proposta_aprovada` | `propagar_proposta_para_obra` | Cria Obra (`OBR-####`), token cliente, valor de contrato, abre portal, cria itens de medição, cronograma 3 níveis. **Não cria CR.** |
+| RDO finalizado (E11) | `rdo_finalizado` | `lancar_custos_rdo` | Cria custo MO automático; vincula ao serviço. |
+| RDO finalizado (E11) | `rdo_finalizado` | `recalcular_medicao_apos_rdo` | Atualiza CR única (UPSERT). |
+| Ponto registrado (E12) | `ponto_registrado` | `calcular_horas_folha` (no fechamento) | Consolida horas → folha. |
+| Folha gerada | `folha_pagamento_criada` | `criar_lancamento_folha_pagamento` | CP consolidada (salário + VA + VT + extras). |
+| Alimentação criada (E13) | `alimentacao_lancamento_criado` | `criar_conta_pagar_alimentacao` | CP no nome do restaurante; rateio M2M. |
+| Compra recebida (E16) | `estoque_entrada_material` | `lancar_custo_material_obra` | Custo na obra (vinculado ao serviço). |
+| Compra recebida (E16) | `estoque_entrada_material` | `criar_conta_pagar_entrada_material` | CP no nome do fornecedor. |
+| Combustível lançado | `combustivel_lancado` | `lancar_custo_combustivel` | Custo na obra/veículo. |
 
 ### Conta a receber única
 
 - Uma e apenas uma por obra: `origem_tipo='OBRA_MEDICAO'`,
-  `numero_documento='OBR-MED-#####'`.
+  `numero_documento='OBR-MED-####'`.
 - `valor_original` = valor medido acumulado.
-- `saldo = max(0, valor_medido - valor_recebido)`.
+- `saldo = max(0, valor_medido − valor_recebido)`.
 - `status` flui PENDENTE → PARCIAL → QUITADA.
 
-### Métricas de funcionários
+### Métricas de funcionários (`services/funcionario_metrics.py`)
 
 | Modo | Mão de obra |
 | --- | --- |
-| `salario` | `horas × valor_hora + HE × valor_hora × 1.5` |
-| `diaria` | `valor_diaria × dias_pagos + (HE / 8) × valor_diaria × 1.5` |
+| `salario` (v1) | `horas × valor_hora + HE × valor_hora × 1.5` |
+| `diaria` (v2) | `valor_diaria × dias_pagos + (HE / 8) × valor_diaria × 1.5` |
 
 **Custo total** = MO + VA × dias_pagos + VT × dias_pagos +
-Alimentação real + Reembolsos aprovados + Almoxarifado em posse.
+Alimentação real (híbrida v1+v2+M2M) + Reembolsos + Almoxarifado em
+posse.
 
-### Cobertura de teste do ciclo (referência para o time técnico)
+### Cobertura de teste do ciclo
 
-- `tests/test_cronograma_automatico_aprovacao.py` — 33/33 PASS
-  (cobre cronograma automático na aprovação ponta a ponta).
-- `tests/test_ciclo_proposta_obra_medido_cr.py` — 30/30 PASS (cobre
-  o ciclo financeiro pós-aprovação, regra da CR única).
-- `tests/test_e2e_orcamento_proposta.py` — 36/36 PASS (cobre catálogo
-  paramétrico → aprovação cliente).
-- `tests/test_e2e_metricas_funcionario.py` — 27/27 PASS (cobre
-  v1+v2 de métricas).
+- `tests/test_cronograma_automatico_aprovacao.py` — cronograma
+  automático na aprovação.
+- `tests/test_ciclo_proposta_obra_medido_cr.py` — ciclo financeiro
+  pós-aprovação, regra da CR única.
+- `tests/test_e2e_orcamento_proposta.py` — catálogo paramétrico →
+  aprovação cliente.
+- `tests/test_orcamento_override_e2e.py` — override + composição
+  customizada (Tasks #118/#120).
+- `tests/test_e2e_metricas_funcionario.py` — métricas v1+v2.
+- `tests/test_agrupamento_diarias_rdo.py` — agrupamento de diárias
+  por RDO.
 
 ---
 
 # Anexo A — Modo Agente (operação dirigida via dataset Alfa)
 
 > **Propósito.** Permitir que um operador (humano ou agente
-> automatizado) reproduza o ciclo de ponta a ponta deste manual a
-> partir de um estado conhecido, sem intervir no banco. O dataset
-> "Construtora Alfa" é semeado por `scripts/seed_demo_alfa.py` e expõe
-> URL/método/seletor verificáveis em cada uma das 17 etapas.
+> automatizado) reproduza o ciclo de ponta a ponta a partir de um
+> estado conhecido. O dataset "Construtora Alfa" é semeado por
+> `scripts/seed_demo_alfa.py`.
 
 ## A.1 — Como rodar o seed
 
@@ -1256,12 +1790,9 @@ Alimentação real + Reembolsos aprovados + Almoxarifado em posse.
 # Plantar (no-op se admin Alfa já existe)
 python3 scripts/seed_demo_alfa.py
 
-# Forçar replantio (apaga e refaz)
+# Forçar replantio
 python3 scripts/seed_demo_alfa.py --reset
 ```
-O script imprime, no final, um bloco `DEMO PRONTA` com URL de login,
-credenciais e os IDs principais (admin, cliente, funcionários, serviços,
-templates, proposta, obra, medição, conta a receber).
 
 ### Em produção (acionamento consciente)
 Auto-seed em produção está **desligado por padrão** desde a Task #108.
@@ -1271,9 +1802,7 @@ SIGE_ALLOW_PROD_SEED=1 \
   python3 /app/scripts/seed_demo_alfa.py --ambiente prod
 ```
 Se o admin Alfa já existir e `--reset` não for passado, o script aborta
-com **exit 2** — ato consciente é exigido. Para re-habilitar o auto-seed
-no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
-`SIGE_ENABLE_DEMO_SEED=true` **e** `SIGE_ALLOW_PROD_SEED=1`.
+com **exit 2**.
 
 ## A.2 — Credenciais publicadas (Construtora Alfa)
 
@@ -1286,203 +1815,237 @@ no entrypoint Easypanel (NÃO recomendado), defina **as duas** variáveis:
 | Cliente PF          | João da Silva — CPF `123.456.789-09`   |
 | Funcionário 1       | Carlos Pereira — mensalista R$ 2.800   |
 | Funcionário 2       | Pedro Souza   — diarista  R$ 180/dia   |
-| Proposta            | nº `001.26` (4 itens, R$ 62.250,00)    |
+| Proposta            | nº `001.26`                            |
 | Obra                | `OBR-2026-001` — Residencial Bela Vista|
 
-## A.3 — URL por etapa (17 etapas do ciclo)
+## A.3 — URL por etapa (25 etapas do ciclo)
 
-> Os IDs `<proposta_id>`, `<obra_id>`, `<medicao_id>` são impressos no
-> bloco `DEMO PRONTA` no fim da execução do seed. Em todas as rotas,
-> o agente deve estar logado com a sessão do admin Alfa.
-
-| # | Etapa                          | Método | URL                                              | DOM esperado (seletor)                              |
-|---|--------------------------------|--------|--------------------------------------------------|------------------------------------------------------|
-| 1 | Login                          | GET / POST | `/login`                                     | sucesso → redireciona para `/dashboard`             |
-| 2 | Dashboard inicial              | GET    | `/dashboard`                                     | `h1` com "Dashboard"; cards de KPI (≥4)             |
-| 3 | Lista de funcionários          | GET    | `/funcionarios`                                  | linhas de funcionário ≥ 2 (Carlos + Pedro)          |
-| 4 | Cadastro de funcionário        | POST   | `/funcionarios` (modal "Novo Funcionário" na própria página) | `select[name=tipo_remuneracao]` no modal; toast de sucesso |
-| 5 | Catálogo de serviços           | GET    | `/catalogo/servicos`                             | 3 linhas de serviço (Alvenaria / Contrapiso / Mobilização) |
-| 6 | Detalhe de serviço + composição| GET    | `/catalogo/servicos/<servico_id>/composicao`     | tabela de composição visível; bloco "Template padrão" preenchido para Alvenaria/Contrapiso |
-| 7 | Lista de propostas             | GET    | `/propostas/`                                    | linha com nº `001.26` e badge `Aprovada`            |
-| 8 | Nova proposta                  | GET / POST | `GET /propostas/nova` ; `POST /propostas/criar` | form de proposta; após salvar, redireciona para o detalhe |
-| 9 | Detalhe da proposta            | GET    | `/propostas/<proposta_id>`                       | status visível = `Aprovada`; 4 itens listados       |
-| 10| Revisão do cronograma da proposta | GET | `/propostas/<proposta_id>/cronograma-revisar`    | árvore com checkboxes (≥9 nós) renderizada         |
-| 11| Aprovação da proposta          | POST   | `/propostas/aprovar/<proposta_id>`               | redireciona para `/obras/<obra_id>`                 |
-| 12| Detalhe da obra                | GET    | `/obras/<obra_id>`                               | título com "Residencial Bela Vista"                 |
-| 13| Cronograma da obra (Gantt)     | GET    | `/cronograma/obra/<obra_id>`                     | barras Gantt ≥9; árvore Serviço→Grupo→Subatividade  |
-| 14| Lista de RDOs                  | GET    | `/rdo`                                           | linhas de RDO finalizado ≥ 2                        |
-| 15| Novo RDO / Salvar              | GET / POST | `GET /rdo/novo` ; `POST /salvar-rdo-flexivel` (form `#formNovoRDO` enctype `multipart/form-data`) | toast de sucesso; novo RDO aparece em `/rdo` (status pode ficar `Rascunho` até finalização explícita via POST `/rdo/<rdo_id>/finalizar`) |
-| 16| Tela de medições + aprovação   | GET / POST | `GET /obras/<obra_id>/medicao` (alias `/medicao/obra/<obra_id>`); `POST /obras/<obra_id>/medicao/fechar` (gerar) e `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (aprovar) | medição #001 visível e com status `APROVADO` |
-| 17| Contas a Receber               | GET    | `/financeiro/contas-receber`                     | linha `OBR-MED-<obra_id>` com valor R$ 32.250,00    |
+| # | Etapa                            | Método | URL                                               |
+|---|----------------------------------|--------|----------------------------------------------------|
+| 1 | Login                            | GET/POST | `/login`                                       |
+| 2 | Catálogos básicos                | GET    | `/catalogo/insumos` ; `/almoxarifado/fornecedores` ; `/clientes` |
+| 3 | Templates de cronograma          | GET    | `/cronograma/templates` (criar: `/cronograma/templates/novo`) |
+| 4 | Catálogo de serviços             | GET    | `/catalogo/servicos` (composição: `/catalogo/servicos/<id>/composicao`) |
+| 5 | Cadastro de funcionário          | POST   | `/funcionarios` (modal `#funcionarioModal`)        |
+| 6 | Orçamento                        | GET/POST | `/orcamentos/` ; `/orcamentos/novo` ; `/orcamentos/<id>/editar` |
+| 7 | Gerar Proposta                   | POST   | `/orcamentos/<id>/gerar-proposta`                  |
+| 8 | Aprovação + revisão              | GET/POST | `/propostas/<id>/cronograma-revisar` ; `/propostas/aprovar/<id>` |
+| 9 | Obra criada                      | GET    | `/obras/<obra_id>`                                 |
+|10 | Métricas funcionário             | GET    | `/funcionarios/<id>` (aba métricas)                |
+|11 | RDO                              | GET/POST | `/rdo/novo` ; `/salvar-rdo-flexivel` ; `/rdo/<id>/finalizar` |
+|12 | Ponto Facial                     | GET/POST | `/ponto/facial` ; `/ponto/api/registrar-facial`  |
+|13 | Alimentação v2                   | GET/POST | `/alimentacao/lancamentos/novo-v2`               |
+|14 | Transporte                       | GET/POST | `/transporte/novo` ou `/transporte/novo-massa`   |
+|15 | Reembolso                        | GET/POST | `/reembolso/novo`                                |
+|16 | Compra (PO + Recebimento)        | GET/POST | `/compras/nova` ; `/compras/receber/<pedido_id>` |
+|17 | Almoxarifado — saída             | GET/POST | `/almoxarifado/saida` ; `/almoxarifado/processar-saida` |
+|18 | Mapa de Concorrência v2          | POST   | `/obras/<obra_id>/mapa-v2/criar`                   |
+|19 | Contas a Pagar                   | GET    | `/financeiro/contas-pagar` ; `/gestao-custos/`     |
+|20 | Contas a Receber                 | GET    | `/financeiro/contas-receber`                       |
+|21 | Fluxo de Caixa                   | GET/POST | `/financeiro/fluxo-caixa` ; `/financeiro/fluxo-caixa/novo` |
+|22 | Medição quinzenal                | GET/POST | `/obras/<obra_id>/medicao` ; `/obras/<obra_id>/medicao/fechar` ; `/obras/<obra_id>/medicao/<med_id>/aprovar` |
+|23 | Portal do Cliente                | GET/POST | `/portal/obra/<token>` (ações: `/compra/<id>/aprovar`, `/mapa-v2/<id>/selecionar`, `/compra/<id>/comprovante`) |
+|24 | Dashboards                       | GET    | `/dashboard` ; `/folha/dashboard` ; `/alimentacao/dashboard` ; `/almoxarifado/` |
+|25 | Relatórios                       | GET    | `/folha/relatorios` ; `/almoxarifado/relatorios` ; `/contabilidade/relatorios` ; `/ponto/relatorio/obra/<id>` |
 
 ## A.4 — Mapas "Rótulo → name/id → tipo" para os formulários centrais
 
-### A.4.1 — Funcionário (template real `templates/funcionarios.html` — modal `#funcionarioModal`, form `#funcionarioForm`, action `POST /funcionarios`, `enctype=multipart/form-data`)
+### A.4.1 — Funcionário (modal `#funcionarioModal`, action `POST /funcionarios`, `enctype=multipart/form-data`)
 
-| Rótulo na tela                | `name` / `id`              | Tipo HTML            | Observações                                  |
-|-------------------------------|----------------------------|----------------------|----------------------------------------------|
-| Nome completo                 | `nome`                     | `text` (required)    |                                              |
-| CPF                           | `cpf`                      | `text` (required)    | mask 999.999.999-99                          |
-| Foto                          | `foto`                     | `file`               | jpg/png, opcional                            |
-| RG                            | `rg`                       | `text`               |                                              |
-| Data de nascimento            | `data_nascimento`          | `date`               |                                              |
-| Endereço                      | `endereco`                 | `textarea`           |                                              |
-| Telefone                      | `telefone`                 | `text`               |                                              |
-| E-mail                        | `email`                    | `email`              |                                              |
-| Data de admissão              | `data_admissao`            | `date`               |                                              |
-| **Tipo de remuneração**       | `tipo_remuneracao`         | `select`             | opções: `salario`, `diaria`                  |
-| Salário fixo (mensalistas)    | `salario`                  | `number step=0.01`   | visível quando `tipo_remuneracao=salario`    |
-| Valor da diária (diaristas)   | `valor_diaria`             | `number step=0.01`   | visível quando `tipo_remuneracao=diaria`     |
-| Função                        | `funcao_id`                | `select`             | FK funcao                                    |
-| Horário de trabalho           | `horario_trabalho_id`      | `select`             | FK horario_trabalho                          |
-| Ativo                         | `ativo`                    | `checkbox`           | default checked                              |
+| Rótulo                        | `name`                     | Tipo                 |
+|-------------------------------|----------------------------|----------------------|
+| Nome completo                 | `nome`                     | `text` required      |
+| CPF                           | `cpf`                      | `text` required      |
+| Foto                          | `foto`                     | `file`               |
+| Data de admissão              | `data_admissao`            | `date`               |
+| **Tipo de remuneração**       | `tipo_remuneracao`         | `select`             |
+| Salário fixo                  | `salario`                  | `number step=0.01`   |
+| Valor da diária               | `valor_diaria`             | `number step=0.01`   |
+| Função                        | `funcao_id`                | `select` (FK)        |
+| Horário de trabalho           | `horario_trabalho_id`      | `select` (FK)        |
+| Ativo                         | `ativo`                    | `checkbox`           |
 
-> Observação: `valor_va`, `valor_vt` e `chave_pix` existem como
-> colunas na tabela `funcionario` e são exibidos nas listas/cards, mas
-> **não estão no modal** — para preenchê-los o agente deve usar
-> `services/funcionario_service.py` ou um update direto pós-criação.
+> `valor_va`, `valor_vt` e `chave_pix` existem na tabela mas não no
+> modal — preencha via service ou edição posterior.
 
-### A.4.2 — Serviço (template real `templates/servicos/editar.html`, mesmo form usado em "novo" e "editar" — endpoint `POST /servicos` / `POST /servicos/<id>/atualizar` via `crud_servicos_completo.py`)
+### A.4.2 — Serviço (`templates/servicos/editar.html`, `POST /servicos`)
 
 | Rótulo                         | `name`                      | Tipo            |
 |--------------------------------|-----------------------------|-----------------|
 | Nome                           | `nome`                      | `text` required |
 | Categoria                      | `categoria`                 | `select`        |
-| Descrição                      | `descricao`                 | `textarea`      |
 | **Template padrão (cronograma)** | `template_padrao_id`      | `select`        |
-| Subatividades (linha repetida) | `subatividades[]`           | `text`          |
+| Composição (insumo × coef)     | via `/catalogo/servicos/<id>/composicao/add` | `text` |
 
-> Observação: `unidade_medida`, `custo_unitario`, `imposto_pct`,
-> `margem_lucro_pct` e `preco_venda_unitario` existem como colunas em
-> `servico` (consumidas pelo cálculo paramétrico em
-> `services/orcamento_parametrico.py`), porém **não fazem parte do form
-> real**; são populadas via composição (insumo × coeficiente) no
-> template `templates/catalogo/composicao_servico.html`.
+### A.4.3 — Orçamento (`templates/orcamentos/editar.html`)
 
-### A.4.3 — Proposta (template real `templates/propostas/nova_proposta.html` — form `#formNovaProposta`, action `POST /propostas/criar`)
+| Rótulo (cabeçalho)            | `name`                      | Tipo           |
+|-------------------------------|-----------------------------|----------------|
+| Cliente                       | `cliente_id`                | `select` (FK)  |
+| Número                        | `numero`                    | `text`         |
+| Data                          | `data`                      | `date`         |
+| Imposto global %              | `imposto_global`            | `number`       |
+| Margem global %               | `margem_global`             | `number`       |
 
-| Rótulo                       | `name`                       | Tipo                |
-|------------------------------|------------------------------|---------------------|
-| Cliente — nome               | `cliente_nome`               | `text` required     |
-| Cliente — e-mail             | `cliente_email`              | `email`             |
-| Cliente — telefone           | `cliente_telefone`           | `text`              |
-| Cliente — CPF/CNPJ           | `cliente_cpf_cnpj`           | `text`              |
-| Número da proposta           | `numero_proposta`            | `text` required     |
-| Assunto                      | `assunto`                    | `text`              |
-| Objeto / descrição           | `objeto`                     | `textarea`          |
-| Endereço da obra             | `endereco_obra`              | `textarea`          |
-| Área total (m²)              | `area_total_m2`              | `number step=0.01`  |
-| Prazo de execução (dias)     | `prazo_execucao`             | `number`            |
-| Item — serviço (FK oculto)   | `item_servico_id`            | `hidden` (linha)    |
-| Item — template (FK oculto)  | `item_template_id`           | `hidden` (linha)    |
-| Item — descrição             | `item_descricao`             | `text` (linha)      |
-| Item — quantidade            | `item_quantidade`            | `number step=0.01`  |
-| Item — unidade               | `item_unidade`               | `select` (linha)    |
-| Item — preço unitário        | `item_preco`                 | `number step=0.01`  |
-| Seção especificações         | `secao_especificacoes`       | `textarea`          |
-| Seção materiais              | `secao_materiais`            | `textarea`          |
-| Seção fabricação             | `secao_fabricacao`           | `textarea`          |
-| Seção logística              | `secao_logistica`            | `textarea`          |
-| Seção montagem               | `secao_montagem`             | `textarea`          |
-| Seção qualidade              | `secao_qualidade`            | `textarea`          |
-| Seção segurança              | `secao_seguranca`            | `textarea`          |
-| Seção assistência técnica    | `secao_assistencia`          | `textarea`          |
-| Seção considerações          | `secao_consideracoes`        | `textarea`          |
-| % Nota fiscal                | `percentual_nota_fiscal`     | `number`            |
-| Valor total                  | `valor_total`                | `number step=0.01`  |
-| Itens (JSON serializado)     | `servicos_json`              | `hidden`            |
+| Rótulo (item, linha repetida) | `name`                                  | Tipo                |
+|-------------------------------|-----------------------------------------|---------------------|
+| Serviço                       | `item_servico_id`                       | `select`            |
+| Descrição                     | `item_descricao`                        | `text`              |
+| Quantidade                    | `item_quantidade`                       | `number step=0.01`  |
+| Unidade                       | `item_unidade`                          | `select`            |
+| Preço unit.                   | `item_preco_unitario`                   | `number step=0.01`  |
+| Imposto%                      | `item_imposto`                          | `number`            |
+| Margem%                       | `item_margem`                           | `number`            |
+| **Cronograma para esta linha**| `cronograma_template_override_id`       | `select`            |
+| Composição (insumo)           | `comp_insumo_<i>`                       | `select`            |
+| Composição (coeficiente)      | `comp_coef_<i>`                         | `number step=0.0001`|
+| Subtotal/un. (coluna calculada) | `<td class="js-subtotal-unit">`        | leitura             |
+| **Voltar à composição padrão**| `POST /orcamentos/itens/<id>/reset-composicao` | submit       |
+| Modal "+ Novo serviço"        | `embedded=1` no GET, hidden no POST     | iframe modal        |
 
-> Observação: o template alternativo `templates/propostas/editar.html`
-> (rota `GET/POST /propostas/editar/<id>`) usa nomes diferentes
-> (`numero`, `titulo`, `descricao`, `cliente_endereco`,
-> `prazo_entrega_dias`, `condicoes_pagamento`) — verifique qual
-> template a rota acessada renderiza antes de mapear.
+### A.4.4 — Cronograma (revisão pré-aprovação, `templates/propostas/cronograma_revisar.html`)
 
-### A.4.4 — Cronograma (revisão pré-aprovação)
-
-| Rótulo                      | `name` / `id`                                | Tipo       |
+| Rótulo                      | `name`                                       | Tipo       |
 |-----------------------------|----------------------------------------------|------------|
 | Marcar / desmarcar nó       | `marcado_<proposta_item_id>_<no_id>`         | `checkbox` |
 | Horas estimadas (override)  | `horas_<proposta_item_id>_<no_id>`           | `number`   |
 | Duração em dias (override)  | `duracao_<proposta_item_id>_<no_id>`         | `number`   |
-| Confirmar e aprovar         | `button[type=submit][name=acao][value=aprovar]` | `submit` |
+| Confirmar e aprovar         | `button[name=acao][value=aprovar]`           | `submit`   |
 
-### A.4.5 — RDO (template real `templates/rdo/novo.html` — form `#formNovoRDO`, action `POST /salvar-rdo-flexivel`, `enctype=multipart/form-data`)
+### A.4.5 — RDO (`templates/rdo/novo.html`, form `#formNovoRDO`, `POST /salvar-rdo-flexivel`)
 
-> O RDO usa um fluxo flexível: a tela é populada via JavaScript a partir
-> das tarefas do cronograma da obra selecionada, e os campos de mão de
-> obra são gerados dinamicamente por subatividade/funcionário. Os
-> seletores estáveis para automação são os listados abaixo.
-
-| Rótulo / função                        | `name` / `id`                                  | Tipo                |
+| Rótulo                                 | `name` / `id`                                  | Tipo                |
 |----------------------------------------|------------------------------------------------|---------------------|
 | Funcionário logado (oculto)            | `funcionario_id`                               | `hidden`            |
-| Admin (oculto)                         | `admin_id_form`                                | `hidden`            |
 | Obra                                   | `obra_id` (`select#obra_id`)                   | `select`            |
 | Data do relatório                      | `data_relatorio` (`input#data_relatorio`)      | `date`              |
-| Tarefas do cronograma (gerado por JS)  | `cronograma_tarefa_<tarefa_id>`                | `checkbox`/`number` |
-| Tarefas para entrega (multi-select)    | `entrega_tarefa_ids[]`                         | `select multiple`   |
+| Tarefas do cronograma                  | `cronograma_tarefa_<tarefa_id>`                | `checkbox`/`number` |
 | Horas por funcionário × subatividade   | `func_<subId>_<funcId>_horas`                  | `number step=0.5`   |
-| Fotos (câmera)                         | `fotos[]` (`#fileInputNovoCam`)                | `file multiple`     |
-| Fotos (galeria)                        | `fotos[]` (`#fileInputNovoGal`)                | `file multiple`     |
-| Legenda da foto                        | `legenda_foto_<i>`                             | `text`              |
+| Fotos                                  | `fotos[]`                                      | `file multiple`     |
 
-Para **finalizar um RDO já salvo** (mudar `status` para `Finalizado`),
-o agente faz `POST /rdo/<rdo_id>/finalizar` (sem corpo).
+Finalizar: POST `/rdo/<rdo_id>/finalizar` (sem corpo).
 
-### A.4.6 — Medição quinzenal (template real `templates/medicao/gestao_itens.html`)
+### A.4.6 — Medição quinzenal (`templates/medicao/gestao_itens.html`)
 
-> No template real, cada ação está num `<form method="post" action="...">`
-> dedicado, com botões de envio simples (`type="submit"`). Para automação,
-> selecione o formulário pela `action` e clique no submit dentro dele.
+| Rótulo / ação                     | Selector                                                        | Endpoint Flask                          |
+|-----------------------------------|-----------------------------------------------------------------|------------------------------------------|
+| Período — início (gerar)          | `form[action*="/medicao/fechar"] input[name=periodo_inicio]`    | POST `/obras/<obra_id>/medicao/fechar`  |
+| Período — fim (gerar)             | `form[action*="/medicao/fechar"] input[name=periodo_fim]`       | idem                                    |
+| Botão "Gerar medição"             | `form[action*="/medicao/fechar"] button[type=submit]`           | idem                                    |
+| Botão "Aprovar medição #N"        | `form[action*="/medicao/<medicao_id>/aprovar"] button[type=submit]` | POST `/obras/<obra_id>/medicao/<medicao_id>/aprovar` |
+| Configuração da obra              | `form[action*="/medicao/config"]`                               | POST `/obras/<obra_id>/medicao/config` |
 
-| Rótulo / ação                     | Localização (selector)                                                         | Endpoint Flask                          |
-|-----------------------------------|--------------------------------------------------------------------------------|------------------------------------------|
-| Período — início (gerar)          | `form[action*="/medicao/fechar"] input[name=periodo_inicio]`                   | POST `/obras/<obra_id>/medicao/fechar` (endpoint `medicao.gerar_medicao`) |
-| Período — fim (gerar)             | `form[action*="/medicao/fechar"] input[name=periodo_fim]`                      | idem                                    |
-| Observações (gerar)               | `form[action*="/medicao/fechar"] textarea[name=observacoes]`                   | idem                                    |
-| Botão "Gerar medição"             | `form[action*="/medicao/fechar"] button[type=submit]`                          | idem                                    |
-| Botão "Aprovar medição #N"        | `form[action*="/medicao/<medicao_id>/aprovar"] button[type=submit]`            | POST `/obras/<obra_id>/medicao/<medicao_id>/aprovar` (endpoint `medicao.fechar`) |
-| Configuração da obra (data inicial / valor de entrada) | `form[action*="/medicao/config"]` com `data_inicio_medicao`, `valor_entrada`, `data_entrada` | POST `/obras/<obra_id>/medicao/config` (endpoint `medicao.config_obra_medicao`) |
-| Novo item de medição (modal)      | `form#formNovoItemMedicao` com `servico_id`, `nome`, `quantidade`, `valor_comercial` | POST `/obras/<obra_id>/medicao/itens` (endpoint `medicao.criar_item`) |
+### A.4.7 — Compras v2 (`/compras/nova`)
+
+| Rótulo                        | `name`                       | Tipo                |
+|-------------------------------|------------------------------|---------------------|
+| Fornecedor                    | `fornecedor_id`              | `select` (FK)       |
+| Obra                          | `obra_id`                    | `select` (FK)       |
+| Data                          | `data`                       | `date`              |
+| Item — insumo                 | `item_insumo_<i>`            | `select`            |
+| Item — quantidade             | `item_quantidade_<i>`        | `number step=0.01`  |
+| Item — preço unit.            | `item_preco_<i>`             | `number step=0.01`  |
+| Recebimento (qtd recebida)    | `qtd_recebida_<item_id>`     | `number step=0.01`  |
+
+### A.4.8 — Alimentação v2 (`/alimentacao/lancamentos/novo-v2`)
+
+| Rótulo                        | `name`                       | Tipo               |
+|-------------------------------|------------------------------|--------------------|
+| Data                          | `data`                       | `date`             |
+| Restaurante                   | `restaurante_id`             | `select` (FK)      |
+| Obra                          | `obra_id`                    | `select` (FK)      |
+| Item — funcionário            | `item_funcionario_<i>`       | `select` (busca)   |
+| Item — tipo                   | `item_tipo_<i>`              | `select`           |
+| Item — quantidade             | `item_qtd_<i>`               | `number`           |
+| Item — valor unit.            | `item_valor_<i>`             | `number step=0.01` |
+
+### A.4.9 — Reembolso v2 (`/reembolso/novo`)
+
+| Rótulo                        | `name`                       | Tipo               |
+|-------------------------------|------------------------------|--------------------|
+| Funcionário                   | `funcionario_id`             | `select` (FK)      |
+| Data                          | `data`                       | `date`             |
+| Descrição                     | `descricao`                  | `text`             |
+| Valor (R$)                    | `valor`                      | `number step=0.01` |
+| Obra                          | `obra_id`                    | `select` (FK)      |
+| Categoria                     | `categoria`                  | `select`           |
+| Anexo                         | `anexo`                      | `file`             |
+
+### A.4.10 — Almoxarifado — saída (`/almoxarifado/saida`)
+
+| Rótulo                        | `name`                       | Tipo               |
+|-------------------------------|------------------------------|--------------------|
+| Obra                          | `obra_id`                    | `select` (FK)      |
+| Serviço da obra               | `servico_obra_id`            | `select` (FK)      |
+| Funcionário (em posse)        | `funcionario_id`             | `select` (FK)      |
+| Item                          | `item_id`                    | `select` (FK)      |
+| Quantidade                    | `quantidade`                 | `number step=0.01` |
+| Lote / Serial (quando aplica) | `lote_id` / `serial_id`      | `select`           |
 
 ## A.5 — Critério de aceite verificável por etapa
 
 Cada etapa pode ser validada por **uma consulta SQL** (no banco do
-tenant Alfa) **ou** por **um seletor CSS** (em testes E2E Playwright).
-A coluna `admin_id` deve sempre ser filtrada pelo ID do admin Alfa
-impresso no bloco `DEMO PRONTA`.
+tenant Alfa) **ou** por **um seletor CSS** (em testes E2E). A coluna
+`admin_id` deve sempre ser filtrada pelo ID do admin Alfa impresso no
+bloco `DEMO PRONTA`.
 
-| # | Etapa                  | Critério SQL (preferencial)                                         | Seletor CSS / DOM (alternativa E2E)                  |
-|---|------------------------|---------------------------------------------------------------------|------------------------------------------------------|
-| 1 | Login                  | `SELECT 1 FROM usuario WHERE email='admin@construtoraalfa.com.br'`  | URL final = `/dashboard`                             |
-| 2 | Dashboard              | n/a                                                                 | cards de KPI count ≥ 4                               |
-| 3 | Lista funcionários     | `SELECT count(*) FROM funcionario WHERE admin_id=:a` ≥ 2            | linhas de funcionário ≥ 2                            |
-| 4 | Cadastro funcionário   | `SELECT tipo_remuneracao,valor_diaria FROM funcionario WHERE cpf='900.901.002-02'` retorna `('diaria',180.00)` | toast "Funcionário cadastrado" após POST `/funcionarios` |
-| 5 | Catálogo serviços      | `SELECT count(*) FROM servico WHERE admin_id=:a` = 3                | tabela com 3 linhas de serviço                       |
-| 6 | Serviço com template   | `SELECT template_padrao_id IS NOT NULL FROM servico WHERE nome='Alvenaria de bloco cerâmico' AND admin_id=:a` retorna `t` | em `/catalogo/servicos/<id>/composicao`, bloco "Template padrão" preenchido |
-| 7 | Lista propostas        | `SELECT numero,status FROM propostas_comerciais WHERE admin_id=:a`  | linha com `001.26` + badge `Aprovada`                |
-| 8 | Itens da proposta      | `SELECT count(*) FROM proposta_itens WHERE proposta_id=:p` = 4      | tabela de itens da proposta com 4 linhas             |
-| 9 | Detalhe proposta       | `SELECT status FROM propostas_comerciais WHERE id=:p` = `'aprovada'`| status visível "Aprovada"                            |
-|10 | Revisão cronograma     | `SELECT cronograma_default_json IS NOT NULL FROM propostas_comerciais WHERE id=:p` retorna `t` | árvore renderizada com checkboxes  |
-|11 | Aprovação              | `SELECT id FROM obra WHERE proposta_origem_id=:p` retorna 1 linha   | POST `/propostas/aprovar/<p>` redireciona para `/obras/<obra_id>` |
-|12 | Detalhe obra           | `SELECT codigo FROM obra WHERE id=:o` = `'OBR-2026-001'`            | título "Residencial Bela Vista"                      |
-|13 | Cronograma materializado | `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:o AND admin_id=:a` ≥ 9 | barras Gantt count ≥ 9                  |
-|14 | RDOs finalizados       | `SELECT count(*) FROM rdo WHERE obra_id=:o AND status='Finalizado'` = 2 | 2 linhas com status "Finalizado"                |
-|15 | RDO mão de obra        | `SELECT count(DISTINCT funcionario_id) FROM rdo_mao_obra rmo JOIN rdo r ON rmo.rdo_id=r.id WHERE r.obra_id=:o` = 2 | toast `RDO finalizado`         |
-|16 | Medição aprovada       | `SELECT status,numero FROM medicao_obra WHERE obra_id=:o` retorna `('APROVADO',1)` | em `/obras/<obra_id>/medicao`, medição #001 exibida com badge `APROVADO` |
-|17 | Conta a Receber        | `SELECT valor_original,status FROM conta_receber WHERE origem_tipo='OBRA_MEDICAO' AND origem_id=:o` retorna `(32250.00,'PENDENTE')` | linha `OBR-MED-<obra_id>` valor `R$ 32.250,00` |
+| # | Etapa                  | Critério SQL                                                          | Seletor CSS / DOM (alternativa) |
+|---|------------------------|-----------------------------------------------------------------------|-----------------------------------|
+| 1 | Login                  | `SELECT 1 FROM usuario WHERE email='admin@construtoraalfa.com.br'`    | URL final = `/dashboard` |
+| 2 | Catálogos              | `SELECT count(*) FROM insumo WHERE admin_id=:a` ≥ 3 ; `SELECT count(*) FROM fornecedor WHERE admin_id=:a` ≥ 1 | linha de insumo + linha de fornecedor |
+| 3 | Templates              | `SELECT count(*) FROM cronograma_template WHERE admin_id=:a` ≥ 2     | árvore Grupo→Subatividade |
+| 4 | Serviços com template  | `SELECT template_padrao_id IS NOT NULL FROM servico WHERE admin_id=:a` retorna `t` ≥ 2 | bloco "Template padrão" preenchido |
+| 5 | Funcionário diarista   | `SELECT tipo_remuneracao,valor_diaria FROM funcionario WHERE cpf='987.654.321-00'` retorna `('diaria',180.00)` | toast após POST `/funcionarios` |
+| 6 | Orçamento com override | `SELECT count(*) FROM orcamento_item WHERE cronograma_template_override_id IS NOT NULL` ≥ 1 ; `SELECT composicao_snapshot IS NOT NULL FROM orcamento_item WHERE id=:i` retorna `t` | linha do orçamento com tag override |
+| 7 | Proposta gerada        | `SELECT count(*) FROM propostas_comerciais WHERE orcamento_origem_id=:o` ≥ 1 | redireciona para `/propostas/<id>` |
+| 8 | Aprovação + cronograma | `SELECT id FROM obra WHERE proposta_origem_id=:p` retorna 1 ; `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:obra` ≥ 6 | redireciona para `/obras/<id>` |
+| 9 | Obra com cronograma    | `SELECT count(*) FROM tarefa_cronograma WHERE obra_id=:obra AND gerada_por_proposta_item_id IS NOT NULL` ≥ 4 | tarefas com etiqueta "📋 do contrato" |
+|10 | Métricas funcionário   | `services/funcionario_metrics.calcular_metricas(funcionario_id, mes)` retorna dict não vazio | cards de KPI ≥ 5 |
+|11 | RDO + custo MO         | `SELECT count(*) FROM custo_obra WHERE origem='RDO' AND obra_id=:obra` ≥ 1 | toast de sucesso após finalizar |
+|12 | Ponto + folha          | `SELECT count(*) FROM ponto_registro WHERE funcionario_id=:f AND data=:d` ≥ 1 ; após fechamento, `SELECT count(*) FROM folha_pagamento WHERE mes=:m` ≥ 1 | mensagem "entrada registrada" |
+|13 | Alimentação v2 + CP    | `SELECT count(*) FROM alimentacao_lancamento WHERE admin_id=:a` ≥ 1 ; `SELECT count(*) FROM gestao_custo_pai WHERE origem='ALIMENTACAO'` ≥ 1 | linha em `/alimentacao/lancamentos` |
+|14 | Transporte             | `SELECT count(*) FROM transporte_lancamento WHERE admin_id=:a` ≥ 1   | linha em `/transporte/` |
+|15 | Reembolso              | `SELECT count(*) FROM reembolso WHERE admin_id=:a` ≥ 1               | linha em `/reembolso/` |
+|16 | Compra recebida        | `SELECT count(*) FROM compra_pedido WHERE status='RECEBIDO'` ≥ 1 ; `SELECT count(*) FROM almoxarifado_movimentacao WHERE tipo='ENTRADA'` ≥ 1 ; CP do fornecedor criada | toast "Recebimento registrado" |
+|17 | Saída almoxarifado     | `SELECT count(*) FROM almoxarifado_movimentacao WHERE tipo='SAIDA' AND obra_id=:obra` ≥ 1 ; `SELECT count(*) FROM custo_obra WHERE origem='ALMOXARIFADO'` ≥ 1 | toast de sucesso |
+|18 | Mapa Concorrência v2   | `SELECT count(*) FROM mapa_concorrencia_v2 WHERE obra_id=:obra` ≥ 1  | grade N×N renderizada |
+|19 | Contas a Pagar         | `SELECT count(*) FROM gestao_custo_pai WHERE admin_id=:a` ≥ 3 (RDO+Compra+Alimentação) | painel kanban com cartões |
+|20 | Contas a Receber única | `SELECT count(*) FROM conta_receber WHERE obra_id=:obra AND origem_tipo='OBRA_MEDICAO'` = 1 | linha `OBR-MED-####` única |
+|21 | Fluxo de Caixa         | `SELECT count(*) FROM fluxo_caixa WHERE admin_id=:a` ≥ 1             | tabela com movimentos |
+|22 | Medição aprovada       | `SELECT status FROM medicao WHERE id=:m` = `'APROVADO'` ; CR atualizada | linha de medição com badge "Aprovado" |
+|23 | Portal do cliente      | GET `/portal/obra/<token>` retorna 200                                 | botão "Aprovar compra" visível |
+|24 | Dashboard              | n/a (visual)                                                          | cards de KPI ≥ 4 em `/dashboard` |
+|25 | Relatórios             | n/a (visual)                                                          | botão "Gerar PDF" funcional em E22 |
 
 ## A.6 — Ordem recomendada para um agente E2E
 
-1. Rodar `python3 scripts/seed_demo_alfa.py --reset` para garantir
-   estado conhecido.
-2. Capturar do stdout os IDs (`<admin_id>`, `<proposta_id>`,
-   `<obra_id>`, `<medicao_id>`).
-3. Executar a etapa 1 (login) e validar o critério da linha 1.
-4. Para cada etapa N (2..17), abrir a URL listada em A.3 e validar
-   o critério da linha N em A.5. Se o critério falhar, capturar
-   screenshot e logs e parar.
-5. Ao final, conferir que `SELECT count(*) FROM conta_receber WHERE
-   origem_tipo='OBRA_MEDICAO' AND origem_id=:o` é exatamente **1**
-   (regra da CR única do ciclo).
+```
+E01 Login
+  ↓
+PRÉ-OBRA
+E02 Catálogos básicos → E03 Templates → E04 Serviços → E05 Funcionários
+  ↓
+E06 Orçamento (com 1 linha override + 1 linha composição customizada)
+  ↓
+E07 Gerar Proposta → E08 Aprovar (revisão) → E09 Verificar obra
+  ↓
+DURANTE A OBRA (paralelo, ordem recomendada)
+E11 RDO finalizado → checa CP/CR
+E12 Ponto facial → fecha mês → checa folha
+E13 Alimentação v2 → checa CP
+E14 Transporte
+E15 Reembolso → aprovar → checa CP
+E16 Compra → Recebimento → checa CP/Estoque/Custo
+E17 Almoxarifado saída → checa Custo
+E18 Mapa Concorrência v2 → cliente escolhe pelo portal
+E22 Medição quinzenal → aprovar → checa CR única atualizada
+E20 Contas a Receber → registrar pagamento parcial
+E19 Contas a Pagar → autorizar e pagar
+E21 Fluxo de Caixa → conferir saldo
+E23 Portal do cliente → conferir aprovações e comprovantes
+  ↓
+VISÃO E ANÁLISE
+E10 Métricas funcionário → conferir custo total
+E24 Dashboards → conferir KPIs batem com somatórios
+E25 Relatórios → gerar holerite + extrato medição PDF
+```
