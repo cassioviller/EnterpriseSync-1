@@ -505,9 +505,13 @@ function abrirEditarServico() {
     alert('Selecione um serviço para editar.');
     return;
   }
-  // Reaproveita rota /servicos/<id>/editar do Catálogo (abre em nova aba para
-  // não perder edições não salvas nas outras linhas do orçamento).
-  window.open(`/servicos/${sid}/editar`, '_blank');
+  // Reaproveita o template do Catálogo dentro do mesmo modal (drawer iframe),
+  // sem perder edições não salvas nas demais linhas do orçamento.
+  const iframe = document.querySelector('#novoServicoModal iframe');
+  const titleEl = document.querySelector('#novoServicoModal .modal-title');
+  if (titleEl) titleEl.innerHTML = '<i class="fas fa-pen me-2"></i>Editar serviço';
+  if (iframe) iframe.src = `/servicos/${sid}/editar?embedded=1`;
+  new bootstrap.Modal(document.getElementById('novoServicoModal')).show();
 }
 
 // Task #118 — Picker de Insumo do Catálogo (busca + categoria + coeficiente)
@@ -527,22 +531,43 @@ async function buscarInsumos() {
   const r = await fetch('/catalogo/api/insumos/buscar?q=' + encodeURIComponent(q));
   const data = await r.json();
   const tb = document.getElementById('insumoPickerResults');
+  // Construído com DOM APIs (nunca innerHTML com dados do servidor) para
+  // evitar XSS via campos como `nome` que podem conter aspas/HTML.
+  tb.replaceChildren();
   if (!data.length) {
-    tb.innerHTML = '<tr><td colspan="4" class="text-muted text-center small">Nenhum insumo encontrado</td></tr>';
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4;
+    td.className = 'text-muted text-center small';
+    td.textContent = 'Nenhum insumo encontrado';
+    tr.appendChild(td); tb.appendChild(tr);
     return;
   }
-  tb.innerHTML = data.map(i => `
-    <tr>
-      <td>${i.nome}</td>
-      <td><span class="badge bg-secondary">${i.tipo || ''}</span></td>
-      <td>${i.unidade || ''}</td>
-      <td class="text-end">R$ ${Number(i.preco||0).toFixed(4)}
-        <button type="button" class="btn btn-sm btn-primary ms-2"
-                onclick='_addInsumoRow(${JSON.stringify(i)})'>
-          <i class="fas fa-plus"></i>
-        </button>
-      </td>
-    </tr>`).join('');
+  data.forEach(i => {
+    const tr = document.createElement('tr');
+    const tdNome = document.createElement('td');
+    tdNome.textContent = i.nome || '';
+    const tdTipo = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-secondary';
+    badge.textContent = i.tipo || '';
+    tdTipo.appendChild(badge);
+    const tdUn = document.createElement('td');
+    tdUn.textContent = i.unidade || '';
+    const tdPreco = document.createElement('td');
+    tdPreco.className = 'text-end';
+    tdPreco.appendChild(document.createTextNode(
+      'R$ ' + Number(i.preco || 0).toFixed(4) + ' '
+    ));
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-primary ms-2';
+    btn.innerHTML = '<i class="fas fa-plus"></i>';
+    btn.addEventListener('click', () => _addInsumoRow(i));
+    tdPreco.appendChild(btn);
+    tr.append(tdNome, tdTipo, tdUn, tdPreco);
+    tb.appendChild(tr);
+  });
 }
 function _addInsumoRow(insumo) {
   if (!_pickerTbody) return;

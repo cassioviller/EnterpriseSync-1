@@ -865,7 +865,24 @@ def atualizar_servico(servico_id):
         
         logger.info(f"✅ Serviço atualizado: {nome} com {subatividades_salvas} subatividades")
         flash(f'Serviço "{nome}" atualizado com sucesso! ({subatividades_salvas} subatividades)', 'success')
-        
+
+        # Task #118: modo embedado (iframe dentro do Orçamento) — devolve uma
+        # página minimalista que avisa o pai via postMessage e fecha o modal.
+        if request.args.get('embedded') or request.form.get('embedded'):
+            return render_template_string("""
+<!doctype html><html><body style="font-family:sans-serif;padding:24px">
+<p>✅ Serviço atualizado. Fechando…</p>
+<script>
+  try {
+    window.parent.postMessage({
+      type: 'sige:servico_atualizado',
+      servico: { id: {{ sid }}, nome: {{ nome|tojson }},
+                 unidade: {{ unidade|tojson }} }
+    }, window.location.origin);
+  } catch (e) { console.error(e); }
+</script></body></html>
+""", sid=servico_id, nome=nome, unidade=(servico.unidade_medida or 'un'))
+
         return redirect(url_for('servicos_crud.index'))
         
     except Exception as e:

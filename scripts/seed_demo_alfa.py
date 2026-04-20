@@ -693,6 +693,87 @@ def _seed():
 
     db.session.commit()
 
+    # 11.5) Task #118 — E2E: gerar Proposta a partir do Orçamento, aprovar e
+    # validar override+snapshot na materialização do cronograma.
+    from services.cronograma_proposta import (
+        montar_arvore_preview as _montar_arvore_t118,
+    )
+
+    proposta_t118 = Proposta()
+    proposta_t118.titulo = orc.titulo + " — Proposta E2E #118"
+    proposta_t118.descricao = orc.descricao
+    proposta_t118.cliente_id = orc.cliente_id
+    proposta_t118.cliente_nome = orc.cliente_nome or CLIENTE_NOME
+    proposta_t118.admin_id = aid
+    proposta_t118.criado_por = aid
+    proposta_t118.status = "rascunho"
+    proposta_t118.valor_total = orc.venda_total or 0
+    proposta_t118.orcamento_id = orc.id
+    db.session.add(proposta_t118); db.session.flush()
+
+    for _idx, _it in enumerate(orc.itens, start=1):
+        db.session.add(PropostaItem(
+            admin_id=aid,
+            proposta_id=proposta_t118.id,
+            item_numero=_idx, ordem=_idx,
+            descricao=_it.descricao,
+            quantidade=_it.quantidade,
+            unidade=_it.unidade,
+            preco_unitario=_it.preco_venda_unitario or 0,
+            subtotal=_it.venda_total or 0,
+            servico_id=_it.servico_id,
+            quantidade_medida=_it.quantidade,
+            cronograma_template_override_id=_it.cronograma_template_override_id,
+            composicao_snapshot=_it.composicao_snapshot or [],
+        ))
+    db.session.flush()
+
+    # Snapshot da árvore (precedência override→padrão) marcando todos os nós.
+    _arvore = _montar_arvore_t118(proposta_t118, aid)
+    def _marcar_todos(nodes):
+        for n in nodes:
+            n["selecionado"] = True
+            for g in n.get("grupos", []):
+                g["selecionado"] = True
+                for s in g.get("subatividades", []):
+                    s["selecionado"] = True
+        return nodes
+    proposta_t118.cronograma_default_json = _marcar_todos(_arvore)
+    proposta_t118.status = "aprovada"
+    db.session.flush()
+
+    # Cria a Obra e dispara o handler (igual à rota de aprovação).
+    obra_t118 = Obra(
+        nome=f"Obra E2E #{proposta_t118.id} — Task #118",
+        codigo=f"E2E118-{proposta_t118.id}",
+        admin_id=aid, status="Em andamento",
+        data_inicio=date.today(), responsavel_id=aid,
+        proposta_origem_id=proposta_t118.id, cliente_id=cliente.id,
+    )
+    db.session.add(obra_t118); db.session.flush()
+    proposta_t118.obra_id = obra_t118.id
+    db.session.flush()
+
+    from handlers.propostas_handlers import handle_proposta_aprovada
+    handle_proposta_aprovada({
+        "proposta_id": proposta_t118.id,
+        "cliente_nome": proposta_t118.cliente_nome,
+        "valor_total": float(proposta_t118.valor_total or 0),
+        "data_aprovacao": date.today().isoformat(),
+    }, aid)
+    db.session.commit()
+
+    # Validação E2E: tarefas materializadas com origem 'override' para o item C.
+    from models import TarefaCronograma as _TC
+    _qs = (_TC.query
+           .filter_by(admin_id=aid, obra_id=obra_t118.id)
+           .all())
+    _origens = {t.gerada_por_proposta_item_id: t for t in _qs if t.gerada_por_proposta_item_id}
+    log.info(
+        "Task #118 E2E: Proposta #%s aprovada → Obra #%s, %d tarefas materializadas",
+        proposta_t118.id, obra_t118.id, len(_qs),
+    )
+
     # 12) Medição quinzenal #001 + APROVAÇÃO → ContaReceber OBR-MED -------
     medicao, err = gerar_medicao_quinzenal(
         obra_id=obra.id, admin_id=aid,
