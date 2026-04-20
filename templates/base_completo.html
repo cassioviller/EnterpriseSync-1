@@ -957,9 +957,28 @@
                                 <li><a class="dropdown-item" href="{{ url_for('almoxarifado.relatorios') }}">
                                     <i class="fas fa-chart-bar me-1"></i> Relatórios
                                 </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.fornecedores') }}">
+                                    <i class="fas fa-truck me-1"></i> Fornecedores
+                                </a></li>
                             </ul>
                         </li>
-                        
+
+                        <!-- Cadastros -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="cadastrosDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-address-book me-1"></i> Cadastros
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('clientes.listar') }}">
+                                    <i class="fas fa-user-tie me-1"></i> Clientes
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('almoxarifado.fornecedores') }}">
+                                    <i class="fas fa-truck me-1"></i> Fornecedores
+                                </a></li>
+                            </ul>
+                        </li>
+
                         <!-- Relatórios -->
                         <li class="nav-item">
                             <a class="nav-link" href="/relatorios">

@@ -1,0 +1,156 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Clientes - Cadastros{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-user-tie text-primary me-2"></i>
+                Clientes
+            </h1>
+            <p class="text-muted mb-0">Gerencie os clientes da sua empresa</p>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('clientes.criar') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Cliente
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('clientes.listar') }}" class="row g-3">
+                <div class="col-md-10">
+                    <input type="text" class="form-control" name="busca"
+                           placeholder="Buscar por nome, e-mail, telefone ou CNPJ..."
+                           value="{{ busca or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i> Buscar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if clientes %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+            <h6 class="mb-0 text-primary">
+                <i class="fas fa-list me-2"></i>
+                {{ clientes|length }} cliente(s) encontrado(s)
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>CNPJ</th>
+                            <th>Contato</th>
+                            <th>Endereço</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cliente in clientes %}
+                        <tr>
+                            <td><strong>{{ cliente.nome }}</strong></td>
+                            <td>
+                                {% if cliente.cnpj %}
+                                    <code class="small">{{ cliente.cnpj }}</code>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if cliente.telefone %}
+                                <div><i class="fas fa-phone text-muted me-1"></i> {{ cliente.telefone }}</div>
+                                {% endif %}
+                                {% if cliente.email %}
+                                <div><i class="fas fa-envelope text-muted me-1"></i> {{ cliente.email }}</div>
+                                {% endif %}
+                                {% if not cliente.telefone and not cliente.email %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if cliente.endereco %}
+                                    {{ cliente.endereco }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('clientes.editar', id=cliente.id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal{{ cliente.id }}"
+                                        title="Excluir">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+
+                        <div class="modal fade" id="deleteModal{{ cliente.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Confirmar Exclusão</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>Tem certeza que deseja excluir o cliente:</p>
+                                        <p class="fw-bold mb-0">{{ cliente.nome }}</p>
+                                        {% if cliente.cnpj %}
+                                        <p class="small text-muted">CNPJ: {{ cliente.cnpj }}</p>
+                                        {% endif %}
+                                        <div class="alert alert-warning small mb-0">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Se este cliente já estiver vinculado a propostas ou orçamentos,
+                                            a exclusão será bloqueada.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <form method="POST" action="{{ url_for('clientes.excluir', id=cliente.id) }}" style="display:inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button type="submit" class="btn btn-danger">Excluir</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info border-0 shadow-sm">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle fa-2x me-3"></i>
+            <div>
+                <strong>Nenhum cliente encontrado</strong>
+                <p class="mb-0 mt-1">
+                    {% if busca %}
+                        Não encontramos clientes com o termo "{{ busca }}".
+                        <a href="{{ url_for('clientes.listar') }}">Ver todos</a>
+                    {% else %}
+                        Cadastre o primeiro cliente para começar.
+                        <a href="{{ url_for('clientes.criar') }}">Criar cliente</a>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

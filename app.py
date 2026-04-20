@@ -288,6 +288,13 @@ try:
 except ImportError:
     logging.warning("Almoxarifado views não disponível")
 
+try:
+    from clientes_views import clientes_bp
+    app.register_blueprint(clientes_bp)
+    logging.info("[OK] Blueprint clientes (cadastros) registrado")
+except Exception as e:
+    logging.error(f"[ERROR] Erro ao registrar blueprint clientes: {e}")
+
 ponto_import_error = None
 try:
     from ponto_views import ponto_bp

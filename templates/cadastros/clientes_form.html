@@ -1,0 +1,125 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if cliente else 'Novo' }} Cliente{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-user-tie text-primary me-2"></i>
+                {{ 'Editar' if cliente else 'Novo' }} Cliente
+            </h1>
+        </div>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-id-card me-2"></i>Dados do Cliente</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="nome" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="nome" name="nome"
+                                   value="{{ valores.nome or '' }}"
+                                   required placeholder="Nome ou Razão Social">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="cnpj" class="form-label">CNPJ</label>
+                            <input type="text" class="form-control" id="cnpj" name="cnpj"
+                                   value="{{ valores.cnpj or '' }}"
+                                   placeholder="00.000.000/0000-00" maxlength="18">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">E-mail</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   value="{{ valores.email or '' }}"
+                                   placeholder="contato@cliente.com.br">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="telefone" class="form-label">Telefone</label>
+                            <input type="text" class="form-control" id="telefone" name="telefone"
+                                   value="{{ valores.telefone or '' }}"
+                                   placeholder="(00) 00000-0000">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Endereço</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="endereco" class="form-label">Endereço Completo</label>
+                            <textarea class="form-control" id="endereco" name="endereco" rows="5"
+                                      placeholder="Rua, número, complemento, bairro, cidade/UF, CEP">{{ valores.endereco or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if cliente else 'Cadastrar' }} Cliente
+                            </button>
+                            <a href="{{ url_for('clientes.listar') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cnpjInput = document.getElementById('cnpj');
+    if (cnpjInput) {
+        cnpjInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 14) {
+                value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+                value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                e.target.value = value;
+            }
+        });
+    }
+    const telInput = document.getElementById('telefone');
+    if (telInput) {
+        telInput.addEventListener('input', function(e) {
+            let v = e.target.value.replace(/\D/g, '');
+            if (v.length <= 11) {
+                if (v.length <= 10) {
+                    v = v.replace(/^(\d{2})(\d)/, '($1) $2');
+                    v = v.replace(/(\d{4})(\d)/, '$1-$2');
+                } else {
+                    v = v.replace(/^(\d{2})(\d)/, '($1) $2');
+                    v = v.replace(/(\d{5})(\d)/, '$1-$2');
+                }
+                e.target.value = v;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

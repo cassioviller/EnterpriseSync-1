@@ -786,6 +786,20 @@
                             
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" style="white-space: nowrap;">
+                                    <i class="fas fa-address-book me-2"></i> Cadastros
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{{ url_for('clientes.listar') }}">
+                                        <i class="fas fa-user-tie me-2"></i> Clientes
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.fornecedores') }}">
+                                        <i class="fas fa-truck me-2"></i> Fornecedores
+                                    </a></li>
+                                </ul>
+                            </div>
+
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" style="white-space: nowrap;">
                                     <i class="fas fa-cog me-2"></i> Configurações
                                 </a>
                                 <ul class="dropdown-menu">
