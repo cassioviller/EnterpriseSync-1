@@ -19,6 +19,16 @@
 
 </div>
 
+> **Atualização (Task #132):** o ciclo completo do sistema —
+> insumo → serviço (com composição e cronograma) → proposta →
+> aprovação do cliente pelo link público → cronograma da obra
+> validado pelo admin — está documentado e ilustrado em
+> [`manual-ciclo-completo.md` § Apêndice B](manual-ciclo-completo.md#apêndice-b--teste-e2e-automatizado-task-132-insumo--serviço--proposta--cliente--cronograma--obra),
+> com screenshots em `docs/img/manual 2/`. Use essa referência para
+> entender em qual tela o cliente aprova (sem ver cronograma) e em
+> qual tela o admin valida o cronograma da obra recém-criada
+> (`/cronograma/obra/<id>`, badge **📋 do contrato**).
+
 ---
 
 # Índice Geral

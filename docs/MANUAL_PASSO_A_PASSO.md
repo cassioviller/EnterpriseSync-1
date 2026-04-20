@@ -4,6 +4,13 @@
 
 > Este manual apresenta instruções práticas e objetivas para utilizar as principais funcionalidades do sistema SIGE EnterpriseSync.
 
+> **Atualização (Task #132):** o ciclo completo do sistema —
+> insumo → serviço (com composição e cronograma) → proposta →
+> aprovação do cliente pelo link público → cronograma da obra
+> validado pelo admin — está documentado e ilustrado em
+> [`manual-ciclo-completo.md` § Apêndice B](manual-ciclo-completo.md#apêndice-b--teste-e2e-automatizado-task-132-insumo--serviço--proposta--cliente--cronograma--obra),
+> com screenshots em `docs/img/manual 2/`.
+
 ---
 
 ## Sumário

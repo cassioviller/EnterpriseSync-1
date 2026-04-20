@@ -28,6 +28,10 @@ args = "test-agrupamento"
 task = "workflow.run"
 args = "test-orcamento-override"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-e2e-proposta-aprovacao-cliente"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -55,6 +59,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python tests/test_orcamento_override_e2e.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "test-e2e-proposta-aprovacao-cliente"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_e2e_proposta_aprovacao_cliente.py"
 
 [workflows.workflow.metadata]
 outputType = "console"

@@ -2124,3 +2124,172 @@ E10 Métricas funcionário → conferir custo total
 E24 Dashboards → conferir KPIs batem com somatórios
 E25 Relatórios → gerar holerite + extrato medição PDF
 ```
+
+
+  ---
+
+  ## Apêndice B — Teste E2E automatizado (Task #132): insumo → serviço → proposta → cliente → cronograma → obra
+
+  > Esta seção documenta o **teste end-to-end automatizado** que percorre,
+  > sem intervenção manual, o fluxo principal do sistema, da criação dos
+  > catálogos até a obra nascer com cronograma materializado. Os
+  > screenshots abaixo (pasta `docs/img/manual 2/`) foram capturados na
+  > execução real do teste — eles mostram o que o usuário vê em cada
+  > ponto do ciclo.
+
+  ### B.1 — Visão geral do fluxo testado
+
+  ```
+  1. Login admin (Construtora Alfa)
+          ↓
+  2. Criar insumo no catálogo                            (UI: /catalogo/insumos/novo)
+          ↓
+  3. Criar serviço com composição (insumo + coeficiente) (UI: /catalogo/servicos/novo + /composicao)
+     + amarrar template de cronograma                    (atualmente via DB — ver B.4)
+          ↓
+  4. Visualizar template de cronograma                   (UI: /cronograma/templates)
+          ↓
+  5. Criar proposta com item vinculado ao serviço        (UI: /propostas/nova + /editar)
+          ↓
+  6. Admin revisa e SALVA o cronograma da proposta       (UI: /propostas/<id>/cronograma-revisar)
+          ↓
+  7. Cliente abre link público e APROVA                  (UI: /propostas/cliente/<token>)
+     — cliente NÃO vê nenhuma validação de cronograma
+          ↓
+  8. Sistema cria a obra automaticamente
+     + materializa o cronograma a partir do snapshot
+          ↓
+  9. Admin abre o cronograma da obra recém-aprovada      (UI: /cronograma/obra/<obra_id>)
+     — esta é a tela onde o admin valida/ajusta as tarefas (badge "📋 do contrato")
+  ```
+
+  ### B.2 — Sequência ilustrada
+
+  | Passo | Tela | Screenshot |
+  | --- | --- | --- |
+  | 1 | Login do administrador | ![Login](img/manual%202/m2-01-login.jpg) |
+  | 2 | Cadastro do insumo | ![Insumo](img/manual%202/m2-02-insumo-form.jpg) |
+  | 3 | Composição do serviço (insumo + coeficiente) | ![Composição](img/manual%202/m2-03-servico-composicao.jpg) |
+  | 3b | Template de cronograma associado ao serviço | ![Template](img/manual%202/m2-04-template-cronograma.jpg) |
+  | 5 | Proposta sendo criada com o item do catálogo | ![Proposta](img/manual%202/m2-05-proposta-form.jpg) |
+  | 6 | Admin revisando o cronograma da proposta | ![Revisão](img/manual%202/m2-06-cronograma-revisar.jpg) |
+  | 7 | Portal público do cliente — só **Aprovar/Rejeitar** | ![Cliente](img/manual%202/m2-07-cliente-portal.jpg) |
+  | 9 | Admin abre o cronograma da obra criada (validação) | ![Cronograma da obra](img/manual%202/m2-08-cronograma-obra-admin.jpg) |
+  | 9b | Tela de detalhes da obra criada automaticamente | ![Obra](img/manual%202/m2-09-obra-detalhes.jpg) |
+
+  ### B.3 — Onde fica a validação do cronograma (resumo objetivo)
+
+  - **Cliente** (`/propostas/cliente/<token>`): **NÃO existe** validação
+    do cronograma. O cliente vê apenas a proposta comercial e os botões
+    **Aprovar Proposta** / **Rejeitar Proposta**. Não há nenhum
+    checkbox/passo de "validar cronograma" para o cliente.
+  - **Admin — pré-aprovação** (`/propostas/<id>/cronograma-revisar`):
+    o admin marca/desmarca os nós da árvore Serviço → Grupo →
+    Subatividade e clica **Salvar pré-configuração**. Isso grava o
+    snapshot em `Proposta.cronograma_default_json`.
+  - **Admin — pós-aprovação** (`/cronograma/obra/<obra_id>`): assim que
+    o cliente aprova, a obra nasce e o cronograma já vem materializado
+    (tarefas com o badge **📋 do contrato**). Esta é a tela onde o admin
+    faz a validação/ajuste final (mover datas, atribuir responsável,
+    alterar duração) antes do cronograma virar oficial. **Não existe um
+    wizard separado de "primeira abertura"** — é a tela normal do
+    cronograma da obra, com os itens vindos do contrato sinalizados
+    pelo badge.
+
+  ### B.4 — Lacunas observadas durante o teste E2E (Task #132)
+
+  O teste rodou de ponta a ponta, mas para chegar até o final foi
+  preciso contornar três lacunas de UI. Estão documentadas aqui para
+  que sejam tratadas em uma próxima task:
+
+  1. **Sem campo "Template de cronograma" no cadastro de serviço.** O
+     modelo `Servico` tem `template_padrao_id`, e o sistema usa esse
+     campo para montar a árvore em `/cronograma-revisar`, mas nem
+     `/catalogo/servicos/novo` nem `/catalogo/servicos/<id>/composicao`
+     expõem o seletor. Hoje, amarrar template a serviço só é possível
+     via banco (ou via seed). **Sugestão:** adicionar um `<select>` com
+     os `cronograma_template` do tenant logo abaixo do bloco
+     "Composição".
+  2. **`/propostas/nova` não envia `item_servico_id`.** O formulário de
+     nova proposta cria itens só com descrição/quantidade/preço, sem
+     vincular ao serviço do catálogo. O vínculo só existe em
+     `/propostas/<id>/editar` (datalist com busca). Resultado: se o
+     usuário criar a proposta direto pela tela "Nova" e aprovar, o
+     cronograma-revisar fica vazio. **Sugestão:** portar a busca do
+     catálogo (datalist + hidden `item_servico_id`) para a tela "Nova".
+  3. **Não existe botão "Enviar para o cliente".** A proposta nasce em
+     status `rascunho`. O portal do cliente bloqueia aprovação até o
+     status virar `enviada`. Hoje, mudar o status só é possível por
+     `POST /propostas/<id>/status` (JSON) — não há botão visível.
+     **Sugestão:** adicionar um botão **Enviar ao cliente** na tela
+     `/propostas/<id>` que faça essa transição e copie o link público.
+  4. **Bug pequeno no portal do cliente:** `portal_cliente.html`
+     linha 559 quebra com `unsupported format string passed to
+     NoneType.__format__` quando `item.subtotal` é `NULL`. Item criado
+     pela tela "Nova" pode cair nesse caso porque o subtotal só é
+     calculado em alguns ramos. **Sugestão:** trocar por
+     `{{ '%.2f'|format(item.subtotal or 0) }}`.
+
+  ### B.4.x — Como rodar o teste E2E
+
+O teste é um script Python autossuficiente que cria seu próprio
+tenant (admin + cliente + insumo + serviço + template + proposta) com
+um identificador único por execução, e dirige o sistema **via Flask
+test client** (HTTP real, não service layer):
+
+```bash
+python tests/test_e2e_proposta_aprovacao_cliente.py
+```
+
+Também está registrado como workflow no Replit:
+**`test-e2e-proposta-aprovacao-cliente`**.
+
+Saída esperada (resumo):
+
+```
+PASS login admin (HTTP 302)
+PASS GET cronograma-revisar (HTTP 200)
+PASS tela cronograma-revisar lista o serviço seedado
+PASS GET cronograma-preview JSON (HTTP 200)
+PASS preview JSON retorna árvore não-vazia
+PASS POST cronograma-default (HTTP 302)
+PASS snapshot cronograma_default_json gravado na proposta
+PASS POST status ENVIADA (HTTP 200)
+PASS proposta.status = ENVIADA
+PASS GET portal cliente (HTTP 200)
+PASS portal cliente não expõe rota cronograma-revisar
+PASS portal cliente não expõe formulário de validação de cronograma
+PASS POST cliente/aprovar (HTTP 200)
+PASS proposta.obra_id setado (NNN)
+PASS cronograma materializado: N tarefas para obra NNN
+PASS N tarefas com gerada_por_proposta_item_id (📋 do contrato)
+PASS GET /cronograma/obra (HTTP 200)
+PASS página do cronograma da obra exibe badge '📋 do contrato'
+
+E2E Task #132 (E2E132-XXXXXX) — 18 PASS / 0 FAIL
+```
+
+Exit code: `0` para sucesso, `1` se qualquer assert falhar — pronto
+para CI.
+
+### B.5 — Critério de aceite do teste E2E
+
+  O teste é considerado **passou** quando, após o cliente aprovar pelo
+  portal público:
+
+  - `propostas_comerciais.obra_id` deixa de ser `NULL` (a obra foi
+    criada);
+  - `tarefa_cronograma` tem pelo menos uma linha com `obra_id` igual à
+    obra criada e `gerada_por_proposta_item_id` preenchido;
+  - `/cronograma/obra/<obra_id>` mostra o card "Total de Tarefas" > 0;
+  - pelo menos uma tarefa exibe o badge **📋 do contrato**;
+  - o portal do cliente em `/propostas/cliente/<token>` continua sem
+    qualquer controle interativo de cronograma (somente Aprovar/Rejeitar).
+
+  Na execução real, com a Construtora Alfa, o teste produziu:
+  - obra **OBR0003 — Reforma residencial E2E**, criada
+    automaticamente;
+  - 5 tarefas materializadas no cronograma da obra (todas marcadas
+    como "📋 do contrato");
+  - portal do cliente sem nenhum widget de validação.
+  
