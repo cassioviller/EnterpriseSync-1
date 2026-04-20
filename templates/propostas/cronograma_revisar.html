@@ -272,6 +272,17 @@ ul.cron-tree .node-sub > .node-label {
                 </h5>
                 {% if item.template_nome %}
                 <span class="badge bg-info">📋 {{ item.template_nome }}</span>
+                {% if item.origem_template == 'override' %}
+                <span class="badge bg-primary"
+                      title="Template definido como override na linha do orçamento (Task #118)">
+                    <i class="fas fa-bolt me-1"></i>override
+                </span>
+                {% elif item.origem_template == 'padrao' %}
+                <span class="badge bg-light text-muted"
+                      title="Template padrão herdado do serviço (Task #102)">
+                    <i class="fas fa-link me-1"></i>padrão do serviço
+                </span>
+                {% endif %}
                 {% endif %}
                 {% if item.sem_template %}
                 <span class="badge bg-secondary">

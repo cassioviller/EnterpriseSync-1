@@ -124,12 +124,18 @@
               <i class="fas fa-plus-circle me-1"></i>novo serviço
             </button>
           </label>
-          <select class="form-select" name="servico_id">
-            <option value="">— item livre —</option>
-            {% for s in servicos %}
-              <option value="{{ s.id }}">{{ s.nome }} ({{ s.unidade_medida }})</option>
-            {% endfor %}
-          </select>
+          <div class="input-group">
+            <select class="form-select" name="servico_id" id="add-servico-select">
+              <option value="">— item livre —</option>
+              {% for s in servicos %}
+                <option value="{{ s.id }}" data-unidade="{{ s.unidade_medida }}">{{ s.nome }} ({{ s.unidade_medida }})</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn btn-outline-secondary"
+                    onclick="abrirEditarServico()" title="Editar serviço selecionado">
+              <i class="fas fa-pen"></i>
+            </button>
+          </div>
         </div>
         <div class="col-md-3">
           <label class="form-label small">Descrição (se livre)</label>
@@ -323,6 +329,21 @@
                 onclick="addCompRow(this)">
           <i class="fas fa-plus me-1"></i> Adicionar componente
         </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
+                onclick="abrirInsumoPicker(this)" title="Buscar insumo do Catálogo">
+          <i class="fas fa-search me-1"></i> Adicionar do Catálogo
+        </button>
+        {% if it.servico_id %}
+        <form method="POST"
+              action="{{ url_for('orcamentos.reset_composicao', item_id=it.id) }}"
+              class="d-inline ms-1"
+              onsubmit="return confirm('Reverter a composição desta linha para o padrão do serviço? Mudanças locais serão perdidas.');">
+          <button class="btn btn-sm btn-outline-warning" type="submit"
+                  title="Voltar à composição padrão do serviço (Catálogo)">
+            <i class="fas fa-undo me-1"></i> Voltar à composição padrão
+          </button>
+        </form>
+        {% endif %}
       </div>
 
       <div class="row g-2 mt-3">
@@ -448,5 +469,137 @@ document.addEventListener('input', e => {
   if (e.target.matches('input,select,textarea')) recalcAll();
 });
 document.addEventListener('DOMContentLoaded', recalcAll);
+
+// Task #118 — Inline Servico CRUD: pós-save no iframe envia postMessage,
+// adicionamos a opção no <select>, selecionamos e fechamos o modal sem reload.
+window.addEventListener('message', function(ev) {
+  if (ev.origin !== window.location.origin) return;
+  const msg = ev.data || {};
+  if (msg.type !== 'sige:servico_criado' || !msg.servico) return;
+  const sv = msg.servico;
+  document.querySelectorAll('select[name="servico_id"]').forEach(sel => {
+    if (![...sel.options].some(o => o.value === String(sv.id))) {
+      const opt = new Option(`${sv.nome} (${sv.unidade || 'un'})`, String(sv.id));
+      opt.dataset.unidade = sv.unidade || 'un';
+      sel.add(opt);
+    }
+  });
+  // Seleciona no formulário "Adicionar item" (preserva edições nas demais linhas)
+  const addSel = document.getElementById('add-servico-select');
+  if (addSel) {
+    addSel.value = String(sv.id);
+    addSel.dispatchEvent(new Event('change', {bubbles:true}));
+  }
+  // Fecha modal de "novo serviço"
+  const modalEl = document.getElementById('novoServicoModal');
+  if (modalEl && window.bootstrap) {
+    const inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    inst.hide();
+  }
+});
+
+function abrirEditarServico() {
+  const sel = document.getElementById('add-servico-select');
+  const sid = sel && sel.value;
+  if (!sid) {
+    alert('Selecione um serviço para editar.');
+    return;
+  }
+  // Reaproveita rota /servicos/<id>/editar do Catálogo (abre em nova aba para
+  // não perder edições não salvas nas outras linhas do orçamento).
+  window.open(`/servicos/${sid}/editar`, '_blank');
+}
+
+// Task #118 — Picker de Insumo do Catálogo (busca + categoria + coeficiente)
+let _pickerTbody = null;
+function abrirInsumoPicker(btn) {
+  _pickerTbody = btn.parentElement.querySelector('.comp-tbody');
+  document.getElementById('insumoPickerQ').value = '';
+  document.getElementById('insumoPickerResults').innerHTML =
+    '<tr><td colspan="4" class="text-muted text-center small">Digite para buscar…</td></tr>';
+  document.getElementById('insumoPickerCoef').value = '1';
+  document.getElementById('insumoPickerTipo').value = 'MATERIAL';
+  const modal = new bootstrap.Modal(document.getElementById('insumoPickerModal'));
+  modal.show();
+}
+async function buscarInsumos() {
+  const q = document.getElementById('insumoPickerQ').value;
+  const r = await fetch('/catalogo/api/insumos/buscar?q=' + encodeURIComponent(q));
+  const data = await r.json();
+  const tb = document.getElementById('insumoPickerResults');
+  if (!data.length) {
+    tb.innerHTML = '<tr><td colspan="4" class="text-muted text-center small">Nenhum insumo encontrado</td></tr>';
+    return;
+  }
+  tb.innerHTML = data.map(i => `
+    <tr>
+      <td>${i.nome}</td>
+      <td><span class="badge bg-secondary">${i.tipo || ''}</span></td>
+      <td>${i.unidade || ''}</td>
+      <td class="text-end">R$ ${Number(i.preco||0).toFixed(4)}
+        <button type="button" class="btn btn-sm btn-primary ms-2"
+                onclick='_addInsumoRow(${JSON.stringify(i)})'>
+          <i class="fas fa-plus"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+function _addInsumoRow(insumo) {
+  if (!_pickerTbody) return;
+  const tipo = document.getElementById('insumoPickerTipo').value || 'MATERIAL';
+  const coef = parseFloat(document.getElementById('insumoPickerCoef').value) || 1;
+  const tmpl = document.getElementById('comp-row-tmpl');
+  const node = tmpl.content.cloneNode(true);
+  node.querySelector('select[name="comp_tipo"]').value = tipo;
+  node.querySelector('input[name="comp_insumo_id"]').value = insumo.id;
+  node.querySelector('input[name="comp_nome"]').value = insumo.nome;
+  node.querySelector('input[name="comp_unidade"]').value = insumo.unidade || 'un';
+  node.querySelector('input[name="comp_coeficiente"]').value = coef;
+  node.querySelector('input[name="comp_preco_unitario"]').value = insumo.preco || 0;
+  _pickerTbody.appendChild(node);
+  recalcAll();
+  bootstrap.Modal.getInstance(document.getElementById('insumoPickerModal')).hide();
+}
 </script>
+
+<!-- Modal: Picker de Insumo do Catálogo (Task #118) -->
+<div class="modal fade" id="insumoPickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-search me-2"></i>Adicionar insumo do Catálogo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label small">Buscar por nome</label>
+            <input id="insumoPickerQ" class="form-control" oninput="buscarInsumos()" autofocus>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Categoria</label>
+            <select id="insumoPickerTipo" class="form-select">
+              <option value="MATERIAL">Material</option>
+              <option value="MAO_OBRA">Mão de obra</option>
+              <option value="EQUIPAMENTO">Equipamento</option>
+              <option value="OUTROS">Outros</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Coeficiente</label>
+            <input id="insumoPickerCoef" type="number" step="0.0001" value="1" class="form-control">
+          </div>
+        </div>
+        <div class="table-responsive" style="max-height:50vh;overflow:auto">
+          <table class="table table-sm">
+            <thead class="table-light"><tr>
+              <th>Insumo</th><th>Tipo</th><th>Un.</th><th class="text-end">Preço vigente</th>
+            </tr></thead>
+            <tbody id="insumoPickerResults"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

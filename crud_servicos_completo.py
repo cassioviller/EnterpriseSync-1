@@ -639,7 +639,25 @@ def criar_servico():
         
         logger.info(f"✅ Serviço '{nome}' criado com {subatividades_criadas} subatividades")
         flash(f'Serviço "{nome}" criado com sucesso!', 'success')
-        
+
+        # Task #118: modo embedado (iframe dentro do Orçamento) — devolve uma
+        # página minimalista que avisa o pai via postMessage e fecha o modal,
+        # injetando o serviço novo já no <select> sem reload.
+        if request.args.get('embedded') or request.form.get('embedded'):
+            return render_template_string("""
+<!doctype html><html><body style="font-family:sans-serif;padding:24px">
+<p>✅ Serviço cadastrado. Fechando…</p>
+<script>
+  try {
+    window.parent.postMessage({
+      type: 'sige:servico_criado',
+      servico: { id: {{ sid }}, nome: {{ nome|tojson }},
+                 unidade: {{ unidade|tojson }} }
+    }, window.location.origin);
+  } catch (e) { console.error(e); }
+</script></body></html>
+""", sid=novo_servico.id, nome=nome, unidade=unidade_medida)
+
         return redirect(url_for('servicos_crud.index'))
         
     except Exception as e:

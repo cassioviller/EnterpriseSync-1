@@ -305,6 +305,31 @@ def atualizar_item(item_id):
     return redirect(url_for('orcamentos.editar', id=orc.id))
 
 
+@orcamentos_bp.route('/itens/<int:item_id>/reset-composicao', methods=['POST'])
+@login_required
+@admin_required
+def reset_composicao(item_id):
+    """Task #118: reverte composicao_snapshot do item para a composição padrão
+    do serviço vinculado no Catálogo. Não toca no Servico nem em outros itens.
+    """
+    admin_id = _admin_id()
+    item = OrcamentoItem.query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
+    if not item.servico_id or not item.servico:
+        flash('Este item não está vinculado a um serviço do catálogo.', 'warning')
+        return redirect(url_for('orcamentos.editar', id=item.orcamento_id))
+    try:
+        item.composicao_snapshot = snapshot_from_servico(item.servico)
+        recalcular_item(item, item.orcamento)
+        recalcular_orcamento(item.orcamento)
+        db.session.commit()
+        flash('Composição revertida ao padrão do serviço.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('erro ao resetar composicao')
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('orcamentos.editar', id=item.orcamento_id))
+
+
 @orcamentos_bp.route('/itens/<int:item_id>/remover', methods=['POST'])
 @login_required
 @admin_required
