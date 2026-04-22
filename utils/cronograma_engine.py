@@ -369,24 +369,44 @@ def recalcular_cronograma(obra_id: int, admin_id: int, cliente: bool = False) ->
 def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dict:
     """
     Retorna um dict com:
-    - percentual_planejado: quanto deveria estar concluído até data_rdo (linear)
+    - percentual_planejado: quanto deveria estar concluído até data_rdo (linear
+        por dias úteis). Vale `None` quando a tarefa não tem `data_inicio` nem
+        `duracao_dias` definidos — sinalizando "sem plano" para a UI (≠ 0%).
     - percentual_realizado: total acumulado de produção até data_rdo
     - quantidade_acumulada: soma de quantidade_executada_dia até data_rdo
+
+    Casos de planejado:
+      • data_rdo  < data_inicio              → 0.0   (ainda não começou no plano)
+      • data_inicio ≤ data_rdo < data_fim    → interpolação linear (dias úteis)
+      • data_rdo ≥ data_fim                  → 100.0
+      • sem data_inicio ou sem duracao_dias  → None  (sem plano calculável)
     """
     from models import TarefaCronograma, RDOApontamentoCronograma, db
 
     tarefa = TarefaCronograma.query.get(tarefa_id)
     if not tarefa:
-        return {'percentual_planejado': 0.0, 'percentual_realizado': 0.0, 'quantidade_acumulada': 0.0}
+        return {'percentual_planejado': None, 'percentual_realizado': 0.0, 'quantidade_acumulada': 0.0}
 
     # ── Planejado (interpolação linear por dias úteis) ──
-    perc_planejado = 0.0
     if tarefa.data_inicio and tarefa.duracao_dias and tarefa.duracao_dias > 0:
-        cal = get_calendario(admin_id)
-        sab, dom = cal.considerar_sabado, cal.considerar_domingo
-        if data_rdo >= tarefa.data_inicio:
-            dias_passados = dias_uteis_entre(tarefa.data_inicio, data_rdo, sab, dom)
-            perc_planejado = min(100.0, round(dias_passados / tarefa.duracao_dias * 100, 2))
+        if data_rdo < tarefa.data_inicio:
+            perc_planejado = 0.0
+        else:
+            cal = get_calendario(admin_id)
+            sab, dom = cal.considerar_sabado, cal.considerar_domingo
+            # data_fim conhecida? prefere a persistida; senão calcula por dias úteis
+            data_fim = tarefa.data_fim or calcular_data_fim(
+                tarefa.data_inicio, tarefa.duracao_dias, sab, dom
+            )
+            if data_rdo >= data_fim:
+                perc_planejado = 100.0
+            else:
+                dias_passados = dias_uteis_entre(tarefa.data_inicio, data_rdo, sab, dom)
+                perc_planejado = min(100.0, round(dias_passados / tarefa.duracao_dias * 100, 2))
+    else:
+        # Sem plano calculável: a UI deve mostrar "—" e badge "Sem plano",
+        # NÃO 0% (que pareceria atraso).
+        perc_planejado = None
 
     # ── Realizado ──
     from sqlalchemy import func as sqlfunc
@@ -411,6 +431,73 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
         'percentual_planejado': perc_planejado,
         'percentual_realizado': perc_realizado,
         'quantidade_acumulada': acumulado,
+    }
+
+
+def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int) -> dict:
+    """
+    Calcula o **progresso geral acumulado da obra** (modo V2) até `data_ref`.
+
+    Itera todas as `TarefaCronograma` FOLHA da obra (subtarefas — tarefas-pai
+    não entram para evitar dupla contagem) e combina via **média ponderada**.
+
+    Peso por tarefa (em ordem de preferência, documentada inline):
+       1. `quantidade_total` (peso pela "massa" física da tarefa, mais fiel);
+       2. `duracao_dias`     (sem qty: usa a fatia temporal planejada);
+       3. `1`                 (último recurso: média simples).
+
+    Tarefas sem qualquer apontamento até `data_ref` contam como **0%**
+    (puxam a média para baixo) — é por isso que o número não pode decrescer
+    em ordem cronológica enquanto novos apontamentos forem adicionados.
+
+    Returns dict:
+      - progresso_geral_pct: float 0..100 (0 quando a obra não tem tarefas)
+      - n_tarefas: int (folhas consideradas)
+      - n_tarefas_apontadas: int (folhas com pelo menos 1 apontamento até data_ref)
+    """
+    from models import TarefaCronograma
+
+    folhas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(is_cliente=False)
+        .all()
+    )
+    if not folhas:
+        return {'progresso_geral_pct': 0.0, 'n_tarefas': 0, 'n_tarefas_apontadas': 0}
+
+    # Identificar IDs de tarefas-pai (que aparecem como tarefa_pai_id em outras)
+    pais_ids = {t.tarefa_pai_id for t in folhas if t.tarefa_pai_id}
+    folhas_efetivas = [t for t in folhas if t.id not in pais_ids]
+    if not folhas_efetivas:
+        return {'progresso_geral_pct': 0.0, 'n_tarefas': 0, 'n_tarefas_apontadas': 0}
+
+    soma_ponderada = 0.0
+    soma_pesos = 0.0
+    n_apontadas = 0
+
+    for t in folhas_efetivas:
+        prog = calcular_progresso_rdo(t.id, data_ref, admin_id)
+        perc_real = float(prog.get('percentual_realizado') or 0.0)
+
+        # Escolha do peso (ver docstring acima)
+        if t.quantidade_total and float(t.quantidade_total) > 0:
+            peso = float(t.quantidade_total)
+        elif t.duracao_dias and int(t.duracao_dias) > 0:
+            peso = float(t.duracao_dias)
+        else:
+            peso = 1.0
+
+        soma_ponderada += perc_real * peso
+        soma_pesos += peso
+        if (prog.get('quantidade_acumulada') or 0) > 0:
+            n_apontadas += 1
+
+    progresso = (soma_ponderada / soma_pesos) if soma_pesos > 0 else 0.0
+    return {
+        'progresso_geral_pct': round(progresso, 1),
+        'n_tarefas': len(folhas_efetivas),
+        'n_tarefas_apontadas': n_apontadas,
     }
 
 

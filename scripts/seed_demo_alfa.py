@@ -524,10 +524,20 @@ def _seed():
     )
     log.info(f"folhas do cronograma: {len(folhas)}")
 
+    # Task #140 — 3 RDOs em datas crescentes com progresso MONOTÔNICO
+    # (30% → 60% → 100%). Demonstra que "Progresso geral" da listagem
+    # nunca decresce no tempo.
     rdos_dados = [
         (date(2026, 2, 5),  30.0, 8.0),
         (date(2026, 2, 12), 60.0, 8.0),
+        (date(2026, 2, 19), 100.0, 8.0),
     ]
+    # mapa percentual_anterior por (idx) para preencher RDOServicoSubatividade
+    _perc_anteriores = {1: 0.0, 2: 30.0, 3: 60.0}
+    # Acumulador V2 (RDOApontamentoCronograma) por tarefa — mantém somatório
+    # entre RDOs para que a coluna `quantidade_acumulada` seja monotônica.
+    from models import RDOApontamentoCronograma as _RAC_seed
+    _v2_acum_qty = {}
     for idx, (dt, perc_destino, horas) in enumerate(rdos_dados, start=1):
         rdo = RDO(
             numero_rdo=f"RDO-2026-{idx:03d}",
@@ -553,7 +563,7 @@ def _seed():
                 horas_trabalhadas=horas, horas_extras=0.0,
                 tarefa_cronograma_id=folha.id,
             ))
-            perc_anterior = 0.0 if idx == 1 else 30.0
+            perc_anterior = _perc_anteriores.get(idx, 0.0)
             db.session.add(RDOServicoSubatividade(
                 rdo_id=rdo.id,
                 servico_id=(serv_alv.id if "alvenaria" in folha.nome_tarefa.lower()
@@ -570,6 +580,23 @@ def _seed():
                 subatividade_mestre_id=folha.subatividade_mestre_id,
             ))
             folha.percentual_concluido = perc_destino
+
+            # Task #140 — Apontamento V2 (RDOApontamentoCronograma).
+            # Necessário para que a listagem de RDO em modo V2 calcule
+            # "Progresso geral" baseado no acumulado real da obra.
+            if folha.quantidade_total and folha.quantidade_total > 0:
+                qty_destino_acum = float(folha.quantidade_total) * (perc_destino / 100.0)
+                qty_anterior_acum = _v2_acum_qty.get(folha.id, 0.0)
+                qty_dia = max(0.0, qty_destino_acum - qty_anterior_acum)
+                _v2_acum_qty[folha.id] = qty_destino_acum
+                db.session.add(_RAC_seed(
+                    rdo_id=rdo.id, tarefa_cronograma_id=folha.id,
+                    admin_id=aid,
+                    quantidade_executada_dia=qty_dia,
+                    quantidade_acumulada=qty_destino_acum,
+                    percentual_realizado=perc_destino,
+                    percentual_planejado=perc_destino,  # demo: planejado = realizado
+                ))
         db.session.flush()
         log.info(f"RDO #{idx} ({dt.isoformat()}) finalizado — folhas a {perc_destino:.0f}%")
 

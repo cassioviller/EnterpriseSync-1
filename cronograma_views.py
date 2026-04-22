@@ -915,7 +915,10 @@ def apontar_producao(rdo_id: int):
     ap.quantidade_executada_dia = qty_dia
     ap.quantidade_acumulada = nova_acumulada
     ap.percentual_realizado = perc_realizado
-    ap.percentual_planejado = progresso['percentual_planejado']
+    # Coluna é NOT NULL: persistimos 0.0 quando não há plano, mas devolvemos
+    # `None` no JSON para a UI distinguir "Sem plano" de 0% real.
+    plan_calculado = progresso['percentual_planejado']
+    ap.percentual_planejado = 0.0 if plan_calculado is None else plan_calculado
 
     db.session.commit()
 
@@ -929,7 +932,7 @@ def apontar_producao(rdo_id: int):
             'quantidade_executada_dia': ap.quantidade_executada_dia,
             'quantidade_acumulada': ap.quantidade_acumulada,
             'percentual_realizado': ap.percentual_realizado,
-            'percentual_planejado': ap.percentual_planejado,
+            'percentual_planejado': plan_calculado,
         },
     })
 

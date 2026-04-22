@@ -961,7 +961,9 @@ console.log('Initializing RDO with light theme...');
                 
                 <div class="rdo-progress">
                     <div class="progress-header">
-                        <span>Progresso Geral</span>
+                        <span title="{% if rdo_data.is_v2_progresso %}Progresso acumulado de toda a obra até a data deste RDO (média ponderada do cronograma).{% else %}Média das subatividades apontadas neste RDO.{% endif %}">
+                            {{ rdo_data.progresso_label|default('Progresso geral') }}
+                        </span>
                         <strong>{{ "%.1f"|format(rdo_data.progresso_medio|default(0)) }}%</strong>
                     </div>
                     <div class="progress-bar">

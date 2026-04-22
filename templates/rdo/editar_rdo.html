@@ -1189,10 +1189,14 @@ async function carregarTarefasRDOEdit() {
 const _rdoV2EditPaisExpandidos = new Set();
 
 function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
-    const perc_plan = t.percentual_planejado ?? 0;
+    // Task #140: distinguir "Sem plano" (null) de 0% real.
+    // Backend retorna `percentual_planejado: null` quando a tarefa não tem
+    // data_inicio/duração — não dá pra dizer "atrasado".
+    const sem_plano = (t.percentual_planejado === null || t.percentual_planejado === undefined);
+    const perc_plan = sem_plano ? 0 : t.percentual_planejado;
     const perc_real = t.percentual_realizado ?? 0;
-    const status_cor   = perc_real >= perc_plan ? '#28a745' : '#dc3545';
-    const status_label = perc_real >= perc_plan ? 'Em dia' : 'Atrasado';
+    const status_cor   = sem_plano ? '#6c757d' : (perc_real >= perc_plan ? '#28a745' : '#dc3545');
+    const status_label = sem_plano ? 'Sem plano' : (perc_real >= perc_plan ? 'Em dia' : 'Atrasado');
     const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
     const qty_acum  = t.quantidade_acumulada
         ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}`
@@ -1239,14 +1243,22 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
         </div>` : ''}
       </div>`;
 
+    const planejadoBlock = sem_plano
+      ? `<div class="d-flex justify-content-between small text-muted mb-1">
+           <span>Planejado <small class="badge bg-secondary-subtle text-secondary border" title="Tarefa sem data de início ou duração no cronograma">Sem plano</small></span>
+           <span>—</span>
+         </div>
+         <div class="progress mb-1" style="height:6px;background:#e9ecef"></div>`
+      : `<div class="d-flex justify-content-between small text-muted mb-1">
+           <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
+         </div>
+         <div class="progress mb-1" style="height:6px;background:#e9ecef">
+           <div class="progress-bar bg-secondary" style="width:${Math.min(perc_plan,100)}%"></div>
+         </div>`;
+
     const progresso = hasInput ? `
       <div class="px-3 pb-2">
-        <div class="d-flex justify-content-between small text-muted mb-1">
-          <span>Planejado</span><span>${perc_plan.toFixed(1)}%</span>
-        </div>
-        <div class="progress mb-1" style="height:6px;background:#e9ecef">
-          <div class="progress-bar bg-secondary" style="width:${Math.min(perc_plan,100)}%"></div>
-        </div>
+        ${planejadoBlock}
         <div class="d-flex justify-content-between small mb-1">
           <span style="color:${status_cor};font-weight:600">
             Realizado &mdash; <small>${status_label}</small>
@@ -1351,7 +1363,11 @@ async function salvarApontamentoEdit(tarefaId) {
         const btn = document.getElementById(`btn_save_${tarefaId}`);
         if (data.status === 'ok') {
             const ap = data.apontamento;
-            const cor = ap.percentual_realizado >= ap.percentual_planejado ? '#28a745' : '#dc3545';
+            // Sem plano (planejado=null) → cor neutra (cinza), não vermelho
+            const semPlano = (ap.percentual_planejado === null || ap.percentual_planejado === undefined);
+            const cor = semPlano
+                ? '#6c757d'
+                : (ap.percentual_realizado >= ap.percentual_planejado ? '#28a745' : '#dc3545');
             const percEl = document.getElementById(`percReal_${tarefaId}`);
             const barEl  = document.getElementById(`barReal_${tarefaId}`);
             if (percEl) { percEl.textContent = ap.percentual_realizado.toFixed(1) + '%'; percEl.style.color = cor; }

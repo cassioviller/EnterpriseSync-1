@@ -1074,6 +1074,14 @@ def visualizar_rdo(id):
                 )
                 for ap in aps:
                     t = ap.tarefa
+                    # Recalcula planejado para distinguir "Sem plano" (None) de 0%
+                    try:
+                        prog = calcular_progresso_rdo(
+                            ap.tarefa_cronograma_id, rdo.data_relatorio, rdo.admin_id
+                        )
+                        plan = prog.get('percentual_planejado')
+                    except Exception:
+                        plan = ap.percentual_planejado
                     apontamentos_cronograma.append({
                         'tarefa_id': ap.tarefa_cronograma_id,
                         'nome_tarefa': t.nome_tarefa if t else '—',
@@ -1082,7 +1090,8 @@ def visualizar_rdo(id):
                         'quantidade_executada_dia': ap.quantidade_executada_dia,
                         'quantidade_acumulada': ap.quantidade_acumulada,
                         'percentual_realizado': ap.percentual_realizado,
-                        'percentual_planejado': ap.percentual_planejado,
+                        'percentual_planejado': plan,
+                        'sem_plano': plan is None,
                     })
         except Exception as e_v2:
             logger.warning(f"[WARN] Falha ao buscar apontamentos V2 do RDO {id}: {e_v2}")
@@ -1412,6 +1421,7 @@ def editar_rdo(id):
             from utils.tenant import is_v2_active
             if is_v2_active():
                 from models import RDOApontamentoCronograma, TarefaCronograma
+                from utils.cronograma_engine import calcular_progresso_rdo
                 aps = (
                     RDOApontamentoCronograma.query
                     .filter_by(rdo_id=rdo.id, admin_id=admin_id)
@@ -1419,13 +1429,21 @@ def editar_rdo(id):
                 )
                 for ap in aps:
                     t = TarefaCronograma.query.get(ap.tarefa_cronograma_id)
+                    try:
+                        prog = calcular_progresso_rdo(
+                            ap.tarefa_cronograma_id, rdo.data_relatorio, admin_id
+                        )
+                        plan = prog.get('percentual_planejado')
+                    except Exception:
+                        plan = ap.percentual_planejado
                     apontamentos_cronograma.append({
                         'tarefa_id': ap.tarefa_cronograma_id,
                         'nome_tarefa': t.nome_tarefa if t else '—',
                         'quantidade_executada_dia': ap.quantidade_executada_dia,
                         'quantidade_acumulada': ap.quantidade_acumulada,
                         'percentual_realizado': ap.percentual_realizado,
-                        'percentual_planejado': ap.percentual_planejado,
+                        'percentual_planejado': plan,
+                        'sem_plano': plan is None,
                         'unidade_medida': t.unidade_medida if t else '',
                     })
         except Exception as e_v2:
@@ -1843,42 +1861,80 @@ def funcionario_rdo_consolidado():
         
         # Enriquecer dados dos RDOs  
         rdos_processados = []
+        # Cache de "progresso geral V2" por (obra_id, data_relatorio) — evita
+        # recalcular para RDOs do mesmo dia/obra dentro da mesma página.
+        _cache_prog_v2: dict = {}
+        # Memoize: a obra usa V2 (tem TarefaCronograma)?
+        _cache_obra_v2: dict = {}
+        from models import RDOApontamentoCronograma as _RAC
+        from models import TarefaCronograma as _TC
+        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
         for rdo, obra in rdos_paginated.items:
             # Contadores básicos com proteção contra erros de schema
             try:
                 total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
                 total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
-                
+
                 # [CONFIG] CALCULAR HORAS TRABALHADAS REAIS
                 mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                 total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
-                
-                # Calcular progresso médio — V1: subatividades, V2: apontamentos cronograma
-                subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-                if subatividades:
+
+                # ── Detectar se a obra opera em modo V2 (cronograma) ──
+                if obra.id not in _cache_obra_v2:
+                    _cache_obra_v2[obra.id] = (
+                        _TC.query.filter_by(obra_id=obra.id, admin_id=admin_id_correto)
+                        .first() is not None
+                    )
+                obra_em_v2 = _cache_obra_v2[obra.id]
+
+                # ── Contador "X atividades" (Task #140 — bug 3) ──
+                # V1 conta subatividades; V2 conta tarefas-cronograma apontadas
+                # neste RDO. Quando ambos existem, somamos (cenários híbridos).
+                aps_rdo_count = _RAC.query.filter_by(rdo_id=rdo.id).count() if obra_em_v2 else 0
+                total_atividades = total_subatividades + aps_rdo_count
+
+                # ── Progresso (Task #140 — bugs 1 e 2) ──
+                # V2 = progresso GERAL ACUMULADO da obra até a data deste RDO
+                #      (média ponderada sobre TODAS as folhas → monotônico no tempo).
+                # V1 = média das subatividades apontadas neste RDO (legado).
+                if obra_em_v2:
+                    cache_key = (obra.id, rdo.data_relatorio)
+                    if cache_key not in _cache_prog_v2:
+                        _cache_prog_v2[cache_key] = calcular_progresso_geral_obra_v2(
+                            obra.id, rdo.data_relatorio, admin_id_correto
+                        )
+                    progresso_medio = _cache_prog_v2[cache_key]['progresso_geral_pct']
+                    progresso_label = 'Progresso geral'
+                elif total_subatividades > 0:
+                    subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
                     progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades)
+                    progresso_label = 'Progresso do dia'
                 else:
-                    from models import RDOApontamentoCronograma as _RAC
-                    aps = _RAC.query.filter_by(rdo_id=rdo.id).all()
-                    progresso_medio = sum(a.percentual_realizado for a in aps) / len(aps) if aps else 0
-                
-                logger.debug(f"DEBUG RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {total_horas_trabalhadas}h trabalhadas, {progresso_medio}% progresso")
+                    progresso_medio = 0
+                    progresso_label = 'Progresso'
+
+                logger.debug(f"DEBUG RDO {rdo.id}: {total_atividades} atividades, {total_funcionarios} func, {total_horas_trabalhadas}h, {progresso_medio:.1f}% ({progresso_label})")
             except Exception as e:
                 logger.warning(f"[WARN] Erro ao calcular métricas do RDO {rdo.id}: {str(e)}. Migração 48 pode não ter sido executada.")
                 db.session.rollback()
                 # Valores padrão quando há erro de schema
                 total_subatividades = 0
+                total_atividades = 0
                 total_funcionarios = 0
                 total_horas_trabalhadas = 0
                 progresso_medio = 0
-            
+                obra_em_v2 = False
+                progresso_label = 'Progresso'
+
             rdos_processados.append({
                 'rdo': rdo,
                 'obra': obra,
-                'total_subatividades': total_subatividades,
+                'total_subatividades': total_atividades,
                 'total_funcionarios': total_funcionarios,
                 'total_horas_trabalhadas': round(total_horas_trabalhadas, 1),
                 'progresso_medio': round(progresso_medio, 1),
+                'progresso_label': progresso_label,
+                'is_v2_progresso': obra_em_v2,
                 'status_cor': {
                     'Rascunho': 'warning',
                     'Finalizado': 'success',

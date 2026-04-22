@@ -1055,17 +1055,33 @@ console.log('Initializing RDO view with light theme...');
             <div class="p-4">
                 <div class="row g-3">
                 {% for ap in apontamentos_cronograma %}
-                {% set status_ok = ap.percentual_realizado >= ap.percentual_planejado %}
+                {# "Sem plano": tarefa sem data_inicio/duração — não dá pra comparar #}
+                {% set sem_plano = ap.sem_plano or ap.percentual_planejado is none %}
+                {% set status_ok = sem_plano or (ap.percentual_realizado >= ap.percentual_planejado) %}
+                {% if sem_plano %}
+                  {% set borda = '#6c757d' %}
+                  {% set badge_bg = '#6c757d' %}
+                  {% set badge_txt = 'Sem plano' %}
+                {% elif status_ok %}
+                  {% set borda = '#28a745' %}
+                  {% set badge_bg = '#28a745' %}
+                  {% set badge_txt = 'Em dia' %}
+                {% else %}
+                  {% set borda = '#dc3545' %}
+                  {% set badge_bg = '#dc3545' %}
+                  {% set badge_txt = 'Atrasado' %}
+                {% endif %}
                 <div class="col-md-6">
-                    <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid {{ '#28a745' if status_ok else '#dc3545' }} !important">
+                    <div class="card border-0 shadow-sm h-100" style="border-left: 4px solid {{ borda }} !important">
                         <div class="card-body pb-2">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h6 class="card-title mb-0 fw-semibold">
                                     <i class="fas fa-tasks me-1 text-secondary fa-xs"></i>
                                     {{ ap.nome_tarefa }}
                                 </h6>
-                                <span class="badge" style="background:{{ '#28a745' if status_ok else '#dc3545' }}">
-                                    {{ 'Em dia' if status_ok else 'Atrasado' }}
+                                <span class="badge" style="background:{{ badge_bg }}"
+                                      title="{% if sem_plano %}Tarefa sem data de início ou duração no cronograma — comparativo planejado vs. realizado indisponível.{% endif %}">
+                                    {{ badge_txt }}
                                 </span>
                             </div>
 
@@ -1080,22 +1096,26 @@ console.log('Initializing RDO view with light theme...');
                             <div class="mb-1">
                                 <div class="d-flex justify-content-between small">
                                     <span class="text-muted">Planejado</span>
-                                    <span class="text-muted fw-semibold">{{ "%.1f"|format(ap.percentual_planejado) }}%</span>
+                                    <span class="text-muted fw-semibold">
+                                        {% if sem_plano %}—{% else %}{{ "%.1f"|format(ap.percentual_planejado) }}%{% endif %}
+                                    </span>
                                 </div>
                                 <div class="progress" style="height:5px;background:#e9ecef">
+                                    {% if not sem_plano %}
                                     <div class="progress-bar bg-secondary"
                                          style="width:{{ [ap.percentual_planejado, 100]|min }}%"
                                          title="Planejado {{ '%.1f'|format(ap.percentual_planejado) }}%"></div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex justify-content-between small">
-                                    <span style="color:{{ '#28a745' if status_ok else '#dc3545' }};font-weight:600">Realizado</span>
-                                    <span style="color:{{ '#28a745' if status_ok else '#dc3545' }};font-weight:600">{{ "%.1f"|format(ap.percentual_realizado) }}%</span>
+                                    <span style="color:{{ borda }};font-weight:600">Realizado</span>
+                                    <span style="color:{{ borda }};font-weight:600">{{ "%.1f"|format(ap.percentual_realizado) }}%</span>
                                 </div>
                                 <div class="progress" style="height:5px;background:#e9ecef">
                                     <div class="progress-bar"
-                                         style="width:{{ [ap.percentual_realizado, 100]|min }}%;background:{{ '#28a745' if status_ok else '#dc3545' }}"
+                                         style="width:{{ [ap.percentual_realizado, 100]|min }}%;background:{{ borda }}"
                                          title="Realizado {{ '%.1f'|format(ap.percentual_realizado) }}%"></div>
                                 </div>
                             </div>
