@@ -474,8 +474,8 @@
                 </div>
             </div>
 
-            <!-- ===== SEÇÃO DE ENTREGAS / TERCEIROS ===== -->
-            {% if entregas_alertas and entregas_alertas|length > 0 %}
+            <!-- ===== SEÇÃO DE ENTREGAS / TERCEIROS (legado: oculta no V2 — agora inline na lista do cronograma) ===== -->
+            {% if entregas_alertas and entregas_alertas|length > 0 and not (is_v2_active is defined and is_v2_active()) %}
             {% set nivel_color_e = {
                 'verde':    {'bg': '#dcfce7', 'border': '#22c55e', 'text': '#166534', 'icon': 'fa-check-circle'},
                 'azul':     {'bg': '#dbeafe', 'border': '#3b82f6', 'text': '#1e40af', 'icon': 'fa-info-circle'},
@@ -1171,13 +1171,14 @@ async function carregarTarefasRDOEdit() {
             return;
         }
         window.__tarefasRDOAll = json.tarefas;
-        const tarefasEmpresa = json.tarefas.filter(t => (t.responsavel || 'empresa') !== 'subempreitada');
         const temSub = json.tarefas.some(t => (t.responsavel || '') === 'subempreitada');
+        // Task #149 — card "Subempreitada — Produção do Dia" agora oculto por padrão
+        // (apontamento é feito inline via botão Equipe na lista principal).
         const cardSub = document.getElementById('cardSubempreitadaEdit');
-        if (cardSub) cardSub.classList.toggle('d-none', !temSub);
+        if (cardSub) cardSub.classList.add('d-none');
         if (temSub) { carregarSubempreitadaList(); carregarSubempreiteirosCombo(); }
-        if (!tarefasEmpresa.length) empty?.classList.remove('d-none');
-        renderizarTarefasEdit(tarefasEmpresa);
+        if (!json.tarefas.length) empty?.classList.remove('d-none');
+        renderizarTarefasEdit(json.tarefas);
     } catch(e) {
         loading?.classList.add('d-none');
         empty?.classList.remove('d-none');
@@ -1188,10 +1189,20 @@ async function carregarTarefasRDOEdit() {
 // Estado dos pais expandidos (mantido entre re-renderizações)
 const _rdoV2EditPaisExpandidos = new Set();
 
+// Task #149 — badge de responsável (Empresa | Subempreitada | Terceiros)
+function _rdoBadgeResponsavelEdit(resp) {
+    const r = (resp || 'empresa').toLowerCase();
+    if (r === 'subempreitada') {
+        return '<span class="badge" style="background:#7e3ff2;color:#fff;font-size:.65rem" title="Tarefa de subempreitada"><i class="fas fa-hammer me-1"></i>Subempreitada</span>';
+    }
+    if (r === 'terceiros') {
+        return '<span class="badge bg-info text-dark" style="font-size:.65rem" title="Entrega/serviço de terceiros"><i class="fas fa-truck-loading me-1"></i>Terceiros</span>';
+    }
+    return '<span class="badge bg-success" style="font-size:.65rem" title="Tarefa executada pela própria empresa"><i class="fas fa-hard-hat me-1"></i>Empresa</span>';
+}
+
 function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
     // Task #140: distinguir "Sem plano" (null) de 0% real.
-    // Backend retorna `percentual_planejado: null` quando a tarefa não tem
-    // data_inicio/duração — não dá pra dizer "atrasado".
     const sem_plano = (t.percentual_planejado === null || t.percentual_planejado === undefined);
     const perc_plan = sem_plano ? 0 : t.percentual_planejado;
     const perc_real = t.percentual_realizado ?? 0;
@@ -1205,9 +1216,72 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
     const indent  = ehFilho ? 'ms-4' : '';
     const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
     const boldCls = isPai ? 'fw-bold' : '';
-    const hasInput = !isPai && t.quantidade_total > 0;
+    const resp = (t.responsavel || 'empresa').toLowerCase();
+    const isTerceiros = resp === 'terceiros';
+    const isSub = resp === 'subempreitada';
+    const isEmpresa = resp === 'empresa';
+    const hasInput = !isPai && isEmpresa && t.quantidade_total > 0;
     const expandido = _rdoV2EditPaisExpandidos.has(t.id);
     const chevronIcon = expandido ? 'fa-chevron-down' : 'fa-chevron-right';
+    const badgeResp = !isPai ? _rdoBadgeResponsavelEdit(resp) : '';
+    const nomeTarefaEsc = (t.nome_tarefa || '').replace(/'/g, "\\'");
+
+    let acaoInner = '';
+    if (!isPai) {
+        if (isTerceiros) {
+            const concluido = (t.percentual_realizado ?? 0) >= 100 || !!t.data_entrega_real;
+            acaoInner = `
+              <div class="d-flex align-items-center gap-2" onclick="event.stopPropagation()">
+                <input type="hidden" name="terceiros_tarefa_ids_lista[]" value="${t.id}" form="formEditarRDO">
+                <div class="form-check m-0">
+                  <input class="form-check-input" type="checkbox"
+                         id="chk_terc_edit_${t.id}"
+                         name="entrega_tarefa_ids[]" value="${t.id}"
+                         form="formEditarRDO"
+                         ${concluido ? 'checked' : ''}
+                         style="transform:scale(1.2)">
+                  <label class="form-check-label small fw-semibold ms-1" for="chk_terc_edit_${t.id}">
+                    Concluído
+                  </label>
+                </div>
+              </div>`;
+        } else if (isSub) {
+            acaoInner = `
+              <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
+                ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
+                <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 px-2"
+                        onclick="event.stopPropagation(); abrirEquipeSubempreitadaEdit(${t.id}, '${nomeTarefaEsc}')"
+                        title="Apontar equipe de subempreitada">
+                  <i class="fas fa-hammer"></i>
+                </button>
+              </div>`;
+        } else {
+            acaoInner = `
+              ${t.quantidade_total
+                ? `<small class="text-muted">Total: ${qty_total}</small>`
+                : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`}
+              ${hasInput ? `
+              <div class="d-flex align-items-center gap-1" style="min-width:200px" onclick="event.stopPropagation()">
+                <small class="text-muted">Acum: ${qty_acum}</small>
+                <input type="number"
+                       id="qty_edit_${t.id}"
+                       class="form-control form-control-sm"
+                       style="width:85px;transition:background .3s"
+                       min="0" step="0.01"
+                       placeholder="Hoje"
+                       value="${qty_hoje > 0 ? qty_hoje : ''}"
+                       title="Quantidade executada hoje">
+                <button id="btn_save_${t.id}" class="btn btn-primary btn-sm px-2"
+                        onclick="event.stopPropagation(); salvarApontamentoEdit(${t.id})"
+                        title="Salvar apontamento">
+                  <i class="fas fa-save fa-xs"></i>
+                </button>
+                <span class="text-muted small">${t.unidade_medida || ''}</span>
+              </div>` : ''}`;
+        }
+    } else {
+        acaoInner = t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : '';
+    }
 
     const headerInner = `
       <div class="d-flex align-items-center gap-2 p-2 ps-3 flex-wrap ${isPai ? 'rdo-tarefa-pai-header-edit' : ''}"
@@ -1219,28 +1293,9 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
             : '<i class="fas fa-tasks text-secondary me-1"></i>'}
           ${t.nome_tarefa}
         </span>
+        ${badgeResp}
         ${isPai ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle">${contadorFilhos} ${contadorFilhos === 1 ? 'subtarefa' : 'subtarefas'}</span>` : ''}
-        ${t.quantidade_total
-          ? `<small class="text-muted">Total: ${qty_total}</small>`
-          : (isPai ? '' : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`)}
-        ${hasInput ? `
-        <div class="d-flex align-items-center gap-1" style="min-width:200px" onclick="event.stopPropagation()">
-          <small class="text-muted">Acum: ${qty_acum}</small>
-          <input type="number"
-                 id="qty_edit_${t.id}"
-                 class="form-control form-control-sm"
-                 style="width:85px;transition:background .3s"
-                 min="0" step="0.01"
-                 placeholder="Hoje"
-                 value="${qty_hoje > 0 ? qty_hoje : ''}"
-                 title="Quantidade executada hoje">
-          <button id="btn_save_${t.id}" class="btn btn-primary btn-sm px-2"
-                  onclick="event.stopPropagation(); salvarApontamentoEdit(${t.id})"
-                  title="Salvar apontamento">
-            <i class="fas fa-save fa-xs"></i>
-          </button>
-          <span class="text-muted small">${t.unidade_medida || ''}</span>
-        </div>` : ''}
+        ${acaoInner}
       </div>`;
 
     const planejadoBlock = sem_plano
@@ -1449,6 +1504,23 @@ function _popularSubModalCombos() {
     const selS = document.getElementById('sub_subempreiteiro_id');
     selS.innerHTML = '<option value="">— Selecione —</option>' +
         _subCacheLista.map(s => `<option value="${s.id}">${s.nome}${s.especialidade ? ' — '+s.especialidade : ''}</option>`).join('');
+}
+
+// Task #149 — abrir modal sub diretamente pela linha da tarefa (pré-seleciona)
+async function abrirEquipeSubempreitadaEdit(tarefaId, nomeTarefa) {
+    if (!_subCacheLista || !_subCacheLista.length) {
+        await carregarSubempreiteirosCombo();
+    }
+    _popularSubModalCombos();
+    document.getElementById('sub_apt_id').value = '';
+    const selT = document.getElementById('sub_tarefa_id');
+    if (selT) selT.value = String(tarefaId);
+    document.getElementById('sub_qtd_pessoas').value = 0;
+    document.getElementById('sub_horas').value = 0;
+    document.getElementById('sub_qtd_prod').value = 0;
+    document.getElementById('sub_obs').value = '';
+    document.getElementById('sub_hh_calc').value = '—';
+    new bootstrap.Modal(document.getElementById('modalSubempreitada')).show();
 }
 
 function abrirNovoSubempreitada() {

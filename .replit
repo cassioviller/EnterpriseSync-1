@@ -36,6 +36,10 @@ args = "test-e2e-proposta-aprovacao-cliente"
 task = "workflow.run"
 args = "test-cronograma-duplicado-rdo"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-rdo-unificado-responsaveis"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -85,6 +89,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python tests/test_cronograma_duplicado_rdo.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "test-rdo-unificado-responsaveis"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_rdo_unificado_responsaveis.py"
 
 [workflows.workflow.metadata]
 outputType = "console"

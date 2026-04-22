@@ -2670,9 +2670,9 @@ def rdo_salvar_unificado():
         # Processar entregas/terceiros marcadas como concluídas no RDO
         try:
             from services.entregas_terceiros import aplicar_entregas_no_rdo
-            qtd_marcadas = aplicar_entregas_no_rdo(rdo, request.form, admin_id=getattr(rdo.obra, 'admin_id', None))
-            if qtd_marcadas > 0:
-                logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) via rdo_salvar_unificado RDO {rdo.id}")
+            qtd_marcadas, qtd_revertidas = aplicar_entregas_no_rdo(rdo, request.form, admin_id=getattr(rdo.obra, 'admin_id', None))
+            if qtd_marcadas > 0 or qtd_revertidas > 0:
+                logger.info(f"[OK] entregas terceiros via rdo_salvar_unificado RDO {rdo.id}: marcadas={qtd_marcadas} revertidas={qtd_revertidas}")
         except Exception as e_ent:
             logger.error(f"Erro processando entregas terceiros (unificado): {e_ent}")
 
@@ -4066,10 +4066,10 @@ def salvar_rdo_flexivel():
             try:
                 from services.entregas_terceiros import aplicar_entregas_no_rdo
                 _admin_id_ent = admin_id or (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None))
-                qtd_marcadas = aplicar_entregas_no_rdo(rdo, request.form, admin_id=_admin_id_ent)
-                if qtd_marcadas > 0:
+                qtd_marcadas, qtd_revertidas = aplicar_entregas_no_rdo(rdo, request.form, admin_id=_admin_id_ent)
+                if qtd_marcadas > 0 or qtd_revertidas > 0:
                     db.session.commit()
-                    logger.info(f"[OK] {qtd_marcadas} entrega(s) terceiros marcada(s) via salvar_rdo_flexivel RDO {rdo.id}")
+                    logger.info(f"[OK] entregas terceiros via salvar_rdo_flexivel RDO {rdo.id}: marcadas={qtd_marcadas} revertidas={qtd_revertidas}")
             except Exception as e_ent:
                 logger.error(f"Erro processando entregas terceiros no RDO: {e_ent}")
                 db.session.rollback()
@@ -4129,6 +4129,58 @@ def salvar_rdo_flexivel():
                         logger.info(f"[OK] {len(tarefa_ids_afetadas)} apontamento(s) cronograma V2 salvos no RDO {rdo.id}")
             except Exception as e_v2:
                 logger.warning(f"[WARN] Falha ao salvar apontamentos V2 no salvar_rdo_flexivel: {e_v2}")
+
+            # Task #149 — Subempreitada inline: persiste apontamentos enviados
+            # via campos `sub_apt_<i>_*` (mesma UI unificada do cronograma).
+            try:
+                from utils.tenant import is_v2_active as _v2a
+                from models import RDOSubempreitadaApontamento, Subempreiteiro, TarefaCronograma
+                from cronograma_views import _atualizar_percentual_com_subempreitada
+                if _v2a():
+                    _admin_id_sub = admin_id or (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None))
+                    indices = set()
+                    for k in request.form.keys():
+                        if k.startswith('sub_apt_') and k.endswith('_tarefa_id'):
+                            try:
+                                indices.add(int(k.split('_')[2]))
+                            except (ValueError, IndexError):
+                                continue
+                    sub_tarefas_afetadas = set()
+                    for i in sorted(indices):
+                        try:
+                            t_id = int(request.form.get(f'sub_apt_{i}_tarefa_id') or 0)
+                            s_id = int(request.form.get(f'sub_apt_{i}_subempreiteiro_id') or 0)
+                            if not t_id or not s_id:
+                                continue
+                            tarefa_sub = TarefaCronograma.query.filter_by(id=t_id, admin_id=_admin_id_sub).first()
+                            if not tarefa_sub or tarefa_sub.is_cliente:
+                                continue
+                            sub_obj = Subempreiteiro.query.filter_by(id=s_id, admin_id=_admin_id_sub).first()
+                            if not sub_obj:
+                                continue
+                            apt = RDOSubempreitadaApontamento(
+                                rdo_id=rdo.id,
+                                tarefa_cronograma_id=t_id,
+                                subempreiteiro_id=s_id,
+                                qtd_pessoas=int(float(request.form.get(f'sub_apt_{i}_qtd_pessoas') or 0)),
+                                horas_trabalhadas=float(request.form.get(f'sub_apt_{i}_horas') or 0),
+                                quantidade_produzida=float(request.form.get(f'sub_apt_{i}_quantidade_produzida') or 0),
+                                observacoes=(request.form.get(f'sub_apt_{i}_observacoes') or '').strip() or None,
+                                admin_id=_admin_id_sub,
+                            )
+                            apt.calcular_homem_hora()
+                            db.session.add(apt)
+                            sub_tarefas_afetadas.add(t_id)
+                        except Exception as e_si:
+                            logger.warning(f"[WARN] Apontamento subempreitada inválido sub_apt_{i}: {e_si}")
+                    if sub_tarefas_afetadas:
+                        db.session.flush()
+                        for tid in sub_tarefas_afetadas:
+                            _atualizar_percentual_com_subempreitada(tid, _admin_id_sub)
+                        db.session.commit()
+                        logger.info(f"[OK] {len(sub_tarefas_afetadas)} tarefa(s) subempreitada apontada(s) no RDO {rdo.id}")
+            except Exception as e_sub:
+                logger.warning(f"[WARN] Falha ao salvar apontamentos subempreitada inline: {e_sub}")
             
             # [DEBUG] VERIFICAÇÃO: Consultar banco para confirmar fotos salvas
             logger.info(f"[DEBUG] [VERIFICAÇÃO] Consultando banco para confirmar fotos salvas...")

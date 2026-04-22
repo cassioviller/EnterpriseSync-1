@@ -285,22 +285,40 @@ def aplicar_entregas_no_rdo(rdo, form_data, admin_id=None):
     """
     Processa form.getlist('entrega_tarefa_ids[]') marcando as tarefas terceiros
     como entregues (data_entrega_real = rdo.data_relatorio, percentual=100).
-    Retorna a quantidade marcada. NAO faz commit (chamador commita).
+
+    Task #149 — quando o front também envia `terceiros_tarefa_ids_lista[]`
+    (lista das tarefas terceiros mostradas inline na lista do cronograma),
+    as tarefas presentes na lista mas NÃO marcadas em
+    `entrega_tarefa_ids[]` são revertidas para pendente (percentual=0,
+    data_entrega_real=None) — permitindo o toggle Concluído/Pendente.
+
+    Retorna tupla (qtd_marcadas, qtd_revertidas). NAO faz commit (chamador commita).
     """
     try:
-        if hasattr(form_data, 'getlist'):
-            ids_raw = form_data.getlist('entrega_tarefa_ids[]') or form_data.getlist('entrega_tarefa_ids')
-        else:
-            v = form_data.get('entrega_tarefa_ids[]') or form_data.get('entrega_tarefa_ids') or []
-            ids_raw = v if isinstance(v, list) else [v]
+        def _getlist(name):
+            if hasattr(form_data, 'getlist'):
+                return form_data.getlist(f'{name}[]') or form_data.getlist(name)
+            v = form_data.get(f'{name}[]') or form_data.get(name) or []
+            return v if isinstance(v, list) else [v]
+
+        ids_raw = _getlist('entrega_tarefa_ids')
+        lista_raw = _getlist('terceiros_tarefa_ids_lista')
+
+        def _to_int_set(seq):
+            out = set()
+            for raw in seq:
+                try:
+                    out.add(int(raw))
+                except (TypeError, ValueError):
+                    continue
+            return out
+
+        marcados = _to_int_set(ids_raw)
+        visiveis = _to_int_set(lista_raw)
 
         data_ref = rdo.data_relatorio if rdo and rdo.data_relatorio else date.today()
         qtd = 0
-        for raw in ids_raw:
-            try:
-                tid = int(raw)
-            except (TypeError, ValueError):
-                continue
+        for tid in marcados:
             q = TarefaCronograma.query.filter_by(id=tid)
             if admin_id is not None:
                 q = q.filter_by(admin_id=admin_id)
@@ -310,11 +328,27 @@ def aplicar_entregas_no_rdo(rdo, form_data, admin_id=None):
             if t.obra_id != rdo.obra_id:
                 continue
             t.percentual_concluido = 100.0
-            # Sempre alinha data_entrega_real com a data do RDO (também para
-            # correções retroativas em RDOs editados).
             t.data_entrega_real = data_ref
             qtd += 1
-        return qtd
+
+        # Toggle reverso: tarefas listadas na UI mas não marcadas → pendente
+        para_desmarcar = visiveis - marcados
+        qtd_revertidas = 0
+        for tid in para_desmarcar:
+            q = TarefaCronograma.query.filter_by(id=tid)
+            if admin_id is not None:
+                q = q.filter_by(admin_id=admin_id)
+            t = q.first()
+            if not t or (t.responsavel or '').lower() != 'terceiros':
+                continue
+            if t.obra_id != rdo.obra_id:
+                continue
+            mudou = (float(t.percentual_concluido or 0) != 0.0) or (t.data_entrega_real is not None)
+            t.percentual_concluido = 0.0
+            t.data_entrega_real = None
+            if mudou:
+                qtd_revertidas += 1
+        return (qtd, qtd_revertidas)
     except Exception as e:
         logger.error(f"Erro aplicar_entregas_no_rdo: {e}")
-        return 0
+        return (0, 0)
