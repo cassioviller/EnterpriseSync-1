@@ -2150,6 +2150,11 @@ def gerar_cronograma_cliente(obra_id):
             if old_t.predecessora_id and old_t.predecessora_id in old_to_new:
                 clone.predecessora_id = old_to_new[old_t.predecessora_id]
 
+        # Task #144: rede de segurança — dedupe defensivo dos clones cliente
+        # (caso o cronograma interno ainda tenha duplicatas que escaparam).
+        from services.cronograma_dedup import deduplicar_tarefas_cronograma
+        deduplicar_tarefas_cronograma(obra_id, admin_id, is_cliente=True)
+
         db.session.commit()
         flash(
             f'Cronograma do cliente regenerado com {len(clones_seq)} tarefa(s) '

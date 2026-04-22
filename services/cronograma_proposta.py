@@ -306,7 +306,7 @@ def materializar_cronograma(
     if not arvore_marcada:
         return 0
 
-    # Idempotência: descobrir quais proposta_item_id já materializados
+    # Idempotência (camada 1): descobrir quais proposta_item_id já materializados
     pi_ids = [n.get('proposta_item_id') for n in arvore_marcada if n.get('proposta_item_id')]
     if pi_ids:
         ja_existem = {
@@ -320,6 +320,16 @@ def materializar_cronograma(
         }
     else:
         ja_existem = set()
+
+    # Task #144 — Idempotência (camada 2): chave natural por
+    # (subatividade_mestre_id | nome_tarefa, tarefa_pai_id) para o caso onde
+    # `gerada_por_proposta_item_id` é nulo (snapshot antigo, re-materialização
+    # via `arvore_marcada` sem PI vinculado, propagação proposta→obra etc).
+    # Se um nó já existe pelo natural key, REUSAMOS a tarefa existente em vez
+    # de inserir uma nova; oportunisticamente preenchemos
+    # `gerada_por_proposta_item_id` para reforçar a idempotência futura.
+    from services.cronograma_dedup import natural_key_index, _key_for
+    nat_idx = natural_key_index(obra_id, admin_id, is_cliente=False)
 
     # Mapa proposta_item_id -> ItemMedicaoComercial (para vincular pesos)
     imc_por_pi = {
@@ -359,22 +369,36 @@ def materializar_cronograma(
             continue
 
         # Nível 0 = nó raiz "Serviço" (grupo agregador)
-        tarefa_serv = TarefaCronograma(
-            obra_id=obra_id,
-            nome_tarefa=nivel0.get('servico_nome') or 'Serviço',
-            duracao_dias=1,
-            data_inicio=data_seed,
-            tarefa_pai_id=None,
-            ordem=ordem_seq[0],
-            admin_id=admin_id,
-            is_cliente=False,
-            responsavel='empresa',
-            gerada_por_proposta_item_id=pi_id,
-        )
-        ordem_seq[0] += 10
-        db.session.add(tarefa_serv)
-        db.session.flush()
-        total_criadas += 1
+        nome_serv = nivel0.get('servico_nome') or 'Serviço'
+        chave_serv = _key_for(None, nome_serv, None)
+        existente_serv = nat_idx.get(chave_serv)
+        if existente_serv is not None:
+            # Reusar tarefa existente (Task #144) — preenche PI se faltar
+            tarefa_serv = existente_serv
+            if tarefa_serv.gerada_por_proposta_item_id is None and pi_id:
+                tarefa_serv.gerada_por_proposta_item_id = pi_id
+            logger.info(
+                f"#144: nó-raiz {nome_serv!r} já existia em obra={obra_id} "
+                f"(id={tarefa_serv.id}) — reuso (skip insert)"
+            )
+        else:
+            tarefa_serv = TarefaCronograma(
+                obra_id=obra_id,
+                nome_tarefa=nome_serv,
+                duracao_dias=1,
+                data_inicio=data_seed,
+                tarefa_pai_id=None,
+                ordem=ordem_seq[0],
+                admin_id=admin_id,
+                is_cliente=False,
+                responsavel='empresa',
+                gerada_por_proposta_item_id=pi_id,
+            )
+            ordem_seq[0] += 10
+            db.session.add(tarefa_serv)
+            db.session.flush()
+            nat_idx[chave_serv] = tarefa_serv
+            total_criadas += 1
 
         # IMC para vincular pesos
         imc = imc_por_pi.get(pi_id)
@@ -399,25 +423,39 @@ def materializar_cronograma(
                         sub_id = None
                 duracao = max(1, int(n.get('duracao_dias') or 1))
                 qty = n.get('quantidade_prevista')
-                tarefa = TarefaCronograma(
-                    obra_id=obra_id,
-                    nome_tarefa=n.get('nome') or 'Tarefa',
-                    duracao_dias=duracao,
-                    data_inicio=data_seed if not is_grupo else None,
-                    quantidade_total=None if is_grupo else qty,
-                    unidade_medida=None if is_grupo else n.get('unidade_medida'),
-                    responsavel=n.get('responsavel') or 'empresa',
-                    tarefa_pai_id=pai_id,
-                    ordem=ordem_seq[0],
-                    admin_id=admin_id,
-                    is_cliente=False,
-                    subatividade_mestre_id=sub_id,
-                    gerada_por_proposta_item_id=pi_id,
-                )
-                ordem_seq[0] += 10
-                db.session.add(tarefa)
-                db.session.flush()
-                total_criadas += 1
+                nome_n = n.get('nome') or 'Tarefa'
+                chave_n = _key_for(sub_id, nome_n, pai_id)
+                existente = nat_idx.get(chave_n)
+                if existente is not None:
+                    # Task #144 — tarefa equivalente já existe; reusar
+                    tarefa = existente
+                    if tarefa.gerada_por_proposta_item_id is None and pi_id:
+                        tarefa.gerada_por_proposta_item_id = pi_id
+                    logger.info(
+                        f"#144: tarefa {nome_n!r} (sub={sub_id}, pai={pai_id}) "
+                        f"já existia em obra={obra_id} (id={tarefa.id}) — reuso"
+                    )
+                else:
+                    tarefa = TarefaCronograma(
+                        obra_id=obra_id,
+                        nome_tarefa=nome_n,
+                        duracao_dias=duracao,
+                        data_inicio=data_seed if not is_grupo else None,
+                        quantidade_total=None if is_grupo else qty,
+                        unidade_medida=None if is_grupo else n.get('unidade_medida'),
+                        responsavel=n.get('responsavel') or 'empresa',
+                        tarefa_pai_id=pai_id,
+                        ordem=ordem_seq[0],
+                        admin_id=admin_id,
+                        is_cliente=False,
+                        subatividade_mestre_id=sub_id,
+                        gerada_por_proposta_item_id=pi_id,
+                    )
+                    ordem_seq[0] += 10
+                    db.session.add(tarefa)
+                    db.session.flush()
+                    nat_idx[chave_n] = tarefa
+                    total_criadas += 1
 
                 if is_grupo:
                     _rec(n['filhos'], tarefa.id)
@@ -459,13 +497,23 @@ def materializar_cronograma(
                     peso = 100.0 / n_folhas
                 # Arredonda para 2 decimais
                 peso_dec = Decimal(str(round(peso, 2)))
-                vinculo = ItemMedicaoCronogramaTarefa(
+                # Task #144: se a folha foi REUSADA (tarefa pré-existente),
+                # pode já existir vínculo IMC↔tarefa (UniqueConstraint
+                # `uq_item_tarefa`) — neste caso só atualiza o peso.
+                vinculo = ItemMedicaoCronogramaTarefa.query.filter_by(
                     item_medicao_id=imc.id,
                     cronograma_tarefa_id=tarefa_folha.id,
-                    peso=peso_dec,
-                    admin_id=admin_id,
-                )
-                db.session.add(vinculo)
+                ).first()
+                if vinculo:
+                    vinculo.peso = peso_dec
+                else:
+                    vinculo = ItemMedicaoCronogramaTarefa(
+                        item_medicao_id=imc.id,
+                        cronograma_tarefa_id=tarefa_folha.id,
+                        peso=peso_dec,
+                        admin_id=admin_id,
+                    )
+                    db.session.add(vinculo)
 
     if total_criadas:
         db.session.flush()

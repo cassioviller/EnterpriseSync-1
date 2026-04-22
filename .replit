@@ -32,6 +32,10 @@ args = "test-orcamento-override"
 task = "workflow.run"
 args = "test-e2e-proposta-aprovacao-cliente"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-cronograma-duplicado-rdo"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -70,6 +74,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python tests/test_e2e_proposta_aprovacao_cliente.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "test-cronograma-duplicado-rdo"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_cronograma_duplicado_rdo.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
