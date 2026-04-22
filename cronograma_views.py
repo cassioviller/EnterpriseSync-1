@@ -631,8 +631,14 @@ def tarefas_rdo(obra_id: int):
         .all()
     )
 
+    # Task #154 — usar o mesmo critério do cronograma para identificar pais
+    # (qualquer tarefa cujo id apareça como tarefa_pai_id de outra) e
+    # garantir que o agregado bate com a tela do cronograma.
+    pai_ids = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
+
     # Montar dict com progresso
     resultado = []
+    item_por_id: dict[int, dict] = {}
     for t in tarefas:
         progresso = calcular_progresso_rdo(t.id, data_rdo, admin_id)
 
@@ -647,7 +653,7 @@ def tarefas_rdo(obra_id: int):
                 qty_hoje = ap.quantidade_executada_dia
                 apontamento_id = ap.id
 
-        resultado.append({
+        item = {
             'id': t.id,
             'tarefa_pai_id': t.tarefa_pai_id,
             'nome_tarefa': t.nome_tarefa,
@@ -663,7 +669,33 @@ def tarefas_rdo(obra_id: int):
             'quantidade_executada_hoje': qty_hoje,
             'apontamento_id': apontamento_id,
             'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
-        })
+            'is_pai': t.id in pai_ids,
+        }
+        resultado.append(item)
+        item_por_id[t.id] = item
+
+    # Bottom-up: % realizado dos pais = média ponderada por duração das filhas
+    # (mesma fórmula de cronograma_engine.recalcular_cronograma). Garante que
+    # o subgrupo no RDO mostra o mesmo valor agregado do cronograma, mesmo se
+    # `percentual_concluido` persistido ainda estiver desatualizado.
+    filhas_por_pai: dict[int, list[dict]] = {}
+    for it in resultado:
+        if it['tarefa_pai_id']:
+            filhas_por_pai.setdefault(it['tarefa_pai_id'], []).append(it)
+
+    pais_ord = [t for t in tarefas if t.id in pai_ids]
+    for pai in sorted(pais_ord, key=lambda x: x.ordem, reverse=True):
+        filhas = filhas_por_pai.get(pai.id, [])
+        if not filhas:
+            continue
+        total_dur = sum(max(int((item_por_id[f['id']].get('duracao_dias') or 1)), 1) for f in filhas)
+        if total_dur > 0:
+            agregado = sum(
+                (f.get('percentual_realizado') or 0) * max(int(f.get('duracao_dias') or 1), 1)
+                for f in filhas
+            ) / total_dur
+            item_por_id[pai.id]['percentual_realizado'] = round(agregado, 2)
+            item_por_id[pai.id]['percentual_concluido'] = round(agregado, 2)
 
     return jsonify({'status': 'ok', 'tarefas': resultado})
 

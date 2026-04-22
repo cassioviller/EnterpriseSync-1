@@ -1201,11 +1201,13 @@ function _rdoBadgeResponsavelEdit(resp) {
     return '<span class="badge bg-success" style="font-size:.65rem" title="Tarefa executada pela própria empresa"><i class="fas fa-hard-hat me-1"></i>Empresa</span>';
 }
 
-function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
+function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
     // Task #140: distinguir "Sem plano" (null) de 0% real.
     const sem_plano = (t.percentual_planejado === null || t.percentual_planejado === undefined);
     const perc_plan = sem_plano ? 0 : t.percentual_planejado;
-    const perc_real = t.percentual_realizado ?? 0;
+    // Task #154: para subgrupos, usa o percentual_concluido (agregado bottom-up)
+    // que bate com a barra do cronograma; folhas continuam usando percentual_realizado.
+    const perc_real = isPai ? (t.percentual_concluido ?? 0) : (t.percentual_realizado ?? 0);
     const status_cor   = sem_plano ? '#6c757d' : (perc_real >= perc_plan ? '#28a745' : '#dc3545');
     const status_label = sem_plano ? 'Sem plano' : (perc_real >= perc_plan ? 'Em dia' : 'Atrasado');
     const qty_total = t.quantidade_total ? `${t.quantidade_total} ${t.unidade_medida}` : '—';
@@ -1213,7 +1215,7 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
         ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}`
         : `0 ${t.unidade_medida}`;
     const qty_hoje  = t.quantidade_executada_hoje ?? rdoV2QtdAnterior[t.id] ?? 0;
-    const indent  = ehFilho ? 'ms-4' : '';
+    const indent  = depth > 0 ? `ms-${Math.min(depth * 3, 5)}` : '';
     const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
     const boldCls = isPai ? 'fw-bold' : '';
     const resp = (t.responsavel || 'empresa').toLowerCase();
@@ -1279,9 +1281,8 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
                 <span class="text-muted small">${t.unidade_medida || ''}</span>
               </div>` : ''}`;
         }
-    } else {
-        acaoInner = t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : '';
     }
+    // Task #154: subgrupos (isPai) NUNCA mostram total/acumulado/equipe.
 
     const headerInner = `
       <div class="d-flex align-items-center gap-2 p-2 ps-3 flex-wrap ${isPai ? 'rdo-tarefa-pai-header-edit' : ''}"
@@ -1311,7 +1312,10 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
            <div class="progress-bar bg-secondary" style="width:${Math.min(perc_plan,100)}%"></div>
          </div>`;
 
-    const progresso = hasInput ? `
+    // Task #154: subgrupos (isPai) também mostram a barra Planejado/Realizado
+    // calculada a partir das filhas (mesmo critério do cronograma).
+    const mostrarBarra = hasInput || isPai;
+    const progresso = mostrarBarra ? `
       <div class="px-3 pb-2">
         ${planejadoBlock}
         <div class="d-flex justify-content-between small mb-1">
@@ -1327,7 +1331,7 @@ function _rdoV2EditRenderTarefaCard(t, isPai, ehFilho, contadorFilhos) {
       </div>` : '';
 
     return `
-      <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden">
+      <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden" data-tarefa-id="${t.id}" data-is-pai="${isPai ? '1' : '0'}">
         ${headerInner}
         ${progresso}
       </div>`;
@@ -1337,29 +1341,32 @@ function renderizarTarefasEdit(tarefas) {
     const container = document.getElementById('cronogramaTarefasEdit');
     if (!container) return;
 
+    // Task #154: render hierárquico recursivo (suporta subgrupo aninhado).
     const filhosPorPai = {};
+    const idsPresentes = new Set(tarefas.map(t => t.id));
     tarefas.forEach(t => {
         if (t.tarefa_pai_id) {
             (filhosPorPai[t.tarefa_pai_id] = filhosPorPai[t.tarefa_pai_id] || []).push(t);
         }
     });
-    const paiIds = new Set(Object.keys(filhosPorPai).map(Number));
 
-    let html = '<div class="p-3">';
-    tarefas.forEach(t => {
-        if (t.tarefa_pai_id && paiIds.has(t.tarefa_pai_id)) return;
-        const isPai = paiIds.has(t.id);
+    function renderNode(t, depth) {
+        const filhos = filhosPorPai[t.id] || [];
+        const isPai = filhos.length > 0;
+        let h = _rdoV2EditRenderTarefaCard(t, isPai, depth, filhos.length);
         if (isPai) {
-            const filhos = filhosPorPai[t.id] || [];
             const expandido = _rdoV2EditPaisExpandidos.has(t.id);
-            html += _rdoV2EditRenderTarefaCard(t, true, false, filhos.length);
-            html += `<div class="rdo-tarefa-filhos-edit ms-3" data-filhos-edit-de="${t.id}" style="${expandido ? '' : 'display:none'}">`;
-            filhos.forEach(f => { html += _rdoV2EditRenderTarefaCard(f, false, true, 0); });
-            html += `</div>`;
-        } else {
-            html += _rdoV2EditRenderTarefaCard(t, false, false, 0);
+            h += `<div class="rdo-tarefa-filhos-edit" data-filhos-edit-de="${t.id}" style="${expandido ? '' : 'display:none'}">`;
+            filhos.forEach(f => { h += renderNode(f, depth + 1); });
+            h += `</div>`;
         }
-    });
+        return h;
+    }
+
+    // Raízes: tarefa sem pai OU cujo pai não está na resposta.
+    const raizes = tarefas.filter(t => !t.tarefa_pai_id || !idsPresentes.has(t.tarefa_pai_id));
+    let html = '<div class="p-3">';
+    raizes.forEach(t => { html += renderNode(t, 0); });
     html += '</div>';
     container.innerHTML = html;
 
