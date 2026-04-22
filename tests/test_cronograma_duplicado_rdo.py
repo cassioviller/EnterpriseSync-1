@@ -444,13 +444,10 @@ class CronogramaDuplicadoRDORunner:
             data = r3.get_json() or {}
             tarefas = data.get('tarefas') or []
             ids_endpoint = {t.get('id') for t in tarefas}
-            # O endpoint devolve TODAS as tarefas da obra/admin (internas
-            # + cliente). A duplicação que o bug introduzia era no banco
-            # (mesma chave natural dentro de UM mesmo tree); por isso o
-            # invariante correto NÃO é "nome_tarefa único na resposta"
-            # (internas e clientes legitimamente compartilham nomes), e
-            # sim "id único na resposta" + "zero grupos duplicados por
-            # chave natural em cada tree". Validamos os dois.
+            # Task #147 — o endpoint devolve APENAS o cronograma INTERNO
+            # (is_cliente=False). Antes do fix, ele retornava interno +
+            # clones do cliente juntos, dobrando cada item no card "Novo RDO"
+            # quando a obra tinha cronograma do cliente gerado.
             dups_int = self._contar_duplicatas(self.obra.id, is_cliente=False)
             dups_cli = self._contar_duplicatas(self.obra.id, is_cliente=True)
             self._assert(
@@ -464,12 +461,23 @@ class CronogramaDuplicadoRDORunner:
                 f'R5 — endpoint retorna ids únicos (n={len(tarefas)}, '
                 f'unicos={len(ids_endpoint)})',
             )
-            # Contagem por tree bate com o esperado (4 + 4 após R4)
+            # Task #147 — endpoint só devolve interno (is_cliente=False)
             n_int = self._contar_total(self.obra.id, is_cliente=False)
             n_cli = self._contar_total(self.obra.id, is_cliente=True)
             self._assert(
-                len(tarefas) == n_int + n_cli,
-                f'R5 — endpoint devolve {n_int}+{n_cli} tarefas (achou {len(tarefas)})',
+                len(tarefas) == n_int,
+                f'R5 — endpoint devolve apenas {n_int} tarefas internas '
+                f'(achou {len(tarefas)}, total cliente={n_cli})',
+            )
+            # Task #147 — cada nome_tarefa aparece exatamente 1x na resposta
+            # (antes do fix: cada nome aparecia 2x — interno + clone cliente)
+            from collections import Counter
+            nome_counts = Counter(t.get('nome_tarefa') for t in tarefas)
+            duplicados_nome = {n: c for n, c in nome_counts.items() if c > 1}
+            self._assert(
+                not duplicados_nome,
+                f'R5 — cada nome_tarefa aparece 1x no endpoint '
+                f'(duplicados={duplicados_nome})',
             )
             self.report['route_evidence'].append({
                 'step': 'R5 GET /cronograma/obra/<id>/tarefas-rdo',
@@ -481,6 +489,62 @@ class CronogramaDuplicadoRDORunner:
                 'duplicatas_cliente': len(dups_cli),
                 'ok': len(dups_int) == 0 and len(dups_cli) == 0,
             })
+
+    # ──────────────────────────────────────────────────────────────────
+    # R5b — Task #147: blindagem dos endpoints de apontamento contra
+    #       tarefas is_cliente=True (não pode criar apontamento "fantasma"
+    #       no clone do cronograma do cliente).
+    # ──────────────────────────────────────────────────────────────────
+    def teste_R5b_apontamento_em_cliente_rejeitado(self):
+        from models import RDO, Subempreiteiro
+        # Pega um RDO existente da obra (criado em R5) e uma TarefaCronograma
+        # cliente (criada em R4 via gerar_cronograma_cliente).
+        rdo = RDO.query.filter_by(obra_id=self.obra.id).first()
+        tarefa_cli = TarefaCronograma.query.filter_by(
+            obra_id=self.obra.id, admin_id=self.admin.id, is_cliente=True
+        ).first()
+        self._assert(rdo is not None, 'R5b — RDO existente para teste negativo')
+        self._assert(tarefa_cli is not None, 'R5b — TarefaCronograma cliente existe')
+        if not rdo or not tarefa_cli:
+            return
+
+        # POST /rdo/<id>/apontar — produção em tarefa cliente deve dar 400
+        r_prod = self._http(
+            'R5b apontar produção em cliente', 'POST',
+            f'/cronograma/rdo/{rdo.id}/apontar',
+            json={'tarefa_cronograma_id': tarefa_cli.id, 'quantidade_executada_dia': 1.0},
+        )
+        self._assert(
+            r_prod.status_code == 400,
+            f'R5b — apontar_producao em is_cliente=True devolve 400 (status={r_prod.status_code})',
+        )
+        if r_prod.status_code == 400:
+            body = r_prod.get_json() or {}
+            self._assert(
+                'cliente' in (body.get('msg') or '').lower(),
+                f'R5b — mensagem de erro menciona cliente (msg={body.get("msg")!r})',
+            )
+
+        # POST /rdo/<id>/apontar-subempreitada — também deve dar 400
+        sub = Subempreiteiro(
+            admin_id=self.admin.id, nome=f'Sub R5b {self._suffix()}',
+        )
+        db.session.add(sub); db.session.commit()
+        r_sub = self._http(
+            'R5b apontar subempreitada em cliente', 'POST',
+            f'/cronograma/rdo/{rdo.id}/apontar-subempreitada',
+            json={
+                'tarefa_cronograma_id': tarefa_cli.id,
+                'subempreiteiro_id': sub.id,
+                'qtd_pessoas': 1, 'horas_trabalhadas': 8.0,
+                'quantidade_produzida': 5.0,
+            },
+        )
+        self._assert(
+            r_sub.status_code == 400,
+            f'R5b — apontar_subempreitada em is_cliente=True devolve 400 '
+            f'(status={r_sub.status_code})',
+        )
 
     # ──────────────────────────────────────────────────────────────────
     # R6 — GET /rdo/novo HTML smoke
@@ -632,6 +696,7 @@ class CronogramaDuplicadoRDORunner:
                 self.teste_R3_snapshot_sem_pi()
                 self.teste_R4_cronograma_cliente_2x_http()
                 self.teste_R5_rdos_via_http_e_endpoint_tarefas()
+                self.teste_R5b_apontamento_em_cliente_rejeitado()
                 self.teste_R6_novo_rdo_html()
                 self.teste_R7_dedup_preserva_apontamentos()
             finally:

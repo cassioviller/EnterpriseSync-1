@@ -620,9 +620,13 @@ def tarefas_rdo(obra_id: int):
     except (ValueError, TypeError):
         data_rdo = date.today()
 
+    # Task #147 — filtra explicitamente o cronograma INTERNO (is_cliente=False).
+    # Sem esse filtro, obras que já tiveram o cronograma do cliente gerado
+    # devolviam interno + clones do cliente juntos, dobrando cada item no card
+    # "Apontamento de Produção — Cronograma" do Novo RDO.
     tarefas = (
         TarefaCronograma.query
-        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
         .order_by(TarefaCronograma.ordem)
         .all()
     )
@@ -707,6 +711,15 @@ def apontar_subempreitada(rdo_id: int):
     tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
     if not tarefa:
         return jsonify({'status': 'error', 'msg': 'Tarefa não encontrada'}), 404
+
+    # Task #147 — apontamentos só podem ser criados na árvore INTERNA da obra.
+    # Bloqueia tentativa (acidental ou maliciosa) de apontar em um clone do
+    # cronograma do cliente, que geraria registros "fantasma" no portal.
+    if tarefa.is_cliente:
+        return jsonify({
+            'status': 'error',
+            'msg': 'Apontamentos não podem ser feitos em tarefas do cronograma do cliente'
+        }), 400
 
     sub = Subempreiteiro.query.filter_by(id=sub_id, admin_id=admin_id).first()
     if not sub:
@@ -876,6 +889,15 @@ def apontar_producao(rdo_id: int):
     tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
     if not tarefa:
         return jsonify({'status': 'error', 'msg': 'Tarefa não encontrada'}), 404
+
+    # Task #147 — apontamentos só podem ser criados na árvore INTERNA da obra.
+    # Bloqueia tentativa (acidental ou maliciosa) de apontar em um clone do
+    # cronograma do cliente, que geraria registros "fantasma" no portal.
+    if tarefa.is_cliente:
+        return jsonify({
+            'status': 'error',
+            'msg': 'Apontamentos não podem ser feitos em tarefas do cronograma do cliente'
+        }), 400
 
     # Buscar apontamento existente ou criar
     ap = RDOApontamentoCronograma.query.filter_by(
