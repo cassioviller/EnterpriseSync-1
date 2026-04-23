@@ -334,8 +334,8 @@
               <td><input class="form-control form-control-sm" type="number" step="0.0001"
                          name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
               <td class="text-end text-muted js-subtotal-unit">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
-              <td class="text-end text-muted js-consumo-tot">{{ '%.4f'|format((c.coeficiente or 0) * (it.quantidade or 0)) }} {{ c.unidade }}</td>
-              <td class="text-end text-dark js-subtotal-tot"><strong>R$ {{ '%.2f'|format((c.coeficiente or 0) * (c.preco_unitario or 0) * (it.quantidade or 0)) }}</strong></td>
+              <td class="text-end text-muted js-consumo-tot">{{ '%.4f'|format((c.coeficiente|float if c.coeficiente is not none else 0) * (it.quantidade|float if it.quantidade is not none else 0)) }} {{ c.unidade }}</td>
+              <td class="text-end text-dark js-subtotal-tot"><strong>R$ {{ '%.2f'|format((c.coeficiente|float if c.coeficiente is not none else 0) * (c.preco_unitario|float if c.preco_unitario is not none else 0) * (it.quantidade|float if it.quantidade is not none else 0)) }}</strong></td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
