@@ -328,22 +328,37 @@
             {% endif %}
         </div>
         
+        {% set _sig_nome = config_empresa.assinatura_nome if config_empresa and config_empresa.assinatura_nome else '' %}
+        {% set _sig_cargo = config_empresa.assinatura_cargo if config_empresa and config_empresa.assinatura_cargo else '' %}
+        {% set _empresa_nome = config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else '' %}
         <div class="signature">
             <p><strong>Atenciosamente,</strong></p>
             <br>
-            <p><strong>{{ config_empresa.responsavel_nome if config_empresa and config_empresa.responsavel_nome else 'Jefferson Luiz Moreira' }} – Gerente {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }}</strong></p>
+            {% if _sig_nome %}
+                <p><strong>{{ _sig_nome }}{% if _sig_cargo %} – {{ _sig_cargo }}{% endif %}{% if _empresa_nome %} – {{ _empresa_nome }}{% endif %}</strong></p>
+            {% elif _empresa_nome %}
+                <p><strong>{{ _empresa_nome }}</strong></p>
+            {% endif %}
         </div>
-        
+
+            {% set _eng_nome = template.engenheiro_nome or (config_empresa.engenheiro_nome if config_empresa and config_empresa.engenheiro_nome else '') %}
+            {% set _eng_crea = template.engenheiro_crea or (config_empresa.engenheiro_crea if config_empresa and config_empresa.engenheiro_crea else '') %}
+            {% set _eng_email = template.engenheiro_email or (config_empresa.engenheiro_email if config_empresa and config_empresa.engenheiro_email else '') %}
+            {% set _eng_tel = template.engenheiro_telefone or (config_empresa.engenheiro_telefone if config_empresa and config_empresa.engenheiro_telefone else '') %}
+            {% set _eng_end = template.engenheiro_endereco or (config_empresa.engenheiro_endereco if config_empresa and config_empresa.engenheiro_endereco else '') %}
+            {% set _eng_web = template.engenheiro_website or (config_empresa.engenheiro_website if config_empresa and config_empresa.engenheiro_website else '') %}
+            {% if _eng_nome or _eng_crea or _eng_email or _eng_tel or _eng_end or _eng_web %}
             <!-- Dados do Engenheiro (da primeira página - conforme imagem) -->
             <div class="company-info">
-                <p><strong>{{ template.engenheiro_nome or 'Engº Lucas Barbosa Alves Pinto' }}</strong></p>
-                <p>{{ template.engenheiro_crea or 'CREA- 5070458626-SP' }}</p>
+                {% if _eng_nome %}<p><strong>{{ _eng_nome }}</strong></p>{% endif %}
+                {% if _eng_crea %}<p>{{ _eng_crea }}</p>{% endif %}
                 <br>
-                <p><i class="fas fa-envelope"></i> {{ template.engenheiro_email or '' }}</p>
-                <p><i class="fas fa-phone"></i> {{ template.engenheiro_telefone or '12 99187-7435' }}</p>
-                <p><i class="fas fa-map-marker-alt"></i> {{ template.engenheiro_endereco or 'Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008' }}</p>
-                <p><i class="fas fa-globe"></i> {{ template.engenheiro_website or '' }}</p>
+                {% if _eng_email %}<p><i class="fas fa-envelope"></i> {{ _eng_email }}</p>{% endif %}
+                {% if _eng_tel %}<p><i class="fas fa-phone"></i> {{ _eng_tel }}</p>{% endif %}
+                {% if _eng_end %}<p><i class="fas fa-map-marker-alt"></i> {{ _eng_end }}</p>{% endif %}
+                {% if _eng_web %}<p><i class="fas fa-globe"></i> {{ _eng_web }}</p>{% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
 

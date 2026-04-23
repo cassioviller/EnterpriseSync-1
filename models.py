@@ -3090,6 +3090,18 @@ class ConfiguracaoEmpresa(db.Model):
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao
     
+    # Bloco de assinatura padrão da proposta
+    assinatura_nome = db.Column(db.String(200), default='')
+    assinatura_cargo = db.Column(db.String(200), default='')
+
+    # Dados padrão do engenheiro responsável (rodapé das propostas)
+    engenheiro_nome = db.Column(db.String(200), default='')
+    engenheiro_crea = db.Column(db.String(50), default='')
+    engenheiro_email = db.Column(db.String(120), default='')
+    engenheiro_telefone = db.Column(db.String(50), default='')
+    engenheiro_endereco = db.Column(db.Text, default='')
+    engenheiro_website = db.Column(db.String(200), default='')
+
     # Configurações padrão
     prazo_entrega_padrao = db.Column(db.Integer, default=90)
     validade_padrao = db.Column(db.Integer, default=7)
@@ -3121,7 +3133,15 @@ class ConfiguracaoEmpresa(db.Model):
             # Campos removidos - agora no template
             'prazo_entrega_padrao': self.prazo_entrega_padrao,
             'validade_padrao': self.validade_padrao,
-            'percentual_nota_fiscal_padrao': float(self.percentual_nota_fiscal_padrao) if self.percentual_nota_fiscal_padrao else 13.5
+            'percentual_nota_fiscal_padrao': float(self.percentual_nota_fiscal_padrao) if self.percentual_nota_fiscal_padrao else 13.5,
+            'assinatura_nome': self.assinatura_nome or '',
+            'assinatura_cargo': self.assinatura_cargo or '',
+            'engenheiro_nome': self.engenheiro_nome or '',
+            'engenheiro_crea': self.engenheiro_crea or '',
+            'engenheiro_email': self.engenheiro_email or '',
+            'engenheiro_telefone': self.engenheiro_telefone or '',
+            'engenheiro_endereco': self.engenheiro_endereco or '',
+            'engenheiro_website': self.engenheiro_website or '',
         }
     
     def to_dict(self):

@@ -3828,6 +3828,7 @@ def executar_migracoes():
             (126, "Task #115 — Orçamento + OrcamentoItem (camada interna que gera Proposta)", migration_126_orcamento),
             (127, "Task #115 v2 — propostas_comerciais.orcamento_id (Orçamento → N Propostas)", migration_127_proposta_orcamento_id),
             (128, "Task #118 — cronograma_template_override_id em orcamento_item e proposta_itens + composicao_snapshot em proposta_itens", migration_128_orcamento_item_cronograma_override),
+            (129, "Task #158 — assinatura e engenheiro responsável em configuracao_empresa", migration_129_configuracao_empresa_assinatura_engenheiro),
         ]
         
         # Executar cada migração com rastreamento
@@ -10309,6 +10310,54 @@ def migration_128_orcamento_item_cronograma_override():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 128: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_129_configuracao_empresa_assinatura_engenheiro():
+    """Migration 129 (Task #158): assinatura e engenheiro responsável em configuracao_empresa.
+
+    Adiciona colunas para que cada empresa configure seu próprio bloco de
+    assinatura e os contatos do engenheiro responsável que aparecem em todos
+    os formatos de PDF de proposta. Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        novas_colunas = [
+            ("assinatura_nome", "VARCHAR(200) DEFAULT ''"),
+            ("assinatura_cargo", "VARCHAR(200) DEFAULT ''"),
+            ("engenheiro_nome", "VARCHAR(200) DEFAULT ''"),
+            ("engenheiro_crea", "VARCHAR(50) DEFAULT ''"),
+            ("engenheiro_email", "VARCHAR(120) DEFAULT ''"),
+            ("engenheiro_telefone", "VARCHAR(50) DEFAULT ''"),
+            ("engenheiro_endereco", "TEXT DEFAULT ''"),
+            ("engenheiro_website", "VARCHAR(200) DEFAULT ''"),
+        ]
+
+        for nome_coluna, tipo_coluna in novas_colunas:
+            cursor.execute(
+                f"ALTER TABLE configuracao_empresa "
+                f"ADD COLUMN IF NOT EXISTS {nome_coluna} {tipo_coluna}"
+            )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 129: assinatura_nome/assinatura_cargo + engenheiro_* "
+            "adicionados em configuracao_empresa"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 129: {e}")
         if connection:
             try:
                 connection.rollback()

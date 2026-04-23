@@ -342,9 +342,22 @@
 
     <div class="signature">
         Atenciosamente,
-        <div class="signature-name">
-            {% if config and config.nome_empresa %}{{ config.nome_empresa }}{% endif %}
+        {% if config and config.assinatura_nome %}
+        <div class="signature-name">{{ config.assinatura_nome }}</div>
+        {% if config.assinatura_cargo %}<div>{{ config.assinatura_cargo }}</div>{% endif %}
+        {% elif config and config.nome_empresa %}
+        <div class="signature-name">{{ config.nome_empresa }}</div>
+        {% endif %}
+        {% if config and (config.engenheiro_nome or config.engenheiro_crea or config.engenheiro_email or config.engenheiro_telefone or config.engenheiro_endereco or config.engenheiro_website) %}
+        <div class="engineer-info" style="margin-top: 12px; font-size: 0.9em;">
+            {% if config.engenheiro_nome %}<div><strong>{{ config.engenheiro_nome }}</strong></div>{% endif %}
+            {% if config.engenheiro_crea %}<div>{{ config.engenheiro_crea }}</div>{% endif %}
+            {% if config.engenheiro_email %}<div>📧 {{ config.engenheiro_email }}</div>{% endif %}
+            {% if config.engenheiro_telefone %}<div>📞 {{ config.engenheiro_telefone }}</div>{% endif %}
+            {% if config.engenheiro_endereco %}<div>📍 {{ config.engenheiro_endereco }}</div>{% endif %}
+            {% if config.engenheiro_website %}<div>🌐 {{ config.engenheiro_website }}</div>{% endif %}
         </div>
+        {% endif %}
     </div>
 
     {% if config and config.website %}

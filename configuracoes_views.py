@@ -114,6 +114,16 @@ def salvar_empresa():
         config.garantias_padrao = request.form.get('garantias_padrao')
         config.observacoes_gerais_padrao = request.form.get('observacoes_gerais_padrao')
         
+        # Bloco de assinatura e contatos do engenheiro responsável (Task #158)
+        config.assinatura_nome = (request.form.get('assinatura_nome') or '').strip()
+        config.assinatura_cargo = (request.form.get('assinatura_cargo') or '').strip()
+        config.engenheiro_nome = (request.form.get('engenheiro_nome') or '').strip()
+        config.engenheiro_crea = (request.form.get('engenheiro_crea') or '').strip()
+        config.engenheiro_email = (request.form.get('engenheiro_email') or '').strip()
+        config.engenheiro_telefone = (request.form.get('engenheiro_telefone') or '').strip()
+        config.engenheiro_endereco = (request.form.get('engenheiro_endereco') or '').strip()
+        config.engenheiro_website = (request.form.get('engenheiro_website') or '').strip()
+
         config.prazo_entrega_padrao = int(request.form.get('prazo_entrega_padrao', 90))
         config.validade_padrao = int(request.form.get('validade_padrao', 7))
         config.percentual_nota_fiscal_padrao = float(request.form.get('percentual_nota_fiscal_padrao', 13.5))

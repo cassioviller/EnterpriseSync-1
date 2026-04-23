@@ -299,9 +299,22 @@
         <p style="text-align: center;">Aguardamos sua confirmação e permanecemos à disposição para quaisquer esclarecimentos.</p>
         
         <div class="signature-box">
-            <div><strong>{{ (config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE')|upper }}</strong></div>
-            <div>Responsável Técnico</div>
+            {% set _sig_nome = (config_empresa.assinatura_nome if config_empresa and config_empresa.assinatura_nome else (config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else '')) %}
+            {% set _sig_cargo = (config_empresa.assinatura_cargo if config_empresa and config_empresa.assinatura_cargo else '') %}
+            {% if _sig_nome %}<div><strong>{{ _sig_nome|upper }}</strong></div>{% endif %}
+            {% if _sig_cargo %}<div>{{ _sig_cargo }}</div>{% endif %}
         </div>
+
+        {% if config_empresa and (config_empresa.engenheiro_nome or config_empresa.engenheiro_crea or config_empresa.engenheiro_email or config_empresa.engenheiro_telefone or config_empresa.engenheiro_endereco or config_empresa.engenheiro_website) %}
+        <div class="engineer-info" style="margin-top: 16px; text-align: center; font-size: 0.9em;">
+            {% if config_empresa.engenheiro_nome %}<div><strong>{{ config_empresa.engenheiro_nome }}</strong></div>{% endif %}
+            {% if config_empresa.engenheiro_crea %}<div>{{ config_empresa.engenheiro_crea }}</div>{% endif %}
+            {% if config_empresa.engenheiro_email %}<div>{{ config_empresa.engenheiro_email }}</div>{% endif %}
+            {% if config_empresa.engenheiro_telefone %}<div>{{ config_empresa.engenheiro_telefone }}</div>{% endif %}
+            {% if config_empresa.engenheiro_endereco %}<div>{{ config_empresa.engenheiro_endereco }}</div>{% endif %}
+            {% if config_empresa.engenheiro_website %}<div>{{ config_empresa.engenheiro_website }}</div>{% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Botões para impressão -->
