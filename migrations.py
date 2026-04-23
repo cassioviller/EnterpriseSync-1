@@ -3830,6 +3830,7 @@ def executar_migracoes():
             (128, "Task #118 — cronograma_template_override_id em orcamento_item e proposta_itens + composicao_snapshot em proposta_itens", migration_128_orcamento_item_cronograma_override),
             (129, "Task #158 — assinatura e engenheiro responsável em configuracao_empresa", migration_129_configuracao_empresa_assinatura_engenheiro),
             (130, "Task #165 — alinhar tipos numéricos de orçamento/proposta_itens (Float→Numeric)", migration_130_alinhar_tipos_numericos_orcamento_proposta),
+            (131, "Task #166 — coeficiente_padrao em insumo (sugestão p/ composição)", migration_131_insumo_coeficiente_padrao),
         ]
         
         # Executar cada migração com rastreamento
@@ -10472,6 +10473,45 @@ def migration_130_alinhar_tipos_numericos_orcamento_proposta():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 130: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_131_insumo_coeficiente_padrao():
+    """Migration 131 (Task #166): adiciona coeficiente_padrao em insumo.
+
+    Coluna NUMERIC(15,6) NOT NULL DEFAULT 1, usada apenas como sugestão de
+    coeficiente ao adicionar o insumo numa composição de serviço pelos
+    pickers (modal "Adicionar do Catálogo" do orçamento e formulário da
+    composição no catálogo). Nunca afeta composições já existentes.
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute(
+            "ALTER TABLE insumo "
+            "ADD COLUMN IF NOT EXISTS coeficiente_padrao NUMERIC(15,6) "
+            "NOT NULL DEFAULT 1"
+        )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 131: coeficiente_padrao adicionada em insumo "
+            "(default 1, NOT NULL)"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 131: {e}")
         if connection:
             try:
                 connection.rollback()

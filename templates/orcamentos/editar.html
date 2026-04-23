@@ -652,6 +652,17 @@ async function buscarInsumos() {
     btn.className = 'btn btn-sm btn-primary ms-2';
     btn.innerHTML = '<i class="fas fa-plus"></i>';
     btn.addEventListener('click', () => _addInsumoRow(i));
+    // Task #166: ao escolher uma linha, pré-preenche o campo coeficiente
+    // do modal com o coeficiente_padrao do insumo (em vez do "1" fixo).
+    // O usuário ainda pode sobrescrever antes de inserir.
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', (ev) => {
+      if (ev.target === btn || btn.contains(ev.target)) return;
+      const coefEl = document.getElementById('insumoPickerCoef');
+      if (coefEl && i.coeficiente_padrao != null) {
+        coefEl.value = String(i.coeficiente_padrao).replace('.', ',');
+      }
+    });
     tdPreco.appendChild(btn);
     tr.append(tdNome, tdTipo, tdUn, tdPreco);
     tb.appendChild(tr);
@@ -660,7 +671,16 @@ async function buscarInsumos() {
 function _addInsumoRow(insumo) {
   if (!_pickerTbody) return;
   const tipo = document.getElementById('insumoPickerTipo').value || 'MATERIAL';
-  const coef = getNum(document.getElementById('insumoPickerCoef')) || 1;
+  const coefEl = document.getElementById('insumoPickerCoef');
+  let coef = getNum(coefEl) || 1;
+  // Task #166: se o usuário não tocou no campo (continua no default "1"),
+  // usa o coeficiente padrão cadastrado no insumo escolhido. Se ele já
+  // editou manualmente, respeita o valor digitado.
+  const userVal = (coefEl && coefEl.value || '').trim().replace(',', '.');
+  const isDefault = userVal === '' || userVal === '1' || Number(userVal) === 1;
+  if (isDefault && insumo.coeficiente_padrao != null) {
+    coef = Number(insumo.coeficiente_padrao) || coef;
+  }
   const tmpl = document.getElementById('comp-row-tmpl');
   const node = tmpl.content.cloneNode(true);
   node.querySelector('select[name="comp_tipo"]').value = tipo;

@@ -100,12 +100,17 @@ def insumo_novo():
         if not nome:
             flash('Nome é obrigatório', 'error')
             return redirect(url_for('catalogo.insumo_novo'))
+        coef_raw = request.form.get('coeficiente_padrao')
+        coef_padrao = _to_decimal(coef_raw, '1') if coef_raw not in (None, '') else Decimal('1')
+        if coef_padrao < 0:
+            coef_padrao = Decimal('1')
         ins = Insumo(
             admin_id=aid,
             nome=nome,
             tipo=(request.form.get('tipo') or 'MATERIAL').upper(),
             unidade=(request.form.get('unidade') or 'un'),
             descricao=request.form.get('descricao') or None,
+            coeficiente_padrao=coef_padrao,
         )
         db.session.add(ins)
         db.session.flush()
@@ -131,6 +136,11 @@ def insumo_editar(insumo_id):
         ins.tipo = (request.form.get('tipo') or ins.tipo).upper()
         ins.unidade = (request.form.get('unidade') or ins.unidade)
         ins.descricao = request.form.get('descricao') or None
+        coef_raw = request.form.get('coeficiente_padrao')
+        if coef_raw not in (None, ''):
+            coef_padrao = _to_decimal(coef_raw, '1')
+            if coef_padrao >= 0:
+                ins.coeficiente_padrao = coef_padrao
         db.session.commit()
         flash('Insumo atualizado.', 'success')
         return redirect(url_for('catalogo.insumo_editar', insumo_id=ins.id))
@@ -510,6 +520,7 @@ def api_buscar_insumos():
         'id': i.id, 'nome': i.nome,
         'tipo': i.tipo, 'unidade': i.unidade,
         'preco': i.preco_vigente(),
+        'coeficiente_padrao': float(i.coeficiente_padrao or 1),
     } for i in rows])
 
 

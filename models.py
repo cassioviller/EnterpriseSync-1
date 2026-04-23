@@ -5399,6 +5399,10 @@ class Insumo(db.Model):
     tipo = db.Column(db.String(20), nullable=False, default='MATERIAL')
     unidade = db.Column(db.String(20), nullable=False, default='un')
     descricao = db.Column(db.Text)
+    # Task #166: coeficiente padrão de consumo do insumo (sugestão automática
+    # ao adicionar este insumo na composição de um serviço). NÃO é usado no
+    # cálculo das composições já existentes; só pré-preenche o picker.
+    coeficiente_padrao = db.Column(db.Numeric(15, 6), nullable=False, default=1)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

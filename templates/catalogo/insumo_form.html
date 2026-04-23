@@ -27,6 +27,19 @@
             <label class="form-label">Unidade</label>
             <input name="unidade" class="form-control" value="{{ insumo.unidade if insumo else 'un' }}">
           </div>
+          <div class="col-md-4">
+            <label class="form-label">Coeficiente padrão</label>
+            <div class="input-group">
+              <input name="coeficiente_padrao" class="form-control" inputmode="decimal"
+                     placeholder="Ex.: 0,04"
+                     value="{{ ('%.4f'|format(insumo.coeficiente_padrao|float))|replace('.', ',') if insumo else '1' }}">
+              <span class="input-group-text" id="coef-unit-suffix">{{ insumo.unidade if insumo else 'un' }}</span>
+            </div>
+            <small class="form-text text-muted">
+              Sugestão automática ao adicionar este insumo numa composição. O coeficiente
+              real de cada serviço é editável e independente.
+            </small>
+          </div>
           <div class="col-12">
             <label class="form-label">Descrição</label>
             <textarea name="descricao" class="form-control" rows="2">{{ insumo.descricao if insumo else '' }}</textarea>
