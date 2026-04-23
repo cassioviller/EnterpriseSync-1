@@ -22,14 +22,14 @@
             </a>
             <div class="btn-group">
                 <a href="{{ url_for('propostas.gerar_pdf', id=proposta.id) }}" class="btn btn-success" target="_blank">
-                    <i class="fas fa-file-pdf me-2"></i>PDF Estruturas do Vale
+                    <i class="fas fa-file-pdf me-2"></i>PDF Completo
                 </a>
                 <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="visually-hidden">Toggle Dropdown</span>
                 </button>
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="{{ url_for('propostas.gerar_pdf', id=proposta.id, formato='estruturas_vale') }}" target="_blank">
-                        <i class="fas fa-file-pdf me-2"></i>Formato Estruturas do Vale
+                        <i class="fas fa-file-pdf me-2"></i>Formato Completo
                     </a></li>
                     <li><a class="dropdown-item" href="{{ url_for('propostas.gerar_pdf', id=proposta.id, formato='simples') }}" target="_blank">
                         <i class="fas fa-file-pdf me-2"></i>Formato Simples

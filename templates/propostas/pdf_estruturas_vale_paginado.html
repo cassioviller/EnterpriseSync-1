@@ -331,7 +331,7 @@
         <div class="signature">
             <p><strong>Atenciosamente,</strong></p>
             <br>
-            <p><strong>{{ config_empresa.responsavel_nome if config_empresa and config_empresa.responsavel_nome else 'Jefferson Luiz Moreira' }} – Gerente {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do Vale' }}</strong></p>
+            <p><strong>{{ config_empresa.responsavel_nome if config_empresa and config_empresa.responsavel_nome else 'Jefferson Luiz Moreira' }} – Gerente {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }}</strong></p>
         </div>
         
             <!-- Dados do Engenheiro (da primeira página - conforme imagem) -->
@@ -339,10 +339,10 @@
                 <p><strong>{{ template.engenheiro_nome or 'Engº Lucas Barbosa Alves Pinto' }}</strong></p>
                 <p>{{ template.engenheiro_crea or 'CREA- 5070458626-SP' }}</p>
                 <br>
-                <p><i class="fas fa-envelope"></i> {{ template.engenheiro_email or 'contato@estruturasdovale.com.br' }}</p>
+                <p><i class="fas fa-envelope"></i> {{ template.engenheiro_email or '' }}</p>
                 <p><i class="fas fa-phone"></i> {{ template.engenheiro_telefone or '12 99187-7435' }}</p>
                 <p><i class="fas fa-map-marker-alt"></i> {{ template.engenheiro_endereco or 'Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008' }}</p>
-                <p><i class="fas fa-globe"></i> {{ template.engenheiro_website or 'www.estruturasdovale.com.br' }}</p>
+                <p><i class="fas fa-globe"></i> {{ template.engenheiro_website or '' }}</p>
             </div>
         </div>
     </div>
@@ -608,9 +608,9 @@
                 </div>
             {% else %}
                 <div class="section-content">
-                    <p>A garantia da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do Vale' }} limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.</p>
+                    <p>A garantia da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }} limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.</p>
                     <br>
-                    <p>A COMPRADORA não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrito da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'Estruturas do vale' }}.</p>
+                    <p>A COMPRADORA não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrito da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }}.</p>
                 </div>
             {% endif %}
         </div>

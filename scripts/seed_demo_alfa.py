@@ -852,7 +852,7 @@ def _seed():
 # ---------------------------------------------------------------------------
 def _imprimir_demo_pronta(info: dict, ambiente: str):
     base_url = (
-        "https://construtoraalfa.estruturasdoval.com.br"
+        "https://construtoraalfa.example.com"
         if ambiente == "prod"
         else "http://localhost:5000"
     )

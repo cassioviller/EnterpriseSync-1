@@ -2666,7 +2666,7 @@ class Proposta(db.Model):
 10% após a conclusão da montagem""")
     
     # Garantias e Considerações
-    garantias = db.Column(db.Text, default="""A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
+    garantias = db.Column(db.Text, default="""A empresa garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
     consideracoes_gerais = db.Column(db.Text, default="""Modificações nesta proposta somente serão válidas por escrito e com aceite mútuo. Em caso de cancelamento do contrato pela contratante, será cobrada multa de 30% sobre o valor total.""")
     
     # Itens Inclusos/Exclusos (JSON)
@@ -2931,16 +2931,15 @@ Atendendo a solicitação de V.sas., apresentamos nossas "Condições Comerciais
 Na expectativa de ter atendido às condições especificadas, aproveitamos para expressar os nossos votos de estima e consideração.
 
 Atenciosamente,
-
-Jefferson Luiz Moreira – Gerente Estruturas do Vale""")
+""")
     
     # Dados do engenheiro responsável (rodapé/cabeçalho)
     engenheiro_nome = db.Column(db.String(200), default='Engº Lucas Barbosa Alves Pinto')
     engenheiro_crea = db.Column(db.String(50), default='CREA- 5070458626-SP')
-    engenheiro_email = db.Column(db.String(120), default='contato@estruturasdovale.com.br')
-    engenheiro_telefone = db.Column(db.String(50), default='12 99187-7435')
-    engenheiro_endereco = db.Column(db.Text, default='Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008')
-    engenheiro_website = db.Column(db.String(200), default='www.estruturasdovale.com.br')
+    engenheiro_email = db.Column(db.String(120), default='')
+    engenheiro_telefone = db.Column(db.String(50), default='')
+    engenheiro_endereco = db.Column(db.Text, default='')
+    engenheiro_website = db.Column(db.String(200), default='')
     
     # Itens inclusos e exclusos
     itens_inclusos = db.Column(db.Text)
@@ -2955,7 +2954,7 @@ Jefferson Luiz Moreira – Gerente Estruturas do Vale""")
 10% após a conclusão da montagem""")
     
     # Garantias padrão
-    garantias = db.Column(db.Text, default="""A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
+    garantias = db.Column(db.Text, default="""A empresa garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.""")
     
     # SEÇÕES COMPLETAS DA PROPOSTA (1-9)
     secao_objeto = db.Column(db.Text, default="""Esta proposta descreve as condições comerciais a serem atendidas para o fornecimento de mão de obra especializada para fabricação e montagem de estruturas conforme segue.""")
@@ -3078,7 +3077,7 @@ class ConfiguracaoEmpresa(db.Model):
     website = db.Column(db.String(200))
     logo_url = db.Column(db.String(500))
     logo_base64 = db.Column(db.Text)  # Logo em base64 para upload direto
-    logo_pdf_base64 = db.Column(db.Text)  # Logo específica para PDFs (formato Estruturas do Vale)
+    logo_pdf_base64 = db.Column(db.Text)  # Logo específica para PDFs
     header_pdf_base64 = db.Column(db.Text)  # Header completo para PDFs (substitui logo no cabeçalho)
     
     # Personalização visual

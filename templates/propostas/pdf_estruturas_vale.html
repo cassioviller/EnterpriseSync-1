@@ -302,7 +302,7 @@
                     <img src="data:image/jpeg;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
                 {% endif %}
                 <div>
-                    <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
+                    <div class="company-name">{{ config.nome_empresa if config and config.nome_empresa else 'SIGE' }}</div>
                     <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
                 </div>
             </div>
@@ -343,26 +343,28 @@
     <div class="signature">
         Atenciosamente,
         <div class="signature-name">
-            Jefferson Luiz Moreira – Gerente Estruturas do Vale
+            {% if config and config.nome_empresa %}{{ config.nome_empresa }}{% endif %}
         </div>
     </div>
 
+    {% if config and config.website %}
     <div class="website">
-        www.estruturasdovale.com.br
+        {{ config.website }}
     </div>
+    {% endif %}
 
+    {% if config and (config.email or config.telefone or config.endereco or config.website) %}
     <!-- Informações de Contato -->
     <div class="contact-info">
-        <div class="contact-title">Eng° Lucas Barbosa Alves Pinto</div>
-        <div class="contact-subtitle">CREA-SP/0486276-SP</div>
+        {% if config.nome_empresa %}<div class="contact-title">{{ config.nome_empresa }}</div>{% endif %}
         <div class="contact-details">
-            <div>📧 contato@estruturasdovale.com.br</div>
-            <div>📞 12 99187-7435</div>
-            <div>📍 Rua Benedito Nunes da Campos, 140, Residencial União,</div>
-            <div>&nbsp;&nbsp;&nbsp;&nbsp;São José dos Campos - CEP: 12.239-908</div>
-            <div>🌐 www.estruturasdovale.com.br</div>
+            {% if config.email %}<div>📧 {{ config.email }}</div>{% endif %}
+            {% if config.telefone %}<div>📞 {{ config.telefone }}</div>{% endif %}
+            {% if config.endereco %}<div>📍 {{ config.endereco }}</div>{% endif %}
+            {% if config.website %}<div>🌐 {{ config.website }}</div>{% endif %}
         </div>
     </div>
+    {% endif %}
     </div>
 
     <!-- Página 2: Sumário -->
@@ -381,7 +383,7 @@
                     <img src="data:image/jpeg;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
                 {% endif %}
                 <div>
-                    <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
+                    <div class="company-name">{{ config.nome_empresa if config and config.nome_empresa else 'SIGE' }}</div>
                     <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
                 </div>
             </div>
@@ -449,7 +451,7 @@
                     <img src="data:image/jpeg;base64,{{ config.logo_base64 }}" alt="Logo" class="logo">
                 {% endif %}
                 <div>
-                    <div class="company-name">{{ config.nome_empresa if config else 'Estruturas do Vale' }}</div>
+                    <div class="company-name">{{ config.nome_empresa if config and config.nome_empresa else 'SIGE' }}</div>
                     <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
                 </div>
             </div>
@@ -566,7 +568,7 @@
                 <img src="data:image/jpeg;base64,{{ config_empresa.logo_base64 }}" alt="Logo" class="logo">
             {% endif %}
             <div>
-                <div class="company-name">{{ config_empresa.nome_empresa if config_empresa else 'Estruturas do Vale' }}</div>
+                <div class="company-name">{{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }}</div>
                 <div class="company-tagline">ESTRUTURAS METÁLICAS</div>
             </div>
         </div>
@@ -581,8 +583,8 @@
             {% if proposta.garantias %}
                 <p>{{ proposta.garantias }}</p>
             {% else %}
-                <p>A garantia da Estruturas do Vale limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.</p>
-                <p>A <strong>COMPRADORA</strong> não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrito da Estruturas do vale.</p>
+                <p>A garantia da empresa limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.</p>
+                <p>A <strong>COMPRADORA</strong> não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrito da empresa.</p>
             {% endif %}
         </div>
 
@@ -613,7 +615,7 @@
         </div>
         
         <div class="footer">
-            WWW.ESTRUTURASDOVALE.COM.BR
+            
         </div>
     </div>
 </body>

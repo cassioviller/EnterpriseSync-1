@@ -534,7 +534,7 @@ def _exportar_pdf(data_inicio, data_fim, obra_id, departamento_id):
     
     # Título
     title = Paragraph("RELATÓRIO CONSOLIDADO SIGE", title_style)
-    subtitle = Paragraph("Sistema Integrado de Gestão Empresarial - Estruturas do Vale", styles['Normal'])
+    subtitle = Paragraph("Sistema Integrado de Gestão Empresarial", styles['Normal'])
     
     elements.append(title)
     elements.append(subtitle)

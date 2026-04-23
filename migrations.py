@@ -4044,7 +4044,7 @@ def garantir_tabela_proposta_templates_existe():
 45% compra dos perfis
 25% no início da montagem in loco
 10% após a conclusão da montagem',
-                    garantias text DEFAULT 'A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.',
+                    garantias text DEFAULT 'A empresa garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.',
                     ativo boolean DEFAULT true,
                     publico boolean DEFAULT false,
                     uso_contador integer DEFAULT 0,
@@ -4114,7 +4114,7 @@ def migrar_colunas_faltantes_proposta_templates():
         ('itens_exclusos', 'text'), 
         ('condicoes', 'text'),
         ('condicoes_pagamento', 'text DEFAULT \'10% de entrada na assinatura do contrato\n10% após projeto aprovado\n45% compra dos perfis\n25% no início da montagem in loco\n10% após a conclusão da montagem\''),
-        ('garantias', 'text DEFAULT \'A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.\''),
+        ('garantias', 'text DEFAULT \'A empresa garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.\''),
         ('ativo', 'boolean DEFAULT true'),
         ('publico', 'boolean DEFAULT false'),
         ('uso_contador', 'integer DEFAULT 0'),
@@ -4286,10 +4286,10 @@ def migrar_campos_completos_templates():
             # Dados do engenheiro responsável
             ("engenheiro_nome", "VARCHAR(200) DEFAULT 'Engº Lucas Barbosa Alves Pinto'"),
             ("engenheiro_crea", "VARCHAR(50) DEFAULT 'CREA- 5070458626-SP'"),
-            ("engenheiro_email", "VARCHAR(120) DEFAULT 'contato@estruturasdovale.com.br'"),
-            ("engenheiro_telefone", "VARCHAR(50) DEFAULT '12 99187-7435'"),
-            ("engenheiro_endereco", "TEXT DEFAULT 'Rua Benedita Nunes de Campos, 140. Residencial União, São José dos Campos - CEP 12.239-008'"),
-            ("engenheiro_website", "VARCHAR(200) DEFAULT 'www.estruturasdovale.com.br'"),
+            ("engenheiro_email", "VARCHAR(120) DEFAULT ''"),
+            ("engenheiro_telefone", "VARCHAR(50) DEFAULT ''"),
+            ("engenheiro_endereco", "TEXT DEFAULT ''"),
+            ("engenheiro_website", "VARCHAR(200) DEFAULT ''"),
             
             # Seções completas da proposta (1-9)
             ("secao_objeto", "TEXT"),

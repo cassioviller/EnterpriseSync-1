@@ -1,4 +1,4 @@
-// Main application JavaScript for SIGE - Estruturas do Vale
+// Main application JavaScript for SIGE
 
 // Global variables
 let currentUser = null;

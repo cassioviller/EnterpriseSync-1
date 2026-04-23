@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#0d6efd">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="manifest" href="/static/manifest.json">
-    <title>{% block title %}SIGE - Estruturas do Vale{% endblock %}</title>
+    <title>{% block title %}SIGE - {{ brand_name }}{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
@@ -969,7 +969,7 @@
     <!-- Footer -->
     <footer class="text-center py-3 mt-5">
         <div class="container">
-            <p class="mb-0">&copy; 2024 SIGE - Estruturas do Vale. Todos os direitos reservados.</p>
+            <p class="mb-0">&copy; 2024 SIGE - {{ brand_name }}. Todos os direitos reservados.</p>
         </div>
     </footer>
     

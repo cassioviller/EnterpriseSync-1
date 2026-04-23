@@ -299,7 +299,7 @@
         <p style="text-align: center;">Aguardamos sua confirmação e permanecemos à disposição para quaisquer esclarecimentos.</p>
         
         <div class="signature-box">
-            <div><strong>ESTRUTURAS DO VALE</strong></div>
+            <div><strong>{{ (config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE')|upper }}</strong></div>
             <div>Responsável Técnico</div>
         </div>
     </div>

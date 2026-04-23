@@ -418,25 +418,24 @@
         <div class="signature">
             Atenciosamente,
             <div class="signature-name">
-                Jefferson Luiz Moreira – Gerente Estruturas do Vale
+            {{ config.nome_empresa if config and config.nome_empresa else 'SIGE' }}
             </div>
         </div>
 
         <div class="website">
-            www.estruturasdovale.com.br
+            {% if config and config.website %}{{ config.website }}{% endif %}
         </div>
 
         <!-- Informações de Contato -->
         <div class="contact-info">
-            <div class="contact-title">Eng° Lucas Barbosa Alves Pinto</div>
-            <div class="contact-subtitle">CREA-SP/0486276-SP</div>
+            {% if config and config.nome_empresa %}<div class="contact-title">{{ config.nome_empresa }}</div>{% endif %}
             <div class="contact-details">
-                <div>📧 contato@estruturasdovale.com.br</div>
-                <div>📞 12 99187-7435</div>
-                <div>📍 Rua Benedito Nunes da Campos, 140, Residencial União,</div>
-                <div>&nbsp;&nbsp;&nbsp;&nbsp;São José dos Campos - CEP: 12.239-908</div>
-                <div>🌐 www.estruturasdovale.com.br</div>
+                {% if config and config.email %}<div>📧 {{ config.email }}</div>{% endif %}
+                {% if config and config.telefone %}<div>📞 {{ config.telefone }}</div>{% endif %}
+                {% if config and config.endereco %}<div>📍 {{ config.endereco }}</div>{% endif %}
+                {% if config and config.website %}<div>🌐 {{ config.website }}</div>{% endif %}
             </div>
+        </div>
         </div>
     </div>
 
@@ -652,7 +651,7 @@
             {% if proposta.garantias %}
                 <p>{{ proposta.garantias | replace('\n', '<br>')|safe }}</p>
             {% else %}
-                <p>A Estruturas do Vale garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.</p>
+                <p>A empresa garante todos os materiais empregados nos serviços contra defeitos de fabricação pelo prazo de 12 (doze) meses contados a partir da data de conclusão da obra, conforme NBR 8800.</p>
             {% endif %}
         </div>
 

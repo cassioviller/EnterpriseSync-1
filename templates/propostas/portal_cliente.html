@@ -441,20 +441,12 @@
         <div class="portal-header">
             <div class="company-logo">
                 <!-- Debug: Verificando configurações -->
-                {% if config_empresa %}
-                    <!-- DEBUG: config_empresa existe -->
-                    {% if config_empresa.logo_base64 %}
-                        <!-- DEBUG: logo existe -->
-                        <img src="data:image/png;base64,{{ config_empresa.logo_base64 }}" alt="{{ config_empresa.nome_empresa or 'Logo da Empresa' }}">
-                        <br>
-                        {{ config_empresa.nome_empresa or 'NOME DA EMPRESA' }}
-                    {% else %}
-                        <!-- DEBUG: logo não existe -->
-                        <i class="fas fa-building"></i> {{ config_empresa.nome_empresa or 'ESTRUTURAS DO VALE' }}
-                    {% endif %}
+                {% if config_empresa and config_empresa.logo_base64 %}
+                    <img src="data:image/png;base64,{{ config_empresa.logo_base64 }}" alt="{{ config_empresa.nome_empresa or 'SIGE' }}">
+                    <br>
+                    {{ config_empresa.nome_empresa or 'SIGE' }}
                 {% else %}
-                    <!-- DEBUG: config_empresa não existe -->
-                    <i class="fas fa-building"></i> ESTRUTURAS DO VALE
+                    <i class="fas fa-building"></i> {{ (config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE') }}
                 {% endif %}
             </div>
             <p class="text-muted mb-4">Portal do Cliente - Proposta Comercial</p>

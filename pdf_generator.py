@@ -72,7 +72,6 @@ class FuncionarioPDFGenerator:
         
         # Cabeçalho
         story.append(Paragraph("SIGE - Sistema Integrado de Gestão Empresarial", self.styles['CustomTitle']))
-        story.append(Paragraph("Estruturas do Vale", self.styles['Normal']))
         story.append(Spacer(1, 20))
         
         # Título do relatório

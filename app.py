@@ -213,6 +213,8 @@ def inject_company_config():
             if config_empresa:
                 return {
                     'config_empresa': config_empresa,
+                    'brand_name': config_empresa.nome_empresa or 'SIGE',
+                    'brand_logo_base64': config_empresa.logo_base64,
                     'empresa_cores': {
                         'primaria': config_empresa.cor_primaria or '#007bff',
                         'secundaria': config_empresa.cor_secundaria or '#6c757d',
@@ -223,6 +225,8 @@ def inject_company_config():
         # Valores padrão se não houver configuração
         return {
             'config_empresa': None,
+            'brand_name': 'SIGE',
+            'brand_logo_base64': None,
             'empresa_cores': {
                 'primaria': '#007bff',
                 'secundaria': '#6c757d', 
@@ -233,6 +237,8 @@ def inject_company_config():
         # Fallback em caso de erro
         return {
             'config_empresa': None,
+            'brand_name': 'SIGE',
+            'brand_logo_base64': None,
             'empresa_cores': {
                 'primaria': '#007bff',
                 'secundaria': '#6c757d',
