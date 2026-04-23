@@ -90,7 +90,7 @@
                             </div>
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            <div class="fw-bold text-dark">{{ "%.1f"|format(taxa_conversao) }}%</div>
+                            <div class="fw-bold text-dark">{{ taxa_conversao|num(1) }}%</div>
                             <div class="text-muted small">Taxa de Conversão</div>
                         </div>
                     </div>
@@ -121,25 +121,25 @@
                     <div class="mb-3">
                         <div class="d-flex justify-content-between">
                             <span class="text-muted">Valor Total</span>
-                            <span class="fw-bold">R$ {{ "{:,.2f}"|format(valor_total) }}</span>
+                            <span class="fw-bold">{{ valor_total|brl }}</span>
                         </div>
                     </div>
                     <div class="mb-3">
                         <div class="d-flex justify-content-between">
                             <span class="text-muted">Valor Aprovado</span>
-                            <span class="fw-bold text-success">R$ {{ "{:,.2f}"|format(valor_aprovado) }}</span>
+                            <span class="fw-bold text-success">{{ valor_aprovado|brl }}</span>
                         </div>
                     </div>
                     <div class="mb-3">
                         <div class="d-flex justify-content-between">
                             <span class="text-muted">Valor Pendente</span>
-                            <span class="fw-bold text-warning">R$ {{ "{:,.2f}"|format(valor_total - valor_aprovado) }}</span>
+                            <span class="fw-bold text-warning">{{ (valor_total - valor_aprovado)|brl }}</span>
                         </div>
                     </div>
                     <div class="progress mt-3" style="height: 10px;">
                         <div class="progress-bar bg-success" style="width: {{ (valor_aprovado / valor_total * 100) if valor_total > 0 else 0 }}%"></div>
                     </div>
-                    <small class="text-muted">{{ "%.1f"|format((valor_aprovado / valor_total * 100) if valor_total > 0 else 0) }}% do valor total aprovado</small>
+                    <small class="text-muted">{{ ((valor_aprovado / valor_total * 100) if valor_total > 0 else 0)|num(1) }}% do valor total aprovado</small>
                 </div>
             </div>
         </div>
@@ -165,7 +165,7 @@
                                     <h6 class="card-title">{{ proposta.titulo }}</h6>
                                     <p class="card-text small">
                                         <strong>Cliente:</strong> {{ proposta.cliente.nome }}<br>
-                                        <strong>Valor:</strong> R$ {{ "{:,.2f}"|format(proposta.valor_total) }}<br>
+                                        <strong>Valor:</strong> {{ proposta.valor_total|brl }}<br>
                                         <strong>Vence em:</strong> {{ proposta.data_vencimento.strftime('%d/%m/%Y') if proposta.data_vencimento else '-' }}
                                     </p>
                                     <a href="{{ url_for('propostas.visualizar', id=proposta.id) }}" class="btn btn-sm btn-warning">
@@ -217,7 +217,7 @@
                                     <td>{{ proposta.cliente.nome }}</td>
                                     <td>{{ proposta.titulo }}</td>
                                     <td>
-                                        <span class="fw-bold">R$ {{ "{:,.2f}"|format(proposta.valor_total) }}</span>
+                                        <span class="fw-bold">{{ proposta.valor_total|brl }}</span>
                                     </td>
                                     <td>
                                         {% if proposta.status == 'rascunho' %}

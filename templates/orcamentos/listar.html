@@ -25,9 +25,9 @@
             <td><strong>{{ o.numero }}</strong></td>
             <td>{{ o.titulo }}</td>
             <td>{{ o.cliente_nome or '—' }}</td>
-            <td class="text-end text-muted">R$ {{ '%.2f'|format(o.custo_total or 0) }}</td>
-            <td class="text-end">R$ {{ '%.2f'|format(o.venda_total or 0) }}</td>
-            <td class="text-end text-success">R$ {{ '%.2f'|format(o.lucro_total or 0) }}</td>
+            <td class="text-end text-muted">{{ o.custo_total|brl }}</td>
+            <td class="text-end">{{ o.venda_total|brl }}</td>
+            <td class="text-end text-success">{{ o.lucro_total|brl }}</td>
             <td><span class="badge bg-secondary">{{ o.status }}</span></td>
             <td>
               {% set _props = o.propostas_geradas %}

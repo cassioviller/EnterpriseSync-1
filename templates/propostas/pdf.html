@@ -213,17 +213,17 @@
                 <tr>
                     <td class="number">{{ item.item_numero }}</td>
                     <td>{{ item.descricao }}</td>
-                    <td class="number">{{ "{:,.3f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                    <td class="number">{{ item.quantidade|num(3) }}</td>
                     <td class="number">{{ item.unidade }}</td>
-                    <td class="currency">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                    <td class="currency">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                    <td class="currency">{{ item.preco_unitario|brl }}</td>
+                    <td class="currency">{{ item.subtotal|brl }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr class="total-row">
                     <td colspan="5" style="text-align: right;"><strong>VALOR TOTAL:</strong></td>
-                    <td class="currency"><strong>R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
+                    <td class="currency"><strong>{{ (proposta.valor_total or 0)|brl }}</strong></td>
                 </tr>
             </tfoot>
         </table>

@@ -70,7 +70,7 @@
                         <div class="col-md-3">
                             <h6 class="text-muted">Valor Total</h6>
                             <p class="mb-0 text-success fw-bold fs-5">
-                                R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                {{ proposta.valor_total|brl }}
                             </p>
                         </div>
                         <div class="col-md-3">
@@ -152,17 +152,20 @@
                                 <tr>
                                     <td class="text-center">{{ item.item_numero }}</td>
                                     <td>{{ item.descricao }}</td>
-                                    <td class="text-center">{{ "{:,.3f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    <td class="text-center">{{ item.quantidade|num(3) }}</td>
                                     <td class="text-center">{{ item.unidade }}</td>
-                                    <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                    <td class="text-end">R$ {{ "{:,.2f}".format(item.subtotal or ((item.preco_unitario or 0) * (item.quantidade or 0))).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                    <td class="text-end">{{ item.preco_unitario|brl }}</td>
+                                    {# Task #165: usa |float para evitar TypeError Decimal x float quando o
+                                       schema diverge entre dev/prod (preco_unitario/quantidade às vezes Float,
+                                       às vezes Numeric/Decimal). O filtro |brl normaliza qualquer tipo. #}
+                                    <td class="text-end">{{ (item.subtotal if item.subtotal is not none else ((item.preco_unitario or 0)|float * (item.quantidade or 0)|float))|brl }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                             <tfoot>
                                 <tr class="table-success">
                                     <td colspan="5" class="text-end"><strong>VALOR TOTAL:</strong></td>
-                                    <td class="text-end"><strong>R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong></td>
+                                    <td class="text-end"><strong>{{ proposta.valor_total|brl }}</strong></td>
                                 </tr>
                             </tfoot>
                         </table>

@@ -34,6 +34,50 @@ def _admin_id() -> int:
     return current_user.admin_id if getattr(current_user, 'admin_id', None) else current_user.id
 
 
+def _parse_br_number(raw, default=0.0) -> float:
+    """Task #165: aceita valores em pt-BR ('1.234,56') ou en-US ('1234.56').
+
+    Regras:
+      - None / '' → default
+      - Números (int/float/Decimal) → float()
+      - Se contém vírgula: assume pt-BR. Remove '.' (milhar) e troca ',' → '.'.
+      - Se só tem ponto: trata como decimal en-US.
+      - Em qualquer falha de parse, devolve default (não levanta).
+    """
+    if raw is None:
+        return float(default)
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    if isinstance(raw, Decimal):
+        return float(raw)
+    s = str(raw).strip()
+    if not s:
+        return float(default)
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _parse_br_decimal(raw, default='0') -> Decimal:
+    """Task #165: versão Decimal de _parse_br_number, para colunas Numeric."""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return Decimal(str(default))
+    if isinstance(raw, Decimal):
+        return raw
+    if isinstance(raw, (int, float)):
+        return Decimal(str(raw))
+    s = str(raw).strip()
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    try:
+        return Decimal(s)
+    except Exception:
+        return Decimal(str(default))
+
+
 def _parse_template_override(raw: Optional[str], admin_id: int) -> Optional[int]:
     """Task #118: valida e devolve um cronograma_template_override_id seguro.
 
@@ -108,8 +152,8 @@ def novo():
                 descricao=request.form.get('descricao') or None,
                 cliente_id=int(cliente_id) if cliente_id else None,
                 cliente_nome=cliente_nome or None,
-                imposto_pct_global=Decimal(str(imp_g)) if imp_g not in (None, '') else None,
-                margem_pct_global=Decimal(str(mar_g)) if mar_g not in (None, '') else None,
+                imposto_pct_global=_parse_br_decimal(imp_g, '0') if imp_g not in (None, '') else None,
+                margem_pct_global=_parse_br_decimal(mar_g, '0') if mar_g not in (None, '') else None,
                 criado_por=current_user.id,
                 status='rascunho',
             )
@@ -180,8 +224,8 @@ def atualizar(id):
         orc.cliente_nome = (request.form.get('cliente_nome') or orc.cliente_nome or '').strip() or None
         imp_g = request.form.get('imposto_pct_global')
         mar_g = request.form.get('margem_pct_global')
-        orc.imposto_pct_global = Decimal(imp_g) if imp_g not in (None, '') else None
-        orc.margem_pct_global = Decimal(mar_g) if mar_g not in (None, '') else None
+        orc.imposto_pct_global = _parse_br_decimal(imp_g, '0') if imp_g not in (None, '') else None
+        orc.margem_pct_global = _parse_br_decimal(mar_g, '0') if mar_g not in (None, '') else None
         recalcular_orcamento(orc)
         db.session.commit()
         flash('Orçamento atualizado.', 'success')
@@ -201,7 +245,7 @@ def adicionar_item(id):
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     try:
         servico_id = request.form.get('servico_id') or None
-        quantidade = Decimal(str(request.form.get('quantidade') or '1'))
+        quantidade = _parse_br_decimal(request.form.get('quantidade'), '1')
         servico = None
         snap = []
         descricao = (request.form.get('descricao') or '').strip()
@@ -257,11 +301,11 @@ def atualizar_item(item_id):
     try:
         item.descricao = (request.form.get('descricao') or item.descricao).strip()
         item.unidade = (request.form.get('unidade') or item.unidade).strip()
-        item.quantidade = Decimal(str(request.form.get('quantidade') or '0'))
+        item.quantidade = _parse_br_decimal(request.form.get('quantidade'), '0')
         imp = request.form.get('imposto_pct')
         mar = request.form.get('margem_pct')
-        item.imposto_pct = Decimal(imp) if imp not in (None, '') else None
-        item.margem_pct = Decimal(mar) if mar not in (None, '') else None
+        item.imposto_pct = _parse_br_decimal(imp, '0') if imp not in (None, '') else None
+        item.margem_pct = _parse_br_decimal(mar, '0') if mar not in (None, '') else None
         item.observacao = request.form.get('observacao') or None
 
         # Composição (campos paralelos)
@@ -282,8 +326,8 @@ def atualizar_item(item_id):
                     'insumo_id': int(ins_ids[i]) if i < len(ins_ids) and ins_ids[i] else None,
                     'nome': nm,
                     'unidade': (unids[i] if i < len(unids) else 'un') or 'un',
-                    'coeficiente': float(coefs[i] or 0) if i < len(coefs) else 0.0,
-                    'preco_unitario': float(precos[i] or 0) if i < len(precos) else 0.0,
+                    'coeficiente': _parse_br_number(coefs[i] if i < len(coefs) else 0, 0.0),
+                    'preco_unitario': _parse_br_number(precos[i] if i < len(precos) else 0, 0.0),
                     'subtotal_unitario': 0.0,
                 })
             except (ValueError, IndexError):

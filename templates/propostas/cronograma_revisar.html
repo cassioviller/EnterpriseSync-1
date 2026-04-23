@@ -290,7 +290,7 @@ ul.cron-tree .node-sub > .node-label {
                 </span>
                 {% endif %}
                 {% if item.horas_totais_estimadas %}
-                <span class="badge-horas">{{ '%.1f'|format(item.horas_totais_estimadas) }}h totais</span>
+                <span class="badge-horas">{{ item.horas_totais_estimadas|num(1) }}h totais</span>
                 {% endif %}
             </div>
 

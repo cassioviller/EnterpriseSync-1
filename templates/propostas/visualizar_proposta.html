@@ -191,10 +191,10 @@
                                         <tr>
                                             <td class="text-center fw-bold">{{ item.item_numero }}</td>
                                             <td style="word-break: break-word;">{{ item.descricao }}</td>
-                                            <td class="text-center">{{ "{:,.1f}".format(item.quantidade).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                            <td class="text-center">{{ item.quantidade|num(1) }}</td>
                                             <td class="text-center">{{ item.unidade }}</td>
-                                            <td class="text-end">R$ {{ "{:,.2f}".format(item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
-                                            <td class="text-end fw-bold text-success">R$ {{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                            <td class="text-end">{{ item.preco_unitario|brl }}</td>
+                                            <td class="text-end fw-bold text-success">{{ item.subtotal|brl }}</td>
                                         </tr>
                                         {% endfor %}
                                     {% endfor %}
@@ -202,7 +202,7 @@
                                 <tfoot class="table-info">
                                     <tr class="fw-bold">
                                         <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL:</td>
-                                        <td class="text-end fs-6 py-2">R$ {{ "{:,.2f}".format(template_info.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                                        <td class="text-end fs-6 py-2">{{ template_info.subtotal|brl }}</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -216,7 +216,7 @@
                     <div class="card-body text-center py-4">
                         <h4 class="mb-2" style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Valor Total da Proposta</h4>
                         <div style="font-size: 2.5rem; font-weight: 900; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-                            R$ {{ "{:,.2f}".format(total_geral or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                            {{ (total_geral or 0)|brl }}
                         </div>
                     </div>
                 </div>
@@ -252,7 +252,7 @@
                                         <br><small class="text-muted">{{ item.especificacoes }}</small>
                                         {% endif %}
                                     </td>
-                                    <td>{{ "%.4f"|format(item.quantidade) }}</td>
+                                    <td>{{ item.quantidade|num(4) }}</td>
                                     <td>{{ item.unidade }}</td>
                                     <td>{{ item.preco_unitario|brl }}</td>
                                     <td>{{ item.valor_total|brl }}</td>

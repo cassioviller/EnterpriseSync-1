@@ -138,7 +138,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Total</label>
                                     <input type="text" class="form-control servico-total" readonly 
-                                           value="R$ {{ '{:,.2f}'.format(item.quantidade * item.preco_unitario).replace(',', 'X').replace('.', ',').replace('X', '.') }}">
+                                           value="{{ ((item.quantidade or 0) * (item.preco_unitario or 0))|brl }}">
                                 </div>
                             </div>
                         </div>
@@ -154,7 +154,7 @@
                         <i class="fas fa-plus"></i> Adicionar Serviço
                     </button>
                     <div class="text-end">
-                        <h5>Total da Proposta: <span id="totalProposta">R$ {{ '{:,.2f}'.format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span></h5>
+                        <h5>Total da Proposta: <span id="totalProposta">{{ (proposta.valor_total or 0)|brl }}</span></h5>
                     </div>
                 </div>
 

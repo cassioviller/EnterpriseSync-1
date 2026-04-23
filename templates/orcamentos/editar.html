@@ -71,12 +71,12 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">Imposto global (%)</label>
-          <input class="form-control" type="number" step="0.01" name="imposto_pct_global"
+          <input class="form-control" type="text" inputmode="decimal" step="0.01" name="imposto_pct_global"
                  value="{{ o.imposto_pct_global if o.imposto_pct_global is not none else '' }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Margem global (%)</label>
-          <input class="form-control" type="number" step="0.01" name="margem_pct_global"
+          <input class="form-control" type="text" inputmode="decimal" step="0.01" name="margem_pct_global"
                  value="{{ o.margem_pct_global if o.margem_pct_global is not none else '' }}">
         </div>
         <div class="col-md-6 d-flex align-items-end justify-content-end">
@@ -90,21 +90,21 @@
   <div class="row g-3 mb-3">
     <div class="col-md-3"><div class="card"><div class="card-body">
       <div class="text-muted small">Custo total</div>
-      <h5 class="mb-0">R$ {{ '%.2f'|format(o.custo_total or 0) }}</h5>
+      <h5 class="mb-0">{{ o.custo_total|brl }}</h5>
     </div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body">
       <div class="text-muted small">Preço de venda</div>
-      <h5 class="mb-0 text-primary">R$ {{ '%.2f'|format(o.venda_total or 0) }}</h5>
+      <h5 class="mb-0 text-primary">{{ o.venda_total|brl }}</h5>
     </div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body">
       <div class="text-muted small">Lucro estimado</div>
-      <h5 class="mb-0 text-success">R$ {{ '%.2f'|format(o.lucro_total or 0) }}</h5>
+      <h5 class="mb-0 text-success">{{ o.lucro_total|brl }}</h5>
     </div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body">
       <div class="text-muted small">Margem efetiva</div>
       <h5 class="mb-0">
         {% if o.venda_total and o.venda_total|float > 0 %}
-          {{ '%.1f'|format((o.lucro_total or 0)|float / o.venda_total|float * 100) }}%
+          {{ ((o.lucro_total or 0)|float / o.venda_total|float * 100)|num(1) }}%
         {% else %}—{% endif %}
       </h5>
     </div></div></div>
@@ -148,7 +148,7 @@
         </div>
         <div class="col-md-2">
           <label class="form-label small">Quantidade</label>
-          <input class="form-control" name="quantidade" type="number" step="0.0001" value="1">
+          <input class="form-control" name="quantidade" type="text" inputmode="decimal" step="0.0001" value="1">
         </div>
         <div class="col-md-2">
           <label class="form-label small" title="Vazio = usa o template padrão do serviço">
@@ -250,17 +250,17 @@
         </div>
         <div class="col-md-2">
           <label class="form-label small">Quantidade</label>
-          <input class="form-control" type="number" step="0.0001" name="quantidade" value="{{ it.quantidade }}">
+          <input class="form-control" type="text" inputmode="decimal" step="0.0001" name="quantidade" value="{{ it.quantidade }}">
         </div>
         <div class="col-md-2">
           <label class="form-label small">Imposto % (item)</label>
-          <input class="form-control" type="number" step="0.01" name="imposto_pct"
+          <input class="form-control" type="text" inputmode="decimal" step="0.01" name="imposto_pct"
                  value="{{ it.imposto_pct if it.imposto_pct is not none else '' }}"
                  placeholder="usa global">
         </div>
         <div class="col-md-2">
           <label class="form-label small">Margem % (item)</label>
-          <input class="form-control" type="number" step="0.01" name="margem_pct"
+          <input class="form-control" type="text" inputmode="decimal" step="0.01" name="margem_pct"
                  value="{{ it.margem_pct if it.margem_pct is not none else '' }}"
                  placeholder="usa global">
         </div>
@@ -329,13 +329,16 @@
               </td>
               <td><input class="form-control form-control-sm" name="comp_nome" value="{{ c.nome }}"></td>
               <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="{{ c.unidade }}"></td>
-              <td><input class="form-control form-control-sm" type="number" step="0.0001"
+              <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
                          name="comp_coeficiente" value="{{ c.coeficiente }}"></td>
-              <td><input class="form-control form-control-sm" type="number" step="0.0001"
+              <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
                          name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
-              <td class="text-end text-muted js-subtotal-unit">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
-              <td class="text-end text-muted js-consumo-tot">{{ '%.4f'|format((c.coeficiente|float if c.coeficiente is not none else 0) * (it.quantidade|float if it.quantidade is not none else 0)) }} {{ c.unidade }}</td>
-              <td class="text-end text-dark js-subtotal-tot"><strong>R$ {{ '%.2f'|format((c.coeficiente|float if c.coeficiente is not none else 0) * (c.preco_unitario|float if c.preco_unitario is not none else 0) * (it.quantidade|float if it.quantidade is not none else 0)) }}</strong></td>
+              {% set _coef = c.coeficiente|float if c.coeficiente not in (none, '') else 0.0 %}
+              {% set _preco = c.preco_unitario|float if c.preco_unitario not in (none, '') else 0.0 %}
+              {% set _qtd = it.quantidade|float if it.quantidade is not none else 0.0 %}
+              <td class="text-end text-muted js-subtotal-unit">R$ {{ c.subtotal_unitario|num(4) }}</td>
+              <td class="text-end text-muted js-consumo-tot">{{ (_coef * _qtd)|num(4) }} {{ c.unidade }}</td>
+              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (_coef * _preco * _qtd)|brl }}</strong></td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
@@ -368,9 +371,9 @@
           <input class="form-control form-control-sm" name="observacao" value="{{ it.observacao or '' }}">
         </div>
         <div class="col-md-3 text-end">
-          <div class="small text-muted">Custo: R$ <span class="js-custo">{{ '%.2f'|format(it.custo_total or 0) }}</span></div>
-          <div class="small">Venda: <strong>R$ <span class="js-venda">{{ '%.2f'|format(it.venda_total or 0) }}</span></strong></div>
-          <div class="small text-success">Lucro: R$ <span class="js-lucro">{{ '%.2f'|format(it.lucro_total or 0) }}</span></div>
+          <div class="small text-muted">Custo: <span class="js-custo">{{ it.custo_total|brl }}</span></div>
+          <div class="small">Venda: <strong><span class="js-venda">{{ it.venda_total|brl }}</span></strong></div>
+          <div class="small text-success">Lucro: <span class="js-lucro">{{ it.lucro_total|brl }}</span></div>
           <div class="small text-muted js-preview-flag" style="display:none">
             <i class="fas fa-circle-notch fa-spin me-1"></i>prévia (não salvo)
           </div>
@@ -409,8 +412,8 @@
     </td>
     <td><input class="form-control form-control-sm" name="comp_nome" placeholder="Descrição"></td>
     <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="un"></td>
-    <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_coeficiente" value="0"></td>
-    <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_preco_unitario" value="0"></td>
+    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_coeficiente" value="0"></td>
+    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_preco_unitario" value="0"></td>
     <td class="text-end text-muted js-subtotal-unit">—</td>
     <td class="text-end text-muted js-consumo-tot">—</td>
     <td class="text-end text-dark js-subtotal-tot">—</td>
@@ -428,7 +431,14 @@ function addCompRow(btn) {
 
 // Task #115 — recálculo em tempo real (espelha services/orcamento_view_service.py).
 const ORC = { imp_global: 0, mar_global: 0 };
-const fmt = n => Number(n||0).toFixed(2);
+// Task #165 — formatadores pt-BR para JS (espelha filtros |brl / |num do server).
+const _BRL_FMT = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtBR(n, decimals){
+  decimals = (decimals == null ? 2 : decimals);
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(Number(n) || 0);
+}
+function fmtBRL(n){ return 'R$ ' + _BRL_FMT.format(Number(n) || 0); }
+const fmt = n => fmtBR(n, 2);
 // Task #124 — leitura robusta de número para inputs do orçamento.
 // Em navegadores pt-BR, `<input type="number">` pode aceitar vírgula como
 // separador decimal mas devolver `.value === ''` (inválido), zerando o cálculo
@@ -436,12 +446,21 @@ const fmt = n => Number(n||0).toFixed(2);
 // vírgula → ponto antes do parseFloat para suportar tanto "0,04" quanto "0.04".
 function getNum(el){
   if (!el) return 0;
+  // Task #165 — espelha _parse_br_number do backend:
+  // se há vírgula, é pt-BR ('1.234,56' → '1234.56'); senão, en-US.
+  const rawVal = el.value == null ? '' : String(el.value).trim();
+  if (!rawVal) return 0;
+  let s = rawVal;
+  if (s.indexOf(',') >= 0) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  }
+  const n = parseFloat(s);
+  if (Number.isFinite(n)) return n;
+  // Fallback final: valueAsNumber (caso navegador já tenha normalizado).
   if (typeof el.valueAsNumber === 'number' && !Number.isNaN(el.valueAsNumber)) {
     return el.valueAsNumber;
   }
-  const raw = (el.value == null ? '' : String(el.value)).trim().replace(',', '.');
-  const n = parseFloat(raw);
-  return Number.isFinite(n) ? n : 0;
+  return 0;
 }
 
 function recalcItem(form){
@@ -461,11 +480,11 @@ function recalcItem(form){
     const consumoTot = coef * qtd;
     const subTot = sub * qtd;
     const subCell = tr.querySelector('.js-subtotal-unit') || tr.children[5];
-    if (subCell) subCell.textContent = 'R$ ' + sub.toFixed(4);
+    if (subCell) subCell.textContent = 'R$ ' + fmtBR(sub, 4);
     const consumoCell = tr.querySelector('.js-consumo-tot');
-    if (consumoCell) consumoCell.textContent = consumoTot.toFixed(4) + (un ? ' ' + un : '');
+    if (consumoCell) consumoCell.textContent = fmtBR(consumoTot, 4) + (un ? ' ' + un : '');
     const subTotCell = tr.querySelector('.js-subtotal-tot');
-    if (subTotCell) subTotCell.innerHTML = '<strong>R$ ' + subTot.toFixed(2) + '</strong>';
+    if (subTotCell) subTotCell.innerHTML = '<strong>' + fmtBRL(subTot) + '</strong>';
     custoUnit += sub;
   });
   // Fórmula canônica idêntica a services/orcamento_view_service.py:
@@ -477,9 +496,9 @@ function recalcItem(form){
   const custoTot  = Math.round(custoUnit * qtd * 100) / 100;
   const vendaTot  = Math.round(precoUnit * qtd * 100) / 100;
   const lucroTot  = Math.round((vendaTot - custoTot) * 100) / 100;
-  form.querySelector('.js-custo').textContent = fmt(custoTot);
-  form.querySelector('.js-venda').textContent = fmt(vendaTot);
-  form.querySelector('.js-lucro').textContent = fmt(lucroTot);
+  form.querySelector('.js-custo').textContent = fmtBRL(custoTot);
+  form.querySelector('.js-venda').textContent = fmtBRL(vendaTot);
+  form.querySelector('.js-lucro').textContent = fmtBRL(lucroTot);
   const flag = form.querySelector('.js-preview-flag');
   if (erro) {
     flag.innerHTML = '<i class="fas fa-exclamation-triangle text-danger me-1"></i>imposto + margem ≥ 100% — preço inválido';
@@ -503,10 +522,10 @@ function recalcAll(){
   // Atualiza cards de totais
   const cards = document.querySelectorAll('.row.g-3.mb-3 h5');
   if (cards.length >= 4) {
-    cards[0].textContent = 'R$ ' + fmt(cT);
-    cards[1].textContent = 'R$ ' + fmt(vT);
-    cards[2].textContent = 'R$ ' + fmt(lT);
-    cards[3].textContent = vT > 0 ? ((lT/vT)*100).toFixed(1) + '%' : '—';
+    cards[0].textContent = fmtBRL(cT);
+    cards[1].textContent = fmtBRL(vT);
+    cards[2].textContent = fmtBRL(lT);
+    cards[3].textContent = vT > 0 ? fmtBR((lT/vT)*100, 1) + '%' : '—';
   }
 }
 
@@ -626,7 +645,7 @@ async function buscarInsumos() {
     const tdPreco = document.createElement('td');
     tdPreco.className = 'text-end';
     tdPreco.appendChild(document.createTextNode(
-      'R$ ' + Number(i.preco || 0).toFixed(4) + ' '
+      'R$ ' + fmtBR(i.preco, 4) + ' '
     ));
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -681,7 +700,7 @@ function _addInsumoRow(insumo) {
           </div>
           <div class="col-md-3">
             <label class="form-label small">Coeficiente</label>
-            <input id="insumoPickerCoef" type="number" step="0.0001" value="1" class="form-control">
+            <input id="insumoPickerCoef" type="text" inputmode="decimal" step="0.0001" value="1" class="form-control">
           </div>
         </div>
         <div class="table-responsive" style="max-height:50vh;overflow:auto">

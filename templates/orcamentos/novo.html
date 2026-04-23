@@ -22,12 +22,12 @@
       </div>
       <div class="col-md-6">
         <label class="form-label">Imposto global (%)</label>
-        <input class="form-control" name="imposto_pct_global" type="number" step="0.01"
+        <input class="form-control" name="imposto_pct_global" type="text" inputmode="decimal" step="0.01"
                value="{{ config.imposto_pct_padrao if config else '' }}">
       </div>
       <div class="col-md-6">
         <label class="form-label">Margem global (%)</label>
-        <input class="form-control" name="margem_pct_global" type="number" step="0.01"
+        <input class="form-control" name="margem_pct_global" type="text" inputmode="decimal" step="0.01"
                value="{{ config.lucro_pct_padrao if config else '' }}">
       </div>
     </div>

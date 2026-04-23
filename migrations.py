@@ -3829,6 +3829,7 @@ def executar_migracoes():
             (127, "Task #115 v2 — propostas_comerciais.orcamento_id (Orçamento → N Propostas)", migration_127_proposta_orcamento_id),
             (128, "Task #118 — cronograma_template_override_id em orcamento_item e proposta_itens + composicao_snapshot em proposta_itens", migration_128_orcamento_item_cronograma_override),
             (129, "Task #158 — assinatura e engenheiro responsável em configuracao_empresa", migration_129_configuracao_empresa_assinatura_engenheiro),
+            (130, "Task #165 — alinhar tipos numéricos de orçamento/proposta_itens (Float→Numeric)", migration_130_alinhar_tipos_numericos_orcamento_proposta),
         ]
         
         # Executar cada migração com rastreamento
@@ -10358,6 +10359,119 @@ def migration_129_configuracao_empresa_assinatura_engenheiro():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 129: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_130_alinhar_tipos_numericos_orcamento_proposta():
+    """Migration 130 (Task #165): garante que colunas numéricas de orçamento e
+    proposta_itens estejam como NUMERIC (Decimal) em todos os ambientes.
+
+    Em algumas instâncias antigas (antes da Task #82/#115) estas colunas
+    foram criadas como DOUBLE PRECISION (Float). Isso causa o erro
+    `unsupported operand type(s) for *: 'float' and 'decimal.Decimal'` no
+    template de edição de orçamento e na visualização da proposta, porque
+    o template mistura valores vindos do banco (float) com valores vindos
+    de JSON (Decimal). Esta migração padroniza para NUMERIC, alinhando o
+    schema com models.py. É idempotente — só converte se a coluna ainda
+    estiver como DOUBLE PRECISION.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # (tabela, coluna, tipo destino)
+        alvos = [
+            ('orcamento_item', 'quantidade', 'NUMERIC(15,4)'),
+            ('orcamento_item', 'imposto_pct', 'NUMERIC(5,2)'),
+            ('orcamento_item', 'margem_pct', 'NUMERIC(5,2)'),
+            ('orcamento_item', 'custo_unitario', 'NUMERIC(15,4)'),
+            ('orcamento_item', 'preco_venda_unitario', 'NUMERIC(15,4)'),
+            ('orcamento_item', 'custo_total', 'NUMERIC(15,2)'),
+            ('orcamento_item', 'venda_total', 'NUMERIC(15,2)'),
+            ('orcamento_item', 'lucro_total', 'NUMERIC(15,2)'),
+            ('orcamento', 'imposto_pct_global', 'NUMERIC(5,2)'),
+            ('orcamento', 'margem_pct_global', 'NUMERIC(5,2)'),
+            ('orcamento', 'custo_total', 'NUMERIC(15,2)'),
+            ('orcamento', 'venda_total', 'NUMERIC(15,2)'),
+            ('orcamento', 'lucro_total', 'NUMERIC(15,2)'),
+            ('proposta_itens', 'quantidade', 'NUMERIC(10,3)'),
+            ('proposta_itens', 'preco_unitario', 'NUMERIC(10,2)'),
+            ('proposta_itens', 'quantidade_medida', 'NUMERIC(15,4)'),
+            ('proposta_itens', 'custo_unitario', 'NUMERIC(15,4)'),
+            ('proposta_itens', 'lucro_unitario', 'NUMERIC(15,4)'),
+            ('proposta_itens', 'subtotal', 'NUMERIC(15,2)'),
+        ]
+
+        convertidas = 0
+        falhas = []
+        # Usa SAVEPOINT por coluna: assim, falha em uma coluna não desfaz
+        # as conversões anteriores já bem-sucedidas (Task #165).
+        for tabela, coluna, tipo in alvos:
+            cursor.execute(
+                """
+                SELECT data_type
+                  FROM information_schema.columns
+                 WHERE table_name = %s AND column_name = %s
+                """,
+                (tabela, coluna),
+            )
+            row = cursor.fetchone()
+            if not row:
+                continue
+            data_type = (row[0] or '').lower()
+            if data_type in ('numeric', 'decimal'):
+                continue
+            sp_name = f"sp_m130_{tabela}_{coluna}"
+            try:
+                cursor.execute(f"SAVEPOINT {sp_name}")
+                cursor.execute(
+                    f"ALTER TABLE {tabela} "
+                    f"ALTER COLUMN {coluna} TYPE {tipo} "
+                    f"USING {coluna}::{tipo}"
+                )
+                cursor.execute(f"RELEASE SAVEPOINT {sp_name}")
+                convertidas += 1
+                logger.info(
+                    f"MIGRACAO 130: {tabela}.{coluna} {data_type} → {tipo}"
+                )
+            except Exception as conv_err:
+                # Reverte só este savepoint, preservando conversões anteriores
+                try:
+                    cursor.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
+                    cursor.execute(f"RELEASE SAVEPOINT {sp_name}")
+                except Exception:
+                    pass
+                falhas.append(f"{tabela}.{coluna}: {conv_err}")
+                logger.warning(
+                    f"MIGRACAO 130: falha ao converter {tabela}.{coluna} "
+                    f"({data_type} → {tipo}): {conv_err}"
+                )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            f"MIGRACAO 130: tipos numéricos alinhados em orçamento/proposta_itens "
+            f"({convertidas} convertidas, {len(falhas)} falhas)"
+        )
+        if falhas:
+            # Lança exceção para que run_migration_safe registre falha e
+            # permita reexecução automática até o schema estar 100% alinhado
+            # (não silencia o problema).
+            raise RuntimeError(
+                f"MIGRACAO 130: {len(falhas)} coluna(s) não puderam ser "
+                f"convertidas para NUMERIC: {falhas}"
+            )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 130: {e}")
         if connection:
             try:
                 connection.rollback()

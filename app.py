@@ -155,24 +155,55 @@ login_manager.init_app(app)
 login_manager.login_view = 'main.login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
 
+def _to_float_safe(value):
+    """Converte Decimal/float/int/str/None para float sem TypeError.
+
+    Centraliza a normalização usada pelos filtros pt-BR para evitar erros do
+    tipo `unsupported operand type(s) for *: 'float' and 'decimal.Decimal'`
+    quando templates misturam valores vindos do banco (Numeric → Decimal) com
+    valores vindos de JSON (float/int) — ver Task #165.
+    """
+    if value is None or value == '':
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        try:
+            return float(str(value).replace(',', '.'))
+        except (TypeError, ValueError):
+            return 0.0
+
+
+def _format_br(value, decimals=2):
+    v = _to_float_safe(value)
+    formatted = f"{v:,.{decimals}f}"
+    return formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
 @app.template_filter('brl')
 def brl_filter(value):
-    try:
-        v = float(value or 0)
-    except (TypeError, ValueError):
-        return 'R$ 0,00'
-    formatted = f"{v:,.2f}"
-    formatted = formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
-    return f"R$ {formatted}"
+    return f"R$ {_format_br(value, 2)}"
+
 
 @app.template_filter('brl_raw')
 def brl_raw_filter(value):
+    return _format_br(value, 2)
+
+
+@app.template_filter('num')
+def num_filter(value, decimals=2):
+    """Filtro pt-BR genérico: aceita Decimal/float/int/None e devolve string
+    com ponto como separador de milhar e vírgula como decimal.
+
+    Uso: ``{{ valor|num(4) }}`` → ``1.234,5678``.
+    """
     try:
-        v = float(value or 0)
+        decimals = int(decimals)
     except (TypeError, ValueError):
-        return '0,00'
-    formatted = f"{v:,.2f}"
-    return formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
+        decimals = 2
+    if decimals < 0:
+        decimals = 0
+    return _format_br(value, decimals)
 
 # Context processor: disponibilidade de blueprints opcionais nos templates
 @app.context_processor

@@ -84,7 +84,7 @@
                                 </td>
                                 <td>{% if proposta.titulo %}{{ proposta.titulo[:50] }}{% if proposta.titulo|length > 50 %}...{% endif %}{% else %}-{% endif %}</td>
                                 <td>
-                                    <strong class="text-success">R$ {{ "{:,.2f}".format(proposta.valor_total or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</strong>
+                                    <strong class="text-success">{{ proposta.valor_total|brl }}</strong>
                                 </td>
                                 <td>
                                     {% if proposta.status == 'rascunho' %}
