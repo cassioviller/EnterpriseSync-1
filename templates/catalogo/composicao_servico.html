@@ -78,10 +78,16 @@
       <table class="table mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Insumo</th><th>Tipo</th><th>Un</th>
+            <th>Insumo</th><th>Tipo</th><th>Un. insumo</th>
             <th class="text-end">Preço (R$)</th>
-            <th class="text-end">Coef.</th>
-            <th class="text-end">Subtotal</th>
+            <th class="text-end" title="Consumo do insumo para produzir 1 {{ servico.unidade_medida }} do serviço"
+                data-bs-toggle="tooltip">
+              Coef. (un / {{ servico.unidade_medida }})
+            </th>
+            <th class="text-end" title="Custo deste insumo por 1 {{ servico.unidade_medida }} do serviço (coef × preço). Não é o custo total da linha — multiplique pela quantidade do item para ter o custo absoluto."
+                data-bs-toggle="tooltip">
+              Custo / {{ servico.unidade_medida }}
+            </th>
             <th></th>
           </tr>
         </thead>
@@ -124,7 +130,7 @@
         </tbody>
         {% if calc.detalhamento %}
         <tfoot class="table-light">
-          <tr><th colspan="5" class="text-end">Custo total:</th>
+          <tr><th colspan="5" class="text-end">Custo total por {{ servico.unidade_medida }} do serviço:</th>
               <th class="text-end text-dark">R$ {{ '%.2f'|format(calc.custo_unitario) }}</th><th></th></tr>
         </tfoot>
         {% endif %}

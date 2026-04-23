@@ -294,9 +294,23 @@
               <th style="width:130px">Tipo</th>
               <th>Insumo / componente</th>
               <th style="width:80px">Un.</th>
-              <th style="width:120px">Coeficiente</th>
+              <th style="width:120px" title="Consumo do insumo para produzir 1 unidade do serviço (ex.: 0,347 placa por m²)."
+                  data-bs-toggle="tooltip">
+                Coef. (un / un. serviço)
+              </th>
               <th style="width:140px">Preço unit. (R$)</th>
-              <th style="width:140px" class="text-end">Subtotal/un.</th>
+              <th style="width:140px" class="text-end" title="Custo deste insumo por 1 unidade do serviço (coef × preço)."
+                  data-bs-toggle="tooltip">
+                Custo / un. serviço
+              </th>
+              <th style="width:140px" class="text-end" title="Consumo total deste insumo no item (coef × quantidade do item)."
+                  data-bs-toggle="tooltip">
+                Consumo total
+              </th>
+              <th style="width:140px" class="text-end" title="Custo total desta linha no item (qtd × coef × preço)."
+                  data-bs-toggle="tooltip">
+                Subtotal total (R$)
+              </th>
               <th style="width:40px"></th>
             </tr>
           </thead>
@@ -314,12 +328,14 @@
                 <input type="hidden" name="comp_insumo_id" value="{{ c.insumo_id or '' }}">
               </td>
               <td><input class="form-control form-control-sm" name="comp_nome" value="{{ c.nome }}"></td>
-              <td><input class="form-control form-control-sm" name="comp_unidade" value="{{ c.unidade }}"></td>
+              <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="{{ c.unidade }}"></td>
               <td><input class="form-control form-control-sm" type="number" step="0.0001"
                          name="comp_coeficiente" value="{{ c.coeficiente }}"></td>
               <td><input class="form-control form-control-sm" type="number" step="0.0001"
                          name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
               <td class="text-end text-muted js-subtotal-unit">R$ {{ '%.4f'|format(c.subtotal_unitario or 0) }}</td>
+              <td class="text-end text-muted js-consumo-tot">{{ '%.4f'|format((c.coeficiente or 0) * (it.quantidade or 0)) }} {{ c.unidade }}</td>
+              <td class="text-end text-dark js-subtotal-tot"><strong>R$ {{ '%.2f'|format((c.coeficiente or 0) * (c.preco_unitario or 0) * (it.quantidade or 0)) }}</strong></td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
@@ -392,10 +408,12 @@
       <input type="hidden" name="comp_insumo_id" value="">
     </td>
     <td><input class="form-control form-control-sm" name="comp_nome" placeholder="Descrição"></td>
-    <td><input class="form-control form-control-sm" name="comp_unidade" value="un"></td>
+    <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="un"></td>
     <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_coeficiente" value="0"></td>
     <td><input class="form-control form-control-sm" type="number" step="0.0001" name="comp_preco_unitario" value="0"></td>
     <td class="text-end text-muted js-subtotal-unit">—</td>
+    <td class="text-end text-muted js-consumo-tot">—</td>
+    <td class="text-end text-dark js-subtotal-tot">—</td>
     <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
       <i class="fas fa-times"></i></button></td>
   </tr>
@@ -437,9 +455,17 @@ function recalcItem(form){
   form.querySelectorAll('.comp-tbody tr').forEach(tr => {
     const coef = getNum(tr.querySelector('input[name="comp_coeficiente"]'));
     const preco = getNum(tr.querySelector('input[name="comp_preco_unitario"]'));
+    const unEl = tr.querySelector('input[name="comp_unidade"]');
+    const un = unEl ? (unEl.value || '').trim() : '';
     const sub = coef * preco;
+    const consumoTot = coef * qtd;
+    const subTot = sub * qtd;
     const subCell = tr.querySelector('.js-subtotal-unit') || tr.children[5];
     if (subCell) subCell.textContent = 'R$ ' + sub.toFixed(4);
+    const consumoCell = tr.querySelector('.js-consumo-tot');
+    if (consumoCell) consumoCell.textContent = consumoTot.toFixed(4) + (un ? ' ' + un : '');
+    const subTotCell = tr.querySelector('.js-subtotal-tot');
+    if (subTotCell) subTotCell.innerHTML = '<strong>R$ ' + subTot.toFixed(2) + '</strong>';
     custoUnit += sub;
   });
   // Fórmula canônica idêntica a services/orcamento_view_service.py:

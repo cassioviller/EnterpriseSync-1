@@ -151,6 +151,69 @@ def test_recalcular_servico_persiste_preco(servico_canonico):
     assert str(servico_canonico.preco_venda_unitario) == '72.09'
 
 
+def test_recalcular_item_coeficiente_como_consumo_por_unidade(admin_id):
+    """Task #163 — coeficiente é consumo por unidade do serviço.
+
+    Cenário concreto descrito pelo usuário:
+      - Drywall:  coef 0,347 placa/m² × R$ 50,00 × 10 m² = R$ 173,50
+      - Mão obra: coef 0,500 h/m²    × R$ 15,00 × 10 m² = R$  75,00
+      Custo total do item de 10 m² = R$ 248,50
+    """
+    from models import Orcamento, OrcamentoItem
+    from services.orcamento_view_service import recalcular_item
+
+    orc = Orcamento(
+        admin_id=admin_id,
+        numero='__t163-orc',
+        titulo='Task #163 coeficiente test',
+        cliente_nome='Cliente teste',
+        criado_por=admin_id,
+        status='rascunho',
+        imposto_pct_global=Decimal('0'),
+        margem_pct_global=Decimal('0'),
+    )
+    db.session.add(orc)
+    db.session.flush()
+
+    item = OrcamentoItem(
+        admin_id=admin_id,
+        orcamento_id=orc.id,
+        ordem=1,
+        descricao='Parede drywall',
+        unidade='m2',
+        quantidade=Decimal('10'),
+        composicao_snapshot=[
+            {
+                'tipo': 'MATERIAL', 'insumo_id': None,
+                'nome': 'Placa drywall',
+                'unidade': 'placa',
+                'coeficiente': 0.347,
+                'preco_unitario': 50.0,
+                'subtotal_unitario': 0.0,
+            },
+            {
+                'tipo': 'MAO_OBRA', 'insumo_id': None,
+                'nome': 'Hora homem',
+                'unidade': 'h',
+                'coeficiente': 0.5,
+                'preco_unitario': 15.0,
+                'subtotal_unitario': 0.0,
+            },
+        ],
+    )
+    db.session.add(item)
+    db.session.flush()
+
+    r = recalcular_item(item, orc)
+    assert r['erro'] is None
+    # custo unitário do serviço = 0,347*50 + 0,5*15 = 17,35 + 7,50 = 24,85
+    assert str(item.custo_unitario) == '24.8500'
+    # custo total do item (10 m²) = 248,50; drywall sozinho = 173,50; MO = 75,00
+    assert str(item.custo_total) == '248.50'
+    assert float(Decimal('0.347') * Decimal('50') * Decimal('10')) == 173.5
+    assert float(Decimal('0.5') * Decimal('15') * Decimal('10')) == 75.0
+
+
 # Permite rodar como script para CI legacy (`python tests/test_orcamento_service.py`)
 def run():
     with app.app_context():
