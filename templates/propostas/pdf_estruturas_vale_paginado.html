@@ -341,15 +341,22 @@
             {% endif %}
         </div>
 
-            {% set _eng_nome = template.engenheiro_nome or (config_empresa.engenheiro_nome if config_empresa and config_empresa.engenheiro_nome else '') %}
-            {% set _eng_crea = template.engenheiro_crea or (config_empresa.engenheiro_crea if config_empresa and config_empresa.engenheiro_crea else '') %}
-            {% set _eng_email = template.engenheiro_email or (config_empresa.engenheiro_email if config_empresa and config_empresa.engenheiro_email else '') %}
-            {% set _eng_tel = template.engenheiro_telefone or (config_empresa.engenheiro_telefone if config_empresa and config_empresa.engenheiro_telefone else '') %}
-            {% set _eng_end = template.engenheiro_endereco or (config_empresa.engenheiro_endereco if config_empresa and config_empresa.engenheiro_endereco else '') %}
-            {% set _eng_web = template.engenheiro_website or (config_empresa.engenheiro_website if config_empresa and config_empresa.engenheiro_website else '') %}
+            {# Task #173 — engenheiro_dados é resolvido em propostas_consolidated.gerar_pdf
+               (Proposta.engenheiro_id → ConfiguracaoEmpresa.engenheiro_padrao_id → legado) #}
+            {% set _ed = engenheiro_dados or {} %}
+            {# Não usa mais PropostaTemplate.engenheiro_* — apenas dados resolvidos
+               pelo helper e fallback p/ os campos legados em ConfiguracaoEmpresa. #}
+            {% set _eng_nome = _ed.nome or (config_empresa.engenheiro_nome if config_empresa and config_empresa.engenheiro_nome else '') %}
+            {% set _eng_crea = _ed.crea or (config_empresa.engenheiro_crea if config_empresa and config_empresa.engenheiro_crea else '') %}
+            {% set _eng_email = _ed.email or (config_empresa.engenheiro_email if config_empresa and config_empresa.engenheiro_email else '') %}
+            {% set _eng_tel = _ed.telefone or (config_empresa.engenheiro_telefone if config_empresa and config_empresa.engenheiro_telefone else '') %}
+            {% set _eng_end = _ed.endereco or (config_empresa.engenheiro_endereco if config_empresa and config_empresa.engenheiro_endereco else '') %}
+            {% set _eng_web = _ed.website or (config_empresa.engenheiro_website if config_empresa and config_empresa.engenheiro_website else '') %}
+            {% set _eng_assin = _ed.assinatura_base64 or '' %}
             {% if _eng_nome or _eng_crea or _eng_email or _eng_tel or _eng_end or _eng_web %}
             <!-- Dados do Engenheiro (da primeira página - conforme imagem) -->
             <div class="company-info">
+                {% if _eng_assin %}<p><img src="{{ _eng_assin }}" alt="Assinatura" style="max-height:60px;max-width:200px;"></p>{% endif %}
                 {% if _eng_nome %}<p><strong>{{ _eng_nome }}</strong></p>{% endif %}
                 {% if _eng_crea %}<p>{{ _eng_crea }}</p>{% endif %}
                 <br>

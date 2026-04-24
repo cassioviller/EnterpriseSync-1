@@ -3832,6 +3832,7 @@ def executar_migracoes():
             (130, "Task #165 — alinhar tipos numéricos de orçamento/proposta_itens (Float→Numeric)", migration_130_alinhar_tipos_numericos_orcamento_proposta),
             (131, "Task #166 — coeficiente_padrao em insumo (sugestão p/ composição)", migration_131_insumo_coeficiente_padrao),
             (132, "Task #172 — Obra.cliente_id FK + backfill por nome/email do cliente", migration_132_obra_cliente_id_fk),
+            (133, "Task #173 — engenheiro_responsavel + FKs em configuracao_empresa e propostas_comerciais (backfill do legado)", migration_133_engenheiro_responsavel),
         ]
         
         # Executar cada migração com rastreamento
@@ -10682,6 +10683,182 @@ def migration_132_obra_cliente_id_fk():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 132: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_133_engenheiro_responsavel():
+    """Migration 133 (Task #173): Cadastro próprio de Engenheiros Responsáveis.
+
+    Estratégia:
+      1. CREATE TABLE engenheiro_responsavel (admin_id, nome, crea, email,
+         telefone, endereco, website, assinatura_base64, ativo, timestamps).
+      2. ADD COLUMN configuracao_empresa.engenheiro_padrao_id (FK SET NULL).
+      3. ADD COLUMN propostas_comerciais.engenheiro_id (FK SET NULL).
+      4. Backfill: para cada ConfiguracaoEmpresa com engenheiro_nome
+         não-vazio, cria um EngenheiroResponsavel (ativo) e define como
+         engenheiro_padrao_id. Se já houver padrão definido, pula.
+
+    Os campos engenheiro_* legados em configuracao_empresa permanecem
+    como fallback (drop está fora do escopo desta task).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1) Tabela engenheiro_responsavel
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS engenheiro_responsavel (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                nome VARCHAR(200) NOT NULL,
+                crea VARCHAR(50) DEFAULT '',
+                email VARCHAR(120) DEFAULT '',
+                telefone VARCHAR(50) DEFAULT '',
+                endereco TEXT DEFAULT '',
+                website VARCHAR(200) DEFAULT '',
+                assinatura_base64 TEXT DEFAULT '',
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_engenheiro_responsavel_admin_id "
+            "ON engenheiro_responsavel (admin_id)"
+        )
+
+        # 2) configuracao_empresa.engenheiro_padrao_id
+        cursor.execute(
+            "ALTER TABLE configuracao_empresa "
+            "ADD COLUMN IF NOT EXISTS engenheiro_padrao_id INTEGER NULL"
+        )
+        cursor.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'configuracao_empresa_engenheiro_padrao_id_fkey'
+                ) THEN
+                    ALTER TABLE configuracao_empresa
+                        ADD CONSTRAINT configuracao_empresa_engenheiro_padrao_id_fkey
+                        FOREIGN KEY (engenheiro_padrao_id)
+                        REFERENCES engenheiro_responsavel(id)
+                        ON DELETE SET NULL;
+                END IF;
+            END$$;
+            """
+        )
+
+        # 3) propostas_comerciais.engenheiro_id
+        cursor.execute(
+            "ALTER TABLE propostas_comerciais "
+            "ADD COLUMN IF NOT EXISTS engenheiro_id INTEGER NULL"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_propostas_comerciais_engenheiro_id "
+            "ON propostas_comerciais (engenheiro_id)"
+        )
+        cursor.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'propostas_comerciais_engenheiro_id_fkey'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                        ADD CONSTRAINT propostas_comerciais_engenheiro_id_fkey
+                        FOREIGN KEY (engenheiro_id)
+                        REFERENCES engenheiro_responsavel(id)
+                        ON DELETE SET NULL;
+                END IF;
+            END$$;
+            """
+        )
+
+        # 4) Backfill: cria EngenheiroResponsavel a partir dos campos legados
+        cursor.execute(
+            """
+            SELECT id, admin_id,
+                   COALESCE(NULLIF(TRIM(engenheiro_nome), ''), '') AS nome,
+                   COALESCE(engenheiro_crea, '')     AS crea,
+                   COALESCE(engenheiro_email, '')    AS email,
+                   COALESCE(engenheiro_telefone, '') AS telefone,
+                   COALESCE(engenheiro_endereco, '') AS endereco,
+                   COALESCE(engenheiro_website, '')  AS website,
+                   engenheiro_padrao_id
+              FROM configuracao_empresa
+             WHERE admin_id IS NOT NULL
+            """
+        )
+        configs = cursor.fetchall()
+
+        criados = 0
+        vinculados = 0
+        for (cfg_id, admin_id, nome, crea, email, telefone, endereco, website, padrao_id) in configs:
+            # Já tem padrão definido — pula (idempotente em re-execuções)
+            if padrao_id is not None:
+                continue
+            # Sem engenheiro_nome no legado — não há o que migrar
+            if not nome:
+                continue
+
+            # Evita duplicar se já há um engenheiro com mesmo (admin_id, nome)
+            cursor.execute(
+                """
+                SELECT id FROM engenheiro_responsavel
+                 WHERE admin_id = %s
+                   AND LOWER(TRIM(nome)) = LOWER(TRIM(%s))
+                 ORDER BY id ASC
+                 LIMIT 1
+                """,
+                (admin_id, nome),
+            )
+            row = cursor.fetchone()
+            if row:
+                eng_id = row[0]
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO engenheiro_responsavel
+                        (admin_id, nome, crea, email, telefone, endereco,
+                         website, assinatura_base64, ativo, criado_em, atualizado_em)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, '', TRUE, NOW(), NOW())
+                    RETURNING id
+                    """,
+                    (admin_id, nome[:200], crea[:50], email[:120],
+                     telefone[:50], endereco, website[:200]),
+                )
+                eng_id = cursor.fetchone()[0]
+                criados += 1
+
+            cursor.execute(
+                "UPDATE configuracao_empresa SET engenheiro_padrao_id = %s WHERE id = %s",
+                (eng_id, cfg_id),
+            )
+            vinculados += 1
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 133: engenheiro_responsavel criado e backfill concluído "
+            "(novos_engenheiros=%s, configs_vinculadas=%s)",
+            criados, vinculados,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 133: {e}")
         if connection:
             try:
                 connection.rollback()

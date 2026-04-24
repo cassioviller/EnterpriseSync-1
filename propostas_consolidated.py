@@ -69,6 +69,24 @@ ALLOWED_EXTENSIONS = {'pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg', 'gif', 'doc', '
 
 # ===== HELPER FUNCTIONS =====
 
+def _parse_engenheiro_id(raw_value, admin_id):
+    """Task #173 — converte e valida engenheiro_id do form.
+
+    Retorna o ID se pertencer ao tenant, ou None caso contrário (limpa o
+    override e faz a proposta cair de volta no padrão da empresa).
+    """
+    raw = (raw_value or '').strip() if isinstance(raw_value, str) else raw_value
+    if not raw:
+        return None
+    try:
+        eng_id = int(raw)
+    except (TypeError, ValueError):
+        return None
+    from models import EngenheiroResponsavel
+    eng = EngenheiroResponsavel.query.filter_by(id=eng_id, admin_id=admin_id).first()
+    return eng.id if eng else None
+
+
 def organizar_itens_por_template(itens):
     """
     Organiza itens por template e categoria com subtotais
@@ -269,9 +287,14 @@ def nova():
             None
         )
         
-        return render_template('propostas/nova_proposta.html', 
+        # Task #173 — engenheiros disponíveis para escolha como override por proposta
+        from services.engenheiro_service import listar_engenheiros_ativos
+        engenheiros = listar_engenheiros_ativos(admin_id)
+
+        return render_template('propostas/nova_proposta.html',
                              templates=[],
-                             config=config)
+                             config=config,
+                             engenheiros=engenheiros)
         
     except Exception as e:
         logger.error(f"ERRO NOVA PROPOSTA: {str(e)}")
@@ -391,7 +414,12 @@ def criar():
         proposta.admin_id = admin_id
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
-        
+
+        # Task #173 — engenheiro responsável (override por proposta)
+        proposta.engenheiro_id = _parse_engenheiro_id(
+            request.form.get('engenheiro_id'), admin_id
+        )
+
         # Condições e observações
         if request.form.get('condicoes_pagamento'):
             proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
@@ -714,11 +742,19 @@ def gerar_pdf(id):
             logger.debug(f"DEBUG PDF: Valor total da proposta: {proposta.valor_total}")
             logger.debug(f"DEBUG PDF: Total geral final: {total_geral}")
         
-        html_content = render_template(template_name, 
-                                     proposta=proposta, 
+        # Task #173 — dados do engenheiro responsável (override por proposta
+        # → padrão da empresa → fallback nos campos legados)
+        from services.engenheiro_service import obter_engenheiro_dados
+        engenheiro_dados = obter_engenheiro_dados(
+            proposta=proposta, config_empresa=config_empresa
+        )
+
+        html_content = render_template(template_name,
+                                     proposta=proposta,
                                      template=template_proposta,
                                      config=config_empresa,
                                      config_empresa=config_empresa,
+                                     engenheiro_dados=engenheiro_dados,
                                      total_geral=total_geral)
         
         logger.debug("DEBUG PDF: Template renderizado com sucesso")
@@ -774,7 +810,11 @@ def editar(id):
         
         logger.debug(f"DEBUG EDITAR: Proposta {proposta.numero} carregada para edição")
         
-        return render_template('propostas/editar.html', proposta=proposta)
+        # Task #173 — engenheiros disponíveis para escolha como override por proposta
+        from services.engenheiro_service import listar_engenheiros_ativos
+        engenheiros = listar_engenheiros_ativos(admin_id)
+
+        return render_template('propostas/editar.html', proposta=proposta, engenheiros=engenheiros)
         
     except Exception as e:
         logger.error(f"ERRO EDITAR PROPOSTA: {str(e)}")
@@ -802,6 +842,11 @@ def atualizar(id):
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
         proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
         proposta.garantias = request.form.get('garantias')
+
+        # Task #173 — engenheiro responsável (override por proposta)
+        proposta.engenheiro_id = _parse_engenheiro_id(
+            request.form.get('engenheiro_id'), admin_id
+        )
         
         # Processar itens inclusos/exclusos
         itens_inclusos_raw = request.form.get('itens_inclusos', '')

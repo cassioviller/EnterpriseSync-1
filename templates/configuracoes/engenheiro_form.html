@@ -1,0 +1,131 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if modo == 'editar' else 'Novo' }} Engenheiro - SIGE{% endblock %}
+
+{% set _f = form or engenheiro %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 offset-lg-2">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="fas fa-user-tie"></i>
+                {% if modo == 'editar' %}Editar Engenheiro Responsável{% else %}Novo Engenheiro Responsável{% endif %}
+            </h1>
+            <a href="{{ url_for('configuracoes.engenheiros') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="nome" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="nome" name="nome" required
+                                   maxlength="200"
+                                   value="{{ _f.nome if _f else '' }}"
+                                   placeholder="Ex: Engº Fulano de Tal">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="crea" class="form-label">CREA / Registro</label>
+                            <input type="text" class="form-control" id="crea" name="crea"
+                                   maxlength="50"
+                                   value="{{ _f.crea if _f else '' }}"
+                                   placeholder="Ex: CREA-1234567-SP">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">E-mail</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   maxlength="120"
+                                   value="{{ _f.email if _f else '' }}"
+                                   placeholder="engenheiro@empresa.com">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="telefone" class="form-label">Telefone</label>
+                            <input type="text" class="form-control" id="telefone" name="telefone"
+                                   maxlength="50"
+                                   value="{{ _f.telefone if _f else '' }}"
+                                   placeholder="(00) 00000-0000">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="endereco" class="form-label">Endereço</label>
+                        <textarea class="form-control" id="endereco" name="endereco" rows="2"
+                                  placeholder="Endereço profissional do engenheiro">{{ _f.endereco if _f else '' }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="website" class="form-label">Website</label>
+                        <input type="url" class="form-control" id="website" name="website"
+                               maxlength="200"
+                               value="{{ _f.website if _f else '' }}"
+                               placeholder="https://www.exemplo.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Imagem da Assinatura (opcional)</label>
+                        <input type="file" class="form-control mb-2" id="assinatura_file" accept="image/png,image/jpeg">
+                        <input type="hidden" id="assinatura_base64" name="assinatura_base64"
+                               value="">
+                        <small class="text-muted d-block">
+                            PNG ou JPG, fundo transparente recomendado. Aparecerá no PDF acima do nome.
+                        </small>
+
+                        {% if engenheiro and engenheiro.assinatura_base64 %}
+                        <div class="mt-2 d-flex align-items-center gap-3">
+                            <img src="{{ engenheiro.assinatura_base64 }}" alt="Assinatura"
+                                 style="max-height:80px; max-width:200px; background:#fff; padding:4px; border:1px solid #ddd;">
+                            <label class="form-check-label">
+                                <input type="checkbox" name="clear_assinatura" value="true" class="form-check-input">
+                                Remover assinatura atual
+                            </label>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input type="checkbox" class="form-check-input" id="ativo" name="ativo" value="1"
+                               {% if (_f is none) or _f.ativo or (form and form.get('ativo')) %}checked{% endif %}>
+                        <label class="form-check-label" for="ativo">Ativo</label>
+                        <small class="text-muted d-block">
+                            Engenheiros inativos não aparecem nos selects de proposta/empresa.
+                        </small>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('configuracoes.engenheiros') }}" class="btn btn-outline-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const fileInput = document.getElementById('assinatura_file');
+    const hidden = document.getElementById('assinatura_base64');
+    if (!fileInput || !hidden) return;
+    fileInput.addEventListener('change', function() {
+        const f = this.files && this.files[0];
+        if (!f) { hidden.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            hidden.value = e.target.result || '';
+        };
+        reader.readAsDataURL(f);
+    });
+})();
+</script>
+{% endblock %}

@@ -4,7 +4,10 @@ Blueprint para configurações da empresa
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from models import ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho, HorarioDia, Funcionario
+from models import (
+    ConfiguracaoEmpresa, Departamento, Funcao, HorarioTrabalho, HorarioDia,
+    Funcionario, EngenheiroResponsavel,
+)
 from decorators import admin_required
 from datetime import datetime, time
 import logging
@@ -35,8 +38,16 @@ def empresa():
     logger.debug(f"DEBUG EMPRESA: config encontrada={config is not None}")
     if config:
         logger.debug(f"DEBUG EMPRESA: nome_empresa={config.nome_empresa}")
-    
-    return render_template('configuracoes/empresa.html', config=config)
+
+    # Task #173 — engenheiros disponíveis para escolha como padrão
+    from services.engenheiro_service import listar_engenheiros_ativos
+    engenheiros = listar_engenheiros_ativos(admin_id)
+
+    return render_template(
+        'configuracoes/empresa.html',
+        config=config,
+        engenheiros=engenheiros,
+    )
 
 @configuracoes_bp.route('/empresa/salvar', methods=['POST'])
 @login_required
@@ -123,6 +134,21 @@ def salvar_empresa():
         config.engenheiro_telefone = (request.form.get('engenheiro_telefone') or '').strip()
         config.engenheiro_endereco = (request.form.get('engenheiro_endereco') or '').strip()
         config.engenheiro_website = (request.form.get('engenheiro_website') or '').strip()
+
+        # Task #173 — engenheiro responsável padrão (FK)
+        eng_padrao_raw = (request.form.get('engenheiro_padrao_id') or '').strip()
+        if eng_padrao_raw:
+            try:
+                eng_padrao_id = int(eng_padrao_raw)
+                # Valida que o engenheiro pertence ao tenant
+                eng = EngenheiroResponsavel.query.filter_by(
+                    id=eng_padrao_id, admin_id=admin_id
+                ).first()
+                config.engenheiro_padrao_id = eng.id if eng else None
+            except (TypeError, ValueError):
+                config.engenheiro_padrao_id = None
+        else:
+            config.engenheiro_padrao_id = None
 
         config.prazo_entrega_padrao = int(request.form.get('prazo_entrega_padrao', 90))
         config.validade_padrao = int(request.form.get('validade_padrao', 7))
@@ -475,3 +501,158 @@ def deletar_horario(id):
         flash(f'Erro ao deletar horário: {str(e)}', 'danger')
     
     return redirect(url_for('configuracoes.horarios'))
+
+# ==================== ENGENHEIROS RESPONSÁVEIS (Task #173) ====================
+
+def _form_to_engenheiro(eng, form, admin_id):
+    """Aplica os campos do formulário ao objeto EngenheiroResponsavel."""
+    eng.admin_id = admin_id
+    eng.nome = (form.get('nome') or '').strip()
+    eng.crea = (form.get('crea') or '').strip()
+    eng.email = (form.get('email') or '').strip()
+    eng.telefone = (form.get('telefone') or '').strip()
+    eng.endereco = (form.get('endereco') or '').strip()
+    eng.website = (form.get('website') or '').strip()
+    eng.ativo = bool(form.get('ativo'))
+
+    assinatura = (form.get('assinatura_base64') or '').strip()
+    if assinatura:
+        eng.assinatura_base64 = assinatura
+    elif form.get('clear_assinatura') == 'true':
+        eng.assinatura_base64 = ''
+
+
+@configuracoes_bp.route('/engenheiros')
+@login_required
+@admin_required
+def engenheiros():
+    """Lista os engenheiros responsáveis cadastrados pelo tenant."""
+    from multitenant_helper import get_admin_id
+    from services.engenheiro_service import listar_engenheiros
+    admin_id = get_admin_id()
+    engs = listar_engenheiros(admin_id, incluir_inativos=True)
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    padrao_id = config.engenheiro_padrao_id if config else None
+    return render_template(
+        'configuracoes/engenheiros.html',
+        engenheiros=engs,
+        engenheiro_padrao_id=padrao_id,
+    )
+
+
+@configuracoes_bp.route('/engenheiros/novo', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def criar_engenheiro():
+    """Cria um novo engenheiro responsável."""
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+
+    if request.method == 'POST':
+        try:
+            nome = (request.form.get('nome') or '').strip()
+            if not nome:
+                flash('Nome do engenheiro é obrigatório.', 'danger')
+                return render_template(
+                    'configuracoes/engenheiro_form.html',
+                    engenheiro=None, modo='criar', form=request.form,
+                )
+            eng = EngenheiroResponsavel()
+            _form_to_engenheiro(eng, request.form, admin_id)
+            db.session.add(eng)
+            db.session.commit()
+            flash('Engenheiro responsável cadastrado com sucesso!', 'success')
+            return redirect(url_for('configuracoes.engenheiros'))
+        except Exception as e:
+            db.session.rollback()
+            logger.exception("Erro ao criar engenheiro responsável")
+            flash(f'Erro ao cadastrar engenheiro: {e}', 'danger')
+
+    return render_template(
+        'configuracoes/engenheiro_form.html',
+        engenheiro=None, modo='criar', form=None,
+    )
+
+
+@configuracoes_bp.route('/engenheiros/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def editar_engenheiro(id):
+    """Edita um engenheiro responsável."""
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    eng = EngenheiroResponsavel.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+    if request.method == 'POST':
+        try:
+            nome = (request.form.get('nome') or '').strip()
+            if not nome:
+                flash('Nome do engenheiro é obrigatório.', 'danger')
+                return render_template(
+                    'configuracoes/engenheiro_form.html',
+                    engenheiro=eng, modo='editar', form=request.form,
+                )
+            _form_to_engenheiro(eng, request.form, admin_id)
+            # Se este engenheiro foi inativado e era o padrão da empresa,
+            # limpa o vínculo (mesma regra de /engenheiros/inativar/<id>).
+            if not eng.ativo:
+                config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+                if config and config.engenheiro_padrao_id == eng.id:
+                    config.engenheiro_padrao_id = None
+            db.session.commit()
+            flash('Engenheiro responsável atualizado com sucesso!', 'success')
+            return redirect(url_for('configuracoes.engenheiros'))
+        except Exception as e:
+            db.session.rollback()
+            logger.exception("Erro ao editar engenheiro responsável")
+            flash(f'Erro ao salvar engenheiro: {e}', 'danger')
+
+    return render_template(
+        'configuracoes/engenheiro_form.html',
+        engenheiro=eng, modo='editar', form=None,
+    )
+
+
+@configuracoes_bp.route('/engenheiros/inativar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def inativar_engenheiro(id):
+    """Inativa (soft-delete) um engenheiro responsável."""
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    try:
+        eng = EngenheiroResponsavel.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        eng.ativo = False
+        # Se este era o padrão da empresa, remove o vínculo para evitar
+        # que um engenheiro inativo continue aparecendo nas propostas.
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        if config and config.engenheiro_padrao_id == eng.id:
+            config.engenheiro_padrao_id = None
+        db.session.commit()
+        flash('Engenheiro inativado.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception("Erro ao inativar engenheiro responsável")
+        flash(f'Erro ao inativar engenheiro: {e}', 'danger')
+
+    return redirect(url_for('configuracoes.engenheiros'))
+
+
+@configuracoes_bp.route('/engenheiros/reativar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def reativar_engenheiro(id):
+    """Reativa um engenheiro previamente inativado."""
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    try:
+        eng = EngenheiroResponsavel.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        eng.ativo = True
+        db.session.commit()
+        flash('Engenheiro reativado.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception("Erro ao reativar engenheiro responsável")
+        flash(f'Erro ao reativar engenheiro: {e}', 'danger')
+
+    return redirect(url_for('configuracoes.engenheiros'))

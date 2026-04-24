@@ -423,14 +423,24 @@
             {% elif config and config.nome_empresa %}
             <div class="signature-name">{{ config.nome_empresa }}</div>
             {% endif %}
-            {% if config and (config.engenheiro_nome or config.engenheiro_crea or config.engenheiro_email or config.engenheiro_telefone or config.engenheiro_endereco or config.engenheiro_website) %}
+            {# Task #173 — usa engenheiro_dados resolvido pelo helper (com fallback no legado) #}
+            {% set _ed = engenheiro_dados or {} %}
+            {% set _eng_nome = _ed.nome or (config.engenheiro_nome if config else '') %}
+            {% set _eng_crea = _ed.crea or (config.engenheiro_crea if config else '') %}
+            {% set _eng_email = _ed.email or (config.engenheiro_email if config else '') %}
+            {% set _eng_tel = _ed.telefone or (config.engenheiro_telefone if config else '') %}
+            {% set _eng_end = _ed.endereco or (config.engenheiro_endereco if config else '') %}
+            {% set _eng_web = _ed.website or (config.engenheiro_website if config else '') %}
+            {% set _eng_assin = _ed.assinatura_base64 or '' %}
+            {% if _eng_nome or _eng_crea or _eng_email or _eng_tel or _eng_end or _eng_web %}
             <div class="engineer-info" style="margin-top: 12px; font-size: 0.9em;">
-                {% if config.engenheiro_nome %}<div><strong>{{ config.engenheiro_nome }}</strong></div>{% endif %}
-                {% if config.engenheiro_crea %}<div>{{ config.engenheiro_crea }}</div>{% endif %}
-                {% if config.engenheiro_email %}<div>📧 {{ config.engenheiro_email }}</div>{% endif %}
-                {% if config.engenheiro_telefone %}<div>📞 {{ config.engenheiro_telefone }}</div>{% endif %}
-                {% if config.engenheiro_endereco %}<div>📍 {{ config.engenheiro_endereco }}</div>{% endif %}
-                {% if config.engenheiro_website %}<div>🌐 {{ config.engenheiro_website }}</div>{% endif %}
+                {% if _eng_assin %}<div><img src="{{ _eng_assin }}" alt="Assinatura" style="max-height:60px;max-width:200px;"></div>{% endif %}
+                {% if _eng_nome %}<div><strong>{{ _eng_nome }}</strong></div>{% endif %}
+                {% if _eng_crea %}<div>{{ _eng_crea }}</div>{% endif %}
+                {% if _eng_email %}<div>📧 {{ _eng_email }}</div>{% endif %}
+                {% if _eng_tel %}<div>📞 {{ _eng_tel }}</div>{% endif %}
+                {% if _eng_end %}<div>📍 {{ _eng_end }}</div>{% endif %}
+                {% if _eng_web %}<div>🌐 {{ _eng_web }}</div>{% endif %}
             </div>
             {% endif %}
         </div>

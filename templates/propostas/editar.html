@@ -174,7 +174,25 @@
                             <!-- Task #115: % Nota Fiscal removido — pertence ao Orçamento interno -->
                             <input type="hidden" name="percentual_nota_fiscal" value="{{ proposta.percentual_nota_fiscal or 0 }}">
                         </div>
-                        
+
+                        {# Task #173 — override do engenheiro responsável (opcional) #}
+                        <div class="mb-3">
+                            <label class="form-label">Engenheiro Responsável (opcional)</label>
+                            <select class="form-select" name="engenheiro_id">
+                                <option value="">— Usar padrão da empresa —</option>
+                                {% for eng in engenheiros or [] %}
+                                    <option value="{{ eng.id }}"
+                                        {% if proposta.engenheiro_id == eng.id %}selected{% endif %}>
+                                        {{ eng.nome }}{% if eng.crea %} — {{ eng.crea }}{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                Selecione para sobrescrever o engenheiro padrão definido em
+                                <em>Configurações &raquo; Empresa</em> só para esta proposta.
+                            </small>
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label">Condições de Pagamento</label>
                             <textarea class="form-control" name="condicoes_pagamento" rows="3">{{ proposta.condicoes_pagamento or '' }}</textarea>

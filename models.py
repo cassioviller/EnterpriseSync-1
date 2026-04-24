@@ -2747,6 +2747,10 @@ class Proposta(db.Model):
     orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id', ondelete='SET NULL'),
                              nullable=True, index=True)
 
+    # Task #173 — engenheiro responsável (override do padrão da empresa por proposta)
+    engenheiro_id = db.Column(db.Integer, db.ForeignKey('engenheiro_responsavel.id', ondelete='SET NULL'),
+                              nullable=True, index=True)
+
     # Task #102 — snapshot do cronograma revisado pelo admin antes de aprovar.
     # Estrutura: lista de Serviços, cada um com filhos (grupos/subatividades),
     # com flag `marcado` por nó. Usado pelo portal do cliente como fonte da verdade.
@@ -3092,6 +3096,52 @@ class ServicoTemplate(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+# Task #173 — Cadastro próprio de Engenheiros Responsáveis
+class EngenheiroResponsavel(db.Model):
+    """Engenheiro responsável que assina propostas (rodapé/PDF).
+
+    Substitui o conjunto de campos engenheiro_* em ConfiguracaoEmpresa,
+    que permanecem como fallback. Cada admin pode cadastrar múltiplos
+    engenheiros e definir um padrão na ConfiguracaoEmpresa; cada Proposta
+    pode opcionalmente sobrescrever o padrão.
+    """
+    __tablename__ = 'engenheiro_responsavel'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+
+    nome = db.Column(db.String(200), nullable=False)
+    crea = db.Column(db.String(50), default='')
+    email = db.Column(db.String(120), default='')
+    telefone = db.Column(db.String(50), default='')
+    endereco = db.Column(db.Text, default='')
+    website = db.Column(db.String(200), default='')
+
+    # Imagem de assinatura opcional (data URI base64)
+    assinatura_base64 = db.Column(db.Text, default='')
+
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<EngenheiroResponsavel {self.nome} (CREA {self.crea})>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'crea': self.crea or '',
+            'email': self.email or '',
+            'telefone': self.telefone or '',
+            'endereco': self.endereco or '',
+            'website': self.website or '',
+            'assinatura_base64': self.assinatura_base64 or '',
+            'ativo': bool(self.ativo),
+        }
+
+
 # Configurações da Empresa
 class ConfiguracaoEmpresa(db.Model):
     """Configurações centrais da empresa para reutilização em propostas"""
@@ -3127,12 +3177,18 @@ class ConfiguracaoEmpresa(db.Model):
     assinatura_cargo = db.Column(db.String(200), default='')
 
     # Dados padrão do engenheiro responsável (rodapé das propostas)
+    # MANTIDOS para fallback após Task #173 (cadastro próprio em EngenheiroResponsavel)
     engenheiro_nome = db.Column(db.String(200), default='')
     engenheiro_crea = db.Column(db.String(50), default='')
     engenheiro_email = db.Column(db.String(120), default='')
     engenheiro_telefone = db.Column(db.String(50), default='')
     engenheiro_endereco = db.Column(db.Text, default='')
     engenheiro_website = db.Column(db.String(200), default='')
+
+    # Task #173 — engenheiro responsável padrão (substitui campos legados acima)
+    engenheiro_padrao_id = db.Column(db.Integer,
+                                     db.ForeignKey('engenheiro_responsavel.id', ondelete='SET NULL'),
+                                     nullable=True)
 
     # Configurações padrão
     prazo_entrega_padrao = db.Column(db.Integer, default=90)

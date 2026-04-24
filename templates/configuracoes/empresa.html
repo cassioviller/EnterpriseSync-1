@@ -113,56 +113,102 @@
                             </div>
                         </div>
 
+                        <!-- Task #173 — Seleção do engenheiro responsável padrão -->
                         <div class="row">
-                            <div class="col-md-8">
+                            <div class="col-12">
                                 <div class="mb-3">
-                                    <label for="engenheiro_nome" class="form-label">Engenheiro Responsável (Nome)</label>
-                                    <input type="text" class="form-control" id="engenheiro_nome" name="engenheiro_nome"
-                                           value="{{ config.engenheiro_nome if config else '' }}"
-                                           placeholder="Ex: Engº Fulano de Tal">
+                                    <label for="engenheiro_padrao_id" class="form-label">
+                                        Engenheiro Responsável Padrão
+                                    </label>
+                                    <div class="d-flex gap-2 align-items-start">
+                                        <select class="form-select" id="engenheiro_padrao_id" name="engenheiro_padrao_id">
+                                            <option value="">— Sem engenheiro padrão (usar campos legados abaixo) —</option>
+                                            {% for eng in engenheiros or [] %}
+                                                <option value="{{ eng.id }}"
+                                                    {% if config and config.engenheiro_padrao_id == eng.id %}selected{% endif %}>
+                                                    {{ eng.nome }}{% if eng.crea %} — {{ eng.crea }}{% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <a href="{{ url_for('configuracoes.engenheiros') }}"
+                                           class="btn btn-outline-primary text-nowrap">
+                                            <i class="fas fa-users-cog me-1"></i> Gerenciar
+                                        </a>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        Os dados do engenheiro selecionado são usados no rodapé dos PDFs.
+                                        Cadastre e edite engenheiros em <em>Configurações &raquo; Engenheiros Responsáveis</em>.
+                                        Cada proposta pode opcionalmente sobrescrever este padrão.
+                                    </small>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="engenheiro_crea" class="form-label">CREA / Registro</label>
-                                    <input type="text" class="form-control" id="engenheiro_crea" name="engenheiro_crea"
-                                           value="{{ config.engenheiro_crea if config else '' }}"
-                                           placeholder="Ex: CREA-1234567-SP">
-                                </div>
+
+                                {% if config and config.engenheiro_padrao_id %}
+                                    {% set _padrao = (engenheiros or []) | selectattr('id', 'equalto', config.engenheiro_padrao_id) | list | first %}
+                                    {% if _padrao %}
+                                    <div class="alert alert-info py-2 small mb-3">
+                                        <strong>{{ _padrao.nome }}</strong>
+                                        {% if _padrao.crea %} &middot; CREA {{ _padrao.crea }}{% endif %}
+                                        {% if _padrao.email %} &middot; {{ _padrao.email }}{% endif %}
+                                        {% if _padrao.telefone %} &middot; {{ _padrao.telefone }}{% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="engenheiro_email" class="form-label">E-mail do Engenheiro</label>
-                                    <input type="email" class="form-control" id="engenheiro_email" name="engenheiro_email"
-                                           value="{{ config.engenheiro_email if config else '' }}"
-                                           placeholder="engenheiro@empresa.com">
+                        <!-- Campos legados (fallback quando não há engenheiro padrão) -->
+                        <details class="mb-3">
+                            <summary class="text-muted small" style="cursor: pointer;">
+                                Dados do engenheiro (modo legado — usado apenas quando nenhum padrão é selecionado)
+                            </summary>
+                            <div class="row mt-3">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="engenheiro_nome" class="form-label">Engenheiro Responsável (Nome)</label>
+                                        <input type="text" class="form-control" id="engenheiro_nome" name="engenheiro_nome"
+                                               value="{{ config.engenheiro_nome if config else '' }}"
+                                               placeholder="Ex: Engº Fulano de Tal">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="engenheiro_crea" class="form-label">CREA / Registro</label>
+                                        <input type="text" class="form-control" id="engenheiro_crea" name="engenheiro_crea"
+                                               value="{{ config.engenheiro_crea if config else '' }}"
+                                               placeholder="Ex: CREA-1234567-SP">
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="engenheiro_telefone" class="form-label">Telefone do Engenheiro</label>
-                                    <input type="text" class="form-control" id="engenheiro_telefone" name="engenheiro_telefone"
-                                           value="{{ config.engenheiro_telefone if config else '' }}"
-                                           placeholder="(00) 00000-0000">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="engenheiro_email" class="form-label">E-mail do Engenheiro</label>
+                                        <input type="email" class="form-control" id="engenheiro_email" name="engenheiro_email"
+                                               value="{{ config.engenheiro_email if config else '' }}"
+                                               placeholder="engenheiro@empresa.com">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="engenheiro_telefone" class="form-label">Telefone do Engenheiro</label>
+                                        <input type="text" class="form-control" id="engenheiro_telefone" name="engenheiro_telefone"
+                                               value="{{ config.engenheiro_telefone if config else '' }}"
+                                               placeholder="(00) 00000-0000">
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="engenheiro_endereco" class="form-label">Endereço do Engenheiro</label>
-                            <textarea class="form-control" id="engenheiro_endereco" name="engenheiro_endereco" rows="2"
-                                      placeholder="Endereço profissional do engenheiro responsável">{{ config.engenheiro_endereco if config else '' }}</textarea>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="engenheiro_website" class="form-label">Website do Engenheiro</label>
-                            <input type="url" class="form-control" id="engenheiro_website" name="engenheiro_website"
-                                   value="{{ config.engenheiro_website if config else '' }}"
-                                   placeholder="https://www.exemplo.com">
-                        </div>
+                            <div class="mb-3">
+                                <label for="engenheiro_endereco" class="form-label">Endereço do Engenheiro</label>
+                                <textarea class="form-control" id="engenheiro_endereco" name="engenheiro_endereco" rows="2"
+                                          placeholder="Endereço profissional do engenheiro responsável">{{ config.engenheiro_endereco if config else '' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="engenheiro_website" class="form-label">Website do Engenheiro</label>
+                                <input type="url" class="form-control" id="engenheiro_website" name="engenheiro_website"
+                                       value="{{ config.engenheiro_website if config else '' }}"
+                                       placeholder="https://www.exemplo.com">
+                            </div>
+                        </details>
 
                         <hr class="my-4">
 
