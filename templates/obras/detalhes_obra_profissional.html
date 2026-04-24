@@ -1358,7 +1358,7 @@
                 {% endif %}
                 <div class="info-item">
                     <div class="info-label"><i class="fas fa-user-tie"></i> Cliente</div>
-                    <div class="info-value">{{ obra.cliente_nome if obra.cliente_nome else (obra.cliente if obra.cliente else 'Cliente Teste LTDA') }}</div>
+                    <div class="info-value">{{ obra.cliente_nome_efetivo if obra.cliente_nome_efetivo else 'Cliente Teste LTDA' }}</div>
                 </div>
                 {% if obra.area_total_m2 and obra.area_total_m2 > 0 %}
                 <div class="info-item">

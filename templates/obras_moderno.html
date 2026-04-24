@@ -737,13 +737,13 @@
                         </div>
                         {% endif %}
                         
-                        {% if obra.cliente or obra.cliente_nome %}
+                        {% if obra.cliente_nome_efetivo %}
                         <div class="obra-detail-item">
                             <div class="obra-detail-label">
                                 <i class="fas fa-user-tie"></i>
                                 Cliente
                             </div>
-                            <div class="obra-detail-value">{{ obra.cliente_nome or obra.cliente or '-' }}</div>
+                            <div class="obra-detail-value">{{ obra.cliente_nome_efetivo or '-' }}</div>
                         </div>
                         {% endif %}
                         

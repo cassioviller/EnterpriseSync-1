@@ -3831,6 +3831,7 @@ def executar_migracoes():
             (129, "Task #158 — assinatura e engenheiro responsável em configuracao_empresa", migration_129_configuracao_empresa_assinatura_engenheiro),
             (130, "Task #165 — alinhar tipos numéricos de orçamento/proposta_itens (Float→Numeric)", migration_130_alinhar_tipos_numericos_orcamento_proposta),
             (131, "Task #166 — coeficiente_padrao em insumo (sugestão p/ composição)", migration_131_insumo_coeficiente_padrao),
+            (132, "Task #172 — Obra.cliente_id FK + backfill por nome/email do cliente", migration_132_obra_cliente_id_fk),
         ]
         
         # Executar cada migração com rastreamento
@@ -10512,6 +10513,175 @@ def migration_131_insumo_coeficiente_padrao():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 131: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_132_obra_cliente_id_fk():
+    """Migration 132 (Task #172): adiciona obra.cliente_id (FK → cliente.id)
+    e faz backfill por dedup estrita (admin_id + nome+email).
+
+    Estratégia:
+      1. ADD COLUMN obra.cliente_id INTEGER NULL (idempotente).
+      2. CREATE INDEX em obra.cliente_id.
+      3. ADD CONSTRAINT FOREIGN KEY (idempotente: pula se já existir).
+      4. Backfill — regra de dedup conservadora para evitar mesclar
+         homônimos dentro do mesmo tenant:
+           a) Se a obra tem nome E e-mail: match estrito por
+              (LOWER(nome)=X AND LOWER(email)=Y).
+           b) Se ainda sem match E há e-mail: match por LOWER(email)
+              somente se UM único cliente do tenant casar (e-mail é
+              identificador forte; multimatch → cria novo).
+           c) Se ainda sem match E há nome (sem e-mail na obra): match
+              por LOWER(nome) somente quando cliente.email IS NULL e
+              for único (evita mesclar com homônimo que já tem e-mail
+              conhecido).
+           d) Caso contrário, cria um novo Cliente.
+    Mantém os campos texto (cliente_nome/email/telefone/cliente) intactos
+    como fallback — o drop é fora do escopo desta task.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1) Coluna
+        cursor.execute(
+            "ALTER TABLE obra ADD COLUMN IF NOT EXISTS cliente_id INTEGER NULL"
+        )
+
+        # 2) Índice
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_obra_cliente_id ON obra (cliente_id)"
+        )
+
+        # 3) FK (idempotente — Postgres não aceita IF NOT EXISTS p/ constraint)
+        cursor.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'obra_cliente_id_fkey'
+                ) THEN
+                    ALTER TABLE obra
+                        ADD CONSTRAINT obra_cliente_id_fkey
+                        FOREIGN KEY (cliente_id) REFERENCES cliente(id)
+                        ON DELETE SET NULL;
+                END IF;
+            END$$;
+            """
+        )
+
+        # 4) Backfill — uma obra por vez (datasets pequenos por tenant).
+        cursor.execute(
+            """
+            SELECT id, admin_id,
+                   COALESCE(NULLIF(TRIM(cliente_nome), ''), NULLIF(TRIM(cliente), '')) AS nome,
+                   NULLIF(TRIM(cliente_email), '') AS email,
+                   NULLIF(TRIM(cliente_telefone), '') AS telefone
+              FROM obra
+             WHERE cliente_id IS NULL
+               AND admin_id IS NOT NULL
+               AND (
+                   COALESCE(NULLIF(TRIM(cliente_nome), ''),
+                            NULLIF(TRIM(cliente), '')) IS NOT NULL
+                   OR NULLIF(TRIM(cliente_email), '') IS NOT NULL
+               )
+            """
+        )
+        obras = cursor.fetchall()
+
+        vinculadas = 0
+        criadas = 0
+        for (obra_id, admin_id, nome, email, telefone) in obras:
+            cliente_id_resolvido = None
+
+            # 4a) Match estrito nome+email (caso ideal)
+            if nome and email:
+                cursor.execute(
+                    """
+                    SELECT id FROM cliente
+                     WHERE admin_id = %s
+                       AND LOWER(TRIM(nome)) = LOWER(TRIM(%s))
+                       AND LOWER(email) = LOWER(%s)
+                     LIMIT 1
+                    """,
+                    (admin_id, nome, email),
+                )
+                row = cursor.fetchone()
+                if row:
+                    cliente_id_resolvido = row[0]
+
+            # 4b) Match por e-mail apenas — exige unicidade (evita ambíguo)
+            if not cliente_id_resolvido and email:
+                cursor.execute(
+                    """
+                    SELECT id FROM cliente
+                     WHERE admin_id = %s
+                       AND LOWER(email) = LOWER(%s)
+                     LIMIT 2
+                    """,
+                    (admin_id, email),
+                )
+                rows = cursor.fetchall()
+                if len(rows) == 1:
+                    cliente_id_resolvido = rows[0][0]
+
+            # 4c) Match por nome apenas — só se a obra não tem e-mail
+            #     E o cliente também não tem e-mail E é único (evita
+            #     mesclar com homônimo que já tem e-mail próprio).
+            if not cliente_id_resolvido and nome and not email:
+                cursor.execute(
+                    """
+                    SELECT id FROM cliente
+                     WHERE admin_id = %s
+                       AND LOWER(TRIM(nome)) = LOWER(TRIM(%s))
+                       AND (email IS NULL OR TRIM(email) = '')
+                     LIMIT 2
+                    """,
+                    (admin_id, nome),
+                )
+                rows = cursor.fetchall()
+                if len(rows) == 1:
+                    cliente_id_resolvido = rows[0][0]
+
+            # 4d) Cria Cliente se nada encontrado
+            if not cliente_id_resolvido:
+                nome_final = (nome or email or 'Cliente')[:200]
+                cursor.execute(
+                    """
+                    INSERT INTO cliente (nome, email, telefone, admin_id, created_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    RETURNING id
+                    """,
+                    (nome_final, email, telefone, admin_id),
+                )
+                cliente_id_resolvido = cursor.fetchone()[0]
+                criadas += 1
+
+            cursor.execute(
+                "UPDATE obra SET cliente_id = %s WHERE id = %s",
+                (cliente_id_resolvido, obra_id),
+            )
+            vinculadas += 1
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 132: obra.cliente_id adicionada e backfill concluído "
+            "(vinculadas=%s, novos_clientes=%s)",
+            vinculadas, criadas,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 132: {e}")
         if connection:
             try:
                 connection.rollback()

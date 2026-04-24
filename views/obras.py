@@ -302,6 +302,15 @@ def nova_obra():
                 import secrets
                 token_cliente = secrets.token_urlsafe(32)
             
+            # Task #172 — resolver/criar Cliente para vínculo via FK
+            from services.cliente_resolver import obter_ou_criar_cliente
+            cliente_obj = obter_ou_criar_cliente(
+                admin_id=admin_id,
+                nome=cliente_nome,
+                email=cliente_email,
+                telefone=cliente_telefone,
+            )
+
             # Criar nova obra
             nova_obra = Obra(
                 nome=nome,
@@ -314,6 +323,7 @@ def nova_obra():
                 area_total_m2=area_total_m2,
                 status=status,
                 responsavel_id=responsavel_id,
+                cliente_id=cliente_obj.id if cliente_obj else None,
                 cliente_nome=cliente_nome,
                 cliente_email=cliente_email,
                 cliente_telefone=cliente_telefone,
@@ -819,6 +829,20 @@ def editar_obra(id):
             obra.cliente_email = request.form.get('cliente_email', '')
             obra.cliente_telefone = request.form.get('cliente_telefone', '')
             obra.portal_ativo = request.form.get('portal_ativo') == '1'
+
+            # Task #172 — re-resolver/atualizar vínculo Cliente quando o
+            # operador edita os campos de cliente da obra. Mantemos os
+            # campos texto como fallback. Erros propagam para rollback
+            # atômico — não atualizamos a Obra silenciosamente sem FK.
+            from services.cliente_resolver import obter_ou_criar_cliente
+            cliente_obj = obter_ou_criar_cliente(
+                admin_id=obra.admin_id,
+                nome=obra.cliente_nome,
+                email=obra.cliente_email,
+                telefone=obra.cliente_telefone,
+            )
+            if cliente_obj:
+                obra.cliente_id = cliente_obj.id
             
             # Campos de Geofencing
             obra.latitude = float(request.form.get('latitude')) if request.form.get('latitude') else None

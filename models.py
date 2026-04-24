@@ -250,6 +250,10 @@ class Obra(db.Model):
     
     # MÓDULO 2: Portal do Cliente - Campos Completos
     token_cliente = db.Column(db.String(255), unique=True)
+    # Task #172 — vínculo direto com o cadastro de Cliente. Os campos
+    # cliente_nome/email/telefone/cliente abaixo permanecem como fallback de
+    # compatibilidade enquanto obras antigas (sem FK) ainda existirem.
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True, index=True)
     cliente_nome = db.Column(db.String(100))
     cliente_email = db.Column(db.String(120))
     cliente_telefone = db.Column(db.String(20))
@@ -281,6 +285,34 @@ class Obra(db.Model):
     custos = db.relationship('CustoObra', backref='obra_ref', lazy=True, overlaps="obra_ref")
     servicos_obra = db.relationship('ServicoObra', backref='obra', cascade='all, delete-orphan', lazy=True)
     servicos_reais = db.relationship('ServicoObraReal', backref='obra_real', cascade='all, delete-orphan', lazy=True)
+
+    # Task #172 — relacionamento com Cliente cadastrado.
+    # backref 'obras' permite Cliente.obras para listar todas as obras do cliente.
+    cliente_ref = db.relationship('Cliente', foreign_keys=[cliente_id], backref='obras')
+
+    # ── Task #172: helpers para ler dados do cliente preferindo a FK ──────
+    # Templates e serviços devem usar essas properties em vez de
+    # cliente_nome/email/telefone diretos. Quando cliente_id está populada,
+    # retorna o dado vivo do cadastro; caso contrário, usa o texto legado.
+
+    @property
+    def cliente_nome_efetivo(self):
+        if self.cliente_ref is not None and self.cliente_ref.nome:
+            return self.cliente_ref.nome
+        return self.cliente_nome or self.cliente or ''
+
+    @property
+    def cliente_email_efetivo(self):
+        if self.cliente_ref is not None and self.cliente_ref.email:
+            return self.cliente_ref.email
+        return self.cliente_email or ''
+
+    @property
+    def cliente_telefone_efetivo(self):
+        if self.cliente_ref is not None and self.cliente_ref.telefone:
+            return self.cliente_ref.telefone
+        return self.cliente_telefone or ''
+
 
 class ServicoObra(db.Model):
     """Relacionamento ORIGINAL - Serviços das Propostas vinculados às Obras (MANTIDO PARA COMPATIBILIDADE)"""

@@ -374,7 +374,7 @@
                                                class="form-control" 
                                                id="cliente_nome" 
                                                name="cliente_nome" 
-                                               value="{{ obra.cliente_nome if obra else '' }}"
+                                               value="{{ obra.cliente_nome_efetivo if obra else '' }}"
                                                placeholder="Nome completo do cliente">
                                     </div>
                                 </div>
@@ -388,7 +388,7 @@
                                                class="form-control" 
                                                id="cliente_email" 
                                                name="cliente_email" 
-                                               value="{{ obra.cliente_email if obra else '' }}"
+                                               value="{{ obra.cliente_email_efetivo if obra else '' }}"
                                                placeholder="cliente@empresa.com">
                                     </div>
                                 </div>
@@ -402,7 +402,7 @@
                                                class="form-control" 
                                                id="cliente_telefone" 
                                                name="cliente_telefone" 
-                                               value="{{ obra.cliente_telefone if obra else '' }}"
+                                               value="{{ obra.cliente_telefone_efetivo if obra else '' }}"
                                                placeholder="(11) 99999-9999">
                                     </div>
                                 </div>

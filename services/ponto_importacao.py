@@ -372,7 +372,7 @@ class PontoExcelService:
                 ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="2E7D32")
                 
                 ws.cell(row=row, column=2, value=obra.nome).border = border
-                ws.cell(row=row, column=3, value=obra.cliente or 'N/A').border = border
+                ws.cell(row=row, column=3, value=obra.cliente_nome_efetivo or obra.cliente or 'N/A').border = border
                 row += 1
         else:
             ws.cell(row=row, column=1, value="Nenhuma obra cadastrada").border = border

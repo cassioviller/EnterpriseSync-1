@@ -306,7 +306,7 @@ def recalcular_medicao_obra(obra_id, admin_id):
         db.session.commit()
         return None
 
-    cliente_nome = obra.cliente or obra.cliente_nome or obra.nome or 'Cliente'
+    cliente_nome = obra.cliente_nome_efetivo or obra.cliente or obra.nome or 'Cliente'
     descricao = f"Medição da obra {obra.codigo or obra.nome} — saldo a faturar acumulado"
     hoje = date.today()
 
@@ -411,7 +411,7 @@ def gerar_pdf_extrato_medicao(medicao_id, admin_id):
     info_data = [
         ['Obra:', obra.nome, 'Contrato:', f"R$ {float(obra.valor_contrato or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
         ['Período:', f"{medicao.periodo_inicio.strftime('%d/%m/%Y')} a {medicao.periodo_fim.strftime('%d/%m/%Y')}", 'Status:', medicao.status],
-        ['Cliente:', obra.cliente or '—', 'Medição Nº:', f"{medicao.numero:03d}"],
+        ['Cliente:', obra.cliente_nome_efetivo or obra.cliente or '—', 'Medição Nº:', f"{medicao.numero:03d}"],
     ]
     info_table = Table(info_data, colWidths=[60, 180, 70, 150])
     info_table.setStyle(TableStyle([

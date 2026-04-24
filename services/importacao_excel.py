@@ -681,12 +681,17 @@ class ImportacaoDiarias:
                     if obra_up in obras_criadas:
                         obra_id = obras_criadas[obra_up]
                     else:
+                        # Task #172 — importação de diárias não traz dados
+                        # de cliente; cliente_id permanece NULL e o operador
+                        # vincula depois pela tela de edição da obra (que
+                        # chama services.cliente_resolver.obter_ou_criar_cliente).
                         nova_obra = Obra(
                             nome=obra_raw.title(),
                             codigo=None,   # sem código — editável depois
                             data_inicio=data_ref,
                             admin_id=admin_id,
                             ativo=True,
+                            cliente_id=None,
                         )
                         db.session.add(nova_obra)
                         db.session.flush()
@@ -1729,10 +1734,13 @@ class ImportacaoFluxoCaixa:
             Obra.nome.ilike('%ADMINISTRATIVO%')
         ).first()
         if not obra_adm:
+            # Task #172 — obra administrativa interna (sem cliente externo);
+            # cliente_id permanece NULL por design.
             obra_adm = Obra(
                 nome='000 - ADMINISTRATIVO / GERAL',
                 admin_id=admin_id,
                 data_inicio=_date.today(),
+                cliente_id=None,
             )
             db.session.add(obra_adm)
             db.session.flush()

@@ -472,6 +472,13 @@ def _seed():
     proposta.valor_total = valor_total
 
     # 9) Obra "Residencial Bela Vista" (criada pela aprovação) -------------
+    # Task #172 — resolve/cria Cliente e vincula via FK (mantém campos texto
+    # como fallback de compatibilidade com leituras legadas).
+    from services.cliente_resolver import obter_ou_criar_cliente
+    cliente_obj = obter_ou_criar_cliente(
+        admin_id=aid, nome=CLIENTE_NOME,
+        email=CLIENTE_EMAIL, telefone=CLIENTE_TELEFONE,
+    )
     obra = Obra(
         nome=OBRA_NOME, codigo=OBRA_CODIGO,
         endereco="Rua das Acácias, 250 — São Paulo / SP",
@@ -483,6 +490,7 @@ def _seed():
         status="Em andamento",
         cliente=CLIENTE_NOME, cliente_nome=CLIENTE_NOME,
         cliente_email=CLIENTE_EMAIL, cliente_telefone=CLIENTE_TELEFONE,
+        cliente_id=(cliente_obj.id if cliente_obj else None),
         proposta_origem_id=proposta.id, portal_ativo=True,
         responsavel_id=pedro.id, ativo=True, admin_id=aid,
         data_inicio_medicao=date(2026, 2, 1),

@@ -801,6 +801,19 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
     valor_total = float(proposta.valor_total or 0)
     cliente_nome = proposta.cliente_nome or 'Cliente não identificado'
 
+    # Task #172 — resolver Cliente preferindo o vínculo já presente na
+    # proposta; senão, dedup por nome/e-mail. Tudo na mesma transação da
+    # rota chamadora — propagamos qualquer erro para garantir rollback
+    # atômico (não vinculamos Obra silenciosamente sem cliente_id).
+    from services.cliente_resolver import obter_ou_criar_cliente
+    cliente_obj = obter_ou_criar_cliente(
+        admin_id=admin_id,
+        nome=proposta.cliente_nome,
+        email=proposta.cliente_email,
+        telefone=proposta.cliente_telefone,
+        cliente_id=getattr(proposta, 'cliente_id', None),
+    )
+
     # 1) Localizar (ou criar) a Obra vinculada à proposta
     obra = None
     if proposta.obra_id:
@@ -836,6 +849,7 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             nome=f"Obra - {proposta.titulo or proposta.numero}",
             codigo=codigo_obra,
             cliente=cliente_nome,
+            cliente_id=cliente_obj.id if cliente_obj else None,
             cliente_nome=cliente_nome,
             cliente_email=proposta.cliente_email,
             cliente_telefone=proposta.cliente_telefone,
@@ -851,12 +865,19 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         )
         db.session.add(obra)
         db.session.flush()
-        logger.info(f"📋 Obra {codigo_obra} criada para proposta {proposta.numero}")
+        logger.info(
+            f"📋 Obra {codigo_obra} criada para proposta {proposta.numero} "
+            f"(cliente_id={obra.cliente_id})"
+        )
     else:
         if not obra.cliente:
             obra.cliente = cliente_nome
         if not obra.cliente_nome:
             obra.cliente_nome = cliente_nome
+        # Task #172 — popula cliente_id em obras pré-existentes que ainda
+        # estavam sem o vínculo, preservando o que já houver.
+        if not obra.cliente_id and cliente_obj:
+            obra.cliente_id = cliente_obj.id
         if (obra.valor_contrato or 0) <= 0 and valor_total > 0:
             obra.valor_contrato = valor_total
         if (obra.orcamento or 0) <= 0 and valor_total > 0:
