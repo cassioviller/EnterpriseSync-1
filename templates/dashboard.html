@@ -144,10 +144,10 @@ html[data-bs-theme="dark"] .header-btn i {
     margin-bottom: 0 !important;
 }
 
-/* Estilo para títulos de seção */
+/* Task #191 — títulos de seção respeitam o tema da empresa */
 .section-header {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    color: white !important;
+    background: linear-gradient(135deg, var(--sige-primary, #2563eb) 0%, var(--sige-header, #1e293b) 100%) !important;
+    color: var(--sige-on-primary, #ffffff) !important;
     padding: 12px 20px;
     border-radius: 8px;
     margin-top: 30px;
@@ -158,12 +158,12 @@ html[data-bs-theme="dark"] .header-btn i {
 .section-header h4 {
     margin: 0;
     font-weight: 600;
-    color: white !important;
+    color: var(--sige-on-primary, #ffffff) !important;
 }
 
 .section-header i {
     margin-right: 8px;
-    color: white !important;
+    color: var(--sige-on-primary, #ffffff) !important;
 }
 </style>
 

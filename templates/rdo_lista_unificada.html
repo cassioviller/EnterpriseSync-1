@@ -93,16 +93,19 @@ console.log('Initializing RDO with light theme...');
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
 }
 
-/* ===== HEADER MODERNO COM GRADIENTE ===== */
+/* ===== HEADER MODERNO (Task #191 — respeita o tema da empresa) ===== */
 .page-header {
-    background: linear-gradient(135deg, #198754 0%, #20c997 50%, #0d6efd 100%) !important;
-    color: white !important;
+    background: linear-gradient(135deg, var(--sige-primary, #2563eb) 0%, var(--sige-header, #1e293b) 100%) !important;
+    color: var(--sige-on-primary, #ffffff) !important;
     padding: 3rem 0 !important;
     margin: 0 0 3rem 0;
     border-radius: 0 0 24px 24px !important;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
     position: relative;
     overflow: hidden;
+}
+.page-header h1, .page-header p {
+    color: var(--sige-on-primary, #ffffff) !important;
 }
 
 .page-header::before {
