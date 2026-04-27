@@ -42,3 +42,9 @@ id = "cykcidTAgSy8zkqm3b2ky"
 uri = "file://static/templates_importacao/5_custos.xlsx"
 type = "table"
 title = "Template 5 — Custos (Fluxo de Caixa)"
+
+[[outputs]]
+id = "twaVqVDr-cvUQctfVE1v-"
+uri = "file://docs/manual_ciclo/Manual_Ciclo_SIGE.pdf"
+type = "pdf"
+title = "Manual Visual do Ciclo Completo SIGE (PDF)"
