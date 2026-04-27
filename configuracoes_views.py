@@ -110,7 +110,15 @@ def salvar_empresa():
         cor_secundaria = request.form.get('cor_secundaria', '#6c757d') 
         cor_fundo = request.form.get('cor_fundo_proposta', '#f8f9fa')
         logo_tamanho = request.form.get('logo_tamanho_portal', 'medio')
-        
+
+        # Task #191: cor_primaria/cor_secundaria são compartilhadas com o tema
+        # do sistema. Se mudaram aqui (form de PDF), invalida o tema_preset
+        # para evitar drift entre o que o admin vê marcado em "Tema do Sistema"
+        # e as cores efetivamente em uso.
+        if (config.cor_primaria != cor_primaria
+                or config.cor_secundaria != cor_secundaria):
+            config.tema_preset = 'custom'
+
         config.cor_primaria = cor_primaria
         config.cor_secundaria = cor_secundaria
         config.cor_fundo_proposta = cor_fundo
