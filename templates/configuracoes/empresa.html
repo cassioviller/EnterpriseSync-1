@@ -371,127 +371,6 @@
                             </div>
                         </div>
 
-                        <hr class="my-4">
-
-                        <!-- Task #191 — Tema do Sistema -->
-                        <h6 class="mb-3" id="tema-sistema">
-                            <i class="fas fa-paint-roller me-2"></i>
-                            Tema do Sistema
-                            <span class="badge bg-primary ms-2">Novo</span>
-                        </h6>
-                        <p class="text-muted small mb-3">
-                            Escolha um preset visual ou personalize as cores da interface.
-                            As alterações são aplicadas para toda a empresa.
-                        </p>
-
-                        {% set tema_atual = sige_theme %}
-                        <form method="POST" action="{{ url_for('configuracoes.salvar_tema') }}" id="form-tema-sistema">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                            <!-- Cards de presets -->
-                            <div class="row g-3 mb-4">
-                                {% for preset_id, preset in sige_theme_presets.items() %}
-                                <div class="col-md-4">
-                                    <label class="tema-preset-card d-block {% if tema_atual.tema_preset == preset_id %}is-active{% endif %}"
-                                           data-preset-id="{{ preset_id }}"
-                                           data-cor-primaria="{{ preset.cor_primaria }}"
-                                           data-cor-secundaria="{{ preset.cor_secundaria }}"
-                                           data-cor-header="{{ preset.cor_header_nav }}"
-                                           data-cor-fundo="{{ preset.cor_fundo_app }}">
-                                        <input type="radio" name="tema_preset" value="{{ preset_id }}" class="d-none"
-                                               {% if tema_atual.tema_preset == preset_id %}checked{% endif %}>
-                                        <div class="tema-preset-swatches">
-                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_header_nav }}"></span>
-                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_primaria }}"></span>
-                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_secundaria }}"></span>
-                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_fundo_app }}"></span>
-                                        </div>
-                                        <div class="tema-preset-name">{{ preset.label }}</div>
-                                        <div class="tema-preset-desc">{{ preset.descricao }}</div>
-                                    </label>
-                                </div>
-                                {% endfor %}
-                            </div>
-
-                            <!-- Custom — 4 cores -->
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="tema_cor_primaria" class="form-label">Cor Primária</label>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <input type="color" class="form-control form-control-color tema-color-input"
-                                                   id="tema_cor_primaria" name="cor_primaria"
-                                                   value="{{ tema_atual.cor_primaria }}" style="width: 50px;">
-                                            <input type="text" class="form-control tema-color-text" readonly
-                                                   value="{{ tema_atual.cor_primaria }}">
-                                        </div>
-                                        <small class="text-muted">Botões, links e abas ativas</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="tema_cor_secundaria" class="form-label">Cor Secundária</label>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <input type="color" class="form-control form-control-color tema-color-input"
-                                                   id="tema_cor_secundaria" name="cor_secundaria"
-                                                   value="{{ tema_atual.cor_secundaria }}" style="width: 50px;">
-                                            <input type="text" class="form-control tema-color-text" readonly
-                                                   value="{{ tema_atual.cor_secundaria }}">
-                                        </div>
-                                        <small class="text-muted">Texto auxiliar e elementos discretos</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="tema_cor_header" class="form-label">Cor do Header / Navbar</label>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <input type="color" class="form-control form-control-color tema-color-input"
-                                                   id="tema_cor_header" name="cor_header_nav"
-                                                   value="{{ tema_atual.cor_header_nav }}" style="width: 50px;">
-                                            <input type="text" class="form-control tema-color-text" readonly
-                                                   value="{{ tema_atual.cor_header_nav }}">
-                                        </div>
-                                        <small class="text-muted">Barra de navegação superior</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="tema_cor_fundo" class="form-label">Cor de Fundo do App</label>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <input type="color" class="form-control form-control-color tema-color-input"
-                                                   id="tema_cor_fundo" name="cor_fundo_app"
-                                                   value="{{ tema_atual.cor_fundo_app }}" style="width: 50px;">
-                                            <input type="text" class="form-control tema-color-text" readonly
-                                                   value="{{ tema_atual.cor_fundo_app }}">
-                                        </div>
-                                        <small class="text-muted">Fundo geral das páginas</small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Preview ao vivo -->
-                            <div class="tema-preview-box" id="tema-preview">
-                                <div class="tema-preview-header" id="tema-preview-header"
-                                     style="background: {{ tema_atual.cor_header_nav }}; color: {{ tema_atual.cor_texto_header }};">
-                                    <i class="fas fa-eye me-2"></i> Pré-visualização do Header
-                                </div>
-                                <div class="tema-preview-body" id="tema-preview-body"
-                                     style="background: {{ tema_atual.cor_fundo_app }};">
-                                    <span class="tema-preview-btn" id="tema-preview-btn"
-                                          style="background: {{ tema_atual.cor_primaria }};">Botão Primário</span>
-                                    <span class="ms-2 text-muted">Texto secundário no fundo do app</span>
-                                </div>
-                            </div>
-
-                            <div class="d-flex justify-content-end gap-2 mt-3">
-                                <button type="button" class="btn btn-outline-secondary" id="btn-resetar-tema">
-                                    <i class="fas fa-undo me-1"></i> Restaurar Padrão (Azul Profundo)
-                                </button>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i> Salvar Tema
-                                </button>
-                            </div>
-                        </form>
 
                         <hr class="my-4">
 
@@ -574,6 +453,142 @@
                             <button type="submit" class="btn btn-success">
                                 <i class="fas fa-save me-2"></i>
                                 Salvar Configurações
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mt-4">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-paint-roller me-2"></i>
+                        Tema do Sistema
+                        <span class="badge bg-primary ms-2">Novo</span>
+                    </h5>
+                    <small class="text-muted">Personalize as cores da interface da empresa.</small>
+                </div>
+                <div class="card-body">
+
+                    <!-- Task #191 — Tema do Sistema -->
+                    <h6 class="mb-3" id="tema-sistema">
+                        <i class="fas fa-paint-roller me-2"></i>
+                        Tema do Sistema
+                        <span class="badge bg-primary ms-2">Novo</span>
+                    </h6>
+                    <p class="text-muted small mb-3">
+                        Escolha um preset visual ou personalize as cores da interface.
+                        As alterações são aplicadas para toda a empresa.
+                    </p>
+
+                    {% set tema_atual = sige_theme %}
+                    <form method="POST" action="{{ url_for('configuracoes.salvar_tema') }}" id="form-tema-sistema">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <!-- Cards de presets -->
+                        <div class="row g-3 mb-4">
+                            {% for preset_id, preset in sige_theme_presets.items() %}
+                            <div class="col-md-4">
+                                <label class="tema-preset-card d-block {% if tema_atual.tema_preset == preset_id %}is-active{% endif %}"
+                                       data-preset-id="{{ preset_id }}"
+                                       data-cor-primaria="{{ preset.cor_primaria }}"
+                                       data-cor-secundaria="{{ preset.cor_secundaria }}"
+                                       data-cor-header="{{ preset.cor_header_nav }}"
+                                       data-cor-fundo="{{ preset.cor_fundo_app }}">
+                                    <input type="radio" name="tema_preset" value="{{ preset_id }}" class="d-none"
+                                           {% if tema_atual.tema_preset == preset_id %}checked{% endif %}>
+                                    <div class="tema-preset-swatches">
+                                        <span class="tema-preset-swatch" style="background:{{ preset.cor_header_nav }}"></span>
+                                        <span class="tema-preset-swatch" style="background:{{ preset.cor_primaria }}"></span>
+                                        <span class="tema-preset-swatch" style="background:{{ preset.cor_secundaria }}"></span>
+                                        <span class="tema-preset-swatch" style="background:{{ preset.cor_fundo_app }}"></span>
+                                    </div>
+                                    <div class="tema-preset-name">{{ preset.label }}</div>
+                                    <div class="tema-preset-desc">{{ preset.descricao }}</div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Custom — 4 cores -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tema_cor_primaria" class="form-label">Cor Primária</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="color" class="form-control form-control-color tema-color-input"
+                                               id="tema_cor_primaria" name="cor_primaria"
+                                               value="{{ tema_atual.cor_primaria }}" style="width: 50px;">
+                                        <input type="text" class="form-control tema-color-text" readonly
+                                               value="{{ tema_atual.cor_primaria }}">
+                                    </div>
+                                    <small class="text-muted">Botões, links e abas ativas</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tema_cor_secundaria" class="form-label">Cor Secundária</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="color" class="form-control form-control-color tema-color-input"
+                                               id="tema_cor_secundaria" name="cor_secundaria"
+                                               value="{{ tema_atual.cor_secundaria }}" style="width: 50px;">
+                                        <input type="text" class="form-control tema-color-text" readonly
+                                               value="{{ tema_atual.cor_secundaria }}">
+                                    </div>
+                                    <small class="text-muted">Texto auxiliar e elementos discretos</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tema_cor_header" class="form-label">Cor do Header / Navbar</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="color" class="form-control form-control-color tema-color-input"
+                                               id="tema_cor_header" name="cor_header_nav"
+                                               value="{{ tema_atual.cor_header_nav }}" style="width: 50px;">
+                                        <input type="text" class="form-control tema-color-text" readonly
+                                               value="{{ tema_atual.cor_header_nav }}">
+                                    </div>
+                                    <small class="text-muted">Barra de navegação superior</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tema_cor_fundo" class="form-label">Cor de Fundo do App</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="color" class="form-control form-control-color tema-color-input"
+                                               id="tema_cor_fundo" name="cor_fundo_app"
+                                               value="{{ tema_atual.cor_fundo_app }}" style="width: 50px;">
+                                        <input type="text" class="form-control tema-color-text" readonly
+                                               value="{{ tema_atual.cor_fundo_app }}">
+                                    </div>
+                                    <small class="text-muted">Fundo geral das páginas</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview ao vivo -->
+                        <div class="tema-preview-box" id="tema-preview">
+                            <div class="tema-preview-header" id="tema-preview-header"
+                                 style="background: {{ tema_atual.cor_header_nav }}; color: {{ tema_atual.cor_texto_header }};">
+                                <i class="fas fa-eye me-2"></i> Pré-visualização do Header
+                            </div>
+                            <div class="tema-preview-body" id="tema-preview-body"
+                                 style="background: {{ tema_atual.cor_fundo_app }};">
+                                <span class="tema-preview-btn" id="tema-preview-btn"
+                                      style="background: {{ tema_atual.cor_primaria }};">Botão Primário</span>
+                                <span class="ms-2 text-muted">Texto secundário no fundo do app</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <button type="button" class="btn btn-outline-secondary" id="btn-resetar-tema">
+                                <i class="fas fa-undo me-1"></i> Restaurar Padrão (Azul Profundo)
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Salvar Tema
                             </button>
                         </div>
                     </form>

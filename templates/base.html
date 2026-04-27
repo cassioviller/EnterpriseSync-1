@@ -27,7 +27,21 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    
+
+    {# Task #191 — variáveis de tema da empresa (4 cores configuráveis) #}
+    {% if sige_theme %}
+    <style id="sige-theme-vars">
+      :root {
+        --sige-primary: {{ sige_theme.cor_primaria }};
+        --sige-secondary: {{ sige_theme.cor_secundaria }};
+        --sige-header: {{ sige_theme.cor_header_nav }};
+        --sige-bg: {{ sige_theme.cor_fundo_app }};
+        --sige-text-on-primary: {{ sige_theme.cor_texto_primaria }};
+        --sige-text-on-header: {{ sige_theme.cor_texto_header }};
+      }
+    </style>
+    {% endif %}
+
     <!-- Global Theme Styling -->
     <style>
         /* ===== DARK MODE (Default) ===== */
@@ -679,6 +693,8 @@
             background-color: rgba(255, 255, 255, 0.1);
         }
     </style>
+    {# Task #191 — sige-theme.css carregado por último para vencer especificidade #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sige-theme.css') }}">
 </head>
 <body>
     <!-- Navigation -->
