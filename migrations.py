@@ -3839,6 +3839,7 @@ def executar_migracoes():
             (138, "Task #162 — scrub de defaults legados em proposta_templates (Lucas Barbosa / São José dos Campos)", migration_138_scrub_proposta_templates_defaults),
             (139, "Task #142 — rdo_apontamento_cronograma.percentual_planejado nullable + backfill NULL para tarefas sem plano", migration_139_apontamento_cronograma_planejado_nullable),
             (140, "Task #200 — obra.cronograma_revisado_em (gate de revisão inicial de cronograma)", migration_140_obra_cronograma_revisado_em),
+            (141, "Task #201 — drop tabelas legadas de propostas (proposta + 7 dependentes/órfãs)", migration_141_drop_legacy_propostas_tables),
         ]
         
         # Executar cada migração com rastreamento
@@ -11621,6 +11622,91 @@ def migration_139_apontamento_cronograma_planejado_nullable():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 139: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_141_drop_legacy_propostas_tables():
+    """Migration 141 (Task #201): aposentar o modelo legado de propostas.
+
+    Remove as tabelas órfãs do antigo sistema de propostas que NÃO têm
+    classe SQLAlchemy mapeada em `models.py` e que NENHUM código vivo
+    consulta. O sistema atual usa exclusivamente `propostas_comerciais`
+    (model `Proposta`).
+
+    Tabelas removidas (em ordem segura — filhas → pai):
+      1. proposta_servico              (FK → proposta)
+      2. item_servico_proposta_dinamica (FK → proposta)
+      3. historico_status_proposta     (FK → proposta)
+      4. item_proposta                 (FK → proposta)
+      5. proposta_log                  (FK → proposta)
+      6. proposta                       (tabela pai)
+      7. item_servico_proposta          (sem FK em runtime; já não existe na maioria dos ambientes)
+      8. tabela_composicao_proposta     (sem FK em runtime; já não existe na maioria dos ambientes)
+
+    A Migration 36 anterior tentava remover apenas `proposta`,
+    `proposta_historico` e `item_servico_proposta_dinamica`, mas estava
+    gateada atrás de `REMOVE_OLD_PROPOSTAS_TABLES=true` e nunca rodou.
+    Esta migração faz o trabalho definitivo SEM feature flag — é seguro
+    porque:
+      - Backup CSV das 10 linhas de `proposta` já foi salvo em
+        `backups/legacy_proposta_2026-04-27.csv` antes do drop.
+      - Todas as tabelas dependentes têm 0 linhas (verificado em dev).
+      - Não há classe SQLAlchemy mapeada para nenhuma delas.
+      - Não há referência em `views/`, `services/`, `handlers/`,
+        `templates/` (apenas em `archive/` e relatórios `.md`).
+
+    Idempotente: usa `DROP TABLE IF EXISTS ... CASCADE`.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        legacy_tables = [
+            'proposta_servico',
+            'item_servico_proposta_dinamica',
+            'historico_status_proposta',
+            'item_proposta',
+            'proposta_log',
+            'proposta',
+            'item_servico_proposta',
+            'tabela_composicao_proposta',
+        ]
+
+        dropped = []
+        for tabela in legacy_tables:
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                     WHERE table_schema = 'public' AND table_name = %s
+                )
+                """,
+                (tabela,),
+            )
+            existe = cursor.fetchone()[0]
+            if not existe:
+                continue
+            cursor.execute(f"DROP TABLE IF EXISTS {tabela} CASCADE")
+            dropped.append(tabela)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 141 CONCLUIDA: tabelas legadas removidas=%s (total=%d)",
+            dropped,
+            len(dropped),
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 141: {e}")
         if connection:
             try:
                 connection.rollback()

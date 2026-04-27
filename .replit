@@ -48,6 +48,10 @@ args = "test-clausulas-configuraveis"
 task = "workflow.run"
 args = "test-cronograma-revisao-obra-gate"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-legacy-propostas-drop"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -130,6 +134,14 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python tests/test_cronograma_revisao_obra_gate.py"
+
+[[workflows.workflow]]
+name = "test-legacy-propostas-drop"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_legacy_propostas_drop.py"
 
 [[ports]]
 localPort = 5000
