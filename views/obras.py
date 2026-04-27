@@ -1242,10 +1242,26 @@ def detalhes_obra(id):
                 admin_id = obra.admin_id  # Ajustar admin_id para as próximas consultas
             else:
                 return f"Obra não encontrada (ID: {id})", 404
-        
-                logger.debug(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
-                logger.debug(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
-        
+
+        # Task #200: gate de revisão inicial de cronograma. Se a obra ainda
+        # não foi revisada E veio de uma proposta com conteúdo de cronograma
+        # E ainda não tem nenhuma TarefaCronograma materializada → redireciona
+        # para a tela de revisão inicial. Próximas visitas (após confirm)
+        # entram direto no detalhe.
+        try:
+            if _precisa_revisao_cronograma_inicial(obra, admin_id):
+                logger.info(
+                    f"#200: gate de revisão inicial disparado para obra={obra.id} "
+                    f"(admin={admin_id}) — redirecionando para tela de revisão"
+                )
+                return redirect(url_for('main.cronograma_revisar_inicial_get', id=obra.id))
+        except Exception as _e_gate:
+            # Defensivo: nunca bloquear o detalhe da obra por falha no gate.
+            logger.warning(f"#200: gate cronograma falhou (obra={obra.id}): {_e_gate}")
+
+        logger.debug(f"DEBUG OBRA ENCONTRADA: {obra.nome} - Admin: {obra.admin_id}")
+        logger.debug(f"DEBUG OBRA DADOS: Status={obra.status}, Orçamento={obra.orcamento}")
+
         # Buscar funcionários que trabalharam na obra (baseado em registros de ponto) - CORRIGIDO
         # Primeiro, buscar registros de ponto para obter IDs dos funcionários
         funcionarios_ids_ponto = set()
@@ -1897,6 +1913,221 @@ def detalhes_obra(id):
         # Exibir traceback completo em modo desenvolvimento
         flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
         return redirect(url_for('main.obras'))
+
+
+# ────────────────────────────────────────────────────────────────────
+# Task #200 — Revisão inicial de cronograma da obra
+# ────────────────────────────────────────────────────────────────────
+
+def _proposta_origem_obra(obra, admin_id):
+    """Retorna a Proposta ATIVA (`propostas_comerciais`) que originou a
+    obra, se houver. Usa duas pistas:
+      1. `obra.proposta_origem_id` (FK direta — preferida).
+      2. Fallback: `propostas_comerciais.obra_id == obra.id` (vínculo inverso).
+    Aplica filtro de admin_id para não vazar entre tenants.
+    """
+    from models import Proposta as _Proposta
+    if getattr(obra, 'proposta_origem_id', None):
+        prop = _Proposta.query.filter_by(
+            id=obra.proposta_origem_id, admin_id=admin_id
+        ).first()
+        if prop:
+            return prop
+    return _Proposta.query.filter_by(obra_id=obra.id, admin_id=admin_id).first()
+
+
+def _precisa_revisao_cronograma_inicial(obra, admin_id):
+    """Task #200 — Decide se a obra deve cair no gate de revisão inicial
+    de cronograma na primeira entrada nos detalhes.
+
+    Critérios (TODOS precisam ser True):
+      a) Obra ainda NÃO foi revisada (`obra.cronograma_revisado_em IS NULL`).
+      b) Existe uma Proposta de origem (FK direta ou inversa) com `tem_conteudo_para_revisar`.
+      c) Obra ainda não tem NENHUMA TarefaCronograma materializada (interno) — evita
+         cair no gate em obras legadas que já têm tarefas (mesmo que `cronograma_revisado_em`
+         seja NULL antes do backfill).
+
+    Defensivo: retorna False na menor dúvida. Falhas de query NÃO bloqueiam o detalhe.
+    """
+    if obra is None:
+        return False
+    if obra.cronograma_revisado_em is not None:
+        return False
+    if admin_id is None:
+        return False
+    proposta = _proposta_origem_obra(obra, admin_id)
+    if proposta is None:
+        return False
+    from services.cronograma_proposta import tem_conteudo_para_revisar
+    if not tem_conteudo_para_revisar(proposta, admin_id):
+        return False
+    # Obra legada que já tem tarefas internas materializadas — não cai no gate.
+    from models import TarefaCronograma as _TC
+    ja_tem = (
+        db.session.query(_TC.id)
+        .filter(_TC.obra_id == obra.id, _TC.is_cliente == False)  # noqa: E712
+        .limit(1)
+        .first()
+    )
+    if ja_tem is not None:
+        return False
+    return True
+
+
+@main_bp.route('/obras/<int:id>/cronograma-revisar-inicial', methods=['GET'])
+@login_required
+@admin_required
+def cronograma_revisar_inicial_get(id):
+    """Task #200 — Renderiza a tela de revisão inicial de cronograma da obra.
+
+    Reaproveita a lógica de `montar_arvore_preview` (que já é usada pela
+    tela de revisão de proposta), mas o POST de confirmação aponta para
+    a obra. Se a obra já foi revisada (cronograma_revisado_em != NULL),
+    redireciona para os detalhes — usuário pode ter chegado por link
+    direto após já ter revisado.
+    """
+    admin_id = get_admin_id_robusta()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    if obra.cronograma_revisado_em is not None:
+        flash('Cronograma desta obra já foi revisado anteriormente.', 'info')
+        return redirect(url_for('main.detalhes_obra', id=obra.id))
+    proposta = _proposta_origem_obra(obra, admin_id)
+    if proposta is None:
+        # Obra não tem origem em proposta — marca como revisada e segue.
+        obra.cronograma_revisado_em = datetime.utcnow()
+        db.session.commit()
+        flash(
+            'Esta obra não tem proposta de origem com cronograma — marcada '
+            'como revisada. Você pode criar tarefas manualmente na aba '
+            'Cronograma.', 'info',
+        )
+        return redirect(url_for('main.detalhes_obra', id=obra.id))
+    from services.cronograma_proposta import montar_arvore_preview
+    arvore = montar_arvore_preview(proposta, admin_id)
+    return render_template(
+        'obras/cronograma_revisar_inicial.html',
+        obra=obra,
+        proposta=proposta,
+        arvore=arvore,
+    )
+
+
+@main_bp.route('/obras/<int:id>/cronograma-revisar-inicial', methods=['POST'])
+@login_required
+@admin_required
+def cronograma_revisar_inicial_post(id):
+    """Task #200 — Recebe a árvore marcada do admin, materializa as
+    TarefaCronograma da obra, marca a obra como revisada e redireciona
+    para os detalhes. Idempotente: se a obra já estava revisada, apenas
+    redireciona (defensivo contra duplo-submit).
+    """
+    admin_id = get_admin_id_robusta()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    if obra.cronograma_revisado_em is not None:
+        flash('Cronograma desta obra já foi revisado.', 'info')
+        return redirect(url_for('main.detalhes_obra', id=obra.id))
+
+    proposta = _proposta_origem_obra(obra, admin_id)
+
+    arvore_raw = request.form.get('cronograma_marcado_json')
+    arvore = None
+    if arvore_raw:
+        try:
+            arvore = json.loads(arvore_raw)
+        except (ValueError, TypeError) as _e_json:
+            logger.warning(f"#200: cronograma_marcado_json inválido (obra={obra.id}): {_e_json}")
+            flash('Falha ao ler árvore de cronograma; tente novamente.', 'error')
+            return redirect(url_for('main.cronograma_revisar_inicial_get', id=obra.id))
+
+    try:
+        criadas = 0
+        if proposta is not None and arvore:
+            from services.cronograma_proposta import materializar_cronograma
+            criadas = materializar_cronograma(
+                proposta, admin_id, obra.id, arvore_marcada=arvore,
+            )
+            # Reaproveita o engine de cálculo de datas/predecessoras quando disponível.
+            try:
+                from utils.cronograma_engine import recalcular_cronograma
+                recalcular_cronograma(obra.id, admin_id)
+            except Exception as _e_eng:
+                logger.warning(f"#200: recalcular_cronograma falhou para obra={obra.id}: {_e_eng}")
+        obra.cronograma_revisado_em = datetime.utcnow()
+        db.session.commit()
+        if criadas > 0:
+            flash(
+                f'Cronograma revisado e gerado: {criadas} tarefa(s) criada(s). '
+                'A obra agora abre normalmente nos detalhes.',
+                'success',
+            )
+        else:
+            flash(
+                'Obra marcada como revisada. Nenhuma tarefa nova foi gerada — '
+                'você pode adicionar tarefas manualmente na aba Cronograma.',
+                'info',
+            )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"#200: falha ao materializar cronograma (obra={obra.id}): {e}")
+        flash(f'Erro ao gerar cronograma: {e}', 'error')
+        return redirect(url_for('main.cronograma_revisar_inicial_get', id=obra.id))
+
+    return redirect(url_for('main.detalhes_obra', id=obra.id))
+
+
+@main_bp.route('/obras/<int:id>/cronograma-revisar-reset', methods=['POST'])
+@login_required
+@admin_required
+def cronograma_revisar_reset(id):
+    """Task #200 — Botão "Revisar de novo" na aba Cronograma da obra.
+
+    Apaga TODAS as tarefas internas geradas a partir da proposta de
+    origem (preserva tarefas adicionadas manualmente, identificadas
+    por `gerada_por_proposta_item_id IS NULL`) e zera
+    `cronograma_revisado_em`, fazendo a obra cair de novo no gate
+    de revisão na próxima visita aos detalhes.
+
+    Em DBs reais, `tarefa_cronograma.tarefa_pai_id` usa ON DELETE SET NULL,
+    então deletar todas as tarefas geradas em uma única query NÃO viola
+    FK (mesmo quando há hierarquia entre as deletadas).
+    `item_medicao_cronograma_tarefa` tem ON DELETE CASCADE, então os pesos
+    das medições são apagados automaticamente.
+    """
+    admin_id = get_admin_id_robusta()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+    from models import TarefaCronograma as _TC
+    try:
+        deleted = (
+            db.session.query(_TC)
+            .filter(
+                _TC.obra_id == obra.id,
+                _TC.admin_id == admin_id,
+                _TC.is_cliente == False,  # noqa: E712
+                _TC.gerada_por_proposta_item_id.isnot(None),
+            )
+            .delete(synchronize_session=False)
+        )
+        obra.cronograma_revisado_em = None
+        db.session.commit()
+        logger.info(
+            f"#200: reset cronograma da obra {obra.id} — "
+            f"{deleted} tarefa(s) gerada(s) por proposta apagada(s); "
+            "gate de revisão será reaberto."
+        )
+        flash(
+            f'Cronograma resetado: {deleted} tarefa(s) apagada(s). '
+            'Refaça a revisão para gerar de novo.',
+            'success',
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"#200: falha ao resetar cronograma (obra={obra.id}): {e}")
+        flash(f'Erro ao resetar cronograma: {e}', 'error')
+        return redirect(url_for('main.detalhes_obra', id=obra.id))
+
+    return redirect(url_for('main.cronograma_revisar_inicial_get', id=obra.id))
+
 
 @main_bp.route('/obras/<int:obra_id>/curva-avanco')
 @login_required

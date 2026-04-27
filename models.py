@@ -275,6 +275,14 @@ class Obra(db.Model):
     # Task #70 — Percentual de administração para cálculo de custo fixo da obra
     percentual_administracao = db.Column(db.Numeric(5, 2), default=0, nullable=False)
 
+    # Task #200 — Revisão de cronograma na primeira entrada da obra.
+    # NULL = obra ainda não passou pelo gate de revisão inicial; uma vez
+    # preenchido, a obra abre direto nos detalhes (sem redirect para a
+    # tela de revisão). Obras criadas com cronograma materializado a
+    # partir de `propostas.cronograma_default_json` na hora da aprovação
+    # já nascem com este campo setado.
+    cronograma_revisado_em = db.Column(db.DateTime, nullable=True)
+
     # Campos de Geofencing (Cerca Virtual)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)

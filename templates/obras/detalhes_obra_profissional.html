@@ -769,22 +769,21 @@
 {% block content %}
 <div class="obra-container" style="padding: 0;">
     <div class="container-fluid" style="padding: 0;">
-        {# Task #102: banner "cronograma pendente" — obra criada por aprovação
-           de proposta sem snapshot de cronograma revisado pelo admin.
+        {# Task #200: banner "cronograma pendente" — obra criada por aprovação
+           de proposta sem snapshot revisado. Mostra LINK direto para a tela
+           de revisão inicial (gate ATIVO normalmente já redireciona, mas
+           o banner é fallback caso o gate não dispare por motivo qualquer).
            Flag `cronograma_pendente` é injetada pela view. #}
         {% if cronograma_pendente %}
             <div class="alert alert-warning d-flex align-items-start gap-2 mb-0"
                  style="border-radius:0; border-left:5px solid #f59e0b;">
                 <i class="fas fa-clock fa-lg mt-1"></i>
-                <div>
+                <div class="flex-grow-1">
                     <strong>Cronograma do contrato pendente.</strong>
-                    Esta obra foi criada pela aprovação de uma proposta, mas o cronograma
-                    automático ainda não foi gerado. Acesse a proposta de origem e use
-                    "Aprovar com Cronograma" ou crie tarefas manualmente abaixo.
-                    {% if obra.proposta_origem_id %}
-                    <a href="{{ url_for('propostas.visualizar', id=obra.proposta_origem_id) }}"
-                       class="alert-link ms-1">Abrir proposta #{{ obra.proposta_origem_id }}</a>.
-                    {% endif %}
+                    Esta obra ainda não teve seu cronograma revisado.
+                    <a href="{{ url_for('main.cronograma_revisar_inicial_get', id=obra.id) }}"
+                       class="alert-link ms-1">Revisar agora</a>
+                    para gerar as tarefas a partir dos templates da proposta.
                 </div>
             </div>
         {% endif %}
@@ -2039,6 +2038,29 @@
                 </div>
             </div>
             <div class="obra-card-body" style="padding: 1rem 1rem 1.25rem;">
+                {# Task #200: botão "Revisar de novo" — só faz sentido se a obra
+                   já passou pelo gate alguma vez (cronograma_revisado_em != NULL).
+                   Apaga as tarefas internas geradas pela proposta e reabre o gate. #}
+                {% if obra.cronograma_revisado_em %}
+                <div class="d-flex flex-wrap align-items-center justify-content-end gap-2"
+                     style="margin-bottom:.75rem;">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        Cronograma revisado em
+                        {{ obra.cronograma_revisado_em.strftime('%d/%m/%Y %H:%M') }}.
+                    </small>
+                    <form method="POST"
+                          action="{{ url_for('main.cronograma_revisar_reset', id=obra.id) }}"
+                          onsubmit="return confirm('Apagar TODAS as tarefas internas geradas pela proposta e reabrir a tela de revisão? Tarefas adicionadas manualmente serão preservadas.');"
+                          style="margin:0;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-warning"
+                                title="Refazer a revisão inicial de cronograma">
+                            <i class="fas fa-rotate-left me-1"></i> Revisar de novo
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2" style="margin-bottom:.75rem;">
                     <p style="font-size:.85rem;color:#64748b;margin:0;flex:1;min-width:240px;">
                         Editor completo do cronograma apresentado ao cliente no Portal — pai/filho, predecessoras,

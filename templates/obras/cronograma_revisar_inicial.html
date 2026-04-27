@@ -1,0 +1,450 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Revisar Cronograma — Obra {{ obra.nome }} - SIGE{% endblock %}
+
+{# Task #200: tela de revisão inicial de cronograma DA OBRA (não da proposta).
+   Reaproveita a UI/macro/JS de templates/propostas/cronograma_revisar.html,
+   mas o POST de confirmação aponta para a obra; e não há botão de
+   pré-configuração — aqui o admin já está aprovando a árvore final que vai
+   virar TarefaCronograma na hora. #}
+{% macro render_nodes(nodes, pi_id) %}
+    {% for n in nodes %}
+    <li class="{% if n.filhos %}node-grupo{% else %}node-sub{% endif %}"
+        data-tipo="{{ n.tipo }}"
+        data-horas="{{ n.horas_estimadas or 0 }}"
+        data-dias="{{ n.duracao_dias or 1 }}"
+        data-sub-id="{{ n.subatividade_mestre_id or '' }}">
+        <span class="node-label">
+            <input type="checkbox" class="form-check-input chk-node"
+                   data-pi-id="{{ pi_id }}"
+                   {% if n.marcado %}checked{% endif %}>
+            {% if n.filhos %}<i class="fas fa-folder-open me-1 text-primary"></i>
+            {% else %}<i class="fas fa-tasks me-1 text-muted"></i>{% endif %}
+            {{ n.nome }}
+            {% if n.quantidade_prevista %}
+            <span class="text-muted small ms-2">
+                qtd: {{ n.quantidade_prevista }}{% if n.unidade_medida %} {{ n.unidade_medida }}{% endif %}
+            </span>
+            {% endif %}
+            {% if not n.filhos %}
+            <span class="inline-edit ms-2">
+                <label class="small text-muted">horas</label>
+                <input type="number" min="0" step="0.5"
+                       class="form-control form-control-sm inp-horas"
+                       value="{{ '%.1f'|format(n.horas_estimadas or 0) }}">
+                <label class="small text-muted ms-1">dur. (dias)</label>
+                <input type="number" min="1" step="1"
+                       class="form-control form-control-sm inp-dias"
+                       value="{{ n.duracao_dias or 1 }}">
+                <span class="badge-warn-zero" style="display:none;"
+                      title="Sem horas — usa fallback de divisão igual">
+                    <i class="fas fa-triangle-exclamation"></i> sem horas (fallback)
+                </span>
+            </span>
+            {% endif %}
+        </span>
+        {% if n.filhos %}
+        <ul class="cron-tree">
+            {{ render_nodes(n.filhos, pi_id) }}
+        </ul>
+        {% endif %}
+    </li>
+    {% endfor %}
+{% endmacro %}
+
+{% block extra_css %}
+<style>
+.page-header-rev {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 16px;
+    margin: 1.5rem 0;
+    box-shadow: 0 8px 32px rgba(25, 135, 84, 0.25);
+}
+.tree-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #198754;
+}
+.tree-card.no-template {
+    border-left-color: #adb5bd;
+    background: #f8f9fa;
+    opacity: 0.85;
+}
+ul.cron-tree, ul.cron-tree ul {
+    list-style: none;
+    padding-left: 1.5rem;
+    margin: 0.25rem 0;
+}
+ul.cron-tree li {
+    padding: 0.35rem 0;
+    border-left: 1px dashed #dee2e6;
+    padding-left: 0.75rem;
+    margin: 0.15rem 0;
+}
+ul.cron-tree .node-grupo > .node-label {
+    font-weight: 600;
+    color: #198754;
+}
+ul.cron-tree .node-sub > .node-label {
+    color: #495057;
+}
+.badge-horas {
+    background: #d1fae5;
+    color: #047857;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    margin-left: 0.5rem;
+}
+.servico-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+.servico-header h5 { margin: 0; }
+.btn-confirmar-final {
+    background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+    border: none;
+    color: white;
+    padding: 0.85rem 2rem;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+.btn-confirmar-final:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(25, 135, 84, 0.35);
+    color: white;
+}
+.summary-bar {
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: center;
+}
+.summary-pill {
+    background: #f1f3f5;
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.summary-pill strong { color: #198754; }
+.inline-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+}
+.inline-edit input.form-control-sm {
+    width: 5.5rem;
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.8rem;
+}
+.badge-warn-zero {
+    background: #fff3cd;
+    color: #92400e;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    margin-left: 0.4rem;
+    border: 1px solid #fde68a;
+}
+.fallback-alert {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    color: #78350f;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    display: none;
+}
+.intro-card {
+    background: #ecfdf5;
+    border-left: 5px solid #10b981;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+    color: #064e3b;
+}
+.intro-card .icon-big {
+    font-size: 1.6rem;
+    color: #10b981;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header-rev">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h1 class="mb-1">
+                    <i class="fas fa-calendar-check me-2"></i>
+                    Revisar Cronograma da Obra
+                </h1>
+                <p class="mb-0 opacity-75">
+                    <strong>{{ obra.nome }}</strong>
+                    {% if obra.codigo %} · Código: <strong>{{ obra.codigo }}</strong>{% endif %}
+                    {% if proposta %} · Proposta de origem:
+                    <strong>#{{ proposta.numero }}</strong>{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="intro-card d-flex gap-3 align-items-start">
+        <i class="fas fa-info-circle icon-big mt-1"></i>
+        <div>
+            <strong>Esta obra ainda não teve seu cronograma revisado.</strong>
+            Abaixo está a árvore inicial gerada a partir dos templates de cronograma
+            dos serviços da proposta — tudo já vem marcado.
+            <strong>Desmarque o que não se aplica</strong> a esta obra específica e
+            clique em <em>"Confirmar e Gerar Cronograma"</em>.
+            Depois de confirmado, a obra abrirá normalmente nos detalhes.
+        </div>
+    </div>
+
+    <div class="summary-bar">
+        <div class="summary-pill">
+            <i class="fas fa-list-check me-1 text-success"></i>
+            Itens da proposta: <strong id="totItens">{{ arvore|length }}</strong>
+        </div>
+        <div class="summary-pill">
+            <i class="fas fa-square-check me-1 text-success"></i>
+            Tarefas selecionadas: <strong id="totMarcados">0</strong>
+        </div>
+        <div class="summary-pill">
+            <i class="fas fa-clock me-1 text-warning"></i>
+            Horas estimadas: <strong id="totHoras">0</strong>h
+        </div>
+        <div class="ms-auto text-muted small">
+            <i class="fas fa-info-circle me-1"></i>
+            Marque/desmarque grupos e subatividades. Pais ⇄ filhos sincronizados.
+        </div>
+    </div>
+
+    <form id="formConfirmar" method="POST"
+          action="{{ url_for('main.cronograma_revisar_inicial_post', id=obra.id) }}">
+        <input type="hidden" name="cronograma_marcado_json" id="cronogramaJson" value="">
+
+        {% if not arvore %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Esta proposta não tem itens com template de cronograma — nada a revisar.
+            Clique em <em>"Confirmar"</em> para marcar a obra como revisada e
+            seguir para os detalhes (você poderá criar tarefas manualmente).
+        </div>
+        {% endif %}
+
+        <div class="fallback-alert" id="fallbackAlert">
+            <i class="fas fa-triangle-exclamation me-2"></i>
+            <strong>Aviso:</strong>
+            <span id="fallbackCount">0</span> tarefa(s) marcada(s) sem horas estimadas.
+            O peso para medição será distribuído por <strong>divisão igual entre folhas</strong>
+            (em vez de proporcional por horas). Configure as horas para usar peso ponderado.
+        </div>
+
+        {% for item in arvore %}
+        <div class="tree-card {% if item.sem_template %}no-template{% endif %}"
+             data-pi-id="{{ item.proposta_item_id }}">
+            <div class="servico-header">
+                {% if not item.sem_template %}
+                <input type="checkbox" class="form-check-input chk-raiz"
+                       data-pi-id="{{ item.proposta_item_id }}"
+                       {% if item.marcado %}checked{% endif %}>
+                {% else %}
+                <input type="checkbox" class="form-check-input" disabled
+                       title="Sem template padrão definido — não gera tarefas">
+                {% endif %}
+                <h5>
+                    <i class="fas fa-cube text-success me-1"></i>
+                    {{ item.servico_nome }}
+                </h5>
+                {% if item.template_nome %}
+                <span class="badge bg-info">📋 {{ item.template_nome }}</span>
+                {% endif %}
+                {% if item.sem_template %}
+                <span class="badge bg-secondary">
+                    <i class="fas fa-ban me-1"></i> Sem template padrão — não gera tarefas
+                </span>
+                {% endif %}
+                {% if item.horas_totais_estimadas %}
+                <span class="badge-horas">
+                    {{ '%.1f'|format(item.horas_totais_estimadas) }}h totais
+                </span>
+                {% endif %}
+            </div>
+
+            {% if item.filhos %}
+            <ul class="cron-tree">
+                {{ render_nodes(item.filhos, item.proposta_item_id) }}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="d-flex justify-content-end align-items-center mt-4 flex-wrap gap-2">
+            <button type="submit" class="btn btn-confirmar-final">
+                <i class="fas fa-check-double me-2"></i>
+                Confirmar e Gerar Cronograma
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const arvoreServer = {{ arvore|tojson }};
+
+function _propagarParaFilhos(li, checked) {
+    li.querySelectorAll(':scope > ul .chk-node').forEach(c => { c.checked = checked; });
+}
+function _atualizarPais(li) {
+    let parentLi = li.parentElement && li.parentElement.closest('li');
+    while (parentLi) {
+        const filhosCk = parentLi.querySelectorAll(':scope > ul > li > .node-label > .chk-node');
+        const algumMarcado = Array.from(filhosCk).some(c => c.checked);
+        const ck = parentLi.querySelector(':scope > .node-label > .chk-node');
+        if (ck) ck.checked = algumMarcado;
+        parentLi = parentLi.parentElement && parentLi.parentElement.closest('li');
+    }
+}
+function _atualizarRaiz(card) {
+    const raiz = card.querySelector('.chk-raiz');
+    if (!raiz) return;
+    const filhos = card.querySelectorAll('ul.cron-tree .chk-node');
+    if (filhos.length === 0) return;
+    raiz.checked = Array.from(filhos).some(c => c.checked);
+}
+
+function _recalcular() {
+    let totMarcados = 0;
+    let totHoras = 0;
+    let foldersFallback = 0;
+    document.querySelectorAll('.tree-card').forEach(card => {
+        if (card.classList.contains('no-template')) return;
+        const folhas = card.querySelectorAll('li.node-sub');
+        folhas.forEach(li => {
+            const ck = li.querySelector(':scope > .node-label > .chk-node');
+            const inpH = li.querySelector(':scope > .node-label > .inline-edit > .inp-horas');
+            const inpD = li.querySelector(':scope > .node-label > .inline-edit > .inp-dias');
+            const warn = li.querySelector(':scope > .node-label > .inline-edit > .badge-warn-zero');
+            const horas = inpH ? parseFloat(inpH.value || '0') : parseFloat(li.dataset.horas || '0');
+            const dias  = inpD ? parseInt(inpD.value || '1', 10) : parseInt(li.dataset.dias || '1', 10);
+            li.dataset.horas = String(horas);
+            li.dataset.dias = String(dias);
+            const checked = ck && ck.checked;
+            const semHoras = (horas <= 0);
+            if (warn) warn.style.display = (checked && semHoras) ? 'inline-block' : 'none';
+            if (checked) {
+                totMarcados += 1;
+                totHoras += horas;
+                if (semHoras) foldersFallback += 1;
+            }
+        });
+    });
+    document.getElementById('totMarcados').textContent = totMarcados;
+    document.getElementById('totHoras').textContent = totHoras.toFixed(1);
+    const alerta = document.getElementById('fallbackAlert');
+    document.getElementById('fallbackCount').textContent = foldersFallback;
+    alerta.style.display = foldersFallback > 0 ? 'block' : 'none';
+}
+
+document.querySelectorAll('.chk-node').forEach(ck => {
+    ck.addEventListener('change', e => {
+        const li = e.target.closest('li');
+        _propagarParaFilhos(li, e.target.checked);
+        _atualizarPais(li);
+        const card = e.target.closest('.tree-card');
+        _atualizarRaiz(card);
+        _recalcular();
+    });
+});
+document.querySelectorAll('.chk-raiz').forEach(ck => {
+    ck.addEventListener('change', e => {
+        const card = e.target.closest('.tree-card');
+        const ckAll = card.querySelectorAll('.chk-node');
+        ckAll.forEach(c => { c.checked = e.target.checked; });
+        _recalcular();
+    });
+});
+document.querySelectorAll('.inp-horas, .inp-dias').forEach(inp => {
+    inp.addEventListener('input', _recalcular);
+});
+
+function _serializeNode(card, originalNode, liElement) {
+    const ck = liElement && liElement.querySelector(':scope > .node-label > .chk-node');
+    const marcado = ck ? ck.checked : !!originalNode.marcado;
+    const inpH = liElement && liElement.querySelector(':scope > .node-label > .inline-edit > .inp-horas');
+    const inpD = liElement && liElement.querySelector(':scope > .node-label > .inline-edit > .inp-dias');
+    const horasEditadas = inpH ? parseFloat(inpH.value || '0') : originalNode.horas_estimadas;
+    const diasEditados  = inpD ? parseInt(inpD.value || '1', 10) : originalNode.duracao_dias;
+    const filhosOriginais = originalNode.filhos || [];
+    const filhosLi = liElement
+        ? Array.from(liElement.querySelectorAll(':scope > ul > li'))
+        : [];
+    const filhosOut = filhosOriginais.map((fo, idx) =>
+        _serializeNode(card, fo, filhosLi[idx])
+    );
+    return {
+        tipo: originalNode.tipo,
+        nome: originalNode.nome,
+        subatividade_mestre_id: originalNode.subatividade_mestre_id,
+        duracao_dias: filhosOut.length ? originalNode.duracao_dias : diasEditados,
+        horas_estimadas: filhosOut.length ? originalNode.horas_estimadas : horasEditadas,
+        quantidade_prevista: originalNode.quantidade_prevista,
+        unidade_medida: originalNode.unidade_medida,
+        responsavel: originalNode.responsavel,
+        marcado: marcado,
+        filhos: filhosOut,
+    };
+}
+
+function _construirArvoreFinal() {
+    const cards = document.querySelectorAll('.tree-card');
+    return arvoreServer.map((item, idx) => {
+        const card = cards[idx];
+        const raiz = card.querySelector('.chk-raiz');
+        const marcadoRaiz = raiz ? raiz.checked : !!item.marcado;
+        const liRoots = card.querySelectorAll(':scope > ul.cron-tree > li');
+        const filhosOriginais = item.filhos || [];
+        const filhosOut = filhosOriginais.map((fo, j) =>
+            _serializeNode(card, fo, liRoots[j])
+        );
+        return {
+            proposta_item_id: item.proposta_item_id,
+            servico_id: item.servico_id,
+            servico_nome: item.servico_nome,
+            template_id: item.template_id,
+            template_nome: item.template_nome,
+            sem_template: item.sem_template,
+            horas_totais_estimadas: item.horas_totais_estimadas,
+            marcado: marcadoRaiz,
+            filhos: filhosOut,
+        };
+    });
+}
+
+document.getElementById('formConfirmar').addEventListener('submit', function(ev) {
+    document.getElementById('cronogramaJson').value = JSON.stringify(_construirArvoreFinal());
+});
+
+_recalcular();
+</script>
+{% endblock %}

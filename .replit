@@ -44,6 +44,10 @@ args = "test-rdo-unificado-responsaveis"
 task = "workflow.run"
 args = "test-clausulas-configuraveis"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-cronograma-revisao-obra-gate"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -118,6 +122,14 @@ args = "python tests/test_clausulas_configuraveis.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "test-cronograma-revisao-obra-gate"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_cronograma_revisao_obra_gate.py"
 
 [[ports]]
 localPort = 5000

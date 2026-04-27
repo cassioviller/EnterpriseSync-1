@@ -3838,6 +3838,7 @@ def executar_migracoes():
             (137, "Task #176/#178 — backfill obras órfãs + DROP legacy cliente_*/engenheiro_* + obra.cliente_id NOT NULL", migration_137_drop_legacy_cliente_e_engenheiro),
             (138, "Task #162 — scrub de defaults legados em proposta_templates (Lucas Barbosa / São José dos Campos)", migration_138_scrub_proposta_templates_defaults),
             (139, "Task #142 — rdo_apontamento_cronograma.percentual_planejado nullable + backfill NULL para tarefas sem plano", migration_139_apontamento_cronograma_planejado_nullable),
+            (140, "Task #200 — obra.cronograma_revisado_em (gate de revisão inicial de cronograma)", migration_140_obra_cronograma_revisado_em),
         ]
         
         # Executar cada migração com rastreamento
@@ -11620,6 +11621,63 @@ def migration_139_apontamento_cronograma_planejado_nullable():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 139: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_140_obra_cronograma_revisado_em():
+    """Migration 140 (Task #200): adiciona `obra.cronograma_revisado_em TIMESTAMP NULL`.
+
+    Marca de "obra já passou pela tela de revisão de cronograma" — usada
+    pelo gate em `views/obras.py:detalhes_obra` para decidir se redireciona
+    o admin para a tela de revisão inicial. Idempotente.
+
+    Backfill: obras que JÁ TÊM tarefas de cronograma materializadas via
+    proposta (via `tarefa_cronograma.gerada_por_proposta_item_id IS NOT NULL`)
+    são marcadas como já revisadas em `created_at` para que NÃO entrem no
+    gate retroativamente — o cronograma delas já foi revisado/gerado pelo
+    fluxo antigo (snapshot na proposta).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            ALTER TABLE obra
+                ADD COLUMN IF NOT EXISTS cronograma_revisado_em TIMESTAMP NULL
+        """)
+
+        # Backfill: obras com tarefas geradas por proposta já são "revisadas"
+        # (sob o fluxo antigo). Não devem cair no gate retroativamente.
+        cursor.execute("""
+            UPDATE obra o
+               SET cronograma_revisado_em = COALESCE(o.created_at, NOW())
+             WHERE o.cronograma_revisado_em IS NULL
+               AND EXISTS (
+                    SELECT 1 FROM tarefa_cronograma t
+                     WHERE t.obra_id = o.id
+                       AND t.gerada_por_proposta_item_id IS NOT NULL
+               )
+        """)
+        backfilled = cursor.rowcount or 0
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 140 CONCLUIDA: obra.cronograma_revisado_em criada; "
+            "backfill obras_com_cronograma_existente=%s",
+            backfilled,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 140: {e}")
         if connection:
             try:
                 connection.rollback()

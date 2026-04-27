@@ -113,9 +113,18 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         data_aprovacao = date.today()
 
     def _materializar_cronograma_se_houver():
-        """Materializa cronograma se proposta tem obra + snapshot revisado."""
-        from models import Proposta as _Proposta
+        """Materializa cronograma se proposta tem obra + snapshot revisado.
+
+        Task #200: quando o admin pré-configurou `cronograma_default_json`
+        ANTES da aprovação, a obra nasce com cronograma materializado E
+        marcada como revisada (`cronograma_revisado_em = NOW()`), pulando
+        o gate de revisão inicial. Quando NÃO há snapshot, a obra fica
+        com `cronograma_revisado_em = NULL` e cai no gate na primeira
+        visita aos detalhes.
+        """
+        from models import Proposta as _Proposta, Obra as _Obra
         from services.cronograma_proposta import materializar_cronograma
+        from datetime import datetime as _dt
         _proposta_obj = _Proposta.query.filter_by(
             id=proposta_id, admin_id=admin_id
         ).first()
@@ -124,10 +133,19 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
                 _proposta_obj, admin_id, _proposta_obj.obra_id,
                 arvore_marcada=_proposta_obj.cronograma_default_json,
             )
+            # Task #200: obra nasce já revisada (admin pré-configurou).
+            obra_obj = _Obra.query.filter_by(id=_proposta_obj.obra_id).first()
+            if obra_obj and obra_obj.cronograma_revisado_em is None:
+                obra_obj.cronograma_revisado_em = _dt.utcnow()
+                logger.info(
+                    f"#200: obra {obra_obj.id} marcada como cronograma_revisado_em "
+                    f"(materializada via snapshot da proposta {proposta_id})"
+                )
         elif _proposta_obj and _proposta_obj.obra_id:
             logger.info(
-                f"#102: proposta {proposta_id} aprovada SEM cronograma_default_json — "
-                "obra criada em estado 'cronograma pendente'."
+                f"#102/#200: proposta {proposta_id} aprovada SEM cronograma_default_json — "
+                "obra criada em estado 'cronograma pendente'; gate de revisão inicial "
+                "será disparado na primeira visita ao detalhe da obra."
             )
 
     # Task #94: lançamento contábil só faz sentido para valor > 0.
