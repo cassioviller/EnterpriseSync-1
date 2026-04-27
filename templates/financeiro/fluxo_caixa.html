@@ -457,7 +457,7 @@ function saveEdit(td) {
                     }
                 } else if (f === 'valor') {
                     var isEntrada = !!row.querySelector('.badge.bg-success');
-                    s.textContent = (isEntrada ? '+' : '-') + ' R$ ' + parseFloat(data.valor).toFixed(2) + ' ';
+                    s.textContent = (isEntrada ? '+' : '-') + ' R$ ' + Number(data.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ';
                     s.appendChild(pencil);
                     var ci2 = c.querySelector('.cell-input');
                     if (ci2) {

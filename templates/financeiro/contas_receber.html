@@ -230,7 +230,7 @@
                 <input type="hidden" name="conta_id" id="baixa_conta_id">
                 <div class="modal-body">
                     <p><strong>Conta:</strong> <span id="baixa_descricao"></span></p>
-                    <p><strong>Saldo:</strong> R$ <span id="baixa_saldo">0.00</span></p>
+                    <p><strong>Saldo:</strong> R$ <span id="baixa_saldo">0,00</span></p>
                     
                     <div class="mb-3">
                         <label class="form-label">Valor a Receber *</label>
@@ -276,9 +276,9 @@
 function abrirModalBaixa(contaId, descricao, saldo) {
     document.getElementById('baixa_conta_id').value = contaId;
     document.getElementById('baixa_descricao').textContent = descricao;
-    document.getElementById('baixa_saldo').textContent = saldo.toFixed(2);
-    document.getElementById('baixa_valor').value = saldo.toFixed(2);
-    document.getElementById('baixa_valor').max = saldo.toFixed(2);
+    document.getElementById('baixa_saldo').textContent = Number(saldo).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('baixa_valor').value = Number(saldo).toFixed(2);
+    document.getElementById('baixa_valor').max = Number(saldo).toFixed(2);
     // Atualizar action do formulário com conta_id
     document.getElementById('formBaixaRecebimento').action = `/financeiro/contas-receber/${contaId}/receber`;
     new bootstrap.Modal(document.getElementById('modalBaixaRecebimento')).show();

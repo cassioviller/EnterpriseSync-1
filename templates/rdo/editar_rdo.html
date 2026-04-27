@@ -395,6 +395,51 @@
                 </div>
             </div>
 
+            <!-- Task #150 — Modal: Lista de apontamentos de Subempreitada por Tarefa (EDIÇÃO) -->
+            <div class="modal fade" id="modalListaSubempreitadaEdit" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg">
+                  <div class="modal-header text-white" style="background:linear-gradient(135deg,#7e3ff2 0%,#5b29b8 100%)">
+                    <h5 class="modal-title">
+                      <i class="fas fa-hammer me-2"></i>
+                      Apontamentos — <span id="listaSubTituloEdit">Tarefa</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body p-0">
+                    <div id="listaSubVazioEdit" class="text-center p-4 text-muted d-none">
+                      <i class="fas fa-hammer fa-2x mb-2 opacity-50"></i><br>
+                      Nenhum apontamento ainda para esta tarefa.
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm table-hover mb-0" id="tabelaListaSubEdit">
+                        <thead class="table-light">
+                          <tr>
+                            <th>Subempreiteiro</th>
+                            <th class="text-end">Pessoas</th>
+                            <th class="text-end">Horas</th>
+                            <th class="text-end">Quantidade</th>
+                            <th class="text-end">HH</th>
+                            <th class="text-end">Produt.</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody id="bodyListaSubEdit"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary"
+                            style="background:#7e3ff2;border-color:#7e3ff2"
+                            id="btnNovoApontamentoListaEdit">
+                      <i class="fas fa-plus"></i> Novo apontamento
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- ── Modal: Apontamento de Subempreitada ── -->
             <div class="modal fade" id="modalSubempreitada" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1189,6 +1234,23 @@ async function carregarTarefasRDOEdit() {
 // Estado dos pais expandidos (mantido entre re-renderizações)
 const _rdoV2EditPaisExpandidos = new Set();
 
+// Task #151 — confirmar reversão de uma tarefa Terceiros antes de desmarcar.
+// Quando o estado anterior era "concluído" e o usuário desmarca, pedir confirmação;
+// se cancelar, restaurar o checkbox.
+function confirmarReverterTerceiros(ev) {
+    const cb = ev && ev.target;
+    if (!cb) return;
+    const prev = cb.dataset.prevChecked === '1';
+    const now = !!cb.checked;
+    if (prev && !now) {
+        if (!confirm('Reverter esta entrega para PENDENTE? A data de entrega será apagada.')) {
+            cb.checked = true;
+            return;
+        }
+    }
+    cb.dataset.prevChecked = now ? '1' : '0';
+}
+
 // Task #149 — badge de responsável (Empresa | Subempreitada | Terceiros)
 function _rdoBadgeResponsavelEdit(resp) {
     const r = (resp || 'empresa').toLowerCase();
@@ -1241,6 +1303,8 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
                          name="entrega_tarefa_ids[]" value="${t.id}"
                          form="formEditarRDO"
                          ${concluido ? 'checked' : ''}
+                         data-prev-checked="${concluido ? '1' : '0'}"
+                         onchange="confirmarReverterTerceiros(event)"
                          style="transform:scale(1.2)">
                   <label class="form-check-label small fw-semibold ms-1" for="chk_terc_edit_${t.id}">
                     Concluído
@@ -1248,13 +1312,21 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
                 </div>
               </div>`;
         } else if (isSub) {
+            const apontados = (_subEditAptsByTarefa && _subEditAptsByTarefa[t.id])
+                ? _subEditAptsByTarefa[t.id].length : 0;
             acaoInner = `
               <div class="d-flex align-items-center gap-1" onclick="event.stopPropagation()">
                 ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
-                <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 px-2"
+                <button type="button"
+                        class="btn btn-sm ${apontados > 0 ? 'btn-primary' : 'btn-outline-secondary'} d-flex align-items-center gap-1 px-2"
+                        id="btn-equipe-edit-${t.id}"
                         onclick="event.stopPropagation(); abrirEquipeSubempreitadaEdit(${t.id}, '${nomeTarefaEsc}')"
-                        title="Apontar equipe de subempreitada">
+                        title="Novo apontamento de subempreitada">
                   <i class="fas fa-hammer"></i>
+                  <span class="badge rounded-pill bg-light text-dark ms-1" id="badge-equipe-edit-${t.id}"
+                        onclick="event.stopPropagation(); abrirListaSubempreitadaEdit(${t.id}, '${nomeTarefaEsc}')"
+                        title="Ver/editar apontamentos desta tarefa"
+                        style="${apontados > 0 ? '' : 'display:none'};font-size:.7rem;cursor:pointer">${apontados}</span>
                 </button>
               </div>`;
         } else {
@@ -1463,6 +1535,24 @@ async function carregarSubempreiteirosCombo() {
     } catch (e) { console.error(e); }
 }
 
+// Task #150 — cache de apontamentos sub agrupado por tarefa, usado para badge inline
+let _subEditAptsByTarefa = {};
+
+function _atualizarBadgeSubEdit(tarefaId) {
+    const lst = _subEditAptsByTarefa[tarefaId] || [];
+    const n = lst.length;
+    const badge = document.getElementById(`badge-equipe-edit-${tarefaId}`);
+    const btn = document.getElementById(`btn-equipe-edit-${tarefaId}`);
+    if (badge) {
+        badge.textContent = n;
+        badge.style.display = n > 0 ? '' : 'none';
+    }
+    if (btn) {
+        btn.classList.toggle('btn-primary', n > 0);
+        btn.classList.toggle('btn-outline-secondary', n === 0);
+    }
+}
+
 async function carregarSubempreitadaList() {
     try {
         const r = await fetch(`/cronograma/rdo/${rdoId}/apontamentos-subempreitada`);
@@ -1474,6 +1564,27 @@ async function carregarSubempreitadaList() {
         const tarefasMap = {};
         (window.__tarefasRDOAll || []).forEach(t => tarefasMap[t.id] = t);
         const apts = j.apontamentos || [];
+
+        // Atualizar cache + badges inline (Task #150) e cache global por id
+        const novoCache = {};
+        const novoCacheById = {};
+        apts.forEach(a => {
+            const tid = a.tarefa_cronograma_id;
+            (novoCache[tid] = novoCache[tid] || []).push(a);
+            novoCacheById[a.id] = a;
+        });
+        const idsAfetadas = new Set([
+            ...Object.keys(_subEditAptsByTarefa).map(Number),
+            ...Object.keys(novoCache).map(Number),
+        ]);
+        _subEditAptsByTarefa = novoCache;
+        window._subAptsCacheById = novoCacheById;
+        idsAfetadas.forEach(_atualizarBadgeSubEdit);
+        // Re-render lista do popover se estiver aberto
+        if (_subListaTarefaCtxEdit && _subListaTarefaCtxEdit.tarefaId) {
+            _renderListaSubempreitadaEdit();
+        }
+
         if (!apts.length) {
             empty?.classList.remove('d-none');
             tabela?.classList.add('d-none');
@@ -1495,7 +1606,7 @@ async function carregarSubempreitadaList() {
                 <td class="text-end">${hh.toFixed(1)}</td>
                 <td class="text-end">${prod}</td>
                 <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick='editarSubempreitada(${JSON.stringify(a)})'><i class="fas fa-edit"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="editarSubempreitadaPorId(${a.id})"><i class="fas fa-edit"></i></button>
                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirSubempreitada(${a.id})"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>`;
@@ -1511,6 +1622,87 @@ function _popularSubModalCombos() {
     const selS = document.getElementById('sub_subempreiteiro_id');
     selS.innerHTML = '<option value="">— Selecione —</option>' +
         _subCacheLista.map(s => `<option value="${s.id}">${s.nome}${s.especialidade ? ' — '+s.especialidade : ''}</option>`).join('');
+}
+
+// Task #150 — Lista inline (popover) de apontamentos de subempreitada por tarefa (EDIÇÃO)
+let _subListaTarefaCtxEdit = { tarefaId: null, nome: '' };
+
+async function abrirListaSubempreitadaEdit(tarefaId, nomeTarefa) {
+    _subListaTarefaCtxEdit = { tarefaId, nome: nomeTarefa || '' };
+    if (!_subCacheLista || !_subCacheLista.length) {
+        await carregarSubempreiteirosCombo();
+    }
+    const titulo = document.getElementById('listaSubTituloEdit');
+    if (titulo) titulo.textContent = nomeTarefa || 'Tarefa';
+    _renderListaSubempreitadaEdit();
+    const modalEl = document.getElementById('modalListaSubempreitadaEdit');
+    new bootstrap.Modal(modalEl).show();
+    const btnNovo = document.getElementById('btnNovoApontamentoListaEdit');
+    if (btnNovo) {
+        btnNovo.onclick = () => {
+            bootstrap.Modal.getInstance(modalEl)?.hide();
+            abrirEquipeSubempreitadaEdit(tarefaId, nomeTarefa);
+        };
+    }
+}
+
+function _renderListaSubempreitadaEdit() {
+    const { tarefaId } = _subListaTarefaCtxEdit;
+    if (!tarefaId) return;
+    const tbody = document.getElementById('bodyListaSubEdit');
+    const vazio = document.getElementById('listaSubVazioEdit');
+    const tabela = document.getElementById('tabelaListaSubEdit');
+    if (!tbody) return;
+    const tarefa = (window.__tarefasRDOAll || []).find(x => x.id === tarefaId) || {};
+    const unidade = tarefa.unidade_medida || '';
+    const apts = _subEditAptsByTarefa[tarefaId] || [];
+    if (!apts.length) {
+        vazio?.classList.remove('d-none');
+        tabela?.classList.add('d-none');
+        tbody.innerHTML = '';
+        return;
+    }
+    vazio?.classList.add('d-none');
+    tabela?.classList.remove('d-none');
+    tbody.innerHTML = apts.map(a => {
+        const hh = (a.qtd_pessoas || 0) * (a.horas_trabalhadas || 0);
+        const prod = hh > 0 ? ((a.quantidade_produzida || 0) / hh).toFixed(3) : '—';
+        return `<tr>
+            <td><small>${a.subempreiteiro_nome || '—'}</small></td>
+            <td class="text-end">${a.qtd_pessoas || 0}</td>
+            <td class="text-end">${(a.horas_trabalhadas || 0).toFixed(1)}</td>
+            <td class="text-end">${(a.quantidade_produzida || 0).toFixed(2)} ${unidade}</td>
+            <td class="text-end">${hh.toFixed(1)}</td>
+            <td class="text-end">${prod}</td>
+            <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="_editarSubempreitadaInlinePorId(${a.id})" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="excluirSubempreitada(${a.id})" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function _editarSubempreitadaInline(apt) {
+    bootstrap.Modal.getInstance(document.getElementById('modalListaSubempreitadaEdit'))?.hide();
+    editarSubempreitada(apt);
+}
+
+function _editarSubempreitadaInlinePorId(id) {
+    const apt = (window._subAptsCacheById || {})[id];
+    if (!apt) { alert('Apontamento não encontrado.'); return; }
+    _editarSubempreitadaInline(apt);
+}
+
+function editarSubempreitadaPorId(id) {
+    const apt = (window._subAptsCacheById || {})[id];
+    if (!apt) { alert('Apontamento não encontrado.'); return; }
+    editarSubempreitada(apt);
 }
 
 // Task #149 — abrir modal sub diretamente pela linha da tarefa (pré-seleciona)

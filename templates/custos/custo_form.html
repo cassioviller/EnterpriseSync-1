@@ -54,9 +54,16 @@
                     <!-- Valor -->
                     <div class="col-md-4">
                         <label class="form-label">Valor (R$) *</label>
-                        <input type="number" step="0.01" name="valor" class="form-control" 
-                               value="{{ custo.valor if custo else '' }}" 
-                               placeholder="0.00" required>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" step="0.01" min="0" name="valor" class="form-control"
+                                   inputmode="decimal"
+                                   value="{{ custo.valor if custo else '' }}"
+                                   placeholder="0,00" required>
+                        </div>
+                        {% if custo and custo.valor is not none %}
+                        <small class="form-text text-muted">Valor atual: {{ custo.valor|brl }}</small>
+                        {% endif %}
                     </div>
 
                     <!-- Data -->

@@ -80,7 +80,7 @@
                                 Total de Custos
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "{:,.2f}".format(total_custos or 0) }}
+                                {{ (total_custos or 0)|brl }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -144,7 +144,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ custo.descricao }}</td>
-                            <td class="text-end font-weight-bold">R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                            <td class="text-end font-weight-bold">{{ custo.valor|brl }}</td>
                             <td class="text-center">
                                 <a href="{{ url_for('custos.editar_custo', custo_id=custo.id) }}" 
                                    class="btn btn-sm btn-outline-primary" title="Editar">
@@ -171,7 +171,7 @@
                                         <p>Tem certeza que deseja deletar este custo?</p>
                                         <div class="alert alert-warning">
                                             <strong>{{ custo.descricao }}</strong><br>
-                                            Valor: R$ {{ "{:,.2f}".format(custo.valor) }}<br>
+                                            Valor: {{ custo.valor|brl }}<br>
                                             Data: {{ custo.data.strftime('%d/%m/%Y') }}
                                         </div>
                                         <p class="text-danger"><strong>Esta ação não pode ser desfeita!</strong></p>

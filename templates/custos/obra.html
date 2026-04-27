@@ -17,7 +17,7 @@
             <div class="card bg-primary text-white shadow">
                 <div class="card-body">
                     <div class="text-white-50 small">Valor do Contrato</div>
-                    <div class="h4">R$ {{ "{:,.2f}".format(obra.valor_contrato or 0) }}</div>
+                    <div class="h4">{{ (obra.valor_contrato or 0)|brl }}</div>
                 </div>
             </div>
         </div>
@@ -25,7 +25,7 @@
             <div class="card bg-danger text-white shadow">
                 <div class="card-body">
                     <div class="text-white-50 small">Total de Custos</div>
-                    <div class="h4">R$ {{ "{:,.2f}".format(total_geral) }}</div>
+                    <div class="h4">{{ total_geral|brl }}</div>
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
             </h6>
             <div class="dropdown no-arrow">
                 <span class="badge badge-primary badge-pill">
-                    {{ dados.quantidade }} lançamentos - R$ {{ "{:,.2f}".format(dados.total) }}
+                    {{ dados.quantidade }} lançamentos - {{ dados.total|brl }}
                 </span>
             </div>
         </div>
@@ -86,8 +86,8 @@
                                 {% endif %}
                             </td>
                             <td>{{ custo.quantidade or 1 }}</td>
-                            <td>R$ {{ "{:,.2f}".format(custo.valor_unitario or custo.valor) }}</td>
-                            <td>R$ {{ "{:,.2f}".format(custo.valor) }}</td>
+                            <td>{{ (custo.valor_unitario or custo.valor)|brl }}</td>
+                            <td>{{ custo.valor|brl }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

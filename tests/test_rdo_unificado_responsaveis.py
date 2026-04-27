@@ -317,6 +317,89 @@ class RDOUnificadoRunner:
         )
 
     # ──────────────────────────────────────────────────────────────────
+    # S5 — Task #150: editar e excluir apontamento de subempreitada via API
+    # ──────────────────────────────────────────────────────────────────
+    def teste_subempreitada_edit_delete(self):
+        rdo_id = getattr(self, '_rdo_id', None)
+        if not rdo_id:
+            self._assert(False, 'S5 — RDO inexistente para teste de edição/exclusão sub')
+            return
+
+        # Lista inicial: deve ter ao menos 1 apontamento da etapa S2
+        r = self._http('S5 listar apt sub', 'GET',
+                       f'/cronograma/rdo/{rdo_id}/apontamentos-subempreitada')
+        self._assert(r.status_code == 200,
+                     f'S5a — GET apontamentos-subempreitada (status={r.status_code})')
+        body = r.get_json() or {}
+        apts = body.get('apontamentos', [])
+        self._assert(len(apts) >= 1,
+                     f'S5b — lista inicial contém apontamento (n={len(apts)})',
+                     evidencia=apts)
+        if not apts:
+            return
+        apt0 = apts[0]
+        apt_id = apt0['id']
+
+        # Editar (PUT-like via POST /apontar-subempreitada com id) — altera qtd_pessoas
+        nova_qtd_pessoas = (apt0.get('qtd_pessoas') or 0) + 2
+        novas_horas = 6.5
+        nova_prod = 200.0
+        r = self._http('S5 editar apt sub', 'POST',
+                       f'/cronograma/rdo/{rdo_id}/apontar-subempreitada',
+                       json={
+                           'id': apt_id,
+                           'tarefa_cronograma_id': self.tarefa_sub.id,
+                           'subempreiteiro_id': self.subempreiteiro.id,
+                           'qtd_pessoas': nova_qtd_pessoas,
+                           'horas_trabalhadas': novas_horas,
+                           'quantidade_produzida': nova_prod,
+                           'observacoes': 'Editado via teste #150',
+                       })
+        self._assert(r.status_code == 200,
+                     f'S5c — POST editar apontamento (status={r.status_code})')
+        edited = (r.get_json() or {}).get('apontamento') or {}
+        self._assert(
+            edited.get('qtd_pessoas') == nova_qtd_pessoas
+            and float(edited.get('horas_trabalhadas') or 0) == novas_horas
+            and float(edited.get('quantidade_produzida') or 0) == nova_prod
+            and (edited.get('observacoes') or '') == 'Editado via teste #150',
+            'S5d — apontamento retornado reflete a edição',
+            evidencia=edited,
+        )
+
+        # Releitura via GET — confere que persistiu no banco
+        r = self._http('S5 relistar apt sub pós-edit', 'GET',
+                       f'/cronograma/rdo/{rdo_id}/apontamentos-subempreitada')
+        body = r.get_json() or {}
+        apts_after_edit = body.get('apontamentos', [])
+        match = next((a for a in apts_after_edit if a['id'] == apt_id), None)
+        self._assert(
+            match is not None
+            and match.get('qtd_pessoas') == nova_qtd_pessoas
+            and float(match.get('quantidade_produzida') or 0) == nova_prod,
+            'S5e — releitura via GET confirma edição persistida',
+            evidencia=match,
+        )
+
+        # Excluir (DELETE)
+        r = self._http('S5 excluir apt sub', 'DELETE',
+                       f'/cronograma/rdo/apontamento-subempreitada/{apt_id}')
+        self._assert(r.status_code == 200,
+                     f'S5f — DELETE apontamento (status={r.status_code})')
+
+        # Releitura final: o id excluído não deve mais aparecer
+        r = self._http('S5 relistar apt sub pós-delete', 'GET',
+                       f'/cronograma/rdo/{rdo_id}/apontamentos-subempreitada')
+        body = r.get_json() or {}
+        apts_after_del = body.get('apontamentos', [])
+        ids_apos = [a['id'] for a in apts_after_del]
+        self._assert(
+            apt_id not in ids_apos,
+            f'S5g — apontamento {apt_id} não consta após DELETE (restantes={ids_apos})',
+            evidencia=apts_after_del,
+        )
+
+    # ──────────────────────────────────────────────────────────────────
     def gravar_relatorio(self):
         os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
         self.report['terminado_em'] = datetime.utcnow().isoformat() + 'Z'
@@ -331,6 +414,7 @@ class RDOUnificadoRunner:
             try:
                 self.setup()
                 self.teste_post_unificado_3_responsaveis()
+                self.teste_subempreitada_edit_delete()
                 self.teste_terceiros_toggle_reverso()
             except Exception as e:
                 logger.exception('Erro fatal no runner')

@@ -87,7 +87,7 @@
                                 Total do Mês Atual
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "{:,.2f}".format(total_mes_atual) }}
+                                {{ total_mes_atual|brl }}
                             </div>
                             {% if variacao_percentual >= 0 %}
                                 <div class="text-xs text-success mt-1">
@@ -117,7 +117,7 @@
                                 Total Geral de Custos
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "{:,.2f}".format(total_custos) }}
+                                {{ total_custos|brl }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -159,7 +159,7 @@
                                 Custo Médio/Obra
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                R$ {{ "{:,.2f}".format(total_custos / obras_com_custos if obras_com_custos > 0 else 0) }}
+                                {{ ((total_custos / obras_com_custos) if obras_com_custos > 0 else 0)|brl }}
                             </div>
                         </div>
                         <div class="col-auto">
@@ -242,7 +242,7 @@
                                 {% for obra in top_obras %}
                                 <tr>
                                     <td>{{ obra.nome }}</td>
-                                    <td>R$ {{ "{:,.2f}".format(obra.total_custos) }}</td>
+                                    <td>{{ obra.total_custos|brl }}</td>
                                     <td>
                                         <a href="{{ url_for('custos.custos_obra', obra_id=obra.id) }}" 
                                            class="btn btn-primary btn-sm">
