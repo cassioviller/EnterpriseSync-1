@@ -52,6 +52,10 @@ args = "test-cronograma-revisao-obra-gate"
 task = "workflow.run"
 args = "test-legacy-propostas-drop"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-compras-nova-dropdown"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -142,6 +146,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python tests/test_legacy_propostas_drop.py"
+
+[[workflows.workflow]]
+name = "test-compras-nova-dropdown"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_compras_nova_dropdown.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000

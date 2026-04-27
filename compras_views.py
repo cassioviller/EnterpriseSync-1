@@ -493,7 +493,27 @@ def nova_post():
     admin_id = _admin_id()
 
     try:
-        fornecedor_id = int(request.form.get('fornecedor_id'))
+        fornecedor_id_raw = request.form.get('fornecedor_id', '').strip()
+        if not fornecedor_id_raw:
+            flash('Selecione um fornecedor antes de salvar a compra. '
+                  'Se nenhum aparece no menu, cadastre o primeiro fornecedor.', 'danger')
+            return redirect(url_for('compras.nova'))
+        try:
+            fornecedor_id = int(fornecedor_id_raw)
+        except (TypeError, ValueError):
+            flash('Fornecedor inválido. Selecione um fornecedor pelo menu.', 'danger')
+            return redirect(url_for('compras.nova'))
+
+        # Defesa multi-tenant: garante que o fornecedor pertence ao admin logado
+        from models import Fornecedor as _Fornecedor
+        fornecedor_owner = _Fornecedor.query.filter_by(
+            id=fornecedor_id, admin_id=admin_id, ativo=True
+        ).first()
+        if not fornecedor_owner:
+            flash('Fornecedor não encontrado ou não pertence à sua conta. '
+                  'Selecione um fornecedor da lista.', 'danger')
+            return redirect(url_for('compras.nova'))
+
         data_compra = datetime.strptime(request.form.get('data_compra'), '%Y-%m-%d').date()
         condicao = request.form.get('condicao_pagamento', 'a_vista')
         parcelas = int(request.form.get('parcelas', 1))
@@ -501,7 +521,18 @@ def nova_post():
         observacoes = request.form.get('observacoes', '').strip() or None
         obra_id = request.form.get('obra_id') or None
         if obra_id:
-            obra_id = int(obra_id)
+            try:
+                obra_id = int(obra_id)
+            except (TypeError, ValueError):
+                flash('Obra inválida. Selecione uma obra pelo menu.', 'danger')
+                return redirect(url_for('compras.nova'))
+            # Defesa multi-tenant: garante que a obra pertence ao admin logado
+            from models import Obra as _Obra
+            obra_owner = _Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+            if not obra_owner:
+                flash('Obra não encontrada ou não pertence à sua conta. '
+                      'Selecione uma obra da lista.', 'danger')
+                return redirect(url_for('compras.nova'))
 
         # Tipo de compra: 'normal' (default) ou 'aprovacao_cliente'
         tipo_compra = request.form.get('tipo_compra', 'normal').strip()
