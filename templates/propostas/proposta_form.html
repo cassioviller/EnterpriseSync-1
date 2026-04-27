@@ -263,6 +263,10 @@
 
 {% block extra_js %}
 <script>
+// Task #181 — formatador pt-BR para R$.
+const _BRL_FMT_PF = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtBRL(n){ return 'R$ ' + _BRL_FMT_PF.format(Number(n) || 0); }
+
 let servicosData = @json([{
     'id': servico.id,
     'nome': servico.nome,
@@ -334,18 +338,19 @@ function recalcularLinha(row) {
     const preco = parseFloat(row.querySelector('.preco-input').value) || 0;
     const total = quantidade * preco;
     
-    row.querySelector('.valor-total-input').value = `R$ ${total.toFixed(2)}`;
+    row.querySelector('.valor-total-input').value = fmtBRL(total);
     recalcularTotal();
 }
 
 function recalcularTotal() {
     let totalGeral = 0;
     document.querySelectorAll('.valor-total-input').forEach(input => {
-        const valor = parseFloat(input.value.replace('R$ ', '').replace(',', '.')) || 0;
+        // Aceita "R$ 1.234,56" — remove "R$", espaços e pontos de milhar; troca vírgula por ponto.
+        const valor = parseFloat(input.value.replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
         totalGeral += valor;
     });
-    
-    document.getElementById('total-geral').textContent = `R$ ${totalGeral.toFixed(2)}`;
+
+    document.getElementById('total-geral').textContent = fmtBRL(totalGeral);
 }
 
 function serializarItensServicos() {

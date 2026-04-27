@@ -271,6 +271,10 @@
 </div>
 
 <script>
+// Task #181 — formatador pt-BR para R$.
+const _BRL_FMT_ED = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtBRL(n){ return 'R$ ' + _BRL_FMT_ED.format(Number(n) || 0); }
+
 function adicionarServico() {
     const container = document.getElementById('servicosContainer');
     const novoServico = document.createElement('div');
@@ -349,7 +353,7 @@ function calcularServico(input) {
     const valorUnitario = parseFloat(servicoItem.querySelector('.servico-valor-unitario').value) || 0;
     const total = quantidade * valorUnitario;
 
-    servicoItem.querySelector('.servico-total').value = 'R$ ' + total.toFixed(2).replace('.', ',');
+    servicoItem.querySelector('.servico-total').value = fmtBRL(total);
     calcularTotal();
 }
 
@@ -360,8 +364,7 @@ function calcularTotal() {
         const valorUnitario = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
         total += quantidade * valorUnitario;
     });
-    const fmt = (n) => 'R$ ' + Number(n||0).toFixed(2).replace('.', ',');
-    document.getElementById('totalProposta').textContent = fmt(total);
+    document.getElementById('totalProposta').textContent = fmtBRL(total);
 }
 
 // Calcular total inicial
@@ -461,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
         dl.innerHTML = lista.map(s => {
           const preco = (s.preco_venda != null ? s.preco_venda : (s.preco_venda_unitario || 0));
           const unidade = s.unidade || s.unidade_medida || 'un';
-          const label = `${s.id} — ${s.nome} (${unidade} | R$ ${Number(preco).toFixed(2)})`;
+          const label = `${s.id} — ${s.nome} (${unidade} | ${fmtBRL(preco)})`;
           return `<option value="${label.replace(/"/g,'&quot;')}"></option>`;
         }).join('');
       })

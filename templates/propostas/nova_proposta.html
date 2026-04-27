@@ -393,6 +393,10 @@
 </div>
 
 <script>
+// Task #181 — formatador pt-BR para R$.
+const _BRL_FMT_NP = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtBRL(n){ return 'R$ ' + _BRL_FMT_NP.format(Number(n) || 0); }
+
 function adicionarServico() {
     const container = document.getElementById('servicosContainer');
     const novoServico = container.firstElementChild.cloneNode(true);
@@ -435,7 +439,7 @@ function calcularServico(input) {
     const valorUnitario = parseFloat(servicoItem.querySelector('.servico-valor-unitario').value) || 0;
     const total = quantidade * valorUnitario;
 
-    servicoItem.querySelector('.servico-total').value = 'R$ ' + total.toFixed(2).replace('.', ',');
+    servicoItem.querySelector('.servico-total').value = fmtBRL(total);
     calcularTotal();
 }
 
@@ -477,8 +481,7 @@ function atualizarTotalGeral() {
         const v = parseFloat(item.querySelector('.servico-valor-unitario').value) || 0;
         total += q * v;
     });
-    const fmt = (n) => 'R$ ' + Number(n||0).toFixed(2).replace('.', ',');
-    const tEl = document.getElementById('totalProposta'); if (tEl) tEl.textContent = fmt(total);
+    const tEl = document.getElementById('totalProposta'); if (tEl) tEl.textContent = fmtBRL(total);
     const inputValor = document.querySelector('input[name="valor_total"]');
     if (inputValor) inputValor.value = total.toFixed(2);
 }
@@ -560,7 +563,7 @@ function limparServicos() {
         dl.innerHTML = lista.map(s => {
           const preco = (s.preco_venda != null ? s.preco_venda : (s.preco_venda_unitario || 0));
           const unidade = s.unidade || s.unidade_medida || 'un';
-          const label = `${s.id} — ${s.nome} (${unidade} | R$ ${Number(preco).toFixed(2)})`;
+          const label = `${s.id} — ${s.nome} (${unidade} | ${fmtBRL(preco)})`;
           return `<option value="${label.replace(/"/g,'&quot;')}"></option>`;
         }).join('');
         console.log('[Catálogo] ' + lista.length + ' serviços carregados.');

@@ -14,16 +14,16 @@
     </div></div></div>
     <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
       <div class="small text-muted">Custo médio realizado / unidade</div>
-      <div class="h5 mb-0 text-primary">{% if medias.custo_medio_realizado_por_unidade is not none %}R$ {{ '%.2f'|format(medias.custo_medio_realizado_por_unidade) }}{% else %}—{% endif %}</div>
+      <div class="h5 mb-0 text-primary">{% if medias.custo_medio_realizado_por_unidade is not none %}{{ medias.custo_medio_realizado_por_unidade|brl }}{% else %}—{% endif %}</div>
     </div></div></div>
     <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
       <div class="small text-muted">Realizado médio / obra</div>
-      <div class="h5 mb-0">R$ {{ '%.2f'|format(medias.realizado_medio_por_obra) }}</div>
+      <div class="h5 mb-0">{{ medias.realizado_medio_por_obra|brl }}</div>
     </div></div></div>
     <div class="col-md-3"><div class="card border-0 bg-light"><div class="card-body py-2">
       <div class="small text-muted">Δ Realizado vs Orçado (global)</div>
       <div class="h5 mb-0 {% if medias.delta_pct_global is not none and medias.delta_pct_global > 0 %}text-danger{% elif medias.delta_pct_global is not none %}text-success{% endif %}">
-        {% if medias.delta_pct_global is not none %}{{ '%+.1f'|format(medias.delta_pct_global) }}%{% else %}—{% endif %}
+        {% if medias.delta_pct_global is not none %}{% if medias.delta_pct_global > 0 %}+{% endif %}{{ medias.delta_pct_global|num(1) }}%{% else %}—{% endif %}
       </div>
     </div></div></div>
   </div>
@@ -47,15 +47,15 @@
           {% for l in linhas %}
           <tr>
             <td>{{ l.obra.nome if l.obra else '—' }}</td>
-            <td class="text-end">{{ '%.2f'|format(l.quantidade) if l.quantidade else '—' }}</td>
-            <td class="text-end">{{ '%.2f'|format(l.orcado) }}</td>
-            <td class="text-end text-dark"><strong>{{ '%.2f'|format(l.realizado) }}</strong></td>
-            <td class="text-end">{% if l.custo_unitario_realizado is not none %}{{ '%.2f'|format(l.custo_unitario_realizado) }}{% else %}—{% endif %}</td>
+            <td class="text-end">{{ l.quantidade|num(2) if l.quantidade else '—' }}</td>
+            <td class="text-end">{{ l.orcado|num(2) }}</td>
+            <td class="text-end text-dark"><strong>{{ l.realizado|num(2) }}</strong></td>
+            <td class="text-end">{% if l.custo_unitario_realizado is not none %}{{ l.custo_unitario_realizado|num(2) }}{% else %}—{% endif %}</td>
             <td class="text-end {% if l.delta_pct is not none and l.delta_pct > 0 %}text-danger{% elif l.delta_pct is not none %}text-success{% endif %}">
-              {% if l.delta_pct is not none %}{{ '%+.1f'|format(l.delta_pct) }}%{% else %}—{% endif %}
+              {% if l.delta_pct is not none %}{% if l.delta_pct > 0 %}+{% endif %}{{ l.delta_pct|num(1) }}%{% else %}—{% endif %}
             </td>
             <td class="text-end">
-              {% if l.custo.item_medicao %}{{ '%.1f'|format(l.custo.item_medicao.percentual_executado_acumulado or 0) }}%{% else %}—{% endif %}
+              {% if l.custo.item_medicao %}{{ (l.custo.item_medicao.percentual_executado_acumulado or 0)|num(1) }}%{% else %}—{% endif %}
             </td>
           </tr>
           {% else %}

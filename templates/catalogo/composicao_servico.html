@@ -11,7 +11,7 @@
       <div class="card text-center shadow-sm h-100">
         <div class="card-body">
           <small class="text-muted">CUSTO UNITÁRIO</small>
-          <h3 class="text-dark mb-0">R$ {{ '%.2f'|format(calc.custo_unitario) }}</h3>
+          <h3 class="text-dark mb-0">{{ calc.custo_unitario|brl }}</h3>
         </div>
       </div>
     </div>
@@ -19,7 +19,7 @@
       <div class="card text-center shadow-sm h-100 bg-light">
         <div class="card-body">
           <small class="text-muted">PREÇO DE VENDA</small>
-          <h3 class="text-success mb-0">R$ {{ '%.2f'|format(calc.preco_venda) }}</h3>
+          <h3 class="text-success mb-0">{{ calc.preco_venda|brl }}</h3>
           <small class="text-muted">por {{ servico.unidade_medida }}</small>
         </div>
       </div>
@@ -57,7 +57,7 @@
             {% for i in insumos %}
             <option value="{{ i.id }}"
                     data-coef-padrao="{{ '%.6f'|format(i.coeficiente_padrao|float) }}">
-              {{ i.nome }} ({{ i.tipo }} / {{ i.unidade }}) — R$ {{ '%.4f'|format(i.preco_vigente()) }}
+              {{ i.nome }} ({{ i.tipo }} / {{ i.unidade }}) — R$ {{ i.preco_vigente()|num(4) }}
             </option>
             {% endfor %}
           </select>
@@ -101,7 +101,7 @@
             <td>{{ d.nome }}</td>
             <td><span class="badge bg-secondary">{{ d.tipo }}</span></td>
             <td>{{ d.unidade }}</td>
-            <td class="text-end">{{ '%.4f'|format(d.preco_unitario) }}</td>
+            <td class="text-end">{{ d.preco_unitario|num(4) }}</td>
             <td class="text-end" style="min-width:170px;">
               {% if comp %}
               <form method="POST" action="{{ url_for('catalogo.servico_composicao_editar', servico_id=servico.id, comp_id=comp.id) }}" class="d-flex gap-1 justify-content-end">
@@ -114,10 +114,10 @@
                 </button>
               </form>
               {% else %}
-                {{ '%.4f'|format(d.coeficiente) }}
+                {{ d.coeficiente|num(4) }}
               {% endif %}
             </td>
-            <td class="text-end text-dark"><strong>{{ '%.2f'|format(d.subtotal) }}</strong></td>
+            <td class="text-end text-dark"><strong>{{ d.subtotal|num(2) }}</strong></td>
             <td class="text-end">
               {% if comp %}
               <form method="POST" action="{{ url_for('catalogo.servico_composicao_excluir', servico_id=servico.id, comp_id=comp.id) }}" class="d-inline" onsubmit="return confirm('Remover linha?')">
@@ -134,7 +134,7 @@
         {% if calc.detalhamento %}
         <tfoot class="table-light">
           <tr><th colspan="5" class="text-end">Custo total por {{ servico.unidade_medida }} do serviço:</th>
-              <th class="text-end text-dark">R$ {{ '%.2f'|format(calc.custo_unitario) }}</th><th></th></tr>
+              <th class="text-end text-dark">{{ calc.custo_unitario|brl }}</th><th></th></tr>
         </tfoot>
         {% endif %}
       </table>

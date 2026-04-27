@@ -265,6 +265,10 @@
 </div>
 
 <script>
+// Task #181 — formatador pt-BR para R$ (espelha filtro |brl do server).
+const _BRL_FMT_NOVA = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmtBRL(n){ return 'R$ ' + _BRL_FMT_NOVA.format(Number(n) || 0); }
+
 let contadorItens = 0;
 
 function adicionarItem(descricao = '', quantidade = 1, unidade = 'un', preco = 0) {
@@ -323,18 +327,19 @@ function calcularSubtotal(itemId) {
     const preco = parseFloat(tr.querySelector('input[name="item_preco"]').value) || 0;
     const subtotal = quantidade * preco;
     
-    tr.querySelector('.subtotal').textContent = 'R$ ' + subtotal.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    tr.querySelector('.subtotal').textContent = fmtBRL(subtotal);
     calcularTotal();
 }
 
 function calcularTotal() {
     let total = 0;
     document.querySelectorAll('.subtotal').forEach(span => {
-        const valor = parseFloat(span.textContent.replace('R$ ', '').replace('.', '').replace(',', '.'));
+        // Aceita "R$ 1.234,56" — remove "R$", espaços e pontos de milhar; troca vírgula por ponto.
+        const valor = parseFloat(span.textContent.replace(/[R$\s.]/g, '').replace(',', '.'));
         if (!isNaN(valor)) total += valor;
     });
-    
-    document.getElementById('valorTotal').textContent = 'R$ ' + total.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+
+    document.getElementById('valorTotal').textContent = fmtBRL(total);
 }
 
 // Carregar template
