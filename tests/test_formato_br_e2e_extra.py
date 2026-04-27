@@ -247,11 +247,10 @@ def cleanup(ctx):
 def _scan_us(text: str, limit: int = 5) -> list[str]:
     """Retorna até `limit` matches do padrão americano em `text`.
 
-    Filtra falsos positivos comuns que não são valores monetários:
-      * versões de software exibidas no rodapé (ex.: 'v9.0', 'v10.04').
-      * datas no formato `DD.MM` (não usadas no app, mas defensivo).
-    O padrão exige '.' + exatamente 2 dígitos no fim, então 'v9.0' já
-    não casa; este helper apenas consolida ofensores genuínos.
+    O padrão `\\d+\\.\\d{2}\\b` exige ponto + exatamente 2 dígitos
+    seguido de fim de palavra. Isso já elimina por desenho falsos
+    positivos comuns ('v9.0', '10.0', dates ISO 'YYYY-MM-DD').
+    Retornar uma lista pequena facilita a mensagem de erro do `_ok`.
     """
     return PADRAO_US_2D.findall(text)[:limit]
 
@@ -419,14 +418,22 @@ def main():
                 _ok(not PADRAO_US_2D.search(v),
                     f'proposta: datalist option sem formato US ("{v}")')
 
-            # E a opção do nosso serviço de seed mostra "R$ 7.199,06".
+            # Validação focada: como a API filtra por admin_id e o
+            # admin desta sessão tem só este serviço, ele DEVE aparecer.
+            # Para evitar acoplar o teste à ordem/limit (limit=500) caso
+            # alguém futuramente compartilhe o admin com mais dados, só
+            # exigimos a presença e o formato BR no preço quando a opção
+            # for encontrada — sem isso, falha explícita.
             opcoes_nosso = [v for v in opcoes if ctx['svc_nome'] in v]
-            _ok(len(opcoes_nosso) == 1,
+            _ok(len(opcoes_nosso) >= 1,
                 f'proposta: datalist contém nosso serviço '
                 f'(matches={opcoes_nosso})')
             if opcoes_nosso:
                 _ok('R$ 7.199,06' in opcoes_nosso[0],
                     f'proposta: option do nosso serviço com preço R$ 7.199,06 '
+                    f'(got "{opcoes_nosso[0]}")')
+                _ok(not PADRAO_US_2D.search(opcoes_nosso[0]),
+                    f'proposta: option do nosso serviço sem formato US '
                     f'(got "{opcoes_nosso[0]}")')
 
             # Nenhum valor americano na página inteira (após populate
