@@ -178,17 +178,16 @@ def salvar_empresa():
 def salvar_tema():
     """Salva o tema do sistema (preset + 4 cores) para a empresa logada.
 
-    Estratégia:
-    - Se um `tema_preset` válido foi enviado, aplica o preset (sobrescrevendo
-      as 4 cores).
-    - Caso contrário, aceita as cores hex enviadas pelo usuário (apenas as
-      válidas substituem; inválidas são silenciosamente ignoradas para não
-      perder dados).
+    Contrato:
+    - Se `tema_preset` for um preset válido (azul_profundo, verde_construcao,
+      grafite_premium): aplica as 4 cores do preset, ignorando os campos de
+      cor enviados.
+    - Caso contrário (preset ausente, vazio ou == 'custom'): persiste as
+      cores hex enviadas. Cores inválidas são silenciosamente ignoradas
+      (mantém o valor anterior). Marca `tema_preset = 'custom'`.
     """
     from multitenant_helper import get_admin_id
-    from services.tema_service import (
-        PRESETS, aplicar_preset, is_hex_color, get_tema_da_empresa,
-    )
+    from services.tema_service import PRESETS, aplicar_preset, is_hex_color
 
     admin_id = get_admin_id()
     config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
@@ -200,27 +199,18 @@ def salvar_tema():
 
     try:
         preset_id = (request.form.get('tema_preset') or '').strip()
-        cor_prim   = (request.form.get('cor_primaria') or '').strip()
-        cor_sec    = (request.form.get('cor_secundaria') or '').strip()
-        cor_header = (request.form.get('cor_header_nav') or '').strip()
-        cor_fundo  = (request.form.get('cor_fundo_app') or '').strip()
 
-        tema_atual = get_tema_da_empresa(config)
-        preset_aplicado = False
-        if preset_id and preset_id in PRESETS:
-            preset = PRESETS[preset_id]
-            # Só aplicamos o preset se as 4 cores enviadas forem idênticas às
-            # do preset (significa "usuário escolheu o preset"); caso contrário,
-            # respeitamos as cores customizadas e mantemos `tema_preset` como
-            # 'custom'.
-            if (cor_prim   == preset['cor_primaria']
-                and cor_sec    == preset['cor_secundaria']
-                and cor_header == preset['cor_header_nav']
-                and cor_fundo  == preset['cor_fundo_app']):
-                aplicar_preset(config, preset_id)
-                preset_aplicado = True
+        if preset_id in PRESETS:
+            # Preset válido → aplica as 4 cores do preset SEMPRE, ignorando
+            # quaisquer cores customizadas vindas no mesmo POST.
+            aplicar_preset(config, preset_id)
+        else:
+            # Modo customizado: persiste apenas cores hex válidas.
+            cor_prim   = (request.form.get('cor_primaria') or '').strip()
+            cor_sec    = (request.form.get('cor_secundaria') or '').strip()
+            cor_header = (request.form.get('cor_header_nav') or '').strip()
+            cor_fundo  = (request.form.get('cor_fundo_app') or '').strip()
 
-        if not preset_aplicado:
             if is_hex_color(cor_prim):
                 config.cor_primaria = cor_prim.lower()
             if is_hex_color(cor_sec):
@@ -229,7 +219,6 @@ def salvar_tema():
                 config.cor_header_nav = cor_header.lower()
             if is_hex_color(cor_fundo):
                 config.cor_fundo_app = cor_fundo.lower()
-            # Sem match exato com preset → marca como 'custom'
             config.tema_preset = 'custom'
 
         config.atualizado_em = datetime.utcnow()
