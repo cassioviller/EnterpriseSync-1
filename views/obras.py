@@ -1858,11 +1858,18 @@ def detalhes_obra(id):
             logger.error(f"Erro nas notificações de orçamento: {_e_notif}")
             notificacoes_orcamento = []
 
-        # Task #102: detectar "cronograma pendente" — obra originada de proposta
-        # mas sem nenhuma TarefaCronograma com gerada_por_proposta_item_id setado.
+        # Task #102/#200: detectar "cronograma pendente" — obra originada de
+        # proposta mas sem nenhuma TarefaCronograma com gerada_por_proposta_item_id
+        # setado. Task #200: se o admin já confirmou a revisão inicial
+        # (obra.cronograma_revisado_em != NULL), o banner NÃO deve mais aparecer
+        # — mesmo que ele tenha desmarcado tudo (zero tarefas geradas) — para
+        # respeitar a UX "considerar revisado uma vez confirmado".
         cronograma_pendente = False
         try:
-            if getattr(obra, 'proposta_origem_id', None):
+            if (
+                getattr(obra, 'proposta_origem_id', None)
+                and getattr(obra, 'cronograma_revisado_em', None) is None
+            ):
                 from models import TarefaCronograma
                 _existe = (
                     db.session.query(TarefaCronograma.id)

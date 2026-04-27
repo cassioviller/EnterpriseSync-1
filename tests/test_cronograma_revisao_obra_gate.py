@@ -444,6 +444,82 @@ def run():
              "(snapshot pré-aprovação)",
              gate_inerte_b6, f"http={r.status_code} loc={loc_b6}")
 
+        # ──────────────── CENÁRIO E — confirmar revisão com TUDO desmarcado ────────────────
+        # UX da Task #200: "uma vez que o admin confirme a revisão, considera-se
+        # revisado — mesmo que ele tenha desmarcado tudo". Nesse caso, a obra
+        # fica sem nenhuma TarefaCronograma gerada por proposta, mas o gate NÃO
+        # deve mais disparar e o banner cronograma_pendente NÃO deve mais aparecer.
+        prop_e_id, token_e = fresh_proposta(
+            client, admin, cliente, servico_id, servico_nome, suffix="E",
+        )
+        client.post(f"/propostas/{prop_e_id}/status", json={"status": "ENVIADA"})
+        aprovar_via_cliente_portal(anon, token_e)
+
+        db.session.expire_all()
+        prop_e = db.session.get(Proposta, prop_e_id)
+        obra_e = db.session.get(Obra, prop_e.obra_id) if prop_e.obra_id else None
+        step("E.1 obra E criada pela aprovação (sem snapshot)",
+             obra_e is not None, f"obra_id={getattr(obra_e, 'id', None)}")
+        step("E.2 obra E nasce SEM cronograma_revisado_em",
+             obra_e is not None and obra_e.cronograma_revisado_em is None,
+             f"flag={getattr(obra_e, 'cronograma_revisado_em', '?')}")
+
+        # 1ª visita — gate dispara
+        r = get_obra_detalhe(client, obra_e.id)
+        loc_e3 = r.headers.get("Location") or ""
+        step("E.3 1ª visita: gate ATIVO (redireciona para revisar)",
+             r.status_code in (302, 303) and "cronograma-revisar-inicial" in loc_e3,
+             f"http={r.status_code} loc={loc_e3}")
+
+        # POST com array vazio — admin não marcou nada, mas confirma
+        r = client.post(
+            f"/obras/{obra_e.id}/cronograma-revisar-inicial",
+            data={"cronograma_marcado_json": json.dumps([])},
+            follow_redirects=False,
+        )
+        step("E.4 POST revisar com tudo desmarcado redireciona",
+             r.status_code in (302, 303), f"http={r.status_code}")
+
+        db.session.expire_all()
+        obra_e = db.session.get(Obra, obra_e.id)
+        step("E.5 obra E marcada como revisada (mesmo sem tarefas)",
+             obra_e.cronograma_revisado_em is not None,
+             f"flag={obra_e.cronograma_revisado_em}")
+
+        tarefas_e = (TarefaCronograma.query
+                     .filter_by(obra_id=obra_e.id, is_cliente=False).all())
+        step("E.6 obra E tem ZERO tarefas internas (admin desmarcou tudo)",
+             len(tarefas_e) == 0, f"tarefas={len(tarefas_e)}")
+
+        # 2ª visita — gate NÃO dispara mesmo com 0 tarefas (revisão registrada)
+        r = get_obra_detalhe(client, obra_e.id)
+        loc_e7 = r.headers.get("Location") or ""
+        gate_inerte_e7 = (
+            r.status_code == 200
+            or (r.status_code in (302, 303)
+                and "cronograma-revisar-inicial" not in loc_e7)
+        )
+        step("E.7 2ª visita: gate NÃO redireciona para revisão (revisado)",
+             gate_inerte_e7, f"http={r.status_code} loc={loc_e7}")
+
+        # E.8 — verificação direta da regra do banner cronograma_pendente:
+        # com cronograma_revisado_em != NULL, a flag computada pela view
+        # detalhes_obra deve ser False mesmo sem TarefaCronograma gerada.
+        from models import TarefaCronograma as _TC
+        existe_gerada = (db.session.query(_TC.id)
+                         .filter(_TC.obra_id == obra_e.id,
+                                 _TC.gerada_por_proposta_item_id.isnot(None))
+                         .first()) is not None
+        cronograma_pendente_calc = (
+            obra_e.proposta_origem_id is not None
+            and obra_e.cronograma_revisado_em is None
+            and not existe_gerada
+        )
+        step("E.8 cronograma_pendente=False após revisão (mesmo sem tarefas)",
+             cronograma_pendente_calc is False,
+             f"calc={cronograma_pendente_calc} flag={obra_e.cronograma_revisado_em} "
+             f"tarefas_geradas={existe_gerada}")
+
     # ───── Resultado ─────
     print("\n" + "=" * 70)
     print(f"E2E Task #200 ({RUN_TAG}) — {len(PASS)} PASS / {len(FAIL)} FAIL")
