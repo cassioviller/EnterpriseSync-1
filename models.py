@@ -3236,10 +3236,15 @@ class ConfiguracaoEmpresa(db.Model):
     header_pdf_base64 = db.Column(db.Text)  # Header completo para PDFs (substitui logo no cabeçalho)
     
     # Personalização visual
-    cor_primaria = db.Column(db.String(7), default='#007bff')  # Cor primária em hexadecimal
-    cor_secundaria = db.Column(db.String(7), default='#6c757d')  # Cor secundária
+    cor_primaria = db.Column(db.String(7), default='#2563eb')  # Cor primária em hexadecimal
+    cor_secundaria = db.Column(db.String(7), default='#64748b')  # Cor secundária
     cor_fundo_proposta = db.Column(db.String(7), default='#f8f9fa')  # Cor de fundo das propostas
     logo_tamanho_portal = db.Column(db.String(20), default='medio')  # Tamanho da logo no portal: pequeno, medio, grande
+
+    # Task #191 — Tema do Sistema (refresh visual SaaS)
+    cor_header_nav = db.Column(db.String(7), default='#1e293b')  # Cor de fundo do header/navbar
+    cor_fundo_app = db.Column(db.String(7), default='#f8fafc')   # Cor de fundo da aplicação
+    tema_preset = db.Column(db.String(40), default='azul_profundo')  # Identificador do preset ativo
     
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 

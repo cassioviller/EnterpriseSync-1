@@ -329,25 +329,30 @@
                         
                         <hr class="my-4">
                         
-                        <!-- Seção de Cores -->
+                        <!-- Seção de Cores das Propostas (PDF) -->
                         <h6 class="mb-3">
                             <i class="fas fa-palette me-2"></i>
-                            Personalização Visual
+                            Cores nas Propostas (PDF)
                         </h6>
-                        
+                        <p class="text-muted small mb-3">
+                            Estas cores são usadas apenas em propostas/PDFs.
+                            Para configurar o tema do sistema (header, fundo, botões da interface),
+                            use a seção "Tema do Sistema" abaixo.
+                        </p>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="row">
                                     <div class="col-12">
                                         <div class="mb-3">
-                                            <label for="cor_primaria" class="form-label">Cor Primária</label>
+                                            <label for="cor_primaria" class="form-label">Cor Primária (Proposta)</label>
                                             <div class="d-flex align-items-center gap-2">
                                                 <input type="color" class="form-control form-control-color" id="cor_primaria" name="cor_primaria" 
-                                                       value="{{ config.cor_primaria if config else '#007bff' }}" style="width: 50px;">
+                                                       value="{{ config.cor_primaria if config else '#2563eb' }}" style="width: 50px;">
                                                 <input type="text" class="form-control" id="cor_primaria_text" readonly 
-                                                       value="{{ config.cor_primaria if config else '#007bff' }}">
+                                                       value="{{ config.cor_primaria if config else '#2563eb' }}">
                                             </div>
-                                            <small class="text-muted">Cor principal dos botões e elementos</small>
+                                            <small class="text-muted">Cor de destaque na proposta gerada</small>
                                         </div>
                                     </div>
                                     <div class="col-12">
@@ -365,6 +370,128 @@
                                 </div>
                             </div>
                         </div>
+
+                        <hr class="my-4">
+
+                        <!-- Task #191 — Tema do Sistema -->
+                        <h6 class="mb-3" id="tema-sistema">
+                            <i class="fas fa-paint-roller me-2"></i>
+                            Tema do Sistema
+                            <span class="badge bg-primary ms-2">Novo</span>
+                        </h6>
+                        <p class="text-muted small mb-3">
+                            Escolha um preset visual ou personalize as cores da interface.
+                            As alterações são aplicadas para toda a empresa.
+                        </p>
+
+                        {% set tema_atual = sige_theme %}
+                        <form method="POST" action="{{ url_for('configuracoes.salvar_tema') }}" id="form-tema-sistema">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                            <!-- Cards de presets -->
+                            <div class="row g-3 mb-4">
+                                {% for preset_id, preset in sige_theme_presets.items() %}
+                                <div class="col-md-4">
+                                    <label class="tema-preset-card d-block {% if tema_atual.tema_preset == preset_id %}is-active{% endif %}"
+                                           data-preset-id="{{ preset_id }}"
+                                           data-cor-primaria="{{ preset.cor_primaria }}"
+                                           data-cor-secundaria="{{ preset.cor_secundaria }}"
+                                           data-cor-header="{{ preset.cor_header_nav }}"
+                                           data-cor-fundo="{{ preset.cor_fundo_app }}">
+                                        <input type="radio" name="tema_preset" value="{{ preset_id }}" class="d-none"
+                                               {% if tema_atual.tema_preset == preset_id %}checked{% endif %}>
+                                        <div class="tema-preset-swatches">
+                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_header_nav }}"></span>
+                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_primaria }}"></span>
+                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_secundaria }}"></span>
+                                            <span class="tema-preset-swatch" style="background:{{ preset.cor_fundo_app }}"></span>
+                                        </div>
+                                        <div class="tema-preset-name">{{ preset.label }}</div>
+                                        <div class="tema-preset-desc">{{ preset.descricao }}</div>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Custom — 4 cores -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tema_cor_primaria" class="form-label">Cor Primária</label>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <input type="color" class="form-control form-control-color tema-color-input"
+                                                   id="tema_cor_primaria" name="cor_primaria"
+                                                   value="{{ tema_atual.cor_primaria }}" style="width: 50px;">
+                                            <input type="text" class="form-control tema-color-text" readonly
+                                                   value="{{ tema_atual.cor_primaria }}">
+                                        </div>
+                                        <small class="text-muted">Botões, links e abas ativas</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tema_cor_secundaria" class="form-label">Cor Secundária</label>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <input type="color" class="form-control form-control-color tema-color-input"
+                                                   id="tema_cor_secundaria" name="cor_secundaria"
+                                                   value="{{ tema_atual.cor_secundaria }}" style="width: 50px;">
+                                            <input type="text" class="form-control tema-color-text" readonly
+                                                   value="{{ tema_atual.cor_secundaria }}">
+                                        </div>
+                                        <small class="text-muted">Texto auxiliar e elementos discretos</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tema_cor_header" class="form-label">Cor do Header / Navbar</label>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <input type="color" class="form-control form-control-color tema-color-input"
+                                                   id="tema_cor_header" name="cor_header_nav"
+                                                   value="{{ tema_atual.cor_header_nav }}" style="width: 50px;">
+                                            <input type="text" class="form-control tema-color-text" readonly
+                                                   value="{{ tema_atual.cor_header_nav }}">
+                                        </div>
+                                        <small class="text-muted">Barra de navegação superior</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tema_cor_fundo" class="form-label">Cor de Fundo do App</label>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <input type="color" class="form-control form-control-color tema-color-input"
+                                                   id="tema_cor_fundo" name="cor_fundo_app"
+                                                   value="{{ tema_atual.cor_fundo_app }}" style="width: 50px;">
+                                            <input type="text" class="form-control tema-color-text" readonly
+                                                   value="{{ tema_atual.cor_fundo_app }}">
+                                        </div>
+                                        <small class="text-muted">Fundo geral das páginas</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Preview ao vivo -->
+                            <div class="tema-preview-box" id="tema-preview">
+                                <div class="tema-preview-header" id="tema-preview-header"
+                                     style="background: {{ tema_atual.cor_header_nav }}; color: {{ tema_atual.cor_texto_header }};">
+                                    <i class="fas fa-eye me-2"></i> Pré-visualização do Header
+                                </div>
+                                <div class="tema-preview-body" id="tema-preview-body"
+                                     style="background: {{ tema_atual.cor_fundo_app }};">
+                                    <span class="tema-preview-btn" id="tema-preview-btn"
+                                          style="background: {{ tema_atual.cor_primaria }};">Botão Primário</span>
+                                    <span class="ms-2 text-muted">Texto secundário no fundo do app</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-2 mt-3">
+                                <button type="button" class="btn btn-outline-secondary" id="btn-resetar-tema">
+                                    <i class="fas fa-undo me-1"></i> Restaurar Padrão (Azul Profundo)
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i> Salvar Tema
+                                </button>
+                            </div>
+                        </form>
 
                         <hr class="my-4">
 
@@ -677,5 +804,80 @@ document.getElementById('cor_primaria').addEventListener('change', function(e) {
         btn.style.borderColor = e.target.value;
     });
 });
+
+/* =====================================================================
+   Task #191 — Tema do Sistema: presets, custom inputs e preview ao vivo
+   ===================================================================== */
+(function temaSistemaInit() {
+    const presetCards = document.querySelectorAll('.tema-preset-card');
+    const inputPrim   = document.getElementById('tema_cor_primaria');
+    const inputSec    = document.getElementById('tema_cor_secundaria');
+    const inputHeader = document.getElementById('tema_cor_header');
+    const inputFundo  = document.getElementById('tema_cor_fundo');
+    const previewHead = document.getElementById('tema-preview-header');
+    const previewBody = document.getElementById('tema-preview-body');
+    const previewBtn  = document.getElementById('tema-preview-btn');
+    const btnReset    = document.getElementById('btn-resetar-tema');
+
+    if (!inputPrim) return;  // página sem o form (usuário não-admin)
+
+    function lum(hex) {
+        const h = hex.replace('#', '');
+        const r = parseInt(h.substr(0, 2), 16) / 255;
+        const g = parseInt(h.substr(2, 2), 16) / 255;
+        const b = parseInt(h.substr(4, 2), 16) / 255;
+        const lin = c => (c <= 0.03928) ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    }
+    function contraste(hex) { return lum(hex) < 0.5 ? '#ffffff' : '#0f172a'; }
+
+    function aplicarPreview() {
+        const cp = inputPrim.value, ch = inputHeader.value, cf = inputFundo.value;
+        previewHead.style.background = ch;
+        previewHead.style.color      = contraste(ch);
+        previewBody.style.background = cf;
+        previewBtn.style.background  = cp;
+        previewBtn.style.color       = contraste(cp);
+    }
+
+    function syncTextNext(input) {
+        const txt = input.parentElement.querySelector('.tema-color-text');
+        if (txt) txt.value = input.value;
+    }
+
+    [inputPrim, inputSec, inputHeader, inputFundo].forEach(inp => {
+        inp.addEventListener('input', function () {
+            syncTextNext(inp);
+            aplicarPreview();
+            // Marca "custom" — desmarca todos presets
+            presetCards.forEach(c => c.classList.remove('is-active'));
+            const radios = document.querySelectorAll('input[name="tema_preset"]');
+            radios.forEach(r => { r.checked = false; });
+        });
+    });
+
+    presetCards.forEach(card => {
+        card.addEventListener('click', function () {
+            const id = card.dataset.presetId;
+            inputPrim.value   = card.dataset.corPrimaria;
+            inputSec.value    = card.dataset.corSecundaria;
+            inputHeader.value = card.dataset.corHeader;
+            inputFundo.value  = card.dataset.corFundo;
+            [inputPrim, inputSec, inputHeader, inputFundo].forEach(syncTextNext);
+            presetCards.forEach(c => c.classList.remove('is-active'));
+            card.classList.add('is-active');
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio) radio.checked = true;
+            aplicarPreview();
+        });
+    });
+
+    if (btnReset) {
+        btnReset.addEventListener('click', function () {
+            const padrao = document.querySelector('.tema-preset-card[data-preset-id="azul_profundo"]');
+            if (padrao) padrao.click();
+        });
+    }
+})();
 </script>
 {% endblock %}

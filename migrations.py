@@ -3834,6 +3834,7 @@ def executar_migracoes():
             (132, "Task #172 — Obra.cliente_id FK + backfill por nome/email do cliente", migration_132_obra_cliente_id_fk),
             (133, "Task #173 — engenheiro_responsavel + FKs em configuracao_empresa e propostas_comerciais (backfill do legado)", migration_133_engenheiro_responsavel),
             (134, "Task #174 — proposta_clausula + proposta_template_clausula (backfill cláusulas configuráveis)", migration_134_clausulas_configuraveis),
+            (135, "Task #191 — tema do sistema (cor_header_nav, cor_fundo_app, tema_preset em configuracao_empresa)", migration_135_tema_sistema_configuracao_empresa),
         ]
         
         # Executar cada migração com rastreamento
@@ -11052,6 +11053,59 @@ def migration_134_clausulas_configuraveis():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 134: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_135_tema_sistema_configuracao_empresa():
+    """Migration 135 (Task #191): Adiciona campos de tema do sistema em configuracao_empresa.
+
+    Campos adicionados:
+      - cor_header_nav  VARCHAR(7) DEFAULT '#1e293b'
+      - cor_fundo_app   VARCHAR(7) DEFAULT '#f8fafc'
+      - tema_preset     VARCHAR(40) DEFAULT 'azul_profundo'
+
+    Idempotente: usa IF NOT EXISTS.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        colunas = [
+            ("cor_header_nav", "VARCHAR(7) DEFAULT '#1e293b'"),
+            ("cor_fundo_app", "VARCHAR(7) DEFAULT '#f8fafc'"),
+            ("tema_preset", "VARCHAR(40) DEFAULT 'azul_profundo'"),
+        ]
+        for nome, tipo in colunas:
+            cursor.execute(
+                f"ALTER TABLE configuracao_empresa "
+                f"ADD COLUMN IF NOT EXISTS {nome} {tipo}"
+            )
+
+        # Backfill: garante valores padrão em registros existentes
+        cursor.execute(
+            "UPDATE configuracao_empresa "
+            "SET cor_header_nav = COALESCE(cor_header_nav, '#1e293b'), "
+            "    cor_fundo_app  = COALESCE(cor_fundo_app,  '#f8fafc'), "
+            "    tema_preset    = COALESCE(tema_preset,    'azul_profundo')"
+        )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 135: tema do sistema (cor_header_nav, cor_fundo_app, tema_preset) "
+            "adicionado em configuracao_empresa"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 135: {e}")
         if connection:
             try:
                 connection.rollback()

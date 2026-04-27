@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#198754">
+    <meta name="theme-color" content="{{ sige_theme.cor_header_nav if sige_theme else '#1e293b' }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="manifest" href="/static/manifest.json">
     <title>{% block title %}SIGE - {{ brand_name }}{% endblock %}</title>
@@ -28,6 +28,20 @@
     
     <!-- Custom CSS com cache-busting -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20250918_1">
+
+    <!-- Task #191 — Tema do Sistema (CSS variables vindas do tenant) -->
+    {% if sige_theme %}
+    <style id="sige-theme-vars">
+      :root {
+        --sige-primary: {{ sige_theme.cor_primaria }};
+        --sige-primary-strong: {{ sige_theme.cor_primaria }};
+        --sige-secondary: {{ sige_theme.cor_secundaria }};
+        --sige-header: {{ sige_theme.cor_header_nav }};
+        --sige-on-header: {{ sige_theme.cor_texto_header }};
+        --sige-bg: {{ sige_theme.cor_fundo_app }};
+      }
+    </style>
+    {% endif %}
     
     <!-- Estilo do Sistema -->
     <style>
@@ -645,7 +659,10 @@
             }
         }
     </style>
-    
+
+    <!-- Task #191 — Theme refresh CSS (carregado por último para vencer especificidade) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sige-theme.css') }}?v=task191">
+
     {% block head %}{% endblock %}
     {% block styles %}{% endblock %}
 </head>
@@ -759,23 +776,26 @@
                             </ul>
                         </li>
                         
+                        <!-- Task #191 — Dropdown Comercial: header de seção e badge para destacar -->
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="propostasDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-file-contract me-1"></i> Propostas
+                            <a class="nav-link dropdown-toggle" href="#" id="propostasDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-briefcase me-1"></i> Comercial
                             </a>
-                            <ul class="dropdown-menu">
+                            <ul class="dropdown-menu" aria-labelledby="propostasDropdown">
+                                <li><h6 class="dropdown-header"><i class="fas fa-file-contract me-1"></i> Propostas</h6></li>
                                 <li><a class="dropdown-item" href="/propostas/dashboard">
-                                    <i class="fas fa-chart-bar me-1"></i> Dashboard
+                                    <i class="fas fa-chart-bar me-1"></i> Dashboard de Propostas
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('propostas.nova_proposta') }}">
-                                    <i class="fas fa-plus me-1"></i> Nova Proposta
+                                    <i class="fas fa-plus-circle me-1"></i> Nova Proposta
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header"><i class="fas fa-calculator me-1"></i> Orçamentos</h6></li>
                                 <li><a class="dropdown-item" href="{{ url_for('orcamentos.listar') }}">
-                                    <i class="fas fa-calculator me-1"></i> Orçamentos
+                                    <i class="fas fa-list me-1"></i> Lista de Orçamentos
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('orcamentos.novo') }}">
-                                    <i class="fas fa-plus-square me-1"></i> Novo Orçamento
+                                    <i class="fas fa-plus-circle me-1"></i> Novo Orçamento
                                 </a></li>
                             </ul>
                         </li>

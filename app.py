@@ -232,50 +232,51 @@ def inject_v2_flag():
 # Context processor para configurações da empresa
 @app.context_processor
 def inject_company_config():
-    """Injeta configurações da empresa em todos os templates"""
+    """Injeta configurações da empresa + tema do sistema em todos os templates."""
+    from services.tema_service import get_tema_da_empresa, listar_presets
+
+    config_empresa = None
     try:
         from flask_login import current_user
         from models import ConfiguracaoEmpresa
-        
+
         if current_user and current_user.is_authenticated:
             admin_id = getattr(current_user, 'admin_id', None) or current_user.id
             config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
-            
-            if config_empresa:
-                return {
-                    'config_empresa': config_empresa,
-                    'brand_name': config_empresa.nome_empresa or 'SIGE',
-                    'brand_logo_base64': config_empresa.logo_base64,
-                    'empresa_cores': {
-                        'primaria': config_empresa.cor_primaria or '#007bff',
-                        'secundaria': config_empresa.cor_secundaria or '#6c757d',
-                        'fundo_proposta': config_empresa.cor_fundo_proposta or '#f8f9fa'
-                    }
-                }
-        
-        # Valores padrão se não houver configuração
-        return {
-            'config_empresa': None,
-            'brand_name': 'SIGE',
-            'brand_logo_base64': None,
-            'empresa_cores': {
-                'primaria': '#007bff',
-                'secundaria': '#6c757d', 
-                'fundo_proposta': '#f8f9fa'
-            }
-        }
     except Exception:
-        # Fallback em caso de erro
-        return {
+        config_empresa = None
+
+    sige_theme = get_tema_da_empresa(config_empresa)
+
+    if config_empresa:
+        ctx = {
+            'config_empresa': config_empresa,
+            'brand_name': config_empresa.nome_empresa or 'SIGE',
+            'brand_logo_base64': config_empresa.logo_base64,
+        }
+    else:
+        ctx = {
             'config_empresa': None,
             'brand_name': 'SIGE',
             'brand_logo_base64': None,
-            'empresa_cores': {
-                'primaria': '#007bff',
-                'secundaria': '#6c757d',
-                'fundo_proposta': '#f8f9fa'
-            }
         }
+
+    ctx.update({
+        # Task #191 — tema do sistema
+        'sige_theme': sige_theme,
+        'sige_theme_presets': listar_presets(),
+        # Compat retro (proposta/PDF)
+        'empresa_cores': {
+            'primaria': sige_theme['cor_primaria'],
+            'secundaria': sige_theme['cor_secundaria'],
+            'fundo_proposta': (
+                config_empresa.cor_fundo_proposta
+                if config_empresa and config_empresa.cor_fundo_proposta
+                else '#f8f9fa'
+            ),
+        },
+    })
+    return ctx
 
 
 # Import all models (now consolidated)

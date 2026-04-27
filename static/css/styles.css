@@ -1,9 +1,11 @@
 /* Custom CSS for SIGE */
 
-/* Override minimal styles only when necessary */
+/* Override minimal styles only when necessary
+ * NOTE: variáveis principais (--sige-primary, etc.) agora vêm de
+ * sige-theme.css (Task #191) e são sobrescritas em runtime pelo
+ * tema da empresa logada. Mantemos aqui apenas defaults secundários.
+ */
 :root {
-    --sige-primary: #0d6efd;
-    --sige-secondary: #6c757d;
     --sige-success: #198754;
     --sige-warning: #ffc107;
     --sige-danger: #dc3545;
@@ -22,18 +24,11 @@
     vertical-align: baseline !important;
 }
 
-/* Módulo selecionado em preto */
+/* Task #191: módulo ativo destacado na cor primária da empresa
+ * (a regra detalhada de hover/active vive em sige-theme.css). */
 .nav-link.active,
 .navbar-nav .nav-link.active {
-    background-color: #000000 !important;
-    color: #ffffff !important;
-    border-radius: 4px;
-}
-
-.nav-link.active:hover,
-.navbar-nav .nav-link.active:hover {
-    background-color: #333333 !important;
-    color: #ffffff !important;
+    border-radius: 8px;
 }
 
 /* Custom utilities */

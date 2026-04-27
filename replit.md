@@ -43,6 +43,7 @@ The system employs a Flask backend, SQLAlchemy ORM, and PostgreSQL database. Jin
     -   **Responsible Engineer Management:** Dedicated `EngenheiroResponsavel` model for managing engineer details, supporting per-proposal overrides and fallback mechanisms.
     -   **Project-Client Linking:** `Obra.cliente_id` FK to `Cliente` for improved data integrity, with fallback to legacy text fields.
     -   **Employee Metrics:** A unified service for calculating employee KPIs and costs for salarists and day-workers, integrating various cost components (labor, benefits, food, reimbursements, inventory).
+    -   **Configurable Theme System (Task #191):** Per-tenant visual theme stored in `ConfiguracaoEmpresa` (4 colors + preset id). Three presets ship out of the box (Azul Profundo SaaS — default, Verde Construção, Grafite Premium) and admins can also tweak the 4 colors freely (primary, secondary, header/nav, app background). The theme is delivered to every page via the `inject_company_config` context processor (`sige_theme`), which feeds CSS variables consumed by `static/css/sige-theme.css`. Bootstrap is preserved; the new stylesheet overrides `--bs-*` and key components (navbar, nav-tabs, buttons, dropdowns) so no template rewrites are needed.
 
 ## External Dependencies
 -   **Flask:** Web framework.

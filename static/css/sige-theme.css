@@ -1,0 +1,440 @@
+/* ===================================================================
+   Task #191 — SIGE Theme (Refresh Visual SaaS Corporativo)
+   Tokens + sobrescrita de Bootstrap a partir das CSS variables
+   injetadas em tempo de request via context_processor `sige_theme`.
+   ================================================================ */
+
+:root {
+  /* Defaults caso o template não injete (ex.: páginas públicas) */
+  --sige-primary: #2563eb;
+  --sige-primary-rgb: 37, 99, 235;
+  --sige-primary-soft: rgba(37, 99, 235, 0.1);
+  --sige-primary-strong: #1d4ed8;
+  --sige-secondary: #64748b;
+  --sige-secondary-rgb: 100, 116, 139;
+  --sige-header: #1e293b;
+  --sige-header-rgb: 30, 41, 59;
+  --sige-on-header: #ffffff;
+  --sige-bg: #f8fafc;
+  --sige-surface: #ffffff;
+  --sige-border: #e2e8f0;
+  --sige-text: #0f172a;
+  --sige-text-muted: #64748b;
+
+  /* Sombras e raios consistentes */
+  --sige-radius-sm: 8px;
+  --sige-radius-md: 12px;
+  --sige-radius-lg: 16px;
+  --sige-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --sige-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --sige-shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.08);
+
+  /* Bootstrap overrides (vence !important do CDN por especificidade no :root) */
+  --bs-primary: var(--sige-primary);
+  --bs-primary-rgb: var(--sige-primary-rgb);
+  --bs-secondary: var(--sige-secondary);
+  --bs-link-color: var(--sige-primary);
+  --bs-link-hover-color: var(--sige-primary-strong);
+  --bs-body-bg: var(--sige-bg);
+  --bs-body-color: var(--sige-text);
+}
+
+/* -----------------------------------------------------------
+   Body / superfícies
+   ----------------------------------------------------------- */
+
+html, body {
+  background-color: var(--sige-bg) !important;
+  color: var(--sige-text) !important;
+}
+
+/* -----------------------------------------------------------
+   Navbar (header) — usa a cor da empresa, com texto auto-contraste
+   Sobrescreve o gradiente verde hardcoded de base_completo.html
+   ----------------------------------------------------------- */
+
+.navbar.fixed-top,
+nav.navbar.fixed-top,
+nav.navbar-expand-lg.fixed-top {
+  background: var(--sige-header) !important;
+  background-image: none !important;
+  box-shadow: 0 2px 14px rgba(var(--sige-header-rgb), 0.25) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.navbar .navbar-brand,
+.navbar .nav-link,
+.navbar .navbar-toggler {
+  color: var(--sige-on-header) !important;
+}
+
+.navbar .navbar-brand i {
+  color: var(--sige-primary) !important;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.navbar .nav-link {
+  border-radius: var(--sige-radius-sm) !important;
+  transition: background-color 0.2s ease, color 0.2s ease !important;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: var(--sige-on-header) !important;
+}
+
+/* Item ativo do menu — destaque na cor primária com texto branco */
+.navbar .nav-link.active,
+.navbar-nav .nav-link.active {
+  background-color: var(--sige-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(var(--sige-primary-rgb), 0.35) !important;
+}
+
+/* Dropdown Comercial / outros — visual premium */
+.navbar .dropdown-menu {
+  border: 1px solid var(--sige-border) !important;
+  border-radius: var(--sige-radius-md) !important;
+  box-shadow: var(--sige-shadow-lg) !important;
+  padding: 0.5rem 0 !important;
+}
+
+.navbar .dropdown-menu .dropdown-header {
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: var(--sige-text-muted) !important;
+  padding: 0.4rem 1rem !important;
+}
+
+.navbar .dropdown-menu .dropdown-item {
+  padding: 0.55rem 1rem !important;
+  font-size: 0.9rem !important;
+  color: var(--sige-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+}
+
+.navbar .dropdown-menu .dropdown-item i {
+  width: 18px;
+  text-align: center;
+  color: var(--sige-primary);
+}
+
+.navbar .dropdown-menu .dropdown-item:hover,
+.navbar .dropdown-menu .dropdown-item:focus {
+  background-color: var(--sige-primary-soft) !important;
+  color: var(--sige-primary-strong) !important;
+}
+
+.navbar .dropdown-divider {
+  margin: 0.35rem 0.6rem !important;
+  border-color: var(--sige-border) !important;
+}
+
+/* Destaque do dropdown Comercial (Propostas) */
+.navbar #propostasDropdown {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  font-weight: 600 !important;
+}
+
+/* -----------------------------------------------------------
+   Botões — primário usa cor da empresa
+   ----------------------------------------------------------- */
+
+.btn-primary,
+.btn.btn-primary {
+  background: var(--sige-primary) !important;
+  background-image: none !important;
+  border-color: var(--sige-primary) !important;
+  color: #ffffff !important;
+  border-radius: var(--sige-radius-sm) !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(var(--sige-primary-rgb), 0.2) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn.btn-primary:hover {
+  background: var(--sige-primary-strong) !important;
+  background-image: none !important;
+  border-color: var(--sige-primary-strong) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(var(--sige-primary-rgb), 0.3) !important;
+}
+
+.btn-outline-primary {
+  color: var(--sige-primary) !important;
+  border-color: var(--sige-primary) !important;
+}
+.btn-outline-primary:hover {
+  background-color: var(--sige-primary) !important;
+  color: #ffffff !important;
+}
+
+.btn-link {
+  color: var(--sige-primary) !important;
+}
+
+/* -----------------------------------------------------------
+   Inputs / form-control / selects
+   ----------------------------------------------------------- */
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--sige-primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--sige-primary-rgb), 0.15) !important;
+}
+
+/* -----------------------------------------------------------
+   Cards — refresh sutil (mais respiração, sombra suave)
+   ----------------------------------------------------------- */
+
+.card {
+  border: 1px solid var(--sige-border) !important;
+  border-radius: var(--sige-radius-md) !important;
+  box-shadow: var(--sige-shadow-sm) !important;
+}
+
+.card .card-header {
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%) !important;
+  border-bottom: 1px solid var(--sige-border) !important;
+  border-radius: var(--sige-radius-md) var(--sige-radius-md) 0 0 !important;
+}
+
+.card .card-header.bg-primary,
+.card .card-header.bg-primary * {
+  color: #ffffff !important;
+}
+.card .card-header.bg-primary {
+  background: var(--sige-primary) !important;
+  background-image: none !important;
+}
+
+/* -----------------------------------------------------------
+   Tabs (.nav-tabs) — TASK #191: corrige abas invisíveis
+   em detalhes da obra e em outras telas que usam o padrão.
+   Vence a regra `.nav-link.active { background:#000 }` herdada.
+   ----------------------------------------------------------- */
+
+.nav-tabs {
+  border-bottom: 1px solid var(--sige-border) !important;
+  gap: 0.25rem;
+}
+
+.nav-tabs .nav-link,
+.nav-pills .nav-link {
+  color: var(--sige-text-muted) !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--sige-radius-sm) var(--sige-radius-sm) 0 0 !important;
+  padding: 0.55rem 1rem !important;
+  font-weight: 500 !important;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.nav-tabs .nav-link:hover,
+.nav-pills .nav-link:hover {
+  color: var(--sige-primary) !important;
+  background-color: var(--sige-primary-soft) !important;
+  border-color: transparent !important;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+  color: var(--sige-primary) !important;
+  background-color: var(--sige-surface) !important;
+  border-color: var(--sige-border) var(--sige-border) var(--sige-surface) !important;
+  box-shadow: 0 -2px 0 var(--sige-primary) inset !important;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  color: #ffffff !important;
+  background-color: var(--sige-primary) !important;
+  box-shadow: 0 2px 8px rgba(var(--sige-primary-rgb), 0.3) !important;
+}
+
+/* -----------------------------------------------------------
+   Badges — cor primária sobrescrita
+   ----------------------------------------------------------- */
+
+.badge.bg-primary,
+.badge.text-bg-primary {
+  background-color: var(--sige-primary) !important;
+  color: #ffffff !important;
+}
+
+/* -----------------------------------------------------------
+   KPI cards — utilitário consistente (Task #191 step 8)
+   Use: <div class="sige-kpi sige-kpi-primary">
+          <div class="sige-kpi-icon"><i class="fas fa-..."></i></div>
+          <div class="sige-kpi-body">
+            <div class="sige-kpi-value">123</div>
+            <div class="sige-kpi-label">Label</div>
+          </div>
+        </div>
+   ----------------------------------------------------------- */
+
+.sige-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--sige-surface);
+  border: 1px solid var(--sige-border);
+  border-radius: var(--sige-radius-md);
+  box-shadow: var(--sige-shadow-sm);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.sige-kpi:hover {
+  box-shadow: var(--sige-shadow-md);
+  transform: translateY(-1px);
+}
+
+.sige-kpi-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  background: var(--sige-primary-soft);
+  color: var(--sige-primary);
+}
+
+.sige-kpi-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.sige-kpi-value {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: var(--sige-text);
+}
+
+.sige-kpi-label {
+  font-size: 0.8rem;
+  color: var(--sige-text-muted);
+  margin-top: 0.15rem;
+}
+
+/* Variantes coloridas (mantém ícone com fundo pastel) */
+.sige-kpi-success .sige-kpi-icon  { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
+.sige-kpi-warning .sige-kpi-icon  { background: rgba(234, 179, 8, 0.15); color: #b45309; }
+.sige-kpi-danger  .sige-kpi-icon  { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+.sige-kpi-info    .sige-kpi-icon  { background: rgba(14, 165, 233, 0.12); color: #0284c7; }
+
+/* -----------------------------------------------------------
+   Headings / hierarquia (telas densas)
+   ----------------------------------------------------------- */
+
+.section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sige-text-muted);
+  margin: 1.5rem 0 0.6rem;
+}
+
+/* -----------------------------------------------------------
+   Tabelas — cabeçalho mais leve
+   ----------------------------------------------------------- */
+
+.table > :not(caption) > * > * {
+  border-color: var(--sige-border) !important;
+}
+
+.table thead th {
+  background-color: #f8fafc !important;
+  color: var(--sige-text) !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid var(--sige-border) !important;
+}
+
+/* -----------------------------------------------------------
+   Theme preset cards (UI de configuração — Task #191 step 9)
+   ----------------------------------------------------------- */
+
+.tema-preset-card {
+  border: 2px solid var(--sige-border);
+  border-radius: var(--sige-radius-md);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--sige-surface);
+}
+
+.tema-preset-card:hover {
+  border-color: var(--sige-primary);
+  box-shadow: var(--sige-shadow-md);
+}
+
+.tema-preset-card.is-active {
+  border-color: var(--sige-primary);
+  box-shadow: 0 0 0 3px var(--sige-primary-soft);
+}
+
+.tema-preset-swatches {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0.6rem;
+}
+
+.tema-preset-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.tema-preset-name {
+  font-weight: 600;
+  color: var(--sige-text);
+  margin-bottom: 0.15rem;
+}
+
+.tema-preset-desc {
+  font-size: 0.8rem;
+  color: var(--sige-text-muted);
+}
+
+.tema-preview-box {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sige-border);
+  border-radius: var(--sige-radius-md);
+  overflow: hidden;
+  margin-top: 1rem;
+}
+
+.tema-preview-header {
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+}
+
+.tema-preview-body {
+  padding: 1rem;
+}
+
+.tema-preview-btn {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--sige-radius-sm);
+  color: #fff;
+  font-weight: 500;
+  font-size: 0.85rem;
+}

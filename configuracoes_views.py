@@ -168,6 +168,86 @@ def salvar_empresa():
     
     return redirect(url_for('configuracoes.empresa'))
 
+
+# ---------------------------------------------------------------------------
+# Task #191 — Tema do Sistema (preset + 4 cores customizadas)
+# ---------------------------------------------------------------------------
+@configuracoes_bp.route('/empresa/tema', methods=['POST'])
+@login_required
+@admin_required
+def salvar_tema():
+    """Salva o tema do sistema (preset + 4 cores) para a empresa logada.
+
+    Estratégia:
+    - Se um `tema_preset` válido foi enviado, aplica o preset (sobrescrevendo
+      as 4 cores).
+    - Caso contrário, aceita as cores hex enviadas pelo usuário (apenas as
+      válidas substituem; inválidas são silenciosamente ignoradas para não
+      perder dados).
+    """
+    from multitenant_helper import get_admin_id
+    from services.tema_service import (
+        PRESETS, aplicar_preset, is_hex_color, get_tema_da_empresa,
+    )
+
+    admin_id = get_admin_id()
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+
+    if not config:
+        config = ConfiguracaoEmpresa()
+        config.admin_id = admin_id
+        config.nome_empresa = getattr(current_user, 'username', None) or 'SIGE'
+
+    try:
+        preset_id = (request.form.get('tema_preset') or '').strip()
+        cor_prim   = (request.form.get('cor_primaria') or '').strip()
+        cor_sec    = (request.form.get('cor_secundaria') or '').strip()
+        cor_header = (request.form.get('cor_header_nav') or '').strip()
+        cor_fundo  = (request.form.get('cor_fundo_app') or '').strip()
+
+        tema_atual = get_tema_da_empresa(config)
+        preset_aplicado = False
+        if preset_id and preset_id in PRESETS:
+            preset = PRESETS[preset_id]
+            # Só aplicamos o preset se as 4 cores enviadas forem idênticas às
+            # do preset (significa "usuário escolheu o preset"); caso contrário,
+            # respeitamos as cores customizadas e mantemos `tema_preset` como
+            # 'custom'.
+            if (cor_prim   == preset['cor_primaria']
+                and cor_sec    == preset['cor_secundaria']
+                and cor_header == preset['cor_header_nav']
+                and cor_fundo  == preset['cor_fundo_app']):
+                aplicar_preset(config, preset_id)
+                preset_aplicado = True
+
+        if not preset_aplicado:
+            if is_hex_color(cor_prim):
+                config.cor_primaria = cor_prim.lower()
+            if is_hex_color(cor_sec):
+                config.cor_secundaria = cor_sec.lower()
+            if is_hex_color(cor_header):
+                config.cor_header_nav = cor_header.lower()
+            if is_hex_color(cor_fundo):
+                config.cor_fundo_app = cor_fundo.lower()
+            # Sem match exato com preset → marca como 'custom'
+            config.tema_preset = 'custom'
+
+        config.atualizado_em = datetime.utcnow()
+        config = db.session.merge(config)
+        db.session.commit()
+        flash('Tema do sistema atualizado com sucesso!', 'success')
+        logger.info(
+            f"Tema salvo (admin_id={admin_id}, preset={config.tema_preset}, "
+            f"cores=[prim={config.cor_primaria}, header={config.cor_header_nav}])"
+        )
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao salvar tema: {str(e)}', 'error')
+        logger.exception("Erro ao salvar tema do sistema")
+
+    return redirect(url_for('configuracoes.empresa') + '#tema-sistema')
+
+
 @configuracoes_bp.route('/api/empresa')
 @login_required
 def api_empresa():
