@@ -3833,6 +3833,7 @@ def executar_migracoes():
             (131, "Task #166 — coeficiente_padrao em insumo (sugestão p/ composição)", migration_131_insumo_coeficiente_padrao),
             (132, "Task #172 — Obra.cliente_id FK + backfill por nome/email do cliente", migration_132_obra_cliente_id_fk),
             (133, "Task #173 — engenheiro_responsavel + FKs em configuracao_empresa e propostas_comerciais (backfill do legado)", migration_133_engenheiro_responsavel),
+            (134, "Task #174 — proposta_clausula + proposta_template_clausula (backfill cláusulas configuráveis)", migration_134_clausulas_configuraveis),
         ]
         
         # Executar cada migração com rastreamento
@@ -10859,6 +10860,198 @@ def migration_133_engenheiro_responsavel():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 133: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_134_clausulas_configuraveis():
+    """Migration 134 (Task #174): cláusulas configuráveis em Proposta/PropostaTemplate.
+
+    Estratégia:
+      1. CREATE TABLE proposta_clausula (proposta_id FK CASCADE, admin_id,
+         titulo, texto, ordem, timestamps).
+      2. CREATE TABLE proposta_template_clausula (proposta_template_id FK
+         CASCADE, admin_id, titulo, texto, ordem, timestamps).
+      3. Backfill — para cada Proposta existente sem cláusulas, cria a
+         partir das colunas texto fixas (condicoes_pagamento,
+         observacoes_entrega, garantias, consideracoes_gerais), preservando
+         a ordem visual original (5,6,7,8 do PDF).
+      4. Backfill — para cada PropostaTemplate existente sem cláusulas,
+         cria a partir de (secao_objeto, condicoes_pagamento,
+         condicoes_entrega, garantias, consideracoes_gerais,
+         secao_validade) na ordem 1..6.
+      5. Cláusulas com texto vazio (após strip) são puladas — equivale a
+         "não exibir".
+
+    As colunas legadas em propostas_comerciais e proposta_templates
+    permanecem inertes para rollback seguro (out-of-scope dropá-las).
+    Idempotente: re-executar não duplica cláusulas (filtra por
+    NOT EXISTS).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1) Tabela proposta_clausula
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS proposta_clausula (
+                id SERIAL PRIMARY KEY,
+                proposta_id INTEGER NOT NULL
+                    REFERENCES propostas_comerciais(id) ON DELETE CASCADE,
+                admin_id INTEGER NULL REFERENCES usuario(id),
+                titulo VARCHAR(200) NOT NULL DEFAULT '',
+                texto TEXT NOT NULL DEFAULT '',
+                ordem INTEGER NOT NULL DEFAULT 1,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_proposta_clausula_proposta_id "
+            "ON proposta_clausula (proposta_id)"
+        )
+
+        # 2) Tabela proposta_template_clausula
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS proposta_template_clausula (
+                id SERIAL PRIMARY KEY,
+                proposta_template_id INTEGER NOT NULL
+                    REFERENCES proposta_templates(id) ON DELETE CASCADE,
+                admin_id INTEGER NULL REFERENCES usuario(id),
+                titulo VARCHAR(200) NOT NULL DEFAULT '',
+                texto TEXT NOT NULL DEFAULT '',
+                ordem INTEGER NOT NULL DEFAULT 1,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS ix_proposta_template_clausula_template_id "
+            "ON proposta_template_clausula (proposta_template_id)"
+        )
+
+        # 3) Backfill Proposta — só para propostas que ainda não têm cláusulas.
+        # Ordem visual do PDF original: 5=Pagamento, 6=Entrega,
+        # 7=Garantias, 8=Considerações Gerais.
+        proposta_clausulas_def = [
+            (1, "Condições de Pagamento", "condicoes_pagamento"),
+            (2, "Condições de Entrega",   "observacoes_entrega"),
+            (3, "Garantias",              "garantias"),
+            (4, "Considerações Gerais",   "consideracoes_gerais"),
+        ]
+
+        cursor.execute(
+            """
+            SELECT id, admin_id,
+                   COALESCE(condicoes_pagamento, ''),
+                   COALESCE(observacoes_entrega, ''),
+                   COALESCE(garantias, ''),
+                   COALESCE(consideracoes_gerais, '')
+              FROM propostas_comerciais p
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM proposta_clausula c
+                  WHERE c.proposta_id = p.id
+             )
+            """
+        )
+        propostas = cursor.fetchall()
+        propostas_backfill = 0
+        for (pid, admin_id, c_pag, c_ent, c_gar, c_geral) in propostas:
+            valores = {
+                'condicoes_pagamento':   c_pag,
+                'observacoes_entrega':   c_ent,
+                'garantias':             c_gar,
+                'consideracoes_gerais':  c_geral,
+            }
+            for ordem, titulo, key in proposta_clausulas_def:
+                texto = (valores.get(key) or '').strip()
+                if not texto:
+                    # Cláusula sem texto: pula (equivalente a "removida").
+                    continue
+                cursor.execute(
+                    """
+                    INSERT INTO proposta_clausula
+                        (proposta_id, admin_id, titulo, texto, ordem,
+                         criado_em, atualizado_em)
+                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                    """,
+                    (pid, admin_id, titulo[:200], texto, ordem),
+                )
+            propostas_backfill += 1
+
+        # 4) Backfill PropostaTemplate
+        template_clausulas_def = [
+            (1, "Objeto",                 "secao_objeto"),
+            (2, "Condições de Pagamento", "condicoes_pagamento"),
+            (3, "Condições de Entrega",   "condicoes_entrega"),
+            (4, "Garantias",              "garantias"),
+            (5, "Considerações Gerais",   "consideracoes_gerais"),
+            (6, "Validade da Proposta",   "secao_validade"),
+        ]
+
+        cursor.execute(
+            """
+            SELECT id, admin_id,
+                   COALESCE(secao_objeto, ''),
+                   COALESCE(condicoes_pagamento, ''),
+                   COALESCE(condicoes_entrega, ''),
+                   COALESCE(garantias, ''),
+                   COALESCE(consideracoes_gerais, ''),
+                   COALESCE(secao_validade, '')
+              FROM proposta_templates t
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM proposta_template_clausula c
+                  WHERE c.proposta_template_id = t.id
+             )
+            """
+        )
+        templates = cursor.fetchall()
+        templates_backfill = 0
+        for (tid, admin_id, s_obj, c_pag, c_ent, c_gar, c_geral, s_val) in templates:
+            valores = {
+                'secao_objeto':          s_obj,
+                'condicoes_pagamento':   c_pag,
+                'condicoes_entrega':     c_ent,
+                'garantias':             c_gar,
+                'consideracoes_gerais':  c_geral,
+                'secao_validade':        s_val,
+            }
+            for ordem, titulo, key in template_clausulas_def:
+                texto = (valores.get(key) or '').strip()
+                if not texto:
+                    continue
+                cursor.execute(
+                    """
+                    INSERT INTO proposta_template_clausula
+                        (proposta_template_id, admin_id, titulo, texto, ordem,
+                         criado_em, atualizado_em)
+                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                    """,
+                    (tid, admin_id, titulo[:200], texto, ordem),
+                )
+            templates_backfill += 1
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 134: cláusulas configuráveis criadas — "
+            "propostas_backfill=%s, templates_backfill=%s",
+            propostas_backfill, templates_backfill,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 134: {e}")
         if connection:
             try:
                 connection.rollback()

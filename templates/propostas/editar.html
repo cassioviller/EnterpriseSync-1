@@ -22,6 +22,12 @@
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('propostas.editar', id=proposta.id) }}" id="formEditarProposta">
+                {# Task #174 — sentinela: indica ao backend que o bloco de cláusulas
+                   foi submetido pela UI (e portanto deve ser reprocessado mesmo
+                   quando o usuário removeu todas as linhas via "remover"). Sem ela,
+                   um POST sem nenhum input clausula_* preserva os dados existentes
+                   (compatibilidade com chamadas legadas). #}
+                <input type="hidden" name="clausulas_payload_present" value="1">
                 <div class="row">
                     <!-- Dados do Cliente -->
                     <div class="col-md-6">
@@ -193,34 +199,64 @@
                             </small>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Condições de Pagamento</label>
-                            <textarea class="form-control" name="condicoes_pagamento" rows="3">{{ proposta.condicoes_pagamento or '' }}</textarea>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Garantias</label>
-                            <textarea class="form-control" name="garantias" rows="3">{{ proposta.garantias or '' }}</textarea>
-                        </div>
                     </div>
-                    
+
                     <div class="col-md-6">
                         <h6 class="text-primary mb-3">Itens Inclusos/Exclusos</h6>
                         <div class="mb-3">
                             <label class="form-label">Itens Inclusos</label>
                             <textarea class="form-control" name="itens_inclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_inclusos|join(';') if proposta.itens_inclusos else '' }}</textarea>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="form-label">Itens Exclusos</label>
                             <textarea class="form-control" name="itens_exclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_exclusos|join(';') if proposta.itens_exclusos else '' }}</textarea>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Considerações Gerais</label>
-                            <textarea class="form-control" name="consideracoes_gerais" rows="3">{{ proposta.consideracoes_gerais or '' }}</textarea>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                {# Task #174 — cláusulas configuráveis (Condições de Pagamento,
+                   Garantias, Considerações Gerais e cláusulas extras). #}
+                <h6 class="text-primary mb-3">
+                    Cláusulas da Proposta
+                    <small class="text-muted">— título + texto, ordenáveis. Texto vazio = não aparece no PDF/portal.</small>
+                </h6>
+                <div id="clausulasContainer">
+                    {% for clausula in proposta.clausulas|sort(attribute='ordem') %}
+                    <div class="clausula-item border rounded p-3 mb-2">
+                        <input type="hidden" class="clausula-ordem" name="clausula_ordem" value="{{ clausula.ordem }}">
+                        <div class="row g-2 align-items-start">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1 small text-muted">Título</label>
+                                <input type="text" class="form-control" name="clausula_titulo"
+                                       value="{{ clausula.titulo or '' }}"
+                                       placeholder="Ex: Condições de Pagamento">
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label mb-1 small text-muted">Texto (vazio = remover)</label>
+                                <textarea class="form-control" name="clausula_texto" rows="3">{{ clausula.texto or '' }}</textarea>
+                            </div>
+                            <div class="col-md-1 d-flex flex-column gap-1 pt-md-4">
+                                <button type="button" class="btn btn-sm btn-outline-secondary clausula-up" title="Mover para cima">
+                                    <i class="fas fa-arrow-up"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary clausula-down" title="Mover para baixo">
+                                    <i class="fas fa-arrow-down"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger clausula-remove" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
+                </div>
+                <div class="mb-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnAdicionarClausula">
+                        <i class="fas fa-plus"></i> Nova cláusula
+                    </button>
                 </div>
 
                 <div class="text-end">
@@ -332,6 +368,80 @@ function calcularTotal() {
 document.addEventListener('DOMContentLoaded', function() {
     calcularTotal();
 });
+
+// Task #174 — gerência das cláusulas configuráveis
+(function(){
+    const container = document.getElementById('clausulasContainer');
+    const btnAdd    = document.getElementById('btnAdicionarClausula');
+    if (!container || !btnAdd) return;
+
+    function renumerar() {
+        const itens = container.querySelectorAll('.clausula-item');
+        itens.forEach((el, idx) => {
+            const ord = el.querySelector('.clausula-ordem');
+            if (ord) ord.value = String(idx + 1);
+        });
+    }
+
+    function novaClausulaHtml(ordem) {
+        const wrap = document.createElement('div');
+        wrap.className = 'clausula-item border rounded p-3 mb-2';
+        wrap.innerHTML = `
+            <input type="hidden" class="clausula-ordem" name="clausula_ordem" value="${ordem}">
+            <div class="row g-2 align-items-start">
+                <div class="col-md-4">
+                    <label class="form-label mb-1 small text-muted">Título</label>
+                    <input type="text" class="form-control" name="clausula_titulo"
+                           placeholder="Ex: Condições de Pagamento">
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label mb-1 small text-muted">Texto (vazio = remover)</label>
+                    <textarea class="form-control" name="clausula_texto" rows="3"></textarea>
+                </div>
+                <div class="col-md-1 d-flex flex-column gap-1 pt-md-4">
+                    <button type="button" class="btn btn-sm btn-outline-secondary clausula-up" title="Mover para cima">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary clausula-down" title="Mover para baixo">
+                        <i class="fas fa-arrow-down"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger clausula-remove" title="Remover">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        return wrap;
+    }
+
+    btnAdd.addEventListener('click', function(){
+        const ordem = container.querySelectorAll('.clausula-item').length + 1;
+        container.appendChild(novaClausulaHtml(ordem));
+        renumerar();
+    });
+
+    container.addEventListener('click', function(ev){
+        const item = ev.target.closest('.clausula-item');
+        if (!item) return;
+        if (ev.target.closest('.clausula-remove')) {
+            item.remove();
+            renumerar();
+            return;
+        }
+        if (ev.target.closest('.clausula-up')) {
+            const prev = item.previousElementSibling;
+            if (prev) container.insertBefore(item, prev);
+            renumerar();
+            return;
+        }
+        if (ev.target.closest('.clausula-down')) {
+            const next = item.nextElementSibling;
+            if (next) container.insertBefore(next, item);
+            renumerar();
+            return;
+        }
+    });
+})();
 </script>
 
 <!-- Task #82/#86: Catálogo de Serviços — datalist global + autofill por delegação -->

@@ -1,0 +1,14 @@
+{# Task #174 — partial compartilhado de cláusulas configuráveis.
+   Renderiza a lista ordenada de cláusulas (título + texto). Cláusulas
+   com texto vazio são puladas (equivale a "remover"). É usado por
+   templates/propostas/pdf.html, pdf_estruturas_vale_paginado.html e
+   portal_cliente.html — formatação fica idêntica nos três. #}
+{% set _clausulas_lista = (clausulas if clausulas is defined else []) or [] %}
+{% for c in _clausulas_lista|sort(attribute='ordem') %}
+  {% if c.texto and c.texto.strip() %}
+    <div class="proposta-clausula" style="margin: 18px 0; page-break-inside: avoid;">
+      <div class="proposta-clausula-titulo" style="font-weight: 700; text-transform: uppercase; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #e9ecef; font-size: 1.05em; color: inherit;">{{ c.titulo }}</div>
+      <div class="proposta-clausula-texto" style="white-space: pre-line; line-height: 1.5;">{{ c.texto }}</div>
+    </div>
+  {% endif %}
+{% endfor %}

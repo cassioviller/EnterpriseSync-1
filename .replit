@@ -40,6 +40,10 @@ args = "test-cronograma-duplicado-rdo"
 task = "workflow.run"
 args = "test-rdo-unificado-responsaveis"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-clausulas-configuraveis"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -100,6 +104,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python tests/test_rdo_unificado_responsaveis.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "test-clausulas-configuraveis"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/test_clausulas_configuraveis.py"
 
 [workflows.workflow.metadata]
 outputType = "console"

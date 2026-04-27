@@ -257,40 +257,23 @@
     </div>
     {% endif %}
 
-    <!-- Condições de Pagamento -->
+    {# Task #174 — cláusulas configuráveis (substitui blocos fixos
+       Pagamento/Entrega/Garantias/Considerações). Prazo de entrega e
+       Validade ficam fora da lista — continuam derivados de
+       prazo_entrega_dias e validade_dias. #}
     <div class="section">
-        <h2 class="section-title">5. CONDIÇÕES DE PAGAMENTO</h2>
-        <div style="white-space: pre-line;">{{ proposta.condicoes_pagamento }}</div>
+        <p><strong>Prazo estimado de entrega:</strong> {{ proposta.prazo_entrega_dias }} dias após confirmação do pedido e aprovação do projeto.</p>
     </div>
 
-    <!-- Condições de Entrega -->
     <div class="section">
-        <h2 class="section-title">6. CONDIÇÕES DE ENTREGA</h2>
-        <p><strong>Prazo estimado:</strong> {{ proposta.prazo_entrega_dias }} dias após confirmação do pedido e aprovação do projeto.</p>
-        {% if proposta.observacoes_entrega %}
-        <div style="white-space: pre-line;">{{ proposta.observacoes_entrega }}</div>
-        {% endif %}
+        {% with clausulas = proposta.clausulas %}
+            {% include 'propostas/_clausulas.html' %}
+        {% endwith %}
     </div>
-
-    <!-- Garantias -->
-    {% if proposta.garantias %}
-    <div class="section">
-        <h2 class="section-title">7. GARANTIAS</h2>
-        <div style="white-space: pre-line;">{{ proposta.garantias }}</div>
-    </div>
-    {% endif %}
-
-    <!-- Considerações Gerais -->
-    {% if proposta.consideracoes_gerais %}
-    <div class="section">
-        <h2 class="section-title">8. CONSIDERAÇÕES GERAIS</h2>
-        <div style="white-space: pre-line;">{{ proposta.consideracoes_gerais }}</div>
-    </div>
-    {% endif %}
 
     <!-- Validade -->
     <div class="section">
-        <h2 class="section-title">9. VALIDADE DA PROPOSTA</h2>
+        <h2 class="section-title">VALIDADE DA PROPOSTA</h2>
         <p>Esta proposta tem validade de <strong>{{ proposta.validade_dias }} dias</strong> a partir da data de sua emissão.</p>
     </div>
 

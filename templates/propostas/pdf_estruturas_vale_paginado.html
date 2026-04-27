@@ -592,75 +592,48 @@
         {% endif %}
 
         <div class="page-content dynamic-content">
-            <!-- 5. CONDIÇÕES DE PAGAMENTO -->
-        <div class="section">
-            <div class="section-title">5. CONDIÇÕES DE PAGAMENTO</div>
-            {% if proposta.condicoes_pagamento %}
-                <div class="section-content">
-                    {{ proposta.condicoes_pagamento | replace('\n', '<br>')|safe }}
-                </div>
-            {% else %}
-                <div class="bullet-list">
-                    <p>25% de entrada na assinatura do contrato</p>
-                    <p>50% compra dos perfis</p>
-                    <p>25% após a conclusão da montagem</p>
-                    <p>Considerar 13,5% para emissão de nota fiscal</p>
-                </div>
-            {% endif %}
-        </div>
+            {# Task #174 — cláusulas configuráveis (REV4).
+               Renderização unificada: TODAS as cláusulas configuráveis
+               (Condições de Pagamento, Garantias, Considerações Gerais e
+               quaisquer extras) passam pelo partial _clausulas.html, na
+               ordem definida por `ordem`. Cláusula com texto vazio NÃO
+               aparece (semântica de "remover via UI" preservada igual aos
+               outros 2 renderers — pdf.html e portal_cliente.html).
 
-        <!-- 6. CONDIÇÕES DE ENTREGA -->
-        <div class="section">
-            <div class="section-title">6. CONDIÇÕES DE ENTREGA</div>
-            <div class="section-content">
-                {% if proposta.prazo_entrega_dias %}
-                <p>Prazo de execução: {{ proposta.prazo_entrega_dias }} dias após aprovação do projeto e liberação do cliente.</p>
-                {% else %}
-                <p>Prazos estimados para montagem das estruturas 90 dias com agendamento prévio.</p>
-                {% endif %}
+               Os campos legados de texto (proposta.condicoes_pagamento,
+               garantias, consideracoes_gerais) NÃO são consultados aqui:
+               a migration 134 já fez backfill convertendo-os em cláusulas
+               para todas as propostas existentes. Para propostas novas,
+               /propostas/criar seeda cláusulas a partir do form (ou copia
+               de PropostaTemplate quando informado template_id).
+
+               As seções 6 (CONDIÇÕES DE ENTREGA) e 9 (VALIDADE) seguem
+               derivadas dos campos numéricos prazo_entrega_dias e
+               validade_dias — não são cláusulas configuráveis. #}
+
+            {# Cláusulas configuráveis (todas, em ordem) #}
+            {% with clausulas = proposta.clausulas %}
+                {% include 'propostas/_clausulas.html' %}
+            {% endwith %}
+
+            <!-- CONDIÇÕES DE ENTREGA (derivada de prazo_entrega_dias) -->
+            <div class="section">
+                <div class="section-title">CONDIÇÕES DE ENTREGA</div>
+                <div class="section-content">
+                    {% if proposta.prazo_entrega_dias %}
+                    <p>Prazo de execução: {{ proposta.prazo_entrega_dias }} dias após aprovação do projeto e liberação do cliente.</p>
+                    {% else %}
+                    <p>Prazos estimados para montagem das estruturas 90 dias com agendamento prévio.</p>
+                    {% endif %}
+                </div>
             </div>
-        </div>
 
-        <!-- 7. GARANTIAS -->
-        <div class="section">
-            <div class="section-title">7. GARANTIAS</div>
-            {% if proposta.garantias %}
+            <!-- VALIDADE DA PROPOSTA (derivada de validade_dias) -->
+            <div class="section">
+                <div class="section-title">VALIDADE DA PROPOSTA:</div>
                 <div class="section-content">
-                    {{ proposta.garantias | replace('\n', '<br>')|safe }}
+                    <p>Esta proposta tem validade de {{ proposta.validade_dias or '7' }} dias a partir da data de emissão.</p>
                 </div>
-            {% else %}
-                <div class="section-content">
-                    <p>A garantia da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }} limita-se a reparar ou substituir os itens defeituosos de seu fornecimento, sem qualquer outra despesa.</p>
-                    <br>
-                    <p>A COMPRADORA não poderá executar qualquer serviço atinente à garantia, nem mesmo permitir que terceiros o façam, sem autorização prévia e por escrito da {{ config_empresa.nome_empresa if config_empresa and config_empresa.nome_empresa else 'SIGE' }}.</p>
-                </div>
-            {% endif %}
-        </div>
-
-        <!-- 8. CONSIDERAÇÕES GERAIS -->
-        <div class="section">
-            <div class="section-title">8. CONSIDERAÇÕES GERAIS</div>
-            {% if proposta.condicoes %}
-                <div class="section-content">
-                    {{ proposta.condicoes | replace('\n', '<br>')|safe }}
-                </div>
-            {% else %}
-                <div class="section-content">
-                    <p><strong>Proposta válida por {{ proposta.validade_dias or '7' }} dias a partir da data de emissão</strong></p>
-                    <br>
-                    <p><strong>Execução conforme normas técnicas brasileiras (NBR 8800, NBR 14762)</strong></p>
-                    <br>
-                    <p><strong>Projeto executivo detalhado incluído no escopo de fornecimento</strong></p>
-                </div>
-            {% endif %}
-        </div>
-
-        <!-- 9. VALIDADE DA PROPOSTA -->
-        <div class="section">
-            <div class="section-title">9. VALIDADE DA PROPOSTA:</div>
-            <div class="section-content">
-                <p>Esta proposta tem validade de {{ proposta.validade_dias or '7' }} dias a partir da data de emissão.</p>
-            </div>
             </div>
         </div>
     </div>

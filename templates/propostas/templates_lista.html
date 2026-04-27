@@ -1,0 +1,76 @@
+{% extends "base_completo.html" %}
+{% block title %}Templates de Proposta - SIGE{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-1">Templates de Proposta</h2>
+            <p class="text-muted mb-0">Configure cláusulas reutilizáveis (objeto, condições de pagamento, garantias, etc.) que serão copiadas ao criar uma nova proposta.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('propostas.novo_template') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Template
+            </a>
+            <a href="{{ url_for('propostas.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            {% if templates %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Categoria</th>
+                            <th class="text-center">Cláusulas</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in templates %}
+                        <tr>
+                            <td>
+                                <strong>{{ t.nome }}</strong>
+                                {% if t.descricao %}
+                                <div class="small text-muted">{{ t.descricao|truncate(80) }}</div>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-info">{{ t.categoria or '—' }}</span></td>
+                            <td class="text-center">{{ t.clausulas|length }}</td>
+                            <td class="text-center">
+                                {% if t.ativo %}
+                                <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('propostas.editar_template', id=t.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-5 text-center text-muted">
+                <i class="fas fa-file-contract fa-3x mb-3"></i>
+                <p class="mb-3">Nenhum template cadastrado ainda.</p>
+                <a href="{{ url_for('propostas.novo_template') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Criar primeiro template
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

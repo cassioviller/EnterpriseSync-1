@@ -31,6 +31,44 @@
               <span class="text-muted small ms-2">— ou siga abaixo para criar manualmente (modo legado).</span>
             </div>
             <form method="POST" action="{{ url_for('propostas.criar') }}" id="formNovaProposta">
+                {# Task #174 — Selector opcional de PropostaTemplate.
+                   Quando informado, /propostas/criar copia as cláusulas
+                   do template para a Proposta nova (em vez de seedar a
+                   partir dos campos legados condicoes_pagamento/garantias/
+                   consideracoes_gerais). É opcional — vazio = comportamento
+                   legado preservado. #}
+                {% if templates_proposta and templates_proposta|length > 0 %}
+                <div class="alert alert-info mb-3" style="border-left: 4px solid #0dcaf0;">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label for="template_id" class="form-label mb-1">
+                                <i class="fas fa-file-import me-1"></i>
+                                <strong>Template de Cláusulas (opcional)</strong>
+                            </label>
+                            <small class="text-muted d-block">
+                                Use um template para reaproveitar Pagamento, Garantias e demais cláusulas.
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <select class="form-select" name="template_id" id="template_id">
+                                <option value="">— Sem template (usar campos legado abaixo) —</option>
+                                {% for t in templates_proposta %}
+                                <option value="{{ t.id }}">
+                                    {{ t.nome }}{% if t.categoria %} ({{ t.categoria }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2 text-end">
+                            <a href="{{ url_for('propostas.listar_templates') }}" class="btn btn-sm btn-outline-secondary"
+                               title="Gerenciar templates" target="_blank">
+                                <i class="fas fa-cog"></i> Gerenciar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <div class="row">
                     <!-- Dados do Cliente -->
                     <div class="col-md-6">

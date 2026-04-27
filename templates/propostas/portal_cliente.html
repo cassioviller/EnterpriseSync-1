@@ -611,15 +611,9 @@
             </div>
         {% endif %}
 
-        <!-- Condições -->
+        <!-- Prazo de Execução (numérico) — Task #174: cláusulas textuais
+             vão para o partial unificado abaixo. -->
         <div class="proposal-card">
-            <h4 class="section-title">
-                <i class="fas fa-credit-card me-2"></i>Condições de Pagamento
-            </h4>
-            <div class="p-3 bg-light rounded mb-3">
-                <div style="white-space: pre-line; line-height: 1.5;">{{ proposta.condicoes_pagamento }}</div>
-            </div>
-            
             <h4 class="section-title">
                 <i class="fas fa-calendar-alt me-2"></i>Prazo de Execução
             </h4>
@@ -628,11 +622,7 @@
                     <div class="display-6 fw-bold text-primary">{{ proposta.prazo_entrega_dias }}</div>
                     <div class="text-muted">dias úteis</div>
                 </div>
-                <p class="text-center mb-2">após confirmação do pedido e aprovação do projeto</p>
-                {% if proposta.observacoes_entrega %}
-                <hr>
-                <div style="white-space: pre-line; font-size: 0.9rem;">{{ proposta.observacoes_entrega }}</div>
-                {% endif %}
+                <p class="text-center mb-0">após confirmação do pedido e aprovação do projeto</p>
             </div>
         </div>
 
@@ -671,17 +661,15 @@
             {% endif %}
         </div>
 
-        <!-- Garantias -->
-        {% if proposta.garantias %}
+        {# Task #174 — cláusulas configuráveis (Pagamento, Entrega,
+           Garantias, Considerações Gerais e cláusulas extras). Renderizadas
+           pelo mesmo partial usado nos PDFs — formatação fica idêntica
+           nos três. Cláusula com texto vazio é pulada. #}
         <div class="proposal-card">
-            <h4 class="section-title">
-                <i class="fas fa-shield-alt text-primary"></i> Garantias
-            </h4>
-            <div class="p-3 bg-light rounded">
-                <div style="white-space: pre-line;">{{ proposta.garantias }}</div>
-            </div>
+            {% with clausulas = proposta.clausulas %}
+                {% include 'propostas/_clausulas.html' %}
+            {% endwith %}
         </div>
-        {% endif %}
 
         <!-- Ações do Cliente -->
         {% if proposta.status == 'ENVIADA' or proposta.status == 'enviada' %}

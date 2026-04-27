@@ -2898,6 +2898,79 @@ class PropostaItem(db.Model):
             'item_ordem_no_grupo': self.item_ordem_no_grupo
         }
 
+class PropostaClausula(db.Model):
+    """Task #174 — cláusula textual configurável de uma Proposta.
+
+    Cada Proposta carrega uma lista ordenada de cláusulas (título + texto +
+    ordem). Cláusula com ``texto`` vazio é considerada removida e não
+    aparece no PDF nem no portal do cliente. Substitui os campos fixos
+    ``condicoes_pagamento``, ``garantias`` e ``consideracoes_gerais`` no
+    nível de renderização — esses campos são mantidos inertes em
+    ``Proposta`` para rollback seguro.
+    """
+    __tablename__ = 'proposta_clausula'
+
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_id = db.Column(
+        db.Integer,
+        db.ForeignKey('propostas_comerciais.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    titulo = db.Column(db.String(200), nullable=False, default='')
+    texto = db.Column(db.Text, nullable=False, default='')
+    ordem = db.Column(db.Integer, nullable=False, default=1)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow,
+                              onupdate=datetime.utcnow)
+
+    proposta = db.relationship(
+        'Proposta',
+        backref=db.backref(
+            'clausulas',
+            order_by='PropostaClausula.ordem',
+            cascade='all, delete-orphan',
+            lazy='select',
+        ),
+    )
+
+
+class PropostaTemplateClausula(db.Model):
+    """Task #174 — cláusula textual configurável de um PropostaTemplate.
+
+    Estrutura espelha :class:`PropostaClausula`. Quando uma nova proposta
+    é gerada a partir do template, a lista de cláusulas é copiada
+    integralmente (preservando ordem e título).
+    """
+    __tablename__ = 'proposta_template_clausula'
+
+    id = db.Column(db.Integer, primary_key=True)
+    proposta_template_id = db.Column(
+        db.Integer,
+        db.ForeignKey('proposta_templates.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    titulo = db.Column(db.String(200), nullable=False, default='')
+    texto = db.Column(db.Text, nullable=False, default='')
+    ordem = db.Column(db.Integer, nullable=False, default=1)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow,
+                              onupdate=datetime.utcnow)
+
+    template = db.relationship(
+        'PropostaTemplate',
+        backref=db.backref(
+            'clausulas',
+            order_by='PropostaTemplateClausula.ordem',
+            cascade='all, delete-orphan',
+            lazy='select',
+        ),
+    )
+
+
 class PropostaArquivo(db.Model):
     __tablename__ = 'proposta_arquivos'
     

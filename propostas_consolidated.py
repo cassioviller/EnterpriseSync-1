@@ -57,7 +57,8 @@ except ImportError as e:
 from app import db
 from models import (
     Proposta, PropostaItem, PropostaHistorico, PropostaArquivo,
-    ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico, Cliente
+    ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico, Cliente,
+    PropostaTemplate, PropostaClausula, PropostaTemplateClausula,
 )
 
 # Blueprint unificado
@@ -85,6 +86,97 @@ def _parse_engenheiro_id(raw_value, admin_id):
     from models import EngenheiroResponsavel
     eng = EngenheiroResponsavel.query.filter_by(id=eng_id, admin_id=admin_id).first()
     return eng.id if eng else None
+
+
+_TITULOS_CLAUSULA_NUMERICA = {
+    'condicoes de entrega',
+    'validade da proposta',
+}
+
+
+def _normalizar_titulo_clausula(titulo):
+    """Task #174 (REV6) — normaliza título de cláusula para comparação
+    case-insensitive e tolerante a acentos/pontuação/espaços.
+
+    Usado por `_copiar_clausulas_template_para_proposta` para detectar
+    títulos que devem ser pulados (entrega/validade — renderizados como
+    seções numéricas separadas).
+
+    Resiliente a variantes do mesmo conceito:
+      - "Condições de Entrega" → "condicoes de entrega"
+      - "CONDIÇÕES DE ENTREGA " → "condicoes de entrega"
+      - "Validade da Proposta:" → "validade da proposta"
+      - "Validade da Proposta " → "validade da proposta"
+    """
+    import unicodedata
+    if not titulo:
+        return ''
+    t = str(titulo).strip().lower()
+    # Remove acentos (NFKD + filtra combining marks).
+    t = unicodedata.normalize('NFKD', t)
+    t = ''.join(ch for ch in t if not unicodedata.combining(ch))
+    # Remove pontuação trailing comum (':', '.', ';') e espaços extras.
+    t = t.rstrip(' :.;,-')
+    # Colapsa múltiplos espaços internos.
+    t = ' '.join(t.split())
+    return t
+
+
+def _copiar_clausulas_template_para_proposta(template, proposta, admin_id):
+    """Task #174 — copia as cláusulas configuráveis de um PropostaTemplate
+    para uma Proposta recém-criada.
+
+    Cada PropostaTemplateClausula vira uma PropostaClausula nova (instância
+    independente, ordem preservada). Cláusulas com texto vazio são puladas.
+    Inclui cláusulas customizadas adicionadas pelo usuário no template
+    (não só as 6 backfilladas pela migration).
+
+    REV5: cláusulas cujo título seja "Condições de Entrega" ou
+    "Validade da Proposta" são puladas — essas duas seções são
+    derivadas dos campos numéricos `prazo_entrega_dias` e
+    `validade_dias` da Proposta e renderizadas separadamente como
+    blocos numéricos no PDF paginado. Copiá-las causaria duplicação
+    de conteúdo nos templates legados backfilados pela migration 134.
+
+    Retorna a quantidade de cláusulas copiadas (0 se template é None ou
+    não tem cláusulas com texto).
+    """
+    if not template:
+        return 0
+    copiadas = 0
+    for tc in sorted(template.clausulas or [], key=lambda c: c.ordem or 0):
+        texto = (tc.texto or '').strip()
+        if not texto:
+            continue
+        titulo_norm = _normalizar_titulo_clausula(tc.titulo)
+        if titulo_norm in _TITULOS_CLAUSULA_NUMERICA:
+            # Pula entrega/validade — são renderizadas como seções
+            # numéricas (prazo_entrega_dias / validade_dias) separadas.
+            continue
+        db.session.add(PropostaClausula(
+            proposta_id=proposta.id,
+            admin_id=admin_id,
+            titulo=(tc.titulo or '')[:200] or '(sem título)',
+            texto=texto,
+            ordem=tc.ordem or (copiadas + 1),
+        ))
+        copiadas += 1
+    return copiadas
+
+
+def _parse_template_id_proposta(raw_value, admin_id):
+    """Task #174 — valida template_id (PropostaTemplate) do form.
+
+    Retorna o template do tenant ou None se inválido/inexistente.
+    """
+    raw = (raw_value or '').strip() if isinstance(raw_value, str) else raw_value
+    if not raw:
+        return None
+    try:
+        tid = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return PropostaTemplate.query.filter_by(id=tid, admin_id=admin_id).first()
 
 
 def organizar_itens_por_template(itens):
@@ -291,8 +383,20 @@ def nova():
         from services.engenheiro_service import listar_engenheiros_ativos
         engenheiros = listar_engenheiros_ativos(admin_id)
 
+        # Task #174 — templates de propostas disponíveis para o admin (com cláusulas).
+        # Listados no formulário num <select name="template_id"> opcional —
+        # quando informado, /propostas/criar copia as cláusulas do template.
+        templates_proposta = safe_db_operation(
+            lambda: PropostaTemplate.query
+                .filter_by(admin_id=admin_id, ativo=True)
+                .order_by(PropostaTemplate.nome.asc())
+                .all(),
+            []
+        )
+
         return render_template('propostas/nova_proposta.html',
                              templates=[],
+                             templates_proposta=templates_proposta,
                              config=config,
                              engenheiros=engenheiros)
         
@@ -439,7 +543,53 @@ def criar():
         
         db.session.add(proposta)
         db.session.flush()  # Obter ID da proposta antes de criar itens
-        
+
+        # Task #174 — cláusulas configuráveis. Prioridade:
+        #   1) Se o form indicou um PropostaTemplate (`template_id`) que
+        #      pertença ao tenant e que tenha cláusulas configuradas,
+        #      copia toda a lista (incluindo cláusulas custom) para a
+        #      Proposta. Cláusula sem texto é pulada.
+        #   2) Caso contrário (sem template ou template sem cláusulas),
+        #      usa o seed legado a partir dos campos de texto fixos.
+        _template_proposta = _parse_template_id_proposta(
+            request.form.get('template_id'), admin_id
+        )
+        _copiadas_template = 0
+        if _template_proposta:
+            _copiadas_template = _copiar_clausulas_template_para_proposta(
+                _template_proposta, proposta, admin_id
+            )
+            if _copiadas_template:
+                # Incrementa contador de uso do template (mesma semântica
+                # de api_organizer.carregar_templates_multiplos).
+                try:
+                    _template_proposta.uso_contador = (
+                        (_template_proposta.uso_contador or 0) + 1
+                    )
+                except Exception:
+                    pass
+
+        if not _copiadas_template:
+            # Fallback: seed a partir das colunas de texto legadas
+            # (mantidas inertes). Cláusula sem texto é pulada.
+            _seed_clausulas = [
+                (1, "Condições de Pagamento", proposta.condicoes_pagamento),
+                (2, "Condições de Entrega",   proposta.observacoes_entrega),
+                (3, "Garantias",              proposta.garantias),
+                (4, "Considerações Gerais",   proposta.consideracoes_gerais),
+            ]
+            for _ord, _tit, _txt in _seed_clausulas:
+                _txt_clean = (_txt or '').strip()
+                if not _txt_clean:
+                    continue
+                db.session.add(PropostaClausula(
+                    proposta_id=proposta.id,
+                    admin_id=admin_id,
+                    titulo=_tit,
+                    texto=_txt_clean,
+                    ordem=_ord,
+                ))
+
         # Ler dados adicionais dos templates
         templates_nomes = request.form.getlist('item_template_nome')
         templates_ids = request.form.getlist('item_template_id')
@@ -840,24 +990,56 @@ def atualizar(id):
         proposta.cliente_endereco = request.form.get('cliente_endereco')
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
-        proposta.condicoes_pagamento = request.form.get('condicoes_pagamento')
-        proposta.garantias = request.form.get('garantias')
 
         # Task #173 — engenheiro responsável (override por proposta)
         proposta.engenheiro_id = _parse_engenheiro_id(
             request.form.get('engenheiro_id'), admin_id
         )
-        
+
         # Processar itens inclusos/exclusos
         itens_inclusos_raw = request.form.get('itens_inclusos', '')
         if itens_inclusos_raw:
             proposta.itens_inclusos = itens_inclusos_raw.replace(';', '\n').strip()
-        
+
         itens_exclusos_raw = request.form.get('itens_exclusos', '')
         if itens_exclusos_raw:
             proposta.itens_exclusos = itens_exclusos_raw.replace(';', '\n').strip()
-        
-        proposta.consideracoes_gerais = request.form.get('consideracoes_gerais', proposta.consideracoes_gerais)
+
+        # Task #174 — cláusulas configuráveis (substitui condicoes_pagamento,
+        # garantias, consideracoes_gerais). Estratégia: deletar todas as
+        # cláusulas existentes e recriar a partir do form. Cláusula com
+        # texto vazio (após strip) é descartada — equivale a "remover".
+        from models import PropostaClausula as _PCl
+        _titulos = request.form.getlist('clausula_titulo')
+        _textos  = request.form.getlist('clausula_texto')
+        _ordens  = request.form.getlist('clausula_ordem')
+        # Só processa se o formulário enviou o bloco — assim chamadas legadas
+        # que não conhecem as cláusulas não apagam o que já existe.
+        # Sentinela `clausulas_payload_present=1` indica que o form de cláusulas
+        # foi de fato submetido (mesmo se vazio = usuário deletou todas as linhas).
+        _payload_present = request.form.get('clausulas_payload_present') == '1'
+        if _payload_present or _titulos or _textos:
+            _PCl.query.filter_by(proposta_id=proposta.id).delete(
+                synchronize_session=False
+            )
+            _n = max(len(_titulos), len(_textos), len(_ordens))
+            for _i in range(_n):
+                _tit = (_titulos[_i] if _i < len(_titulos) else '').strip()
+                _txt = (_textos[_i]  if _i < len(_textos)  else '').strip()
+                if not _txt:
+                    # Cláusula sem texto: equivale a remover.
+                    continue
+                try:
+                    _ord = int(_ordens[_i]) if _i < len(_ordens) and _ordens[_i] else (_i + 1)
+                except (ValueError, TypeError):
+                    _ord = _i + 1
+                db.session.add(_PCl(
+                    proposta_id=proposta.id,
+                    admin_id=admin_id,
+                    titulo=_tit[:200] or '(sem título)',
+                    texto=_txt,
+                    ordem=_ord,
+                ))
         
         # ===== PROCESSAR ITENS DA PROPOSTA =====
         # Coletar dados dos itens do formulário
@@ -1047,6 +1229,178 @@ def deletar(id):
         logger.error(f"ERRO DELETAR PROPOSTA: {str(e)}")
         flash(f'Erro ao excluir proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.visualizar', id=id))
+
+def _processar_clausulas_template_form(template, admin_id):
+    """Task #174 — lê listas clausula_titulo[]/clausula_texto[]/clausula_ordem[]
+    do form e regrava as cláusulas do PropostaTemplate (delete + re-insert).
+    Cláusula com texto vazio é descartada (equivale a "remover").
+    Só processa se o bloco vier no form (callers legados não apagam dados).
+    Retorna a quantidade de cláusulas persistidas.
+    """
+    titulos = request.form.getlist('clausula_titulo')
+    textos  = request.form.getlist('clausula_texto')
+    ordens  = request.form.getlist('clausula_ordem')
+    # Sentinela `clausulas_payload_present=1` permite que o usuário delete
+    # TODAS as cláusulas via UI (sem enviar nenhuma linha) e ainda assim
+    # processar (zerando a tabela). Sem ela, callers legados que não
+    # conhecem o bloco continuam preservando os dados existentes.
+    payload_present = request.form.get('clausulas_payload_present') == '1'
+    if not (payload_present or titulos or textos):
+        return 0
+
+    PropostaTemplateClausula.query.filter_by(
+        proposta_template_id=template.id
+    ).delete(synchronize_session=False)
+
+    persistidas = 0
+    n = max(len(titulos), len(textos), len(ordens))
+    for i in range(n):
+        tit = (titulos[i] if i < len(titulos) else '').strip()
+        txt = (textos[i]  if i < len(textos)  else '').strip()
+        if not txt:
+            continue
+        try:
+            ordem = int(ordens[i]) if i < len(ordens) and ordens[i] else (i + 1)
+        except (ValueError, TypeError):
+            ordem = i + 1
+        db.session.add(PropostaTemplateClausula(
+            proposta_template_id=template.id,
+            admin_id=admin_id,
+            titulo=tit[:200] or '(sem título)',
+            texto=txt,
+            ordem=ordem,
+        ))
+        persistidas += 1
+    return persistidas
+
+
+@propostas_bp.route('/templates')
+@login_required
+@admin_required
+def listar_templates():
+    """Task #174 — lista PropostaTemplates do tenant para gerenciar
+    cláusulas (e demais campos de configuração)."""
+    try:
+        admin_id = get_admin_id()
+        templates = PropostaTemplate.query.filter_by(
+            admin_id=admin_id
+        ).order_by(
+            PropostaTemplate.ativo.desc(),
+            PropostaTemplate.categoria.asc(),
+            PropostaTemplate.nome.asc(),
+        ).all()
+        return render_template(
+            'propostas/templates_lista.html',
+            templates=templates,
+        )
+    except Exception as e:
+        logger.error(f"ERRO LISTAR TEMPLATES: {str(e)}")
+        flash(f'Erro ao listar templates: {str(e)}', 'error')
+        return redirect(url_for('propostas.index'))
+
+
+@propostas_bp.route('/templates/novo', methods=['GET'])
+@login_required
+@admin_required
+def novo_template():
+    """Task #174 — formulário de criação de PropostaTemplate."""
+    return render_template('propostas/template_form.html', template=None)
+
+
+@propostas_bp.route('/templates/criar', methods=['POST'])
+@login_required
+@admin_required
+def criar_template():
+    """Task #174 — persiste novo PropostaTemplate + cláusulas configuráveis."""
+    try:
+        admin_id = get_admin_id()
+        nome = (request.form.get('nome') or '').strip()
+        categoria = (request.form.get('categoria') or '').strip()
+        descricao = (request.form.get('descricao') or '').strip()
+        if not nome:
+            flash('Nome do template é obrigatório', 'error')
+            return redirect(url_for('propostas.novo_template'))
+        if not categoria:
+            categoria = 'Geral'
+
+        template = PropostaTemplate(
+            nome=nome[:100],
+            categoria=categoria[:50],
+            descricao=descricao or None,
+            ativo=request.form.get('ativo', 'on') in ('on', 'true', '1'),
+            admin_id=admin_id,
+            criado_por=current_user.id,
+            itens_padrao=[],
+        )
+        db.session.add(template)
+        db.session.flush()
+
+        n = _processar_clausulas_template_form(template, admin_id)
+
+        db.session.commit()
+        flash(f'Template "{nome}" criado com {n} cláusula(s).', 'success')
+        return redirect(url_for('propostas.editar_template', id=template.id))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO CRIAR TEMPLATE: {str(e)}")
+        flash(f'Erro ao criar template: {str(e)}', 'error')
+        return redirect(url_for('propostas.novo_template'))
+
+
+@propostas_bp.route('/templates/<int:id>/editar', methods=['GET'])
+@login_required
+@admin_required
+def editar_template(id):
+    """Task #174 — formulário de edição de PropostaTemplate."""
+    try:
+        admin_id = get_admin_id()
+        template = PropostaTemplate.query.filter_by(
+            id=id, admin_id=admin_id
+        ).first_or_404()
+        return render_template(
+            'propostas/template_form.html',
+            template=template,
+        )
+    except Exception as e:
+        logger.error(f"ERRO EDITAR TEMPLATE: {str(e)}")
+        flash(f'Erro ao carregar template: {str(e)}', 'error')
+        return redirect(url_for('propostas.listar_templates'))
+
+
+@propostas_bp.route('/templates/<int:id>/atualizar', methods=['POST'])
+@login_required
+@admin_required
+def atualizar_template(id):
+    """Task #174 — atualiza PropostaTemplate + regrava cláusulas."""
+    try:
+        admin_id = get_admin_id()
+        template = PropostaTemplate.query.filter_by(
+            id=id, admin_id=admin_id
+        ).first_or_404()
+
+        nome = (request.form.get('nome') or '').strip()
+        categoria = (request.form.get('categoria') or '').strip()
+        descricao = (request.form.get('descricao') or '').strip()
+        if not nome:
+            flash('Nome do template é obrigatório', 'error')
+            return redirect(url_for('propostas.editar_template', id=id))
+
+        template.nome = nome[:100]
+        template.categoria = (categoria or 'Geral')[:50]
+        template.descricao = descricao or None
+        template.ativo = request.form.get('ativo', 'off') in ('on', 'true', '1')
+
+        n = _processar_clausulas_template_form(template, admin_id)
+
+        db.session.commit()
+        flash(f'Template atualizado ({n} cláusula(s)).', 'success')
+        return redirect(url_for('propostas.editar_template', id=id))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO ATUALIZAR TEMPLATE: {str(e)}")
+        flash(f'Erro ao atualizar template: {str(e)}', 'error')
+        return redirect(url_for('propostas.editar_template', id=id))
+
 
 @propostas_bp.route('/<int:id>/cronograma-revisar', methods=['GET'])
 @login_required
