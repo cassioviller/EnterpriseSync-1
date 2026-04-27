@@ -389,11 +389,62 @@ def main():
             _ok(any('R$ 1.351,50' in v for v in valores),
                 f'proposta: ao menos 1 servico-total = R$ 1.351,50 ({valores})')
 
-            # Nenhum valor americano na página inteira.
+            # Dropdown / datalist do catálogo de serviços
+            # ─────────────────────────────────────────────────────────
+            # editar.html monta um <datalist id="catalogo_servicos_dl">
+            # via fetch('/catalogo/api/servicos/buscar?limit=500') no
+            # DOMContentLoaded, com label
+            #   "<id> — <nome> (<unidade> | R$ N.NNN,NN)"
+            # construído por fmtBRL(). Aguardamos o populate e
+            # validamos a opção do nosso serviço.
+            try:
+                page.wait_for_function(
+                    "document.querySelectorAll('#catalogo_servicos_dl option').length > 0",
+                    timeout=10000,
+                )
+            except Exception as e:  # pragma: no cover
+                _ok(False, f'proposta: datalist não populou (erro={e})')
+
+            opcoes = page.locator('#catalogo_servicos_dl option').evaluate_all(
+                'els => els.map(o => o.value)'
+            )
+            log.info(f'[proposta] datalist opções (sample): {opcoes[:3]}')
+            _ok(len(opcoes) > 0,
+                f'proposta: datalist tem opções (count={len(opcoes)})')
+
+            # Toda opção precisa estar em BR e nenhuma em US.
+            for v in opcoes:
+                _ok(bool(PADRAO_BRL.search(v)),
+                    f'proposta: datalist option em BR ("{v}")')
+                _ok(not PADRAO_US_2D.search(v),
+                    f'proposta: datalist option sem formato US ("{v}")')
+
+            # E a opção do nosso serviço de seed mostra "R$ 7.199,06".
+            opcoes_nosso = [v for v in opcoes if ctx['svc_nome'] in v]
+            _ok(len(opcoes_nosso) == 1,
+                f'proposta: datalist contém nosso serviço '
+                f'(matches={opcoes_nosso})')
+            if opcoes_nosso:
+                _ok('R$ 7.199,06' in opcoes_nosso[0],
+                    f'proposta: option do nosso serviço com preço R$ 7.199,06 '
+                    f'(got "{opcoes_nosso[0]}")')
+
+            # Nenhum valor americano na página inteira (após populate
+            # do datalist — datalist values podem entrar no innerText
+            # em alguns navegadores; checamos via outerHTML para ser
+            # robustos).
             body_text = page.locator('body').inner_text()
             ofensores = _scan_us(body_text)
             _ok(not ofensores,
                 f'proposta editar: body sem formato US (ofensores={ofensores})')
+
+            datalist_html = page.locator('#catalogo_servicos_dl').evaluate(
+                'el => el.outerHTML'
+            )
+            ofensores_dl = PADRAO_US_2D.findall(datalist_html)[:5]
+            _ok(not ofensores_dl,
+                f'proposta editar: datalist HTML sem formato US '
+                f'(ofensores={ofensores_dl})')
 
             browser.close()
     finally:
