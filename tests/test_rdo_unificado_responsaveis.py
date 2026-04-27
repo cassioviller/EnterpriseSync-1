@@ -40,7 +40,7 @@ from app import app, db
 from werkzeug.security import generate_password_hash
 
 from models import (
-    Usuario, TipoUsuario, Obra, Funcionario, Departamento, HorarioTrabalho,
+    Usuario, TipoUsuario, Obra, Cliente, Funcionario, Departamento, HorarioTrabalho,
     TarefaCronograma, RDO, RDOApontamentoCronograma,
     RDOSubempreitadaApontamento, Subempreiteiro, SubatividadeMestre,
 )
@@ -143,10 +143,19 @@ class RDOUnificadoRunner:
         )
         db.session.add(self.subempreiteiro)
 
+        self.cliente = Cliente(
+            nome=f'Cliente Task149 {suf}',
+            email=f'cli_task149_{suf[:6]}@example.com',
+            admin_id=admin_id,
+        )
+        db.session.add(self.cliente)
+        db.session.flush()
+
         self.obra = Obra(
             nome=f'Obra Task149 {suf}', codigo=f'T149-{suf[:6]}',
             admin_id=admin_id, status='Em andamento',
             data_inicio=date.today(),
+            cliente_id=self.cliente.id,
         )
         db.session.add(self.obra)
         db.session.flush()

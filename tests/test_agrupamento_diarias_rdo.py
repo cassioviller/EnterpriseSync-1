@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
 from models import (
-    Usuario, TipoUsuario, Funcionario, Obra,
+    Usuario, TipoUsuario, Funcionario, Obra, Cliente,
     RDO, RDOMaoObra,
     GestaoCustoPai, GestaoCustoFilho,
 )
@@ -94,11 +94,20 @@ class AgrupamentoTestRunner:
         )
         db.session.add(func)
 
+        cliente = Cliente(
+            nome=f'Cliente Agrupamento {suffix}',
+            email=f'cliente_ag_{suffix}@example.com',
+            admin_id=admin.id,
+        )
+        db.session.add(cliente)
+        db.session.flush()
+
         obra = Obra(
             nome=f'Obra Agrupamento {suffix}',
             codigo=f'OAG{admin.id}',
             data_inicio=date.today(),
             admin_id=admin.id,
+            cliente_id=cliente.id,
             ativo=True,
         )
         db.session.add(obra)

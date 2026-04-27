@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, Cliente, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -69,7 +69,11 @@ def obras():
     if filtros['status']:
         query = query.filter(Obra.status == filtros['status'])
     if filtros['cliente']:
-        query = query.filter(Obra.cliente.ilike(f"%{filtros['cliente']}%"))
+        # Task #176: a obra agora referencia Cliente por FK (cliente_id).
+        # Filtra pelo nome do Cliente vinculado (mesmo tenant).
+        query = query.join(Cliente, Obra.cliente_id == Cliente.id).filter(
+            Cliente.nome.ilike(f"%{filtros['cliente']}%")
+        )
     
     # Aplicar filtros de data (usando data_inicio da obra)
     if filtros['data_inicio']:
@@ -245,10 +249,16 @@ def nova_obra():
             area_total_m2 = request.form.get('area_total_m2')
             responsavel_id = request.form.get('responsavel_id')
             
-            # Dados do cliente
-            cliente_nome = request.form.get('cliente_nome', '')
-            cliente_email = request.form.get('cliente_email', '')
-            cliente_telefone = request.form.get('cliente_telefone', '')
+            # Task #175 — Cliente é selecionado do cadastro OU resolvido por
+            # texto livre (nome/email/telefone) via cliente_resolver.
+            cliente_id_raw = (request.form.get('cliente_id') or '').strip()
+            try:
+                cliente_id_form = int(cliente_id_raw) if cliente_id_raw else None
+            except (TypeError, ValueError):
+                cliente_id_form = None
+            cliente_busca_form = (request.form.get('cliente_busca') or '').strip()
+            cliente_email_form = (request.form.get('cliente_email') or '').strip()
+            cliente_telefone_form = (request.form.get('cliente_telefone') or '').strip()
             portal_ativo = request.form.get('portal_ativo') == '1'
             
             # Datas
@@ -296,20 +306,41 @@ def nova_obra():
                     import time
                     codigo = f"O{int(time.time()) % 100000:05d}"
             
-            # Gerar token para portal do cliente se ativo
-            token_cliente = None
-            if portal_ativo and cliente_email:
-                import secrets
-                token_cliente = secrets.token_urlsafe(32)
-            
-            # Task #172 — resolver/criar Cliente para vínculo via FK
+            # Task #175/#176 — Cliente é obrigatório.
+            #   1. Se o usuário escolheu um Cliente do cadastro (cliente_id),
+            #      use-o (validando o tenant para não vazar entre admins).
+            #   2. Caso contrário, fallback de texto livre via cliente_resolver:
+            #      "obter ou criar Cliente" a partir do que foi digitado em
+            #      cliente_busca/cliente_email/cliente_telefone. Mantém a UX
+            #      de quem ainda não tem o cliente cadastrado, mas grava sempre
+            #      um Cliente real (FK respeitada).
             from services.cliente_resolver import obter_ou_criar_cliente
             cliente_obj = obter_ou_criar_cliente(
                 admin_id=admin_id,
-                nome=cliente_nome,
-                email=cliente_email,
-                telefone=cliente_telefone,
+                nome=cliente_busca_form or None,
+                email=cliente_email_form or None,
+                telefone=cliente_telefone_form or None,
+                cliente_id=cliente_id_form,
             )
+            # Se cliente_id veio mas é de outro tenant, o resolver retorna None
+            # nesse path — então caímos no fallback por nome/email se houver.
+            if not cliente_obj and (cliente_busca_form or cliente_email_form):
+                cliente_obj = obter_ou_criar_cliente(
+                    admin_id=admin_id,
+                    nome=cliente_busca_form or None,
+                    email=cliente_email_form or None,
+                    telefone=cliente_telefone_form or None,
+                )
+            if not cliente_obj:
+                flash('Informe um cliente (selecione do cadastro ou digite o nome) antes de salvar a obra.', 'danger')
+                return redirect(url_for('main.nova_obra'))
+            db.session.flush()  # garante cliente_obj.id quando recém criado
+
+            # Gerar token para portal do cliente se ativo
+            token_cliente = None
+            if portal_ativo and (cliente_obj.email or '').strip():
+                import secrets
+                token_cliente = secrets.token_urlsafe(32)
 
             # Criar nova obra
             nova_obra = Obra(
@@ -323,10 +354,7 @@ def nova_obra():
                 area_total_m2=area_total_m2,
                 status=status,
                 responsavel_id=responsavel_id,
-                cliente_id=cliente_obj.id if cliente_obj else None,
-                cliente_nome=cliente_nome,
-                cliente_email=cliente_email,
-                cliente_telefone=cliente_telefone,
+                cliente_id=cliente_obj.id,
                 portal_ativo=portal_ativo,
                 token_cliente=token_cliente,
                 admin_id=admin_id,
@@ -824,33 +852,45 @@ def editar_obra(id):
             else:
                 obra.codigo = codigo_form
             
-            # Dados do cliente
-            obra.cliente_nome = request.form.get('cliente_nome', '')
-            obra.cliente_email = request.form.get('cliente_email', '')
-            obra.cliente_telefone = request.form.get('cliente_telefone', '')
-            obra.portal_ativo = request.form.get('portal_ativo') == '1'
-
-            # Task #172 — re-resolver/atualizar vínculo Cliente quando o
-            # operador edita os campos de cliente da obra. Mantemos os
-            # campos texto como fallback. Erros propagam para rollback
-            # atômico — não atualizamos a Obra silenciosamente sem FK.
+            # Task #175/#176 — Cliente vem do cadastro OU é resolvido por
+            # texto livre via cliente_resolver (mesma lógica do create).
+            cliente_id_raw = (request.form.get('cliente_id') or '').strip()
+            try:
+                cliente_id_form = int(cliente_id_raw) if cliente_id_raw else None
+            except (TypeError, ValueError):
+                cliente_id_form = None
+            cliente_busca_form = (request.form.get('cliente_busca') or '').strip()
+            cliente_email_form = (request.form.get('cliente_email') or '').strip()
+            cliente_telefone_form = (request.form.get('cliente_telefone') or '').strip()
             from services.cliente_resolver import obter_ou_criar_cliente
             cliente_obj = obter_ou_criar_cliente(
                 admin_id=obra.admin_id,
-                nome=obra.cliente_nome,
-                email=obra.cliente_email,
-                telefone=obra.cliente_telefone,
+                nome=cliente_busca_form or None,
+                email=cliente_email_form or None,
+                telefone=cliente_telefone_form or None,
+                cliente_id=cliente_id_form,
             )
-            if cliente_obj:
-                obra.cliente_id = cliente_obj.id
-            
+            if not cliente_obj and (cliente_busca_form or cliente_email_form):
+                cliente_obj = obter_ou_criar_cliente(
+                    admin_id=obra.admin_id,
+                    nome=cliente_busca_form or None,
+                    email=cliente_email_form or None,
+                    telefone=cliente_telefone_form or None,
+                )
+            if not cliente_obj:
+                flash('Informe um cliente (selecione do cadastro ou digite o nome) antes de salvar a obra.', 'danger')
+                return redirect(url_for('main.editar_obra', id=obra.id))
+            db.session.flush()
+            obra.cliente_id = cliente_obj.id
+            obra.portal_ativo = request.form.get('portal_ativo') == '1'
+
             # Campos de Geofencing
             obra.latitude = float(request.form.get('latitude')) if request.form.get('latitude') else None
             obra.longitude = float(request.form.get('longitude')) if request.form.get('longitude') else None
             obra.raio_geofence_metros = int(request.form.get('raio_geofence_metros', 100)) if request.form.get('raio_geofence_metros') else 100
-            
+
             # Gerar token se portal ativado e não existir
-            if obra.portal_ativo and obra.cliente_email and not obra.token_cliente:
+            if obra.portal_ativo and (cliente_obj.email or '').strip() and not obra.token_cliente:
                 import secrets
                 obra.token_cliente = secrets.token_urlsafe(32)
             

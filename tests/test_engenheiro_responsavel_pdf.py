@@ -1,23 +1,27 @@
-"""Task #173 — testes para EngenheiroResponsavel + helper de PDF.
+"""Task #173 / #178 — testes para EngenheiroResponsavel + helper de PDF.
 
 Cobertura:
   T1. Schema: tabela engenheiro_responsavel + colunas FK em
       configuracao_empresa.engenheiro_padrao_id e propostas_comerciais.engenheiro_id
-      (migração 133 aplicada).
+      (migração 133 aplicada). Os campos legados engenheiro_* da
+      configuracao_empresa foram removidos (migração 135 — Task #178).
   T2. Helper services.engenheiro_service.obter_engenheiro_dados:
        a. Sem nada configurado → fonte=vazio.
-       b. Apenas legado em ConfiguracaoEmpresa → fonte=configuracao_empresa_legado
-          e trazem os campos engenheiro_*.
+       b. Config sem engenheiro_padrao_id → fonte=vazio (campos legados
+          foram removidos pela Task #178; não há mais fallback textual).
        c. ConfiguracaoEmpresa.engenheiro_padrao_id apontando para um registro →
-          fonte=engenheiro_responsavel; ignora o legado.
+          fonte=engenheiro_responsavel.
        d. Proposta.engenheiro_id sobrescreve o padrão da empresa.
        e. Editar telefone do engenheiro padrão reflete no resultado seguinte.
+       e2. Engenheiro padrão inativo → fonte=vazio.
        f. listar_engenheiros_ativos respeita ativo=False.
   T3. _parse_engenheiro_id (propostas_consolidated):
        a. Vazio → None.
        b. ID inexistente → None.
        c. ID de outro tenant → None.
        d. ID válido do mesmo tenant → eng.id.
+  T4. PDF paginado/final usam engenheiro_dados (override) e não vazam
+      PropostaTemplate.engenheiro_*.
 """
 from __future__ import annotations
 
@@ -114,25 +118,20 @@ def t2_helper_obter_engenheiro_dados():
            dados['fonte'] == 'vazio' and dados['nome'] == '',
            evidence=f"fonte={dados['fonte']}, nome={dados['nome']!r}")
 
-    # Setup config com legado preenchido (sem engenheiro_padrao_id)
+    # Setup config sem engenheiro_padrao_id (Task #178: campos legados removidos)
     cfg = ConfiguracaoEmpresa(
         admin_id=aid,
         nome_empresa='Empresa T173',
-        engenheiro_nome='Eng. Legado',
-        engenheiro_crea='CREA-LEG-1',
-        engenheiro_email='legado@empresa.test',
-        engenheiro_telefone='11 0000-0000',
     )
     db.session.add(cfg)
     db.session.flush()
 
-    # 2b — apenas legado
+    # 2b — sem padrão e sem legado (legado removido em Task #178)
     dados = obter_engenheiro_dados(proposta=None, config_empresa=cfg)
-    record('T2b — só legado → fonte=configuracao_empresa_legado',
-           dados['fonte'] == 'configuracao_empresa_legado'
-           and dados['nome'] == 'Eng. Legado'
-           and dados['crea'] == 'CREA-LEG-1'
-           and dados['telefone'] == '11 0000-0000',
+    record('T2b — config sem padrão → fonte=vazio (sem legado pós #178)',
+           dados['fonte'] == 'vazio'
+           and dados['nome'] == ''
+           and dados['crea'] == '',
            evidence=f"fonte={dados['fonte']}, nome={dados['nome']!r}")
 
     # Cria engenheiro próprio e marca como padrão
@@ -199,12 +198,13 @@ def t2_helper_obter_engenheiro_dados():
            evidence=f"telefone={dados['telefone']!r}")
 
     # 2e2 — engenheiro inativado deixa de ser usado pelo helper
+    # (Task #178: sem fallback legado — vai direto para fonte=vazio)
     eng_padrao.ativo = False
     db.session.flush()
     dados = obter_engenheiro_dados(proposta=prop_sem_override, config_empresa=cfg)
-    record('T2e2 — engenheiro padrão inativo cai no legado',
-           dados['fonte'] == 'configuracao_empresa_legado'
-           and dados['nome'] == 'Eng. Legado',
+    record('T2e2 — engenheiro padrão inativo → fonte=vazio',
+           dados['fonte'] == 'vazio'
+           and dados['nome'] == '',
            evidence=f"fonte={dados['fonte']}, nome={dados['nome']!r}")
     # Reativa para o resto dos testes
     eng_padrao.ativo = True
@@ -261,8 +261,6 @@ def t4_pdf_paginado_nao_vaza_template_engenheiro():
     cfg = ConfiguracaoEmpresa(
         admin_id=aid, nome_empresa='Empresa T173 PDF',
         engenheiro_padrao_id=eng_padrao.id,
-        engenheiro_nome='LEGADO_NAO_DEVE_APARECER',
-        engenheiro_crea='LEGADO_CREA_NAO',
     )
     db.session.add(cfg)
     db.session.flush()
@@ -320,10 +318,8 @@ def t4_pdf_paginado_nao_vaza_template_engenheiro():
            and 'Rua TPL Não' not in html
            and 'https://tpl-nao.test' not in html,
            evidence='nenhum dado de PropostaTemplate vazou')
-    record('T4c — PDF paginado NÃO usa legado quando override está ativo',
-           'LEGADO_NAO_DEVE_APARECER' not in html
-           and 'LEGADO_CREA_NAO' not in html,
-           evidence='nenhum dado legado vazou')
+    # T4c removido em Task #178: campos legados engenheiro_* da
+    # configuracao_empresa foram dropados — não há mais como vazar.
 
     # Sanity: também valida o template "final" (outra variante reescrita)
     with app.test_request_context('/'):

@@ -133,15 +133,11 @@ def salvar_empresa():
         config.garantias_padrao = request.form.get('garantias_padrao')
         config.observacoes_gerais_padrao = request.form.get('observacoes_gerais_padrao')
         
-        # Bloco de assinatura e contatos do engenheiro responsável (Task #158)
+        # Bloco de assinatura (Task #158). Os campos legados engenheiro_*
+        # foram removidos em Task #178 — agora a única fonte é a FK
+        # `engenheiro_padrao_id` resolvida pelo cadastro de engenheiros.
         config.assinatura_nome = (request.form.get('assinatura_nome') or '').strip()
         config.assinatura_cargo = (request.form.get('assinatura_cargo') or '').strip()
-        config.engenheiro_nome = (request.form.get('engenheiro_nome') or '').strip()
-        config.engenheiro_crea = (request.form.get('engenheiro_crea') or '').strip()
-        config.engenheiro_email = (request.form.get('engenheiro_email') or '').strip()
-        config.engenheiro_telefone = (request.form.get('engenheiro_telefone') or '').strip()
-        config.engenheiro_endereco = (request.form.get('engenheiro_endereco') or '').strip()
-        config.engenheiro_website = (request.form.get('engenheiro_website') or '').strip()
 
         # Task #173 — engenheiro responsável padrão (FK)
         eng_padrao_raw = (request.form.get('engenheiro_padrao_id') or '').strip()

@@ -395,7 +395,7 @@ class OverrideE2ERunner:
             admin_id=aid, status='Em andamento',
             data_inicio=date.today(),
             proposta_origem_id=self.proposta.id,
-            cliente_nome=self.cliente.nome,
+            cliente_id=self.cliente.id,
         )
         db.session.add(obra); db.session.flush()
         self.proposta.obra_id = obra.id

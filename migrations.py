@@ -3835,6 +3835,8 @@ def executar_migracoes():
             (133, "Task #173 — engenheiro_responsavel + FKs em configuracao_empresa e propostas_comerciais (backfill do legado)", migration_133_engenheiro_responsavel),
             (134, "Task #174 — proposta_clausula + proposta_template_clausula (backfill cláusulas configuráveis)", migration_134_clausulas_configuraveis),
             (135, "Task #191 — tema do sistema (cor_header_nav, cor_fundo_app, tema_preset em configuracao_empresa)", migration_135_tema_sistema_configuracao_empresa),
+            (137, "Task #176/#178 — backfill obras órfãs + DROP legacy cliente_*/engenheiro_* + obra.cliente_id NOT NULL", migration_137_drop_legacy_cliente_e_engenheiro),
+            (138, "Task #162 — scrub de defaults legados em proposta_templates (Lucas Barbosa / São José dos Campos)", migration_138_scrub_proposta_templates_defaults),
         ]
         
         # Executar cada migração com rastreamento
@@ -11106,6 +11108,413 @@ def migration_135_tema_sistema_configuracao_empresa():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 135: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_137_drop_legacy_cliente_e_engenheiro():
+    """Migration 137 (Tasks #176/#178): consolida Cliente FK na obra e
+    remove campos legados engenheiro_* da configuracao_empresa.
+
+    Estratégia (idempotente):
+      1. Backfill obras órfãs (cliente_id NULL): para cada admin_id
+         distinto que tenha obras sem cliente, garante um Cliente
+         placeholder ("Cliente não informado" / email
+         "sem-cliente@<admin>.local") e vincula. Preserva todos os tipos
+         de ID — apenas vincula uma FK já existente.
+      2. ALTER TABLE obra ALTER COLUMN cliente_id SET NOT NULL.
+      3. ALTER TABLE obra DROP COLUMN cliente_nome / cliente_email /
+         cliente_telefone / cliente (campos varchar/text, não-PK).
+      4. ALTER TABLE configuracao_empresa DROP COLUMN engenheiro_nome /
+         engenheiro_crea / engenheiro_email / engenheiro_telefone /
+         engenheiro_endereco / engenheiro_website (campos varchar/text,
+         não-PK). A FK engenheiro_padrao_id (criada em mig. 133) é a
+         única fonte de verdade restante.
+
+    Nenhum tipo de PRIMARY KEY é alterado. A FK obra.cliente_id já
+    existe (criada na migration 132) — apenas adicionamos NOT NULL.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 0) Curto-circuito se a coluna cliente_id já não existe
+        cursor.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'obra' AND column_name = 'cliente_id'
+            """
+        )
+        if cursor.fetchone() is None:
+            logger.info("MIGRACAO 137: obra.cliente_id ausente — pulando")
+            cursor.close()
+            connection.close()
+            return True
+
+        # 1) Backfill de obras órfãs por tenant.
+        cursor.execute(
+            """
+            SELECT DISTINCT admin_id
+              FROM obra
+             WHERE cliente_id IS NULL
+               AND admin_id IS NOT NULL
+            """
+        )
+        admins_orfaos = [r[0] for r in cursor.fetchall()]
+
+        backfill_count = 0
+        for admin_id in admins_orfaos:
+            placeholder_email = f"sem-cliente+{admin_id}@placeholder.local"
+            placeholder_nome = "Cliente não informado"
+
+            cursor.execute(
+                """
+                SELECT id FROM cliente
+                 WHERE admin_id = %s AND email = %s
+                 ORDER BY id ASC LIMIT 1
+                """,
+                (admin_id, placeholder_email),
+            )
+            row = cursor.fetchone()
+            if row:
+                cliente_id = row[0]
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO cliente
+                        (admin_id, nome, email, telefone, created_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    RETURNING id
+                    """,
+                    (admin_id, placeholder_nome, placeholder_email, ''),
+                )
+                cliente_id = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                UPDATE obra SET cliente_id = %s
+                 WHERE cliente_id IS NULL AND admin_id = %s
+                """,
+                (cliente_id, admin_id),
+            )
+            backfill_count += cursor.rowcount
+
+        # Obras com admin_id NULL e cliente_id NULL — não conseguimos
+        # criar placeholder seguro; aborta com diagnóstico claro.
+        cursor.execute(
+            "SELECT COUNT(*) FROM obra "
+            "WHERE cliente_id IS NULL AND admin_id IS NULL"
+        )
+        sem_admin = cursor.fetchone()[0]
+        if sem_admin:
+            raise RuntimeError(
+                f"MIGRACAO 137 abortada: {sem_admin} obra(s) sem cliente_id "
+                "E sem admin_id — corrija manualmente antes de aplicar."
+            )
+
+        # 2) NOT NULL em obra.cliente_id
+        cursor.execute(
+            "ALTER TABLE obra ALTER COLUMN cliente_id SET NOT NULL"
+        )
+
+        # 3) DROP campos legados em obra (varchar/text, não-PK).
+        for col in ('cliente_nome', 'cliente_email',
+                    'cliente_telefone', 'cliente'):
+            cursor.execute(
+                f"ALTER TABLE obra DROP COLUMN IF EXISTS {col}"
+            )
+
+        # 4) DROP campos engenheiro_* legados em configuracao_empresa.
+        for col in ('engenheiro_nome', 'engenheiro_crea',
+                    'engenheiro_email', 'engenheiro_telefone',
+                    'engenheiro_endereco', 'engenheiro_website'):
+            cursor.execute(
+                f"ALTER TABLE configuracao_empresa DROP COLUMN IF EXISTS {col}"
+            )
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 137: backfill_obras=%s, NOT NULL aplicado, "
+            "colunas legadas removidas (obra + configuracao_empresa).",
+            backfill_count,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 137: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_138_scrub_proposta_templates_defaults():
+    """Migration 138 (Task #162): normaliza linhas legadas em
+    proposta_templates que ainda carregam os defaults hard-coded
+    removidos do model ("Engº Lucas Barbosa..." e "São José dos Campos...").
+
+    Esta migração é **somente data scrub** (UPDATE) — nenhuma alteração
+    de schema, nenhum ALTER TABLE, nenhum DROP, nenhuma mudança em
+    PRIMARY KEY ou FK. Apenas zera valores em colunas varchar/text
+    pré-existentes para os registros que ainda contenham os defaults
+    legados antigos. Idempotente: rodar de novo é no-op.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # Curto-circuito se a tabela não existir ainda (instalações novas)
+        cursor.execute(
+            """
+            SELECT 1 FROM information_schema.tables
+             WHERE table_name = 'proposta_templates'
+            """
+        )
+        if cursor.fetchone() is None:
+            logger.info("MIGRACAO 138: proposta_templates ausente — pulando")
+            cursor.close()
+            connection.close()
+            return True
+
+        total_updates = 0
+
+        # 1) cidade_data: zera padrão antigo "São José dos Campos, ..."
+        cursor.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'proposta_templates'
+               AND column_name = 'cidade_data'
+            """
+        )
+        if cursor.fetchone() is not None:
+            cursor.execute(
+                """
+                UPDATE proposta_templates
+                   SET cidade_data = ''
+                 WHERE cidade_data ILIKE %s
+                """,
+                ('%São José dos Campos%',),
+            )
+            total_updates += cursor.rowcount or 0
+
+        # 2) engenheiro_*: zera defaults baked-in de "Lucas Barbosa".
+        #    A fonte de verdade agora é EngenheiroResponsavel
+        #    (Task #173) via services.engenheiro_service.
+        eng_columns = [
+            'engenheiro_nome',
+            'engenheiro_crea',
+            'engenheiro_email',
+            'engenheiro_telefone',
+            'engenheiro_endereco',
+            'engenheiro_website',
+        ]
+        cursor.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'proposta_templates'
+               AND column_name = ANY(%s)
+            """,
+            (eng_columns,),
+        )
+        existing_eng_cols = {r[0] for r in cursor.fetchall()}
+
+        if 'engenheiro_nome' in existing_eng_cols:
+            # SET de todos os campos do engenheiro nas linhas onde o
+            # nome ainda contém "Lucas" + "Barbosa" (case-insensitive).
+            set_clauses = []
+            for col in existing_eng_cols:
+                set_clauses.append(f"{col} = ''")
+            set_sql = ", ".join(set_clauses)
+
+            cursor.execute(
+                f"""
+                UPDATE proposta_templates
+                   SET {set_sql}
+                 WHERE engenheiro_nome ILIKE %s
+                    OR engenheiro_nome ILIKE %s
+                """,
+                ('%Lucas%Barbosa%', '%Engº Lucas%'),
+            )
+            total_updates += cursor.rowcount or 0
+
+        # 3) destinatario / atencao_de / telefone_cliente: zera apenas
+        #    se forem vestígios óbvios do antigo placeholder Lucas Barbosa.
+        for col in ('destinatario', 'atencao_de', 'telefone_cliente'):
+            cursor.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'proposta_templates'
+                   AND column_name = %s
+                """,
+                (col,),
+            )
+            if cursor.fetchone() is None:
+                continue
+            cursor.execute(
+                f"""
+                UPDATE proposta_templates
+                   SET {col} = NULL
+                 WHERE {col} ILIKE %s
+                """,
+                ('%Lucas%Barbosa%',),
+            )
+            total_updates += cursor.rowcount or 0
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 138: scrub de defaults legados concluído "
+            "(linhas atualizadas=%s).",
+            total_updates,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 138: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_136_scrub_proposta_templates_defaults():
+    """Migration 136 (Task #162): normaliza linhas legadas em
+    proposta_templates que ainda carregam os defaults hard-coded
+    removidos do model ("Engº Lucas Barbosa..." e "São José dos Campos...").
+
+    Esta migração é **somente data scrub** (UPDATE) — nenhuma alteração
+    de schema, nenhum ALTER TABLE, nenhum DROP, nenhuma mudança em
+    PRIMARY KEY ou FK. Apenas zera valores em colunas varchar/text
+    pré-existentes para os registros que ainda contenham os defaults
+    legados antigos. Idempotente: rodar de novo é no-op.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # Curto-circuito se a tabela não existir ainda (instalações novas)
+        cursor.execute(
+            """
+            SELECT 1 FROM information_schema.tables
+             WHERE table_name = 'proposta_templates'
+            """
+        )
+        if cursor.fetchone() is None:
+            logger.info("MIGRACAO 136: proposta_templates ausente — pulando")
+            cursor.close()
+            connection.close()
+            return True
+
+        total_updates = 0
+
+        # 1) cidade_data: zera padrão antigo "São José dos Campos, ..."
+        cursor.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'proposta_templates'
+               AND column_name = 'cidade_data'
+            """
+        )
+        if cursor.fetchone() is not None:
+            cursor.execute(
+                """
+                UPDATE proposta_templates
+                   SET cidade_data = ''
+                 WHERE cidade_data ILIKE %s
+                """,
+                ('%São José dos Campos%',),
+            )
+            total_updates += cursor.rowcount or 0
+
+        # 2) engenheiro_*: zera defaults baked-in de "Lucas Barbosa".
+        #    A fonte de verdade agora é EngenheiroResponsavel
+        #    (Task #173) via services.engenheiro_service.
+        eng_columns = [
+            'engenheiro_nome',
+            'engenheiro_crea',
+            'engenheiro_email',
+            'engenheiro_telefone',
+            'engenheiro_endereco',
+            'engenheiro_website',
+        ]
+        cursor.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'proposta_templates'
+               AND column_name = ANY(%s)
+            """,
+            (eng_columns,),
+        )
+        existing_eng_cols = {r[0] for r in cursor.fetchall()}
+
+        if 'engenheiro_nome' in existing_eng_cols:
+            # SET de todos os campos do engenheiro nas linhas onde o
+            # nome ainda contém "Lucas" + "Barbosa" (case-insensitive).
+            set_clauses = []
+            for col in existing_eng_cols:
+                set_clauses.append(f"{col} = ''")
+            set_sql = ", ".join(set_clauses)
+
+            cursor.execute(
+                f"""
+                UPDATE proposta_templates
+                   SET {set_sql}
+                 WHERE engenheiro_nome ILIKE %s
+                    OR engenheiro_nome ILIKE %s
+                """,
+                ('%Lucas%Barbosa%', '%Engº Lucas%'),
+            )
+            total_updates += cursor.rowcount or 0
+
+        # 3) destinatario / atencao_de / telefone_cliente: zera apenas
+        #    se forem vestígios óbvios do antigo placeholder Lucas Barbosa.
+        for col in ('destinatario', 'atencao_de', 'telefone_cliente'):
+            cursor.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'proposta_templates'
+                   AND column_name = %s
+                """,
+                (col,),
+            )
+            if cursor.fetchone() is None:
+                continue
+            cursor.execute(
+                f"""
+                UPDATE proposta_templates
+                   SET {col} = NULL
+                 WHERE {col} ILIKE %s
+                """,
+                ('%Lucas%Barbosa%',),
+            )
+            total_updates += cursor.rowcount or 0
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 136: scrub de defaults legados concluído "
+            "(linhas atualizadas=%s).",
+            total_updates,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 136: {e}")
         if connection:
             try:
                 connection.rollback()

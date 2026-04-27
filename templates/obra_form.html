@@ -359,51 +359,51 @@
                                 </div>
                             </div>
 
-                            <!-- Informações do Cliente -->
+                            <!-- Cliente (Task #175) — selecionado do cadastro de Clientes -->
                             <h5 class="mb-4 mt-5" style="color: #198754; font-weight: 600;">
-                                <i class="fas fa-user-tie me-2"></i>Informações do Cliente
+                                <i class="fas fa-user-tie me-2"></i>Cliente
                             </h5>
-                            
+
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-12">
                                     <div class="form-group">
-                                        <label for="cliente_nome" class="form-label">
-                                            <i class="fas fa-user"></i>Nome do Cliente
+                                        <label for="cliente_busca" class="form-label">
+                                            <i class="fas fa-search"></i> Buscar Cliente *
                                         </label>
-                                        <input type="text" 
-                                               class="form-control" 
-                                               id="cliente_nome" 
-                                               name="cliente_nome" 
-                                               value="{{ obra.cliente_nome_efetivo if obra else '' }}"
-                                               placeholder="Nome completo do cliente">
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="cliente_email" class="form-label">
-                                            <i class="fas fa-envelope"></i>Email do Cliente
-                                        </label>
-                                        <input type="email" 
-                                               class="form-control" 
-                                               id="cliente_email" 
-                                               name="cliente_email" 
-                                               value="{{ obra.cliente_email_efetivo if obra else '' }}"
-                                               placeholder="cliente@empresa.com">
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="cliente_telefone" class="form-label">
-                                            <i class="fas fa-phone"></i>Telefone do Cliente
-                                        </label>
-                                        <input type="tel" 
-                                               class="form-control" 
-                                               id="cliente_telefone" 
-                                               name="cliente_telefone" 
-                                               value="{{ obra.cliente_telefone_efetivo if obra else '' }}"
-                                               placeholder="(11) 99999-9999">
+                                        <div class="position-relative">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   id="cliente_busca"
+                                                   name="cliente_busca"
+                                                   autocomplete="off"
+                                                   placeholder="Digite nome, e-mail, telefone ou CNPJ do cliente..."
+                                                   value="{{ (obra.cliente_ref.nome if obra and obra.cliente_ref else '') }}"
+                                                   required>
+                                            <input type="hidden"
+                                                   id="cliente_id"
+                                                   name="cliente_id"
+                                                   value="{{ obra.cliente_id if obra and obra.cliente_id else '' }}">
+                                            <div id="cliente_resultados"
+                                                 class="list-group position-absolute w-100 shadow-sm"
+                                                 style="z-index: 1050; max-height: 280px; overflow-y: auto; display: none;"></div>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            Apenas clientes do cadastro podem ser vinculados.
+                                            Para criar um novo, abra
+                                            <a href="{{ url_for('clientes.criar') }}" target="_blank">
+                                                <i class="fas fa-external-link-alt"></i> Cadastro de Clientes
+                                            </a>.
+                                        </small>
+                                        <div id="cliente_resumo"
+                                             class="alert alert-info py-2 small mt-2 mb-0"
+                                             style="display: {{ 'block' if obra and obra.cliente_ref else 'none' }};">
+                                            {% if obra and obra.cliente_ref %}
+                                                <strong>{{ obra.cliente_ref.nome }}</strong>
+                                                {% if obra.cliente_ref.email %} &middot; {{ obra.cliente_ref.email }}{% endif %}
+                                                {% if obra.cliente_ref.telefone %} &middot; {{ obra.cliente_ref.telefone }}{% endif %}
+                                                {% if obra.cliente_ref.cnpj %} &middot; CNPJ {{ obra.cliente_ref.cnpj }}{% endif %}
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -772,5 +772,102 @@ function obterLocalizacaoAtual(event) {
         }
     );
 }
+
+// Task #175 — autocomplete de Cliente no formulário de Obra
+(function() {
+    const inputBusca = document.getElementById('cliente_busca');
+    const inputId = document.getElementById('cliente_id');
+    const resultados = document.getElementById('cliente_resultados');
+    const resumo = document.getElementById('cliente_resumo');
+    if (!inputBusca || !inputId || !resultados) return;
+
+    let timer = null;
+
+    function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, function(c) {
+            return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c];
+        });
+    }
+
+    function fechar() { resultados.style.display = 'none'; resultados.innerHTML = ''; }
+
+    function selecionar(cli) {
+        inputId.value = cli.id;
+        inputBusca.value = cli.nome;
+        resumo.style.display = 'block';
+        resumo.innerHTML = '<strong>' + escapeHtml(cli.nome) + '</strong>'
+            + (cli.email ? ' &middot; ' + escapeHtml(cli.email) : '')
+            + (cli.telefone ? ' &middot; ' + escapeHtml(cli.telefone) : '')
+            + (cli.cnpj ? ' &middot; CNPJ ' + escapeHtml(cli.cnpj) : '');
+        fechar();
+    }
+
+    function buscar(q) {
+        fetch('{{ url_for("clientes.api_buscar") }}?q=' + encodeURIComponent(q), {
+            credentials: 'same-origin',
+            headers: {'Accept': 'application/json'}
+        })
+        .then(r => r.ok ? r.json() : {results: []})
+        .then(data => {
+            const items = (data && data.results) || [];
+            if (!items.length) {
+                resultados.innerHTML = '<div class="list-group-item text-muted small">'
+                    + 'Nenhum cliente encontrado. '
+                    + '<a href="{{ url_for("clientes.criar") }}" target="_blank">Cadastrar novo</a>'
+                    + '</div>';
+                resultados.style.display = 'block';
+                return;
+            }
+            resultados.innerHTML = items.map(c =>
+                '<button type="button" class="list-group-item list-group-item-action" data-id="' + c.id + '">'
+                + '<strong>' + escapeHtml(c.nome) + '</strong>'
+                + (c.email ? ' <small class="text-muted">' + escapeHtml(c.email) + '</small>' : '')
+                + (c.telefone ? ' <small class="text-muted">· ' + escapeHtml(c.telefone) + '</small>' : '')
+                + (c.cnpj ? ' <small class="text-muted">· ' + escapeHtml(c.cnpj) + '</small>' : '')
+                + '</button>'
+            ).join('');
+            resultados.style.display = 'block';
+            resultados.querySelectorAll('button[data-id]').forEach((btn, idx) => {
+                btn.addEventListener('click', () => selecionar(items[idx]));
+            });
+        })
+        .catch(() => fechar());
+    }
+
+    inputBusca.addEventListener('input', function() {
+        // Qualquer edição manual invalida a seleção anterior — o servidor
+        // resolverá o cliente pelo texto digitado (cliente_resolver).
+        inputId.value = '';
+        resumo.style.display = 'none';
+        resumo.innerHTML = '';
+        clearTimeout(timer);
+        const q = inputBusca.value.trim();
+        timer = setTimeout(() => buscar(q), 200);
+    });
+
+    inputBusca.addEventListener('focus', function() {
+        if (resultados.innerHTML) resultados.style.display = 'block';
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!resultados.contains(e.target) && e.target !== inputBusca) fechar();
+    });
+
+    // Sem hard-block no submit: se nenhum item da lista foi escolhido, o
+    // texto digitado em cliente_busca é enviado e o servidor cria/recupera
+    // o Cliente via cliente_resolver. Apenas exigimos que o campo não esteja
+    // completamente vazio (HTML5 required já cobre isso).
+    const form = inputBusca.closest('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!inputBusca.value.trim()) {
+                e.preventDefault();
+                inputBusca.focus();
+                inputBusca.classList.add('is-invalid');
+                alert('Informe o cliente (selecione do cadastro ou digite o nome).');
+            }
+        });
+    }
+})();
 </script>
 {% endblock %}

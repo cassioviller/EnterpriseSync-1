@@ -845,14 +845,18 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             numero += 1
             codigo_obra = f"OBR{numero:04d}"
 
+        # Task #176 — Obra exige cliente_id (FK NOT NULL). Se a Proposta
+        # não tem cliente cadastrado, abortamos a propagação para evitar
+        # inserir uma Obra órfã.
+        if not cliente_obj:
+            raise ValueError(
+                f"Proposta {proposta.numero} sem cliente cadastrado "
+                f"— não é possível criar a Obra correspondente."
+            )
         obra = Obra(
             nome=f"Obra - {proposta.titulo or proposta.numero}",
             codigo=codigo_obra,
-            cliente=cliente_nome,
-            cliente_id=cliente_obj.id if cliente_obj else None,
-            cliente_nome=cliente_nome,
-            cliente_email=proposta.cliente_email,
-            cliente_telefone=proposta.cliente_telefone,
+            cliente_id=cliente_obj.id,
             endereco=proposta.cliente_endereco,
             data_inicio=datetime.now().date(),
             valor_contrato=valor_total,
@@ -870,12 +874,7 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             f"(cliente_id={obra.cliente_id})"
         )
     else:
-        if not obra.cliente:
-            obra.cliente = cliente_nome
-        if not obra.cliente_nome:
-            obra.cliente_nome = cliente_nome
-        # Task #172 — popula cliente_id em obras pré-existentes que ainda
-        # estavam sem o vínculo, preservando o que já houver.
+        # Task #176 — popula cliente_id em obras pré-existentes (legado).
         if not obra.cliente_id and cliente_obj:
             obra.cliente_id = cliente_obj.id
         if (obra.valor_contrato or 0) <= 0 and valor_total > 0:

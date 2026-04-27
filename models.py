@@ -250,14 +250,13 @@ class Obra(db.Model):
     
     # MÓDULO 2: Portal do Cliente - Campos Completos
     token_cliente = db.Column(db.String(255), unique=True)
-    # Task #172 — vínculo direto com o cadastro de Cliente. Os campos
-    # cliente_nome/email/telefone/cliente abaixo permanecem como fallback de
-    # compatibilidade enquanto obras antigas (sem FK) ainda existirem.
-    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True, index=True)
-    cliente_nome = db.Column(db.String(100))
-    cliente_email = db.Column(db.String(120))
-    cliente_telefone = db.Column(db.String(20))
-    cliente = db.Column(db.String(200), nullable=True)  # Campo cliente para filtros
+    # Task #176 — Cliente é vínculo único e obrigatório (FK NOT NULL). Os
+    # antigos campos texto cliente_nome/email/telefone/cliente foram
+    # removidos: a única fonte de verdade é o cadastro de Cliente.
+    cliente_id = db.Column(
+        db.Integer, db.ForeignKey('cliente.id'),
+        nullable=False, index=True,
+    )
     proposta_origem_id = db.Column(db.Integer, db.ForeignKey('propostas_comerciais.id'))
     
     # Configurações do Portal
@@ -290,28 +289,21 @@ class Obra(db.Model):
     # backref 'obras' permite Cliente.obras para listar todas as obras do cliente.
     cliente_ref = db.relationship('Cliente', foreign_keys=[cliente_id], backref='obras')
 
-    # ── Task #172: helpers para ler dados do cliente preferindo a FK ──────
-    # Templates e serviços devem usar essas properties em vez de
-    # cliente_nome/email/telefone diretos. Quando cliente_id está populada,
-    # retorna o dado vivo do cadastro; caso contrário, usa o texto legado.
+    # ── Task #176: properties simplificadas — apenas a FK Cliente é fonte de
+    # verdade. Os antigos campos texto cliente_nome/email/telefone foram
+    # removidos do schema; nada de fallback legado.
 
     @property
     def cliente_nome_efetivo(self):
-        if self.cliente_ref is not None and self.cliente_ref.nome:
-            return self.cliente_ref.nome
-        return self.cliente_nome or self.cliente or ''
+        return (self.cliente_ref.nome or '') if self.cliente_ref is not None else ''
 
     @property
     def cliente_email_efetivo(self):
-        if self.cliente_ref is not None and self.cliente_ref.email:
-            return self.cliente_ref.email
-        return self.cliente_email or ''
+        return (self.cliente_ref.email or '') if self.cliente_ref is not None else ''
 
     @property
     def cliente_telefone_efetivo(self):
-        if self.cliente_ref is not None and self.cliente_ref.telefone:
-            return self.cliente_ref.telefone
-        return self.cliente_telefone or ''
+        return (self.cliente_ref.telefone or '') if self.cliente_ref is not None else ''
 
 
 class ServicoObra(db.Model):
@@ -3025,7 +3017,9 @@ class PropostaTemplate(db.Model):
     
     # CAMPOS COMPLETOS DO TEMPLATE - PRIMEIRA PÁGINA ATÉ PONTO 9
     # Dados do cliente (primeira página)
-    cidade_data = db.Column(db.String(200), default='São José dos Campos, [DATA]')
+    # Task #162 — sem default hard-coded de cidade. O template renderiza
+    # apenas o que estiver configurado pelo tenant.
+    cidade_data = db.Column(db.String(200), default='')
     destinatario = db.Column(db.String(200))  # "À [Nome do Cliente]"
     atencao_de = db.Column(db.String(200))    # "A/c.: [Responsável]"
     telefone_cliente = db.Column(db.String(50)) # "12 98111-0980"
@@ -3043,8 +3037,11 @@ Atenciosamente,
 """)
     
     # Dados do engenheiro responsável (rodapé/cabeçalho)
-    engenheiro_nome = db.Column(db.String(200), default='Engº Lucas Barbosa Alves Pinto')
-    engenheiro_crea = db.Column(db.String(50), default='CREA- 5070458626-SP')
+    # Task #162 — defaults zerados; nada de "Lucas Barbosa" hard-coded.
+    # Para a fonte real do engenheiro use EngenheiroResponsavel
+    # (Task #173) via services.engenheiro_service.obter_engenheiro_dados.
+    engenheiro_nome = db.Column(db.String(200), default='')
+    engenheiro_crea = db.Column(db.String(50), default='')
     engenheiro_email = db.Column(db.String(120), default='')
     engenheiro_telefone = db.Column(db.String(50), default='')
     engenheiro_endereco = db.Column(db.Text, default='')
@@ -3254,16 +3251,10 @@ class ConfiguracaoEmpresa(db.Model):
     assinatura_nome = db.Column(db.String(200), default='')
     assinatura_cargo = db.Column(db.String(200), default='')
 
-    # Dados padrão do engenheiro responsável (rodapé das propostas)
-    # MANTIDOS para fallback após Task #173 (cadastro próprio em EngenheiroResponsavel)
-    engenheiro_nome = db.Column(db.String(200), default='')
-    engenheiro_crea = db.Column(db.String(50), default='')
-    engenheiro_email = db.Column(db.String(120), default='')
-    engenheiro_telefone = db.Column(db.String(50), default='')
-    engenheiro_endereco = db.Column(db.Text, default='')
-    engenheiro_website = db.Column(db.String(200), default='')
-
-    # Task #173 — engenheiro responsável padrão (substitui campos legados acima)
+    # Task #178 — Engenheiro responsável: a única fonte de verdade é
+    # EngenheiroResponsavel (cadastro próprio, Task #173). Os antigos
+    # campos engenheiro_nome/crea/email/telefone/endereco/website foram
+    # removidos do schema.
     engenheiro_padrao_id = db.Column(db.Integer,
                                      db.ForeignKey('engenheiro_responsavel.id', ondelete='SET NULL'),
                                      nullable=True)
@@ -3302,12 +3293,9 @@ class ConfiguracaoEmpresa(db.Model):
             'percentual_nota_fiscal_padrao': float(self.percentual_nota_fiscal_padrao) if self.percentual_nota_fiscal_padrao else 13.5,
             'assinatura_nome': self.assinatura_nome or '',
             'assinatura_cargo': self.assinatura_cargo or '',
-            'engenheiro_nome': self.engenheiro_nome or '',
-            'engenheiro_crea': self.engenheiro_crea or '',
-            'engenheiro_email': self.engenheiro_email or '',
-            'engenheiro_telefone': self.engenheiro_telefone or '',
-            'engenheiro_endereco': self.engenheiro_endereco or '',
-            'engenheiro_website': self.engenheiro_website or '',
+            # Task #178 — campos engenheiro_* removidos. Use
+            # services.engenheiro_service.obter_engenheiro_dados.
+            'engenheiro_padrao_id': self.engenheiro_padrao_id,
         }
     
     def to_dict(self):

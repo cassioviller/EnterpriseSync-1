@@ -84,47 +84,57 @@
 
                         <hr class="my-4">
 
-                        <!-- Assinatura da Proposta e Engenheiro Responsável (Task #158) -->
+                        <!-- Assinatura da Proposta e Engenheiro Responsável (Task #158/#173/#178) -->
                         <h6 class="mb-3">
                             <i class="fas fa-signature me-2"></i>
                             Assinatura da Proposta e Engenheiro Responsável
                         </h6>
                         <p class="text-muted small mb-3">
                             Estes dados aparecem no rodapé/assinatura dos PDFs de proposta.
-                            Campos em branco são omitidos automaticamente.
+                            Campos em branco são omitidos automaticamente. A pré-visualização
+                            ao lado é atualizada em tempo real conforme você digita.
                         </p>
 
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="assinatura_nome" class="form-label">Nome para Assinatura</label>
-                                    <input type="text" class="form-control" id="assinatura_nome" name="assinatura_nome"
-                                           value="{{ config.assinatura_nome if config else '' }}"
-                                           placeholder="Ex: João da Silva">
+                            <div class="col-md-7">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="assinatura_nome" class="form-label">Nome para Assinatura</label>
+                                            <input type="text" class="form-control" id="assinatura_nome" name="assinatura_nome"
+                                                   value="{{ config.assinatura_nome if config else '' }}"
+                                                   placeholder="Ex: João da Silva"
+                                                   data-preview-target="prev-assinatura-nome">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="assinatura_cargo" class="form-label">Cargo / Função</label>
+                                            <input type="text" class="form-control" id="assinatura_cargo" name="assinatura_cargo"
+                                                   value="{{ config.assinatura_cargo if config else '' }}"
+                                                   placeholder="Ex: Diretor Comercial"
+                                                   data-preview-target="prev-assinatura-cargo">
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="assinatura_cargo" class="form-label">Cargo / Função</label>
-                                    <input type="text" class="form-control" id="assinatura_cargo" name="assinatura_cargo"
-                                           value="{{ config.assinatura_cargo if config else '' }}"
-                                           placeholder="Ex: Diretor Comercial">
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Task #173 — Seleção do engenheiro responsável padrão -->
-                        <div class="row">
-                            <div class="col-12">
+                                <!-- Task #173/#178 — Seleção do engenheiro responsável padrão -->
                                 <div class="mb-3">
                                     <label for="engenheiro_padrao_id" class="form-label">
                                         Engenheiro Responsável Padrão
                                     </label>
                                     <div class="d-flex gap-2 align-items-start">
                                         <select class="form-select" id="engenheiro_padrao_id" name="engenheiro_padrao_id">
-                                            <option value="">— Sem engenheiro padrão (usar campos legados abaixo) —</option>
+                                            <option value="">— Sem engenheiro padrão —</option>
                                             {% for eng in engenheiros or [] %}
                                                 <option value="{{ eng.id }}"
+                                                    data-nome="{{ eng.nome or '' }}"
+                                                    data-crea="{{ eng.crea or '' }}"
+                                                    data-email="{{ eng.email or '' }}"
+                                                    data-telefone="{{ eng.telefone or '' }}"
+                                                    data-endereco="{{ eng.endereco or '' }}"
+                                                    data-website="{{ eng.website or '' }}"
+                                                    data-assinatura="{{ eng.assinatura_base64 or '' }}"
                                                     {% if config and config.engenheiro_padrao_id == eng.id %}selected{% endif %}>
                                                     {{ eng.nome }}{% if eng.crea %} — {{ eng.crea }}{% endif %}
                                                 </option>
@@ -141,74 +151,39 @@
                                         Cada proposta pode opcionalmente sobrescrever este padrão.
                                     </small>
                                 </div>
+                            </div>
 
-                                {% if config and config.engenheiro_padrao_id %}
-                                    {% set _padrao = (engenheiros or []) | selectattr('id', 'equalto', config.engenheiro_padrao_id) | list | first %}
-                                    {% if _padrao %}
-                                    <div class="alert alert-info py-2 small mb-3">
-                                        <strong>{{ _padrao.nome }}</strong>
-                                        {% if _padrao.crea %} &middot; CREA {{ _padrao.crea }}{% endif %}
-                                        {% if _padrao.email %} &middot; {{ _padrao.email }}{% endif %}
-                                        {% if _padrao.telefone %} &middot; {{ _padrao.telefone }}{% endif %}
+                            <div class="col-md-5">
+                                <div class="card border-info" id="bloco-preview-assinatura">
+                                    <div class="card-header bg-light py-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-eye me-1"></i>
+                                            Pré-visualização (rodapé do PDF)
+                                        </small>
                                     </div>
-                                    {% endif %}
-                                {% endif %}
+                                    <div class="card-body text-center">
+                                        <div class="fw-bold" id="prev-assinatura-nome">{{ config.assinatura_nome if config else '' }}</div>
+                                        <div class="text-muted small mb-2" id="prev-assinatura-cargo">{{ config.assinatura_cargo if config else '' }}</div>
+                                        <hr class="my-2">
+                                        <div id="prev-eng-bloco" class="small text-start">
+                                            <div class="text-center mb-2 d-none" id="prev-eng-assinatura-wrap">
+                                                <img id="prev-eng-assinatura"
+                                                     alt="Assinatura"
+                                                     style="max-height: 70px; max-width: 220px; object-fit: contain;">
+                                            </div>
+                                            <div class="fw-semibold" id="prev-eng-nome"></div>
+                                            <div id="prev-eng-crea" class="text-muted"></div>
+                                            <div id="prev-eng-contato" class="text-muted"></div>
+                                            <div id="prev-eng-endereco" class="text-muted"></div>
+                                            <div id="prev-eng-website" class="text-muted"></div>
+                                            <div id="prev-eng-vazio" class="text-muted fst-italic d-none">
+                                                Nenhum engenheiro padrão selecionado.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-
-                        <!-- Campos legados (fallback quando não há engenheiro padrão) -->
-                        <details class="mb-3">
-                            <summary class="text-muted small" style="cursor: pointer;">
-                                Dados do engenheiro (modo legado — usado apenas quando nenhum padrão é selecionado)
-                            </summary>
-                            <div class="row mt-3">
-                                <div class="col-md-8">
-                                    <div class="mb-3">
-                                        <label for="engenheiro_nome" class="form-label">Engenheiro Responsável (Nome)</label>
-                                        <input type="text" class="form-control" id="engenheiro_nome" name="engenheiro_nome"
-                                               value="{{ config.engenheiro_nome if config else '' }}"
-                                               placeholder="Ex: Engº Fulano de Tal">
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="engenheiro_crea" class="form-label">CREA / Registro</label>
-                                        <input type="text" class="form-control" id="engenheiro_crea" name="engenheiro_crea"
-                                               value="{{ config.engenheiro_crea if config else '' }}"
-                                               placeholder="Ex: CREA-1234567-SP">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="engenheiro_email" class="form-label">E-mail do Engenheiro</label>
-                                        <input type="email" class="form-control" id="engenheiro_email" name="engenheiro_email"
-                                               value="{{ config.engenheiro_email if config else '' }}"
-                                               placeholder="engenheiro@empresa.com">
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="engenheiro_telefone" class="form-label">Telefone do Engenheiro</label>
-                                        <input type="text" class="form-control" id="engenheiro_telefone" name="engenheiro_telefone"
-                                               value="{{ config.engenheiro_telefone if config else '' }}"
-                                               placeholder="(00) 00000-0000">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="engenheiro_endereco" class="form-label">Endereço do Engenheiro</label>
-                                <textarea class="form-control" id="engenheiro_endereco" name="engenheiro_endereco" rows="2"
-                                          placeholder="Endereço profissional do engenheiro responsável">{{ config.engenheiro_endereco if config else '' }}</textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label for="engenheiro_website" class="form-label">Website do Engenheiro</label>
-                                <input type="url" class="form-control" id="engenheiro_website" name="engenheiro_website"
-                                       value="{{ config.engenheiro_website if config else '' }}"
-                                       placeholder="https://www.exemplo.com">
-                            </div>
-                        </details>
 
                         <hr class="my-4">
 
@@ -892,6 +867,78 @@ document.getElementById('cor_primaria').addEventListener('change', function(e) {
             const padrao = document.querySelector('.tema-preset-card[data-preset-id="azul_profundo"]');
             if (padrao) padrao.click();
         });
+    }
+})();
+
+// Task #161/#178 — pré-visualização em tempo real do bloco de assinatura/engenheiro
+(function () {
+    function bindPreview(inputId, targetId) {
+        const inp = document.getElementById(inputId);
+        const tgt = document.getElementById(targetId);
+        if (!inp || !tgt) return;
+        inp.addEventListener('input', function () {
+            tgt.textContent = inp.value || '';
+        });
+    }
+    bindPreview('assinatura_nome', 'prev-assinatura-nome');
+    bindPreview('assinatura_cargo', 'prev-assinatura-cargo');
+
+    function joinSep(parts, sep) {
+        return parts.filter(function (p) { return p && p.trim(); }).join(sep);
+    }
+
+    function atualizarPreviewEngenheiro() {
+        const sel = document.getElementById('engenheiro_padrao_id');
+        if (!sel) return;
+        const opt = sel.options[sel.selectedIndex];
+        const nomeEl = document.getElementById('prev-eng-nome');
+        const creaEl = document.getElementById('prev-eng-crea');
+        const contEl = document.getElementById('prev-eng-contato');
+        const endEl = document.getElementById('prev-eng-endereco');
+        const webEl = document.getElementById('prev-eng-website');
+        const vazioEl = document.getElementById('prev-eng-vazio');
+        const assImg = document.getElementById('prev-eng-assinatura');
+        const assWrap = document.getElementById('prev-eng-assinatura-wrap');
+        if (!opt || !opt.value) {
+            nomeEl.textContent = '';
+            creaEl.textContent = '';
+            contEl.textContent = '';
+            endEl.textContent = '';
+            webEl.textContent = '';
+            if (assImg) assImg.removeAttribute('src');
+            if (assWrap) assWrap.classList.add('d-none');
+            vazioEl.classList.remove('d-none');
+            return;
+        }
+        vazioEl.classList.add('d-none');
+        const nome = opt.dataset.nome || '';
+        const crea = opt.dataset.crea || '';
+        const email = opt.dataset.email || '';
+        const tel = opt.dataset.telefone || '';
+        const end = opt.dataset.endereco || '';
+        const web = opt.dataset.website || '';
+        const ass = opt.dataset.assinatura || '';
+        nomeEl.textContent = nome;
+        creaEl.textContent = crea ? 'CREA: ' + crea : '';
+        contEl.textContent = joinSep([email, tel], ' · ');
+        endEl.textContent = end;
+        webEl.textContent = web;
+        if (assImg && assWrap) {
+            if (ass) {
+                const src = ass.startsWith('data:') ? ass : ('data:image/png;base64,' + ass);
+                assImg.src = src;
+                assWrap.classList.remove('d-none');
+            } else {
+                assImg.removeAttribute('src');
+                assWrap.classList.add('d-none');
+            }
+        }
+    }
+
+    const sel = document.getElementById('engenheiro_padrao_id');
+    if (sel) {
+        sel.addEventListener('change', atualizarPreviewEngenheiro);
+        atualizarPreviewEngenheiro();
     }
 })();
 </script>

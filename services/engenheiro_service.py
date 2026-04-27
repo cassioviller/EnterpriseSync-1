@@ -1,12 +1,17 @@
 """
-services/engenheiro_service.py — Task #173
+services/engenheiro_service.py — Task #173 / #178
 
 Helper para resolver os dados do engenheiro responsável que aparece no
-rodapé/PDF de uma proposta. Centraliza a regra de prioridade:
+rodapé/PDF de uma proposta. Após Task #178 a única fonte de verdade é
+o cadastro `EngenheiroResponsavel` (Task #173). A regra de prioridade
+ficou:
 
-  1. Proposta.engenheiro_id   (override por proposta)
+  1. Proposta.engenheiro_id          (override por proposta)
   2. ConfiguracaoEmpresa.engenheiro_padrao_id  (padrão da empresa)
-  3. Campos legados engenheiro_* da ConfiguracaoEmpresa (fallback)
+  3. (vazio) — sem engenheiro configurado.
+
+Os campos legados `engenheiro_*` da `ConfiguracaoEmpresa` foram
+removidos do schema e não são mais consultados.
 
 Mantém os templates PDF agnósticos: todos consomem `engenheiro_dados`,
 um dict simples com nome/crea/email/telefone/endereco/website e a
@@ -35,23 +40,11 @@ def _from_engenheiro(engenheiro) -> Dict[str, Any]:
     }
 
 
-def _from_legacy(config) -> Dict[str, Any]:
-    if config is None:
-        return {
-            'nome': '', 'crea': '', 'email': '', 'telefone': '',
-            'endereco': '', 'website': '', 'assinatura_base64': '',
-            'fonte': 'vazio', 'engenheiro_id': None,
-        }
+def _vazio_payload() -> Dict[str, Any]:
     return {
-        'nome': (getattr(config, 'engenheiro_nome', '') or '').strip(),
-        'crea': (getattr(config, 'engenheiro_crea', '') or '').strip(),
-        'email': (getattr(config, 'engenheiro_email', '') or '').strip(),
-        'telefone': (getattr(config, 'engenheiro_telefone', '') or '').strip(),
-        'endereco': (getattr(config, 'engenheiro_endereco', '') or '').strip(),
-        'website': (getattr(config, 'engenheiro_website', '') or '').strip(),
-        'assinatura_base64': '',
-        'fonte': 'configuracao_empresa_legado',
-        'engenheiro_id': None,
+        'nome': '', 'crea': '', 'email': '', 'telefone': '',
+        'endereco': '', 'website': '', 'assinatura_base64': '',
+        'fonte': 'vazio', 'engenheiro_id': None,
     }
 
 
@@ -62,11 +55,11 @@ def obter_engenheiro_dados(proposta=None, config_empresa=None) -> Dict[str, Any]
         proposta: instância de Proposta (ou None). Se tiver engenheiro_id,
             tem prioridade absoluta (override por proposta).
         config_empresa: instância de ConfiguracaoEmpresa (ou None). Se
-            tiver engenheiro_padrao_id, é o segundo nível. Caso contrário,
-            usa os campos legados engenheiro_* dela.
+            tiver engenheiro_padrao_id, é o segundo nível.
 
     Sempre devolve um dict (nunca None) com chaves estáveis para o
-    template; valores podem ser strings vazias.
+    template; valores podem ser strings vazias quando nada está
+    configurado.
     """
     # Import local para evitar ciclo no import-time
     from models import EngenheiroResponsavel
@@ -98,8 +91,8 @@ def obter_engenheiro_dados(proposta=None, config_empresa=None) -> Dict[str, Any]
         if eng is not None and eng.ativo:
             return _from_engenheiro(eng)
 
-    # 3) Legado
-    return _from_legacy(config_empresa)
+    # 3) Sem engenheiro configurado.
+    return _vazio_payload()
 
 
 def listar_engenheiros_ativos(admin_id: int):

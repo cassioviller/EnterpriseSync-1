@@ -364,7 +364,7 @@
         <!-- Se não houver header_pdf_base64, fica vazio (sem header verde) -->
 
         <div class="date-location">
-            São José dos Campos, {% if proposta.criado_em %}{{ proposta.criado_em.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') }}{% else %}19 de agosto de 2025{% endif %}.
+            {% if template and template.cidade_data %}{{ template.cidade_data }}, {% endif %}{% if proposta.criado_em %}{{ proposta.criado_em.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') }}{% endif %}.
         </div>
 
         <div class="recipient">
@@ -425,12 +425,13 @@
             {% endif %}
             {# Task #173 — usa engenheiro_dados resolvido pelo helper (com fallback no legado) #}
             {% set _ed = engenheiro_dados or {} %}
-            {% set _eng_nome = _ed.nome or (config.engenheiro_nome if config else '') %}
-            {% set _eng_crea = _ed.crea or (config.engenheiro_crea if config else '') %}
-            {% set _eng_email = _ed.email or (config.engenheiro_email if config else '') %}
-            {% set _eng_tel = _ed.telefone or (config.engenheiro_telefone if config else '') %}
-            {% set _eng_end = _ed.endereco or (config.engenheiro_endereco if config else '') %}
-            {% set _eng_web = _ed.website or (config.engenheiro_website if config else '') %}
+            {# Task #178 — única fonte: engenheiro_dados (helper engenheiro_service). #}
+            {% set _eng_nome = _ed.nome or '' %}
+            {% set _eng_crea = _ed.crea or '' %}
+            {% set _eng_email = _ed.email or '' %}
+            {% set _eng_tel = _ed.telefone or '' %}
+            {% set _eng_end = _ed.endereco or '' %}
+            {% set _eng_web = _ed.website or '' %}
             {% set _eng_assin = _ed.assinatura_base64 or '' %}
             {% if _eng_nome or _eng_crea or _eng_email or _eng_tel or _eng_end or _eng_web %}
             <div class="engineer-info" style="margin-top: 12px; font-size: 0.9em;">

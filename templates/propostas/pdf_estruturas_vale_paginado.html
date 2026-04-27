@@ -293,7 +293,7 @@
         
         <div class="page-content fixed-content">
             <div class="date-location">
-                {{ template.cidade_data or 'São José dos Campos' }}, {{ proposta.data_criacao.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') if proposta.data_criacao else '18 de agosto de 2025' }}.
+                {% if template and template.cidade_data %}{{ template.cidade_data }}, {% endif %}{{ proposta.data_criacao.strftime('%d de %B de %Y')|replace('January', 'janeiro')|replace('February', 'fevereiro')|replace('March', 'março')|replace('April', 'abril')|replace('May', 'maio')|replace('June', 'junho')|replace('July', 'julho')|replace('August', 'agosto')|replace('September', 'setembro')|replace('October', 'outubro')|replace('November', 'novembro')|replace('December', 'dezembro') if proposta.data_criacao else '' }}.
             </div>
         
         <div class="recipient">
@@ -346,12 +346,13 @@
             {% set _ed = engenheiro_dados or {} %}
             {# Não usa mais PropostaTemplate.engenheiro_* — apenas dados resolvidos
                pelo helper e fallback p/ os campos legados em ConfiguracaoEmpresa. #}
-            {% set _eng_nome = _ed.nome or (config_empresa.engenheiro_nome if config_empresa and config_empresa.engenheiro_nome else '') %}
-            {% set _eng_crea = _ed.crea or (config_empresa.engenheiro_crea if config_empresa and config_empresa.engenheiro_crea else '') %}
-            {% set _eng_email = _ed.email or (config_empresa.engenheiro_email if config_empresa and config_empresa.engenheiro_email else '') %}
-            {% set _eng_tel = _ed.telefone or (config_empresa.engenheiro_telefone if config_empresa and config_empresa.engenheiro_telefone else '') %}
-            {% set _eng_end = _ed.endereco or (config_empresa.engenheiro_endereco if config_empresa and config_empresa.engenheiro_endereco else '') %}
-            {% set _eng_web = _ed.website or (config_empresa.engenheiro_website if config_empresa and config_empresa.engenheiro_website else '') %}
+            {# Task #178 — única fonte: engenheiro_dados (helper engenheiro_service). #}
+            {% set _eng_nome = _ed.nome or '' %}
+            {% set _eng_crea = _ed.crea or '' %}
+            {% set _eng_email = _ed.email or '' %}
+            {% set _eng_tel = _ed.telefone or '' %}
+            {% set _eng_end = _ed.endereco or '' %}
+            {% set _eng_web = _ed.website or '' %}
             {% set _eng_assin = _ed.assinatura_base64 or '' %}
             {% if _eng_nome or _eng_crea or _eng_email or _eng_tel or _eng_end or _eng_web %}
             <!-- Dados do Engenheiro (da primeira página - conforme imagem) -->

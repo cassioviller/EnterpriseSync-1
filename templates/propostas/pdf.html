@@ -290,12 +290,13 @@
 
         {# Task #173 — usa engenheiro_dados resolvido pelo helper (com fallback no legado) #}
         {% set _ed = engenheiro_dados or {} %}
-        {% set _eng_nome = _ed.nome or (config_empresa.engenheiro_nome if config_empresa else '') %}
-        {% set _eng_crea = _ed.crea or (config_empresa.engenheiro_crea if config_empresa else '') %}
-        {% set _eng_email = _ed.email or (config_empresa.engenheiro_email if config_empresa else '') %}
-        {% set _eng_tel = _ed.telefone or (config_empresa.engenheiro_telefone if config_empresa else '') %}
-        {% set _eng_end = _ed.endereco or (config_empresa.engenheiro_endereco if config_empresa else '') %}
-        {% set _eng_web = _ed.website or (config_empresa.engenheiro_website if config_empresa else '') %}
+        {# Task #178 — única fonte: engenheiro_dados (helper engenheiro_service). #}
+        {% set _eng_nome = _ed.nome or '' %}
+        {% set _eng_crea = _ed.crea or '' %}
+        {% set _eng_email = _ed.email or '' %}
+        {% set _eng_tel = _ed.telefone or '' %}
+        {% set _eng_end = _ed.endereco or '' %}
+        {% set _eng_web = _ed.website or '' %}
         {% set _eng_assin = _ed.assinatura_base64 or '' %}
         {% if _eng_nome or _eng_crea or _eng_email or _eng_tel or _eng_end or _eng_web %}
         <div class="engineer-info" style="margin-top: 16px; text-align: center; font-size: 0.9em;">

@@ -4,7 +4,9 @@ Blueprint de Cadastro de Clientes (Task #138)
 Tela própria de CRUD para Clientes do admin logado, separada do
 formulário de Proposta. Multi-tenant: cada admin vê apenas os seus.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import (
+    Blueprint, render_template, request, redirect, url_for, flash, jsonify,
+)
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from datetime import datetime
@@ -138,6 +140,45 @@ def editar(id):
 
     return render_template('cadastros/clientes_form.html',
                            cliente=cliente, valores=_Valores(cliente))
+
+
+@clientes_bp.route('/api/buscar', methods=['GET'])
+@login_required
+def api_buscar():
+    """Endpoint JSON para autocomplete de cliente em formulário de Obra
+    (Task #175). Retorna até 20 clientes do tenant filtrados por nome,
+    e-mail, telefone ou CNPJ. Sempre escopo do admin_id atual.
+    """
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'results': []}), 401
+
+    termo = (request.args.get('q') or '').strip()
+    query = Cliente.query.filter_by(admin_id=admin_id)
+    if termo:
+        like = f'%{termo}%'
+        query = query.filter(or_(
+            Cliente.nome.ilike(like),
+            Cliente.email.ilike(like),
+            Cliente.telefone.ilike(like),
+            Cliente.cnpj.ilike(like),
+        ))
+    clientes = (
+        query.order_by(Cliente.nome.asc()).limit(20).all()
+    )
+    return jsonify({
+        'results': [
+            {
+                'id': c.id,
+                'nome': c.nome or '',
+                'email': c.email or '',
+                'telefone': c.telefone or '',
+                'cnpj': c.cnpj or '',
+                'endereco': c.endereco or '',
+            }
+            for c in clientes
+        ]
+    })
 
 
 @clientes_bp.route('/<int:id>/excluir', methods=['POST'])
