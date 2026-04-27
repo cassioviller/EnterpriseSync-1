@@ -72,12 +72,14 @@
         <div class="col-md-3">
           <label class="form-label">Imposto global (%)</label>
           <input class="form-control" type="text" inputmode="decimal" step="0.01" name="imposto_pct_global"
-                 value="{{ o.imposto_pct_global if o.imposto_pct_global is not none else '' }}">
+                 placeholder="0,00"
+                 value="{{ o.imposto_pct_global|num(2) if o.imposto_pct_global is not none else '' }}">
         </div>
         <div class="col-md-3">
           <label class="form-label">Margem global (%)</label>
           <input class="form-control" type="text" inputmode="decimal" step="0.01" name="margem_pct_global"
-                 value="{{ o.margem_pct_global if o.margem_pct_global is not none else '' }}">
+                 placeholder="0,00"
+                 value="{{ o.margem_pct_global|num(2) if o.margem_pct_global is not none else '' }}">
         </div>
         <div class="col-md-6 d-flex align-items-end justify-content-end">
           <button class="btn btn-primary"><i class="fas fa-save me-1"></i> Salvar</button>
@@ -250,18 +252,20 @@
         </div>
         <div class="col-md-2">
           <label class="form-label small">Quantidade</label>
-          <input class="form-control" type="text" inputmode="decimal" step="0.0001" name="quantidade" value="{{ it.quantidade }}">
+          <input class="form-control" type="text" inputmode="decimal" step="0.0001" name="quantidade"
+                 placeholder="0,00"
+                 value="{{ it.quantidade|num(4) if it.quantidade is not none else '' }}">
         </div>
         <div class="col-md-2">
           <label class="form-label small">Imposto % (item)</label>
           <input class="form-control" type="text" inputmode="decimal" step="0.01" name="imposto_pct"
-                 value="{{ it.imposto_pct if it.imposto_pct is not none else '' }}"
+                 value="{{ it.imposto_pct|num(2) if it.imposto_pct is not none else '' }}"
                  placeholder="usa global">
         </div>
         <div class="col-md-2">
           <label class="form-label small">Margem % (item)</label>
           <input class="form-control" type="text" inputmode="decimal" step="0.01" name="margem_pct"
-                 value="{{ it.margem_pct if it.margem_pct is not none else '' }}"
+                 value="{{ it.margem_pct|num(2) if it.margem_pct is not none else '' }}"
                  placeholder="usa global">
         </div>
         <div class="col-md-12">
@@ -330,9 +334,11 @@
               <td><input class="form-control form-control-sm" name="comp_nome" value="{{ c.nome }}"></td>
               <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="{{ c.unidade }}"></td>
               <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
-                         name="comp_coeficiente" value="{{ c.coeficiente }}"></td>
+                         name="comp_coeficiente"
+                         value="{{ c.coeficiente|num(4) if c.coeficiente not in (none, '') else '0,0000' }}"></td>
               <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
-                         name="comp_preco_unitario" value="{{ c.preco_unitario }}"></td>
+                         name="comp_preco_unitario"
+                         value="{{ c.preco_unitario|num(4) if c.preco_unitario not in (none, '') else '0,0000' }}"></td>
               {% set _coef = c.coeficiente|float if c.coeficiente not in (none, '') else 0.0 %}
               {% set _preco = c.preco_unitario|float if c.preco_unitario not in (none, '') else 0.0 %}
               {% set _qtd = it.quantidade|float if it.quantidade is not none else 0.0 %}
