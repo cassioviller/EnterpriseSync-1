@@ -52,7 +52,7 @@ from models import (
     Fornecedor, Cliente, Obra, PedidoCompra, PedidoCompraItem,
     AlmoxarifadoMovimento, AlmoxarifadoEstoque,
     GestaoCustoPai, GestaoCustoFilho,
-    LancamentoContabil, PartidaContabil,
+    LancamentoContabil, PartidaContabil, PlanoContas,
 )
 
 RUN_TAG = f"COMPRAS202-{secrets.token_hex(3).upper()}"
@@ -208,10 +208,23 @@ def cleanup(admin_ids):
             db.session.delete(p)
         db.session.commit()
 
-        # 4) Obra → Cliente → Fornecedor → Usuario
+        # 4) Obra → Cliente → Fornecedor
         Obra.query.filter(Obra.admin_id.in_(admin_ids)).delete(synchronize_session=False)
         Cliente.query.filter(Cliente.admin_id.in_(admin_ids)).delete(synchronize_session=False)
         Fornecedor.query.filter(Fornecedor.admin_id.in_(admin_ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+        # 5) PlanoContas (auto-seedado pelo primeiro lançamento contábil
+        # via contabilidade_utils.seed_plano_contas_v2). Tabela tem self-FK
+        # via conta_pai_codigo, mas DELETE em massa pelo admin_id resolve
+        # tudo em uma transação. Nenhuma outra tabela referencia esses
+        # códigos depois que LancamentoContabil/Partidas foram apagados.
+        PlanoContas.query.filter(
+            PlanoContas.admin_id.in_(admin_ids)
+        ).delete(synchronize_session=False)
+        db.session.commit()
+
+        # 6) Usuario (admin) — agora sem dependências pendentes
         Usuario.query.filter(Usuario.id.in_(admin_ids)).delete(synchronize_session=False)
         db.session.commit()
     except Exception as e:
