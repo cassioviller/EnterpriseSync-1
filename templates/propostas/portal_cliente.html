@@ -464,7 +464,7 @@
             
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h2 class="text-primary mb-0">Proposta {{ proposta.numero }} - {{ proposta.titulo }}</h2>
+                    <h2 class="text-primary mb-0">Proposta {{ proposta.numero }}{% if proposta.titulo %} - {{ proposta.titulo }}{% endif %}</h2>
                 </div>
                 <div class="text-end">
                     {% if proposta.status == 'ENVIADA' or proposta.status == 'enviada' %}
@@ -483,7 +483,7 @@
             <div class="row align-items-center mb-4">
                 <div class="col-md-8">
                     <h3 class="text-primary mb-3">Olá, {{ proposta.cliente_nome }}!</h3>
-                    <p class="lead">Segue nossa proposta comercial para {{ proposta.titulo.lower() }}.</p>
+                    <p class="lead">Segue nossa proposta comercial{% if proposta.titulo %} para {{ proposta.titulo.lower() }}{% endif %}.</p>
                     
                     <div class="info-grid">
                         <div class="info-item">

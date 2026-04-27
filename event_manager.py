@@ -814,6 +814,34 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         cliente_id=getattr(proposta, 'cliente_id', None),
     )
 
+    # Task #195 — Fallback resiliente: se a Proposta tem dados de cliente
+    # degenerados (cliente_nome só com whitespace, sem e-mail, sem cliente_id
+    # válido — comum em dados legados ou imports), o resolver retorna None.
+    # Antes a aprovação morria com ValueError e o cliente via flash genérico.
+    # Agora criamos um Cliente sintético identificado pela própria proposta,
+    # garantindo que o portal sempre consiga aprovar e gerar a Obra.
+    if cliente_obj is None:
+        from models import Cliente
+        nome_fallback = (
+            (proposta.cliente_nome or '').strip()
+            or (proposta.cliente_email or '').strip()
+            or f"Cliente da Proposta {proposta.numero}"
+        )[:200]
+        cliente_obj = Cliente(
+            nome=nome_fallback,
+            email=(proposta.cliente_email or '').strip()[:120] or None,
+            telefone=(proposta.cliente_telefone or '').strip()[:20] or None,
+            admin_id=admin_id,
+        )
+        db.session.add(cliente_obj)
+        db.session.flush()
+        logger.warning(
+            "[Task #195] Cliente sintético criado id=%s nome=%r para "
+            "Proposta %s (admin_id=%s) — dados de cliente da proposta "
+            "estavam vazios/degenerados",
+            cliente_obj.id, cliente_obj.nome, proposta.numero, admin_id,
+        )
+
     # 1) Localizar (ou criar) a Obra vinculada à proposta
     obra = None
     if proposta.obra_id:
@@ -845,9 +873,9 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             numero += 1
             codigo_obra = f"OBR{numero:04d}"
 
-        # Task #176 — Obra exige cliente_id (FK NOT NULL). Se a Proposta
-        # não tem cliente cadastrado, abortamos a propagação para evitar
-        # inserir uma Obra órfã.
+        # Task #176 — Obra exige cliente_id (FK NOT NULL). O fallback
+        # acima garante que cliente_obj nunca seja None aqui; este check
+        # permanece como salvaguarda defensiva.
         if not cliente_obj:
             raise ValueError(
                 f"Proposta {proposta.numero} sem cliente cadastrado "

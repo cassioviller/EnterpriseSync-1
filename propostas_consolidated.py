@@ -1698,7 +1698,8 @@ def aprovar_proposta_cliente(token):
             db.session.rollback()
             _log.error(f"proposta_aprovada (cliente) não materializou Obra para proposta {proposta.id}")
             flash(
-                'Houve uma falha ao gerar a obra. Sua aprovação não foi efetivada.',
+                'Houve uma falha ao gerar a obra. Sua aprovação não foi efetivada. '
+                'Por favor, entre em contato com nossa equipe para concluirmos o processo.',
                 'error',
             )
             return redirect(url_for('propostas.portal_cliente', token=token))
