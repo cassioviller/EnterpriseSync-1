@@ -1,0 +1,79 @@
+{% extends 'portal/_base.html' %}
+
+{% block title %}Portal temporariamente inativo — {{ obra.nome }}{% endblock %}
+
+{% block topbar_actions %}
+<span class="portal-secure-pill" aria-label="Portal inativo">
+    <i class="fas fa-pause-circle" style="color: var(--warning);"></i> Inativo
+</span>
+{% endblock %}
+
+{% block extra_styles %}
+        .inativo-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: 36px 28px;
+            text-align: center;
+            max-width: 560px;
+            margin: 24px auto 0;
+        }
+        .inativo-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--warning-bg);
+            color: var(--warning);
+            font-size: 1.8rem;
+            margin-bottom: 18px;
+        }
+        .inativo-titulo {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0 0 10px;
+        }
+        .inativo-texto {
+            color: var(--text-muted);
+            font-size: .95rem;
+            margin-bottom: 8px;
+        }
+        .inativo-meta {
+            margin-top: 22px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-soft);
+            font-size: .82rem;
+            color: var(--text-subtle);
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            align-items: center;
+        }
+{% endblock %}
+
+{% block content %}
+<div class="inativo-card">
+    <div class="inativo-icon" aria-hidden="true">
+        <i class="fas fa-pause-circle"></i>
+    </div>
+    <h1 class="inativo-titulo">Portal temporariamente inativo</h1>
+    <p class="inativo-texto">
+        O acompanhamento on-line da obra <strong>{{ obra.nome }}</strong>
+        está pausado neste momento.
+    </p>
+    <p class="inativo-texto">
+        Entre em contato com {{ nome_empresa or 'a construtora' }} para retomar
+        o acesso ou tirar dúvidas sobre o andamento.
+    </p>
+    {% if obra.data_inicio %}
+    <div class="inativo-meta">
+        <i class="far fa-calendar"></i>
+        Obra iniciada em {{ obra.data_inicio.strftime('%d/%m/%Y') }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

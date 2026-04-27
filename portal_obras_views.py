@@ -41,15 +41,40 @@ def _ensure_upload_folder():
 
 
 def _get_obra_by_token(token: str) -> Obra:
+    """Para rotas de ação (POST): retorna a Obra ativa ou aborta com 404.
+    Portal desativado é tratado como ausência para evitar mutações."""
     obra = Obra.query.filter_by(token_cliente=token, portal_ativo=True).first()
     if not obra:
         abort(404)
     return obra
 
 
+def _resolve_obra_for_view(token: str):
+    """Para rotas GET visíveis ao cliente: se o token existe mas o portal
+    está desativado, devolve uma resposta renderizando portal_inativo.html
+    com o branding do tenant. Se o token não existe, aborta com 404.
+    Retorna (obra, response_or_none)."""
+    obra = Obra.query.filter_by(token_cliente=token).first()
+    if not obra:
+        abort(404)
+    if not obra.portal_ativo:
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=obra.admin_id).first()
+        nome_empresa = config.nome_empresa if config else 'Construtora'
+        response = render_template(
+            'portal/portal_inativo.html',
+            obra=obra,
+            config_empresa=config,
+            nome_empresa=nome_empresa,
+        )
+        return obra, response
+    return obra, None
+
+
 @portal_obras_bp.route('/obra/<token>')
 def portal_obra(token: str):
-    obra = _get_obra_by_token(token)
+    obra, inactive_response = _resolve_obra_for_view(token)
+    if inactive_response is not None:
+        return inactive_response
 
     obra.ultima_visualizacao_cliente = datetime.utcnow()
     try:
@@ -256,6 +281,7 @@ def portal_obra(token: str):
         medicoes=medicoes,
         medicao_contas=medicao_contas,
         nome_empresa=nome_empresa,
+        config_empresa=config,
         hoje=date.today(),
         mapas_v2_abertos_ctx=mapas_v2_abertos_ctx,
         mapas_v2_concluidos_ctx=mapas_v2_concluidos_ctx,
@@ -520,7 +546,9 @@ def selecionar_mapa_v2(token: str, mapa_id: int):
 
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>')
 def portal_rdo_detalhe(token: str, rdo_id: int):
-    obra = _get_obra_by_token(token)
+    obra, inactive_response = _resolve_obra_for_view(token)
+    if inactive_response is not None:
+        return inactive_response
     admin_id = obra.admin_id
 
     rdo = RDO.query.filter_by(id=rdo_id, obra_id=obra.id, admin_id=admin_id).first()
@@ -546,5 +574,6 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
         equipamentos=equipamentos,
         ocorrencias=ocorrencias,
         nome_empresa=nome_empresa,
+        config_empresa=config,
         token=token,
     )

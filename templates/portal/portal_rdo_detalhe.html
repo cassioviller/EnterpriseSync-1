@@ -1,82 +1,141 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RDO {{ rdo.numero_rdo }} — {{ obra.nome }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body { background: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
-        .header-portal {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
-            color: #fff; padding: 1.5rem 2rem;
+{% extends 'portal/_base.html' %}
+
+{% block title %}RDO {{ rdo.numero_rdo }} — {{ obra.nome }}{% endblock %}
+
+{% block obra_titulo %}RDO {{ rdo.numero_rdo }}{% endblock %}
+{% block obra_subtitulo %}
+<div class="portal-brand-cliente">{{ obra.nome }}</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('portal_obras.portal_obra', token=token) }}"
+   class="btn btn-portal-outline" aria-label="Voltar para o portal da obra">
+    <i class="fas fa-arrow-left me-1"></i> Voltar ao portal
+</a>
+{% endblock %}
+
+{% block extra_styles %}
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
         }
-        .header-portal a { color: rgba(255,255,255,.8); text-decoration: none; font-size: .9rem; }
-        .header-portal a:hover { color: #fff; }
-        .container-portal { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-        .card-portal {
-            background: #fff; border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,.08);
-            overflow: hidden; margin-bottom: 1.25rem;
+        .info-item label {
+            display: block;
+            font-size: .72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600;
+            margin-bottom: 4px;
         }
-        .card-portal .card-header-custom {
-            padding: .75rem 1.25rem;
-            background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-            font-weight: 600; font-size: .95rem; color: #334155;
+        .info-item span {
+            font-size: .95rem;
+            font-weight: 500;
+            color: var(--text);
         }
-        .card-portal .card-body-custom { padding: 1rem 1.25rem; }
-        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; }
-        .info-item label { font-size: .75rem; color: #64748b; text-transform: uppercase; margin-bottom: 2px; display: block; }
-        .info-item span { font-size: .95rem; font-weight: 500; color: #1e293b; }
-        .section-title {
-            font-size: 1.1rem; font-weight: 700; color: #1e3a5f;
-            margin: 1.5rem 0 .75rem; display: flex; align-items: center; gap: .5rem;
+        .progress-bar-thin {
+            height: 6px;
+            background: var(--surface-3);
+            border-radius: 999px;
+            overflow: hidden;
         }
-        .table-portal { width: 100%; border-collapse: collapse; font-size: .88rem; }
-        .table-portal th {
-            background: #f8fafc; color: #64748b; font-weight: 600;
-            padding: .5rem .75rem; text-align: left; font-size: .75rem; text-transform: uppercase; border-bottom: 2px solid #e2e8f0;
+        .progress-bar-thin > span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            transition: width .3s;
         }
-        .table-portal td { padding: .5rem .75rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
-        .badge-clima { padding: .25rem .6rem; border-radius: 6px; font-size: .8rem; font-weight: 500; }
-        .foto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .75rem; padding: 1rem 1.25rem; }
+        .foto-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            padding: 16px;
+        }
         .foto-item img {
-            width: 100%; height: 180px; object-fit: cover; border-radius: 8px;
-            cursor: pointer; transition: transform .15s;
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
+            cursor: zoom-in;
+            transition: transform .15s, box-shadow .15s;
+            border: 1px solid var(--border);
         }
-        .foto-item img:hover { transform: scale(1.03); }
-        .foto-caption { font-size: .78rem; color: #64748b; margin-top: .35rem; text-align: center; }
-        .progress-bar-custom {
-            height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;
+        .foto-item img:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow-md);
         }
-        .progress-bar-fill {
-            height: 100%; border-radius: 3px; transition: width .3s;
+        .foto-caption {
+            font-size: .78rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            text-align: center;
         }
-        .footer-portal {
-            text-align: center; padding: 2rem 1rem; color: #94a3b8; font-size: .82rem;
+        .modal-foto {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .9);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+            padding: 24px;
         }
-        .modal-foto { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 9999; justify-content: center; align-items: center; cursor: pointer; }
         .modal-foto.active { display: flex; }
-        .modal-foto img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
-    </style>
-</head>
-<body>
+        .modal-foto img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: var(--radius);
+            box-shadow: 0 20px 50px rgba(0,0,0,.5);
+        }
+        .ocorrencia-card {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+        .ocorrencia-card:last-child { border-bottom: none; }
+        .ocorrencia-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+        .ocorrencia-tipo {
+            font-weight: 600;
+            color: var(--text);
+        }
+        .ocorrencia-desc {
+            font-size: .9rem;
+            color: var(--text);
+        }
+        .ocorrencia-acao {
+            margin-top: 6px;
+            font-size: .82rem;
+            color: var(--text-muted);
+        }
+        .comentario-box {
+            padding: 14px 18px;
+            white-space: pre-line;
+            color: var(--text);
+            line-height: 1.6;
+        }
+        @media (max-width: 575.98px) {
+            .info-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .foto-item img { height: 160px; }
+        }
+{% endblock %}
 
-<div class="header-portal">
-    <a href="{{ url_for('portal_obras.portal_obra', token=token) }}">
-        <i class="fas fa-arrow-left me-1"></i> Voltar ao Portal
-    </a>
-    <h4 class="mt-2 mb-0"><i class="fas fa-clipboard-list me-2"></i>RDO {{ rdo.numero_rdo }}</h4>
-    <div class="small mt-1" style="opacity:.8">{{ obra.nome }} — {{ nome_empresa }}</div>
-</div>
+{% block content %}
 
-<div class="container-portal">
-
+<!-- Informações gerais ──────────────────────────────────────── -->
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-info-circle"></i></span>
+        <h2 class="section-title">Informações gerais</h2>
+    </div>
     <div class="card-portal">
-        <div class="card-header-custom"><i class="fas fa-info-circle me-2"></i>Informações Gerais</div>
-        <div class="card-body-custom">
+        <div class="card-portal-body">
             <div class="info-grid">
                 <div class="info-item">
                     <label>Data</label>
@@ -92,185 +151,222 @@
                 </div>
                 <div class="info-item">
                     <label>Status</label>
-                    <span class="badge bg-success">{{ rdo.status }}</span>
+                    <span><span class="pill pill-success">{{ rdo.status }}</span></span>
                 </div>
             </div>
         </div>
     </div>
+</section>
 
-    {% if rdo.clima_geral or rdo.temperatura_media or rdo.condicoes_trabalho %}
+<!-- Condições climáticas ────────────────────────────────────── -->
+{% if rdo.clima_geral or rdo.temperatura_media or rdo.condicoes_trabalho %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-cloud-sun"></i></span>
+        <h2 class="section-title">Condições climáticas</h2>
+    </div>
     <div class="card-portal">
-        <div class="card-header-custom"><i class="fas fa-cloud-sun me-2"></i>Condições Climáticas</div>
-        <div class="card-body-custom">
+        <div class="card-portal-body">
             <div class="info-grid">
                 {% if rdo.clima_geral %}
-                <div class="info-item">
-                    <label>Clima</label>
-                    <span>{{ rdo.clima_geral }}</span>
-                </div>
+                <div class="info-item"><label>Clima</label><span>{{ rdo.clima_geral }}</span></div>
                 {% endif %}
                 {% if rdo.temperatura_media %}
-                <div class="info-item">
-                    <label>Temperatura</label>
-                    <span>{{ rdo.temperatura_media }}</span>
-                </div>
+                <div class="info-item"><label>Temperatura</label><span>{{ rdo.temperatura_media }}</span></div>
                 {% endif %}
                 {% if rdo.umidade_relativa %}
-                <div class="info-item">
-                    <label>Umidade</label>
-                    <span>{{ rdo.umidade_relativa }}%</span>
-                </div>
+                <div class="info-item"><label>Umidade</label><span>{{ rdo.umidade_relativa }}%</span></div>
                 {% endif %}
                 {% if rdo.vento_velocidade %}
-                <div class="info-item">
-                    <label>Vento</label>
-                    <span>{{ rdo.vento_velocidade }}</span>
-                </div>
+                <div class="info-item"><label>Vento</label><span>{{ rdo.vento_velocidade }}</span></div>
                 {% endif %}
                 {% if rdo.precipitacao %}
-                <div class="info-item">
-                    <label>Precipitação</label>
-                    <span>{{ rdo.precipitacao }}</span>
-                </div>
+                <div class="info-item"><label>Precipitação</label><span>{{ rdo.precipitacao }}</span></div>
                 {% endif %}
                 {% if rdo.condicoes_trabalho %}
-                <div class="info-item">
-                    <label>Condições de Trabalho</label>
-                    <span>{{ rdo.condicoes_trabalho }}</span>
-                </div>
+                <div class="info-item"><label>Condições de trabalho</label><span>{{ rdo.condicoes_trabalho }}</span></div>
                 {% endif %}
             </div>
             {% if rdo.observacoes_climaticas %}
-            <div class="mt-2 small text-muted">{{ rdo.observacoes_climaticas }}</div>
+            <div class="mt-3" style="font-size:.85rem;color:var(--text-muted);">{{ rdo.observacoes_climaticas }}</div>
             {% endif %}
         </div>
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
-    {% if subatividades %}
-    <div class="section-title"><i class="fas fa-tasks"></i> Serviços / Atividades</div>
-    <div class="card-portal">
-        <table class="table-portal">
-            <thead>
-                <tr>
-                    <th>Atividade</th>
-                    <th style="width:100px">Anterior</th>
-                    <th style="width:100px">Incremento</th>
-                    <th style="width:100px">Atual</th>
-                    <th style="width:180px">Progresso</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in subatividades %}
-                <tr>
-                    <td>
-                        <strong>{{ s.nome_subatividade }}</strong>
-                        {% if s.descricao_subatividade %}
-                        <div class="small text-muted">{{ s.descricao_subatividade }}</div>
-                        {% endif %}
-                        {% if s.observacoes_tecnicas %}
-                        <div class="small text-muted fst-italic">{{ s.observacoes_tecnicas }}</div>
-                        {% endif %}
-                    </td>
-                    <td>{{ '%.1f'|format(s.percentual_anterior or 0) }}%</td>
-                    <td class="text-success fw-semibold">+{{ '%.1f'|format(s.incremento_dia or 0) }}%</td>
-                    <td class="fw-bold">{{ '%.1f'|format(s.percentual_conclusao or 0) }}%</td>
-                    <td>
-                        <div class="progress-bar-custom">
-                            <div class="progress-bar-fill" style="width:{{ s.percentual_conclusao or 0 }}%;background:{% if (s.percentual_conclusao or 0) >= 100 %}#22c55e{% elif (s.percentual_conclusao or 0) >= 50 %}#3b82f6{% else %}#f59e0b{% endif %}"></div>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Atividades ──────────────────────────────────────────────── -->
+{% if subatividades %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-tasks"></i></span>
+        <h2 class="section-title">Serviços / atividades</h2>
+        <span class="section-counter">{{ subatividades|length }}</span>
     </div>
-    {% endif %}
-
-    {% if mao_obra %}
-    <div class="section-title"><i class="fas fa-hard-hat"></i> Mão de Obra</div>
     <div class="card-portal">
-        <table class="table-portal">
-            <thead>
-                <tr>
-                    <th>Funcionário</th>
-                    <th>Função</th>
-                    <th style="width:80px">Horas</th>
-                    <th style="width:80px">H. Extra</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for mo in mao_obra %}
-                <tr>
-                    <td>{{ mo.funcionario.nome if mo.funcionario else '—' }}</td>
-                    <td>{{ mo.funcao_exercida }}</td>
-                    <td>{{ '%.1f'|format(mo.horas_trabalhadas) }}h</td>
-                    <td>{% if mo.horas_extras and mo.horas_extras > 0 %}{{ '%.1f'|format(mo.horas_extras) }}h{% else %}—{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="card-body-custom small text-muted">
-            <strong>Total:</strong> {{ mao_obra|length }} trabalhador{{ 'es' if mao_obra|length > 1 }}
-            — {{ '%.1f'|format(mao_obra|map(attribute='horas_trabalhadas')|sum) }}h trabalhadas
+        <div class="table-responsive">
+            <table class="table-portal">
+                <thead>
+                    <tr>
+                        <th>Atividade</th>
+                        <th style="width:90px;">Anterior</th>
+                        <th style="width:100px;">Incremento</th>
+                        <th style="width:80px;">Atual</th>
+                        <th style="width:160px;">Progresso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in subatividades %}
+                    {% set pc = s.percentual_conclusao or 0 %}
+                    <tr>
+                        <td>
+                            <strong>{{ s.nome_subatividade }}</strong>
+                            {% if s.descricao_subatividade %}
+                            <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px;">{{ s.descricao_subatividade }}</div>
+                            {% endif %}
+                            {% if s.observacoes_tecnicas %}
+                            <div style="font-size:.78rem;color:var(--text-muted);font-style:italic;margin-top:2px;">{{ s.observacoes_tecnicas }}</div>
+                            {% endif %}
+                        </td>
+                        <td style="font-variant-numeric:tabular-nums;">{{ '%.1f'|format(s.percentual_anterior or 0) }}%</td>
+                        <td style="color:var(--success);font-weight:600;font-variant-numeric:tabular-nums;">+{{ '%.1f'|format(s.incremento_dia or 0) }}%</td>
+                        <td style="font-weight:700;font-variant-numeric:tabular-nums;">{{ '%.1f'|format(pc) }}%</td>
+                        <td>
+                            <div class="progress-bar-thin">
+                                <span style="width:{{ pc }}%;background:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#f59e0b{% endif %};"></span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
-    {% if equipamentos %}
-    <div class="section-title"><i class="fas fa-truck"></i> Equipamentos</div>
-    <div class="card-portal">
-        <table class="table-portal">
-            <thead>
-                <tr>
-                    <th>Equipamento</th>
-                    <th style="width:80px">Qtd</th>
-                    <th style="width:100px">Horas Uso</th>
-                    <th>Conservação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for eq in equipamentos %}
-                <tr>
-                    <td>{{ eq.nome_equipamento }}</td>
-                    <td>{{ eq.quantidade }}</td>
-                    <td>{{ '%.1f'|format(eq.horas_uso) }}h</td>
-                    <td>{{ eq.estado_conservacao }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Mão de obra ─────────────────────────────────────────────── -->
+{% if mao_obra %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-hard-hat"></i></span>
+        <h2 class="section-title">Mão de obra</h2>
+        <span class="section-counter">{{ mao_obra|length }}</span>
     </div>
-    {% endif %}
+    <div class="card-portal">
+        <div class="table-responsive">
+            <table class="table-portal">
+                <thead>
+                    <tr>
+                        <th>Funcionário</th>
+                        <th>Função</th>
+                        <th style="width:90px;">Horas</th>
+                        <th style="width:90px;">H. extra</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mo in mao_obra %}
+                    <tr>
+                        <td>{{ mo.funcionario.nome if mo.funcionario else '—' }}</td>
+                        <td>{{ mo.funcao_exercida }}</td>
+                        <td style="font-variant-numeric:tabular-nums;">{{ '%.1f'|format(mo.horas_trabalhadas) }}h</td>
+                        <td style="font-variant-numeric:tabular-nums;">{% if mo.horas_extras and mo.horas_extras > 0 %}{{ '%.1f'|format(mo.horas_extras) }}h{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-portal-body" style="background:var(--surface-2);font-size:.85rem;color:var(--text-muted);border-top:1px solid var(--border);">
+            <strong style="color:var(--text);">{{ mao_obra|length }}</strong> trabalhador{{ 'es' if mao_obra|length > 1 }}
+            &nbsp;·&nbsp;
+            <strong style="color:var(--text);font-variant-numeric:tabular-nums;">{{ '%.1f'|format(mao_obra|map(attribute='horas_trabalhadas')|sum) }}h</strong> trabalhadas
+        </div>
+    </div>
+</section>
+{% endif %}
 
-    {% if ocorrencias %}
-    <div class="section-title"><i class="fas fa-exclamation-triangle"></i> Ocorrências</div>
+<!-- Equipamentos ────────────────────────────────────────────── -->
+{% if equipamentos %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-truck"></i></span>
+        <h2 class="section-title">Equipamentos</h2>
+        <span class="section-counter">{{ equipamentos|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="table-responsive">
+            <table class="table-portal">
+                <thead>
+                    <tr>
+                        <th>Equipamento</th>
+                        <th style="width:80px;">Qtd</th>
+                        <th style="width:100px;">Horas uso</th>
+                        <th>Conservação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for eq in equipamentos %}
+                    <tr>
+                        <td>{{ eq.nome_equipamento }}</td>
+                        <td style="font-variant-numeric:tabular-nums;">{{ eq.quantidade }}</td>
+                        <td style="font-variant-numeric:tabular-nums;">{{ '%.1f'|format(eq.horas_uso) }}h</td>
+                        <td>{{ eq.estado_conservacao }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Ocorrências ─────────────────────────────────────────────── -->
+{% if ocorrencias %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-exclamation-triangle"></i></span>
+        <h2 class="section-title">Ocorrências</h2>
+        <span class="section-counter">{{ ocorrencias|length }}</span>
+    </div>
     <div class="card-portal">
         {% for oc in ocorrencias %}
-        <div class="card-body-custom" style="border-bottom:1px solid #f1f5f9">
-            <div class="d-flex align-items-center gap-2">
-                <span class="fw-semibold">{{ oc.tipo_ocorrencia or 'Ocorrência' }}</span>
-                <span class="badge {% if oc.severidade == 'Crítica' %}bg-danger{% elif oc.severidade == 'Alta' %}bg-warning text-dark{% elif oc.severidade == 'Média' %}bg-info{% else %}bg-secondary{% endif %}" style="font-size:.7rem">{{ oc.severidade }}</span>
-                <span class="badge {% if oc.status_resolucao == 'Resolvido' %}bg-success{% elif oc.status_resolucao == 'Em Andamento' %}bg-primary{% else %}bg-warning text-dark{% endif %}" style="font-size:.7rem">{{ oc.status_resolucao }}</span>
+        <div class="ocorrencia-card">
+            <div class="ocorrencia-head">
+                <span class="ocorrencia-tipo">{{ oc.tipo_ocorrencia or 'Ocorrência' }}</span>
+                <span class="pill {% if oc.severidade == 'Crítica' %}pill-danger{% elif oc.severidade == 'Alta' %}pill-warning{% elif oc.severidade == 'Média' %}pill-info{% else %}pill-neutral{% endif %}">{{ oc.severidade }}</span>
+                <span class="pill {% if oc.status_resolucao == 'Resolvido' %}pill-success{% elif oc.status_resolucao == 'Em Andamento' %}pill-info{% else %}pill-warning{% endif %}">{{ oc.status_resolucao }}</span>
             </div>
-            <div class="small mt-1">{{ oc.descricao_ocorrencia or '' }}</div>
+            <div class="ocorrencia-desc">{{ oc.descricao_ocorrencia or '' }}</div>
             {% if oc.acoes_corretivas %}
-            <div class="small mt-1 text-muted"><strong>Ação:</strong> {{ oc.acoes_corretivas }}</div>
+            <div class="ocorrencia-acao"><strong>Ação:</strong> {{ oc.acoes_corretivas }}</div>
             {% endif %}
         </div>
         {% endfor %}
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
-    {% if rdo.comentario_geral %}
-    <div class="section-title"><i class="fas fa-comment-alt"></i> Comentários Gerais</div>
-    <div class="card-portal">
-        <div class="card-body-custom">{{ rdo.comentario_geral }}</div>
+<!-- Comentários ─────────────────────────────────────────────── -->
+{% if rdo.comentario_geral %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-comment-alt"></i></span>
+        <h2 class="section-title">Comentários gerais</h2>
     </div>
-    {% endif %}
+    <div class="card-portal">
+        <div class="comentario-box">{{ rdo.comentario_geral }}</div>
+    </div>
+</section>
+{% endif %}
 
-    {% if fotos %}
-    <div class="section-title"><i class="fas fa-camera"></i> Fotos ({{ fotos|length }})</div>
+<!-- Fotos ───────────────────────────────────────────────────── -->
+{% if fotos %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-camera"></i></span>
+        <h2 class="section-title">Fotos</h2>
+        <span class="section-counter">{{ fotos|length }}</span>
+    </div>
     <div class="card-portal">
         <div class="foto-grid">
             {% for f in fotos %}
@@ -291,24 +387,26 @@
             {% endfor %}
         </div>
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
-</div>
-
-<div class="footer-portal">
-    <i class="fas fa-lock me-1"></i> Portal seguro &mdash; {{ nome_empresa }} &mdash; SIGE
-</div>
-
-<div class="modal-foto" id="modalFoto" onclick="this.classList.remove('active')">
+<div class="modal-foto" id="modalFoto" onclick="this.classList.remove('active')" role="dialog" aria-modal="true" aria-label="Foto ampliada">
     <img id="modalFotoImg" src="" alt="Foto ampliada">
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
 function abrirFoto(src) {
+    var modal = document.getElementById('modalFoto');
     document.getElementById('modalFotoImg').src = src;
-    document.getElementById('modalFoto').classList.add('active');
+    modal.classList.add('active');
 }
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('modalFoto').classList.remove('active');
+    }
+});
 </script>
-</body>
-</html>
+{% endblock %}

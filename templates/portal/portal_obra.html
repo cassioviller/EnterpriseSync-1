@@ -1,467 +1,780 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ obra.nome }} — Portal do Cliente</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        :root {
-            --brand: #1e40af;
-            --brand-light: #3b82f6;
-            --brand-bg: #eff6ff;
-        }
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #f0f4f8;
-            color: #1e293b;
-            margin: 0;
-        }
-        .portal-header {
-            background: linear-gradient(135deg, var(--brand) 0%, #1e3a8a 100%);
-            color: #fff;
-            padding: 2.5rem 0 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-        .portal-header::after {
-            content: '';
-            position: absolute;
-            top: -40%;
-            right: -10%;
-            width: 400px;
-            height: 400px;
-            border-radius: 50%;
-            background: rgba(255,255,255,.06);
-        }
-        .portal-header h1 { font-size: 1.8rem; font-weight: 700; margin: 0; }
-        .portal-header .subtitle { opacity: .85; font-size: .95rem; }
-        .portal-header .badge-portal {
-            background: rgba(255,255,255,.18);
-            color: #fff;
-            padding: .35rem .75rem;
-            border-radius: 20px;
-            font-size: .8rem;
-            font-weight: 500;
-        }
-        .section-title {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--brand);
-            margin-bottom: 1rem;
-            display: flex;
+{% extends 'portal/_base.html' %}
+
+{% block title %}{{ obra.nome }} — Portal do Cliente{% endblock %}
+
+{% block extra_styles %}
+        /* ── Hero / progresso geral ──────────────────────────────── */
+        .hero-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            padding: 22px;
+            display: grid;
+            grid-template-columns: minmax(150px, 200px) 1fr;
+            gap: 22px;
             align-items: center;
-            gap: .5rem;
         }
-        .card-portal {
-            background: #fff;
-            border: none;
-            border-radius: 14px;
-            box-shadow: 0 2px 12px rgba(0,0,0,.06);
-            overflow: hidden;
-            transition: box-shadow .2s;
-        }
-        .card-portal:hover {
-            box-shadow: 0 6px 24px rgba(0,0,0,.1);
-        }
-        .progress-ring {
-            width: 120px; height: 120px;
-            margin: 0 auto;
-        }
+        .progress-ring-wrap { text-align: center; }
+        .progress-ring { width: 144px; height: 144px; }
         .progress-ring circle {
             fill: none;
-            stroke-width: 10;
+            stroke-width: 12;
         }
-        .progress-ring .bg { stroke: #e2e8f0; }
-        .progress-ring .fg { stroke: var(--brand-light); stroke-linecap: round; transition: stroke-dashoffset .6s; }
-        .progress-label {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--brand);
+        .progress-ring .ring-bg { stroke: var(--surface-3); }
+        .progress-ring .ring-fg {
+            stroke: var(--brand);
+            stroke-linecap: round;
+            transition: stroke-dashoffset .8s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
         }
-        .kpi-card {
-            text-align: center;
-            padding: 1.25rem;
-        }
-        .kpi-card .kpi-val {
+        .progress-ring-wrap .progress-pct {
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--brand);
+            color: var(--text);
+            margin-top: 6px;
+            font-variant-numeric: tabular-nums;
         }
-        .kpi-card .kpi-lbl {
-            font-size: .8rem;
-            color: #64748b;
-            margin-top: .25rem;
+        .progress-ring-wrap .progress-lbl {
+            font-size: .78rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600;
         }
+        .hero-stats { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .kpi {
+            background: var(--surface-2);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-sm);
+            padding: 12px 10px;
+            text-align: center;
+        }
+        .kpi-val {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+        .kpi-lbl {
+            font-size: .72rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600;
+        }
+        .obra-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px 18px;
+            font-size: .85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-soft);
+            padding-top: 14px;
+        }
+        .obra-info strong { color: var(--text); font-weight: 600; }
+
+        /* ── Cronograma ──────────────────────────────────────────── */
+        .timeline { display: flex; flex-direction: column; }
+        .timeline-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+        .timeline-row:last-child { border-bottom: none; }
+        .timeline-name {
+            flex: 1;
+            min-width: 0;
+        }
+        .timeline-name .nome { font-weight: 500; color: var(--text); font-size: .92rem; }
+        .timeline-name .periodo {
+            font-size: .76rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .timeline-bar {
+            width: 110px;
+            height: 6px;
+            background: var(--surface-3);
+            border-radius: 999px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .timeline-bar > span {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            transition: width .4s ease;
+        }
+        .timeline-perc {
+            width: 52px;
+            text-align: right;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            font-size: .9rem;
+        }
+
+        /* ── Linhas de compra / medição / RDO ───────────────────── */
+        .row-list { display: flex; flex-direction: column; }
+        .row-list > * { border-bottom: 1px solid var(--border-soft); }
+        .row-list > *:last-child { border-bottom: none; }
+
         .compra-row {
-            border-bottom: 1px solid #f1f5f9;
-            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 18px;
+            flex-wrap: wrap;
+        }
+        .compra-info { flex: 1; min-width: 200px; }
+        .compra-fornec { font-weight: 600; color: var(--text); font-size: .95rem; }
+        .compra-meta { font-size: .8rem; color: var(--text-muted); margin-top: 3px; }
+        .compra-meta i { width: 14px; }
+        .compra-pix {
+            font-size: .8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .compra-pix code {
+            background: var(--surface-2);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: .78rem;
+            color: var(--text);
+            border: 1px solid var(--border-soft);
+        }
+        .compra-valor {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .compra-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .upload-comprovante {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .upload-comprovante input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 1px; height: 1px;
+        }
+        .upload-comprovante .file-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: .85rem;
+            font-weight: 500;
+            transition: all .15s ease;
+        }
+        .upload-comprovante .file-label:hover { background: var(--surface-2); border-color: #cbd5e1; }
+        .upload-comprovante .file-name {
+            font-size: .8rem;
+            color: var(--text-muted);
+            max-width: 140px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── Medições ────────────────────────────────────────────── */
+        .medicao-card { padding: 14px 18px; }
+        .medicao-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .medicao-num {
+            font-size: .95rem;
+            font-weight: 700;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+        .medicao-periodo { font-size: .8rem; color: var(--text-muted); }
+        .medicao-vals {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            margin-left: auto;
+            flex-wrap: wrap;
+        }
+        .medicao-perc {
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            font-size: .95rem;
+            color: var(--text);
+        }
+        .medicao-valor {
+            font-weight: 700;
+            color: var(--success);
+            font-variant-numeric: tabular-nums;
+            font-size: .95rem;
+        }
+        .medicao-meta {
+            margin-top: 8px;
+            font-size: .82rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .medicao-meta strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+        .medicao-meta .negativo { color: var(--danger); }
+        .medicao-meta .positivo { color: var(--success); }
+        .medicao-obs {
+            margin-top: 8px;
+            font-size: .82rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .medicao-pdf {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: var(--surface);
+            color: var(--brand);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            transition: all .15s;
+        }
+        .medicao-pdf:hover {
+            background: var(--brand-soft);
+            color: var(--brand-strong);
+            text-decoration: none;
+        }
+
+        /* ── Mapa V2 ─────────────────────────────────────────────── */
+        .mapa-v2-card { padding: 0; }
+        .mapa-v2-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            background: var(--brand-soft);
+            border-bottom: 1px solid var(--border-soft);
+            flex-wrap: wrap;
+        }
+        .mapa-v2-head.concluido { background: var(--success-bg); border-bottom-color: #bbf7d0; }
+        .mapa-v2-head .nome {
+            font-weight: 700;
+            color: var(--text);
+            flex: 1;
+            min-width: 0;
+        }
+        .mapa-v2-body { padding: 16px 18px; }
+        .mapa-v2-legenda {
+            font-size: .82rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
             display: flex;
             flex-wrap: wrap;
+            gap: 6px 12px;
             align-items: center;
-            gap: .75rem;
         }
-        .compra-row:last-child { border-bottom: none; }
-        .compra-info { flex: 1; min-width: 200px; }
-        .compra-info .fornecedor { font-weight: 600; color: #1e293b; }
-        .compra-info .meta { font-size: .82rem; color: #64748b; }
-        .compra-valor { font-weight: 700; font-size: 1.1rem; color: #0f172a; white-space: nowrap; }
-        .compra-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
-        .status-badge {
+        .mapa-v2-legenda-tag {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: .3rem .7rem;
-            border-radius: 20px;
-            font-size: .78rem;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: .73rem;
             font-weight: 600;
         }
-        .status-pendente { background: #fef3c7; color: #92400e; }
-        .status-aprovado { background: #d1fae5; color: #065f46; }
-        .status-recusado { background: #fee2e2; color: #991b1b; }
-        .status-faturado { background: #dbeafe; color: #1e40af; }
-        .tarefa-row {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            padding: .6rem 1.25rem;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: .9rem;
+        .mapa-v2-legenda-tag.menor-preco { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+        .mapa-v2-legenda-tag.menor-prazo { background: var(--info-bg); color: var(--info); border: 1px solid #bfdbfe; }
+        .mapa-v2-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: .85rem;
         }
-        .tarefa-row:last-child { border-bottom: none; }
-        .tarefa-nome { flex: 1; }
-        .tarefa-perc { font-weight: 600; white-space: nowrap; min-width: 50px; text-align: right; }
-        .tarefa-bar { width: 100px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
-        .tarefa-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
-        .tarefa-pai-header {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            padding: .7rem 1.25rem;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: .9rem;
+        .mapa-v2-table thead th {
+            background: var(--surface-2);
+            color: var(--text);
+            font-weight: 600;
+            text-align: center;
+            padding: 10px 8px;
+            font-size: .78rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .mapa-v2-table thead th:first-child { text-align: left; padding-left: 14px; }
+        .mapa-v2-table .forn-header {
             cursor: pointer;
             user-select: none;
-            background: #f8fafc;
-            transition: background .2s;
+            min-width: 130px;
+            transition: background .15s;
         }
-        .tarefa-pai-header:hover { background: #f1f5f9; }
-        .tarefa-pai-header .chevron {
-            transition: transform .25s ease;
-            font-size: .7rem;
-            color: #94a3b8;
-            width: 16px;
+        .mapa-v2-table .forn-header:hover { background: var(--surface-3); }
+        .mapa-v2-table .forn-header .forn-hint {
+            font-size: .68rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+        .mapa-v2-table tbody td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border-soft);
+            vertical-align: middle;
+        }
+        .mapa-v2-table tbody td:first-child { padding-left: 14px; }
+        .mapa-v2-table .item-desc { font-weight: 600; color: var(--text); }
+        td.cotacao-cell {
             text-align: center;
-            flex-shrink: 0;
+            cursor: pointer;
+            transition: background .15s;
         }
-        .tarefa-pai-header.open .chevron { transform: rotate(90deg); }
-        .tarefa-pai-header .tarefa-nome { font-weight: 600; }
-        .tarefa-filhas-container {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height .3s ease;
+        td.cotacao-cell.cell-min-val   { background: #ecfdf5; }
+        td.cotacao-cell.cell-min-prazo { background: var(--info-bg); }
+        td.cotacao-cell.cell-min-val.cell-min-prazo { background: #ecfdf5; }
+        td.cotacao-cell.cell-selected  { background: #d1fae5 !important; }
+        td.cotacao-cell .radio-visual {
+            border: 2px solid #cbd5e1;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            padding: 7px 6px;
+            font-size: .82rem;
+            transition: border-color .15s;
         }
-        .tarefa-filhas-container.open { max-height: 1000px; }
-        .tarefa-filhas-container .tarefa-row {
-            padding-left: 2.5rem;
-            background: #fff;
+        td.cotacao-cell.cell-selected .radio-visual {
+            border-color: var(--success);
+            background: #f0fdf4;
         }
-        .medicao-card {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid #f1f5f9;
+        .cot-valor { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+        .cot-valor.menor-preco { color: #059669; }
+        .cot-valor.menor-prazo { color: var(--info); }
+        .cot-prazo {
+            font-size: .72rem;
+            margin-top: 3px;
+            color: var(--text-muted);
         }
-        .medicao-card:last-child { border-bottom: none; }
-        .rdo-row {
-            padding: .6rem 1.25rem;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: .9rem;
+        .cot-prazo.menor-prazo { color: var(--info); font-weight: 700; }
+        .mapa-v2-table tfoot td {
+            background: var(--surface-2);
+            font-weight: 700;
+            color: var(--text);
+            padding: 10px 8px;
+            font-size: .85rem;
+            border-top: 1px solid var(--border);
+            font-variant-numeric: tabular-nums;
+            text-align: center;
+        }
+        .mapa-v2-table tfoot td:first-child { text-align: left; padding-left: 14px; font-size: .78rem; color: var(--text-muted); }
+        .mapa-v2-actions { text-align: right; padding-top: 14px; }
+
+        /* Mapa V2 concluído */
+        .forn-bloco { margin-bottom: 18px; }
+        .forn-bloco-head {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
-            gap: .75rem;
+            gap: 8px;
+            font-weight: 700;
+            color: var(--text);
+            font-size: .9rem;
         }
-        .rdo-row:hover { background: #f8fafc; }
-        .rdo-row:last-child { border-bottom: none; }
-        .footer-portal {
-            text-align: center;
-            padding: 2rem 1rem;
-            color: #94a3b8;
+        .forn-bloco-head i { color: var(--brand); }
+        .forn-bloco-head .forn-total {
+            margin-left: auto;
+            font-variant-numeric: tabular-nums;
+            color: var(--brand);
+        }
+        .forn-bloco table {
+            width: 100%;
+            border-collapse: collapse;
             font-size: .82rem;
+            border: 1px solid var(--border);
+            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+            overflow: hidden;
         }
-        .flash-messages .alert {
-            border: none;
-            border-radius: 10px;
+        .forn-bloco th {
+            background: var(--brand-soft);
+            color: var(--text);
+            font-weight: 600;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: .73rem;
+            text-transform: uppercase;
+            letter-spacing: .03em;
         }
-        @media (max-width: 575px) {
-            .portal-header h1 { font-size: 1.3rem; }
-            .compra-row { flex-direction: column; align-items: flex-start; }
+        .forn-bloco td {
+            padding: 8px 10px;
+            border-top: 1px solid var(--border-soft);
+            color: var(--text);
         }
-    </style>
-</head>
-<body>
+        .forn-bloco tfoot td {
+            background: var(--brand-soft);
+            font-weight: 700;
+            color: var(--brand-strong);
+            font-variant-numeric: tabular-nums;
+        }
+        .grand-total {
+            background: var(--text);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .grand-total .label { font-weight: 600; font-size: .9rem; }
+        .grand-total .valor { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-<div class="portal-header">
-    <div class="container">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div>
-                <h1><i class="fas fa-hard-hat me-2"></i>{{ obra.nome }}</h1>
-                <div class="subtitle mt-1">{{ nome_empresa }}{% if obra.cliente_nome_efetivo %} &mdash; {{ obra.cliente_nome_efetivo }}{% endif %}</div>
+        /* ── RDO row ─────────────────────────────────────────────── */
+        .rdo-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            color: var(--text);
+            transition: background .15s;
+        }
+        .rdo-row:hover { background: var(--surface-2); text-decoration: none; color: var(--text); }
+        .rdo-thumb {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius-sm);
+            background: var(--surface-3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-subtle);
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .rdo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .rdo-data { font-weight: 600; font-size: .9rem; min-width: 88px; font-variant-numeric: tabular-nums; }
+        .rdo-coment { flex: 1; min-width: 0; font-size: .85rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rdo-fotos {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: .78rem;
+            color: var(--text-muted);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            padding: 3px 8px;
+            border-radius: var(--radius-pill);
+            white-space: nowrap;
+        }
+        .rdo-row .chev { color: var(--text-subtle); flex-shrink: 0; }
+
+        /* ── Responsivo ──────────────────────────────────────────── */
+        @media (max-width: 767.98px) {
+            .hero-card {
+                grid-template-columns: 1fr;
+                gap: 18px;
+                padding: 18px;
+            }
+            .progress-ring { width: 120px; height: 120px; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .obra-info { grid-template-columns: 1fr; }
+            .compra-row { flex-direction: column; align-items: stretch; gap: 10px; }
+            .compra-acoes { justify-content: stretch; }
+            .compra-acoes form, .compra-acoes a { flex: 1; }
+            .compra-acoes .btn { width: 100%; }
+            .medicao-vals { margin-left: 0; }
+            .mapa-v2-table { font-size: .78rem; }
+            .rdo-row { flex-wrap: wrap; }
+            .rdo-coment { white-space: normal; flex-basis: 100%; padding-left: 68px; margin-top: -4px; }
+        }
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero / progresso geral ───────────────────────────────────── -->
+<section class="section">
+    <div class="hero-card">
+        <div class="progress-ring-wrap">
+            <svg class="progress-ring" viewBox="0 0 120 120" aria-label="Progresso geral da obra">
+                <circle class="ring-bg" cx="60" cy="60" r="50"/>
+                <circle class="ring-fg" cx="60" cy="60" r="50"
+                        stroke-dasharray="314.16"
+                        stroke-dashoffset="{{ 314.16 - (314.16 * perc_geral / 100) }}"/>
+            </svg>
+            <div class="progress-pct">{{ perc_geral }}%</div>
+            <div class="progress-lbl">Progresso geral</div>
+        </div>
+        <div class="hero-stats">
+            <div class="kpi-grid">
+                <div class="kpi">
+                    <div class="kpi-val">{{ cronograma_cliente|length }}</div>
+                    <div class="kpi-lbl">Tarefas</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-val">{{ compras_pendentes|length }}</div>
+                    <div class="kpi-lbl">Compras<br>pendentes</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-val">{{ medicoes|length }}</div>
+                    <div class="kpi-lbl">Medições</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-val">{% if obra.data_inicio %}{{ (hoje - obra.data_inicio).days }}{% else %}—{% endif %}</div>
+                    <div class="kpi-lbl">Dias de obra</div>
+                </div>
             </div>
-            <span class="badge-portal"><i class="fas fa-signal me-1"></i>Portal do Cliente</span>
+            <div class="obra-info">
+                <div><strong>Início:</strong> {{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '—' }}</div>
+                <div><strong>Previsão fim:</strong> {{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '—' }}</div>
+                <div><strong>Status:</strong> {{ obra.status }}</div>
+                <div><strong>Endereço:</strong> {{ obra.endereco or '—' }}</div>
+            </div>
         </div>
     </div>
-</div>
+</section>
 
-<div class="container py-4">
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="flash-messages mb-3">
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card-portal p-3 text-center">
-                <svg class="progress-ring" viewBox="0 0 120 120">
-                    <circle class="bg" cx="60" cy="60" r="50"/>
-                    <circle class="fg" cx="60" cy="60" r="50"
-                            stroke-dasharray="314.16"
-                            stroke-dashoffset="{{ 314.16 - (314.16 * perc_geral / 100) }}"
-                            transform="rotate(-90 60 60)"/>
-                </svg>
-                <div class="progress-label mt-2">{{ perc_geral }}%</div>
-                <div class="text-muted small">Progresso Geral</div>
-            </div>
-        </div>
-        <div class="col-md-8">
-            <div class="row g-3">
-                <div class="col-6 col-lg-3">
-                    <div class="card-portal kpi-card">
-                        <div class="kpi-val">{{ cronograma_cliente|length }}</div>
-                        <div class="kpi-lbl">Tarefas</div>
-                    </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <div class="card-portal kpi-card">
-                        <div class="kpi-val">{{ compras_pendentes|length }}</div>
-                        <div class="kpi-lbl">Compras Pendentes</div>
-                    </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <div class="card-portal kpi-card">
-                        <div class="kpi-val">{{ medicoes|length }}</div>
-                        <div class="kpi-lbl">Medições</div>
-                    </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <div class="card-portal kpi-card">
-                        {% if obra.data_inicio %}
-                        <div class="kpi-val">{{ (hoje - obra.data_inicio).days }}</div>
-                        <div class="kpi-lbl">Dias</div>
-                        {% else %}
-                        <div class="kpi-val">—</div>
-                        <div class="kpi-lbl">Dias</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="card-portal p-3 mt-3">
-                <div class="row small">
-                    <div class="col-sm-6 mb-1"><strong>Início:</strong> {{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '—' }}</div>
-                    <div class="col-sm-6 mb-1"><strong>Previsão Fim:</strong> {{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '—' }}</div>
-                    <div class="col-sm-6 mb-1"><strong>Status:</strong> {{ obra.status }}</div>
-                    <div class="col-sm-6 mb-1"><strong>Endereço:</strong> {{ obra.endereco or '—' }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="section-title"><i class="fas fa-tasks"></i> Cronograma</div>
-    <div class="card-portal mb-4">
+<!-- Cronograma ──────────────────────────────────────────────── -->
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-tasks"></i></span>
+        <h2 class="section-title">Cronograma</h2>
         {% if cronograma_cliente %}
+        <span class="section-counter">{{ cronograma_cliente|length }}</span>
+        {% endif %}
+    </div>
+    <div class="card-portal">
+        {% if cronograma_cliente %}
+        <div class="timeline">
             {% for t in cronograma_cliente %}
             {% set pc = t.percentual_apresentacao or 0 %}
-            <div class="tarefa-row">
-                <span class="tarefa-nome">
-                    {{ t.nome_tarefa }}
+            <div class="timeline-row">
+                <div class="timeline-name">
+                    <div class="nome">{{ t.nome_tarefa }}</div>
                     {% if t.data_inicio_apresentacao and t.data_fim_apresentacao %}
-                    <span class="text-muted" style="font-size:.78rem;display:block;">
-                        {{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }} → {{ t.data_fim_apresentacao.strftime('%d/%m/%Y') }}
-                    </span>
+                    <div class="periodo">{{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }} → {{ t.data_fim_apresentacao.strftime('%d/%m/%Y') }}</div>
                     {% elif t.data_inicio_apresentacao %}
-                    <span class="text-muted" style="font-size:.78rem;display:block;">
-                        Início: {{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }}
-                    </span>
+                    <div class="periodo">Início: {{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }}</div>
                     {% endif %}
-                </span>
-                <div class="tarefa-bar">
-                    <div class="tarefa-bar-fill" style="width:{{ pc }}%;background:{% if pc >= 100 %}#22c55e{% elif pc >= 50 %}#3b82f6{% else %}#f59e0b{% endif %};"></div>
                 </div>
-                <span class="tarefa-perc" style="color:{% if pc >= 100 %}#16a34a{% elif pc >= 50 %}#2563eb{% else %}#d97706{% endif %}">{{ pc|round(1) }}%</span>
+                <div class="timeline-bar">
+                    <span style="width:{{ pc }}%;background:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#f59e0b{% endif %};"></span>
+                </div>
+                <div class="timeline-perc" style="color:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#d97706{% endif %}">{{ pc|round(1) }}%</div>
             </div>
             {% endfor %}
+        </div>
         {% else %}
-        <div style="padding:2rem 1.25rem;text-align:center;color:#64748b;">
-            <i class="fas fa-clock fa-2x mb-3" style="opacity:.35;display:block;"></i>
-            <div style="font-weight:600;margin-bottom:.25rem;">Cronograma em atualização</div>
-            <div style="font-size:.85rem;">O cronograma detalhado desta obra será disponibilizado em breve.</div>
+        <div class="empty-state">
+            <i class="far fa-clock"></i>
+            <div class="empty-title">Cronograma em atualização</div>
+            <div class="empty-msg">O cronograma detalhado desta obra será disponibilizado em breve.</div>
         </div>
         {% endif %}
     </div>
+</section>
 
-    {% if compras_pendentes %}
-    <div class="section-title"><i class="fas fa-clipboard-check"></i> Compras para Aprovação</div>
-    <div class="card-portal mb-4">
-        {% for c in compras_pendentes %}
-        <div class="compra-row">
-            <div class="compra-info">
-                <div class="fornecedor">{{ c.fornecedor.nome }}</div>
-                <div class="meta">
-                    {{ c.data_compra.strftime('%d/%m/%Y') }}
-                    {% if c.numero %} &mdash; NF {{ c.numero }}{% endif %}
-                </div>
-                {% if c.fornecedor.chave_pix %}
-                <div class="meta mt-1"><i class="fas fa-key me-1"></i>PIX: {{ c.fornecedor.chave_pix }}</div>
-                {% endif %}
-            </div>
-            <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
-            <span class="status-badge status-pendente"><i class="fas fa-clock"></i> Pendente</span>
-            <div class="compra-actions">
-                <form method="POST" action="{{ url_for('portal_obras.aprovar_compra', token=obra.token_cliente, compra_id=c.id) }}" class="d-inline">
-                    <button class="btn btn-sm btn-success"><i class="fas fa-check me-1"></i>Aprovar</button>
-                </form>
-                <form method="POST" action="{{ url_for('portal_obras.recusar_compra', token=obra.token_cliente, compra_id=c.id) }}" class="d-inline">
-                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-times me-1"></i>Recusar</button>
-                </form>
-            </div>
-        </div>
-        {% endfor %}
+<!-- Compras para aprovação ───────────────────────────────────── -->
+{% if compras_pendentes %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-clipboard-check"></i></span>
+        <h2 class="section-title">Compras para sua aprovação</h2>
+        <span class="section-counter">{{ compras_pendentes|length }}</span>
     </div>
-    {% endif %}
-
-    {% if compras_resolvidas %}
-    <div class="section-title"><i class="fas fa-shopping-cart"></i> Compras Resolvidas</div>
-    <div class="card-portal mb-4">
-        {% for c in compras_resolvidas %}
-        {% set status = c.status_aprovacao_cliente %}
-        <div class="compra-row">
-            <div class="compra-info">
-                <div class="fornecedor">{{ c.fornecedor.nome }}</div>
-                <div class="meta">
-                    {{ c.data_compra.strftime('%d/%m/%Y') }}
-                    {% if c.numero %} &mdash; NF {{ c.numero }}{% endif %}
+    <div class="card-portal">
+        <div class="row-list">
+            {% for c in compras_pendentes %}
+            <div class="compra-row">
+                <div class="compra-info">
+                    <div class="compra-fornec">{{ c.fornecedor.nome }}</div>
+                    <div class="compra-meta">
+                        <i class="far fa-calendar"></i> {{ c.data_compra.strftime('%d/%m/%Y') }}
+                        {% if c.numero %}&nbsp;·&nbsp;NF {{ c.numero }}{% endif %}
+                    </div>
+                    {% if c.fornecedor.chave_pix %}
+                    <div class="compra-pix"><i class="fas fa-key"></i> PIX <code>{{ c.fornecedor.chave_pix }}</code></div>
+                    {% endif %}
                 </div>
-                {% if c.fornecedor.chave_pix %}
-                <div class="meta mt-1"><i class="fas fa-key me-1"></i>PIX: {{ c.fornecedor.chave_pix }}</div>
-                {% endif %}
+                <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
+                <span class="pill pill-warning"><i class="fas fa-clock"></i> Pendente</span>
+                <div class="compra-acoes">
+                    <form method="POST" action="{{ url_for('portal_obras.aprovar_compra', token=obra.token_cliente, compra_id=c.id) }}">
+                        <button class="btn btn-portal-success" aria-label="Aprovar compra de {{ c.fornecedor.nome }}">
+                            <i class="fas fa-check me-1"></i> Aprovar
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('portal_obras.recusar_compra', token=obra.token_cliente, compra_id=c.id) }}">
+                        <button class="btn btn-portal-danger" aria-label="Recusar compra de {{ c.fornecedor.nome }}">
+                            <i class="fas fa-times me-1"></i> Recusar
+                        </button>
+                    </form>
+                </div>
             </div>
-            <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
-            <div>
-                {% if status == 'APROVADO' %}
-                <span class="status-badge status-aprovado"><i class="fas fa-check-circle"></i> Aprovado</span>
-                {% elif status == 'RECUSADO' %}
-                <span class="status-badge status-recusado"><i class="fas fa-times-circle"></i> Recusado</span>
-                {% endif %}
-            </div>
-            <div class="compra-actions">
-                {% if status == 'APROVADO' and not c.comprovante_pagamento_url %}
-                <form method="POST" action="{{ url_for('portal_obras.upload_comprovante', token=obra.token_cliente, compra_id=c.id) }}"
-                      enctype="multipart/form-data" class="d-inline-flex align-items-center gap-1">
-                    <input type="file" name="comprovante" accept="image/*,.pdf" class="form-control form-control-sm" style="max-width:180px" required>
-                    <button class="btn btn-sm btn-primary"><i class="fas fa-upload"></i></button>
-                </form>
-                {% elif c.comprovante_pagamento_url %}
-                <a href="{{ c.comprovante_pagamento_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-file-alt me-1"></i>Comprovante
-                </a>
-                {% endif %}
-            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
-    {% if medicoes %}
-    <div class="section-title"><i class="fas fa-ruler-combined"></i> Medições</div>
-    <div class="card-portal mb-4">
-        {% for m in medicoes %}
-        <div class="medicao-card">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+<!-- Compras resolvidas ──────────────────────────────────────── -->
+{% if compras_resolvidas %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-shopping-cart"></i></span>
+        <h2 class="section-title">Compras resolvidas</h2>
+        <span class="section-counter">{{ compras_resolvidas|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="row-list">
+            {% for c in compras_resolvidas %}
+            {% set status = c.status_aprovacao_cliente %}
+            <div class="compra-row">
+                <div class="compra-info">
+                    <div class="compra-fornec">{{ c.fornecedor.nome }}</div>
+                    <div class="compra-meta">
+                        <i class="far fa-calendar"></i> {{ c.data_compra.strftime('%d/%m/%Y') }}
+                        {% if c.numero %}&nbsp;·&nbsp;NF {{ c.numero }}{% endif %}
+                    </div>
+                    {% if c.fornecedor.chave_pix %}
+                    <div class="compra-pix"><i class="fas fa-key"></i> PIX <code>{{ c.fornecedor.chave_pix }}</code></div>
+                    {% endif %}
+                </div>
+                <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
                 <div>
-                    <strong>Medição #{{ "%03d"|format(m.numero) }}</strong>
-                    {% if m.periodo_inicio and m.periodo_fim %}
-                    <span class="text-muted small ms-2">{{ m.periodo_inicio.strftime('%d/%m/%Y') }} — {{ m.periodo_fim.strftime('%d/%m/%Y') }}</span>
-                    {% elif m.data_inicio and m.data_fim %}
-                    <span class="text-muted small ms-2">{{ m.data_inicio.strftime('%d/%m/%Y') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}</span>
+                    {% if status == 'APROVADO' %}
+                    <span class="pill pill-success"><i class="fas fa-check-circle"></i> Aprovado</span>
+                    {% elif status == 'RECUSADO' %}
+                    <span class="pill pill-danger"><i class="fas fa-times-circle"></i> Recusado</span>
                     {% endif %}
                 </div>
-                <div class="d-flex align-items-center gap-3">
-                    <span class="fw-bold">{{ m.percentual_executado|round(1) }}%</span>
-                    {% set val_display = m.valor_a_faturar_periodo if m.valor_a_faturar_periodo and m.valor_a_faturar_periodo|float > 0 else m.valor_medido %}
-                    {% if val_display and val_display|float > 0 %}
-                    <span class="fw-bold text-success">{{ val_display|float|brl }}</span>
-                    {% endif %}
-                    <span class="status-badge {% if m.status == 'APROVADO' %}status-aprovado{% elif m.status == 'FATURADO' %}status-faturado{% else %}status-pendente{% endif %}">
-                        {{ m.status }}
-                    </span>
-                    <a href="{{ url_for('medicao.portal_pdf_extrato', medicao_id=m.id) }}?token={{ obra.token_cliente }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Extrato PDF">
-                        <i class="fas fa-file-pdf"></i>
+                <div class="compra-acoes">
+                    {% if status == 'APROVADO' and not c.comprovante_pagamento_url %}
+                    <form method="POST"
+                          action="{{ url_for('portal_obras.upload_comprovante', token=obra.token_cliente, compra_id=c.id) }}"
+                          enctype="multipart/form-data"
+                          class="upload-comprovante"
+                          onsubmit="this.querySelector('button').disabled = true;">
+                        <label class="file-label" for="comp_{{ c.id }}">
+                            <i class="fas fa-paperclip"></i> Anexar comprovante
+                        </label>
+                        <input type="file" id="comp_{{ c.id }}" name="comprovante"
+                               accept="image/*,.pdf" required
+                               onchange="this.form.querySelector('.file-name').textContent = this.files[0]?.name || ''; this.form.querySelector('button').style.display = 'inline-flex';">
+                        <span class="file-name"></span>
+                        <button type="submit" class="btn btn-portal-primary" style="display:none;">
+                            <i class="fas fa-upload me-1"></i> Enviar
+                        </button>
+                    </form>
+                    {% elif c.comprovante_pagamento_url %}
+                    <a href="{{ c.comprovante_pagamento_url }}" target="_blank" rel="noopener"
+                       class="btn btn-portal-outline">
+                        <i class="far fa-file-alt me-1"></i> Ver comprovante
                     </a>
+                    {% endif %}
                 </div>
             </div>
-            {% if m.valor_total_medido_periodo and m.valor_total_medido_periodo|float > 0 %}
-            <div class="small mt-1">
-                <span class="text-muted">Medido:</span> <strong>{{ m.valor_total_medido_periodo|float|brl }}</strong>
-                {% if m.valor_entrada_abatido_periodo and m.valor_entrada_abatido_periodo|float > 0 %}
-                <span class="text-muted ms-2">Entrada:</span> <strong class="text-danger">−{{ m.valor_entrada_abatido_periodo|float|brl }}</strong>
-                {% endif %}
-                <span class="text-muted ms-2">A Faturar:</span> <strong class="text-success">{{ (m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0)|brl }}</strong>
-            </div>
-            {% endif %}
-            {% if medicao_contas and medicao_contas.get(m.id) %}
-            {% set cr = medicao_contas[m.id] %}
-            <div class="small mt-1">
-                <span class="text-muted">Conta a Receber:</span>
-                <span class="badge {% if cr.status == 'PAGO' or cr.status == 'RECEBIDO' %}bg-success{% elif cr.status == 'VENCIDO' %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size:.65rem">
-                    {{ cr.status }}
-                </span>
-                <span class="text-muted ms-1">{{ cr.numero_documento }}</span>
-                {% if cr.data_vencimento %}
-                <span class="text-muted ms-1">Venc: {{ cr.data_vencimento.strftime('%d/%m/%Y') }}</span>
-                {% endif %}
-            </div>
-            {% endif %}
-            {% if m.observacoes %}
-            <div class="small text-muted mt-1">{{ m.observacoes }}</div>
-            {% endif %}
+            {% endfor %}
         </div>
-        {% endfor %}
     </div>
-    {% endif %}
+</section>
+{% endif %}
 
+<!-- Medições ────────────────────────────────────────────────── -->
+{% if medicoes %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-ruler-combined"></i></span>
+        <h2 class="section-title">Medições</h2>
+        <span class="section-counter">{{ medicoes|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="row-list">
+            {% for m in medicoes %}
+            <div class="medicao-card">
+                <div class="medicao-head">
+                    <div>
+                        <span class="medicao-num">Medição #{{ "%03d"|format(m.numero) }}</span>
+                        {% if m.periodo_inicio and m.periodo_fim %}
+                        <span class="medicao-periodo">&nbsp;·&nbsp;{{ m.periodo_inicio.strftime('%d/%m/%Y') }} — {{ m.periodo_fim.strftime('%d/%m/%Y') }}</span>
+                        {% elif m.data_inicio and m.data_fim %}
+                        <span class="medicao-periodo">&nbsp;·&nbsp;{{ m.data_inicio.strftime('%d/%m/%Y') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="medicao-vals">
+                        <span class="medicao-perc">{{ m.percentual_executado|round(1) }}%</span>
+                        {% set val_display = m.valor_a_faturar_periodo if m.valor_a_faturar_periodo and m.valor_a_faturar_periodo|float > 0 else m.valor_medido %}
+                        {% if val_display and val_display|float > 0 %}
+                        <span class="medicao-valor">{{ val_display|float|brl }}</span>
+                        {% endif %}
+                        <span class="pill {% if m.status == 'APROVADO' %}pill-success{% elif m.status == 'FATURADO' %}pill-info{% else %}pill-warning{% endif %}">{{ m.status }}</span>
+                        <a href="{{ url_for('medicao.portal_pdf_extrato', medicao_id=m.id) }}?token={{ obra.token_cliente }}"
+                           target="_blank" rel="noopener"
+                           class="medicao-pdf"
+                           title="Baixar extrato em PDF" aria-label="Baixar extrato em PDF da medição {{ m.numero }}">
+                            <i class="fas fa-file-pdf"></i>
+                        </a>
+                    </div>
+                </div>
+                {% if m.valor_total_medido_periodo and m.valor_total_medido_periodo|float > 0 %}
+                <div class="medicao-meta">
+                    <span>Medido <strong>{{ m.valor_total_medido_periodo|float|brl }}</strong></span>
+                    {% if m.valor_entrada_abatido_periodo and m.valor_entrada_abatido_periodo|float > 0 %}
+                    <span>Entrada <strong class="negativo">−{{ m.valor_entrada_abatido_periodo|float|brl }}</strong></span>
+                    {% endif %}
+                    <span>A faturar <strong class="positivo">{{ (m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0)|brl }}</strong></span>
+                </div>
+                {% endif %}
+                {% if medicao_contas and medicao_contas.get(m.id) %}
+                {% set cr = medicao_contas[m.id] %}
+                <div class="medicao-meta">
+                    <span>Conta a receber
+                        <span class="pill {% if cr.status == 'PAGO' or cr.status == 'RECEBIDO' %}pill-success{% elif cr.status == 'VENCIDO' %}pill-danger{% else %}pill-warning{% endif %}">{{ cr.status }}</span>
+                    </span>
+                    <span><strong>{{ cr.numero_documento }}</strong></span>
+                    {% if cr.data_vencimento %}
+                    <span>Venc. <strong>{{ cr.data_vencimento.strftime('%d/%m/%Y') }}</strong></span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if m.observacoes %}
+                <div class="medicao-obs">{{ m.observacoes }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
 
-    <style>
-    /* Mapa V2 — estilos de highlight por CSS class (persistentes) */
-    td.cotacao-cell { text-align:center; cursor:pointer; transition:background .15s; }
-    td.cotacao-cell.cell-min-val  { background:#ecfdf5; }
-    td.cotacao-cell.cell-min-prazo { background:#eff6ff; }
-    td.cotacao-cell.cell-min-val.cell-min-prazo { background:#ecfdf5; } /* val tem prioridade */
-    td.cotacao-cell.cell-selected  { background:#d1fae5 !important; }
-    td.cotacao-cell.cell-selected .radio-visual { border-color:#059669 !important; background:#f0fdf4; }
-    td.cotacao-cell:not(.cell-selected) .radio-visual { border:2px solid #cbd5e1; background:transparent; }
-    </style>
-
-    {% if mapas_v2_abertos_ctx %}
-    <div class="section-title"><i class="fas fa-table"></i> Comparativo de Fornecedores — Aguardando sua Escolha</div>
+<!-- Mapa V2 - aguardando escolha ───────────────────────────── -->
+{% if mapas_v2_abertos_ctx %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-table"></i></span>
+        <h2 class="section-title">Comparativo de fornecedores — aguardando sua escolha</h2>
+        <span class="section-counter">{{ mapas_v2_abertos_ctx|length }}</span>
+    </div>
     {% for ctx in mapas_v2_abertos_ctx %}
     {% set mapa = ctx.mapa %}
     {% set fornecedores = ctx.fornecedores %}
@@ -469,31 +782,32 @@
     {% set cotacoes_map = ctx.cotacoes_map %}
     {% set min_val_map = ctx.min_val_map %}
     {% set min_prazo_map = ctx.min_prazo_map %}
-    <div class="card-portal mb-4">
-        <div style="background:#eff6ff;padding:.9rem 1.25rem;border-bottom:1px solid #dbeafe;display:flex;align-items:center;gap:.75rem;">
-            <i class="fas fa-table" style="color:#1d4ed8;"></i>
-            <span style="font-weight:700;color:#1e3a8a;flex:1;">{{ mapa.nome }}</span>
-            <span style="background:#fef3c7;color:#92400e;padding:.25rem .65rem;border-radius:20px;font-size:.75rem;font-weight:600;"><i class="fas fa-clock me-1"></i>Aguardando sua escolha</span>
+    <div class="card-portal mapa-v2-card mb-3">
+        <div class="mapa-v2-head">
+            <i class="fas fa-table" style="color:var(--brand);"></i>
+            <span class="nome">{{ mapa.nome }}</span>
+            <span class="pill pill-warning"><i class="fas fa-clock"></i> Aguardando sua escolha</span>
         </div>
-        <div style="padding:1rem 1.25rem;">
-            <p style="font-size:.85rem;color:#64748b;margin-bottom:.75rem;">
-                <i class="fas fa-info-circle me-1"></i>Compare os preços e selecione o fornecedor preferido para cada item.
-                Clique no cabeçalho da coluna para pré-selecionar todos os itens daquele fornecedor.
-                <span style="background:#ecfdf5;color:#059669;padding:.1rem .4rem;border-radius:4px;font-weight:600;"><i class="fas fa-star me-1" style="font-size:.7rem;"></i>verde = menor preço</span>
-                <span style="background:#eff6ff;color:#1d4ed8;padding:.1rem .4rem;border-radius:4px;font-weight:600;margin-left:.25rem;"><i class="fas fa-bolt me-1" style="font-size:.7rem;"></i>azul = prazo mais curto</span>
-            </p>
+        <div class="mapa-v2-body">
+            <div class="mapa-v2-legenda">
+                <i class="fas fa-info-circle"></i>
+                <span>Compare os preços e selecione o fornecedor preferido para cada item. Clique no nome de um fornecedor (cabeçalho) para selecionar todos os itens dele de uma vez.</span>
+                <span class="mapa-v2-legenda-tag menor-preco"><i class="fas fa-star"></i> menor preço</span>
+                <span class="mapa-v2-legenda-tag menor-prazo"><i class="fas fa-bolt"></i> prazo mais curto</span>
+            </div>
             <form method="POST" action="{{ url_for('portal_obras.selecionar_mapa_v2', token=obra.token_cliente, mapa_id=mapa.id) }}" id="form-mapa-{{ mapa.id }}">
-                <div class="table-responsive mb-3">
-                    <table class="table table-bordered mb-0" style="font-size:.85rem;" id="table-mapa-{{ mapa.id }}">
+                <div class="table-responsive">
+                    <table class="mapa-v2-table" id="table-mapa-{{ mapa.id }}">
                         <thead>
-                            <tr style="background:#1e3a8a;color:#fff;">
-                                <th style="min-width:180px;vertical-align:middle;">Item</th>
-                                <th style="width:60px;text-align:center;vertical-align:middle;">Qtd</th>
-                                <th style="width:40px;text-align:center;vertical-align:middle;">Un</th>
+                            <tr>
+                                <th style="min-width:180px;">Item</th>
+                                <th style="width:60px;">Qtd</th>
+                                <th style="width:40px;">Un</th>
                                 {% for forn in fornecedores %}
-                                <th style="min-width:130px;text-align:center;cursor:pointer;" class="forn-header" data-mapa="{{ mapa.id }}" data-forn="{{ forn.id }}" title="Clique para selecionar todos os itens deste fornecedor">
+                                <th class="forn-header" data-mapa="{{ mapa.id }}" data-forn="{{ forn.id }}"
+                                    title="Selecionar todos os itens deste fornecedor">
                                     {{ forn.nome }}
-                                    <div style="font-size:.7rem;font-weight:400;opacity:.8;margin-top:.15rem;">clique para selecionar todos</div>
+                                    <div class="forn-hint">clique para selecionar tudo</div>
                                 </th>
                                 {% endfor %}
                             </tr>
@@ -504,7 +818,7 @@
                             {% set mv_forn = min_val_map.get(item.id) %}
                             {% set mp_forn = min_prazo_map.get(item.id) %}
                             <tr>
-                                <td style="font-weight:600;">{{ item.descricao }}</td>
+                                <td class="item-desc">{{ item.descricao }}</td>
                                 <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
                                 <td style="text-align:center;">{{ item.unidade }}</td>
                                 {% for forn in fornecedores %}
@@ -519,17 +833,17 @@
                                                class="cotacao-radio" data-mapa="{{ mapa.id }}" data-item="{{ item.id }}" data-forn="{{ forn.id }}"
                                                {% if is_min_val %}checked{% endif %}
                                                style="display:none;" required>
-                                        <div class="radio-visual" style="border:2px solid #cbd5e1;border-radius:6px;padding:.4rem .3rem;font-size:.82rem;transition:border .15s;">
+                                        <div class="radio-visual">
                                             {% if cur_val > 0 %}
-                                            <div style="font-weight:700;color:{% if is_min_val %}#059669{% elif is_min_prazo %}#1d4ed8{% else %}#1e293b{% endif %};">
+                                            <div class="cot-valor{% if is_min_val %} menor-preco{% elif is_min_prazo %} menor-prazo{% endif %}">
                                                 {{ cur_val|brl }}
                                                 {% if is_min_val %}<i class="fas fa-star ms-1" style="font-size:.65rem;color:#f59e0b;" title="Menor preço"></i>{% endif %}
                                             </div>
                                             {% else %}
-                                            <div style="color:#94a3b8;">—</div>
+                                            <div style="color:var(--text-subtle);">—</div>
                                             {% endif %}
                                             {% if cot and cot.prazo %}
-                                            <div style="font-size:.72rem;margin-top:.15rem;{% if is_min_prazo %}color:#1d4ed8;font-weight:700;{% else %}color:#64748b;{% endif %}">
+                                            <div class="cot-prazo{% if is_min_prazo %} menor-prazo{% endif %}">
                                                 <i class="fas fa-clock me-1"></i>{{ cot.prazo }}{% if is_min_prazo %}<i class="fas fa-bolt ms-1" style="font-size:.6rem;color:#f59e0b;" title="Prazo mais curto"></i>{% endif %}
                                             </div>
                                             {% endif %}
@@ -541,8 +855,8 @@
                             {% endfor %}
                         </tbody>
                         <tfoot>
-                            <tr style="background:#f8fafc;font-weight:700;">
-                                <td colspan="3" style="font-size:.82rem;">Total por Fornecedor</td>
+                            <tr>
+                                <td colspan="3">Total por fornecedor</td>
                                 {% for forn in fornecedores %}
                                 {% set tot = namespace(v=0) %}
                                 {% for item in itens %}
@@ -551,7 +865,7 @@
                                         {% set tot.v = tot.v + (cot.valor_unitario|float * item.quantidade|float) %}
                                     {% endif %}
                                 {% endfor %}
-                                <td style="text-align:center;color:#1e3a8a;" id="total-mapa{{ mapa.id }}-forn{{ forn.id }}">
+                                <td id="total-mapa{{ mapa.id }}-forn{{ forn.id }}">
                                     {% if tot.v > 0 %}{{ tot.v|brl }}{% else %}—{% endif %}
                                 </td>
                                 {% endfor %}
@@ -559,35 +873,41 @@
                         </tfoot>
                     </table>
                 </div>
-                <div class="text-end">
-                    <button type="submit" class="btn btn-success fw-semibold px-4" onclick="return confirm('Confirmar a seleção de fornecedores e gerar o relatório de aprovação?')">
-                        <i class="fas fa-file-alt me-2"></i>Salvar e Gerar Relatório
+                <div class="mapa-v2-actions">
+                    <button type="submit" class="btn btn-portal-success"
+                            onclick="return confirm('Confirmar a seleção de fornecedores e gerar o relatório de aprovação?');">
+                        <i class="fas fa-file-alt me-1"></i> Salvar e gerar relatório
                     </button>
                 </div>
             </form>
         </div>
     </div>
     {% endfor %}
-    {% endif %}
+</section>
+{% endif %}
 
-    {% if mapas_v2_concluidos_ctx %}
-    <div class="section-title"><i class="fas fa-check-circle"></i> Relatório de Fornecedores Aprovados</div>
+<!-- Mapa V2 - concluído ─────────────────────────────────────── -->
+{% if mapas_v2_concluidos_ctx %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-check-circle"></i></span>
+        <h2 class="section-title">Relatório de fornecedores aprovados</h2>
+        <span class="section-counter">{{ mapas_v2_concluidos_ctx|length }}</span>
+    </div>
     {% for ctx in mapas_v2_concluidos_ctx %}
     {% set mapa = ctx.mapa %}
     {% set fornecedores = ctx.fornecedores %}
     {% set itens = ctx.itens %}
     {% set cotacoes_map = ctx.cotacoes_map %}
-    <div class="card-portal mb-4">
-        <div style="background:#f0fdf4;padding:.9rem 1.25rem;border-bottom:1px solid #d1fae5;display:flex;align-items:center;gap:.75rem;">
-            <i class="fas fa-check-circle" style="color:#059669;"></i>
-            <span style="font-weight:700;color:#065f46;flex:1;">{{ mapa.nome }}</span>
-            <span style="background:#d1fae5;color:#065f46;padding:.25rem .65rem;border-radius:20px;font-size:.75rem;font-weight:600;"><i class="fas fa-check me-1"></i>Aprovado</span>
+    <div class="card-portal mapa-v2-card mb-3">
+        <div class="mapa-v2-head concluido">
+            <i class="fas fa-check-circle" style="color:var(--success);"></i>
+            <span class="nome">{{ mapa.nome }}</span>
+            <span class="pill pill-success"><i class="fas fa-check"></i> Aprovado</span>
         </div>
-        <div style="padding:.75rem 1.25rem 1.25rem;">
-            <!-- Relatório agrupado por fornecedor selecionado -->
+        <div class="mapa-v2-body">
             {% set grand_total = namespace(v=0) %}
             {% for forn in fornecedores %}
-                {% set forn_itens = namespace(lista=[]) %}
                 {% set forn_total = namespace(v=0) %}
                 {% for item in itens %}
                     {% set cot = cotacoes_map.get(item.id, {}).get(forn.id) %}
@@ -598,19 +918,19 @@
                     {% endif %}
                 {% endfor %}
                 {% if forn_total.v > 0 %}
-                <div style="margin-bottom:1.25rem;">
-                    <div style="background:#1e3a8a;color:#fff;padding:.5rem 1rem;border-radius:6px 6px 0 0;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:.5rem;">
+                <div class="forn-bloco">
+                    <div class="forn-bloco-head">
                         <i class="fas fa-building"></i>{{ forn.nome }}
-                        <span style="margin-left:auto;font-size:.82rem;font-weight:400;opacity:.85;">{{ forn_total.v|brl }}</span>
+                        <span class="forn-total">{{ forn_total.v|brl }}</span>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-bordered table-sm mb-0" style="font-size:.83rem;border-radius:0 0 6px 6px;overflow:hidden;">
-                            <thead style="background:#f0f4ff;">
+                        <table>
+                            <thead>
                                 <tr>
                                     <th>Item</th>
                                     <th style="width:60px;text-align:center;">Qtd</th>
                                     <th style="width:40px;text-align:center;">Un</th>
-                                    <th style="text-align:right;">Preço Unit.</th>
+                                    <th style="text-align:right;">Preço unit.</th>
                                     <th style="text-align:right;">Subtotal</th>
                                     <th style="width:100px;">Prazo</th>
                                 </tr>
@@ -621,20 +941,20 @@
                                 {% if cot and cot.selecionado %}
                                 {% set subtotal = (cot.valor_unitario|float) * (item.quantidade|float) %}
                                 <tr>
-                                    <td style="font-weight:600;">{{ item.descricao }}</td>
+                                    <td><strong>{{ item.descricao }}</strong></td>
                                     <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
                                     <td style="text-align:center;">{{ item.unidade }}</td>
-                                    <td style="text-align:right;color:#1e293b;">{{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}</td>
-                                    <td style="text-align:right;font-weight:700;color:#1e3a8a;">{{ subtotal|brl }}</td>
-                                    <td style="color:#64748b;font-size:.78rem;">{{ cot.prazo or '—' }}</td>
+                                    <td style="text-align:right;font-variant-numeric:tabular-nums;">{{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}</td>
+                                    <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:var(--brand-strong);">{{ subtotal|brl }}</td>
+                                    <td style="color:var(--text-muted);font-size:.78rem;">{{ cot.prazo or '—' }}</td>
                                 </tr>
                                 {% endif %}
                                 {% endfor %}
                             </tbody>
                             <tfoot>
-                                <tr style="background:#eff6ff;font-weight:700;">
-                                    <td colspan="4" style="text-align:right;font-size:.84rem;">Total {{ forn.nome }}</td>
-                                    <td style="text-align:right;color:#1e3a8a;">{{ forn_total.v|brl }}</td>
+                                <tr>
+                                    <td colspan="4" style="text-align:right;">Total {{ forn.nome }}</td>
+                                    <td style="text-align:right;">{{ forn_total.v|brl }}</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -643,19 +963,19 @@
                 </div>
                 {% endif %}
             {% endfor %}
-            <!-- Total Geral -->
             {% if grand_total.v > 0 %}
-            <div style="background:#1e3a8a;color:#fff;padding:.65rem 1rem;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;">
-                <span style="font-weight:700;"><i class="fas fa-calculator me-2"></i>Total Geral do Mapa</span>
-                <span style="font-size:1.1rem;font-weight:800;">{{ grand_total.v|brl }}</span>
+            <div class="grand-total">
+                <span class="label"><i class="fas fa-calculator me-2"></i>Total geral do mapa</span>
+                <span class="valor">{{ grand_total.v|brl }}</span>
             </div>
             {% endif %}
-            <!-- Tabela completa de referência (todos os fornecedores) -->
-            <details style="margin-top:1.25rem;">
-                <summary style="cursor:pointer;color:#64748b;font-size:.84rem;padding:.4rem 0;"><i class="fas fa-table me-1"></i>Ver tabela completa de cotações</summary>
+            <details style="margin-top:14px;">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:.84rem;padding:6px 0;">
+                    <i class="fas fa-table me-1"></i> Ver tabela completa de cotações
+                </summary>
                 <div class="table-responsive mt-2">
-                    <table class="table table-bordered table-sm mb-0" style="font-size:.82rem;">
-                        <thead style="background:#f8fafc;">
+                    <table class="table-portal">
+                        <thead>
                             <tr>
                                 <th>Item</th>
                                 <th style="width:55px;text-align:center;">Qtd</th>
@@ -669,21 +989,21 @@
                             {% for item in itens %}
                             {% set item_cots = cotacoes_map.get(item.id, {}) %}
                             <tr>
-                                <td style="font-weight:600;">{{ item.descricao }}</td>
+                                <td><strong>{{ item.descricao }}</strong></td>
                                 <td style="text-align:center;">{{ item.quantidade|float|round(2) }}</td>
                                 <td style="text-align:center;">{{ item.unidade }}</td>
                                 {% for forn in fornecedores %}
                                 {% set cot = item_cots.get(forn.id) %}
                                 <td style="text-align:center;{% if cot and cot.selecionado %}background:#ecfdf5;{% endif %}">
                                     {% if cot and cot.selecionado %}
-                                    <strong style="color:#059669;">
+                                    <strong style="color:var(--success);font-variant-numeric:tabular-nums;">
                                         {{ cot.valor_unitario|float|brl if cot.valor_unitario else '—' }}
                                         <i class="fas fa-check-circle ms-1" style="font-size:.7rem;"></i>
                                     </strong>
-                                    {% if cot.prazo %}<div style="font-size:.7rem;color:#64748b;">{{ cot.prazo }}</div>{% endif %}
+                                    {% if cot.prazo %}<div style="font-size:.7rem;color:var(--text-muted);">{{ cot.prazo }}</div>{% endif %}
                                     {% else %}
-                                    <span style="color:#94a3b8;">{{ cot.valor_unitario|float|brl if cot and cot.valor_unitario else '—' }}</span>
-                                    {% if cot and cot.prazo %}<div style="font-size:.7rem;color:#cbd5e1;">{{ cot.prazo }}</div>{% endif %}
+                                    <span style="color:var(--text-subtle);font-variant-numeric:tabular-nums;">{{ cot.valor_unitario|float|brl if cot and cot.valor_unitario else '—' }}</span>
+                                    {% if cot and cot.prazo %}<div style="font-size:.7rem;color:var(--text-subtle);">{{ cot.prazo }}</div>{% endif %}
                                     {% endif %}
                                 </td>
                                 {% endfor %}
@@ -696,57 +1016,60 @@
         </div>
     </div>
     {% endfor %}
-    {% endif %}
+</section>
+{% endif %}
 
-    {% if rdos %}
-    <div class="section-title"><i class="fas fa-clipboard-list"></i> Relatórios Diários (RDOs Finalizados)</div>
-    <div class="card-portal mb-4">
-        {% for r in rdos %}
-        <a href="{{ url_for('portal_obras.portal_rdo_detalhe', token=obra.token_cliente, rdo_id=r.id) }}" class="rdo-row" style="text-decoration:none;color:inherit;cursor:pointer;transition:background .15s">
-            {% if r.fotos and r.fotos|length > 0 %}
-            {% set foto = r.fotos[0] %}
-            {% if foto.thumbnail_base64 %}
-            <img src="data:image/webp;base64,{{ foto.thumbnail_base64 }}" alt="Foto RDO"
-                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
-            {% elif foto.thumbnail %}
-            <img src="{{ foto.thumbnail }}" alt="Foto RDO"
-                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
-            {% elif foto.caminho_arquivo %}
-            <img src="/{{ foto.caminho_arquivo }}" alt="Foto RDO"
-                 style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">
-            {% else %}
-            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <i class="fas fa-image text-muted"></i>
-            </div>
-            {% endif %}
-            {% else %}
-            <div style="width:48px;height:48px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <i class="fas fa-image text-muted"></i>
-            </div>
-            {% endif %}
-            <span class="badge bg-success" style="min-width:80px">Finalizado</span>
-            <span class="fw-semibold">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</span>
-            <span class="text-muted small flex-fill">{{ r.comentario_geral or '' }}</span>
-            {% if r.fotos and r.fotos|length > 0 %}
-            <span class="badge bg-light text-dark" style="font-size:.7rem"><i class="fas fa-camera me-1"></i>{{ r.fotos|length }} foto{{ 's' if r.fotos|length > 1 }}</span>
-            {% endif %}
-            <i class="fas fa-chevron-right text-muted"></i>
-        </a>
-        {% endfor %}
+<!-- RDOs ────────────────────────────────────────────────────── -->
+{% if rdos %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-clipboard-list"></i></span>
+        <h2 class="section-title">Relatórios diários (RDOs)</h2>
+        <span class="section-counter">{{ rdos|length }}</span>
     </div>
-    {% endif %}
+    <div class="card-portal">
+        <div class="row-list">
+            {% for r in rdos %}
+            <a href="{{ url_for('portal_obras.portal_rdo_detalhe', token=obra.token_cliente, rdo_id=r.id) }}"
+               class="rdo-row"
+               aria-label="Abrir RDO de {{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else 'data indisponível' }}">
+                <div class="rdo-thumb">
+                    {% if r.fotos and r.fotos|length > 0 %}
+                    {% set foto = r.fotos[0] %}
+                    {% if foto.thumbnail_base64 %}
+                    <img src="data:image/webp;base64,{{ foto.thumbnail_base64 }}" alt="">
+                    {% elif foto.thumbnail %}
+                    <img src="{{ foto.thumbnail }}" alt="">
+                    {% elif foto.caminho_arquivo %}
+                    <img src="/{{ foto.caminho_arquivo }}" alt="">
+                    {% else %}
+                    <i class="far fa-image"></i>
+                    {% endif %}
+                    {% else %}
+                    <i class="far fa-image"></i>
+                    {% endif %}
+                </div>
+                <span class="pill pill-success" style="min-width:90px;justify-content:center;">Finalizado</span>
+                <div class="rdo-data">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</div>
+                <div class="rdo-coment">{{ r.comentario_geral or '' }}</div>
+                {% if r.fotos and r.fotos|length > 0 %}
+                <span class="rdo-fotos"><i class="fas fa-camera"></i> {{ r.fotos|length }} foto{{ 's' if r.fotos|length > 1 }}</span>
+                {% endif %}
+                <i class="fas fa-chevron-right chev"></i>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
 
-</div>
+{% endblock %}
 
-<div class="footer-portal">
-    <i class="fas fa-lock me-1"></i> Portal seguro &mdash; {{ nome_empresa }} &mdash; SIGE
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_scripts %}
 <script>
-// Mapa V2 — interactive radio selection
-// Min-value (green) and min-prazo (blue) highlights are CSS classes applied server-side
-// and MUST NOT be removed by JS. Only 'cell-selected' class is toggled by JS.
+// ── Mapa V2: seleção interativa ────────────────────────────────
+// Classes 'cell-min-val' e 'cell-min-prazo' são aplicadas server-side
+// e devem ser preservadas. Apenas 'cell-selected' é controlada por JS.
 (function() {
     function applySelectionHighlight(mapaId, itemId) {
         var radios = document.querySelectorAll(
@@ -755,15 +1078,11 @@
         radios.forEach(function(radio) {
             var cell = radio.closest('td.cotacao-cell');
             if (!cell) return;
-            if (radio.checked) {
-                cell.classList.add('cell-selected');
-            } else {
-                cell.classList.remove('cell-selected');
-            }
+            if (radio.checked) cell.classList.add('cell-selected');
+            else cell.classList.remove('cell-selected');
         });
     }
 
-    // Cell click → select that radio
     document.querySelectorAll('td.cotacao-cell').forEach(function(cell) {
         cell.addEventListener('click', function() {
             var radio = cell.querySelector('input.cotacao-radio');
@@ -774,7 +1093,6 @@
         });
     });
 
-    // Column header click → select all rows for that supplier
     document.querySelectorAll('th.forn-header').forEach(function(th) {
         th.addEventListener('click', function() {
             var mapaId = th.dataset.mapa;
@@ -789,11 +1107,9 @@
         });
     });
 
-    // Initialize selection highlight for pre-checked radios (min-val pre-selected server-side)
     document.querySelectorAll('input.cotacao-radio:checked').forEach(function(radio) {
         applySelectionHighlight(radio.dataset.mapa, radio.dataset.item);
     });
 })();
 </script>
-</body>
-</html>
+{% endblock %}
