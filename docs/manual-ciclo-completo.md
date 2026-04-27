@@ -9,7 +9,37 @@
 
 ---
 
-## Changelog (o que mudou desde a versão anterior — Tasks #102 → #118)
+## Changelog (atualização de abril/2026 — Tasks #119 → #202)
+
+> Em cima da base v10.0 (Tasks #102 → #118), entre fevereiro e abril
+> de 2026 entraram mais 5 mudanças que afetam o uso diário. As seções
+> abaixo do manual já refletem o comportamento novo; este resumo é só
+> para quem já conhecia a versão anterior.
+
+| Bloco | O que mudou | Por que importa para você |
+| --- | --- | --- |
+| **Gate de revisão inicial do cronograma na obra (Task #200)** | Quando o cliente aprova a proposta sem que o admin tenha pré-configurado o cronograma, a Obra nasce em estado "cronograma pendente" e a **primeira visita** ao detalhe da obra **redireciona automaticamente** para uma tela `Revisar cronograma inicial` — onde você marca/desmarca subatividades e clica **Confirmar**. Só depois disso a obra abre normalmente. Existe também botão **"Revisar de novo"** na aba Cronograma, que apaga só as tarefas vindas da proposta (preserva tarefas que você criou manualmente) e reabre o gate. | Você nunca mais é jogado dentro de uma obra com cronograma "default" indesejado. Se o cliente aprovou pelo portal sem você ter marcado nada antes, a primeira coisa que você vê é a tela de revisão. Se preferir começar do zero, é só desmarcar tudo e confirmar — a obra fica revisada (sem tarefas) e você cria as etapas manualmente depois. Coberto por `tests/test_cronograma_revisao_obra_gate.py`. |
+| **Busca por digitação no fornecedor da Compra (Task #202)** | Em `/compras/nova` os dropdowns de Fornecedor e Obra agora têm **busca por digitação** (Select2). Você clica no campo, digita parte do nome e o sistema filtra. Quando a empresa **ainda não tem nenhum fornecedor cadastrado**, o select é substituído por um aviso amarelo com o link direto para "Cadastrar primeiro fornecedor". O backend rejeita com mensagem clara qualquer fornecedor/obra que não pertença ao seu tenant (proteção contra erro de seleção e contra acesso indevido). | Empresas com 100+ fornecedores podem finalmente encontrar o certo digitando — antes era preciso rolar a lista nativa do navegador. E quem está abrindo o sistema pela primeira vez vê um caminho óbvio para destravar a primeira compra (botão direto pra cadastro de fornecedor). Coberto por `tests/test_compras_nova_dropdown.py`. |
+| **Tema visual configurável (Task #191)** | Em **Configurações da Empresa** apareceu uma nova aba "Tema" com 3 presets prontos (Azul Profundo SaaS — padrão; Verde Construção; Grafite Premium) e a opção de ajustar livremente as 4 cores principais (primária, secundária, header/nav e fundo do app). A cor escolhida vale para todas as páginas do sistema, do login ao portal cliente. | Cada empresa pode adaptar o sistema à sua identidade visual sem mexer em código. A escolha fica salva em `ConfiguracaoEmpresa` por tenant — você pode trocar a qualquer momento e a alteração aparece imediatamente. |
+| **Portal do cliente mais resistente (Task #195)** | Duas correções no fluxo `POST /propostas/cliente/<token>/aprovar`: (a) o portal não quebra mais se a proposta tiver título vazio (antes dava erro 500 e o cliente não conseguia aprovar); (b) se na proposta o nome do cliente estiver em branco e não houver `cliente_id` válido, o sistema cria automaticamente um cliente sintético (nomeado pelo número da proposta) para que a Obra consiga ser criada — em vez de falhar a aprovação. | Propostas legadas migradas de outros sistemas, sem todos os campos preenchidos, agora podem ser aprovadas normalmente pelo cliente. Aparece um aviso (warning) no log para o admin corrigir o cadastro depois, mas o fluxo do cliente nunca é interrompido. |
+| **Limpeza das tabelas legadas de propostas (Task #201)** | A migração 141 dropou 8 tabelas órfãs do antigo modelo de proposta (`proposta`, `proposta_servico`, `item_proposta`, etc.) que existiam no banco mas não eram usadas por nenhum código vivo. As 10 linhas remanescentes da tabela `proposta` foram salvas em `backups/legacy_proposta_2026-04-27.csv` antes do drop. | Mudança 100% interna — invisível pra você. O sistema agora tem **um único** modelo de proposta (`Proposta` em `propostas_comerciais`, com 700+ propostas em produção), eliminando confusão sobre "qual tabela é a verdadeira". Coberto por `tests/test_legacy_propostas_drop.py`. |
+
+### Validação ponta-a-ponta (Task #208)
+
+Todo o ciclo descrito neste manual — Catálogo → Orçamento → Proposta
+→ Envio → Portal cliente → Aprovação → Obra → Revisão de cronograma
+→ Compra → RDO — foi validado em sessão real de navegador no dia
+27/04/2026, exercitando login, formulários, dropdowns Select2,
+gate de revisão de cronograma, criação de pedido de compra (R$
+760,00 = 20 × 38,00) e geração de RDO. Os 8 contadores finais
+fecharam (insumos=2, serviços=1, composições=2, orçamento=1,
+proposta=1, obra=1, compra=1, RDO=1). Se algum dos passos abaixo
+mostrar comportamento diferente do descrito, é um bug regressivo —
+abra um chamado para o time técnico.
+
+---
+
+## Changelog anterior (Tasks #102 → #118)
 
 > A versão anterior do manual documentou o sistema na Task #102
 > (cronograma automático na aprovação). Esta versão (v10.0) cobre tudo
@@ -703,6 +733,21 @@ engenheiro de campo vai abrir a obra e encontrar tudo certo.
 **3. Onde clicar.** Menu lateral → "Obras" → linha "Residencial Bela
 Vista".
 
+> **⚠️ Atenção (Task #200): gate de revisão de cronograma na 1ª
+> visita.** Se você **não** tiver pré-configurado o cronograma na
+> Etapa 8 (botão "Salvar pré-configuração" antes do cliente aprovar),
+> a primeira vez que você clicar na obra o sistema **redireciona
+> automaticamente** para a tela `Revisar cronograma inicial` —
+> mesma árvore da Etapa 8, com tudo marcado por padrão. Marque/
+> desmarque conforme a obra real e clique **"Confirmar e gerar
+> cronograma"** no rodapé. Só **depois disso** o detalhe da obra
+> abre normalmente. Se o cliente aprovou pelo portal sem que você
+> tenha pré-configurado, esse gate é seu primeiro contato — e é
+> intencional. Para revisar de novo no futuro, use o botão
+> **"Revisar de novo"** na aba Cronograma da obra (apaga só as
+> tarefas vindas da proposta, preserva as que você criou
+> manualmente, e reabre o gate).
+
 **4. O que aparece na tela.** Painel da obra com várias abas:
 Resumo, Cronograma, Medição comercial, Custos, Contas a Receber,
 RDOs, Almoxarifado, Cotação, Compras, Portal.
@@ -1149,6 +1194,15 @@ fornecedor e custo lançado na obra.
 data, condições). Tabela dinâmica de itens (insumo, quantidade,
 preço unitário, subtotal). Total no rodapé.
 
+> **Atualização (Task #202).** Os campos **Fornecedor** e **Obra**
+> agora têm **busca por digitação**: clique no campo, digite parte
+> do nome (ex.: "cerâmi") e a lista filtra na hora. Antes era um
+> select nativo do navegador, em que você tinha que rolar a lista
+> inteira. Quando a sua empresa **ainda não tem nenhum fornecedor
+> cadastrado**, o select de Fornecedor é substituído por um aviso
+> amarelo com link direto para "Cadastrar primeiro fornecedor" —
+> nesse caso, cadastre o fornecedor primeiro e volte aqui.
+
 
 ![Pedido de compra novo](img/manual-ciclo/e16-compras-nova.jpg)
 
@@ -1156,8 +1210,8 @@ preço unitário, subtotal). Total no rodapé.
 
 | Campo | Tipo | Exemplo |
 | --- | --- | --- |
-| Fornecedor | Dropdown | `Cerâmica Forte` |
-| Obra | Dropdown | `Residencial Bela Vista` |
+| Fornecedor | Dropdown com busca por digitação (Select2) — obrigatório | `Cerâmica Forte` |
+| Obra | Dropdown com busca por digitação (Select2) | `Residencial Bela Vista` |
 | Data | Data | `05/05/2026` |
 | Condições de pagamento | Texto | `30 dias` |
 | Item — insumo | Combobox com busca | `Bloco cerâmico 9x19x19` |
