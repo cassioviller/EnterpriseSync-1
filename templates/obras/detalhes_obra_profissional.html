@@ -1815,6 +1815,37 @@
              ═══════════════════════════════════════════════════════════════ -->
         <div class="tab-pane fade" id="tab-rdos" role="tabpanel">
 
+        {# ═══════════════════════════════════════════════════════════════ #}
+        {# Task #141 — Curva de Avanço (Planejado × Realizado por RDO)      #}
+        {# ═══════════════════════════════════════════════════════════════ #}
+        <div class="obra-card" id="card-curva-avanco" style="margin-bottom: 1rem;">
+            <div class="obra-card-header">
+                <h3>
+                    <i class="fas fa-chart-line"></i>
+                    Curva de Avanço
+                    <small class="text-muted ms-2" style="font-size: .75rem; font-weight: 400;">
+                        Planejado × Realizado por RDO finalizado
+                    </small>
+                </h3>
+            </div>
+            <div class="obra-card-body">
+                <div id="curvaAvancoEmpty" style="display:none; text-align:center; padding:2rem; color:#9ca3af;">
+                    <i class="fas fa-chart-line" style="font-size:2rem; opacity:.5;"></i>
+                    <p class="mb-0 mt-2">Nenhum RDO finalizado ainda.</p>
+                    <small>O gráfico aparecerá assim que houver RDOs finalizados nesta obra.</small>
+                </div>
+                <div id="curvaAvancoErr" style="display:none; text-align:center; padding:1rem; color:#ef4444;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Falha ao carregar curva de avanço.</span>
+                </div>
+                <canvas id="chartCurvaAvanco"
+                        data-obra-id="{{ obra.id }}"
+                        data-curva-url="{{ url_for('main.curva_avanco_obra', obra_id=obra.id) }}"
+                        height="120"
+                        style="max-height:340px;"></canvas>
+            </div>
+        </div>
+
         <!-- RDOs Recentes -->
         {% if rdos %}
         <div class="obra-card">
@@ -2757,6 +2788,134 @@ function compraObraRemoverItem(btn) {
             });
         });
     });
+})();
+</script>
+
+<script>
+// ── Task #141 — Curva de Avanço (Planejado × Realizado) ────────────────
+(function () {
+    'use strict';
+    var canvas = document.getElementById('chartCurvaAvanco');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    var url = canvas.getAttribute('data-curva-url');
+    var instance = null;
+    var loaded = false;
+
+    function showEmpty(msg) {
+        var em = document.getElementById('curvaAvancoEmpty');
+        if (em) {
+            em.style.display = 'block';
+            if (msg) em.querySelector('p').textContent = msg;
+        }
+        canvas.style.display = 'none';
+    }
+    function showError() {
+        var er = document.getElementById('curvaAvancoErr');
+        if (er) er.style.display = 'block';
+        canvas.style.display = 'none';
+    }
+
+    function render(pontos) {
+        if (!pontos || pontos.length === 0) { showEmpty(); return; }
+        var labels    = pontos.map(function (p) { return p.data_label; });
+        var planejado = pontos.map(function (p) { return Number(p.planejado || 0); });
+        var realizado = pontos.map(function (p) { return Number(p.realizado || 0); });
+
+        // cor do realizado: verde se >= planejado no último ponto, azul caso contrário
+        var ultimoIdx = pontos.length - 1;
+        var corReal = (realizado[ultimoIdx] >= planejado[ultimoIdx]) ? '#16a34a' : '#3b82f6';
+
+        if (instance) { try { instance.destroy(); } catch (e) {} }
+        instance = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Planejado',
+                        data: planejado,
+                        borderColor: '#9ca3af',
+                        backgroundColor: 'rgba(156,163,175,.15)',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        tension: 0.25,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#6b7280',
+                        fill: false,
+                    },
+                    {
+                        label: 'Realizado',
+                        data: realizado,
+                        borderColor: corReal,
+                        backgroundColor: corReal + '22',
+                        borderWidth: 2.5,
+                        tension: 0.25,
+                        pointRadius: 3,
+                        pointBackgroundColor: corReal,
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', align: 'end' },
+                    tooltip: {
+                        callbacks: {
+                            title: function (items) {
+                                if (!items.length) return '';
+                                var idx = items[0].dataIndex;
+                                var p = pontos[idx];
+                                return 'RDO ' + (p.rdo_id || '') + ' — ' + p.data_label;
+                            },
+                            label: function (ctx) {
+                                return ctx.dataset.label + ': ' +
+                                       Number(ctx.raw).toFixed(1) + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'RDO finalizado (data)' },
+                        ticks: { autoSkip: true, maxRotation: 30, minRotation: 0 }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: 'Progresso (%)' },
+                        ticks: { callback: function (v) { return v + '%'; } }
+                    }
+                }
+            }
+        });
+    }
+
+    function load() {
+        if (loaded) return;
+        loaded = true;
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (!json || json.status !== 'ok') { showError(); return; }
+                render(json.pontos || []);
+            })
+            .catch(function () { showError(); });
+    }
+
+    // Lazy-load: só busca quando a aba RDOs ficar visível.
+    var rdosBtn = document.querySelector('button[data-bs-target="#tab-rdos"]');
+    if (rdosBtn) {
+        rdosBtn.addEventListener('shown.bs.tab', load);
+        // Se a aba RDOs já estiver ativa (e.g. abertura via #rdos), carrega já.
+        var pane = document.getElementById('tab-rdos');
+        if (pane && pane.classList.contains('active')) load();
+    } else {
+        load();
+    }
 })();
 </script>
 

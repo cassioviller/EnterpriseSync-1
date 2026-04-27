@@ -670,6 +670,10 @@ def tarefas_rdo(obra_id: int):
             'apontamento_id': apontamento_id,
             'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
             'is_pai': t.id in pai_ids,
+            'data_entrega_real': (
+                t.data_entrega_real.isoformat()
+                if getattr(t, 'data_entrega_real', None) else None
+            ),
         }
         resultado.append(item)
         item_por_id[t.id] = item
@@ -969,10 +973,11 @@ def apontar_producao(rdo_id: int):
     ap.quantidade_executada_dia = qty_dia
     ap.quantidade_acumulada = nova_acumulada
     ap.percentual_realizado = perc_realizado
-    # Coluna é NOT NULL: persistimos 0.0 quando não há plano, mas devolvemos
-    # `None` no JSON para a UI distinguir "Sem plano" de 0% real.
+    # Task #142 — coluna agora é nullable. Persistimos `None` quando a tarefa
+    # não tem plano calculável (sem data_inicio/duração). A UI usa esse `None`
+    # para mostrar "—" / badge "Sem plano" em vez de 0%.
     plan_calculado = progresso['percentual_planejado']
-    ap.percentual_planejado = 0.0 if plan_calculado is None else plan_calculado
+    ap.percentual_planejado = plan_calculado
 
     db.session.commit()
 

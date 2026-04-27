@@ -1065,23 +1065,20 @@ def visualizar_rdo(id):
         try:
             from utils.tenant import is_v2_active
             from models import RDOApontamentoCronograma
-            from utils.cronograma_engine import calcular_progresso_rdo
             if is_v2_active():
                 aps = (
                     RDOApontamentoCronograma.query
                     .filter_by(rdo_id=rdo.id)
                     .all()
                 )
+                # Task #142 — coluna `percentual_planejado` agora é nullable
+                # (Migração 139). Lemos o valor armazenado direto: `None`
+                # significa "Sem plano" (tarefa sem data_inicio/duração) e
+                # número significa o planejado calculado quando o apontamento
+                # foi salvo. Sem mais recálculo redundante na view.
                 for ap in aps:
                     t = ap.tarefa
-                    # Recalcula planejado para distinguir "Sem plano" (None) de 0%
-                    try:
-                        prog = calcular_progresso_rdo(
-                            ap.tarefa_cronograma_id, rdo.data_relatorio, rdo.admin_id
-                        )
-                        plan = prog.get('percentual_planejado')
-                    except Exception:
-                        plan = ap.percentual_planejado
+                    plan = ap.percentual_planejado
                     apontamentos_cronograma.append({
                         'tarefa_id': ap.tarefa_cronograma_id,
                         'nome_tarefa': t.nome_tarefa if t else '—',
@@ -1421,21 +1418,16 @@ def editar_rdo(id):
             from utils.tenant import is_v2_active
             if is_v2_active():
                 from models import RDOApontamentoCronograma, TarefaCronograma
-                from utils.cronograma_engine import calcular_progresso_rdo
                 aps = (
                     RDOApontamentoCronograma.query
                     .filter_by(rdo_id=rdo.id, admin_id=admin_id)
                     .all()
                 )
+                # Task #142 — sem recálculo: lemos `percentual_planejado`
+                # já persistido (nullable). `None` => "Sem plano".
                 for ap in aps:
                     t = TarefaCronograma.query.get(ap.tarefa_cronograma_id)
-                    try:
-                        prog = calcular_progresso_rdo(
-                            ap.tarefa_cronograma_id, rdo.data_relatorio, admin_id
-                        )
-                        plan = prog.get('percentual_planejado')
-                    except Exception:
-                        plan = ap.percentual_planejado
+                    plan = ap.percentual_planejado
                     apontamentos_cronograma.append({
                         'tarefa_id': ap.tarefa_cronograma_id,
                         'nome_tarefa': t.nome_tarefa if t else '—',

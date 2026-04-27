@@ -3837,6 +3837,7 @@ def executar_migracoes():
             (135, "Task #191 — tema do sistema (cor_header_nav, cor_fundo_app, tema_preset em configuracao_empresa)", migration_135_tema_sistema_configuracao_empresa),
             (137, "Task #176/#178 — backfill obras órfãs + DROP legacy cliente_*/engenheiro_* + obra.cliente_id NOT NULL", migration_137_drop_legacy_cliente_e_engenheiro),
             (138, "Task #162 — scrub de defaults legados em proposta_templates (Lucas Barbosa / São José dos Campos)", migration_138_scrub_proposta_templates_defaults),
+            (139, "Task #142 — rdo_apontamento_cronograma.percentual_planejado nullable + backfill NULL para tarefas sem plano", migration_139_apontamento_cronograma_planejado_nullable),
         ]
         
         # Executar cada migração com rastreamento
@@ -11515,6 +11516,110 @@ def migration_136_scrub_proposta_templates_defaults():
         return True
     except Exception as e:
         logger.error(f"Erro na migracao 136: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_139_apontamento_cronograma_planejado_nullable():
+    """Migration 139 (Task #142): torna `rdo_apontamento_cronograma.percentual_planejado`
+    nullable e faz backfill semântico — para apontamentos cuja TarefaCronograma
+    não tem `data_inicio` ou `duracao_dias` (calculáveis), o valor 0.0 legado é
+    convertido para NULL ("Sem plano"), distinguindo-o de 0% real.
+
+    - DDL: `ALTER COLUMN percentual_planejado DROP NOT NULL`
+    - DML: `UPDATE ... SET percentual_planejado = NULL` para tarefas sem plano.
+
+    Idempotente: se a coluna já é nullable, apenas refaz o backfill (no-op
+    quando todos os apontamentos sem plano já estão NULL).
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # Curto-circuito: tabela ausente em instalações novas (db.create_all
+        # já cria com nullable=True). Apenas registra e sai.
+        cursor.execute(
+            """
+            SELECT 1 FROM information_schema.tables
+             WHERE table_name = 'rdo_apontamento_cronograma'
+            """
+        )
+        if cursor.fetchone() is None:
+            logger.info(
+                "MIGRACAO 139: rdo_apontamento_cronograma ausente — pulando"
+            )
+            cursor.close()
+            connection.close()
+            return True
+
+        # 1) Garantir que a coluna existe e está nullable
+        cursor.execute(
+            """
+            SELECT is_nullable FROM information_schema.columns
+             WHERE table_name = 'rdo_apontamento_cronograma'
+               AND column_name = 'percentual_planejado'
+            """
+        )
+        row = cursor.fetchone()
+        if row is None:
+            logger.info(
+                "MIGRACAO 139: coluna percentual_planejado ausente — pulando"
+            )
+            cursor.close()
+            connection.close()
+            return True
+
+        already_nullable = (row[0] == 'YES')
+        if not already_nullable:
+            cursor.execute(
+                """
+                ALTER TABLE rdo_apontamento_cronograma
+                    ALTER COLUMN percentual_planejado DROP NOT NULL
+                """
+            )
+            logger.info(
+                "MIGRACAO 139: percentual_planejado agora aceita NULL"
+            )
+        else:
+            logger.info(
+                "MIGRACAO 139: percentual_planejado já nullable — sem ALTER"
+            )
+
+        # 2) Backfill: tarefas sem plano calculável → NULL
+        # Critério "sem plano" = data_inicio IS NULL OR duracao_dias IS NULL
+        # OR duracao_dias <= 0 (mesmo critério de calcular_progresso_rdo).
+        cursor.execute(
+            """
+            UPDATE rdo_apontamento_cronograma AS ap
+               SET percentual_planejado = NULL
+              FROM tarefa_cronograma AS t
+             WHERE ap.tarefa_cronograma_id = t.id
+               AND ap.percentual_planejado IS NOT NULL
+               AND (
+                    t.data_inicio IS NULL
+                 OR t.duracao_dias IS NULL
+                 OR t.duracao_dias <= 0
+               )
+            """
+        )
+        backfilled = cursor.rowcount or 0
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 139: backfill 'Sem plano' concluído (linhas=%s)",
+            backfilled,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 139: {e}")
         if connection:
             try:
                 connection.rollback()

@@ -4541,7 +4541,11 @@ class RDOApontamentoCronograma(db.Model):
     quantidade_executada_dia = db.Column(db.Float, default=0.0, nullable=False)
     quantidade_acumulada = db.Column(db.Float, default=0.0, nullable=False)
     percentual_realizado = db.Column(db.Float, default=0.0, nullable=False)
-    percentual_planejado = db.Column(db.Float, default=0.0, nullable=False)
+    # Task #142 — nullable: a coluna passa a aceitar NULL para sinalizar
+    # "tarefa sem plano calculável" (sem data_inicio/duração) em vez de
+    # confundir 0% real com 0% sem plano. A rota `apontar_producao` grava
+    # `None` direto quando `calcular_progresso_rdo` devolve `None`.
+    percentual_planejado = db.Column(db.Float, nullable=True)
     admin_id = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(

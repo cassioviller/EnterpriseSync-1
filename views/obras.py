@@ -1898,6 +1898,84 @@ def detalhes_obra(id):
         flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
         return redirect(url_for('main.obras'))
 
+@main_bp.route('/obras/<int:obra_id>/curva-avanco')
+@login_required
+def curva_avanco_obra(obra_id):
+    """Task #141 — Série temporal "planejado × realizado" da obra para o card
+    "Curva de avanço" no detalhes da obra (Chart.js).
+
+    Retorna 1 ponto por RDO finalizado (ordem cronológica), com:
+      - data: ISO yyyy-mm-dd da data_relatorio do RDO
+      - data_label: dd/mm/yyyy (para o eixo X do gráfico)
+      - planejado: % planejado da obra até a data do RDO (0..100)
+      - realizado: % realizado da obra até a data do RDO (0..100)
+      - rdo_id: id do RDO (para tooltip / drilldown futuro)
+
+    Tenancy: usa o mesmo critério de admin_id do `detalhes_obra` (acesso
+    cross-tenant restrito via filtro explícito por obra+admin_id).
+    """
+    try:
+        admin_id = None
+        if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
+            if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+                admin_id = None
+            elif current_user.tipo_usuario == TipoUsuario.ADMIN:
+                admin_id = current_user.id
+            else:
+                admin_id = current_user.admin_id
+
+        if admin_id is not None:
+            obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        else:
+            obra = Obra.query.filter_by(id=obra_id).first()
+        if not obra:
+            return jsonify({'status': 'error', 'msg': 'Obra não encontrada'}), 404
+
+        admin_id_obra = obra.admin_id
+
+        rdos_finalizados = (
+            RDO.query
+            .filter(
+                RDO.obra_id == obra_id,
+                RDO.admin_id == admin_id_obra,
+                RDO.status == 'Finalizado',
+                RDO.data_relatorio.isnot(None),
+            )
+            .order_by(RDO.data_relatorio.asc(), RDO.id.asc())
+            .all()
+        )
+
+        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+
+        pontos = []
+        # Cache por data — múltiplos RDOs no mesmo dia compartilham resultado.
+        cache_data: dict = {}
+        for rdo in rdos_finalizados:
+            d = rdo.data_relatorio
+            if d not in cache_data:
+                cache_data[d] = calcular_progresso_geral_obra_v2(
+                    obra_id, d, admin_id_obra
+                )
+            agg = cache_data[d]
+            pontos.append({
+                'rdo_id': rdo.id,
+                'data': d.isoformat(),
+                'data_label': d.strftime('%d/%m/%Y'),
+                'planejado': float(agg.get('progresso_planejado_pct') or 0.0),
+                'realizado': float(agg.get('progresso_geral_pct') or 0.0),
+            })
+
+        return jsonify({
+            'status': 'ok',
+            'obra_id': obra_id,
+            'pontos': pontos,
+            'total_rdos_finalizados': len(pontos),
+        })
+    except Exception as e:
+        logger.error(f"[curva_avanco_obra] obra_id={obra_id}: {e}")
+        return jsonify({'status': 'error', 'msg': str(e)}), 500
+
+
 @main_bp.route('/obras/<int:obra_id>/compras/nova', methods=['POST'])
 @login_required
 @admin_required

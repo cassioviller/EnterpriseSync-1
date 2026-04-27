@@ -452,6 +452,10 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
 
     Returns dict:
       - progresso_geral_pct: float 0..100 (0 quando a obra não tem tarefas)
+      - progresso_planejado_pct: float 0..100 (Task #141 — planejado da obra
+        à data_ref, mesma média ponderada usando `percentual_planejado`).
+        Tarefas "Sem plano" contam como 0 no agregado planejado (consistente
+        com o comportamento de "realizado" para tarefas sem apontamento).
       - n_tarefas: int (folhas consideradas)
       - n_tarefas_apontadas: int (folhas com pelo menos 1 apontamento até data_ref)
     """
@@ -464,21 +468,34 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
         .all()
     )
     if not folhas:
-        return {'progresso_geral_pct': 0.0, 'n_tarefas': 0, 'n_tarefas_apontadas': 0}
+        return {
+            'progresso_geral_pct': 0.0,
+            'progresso_planejado_pct': 0.0,
+            'n_tarefas': 0,
+            'n_tarefas_apontadas': 0,
+        }
 
     # Identificar IDs de tarefas-pai (que aparecem como tarefa_pai_id em outras)
     pais_ids = {t.tarefa_pai_id for t in folhas if t.tarefa_pai_id}
     folhas_efetivas = [t for t in folhas if t.id not in pais_ids]
     if not folhas_efetivas:
-        return {'progresso_geral_pct': 0.0, 'n_tarefas': 0, 'n_tarefas_apontadas': 0}
+        return {
+            'progresso_geral_pct': 0.0,
+            'progresso_planejado_pct': 0.0,
+            'n_tarefas': 0,
+            'n_tarefas_apontadas': 0,
+        }
 
-    soma_ponderada = 0.0
+    soma_real = 0.0
+    soma_plan = 0.0
     soma_pesos = 0.0
     n_apontadas = 0
 
     for t in folhas_efetivas:
         prog = calcular_progresso_rdo(t.id, data_ref, admin_id)
         perc_real = float(prog.get('percentual_realizado') or 0.0)
+        # Sem plano calculável conta como 0 no agregado planejado.
+        perc_plan = float(prog.get('percentual_planejado') or 0.0)
 
         # Escolha do peso (ver docstring acima)
         if t.quantidade_total and float(t.quantidade_total) > 0:
@@ -488,14 +505,17 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
         else:
             peso = 1.0
 
-        soma_ponderada += perc_real * peso
+        soma_real += perc_real * peso
+        soma_plan += perc_plan * peso
         soma_pesos += peso
         if (prog.get('quantidade_acumulada') or 0) > 0:
             n_apontadas += 1
 
-    progresso = (soma_ponderada / soma_pesos) if soma_pesos > 0 else 0.0
+    progresso = (soma_real / soma_pesos) if soma_pesos > 0 else 0.0
+    planejado = (soma_plan / soma_pesos) if soma_pesos > 0 else 0.0
     return {
         'progresso_geral_pct': round(progresso, 1),
+        'progresso_planejado_pct': round(planejado, 1),
         'n_tarefas': len(folhas_efetivas),
         'n_tarefas_apontadas': n_apontadas,
     }
