@@ -261,7 +261,11 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
+{# Task #213: bloco renomeado de `extra_js` para `scripts` — base_completo.html
+   só renderiza `{% block scripts %}`. Este JS é crítico (formatadores BR$,
+   adicionar/remover linhas de serviço, máscara de telefone, recálculo do
+   total) — sem ele, nenhuma operação no formulário funciona. #}
 <script>
 // Task #181 — formatador pt-BR para R$.
 const _BRL_FMT_PF = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
