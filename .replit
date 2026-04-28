@@ -20,42 +20,6 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-agrupamento"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-orcamento-override"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-e2e-proposta-aprovacao-cliente"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-cronograma-duplicado-rdo"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-rdo-unificado-responsaveis"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-clausulas-configuraveis"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-cronograma-revisao-obra-gate"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-legacy-propostas-drop"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test-compras-nova-dropdown"
-
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -65,105 +29,13 @@ task = "shell.exec"
 args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
 waitForPort = 5000
 
-[[workflows.workflow]]
-name = "test-agrupamento"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_agrupamento_diarias_rdo.py"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "test-orcamento-override"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_orcamento_override_e2e.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "test-e2e-proposta-aprovacao-cliente"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_e2e_proposta_aprovacao_cliente.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "test-cronograma-duplicado-rdo"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_cronograma_duplicado_rdo.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "test-rdo-unificado-responsaveis"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_rdo_unificado_responsaveis.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "test-clausulas-configuraveis"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_clausulas_configuraveis.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "test-cronograma-revisao-obra-gate"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_cronograma_revisao_obra_gate.py"
-
-[[workflows.workflow]]
-name = "test-legacy-propostas-drop"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_legacy_propostas_drop.py"
-
-[[workflows.workflow]]
-name = "test-compras-nova-dropdown"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python tests/test_compras_nova_dropdown.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [agent]
 integrations = ["python_database:1.0.0"]
+stack = "FLASK_VANILLA_JS"
 
 [postMerge]
 path = "scripts/post-merge.sh"

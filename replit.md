@@ -49,13 +49,20 @@ The system utilizes a Flask backend with SQLAlchemy ORM, a PostgreSQL database, 
     -   **Single Proposta Model:** Consolidated proposal data into a single `Proposta` model, dropping several legacy tables after data backup.
     -   **Initial Schedule Review on Obra:** Implemented a two-state visit gate for newly created `Obra` instances, requiring administrative review of the initial schedule before full project access. Includes a reset mechanism and backfill for existing production data.
 
+## Replit Environment Notes
+- **Runtime:** Python 3.11 with gunicorn served via `.pythonlibs/bin/gunicorn`
+- **Database:** Replit built-in PostgreSQL (via `DATABASE_URL` pointing to `helium`)
+- **Auth:** Custom Flask-Login (no external auth provider)
+- **Session Secret:** Stored in `SESSION_SECRET` environment variable
+- **Run command:** `.pythonlibs/bin/gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app`
+- **Added models:** `ManutencaoVeiculo` and `RdoAtividade` (legacy stub) to fix missing FK targets in `models.py`
+
 ## External Dependencies
 -   **Flask:** Web framework.
 -   **SQLAlchemy:** Object Relational Mapper (ORM).
 -   **PostgreSQL:** Relational database management system.
 -   **Bootstrap:** Frontend framework.
 -   **Jinja2:** Python templating language.
--   **Docker:** Containerization platform.
 -   **Sortable.js:** JavaScript library for drag-and-drop.
 -   **python-dateutil:** Date/time utilities.
 -   **DeepFace:** Facial recognition library.

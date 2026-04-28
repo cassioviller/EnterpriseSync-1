@@ -1073,6 +1073,36 @@ class AlimentacaoLancamentoItem(db.Model):
     centro_custo = db.relationship('CentroCusto', backref='despesas_alimentacao', foreign_keys=[centro_custo_id])
 
 
+class ManutencaoVeiculo(db.Model):
+    """Registro de manutenções realizadas em veículos"""
+    __tablename__ = 'manutencao_veiculo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
+
+    data_manutencao = db.Column(db.Date, nullable=False)
+    tipo_manutencao = db.Column(db.String(50), nullable=False)
+    descricao = db.Column(db.Text)
+    fornecedor = db.Column(db.String(200))
+    valor = db.Column(db.Numeric(10, 2), default=0.0)
+    km_veiculo = db.Column(db.Integer)
+    proxima_manutencao_km = db.Column(db.Integer)
+    proxima_manutencao_data = db.Column(db.Date)
+    numero_nota_fiscal = db.Column(db.String(50))
+    status = db.Column(db.String(20), default='Concluída')
+    observacoes = db.Column(db.Text)
+
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    veiculo = db.relationship('Veiculo', backref='manutencoes')
+    admin = db.relationship('Usuario', backref='manutencoes_veiculo_admin')
+
+    def __repr__(self):
+        return f'<ManutencaoVeiculo {self.tipo_manutencao} - {self.data_manutencao}>'
+
+
 class DocumentoFiscal(db.Model):
     """Controle de documentos fiscais relacionados a veículos"""
     __tablename__ = 'documento_fiscal'
@@ -2228,6 +2258,25 @@ class ParametrosLegais(db.Model):
         """Limpa cache de parâmetros legais (usar ao criar/editar)"""
         ParametrosLegais.get_parametros_cached.cache_clear()
         logger.info("[SYNC] Cache de ParametrosLegais invalidado")
+
+
+# ================================
+# RDO ATIVIDADE - MODELO LEGADO (mantido para compatibilidade de FK)
+# ================================
+
+class RdoAtividade(db.Model):
+    """Modelo legado de atividades de RDO - mantido apenas para compatibilidade de chave estrangeira"""
+    __tablename__ = 'rdo_atividade'
+
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'), nullable=True)
+    descricao = db.Column(db.Text)
+    status = db.Column(db.String(20), default='Em andamento')
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<RdoAtividade {self.id}>'
 
 
 # ================================
