@@ -159,6 +159,15 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
         _materializar_cronograma_se_houver()
         return
 
+    # Garantir plano de contas antes de inserir PartidaContabil (FK constraint).
+    # seed_plano_contas_if_needed usa flush (não commit) para não quebrar a
+    # transação atômica gerenciada pela rota chamadora.
+    try:
+        from contabilidade_utils import seed_plano_contas_if_needed
+        seed_plano_contas_if_needed(admin_id)
+    except Exception as _se:
+        logger.warning(f"[WARN] seed_plano_contas_if_needed falhou (proposta {proposta_id}): {_se}")
+
     # 1. Criar lançamento contábil
     lancamento = LancamentoContabil(
         numero=gerar_numero_lancamento(admin_id),

@@ -1460,26 +1460,42 @@ MAPEAMENTO_CONTABIL = {
 # Nomes adaptados para os módulos V2 (alimentação, transporte, folha, compras).
 _V2_CONTAS_SEED = [
     # (codigo, nome, tipo_conta, natureza, nivel, conta_pai_codigo, aceita_lancamento)
-    ('1',          'ATIVO',                    'ATIVO',   'DEVEDORA', 1, None,     False),
-    ('1.1',        'ATIVO CIRCULANTE',         'ATIVO',   'DEVEDORA', 2, '1',      False),
-    ('1.1.01',     'DISPONÍVEL',               'ATIVO',   'DEVEDORA', 3, '1.1',    False),
-    ('1.1.03',     'ESTOQUES',                 'ATIVO',   'DEVEDORA', 3, '1.1',    False),
-    ('2',          'PASSIVO',                  'PASSIVO', 'CREDORA',  1, None,     False),
-    ('2.1',        'PASSIVO CIRCULANTE',       'PASSIVO', 'CREDORA',  2, '2',      False),
-    ('2.1.01',     'FORNECEDORES',             'PASSIVO', 'CREDORA',  3, '2.1',    False),
-    ('2.1.02',     'OBRIGAÇÕES TRABALHISTAS',  'PASSIVO', 'CREDORA',  3, '2.1',    False),
-    ('6',          'DESPESAS',                 'DESPESA', 'DEVEDORA', 1, None,     False),
-    ('6.1',        'DESPESAS OPERACIONAIS',    'DESPESA', 'DEVEDORA', 2, '6',      False),
-    ('6.1.01',     'DESPESAS COM PESSOAL',     'DESPESA', 'DEVEDORA', 3, '6.1',    False),
-    ('6.1.02',     'DESPESAS GERAIS',          'DESPESA', 'DEVEDORA', 3, '6.1',    False),
-    ('1.1.01.001', 'Caixa Geral',              'ATIVO',   'DEVEDORA', 4, '1.1.01', True),
-    ('1.1.01.002', 'Bancos Conta Movimento',   'ATIVO',   'DEVEDORA', 4, '1.1.01', True),
-    ('1.1.03.001', 'Estoque de Materiais',     'ATIVO',   'DEVEDORA', 4, '1.1.03', True),
-    ('2.1.01.001', 'Fornecedores a Pagar',     'PASSIVO', 'CREDORA',  4, '2.1.01', True),
-    ('2.1.02.001', 'Salários a Pagar',         'PASSIVO', 'CREDORA',  4, '2.1.02', True),
-    ('6.1.01.001', 'Despesa com Salários',     'DESPESA', 'DEVEDORA', 4, '6.1.01', True),
-    ('6.1.01.002', 'Despesa com Alimentação',  'DESPESA', 'DEVEDORA', 4, '6.1.01', True),
-    ('6.1.02.002', 'Despesa com Transporte',   'DESPESA', 'DEVEDORA', 4, '6.1.02', True),
+    # Nível 1 — raízes (sem pai)
+    ('1',          'ATIVO',                        'ATIVO',    'DEVEDORA', 1, None,      False),
+    ('2',          'PASSIVO',                      'PASSIVO',  'CREDORA',  1, None,      False),
+    ('4',          'RECEITAS',                     'RECEITA',  'CREDORA',  1, None,      False),
+    ('6',          'DESPESAS',                     'DESPESA',  'DEVEDORA', 1, None,      False),
+    # Nível 2
+    ('1.1',        'ATIVO CIRCULANTE',             'ATIVO',    'DEVEDORA', 2, '1',       False),
+    ('2.1',        'PASSIVO CIRCULANTE',           'PASSIVO',  'CREDORA',  2, '2',       False),
+    ('4.1',        'RECEITA BRUTA',                'RECEITA',  'CREDORA',  2, '4',       False),
+    ('6.1',        'DESPESAS OPERACIONAIS',        'DESPESA',  'DEVEDORA', 2, '6',       False),
+    # Nível 3
+    ('1.1.01',     'DISPONÍVEL',                   'ATIVO',    'DEVEDORA', 3, '1.1',     False),
+    ('1.1.02',     'CONTAS A RECEBER',             'ATIVO',    'DEVEDORA', 3, '1.1',     False),
+    ('1.1.03',     'ESTOQUES',                     'ATIVO',    'DEVEDORA', 3, '1.1',     False),
+    ('2.1.01',     'FORNECEDORES',                 'PASSIVO',  'CREDORA',  3, '2.1',     False),
+    ('2.1.02',     'OBRIGAÇÕES TRABALHISTAS',      'PASSIVO',  'CREDORA',  3, '2.1',     False),
+    ('2.1.03',     'OBRIGAÇÕES FISCAIS',           'PASSIVO',  'CREDORA',  3, '2.1',     False),
+    ('4.1.01',     'RECEITA DE SERVIÇOS',          'RECEITA',  'CREDORA',  3, '4.1',     False),
+    ('6.1.01',     'DESPESAS COM PESSOAL',         'DESPESA',  'DEVEDORA', 3, '6.1',     False),
+    ('6.1.02',     'DESPESAS GERAIS',              'DESPESA',  'DEVEDORA', 3, '6.1',     False),
+    # Nível 4
+    ('1.1.01.001', 'Caixa Geral',                  'ATIVO',    'DEVEDORA', 4, '1.1.01',  True),
+    ('1.1.01.002', 'Bancos Conta Movimento',       'ATIVO',    'DEVEDORA', 4, '1.1.01',  True),
+    ('1.1.02.001', 'Clientes',                     'ATIVO',    'DEVEDORA', 4, '1.1.02',  True),
+    ('1.1.03.001', 'Estoque de Materiais',         'ATIVO',    'DEVEDORA', 4, '1.1.03',  True),
+    ('2.1.01.001', 'Fornecedores a Pagar',         'PASSIVO',  'CREDORA',  4, '2.1.01',  True),
+    ('2.1.02.001', 'Salários a Pagar',             'PASSIVO',  'CREDORA',  4, '2.1.02',  True),
+    ('2.1.02.002', 'INSS a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.02',  True),
+    ('2.1.02.003', 'FGTS a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.02',  True),
+    ('2.1.03.001', 'IRRF a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.03',  True),
+    ('4.1.01.001', 'Receita de Serviços',          'RECEITA',  'CREDORA',  4, '4.1.01',  True),
+    ('6.1.01.001', 'Despesa com Salários',         'DESPESA',  'DEVEDORA', 4, '6.1.01',  True),
+    ('6.1.01.002', 'Despesa com Alimentação',      'DESPESA',  'DEVEDORA', 4, '6.1.01',  True),
+    ('6.1.02.001', 'Despesa com Combustível',      'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
+    ('6.1.02.002', 'Despesa com Transporte',       'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
+    ('6.1.02.003', 'Despesa com Material',         'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
 ]
 
 _v2_seeded_admins: set = set()
@@ -1511,14 +1527,14 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
                 VALUES
                     (:codigo, :nome, :tipo, :natureza, :nivel,
                      :pai, :aceita, true, :aid)
-                ON CONFLICT ON CONSTRAINT plano_contas_codigo_admin_unique DO NOTHING
+                ON CONFLICT (codigo) DO NOTHING
             """), {
                 'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
                 'natureza': natureza, 'nivel': nivel, 'pai': pai,
                 'aceita': aceita, 'aid': admin_id,
             })
 
-        db.session.commit()
+        db.session.flush()
         _v2_seeded_admins.add(admin_id)
         PlanoContas.invalidar_cache()
         logger.info(
@@ -1528,10 +1544,6 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
 
     except Exception as e:
         logger.error(f"[ERROR] seed_plano_contas_if_needed admin={admin_id}: {e}")
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
 
 
 def gerar_lancamento_contabil_automatico(
