@@ -282,9 +282,9 @@ def servico_vincular_template(servico_id):
     """Vincula ou desvincula um template de cronograma padrão ao serviço."""
     aid = _admin_id()
     svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
-    template_id = request.form.get('template_padrao_id', '').strip()
+    template_id = request.form.get('template_padrao_id', type=int)
     if template_id:
-        tmpl = CronogramaTemplate.query.filter_by(id=int(template_id), admin_id=aid).first()
+        tmpl = CronogramaTemplate.query.filter_by(id=template_id, admin_id=aid, ativo=True).first()
         if not tmpl:
             flash('Template não encontrado.', 'error')
             return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
