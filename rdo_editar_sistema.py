@@ -348,7 +348,7 @@ def salvar_edicao_rdo(rdo_id):
         # que a normalização (utils/rdo_horas) considere o conjunto de
         # atividades em que cada funcionário aparece — ex.: 8h em 3
         # subatividades vira 8/3h por subatividade, não 24h fictícias.
-        entradas_brutas = []  # (func_id, ('sub', sub_mestre_id), horas)
+        entradas_brutas = []  # (func_id, ('sub', sub_mestre_id), horas, horas_extras)
         for campo, valor in request.form.items():
             m = _sub_func_pattern.match(campo)
             if m and valor:
@@ -360,8 +360,15 @@ def salvar_edicao_rdo(rdo_id):
                     continue
                 if horas_trabalhadas <= 0:
                     continue
+                extras_field = request.form.get(
+                    f'sub_func_{sub_mestre_id}_{func_id}_horas_extras', ''
+                )
+                try:
+                    extras = float(extras_field) if extras_field else 0.0
+                except (ValueError, TypeError):
+                    extras = 0.0
                 entradas_brutas.append(
-                    (func_id, ('sub', sub_mestre_id), horas_trabalhadas)
+                    (func_id, ('sub', sub_mestre_id), horas_trabalhadas, max(0.0, extras))
                 )
 
         entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
@@ -369,7 +376,7 @@ def salvar_edicao_rdo(rdo_id):
         # Processar vínculos per-subatividade (sub_func_{sub_mestre_id}_{func_id}_horas)
         func_ids_vinculados = set()
         funcionarios_salvos = 0
-        for func_id, atividade_key, horas_trabalhadas in entradas_normalizadas:
+        for func_id, atividade_key, horas_trabalhadas, horas_extras_norm in entradas_normalizadas:
             _, sub_mestre_id = atividade_key
             funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
             if funcionario:
@@ -380,13 +387,14 @@ def salvar_edicao_rdo(rdo_id):
                     funcionario_id=func_id,
                     funcao_exercida=funcao_exercida,
                     horas_trabalhadas=horas_trabalhadas,
+                    horas_extras=horas_extras_norm,
                     admin_id=admin_id,
                     subatividade_id=sub_db_id,
                 )
                 db.session.add(rdo_funcionario)
                 func_ids_vinculados.add(func_id)
                 funcionarios_salvos += 1
-                logger.info(f"✅ Funcionário por subatividade: {funcionario.nome} → sub_mestre={sub_mestre_id} sub_db={sub_db_id} {horas_trabalhadas:.2f}h")
+                logger.info(f"✅ Funcionário por subatividade: {funcionario.nome} → sub_mestre={sub_mestre_id} sub_db={sub_db_id} {horas_trabalhadas:.2f}h (extras {horas_extras_norm:.2f}h)")
 
         # Processar funcionários sem vínculo de subatividade (campos horas_{func_id})
         for func_id in funcionarios_selecionados:

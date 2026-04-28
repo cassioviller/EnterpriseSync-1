@@ -310,28 +310,50 @@ def salvar_rdo():
                     logger.error(f"Erro ao processar subatividade {key}: {e}")
         
         # Processar funcionários
-        funcionarios_salvos = 0
+        # Aplica utils.rdo_horas.normalizar_horas_funcionario por consistência
+        # com os demais fluxos. Como este formulário emite uma única chave
+        # `funcionario_{id}_horas` por funcionário (não há dimensão de
+        # subatividade), a normalização é efetivamente no-op (N=1 por
+        # funcionário), mas garante o mesmo comportamento defensivo se a
+        # chave passar a se repetir no futuro.
+        from utils.rdo_horas import normalizar_horas_funcionario
+        entradas_brutas = []  # (func_id, ('flat', func_id), horas, horas_extras)
         for key, value in request.form.items():
             if key.startswith('funcionario_') and key.endswith('_horas'):
                 try:
                     funcionario_id = int(key.split('_')[1])
                     horas = float(value) if value else 0
-                    
-                    if horas > 0:
-                        funcionario = Funcionario.query.get(funcionario_id)
-                        if funcionario:
-                            mao_obra = RDOMaoObra(
-                                rdo_id=rdo.id,
-                                funcionario_id=funcionario_id,
-                                funcao_exercida=funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral',
-                                horas_trabalhadas=horas,
-                                admin_id=admin_id
-                            )
-                            db.session.add(mao_obra)
-                            funcionarios_salvos += 1
-                            
                 except (ValueError, IndexError) as e:
                     logger.error(f"Erro ao processar funcionário {key}: {e}")
+                    continue
+                if horas <= 0:
+                    continue
+                extras_field = request.form.get(
+                    f'funcionario_{funcionario_id}_horas_extras', ''
+                )
+                try:
+                    extras = float(extras_field) if extras_field else 0.0
+                except (ValueError, TypeError):
+                    extras = 0.0
+                entradas_brutas.append(
+                    (funcionario_id, ('flat', funcionario_id), horas, max(0.0, extras))
+                )
+
+        entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
+        funcionarios_salvos = 0
+        for func_id_n, _key, horas_n, extras_n in entradas_normalizadas:
+            funcionario = Funcionario.query.get(func_id_n)
+            if funcionario:
+                mao_obra = RDOMaoObra(
+                    rdo_id=rdo.id,
+                    funcionario_id=func_id_n,
+                    funcao_exercida=funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral',
+                    horas_trabalhadas=horas_n,
+                    horas_extras=extras_n,
+                    admin_id=admin_id
+                )
+                db.session.add(mao_obra)
+                funcionarios_salvos += 1
         
         # Processar equipamentos
         equipamentos_json = request.form.get('equipamentos', '[]')
