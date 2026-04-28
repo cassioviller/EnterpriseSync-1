@@ -82,7 +82,7 @@
         }
         .obra-info strong { color: var(--text); font-weight: 600; }
 
-        /* ── Cronograma ──────────────────────────────────────────── */
+        /* ── Cronograma (árvore: serviço → grupo → subatividade) ─── */
         .timeline { display: flex; flex-direction: column; }
         .timeline-row {
             display: flex;
@@ -95,7 +95,11 @@
         .timeline-name {
             flex: 1;
             min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        .timeline-name .label { flex: 1; min-width: 0; }
         .timeline-name .nome { font-weight: 500; color: var(--text); font-size: .92rem; }
         .timeline-name .periodo {
             font-size: .76rem;
@@ -123,6 +127,48 @@
             font-variant-numeric: tabular-nums;
             font-size: .9rem;
         }
+        /* Hierarquia da árvore: usa <details>/<summary> para collapse nativo */
+        .cron-node { border-bottom: 1px solid var(--border-soft); }
+        .cron-node:last-child { border-bottom: none; }
+        .cron-node > summary {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 18px;
+            user-select: none;
+        }
+        .cron-node > summary::-webkit-details-marker { display: none; }
+        .cron-node > summary:hover { background: var(--surface-2, rgba(0,0,0,.02)); }
+        .cron-caret {
+            width: 16px;
+            text-align: center;
+            color: var(--text-muted);
+            transition: transform .15s ease;
+            flex-shrink: 0;
+            font-size: .8rem;
+        }
+        .cron-node[open] > summary .cron-caret { transform: rotate(90deg); }
+        .cron-leaf-spacer { width: 16px; flex-shrink: 0; }
+        /* Indentação por nível (servico=0, grupo=1, subatividade=2+) */
+        .cron-children > .cron-node > summary,
+        .cron-children > .cron-row {
+            padding-left: 36px;
+        }
+        .cron-children .cron-children > .cron-node > summary,
+        .cron-children .cron-children > .cron-row {
+            padding-left: 56px;
+        }
+        .cron-children .cron-children .cron-children > .cron-node > summary,
+        .cron-children .cron-children .cron-children > .cron-row {
+            padding-left: 76px;
+        }
+        /* Tipografia por nível */
+        .cron-node[data-level="0"] > summary .nome { font-weight: 700; font-size: .98rem; }
+        .cron-node[data-level="1"] > summary .nome { font-weight: 600; font-size: .92rem; color: var(--text); }
+        .cron-row { display: flex; align-items: center; gap: 14px; padding: 10px 18px; }
+        .cron-row .nome { font-weight: 500; font-size: .9rem; }
 
         /* ── Linhas de compra / medição / RDO ───────────────────── */
         .row-list { display: flex; flex-direction: column; }
@@ -555,6 +601,55 @@
 </section>
 
 <!-- Cronograma ──────────────────────────────────────────────── -->
+{# Renderiza recursivamente um nó (serviço/grupo/subatividade) e seus filhos. #}
+{% macro render_cron_node(node, level=0) -%}
+{%- set pc = node.percentual_apresentacao or 0 -%}
+{%- if node.filhos -%}
+<details class="cron-node" data-level="{{ level }}" {% if level < 2 %}open{% endif %}>
+    <summary>
+        <span class="cron-caret"><i class="fas fa-chevron-right"></i></span>
+        <div class="timeline-name">
+            <div class="label">
+                <div class="nome">{{ node.nome_tarefa }}</div>
+                {% if node.data_inicio_apresentacao and node.data_fim_apresentacao %}
+                <div class="periodo">{{ node.data_inicio_apresentacao.strftime('%d/%m/%Y') }} → {{ node.data_fim_apresentacao.strftime('%d/%m/%Y') }}</div>
+                {% elif node.data_inicio_apresentacao %}
+                <div class="periodo">Início: {{ node.data_inicio_apresentacao.strftime('%d/%m/%Y') }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="timeline-bar">
+            <span style="width:{{ pc }}%;background:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#f59e0b{% endif %};"></span>
+        </div>
+        <div class="timeline-perc" style="color:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#d97706{% endif %}">{{ pc|round(1) }}%</div>
+    </summary>
+    <div class="cron-children">
+        {% for filho in node.filhos %}
+            {{ render_cron_node(filho, level + 1) }}
+        {% endfor %}
+    </div>
+</details>
+{%- else -%}
+<div class="cron-row" data-level="{{ level }}">
+    <span class="cron-leaf-spacer"></span>
+    <div class="timeline-name">
+        <div class="label">
+            <div class="nome">{{ node.nome_tarefa }}</div>
+            {% if node.data_inicio_apresentacao and node.data_fim_apresentacao %}
+            <div class="periodo">{{ node.data_inicio_apresentacao.strftime('%d/%m/%Y') }} → {{ node.data_fim_apresentacao.strftime('%d/%m/%Y') }}</div>
+            {% elif node.data_inicio_apresentacao %}
+            <div class="periodo">Início: {{ node.data_inicio_apresentacao.strftime('%d/%m/%Y') }}</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="timeline-bar">
+        <span style="width:{{ pc }}%;background:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#f59e0b{% endif %};"></span>
+    </div>
+    <div class="timeline-perc" style="color:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#d97706{% endif %}">{{ pc|round(1) }}%</div>
+</div>
+{%- endif -%}
+{%- endmacro %}
+
 <section class="section">
     <div class="section-head">
         <span class="section-icon"><i class="fas fa-tasks"></i></span>
@@ -564,18 +659,25 @@
         {% endif %}
     </div>
     <div class="card-portal">
-        {% if cronograma_cliente %}
+        {% if cronograma_cliente_tree %}
+        <div class="timeline">
+            {% for raiz in cronograma_cliente_tree %}
+                {{ render_cron_node(raiz, 0) }}
+            {% endfor %}
+        </div>
+        {% elif cronograma_cliente %}
+        {# Fallback para dados sem hierarquia (compat retroativa) #}
         <div class="timeline">
             {% for t in cronograma_cliente %}
-            {% set pc = t.percentual_apresentacao or 0 %}
+            {% set pc = (t.percentual_concluido if t.percentual_concluido is defined else t.percentual_apresentacao) or 0 %}
             <div class="timeline-row">
                 <div class="timeline-name">
-                    <div class="nome">{{ t.nome_tarefa }}</div>
-                    {% if t.data_inicio_apresentacao and t.data_fim_apresentacao %}
-                    <div class="periodo">{{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }} → {{ t.data_fim_apresentacao.strftime('%d/%m/%Y') }}</div>
-                    {% elif t.data_inicio_apresentacao %}
-                    <div class="periodo">Início: {{ t.data_inicio_apresentacao.strftime('%d/%m/%Y') }}</div>
-                    {% endif %}
+                    <div class="label">
+                        <div class="nome">{{ t.nome_tarefa }}</div>
+                        {% if t.data_inicio and t.data_fim %}
+                        <div class="periodo">{{ t.data_inicio.strftime('%d/%m/%Y') }} → {{ t.data_fim.strftime('%d/%m/%Y') }}</div>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="timeline-bar">
                     <span style="width:{{ pc }}%;background:{% if pc >= 100 %}var(--success){% elif pc >= 50 %}var(--brand){% else %}#f59e0b{% endif %};"></span>

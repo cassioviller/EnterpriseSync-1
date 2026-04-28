@@ -98,9 +98,9 @@ def portal_obra(token: str):
         perc_geral = 0.0
 
     # Cronograma do cliente: agora vive em TarefaCronograma com is_cliente=True
-    # (migration #117). Mapeamos os nomes de campo para o formato que o template
-    # do portal espera (percentual_apresentacao / data_inicio_apresentacao /
-    # data_fim_apresentacao) usando SimpleNamespace.
+    # (migration #117). Constrói a árvore hierárquica (serviço → grupo →
+    # subatividade) usando tarefa_pai_id e a expõe ao template já agrupada
+    # para renderização com <details>/<summary> (collapse nativo).
     from types import SimpleNamespace
     _tarefas_cliente = (
         TarefaCronograma.query
@@ -108,17 +108,29 @@ def portal_obra(token: str):
         .order_by(TarefaCronograma.ordem)
         .all()
     )
-    cronograma_cliente = [
-        SimpleNamespace(
+
+    def _make_node(t):
+        return SimpleNamespace(
             id=t.id,
+            tarefa_pai_id=t.tarefa_pai_id,
             nome_tarefa=t.nome_tarefa,
             percentual_apresentacao=t.percentual_concluido or 0.0,
             data_inicio_apresentacao=t.data_inicio,
             data_fim_apresentacao=t.data_fim,
             ordem=t.ordem,
+            filhos=[],
         )
-        for t in _tarefas_cliente
-    ]
+
+    _nodes_by_id = {t.id: _make_node(t) for t in _tarefas_cliente}
+    cronograma_cliente_tree = []
+    for t in _tarefas_cliente:
+        node = _nodes_by_id[t.id]
+        if t.tarefa_pai_id and t.tarefa_pai_id in _nodes_by_id:
+            _nodes_by_id[t.tarefa_pai_id].filhos.append(node)
+        else:
+            cronograma_cliente_tree.append(node)
+    # Total de tarefas (folhas + nós) para o counter da seção; mantém compat.
+    cronograma_cliente = list(_tarefas_cliente)
 
     compras_pendentes = (
         PedidoCompra.query
@@ -274,6 +286,7 @@ def portal_obra(token: str):
         obra=obra,
         tarefas=tarefas,
         cronograma_cliente=cronograma_cliente,
+        cronograma_cliente_tree=cronograma_cliente_tree,
         perc_geral=round(perc_geral, 1),
         compras_pendentes=compras_pendentes,
         compras_resolvidas=compras_resolvidas,
