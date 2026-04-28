@@ -1137,13 +1137,13 @@ console.log('Initializing RDO view with light theme...');
                 <div class="info-header-icon">
                     <i class="fas fa-users"></i>
                 </div>
-                <h3>Mão de Obra ({{ total_funcionarios }} funcionários)</h3>
+                <h3>Mão de Obra ({{ total_funcionarios }} funcionário{{ 's' if total_funcionarios != 1 else '' }})</h3>
             </div>
             <div class="funcionarios-grid">
                 {% for funcionario in funcionarios %}
                 <div class="funcionario-card">
                     <div class="funcionario-avatar">
-                        {% if funcionario.funcionario.foto %}
+                        {% if funcionario.funcionario and funcionario.funcionario.foto %}
                             <img src="{{ funcionario.funcionario.foto }}" alt="{{ funcionario.funcionario.nome }}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
                         {% else %}
                             <i class="fas fa-user"></i>
@@ -1155,6 +1155,23 @@ console.log('Initializing RDO view with light theme...');
                         <i class="fas fa-clock"></i>
                         <span>{{ "%.1f"|format(funcionario.horas_trabalhadas) }}h</span>
                     </div>
+                    {% if funcionario.atividades %}
+                    <div class="funcionario-atividades mt-2 w-100" style="text-align: left;">
+                        <small class="text-muted d-block mb-1" style="font-weight: 600;">
+                            <i class="fas fa-list-ul"></i>
+                            {{ funcionario.atividades|length }} atividade{{ 's' if funcionario.atividades|length != 1 else '' }}
+                        </small>
+                        <ul class="list-unstyled mb-0" style="font-size: 0.82rem; padding-left: 0.25rem;">
+                            {% for a in funcionario.atividades %}
+                            <li class="text-truncate" title="{{ a.nome }} ({{ '%.2f'|format(a.horas) }}h)">
+                                <i class="fas fa-angle-right text-muted"></i>
+                                {{ a.nome }}
+                                <span class="text-muted">({{ "%.2f"|format(a.horas) }}h)</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>

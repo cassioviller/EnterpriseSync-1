@@ -787,10 +787,47 @@ def visualizar_rdo(id):
         # Buscar subatividades do RDO (sem relacionamentos problemáticos)
         subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
         
-        # Buscar mão de obra com relacionamentos
-        funcionarios = RDOMaoObra.query.options(
-            db.joinedload(RDOMaoObra.funcionario)
+        # Buscar mão de obra com relacionamentos (subatividade + tarefa
+        # do cronograma para que possamos exibir o nome da atividade
+        # ao lado das horas).
+        mao_obra_rows = RDOMaoObra.query.options(
+            db.joinedload(RDOMaoObra.funcionario),
+            db.joinedload(RDOMaoObra.subatividade),
+            db.joinedload(RDOMaoObra.tarefa_cronograma),
         ).filter_by(rdo_id=rdo.id).all()
+
+        # Agrupar por funcionário: 1 card por pessoa, com a lista de
+        # atividades em que ele aparece. Quando o mesmo funcionário
+        # consta em N atividades (subativ ou tarefa cronograma), as
+        # horas são SOMADAS — como o salvamento já normaliza
+        # (utils/rdo_horas), o total bate com a jornada-base do dia.
+        funcionarios_dict = {}
+        for mo in mao_obra_rows:
+            if not mo.funcionario_id:
+                continue
+            entry = funcionarios_dict.setdefault(mo.funcionario_id, {
+                'funcionario': mo.funcionario,
+                'horas_trabalhadas': 0.0,
+                'horas_extras': 0.0,
+                'atividades': [],
+            })
+            horas = float(mo.horas_trabalhadas or 0)
+            extras = float(mo.horas_extras or 0)
+            entry['horas_trabalhadas'] += horas
+            entry['horas_extras'] += extras
+
+            nome_atividade = None
+            if mo.subatividade and mo.subatividade.nome_subatividade:
+                nome_atividade = mo.subatividade.nome_subatividade
+            elif mo.tarefa_cronograma and mo.tarefa_cronograma.nome_tarefa:
+                nome_atividade = mo.tarefa_cronograma.nome_tarefa
+            if nome_atividade:
+                entry['atividades'].append({
+                    'nome': nome_atividade,
+                    'horas': horas,
+                })
+
+        funcionarios = list(funcionarios_dict.values())
         
         # Calcular estatísticas
         total_subatividades = len(subatividades)
@@ -930,8 +967,9 @@ def visualizar_rdo(id):
                 progresso_obra = round(progresso_total_pontos / (100 * total_subatividades_obra), 1) * 100 if total_subatividades_obra > 0 else 0
                 peso_por_subatividade = 100.0 / total_subatividades_obra if total_subatividades_obra > 0 else 0
         
-        # Calcular total de horas trabalhadas
-        total_horas_trabalhadas = sum(func.horas_trabalhadas or 0 for func in funcionarios)
+        # Calcular total de horas trabalhadas (funcionarios agora é lista de
+        # dicts agregados por funcionário — somar a chave já normalizada).
+        total_horas_trabalhadas = sum(func.get('horas_trabalhadas') or 0 for func in funcionarios)
         
         logger.debug(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
         logger.debug(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
@@ -3851,66 +3889,46 @@ def salvar_rdo_flexivel():
             db.session.flush()
             logger.info(f"[FLUSH] Subatividades persistidas. IDs disponíveis.")
             
-            # PROCESSAR MÃO DE OBRA POR SUBATIVIDADE (novo formato: func_{sub_mestre_id}_{func_id}_horas)
+            # PROCESSAR MÃO DE OBRA — coletar TODAS as entradas (subatividades
+            # + cronograma V2) por funcionário ANTES de gravar, para que a
+            # normalização de horas (utils/rdo_horas) considere o conjunto
+            # completo de atividades em que o funcionário participa neste
+            # RDO. Sem isso, um funcionário em 2 subatividades + 1 tarefa
+            # apareceria com 24h fictícias (8h × 3) em vez de 8h divididas
+            # igualmente em 8/3h por atividade.
             import re as _re
+            from utils.rdo_horas import normalizar_horas_funcionario
+
             _func_pattern = _re.compile(r'^func_(\d+)_(\d+)_horas$')
-            funcionarios_por_sub = {}  # sub_mestre_id_str → [(func_id, horas)]
+            _cron_tarefa_pattern = _re.compile(r'^cron_tarefa_(\d+)_func_(\d+)_horas$')
+            _cron_func_pattern   = _re.compile(r'^cron_func_(\d+)_horas$')
+
+            # Entradas de subatividade — chave ('sub', sub_mestre_id_str).
+            # IMPORTANTE: descartamos linhas com horas<=0 ANTES de normalizar.
+            # Sem isso, "0" (string truthy) seria contado em N e roubaria
+            # horas das atividades verdadeiras (ex.: 8h+8h+0h em 3 subs viraria
+            # 8/3h em todas, incluindo a que deveria ser 0).
+            entradas_brutas = []  # (func_id, atividade_key, horas)
             for field_name, field_value in request.form.items():
                 m = _func_pattern.match(field_name)
                 if m and field_value:
-                    sub_mestre_id_str = m.group(1)
-                    func_id_str = m.group(2)
                     try:
+                        sub_mestre_id_str = m.group(1)
+                        func_id = int(m.group(2))
                         horas = float(field_value) if field_value else 8.8
-                        if sub_mestre_id_str not in funcionarios_por_sub:
-                            funcionarios_por_sub[sub_mestre_id_str] = []
-                        funcionarios_por_sub[sub_mestre_id_str].append((int(func_id_str), horas))
                     except (ValueError, TypeError):
                         continue
-            
-            logger.info(f"[USERS] Campos func_*_*_horas encontrados: {len(funcionarios_por_sub)} subatividades com funcionários")
-            
-            mao_obra_count = 0
-            for sub_mestre_id_str, func_list in funcionarios_por_sub.items():
-                subat_obj = sub_id_to_obj.get(sub_mestre_id_str)
-                if not subat_obj:
-                    logger.warning(f"[WARN] sub_mestre_id={sub_mestre_id_str} não encontrado no mapa de subatividades")
-                    continue
-                for func_id_sel, horas in func_list:
-                    # Tenant-safe: validar que funcionário pertence ao mesmo admin
-                    funcionario = Funcionario.query.filter_by(id=func_id_sel, admin_id=admin_id).first()
-                    if not funcionario:
-                        logger.warning(f"[WARN] Funcionário ID {func_id_sel} não encontrado")
+                    if horas <= 0:
                         continue
-                    funcao_exercida = 'Diarista'
-                    try:
-                        if hasattr(funcionario, 'funcao_ref') and funcionario.funcao_ref:
-                            funcao_exercida = funcionario.funcao_ref.nome
-                        elif hasattr(funcionario, 'funcao') and funcionario.funcao:
-                            funcao_exercida = funcionario.funcao
-                    except Exception:
-                        pass
-                    mao_obra = RDOMaoObra(
-                        rdo_id=rdo.id,
-                        funcionario_id=func_id_sel,
-                        horas_trabalhadas=horas,
-                        funcao_exercida=funcao_exercida,
-                        admin_id=admin_id,
-                        subatividade_id=subat_obj.id,
-                        horas_extras=0.0
+                    entradas_brutas.append(
+                        (func_id, ('sub', sub_mestre_id_str), horas)
                     )
-                    db.session.add(mao_obra)
-                    mao_obra_count += 1
-                    logger.info(f"[WORKER] Mão de obra: {funcionario.nome} → subat '{subat_obj.nome_subatividade}' ({horas}h)")
-            
-            # PROCESSAR MÃO DE OBRA DO CRONOGRAMA V2
-            # Formato: cron_tarefa_{tarefa_id}_func_{func_id}_horas  → guarda tarefa_cronograma_id
-            # Legado:  cron_func_{func_id}_horas                      → tarefa_cronograma_id=None
-            _cron_tarefa_pattern = _re.compile(r'^cron_tarefa_(\d+)_func_(\d+)_horas$')
-            _cron_func_pattern   = _re.compile(r'^cron_func_(\d+)_horas$')
-            cron_func_count = 0
-            # Acumula (func_id, tarefa_id, horas) — um registro por func×tarefa
-            _cron_entries = {}   # (func_id, tarefa_id) → horas
+
+            # Entradas de cronograma V2 — chave ('cron', tarefa_id_or_None);
+            # dedupe (func_id, tarefa_id) caso o form mande duplicatas.
+            # Mesmo filtro horas<=0 aplicado aqui para consistência com o
+            # fluxo de edição (rdo_editar_sistema).
+            seen_cron_keys = set()
             for field_name, field_value in request.form.items():
                 if not field_value:
                     continue
@@ -3926,17 +3944,39 @@ def salvar_rdo_flexivel():
                         tarefa_id_cron = None
                         func_id_cron   = int(m_legacy.group(1))
                     horas_cron = float(field_value) if field_value else 8.8
-                    key = (func_id_cron, tarefa_id_cron)
-                    if key not in _cron_entries:
-                        _cron_entries[key] = horas_cron
                 except (ValueError, TypeError) as e_cron:
                     logger.warning(f"[WARN] Erro ao processar {field_name}: {e_cron}")
                     continue
+                if horas_cron <= 0:
+                    continue
+                cron_key = (func_id_cron, tarefa_id_cron)
+                if cron_key in seen_cron_keys:
+                    continue
+                seen_cron_keys.add(cron_key)
+                entradas_brutas.append(
+                    (func_id_cron, ('cron', tarefa_id_cron), horas_cron)
+                )
 
-            for (func_id_cron, tarefa_id_cron), horas_cron in _cron_entries.items():
-                funcionario = Funcionario.query.filter_by(id=func_id_cron, admin_id=admin_id).first()
+            # Normalizar (8h × N atividades → 8/N por atividade)
+            entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
+
+            n_subs = sum(1 for _, k, _ in entradas_brutas if k[0] == 'sub')
+            n_crons = sum(1 for _, k, _ in entradas_brutas if k[0] == 'cron')
+            logger.info(
+                f"[USERS] Mão de obra: {n_subs} entrada(s) por subatividade + "
+                f"{n_crons} entrada(s) por cronograma → {len(entradas_normalizadas)} "
+                f"linha(s) normalizadas"
+            )
+
+            mao_obra_count = 0
+            cron_func_count = 0
+            for func_id_sel, atividade_key, horas_norm in entradas_normalizadas:
+                # Tenant-safe: validar que funcionário pertence ao mesmo admin
+                funcionario = Funcionario.query.filter_by(
+                    id=func_id_sel, admin_id=admin_id
+                ).first()
                 if not funcionario:
-                    logger.warning(f"[WARN] Funcionário cronograma ID {func_id_cron} não encontrado")
+                    logger.warning(f"[WARN] Funcionário ID {func_id_sel} não encontrado")
                     continue
                 funcao_exercida = 'Diarista'
                 try:
@@ -3946,23 +3986,48 @@ def salvar_rdo_flexivel():
                         funcao_exercida = funcionario.funcao
                 except Exception:
                     pass
-                mao_obra_cron = RDOMaoObra(
-                    rdo_id=rdo.id,
-                    funcionario_id=func_id_cron,
-                    horas_trabalhadas=horas_cron,
-                    funcao_exercida=funcao_exercida,
-                    admin_id=admin_id,
-                    subatividade_id=None,
-                    tarefa_cronograma_id=tarefa_id_cron,
-                    horas_extras=0.0
-                )
-                db.session.add(mao_obra_cron)
-                mao_obra_count += 1
-                cron_func_count += 1
-                logger.info(
-                    f"[WORKER] Mão de obra cronograma: {funcionario.nome} ({horas_cron}h) "
-                    f"tarefa_id={tarefa_id_cron}"
-                )
+
+                tipo_atividade, atividade_id = atividade_key
+                if tipo_atividade == 'sub':
+                    subat_obj = sub_id_to_obj.get(atividade_id)
+                    if not subat_obj:
+                        logger.warning(
+                            f"[WARN] sub_mestre_id={atividade_id} não encontrado no mapa de subatividades"
+                        )
+                        continue
+                    mao_obra = RDOMaoObra(
+                        rdo_id=rdo.id,
+                        funcionario_id=func_id_sel,
+                        horas_trabalhadas=horas_norm,
+                        funcao_exercida=funcao_exercida,
+                        admin_id=admin_id,
+                        subatividade_id=subat_obj.id,
+                        horas_extras=0.0
+                    )
+                    db.session.add(mao_obra)
+                    mao_obra_count += 1
+                    logger.info(
+                        f"[WORKER] Mão de obra: {funcionario.nome} → subat "
+                        f"'{subat_obj.nome_subatividade}' ({horas_norm:.2f}h)"
+                    )
+                else:  # 'cron'
+                    mao_obra_cron = RDOMaoObra(
+                        rdo_id=rdo.id,
+                        funcionario_id=func_id_sel,
+                        horas_trabalhadas=horas_norm,
+                        funcao_exercida=funcao_exercida,
+                        admin_id=admin_id,
+                        subatividade_id=None,
+                        tarefa_cronograma_id=atividade_id,
+                        horas_extras=0.0
+                    )
+                    db.session.add(mao_obra_cron)
+                    mao_obra_count += 1
+                    cron_func_count += 1
+                    logger.info(
+                        f"[WORKER] Mão de obra cronograma: {funcionario.nome} "
+                        f"({horas_norm:.2f}h) tarefa_id={atividade_id}"
+                    )
 
             if cron_func_count:
                 logger.info(f"[USERS] {cron_func_count} alocação(ões) via cronograma V2 (func×tarefa)")
