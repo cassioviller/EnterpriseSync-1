@@ -498,11 +498,6 @@
 {% endblock %}
 
 {% block scripts %}
-{# Task #213: bloco renomeado de `extra_js` para `scripts` — base_completo.html
-   só renderiza `{% block scripts %}`. Este JS é crítico (modais de
-   alteração de status, conversão para obra, exclusão via fetch para
-   /propostas/<id>/status, /converter, /excluir) — sem ele, todos os
-   botões de ação da tela ficam mudos. #}
 <script>
 let statusParaAlterar = null;
 

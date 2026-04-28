@@ -352,11 +352,6 @@ ul.cron-tree .node-sub > .node-label {
 {% endblock %}
 
 {% block scripts %}
-{# Task #213: bloco renomeado de `extra_js` para `scripts` — base_completo.html
-   só renderiza `{% block scripts %}`, então o JS abaixo (que monta o JSON
-   da árvore revisada no submit) precisa estar neste bloco para realmente
-   executar no browser. Antes, o submit chegava com o hidden vazio e a
-   revisão do admin era silenciosamente descartada. #}
 <script>
 // Server-side tree (rendered by Jinja em data-attrs). Reconstruímos o JSON
 // a partir do DOM no submit.
