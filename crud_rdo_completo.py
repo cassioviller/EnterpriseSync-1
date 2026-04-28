@@ -310,12 +310,12 @@ def salvar_rdo():
                     logger.error(f"Erro ao processar subatividade {key}: {e}")
         
         # Processar funcionários
-        # Aplica utils.rdo_horas.normalizar_horas_funcionario por consistência
-        # com os demais fluxos. Como este formulário emite uma única chave
-        # `funcionario_{id}_horas` por funcionário (não há dimensão de
-        # subatividade), a normalização é efetivamente no-op (N=1 por
-        # funcionário), mas garante o mesmo comportamento defensivo se a
-        # chave passar a se repetir no futuro.
+        # Este formulário usa apenas a chave plana `funcionario_{id}_horas`
+        # (uma entrada por funcionário) e não possui dimensão de
+        # subatividade — portanto a chave de atividade ('flat', func_id)
+        # gera N=1 por funcionário e a normalização é no-op aqui. O helper
+        # é chamado para manter o pipeline (filtro horas<=0, parseamento de
+        # horas_extras, criação dos RDOMaoObra) idêntico aos demais fluxos.
         from utils.rdo_horas import normalizar_horas_funcionario
         entradas_brutas = []  # (func_id, ('flat', func_id), horas, horas_extras)
         for key, value in request.form.items():
