@@ -23,6 +23,7 @@ from app import db
 from models import (
     Servico, Insumo, PrecoBaseInsumo, ComposicaoServico,
     PropostaItem, ItemMedicaoComercial, ObraServicoCusto, Obra,
+    CronogramaTemplate,
 )
 from services.orcamento_service import (
     calcular_precos_servico, recalcular_servico_preco,
@@ -266,11 +267,34 @@ def servico_composicao(servico_id):
     aid = _admin_id()
     svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
     insumos_disp = Insumo.query.filter_by(admin_id=aid, ativo=True).order_by(Insumo.nome).all()
+    templates_disp = CronogramaTemplate.query.filter_by(admin_id=aid, ativo=True).order_by(CronogramaTemplate.nome).all()
     calc = calcular_precos_servico(svc)
     return render_template(
         'catalogo/composicao_servico.html',
         servico=svc, insumos=insumos_disp, calc=calc,
+        templates_disponiveis=templates_disp,
     )
+
+
+@catalogo_bp.route('/servicos/<int:servico_id>/template', methods=['POST'])
+@login_required
+def servico_vincular_template(servico_id):
+    """Vincula ou desvincula um template de cronograma padrão ao serviço."""
+    aid = _admin_id()
+    svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
+    template_id = request.form.get('template_padrao_id', '').strip()
+    if template_id:
+        tmpl = CronogramaTemplate.query.filter_by(id=int(template_id), admin_id=aid).first()
+        if not tmpl:
+            flash('Template não encontrado.', 'error')
+            return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
+        svc.template_padrao_id = tmpl.id
+        flash(f'Cronograma "{tmpl.nome}" vinculado ao serviço.', 'success')
+    else:
+        svc.template_padrao_id = None
+        flash('Cronograma desvinculado do serviço.', 'success')
+    db.session.commit()
+    return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
 
 
 @catalogo_bp.route('/servicos/<int:servico_id>/composicao/add', methods=['POST'])

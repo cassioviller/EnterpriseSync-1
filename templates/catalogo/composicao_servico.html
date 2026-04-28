@@ -46,6 +46,58 @@
   </div>
 
   <div class="card shadow-sm mb-3">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <strong><i class="fas fa-calendar-alt text-primary me-1"></i> Cronograma Padrão</strong>
+      {% if servico.template_padrao %}
+        <span class="badge bg-success"><i class="fas fa-link me-1"></i>Vinculado</span>
+      {% else %}
+        <span class="badge bg-secondary">Sem template</span>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      {% if servico.template_padrao %}
+        <div class="alert alert-success py-2 px-3 mb-3 d-flex align-items-center gap-2">
+          <i class="fas fa-check-circle"></i>
+          <span>Template atual: <strong>{{ servico.template_padrao.nome }}</strong>
+            {% if servico.template_padrao.categoria %}<span class="text-muted small">({{ servico.template_padrao.categoria }})</span>{% endif %}
+          </span>
+        </div>
+      {% else %}
+        <p class="text-muted mb-3"><i class="fas fa-info-circle me-1"></i>Nenhum template de cronograma vinculado. Quando uma proposta com este serviço for aprovada, nenhum cronograma será gerado automaticamente.</p>
+      {% endif %}
+      <form method="POST" action="{{ url_for('catalogo.servico_vincular_template', servico_id=servico.id) }}" class="row g-2 align-items-end">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="col-md-8">
+          <label class="form-label small mb-1">Selecionar template de cronograma</label>
+          <select name="template_padrao_id" class="form-select">
+            <option value="">— Nenhum (desvincular) —</option>
+            {% for t in templates_disponiveis %}
+            <option value="{{ t.id }}" {% if servico.template_padrao_id == t.id %}selected{% endif %}>
+              {{ t.nome }}{% if t.categoria %} — {{ t.categoria }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          {% if not templates_disponiveis %}
+          <div class="form-text text-warning"><i class="fas fa-exclamation-triangle me-1"></i>
+            Nenhum template de cronograma cadastrado para este tenant.
+          </div>
+          {% endif %}
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+          <button class="btn btn-primary flex-grow-1"><i class="fas fa-save me-1"></i>Salvar</button>
+          {% if servico.template_padrao %}
+          <button class="btn btn-outline-danger" type="submit" name="template_padrao_id" value=""
+                  onclick="return confirm('Desvincular o cronograma deste serviço?')"
+                  title="Desvincular cronograma">
+            <i class="fas fa-unlink"></i>
+          </button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
     <div class="card-header bg-light"><strong>Adicionar / atualizar insumo na composição</strong></div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('catalogo.servico_composicao_add', servico_id=servico.id) }}" class="row g-2 align-items-end">
