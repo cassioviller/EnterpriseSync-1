@@ -342,18 +342,48 @@ echo "" | tee -a "$LOG_FILE"
 #       python3 /app/scripts/seed_demo_alfa.py --ambiente prod
 echo "🌱 FASE 3.7: SEED DEMO ALFA (auto-seed TEMPORARIAMENTE LIGADO)" | tee -a "$LOG_FILE"
 echo "==============================================" | tee -a "$LOG_FILE"
-if [ "${SIGE_ENABLE_DEMO_SEED:-true}" = "true" ] && \
-   [ "${SIGE_ALLOW_PROD_SEED:-1}" = "1" ]; then
+
+# Resolver e EXPORTAR as flags para que o subprocesso python3 enxergue.
+# (Sem export, ${VAR:-default} só vale para o teste do bash; o python
+#  herda apenas variáveis exportadas — bug original que impedia o seed
+#  de rodar em deploys EasyPanel sem variáveis configuradas no painel.)
+export SIGE_ENABLE_DEMO_SEED="${SIGE_ENABLE_DEMO_SEED:-true}"
+export SIGE_ALLOW_PROD_SEED="${SIGE_ALLOW_PROD_SEED:-1}"
+
+echo "   SIGE_ENABLE_DEMO_SEED=$SIGE_ENABLE_DEMO_SEED" | tee -a "$LOG_FILE"
+echo "   SIGE_ALLOW_PROD_SEED=$SIGE_ALLOW_PROD_SEED" | tee -a "$LOG_FILE"
+
+if [ "$SIGE_ENABLE_DEMO_SEED" = "true" ] && [ "$SIGE_ALLOW_PROD_SEED" = "1" ]; then
     if [ -f /app/scripts/seed_demo_alfa.py ]; then
         SEED_LOG="/tmp/sige_seed_demo_alfa.log"
-        timeout 60 python3 /app/scripts/seed_demo_alfa.py --ambiente prod \
-            2>&1 | tee -a "$SEED_LOG" | tee -a "$LOG_FILE" || \
-            echo "⚠️ seed demo Alfa falhou (continuando deploy) — ver $SEED_LOG" | tee -a "$LOG_FILE"
+        SEED_TIMEOUT="${SIGE_SEED_TIMEOUT:-300}"
+        echo "🌱 Executando seed demo Alfa (timeout ${SEED_TIMEOUT}s)..." | tee -a "$LOG_FILE"
+        # Usa um pipeline mas captura o exit code do python via PIPESTATUS
+        # para detectar falhas de verdade (sem ser mascaradas pelo `tee`).
+        set +e
+        timeout "$SEED_TIMEOUT" python3 /app/scripts/seed_demo_alfa.py --ambiente prod \
+            2>&1 | tee -a "$SEED_LOG" | tee -a "$LOG_FILE"
+        SEED_EXIT=${PIPESTATUS[0]}
+        set -e
+        case "$SEED_EXIT" in
+            0)
+                echo "✅ seed demo Alfa concluído com sucesso (exit 0)" | tee -a "$LOG_FILE"
+                ;;
+            2)
+                echo "ℹ️ seed demo Alfa: exit 2 (idempotente — admin Alfa já existe — ou guard de produção). Ver $SEED_LOG para detalhes." | tee -a "$LOG_FILE"
+                ;;
+            124)
+                echo "❌ seed demo Alfa atingiu timeout de ${SEED_TIMEOUT}s (exit 124) — ver $SEED_LOG" | tee -a "$LOG_FILE"
+                ;;
+            *)
+                echo "⚠️ seed demo Alfa falhou (exit $SEED_EXIT, continuando deploy) — ver $SEED_LOG" | tee -a "$LOG_FILE"
+                ;;
+        esac
     else
         echo "ℹ️ scripts/seed_demo_alfa.py ausente — seed pulado" | tee -a "$LOG_FILE"
     fi
 else
-    echo "⏭️ auto-seed desabilitado (default em prod). Para rodar manualmente:" | tee -a "$LOG_FILE"
+    echo "⏭️ auto-seed desabilitado. Para rodar manualmente:" | tee -a "$LOG_FILE"
     echo "   SIGE_ALLOW_PROD_SEED=1 python3 /app/scripts/seed_demo_alfa.py --ambiente prod" | tee -a "$LOG_FILE"
 fi
 
