@@ -153,6 +153,13 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
             'marcado': bool,
             'filhos': [ ...nós do template... ]
         }, ...]
+
+    Fix #6: O filtro `CronogramaTemplate.ativo == True` foi removido desta
+    função. O campo `ativo` controla a exibição do template nos seletores de
+    NOVA proposta/orçamento, mas NÃO deve impedir que o template seja
+    resolvido para itens de propostas existentes na tela de revisão inicial.
+    Templates desativados continuam acessíveis para revisão de propostas que
+    já os referenciam via Servico.template_padrao_id.
     """
     preconfig_idx = _index_preconfig(getattr(proposta, 'cronograma_default_json', None))
     itens = (
@@ -162,16 +169,31 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
         .all()
     )
     if not itens:
+        logger.debug(
+            f"montar_arvore_preview: proposta={proposta.id} não tem PropostaItem — "
+            "retornando árvore vazia"
+        )
         return []
 
-    # Cache servico → template
+    # Cache servico → template (filtro de tenant obrigatório)
     serv_ids = {it.servico_id for it in itens if it.servico_id}
     servicos = {s.id: s for s in Servico.query.filter(
         Servico.id.in_(serv_ids), Servico.admin_id == admin_id
     ).all()} if serv_ids else {}
 
+    # Diagnóstico: itens sem servico no cache indicam possível admin_id incorreto.
+    _sem_cache = [it.servico_id for it in itens if it.servico_id and it.servico_id not in servicos]
+    if _sem_cache:
+        logger.debug(
+            f"montar_arvore_preview: proposta={proposta.id} — "
+            f"{len(_sem_cache)} servico_id(s) não encontrados para admin_id={admin_id}: "
+            f"{_sem_cache}. Esses itens resultarão em sem_template=True."
+        )
+
     # Task #118: precedência override → padrão. Coleta TODOS os IDs candidatos
     # (overrides por linha + padrões dos serviços) numa única query.
+    # Fix #6: NÃO filtrar por ativo — templates desativados ainda devem ser
+    # resolvidos para propostas existentes (ativo só filtra novos seletores).
     tmpl_ids = {s.template_padrao_id for s in servicos.values() if s.template_padrao_id}
     tmpl_ids |= {
         getattr(it, 'cronograma_template_override_id', None)
@@ -181,8 +203,15 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
     templates = {t.id: t for t in CronogramaTemplate.query.filter(
         CronogramaTemplate.id.in_(tmpl_ids),
         CronogramaTemplate.admin_id == admin_id,
-        CronogramaTemplate.ativo == True,  # noqa: E712
+        # ativo NÃO é filtrado aqui: templates desativados permanecem acessíveis
+        # para revisão de propostas que já os referenciam.
     ).all()} if tmpl_ids else {}
+
+    logger.debug(
+        f"montar_arvore_preview: proposta={proposta.id} admin={admin_id} — "
+        f"{len(itens)} item(ns), {len(servicos)} serviço(s) em cache, "
+        f"{len(tmpl_ids)} template_id(s) candidatos, {len(templates)} template(s) carregados"
+    )
 
     arvore: list[dict] = []
     for it in itens:
@@ -193,6 +222,24 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
         tmpl = templates.get(template_efetivo_id) if template_efetivo_id else None
         origem_template = ('override' if override_id and tmpl else
                            ('padrao' if tmpl else None))
+
+        # Log por item para facilitar diagnóstico em produção.
+        if tmpl:
+            logger.debug(
+                f"  PI={it.id} servico_id={it.servico_id} "
+                f"→ template={tmpl.id!r} ({tmpl.nome!r}) "
+                f"origem={origem_template} ativo={tmpl.ativo}"
+            )
+        else:
+            _reason = (
+                'sem servico_id' if not it.servico_id else
+                'servico não encontrado (admin_id mismatch?)' if not servico else
+                'servico sem template_padrao_id e sem override' if not template_efetivo_id else
+                f'template_id={template_efetivo_id} não carregado (admin_id mismatch ou deletado?)'
+            )
+            logger.debug(
+                f"  PI={it.id} servico_id={it.servico_id} → sem_template=True ({_reason})"
+            )
 
         nome_serv = (servico.nome if servico else (it.descricao or f'Item {it.item_numero or it.id}'))
         pre = preconfig_idx.get(it.id)
@@ -250,27 +297,44 @@ def _somar_horas_folhas(nos: list[dict]) -> float:
 
 
 def tem_conteudo_para_revisar(proposta, admin_id: int) -> bool:
-    """True se há pelo menos um PropostaItem com template efetivo:
-    override por linha (Task #118) OU padrão do serviço (Task #102)."""
-    # Task #118: override tem precedência → basta um item com override.
+    """True se há pelo menos um PropostaItem com template efetivo e acessível:
+    override por linha (Task #118) OU padrão do serviço (Task #102).
+
+    Fix #6: agora junta CronogramaTemplate para garantir que o template
+    referenciado realmente existe e pertence ao mesmo tenant (admin_id).
+    O campo `ativo` NÃO é verificado — alinhado com montar_arvore_preview
+    que também aceita templates desativados para propostas existentes.
+    """
+    # Task #118: override tem precedência → basta um item com override acessível.
     has_override = (
         db.session.query(PropostaItem.id)
+        .join(
+            CronogramaTemplate,
+            CronogramaTemplate.id == PropostaItem.cronograma_template_override_id,
+        )
         .filter(
             PropostaItem.proposta_id == proposta.id,
             PropostaItem.cronograma_template_override_id.isnot(None),
+            CronogramaTemplate.admin_id == admin_id,
         )
         .limit(1)
         .first()
     )
     if has_override:
         return True
+    # Template padrão do serviço: verifica que o template existe e é do mesmo tenant.
     q = (
         db.session.query(Servico.id)
         .join(PropostaItem, PropostaItem.servico_id == Servico.id)
+        .join(
+            CronogramaTemplate,
+            CronogramaTemplate.id == Servico.template_padrao_id,
+        )
         .filter(
             PropostaItem.proposta_id == proposta.id,
             Servico.admin_id == admin_id,
             Servico.template_padrao_id.isnot(None),
+            CronogramaTemplate.admin_id == admin_id,
         )
         .limit(1)
     )
