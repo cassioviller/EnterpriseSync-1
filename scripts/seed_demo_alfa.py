@@ -116,6 +116,10 @@ def _reset_dataset():
         "UPDATE obra SET responsavel_id=NULL "
         "WHERE responsavel_id IN (SELECT id FROM funcionario WHERE admin_id=:a)"
     ), {"a": aid})
+    # NULL proposta_origem_id antes de deletar propostas (FK bidirecional)
+    db.session.execute(text(
+        "UPDATE obra SET proposta_origem_id=NULL WHERE admin_id=:a"
+    ), {"a": aid})
 
     # Etapa 2: deleção em cascata manual (filhos antes dos pais)
     deletes = [
@@ -129,13 +133,67 @@ def _reset_dataset():
         "DELETE FROM rdo_mao_obra WHERE admin_id=:a",
         "DELETE FROM rdo_mao_obra WHERE funcionario_id IN "
         "(SELECT id FROM funcionario WHERE admin_id=:a)",
+        "DELETE FROM rdo_equipamento WHERE rdo_id IN "
+        "(SELECT id FROM rdo WHERE admin_id=:a)",
+        "DELETE FROM rdo_ocorrencia WHERE rdo_id IN "
+        "(SELECT id FROM rdo WHERE admin_id=:a)",
         "DELETE FROM rdo WHERE admin_id=:a",
         # Cronograma da obra
         "DELETE FROM tarefa_cronograma WHERE admin_id=:a",
-        # Custos / propostas / obras
+        # Custos V2 (criados pelo backfill _backfill_custos_rdo_demo)
+        "DELETE FROM gestao_custo_filho WHERE pai_id IN "
+        "(SELECT id FROM gestao_custo_pai WHERE admin_id=:a)",
+        "DELETE FROM gestao_custo_pai WHERE admin_id=:a",
+        # Todas as tabelas com FK obra_id (descobertas via information_schema)
+        # ---- Alimentação ----
+        "DELETE FROM alimentacao_lancamento_item WHERE lancamento_id IN "
+        "(SELECT id FROM alimentacao_lancamento WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
+        "DELETE FROM alimentacao_lancamento WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Mapa de concorrência (filhos primeiro) ----
+        "DELETE FROM mapa_cotacao WHERE mapa_id IN "
+        "(SELECT id FROM mapa_concorrencia_v2 WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
+        "DELETE FROM mapa_item_cotacao WHERE mapa_id IN "
+        "(SELECT id FROM mapa_concorrencia_v2 WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
+        "DELETE FROM mapa_fornecedor WHERE mapa_id IN "
+        "(SELECT id FROM mapa_concorrencia_v2 WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
+        "DELETE FROM mapa_concorrencia_v2 WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM mapa_concorrencia WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Compras ----
+        "DELETE FROM pedido_compra_item WHERE pedido_id IN "
+        "(SELECT id FROM pedido_compra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
+        "DELETE FROM pedido_compra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Transporte ----
+        "DELETE FROM lancamento_transporte WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Serviços ----
+        "DELETE FROM historico_produtividade_servico WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM servico_obra_real WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM servico_obra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Ponto / Registro ----
+        "DELETE FROM funcionario_obras_ponto WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM registro_ponto WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM registro_alimentacao WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Financeiro / Custos ----
+        "DELETE FROM custo_obra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM outro_custo WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM receita WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM fluxo_caixa WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM folha_processada WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM reembolso_funcionario WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM conta_pagar WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Cronograma cliente / Dispositivos ----
+        "DELETE FROM cronograma_cliente WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM dispositivo_obra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Alocação / Equipe ----
+        "DELETE FROM alocacao_equipe WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM allocation WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Notificações ----
+        "DELETE FROM notificacao_cliente WHERE admin_id=:a",
+        "DELETE FROM notificacao_orcamento WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        # ---- Custos / propostas / obras ----
         "DELETE FROM obra_servico_custo WHERE admin_id=:a",
         "DELETE FROM proposta_itens WHERE admin_id=:a",
-        "DELETE FROM proposta_historico WHERE admin_id=:a",
+        "DELETE FROM proposta_historico WHERE proposta_id IN "
+        "(SELECT id FROM propostas_comerciais WHERE admin_id=:a OR criado_por=:a)",
         "DELETE FROM propostas_comerciais WHERE admin_id=:a OR criado_por=:a",
         "DELETE FROM obra WHERE admin_id=:a",
         # Catálogo
@@ -146,17 +204,98 @@ def _reset_dataset():
         "DELETE FROM subatividade_mestre WHERE admin_id=:a",
         "DELETE FROM preco_base_insumo WHERE admin_id=:a",
         "DELETE FROM insumo WHERE admin_id=:a",
+        # Orçamentos (referenciam cliente)
+        "DELETE FROM orcamento_item WHERE admin_id=:a",
+        "DELETE FROM orcamento WHERE admin_id=:a",
         # Pessoas / config
         "DELETE FROM funcionario WHERE admin_id=:a",
         "DELETE FROM cliente WHERE admin_id=:a",
         "DELETE FROM conta_receber WHERE admin_id=:a",
         "DELETE FROM configuracao_empresa WHERE admin_id=:a",
         "DELETE FROM calendario_empresa WHERE admin_id=:a",
+        # Tabelas com admin_id FK para usuario que podem ter sobrado
+        "DELETE FROM alimentacao_item WHERE admin_id=:a",
+        "DELETE FROM almoxarifado_estoque WHERE admin_id=:a",
+        "DELETE FROM almoxarifado_movimento WHERE admin_id=:a",
+        "DELETE FROM movimentacao_estoque WHERE admin_id=:a",
+        "DELETE FROM custo_veiculo WHERE admin_id=:a",
+        "DELETE FROM uso_veiculo WHERE admin_id=:a",
+        "DELETE FROM frota_despesa WHERE admin_id=:a",
+        "DELETE FROM frota_utilizacao WHERE admin_id=:a",
+        "DELETE FROM outro_custo WHERE admin_id=:a",
+        "DELETE FROM receita WHERE admin_id=:a",
+        "DELETE FROM fluxo_caixa WHERE admin_id=:a",
+        "DELETE FROM weekly_plan WHERE admin_id=:a",
         "DELETE FROM usuario WHERE admin_id=:a",
-        "DELETE FROM usuario WHERE id=:a",
+        # NÃO incluir "DELETE FROM usuario WHERE id=:a" aqui —
+        # essa deleção final do próprio admin fica após o cleanup dinâmico.
     ]
+    # Executa cada DELETE dentro de um SAVEPOINT individual.
+    # Se uma tabela não existir ou tiver FK inesperado, o SAVEPOINT é
+    # revertido e o loop continua — garantindo que o admin seja deletado.
+    skipped = []
     for sql in deletes:
-        db.session.execute(text(sql), {"a": aid})
+        try:
+            db.session.execute(text("SAVEPOINT sp_reset_cleanup"))
+            db.session.execute(text(sql), {"a": aid})
+            db.session.execute(text("RELEASE SAVEPOINT sp_reset_cleanup"))
+        except Exception as _e:
+            db.session.execute(text("ROLLBACK TO SAVEPOINT sp_reset_cleanup"))
+            skipped.append(f"{sql[:70]} → {type(_e).__name__}: {str(_e)[:60]}")
+    if skipped:
+        for s in skipped:
+            log.warning(f"reset skip: {s}")
+
+    # Passagem dinâmica: para cada par (tabela, coluna) que tem FK apontando
+    # para usuario.id onde o valor = aid, tenta DELETE ou NULL.
+    # Isso garante que o usuario admin possa ser apagado independente de
+    # qual coluna (admin_id, criado_por, responsavel_id, etc.) referencia aid.
+    try:
+        fk_cols = db.session.execute(text("""
+            SELECT DISTINCT kcu.table_name, kcu.column_name,
+                   col.is_nullable
+            FROM information_schema.key_column_usage kcu
+            JOIN information_schema.table_constraints tc
+                ON tc.constraint_name = kcu.constraint_name
+            JOIN information_schema.referential_constraints rc
+                ON rc.constraint_name = tc.constraint_name
+            JOIN information_schema.key_column_usage ccu
+                ON ccu.constraint_name = rc.unique_constraint_name
+            JOIN information_schema.columns col
+                ON col.table_name = kcu.table_name
+                AND col.column_name = kcu.column_name
+                AND col.table_schema = 'public'
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND ccu.table_name = 'usuario'
+              AND kcu.table_schema = 'public'
+            ORDER BY kcu.table_name
+        """)).fetchall()
+        for (tbl, col, nullable) in fk_cols:
+            try:
+                db.session.execute(text("SAVEPOINT sp_dynclean"))
+                if nullable == "YES":
+                    db.session.execute(
+                        text(f"UPDATE {tbl} SET {col}=NULL WHERE {col}=:a"),
+                        {"a": aid},
+                    )
+                else:
+                    db.session.execute(
+                        text(f"DELETE FROM {tbl} WHERE {col}=:a"),
+                        {"a": aid},
+                    )
+                db.session.execute(text("RELEASE SAVEPOINT sp_dynclean"))
+            except Exception as _de:
+                db.session.execute(text("ROLLBACK TO SAVEPOINT sp_dynclean"))
+                log.debug(f"dyn-clean skip {tbl}.{col}: {_de}")
+    except Exception as _ie:
+        log.warning(f"passagem dinâmica fk→usuario falhou: {_ie}")
+
+    # Deleção final do próprio admin (após cleanup dinâmico de todas as FKs)
+    try:
+        db.session.execute(text("DELETE FROM usuario WHERE id=:a"), {"a": aid})
+    except Exception as _ue:
+        log.warning(f"reset: não foi possível deletar usuario id={aid}: {_ue}")
+
     db.session.commit()
     log.info("reset concluído")
 
@@ -173,6 +312,7 @@ def _seed():
         CronogramaTemplateItem, Servico, ComposicaoServico,
         Proposta, PropostaItem, Obra, ItemMedicaoComercial,
         TarefaCronograma, RDO, RDOMaoObra, RDOServicoSubatividade,
+        RDOEquipamento, RDOOcorrencia,
         ContaReceber, Orcamento, OrcamentoItem,
     )
     from services.orcamento_view_service import (
@@ -603,6 +743,34 @@ def _seed():
                     percentual_realizado=perc_destino,
                     percentual_planejado=perc_destino,  # demo: planejado = realizado
                 ))
+        # Equipamento (betoneira aparece no 2º e 3º RDO — obra em plena atividade)
+        if idx >= 2:
+            db.session.add(RDOEquipamento(
+                admin_id=aid, rdo_id=rdo.id,
+                nome_equipamento="Betoneira 400L",
+                quantidade=1,
+                horas_uso=4.0,
+                estado_conservacao="Bom",
+            ))
+
+        # Ocorrência — cada RDO tem pelo menos uma
+        _ocorrencia_dados = [
+            ("Segurança", "Baixa",
+             "Uso correto de EPIs verificado em toda a equipe."),
+            ("Climático", "Baixa",
+             "Chuva leve no período da tarde — trabalho suspenso 2h."),
+            ("Observação", "Baixa",
+             "Serviço concluído dentro do prazo previsto — equipe de parabéns."),
+        ]
+        _tipo_oc, _sev_oc, _desc_oc = _ocorrencia_dados[idx - 1]
+        db.session.add(RDOOcorrencia(
+            admin_id=aid, rdo_id=rdo.id,
+            tipo_ocorrencia=_tipo_oc,
+            severidade=_sev_oc,
+            descricao_ocorrencia=_desc_oc,
+            status_resolucao="Resolvido",
+        ))
+
         db.session.flush()
         log.info(f"RDO #{idx} ({dt.isoformat()}) finalizado — folhas a {perc_destino:.0f}%")
 
@@ -620,19 +788,19 @@ def _seed():
     db.session.add(tmpl_alv_expresso); db.session.flush()
     g_exp = CronogramaTemplateItem(
         admin_id=aid, template_id=tmpl_alv_expresso.id, parent_item_id=None,
-        nome="Alvenaria expressa", ordem=1, horas_estimadas=Decimal("0"),
+        nome_tarefa="Alvenaria expressa", ordem=1, duracao_dias=1,
     )
     db.session.add(g_exp); db.session.flush()
     db.session.add_all([
         CronogramaTemplateItem(
             admin_id=aid, template_id=tmpl_alv_expresso.id,
-            parent_item_id=g_exp.id, nome="Marcação + 1ª fiada",
-            ordem=1, horas_estimadas=Decimal("16"),
+            parent_item_id=g_exp.id, nome_tarefa="Marcação + 1ª fiada",
+            ordem=1, duracao_dias=2,
         ),
         CronogramaTemplateItem(
             admin_id=aid, template_id=tmpl_alv_expresso.id,
-            parent_item_id=g_exp.id, nome="Elevação até cinta",
-            ordem=2, horas_estimadas=Decimal("24"),
+            parent_item_id=g_exp.id, nome_tarefa="Elevação até cinta",
+            ordem=2, duracao_dias=3,
         ),
     ]); db.session.flush()
 
