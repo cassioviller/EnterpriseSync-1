@@ -128,7 +128,7 @@ def _reset_dataset():
         "DELETE FROM medicao_obra WHERE admin_id=:a",
         "DELETE FROM item_medicao_cronograma_tarefa WHERE admin_id=:a",
         "DELETE FROM item_medicao_comercial WHERE admin_id=:a",
-        # RDO
+        # RDO (todos os filhos antes do pai)
         "DELETE FROM rdo_servico_subatividade WHERE admin_id=:a",
         "DELETE FROM rdo_mao_obra WHERE admin_id=:a",
         "DELETE FROM rdo_mao_obra WHERE funcionario_id IN "
@@ -137,6 +137,7 @@ def _reset_dataset():
         "(SELECT id FROM rdo WHERE admin_id=:a)",
         "DELETE FROM rdo_ocorrencia WHERE rdo_id IN "
         "(SELECT id FROM rdo WHERE admin_id=:a)",
+        "DELETE FROM rdo_apontamento_cronograma WHERE admin_id=:a",
         "DELETE FROM rdo WHERE admin_id=:a",
         # Cronograma da obra
         "DELETE FROM tarefa_cronograma WHERE admin_id=:a",
@@ -234,14 +235,20 @@ def _reset_dataset():
     # Se uma tabela não existir ou tiver FK inesperado, o SAVEPOINT é
     # revertido e o loop continua — garantindo que o admin seja deletado.
     skipped = []
+    deleted_total = 0
     for sql in deletes:
         try:
             db.session.execute(text("SAVEPOINT sp_reset_cleanup"))
-            db.session.execute(text(sql), {"a": aid})
+            result = db.session.execute(text(sql), {"a": aid})
             db.session.execute(text("RELEASE SAVEPOINT sp_reset_cleanup"))
+            deleted_total += result.rowcount if result.rowcount and result.rowcount > 0 else 0
         except Exception as _e:
             db.session.execute(text("ROLLBACK TO SAVEPOINT sp_reset_cleanup"))
             skipped.append(f"{sql[:70]} → {type(_e).__name__}: {str(_e)[:60]}")
+    log.info(
+        f"reset explícito: {deleted_total} registro(s) removido(s), "
+        f"{len(skipped)} statement(s) pulado(s)"
+    )
     if skipped:
         for s in skipped:
             log.warning(f"reset skip: {s}")
@@ -270,6 +277,7 @@ def _reset_dataset():
               AND kcu.table_schema = 'public'
             ORDER BY kcu.table_name
         """)).fetchall()
+        dyn_ok, dyn_skip = 0, 0
         for (tbl, col, nullable) in fk_cols:
             try:
                 db.session.execute(text("SAVEPOINT sp_dynclean"))
@@ -284,16 +292,23 @@ def _reset_dataset():
                         {"a": aid},
                     )
                 db.session.execute(text("RELEASE SAVEPOINT sp_dynclean"))
+                dyn_ok += 1
             except Exception as _de:
                 db.session.execute(text("ROLLBACK TO SAVEPOINT sp_dynclean"))
+                dyn_skip += 1
                 log.debug(f"dyn-clean skip {tbl}.{col}: {_de}")
+        log.info(f"reset dinâmico: {dyn_ok} FK(s) limpas, {dyn_skip} FK(s) puladas")
     except Exception as _ie:
         log.warning(f"passagem dinâmica fk→usuario falhou: {_ie}")
 
     # Deleção final do próprio admin (após cleanup dinâmico de todas as FKs)
+    # Usa SAVEPOINT para não abortar a sessão se alguma FK residual impedir.
     try:
+        db.session.execute(text("SAVEPOINT sp_delete_admin"))
         db.session.execute(text("DELETE FROM usuario WHERE id=:a"), {"a": aid})
+        db.session.execute(text("RELEASE SAVEPOINT sp_delete_admin"))
     except Exception as _ue:
+        db.session.execute(text("ROLLBACK TO SAVEPOINT sp_delete_admin"))
         log.warning(f"reset: não foi possível deletar usuario id={aid}: {_ue}")
 
     db.session.commit()
@@ -948,7 +963,7 @@ def _seed():
         nome=f"Obra E2E #{proposta_t118.id} — Task #118",
         codigo=f"E2E118-{proposta_t118.id}",
         admin_id=aid, status="Em andamento",
-        data_inicio=date.today(), responsavel_id=aid,
+        data_inicio=date.today(), responsavel_id=pedro.id,
         proposta_origem_id=proposta_t118.id, cliente_id=cliente.id,
     )
     db.session.add(obra_t118); db.session.flush()
