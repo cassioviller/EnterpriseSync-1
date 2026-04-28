@@ -732,6 +732,13 @@ def lancar_custos_rdo(data: dict, admin_id: int):
             )
 
             if not existing_filho:
+                # ``force_v2=True``: handler roda em background (sem
+                # ``current_user`` confiável). Tenant já validado acima
+                # (Funcionario.admin_id == admin_id). Sem isso, em
+                # contextos sem sessão (jobs, eventos repostos), a
+                # diária seria silenciosamente skipada enquanto o VA/VT
+                # abaixo seria gravado — assimetria que confunde o
+                # módulo financeiro.
                 filho = registrar_custo_automatico(
                     admin_id=admin_id,
                     tipo_categoria='SALARIO',
@@ -744,6 +751,7 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     origem_tabela='rdo_mao_obra',
                     origem_id=rdo.id,
                     obra_servico_custo_id=obra_servico_custo_id_auto,
+                    force_v2=True,
                 )
                 if filho:
                     gestao_criados += 1
@@ -751,6 +759,93 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                     logger.warning(f"⚠️ registrar_custo_automatico retornou None para {funcionario.nome}")
             else:
                 logger.info(f"⏭️ GestaoCustoFilho já existe para {funcionario.nome} em {data_rdo} — skip")
+
+            # ── VA (Vale Alimentação) e VT (Vale Transporte) por dia trabalhado ──
+            # Lê do cadastro do Funcionario (valor_va, valor_vt). Espelha o
+            # comportamento do handler ponto_registrado/calcular_horas_folha
+            # para que o lançamento de diária via RDO também gere os custos
+            # de benefícios em Contas a Pagar / Gestão de Custos V2.
+            #
+            # Idempotência (broad): considera VA/VT já lançado se existe um
+            # GestaoCustoFilho para o MESMO funcionário, MESMA data e MESMA
+            # categoria (ALIMENTACAO/TRANSPORTE), independente da origem
+            # (rdo_mao_obra_va, registro_ponto_va, etc.). Isso evita
+            # duplicação quando o tenant já foi populado por outro caminho
+            # (seed, ponto eletrônico, edição via crud_rdo_completo).
+            #
+            # ``force_v2=True``: este handler roda como background event,
+            # sem ``current_user`` confiável; o tenant já foi validado pelo
+            # próprio handler (Funcionario.admin_id == admin_id na linha
+            # 634), então podemos pular a checagem baseada em sessão.
+            for tag, attr_valor, tipo_cat in [
+                ('VA', 'valor_va', 'ALIMENTACAO'),
+                ('VT', 'valor_vt', 'TRANSPORTE'),
+            ]:
+                valor_beneficio = float(getattr(funcionario, attr_valor, 0) or 0)
+                if valor_beneficio <= 0:
+                    continue
+
+                # Categorias equivalentes: aceita tanto nome legado quanto
+                # normalizado (mesma lógica de registrar_custo_automatico).
+                cats_equivalentes = {tipo_cat}
+                try:
+                    legada_map = GestaoCustoPai._CATEGORIA_LEGADA_MAP
+                    norm = legada_map.get(tipo_cat, tipo_cat)
+                    cats_equivalentes.add(norm)
+                    for legada, nova in legada_map.items():
+                        if nova == norm:
+                            cats_equivalentes.add(legada)
+                except Exception:
+                    pass
+
+                ja_existe = (
+                    db.session.query(GestaoCustoFilho)
+                    .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+                    .filter(
+                        GestaoCustoFilho.data_referencia == data_rdo,
+                        GestaoCustoFilho.admin_id == admin_id,
+                        GestaoCustoPai.entidade_id == func_id,
+                        GestaoCustoPai.tipo_categoria.in_(list(cats_equivalentes)),
+                    )
+                    .first()
+                )
+                if ja_existe:
+                    logger.info(
+                        f"⏭️ {tag} de {funcionario.nome} em {data_rdo} já lançado "
+                        f"(filho_id={ja_existe.id}, origem={ja_existe.origem_tabela}) — skip"
+                    )
+                    continue
+
+                desc_beneficio = (
+                    f"{tag} - {funcionario.nome} - {data_rdo.strftime('%d/%m/%Y')}"
+                    f" (RDO {rdo.numero_rdo})"
+                )
+                filho_b = registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria=tipo_cat,
+                    entidade_nome=funcionario.nome,
+                    entidade_id=func_id,
+                    data=data_rdo,
+                    descricao=desc_beneficio,
+                    valor=valor_beneficio,
+                    obra_id=rdo.obra_id,
+                    origem_tabela=f'rdo_mao_obra_{tag.lower()}',
+                    origem_id=rdo.id,
+                    force_v2=True,
+                )
+                if filho_b:
+                    gestao_criados += 1
+                    valor_total_custos += valor_beneficio
+                    logger.info(
+                        f"[OK] {tag} R$ {valor_beneficio:.2f} lançado para "
+                        f"{funcionario.nome} (RDO {rdo.numero_rdo})"
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️ {tag} não lançado para {funcionario.nome} "
+                        f"(registrar_custo_automatico retornou None — "
+                        f"verifique tenant V2 e logs anteriores)"
+                    )
 
             valor_total_custos += valor_diaria
 
