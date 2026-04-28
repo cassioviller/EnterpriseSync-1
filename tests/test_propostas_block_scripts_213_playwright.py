@@ -258,39 +258,76 @@ def run():
                    "P2.e status permanece RASCUNHO", f"status={p_db.status}")
 
             # ── 3) PATH B — Aprovar Proposta e Gerar Cronograma ────────
+            #     Aqui validamos NÃO só que houve materialização, mas que
+            #     as edições específicas do admin foram refletidas:
+            #       - duracao_dias=9 da sub_a (folha #0) chega ao DB
+            #       - sub_b DESMARCADA não vira tarefa
             page.goto(url_revisar, wait_until="domcontentloaded")
             page.wait_for_load_state("networkidle")
 
-            inp_horas2 = page.locator("input.inp-horas").first
-            ok(inp_horas2.count() > 0, "P3.a tela reabriu com inputs")
+            inp_horas_list = page.locator("input.inp-horas")
+            inp_dias_list = page.locator("input.inp-dias")
+            ok(inp_horas_list.count() >= 2, "P3.a tela reabriu c/ 2 folhas",
+               f"n_horas={inp_horas_list.count()}")
 
-            inp_horas2.fill("55")
-            inp_horas2.dispatch_event("input")
+            # Edita sub_a (folha #0)
+            inp_horas_list.first.fill("55")
+            inp_horas_list.first.dispatch_event("input")
+            inp_dias_list.first.fill("9")
+            inp_dias_list.first.dispatch_event("input")
 
-            # garante todos os chk-raiz marcados (folhas vão materializar)
+            # Garante chk-raiz marcado (root da raiz do serviço)
             for i in range(page.locator("input.chk-raiz").count()):
                 cb = page.locator("input.chk-raiz").nth(i)
                 if not cb.is_checked():
                     cb.check()
 
+            # DESMARCA a 2ª folha (sub_b) — chk-node da 2ª li.node-sub
+            sub_b_li = page.locator("li.node-sub").nth(1)
+            sub_b_chk = sub_b_li.locator("> .node-label > input.chk-node")
+            ok(sub_b_chk.count() == 1, "P3.b chk-node sub_b localizado")
+            if sub_b_chk.is_checked():
+                sub_b_chk.uncheck()
+            ok(not sub_b_chk.is_checked(), "P3.c chk-node sub_b agora desmarcado")
+
             page.locator('button[type="submit"]:has-text("Aprovar Proposta")').first.click()
             page.wait_for_load_state("networkidle")
             ok("/cronograma-revisar" not in page.url,
-               "P3.b saiu da tela após aprovar", f"url={page.url}")
+               "P3.d saiu da tela após aprovar", f"url={page.url}")
+
+            sub_a_nome = f"Preparo {RUN_TAG}"
+            sub_b_nome = f"Aplicacao {RUN_TAG}"
 
             with app.app_context():
                 db.session.expire_all()
                 p_db = Proposta.query.get(ctx["proposta_id"])
                 ok((p_db.status or "").upper() == "APROVADA",
-                   "P3.c status = APROVADA", f"status={p_db.status}")
+                   "P3.e status = APROVADA", f"status={p_db.status}")
                 ok(p_db.obra_id is not None,
-                   "P3.d obra_id criado", f"obra_id={p_db.obra_id}")
+                   "P3.f obra_id criado", f"obra_id={p_db.obra_id}")
                 if p_db.obra_id:
-                    n = TarefaCronograma.query.filter_by(
-                        obra_id=p_db.obra_id, is_cliente=False).count()
-                    ok(n > 0,
-                       "P3.e TarefaCronograma materializadas (>0)",
-                       f"n_tarefas={n}")
+                    tarefas = TarefaCronograma.query.filter_by(
+                        obra_id=p_db.obra_id, is_cliente=False).all()
+                    nomes = sorted(t.nome_tarefa for t in tarefas)
+                    ok(len(tarefas) > 0,
+                       "P3.g TarefaCronograma materializadas (>0)",
+                       f"n_tarefas={len(tarefas)} nomes={nomes}")
+
+                    # sub_a foi materializada com a duracao editada (9 dias)
+                    t_a = next((t for t in tarefas if t.nome_tarefa == sub_a_nome), None)
+                    ok(t_a is not None,
+                       "P3.h sub_a (marcada) materializada como tarefa",
+                       f"encontrada={bool(t_a)}")
+                    if t_a:
+                        ok(int(t_a.duracao_dias or 0) == 9,
+                           "P3.i sub_a tem duracao_dias=9 (edição do admin refletida)",
+                           f"duracao_dias={t_a.duracao_dias}")
+
+                    # sub_b (desmarcada) NÃO pode ter virado tarefa
+                    t_b = next((t for t in tarefas if t.nome_tarefa == sub_b_nome), None)
+                    ok(t_b is None,
+                       "P3.j sub_b (desmarcada) NÃO foi materializada",
+                       f"tarefa_b_inesperada={t_b.id if t_b else None}")
 
             browser.close()
 
