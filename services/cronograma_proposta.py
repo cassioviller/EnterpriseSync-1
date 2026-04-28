@@ -181,13 +181,14 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
         Servico.id.in_(serv_ids), Servico.admin_id == admin_id
     ).all()} if serv_ids else {}
 
-    # Diagnóstico: itens sem servico no cache indicam possível admin_id incorreto.
-    _sem_cache = [it.servico_id for it in itens if it.servico_id and it.servico_id not in servicos]
+    # Diagnóstico: IDs de serviço ausentes no cache indicam possível admin_id incorreto.
+    # Uso de set para deduplicar (um serviço pode aparecer em múltiplos itens).
+    _sem_cache = sorted({it.servico_id for it in itens if it.servico_id and it.servico_id not in servicos})
     if _sem_cache:
         logger.debug(
             f"montar_arvore_preview: proposta={proposta.id} — "
-            f"{len(_sem_cache)} servico_id(s) não encontrados para admin_id={admin_id}: "
-            f"{_sem_cache}. Esses itens resultarão em sem_template=True."
+            f"{len(_sem_cache)} servico_id(s) distintos não encontrados para admin_id={admin_id}: "
+            f"{_sem_cache}. Itens correspondentes resultarão em sem_template=True."
         )
 
     # Task #118: precedência override → padrão. Coleta TODOS os IDs candidatos
