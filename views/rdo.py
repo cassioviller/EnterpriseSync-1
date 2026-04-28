@@ -158,15 +158,35 @@ def rdos():
         
         rdos = SimplePagination(rdos_lista)
         session.close()
-        
+
         logger.debug(f"DEBUG LISTA RDOs: {rdos.total} RDOs encontrados para admin_id={admin_id}")
         if rdos.items:
             logger.debug(f"DEBUG: Mostrando página {rdos.page} com {len(rdos.items)} RDOs")
             for rdo in rdos.items[:3]:
                 logger.debug(f"DEBUG RDO {rdo.id}: {len(rdo.servico_subatividades)} subatividades, {len(rdo.mao_obra)} funcionários, {rdo.progresso_total}% progresso")
-        
+
+        rdos_processados = []
+        for rdo_view in rdos.items:
+            rdos_processados.append({
+                'rdo': rdo_view,
+                'obra': rdo_view.obra,
+                'total_subatividades': len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0,
+                'total_funcionarios': len(rdo_view.mao_obra) if rdo_view.mao_obra else 0,
+                'total_horas_trabalhadas': rdo_view.horas_totais,
+                'progresso_medio': rdo_view.progresso_total,
+                'status_cor': {
+                    'Rascunho': 'warning',
+                    'Finalizado': 'success',
+                    'Aprovado': 'info'
+                }.get(rdo_view.status, 'secondary')
+            })
+
         return render_template('rdo_lista_unificada.html',
-                             rdos=rdos,
+                             rdos=rdos_processados,
+                             pagination=rdos,
+                             total_rdos=rdos.total,
+                             page=rdos.page,
+                             admin_id=admin_id,
                              obras=obras,
                              funcionarios=funcionarios,
                              filters={
@@ -230,9 +250,29 @@ def rdos():
                     rdo.mao_obra = []
                 
                     logger.info(f"FALLBACK: Carregados {len(rdos.items)} RDOs básicos")
-            
+
+            rdos_processados = []
+            for rdo_view in rdos.items:
+                rdos_processados.append({
+                    'rdo': rdo_view,
+                    'obra': rdo_view.obra,
+                    'total_subatividades': len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0,
+                    'total_funcionarios': len(rdo_view.mao_obra) if rdo_view.mao_obra else 0,
+                    'total_horas_trabalhadas': rdo_view.horas_totais,
+                    'progresso_medio': rdo_view.progresso_total,
+                    'status_cor': {
+                        'Rascunho': 'warning',
+                        'Finalizado': 'success',
+                        'Aprovado': 'info'
+                    }.get(rdo_view.status, 'secondary')
+                })
+
             return render_template('rdo_lista_unificada.html',
-                                 rdos=rdos,
+                                 rdos=rdos_processados,
+                                 pagination=rdos,
+                                 total_rdos=rdos.total,
+                                 page=rdos.page,
+                                 admin_id=admin_id,
                                  obras=obras,
                                  funcionarios=funcionarios,
                                  filters={
