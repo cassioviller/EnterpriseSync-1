@@ -542,21 +542,76 @@ def recalcular(obra_id: int):
 @cronograma_bp.route('/obra/<int:obra_id>/reordenar', methods=['POST'])
 @login_required
 def reordenar(obra_id: int):
+    """
+    Persiste a nova ordem dos itens do cronograma da obra. Espera JSON:
+        {"ordem": [<id>, <id>, ...]}
+
+    Task #19 — drag-and-drop com persistência: valida que a obra pertence
+    ao tenant, que todos os IDs são inteiros únicos e que cada um pertence
+    à mesma obra/admin (e ao mesmo modo cliente/interno). Escreve em uma
+    única transação; em qualquer falha faz rollback e devolve erro para
+    o front reverter visualmente.
+    """
     guard = _check_v2()
     if guard:
-        return jsonify({'status': 'error'}), 403
+        return jsonify({'status': 'error', 'msg': 'V2 only'}), 403
 
     admin_id = _admin_id()
     cliente_mode = _modo_cliente()
+
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if not obra:
+        return jsonify({'status': 'error', 'msg': 'Obra não encontrada.'}), 404
+
     data = request.get_json(silent=True) or {}
-    ordem_ids = data.get('ordem', [])  # lista de IDs na nova ordem
+    ordem_raw = data.get('ordem')
 
-    for idx, tid in enumerate(ordem_ids):
-        TarefaCronograma.query.filter_by(
-            id=int(tid), obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
-        ).update({'ordem': idx})
+    if not isinstance(ordem_raw, list) or not ordem_raw:
+        return jsonify({
+            'status': 'error',
+            'msg': 'Campo "ordem" deve ser uma lista de IDs.',
+        }), 400
 
-    db.session.commit()
+    try:
+        ordem_ids = [int(x) for x in ordem_raw]
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'msg': 'IDs inválidos.'}), 400
+
+    if len(set(ordem_ids)) != len(ordem_ids):
+        return jsonify({'status': 'error', 'msg': 'IDs duplicados na ordem.'}), 400
+
+    # Carrega TODAS as tarefas da nova ordem em UMA query e valida que
+    # cada uma pertence à obra/admin e ao modo (cliente vs. interno) atual.
+    # Tudo ou nada: se algum ID não bate, devolve 400 e nada é persistido.
+    tarefas = TarefaCronograma.query.filter(
+        TarefaCronograma.id.in_(ordem_ids),
+        TarefaCronograma.obra_id == obra_id,
+        TarefaCronograma.admin_id == admin_id,
+        TarefaCronograma.is_cliente == cliente_mode,
+    ).all()
+
+    if len(tarefas) != len(ordem_ids):
+        return jsonify({
+            'status': 'error',
+            'msg': 'Algumas tarefas não pertencem a esta obra.',
+        }), 400
+
+    by_id = {t.id: t for t in tarefas}
+    try:
+        for idx, tid in enumerate(ordem_ids):
+            by_id[tid].ordem = idx
+        db.session.commit()
+    except Exception as exc:  # pragma: no cover - defensivo
+        db.session.rollback()
+        logger.exception(
+            f"[ERROR] Falha ao reordenar cronograma obra={obra_id}: {exc}"
+        )
+        return jsonify({'status': 'error', 'msg': 'Falha ao salvar ordem.'}), 500
+
+    logger.info(
+        f"[OK] Cronograma reordenado obra={obra_id} cliente={cliente_mode} "
+        f"qtd={len(ordem_ids)}"
+    )
     return jsonify({'status': 'ok'})
 
 

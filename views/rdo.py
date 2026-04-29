@@ -1565,9 +1565,16 @@ def editar_rdo(id):
             from utils.tenant import is_v2_active
             if is_v2_active():
                 from models import RDOApontamentoCronograma, TarefaCronograma
+                # Task #19 — exibe apontamentos na ordem definida pelo
+                # cronograma (mesmo critério usado no editor de cronograma).
                 aps = (
                     RDOApontamentoCronograma.query
-                    .filter_by(rdo_id=rdo.id, admin_id=admin_id)
+                    .join(TarefaCronograma, TarefaCronograma.id == RDOApontamentoCronograma.tarefa_cronograma_id)
+                    .filter(
+                        RDOApontamentoCronograma.rdo_id == rdo.id,
+                        RDOApontamentoCronograma.admin_id == admin_id,
+                    )
+                    .order_by(TarefaCronograma.ordem, TarefaCronograma.id)
                     .all()
                 )
                 # Task #142 — sem recálculo: lemos `percentual_planejado`

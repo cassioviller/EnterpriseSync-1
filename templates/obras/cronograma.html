@@ -123,8 +123,7 @@
                 data-perc="{{ perc }}"
                 data-planejado="{{ plan }}"
                 data-inicio="{{ t.data_inicio.isoformat() if t.data_inicio else '' }}"
-                data-fim="{{ t.data_fim.isoformat() if t.data_fim else '' }}"
-                draggable="true">
+                data-fim="{{ t.data_fim.isoformat() if t.data_fim else '' }}">
 
               {# Drag handle #}
               <td class="td-grip">
@@ -795,14 +794,20 @@
   border-left: 2px dashed rgba(255,255,255,.9);
   z-index: 4; pointer-events: none;
 }
-/* Row drag */
-.tarefa-row.dragging-row { opacity: .45; background: #fff3cd !important; }
-.tarefa-row.drag-over-row { border-top: 2px solid #1976d2; }
+/* Gantt bar drop highlight */
 .gantt-row.drag-over { background: #ddeeff !important; }
 
 /* Offcanvas progress preview */
 #ed_perc { accent-color: #1976d2; }
+
+/* Task #19 — feedback visual SortableJS para reordenação de linhas */
+.tarefa-row.sortable-ghost { opacity: .35; background: #fff3cd !important; }
+.tarefa-row.sortable-chosen { background: #fffae5 !important; }
+.tarefa-row.sortable-drag { box-shadow: 0 6px 18px rgba(0,0,0,.18); }
 </style>
+
+<!-- Task #19 — SortableJS para reordenação confiável de itens do cronograma -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <script>
 const OBRA_ID  = {{ obra.id }};
@@ -1581,7 +1586,7 @@ function adicionarLinhaTabela(t) {
   row.dataset.planejado = Math.round(t.percentual_planejado || 0);
   row.dataset.inicio   = t.data_inicio || '';
   row.dataset.fim      = t.data_fim    || '';
-  row.draggable = true;
+  // Task #19 — drag-and-drop é gerenciado por SortableJS via .drag-handle.
 
   const ePai = tarefas.some(x => x.tarefa_pai_id === t.id);
   const qtdHtml = ePai
@@ -1860,69 +1865,111 @@ function renderGantt() {
   });
 }
 
-// ── Row Drag & Drop ──
-let rowDrag = null;
+// ── Row Drag & Drop (Task #19 — SortableJS + persistência confiável) ──
+// Snapshot da ordem antes do drag, usado para reverter visualmente caso
+// o servidor recuse a nova ordem (ex.: erro de rede ou validação).
+let _preDragOrder = null;
+
+function _renumerarColunaIndice(tbody) {
+  // Mantém a coluna "#" coerente com a ordem visual atual sem precisar
+  // re-renderizar a tabela inteira.
+  let i = 1;
+  tbody.querySelectorAll('.tarefa-row').forEach(r => {
+    const numCell = r.querySelector('.td-num');
+    if (numCell) numCell.textContent = i++;
+  });
+}
+
+function _restaurarOrdemDOM(tbody, ordemIds) {
+  // Reordena os <tr> conforme `ordemIds`, preservando elementos que não
+  // estejam na lista (defesa: nunca remove nada do DOM).
+  if (!ordemIds || !ordemIds.length) return;
+  const byId = new Map();
+  tbody.querySelectorAll('.tarefa-row').forEach(r => byId.set(parseInt(r.dataset.id), r));
+  ordemIds.forEach(id => {
+    const el = byId.get(id);
+    if (el) tbody.appendChild(el);
+  });
+  _renumerarColunaIndice(tbody);
+}
 
 function initRowDrag() {
   const tbody = document.getElementById('tarefasBody');
   if (!tbody) return;
+  if (typeof Sortable === 'undefined') {
+    console.warn('[cronograma] SortableJS indisponível — drag-and-drop desabilitado.');
+    return;
+  }
 
-  tbody.addEventListener('dragstart', e => {
-    const row = e.target.closest('.tarefa-row');
-    if (!row || !e.target.closest('.drag-handle')) { e.preventDefault(); return; }
-    rowDrag = { el: row, id: parseInt(row.dataset.id) };
-    row.classList.add('dragging-row');
-    e.dataTransfer.effectAllowed = 'move';
-  });
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    draggable: '.tarefa-row',
+    animation: 150,
+    forceFallback: true,           // garante feedback visual consistente em <tbody>
+    fallbackTolerance: 4,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
 
-  tbody.addEventListener('dragover', e => {
-    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-    const row = e.target.closest('.tarefa-row');
-    tbody.querySelectorAll('.drag-over-row').forEach(r => r.classList.remove('drag-over-row'));
-    if (row && rowDrag && row !== rowDrag.el) row.classList.add('drag-over-row');
-  });
+    onStart() {
+      _preDragOrder = Array.from(tbody.querySelectorAll('.tarefa-row'))
+        .map(r => parseInt(r.dataset.id));
+    },
 
-  tbody.addEventListener('dragleave', e => {
-    const row = e.target.closest('.tarefa-row');
-    if (row) row.classList.remove('drag-over-row');
-  });
+    async onEnd(evt) {
+      const movedEl = evt.item;
+      const movedId = parseInt(movedEl.dataset.id);
 
-  tbody.addEventListener('drop', async e => {
-    e.preventDefault();
-    const targetRow = e.target.closest('.tarefa-row');
-    if (!rowDrag || !targetRow || targetRow === rowDrag.el) { cleanupRowDrag(); return; }
+      // Se o item movido é uma tarefa-pai, mantém o grupo coeso: arrasta os
+      // filhos imediatamente para logo após o pai. (Task #19 não suporta
+      // mover sub-itens entre pais, mas precisa preservar a hierarquia visual.)
+      if (movedEl.classList.contains('tarefa-pai')) {
+        const filhos = Array.from(
+          tbody.querySelectorAll(`.tarefa-row[data-pai="${movedId}"]`)
+        );
+        let anchor = movedEl;
+        filhos.forEach(c => { anchor.after(c); anchor = c; });
+      }
 
-    const rows = Array.from(tbody.querySelectorAll('.tarefa-row'));
-    if (rows.indexOf(rowDrag.el) < rows.indexOf(targetRow)) targetRow.after(rowDrag.el);
-    else targetRow.before(rowDrag.el);
+      const newOrder = Array.from(tbody.querySelectorAll('.tarefa-row'))
+        .map(r => parseInt(r.dataset.id));
 
-    cleanupRowDrag();
-    const newOrder = Array.from(tbody.querySelectorAll('.tarefa-row')).map(r => parseInt(r.dataset.id));
+      // Sem mudança real (drop no mesmo lugar) → não consulta o servidor.
+      const unchanged = _preDragOrder
+        && _preDragOrder.length === newOrder.length
+        && _preDragOrder.every((v, i) => v === newOrder[i]);
 
-    try {
-      const res = await fetch(`${URL_BASE}/reordenar${QS_CLIENTE}`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ ordem: newOrder }),
-      });
-      const data = await res.json();
-      if (data.status === 'ok') {
+      if (unchanged) {
+        _preDragOrder = null;
+        return;
+      }
+
+      _renumerarColunaIndice(tbody);
+      const snapshot = _preDragOrder;
+      _preDragOrder = null;
+
+      try {
+        const res = await fetch(`${URL_BASE}/reordenar${QS_CLIENTE}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ordem: newOrder }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'ok') {
+          throw new Error(data.msg || 'Falha ao salvar ordem');
+        }
+        // Sincroniza estado local + Gantt com a nova ordem persistida.
         const byId = Object.fromEntries(tarefas.map(t => [t.id, t]));
         tarefas = newOrder.map(id => byId[id]).filter(Boolean);
         renderGantt();
         toast('Ordem salva');
-      } else {
-        toast('Erro ao salvar ordem', 'error');
+      } catch (err) {
+        // Rollback visual: restaura a ordem que existia antes do drag.
+        _restaurarOrdemDOM(tbody, snapshot);
+        toast('Não foi possível salvar a ordem. Restaurada a anterior.', 'error');
       }
-    } catch(err) { toast('Erro de rede', 'error'); }
+    },
   });
-
-  tbody.addEventListener('dragend', cleanupRowDrag);
-}
-
-function cleanupRowDrag() {
-  if (rowDrag) rowDrag.el.classList.remove('dragging-row');
-  document.querySelectorAll('.drag-over-row').forEach(r => r.classList.remove('drag-over-row'));
-  rowDrag = null;
 }
 
 // ── Init ──

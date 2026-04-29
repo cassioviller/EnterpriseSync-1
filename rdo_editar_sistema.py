@@ -113,9 +113,17 @@ def editar_rdo_form(rdo_id):
             if is_v2_active():
                 from models import RDOApontamentoCronograma, TarefaCronograma
                 from app import db as _db
-                aps = RDOApontamentoCronograma.query.filter_by(
-                    rdo_id=rdo_id, admin_id=admin_id
-                ).all()
+                # Task #19 — apontamentos seguem a ordem do cronograma.
+                aps = (
+                    RDOApontamentoCronograma.query
+                    .join(TarefaCronograma, TarefaCronograma.id == RDOApontamentoCronograma.tarefa_cronograma_id)
+                    .filter(
+                        RDOApontamentoCronograma.rdo_id == rdo_id,
+                        RDOApontamentoCronograma.admin_id == admin_id,
+                    )
+                    .order_by(TarefaCronograma.ordem, TarefaCronograma.id)
+                    .all()
+                )
                 for ap in aps:
                     t = TarefaCronograma.query.get(ap.tarefa_cronograma_id)
                     apontamentos_cronograma.append({
