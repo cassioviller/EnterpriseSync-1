@@ -590,6 +590,239 @@ console.log('Initializing RDO view with light theme...');
     }
 }
 
+/* ===== TABLET: melhorar densidade ===== */
+@media (min-width: 481px) and (max-width: 1024px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .info-section { margin: 0 1.25rem 2rem 1.25rem; }
+    .info-body { padding: 1.5rem; }
+    .funcionarios-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .subatividades-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+}
+
+/* ===== BLOCOS DE OBSERVAÇÕES E OCORRÊNCIAS ===== */
+.obs-block {
+    background: #fffdf5;
+    border-left: 4px solid #ffc107;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    color: #212529;
+    white-space: pre-wrap;
+    font-size: .95rem;
+    line-height: 1.5;
+}
+
+.obs-inline {
+    margin-top: .75rem;
+    padding: .6rem .85rem;
+    background: #fffdf5;
+    border-left: 3px solid #ffc107;
+    border-radius: 6px;
+    font-size: .82rem;
+    color: #495057;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+.obs-inline i { color: #d39e00; margin-right: .3rem; }
+
+.obs-inline .obs-label {
+    display: block;
+    font-weight: 700;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-size: .7rem;
+    margin-bottom: .2rem;
+}
+
+.empty-inline {
+    color: #6c757d;
+    font-style: italic;
+    font-size: .9rem;
+    padding: .25rem 0;
+}
+
+.equipamentos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.25rem;
+    padding: 2rem;
+}
+
+.equipamento-card {
+    background: #ffffff;
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    color: var(--gray-800);
+}
+
+.equipamento-card h5 {
+    margin: 0 0 .75rem 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.equipamento-card .equipamento-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    font-size: .85rem;
+    color: var(--gray-600);
+}
+
+.equipamento-card .equipamento-meta span {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    padding: .25rem .6rem;
+    border-radius: 999px;
+}
+
+.estado-badge {
+    background: #e7f5ee !important;
+    color: #155724 !important;
+    border-color: #c3e6cb !important;
+}
+
+.ocorrencias-list {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.ocorrencia-card {
+    background: #ffffff;
+    border-radius: var(--border-radius);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    border-left: 5px solid var(--gray-400);
+    color: var(--gray-800);
+}
+
+.ocorrencia-card.severidade-baixa { border-left-color: #6c757d; }
+.ocorrencia-card.severidade-media { border-left-color: #ffc107; }
+.ocorrencia-card.severidade-alta { border-left-color: #fd7e14; }
+.ocorrencia-card.severidade-critica { border-left-color: #dc3545; background: #fff5f5; }
+
+.ocorrencia-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .75rem;
+}
+
+.ocorrencia-header .badge-meta {
+    display: inline-block;
+    padding: .25rem .65rem;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+}
+
+.ocorrencia-header .badge-sev-baixa { background: #e9ecef; color: #495057; }
+.ocorrencia-header .badge-sev-media { background: #fff3cd; color: #856404; border-color: #ffeeba; }
+.ocorrencia-header .badge-sev-alta  { background: #ffe5d0; color: #9a4a07; border-color: #fcd5b6; }
+.ocorrencia-header .badge-sev-critica { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+
+.ocorrencia-header .badge-status-pendente { background: #fff3cd; color: #856404; border-color: #ffeeba; }
+.ocorrencia-header .badge-status-em-andamento { background: #cce5ff; color: #004085; border-color: #b8daff; }
+.ocorrencia-header .badge-status-resolvido { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+
+.ocorrencia-descricao {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--gray-800);
+    white-space: pre-wrap;
+    margin-bottom: .75rem;
+}
+
+.ocorrencia-detalhes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .75rem;
+    margin-top: .75rem;
+}
+
+.ocorrencia-detalhes .detalhe-item {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: .65rem .85rem;
+    font-size: .85rem;
+}
+
+.ocorrencia-detalhes .detalhe-item .detalhe-label {
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-size: .7rem;
+    font-weight: 700;
+    color: var(--gray-600);
+    margin-bottom: .2rem;
+}
+
+.ocorrencia-detalhes .detalhe-item .detalhe-value {
+    color: var(--gray-800);
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+.clima-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    padding: 0 0 1rem 0;
+}
+
+.clima-item {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+}
+
+.clima-item .clima-label {
+    display: block;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 700;
+    color: var(--gray-600);
+    margin-bottom: .35rem;
+}
+
+.clima-item .clima-value {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+/* ===== IMPRESSÃO ===== */
+@media print {
+    .page-header { background: #ffffff !important; color: #212529 !important; box-shadow: none !important; border: 1px solid #dee2e6 !important; padding: 1rem 0 !important; }
+    .page-header * { color: #212529 !important; }
+    .btn-voltar { display: none !important; }
+    .stat-card, .info-card, .funcionario-card, .subatividade-card, .equipamento-card, .ocorrencia-card { box-shadow: none !important; break-inside: avoid; page-break-inside: avoid; }
+    .info-section { margin: 0 0 1rem 0 !important; }
+    .stats-grid { margin: 0 0 1rem 0 !important; }
+    .rdo-container { background: #ffffff !important; }
+    .foto-lightbox { display: none !important; }
+    .obs-block, .obs-inline { background: #fffdf5 !important; }
+}
+
 /* ===== LIGHTBOX PERSONALIZADO FULLSCREEN (substitui Bootstrap modal) ===== */
 .foto-lightbox {
     display: none;
@@ -897,19 +1130,105 @@ console.log('Initializing RDO view with light theme...');
                 </div>
                 <div class="info-row">
                     <span class="info-label">Criado em:</span>
-                    <span class="info-value">{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else 'N/A' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Condições Climáticas:</span>
-                    <span class="info-value">{{ rdo.clima_geral if rdo.clima_geral else 'Não informado' }}</span>
+                    <span class="info-value">{{ rdo.created_at.strftime('%d/%m/%Y %H:%M') if rdo.created_at else '—' }}</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Local:</span>
                     <span class="info-value">{{ '🏗️ Campo' if rdo.local == 'Campo' else '🔧 Oficina' if rdo.local == 'Oficina' else (rdo.local if rdo.local else 'Campo') }}</span>
                 </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">
+                        {% set status_class = 'status-rascunho' %}
+                        {% if rdo.status == 'Finalizado' %}{% set status_class = 'status-finalizado' %}
+                        {% elif rdo.status in ['Em Andamento', 'Em andamento'] %}{% set status_class = 'status-em-andamento' %}
+                        {% endif %}
+                        <span class="status-badge {{ status_class }}">{{ rdo.status or 'Rascunho' }}</span>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Seção Condições Climáticas -->
+    {% set tem_clima = rdo.clima_geral or rdo.temperatura_media or rdo.umidade_relativa is not none or rdo.vento_velocidade or rdo.precipitacao or rdo.condicoes_trabalho or rdo.observacoes_climaticas %}
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon" style="background:linear-gradient(135deg,#0d6efd,#0a58ca)">
+                    <i class="fas fa-cloud-sun"></i>
+                </div>
+                <h3>Condições Climáticas</h3>
+            </div>
+            <div class="info-body">
+                {% if tem_clima %}
+                <div class="clima-grid">
+                    {% if rdo.clima_geral %}
+                    <div class="clima-item">
+                        <span class="clima-label">Clima geral</span>
+                        <span class="clima-value">{{ rdo.clima_geral }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rdo.temperatura_media %}
+                    <div class="clima-item">
+                        <span class="clima-label">Temperatura média</span>
+                        <span class="clima-value">{{ rdo.temperatura_media }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rdo.umidade_relativa is not none %}
+                    <div class="clima-item">
+                        <span class="clima-label">Umidade relativa</span>
+                        <span class="clima-value">{{ rdo.umidade_relativa }}%</span>
+                    </div>
+                    {% endif %}
+                    {% if rdo.vento_velocidade %}
+                    <div class="clima-item">
+                        <span class="clima-label">Vento</span>
+                        <span class="clima-value">{{ rdo.vento_velocidade }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rdo.precipitacao %}
+                    <div class="clima-item">
+                        <span class="clima-label">Precipitação</span>
+                        <span class="clima-value">{{ rdo.precipitacao }}</span>
+                    </div>
+                    {% endif %}
+                    {% if rdo.condicoes_trabalho %}
+                    <div class="clima-item">
+                        <span class="clima-label">Condições de trabalho</span>
+                        <span class="clima-value">{{ rdo.condicoes_trabalho }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if rdo.observacoes_climaticas %}
+                <div class="obs-block mt-2">
+                    <strong><i class="fas fa-comment-dots"></i> Observações climáticas</strong>
+                    <div style="margin-top:.4rem">{{ rdo.observacoes_climaticas }}</div>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="empty-inline"><i class="fas fa-info-circle"></i> Nenhuma condição climática registrada.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção Observações Gerais do RDO -->
+    {% if rdo.comentario_geral and rdo.comentario_geral.strip() %}
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon" style="background:linear-gradient(135deg,#ffc107,#d39e00)">
+                    <i class="fas fa-sticky-note"></i>
+                </div>
+                <h3>Observações Gerais</h3>
+            </div>
+            <div class="info-body">
+                <div class="obs-block">{{ rdo.comentario_geral }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
 
 
@@ -949,6 +1268,17 @@ console.log('Initializing RDO view with light theme...');
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: {{ subatividade.percentual_conclusao or 0 }}%"></div>
                             </div>
+                            {% if subatividade.descricao_subatividade and subatividade.descricao_subatividade.strip() %}
+                            <div class="mt-2" style="font-size:.82rem;color:#495057">
+                                {{ subatividade.descricao_subatividade }}
+                            </div>
+                            {% endif %}
+                            {% if subatividade.observacoes_tecnicas and subatividade.observacoes_tecnicas.strip() %}
+                            <div class="obs-inline">
+                                <span class="obs-label"><i class="fas fa-comment-dots"></i> Observações</span>
+                                {{ subatividade.observacoes_tecnicas }}
+                            </div>
+                            {% endif %}
                             {% if subatividade.quantidade_produzida is not none %}
                             <div class="mt-2 px-1" style="font-size:.82rem">
                                 <span class="text-success fw-semibold">
@@ -1129,6 +1459,130 @@ console.log('Initializing RDO view with light theme...');
     </div>
     {% endif %}
 
+    <!-- Seção Equipamentos -->
+    {% set equipamentos_rdo = rdo.equipamentos|list if rdo.equipamentos else [] %}
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon" style="background:linear-gradient(135deg,#6f42c1,#4a2a8a)">
+                    <i class="fas fa-truck-pickup"></i>
+                </div>
+                <h3>Equipamentos {% if equipamentos_rdo %}({{ equipamentos_rdo|length }}){% endif %}</h3>
+            </div>
+            {% if equipamentos_rdo %}
+            <div class="equipamentos-grid">
+                {% for eq in equipamentos_rdo %}
+                <div class="equipamento-card">
+                    <h5><i class="fas fa-cogs text-secondary"></i> {{ eq.nome_equipamento }}</h5>
+                    <div class="equipamento-meta">
+                        <span><strong>Qtd.</strong> {{ eq.quantidade }}</span>
+                        <span><strong>Uso</strong> {{ "%.1f"|format(eq.horas_uso or 0) }}h</span>
+                        {% if eq.estado_conservacao %}
+                        <span class="estado-badge"><i class="fas fa-check-circle"></i> {{ eq.estado_conservacao }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="padding: 2rem 1.5rem; text-align: center;">
+                <div style="font-size: 2.5rem; color: var(--gray-300); margin-bottom: .5rem;">
+                    <i class="fas fa-truck-pickup"></i>
+                </div>
+                <p class="empty-inline">Nenhum equipamento registrado neste RDO.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Seção Ocorrências -->
+    {% set ocorrencias_rdo = rdo.ocorrencias_rdo|list if rdo.ocorrencias_rdo else [] %}
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon" style="background:linear-gradient(135deg,#dc3545,#a71d2a)">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Ocorrências {% if ocorrencias_rdo %}({{ ocorrencias_rdo|length }}){% endif %}</h3>
+            </div>
+            {% if ocorrencias_rdo %}
+            <div class="ocorrencias-list">
+                {% for oc in ocorrencias_rdo %}
+                {% set sev = (oc.severidade or 'Baixa')|lower %}
+                {% set sev_class = 'baixa' %}
+                {% if sev in ['média','media'] %}{% set sev_class = 'media' %}
+                {% elif sev == 'alta' %}{% set sev_class = 'alta' %}
+                {% elif sev in ['crítica','critica'] %}{% set sev_class = 'critica' %}
+                {% endif %}
+                {% set status_norm = (oc.status_resolucao or 'Pendente')|lower %}
+                {% set status_class = 'pendente' %}
+                {% if status_norm in ['em andamento','em_andamento'] %}{% set status_class = 'em-andamento' %}
+                {% elif status_norm == 'resolvido' %}{% set status_class = 'resolvido' %}
+                {% endif %}
+                <div class="ocorrencia-card severidade-{{ sev_class }}">
+                    <div class="ocorrencia-header">
+                        {% if oc.tipo_ocorrencia %}
+                        <span class="badge-meta"><i class="fas fa-tag"></i> {{ oc.tipo_ocorrencia }}</span>
+                        {% endif %}
+                        <span class="badge-meta badge-sev-{{ sev_class }}">
+                            <i class="fas fa-signal"></i> Severidade: {{ oc.severidade or 'Baixa' }}
+                        </span>
+                        <span class="badge-meta badge-status-{{ status_class }}">
+                            <i class="fas fa-circle-check"></i> {{ oc.status_resolucao or 'Pendente' }}
+                        </span>
+                        {% if oc.criado_em %}
+                        <span class="badge-meta" title="Registrado em">
+                            <i class="far fa-clock"></i> {{ oc.criado_em.strftime('%d/%m/%Y %H:%M') }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="ocorrencia-descricao">{{ oc.descricao_ocorrencia }}</div>
+                    <div class="ocorrencia-detalhes">
+                        {% if oc.problemas_identificados and oc.problemas_identificados.strip() %}
+                        <div class="detalhe-item">
+                            <span class="detalhe-label"><i class="fas fa-bug"></i> Problemas identificados</span>
+                            <span class="detalhe-value">{{ oc.problemas_identificados }}</span>
+                        </div>
+                        {% endif %}
+                        {% if oc.acoes_corretivas and oc.acoes_corretivas.strip() %}
+                        <div class="detalhe-item">
+                            <span class="detalhe-label"><i class="fas fa-tools"></i> Ações corretivas</span>
+                            <span class="detalhe-value">{{ oc.acoes_corretivas }}</span>
+                        </div>
+                        {% endif %}
+                        {% if oc.responsavel_acao %}
+                        <div class="detalhe-item">
+                            <span class="detalhe-label"><i class="fas fa-user-shield"></i> Responsável</span>
+                            <span class="detalhe-value">{{ oc.responsavel_acao }}</span>
+                        </div>
+                        {% endif %}
+                        {% if oc.prazo_resolucao %}
+                        <div class="detalhe-item">
+                            <span class="detalhe-label"><i class="far fa-calendar-alt"></i> Prazo de resolução</span>
+                            <span class="detalhe-value">{{ oc.prazo_resolucao.strftime('%d/%m/%Y') }}</span>
+                        </div>
+                        {% endif %}
+                        {% if oc.observacoes_resolucao and oc.observacoes_resolucao.strip() %}
+                        <div class="detalhe-item" style="grid-column: 1 / -1;">
+                            <span class="detalhe-label"><i class="fas fa-comment-dots"></i> Observações da resolução</span>
+                            <span class="detalhe-value">{{ oc.observacoes_resolucao }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="padding: 2rem 1.5rem; text-align: center;">
+                <div style="font-size: 2.5rem; color: var(--gray-300); margin-bottom: .5rem;">
+                    <i class="far fa-smile"></i>
+                </div>
+                <p class="empty-inline">Nenhuma ocorrência registrada neste RDO.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Seção Mão de Obra -->
     {% if funcionarios %}
     <div class="info-section">
@@ -1154,6 +1608,11 @@ console.log('Initializing RDO view with light theme...');
                     <div class="funcionario-horas">
                         <i class="fas fa-clock"></i>
                         <span>{{ "%.1f"|format(funcionario.horas_trabalhadas) }}h</span>
+                        {% if funcionario.horas_extras and funcionario.horas_extras > 0 %}
+                        <span class="badge bg-warning text-dark ms-2" style="font-size:.7rem" title="Horas extras">
+                            +{{ "%.1f"|format(funcionario.horas_extras) }}h extras
+                        </span>
+                        {% endif %}
                     </div>
                     {% if funcionario.atividades %}
                     <div class="funcionario-atividades mt-2 w-100" style="text-align: left;">
