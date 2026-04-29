@@ -28,6 +28,28 @@ except ImportError:
             return func
         return decorator
 
+
+def _gerar_numero_rdo_unico(obra_id, data_relatorio, admin_id):
+    """Gera um número de RDO globalmente único.
+
+    O método de instância ``RDO.gerar_numero_rdo`` (models.py) faz uma
+    contagem de RDOs por obra e por ano, mas a coluna ``RDO.numero_rdo``
+    tem ``UNIQUE`` global no banco — então duas obras diferentes acabam
+    colidindo na primeira linha (ambas geram ``RDO-{ano}-001``). Este
+    helper segue o mesmo formato usado pelo fluxo principal
+    (``rdo_salvar_unificado`` — ``RDO-{admin_id}-{ano}-NNN``) e faz
+    retry automático em caso de colisão. Task #12.
+    """
+    import random
+    ano_atual = data_relatorio.year if data_relatorio else datetime.now().year
+    contador = 1
+    while contador <= 999:
+        numero_proposto = f"RDO-{admin_id}-{ano_atual}-{contador:03d}"
+        if not RDO.query.filter_by(numero_rdo=numero_proposto).first():
+            return numero_proposto
+        contador += 1
+    return f"RDO-{admin_id}-{ano_atual}-{random.randint(1000, 9999):04d}"
+
 @main_bp.route('/rdos')
 @main_bp.route('/rdo')
 @main_bp.route('/rdo/')
@@ -509,22 +531,23 @@ def criar_rdo():
         if rdo_existente:
             flash(f'Já existe um RDO para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
             return redirect(url_for('main.editar_rdo', id=rdo_existente.id))
-        
-        # Gerar número do RDO
-        numero_rdo = gerar_numero_rdo(obra_id, data_relatorio)
-        
-        # Criar RDO
+
+        # Criar RDO e gerar número globalmente único.
+        # (Task #12: a antiga chamada `gerar_numero_rdo(obra_id, data)` como
+        # função livre não existia e fazia a rota abortar com NameError
+        # antes da normalização de horas.)
+        numero_rdo = _gerar_numero_rdo_unico(obra_id, data_relatorio, admin_id)
         rdo = RDO()
         rdo.numero_rdo = numero_rdo
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
-        # Buscar o funcionário correspondente ao usuário logado
-        funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=current_user.admin_id).first()
-        if funcionario:
-            rdo.criado_por_id = funcionario.id
-        else:
-            flash('Funcionário não encontrado. Entre em contato com o administrador.', 'error')
-            return redirect(url_for('main.funcionario_rdo_novo'))
+        # Task #12: ``RDO.criado_por_id`` é FK para ``usuario.id``,
+        # então o id correto é ``current_user.id`` (usuario do criador) — não
+        # ``funcionario.id``, que era usado anteriormente e (a) não satisfaz a
+        # FK quando os contadores das duas tabelas divergem (b) bloqueia
+        # admins que não têm Funcionario com o mesmo email.
+        rdo.criado_por_id = current_user.id
+        rdo.admin_id = admin_id
         rdo.tempo_manha = request.form.get('tempo_manha', 'Bom')
         rdo.tempo_tarde = request.form.get('tempo_tarde', 'Bom')
         rdo.tempo_noite = request.form.get('tempo_noite', 'Bom')
@@ -1364,15 +1387,15 @@ def duplicar_rdo(id):
         novo_rdo = RDO()
         novo_rdo.obra_id = rdo_original.obra_id
         novo_rdo.data_relatorio = date.today()  # Data atual
-        novo_rdo.numero_rdo = gerar_numero_rdo(rdo_original.obra_id, novo_rdo.data_relatorio)
+        # Task #12: gerar número globalmente único em vez da função livre inexistente
+        novo_rdo.numero_rdo = _gerar_numero_rdo_unico(
+            novo_rdo.obra_id, novo_rdo.data_relatorio, admin_id
+        )
         
-        # Buscar funcionário correspondente ao usuário logado
-        funcionario = Funcionario.query.filter_by(
-            email=current_user.email, 
-            admin_id=current_user.admin_id
-        ).first()
-        if funcionario:
-            novo_rdo.criado_por_id = funcionario.id
+        # Task #12: ``RDO.criado_por_id`` é FK para ``usuario.id`` —
+        # usar ``current_user.id`` em vez de funcionario.id (mesmo bug do
+        # criar_rdo / rdo_salvar_unificado).
+        novo_rdo.criado_por_id = current_user.id
         
         # Copiar dados climáticos
         novo_rdo.tempo_manha = rdo_original.tempo_manha
@@ -1487,8 +1510,11 @@ def atualizar_rdo(id):
         rdo.comentario_geral = request.form.get('comentario_geral', '')
         
         # Se mudou para data diferente, atualizar número do RDO
+        # Task #12: gerar número globalmente único em vez da função livre inexistente
         if rdo.data_relatorio != data_relatorio:
-            rdo.numero_rdo = gerar_numero_rdo(rdo.obra_id, data_relatorio)
+            rdo.numero_rdo = _gerar_numero_rdo_unico(
+                rdo.obra_id, data_relatorio, admin_id
+            )
         
         db.session.commit()
         
@@ -2362,9 +2388,13 @@ def rdo_salvar_unificado():
                     db.session.flush()
                     logger.info(f"[OK] Funcionário criado: {funcionario.nome} (ID: {funcionario.id})")
             
-            rdo.criado_por_id = funcionario.id
+            # Task #12: ``RDO.criado_por_id`` é FK para ``usuario.id``,
+            # então usamos ``current_user.id`` (sempre um usuario válido) em
+            # vez de ``funcionario.id`` (FK para tabela diferente — só
+            # passava por coincidência de IDs).
+            rdo.criado_por_id = current_user.id
             rdo.admin_id = admin_id_correto
-            
+
             logger.debug(f"DEBUG: RDO configurado - criado_por_id={rdo.criado_por_id}, admin_id={rdo.admin_id}")
             
             logger.debug(f"DEBUG CRIAÇÃO: Criando novo RDO {numero_rdo}")

@@ -1,5 +1,5 @@
 """
-Task #9 — E2E: endpoints legados de RDO continuam normalizando horas.
+Task #9 / #12 — E2E: endpoints legados de RDO continuam normalizando horas.
 
 Confirma que as três rotas legadas que ainda criam ``RDOMaoObra``
 direto (sem o fluxo principal ``/salvar-rdo-flexivel``) aplicam a
@@ -12,7 +12,8 @@ aplicada).
 Cenários:
   L1. POST /rdo/criar (views.rdo:criar_rdo, formato JSON legado).
       Envia ``mao_obra`` com o MESMO funcionário 3x e valida que
-      o total persistido é ≤ 8h por funcionário.
+      o total persistido é 8h por funcionário (Task #12 destravou
+      esse cenário ao corrigir o NameError ``gerar_numero_rdo``).
 
   L2. POST /rdo/salvar (views.rdo:rdo_salvar_unificado, alias
       legado também usado por /funcionario/rdo/criar). Envia
@@ -193,17 +194,13 @@ class LegacyRDOEndpointsRunner:
 
     # ── Cenário L1 — POST /rdo/criar (criar_rdo) ────────────────────────────
     def cenario_L1_criar_rdo_legado(self):
-        """Verifica que a rota legada /rdo/criar emite a telemetria
-        ``[LEGACY-RDO]`` adicionada pela Task #9.
+        """Verifica que a rota legada /rdo/criar:
 
-        Observação: o corpo da view ``criar_rdo`` chama ``gerar_numero_rdo``
-        como função livre, mas o símbolo só existe como método em
-        ``RDO.gerar_numero_rdo`` — bug pré-existente, alheio à Task #9, que
-        faz a rota abortar antes de tocar o bloco de normalização (já
-        existente desde Task #8). Por isso aqui validamos apenas a
-        telemetria, e registramos o bug como follow-up para um próximo
-        ciclo. A normalização end-to-end é coberta pelo cenário L2 (mesmo
-        helper, mesmo padrão).
+        1. emite a telemetria ``[LEGACY-RDO]`` (Task #9);
+        2. cria efetivamente um RDO (Task #12 corrigiu o NameError de
+           ``gerar_numero_rdo`` que abortava a rota antes do commit);
+        3. normaliza horas — 3 entradas do mesmo funcionário com 8h cada
+           devem totalizar 8h gravadas (e não 24h infladas).
         """
         listener = _ListLogHandler()
         listener.setLevel(logging.WARNING)
@@ -220,7 +217,7 @@ class LegacyRDOEndpointsRunner:
                 'obra_id': str(self.obra.id),
                 'data_relatorio': data_relatorio,
                 'tempo_manha': 'Bom',
-                'observacoes_gerais': 'Task #9 — L1 criar_rdo legado',
+                'observacoes_gerais': 'Task #12 — L1 criar_rdo legado',
                 'mao_obra': mao_obra_payload,
             }
             r = self.client.post('/rdo/criar', data=form, follow_redirects=False)
@@ -234,6 +231,31 @@ class LegacyRDOEndpointsRunner:
         self._assert(
             listener.has_legacy_warning('/rdo/criar'),
             'L1 — telemetria [LEGACY-RDO] /rdo/criar emitida (Task #9)',
+        )
+
+        rdo = (
+            RDO.query.filter_by(
+                obra_id=self.obra.id,
+                data_relatorio=date.today(),
+            )
+            .order_by(RDO.id.desc())
+            .first()
+        )
+        self._assert(rdo is not None, 'L1 — RDO criado pelo /rdo/criar (Task #12)')
+        if not rdo:
+            return
+
+        linhas = RDOMaoObra.query.filter_by(
+            rdo_id=rdo.id, funcionario_id=self.func.id
+        ).all()
+        self._assert(
+            len(linhas) == 3,
+            f'L1 — 3 linhas de mão de obra gravadas (achou {len(linhas)})',
+        )
+        total = sum(float(m.horas_trabalhadas or 0) for m in linhas)
+        self._assert(
+            abs(total - 8.0) < 0.01,
+            f'L1 — total normalizado para 8h (achou {total:.2f}h, esperado 8h)',
         )
 
     # ── Cenário L2 — POST /rdo/salvar (rdo_salvar_unificado) ────────────────
