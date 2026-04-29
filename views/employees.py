@@ -215,10 +215,16 @@ def funcionarios():
         ativo=False
     ).order_by(Funcionario.nome).all()
     
-    # Buscar obras ativas do admin para o modal de lançamento múltiplo
+    # Buscar obras ativas do admin para o modal de lançamento múltiplo.
+    # Task #17: o que define se uma obra entra nos seletores operacionais é
+    # a flag `Obra.ativo` (mesmo padrão de Funcionario.ativo). O campo
+    # `status` (Em andamento/Pausada/Concluída) é descritivo e não controla
+    # mais a visibilidade — usar `status='Em andamento'` aqui faria com que
+    # uma obra desativada via Concluir/Reativar continuasse aparecendo no
+    # modal só por estar com o status textual antigo.
     obras_ativas = Obra.query.filter_by(
         admin_id=admin_id,
-        status='Em andamento'  
+        ativo=True
     ).order_by(Obra.nome).all()
     
     # Tratamento de erro robusto para KPIs

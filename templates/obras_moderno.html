@@ -651,135 +651,240 @@
             </div>
         </div>
 
-        <!-- Grid de Obras -->
-        <div class="obras-grid" id="cardView">
-            {% for obra in obras %}
-            <div class="obra-card fade-in">
-                <div class="obra-card-header">
-                    <h3 class="obra-card-title">{{ obra.nome }}</h3>
-                    <div class="obra-card-subtitle">
-                        {% if obra.codigo %}
-                        <span><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
-                        {% endif %}
-                        <span class="status-badge status-{{ (obra.status or 'pendente').lower().replace(' ', '-') }}">
-                            <i class="fas fa-circle"></i>
-                            {{ obra.status or 'Pendente' }}
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="obra-card-body">
-                    <!-- KPIs da Obra -->
-                    <div class="obra-info-grid">
-                        <div class="obra-info-item">
-                            <div class="obra-info-value">
-                                {% if obra.orcamento and obra.orcamento > 0 %}
-                                R$ {{ '{:,.0f}'.format(obra.orcamento).replace(',', '.') }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </div>
-                            <div class="obra-info-label">Orçamento</div>
-                        </div>
-                        
-                        <div class="obra-info-item">
-                            <div class="obra-info-value">
-                                {% if obra.data_inicio and obra.data_previsao_fim %}
-                                {{ (obra.data_previsao_fim - obra.data_inicio).days }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </div>
-                            <div class="obra-info-label">Dias Previstos</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Progresso da Obra -->
-                    {% if obra.progresso_conclusao or obra.progresso_conclusao == 0 %}
-                    <div class="progress-container">
-                        <div class="progress-header">
-                            <small><strong>Progresso da Obra</strong></small>
-                            <small><strong>{{ obra.progresso_conclusao or 0 }}%</strong></small>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: {{ obra.progresso_conclusao or 0 }}%"></div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Detalhes da Obra -->
-                    <div class="obra-details">
-                        {% if obra.endereco %}
-                        <div class="obra-detail-item">
-                            <div class="obra-detail-label">
-                                <i class="fas fa-map-marker-alt"></i>
-                                Endereço
-                            </div>
-                            <div class="obra-detail-value">{{ obra.endereco[:30] + '...' if obra.endereco|length > 30 else obra.endereco }}</div>
-                        </div>
-                        {% endif %}
-                        
-                        <div class="obra-detail-item">
-                            <div class="obra-detail-label">
-                                <i class="fas fa-calendar-alt"></i>
-                                Data Início
-                            </div>
-                            <div class="obra-detail-value">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
-                        </div>
-                        
-                        {% if obra.data_previsao_fim %}
-                        <div class="obra-detail-item">
-                            <div class="obra-detail-label">
-                                <i class="fas fa-flag-checkered"></i>
-                                Previsão Fim
-                            </div>
-                            <div class="obra-detail-value">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') }}</div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if obra.cliente_nome_efetivo %}
-                        <div class="obra-detail-item">
-                            <div class="obra-detail-label">
-                                <i class="fas fa-user-tie"></i>
-                                Cliente
-                            </div>
-                            <div class="obra-detail-value">{{ obra.cliente_nome_efetivo or '-' }}</div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if obra.responsavel %}
-                        <div class="obra-detail-item">
-                            <div class="obra-detail-label">
-                                <i class="fas fa-user-hard-hat"></i>
-                                Responsável
-                            </div>
-                            <div class="obra-detail-value">{{ obra.responsavel.nome }}</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Ações -->
-                    <div class="obra-actions">
-                        <a href="/obras/detalhes/{{ obra.id }}" class="btn-action btn-info">
-                            <i class="fas fa-eye"></i>
-                            Detalhes
-                        </a>
-                        <a href="/obras/editar/{{ obra.id }}" class="btn-action btn-warning">
-                            <i class="fas fa-edit"></i>
-                            Editar
-                        </a>
-                        <button class="btn-action btn-danger" onclick="excluirObra({{ obra.id }})">
-                            <i class="fas fa-trash"></i>
-                            Excluir
-                        </button>
-                    </div>
-                </div>
+        {# Task #17 — separação visual: obras ativas vs. concluídas/inativas.
+           Espelha o pattern de templates/funcionarios.html (seções com
+           cabeçalho + linha separadora). As obras inativas continuam
+           aparecendo aqui com aparência atenuada e ações limitadas
+           (Detalhes / Reativar) — todos os dados históricos preservados. #}
+
+        {# ===== Obras ATIVAS ===== #}
+        {% if obras_ativas %}
+        <div class="obras-section obras-ativas mb-4">
+            <div class="d-flex align-items-center mb-3">
+                <h5 class="mb-0">
+                    <i class="fas fa-hard-hat text-success me-2"></i>
+                    Obras Ativas
+                    <span class="badge bg-success ms-2">{{ obras_ativas|length }}</span>
+                </h5>
             </div>
-            {% endfor %}
+            <div class="obras-grid" id="cardView">
+                {% for obra in obras_ativas %}
+                <div class="obra-card fade-in obra-card-ativa" data-obra-id="{{ obra.id }}" data-status="ativo">
+                    <div class="obra-card-header">
+                        <h3 class="obra-card-title">{{ obra.nome }}</h3>
+                        <div class="obra-card-subtitle">
+                            {% if obra.codigo %}
+                            <span><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
+                            {% endif %}
+                            <span class="status-badge status-{{ (obra.status or 'pendente').lower().replace(' ', '-') }}">
+                                <i class="fas fa-circle"></i>
+                                {{ obra.status or 'Pendente' }}
+                            </span>
+                            <span class="status-badge" style="background:#d1fae5; color:#065f46;">
+                                <i class="fas fa-check-circle"></i>
+                                Ativa
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="obra-card-body">
+                        <div class="obra-info-grid">
+                            <div class="obra-info-item">
+                                <div class="obra-info-value">
+                                    {% if obra.orcamento and obra.orcamento > 0 %}
+                                    R$ {{ '{:,.0f}'.format(obra.orcamento).replace(',', '.') }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </div>
+                                <div class="obra-info-label">Orçamento</div>
+                            </div>
+                            <div class="obra-info-item">
+                                <div class="obra-info-value">
+                                    {% if obra.data_inicio and obra.data_previsao_fim %}
+                                    {{ (obra.data_previsao_fim - obra.data_inicio).days }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </div>
+                                <div class="obra-info-label">Dias Previstos</div>
+                            </div>
+                        </div>
+
+                        {% if obra.progresso_conclusao or obra.progresso_conclusao == 0 %}
+                        <div class="progress-container">
+                            <div class="progress-header">
+                                <small><strong>Progresso da Obra</strong></small>
+                                <small><strong>{{ obra.progresso_conclusao or 0 }}%</strong></small>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ obra.progresso_conclusao or 0 }}%"></div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="obra-details">
+                            {% if obra.endereco %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-map-marker-alt"></i> Endereço
+                                </div>
+                                <div class="obra-detail-value">{{ obra.endereco[:30] + '...' if obra.endereco|length > 30 else obra.endereco }}</div>
+                            </div>
+                            {% endif %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-calendar-alt"></i> Data Início
+                                </div>
+                                <div class="obra-detail-value">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
+                            </div>
+                            {% if obra.data_previsao_fim %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-flag-checkered"></i> Previsão Fim
+                                </div>
+                                <div class="obra-detail-value">{{ obra.data_previsao_fim.strftime('%d/%m/%Y') }}</div>
+                            </div>
+                            {% endif %}
+                            {% if obra.cliente_nome_efetivo %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-user-tie"></i> Cliente
+                                </div>
+                                <div class="obra-detail-value">{{ obra.cliente_nome_efetivo or '-' }}</div>
+                            </div>
+                            {% endif %}
+                            {% if obra.responsavel %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-user-hard-hat"></i> Responsável
+                                </div>
+                                <div class="obra-detail-value">{{ obra.responsavel.nome }}</div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="obra-actions">
+                            <a href="/obras/detalhes/{{ obra.id }}" class="btn-action btn-info">
+                                <i class="fas fa-eye"></i> Detalhes
+                            </a>
+                            <a href="/obras/editar/{{ obra.id }}" class="btn-action btn-warning">
+                                <i class="fas fa-edit"></i> Editar
+                            </a>
+                            <button class="btn-action btn-secondary"
+                                    onclick="toggleAtivoObra({{ obra.id }}, '{{ obra.nome|replace("'", "\\'") }}', false)">
+                                <i class="fas fa-flag-checkered"></i> Concluir
+                            </button>
+                            <button class="btn-action btn-danger" onclick="excluirObra({{ obra.id }})">
+                                <i class="fas fa-trash"></i> Excluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
+        {% endif %}
+
+        {# ===== Linha Separadora ===== #}
+        {% if obras_ativas and obras_inativas %}
+        <hr class="obras-separador my-4" style="border: 0; height: 2px; background: linear-gradient(90deg, #dee2e6 0%, #6c757d 50%, #dee2e6 100%); opacity: 0.7;">
+        {% endif %}
+
+        {# ===== Obras INATIVAS / CONCLUÍDAS ===== #}
+        {% if obras_inativas %}
+        <div class="obras-section obras-inativas mb-4">
+            <div class="d-flex align-items-center mb-3">
+                <h5 class="mb-0 text-muted">
+                    <i class="fas fa-archive me-2"></i>
+                    Obras Concluídas / Inativas
+                    <span class="badge bg-secondary ms-2">{{ obras_inativas|length }}</span>
+                </h5>
+                <small class="text-muted ms-3">(dados históricos preservados)</small>
+            </div>
+            <div class="obras-grid" id="cardViewInativas">
+                {% for obra in obras_inativas %}
+                <div class="obra-card fade-in obra-card-inativa" data-obra-id="{{ obra.id }}" data-status="inativo" style="opacity: 0.85;">
+                    <div class="obra-card-header" style="background: #f1f5f9;">
+                        <h3 class="obra-card-title text-muted">{{ obra.nome }}</h3>
+                        <div class="obra-card-subtitle">
+                            {% if obra.codigo %}
+                            <span class="text-muted"><i class="fas fa-hashtag"></i> {{ obra.codigo }}</span>
+                            {% endif %}
+                            <span class="status-badge" style="background:#fee2e2; color:#991b1b;">
+                                <i class="fas fa-archive"></i>
+                                Concluída / Inativa
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="obra-card-body">
+                        <div class="obra-info-grid">
+                            <div class="obra-info-item">
+                                <div class="obra-info-value text-muted">
+                                    {% if obra.orcamento and obra.orcamento > 0 %}
+                                    R$ {{ '{:,.0f}'.format(obra.orcamento).replace(',', '.') }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </div>
+                                <div class="obra-info-label">Orçamento (histórico)</div>
+                            </div>
+                            <div class="obra-info-item">
+                                <div class="obra-info-value text-muted">
+                                    {% if obra.data_inicio and obra.data_previsao_fim %}
+                                    {{ (obra.data_previsao_fim - obra.data_inicio).days }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </div>
+                                <div class="obra-info-label">Dias Previstos</div>
+                            </div>
+                        </div>
+
+                        <div class="obra-details">
+                            {% if obra.endereco %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-map-marker-alt"></i> Endereço
+                                </div>
+                                <div class="obra-detail-value text-muted">{{ obra.endereco[:30] + '...' if obra.endereco|length > 30 else obra.endereco }}</div>
+                            </div>
+                            {% endif %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-calendar-alt"></i> Data Início
+                                </div>
+                                <div class="obra-detail-value text-muted">{{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '-' }}</div>
+                            </div>
+                            {% if obra.cliente_nome_efetivo %}
+                            <div class="obra-detail-item">
+                                <div class="obra-detail-label">
+                                    <i class="fas fa-user-tie"></i> Cliente
+                                </div>
+                                <div class="obra-detail-value text-muted">{{ obra.cliente_nome_efetivo or '-' }}</div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="obra-actions">
+                            <a href="/obras/detalhes/{{ obra.id }}" class="btn-action btn-info">
+                                <i class="fas fa-eye"></i> Detalhes
+                            </a>
+                            <button class="btn-action btn-success"
+                                    onclick="toggleAtivoObra({{ obra.id }}, '{{ obra.nome|replace("'", "\\'") }}', true)">
+                                <i class="fas fa-undo"></i> Reativar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Estado Vazio -->
-        {% if not obras %}
+        {% if not obras_ativas and not obras_inativas %}
         <div class="empty-state">
             <i class="fas fa-hard-hat"></i>
             <h5>Nenhuma obra encontrada</h5>
@@ -818,6 +923,43 @@ function excluirObra(id) {
         document.body.appendChild(form);
         form.submit();
     }
+}
+
+// Task #17 — Concluir/Reativar obra (espelho do toggleStatusFuncionario).
+// NÃO exclui dados: apenas alterna o flag `ativo` do registro. As obras
+// inativas são preservadas para histórico e ocultas dos seletores.
+function toggleAtivoObra(id, nome, ativar) {
+    const acao = ativar ? 'reativar' : 'marcar como concluída';
+    const detalhe = ativar
+        ? 'A obra voltará a aparecer nas listagens e seletores.'
+        : 'A obra será ocultada das listagens e seletores, mas todos os dados (RDOs, ponto, custos) serão preservados e continuarão acessíveis pelos detalhes.';
+    const mensagem = `Tem certeza que deseja ${acao} a obra "${nome}"?\n\n${detalhe}`;
+
+    if (!confirm(mensagem)) return;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    fetch(`/api/obra/${id}/toggle-ativo`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf
+        },
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data && data.success) {
+            alert(data.message || 'Status da obra atualizado com sucesso.');
+            location.reload();
+        } else {
+            alert('Erro: ' + ((data && data.message) || 'falha desconhecida'));
+        }
+    })
+    .catch(err => {
+        console.error('Erro ao alternar status da obra:', err);
+        alert('Erro interno do servidor ao alterar o status da obra.');
+    });
 }
 
 // Função para alternar visualização (futura implementação)

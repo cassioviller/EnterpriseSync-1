@@ -232,7 +232,19 @@ def obras():
                 'custo_transporte': 0
             }
     
-    return render_template('obras_moderno.html', obras=obras, filtros=filtros)
+    # Task #17: separar obras ativas (em andamento/listagem padrão) das
+    # inativas (concluídas/desativadas) para a UI. Os filtros já foram
+    # aplicados acima — aqui apenas particionamos a lista para o template.
+    obras_ativas = [o for o in obras if o.ativo]
+    obras_inativas = [o for o in obras if not o.ativo]
+
+    return render_template(
+        'obras_moderno.html',
+        obras=obras,
+        obras_ativas=obras_ativas,
+        obras_inativas=obras_inativas,
+        filtros=filtros,
+    )
 
 # CRUD OBRAS - Nova Obra
 @main_bp.route('/obras/nova', methods=['GET', 'POST'])
@@ -342,6 +354,12 @@ def nova_obra():
                 import secrets
                 token_cliente = secrets.token_urlsafe(32)
 
+            # Task #17 — o formulário compartilhado expõe o checkbox
+            # "Obra ativa" (default checked em criação). Lemos com o mesmo
+            # padrão do edit (`'ativo' in request.form`) para que, se o
+            # usuário desmarcar antes de salvar, a obra já nasça inativa.
+            ativo = 'ativo' in request.form
+
             # Criar nova obra
             nova_obra = Obra(
                 nome=nome,
@@ -353,6 +371,7 @@ def nova_obra():
                 valor_contrato=valor_contrato,
                 area_total_m2=area_total_m2,
                 status=status,
+                ativo=ativo,
                 responsavel_id=responsavel_id,
                 cliente_id=cliente_obj.id,
                 portal_ativo=portal_ativo,
@@ -884,6 +903,12 @@ def editar_obra(id):
             obra.cliente_id = cliente_obj.id
             obra.portal_ativo = request.form.get('portal_ativo') == '1'
 
+            # Task #17: marcar obra como concluída/inativa via checkbox no
+            # formulário de edição (mesmo padrão de Funcionario.ativo).
+            # Preserva todos os dados históricos — apenas oculta a obra das
+            # listagens/seletores principais.
+            obra.ativo = 'ativo' in request.form
+
             # Campos de Geofencing
             obra.latitude = float(request.form.get('latitude')) if request.form.get('latitude') else None
             obra.longitude = float(request.form.get('longitude')) if request.form.get('longitude') else None
@@ -1155,27 +1180,79 @@ def excluir_obra(id):
         flash(f'Erro ao excluir obra: {str(e)}', 'error')
         return redirect(url_for('main.obras'))
 
-# Toggle Ativo/Finalizado de Obra
+# Toggle Ativo/Concluído de Obra (form-based, redirect)
 @main_bp.route('/obras/toggle-status/<int:id>', methods=['POST'])
 @login_required
 def toggle_status_obra(id):
-    """Alterna status ativo/finalizado da obra"""
+    """Alterna status ativo/concluído (inativo) da obra.
+
+    Task #17: aplicar isolamento por tenant (admin_id) — equivalente ao
+    pattern usado em ``toggle_funcionario_ativo``. Mantida a resposta de
+    redirect para compatibilidade com o formulário existente em
+    ``detalhes_obra_profissional.html``. O endpoint JSON usado pela
+    listagem moderna está em ``toggle_ativo_obra_api`` abaixo.
+    """
     try:
-        obra = Obra.query.get_or_404(id)
-        
-        # Alternar o status ativo
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            flash('Admin não identificado para alterar a obra.', 'error')
+            return redirect(url_for('main.obras'))
+
+        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada.', 'error')
+            return redirect(url_for('main.obras'))
+
         obra.ativo = not obra.ativo
         db.session.commit()
-        
-        status_texto = "ATIVO" if obra.ativo else "FINALIZADO"
+
+        status_texto = "ATIVA" if obra.ativo else "CONCLUÍDA"
         flash(f'Obra "{obra.nome}" alterada para {status_texto}!', 'success')
-        
+
         return redirect(url_for('main.detalhes_obra', id=id))
-        
+
     except Exception as e:
         db.session.rollback()
+        logger.error(f"[ERROR] Erro ao toggle obra {id}: {str(e)}")
         flash(f'Erro ao alterar status da obra: {str(e)}', 'error')
         return redirect(url_for('main.detalhes_obra', id=id))
+
+
+# Toggle Ativo/Concluído de Obra (API JSON, usado pela listagem moderna)
+@main_bp.route('/api/obra/<int:obra_id>/toggle-ativo', methods=['POST'])
+@login_required
+def toggle_ativo_obra_api(obra_id):
+    """Toggle status ativo/concluído (inativo) da obra — resposta JSON.
+
+    Task #17: mesmo padrão de ``toggle_funcionario_ativo`` para uso em
+    fetch() na listagem de obras. NUNCA exclui dados — apenas marca a
+    obra como inativa para ocultá-la da listagem padrão e dos seletores.
+    """
+    try:
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            return jsonify({'success': False, 'message': 'Admin não identificado'}), 403
+
+        obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
+
+        obra.ativo = not obra.ativo
+        db.session.commit()
+
+        status_texto = "reativada" if obra.ativo else "concluída"
+        logger.info(f"[OK] Obra {obra.nome} {status_texto} (admin_id={admin_id})")
+
+        return jsonify({
+            'success': True,
+            'message': f'Obra {status_texto} com sucesso',
+            'ativo': obra.ativo,
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] ERRO AO TOGGLE OBRA: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')

@@ -287,7 +287,10 @@ def _relatorio_veiculos():
 def _relatorio_dashboard_executivo():
     """Dashboard executivo"""
     total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
-    total_obras = Obra.query.filter_by(status='Em andamento').count()
+    # Task #17: contar pelo flag `ativo` (mesmo padrão de Funcionario), não
+    # mais pelo status textual — `ativo` é o que define se a obra entra nos
+    # relatórios/dashboards do dia a dia.
+    total_obras = Obra.query.filter_by(ativo=True).count()
     total_veiculos = Veiculo.query.count()
     
     # Custos do mês atual

@@ -527,6 +527,37 @@
                                 </div>
                             </div>
 
+                            {# Task #17 — Marcar a obra como ativa/concluída sem apagar dados.
+                               Quando desmarcada, a obra fica oculta da listagem padrão e dos
+                               seletores (RDO, Ponto, Financeiro etc.), mas permanece acessível
+                               via histórico/detalhes. Mesmo padrão usado para Funcionario.ativo. #}
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group">
+                                        <div class="form-check form-switch" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   role="switch"
+                                                   id="ativo"
+                                                   name="ativo"
+                                                   value="1"
+                                                   {% if (obra is none) or obra.ativo %}checked{% endif %}>
+                                            <label class="form-check-label" for="ativo">
+                                                <strong><i class="fas fa-toggle-on me-1"></i>Obra ativa</strong>
+                                            </label>
+                                            <div>
+                                                <small class="text-muted">
+                                                    Desmarque para marcar a obra como concluída/inativa.
+                                                    Os dados históricos (RDOs, ponto, custos) são preservados
+                                                    e a obra fica oculta da listagem principal e dos seletores,
+                                                    mas continua acessível pelos detalhes.
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Geofencing (Cerca Virtual) -->
                             <h5 class="mb-4 mt-5" style="color: #198754; font-weight: 600;">
                                 <i class="fas fa-map-marked-alt me-2"></i>Geofencing (Cerca Virtual)

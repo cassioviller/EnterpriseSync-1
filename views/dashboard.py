@@ -421,10 +421,16 @@ def dashboard():
         ).order_by(Funcionario.created_at.desc()).limit(5).all()
         logger.debug(f"DEBUG: {len(funcionarios_recentes)} funcionários recentes")
         
-        # Obras ativas com progresso baseado em RDOs
+        # Obras ativas com progresso baseado em RDOs.
+        # Task #17: a flag canônica de "obra entra nas listagens do dia a
+        # dia" é `Obra.ativo` (mesmo padrão de Funcionario). Mantemos o
+        # filtro de status para preservar as semânticas existentes
+        # (rascunhos/canceladas continuam fora), mas só consideramos obras
+        # com `ativo == True` — concluir uma obra via Task #17 a remove
+        # daqui automaticamente.
         logger.debug("DEBUG: Buscando obras ativas...")
         obras_ativas = Obra.query.filter_by(
-            admin_id=admin_id
+            admin_id=admin_id, ativo=True
         ).filter(
             Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).order_by(Obra.created_at.desc()).limit(5).all()
@@ -961,10 +967,12 @@ def dashboard():
     try:
         # Buscar valor total de contratos das obras ativas (importar func explicitamente)
         from sqlalchemy import func as sql_func
+        # Task #17: respeitar `Obra.ativo` (flag canônica) além do status.
         valor_contrato_total = db.session.query(
             sql_func.sum(Obra.valor_contrato)
         ).filter(
             Obra.admin_id == admin_id,
+            Obra.ativo == True,
             Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).scalar() or 0
         
@@ -981,9 +989,12 @@ def dashboard():
         valor_contrato_total = 0
         margem_percentual = 0
     
-    # Adicionar contagem correta de obras ativas com tratamento de erro
+    # Adicionar contagem correta de obras ativas com tratamento de erro.
+    # Task #17: a flag canônica de "obra ativa para o dia a dia" é
+    # `Obra.ativo`. Mantemos o filtro de status legado para excluir
+    # cancelamentos/rascunhos, mas só contamos obras com `ativo == True`.
     obras_ativas_count = safe_db_operation(
-        lambda: Obra.query.filter_by(admin_id=admin_id).filter(
+        lambda: Obra.query.filter_by(admin_id=admin_id, ativo=True).filter(
             Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).count(),
         default_value=0
@@ -999,18 +1010,23 @@ def dashboard():
     logger.debug(f"DEBUG FINAL - Funcionários por função: {funcionarios_funcao}")
     logger.debug(f"DEBUG FINAL - Custos por obra: {custos_obra}")
     
-    # Buscar obras em andamento para a tabela com tratamento de erro
+    # Buscar obras em andamento para a tabela com tratamento de erro.
+    # Task #17: respeitar `Obra.ativo` (flag canônica) além do status legado.
     obras_andamento = safe_db_operation(
-        lambda: Obra.query.filter_by(admin_id=admin_id).filter(
+        lambda: Obra.query.filter_by(admin_id=admin_id, ativo=True).filter(
             Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
         ).order_by(Obra.data_inicio.desc()).limit(5).all(),
         default_value=[]
     )
 
     # Lista de todas as obras para o filtro de seleção no gráfico
+    # Task #17: o seletor do gráfico do dashboard só oferece obras ativas
+    # por padrão. Para análises históricas envolvendo obras concluídas, o
+    # usuário usa as telas de relatório/detalhes (que continuam acessíveis
+    # mesmo para obras inativas).
     obras_disponiveis = safe_db_operation(
         lambda: [{'id': o.id, 'nome': o.nome}
-                 for o in Obra.query.filter_by(admin_id=admin_id)
+                 for o in Obra.query.filter_by(admin_id=admin_id, ativo=True)
                                     .order_by(Obra.nome).all()],
         default_value=[]
     )
