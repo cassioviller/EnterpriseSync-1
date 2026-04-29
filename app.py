@@ -205,6 +205,20 @@ def num_filter(value, decimals=2):
         decimals = 0
     return _format_br(value, decimals)
 
+# Task #18 — helpers de orçamento expostos aos templates (composição agrupada
+# em valor de venda e quebra de texto livre em bullets).
+@app.template_global()
+def composicao_venda_agrupada(snapshot, custo_unit, preco_venda_unit, quantidade):
+    from services.orcamento_view_service import composicao_venda_agrupada as _f
+    return _f(snapshot, custo_unit, preco_venda_unit, quantidade)
+
+
+@app.template_global()
+def split_lines(texto):
+    from services.orcamento_view_service import split_lines as _f
+    return _f(texto)
+
+
 # Context processor: disponibilidade de blueprints opcionais nos templates
 @app.context_processor
 def inject_blueprint_flags():

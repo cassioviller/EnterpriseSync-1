@@ -1,0 +1,178 @@
+{# Task #18 — Card/linha expansível de serviço para a proposta.
+
+NOTA: o CSS deste partial vive em `static/css/servico_card.css` e deve ser
+carregado UMA ÚNICA VEZ pela página pai (via <link rel="stylesheet">). Os
+três templates que usam este partial — `orcamentos/editar.html`,
+`propostas/detalhes_proposta.html`, `propostas/portal_cliente.html` — já
+fazem essa inclusão.
+
+Renderiza um item da proposta em três formatos:
+  - Cabeçalho colapsado: descrição, qtd × un, valor unitário, total +
+    pílulas com subtotais por categoria (mão de obra/material/equipamento).
+    Categorias zeradas são omitidas.
+  - Corpo expandido: 3 colunas (uma por categoria) listando insumos
+    com qtd total × un., valor unitário, valor total. Abaixo, listas de
+    "Itens inclusos" e "Itens exclusos" se presentes.
+
+Uso:
+  {% with item=item, idx=loop.index, prefix='psv' %}
+    {% include 'propostas/_servico_card.html' %}
+  {% endwith %}
+
+Espera:
+  - item: PropostaItem OU OrcamentoItem com .descricao, .quantidade, .unidade,
+          .preco_unitario|preco_venda_unitario, .subtotal|venda_total,
+          .composicao_snapshot, .custo_unitario|None,
+          .itens_inclusos|str, .itens_exclusos|str
+  - idx: número/sequência exibido no badge "Item #N"
+  - prefix: prefixo do id do collapse (evitar colisão entre 3 templates)
+#}
+
+{# Normaliza campos: PropostaItem usa preco_unitario+subtotal,
+   OrcamentoItem usa preco_venda_unitario+venda_total. #}
+{% set _preco_unit = item.preco_unitario if item.preco_unitario is defined and item.preco_unitario is not none else item.preco_venda_unitario %}
+{% set _total_venda = item.subtotal if item.subtotal is defined and item.subtotal is not none else item.venda_total %}
+{% set _qtd = item.quantidade or 0 %}
+{% set _custo_unit = item.custo_unitario if item.custo_unitario is defined and item.custo_unitario is not none else 0 %}
+{# Calcula custo unit a partir do snapshot quando não persistido (PropostaItem
+   normalmente não tem custo). Markup proporcional aplicado pelo helper. #}
+{% if (not _custo_unit or _custo_unit == 0) and item.composicao_snapshot %}
+  {% set _custo_unit = item.composicao_snapshot|sum(attribute='subtotal_unitario') %}
+{% endif %}
+{% set _grupos = composicao_venda_agrupada(item.composicao_snapshot, _custo_unit, _preco_unit, _qtd) %}
+{% set _has_inclusos = item.itens_inclusos and split_lines(item.itens_inclusos)|length > 0 %}
+{% set _has_exclusos = item.itens_exclusos and split_lines(item.itens_exclusos)|length > 0 %}
+{% set _has_expand = (_grupos|length > 0) or _has_inclusos or _has_exclusos %}
+{% set _collapse_id = prefix ~ '-' ~ idx %}
+
+<div class="card mb-2 servico-card border">
+  <div class="card-header bg-light d-flex flex-wrap gap-2 align-items-center justify-content-between"
+       style="cursor: {% if _has_expand %}pointer{% else %}default{% endif %};"
+       {% if _has_expand %}data-bs-toggle="collapse" data-bs-target="#{{ _collapse_id }}"
+       aria-expanded="false" aria-controls="{{ _collapse_id }}"{% endif %}>
+    <div class="flex-grow-1" style="min-width: 280px;">
+      <div class="d-flex align-items-baseline gap-2 flex-wrap">
+        {% if _has_expand %}
+          <i class="fas fa-chevron-right small text-muted servico-card-chevron" aria-hidden="true"></i>
+        {% else %}
+          <span class="d-inline-block" style="width: 12px;"></span>
+        {% endif %}
+        <span class="badge bg-secondary">Item #{{ idx }}</span>
+        <strong style="word-break: break-word;">{{ item.descricao }}</strong>
+      </div>
+      {# Pílulas de subtotal por categoria — só categorias > 0 (regra da task). #}
+      {% if _grupos %}
+      <div class="d-flex flex-wrap gap-1 mt-2 ms-4">
+        {% for tipo, label, sub, _insumos in _grupos %}
+          <span class="badge rounded-pill
+                       {% if tipo == 'MAO_OBRA' %}bg-info text-dark
+                       {% elif tipo == 'MATERIAL' %}bg-warning text-dark
+                       {% elif tipo == 'EQUIPAMENTO' %}bg-primary
+                       {% else %}bg-secondary{% endif %}"
+                title="Subtotal de {{ label|lower }} neste serviço">
+            {{ label }}: {{ sub|brl }}
+          </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="text-end" style="min-width: 220px;">
+      <div class="small text-muted">
+        {{ _qtd|num(2) }} {{ item.unidade }} × {{ _preco_unit|brl }}
+      </div>
+      <div class="fs-5 fw-bold text-success">{{ _total_venda|brl }}</div>
+    </div>
+  </div>
+
+  {% if _has_expand %}
+  <div class="collapse" id="{{ _collapse_id }}">
+    <div class="card-body bg-white">
+      {% if _grupos %}
+      <div class="row g-3">
+        {% for tipo, label, sub, insumos in _grupos %}
+        <div class="col-md-4">
+          <div class="border rounded h-100">
+            <div class="px-2 py-1 fw-semibold text-white text-uppercase small
+                        {% if tipo == 'MAO_OBRA' %}bg-info
+                        {% elif tipo == 'MATERIAL' %}bg-warning text-dark
+                        {% elif tipo == 'EQUIPAMENTO' %}bg-primary
+                        {% else %}bg-secondary{% endif %}">
+              <i class="fas
+                 {% if tipo == 'MAO_OBRA' %}fa-hard-hat
+                 {% elif tipo == 'MATERIAL' %}fa-boxes-stacked
+                 {% elif tipo == 'EQUIPAMENTO' %}fa-tools
+                 {% else %}fa-ellipsis-h{% endif %} me-1"></i>
+              {{ label }}
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-borderless mb-0 small">
+                <thead class="text-muted">
+                  <tr>
+                    <th class="ps-2">Insumo</th>
+                    <th class="text-end" style="white-space: nowrap;">Qtd × un.</th>
+                    <th class="text-end" style="white-space: nowrap;">Vlr. unit.</th>
+                    <th class="text-end pe-2" style="white-space: nowrap;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for ins in insumos %}
+                  <tr>
+                    <td class="ps-2" style="word-break: break-word;">{{ ins.nome }}</td>
+                    <td class="text-end" style="white-space: nowrap;">
+                      {{ ins.qtd_total|num(2) }} {{ ins.unidade }}
+                    </td>
+                    <td class="text-end" style="white-space: nowrap;">{{ ins.valor_unitario_venda|brl }}</td>
+                    <td class="text-end pe-2 fw-semibold" style="white-space: nowrap;">{{ ins.valor_total_venda|brl }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot class="border-top">
+                  <tr>
+                    <td colspan="3" class="text-end pe-1 fw-semibold ps-2">Subtotal</td>
+                    <td class="text-end pe-2 fw-bold">{{ sub|brl }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if _has_inclusos or _has_exclusos %}
+      <div class="row g-3 mt-2">
+        {% if _has_inclusos %}
+        <div class="col-md-6">
+          <div class="border rounded p-3 bg-success bg-opacity-10 h-100">
+            <h6 class="text-success mb-2">
+              <i class="fas fa-check-circle me-1"></i> Itens inclusos
+            </h6>
+            <ul class="mb-0 ps-3 small">
+              {% for linha in split_lines(item.itens_inclusos) %}
+              <li>{{ linha }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+        {% if _has_exclusos %}
+        <div class="col-md-6">
+          <div class="border rounded p-3 bg-danger bg-opacity-10 h-100">
+            <h6 class="text-danger mb-2">
+              <i class="fas fa-times-circle me-1"></i> Itens exclusos
+            </h6>
+            <ul class="mb-0 ps-3 small">
+              {% for linha in split_lines(item.itens_exclusos) %}
+              <li>{{ linha }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>

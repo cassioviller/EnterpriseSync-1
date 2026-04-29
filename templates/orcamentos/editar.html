@@ -1,5 +1,8 @@
 {% extends "base_completo.html" %}
 {% block title %}Orçamento {{ orcamento.numero }}{% endblock %}
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/servico_card.css') }}">
+{% endblock %}
 {% block content %}
 {% set o = orcamento %}
 <div class="container-fluid py-3">
@@ -89,6 +92,12 @@
   </div>
 
   <!-- Totais -->
+  {# Task #18 — média SIMPLES do valor unitário entre os serviços. Como cada
+     serviço pode ter unidade diferente (m², h, kg, un), uma média ponderada
+     por quantidade não tem sentido físico — usamos a média aritmética como
+     referência indicativa. #}
+  {% set _itens_validos = o.itens|selectattr('preco_venda_unitario')|list %}
+  {% set _media_unit = (_itens_validos|sum(attribute='preco_venda_unitario') / _itens_validos|length) if _itens_validos|length > 0 else 0 %}
   <div class="row g-3 mb-3">
     <div class="col-md-3"><div class="card"><div class="card-body">
       <div class="text-muted small">Custo total</div>
@@ -98,11 +107,17 @@
       <div class="text-muted small">Preço de venda</div>
       <h5 class="mb-0 text-primary">{{ o.venda_total|brl }}</h5>
     </div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body">
+    <div class="col-md-2"><div class="card"><div class="card-body">
+      <div class="text-muted small" title="Média aritmética simples do preço unitário entre os serviços. Indicativa: as unidades podem variar entre itens.">
+        Vlr. unit. médio <i class="fas fa-info-circle small text-muted"></i>
+      </div>
+      <h5 class="mb-0">{{ _media_unit|brl }}</h5>
+    </div></div></div>
+    <div class="col-md-2"><div class="card"><div class="card-body">
       <div class="text-muted small">Lucro estimado</div>
       <h5 class="mb-0 text-success">{{ o.lucro_total|brl }}</h5>
     </div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body">
+    <div class="col-md-2"><div class="card"><div class="card-body">
       <div class="text-muted small">Margem efetiva</div>
       <h5 class="mb-0">
         {% if o.venda_total and o.venda_total|float > 0 %}
@@ -385,10 +400,45 @@
           </div>
         </div>
       </div>
+
+      {# Task #18 — Itens inclusos/exclusos por SERVIÇO (texto livre, 1 por linha) #}
+      <div class="row g-2 mt-2">
+        <div class="col-md-6">
+          <label class="form-label small">
+            <i class="fas fa-check-circle text-success me-1"></i>
+            Itens inclusos neste serviço
+            <span class="text-muted">— um por linha</span>
+          </label>
+          <textarea class="form-control form-control-sm" name="itens_inclusos" rows="3"
+                    placeholder="Ex.: limpeza final&#10;projeto executivo&#10;descarte de entulho">{{ it.itens_inclusos or '' }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">
+            <i class="fas fa-times-circle text-danger me-1"></i>
+            Itens exclusos / não inclusos
+            <span class="text-muted">— um por linha</span>
+          </label>
+          <textarea class="form-control form-control-sm" name="itens_exclusos" rows="3"
+                    placeholder="Ex.: ART/RRT&#10;ligação definitiva de água/luz">{{ it.itens_exclusos or '' }}</textarea>
+        </div>
+      </div>
+
       <div class="text-end mt-2">
         <button class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Salvar item</button>
       </div>
     </form>
+
+    {# Task #18 — Prévia de como este serviço aparece para o cliente #}
+    <div class="card-body bg-light border-top">
+      <div class="small text-muted mb-2">
+        <i class="fas fa-eye me-1"></i>
+        Prévia de como este serviço aparece na proposta enviada ao cliente
+        <span class="text-muted">(clique no cartão para expandir)</span>:
+      </div>
+      {% with item=it, idx=it.ordem, prefix='orc' ~ o.id %}
+        {% include 'propostas/_servico_card.html' %}
+      {% endwith %}
+    </div>
     {% if it.servico_id %}
     {# Form externo (fora do item-form) para o botão "voltar à composição padrão" #}
     <form id="reset-comp-form-{{ it.id }}"

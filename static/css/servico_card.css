@@ -1,0 +1,23 @@
+/* Task #18 — estilos do card expansível de serviço (templates/propostas/_servico_card.html).
+ * Carregado uma única vez por página via <link> no head do template pai.
+ *
+ * O override de display:table no mobile é necessário porque o CSS do
+ * portal_cliente.html esconde tabelas dentro de .table-responsive em telas
+ * pequenas; aqui restauramos esse comportamento APENAS para tabelas dentro
+ * dos nossos cards de serviço.
+ */
+.servico-card .servico-card-chevron {
+  transition: transform 0.2s ease;
+}
+.servico-card [aria-expanded="true"] .servico-card-chevron {
+  transform: rotate(90deg);
+}
+.servico-card .card-header:hover {
+  background-color: #e9ecef !important;
+}
+@media (max-width: 768px) {
+  .servico-card .table-responsive table {
+    display: table !important;
+    width: 100%;
+  }
+}

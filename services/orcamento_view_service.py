@@ -117,6 +117,117 @@ def recalcular_item(item, orcamento) -> dict:
     }
 
 
+_TIPO_LABELS = {
+    'MAO_OBRA': 'Mão de obra',
+    'MATERIAL': 'Material',
+    'EQUIPAMENTO': 'Equipamento',
+    'OUTROS': 'Outros',
+}
+# Ordem fixa para garantir as 3 colunas principais na ordem padrão; "OUTROS"
+# vai para o fim se houver insumos sem categoria reconhecida.
+_TIPO_ORDEM = ['MAO_OBRA', 'MATERIAL', 'EQUIPAMENTO', 'OUTROS']
+
+
+def composicao_venda_agrupada(snapshot, custo_unit, preco_venda_unit, quantidade):
+    """Task #18 — converte composicao_snapshot (CUSTO) em VENDA agrupada por tipo.
+
+    O snapshot persiste o custo dos insumos. Para mostrar valores de venda na
+    proposta sem reabrir o cálculo cascata, aplicamos um markup proporcional:
+    cada insumo recebe a mesma razão (preco_venda_unit / custo_unit) que o
+    item inteiro — assim a soma das vendas dos insumos == venda total do item.
+
+    Quando o custo unitário é 0 (composição vazia), distribuímos o preço de
+    venda igualmente entre os insumos (ou devolvemos lista vazia).
+
+    Args:
+        snapshot: lista de dicts {tipo, nome, unidade, coeficiente,
+            preco_unitario, subtotal_unitario, ...}
+        custo_unit: custo total para 1 unidade do serviço.
+        preco_venda_unit: preço de venda para 1 unidade do serviço.
+        quantidade: quantidade do serviço no orçamento.
+
+    Returns:
+        Lista ordenada de tuplas (tipo, label, subtotal_venda_total, [insumos]).
+        Cada insumo tem: nome, unidade, qtd_total, valor_unitario_venda,
+        valor_total_venda. Tipos com subtotal == 0 são omitidos.
+    """
+    snap = snapshot or []
+    qtd_serv = _d(quantidade)
+    custo_u = _d(custo_unit)
+    venda_u = _d(preco_venda_unit)
+
+    # Estratégia de markup:
+    #  - custo > 0  → razão proporcional venda/custo (preserva mix de custo).
+    #  - custo == 0 mas venda > 0 → distribui venda igualmente entre as linhas
+    #    com coeficiente > 0 (mantém o tipo de cada insumo). Garante que o
+    #    cliente continua vendo a composição mesmo quando os custos no snapshot
+    #    estão zerados (insumos sem preço cadastrado, p.ex.).
+    snap_validos = [l for l in snap if _d(l.get('coeficiente')) > 0]
+    use_equal_dist = False
+    venda_unit_equal = Decimal('0')
+    ratio = Decimal('0')
+    if custo_u > 0:
+        ratio = venda_u / custo_u
+    elif venda_u > 0 and snap_validos:
+        use_equal_dist = True
+        venda_unit_equal = (venda_u / Decimal(len(snap_validos))).quantize(
+            Decimal('0.0001')
+        )
+
+    grupos = {t: {'subtotal': Decimal('0'), 'insumos': []} for t in _TIPO_ORDEM}
+
+    for linha in snap:
+        tipo = (linha.get('tipo') or 'OUTROS').upper()
+        if tipo not in grupos:
+            tipo = 'OUTROS'
+        coef = _d(linha.get('coeficiente'))
+        custo_unit_insumo = _d(linha.get('subtotal_unitario'))  # coef × preço (custo)
+        if use_equal_dist and coef > 0:
+            venda_unit_insumo = venda_unit_equal
+        elif ratio > 0:
+            venda_unit_insumo = custo_unit_insumo * ratio
+        else:
+            venda_unit_insumo = Decimal('0')
+        venda_total_insumo = (venda_unit_insumo * qtd_serv).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        qtd_total_insumo = (coef * qtd_serv).quantize(Decimal('0.0001'))
+        grupos[tipo]['subtotal'] += venda_total_insumo
+        grupos[tipo]['insumos'].append({
+            'nome': linha.get('nome') or '',
+            'unidade': linha.get('unidade') or 'un',
+            'coeficiente': float(coef),
+            'qtd_total': float(qtd_total_insumo),
+            'valor_unitario_venda': float(
+                venda_unit_insumo.quantize(Decimal('0.0001'))
+            ),
+            'valor_total_venda': float(venda_total_insumo),
+        })
+
+    resultado = []
+    for tipo in _TIPO_ORDEM:
+        sub = grupos[tipo]['subtotal']
+        # Esconde categoria zerada (regra explícita da task)
+        if sub <= 0 and not grupos[tipo]['insumos']:
+            continue
+        if sub <= 0:
+            continue
+        resultado.append((
+            tipo,
+            _TIPO_LABELS[tipo],
+            float(sub.quantize(Decimal('0.01'))),
+            grupos[tipo]['insumos'],
+        ))
+    return resultado
+
+
+def split_lines(texto):
+    """Task #18 — quebra texto livre em lista de bullets, ignorando vazios."""
+    if not texto:
+        return []
+    return [l.strip() for l in str(texto).splitlines() if l and l.strip()]
+
+
 def recalcular_orcamento(orcamento) -> dict:
     """Recalcula todos os itens e os totais do orçamento."""
     custo = Decimal('0')

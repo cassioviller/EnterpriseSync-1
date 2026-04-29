@@ -333,6 +333,11 @@ def atualizar_item(item_id):
             except (ValueError, IndexError):
                 continue
         item.composicao_snapshot = snap
+        # Task #18 — inclusos/exclusos por serviço (texto livre, 1 item/linha)
+        if 'itens_inclusos' in request.form:
+            item.itens_inclusos = (request.form.get('itens_inclusos') or '').strip() or None
+        if 'itens_exclusos' in request.form:
+            item.itens_exclusos = (request.form.get('itens_exclusos') or '').strip() or None
         # Task #118: override de cronograma na linha
         if 'cronograma_template_override_id' in request.form:
             item.cronograma_template_override_id = _parse_template_override(
@@ -444,6 +449,9 @@ def duplicar(id):
                 composicao_snapshot=it.composicao_snapshot or [],
                 observacao=it.observacao,
                 cronograma_template_override_id=it.cronograma_template_override_id,
+                # Task #18: copia inclusos/exclusos por serviço na revisão
+                itens_inclusos=it.itens_inclusos,
+                itens_exclusos=it.itens_exclusos,
             )
             db.session.add(novo_it)
         db.session.flush()
@@ -506,6 +514,9 @@ def gerar_proposta(id):
                 # add/remove/coeficientes feitos na linha do orçamento.
                 cronograma_template_override_id=it.cronograma_template_override_id,
                 composicao_snapshot=it.composicao_snapshot or [],
+                # Task #18: propaga inclusos/exclusos por serviço
+                itens_inclusos=it.itens_inclusos,
+                itens_exclusos=it.itens_exclusos,
             )
             db.session.add(pi)
 

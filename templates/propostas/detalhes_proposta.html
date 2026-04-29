@@ -1,6 +1,10 @@
 {% extends "base_completo.html" %}
 {% block title %}Proposta {{ proposta.numero }} - SIGE{% endblock %}
 
+{% block styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/servico_card.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -152,6 +156,19 @@
                 </div>
             </div>
 
+            {# Task #18 — média SIMPLES do valor unitário entre serviços
+               (cada serviço pode ter unidade distinta, ponderar não tem sentido). #}
+            {% set _all_itens = [] %}
+            {% if proposta.templates_organizados %}
+              {% for template_info in proposta.templates_organizados %}
+                {% for _cat, _itens_cat in template_info.categorias %}
+                  {% for _it in _itens_cat %}{% set _ = _all_itens.append(_it) %}{% endfor %}
+                {% endfor %}
+              {% endfor %}
+            {% endif %}
+            {% set _itens_validos = _all_itens|selectattr('preco_unitario')|list %}
+            {% set _media_unit = (_itens_validos|sum(attribute='preco_unitario') / _itens_validos|length) if _itens_validos|length > 0 else 0 %}
+
             <!-- Tabelas de Serviços por Template (igual ao Portal do Cliente) -->
             {% if proposta.templates_organizados %}
                 {% for template_info in proposta.templates_organizados %}
@@ -160,49 +177,38 @@
                         <h5 class="mb-0"><i class="fas fa-list-alt"></i> {{ template_info.template_nome }}</h5>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-sm">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 40px; text-align: center;">Item</th>
-                                        <th style="min-width: 120px;">Descrição</th>
-                                        <th style="width: 60px; text-align: center;">Qtd</th>
-                                        <th style="width: 50px; text-align: center;">Un.</th>
-                                        <th style="width: 100px; text-align: right;">Preço Unit.</th>
-                                        <th style="width: 100px; text-align: right;">Subtotal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for categoria, itens_categoria in template_info.categorias %}
-                                        {% if categoria and categoria != 'Serviços' %}
-                                        <tr class="table-secondary">
-                                            <td colspan="6" class="fw-bold">{{ categoria }}</td>
-                                        </tr>
-                                        {% endif %}
-                                        {% for item in itens_categoria %}
-                                        <tr>
-                                            <td class="text-center fw-bold">{{ item.item_numero }}</td>
-                                            <td style="word-break: break-word;">{{ item.descricao }}</td>
-                                            <td class="text-center">{{ item.quantidade|num(1) }}</td>
-                                            <td class="text-center">{{ item.unidade }}</td>
-                                            <td class="text-end">{{ item.preco_unitario|brl }}</td>
-                                            <td class="text-end fw-bold text-success">{{ item.subtotal|brl }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endfor %}
-                                </tbody>
-                                <tfoot class="table-info">
-                                    <tr class="fw-bold">
-                                        <td colspan="5" class="text-end fs-6 py-2">SUBTOTAL:</td>
-                                        <td class="text-end fs-6 py-2">{{ template_info.subtotal|brl }}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                        {# Task #18 — cards expansíveis no lugar da tabela. #}
+                        {% for categoria, itens_categoria in template_info.categorias %}
+                            {% if categoria and categoria != 'Serviços' %}
+                            <h6 class="text-muted text-uppercase small mt-3 mb-2">{{ categoria }}</h6>
+                            {% endif %}
+                            {% for item in itens_categoria %}
+                              {% with item=item, idx=item.item_numero or loop.index, prefix='dp-' ~ template_info.template_nome|replace(' ','_')|replace('/','_') ~ '-' ~ loop.index %}
+                                {% include 'propostas/_servico_card.html' %}
+                              {% endwith %}
+                            {% endfor %}
+                        {% endfor %}
+                        <div class="d-flex justify-content-end pt-2 border-top mt-2">
+                            <span class="fw-bold">Subtotal: <span class="text-success">{{ template_info.subtotal|brl }}</span></span>
                         </div>
                     </div>
                 </div>
                 {% endfor %}
-                
+
+                {# Task #18 — rodapé com média do valor unitário entre serviços. #}
+                <div class="card mb-3">
+                    <div class="card-body py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small" title="Média aritmética simples — as unidades dos serviços podem variar.">
+                                <i class="fas fa-chart-line me-1"></i>
+                                Valor unitário médio entre serviços:
+                            </span>
+                            <strong class="ms-1">{{ _media_unit|brl }}</strong>
+                        </div>
+                        <div class="text-muted small">{{ _itens_validos|length }} serviço(s)</div>
+                    </div>
+                </div>
+
                 <!-- Total Geral -->
                 <div class="card mb-4" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none;">
                     <div class="card-body text-center py-4">

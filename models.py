@@ -2911,6 +2911,12 @@ class PropostaItem(db.Model):
     )
     composicao_snapshot = db.Column(JSON, nullable=True)
 
+    # Task #18 — inclusos/exclusos POR ITEM (texto livre, uma linha por item)
+    # propagados a partir do OrcamentoItem em gerar_proposta. Diferentes do
+    # campo Proposta.itens_inclusos/itens_exclusos (que é por proposta inteira).
+    itens_inclusos = db.Column(db.Text)
+    itens_exclusos = db.Column(db.Text)
+
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relacionamento com template (opcional)
@@ -5795,6 +5801,11 @@ class OrcamentoItem(db.Model):
     lucro_total = db.Column(db.Numeric(15, 2), default=0)
 
     observacao = db.Column(db.Text)
+    # Task #18 — itens inclusos / exclusos por SERVIÇO (texto livre, uma linha
+    # por item; renderizados como bullets no card expansível). Campos próprios
+    # da linha do orçamento — propagados para PropostaItem em gerar_proposta.
+    itens_inclusos = db.Column(db.Text)
+    itens_exclusos = db.Column(db.Text)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     servico = db.relationship('Servico', foreign_keys=[servico_id])
