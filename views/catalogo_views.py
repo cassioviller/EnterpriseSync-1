@@ -15,7 +15,7 @@ import logging
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash,
-    jsonify, abort,
+    jsonify, abort, send_file,
 )
 from flask_login import login_required, current_user
 
@@ -209,6 +209,74 @@ def insumo_excluir(insumo_id):
         db.session.commit()
         flash('Insumo excluído.', 'success')
     return redirect(url_for('catalogo.insumos_list'))
+
+
+# Task #23 — Modelo Excel para Insumos (download/import)
+@catalogo_bp.route('/insumos/modelo-excel')
+@login_required
+def insumos_modelo_excel():
+    """Baixa o modelo `.xlsx` para cadastro em massa de insumos."""
+    _admin_id()  # garante autenticação
+    from services.catalogo_excel import gerar_modelo_insumos_xlsx
+    bio = gerar_modelo_insumos_xlsx()
+    return send_file(
+        BytesIO_wrap(bio),
+        as_attachment=True,
+        download_name='modelo_insumos.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@catalogo_bp.route('/insumos/importar-excel', methods=['POST'])
+@login_required
+def insumos_importar_excel():
+    """Recebe um `.xlsx` preenchido e faz upsert dos insumos."""
+    aid = _admin_id()
+    arquivo = request.files.get('arquivo')
+    if not arquivo or not arquivo.filename:
+        flash('Selecione um arquivo Excel para importar.', 'error')
+        return redirect(url_for('catalogo.insumos_list'))
+    if not arquivo.filename.lower().endswith(('.xlsx', '.xlsm')):
+        flash('Envie um arquivo .xlsx (Excel).', 'error')
+        return redirect(url_for('catalogo.insumos_list'))
+
+    from services.catalogo_excel import importar_insumos_xlsx
+    try:
+        resultado = importar_insumos_xlsx(arquivo.stream, aid)
+    except ValueError as e:
+        flash(f'Erro ao importar: {e}', 'error')
+        return redirect(url_for('catalogo.insumos_list'))
+    except Exception as e:
+        logger.exception('Erro inesperado importando insumos via Excel')
+        flash(f'Erro inesperado: {e}', 'error')
+        return redirect(url_for('catalogo.insumos_list'))
+
+    msg = (
+        f'Importação concluída: {resultado["created"]} criado(s), '
+        f'{resultado["updated"]} atualizado(s), '
+        f'{resultado["preco_atualizado"]} preço(s) ajustado(s), '
+        f'{resultado["servicos_recalculados"]} serviço(s) recalculado(s).'
+    )
+    flash(msg, 'success')
+
+    if resultado['rejected']:
+        detalhes = '; '.join(
+            f'linha {r["linha"]}: {r["motivo"]}'
+            for r in resultado['rejected'][:15]
+        )
+        suffix = '' if len(resultado['rejected']) <= 15 else f' (+{len(resultado["rejected"]) - 15} outras)'
+        flash(
+            f'{len(resultado["rejected"])} linha(s) rejeitada(s): {detalhes}{suffix}',
+            'warning',
+        )
+
+    return redirect(url_for('catalogo.insumos_list'))
+
+
+def BytesIO_wrap(data: bytes):
+    """Envolve `bytes` em BytesIO para `send_file`."""
+    import io as _io
+    return _io.BytesIO(data)
 
 
 # ──────────────────────────────────────────────────────────────────────

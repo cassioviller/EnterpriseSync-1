@@ -7,9 +7,43 @@
       <h2 class="mb-1"><i class="fas fa-cubes text-primary"></i> Catálogo de Insumos</h2>
       <p class="text-muted mb-0">Itens base para composição de serviços (mão de obra, material, equipamento)</p>
     </div>
-    <a href="{{ url_for('catalogo.insumo_novo') }}" class="btn btn-primary">
-      <i class="fas fa-plus"></i> Novo Insumo
-    </a>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('catalogo.insumos_modelo_excel') }}" class="btn btn-outline-success">
+        <i class="fas fa-file-excel"></i> Baixar modelo
+      </a>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalImportInsumos">
+        <i class="fas fa-file-import"></i> Importar Excel
+      </button>
+      <a href="{{ url_for('catalogo.insumo_novo') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Novo Insumo
+      </a>
+    </div>
+  </div>
+
+  <!-- Modal: Importar Insumos via Excel -->
+  <div class="modal fade" id="modalImportInsumos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" method="POST" action="{{ url_for('catalogo.insumos_importar_excel') }}" enctype="multipart/form-data">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-file-import text-primary"></i> Importar Insumos</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Baixe primeiro o <a href="{{ url_for('catalogo.insumos_modelo_excel') }}">modelo Excel</a>,
+            preencha as linhas e envie aqui. Insumos com nome igual a um já existente serão
+            <strong>atualizados</strong> em vez de duplicados.
+          </p>
+          <label class="form-label">Arquivo (.xlsx)</label>
+          <input type="file" name="arquivo" accept=".xlsx,.xlsm" class="form-control" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Importar</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <form method="GET" class="card card-body mb-3 shadow-sm">

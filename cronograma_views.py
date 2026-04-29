@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for, flash
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_file, url_for, flash
 from flask_login import current_user, login_required
 
 from models import (
@@ -1413,6 +1413,74 @@ def editar_template(template_id: int):
         itens=list(tmpl.itens),
         itens_arvore=itens_arvore,
     )
+
+
+# Task #23 — Modelo Excel para Templates de Cronograma (download/import)
+@cronograma_bp.route('/templates/modelo-excel')
+@login_required
+def templates_modelo_excel():
+    """Baixa o modelo `.xlsx` para cadastro de template + itens."""
+    guard = _check_v2()
+    if guard:
+        return guard
+    from services.catalogo_excel import gerar_modelo_cronograma_xlsx
+    import io as _io
+    bio = gerar_modelo_cronograma_xlsx()
+    return send_file(
+        _io.BytesIO(bio),
+        as_attachment=True,
+        download_name='modelo_cronograma.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@cronograma_bp.route('/templates/importar-excel', methods=['POST'])
+@login_required
+def templates_importar_excel():
+    """Recebe um `.xlsx` preenchido e cria/atualiza um template."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    arquivo = request.files.get('arquivo')
+    if not arquivo or not arquivo.filename:
+        flash('Selecione um arquivo Excel para importar.', 'error')
+        return redirect(url_for('cronograma.listar_templates'))
+    if not arquivo.filename.lower().endswith(('.xlsx', '.xlsm')):
+        flash('Envie um arquivo .xlsx (Excel).', 'error')
+        return redirect(url_for('cronograma.listar_templates'))
+
+    from services.catalogo_excel import importar_cronograma_xlsx
+    try:
+        resultado = importar_cronograma_xlsx(arquivo.stream, admin_id)
+    except ValueError as e:
+        flash(f'Erro ao importar: {e}', 'error')
+        return redirect(url_for('cronograma.listar_templates'))
+    except Exception as e:
+        logger.exception('Erro inesperado importando template via Excel')
+        flash(f'Erro inesperado: {e}', 'error')
+        return redirect(url_for('cronograma.listar_templates'))
+
+    acao = 'criado' if resultado['criado_ou_atualizado'] == 'created' else 'atualizado'
+    flash(
+        f'Template "{resultado["template_nome"]}" {acao} com '
+        f'{resultado["itens_count"]} item(ns).',
+        'success',
+    )
+
+    if resultado['rejected']:
+        detalhes = '; '.join(
+            f'linha {r["linha"]}: {r["motivo"]}'
+            for r in resultado['rejected'][:15]
+        )
+        suffix = '' if len(resultado['rejected']) <= 15 else f' (+{len(resultado["rejected"]) - 15} outras)'
+        flash(
+            f'{len(resultado["rejected"])} linha(s) rejeitada(s): {detalhes}{suffix}',
+            'warning',
+        )
+
+    return redirect(url_for('cronograma.listar_templates'))
 
 
 @cronograma_bp.route('/templates/<int:template_id>/excluir', methods=['POST'])

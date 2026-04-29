@@ -19,13 +19,45 @@
         </ol>
       </nav>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
       <a href="{{ url_for('cronograma.catalogo_subatividades') }}" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-book-open me-1"></i> Catálogo
       </a>
+      <a href="{{ url_for('cronograma.templates_modelo_excel') }}" class="btn btn-outline-success btn-sm">
+        <i class="fas fa-file-excel me-1"></i> Baixar modelo
+      </a>
+      <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalImportTemplate">
+        <i class="fas fa-file-import me-1"></i> Importar Excel
+      </button>
       <a href="{{ url_for('cronograma.novo_template') }}" class="btn btn-primary btn-sm">
         <i class="fas fa-plus me-1"></i> Novo Template
       </a>
+    </div>
+  </div>
+
+  <!-- Modal: Importar Template via Excel -->
+  <div class="modal fade" id="modalImportTemplate" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" method="POST" action="{{ url_for('cronograma.templates_importar_excel') }}" enctype="multipart/form-data">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-file-import text-primary"></i> Importar Template</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Baixe primeiro o <a href="{{ url_for('cronograma.templates_modelo_excel') }}">modelo Excel</a>,
+            preencha as abas <strong>Template</strong> e <strong>Itens</strong> e envie aqui.
+            Reimportar com o mesmo nome <strong>substitui</strong> os itens existentes.
+          </p>
+          <label class="form-label">Arquivo (.xlsx)</label>
+          <input type="file" name="arquivo" accept=".xlsx,.xlsm" class="form-control" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Importar</button>
+        </div>
+      </form>
     </div>
   </div>
 
