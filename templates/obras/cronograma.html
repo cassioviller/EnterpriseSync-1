@@ -1037,10 +1037,18 @@ function restaurarCelulaResp(el, tarefaId) {
   el.innerHTML = buildRespBadge(resp);
 }
 
+// Helper único: renderiza o badge de predecessora de forma consistente,
+// SEMPRE com data-pred-id para que renumerarTudo()/updatePredBadges()
+// consiga refrescar depois de drag/criar/excluir/edição inline.
+function renderPredBadge(predId) {
+  if (!predId) return '—';
+  const pid = Number(predId);
+  return `<span class="badge bg-light text-secondary border" data-pred-id="${pid}">${getIndiceTabela(pid)}</span>`;
+}
+
 function restaurarCelulaPred(el, tarefaId) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
-  const pid = tarefa ? tarefa.predecessora_id : null;
-  el.innerHTML = pid ? `<span class="badge bg-light text-secondary border">${getIndiceTabela(pid)}</span>` : '—';
+  el.innerHTML = renderPredBadge(tarefa ? tarefa.predecessora_id : null);
 }
 function restaurarCelulaDate(el, tarefaId, tipo) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
@@ -1138,9 +1146,7 @@ function updateTarefaLocal(t) {
 
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
-  if (pred) pred.innerHTML = t.predecessora_id
-    ? `<span class="badge bg-light text-secondary border">${getIndiceTabela(t.predecessora_id)}</span>`
-    : '—';
+  if (pred) pred.innerHTML = renderPredBadge(t.predecessora_id);
   const resp = t.responsavel || 'empresa';
   if (percEl) {
     if (resp === 'terceiros') {
@@ -1433,23 +1439,46 @@ async function salvarNovaTarefa() {
     responsavel:             document.getElementById('nt_resp').value || 'empresa',
     subatividade_mestre_id:  catId ? parseInt(catId) : null,
   };
+  let res;
   try {
-    const res = await fetch(`${URL_BASE}/tarefa${QS_CLIENTE}`, {
+    res = await fetch(`${URL_BASE}/tarefa${QS_CLIENTE}`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body),
     });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      bootstrap.Modal.getInstance(document.getElementById('modalNovaTarefa'))?.hide();
-      tarefas.push(data.tarefa);
-      adicionarLinhaTabela(data.tarefa);
-      renderGantt();
-      toast('Tarefa criada com sucesso', 'success');
-      document.getElementById('emptyState')?.remove();
-    } else {
-      toast(data.msg || 'Erro ao criar tarefa', 'error');
-    }
-  } catch(e) { toast('Erro de rede', 'error'); }
+  } catch(netErr) {
+    console.error('[cronograma] Erro de rede ao criar tarefa', netErr);
+    toast('Erro de rede ao criar tarefa: ' + (netErr.message || netErr), 'error');
+    return;
+  }
+  // Tenta JSON; se vier HTML/texto (ex.: erro 500 não tratado), expõe trecho.
+  let data = null;
+  let rawText = '';
+  try {
+    data = await res.clone().json();
+  } catch(_) {
+    try { rawText = await res.text(); } catch(_) {}
+  }
+  if (!res.ok || !data || data.status !== 'ok') {
+    const msg = (data && (data.msg || data.error))
+              || (rawText && rawText.slice(0, 180))
+              || `Erro ${res.status} ao criar tarefa`;
+    console.error('[cronograma] Falha ao criar tarefa', { status: res.status, data, rawText });
+    toast(msg, 'error');
+    return;
+  }
+  try {
+    bootstrap.Modal.getInstance(document.getElementById('modalNovaTarefa'))?.hide();
+    tarefas.push(data.tarefa);
+    adicionarLinhaTabela(data.tarefa);
+    renumerarTudo();
+    renderGantt();
+    toast('Tarefa criada com sucesso', 'success');
+    document.getElementById('emptyState')?.remove();
+  } catch(renderErr) {
+    // A tarefa foi criada no servidor; só a UI quebrou. Avisa o usuário e pede reload.
+    console.error('[cronograma] Tarefa criada, mas falhou ao renderizar', renderErr);
+    toast('Tarefa criada, mas a tela falhou ao atualizar. Recarregue a página.', 'warning');
+  }
 }
 
 // ── Offcanvas Editar ──
@@ -1630,7 +1659,7 @@ function adicionarLinhaTabela(t) {
     <td class="td-center"><span class="badge-dur dur-val" ondblclick="iniciarEdicao(this,${t.id},'duracao_dias')" title="Duplo-clique para editar">${t.duracao_dias}d</span></td>
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
-    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${t.predecessora_id ? `<span class="badge bg-light text-secondary border">${getIndiceTabela(t.predecessora_id)}</span>` : '—'}</span></td>
+    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${renderPredBadge(t.predecessora_id)}</span></td>
     <td class="td-center small text-muted"><span class="qty-val" ondblclick="iniciarEdicao(this,${t.id},'quantidade_total')" title="Duplo-clique para editar">${qtdHtml}</span></td>
     <td class="td-center td-resp small">${respBadge}</td>
     <td class="td-perc plan-val">${planCell}</td>
@@ -1659,14 +1688,18 @@ async function excluirTarefa(id, nome, doContrato) {
     const res = await fetch(`${URL_BASE}/tarefa/${id}${QS_CLIENTE}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.status === 'ok') {
-      document.querySelector(`[data-id="${id}"]`)?.remove();
+      document.querySelector(`tr.tarefa-row[data-id="${id}"]`)?.remove();
       tarefas = tarefas.filter(t => t.id !== id);
+      renumerarTudo();
       renderGantt();
       toast('Tarefa excluída');
     } else {
-      toast(data.msg || 'Erro ao excluir', 'error');
+      toast(data.msg || data.error || 'Erro ao excluir', 'error');
     }
-  } catch(e) { toast('Erro de rede', 'error'); }
+  } catch(e) {
+    console.error('[cronograma] Erro de rede ao excluir tarefa', e);
+    toast('Erro de rede ao excluir: ' + (e.message || e), 'error');
+  }
 }
 
 // ── Toggle Terceiros (checkbox de conclusão) ──
@@ -1880,6 +1913,17 @@ function _renumerarColunaIndice(tbody) {
   });
 }
 
+// Renumera tudo o que depende da posição visual: coluna "#" e badges de PRED.
+// Usado depois de drag-and-drop, criação e exclusão de tarefas.
+function renumerarTudo(tbody) {
+  tbody = tbody || document.getElementById('tarefasBody');
+  if (!tbody) return;
+  _renumerarColunaIndice(tbody);
+  // updatePredBadges() lê o estado global `tarefas` via getIndiceTabela,
+  // então quem chamar deve garantir que `tarefas` já está na ordem correta.
+  updatePredBadges();
+}
+
 function _restaurarOrdemDOM(tbody, ordemIds) {
   // Reordena os <tr> conforme `ordemIds`, preservando elementos que não
   // estejam na lista (defesa: nunca remove nada do DOM).
@@ -1890,7 +1934,11 @@ function _restaurarOrdemDOM(tbody, ordemIds) {
     const el = byId.get(id);
     if (el) tbody.appendChild(el);
   });
-  _renumerarColunaIndice(tbody);
+  // Restaura também o estado local `tarefas` para a ordem antiga, antes de
+  // renumerar, senão os badges PRED. usariam a ordem nova.
+  const tById = Object.fromEntries(tarefas.map(t => [t.id, t]));
+  tarefas = ordemIds.map(id => tById[id]).filter(Boolean);
+  renumerarTudo(tbody);
 }
 
 function initRowDrag() {
@@ -1944,7 +1992,11 @@ function initRowDrag() {
         return;
       }
 
-      _renumerarColunaIndice(tbody);
+      // Atualiza o estado local `tarefas` ANTES de renumerar — assim a coluna
+      // PRED. consegue resolver os índices novos (getIndiceTabela usa `tarefas`).
+      const byId = Object.fromEntries(tarefas.map(t => [t.id, t]));
+      tarefas = newOrder.map(id => byId[id]).filter(Boolean);
+      renumerarTudo(tbody);
       const snapshot = _preDragOrder;
       _preDragOrder = null;
 
@@ -1956,17 +2008,16 @@ function initRowDrag() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.status !== 'ok') {
-          throw new Error(data.msg || 'Falha ao salvar ordem');
+          throw new Error(data.msg || data.error || `Erro ${res.status}`);
         }
-        // Sincroniza estado local + Gantt com a nova ordem persistida.
-        const byId = Object.fromEntries(tarefas.map(t => [t.id, t]));
-        tarefas = newOrder.map(id => byId[id]).filter(Boolean);
         renderGantt();
         toast('Ordem salva');
       } catch (err) {
+        console.error('[cronograma] Falha ao salvar ordem', err);
         // Rollback visual: restaura a ordem que existia antes do drag.
         _restaurarOrdemDOM(tbody, snapshot);
-        toast('Não foi possível salvar a ordem. Restaurada a anterior.', 'error');
+        renderGantt();
+        toast('Não foi possível salvar a ordem (' + (err.message || err) + '). Restaurada a anterior.', 'error');
       }
     },
   });
