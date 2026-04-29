@@ -470,8 +470,23 @@ def novo_rdo():
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
 def criar_rdo():
-    """Cria um novo RDO"""
+    """Cria um novo RDO (endpoint legado — Task #9).
+
+    Mantido apenas para compatibilidade com scripts antigos / integrações
+    externas. O fluxo principal de salvamento é POST /salvar-rdo-flexivel.
+    A normalização de horas (utils/rdo_horas) é aplicada para garantir que,
+    se chamado por um cliente legado, ainda assim os RDOs gravados não
+    inflam horas. A linha logger.warning abaixo serve de telemetria para
+    confirmar quando essa rota é efetivamente usada em produção.
+    """
     try:
+        logger.warning(
+            "[LEGACY-RDO] POST /rdo/criar (criar_rdo) chamado — "
+            "endpoint legado. user=%s admin_id_user=%s referrer=%s",
+            getattr(current_user, 'email', '?'),
+            getattr(current_user, 'admin_id', None),
+            request.referrer,
+        )
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         
         # Dados básicos
@@ -2185,8 +2200,26 @@ def funcionario_rdo_novo():
 @main_bp.route('/rdo/salvar', methods=['POST'])
 @funcionario_required
 def rdo_salvar_unificado():
-    """Interface unificada para salvar RDO - Admin e Funcionário"""
+    """Interface unificada para salvar RDO - Admin e Funcionário (legado).
+
+    Endpoint legado mantido como alias para o fluxo principal
+    (POST /salvar-rdo-flexivel) e ainda usado internamente pelo
+    /funcionario/rdo/criar. A normalização de horas via
+    utils/rdo_horas.normalizar_horas_funcionario foi aplicada
+    (Task #9) para que, mesmo quando chamado por scripts antigos
+    ou integrações externas, o RDO persistido não infle horas do
+    funcionário (ex.: 8h em N atividades não pode virar 8×N h).
+    A linha logger.warning abaixo serve de telemetria para
+    confirmar quando este endpoint legado é efetivamente usado.
+    """
     try:
+        logger.warning(
+            "[LEGACY-RDO] POST /rdo/salvar (rdo_salvar_unificado) chamado — "
+            "endpoint legado. user=%s referrer=%s path=%s",
+            getattr(current_user, 'email', '?'),
+            request.referrer,
+            request.path,
+        )
         # Verificar se é edição ou criação
         rdo_id = request.form.get('rdo_id', type=int)
         
@@ -2670,58 +2703,127 @@ def rdo_salvar_unificado():
                 logger.error(f"Erro ao processar atividades JSON: {e}")
                 flash(f'Erro ao processar atividades: {e}', 'warning')
         
-        # Processar mão de obra (sistema novo)
-                logger.debug("DEBUG: Processando funcionários do formulário...")
-        
-        # Percorrer funcionários enviados no formulário
+        # Processar mão de obra (legado /rdo/salvar) — coletar TODAS as
+        # entradas (path A: campos achatados funcionario_<id>_nome/_horas;
+        # path B: JSON 'mao_obra' fallback) ANTES de gravar, para que a
+        # normalização (utils/rdo_horas.normalizar_horas_funcionario)
+        # divida igualmente as horas-base do funcionário pelas N
+        # atividades distintas em que ele aparece. Isso impede que um
+        # cliente legado que poste o mesmo funcionário em vários blocos
+        # (ex.: form + JSON, ou JSON com duplicatas) acabe gravando
+        # horas infladas — Task #9.
+        from utils.rdo_horas import normalizar_horas_funcionario
+        logger.debug("DEBUG: Processando funcionários do formulário (legado)...")
+
+        # entradas: (func_id, atividade_key, horas, horas_extras, funcao)
+        entradas_brutas = []
+
+        # Path A — campos achatados funcionario_<id>_nome / _horas / _horas_extras / _funcao
         for key, value in request.form.items():
-            if key.startswith('funcionario_') and key.endswith('_nome'):
-                try:
-                    # Extrair ID do funcionário: funcionario_123_nome -> 123
-                    funcionario_id = key.split('_')[1]
-                    nome_funcionario = value
-                    
-                    # Buscar horas trabalhadas correspondentes
-                    horas_key = f'funcionario_{funcionario_id}_horas'
-                    horas = float(request.form.get(horas_key, 8))
-                    
-                    if nome_funcionario and horas > 0:
-                        # Buscar funcionário no banco
-                        funcionario = Funcionario.query.get(funcionario_id)
-                        if funcionario:
-                            mao_obra = RDOMaoObra()
-                            mao_obra.rdo_id = rdo.id
-                            mao_obra.funcionario_id = int(funcionario_id)
-                            mao_obra.funcao_exercida = funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral'
-                            mao_obra.horas_trabalhadas = horas
-                            mao_obra.admin_id = admin_id_correto
-                            db.session.add(mao_obra)
-                            
-                            logger.debug(f"DEBUG: Funcionário {nome_funcionario}: {horas}h")
-                        
-                except (ValueError, IndexError) as e:
-                    logger.error(f"Erro ao processar funcionário {key}: {e}")
-                    continue
-        
-        # Processar mão de obra antiga (fallback para compatibilidade)
+            if not (key.startswith('funcionario_') and key.endswith('_nome')):
+                continue
+            try:
+                funcionario_id = int(key.split('_')[1])
+            except (ValueError, IndexError) as e:
+                logger.error(f"Erro ao processar funcionário {key}: {e}")
+                continue
+            nome_funcionario = (value or '').strip()
+            if not nome_funcionario:
+                continue
+            horas_field = request.form.get(
+                f'funcionario_{funcionario_id}_horas', '8'
+            )
+            try:
+                horas = float(horas_field) if horas_field else 0.0
+            except (ValueError, TypeError):
+                continue
+            if horas <= 0:
+                continue
+            extras_field = request.form.get(
+                f'funcionario_{funcionario_id}_horas_extras', ''
+            )
+            try:
+                extras = float(extras_field) if extras_field else 0.0
+            except (ValueError, TypeError):
+                extras = 0.0
+            funcao_form = request.form.get(
+                f'funcionario_{funcionario_id}_funcao', ''
+            ).strip()
+            entradas_brutas.append(
+                (funcionario_id, ('flat-form', funcionario_id), horas,
+                 max(0.0, extras), funcao_form)
+            )
+
+        # Path B (legado) — lista JSON em 'mao_obra'
         mao_obra_json = request.form.get('mao_obra', '[]')
         if mao_obra_json and mao_obra_json != '[]':
             try:
                 mao_obra_list = json.loads(mao_obra_json)
                 for i, mo_data in enumerate(mao_obra_list):
-                    funcionario_id = mo_data.get('funcionario_id')
-                    if funcionario_id:
-                        mao_obra = RDOMaoObra()
-                        mao_obra.rdo_id = rdo.id
-                        mao_obra.funcionario_id = int(funcionario_id)
-                        mao_obra.funcao_exercida = mo_data.get('funcao', '').strip()
-                        mao_obra.horas_trabalhadas = float(mo_data.get('horas', 8))
-                        mao_obra.admin_id = admin_id_correto
-                        db.session.add(mao_obra)
-                        logger.debug(f"DEBUG: Funcionário JSON ID {funcionario_id}: {mo_data.get('horas', 8)}h")
+                    fid_raw = mo_data.get('funcionario_id')
+                    if not fid_raw:
+                        continue
+                    try:
+                        fid = int(fid_raw)
+                    except (ValueError, TypeError):
+                        continue
+                    try:
+                        h = float(mo_data.get('horas', 8) or 0)
+                    except (ValueError, TypeError):
+                        continue
+                    if h <= 0:
+                        continue
+                    try:
+                        ex = float(mo_data.get('horas_extras', 0) or 0)
+                    except (ValueError, TypeError):
+                        ex = 0.0
+                    fc = (mo_data.get('funcao') or '').strip()
+                    entradas_brutas.append(
+                        (fid, ('mao_obra_json', i), h, max(0.0, ex), fc)
+                    )
             except (json.JSONDecodeError, ValueError) as e:
                 logger.error(f"Erro ao processar mão de obra JSON: {e}")
                 flash(f'Erro ao processar mão de obra: {e}', 'warning')
+
+        # Aplicar normalização: 8h × N atividades → 8/N por atividade
+        entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
+        logger.info(
+            "[USERS] /rdo/salvar legado — %d entrada(s) brutas → %d normalizada(s) "
+            "(helper utils.rdo_horas)",
+            len(entradas_brutas), len(entradas_normalizadas),
+        )
+
+        for entrada in entradas_normalizadas:
+            func_id_n = entrada[0]
+            horas_n = entrada[2]
+            extras_n = entrada[3]
+            funcao_n = entrada[4] if len(entrada) > 4 else ''
+            funcionario_obj = Funcionario.query.filter_by(
+                id=func_id_n, admin_id=admin_id_correto
+            ).first()
+            if not funcionario_obj:
+                logger.warning(
+                    "[WARN] /rdo/salvar legado: funcionário %s ignorado "
+                    "(não encontrado para admin %s)",
+                    func_id_n, admin_id_correto,
+                )
+                continue
+            mao_obra = RDOMaoObra()
+            mao_obra.rdo_id = rdo.id
+            mao_obra.funcionario_id = func_id_n
+            mao_obra.funcao_exercida = (
+                funcao_n
+                or (funcionario_obj.funcao_ref.nome
+                    if funcionario_obj.funcao_ref else 'Geral')
+            )
+            mao_obra.horas_trabalhadas = horas_n
+            mao_obra.horas_extras = extras_n
+            mao_obra.admin_id = admin_id_correto
+            db.session.add(mao_obra)
+            logger.debug(
+                "DEBUG: Mão de obra (legado) func %s — %.2fh (extras %.2fh)",
+                func_id_n, horas_n, extras_n,
+            )
         
         # Processar equipamentos
         equipamentos_json = request.form.get('equipamentos', '[]')

@@ -196,8 +196,23 @@ def visualizar_rdo(rdo_id):
 @rdo_crud_bp.route('/salvar', methods=['POST'])
 @login_required
 def salvar_rdo():
-    """Salvar RDO (criar ou editar)"""
+    """Salvar RDO (criar ou editar) — endpoint legado.
+
+    Mantido para compatibilidade; o fluxo principal hoje é
+    POST /salvar-rdo-flexivel. A normalização de horas via
+    utils.rdo_horas.normalizar_horas_funcionario já é aplicada
+    abaixo (Task #8) e a linha logger.warning deste preâmbulo é
+    telemetria (Task #9) para confirmar quando este endpoint
+    legado é efetivamente usado em produção.
+    """
     try:
+        logger.warning(
+            "[LEGACY-RDO] POST /rdo/salvar (rdo_crud.salvar_rdo) chamado — "
+            "endpoint legado. user=%s referrer=%s path=%s",
+            getattr(current_user, 'email', '?'),
+            request.referrer,
+            request.path,
+        )
         admin_id = get_admin_id()
         rdo_id = request.form.get('rdo_id', type=int)
         
