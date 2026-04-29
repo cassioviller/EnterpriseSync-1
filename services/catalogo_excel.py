@@ -87,23 +87,35 @@ def _checar_max_linhas(quantidade: int, contexto: str = '') -> None:
 # ──────────────────────────────────────────────────────────────────────
 # Helpers comuns
 # ──────────────────────────────────────────────────────────────────────
-def _decimal_or_none(value) -> Decimal | None:
-    """Converte string/num pt-BR/EN para Decimal. Retorna None se vazio
-    ou inválido."""
+def _parse_decimal(value) -> tuple[Decimal | None, bool]:
+    """Converte string/num pt-BR/EN para Decimal.
+
+    Retorna ``(decimal, invalido)``:
+      - ``(None, False)`` se a célula estiver vazia/None.
+      - ``(Decimal, False)`` se a conversão for bem-sucedida.
+      - ``(None, True)`` se a célula tiver conteúdo mas não for um
+        número válido (caller deve rejeitar a linha com motivo).
+    """
     if value is None or value == '':
-        return None
+        return None, False
     s = str(value).strip()
     if not s:
-        return None
-    s = s.replace('R$', '').replace('r$', '').replace(' ', '').replace('\xa0', '')
-    if ',' in s and '.' in s:
-        s = s.replace('.', '').replace(',', '.')
-    elif ',' in s:
-        s = s.replace(',', '.')
+        return None, False
+    s_clean = s.replace('R$', '').replace('r$', '').replace(' ', '').replace('\xa0', '')
+    if ',' in s_clean and '.' in s_clean:
+        s_clean = s_clean.replace('.', '').replace(',', '.')
+    elif ',' in s_clean:
+        s_clean = s_clean.replace(',', '.')
     try:
-        return Decimal(s)
+        return Decimal(s_clean), False
     except (InvalidOperation, ValueError):
-        return None
+        return None, True
+
+
+def _decimal_or_none(value) -> Decimal | None:
+    """Wrapper retro-compatível que retorna apenas o Decimal (ou None)."""
+    dec, _ = _parse_decimal(value)
+    return dec
 
 
 def _str_or_none(value) -> str | None:
@@ -113,13 +125,26 @@ def _str_or_none(value) -> str | None:
     return s or None
 
 
-def _int_or_none(value) -> int | None:
+def _parse_int(value) -> tuple[int | None, bool]:
+    """Análogo a ``_parse_decimal`` para inteiros.
+
+    Retorna ``(int, invalido)``.
+    """
     if value is None or value == '':
-        return None
+        return None, False
+    s = str(value).strip()
+    if not s:
+        return None, False
     try:
-        return int(float(str(value).replace(',', '.')))
+        return int(float(s.replace(',', '.'))), False
     except (ValueError, TypeError):
-        return None
+        return None, True
+
+
+def _int_or_none(value) -> int | None:
+    """Wrapper retro-compatível que retorna apenas o int (ou None)."""
+    val, _ = _parse_int(value)
+    return val
 
 
 def _style_header(ws, ncols: int):
@@ -287,7 +312,15 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                 continue
 
             descricao = _str_or_none(_col(row, 'descricao'))
-            coef_dec = _decimal_or_none(_col(row, 'coeficiente_padrao'))
+
+            coef_dec, coef_invalido = _parse_decimal(_col(row, 'coeficiente_padrao'))
+            if coef_invalido:
+                rejected.append({
+                    'linha': row_idx,
+                    'motivo': (f'coeficiente_padrao inválido: '
+                               f'"{_col(row, "coeficiente_padrao")}" não é numérico.'),
+                })
+                continue
             if coef_dec is None:
                 coef_dec = Decimal('1')
             if coef_dec < 0:
@@ -297,7 +330,14 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                 })
                 continue
 
-            preco_dec = _decimal_or_none(_col(row, 'preco_base'))
+            preco_dec, preco_invalido = _parse_decimal(_col(row, 'preco_base'))
+            if preco_invalido:
+                rejected.append({
+                    'linha': row_idx,
+                    'motivo': (f'preco_base inválido: '
+                               f'"{_col(row, "preco_base")}" não é numérico.'),
+                })
+                continue
             if preco_dec is not None and preco_dec < 0:
                 rejected.append({
                     'linha': row_idx,
@@ -566,12 +606,15 @@ def importar_cronograma_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
         if not any(c not in (None, '') for c in row):
             continue
 
-        ordem = _int_or_none(_col_i(row, 'ordem'))
+        ordem, ordem_invalido = _parse_int(_col_i(row, 'ordem'))
         nome_tarefa = _str_or_none(_col_i(row, 'nome_tarefa'))
-        dur = _int_or_none(_col_i(row, 'duracao_dias'))
+        dur, dur_invalido = _parse_int(_col_i(row, 'duracao_dias'))
 
-        if ordem is None:
-            rejected.append({'linha': row_idx, 'motivo': 'ordem é obrigatória e deve ser numérica.'})
+        if ordem_invalido or ordem is None:
+            rejected.append({
+                'linha': row_idx,
+                'motivo': 'ordem é obrigatória e deve ser numérica.',
+            })
             continue
         if ordem in ordens_vistas:
             rejected.append({'linha': row_idx, 'motivo': f'ordem {ordem} duplicada na planilha.'})
@@ -579,15 +622,29 @@ def importar_cronograma_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
         if not nome_tarefa:
             rejected.append({'linha': row_idx, 'motivo': 'nome_tarefa é obrigatório.'})
             continue
-        if dur is None or dur < 1:
+        if dur_invalido or dur is None or dur < 1:
             rejected.append({
                 'linha': row_idx,
                 'motivo': 'duracao_dias deve ser inteiro >= 1.',
             })
             continue
 
-        parent_ordem = _int_or_none(_col_i(row, 'parent_ordem'))
-        qtd_dec = _decimal_or_none(_col_i(row, 'quantidade_prevista'))
+        parent_ordem, parent_invalido = _parse_int(_col_i(row, 'parent_ordem'))
+        if parent_invalido:
+            rejected.append({
+                'linha': row_idx,
+                'motivo': (f'parent_ordem inválido: '
+                           f'"{_col_i(row, "parent_ordem")}" não é numérico.'),
+            })
+            continue
+        qtd_dec, qtd_invalido = _parse_decimal(_col_i(row, 'quantidade_prevista'))
+        if qtd_invalido:
+            rejected.append({
+                'linha': row_idx,
+                'motivo': (f'quantidade_prevista inválida: '
+                           f'"{_col_i(row, "quantidade_prevista")}" não é numérica.'),
+            })
+            continue
         responsavel = (_str_or_none(_col_i(row, 'responsavel')) or 'empresa').lower()
         if responsavel not in RESPONSAVEIS_VALIDOS:
             rejected.append({
