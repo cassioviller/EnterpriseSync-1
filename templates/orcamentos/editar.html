@@ -96,7 +96,7 @@
      serviço pode ter unidade diferente (m², h, kg, un), uma média ponderada
      por quantidade não tem sentido físico — usamos a média aritmética como
      referência indicativa. #}
-  {% set _itens_validos = o.itens|selectattr('preco_venda_unitario')|list %}
+  {% set _itens_validos = o.itens|rejectattr('preco_venda_unitario', 'none')|list %}
   {% set _media_unit = (_itens_validos|sum(attribute='preco_venda_unitario') / _itens_validos|length) if _itens_validos|length > 0 else 0 %}
   <div class="row g-3 mb-3">
     <div class="col-md-3"><div class="card"><div class="card-body">
