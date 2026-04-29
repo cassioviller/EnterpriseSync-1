@@ -5012,6 +5012,10 @@ class MapaFornecedor(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     nome = db.Column(db.String(200), nullable=False)
     ordem = db.Column(db.Integer, default=0)
+    # Task #21 — atributos comerciais por fornecedor (não mais por célula item×forn)
+    prazo_entrega = db.Column(db.String(100))
+    observacao = db.Column(db.Text)
+    condicoes_pagamento = db.Column(db.String(255))
 
     cotacoes = db.relationship('MapaCotacao', backref='fornecedor', cascade='all, delete-orphan')
 
@@ -5030,8 +5034,16 @@ class MapaItemCotacao(db.Model):
     unidade = db.Column(db.String(50), default='un')
     quantidade = db.Column(db.Numeric(12, 3), default=1)
     ordem = db.Column(db.Integer, default=0)
+    # Task #21 — fornecedor escolhido para compra deste item (admin define;
+    # também espelhado a partir da seleção do cliente no portal)
+    fornecedor_escolhido_id = db.Column(
+        db.Integer,
+        db.ForeignKey('mapa_fornecedor.id', ondelete='SET NULL'),
+        nullable=True,
+    )
 
     cotacoes = db.relationship('MapaCotacao', backref='item', cascade='all, delete-orphan')
+    fornecedor_escolhido = db.relationship('MapaFornecedor', foreign_keys=[fornecedor_escolhido_id])
 
     def __repr__(self):
         return f'<MapaItemCotacao #{self.id} "{self.descricao}">'
@@ -5047,11 +5059,49 @@ class MapaCotacao(db.Model):
     fornecedor_id = db.Column(db.Integer, db.ForeignKey('mapa_fornecedor.id', ondelete='CASCADE'), nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     valor_unitario = db.Column(db.Numeric(14, 2), default=0)
+    # DEPRECATED Task #21 — prazo agora vive em MapaFornecedor.prazo_entrega.
+    # Mantido por compatibilidade de dados históricos / rollback seguro.
     prazo = db.Column(db.String(100))
     selecionado = db.Column(db.Boolean, default=False, nullable=False)
 
     def __repr__(self):
         return f'<MapaCotacao item={self.item_id} forn={self.fornecedor_id} val={self.valor_unitario}>'
+
+
+class RelatorioCompraMapa(db.Model):
+    """Relatório de Compra (PDF) gerado a partir de um MapaConcorrenciaV2.
+
+    Cada vez que o admin clica em "Gerar Relatório de Compra" um PDF é
+    materializado em static/uploads/relatorios_mapa/<obra_id>/ e um
+    registro é criado aqui — permitindo histórico de versões e download
+    via portal do cliente.
+    """
+    __tablename__ = 'relatorio_compra_mapa'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mapa_id = db.Column(db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='CASCADE'), nullable=False)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    gerado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    versao = db.Column(db.Integer, default=1, nullable=False)
+    arquivo_path = db.Column(db.String(500), nullable=False)  # caminho relativo dentro de static/
+    arquivo_nome = db.Column(db.String(255), nullable=False)
+    total_geral = db.Column(db.Numeric(14, 2), default=0)
+    gerado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    mapa = db.relationship('MapaConcorrenciaV2', backref=db.backref(
+        'relatorios_compra', lazy='dynamic',
+        order_by='RelatorioCompraMapa.versao.desc()',
+        cascade='all, delete-orphan'
+    ))
+    obra = db.relationship('Obra', backref=db.backref(
+        'relatorios_compra_mapa', lazy='dynamic',
+        order_by='RelatorioCompraMapa.gerado_em.desc()',
+    ))
+    gerado_por = db.relationship('Usuario', foreign_keys=[gerado_por_id])
+
+    def __repr__(self):
+        return f'<RelatorioCompraMapa #{self.id} mapa={self.mapa_id} v{self.versao}>'
 
 
 class CronogramaCliente(db.Model):

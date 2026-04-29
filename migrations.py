@@ -3840,6 +3840,8 @@ def executar_migracoes():
             (139, "Task #142 — rdo_apontamento_cronograma.percentual_planejado nullable + backfill NULL para tarefas sem plano", migration_139_apontamento_cronograma_planejado_nullable),
             (140, "Task #200 — obra.cronograma_revisado_em (gate de revisão inicial de cronograma)", migration_140_obra_cronograma_revisado_em),
             (141, "Task #201 — drop tabelas legadas de propostas (proposta + 7 dependentes/órfãs)", migration_141_drop_legacy_propostas_tables),
+            (142, "Task #21 — Mapa V2: prazo/obs/condições por fornecedor + fornecedor_escolhido_id por item + relatorio_compra_mapa", migration_142_mapa_v2_relatorio_compra),
+            (143, "Task #21 — relatorio_compra_mapa: UNIQUE (mapa_id, versao) p/ versionamento seguro sob concorrência", migration_143_relatorio_compra_unique_versao),
         ]
         
         # Executar cada migração com rastreamento
@@ -11770,4 +11772,204 @@ def migration_140_obra_cronograma_revisado_em():
                 connection.close()
             except Exception:
                 pass
+        raise
+
+
+def migration_142_mapa_v2_relatorio_compra():
+    """Migration 142 (Task #21): Mapa V2 — prazo por fornecedor + relatório de compra.
+
+    1. ALTER mapa_fornecedor: adiciona prazo_entrega, observacao, condicoes_pagamento.
+    2. ALTER mapa_item_cotacao: adiciona fornecedor_escolhido_id (FK ON DELETE SET NULL).
+    3. CREATE TABLE relatorio_compra_mapa.
+    4. Backfill prazo_entrega: pega o prazo mais frequente das cotações de cada
+       fornecedor (estratégia: agrupar por mapa_fornecedor.id, contar
+       MapaCotacao.prazo, pegar o mais comum não vazio).
+    5. Backfill fornecedor_escolhido_id: para cotações com selecionado=True
+       (mapas já aprovados pelo cliente), espelha em MapaItemCotacao.
+
+    Observação: NÃO removemos mapa_cotacao.prazo — fica deprecated por
+    segurança de rollback. A nova UI ignora esse campo na escrita, mas
+    leituras antigas continuam funcionando.
+
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1) ALTER mapa_fornecedor
+        cursor.execute("""
+            ALTER TABLE mapa_fornecedor
+                ADD COLUMN IF NOT EXISTS prazo_entrega VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS observacao TEXT,
+                ADD COLUMN IF NOT EXISTS condicoes_pagamento VARCHAR(255)
+        """)
+
+        # 2) ALTER mapa_item_cotacao — FK SET NULL para evitar deletar item se
+        #    o fornecedor escolhido for removido
+        cursor.execute("""
+            ALTER TABLE mapa_item_cotacao
+                ADD COLUMN IF NOT EXISTS fornecedor_escolhido_id INTEGER
+        """)
+        # FK constraint em separado (IF NOT EXISTS não funciona para FK; usar bloco)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                     WHERE constraint_name = 'mapa_item_cotacao_fornecedor_escolhido_fk'
+                       AND table_name = 'mapa_item_cotacao'
+                ) THEN
+                    ALTER TABLE mapa_item_cotacao
+                        ADD CONSTRAINT mapa_item_cotacao_fornecedor_escolhido_fk
+                        FOREIGN KEY (fornecedor_escolhido_id)
+                        REFERENCES mapa_fornecedor(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+        """)
+
+        # 3) CREATE TABLE relatorio_compra_mapa
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS relatorio_compra_mapa (
+                id SERIAL PRIMARY KEY,
+                mapa_id INTEGER NOT NULL REFERENCES mapa_concorrencia_v2(id) ON DELETE CASCADE,
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                gerado_por_id INTEGER REFERENCES usuario(id),
+                versao INTEGER NOT NULL DEFAULT 1,
+                arquivo_path VARCHAR(500) NOT NULL,
+                arquivo_nome VARCHAR(255) NOT NULL,
+                total_geral NUMERIC(14, 2) DEFAULT 0,
+                gerado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_relatorio_compra_mapa_obra
+                ON relatorio_compra_mapa(obra_id, gerado_em DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_relatorio_compra_mapa_mapa
+                ON relatorio_compra_mapa(mapa_id, versao DESC)
+        """)
+
+        # 4) Backfill prazo_entrega — prazo mais comum por fornecedor
+        cursor.execute("""
+            WITH prazo_modas AS (
+                SELECT
+                    fornecedor_id,
+                    prazo,
+                    COUNT(*) AS qtd,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY fornecedor_id
+                        ORDER BY COUNT(*) DESC, prazo
+                    ) AS rn
+                  FROM mapa_cotacao
+                 WHERE prazo IS NOT NULL AND TRIM(prazo) <> ''
+              GROUP BY fornecedor_id, prazo
+            )
+            UPDATE mapa_fornecedor mf
+               SET prazo_entrega = pm.prazo
+              FROM prazo_modas pm
+             WHERE pm.fornecedor_id = mf.id
+               AND pm.rn = 1
+               AND (mf.prazo_entrega IS NULL OR TRIM(mf.prazo_entrega) = '')
+        """)
+        backfill_prazo = cursor.rowcount or 0
+
+        # 5) Backfill fornecedor_escolhido_id a partir de selecionado=True.
+        # Tie-break determinístico (MAX(id)) para o caso de >1 cotação
+        # marcada como selecionado=True para o mesmo item (dado legado).
+        cursor.execute("""
+            UPDATE mapa_item_cotacao mi
+               SET fornecedor_escolhido_id = sub.fornecedor_id
+              FROM (
+                  SELECT DISTINCT ON (item_id)
+                         item_id, fornecedor_id, id
+                    FROM mapa_cotacao
+                   WHERE selecionado = TRUE
+                ORDER BY item_id, id DESC
+              ) sub
+             WHERE sub.item_id = mi.id
+               AND mi.fornecedor_escolhido_id IS NULL
+        """)
+        backfill_escolhido = cursor.rowcount or 0
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 142 CONCLUIDA: mapa_fornecedor (prazo/obs/cond), "
+            "mapa_item_cotacao.fornecedor_escolhido_id, relatorio_compra_mapa criados; "
+            "backfill_prazo=%s, backfill_escolhido=%s",
+            backfill_prazo, backfill_escolhido,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Erro na migracao 142: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_143_relatorio_compra_unique_versao():
+    """Task #21 — Adiciona UNIQUE (mapa_id, versao) em relatorio_compra_mapa.
+
+    Justificativa (code review): a alocação de versão é feita em app code via
+    MAX(versao)+1, sem cadeado, sujeito a corrida em geração concorrente do
+    PDF. Esta constraint força o INSERT a falhar quando duas requisições tentam
+    a mesma versão; o caller (views/obras.py:gerar_relatorio) faz retry com
+    nova MAX(versao)+1 — eliminando duplicatas.
+
+    Idempotente — usa DO$$ + IF NOT EXISTS via verificação em pg_constraint.
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 143: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                     WHERE conname = 'uq_relatorio_compra_mapa_versao'
+                ) THEN
+                    ALTER TABLE relatorio_compra_mapa
+                      ADD CONSTRAINT uq_relatorio_compra_mapa_versao
+                      UNIQUE (mapa_id, versao);
+                END IF;
+            END$$;
+        """)
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 143 CONCLUIDA: UNIQUE (mapa_id, versao) em "
+            "relatorio_compra_mapa garantida."
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 143 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
         raise

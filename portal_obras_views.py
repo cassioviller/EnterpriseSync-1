@@ -24,6 +24,7 @@ from models import (
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
     MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente,
     MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao,
+    RelatorioCompraMapa,
 )
 
 logger = logging.getLogger(__name__)
@@ -229,44 +230,55 @@ def portal_obra(token: str):
 
     def _build_v2_context(mapa_list):
         """Constrói dicts de contexto para renderização de mapas V2.
-        Computa min_val_map e min_prazo_map em Python para comparações corretas."""
+
+        Task #21: prazo agora vive em MapaFornecedor.prazo_entrega.
+        min_prazo_map = fornecedor com menor prazo (calculado uma vez por mapa).
+        Cada item passa a referenciar fornecedor_escolhido_id.
+        """
         result = []
         for mapa in mapa_list:
             cotacoes_map = {}
             for cot in mapa.cotacoes:
                 cotacoes_map.setdefault(cot.item_id, {})[cot.fornecedor_id] = cot
 
+            # Menor prazo entre fornecedores (válido para o mapa todo)
+            best_prazo_days = None
+            best_prazo_forn = None
+            for forn in mapa.fornecedores:
+                p = (forn.prazo_entrega or '').strip()
+                if not p:
+                    continue
+                days = _prazo_to_days(p)
+                if days < float('inf') and (best_prazo_days is None or days < best_prazo_days):
+                    best_prazo_days = days
+                    best_prazo_forn = forn.id
+
             min_val_map = {}    # {item_id: forn_id com menor valor}
-            min_prazo_map = {}  # {item_id: forn_id com menor prazo (em dias)}
+            min_prazo_map = {}  # {item_id: forn_id com menor prazo (mesmo p/ todos)}
 
             for item in mapa.itens:
                 item_cots = cotacoes_map.get(item.id, {})
                 best_val = None
                 best_val_forn = None
-                best_prazo_days = None
-                best_prazo_forn = None
-
                 for forn in mapa.fornecedores:
                     cot = item_cots.get(forn.id)
-                    if not cot:
+                    if not cot or not cot.valor_unitario:
                         continue
-                    # Menor valor unitário
-                    if cot.valor_unitario:
-                        v = float(cot.valor_unitario)
-                        if v > 0 and (best_val is None or v < best_val):
-                            best_val = v
-                            best_val_forn = forn.id
-                    # Menor prazo (numericamente)
-                    if cot.prazo and cot.prazo.strip():
-                        days = _prazo_to_days(cot.prazo)
-                        if days < float('inf') and (best_prazo_days is None or days < best_prazo_days):
-                            best_prazo_days = days
-                            best_prazo_forn = forn.id
-
+                    v = float(cot.valor_unitario)
+                    if v > 0 and (best_val is None or v < best_val):
+                        best_val = v
+                        best_val_forn = forn.id
                 if best_val_forn:
                     min_val_map[item.id] = best_val_forn
                 if best_prazo_forn:
                     min_prazo_map[item.id] = best_prazo_forn
+
+            relatorios = (
+                RelatorioCompraMapa.query
+                .filter_by(mapa_id=mapa.id)
+                .order_by(RelatorioCompraMapa.versao.desc())
+                .all()
+            )
 
             result.append({
                 'mapa': mapa,
@@ -275,6 +287,7 @@ def portal_obra(token: str):
                 'cotacoes_map': cotacoes_map,
                 'min_val_map': min_val_map,
                 'min_prazo_map': min_prazo_map,
+                'relatorios': relatorios,
             })
         return result
 
@@ -542,6 +555,12 @@ def selecionar_mapa_v2(token: str, mapa_id: int):
                 cot.item_id in selecoes and cot.fornecedor_id == selecoes[cot.item_id]
             )
 
+        # Task #21 — espelhar a escolha do cliente em
+        # MapaItemCotacao.fornecedor_escolhido_id (fonte canônica nova).
+        # Limpa explicitamente itens não selecionados para evitar estado obsoleto.
+        for item in mapa.itens:
+            item.fornecedor_escolhido_id = selecoes.get(item.id)
+
         mapa.status = 'concluido'
         db.session.commit()
         logger.info(
@@ -555,6 +574,26 @@ def selecionar_mapa_v2(token: str, mapa_id: int):
         flash('Erro ao registrar seleção. Tente novamente.', 'danger')
 
     return redirect(url_for('portal_obras.portal_obra', token=token))
+
+
+@portal_obras_bp.route('/obra/<token>/mapa-v2/<int:mapa_id>/relatorio/<int:rel_id>/baixar')
+def baixar_relatorio_mapa_v2_portal(token: str, mapa_id: int, rel_id: int):
+    """Download de PDF de Relatório de Compra pelo portal do cliente."""
+    from flask import send_from_directory, abort, current_app
+    obra = _get_obra_by_token(token)
+    rel = (
+        RelatorioCompraMapa.query
+        .filter_by(id=rel_id, mapa_id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id)
+        .first()
+    )
+    if not rel:
+        abort(404)
+    static_root = os.path.join(current_app.root_path, 'static')
+    abs_dir = os.path.dirname(os.path.join(static_root, rel.arquivo_path))
+    return send_from_directory(
+        abs_dir, os.path.basename(rel.arquivo_path),
+        as_attachment=False, download_name=rel.arquivo_nome,
+    )
 
 
 @portal_obras_bp.route('/obra/<token>/rdo/<int:rdo_id>')

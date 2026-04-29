@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, Cliente, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, Cliente, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
@@ -2868,28 +2868,126 @@ def editar_mapa_v2(obra_id, mapa_id):
                     flash('Item removido.', 'success')
 
             elif action == 'save_cotacoes':
-                # Salva valores e prazos da tabela de cotações
+                # Task #21 — fluxo unificado:
+                #   * val_<item>_<forn>            → MapaCotacao.valor_unitario
+                #   * prazo_forn_<forn>            → MapaFornecedor.prazo_entrega
+                #   * obs_forn_<forn>              → MapaFornecedor.observacao
+                #   * cond_forn_<forn>             → MapaFornecedor.condicoes_pagamento
+                #   * escolha_<item>               → MapaItemCotacao.fornecedor_escolhido_id
+                #     (valor "" = sem escolha; valor inteiro = forn_id válido)
+                forns_validos = {f.id for f in mapa.fornecedores}
+                itens_validos = {i.id for i in mapa.itens}
+
+                # 1) valores das células
                 for key, val in request.form.items():
-                    if key.startswith('val_'):
+                    if not key.startswith('val_'):
+                        continue
+                    try:
                         _, item_id_s, forn_id_s = key.split('_', 2)
                         item_id_k = int(item_id_s)
                         forn_id_k = int(forn_id_s)
-                        cot = MapaCotacao.query.filter_by(
-                            mapa_id=mapa.id, item_id=item_id_k, fornecedor_id=forn_id_k
-                        ).first()
-                        if not cot:
-                            cot = MapaCotacao(
-                                mapa_id=mapa.id, item_id=item_id_k,
-                                fornecedor_id=forn_id_k, admin_id=admin_id,
-                                valor_unitario=0, selecionado=False
-                            )
-                            db.session.add(cot)
-                        cot.valor_unitario = _parse_brl(val)
-                        prazo_key = f'prazo_{item_id_s}_{forn_id_s}'
-                        prazo_val = request.form.get(prazo_key, '').strip()
-                        cot.prazo = prazo_val or None
+                    except (ValueError, AttributeError):
+                        continue
+                    if item_id_k not in itens_validos or forn_id_k not in forns_validos:
+                        continue
+                    cot = MapaCotacao.query.filter_by(
+                        mapa_id=mapa.id, item_id=item_id_k, fornecedor_id=forn_id_k
+                    ).first()
+                    if not cot:
+                        cot = MapaCotacao(
+                            mapa_id=mapa.id, item_id=item_id_k,
+                            fornecedor_id=forn_id_k, admin_id=admin_id,
+                            valor_unitario=0, selecionado=False
+                        )
+                        db.session.add(cot)
+                    cot.valor_unitario = _parse_brl(val)
+
+                # 2) atributos comerciais por fornecedor
+                for forn in mapa.fornecedores:
+                    prazo_v = (request.form.get(f'prazo_forn_{forn.id}', '') or '').strip()
+                    obs_v = (request.form.get(f'obs_forn_{forn.id}', '') or '').strip()
+                    cond_v = (request.form.get(f'cond_forn_{forn.id}', '') or '').strip()
+                    forn.prazo_entrega = prazo_v or None
+                    forn.observacao = obs_v or None
+                    forn.condicoes_pagamento = cond_v or None
+
+                # 3) fornecedor escolhido por item
+                for item in mapa.itens:
+                    raw = (request.form.get(f'escolha_{item.id}', '') or '').strip()
+                    if raw == '':
+                        item.fornecedor_escolhido_id = None
+                        continue
+                    try:
+                        fid = int(raw)
+                    except ValueError:
+                        continue
+                    if fid in forns_validos:
+                        item.fornecedor_escolhido_id = fid
+
                 db.session.commit()
-                flash('Cotações salvas com sucesso.', 'success')
+                flash('Cotações e seleções salvas com sucesso.', 'success')
+
+            elif action == 'gerar_relatorio':
+                # Task #21 — gera PDF "Relatório de Compra" e registra em
+                # RelatorioCompraMapa. Disponibilizado no portal do cliente.
+                # Versionamento robusto: tenta MAX(versao)+1 e, em caso de
+                # corrida (UNIQUE (mapa_id, versao) em migration 143), retenta.
+                from services.mapa_relatorio_pdf import gerar_relatorio_compra_pdf
+                from sqlalchemy.exc import IntegrityError
+
+                config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+                nome_empresa = config.nome_empresa if config else ''
+
+                rel = None
+                proxima_versao = None
+                for tentativa in range(5):
+                    ultima = (
+                        RelatorioCompraMapa.query
+                        .filter_by(mapa_id=mapa.id)
+                        .order_by(RelatorioCompraMapa.versao.desc())
+                        .first()
+                    )
+                    proxima_versao = (ultima.versao + 1) if ultima else 1
+                    meta = gerar_relatorio_compra_pdf(
+                        mapa=mapa, obra=obra, versao=proxima_versao,
+                        nome_empresa=nome_empresa,
+                    )
+                    rel = RelatorioCompraMapa(
+                        mapa_id=mapa.id, obra_id=obra.id, admin_id=admin_id,
+                        gerado_por_id=current_user.id if current_user.is_authenticated else None,
+                        versao=proxima_versao,
+                        arquivo_path=meta['arquivo_path'],
+                        arquivo_nome=meta['arquivo_nome'],
+                        total_geral=meta['total_geral'],
+                    )
+                    db.session.add(rel)
+                    try:
+                        db.session.commit()
+                        break
+                    except IntegrityError:
+                        # Conflito de versão (corrida) — limpa PDF gerado e retenta
+                        db.session.rollback()
+                        try:
+                            from flask import current_app as _ca
+                            _abs = os.path.join(_ca.root_path, 'static', meta['arquivo_path'])
+                            if os.path.isfile(_abs):
+                                os.remove(_abs)
+                        except Exception:
+                            pass
+                        rel = None
+                else:
+                    flash(
+                        'Não foi possível alocar uma nova versão do relatório (concorrência).',
+                        'danger',
+                    )
+                    return redirect(url_for(
+                        'main.editar_mapa_v2', obra_id=obra.id, mapa_id=mapa.id
+                    ))
+
+                flash(
+                    f'Relatório de Compra v{proxima_versao} gerado com sucesso.',
+                    'success'
+                )
 
             elif action == 'toggle_status':
                 mapa.status = 'concluido' if mapa.status == 'aberto' else 'aberto'
@@ -2910,12 +3008,67 @@ def editar_mapa_v2(obra_id, mapa_id):
     for cot in mapa.cotacoes:
         cotacoes_map.setdefault(cot.item_id, {})[cot.fornecedor_id] = cot
 
+    relatorios = (
+        RelatorioCompraMapa.query
+        .filter_by(mapa_id=mapa.id)
+        .order_by(RelatorioCompraMapa.versao.desc())
+        .all()
+    )
+
     return render_template(
         'obras/mapa_concorrencia_v2.html',
         obra=obra,
         mapa=mapa,
         cotacoes_map=cotacoes_map,
+        relatorios=relatorios,
     )
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/relatorio/<int:rel_id>/baixar')
+@login_required
+@admin_required
+def baixar_relatorio_mapa_v2(obra_id, mapa_id, rel_id):
+    """Download de PDF de Relatório de Compra (admin)."""
+    from flask import send_from_directory, abort, current_app
+    admin_id = get_tenant_admin_id()
+    rel = (
+        RelatorioCompraMapa.query
+        .filter_by(id=rel_id, mapa_id=mapa_id, obra_id=obra_id, admin_id=admin_id)
+        .first()
+    )
+    if not rel:
+        abort(404)
+    static_root = os.path.join(current_app.root_path, 'static')
+    abs_dir = os.path.dirname(os.path.join(static_root, rel.arquivo_path))
+    return send_from_directory(
+        abs_dir, os.path.basename(rel.arquivo_path),
+        as_attachment=False, download_name=rel.arquivo_nome,
+    )
+
+
+@main_bp.route('/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/relatorio/<int:rel_id>/excluir', methods=['POST'])
+@login_required
+@admin_required
+def excluir_relatorio_mapa_v2(obra_id, mapa_id, rel_id):
+    """Exclui um Relatório de Compra (registro + arquivo)."""
+    from flask import current_app
+    admin_id = get_tenant_admin_id()
+    rel = (
+        RelatorioCompraMapa.query
+        .filter_by(id=rel_id, mapa_id=mapa_id, obra_id=obra_id, admin_id=admin_id)
+        .first()
+    )
+    if rel:
+        try:
+            abs_path = os.path.join(current_app.root_path, 'static', rel.arquivo_path)
+            if os.path.isfile(abs_path):
+                os.remove(abs_path)
+        except Exception as e:
+            logger.warning(f"Falha ao remover PDF do relatório {rel.id}: {e}")
+        db.session.delete(rel)
+        db.session.commit()
+        flash('Relatório excluído.', 'success')
+    return redirect(url_for('main.editar_mapa_v2', obra_id=obra_id, mapa_id=mapa_id))
 
 
 @main_bp.route('/obras/<int:obra_id>/mapa-v2/<int:mapa_id>/deletar', methods=['POST'])
