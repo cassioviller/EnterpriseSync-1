@@ -20,6 +20,7 @@ from auth import admin_required
 from models import (
     Orcamento, OrcamentoItem, Servico, Cliente, Proposta, PropostaItem,
     PropostaHistorico, ConfiguracaoEmpresa, CronogramaTemplate,
+    PropostaTemplate, PropostaClausula,
 )
 from services.orcamento_view_service import (
     snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -195,12 +196,23 @@ def editar(id):
     for it in orc.itens:
         if it.servico:
             composicao_padrao_por_item[it.id] = snapshot_from_servico(it.servico)
+
+    # Task #31 — modelos de proposta disponíveis para seleção no momento de
+    # gerar a Proposta a partir deste orçamento (modal "Escolher modelo").
+    templates_proposta = (
+        PropostaTemplate.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(PropostaTemplate.nome)
+        .all()
+    )
+
     return render_template(
         'orcamentos/editar.html',
         orcamento=orc,
         servicos=servicos,
         templates_cronograma=templates_cronograma,
         composicao_padrao_por_item=composicao_padrao_por_item,
+        templates_proposta=templates_proposta,
     )
 
 
@@ -475,9 +487,30 @@ def gerar_proposta(id):
 
     Apenas descricao/quantidade/unidade/preco_venda são propagados.
     Custos, composição, margem e imposto NÃO são copiados para a Proposta.
+
+    Task #31 — aceita ``template_id`` (PropostaTemplate do tenant) no form
+    para pré-popular cláusulas/condições. Quando vem de template, marca
+    todos os campos copiados como ``pendentes de revisão`` (cláusulas com
+    ``revisado_em=NULL`` e lista ``campos_pendentes_revisao``); o admin
+    precisa revisar/marcar antes de poder enviar.
     """
     admin_id = _admin_id()
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+    # Task #31 — template opcional escolhido no modal "Gerar Proposta".
+    template_id_raw = (request.form.get('template_id') or '').strip()
+    template = None
+    if template_id_raw:
+        try:
+            template_id = int(template_id_raw)
+            template = PropostaTemplate.query.filter_by(
+                id=template_id, admin_id=admin_id, ativo=True
+            ).first()
+            if not template:
+                flash('Modelo de proposta inválido ou desativado.', 'warning')
+        except (TypeError, ValueError):
+            template = None
+
     try:
         recalcular_orcamento(orc)
 
@@ -491,8 +524,100 @@ def gerar_proposta(id):
         proposta.status = 'rascunho'
         proposta.valor_total = orc.venda_total or 0
         proposta.orcamento_id = orc.id  # vínculo 1→N (Task #115 v2)
+        proposta.versao = 1
+        # Task #31 — aplicar campos numéricos / textuais do template (se
+        # houver). Em paralelo, registra na lista de revisão pendente.
+        campos_pendentes = []
+        if template:
+            proposta.proposta_template_id = template.id
+            if template.prazo_entrega_dias:
+                proposta.prazo_entrega_dias = template.prazo_entrega_dias
+                campos_pendentes.append('prazo_entrega_dias')
+            if template.validade_dias:
+                proposta.validade_dias = template.validade_dias
+                campos_pendentes.append('validade_dias')
+            if template.percentual_nota_fiscal is not None:
+                proposta.percentual_nota_fiscal = template.percentual_nota_fiscal
+            if template.itens_inclusos:
+                # Itens inclusos no template ficam como string com '\n'.
+                # Proposta.itens_inclusos é JSON (list[str]).
+                _inc = [
+                    ln.strip() for ln in str(template.itens_inclusos).splitlines()
+                    if ln and ln.strip()
+                ]
+                if _inc:
+                    proposta.itens_inclusos = _inc
+                    campos_pendentes.append('itens_inclusos')
+            if template.itens_exclusos:
+                _exc = [
+                    ln.strip() for ln in str(template.itens_exclusos).splitlines()
+                    if ln and ln.strip()
+                ]
+                if _exc:
+                    proposta.itens_exclusos = _exc
+                    campos_pendentes.append('itens_exclusos')
+        proposta.campos_pendentes_revisao = campos_pendentes
+
         db.session.add(proposta)
         db.session.flush()
+
+        # Task #31 — copiar cláusulas do template (se houver). Usa o helper
+        # canônico de propostas_consolidated (skip "Condições de Entrega" /
+        # "Validade da Proposta" — esses são derivados de campos numéricos).
+        if template:
+            from propostas_consolidated import (
+                _copiar_clausulas_template_para_proposta,
+            )
+            n_copiadas = _copiar_clausulas_template_para_proposta(
+                template, proposta, admin_id
+            )
+            try:
+                template.uso_contador = (template.uso_contador or 0) + 1
+            except Exception:
+                pass
+            # Garante NULL para tudo vindo de template (default já é,
+            # mas explicitar evita ambiguidade pós-flush).
+            for cl in proposta.clausulas:
+                cl.revisado_em = None
+
+            # Task #31 — Carry-over de campos textuais do PropostaTemplate
+            # que NÃO estão modelados como cláusulas configuráveis (legacy
+            # / texto livre). Cada um vira uma cláusula extra na proposta,
+            # também marcada como pendente de revisão. Pula títulos que já
+            # vieram via _copiar_clausulas_template_para_proposta para não
+            # duplicar (heurística por título normalizado).
+            from propostas_consolidated import _normalizar_titulo_clausula
+            from models import PropostaClausula as _PCl
+            ja_titulos = {
+                _normalizar_titulo_clausula(c.titulo or '')
+                for c in proposta.clausulas
+            }
+            ordem_base = (max(
+                (c.ordem or 0) for c in proposta.clausulas
+            ) if proposta.clausulas else 0) + 1
+            extras_textuais = [
+                ('Apresentação', getattr(template, 'texto_apresentacao', None)),
+                ('Objeto', getattr(template, 'secao_objeto', None)),
+                ('Condições de Pagamento', getattr(template, 'condicoes_pagamento', None)),
+                ('Garantias', getattr(template, 'garantias', None)),
+                ('Considerações Gerais', getattr(template, 'consideracoes_gerais', None)),
+                ('Condições', getattr(template, 'condicoes', None)),
+            ]
+            for titulo, texto in extras_textuais:
+                if not (texto or '').strip():
+                    continue
+                if _normalizar_titulo_clausula(titulo) in ja_titulos:
+                    continue
+                db.session.add(_PCl(
+                    proposta_id=proposta.id,
+                    admin_id=admin_id,
+                    titulo=titulo[:200],
+                    texto=str(texto).strip(),
+                    ordem=ordem_base,
+                    revisado_em=None,
+                ))
+                ordem_base += 1
+                ja_titulos.add(_normalizar_titulo_clausula(titulo))
 
         for idx, it in enumerate(orc.itens, start=1):
             pi = PropostaItem(
@@ -534,8 +659,24 @@ def gerar_proposta(id):
         if orc.status == 'rascunho':
             orc.status = 'fechado'
         db.session.commit()
-        flash(f'Proposta {proposta.numero} gerada a partir do orçamento.', 'success')
-        return redirect(url_for('propostas.visualizar', id=proposta.id))
+        # Task #31 — após gerar a proposta, sempre cair na tela de
+        # revisão (editar) — é onde o admin confere/marca cláusulas e
+        # campos vindos do modelo antes de enviar ao cliente. A tela
+        # de visualização permanece acessível pelo botão "Visualizar".
+        if template:
+            flash(
+                f'Proposta {proposta.numero} gerada a partir do modelo '
+                f'"{template.nome}". Revise os itens marcados como '
+                'pendentes antes de enviar ao cliente.',
+                'success',
+            )
+        else:
+            flash(
+                f'Proposta {proposta.numero} gerada a partir do orçamento. '
+                'Revise antes de enviar.',
+                'success',
+            )
+        return redirect(url_for('propostas.editar', id=proposta.id))
     except Exception as e:
         db.session.rollback()
         logger.exception('erro ao gerar proposta do orcamento')

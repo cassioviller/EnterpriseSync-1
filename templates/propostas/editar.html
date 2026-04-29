@@ -21,6 +21,46 @@
             </div>
         </div>
         <div class="card-body">
+
+            {# Task #31 — Painel de Revisão. Mostra ao admin tudo que veio
+               do modelo (PropostaTemplate) e ainda precisa ser confirmado
+               antes do envio ao cliente. O botão Enviar fica desabilitado
+               enquanto houver pendências. #}
+            {% set _clausulas_pend = proposta.clausulas_pendentes_revisao() %}
+            {% set _campos_pend = proposta.campos_pendentes_revisao or [] %}
+            {% set _pode_enviar = proposta.pode_enviar() %}
+            {% if proposta.versao and proposta.versao > 1 %}
+            <div class="alert alert-info d-flex align-items-center">
+                <i class="fas fa-code-branch fa-lg me-3"></i>
+                <div>
+                    <strong>Versão {{ proposta.versao }}</strong> desta proposta.
+                    {% if proposta.proposta_origem_id %}
+                    Veio de <a href="{{ url_for('propostas.visualizar', id=proposta.proposta_origem_id) }}" class="alert-link">versão anterior</a>.
+                    {% endif %}
+                    Edições aqui só passam a valer para o cliente após o envio.
+                </div>
+            </div>
+            {% endif %}
+            {% if _clausulas_pend or _campos_pend %}
+            <div class="alert alert-warning">
+                <h6 class="alert-heading mb-2"><i class="fas fa-tasks me-2"></i> Revisão pendente antes do envio</h6>
+                <p class="small mb-2">
+                    Esta proposta foi pré-preenchida a partir de um <strong>modelo</strong>.
+                    Revise os itens marcados com <span class="badge bg-warning text-dark">REVISAR</span>
+                    e marque-os como conferidos. O botão <strong>Enviar ao Cliente</strong> só fica
+                    disponível quando tudo for revisado.
+                </p>
+                <ul class="small mb-0">
+                    {% if _clausulas_pend %}<li>{{ _clausulas_pend|length }} cláusula(s) aguardando revisão.</li>{% endif %}
+                    {% if _campos_pend %}<li>{{ _campos_pend|length }} campo(s) (prazo/validade/inclusos/exclusos) aguardando revisão.</li>{% endif %}
+                </ul>
+            </div>
+            {% elif proposta.proposta_template_id %}
+            <div class="alert alert-success small">
+                <i class="fas fa-check-circle me-1"></i> Tudo revisado. Pronta para envio.
+            </div>
+            {% endif %}
+
             <form method="POST" action="{{ url_for('propostas.editar', id=proposta.id) }}" id="formEditarProposta">
                 {# Task #174 — sentinela: indica ao backend que o bloco de cláusulas
                    foi submetido pela UI (e portanto deve ser reprocessado mesmo
@@ -173,8 +213,51 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Prazo de Entrega (dias)</label>
+                                    <label class="form-label">
+                                        Prazo de Entrega (dias)
+                                        {% if 'prazo_entrega_dias' in _campos_pend %}
+                                        <span class="badge bg-warning text-dark ms-1">REVISAR</span>
+                                        {% endif %}
+                                    </label>
                                     <input type="number" class="form-control" name="prazo_entrega_dias" value="{{ proposta.prazo_entrega_dias }}" min="1">
+                                    {% if 'prazo_entrega_dias' in _campos_pend %}
+                                    {# Task #31 — valor original p/ edit-detection no backend.
+                                       Se o admin alterar o número e salvar, drena a pendência
+                                       sem precisar marcar a checkbox abaixo. #}
+                                    <input type="hidden" name="campo_revisao_original_prazo_entrega_dias"
+                                           value="{{ proposta.prazo_entrega_dias }}">
+                                    <div class="form-check small mt-1">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="campo_revisao_ack" value="prazo_entrega_dias"
+                                               id="ack_prazo">
+                                        <label class="form-check-label text-success" for="ack_prazo">
+                                            Marcar como revisado (ou apenas edite o valor acima)
+                                        </label>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        Validade da Proposta (dias)
+                                        {% if 'validade_dias' in _campos_pend %}
+                                        <span class="badge bg-warning text-dark ms-1">REVISAR</span>
+                                        {% endif %}
+                                    </label>
+                                    <input type="number" class="form-control" name="validade_dias" value="{{ proposta.validade_dias or 7 }}" min="1">
+                                    {% if 'validade_dias' in _campos_pend %}
+                                    <input type="hidden" name="campo_revisao_original_validade_dias"
+                                           value="{{ proposta.validade_dias or 7 }}">
+                                    <div class="form-check small mt-1">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="campo_revisao_ack" value="validade_dias"
+                                               id="ack_validade">
+                                        <label class="form-check-label text-success" for="ack_validade">
+                                            Marcar como revisado (ou apenas edite o valor acima)
+                                        </label>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <!-- Task #115: % Nota Fiscal removido — pertence ao Orçamento interno -->
@@ -204,13 +287,47 @@
                     <div class="col-md-6">
                         <h6 class="text-primary mb-3">Itens Inclusos/Exclusos</h6>
                         <div class="mb-3">
-                            <label class="form-label">Itens Inclusos</label>
+                            <label class="form-label">
+                                Itens Inclusos
+                                {% if 'itens_inclusos' in _campos_pend %}
+                                <span class="badge bg-warning text-dark ms-1">REVISAR</span>
+                                {% endif %}
+                            </label>
                             <textarea class="form-control" name="itens_inclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_inclusos|join(';') if proposta.itens_inclusos else '' }}</textarea>
+                            {% if 'itens_inclusos' in _campos_pend %}
+                            <input type="hidden" name="campo_revisao_original_itens_inclusos"
+                                   value="{{ proposta.itens_inclusos|join(';') if proposta.itens_inclusos else '' }}">
+                            <div class="form-check small mt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="campo_revisao_ack" value="itens_inclusos"
+                                       id="ack_inclusos">
+                                <label class="form-check-label text-success" for="ack_inclusos">
+                                    Marcar como revisado (ou apenas edite a lista acima)
+                                </label>
+                            </div>
+                            {% endif %}
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Itens Exclusos</label>
+                            <label class="form-label">
+                                Itens Exclusos
+                                {% if 'itens_exclusos' in _campos_pend %}
+                                <span class="badge bg-warning text-dark ms-1">REVISAR</span>
+                                {% endif %}
+                            </label>
                             <textarea class="form-control" name="itens_exclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_exclusos|join(';') if proposta.itens_exclusos else '' }}</textarea>
+                            {% if 'itens_exclusos' in _campos_pend %}
+                            <input type="hidden" name="campo_revisao_original_itens_exclusos"
+                                   value="{{ proposta.itens_exclusos|join(';') if proposta.itens_exclusos else '' }}">
+                            <div class="form-check small mt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       name="campo_revisao_ack" value="itens_exclusos"
+                                       id="ack_exclusos">
+                                <label class="form-check-label text-success" for="ack_exclusos">
+                                    Marcar como revisado (ou apenas edite a lista acima)
+                                </label>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -225,11 +342,24 @@
                 </h6>
                 <div id="clausulasContainer">
                     {% for clausula in proposta.clausulas|sort(attribute='ordem') %}
-                    <div class="clausula-item border rounded p-3 mb-2">
+                    {% set _pend = (clausula.revisado_em is none) %}
+                    <div class="clausula-item border rounded p-3 mb-2 {% if _pend %}border-warning{% endif %}">
                         <input type="hidden" class="clausula-ordem" name="clausula_ordem" value="{{ clausula.ordem }}">
+                        {# Task #31 — flag e texto original para detecção de edição #}
+                        <input type="hidden" class="clausula-revisado-flag" name="clausula_revisado_flag" value="0">
+                        <input type="hidden" name="clausula_texto_original" value="{{ clausula.texto or '' }}">
                         <div class="row g-2 align-items-start">
                             <div class="col-md-4">
-                                <label class="form-label mb-1 small text-muted">Título</label>
+                                <label class="form-label mb-1 small text-muted">
+                                    Título
+                                    {% if _pend %}
+                                    <span class="badge bg-warning text-dark ms-1">REVISAR</span>
+                                    {% else %}
+                                    <span class="badge bg-success ms-1" title="Revisado em {{ clausula.revisado_em.strftime('%d/%m/%Y %H:%M') }}">
+                                        <i class="fas fa-check"></i> revisado
+                                    </span>
+                                    {% endif %}
+                                </label>
                                 <input type="text" class="form-control" name="clausula_titulo"
                                        value="{{ clausula.titulo or '' }}"
                                        placeholder="Ex: Condições de Pagamento">
@@ -237,6 +367,14 @@
                             <div class="col-md-7">
                                 <label class="form-label mb-1 small text-muted">Texto (vazio = remover)</label>
                                 <textarea class="form-control" name="clausula_texto" rows="3">{{ clausula.texto or '' }}</textarea>
+                                {% if _pend %}
+                                <div class="form-check small mt-1">
+                                    <input class="form-check-input clausula-revisado-check" type="checkbox" id="ack_clausula_{{ clausula.id }}">
+                                    <label class="form-check-label text-success" for="ack_clausula_{{ clausula.id }}">
+                                        Marcar esta cláusula como revisada
+                                    </label>
+                                </div>
+                                {% endif %}
                             </div>
                             <div class="col-md-1 d-flex flex-column gap-1 pt-md-4">
                                 <button type="button" class="btn btn-sm btn-outline-secondary clausula-up" title="Mover para cima">
@@ -266,6 +404,27 @@
                     </button>
                 </div>
             </form>
+
+            {# Task #31 — Form de Envio (separado do form de salvar). Só fica
+               disponível quando todas as cláusulas / campos estão revisados.
+               O backend revalida em /enviar/<id>. #}
+            <hr class="my-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1"><i class="fas fa-paper-plane me-2"></i> Pronta para o cliente?</h6>
+                    <small class="text-muted">
+                        Salve as alterações acima antes de enviar. O envio gera o link
+                        do portal do cliente e marca a proposta como <strong>Enviada</strong>.
+                    </small>
+                </div>
+                <form method="POST" action="{{ url_for('propostas.enviar', id=proposta.id) }}"
+                      onsubmit="return confirm('Enviar esta proposta ao cliente? Após enviar, novas edições criarão uma nova versão (v{{ (proposta.versao or 1) + 1 }}).');">
+                    <button type="submit" class="btn btn-success btn-lg"
+                            {% if not _pode_enviar %}disabled title="Existem itens pendentes de revisão"{% endif %}>
+                        <i class="fas fa-paper-plane me-2"></i> Enviar ao Cliente
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -389,8 +548,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function novaClausulaHtml(ordem) {
         const wrap = document.createElement('div');
         wrap.className = 'clausula-item border rounded p-3 mb-2';
+        // Task #31 — cláusula nova já é "revisada" implicitamente (admin
+        // acabou de criá-la). Backend trata texto_original vazio como
+        // revisado_em=now(). Inclui flag para parity de índice.
         wrap.innerHTML = `
             <input type="hidden" class="clausula-ordem" name="clausula_ordem" value="${ordem}">
+            <input type="hidden" class="clausula-revisado-flag" name="clausula_revisado_flag" value="1">
+            <input type="hidden" name="clausula_texto_original" value="">
             <div class="row g-2 align-items-start">
                 <div class="col-md-4">
                     <label class="form-label mb-1 small text-muted">Título</label>
@@ -416,6 +580,16 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         return wrap;
     }
+
+    // Task #31 — sincroniza o checkbox visual "marcar como revisado" com
+    // o input hidden enviado ao backend (clausula_revisado_flag).
+    container.addEventListener('change', function(ev){
+        if (!ev.target.classList || !ev.target.classList.contains('clausula-revisado-check')) return;
+        const item = ev.target.closest('.clausula-item');
+        if (!item) return;
+        const flag = item.querySelector('.clausula-revisado-flag');
+        if (flag) flag.value = ev.target.checked ? '1' : '0';
+    });
 
     btnAdd.addEventListener('click', function(){
         const ordem = container.querySelectorAll('.clausula-item').length + 1;

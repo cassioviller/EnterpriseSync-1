@@ -14,13 +14,32 @@
         </div>
         <div class="btn-group">
             {% if proposta.status == 'rascunho' or proposta.status == 'RASCUNHO' %}
+            {# Task #31 — em rascunho o admin DEVE passar pela tela de
+               revisão antes de enviar. O botão "Enviar" continua aqui
+               por conveniência, mas só fica habilitado quando não há
+               pendências (mesma regra de pode_enviar()). Caso contrário
+               o admin é direcionado para Editar/Revisar. #}
+            {% if proposta.pode_enviar() %}
             <button class="btn btn-success" onclick="alterarStatus('enviada')">
                 <i class="fas fa-paper-plane me-1"></i> Enviar
             </button>
+            {% else %}
+            <button class="btn btn-success" disabled
+                    title="Existem itens marcados como REVISAR. Abra a tela de revisão para liberar o envio.">
+                <i class="fas fa-paper-plane me-1"></i> Enviar
+            </button>
+            {% endif %}
             <a href="{{ url_for('propostas.editar', id=proposta.id) }}" class="btn btn-primary">
-                <i class="fas fa-edit me-1"></i> Editar
+                <i class="fas fa-edit me-1"></i> Editar / Revisar
             </a>
             {% elif proposta.status == 'enviada' or proposta.status == 'ENVIADA' %}
+            {# Task #31 — proposta enviada: editar exige nova versão #}
+            {% if not proposta.substituida_por_id %}
+            <a href="{{ url_for('propostas.editar', id=proposta.id) }}" class="btn btn-primary"
+               title="Editar criará uma nova versão (v{{ (proposta.versao or 1) + 1 }})">
+                <i class="fas fa-code-branch me-1"></i> Nova Versão
+            </a>
+            {% endif %}
             <button class="btn btn-warning" onclick="alterarStatus('em_analise')">
                 <i class="fas fa-clock me-1"></i> Em Análise
             </button>
@@ -299,6 +318,100 @@
 
         <!-- Status e Informações -->
         <div class="col-md-4">
+
+            {# Task #31 — Histórico de versões da proposta.
+               Mostra cada versão com link para o portal do cliente
+               (token público), badge "vigente" para a versão atualmente
+               válida (última não substituída em status enviada/em_analise/
+               aprovada), e marcação "esta tela" para a versão sendo vista. #}
+            {% set _cadeia = proposta.cadeia_versoes() %}
+            {% if _cadeia and _cadeia|length > 1 %}
+            {# Determina a versão "vigente" para o cliente: a mais recente
+               (maior versão) cujo status seja enviada / em_analise / aprovada.
+               Se uma v(N+1) ainda é rascunho, a vigente continua sendo a
+               v(N) já enviada — só "muda" quando a nova for enviada.
+               Se NENHUMA versão da cadeia foi enviada ainda, marca-se a
+               última (rascunho) como vigente para indicar onde está o
+               trabalho em andamento. #}
+            {% set _vigente = namespace(v=None) %}
+            {% for v in _cadeia %}
+                {% if (v.status or '')|lower in ['enviada','em_analise','aprovada'] %}
+                    {% set _vigente.v = v %}
+                {% endif %}
+            {% endfor %}
+            {% if _vigente.v is none %}{% set _vigente.v = _cadeia[-1] %}{% endif %}
+
+            <div class="card mb-4 border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-code-branch me-2"></i>Versões desta Proposta</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for v in _cadeia %}
+                        <li class="list-group-item {% if v.id == proposta.id %}list-group-item-info{% endif %}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div>
+                                        <strong>v{{ v.versao or 1 }}</strong>
+                                        {% if v.id == proposta.id %}
+                                        <span class="badge bg-primary ms-1" title="Versão atualmente exibida">esta tela</span>
+                                        {% else %}
+                                        <a href="{{ url_for('propostas.visualizar', id=v.id) }}" class="ms-1">
+                                            {{ v.numero }}
+                                        </a>
+                                        {% endif %}
+                                        {% if _vigente.v and v.id == _vigente.v.id %}
+                                        <span class="badge bg-success ms-1" title="Versão vigente / válida para o cliente">vigente</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if v.substituida_em %}
+                                    {# Task #31 — apontar explicitamente qual versão substituiu esta. #}
+                                    {% set _sub = None %}
+                                    {% if v.substituida_por_id %}
+                                        {% for vv in _cadeia %}
+                                            {% if vv.id == v.substituida_por_id %}{% set _sub = vv %}{% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Substituída em {{ v.substituida_em.strftime('%d/%m/%Y %H:%M') }}
+                                        {% if _sub %}
+                                        — pela
+                                        <a href="{{ url_for('propostas.visualizar', id=_sub.id) }}" class="text-decoration-none">
+                                            <strong>v{{ _sub.versao or '?' }}</strong>
+                                        </a>
+                                        {% endif %}
+                                    </small>
+                                    {% elif v.data_envio %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-paper-plane me-1"></i>
+                                        Enviada em {{ v.data_envio.strftime('%d/%m/%Y %H:%M') }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <span class="badge bg-secondary text-uppercase ms-2">{{ v.status }}</span>
+                            </div>
+                            {% if v.token_cliente %}
+                            <div class="input-group input-group-sm mt-2">
+                                <span class="input-group-text"><i class="fas fa-link"></i></span>
+                                <input type="text" class="form-control form-control-sm"
+                                       value="{{ url_for('propostas.portal_cliente', token=v.token_cliente, _external=True) }}"
+                                       readonly id="link_v_{{ v.id }}"
+                                       title="Link público do portal do cliente para esta versão">
+                                <button class="btn btn-outline-secondary btn-sm" type="button"
+                                        onclick="(function(b){const i=document.getElementById('link_v_{{ v.id }}'); i.select(); document.execCommand('copy'); b.innerHTML='<i class=\u0022fas fa-check\u0022></i>'; setTimeout(()=>b.innerHTML='<i class=\u0022fas fa-copy\u0022></i>', 1500);})(this)"
+                                        title="Copiar link">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Status</h5>
@@ -314,6 +427,9 @@
                     <span class="badge bg-{{ status_class.get(proposta.status, 'secondary') }} fs-6">
                         {{ proposta.status }}
                     </span>
+                    {% if proposta.versao and proposta.versao > 1 %}
+                    <span class="badge bg-info fs-6 ms-1">v{{ proposta.versao }}</span>
+                    {% endif %}
                     
                     <hr>
                     

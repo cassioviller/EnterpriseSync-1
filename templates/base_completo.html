@@ -790,6 +790,10 @@
                                 <li><a class="dropdown-item" href="{{ url_for('propostas.nova_proposta') }}">
                                     <i class="fas fa-plus-circle me-1"></i> Nova Proposta
                                 </a></li>
+                                {# Task #31 — link visível para Modelos de Proposta #}
+                                <li><a class="dropdown-item" href="{{ url_for('propostas.listar_templates') }}">
+                                    <i class="fas fa-clipboard-list me-1"></i> Modelos de Proposta
+                                </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header"><i class="fas fa-calculator me-1"></i> Orçamentos</h6></li>
                                 <li><a class="dropdown-item" href="{{ url_for('orcamentos.listar') }}">

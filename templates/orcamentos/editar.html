@@ -25,11 +25,73 @@
           <i class="fas fa-copy me-1"></i> Duplicar
         </button>
       </form>
-      <form method="POST" action="{{ url_for('orcamentos.gerar_proposta', id=o.id) }}" class="d-inline">
-        <button class="btn btn-success"
-                onclick="return confirm('Gerar nova Proposta a partir deste orçamento? O cliente verá apenas descrição e preço de venda.');">
-          <i class="fas fa-file-export me-1"></i> Gerar Proposta a partir do Orçamento
-        </button>
+      {# Task #31 — abrir modal "Escolher Modelo de Proposta" #}
+      <button type="button" class="btn btn-success"
+              data-bs-toggle="modal" data-bs-target="#modalGerarProposta">
+        <i class="fas fa-file-export me-1"></i> Gerar Proposta a partir do Orçamento
+      </button>
+    </div>
+  </div>
+
+  {# Task #31 — modal de seleção de modelo de proposta #}
+  <div class="modal fade" id="modalGerarProposta" tabindex="-1" aria-labelledby="modalGerarPropostaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <form method="POST" action="{{ url_for('orcamentos.gerar_proposta', id=o.id) }}" class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalGerarPropostaLabel">
+            <i class="fas fa-file-export me-2"></i> Gerar Proposta — Escolher Modelo
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3">
+            Escolha um <strong>Modelo de Proposta</strong> para pré-popular cláusulas, prazos,
+            validade e itens inclusos/exclusos. Você poderá <strong>revisar</strong> tudo antes
+            de enviar ao cliente. O cliente vê apenas descrição e preço de venda dos serviços.
+          </p>
+
+          <div class="list-group">
+            {# Opção sem modelo — mantém comportamento legado #}
+            <label class="list-group-item d-flex gap-3 align-items-start">
+              <input class="form-check-input flex-shrink-0 mt-1" type="radio"
+                     name="template_id" value="" checked>
+              <span>
+                <strong>Sem modelo</strong> — usar valores padrão da proposta.
+                <br><small class="text-muted">Cláusulas e prazos virão dos defaults do sistema; nada precisa ser revisado.</small>
+              </span>
+            </label>
+
+            {% for tpl in templates_proposta or [] %}
+            <label class="list-group-item d-flex gap-3 align-items-start">
+              <input class="form-check-input flex-shrink-0 mt-1" type="radio"
+                     name="template_id" value="{{ tpl.id }}">
+              <span class="flex-grow-1">
+                <strong>{{ tpl.nome }}</strong>
+                {% if tpl.categoria %}<span class="badge bg-secondary ms-1">{{ tpl.categoria }}</span>{% endif %}
+                {% if tpl.descricao %}<br><small class="text-muted">{{ tpl.descricao }}</small>{% endif %}
+                <br>
+                <small class="text-muted">
+                  Prazo entrega: <strong>{{ tpl.prazo_entrega_dias or '—' }}</strong> dias ·
+                  Validade: <strong>{{ tpl.validade_dias or '—' }}</strong> dias ·
+                  Cláusulas: <strong>{{ (tpl.clausulas or [])|length }}</strong>
+                </small>
+              </span>
+            </label>
+            {% else %}
+            <div class="alert alert-info mb-0 small">
+              Nenhum modelo cadastrado.
+              <a href="{{ url_for('propostas.listar_templates') }}">Cadastrar modelos</a> em
+              <em>Comercial » Modelos de Proposta</em>.
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-file-export me-1"></i> Gerar Proposta
+          </button>
+        </div>
       </form>
     </div>
   </div>

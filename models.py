@@ -2805,6 +2805,35 @@ class Proposta(db.Model):
     # com flag `marcado` por nó. Usado pelo portal do cliente como fonte da verdade.
     cronograma_default_json = db.Column(JSON, nullable=True)
 
+    # Task #31 — versionamento de propostas: cada vez que uma proposta já
+    # enviada é "editada", criamos uma nova Proposta (v2, v3...) ligada via
+    # proposta_origem_id, e marcamos a anterior como substituída. v1 = original.
+    versao = db.Column(db.Integer, nullable=False, default=1)
+    proposta_origem_id = db.Column(
+        db.Integer, db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    substituida_por_id = db.Column(
+        db.Integer, db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    substituida_em = db.Column(db.DateTime, nullable=True)
+
+    # Task #31 — template aplicado na geração (informativo + base de comparação
+    # na revisão). NULL = proposta sem template (editada manualmente).
+    proposta_template_id = db.Column(
+        db.Integer, db.ForeignKey('proposta_templates.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+
+    # Task #31 — lista de chaves de campos vindos do template que ainda
+    # precisam de revisão pelo admin antes do envio. Strings tipo
+    # 'prazo_entrega_dias', 'validade_dias', 'itens_inclusos',
+    # 'itens_exclusos', 'texto_apresentacao'. Cláusulas têm seu próprio
+    # marker (PropostaClausula.revisado_em). Quando vazia AND todas as
+    # cláusulas têm revisado_em != NULL, a proposta pode ser enviada.
+    campos_pendentes_revisao = db.Column(JSON, nullable=True, default=list)
+
     # Relacionamentos
     cliente = db.relationship('Cliente', backref='propostas')
     itens = db.relationship('PropostaItem', backref='proposta', lazy=True, cascade='all, delete-orphan')
@@ -2847,6 +2876,53 @@ class Proposta(db.Model):
             'valor_total': float(self.valor_total) if self.valor_total else 0,
             'criado_em': self.criado_em.isoformat() if self.criado_em else None
         }
+
+    # ────────── Task #31 — versionamento e revisão ──────────
+    def cadeia_versoes(self):
+        """Retorna lista ordenada de todas as Propostas dessa cadeia de versões.
+
+        v1 → v2 → v3 ...; segue ``proposta_origem_id`` para trás até a raiz e
+        ``substituida_por_id`` para frente até a versão mais recente.
+        Inclui a própria proposta atual. Em caso de ciclo (defensivo) ou
+        chains profundas, limita a 50 nós.
+        """
+        # Raiz (v1)
+        raiz = self
+        seen = {self.id}
+        while raiz.proposta_origem_id and len(seen) < 50:
+            anterior = Proposta.query.get(raiz.proposta_origem_id)
+            if not anterior or anterior.id in seen:
+                break
+            seen.add(anterior.id)
+            raiz = anterior
+        # Caminhar para frente
+        chain = [raiz]
+        cur = raiz
+        seen = {raiz.id}
+        while cur.substituida_por_id and len(seen) < 50:
+            prox = Proposta.query.get(cur.substituida_por_id)
+            if not prox or prox.id in seen:
+                break
+            seen.add(prox.id)
+            chain.append(prox)
+            cur = prox
+        return chain
+
+    def clausulas_pendentes_revisao(self):
+        """Lista PropostaClausulas que ainda têm ``revisado_em`` NULL."""
+        return [c for c in (self.clausulas or []) if c.revisado_em is None]
+
+    def pode_enviar(self):
+        """Task #31 — True se a proposta pode ser enviada (status rascunho e
+        nenhum item de revisão pendente)."""
+        if (self.status or '').lower() != 'rascunho':
+            return False
+        if self.campos_pendentes_revisao:
+            return False
+        if self.clausulas_pendentes_revisao():
+            return False
+        return True
+
 
 class PropostaHistorico(db.Model):
     __tablename__ = 'proposta_historico'
@@ -2979,6 +3055,12 @@ class PropostaClausula(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow,
                               onupdate=datetime.utcnow)
+
+    # Task #31 — marcador de revisão. NULL = vinda de template e ainda não
+    # revisada pelo admin (precisa marcar antes de enviar). Quando o admin
+    # marca como "revisada" (checkbox no editor) ou edita o texto via UI,
+    # registramos o timestamp aqui.
+    revisado_em = db.Column(db.DateTime, nullable=True)
 
     proposta = db.relationship(
         'Proposta',

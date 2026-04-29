@@ -763,8 +763,23 @@ def alterar_status(id):
             }), 400
         
         status_anterior = proposta.status
+
+        # Task #31 — gate de envio: só permite ENVIADA quando a proposta
+        # passa pelos checks de revisão (cláusulas + campos pendentes).
+        if novo_status == 'ENVIADA' and not proposta.pode_enviar():
+            pend_n = len(proposta.clausulas_pendentes_revisao())
+            pend_c = len(proposta.campos_pendentes_revisao or [])
+            return jsonify({
+                'success': False,
+                'message': (
+                    f'Revisão pendente: {pend_n} cláusula(s) e {pend_c} '
+                    'campo(s) aguardando confirmação. Marque-os como '
+                    'revisados antes de enviar.'
+                ),
+            }), 400
+
         proposta.status = novo_status
-        
+
         if novo_status == 'ENVIADA':
             proposta.data_envio = datetime.utcnow()
         elif novo_status == 'APROVADA':
@@ -953,23 +968,236 @@ def criar_proposta():
 @login_required
 @admin_required
 def editar(id):
-    """Exibe formulário para editar proposta"""
+    """Exibe formulário para editar / revisar proposta.
+
+    Task #31 — quando a proposta NÃO está em rascunho (já foi enviada,
+    aprovada, etc.), editar diretamente quebraria a versão histórica que
+    o cliente recebeu. Em vez disso, renderiza uma tela de confirmação
+    que oferece criar uma nova versão (v2, v3...). A edição original só
+    procede sem prompt para status='rascunho'.
+    """
     try:
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
-        
+
+        # Task #31 — gate de versionamento: status enviada/aprovada/etc. exige
+        # criar nova versão antes de editar.
+        if (proposta.status or '').lower() != 'rascunho':
+            return render_template(
+                'propostas/confirmar_nova_versao.html',
+                proposta=proposta,
+            )
+
         logger.debug(f"DEBUG EDITAR: Proposta {proposta.numero} carregada para edição")
-        
+
         # Task #173 — engenheiros disponíveis para escolha como override por proposta
         from services.engenheiro_service import listar_engenheiros_ativos
         engenheiros = listar_engenheiros_ativos(admin_id)
 
         return render_template('propostas/editar.html', proposta=proposta, engenheiros=engenheiros)
-        
+
     except Exception as e:
         logger.error(f"ERRO EDITAR PROPOSTA: {str(e)}")
         flash(f'Erro ao carregar proposta para edição: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
+
+
+# ───────────── Task #31 — versionamento (criar nova versão) ─────────────
+@propostas_bp.route('/<int:id>/nova-versao', methods=['POST'])
+@login_required
+@admin_required
+def criar_nova_versao(id):
+    """Task #31 — clona a proposta gerando uma nova versão (v2, v3, ...).
+
+    Mantém histórico:
+      * proposta original recebe ``substituida_por_id`` e ``substituida_em``
+      * nova proposta tem ``proposta_origem_id`` apontando p/ a origem,
+        ``versao`` = origem.versao + 1, status='rascunho', token novo.
+
+    Itens (PropostaItem) e cláusulas (PropostaClausula) são clonadas
+    integralmente. As cláusulas clonadas mantêm o ``revisado_em`` da
+    origem (já foram revisadas antes do envio anterior); o admin pode
+    re-editá-las e re-revisá-las normalmente.
+    """
+    try:
+        admin_id = get_admin_id()
+        origem = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+        if origem.substituida_por_id:
+            # Já existe uma versão posterior — redireciona para ela.
+            flash(
+                'Esta proposta já tem uma versão mais recente. Abrindo-a.',
+                'warning',
+            )
+            return redirect(url_for('propostas.editar', id=origem.substituida_por_id))
+
+        nova = Proposta()
+        # Numero: sufixo "-vN" quando não é v1 → v2 (mantém prefixo legível).
+        nova_versao_num = (origem.versao or 1) + 1
+        base_numero = (origem.numero or '').rsplit('-v', 1)[0]
+        candidato = f"{base_numero}-v{nova_versao_num}"
+        # Garantir unicidade por tenant
+        i = 0
+        while Proposta.query.filter_by(numero=candidato, admin_id=admin_id).first():
+            i += 1
+            candidato = f"{base_numero}-v{nova_versao_num}.{i}"
+        nova.numero = candidato
+
+        nova.titulo = origem.titulo
+        nova.descricao = origem.descricao
+        nova.cliente_id = origem.cliente_id
+        nova.cliente_nome = origem.cliente_nome
+        nova.cliente_email = origem.cliente_email
+        nova.cliente_telefone = origem.cliente_telefone
+        nova.cliente_endereco = origem.cliente_endereco
+        nova.admin_id = admin_id
+        nova.criado_por = current_user.id
+        nova.status = 'rascunho'
+        nova.valor_total = origem.valor_total or 0
+        nova.orcamento_id = origem.orcamento_id
+        nova.engenheiro_id = origem.engenheiro_id
+        nova.proposta_template_id = origem.proposta_template_id
+        nova.prazo_entrega_dias = origem.prazo_entrega_dias
+        nova.validade_dias = origem.validade_dias
+        nova.percentual_nota_fiscal = origem.percentual_nota_fiscal
+        nova.condicoes_pagamento = origem.condicoes_pagamento
+        nova.garantias = origem.garantias
+        nova.consideracoes_gerais = origem.consideracoes_gerais
+        nova.observacoes_entrega = origem.observacoes_entrega
+        nova.itens_inclusos = origem.itens_inclusos
+        nova.itens_exclusos = origem.itens_exclusos
+        nova.cronograma_default_json = origem.cronograma_default_json
+        nova.versao = nova_versao_num
+        nova.proposta_origem_id = origem.id
+        # Por design: ao re-editar, o admin pode revisar tudo de novo.
+        # Mas como já foi revisado antes do envio anterior, marcamos
+        # vazio (sem pendências) — o admin pode editar livremente
+        # cláusulas/campos antes de enviar.
+        nova.campos_pendentes_revisao = []
+
+        db.session.add(nova)
+        db.session.flush()
+
+        # Clonar itens
+        for it in origem.itens or []:
+            db.session.add(PropostaItem(
+                admin_id=admin_id,
+                proposta_id=nova.id,
+                item_numero=it.item_numero,
+                ordem=it.ordem,
+                descricao=it.descricao,
+                quantidade=it.quantidade,
+                unidade=it.unidade,
+                preco_unitario=it.preco_unitario,
+                subtotal=it.subtotal,
+                servico_id=it.servico_id,
+                quantidade_medida=it.quantidade_medida,
+                custo_unitario=it.custo_unitario,
+                lucro_unitario=it.lucro_unitario,
+                cronograma_template_override_id=it.cronograma_template_override_id,
+                composicao_snapshot=it.composicao_snapshot or [],
+                itens_inclusos=getattr(it, 'itens_inclusos', None),
+                itens_exclusos=getattr(it, 'itens_exclusos', None),
+                template_origem_id=it.template_origem_id,
+                template_origem_nome=it.template_origem_nome,
+                categoria_titulo=it.categoria_titulo,
+            ))
+
+        # Clonar cláusulas (já revisadas — origem já foi enviada)
+        from models import PropostaClausula as _PCl
+        for cl in origem.clausulas or []:
+            db.session.add(_PCl(
+                proposta_id=nova.id,
+                admin_id=admin_id,
+                titulo=cl.titulo,
+                texto=cl.texto,
+                ordem=cl.ordem,
+                revisado_em=cl.revisado_em or datetime.utcnow(),
+            ))
+
+        # Marca origem como substituída
+        origem.substituida_por_id = nova.id
+        origem.substituida_em = datetime.utcnow()
+
+        db.session.add(PropostaHistorico(
+            proposta_id=nova.id,
+            usuario_id=current_user.id,
+            acao='nova_versao',
+            observacao=f'Nova versão (v{nova_versao_num}) gerada a partir de {origem.numero} (v{origem.versao}).',
+            admin_id=admin_id,
+        ))
+        db.session.add(PropostaHistorico(
+            proposta_id=origem.id,
+            usuario_id=current_user.id,
+            acao='substituida',
+            observacao=f'Substituída por {nova.numero} (v{nova_versao_num}).',
+            admin_id=admin_id,
+        ))
+
+        db.session.commit()
+        flash(
+            f'Nova versão criada: {nova.numero} (v{nova_versao_num}). '
+            f'Edite à vontade — só passa a valer ao enviar.',
+            'success',
+        )
+        return redirect(url_for('propostas.editar', id=nova.id))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Task #31 — erro ao criar nova versão da proposta')
+        flash(f'Erro ao criar nova versão: {e}', 'error')
+        return redirect(url_for('propostas.visualizar', id=id))
+
+
+# ───────────── Task #31 — enviar proposta (gate de revisão) ─────────────
+@propostas_bp.route('/<int:id>/enviar', methods=['POST'])
+@login_required
+@admin_required
+def enviar(id):
+    """Task #31 — marca a proposta como enviada (status='enviada').
+
+    Só permite o envio se ``proposta.pode_enviar()`` for True (status
+    rascunho + nenhuma cláusula/campo pendente de revisão). Caso contrário,
+    redireciona de volta à tela de revisão com mensagem explicativa.
+    """
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+        if (proposta.status or '').lower() != 'rascunho':
+            flash('Só é possível enviar propostas em rascunho.', 'warning')
+            return redirect(url_for('propostas.visualizar', id=id))
+
+        if not proposta.pode_enviar():
+            pend_n = len(proposta.clausulas_pendentes_revisao())
+            pend_c = len(proposta.campos_pendentes_revisao or [])
+            flash(
+                f'Revisão pendente: {pend_n} cláusula(s) e {pend_c} campo(s) '
+                f'aguardando confirmação. Marque-os como revisados antes de enviar.',
+                'warning',
+            )
+            return redirect(url_for('propostas.editar', id=id))
+
+        proposta.status = 'enviada'
+        proposta.data_envio = datetime.utcnow()
+        db.session.add(PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='enviada',
+            observacao=f'Proposta v{proposta.versao} enviada após revisão completa.',
+            admin_id=admin_id,
+        ))
+        db.session.commit()
+        flash(
+            f'Proposta {proposta.numero} (v{proposta.versao}) enviada. '
+            'Compartilhe o link do portal do cliente.',
+            'success',
+        )
+        return redirect(url_for('propostas.visualizar', id=id))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Task #31 — erro ao enviar proposta')
+        flash(f'Erro ao enviar proposta: {e}', 'error')
+        return redirect(url_for('propostas.editar', id=id))
 
 @propostas_bp.route('/editar/<int:id>', methods=['POST'])
 @login_required
@@ -979,7 +1207,24 @@ def atualizar(id):
     try:
         admin_id = get_admin_id()
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
-        
+
+        # Task #31 — versionamento: SOMENTE rascunhos podem ser editados
+        # diretamente. Se a proposta já foi enviada (ou está em qualquer
+        # outro status) o admin tem que passar pelo fluxo de "Nova Versão"
+        # (que clona e gera vN+1). Bloqueia POST direto / forms obsoletos
+        # / chamadas externas que tentem mutar o histórico já enviado.
+        # Como a rota GET /editar/<id> já redireciona não-rascunhos para a
+        # tela de confirmação de nova versão, basta devolver o admin para
+        # /editar/<id> — ele cai naturalmente na confirmação.
+        if (proposta.status or '').lower() != 'rascunho':
+            flash(
+                'Esta proposta já foi enviada e não pode ser alterada '
+                'diretamente. Crie uma nova versão para fazer ajustes — '
+                'o histórico das versões anteriores é preservado.',
+                'warning'
+            )
+            return redirect(url_for('propostas.editar', id=id))
+
         # Atualizar campos básicos da proposta
         proposta.numero = request.form.get('numero')
         proposta.titulo = request.form.get('titulo')
@@ -988,8 +1233,26 @@ def atualizar(id):
         proposta.cliente_email = request.form.get('cliente_email')
         proposta.cliente_telefone = request.form.get('cliente_telefone')
         proposta.cliente_endereco = request.form.get('cliente_endereco')
-        proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
-        proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
+        # Task #31 — parsing seguro de prazo/validade (defaults preservam
+        # os valores atuais quando o form não trouxer o campo).
+        try:
+            proposta.prazo_entrega_dias = int(
+                request.form.get('prazo_entrega_dias') or proposta.prazo_entrega_dias or 90
+            )
+        except (TypeError, ValueError):
+            pass
+        try:
+            proposta.validade_dias = int(
+                request.form.get('validade_dias') or proposta.validade_dias or 7
+            )
+        except (TypeError, ValueError):
+            pass
+        try:
+            proposta.percentual_nota_fiscal = float(
+                request.form.get('percentual_nota_fiscal') or proposta.percentual_nota_fiscal or 13.5
+            )
+        except (TypeError, ValueError):
+            pass
 
         # Task #173 — engenheiro responsável (override por proposta)
         proposta.engenheiro_id = _parse_engenheiro_id(
@@ -1009,10 +1272,32 @@ def atualizar(id):
         # garantias, consideracoes_gerais). Estratégia: deletar todas as
         # cláusulas existentes e recriar a partir do form. Cláusula com
         # texto vazio (após strip) é descartada — equivale a "remover".
+        #
+        # Task #31 — preserva o marcador de revisão (revisado_em):
+        #   - Se a cláusula tinha revisado_em != NULL e o texto NÃO mudou,
+        #     mantemos o timestamp anterior (revisado).
+        #   - Se o texto mudou OU veio o flag clausula_revisado para esta
+        #     linha, marcamos revisado_em=now() (o admin tocou nela).
+        #   - Caso contrário (cláusula nova ou pendente intacta), fica NULL.
         from models import PropostaClausula as _PCl
         _titulos = request.form.getlist('clausula_titulo')
         _textos  = request.form.getlist('clausula_texto')
         _ordens  = request.form.getlist('clausula_ordem')
+        # Task #31 — flags de revisão paralelos por linha. Usa
+        # 'clausula_revisado_flag' como sentinela (sempre presente, "1"
+        # se checado, "0" caso contrário) — assim mantemos posicionamento
+        # alinhado mesmo quando o usuário não marca a checkbox.
+        _flags_rev = request.form.getlist('clausula_revisado_flag')
+        # Texto original anterior (vindo do hidden) para detectar edição.
+        _textos_originais = request.form.getlist('clausula_texto_original')
+
+        # Snapshot atual { (titulo_norm, texto_norm) -> revisado_em } para
+        # casar pós-delete (mais robusto que trabalhar com IDs em UI livre).
+        _snap_revisado = {}
+        for _c in (proposta.clausulas or []):
+            _key = ((_c.titulo or '').strip()[:200], (_c.texto or '').strip())
+            _snap_revisado[_key] = _c.revisado_em
+
         # Só processa se o formulário enviou o bloco — assim chamadas legadas
         # que não conhecem as cláusulas não apagam o que já existe.
         # Sentinela `clausulas_payload_present=1` indica que o form de cláusulas
@@ -1033,13 +1318,66 @@ def atualizar(id):
                     _ord = int(_ordens[_i]) if _i < len(_ordens) and _ordens[_i] else (_i + 1)
                 except (ValueError, TypeError):
                     _ord = _i + 1
+
+                # Task #31 — derivar revisado_em
+                _flag = _flags_rev[_i] if _i < len(_flags_rev) else '0'
+                _txt_orig = (
+                    _textos_originais[_i]
+                    if _i < len(_textos_originais) else ''
+                ).strip()
+                _key = (_tit[:200] or '(sem título)', _txt)
+                _prev_rev = _snap_revisado.get(_key)
+                if _flag == '1':
+                    # Admin marcou explicitamente como revisada nesta sessão.
+                    _rev_em = datetime.utcnow()
+                elif _txt_orig and _txt != _txt_orig:
+                    # Texto editado pelo admin → considera revisado.
+                    _rev_em = datetime.utcnow()
+                elif _prev_rev is not None:
+                    # Texto inalterado, já era revisado anteriormente.
+                    _rev_em = _prev_rev
+                else:
+                    # Cláusula nova adicionada manualmente (sem texto original
+                    # e sem flag) → considera revisada (admin acabou de criar).
+                    _rev_em = datetime.utcnow() if not _txt_orig else None
+
                 db.session.add(_PCl(
                     proposta_id=proposta.id,
                     admin_id=admin_id,
                     titulo=_tit[:200] or '(sem título)',
                     texto=_txt,
                     ordem=_ord,
+                    revisado_em=_rev_em,
                 ))
+
+        # Task #31 — campos não-cláusula: drenar pendências quando
+        #   (a) admin marca a checkbox "marcar como revisado" (campo_revisao_ack), ou
+        #   (b) admin EDITA o valor (form difere do hidden "campo_revisao_original_<chave>"
+        #       renderizado na tela). Edit-detection segue a mesma filosofia
+        #       das cláusulas: tocar o conteúdo conta como revisado.
+        _campos_rev_ack = set(
+            (k or '').strip()
+            for k in request.form.getlist('campo_revisao_ack')
+            if (k or '').strip()
+        )
+        _pendentes_atual = list(proposta.campos_pendentes_revisao or [])
+        if _pendentes_atual:
+            # Mapa chave-pendente → como ler o valor SUBMETIDO (string normalizada)
+            # para comparar com o original. Mantém a lista alinhada com o template.
+            def _form_val(k):
+                v = request.form.get(k)
+                return (v or '').strip()
+            _editados = set()
+            for _k in _pendentes_atual:
+                _orig = _form_val(f'campo_revisao_original_{_k}')
+                _novo = _form_val(_k)
+                # Só conta como "editado" se o hidden original veio (i.e. o template
+                # de revisão renderizou o campo) e o conteúdo mudou.
+                if _orig != '' and _novo != _orig:
+                    _editados.add(_k)
+            _drenados = _campos_rev_ack | _editados
+            _pendentes_novos = [k for k in _pendentes_atual if k not in _drenados]
+            proposta.campos_pendentes_revisao = _pendentes_novos
         
         # ===== PROCESSAR ITENS DA PROPOSTA =====
         # Coletar dados dos itens do formulário

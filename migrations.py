@@ -3842,6 +3842,7 @@ def executar_migracoes():
             (141, "Task #201 — drop tabelas legadas de propostas (proposta + 7 dependentes/órfãs)", migration_141_drop_legacy_propostas_tables),
             (142, "Task #21 — Mapa V2: prazo/obs/condições por fornecedor + fornecedor_escolhido_id por item + relatorio_compra_mapa", migration_142_mapa_v2_relatorio_compra),
             (143, "Task #21 — relatorio_compra_mapa: UNIQUE (mapa_id, versao) p/ versionamento seguro sob concorrência", migration_143_relatorio_compra_unique_versao),
+            (144, "Task #31 — versionamento + revisão obrigatória de propostas (proposta + proposta_clausula)", migration_144_proposta_versionamento_revisao),
         ]
         
         # Executar cada migração com rastreamento
@@ -11967,6 +11968,169 @@ def migration_143_relatorio_compra_unique_versao():
         return True
     except Exception as e:
         logger.error("MIGRACAO 143 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_144_proposta_versionamento_revisao():
+    """Task #31 — versionamento + revisão obrigatória de propostas.
+
+    Adiciona a `propostas_comerciais`:
+      - versao INTEGER NOT NULL DEFAULT 1
+      - proposta_origem_id INTEGER NULL FK self ON DELETE SET NULL
+      - substituida_por_id INTEGER NULL FK self ON DELETE SET NULL
+      - substituida_em TIMESTAMP NULL
+      - proposta_template_id INTEGER NULL FK proposta_templates ON DELETE SET NULL
+      - campos_pendentes_revisao JSONB NULL DEFAULT '[]'
+
+    Adiciona a `proposta_clausula`:
+      - revisado_em TIMESTAMP NULL
+
+    Backfill defensivo:
+      - Para propostas existentes (legadas), assume já revisadas:
+        propostas_comerciais.campos_pendentes_revisao = '[]'
+        proposta_clausula.revisado_em = COALESCE(criado_em, NOW()) — para
+        que propostas históricas não fiquem bloqueando "Enviar".
+
+    Idempotente: usa IF NOT EXISTS / verificações em
+    information_schema.columns. Não faz DROP.
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 144: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+
+        # 1) propostas_comerciais — colunas novas
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='propostas_comerciais'
+                       AND column_name='versao'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                      ADD COLUMN versao INTEGER NOT NULL DEFAULT 1;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='propostas_comerciais'
+                       AND column_name='proposta_origem_id'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                      ADD COLUMN proposta_origem_id INTEGER NULL
+                      REFERENCES propostas_comerciais(id) ON DELETE SET NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='propostas_comerciais'
+                       AND column_name='substituida_por_id'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                      ADD COLUMN substituida_por_id INTEGER NULL
+                      REFERENCES propostas_comerciais(id) ON DELETE SET NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='propostas_comerciais'
+                       AND column_name='substituida_em'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                      ADD COLUMN substituida_em TIMESTAMP NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='propostas_comerciais'
+                       AND column_name='proposta_template_id'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                      ADD COLUMN proposta_template_id INTEGER NULL
+                      REFERENCES proposta_templates(id) ON DELETE SET NULL;
+                END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='propostas_comerciais'
+                       AND column_name='campos_pendentes_revisao'
+                ) THEN
+                    ALTER TABLE propostas_comerciais
+                      ADD COLUMN campos_pendentes_revisao JSONB NULL DEFAULT '[]'::jsonb;
+                END IF;
+            END$$;
+        """)
+
+        # Índices auxiliares
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_propostas_comerciais_proposta_origem_id
+              ON propostas_comerciais (proposta_origem_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_propostas_comerciais_substituida_por_id
+              ON propostas_comerciais (substituida_por_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_propostas_comerciais_proposta_template_id
+              ON propostas_comerciais (proposta_template_id)
+        """)
+
+        # 2) proposta_clausula — coluna revisado_em
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='proposta_clausula'
+                       AND column_name='revisado_em'
+                ) THEN
+                    ALTER TABLE proposta_clausula
+                      ADD COLUMN revisado_em TIMESTAMP NULL;
+                END IF;
+            END$$;
+        """)
+
+        # 3) Backfill defensivo — propostas legadas não bloqueiam envio.
+        #    - cláusulas já existentes: revisado_em = criado_em
+        #    - propostas existentes sem campos_pendentes_revisao: '[]'
+        cursor.execute("""
+            UPDATE proposta_clausula
+               SET revisado_em = COALESCE(criado_em, NOW())
+             WHERE revisado_em IS NULL
+        """)
+        cursor.execute("""
+            UPDATE propostas_comerciais
+               SET campos_pendentes_revisao = '[]'::jsonb
+             WHERE campos_pendentes_revisao IS NULL
+        """)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 144 CONCLUIDA: versionamento + revisão de propostas garantidos.")
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 144 falhou: %s", e)
         try:
             connection.rollback()
             connection.close()
