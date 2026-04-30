@@ -285,6 +285,43 @@
             </div>
             {% endif %}
 
+            {# Task #34 — Cláusulas configuráveis da proposta
+               (Condições de Pagamento, Garantias, Considerações Gerais e
+               cláusulas extras vindas do PropostaTemplate). O painel de
+               revisão completo (com ações REVISADO / EDITAR / REMOVER)
+               fica em editar.html — aqui é só leitura, mostrando o mesmo
+               conteúdo que o PDF e o portal do cliente, mais um aviso
+               quando há itens pendentes que ainda travam o envio. #}
+            {% if proposta.clausulas %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-file-signature me-2"></i>Cláusulas da Proposta</h5>
+                    {% set _pendentes_visu = proposta.clausulas_pendentes_revisao() %}
+                    {% if _pendentes_visu %}
+                    <span class="badge bg-warning text-dark"
+                          title="Cláusulas que vieram do modelo e ainda precisam de revisão antes do envio">
+                        <i class="fas fa-tasks me-1"></i>{{ _pendentes_visu|length }} a revisar
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% with clausulas = proposta.clausulas %}
+                        {% include 'propostas/_clausulas.html' %}
+                    {% endwith %}
+                    {% if _pendentes_visu and (proposta.status or '')|lower == 'rascunho' %}
+                    <div class="alert alert-warning small mt-3 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Esta proposta foi pré-preenchida a partir de um <strong>modelo</strong>.
+                        <a href="{{ url_for('propostas.editar', id=proposta.id) }}" class="alert-link">
+                            Revise as cláusulas marcadas como <span class="badge bg-warning text-dark">REVISAR</span>
+                        </a>
+                        antes de enviar ao cliente.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Logs -->
             {% if proposta.logs %}
             <div class="card">
