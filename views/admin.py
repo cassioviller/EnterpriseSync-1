@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from models import db, Usuario, TipoUsuario, Funcionario, Obra, RegistroPonto
-from auth import super_admin_required
+from auth import super_admin_required, admin_required
 from utils.tenant import get_tenant_admin_id
 from datetime import datetime
 from sqlalchemy import text
@@ -220,6 +220,108 @@ def database_diagnostics():
         logger.error(f"Erro no painel de diagnóstico: {e}")
         flash(f'Erro ao carregar diagnóstico: {str(e)}', 'danger')
         return redirect(url_for('main.dashboard'))
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Task #43 — Painel de webhooks para n8n.
+# Lista as últimas N entregas (com filtros) e permite forçar nova tentativa
+# em entregas com falha. Acessível a admin OU super_admin: o tenant admin
+# vê SOMENTE suas próprias entregas (filtragem por admin_id), e o super_admin
+# vê todas, de todos os tenants.
+# ──────────────────────────────────────────────────────────────────────────
+def _admin_can_see_entrega(entrega):
+    """Tenant admin só pode mexer em entregas do próprio admin_id;
+    super_admin pode tudo. Centraliza a regra para a listagem e o reenvio.
+    """
+    if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
+        return True
+    try:
+        meu_admin_id = get_tenant_admin_id()
+    except Exception:
+        meu_admin_id = current_user.id
+    return entrega.admin_id == meu_admin_id
+
+
+@main_bp.route('/admin/webhooks')
+@admin_required
+def admin_webhooks_listar():
+    try:
+        from models import WebhookEntrega
+        from utils.webhook_dispatcher import (
+            WEBHOOK_EVENT_ALLOWLIST, is_enabled, get_webhook_url, MAX_TENTATIVAS,
+        )
+
+        status_filtro = (request.args.get('status') or '').strip().lower()
+        event_filtro = (request.args.get('event') or '').strip()
+        STATUS_VALIDOS = {'pendente', 'enviado', 'falha'}
+
+        q = WebhookEntrega.query
+        # Tenant scoping: admin tenant só enxerga as próprias entregas.
+        if current_user.tipo_usuario != TipoUsuario.SUPER_ADMIN:
+            try:
+                meu_admin_id = get_tenant_admin_id()
+            except Exception:
+                meu_admin_id = current_user.id
+            q = q.filter(WebhookEntrega.admin_id == meu_admin_id)
+
+        if status_filtro in STATUS_VALIDOS:
+            q = q.filter(WebhookEntrega.status == status_filtro)
+        if event_filtro:
+            q = q.filter(WebhookEntrega.event == event_filtro)
+        entregas = q.order_by(WebhookEntrega.created_at.desc()).limit(200).all()
+
+        eventos_q = db.session.query(WebhookEntrega.event).distinct()
+        if current_user.tipo_usuario != TipoUsuario.SUPER_ADMIN:
+            try:
+                meu_admin_id = get_tenant_admin_id()
+            except Exception:
+                meu_admin_id = current_user.id
+            eventos_q = eventos_q.filter(WebhookEntrega.admin_id == meu_admin_id)
+        eventos_distintos = [row[0] for row in eventos_q.order_by(WebhookEntrega.event.asc()).all()]
+
+        return render_template(
+            'admin/webhooks.html',
+            entregas=entregas,
+            eventos_distintos=eventos_distintos,
+            allowlist=sorted(WEBHOOK_EVENT_ALLOWLIST),
+            webhook_ativo=is_enabled(),
+            webhook_url=get_webhook_url(),
+            max_tentativas=MAX_TENTATIVAS,
+            status_filtro=status_filtro,
+            event_filtro=event_filtro,
+        )
+    except Exception as e:
+        logger.error(f"[admin_webhooks] erro: {e}", exc_info=True)
+        flash(f'Erro ao carregar webhooks: {e}', 'danger')
+        return redirect(url_for('main.dashboard'))
+
+
+@main_bp.route('/admin/webhooks/<int:entrega_id>/reenviar', methods=['POST'])
+@admin_required
+def admin_webhooks_reenviar(entrega_id):
+    try:
+        from models import WebhookEntrega
+        from utils.webhook_dispatcher import reentregar_uma, is_enabled
+        if not is_enabled():
+            flash('Webhook desligado (N8N_WEBHOOK_URL não configurado).', 'warning')
+            return redirect(url_for('main.admin_webhooks_listar'))
+        entrega = db.session.get(WebhookEntrega, entrega_id)
+        if entrega is None:
+            flash(f'Entrega #{entrega_id} não encontrada.', 'warning')
+            return redirect(url_for('main.admin_webhooks_listar'))
+        if not _admin_can_see_entrega(entrega):
+            flash('Você não tem permissão para reenviar esta entrega.', 'danger')
+            return redirect(url_for('main.admin_webhooks_listar'))
+        ok = reentregar_uma(entrega_id)
+        if ok:
+            flash(f'Entrega #{entrega_id} reenviada com sucesso.', 'success')
+        else:
+            flash(f'Falha ao reenviar entrega #{entrega_id} — veja o log.', 'warning')
+        return redirect(url_for('main.admin_webhooks_listar'))
+    except Exception as e:
+        logger.error(f"[admin_webhooks_reenviar] erro: {e}", exc_info=True)
+        flash(f'Erro ao reenviar webhook: {e}', 'danger')
+        return redirect(url_for('main.admin_webhooks_listar'))
 
 
 @main_bp.route('/admin/database-diagnostics/check-table', methods=['POST'])

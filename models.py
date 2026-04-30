@@ -6170,3 +6170,32 @@ class LeadHistorico(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Task #43 — Webhook para n8n (notificações externas)
+# ──────────────────────────────────────────────────────────────────────────────
+class WebhookEntrega(db.Model):
+    """Task #43 — log/fila de entregas de webhook para n8n.
+
+    Cada linha representa uma tentativa de notificar o n8n sobre um evento
+    do sistema. Quando o POST falha (timeout, conexão, 5xx), a linha fica
+    em ``status='pendente'`` para o job de retry. Após 3 tentativas sem
+    sucesso, vira ``status='falha'`` (falha permanente).
+    """
+
+    __tablename__ = 'webhook_entrega'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event = db.Column(db.String(80), nullable=False, index=True)
+    payload = db.Column(JSON, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pendente', index=True)
+    tentativas = db.Column(db.Integer, nullable=False, default=0)
+    ultimo_erro = db.Column(db.Text, nullable=True)
+    proxima_tentativa_em = db.Column(db.DateTime, nullable=True, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=True)
+
+    def __repr__(self):
+        return f'<WebhookEntrega {self.id} {self.event} {self.status}>'

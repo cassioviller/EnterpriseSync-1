@@ -3847,6 +3847,7 @@ def executar_migracoes():
             (146, "Task #42 — CRM de Leads: 9 tabelas (lead, lead_historico, 7 listas mestras) + seed genérico (sem Responsáveis)", migration_146_crm_leads_e_seed_generico),
             (147, "Task #18 hotfix — itens_inclusos/itens_exclusos em proposta_itens e orcamento_item", migration_147_proposta_orcamento_itens_inclusos_exclusos),
             (148, "Task #47 — proposta_templates.padrao + índice parcial único + backfill (template mais antigo por admin)", migration_148_proposta_templates_padrao),
+            (149, "Task #43 — webhook_entrega (fila/log de notificações para n8n)", migration_149_webhook_entrega),
         ]
         
         # Executar cada migração com rastreamento
@@ -12479,3 +12480,76 @@ def migration_147_proposta_orcamento_itens_inclusos_exclusos():
         raise
 
 
+def migration_149_webhook_entrega():
+    """Task #43 — Tabela ``webhook_entrega`` (fila/log de entregas para n8n).
+
+    Cria a tabela usada por ``utils.webhook_dispatcher`` para registrar cada
+    POST disparado para o n8n. Em sucesso, fica como 'enviado'; em falha de
+    rede ou HTTP 5xx, fica 'pendente' e o job de retry tenta novamente
+    (backoff 1m → 5m → 15m, total = 1 inicial + 3 retries). Depois disso,
+    ``status='falha'`` (permanente).
+
+    Sem backfill — tabela nasce vazia.
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 149: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS webhook_entrega (
+                id                    SERIAL PRIMARY KEY,
+                event                 VARCHAR(80)  NOT NULL,
+                payload               JSONB        NOT NULL,
+                status                VARCHAR(20)  NOT NULL DEFAULT 'pendente',
+                tentativas            INTEGER      NOT NULL DEFAULT 0,
+                ultimo_erro           TEXT         NULL,
+                proxima_tentativa_em  TIMESTAMP    NULL,
+                admin_id              INTEGER      NULL REFERENCES usuario(id) ON DELETE SET NULL,
+                created_at            TIMESTAMP    NOT NULL DEFAULT NOW(),
+                sent_at               TIMESTAMP    NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_webhook_entrega_event
+                ON webhook_entrega (event)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_webhook_entrega_status
+                ON webhook_entrega (status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_webhook_entrega_proxima_tentativa
+                ON webhook_entrega (proxima_tentativa_em)
+                WHERE status = 'pendente'
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_webhook_entrega_admin
+                ON webhook_entrega (admin_id)
+        """)
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 149 CONCLUIDA: webhook_entrega criada (vazia, com índices).")
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 149 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise

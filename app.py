@@ -323,6 +323,16 @@ try:
 except Exception as e:
     logging.warning(f"[WARN] Handler de financeiro não carregado: {e}")
 
+# Task #43 — Webhook para n8n (notificações externas).
+# Bootstrap: registra listener universal para a allowlist + thread de retry.
+# No-op se N8N_WEBHOOK_URL não estiver configurado.
+try:
+    from utils.webhook_dispatcher import init_app as _init_webhook
+    _init_webhook(app)
+    logging.info("[OK] Despachante de webhook (n8n) inicializado")
+except Exception as e:
+    logging.warning(f"[WARN] Despachante de webhook não carregado: {e}")
+
 # Import views
 from views import main_bp
 from production_routes import production_bp

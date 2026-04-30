@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Webhooks (n8n) — SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-bolt me-2"></i>Webhooks para n8n
+            </h2>
+            <p class="text-muted mb-0">
+                Últimas 200 entregas, com filtros e botão para reenviar manualmente.
+            </p>
+        </div>
+        <a href="{{ url_for('main.admin_webhooks_listar') }}"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-sync me-1"></i>Atualizar
+        </a>
+    </div>
+
+    <!-- Status do canal -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Status do canal</small>
+                    {% if webhook_ativo %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-circle-check me-1"></i>Ativo
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            <i class="fas fa-circle-pause me-1"></i>Desligado
+                        </span>
+                        <small class="text-muted d-block mt-1">
+                            Configure <code>N8N_WEBHOOK_URL</code> para ligar.
+                        </small>
+                    {% endif %}
+                </div>
+                <div class="col-md-5">
+                    <small class="text-muted d-block">URL do webhook</small>
+                    <code class="text-break">
+                        {{ webhook_url or '— não configurada —' }}
+                    </code>
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted d-block">Tentativas máximas</small>
+                    <strong>{{ max_tentativas }}</strong>
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted d-block">Eventos na allowlist</small>
+                    <strong>{{ allowlist|length }}</strong>
+                </div>
+            </div>
+            {% if allowlist %}
+            <div class="mt-3">
+                <small class="text-muted d-block mb-1">Eventos permitidos para sair:</small>
+                {% for ev in allowlist %}
+                    <span class="badge bg-info text-dark me-1">{{ ev }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-warning mt-3 mb-0">
+                <i class="fas fa-triangle-exclamation me-2"></i>
+                Nenhum evento na allowlist — nada vai sair para o n8n até alguém
+                adicionar nomes em <code>utils/webhook_dispatcher.py</code>.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">— todos —</option>
+                        <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+                        <option value="enviado"  {% if status_filtro == 'enviado'  %}selected{% endif %}>Enviado</option>
+                        <option value="falha"    {% if status_filtro == 'falha'    %}selected{% endif %}>Falha</option>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small">Evento</label>
+                    <select name="event" class="form-select form-select-sm">
+                        <option value="">— todos —</option>
+                        {% for ev in eventos_distintos %}
+                            <option value="{{ ev }}" {% if event_filtro == ev %}selected{% endif %}>{{ ev }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                        <i class="fas fa-filter me-1"></i>Filtrar
+                    </button>
+                    <a href="{{ url_for('main.admin_webhooks_listar') }}"
+                       class="btn btn-outline-secondary btn-sm">
+                        Limpar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Lista -->
+    <div class="card">
+        <div class="card-body p-0">
+            {% if entregas %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 70px;">#</th>
+                            <th>Evento</th>
+                            <th>Status</th>
+                            <th class="text-center">Tentativas</th>
+                            <th>Criado em</th>
+                            <th>Enviado em</th>
+                            <th>Próxima tentativa</th>
+                            <th>Último erro</th>
+                            <th class="text-end" style="width: 120px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in entregas %}
+                        <tr>
+                            <td><code>{{ e.id }}</code></td>
+                            <td><span class="text-monospace">{{ e.event }}</span></td>
+                            <td>
+                                {% if e.status == 'enviado' %}
+                                    <span class="badge bg-success">enviado</span>
+                                {% elif e.status == 'pendente' %}
+                                    <span class="badge bg-warning text-dark">pendente</span>
+                                {% else %}
+                                    <span class="badge bg-danger">falha</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ e.tentativas or 0 }}/{{ max_tentativas }}</td>
+                            <td><small>{{ e.created_at.strftime('%d/%m/%Y %H:%M:%S') if e.created_at else '—' }}</small></td>
+                            <td><small>{{ e.sent_at.strftime('%d/%m/%Y %H:%M:%S') if e.sent_at else '—' }}</small></td>
+                            <td><small>{{ e.proxima_tentativa_em.strftime('%d/%m/%Y %H:%M:%S') if e.proxima_tentativa_em else '—' }}</small></td>
+                            <td>
+                                {% if e.ultimo_erro %}
+                                    <small class="text-danger" title="{{ e.ultimo_erro }}">
+                                        {{ e.ultimo_erro[:80] }}{% if e.ultimo_erro|length > 80 %}…{% endif %}
+                                    </small>
+                                {% else %}
+                                    <small class="text-muted">—</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if e.status != 'enviado' and webhook_ativo %}
+                                <form method="post"
+                                      action="{{ url_for('main.admin_webhooks_reenviar', entrega_id=e.id) }}"
+                                      class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-rotate-right me-1"></i>Reenviar
+                                    </button>
+                                </form>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-inbox fa-2x mb-3"></i>
+                <p class="mb-0">Nenhuma entrega registrada ainda{% if status_filtro or event_filtro %} para o filtro escolhido{% endif %}.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
