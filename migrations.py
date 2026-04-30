@@ -3844,6 +3844,7 @@ def executar_migracoes():
             (143, "Task #21 — relatorio_compra_mapa: UNIQUE (mapa_id, versao) p/ versionamento seguro sob concorrência", migration_143_relatorio_compra_unique_versao),
             (144, "Task #31 — versionamento + revisão obrigatória de propostas (proposta + proposta_clausula)", migration_144_proposta_versionamento_revisao),
             (145, "Task #38 — rdo_mao_obra.peso_distribuicao (peso da tarefa principal do funcionário)", migration_145_rdo_mao_obra_peso_distribuicao),
+            (146, "Task #42 — CRM de Leads: 9 tabelas (lead, lead_historico, 7 listas mestras) + seed genérico (sem Responsáveis)", migration_146_crm_leads_e_seed_generico),
         ]
         
         # Executar cada migração com rastreamento
@@ -12200,4 +12201,169 @@ def migration_145_rdo_mao_obra_peso_distribuicao():
             connection.close()
         except Exception:
             pass
+        raise
+
+
+def migration_146_crm_leads_e_seed_generico():
+    """Migration 146 (Task #42): CRM de Leads — schema completo + seed genérico.
+
+    Cria 9 tabelas novas:
+      - 7 listas mestras (crm_responsavel, crm_origem, crm_cadencia,
+        crm_situacao, crm_tipo_material, crm_tipo_obra, crm_motivo_perda)
+        com UNIQUE(admin_id, nome) e flag `ativo`.
+      - lead (entidade principal — todos os campos da planilha + FKs
+        opcionais para cliente, propostas_comerciais e obra).
+      - lead_historico (timeline de alterações, ON DELETE CASCADE).
+
+    Após criar as tabelas, popula automaticamente as 6 listas mestras
+    NÃO-NOMINAIS (Origens, Cadências, Situações, Tipos de Material,
+    Tipos de Obra, Motivos de Perda) com valores padrão genéricos
+    para todo admin existente — IDEMPOTENTE por lista (não duplica e
+    não reaparece se admin já personalizou). A lista `crm_responsavel`
+    nunca recebe seed.
+
+    Idempotente.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+
+        # 1) Criar as 7 tabelas de listas mestras (todas têm o mesmo schema)
+        for tabela in (
+            'crm_responsavel', 'crm_origem', 'crm_cadencia', 'crm_situacao',
+            'crm_tipo_material', 'crm_tipo_obra', 'crm_motivo_perda',
+        ):
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS {tabela} (
+                    id SERIAL PRIMARY KEY,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(120) NOT NULL,
+                    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_{tabela}_admin_nome UNIQUE (admin_id, nome)
+                )
+            """)
+            cursor.execute(f"""
+                CREATE INDEX IF NOT EXISTS ix_{tabela}_admin
+                  ON {tabela} (admin_id)
+            """)
+
+        # 2) Criar a tabela lead
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lead (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                data_chegada DATE NOT NULL DEFAULT CURRENT_DATE,
+                data_envio DATE,
+                nome VARCHAR(200) NOT NULL,
+                contato VARCHAR(50),
+                email VARCHAR(200),
+                responsavel_id INTEGER REFERENCES crm_responsavel(id),
+                origem_id INTEGER REFERENCES crm_origem(id),
+                cadencia_id INTEGER REFERENCES crm_cadencia(id),
+                situacao_id INTEGER REFERENCES crm_situacao(id),
+                tipo_material_id INTEGER REFERENCES crm_tipo_material(id),
+                tipo_obra_id INTEGER REFERENCES crm_tipo_obra(id),
+                motivo_perda_id INTEGER REFERENCES crm_motivo_perda(id),
+                localizacao VARCHAR(200),
+                detalhes_localizacao TEXT,
+                demanda TEXT,
+                pasta VARCHAR(500),
+                valor_proposta NUMERIC(15, 2),
+                status VARCHAR(40) NOT NULL DEFAULT 'Em fila',
+                observacao TEXT,
+                data_retomada DATE,
+                cliente_id INTEGER REFERENCES cliente(id),
+                proposta_id INTEGER REFERENCES propostas_comerciais(id) ON DELETE SET NULL,
+                obra_id INTEGER REFERENCES obra(id) ON DELETE SET NULL,
+                criado_por_id INTEGER REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_lead_admin_status
+              ON lead (admin_id, status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_lead_admin_responsavel
+              ON lead (admin_id, responsavel_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_lead_cliente_id
+              ON lead (cliente_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_lead_proposta_id
+              ON lead (proposta_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_lead_obra_id
+              ON lead (obra_id)
+        """)
+
+        # 3) Criar a tabela lead_historico (multi-tenant: admin_id é
+        #    obrigatório — se a tabela já existir e o auto-fix universal
+        #    tiver adicionado a coluna depois, o INSERT do app já contempla.)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lead_historico (
+                id SERIAL PRIMARY KEY,
+                lead_id INTEGER NOT NULL REFERENCES lead(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                campo VARCHAR(60) NOT NULL,
+                valor_antes VARCHAR(255),
+                valor_depois VARCHAR(255),
+                descricao TEXT,
+                usuario_id INTEGER REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # Garantir admin_id se a tabela já existia sem (forward-compatível)
+        cursor.execute("""
+            ALTER TABLE lead_historico
+                ADD COLUMN IF NOT EXISTS admin_id INTEGER REFERENCES usuario(id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_lead_historico_lead
+              ON lead_historico (lead_id)
+        """)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        connection = None
+
+        # 4) Seed genérico para TODOS os admins existentes (idempotente).
+        # Usamos o helper Python (que abre sessão SQLAlchemy) — fora do
+        # cursor raw porque queremos commit ORM atômico por admin.
+        try:
+            from crm_seeds import seed_listas_mestras_para_todos_admins
+            n_admins, n_linhas = seed_listas_mestras_para_todos_admins()
+            logger.info(
+                "MIGRACAO 146: seed CRM aplicado em %s admin(s), %s linhas inseridas",
+                n_admins, n_linhas,
+            )
+        except Exception as seed_err:
+            # Não derrubar a migração se o seed falhar — as tabelas já
+            # estão criadas e o admin pode cadastrar manualmente.
+            logger.error(
+                "MIGRACAO 146: seed CRM falhou (tabelas já criadas; admin pode "
+                "cadastrar manualmente): %s",
+                seed_err,
+            )
+
+        logger.info(
+            "MIGRACAO 146 CONCLUIDA: 9 tabelas CRM criadas + seed genérico aplicado."
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 146 falhou: %s", e)
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
         raise

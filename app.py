@@ -347,6 +347,14 @@ try:
 except Exception as e:
     logging.error(f"[ERROR] Erro ao registrar blueprint clientes: {e}")
 
+# Task #42 — CRM de Leads
+try:
+    from crm_views import crm_bp
+    app.register_blueprint(crm_bp)
+    logging.info("[OK] Blueprint CRM de Leads registrado")
+except Exception as e:
+    logging.error(f"[ERROR] Erro ao registrar blueprint CRM: {e}")
+
 ponto_import_error = None
 try:
     from ponto_views import ponto_bp

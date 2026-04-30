@@ -1,0 +1,389 @@
+{% extends "base_completo.html" %}
+
+{% block title %}CRM — Kanban de Leads{% endblock %}
+
+{% block extra_css %}
+<style>
+.crm-kanban-wrapper {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+}
+.crm-kanban {
+    display: flex;
+    gap: 12px;
+    min-height: 70vh;
+    align-items: flex-start;
+}
+.crm-coluna {
+    flex: 0 0 280px;
+    background: #f4f6fa;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    max-height: 78vh;
+}
+.crm-coluna__header {
+    padding: 10px 12px;
+    border-bottom: 2px solid #fff;
+    border-radius: 10px 10px 0 0;
+    color: #fff;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.crm-coluna__corpo {
+    padding: 8px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 100px;
+}
+.crm-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: grab;
+    border-left: 4px solid #6c757d;
+    transition: box-shadow .15s, transform .15s;
+}
+.crm-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.12); transform: translateY(-1px); }
+.crm-card.sortable-ghost { opacity: 0.4; background: #e9ecef; }
+.crm-card.sortable-chosen { box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.crm-card__nome { font-weight: 600; color: #212529; margin-bottom: 4px; }
+.crm-card__linha { font-size: .82rem; color: #495057; margin-bottom: 2px; }
+.crm-card__valor { font-weight: 700; color: #198754; }
+.crm-card__rodape { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: .75rem; color: #6c757d; }
+.crm-card__badge {
+    font-size: .7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #e9ecef;
+    color: #495057;
+}
+.crm-card__badge.warning { background: #fff3cd; color: #664d03; }
+.crm-card__badge.danger { background: #f8d7da; color: #842029; }
+.crm-card__acoes { display: flex; gap: 4px; }
+.crm-card__acoes a { color: #6c757d; font-size: .85rem; }
+.crm-card__acoes a:hover { color: #0d6efd; }
+
+/* cores por status */
+.status-em-fila        { background: #6c757d; }
+.status-em-andamento   { background: #0dcaf0; }
+.status-enviado        { background: #0d6efd; }
+.status-validacao      { background: #6f42c1; }
+.status-aprovado       { background: #198754; }
+.status-feedback       { background: #fd7e14; }
+.status-congelado      { background: #495057; }
+.status-perdido        { background: #dc3545; }
+
+.crm-card.status-em-fila        { border-left-color: #6c757d; }
+.crm-card.status-em-andamento   { border-left-color: #0dcaf0; }
+.crm-card.status-enviado        { border-left-color: #0d6efd; }
+.crm-card.status-validacao      { border-left-color: #6f42c1; }
+.crm-card.status-aprovado       { border-left-color: #198754; }
+.crm-card.status-feedback       { border-left-color: #fd7e14; }
+.crm-card.status-congelado      { border-left-color: #495057; }
+.crm-card.status-perdido        { border-left-color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-funnel-dollar text-primary me-2"></i>
+                CRM — Kanban de Leads
+            </h1>
+            <p class="text-muted mb-0">Arraste os cartões entre as colunas para mudar o estágio</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('crm.lista', **filtros) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i> Visão lista
+            </a>
+            {% if is_admin %}
+            <a href="{{ url_for('crm.cadastros') }}" class="btn btn-outline-primary">
+                <i class="fas fa-cog me-1"></i> Cadastros
+            </a>
+            {% endif %}
+            <a href="{{ url_for('crm.novo') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Lead
+            </a>
+        </div>
+    </div>
+
+    {# Filtros #}
+    <form method="GET" action="{{ url_for('crm.kanban') }}" class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm" name="busca"
+                           placeholder="Buscar nome / contato / e-mail / demanda..."
+                           value="{{ filtros.busca }}">
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" name="responsavel_id">
+                        <option value="">Todos os responsáveis</option>
+                        {% for r in listas.responsavel %}
+                        <option value="{{ r.id }}" {% if filtros.responsavel_id == r.id %}selected{% endif %}>{{ r.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" name="origem_id">
+                        <option value="">Todas as origens</option>
+                        {% for o in listas.origem %}
+                        <option value="{{ o.id }}" {% if filtros.origem_id == o.id %}selected{% endif %}>{{ o.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" name="tipo_obra_id">
+                        <option value="">Todos os tipos de obra</option>
+                        {% for t in listas.tipo_obra %}
+                        <option value="{{ t.id }}" {% if filtros.tipo_obra_id == t.id %}selected{% endif %}>{{ t.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="month" class="form-control form-control-sm" name="mes_chegada" value="{{ filtros.mes_chegada }}">
+                </div>
+                <div class="col-md-1 d-flex gap-1">
+                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                    <a href="{{ url_for('crm.kanban') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="crm-kanban-wrapper">
+        <div class="crm-kanban">
+            {% for col in colunas %}
+            {% set slug = col.nome|lower|replace('ã','a')|replace('é','e')|replace(' ','-') %}
+            <div class="crm-coluna" data-status="{{ col.nome }}">
+                <div class="crm-coluna__header status-{{ slug }}">
+                    <span>{{ col.nome }} <span class="badge bg-light text-dark ms-1">{{ col.count }}</span></span>
+                    {% if col.valor_total and col.valor_total > 0 %}
+                    <span class="small">R$ {{ "{:,.0f}".format(col.valor_total).replace(',', '.') }}</span>
+                    {% endif %}
+                </div>
+                <div class="crm-coluna__corpo crm-droppable" data-status="{{ col.nome }}">
+                    {% for lead in col.leads %}
+                    <div class="crm-card status-{{ slug }}" data-lead-id="{{ lead.id }}">
+                        <div class="crm-card__nome">{{ lead.nome }}</div>
+                        {% if lead.responsavel %}
+                        <div class="crm-card__linha">
+                            <i class="fas fa-user-tie text-muted me-1"></i>{{ lead.responsavel.nome }}
+                        </div>
+                        {% endif %}
+                        {% if lead.tipo_material %}
+                        <div class="crm-card__linha">
+                            <i class="fas fa-cube text-muted me-1"></i>{{ lead.tipo_material.nome }}
+                            {% if lead.tipo_obra %}<span class="text-muted">— {{ lead.tipo_obra.nome }}</span>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if lead.localizacao %}
+                        <div class="crm-card__linha">
+                            <i class="fas fa-map-marker-alt text-muted me-1"></i>{{ lead.localizacao }}
+                        </div>
+                        {% endif %}
+                        {% if lead.valor_proposta %}
+                        <div class="crm-card__linha crm-card__valor">
+                            R$ {{ "{:,.2f}".format(lead.valor_proposta).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                        </div>
+                        {% endif %}
+                        <div class="crm-card__rodape">
+                            <span>
+                                {% if lead.dias_parado >= 14 %}
+                                <span class="crm-card__badge danger" title="Parado há {{ lead.dias_parado }} dias">
+                                    <i class="fas fa-clock"></i> {{ lead.dias_parado }}d
+                                </span>
+                                {% elif lead.dias_parado >= 7 %}
+                                <span class="crm-card__badge warning" title="Parado há {{ lead.dias_parado }} dias">
+                                    <i class="fas fa-clock"></i> {{ lead.dias_parado }}d
+                                </span>
+                                {% else %}
+                                <span class="crm-card__badge">
+                                    <i class="fas fa-clock"></i> {{ lead.dias_parado }}d
+                                </span>
+                                {% endif %}
+                            </span>
+                            <span class="crm-card__acoes">
+                                <a href="{{ url_for('crm.editar', lead_id=lead.id) }}" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# Modal de motivo da perda #}
+<div class="modal fade" id="modalMotivoPerda" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Motivo da Perda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Para mover este lead para <strong>Perdido</strong>, selecione o motivo:</p>
+                <select id="motivoPerdaSelect" class="form-select">
+                    <option value="">— Selecione —</option>
+                    {% for mp in listas.motivo_perda %}
+                    <option value="{{ mp.id }}">{{ mp.nome }}</option>
+                    {% endfor %}
+                </select>
+                {% if not listas.motivo_perda %}
+                <div class="alert alert-warning mt-2 mb-0 small">
+                    Nenhum motivo cadastrado.
+                    {% if is_admin %}<a href="{{ url_for('crm.cadastros') }}#motivo_perda">Cadastrar agora</a>{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="motivoPerdaCancelar">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="motivoPerdaConfirmar">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+(function() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                    || '{{ csrf_token() }}';
+    const modalMotivoEl = document.getElementById('modalMotivoPerda');
+    const modalMotivo = modalMotivoEl ? new bootstrap.Modal(modalMotivoEl) : null;
+    let pendingMove = null; // {leadId, novoStatus, fromColEl, cardEl, beforeEl}
+
+    function postMudarStatus(leadId, novoStatus, motivoPerdaId) {
+        const body = new URLSearchParams();
+        body.set('status', novoStatus);
+        if (motivoPerdaId) body.set('motivo_perda_id', motivoPerdaId);
+        return fetch(`/crm/${leadId}/mudar_status`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+        }).then(r => r.json().then(data => ({status: r.status, data})));
+    }
+
+    function reverterMove(p) {
+        if (!p) return;
+        const origemCorpo = p.fromColEl.querySelector('.crm-droppable');
+        if (p.beforeEl) origemCorpo.insertBefore(p.cardEl, p.beforeEl);
+        else origemCorpo.appendChild(p.cardEl);
+    }
+
+    function aplicarClassesStatus(cardEl, novoStatus) {
+        const classes = ['em-fila','em-andamento','enviado','validacao','aprovado','feedback','congelado','perdido'];
+        classes.forEach(c => cardEl.classList.remove('status-' + c));
+        const slug = novoStatus.toLowerCase()
+            .replace(/ã/g,'a').replace(/é/g,'e').replace(/ /g,'-');
+        cardEl.classList.add('status-' + slug);
+    }
+
+    function showFlash(msg, level) {
+        const wrap = document.createElement('div');
+        wrap.className = `alert alert-${level || 'info'} alert-dismissible fade show shadow-sm`;
+        wrap.style.position = 'fixed';
+        wrap.style.top = '70px';
+        wrap.style.right = '20px';
+        wrap.style.zIndex = 9999;
+        wrap.innerHTML = `${msg} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        document.body.appendChild(wrap);
+        setTimeout(() => wrap.remove(), 5000);
+    }
+
+    document.querySelectorAll('.crm-droppable').forEach(col => {
+        new Sortable(col, {
+            group: 'kanban',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: function(evt) {
+                const cardEl = evt.item;
+                const leadId = cardEl.dataset.leadId;
+                const novoStatus = evt.to.dataset.status;
+                const oldStatus = evt.from.dataset.status;
+                if (novoStatus === oldStatus) return;
+                const beforeEl = evt.from.children[evt.oldIndex] || null;
+
+                pendingMove = {
+                    leadId, novoStatus,
+                    fromColEl: evt.from.parentElement,
+                    cardEl, beforeEl,
+                };
+
+                postMudarStatus(leadId, novoStatus).then(({status, data}) => {
+                    if (data.ok) {
+                        aplicarClassesStatus(cardEl, novoStatus);
+                        if (data.avisos && data.avisos.length) {
+                            data.avisos.forEach(a => showFlash(a, 'info'));
+                        }
+                        showFlash('Status atualizado.', 'success');
+                        pendingMove = null;
+                    } else if (data.requer_motivo && modalMotivo) {
+                        modalMotivo.show();
+                    } else {
+                        reverterMove(pendingMove);
+                        pendingMove = null;
+                        showFlash(data.msg || 'Erro ao mudar status', 'danger');
+                    }
+                }).catch(err => {
+                    reverterMove(pendingMove);
+                    pendingMove = null;
+                    showFlash('Erro de comunicação: ' + err, 'danger');
+                });
+            }
+        });
+    });
+
+    // Modal motivo perda
+    document.getElementById('motivoPerdaConfirmar')?.addEventListener('click', () => {
+        if (!pendingMove) { modalMotivo.hide(); return; }
+        const motivoId = document.getElementById('motivoPerdaSelect').value;
+        if (!motivoId) { alert('Selecione um motivo.'); return; }
+        postMudarStatus(pendingMove.leadId, pendingMove.novoStatus, motivoId).then(({data}) => {
+            if (data.ok) {
+                aplicarClassesStatus(pendingMove.cardEl, pendingMove.novoStatus);
+                showFlash('Lead movido para Perdido.', 'success');
+                pendingMove = null;
+                modalMotivo.hide();
+            } else {
+                reverterMove(pendingMove);
+                pendingMove = null;
+                modalMotivo.hide();
+                showFlash(data.msg || 'Erro', 'danger');
+            }
+        });
+    });
+    document.getElementById('motivoPerdaCancelar')?.addEventListener('click', () => {
+        reverterMove(pendingMove);
+        pendingMove = null;
+    });
+    modalMotivoEl?.addEventListener('hidden.bs.modal', () => {
+        // Se ainda há pending (usuário fechou sem confirmar), reverte
+        if (pendingMove) { reverterMove(pendingMove); pendingMove = null; }
+    });
+})();
+</script>
+{% endblock %}

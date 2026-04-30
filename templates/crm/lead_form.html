@@ -1,0 +1,257 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{% if lead %}Editar Lead{% else %}Novo Lead{% endif %} - CRM{% endblock %}
+
+{% macro select_lista(name, items, valor_id, label, required=False, placeholder='— Selecione —') %}
+    <label class="form-label small text-muted mb-1">{{ label }}{% if required %} *{% endif %}</label>
+    <select class="form-select form-select-sm" name="{{ name }}" {% if required %}required{% endif %}>
+        <option value="">{{ placeholder }}</option>
+        {% for it in items %}
+        <option value="{{ it.id }}" {% if valor_id == it.id %}selected{% endif %}>{{ it.nome }}</option>
+        {% endfor %}
+    </select>
+{% endmacro %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 mb-0">
+                <i class="fas fa-user-plus text-primary me-2"></i>
+                {% if lead %}Editar Lead — {{ lead.nome }}{% else %}Novo Lead{% endif %}
+            </h1>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('crm.kanban') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Voltar ao Kanban
+            </a>
+            {% if lead and lead.cliente %}
+            <a href="{{ url_for('crm.gerar_proposta', lead_id=lead.id) }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-file-invoice me-1"></i> Gerar Proposta
+            </a>
+            <a href="{{ url_for('crm.criar_obra', lead_id=lead.id) }}" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-hard-hat me-1"></i> Criar Obra
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="POST" action="{% if lead %}{{ url_for('crm.editar', lead_id=lead.id) }}{% else %}{{ url_for('crm.novo') }}{% endif %}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+            {# Coluna esquerda — formulário #}
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white"><strong>Identificação</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-1">Nome / Empresa *</label>
+                                <input type="text" name="nome" class="form-control" required maxlength="200"
+                                       value="{{ valores.nome if valores else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">Contato (telefone)</label>
+                                <input type="text" name="contato" class="form-control" maxlength="50"
+                                       value="{{ valores.contato if valores else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">E-mail</label>
+                                <input type="email" name="email" class="form-control" maxlength="200"
+                                       value="{{ valores.email if valores else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">Data de chegada</label>
+                                <input type="date" name="data_chegada" class="form-control"
+                                       value="{% if lead %}{{ lead.data_chegada.isoformat() if lead.data_chegada else '' }}{% endif %}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">Data de envio</label>
+                                <input type="date" name="data_envio" class="form-control"
+                                       value="{% if lead and lead.data_envio %}{{ lead.data_envio.isoformat() }}{% endif %}">
+                            </div>
+                            <div class="col-md-6">
+                                {{ select_lista('responsavel_id', listas.responsavel,
+                                                 (lead.responsavel_id if lead else None),
+                                                 'Responsável') }}
+                                {% if not listas.responsavel %}
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Nenhum responsável cadastrado.
+                                    <a href="{{ url_for('crm.cadastros') }}#responsavel">Cadastrar</a>
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white"><strong>Classificação</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                {{ select_lista('origem_id', listas.origem,
+                                                 (lead.origem_id if lead else None), 'Origem') }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ select_lista('cadencia_id', listas.cadencia,
+                                                 (lead.cadencia_id if lead else None), 'Cadência') }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ select_lista('situacao_id', listas.situacao,
+                                                 (lead.situacao_id if lead else None), 'Situação') }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ select_lista('tipo_material_id', listas.tipo_material,
+                                                 (lead.tipo_material_id if lead else None), 'Tipo de Material') }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ select_lista('tipo_obra_id', listas.tipo_obra,
+                                                 (lead.tipo_obra_id if lead else None), 'Tipo de Obra') }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted mb-1">Valor estimado (R$)</label>
+                                <input type="text" name="valor_proposta" class="form-control"
+                                       placeholder="Ex.: 25.000,00"
+                                       value="{% if lead and lead.valor_proposta %}{{ '{:.2f}'.format(lead.valor_proposta).replace('.', ',') }}{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white"><strong>Localização e demanda</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-1">Localização (cidade/bairro)</label>
+                                <input type="text" name="localizacao" class="form-control" maxlength="200"
+                                       value="{{ valores.localizacao if valores else '' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted mb-1">Detalhes da localização</label>
+                                <input type="text" name="detalhes_localizacao" class="form-control"
+                                       value="{{ valores.detalhes_localizacao if valores else '' }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small text-muted mb-1">Demanda / descrição</label>
+                                <textarea name="demanda" class="form-control" rows="3">{{ valores.demanda if valores else '' }}</textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small text-muted mb-1">Pasta / link de documentos</label>
+                                <input type="text" name="pasta" class="form-control"
+                                       placeholder="URL do Drive, OneDrive, etc."
+                                       value="{{ valores.pasta if valores else '' }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small text-muted mb-1">Observação</label>
+                                <textarea name="observacao" class="form-control" rows="2">{{ valores.observacao if valores else '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Coluna direita — status, motivo, vínculos, timeline #}
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white"><strong>Estágio do Lead</strong></div>
+                    <div class="card-body">
+                        <label class="form-label small text-muted mb-1">Status</label>
+                        <select name="status" class="form-select" id="statusSelect">
+                            {% for s in status_enum %}
+                            <option value="{{ s.value }}"
+                                    {% if (lead and lead.status == s.value) or (not lead and s.value == 'Em fila') %}selected{% endif %}>
+                                {{ s.value }}
+                            </option>
+                            {% endfor %}
+                        </select>
+
+                        <div id="motivoPerdaWrap" class="mt-3" style="display:none">
+                            {{ select_lista('motivo_perda_id', listas.motivo_perda,
+                                             (lead.motivo_perda_id if lead else None),
+                                             'Motivo da perda') }}
+                        </div>
+
+                        <div id="dataRetomadaWrap" class="mt-3" style="display:none">
+                            <label class="form-label small text-muted mb-1">Data sugerida de retomada (Congelado)</label>
+                            <input type="date" name="data_retomada" class="form-control"
+                                   value="{% if lead and lead.data_retomada %}{{ lead.data_retomada.isoformat() }}{% endif %}">
+                        </div>
+                    </div>
+                </div>
+
+                {% if lead and lead.cliente %}
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white"><strong>Cliente vinculado</strong></div>
+                    <div class="card-body small">
+                        <div><i class="fas fa-user me-1 text-muted"></i><strong>{{ lead.cliente.nome }}</strong></div>
+                        {% if lead.cliente.telefone %}<div><i class="fas fa-phone me-1 text-muted"></i>{{ lead.cliente.telefone }}</div>{% endif %}
+                        {% if lead.cliente.email %}<div><i class="fas fa-envelope me-1 text-muted"></i>{{ lead.cliente.email }}</div>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if lead %}
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white"><strong>Histórico</strong></div>
+                    <div class="card-body p-0">
+                        {% if lead.historico %}
+                        <ul class="list-group list-group-flush small">
+                            {% for h in lead.historico %}
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <strong class="text-capitalize">{{ h.campo }}</strong>
+                                    <small class="text-muted">{{ h.created_at.strftime('%d/%m/%Y %H:%M') if h.created_at else '' }}</small>
+                                </div>
+                                {% if h.descricao %}
+                                <div class="text-muted">{{ h.descricao }}</div>
+                                {% else %}
+                                <div class="text-muted">
+                                    {{ h.valor_antes or '—' }} <i class="fas fa-arrow-right mx-1"></i> {{ h.valor_depois or '—' }}
+                                </div>
+                                {% endif %}
+                                {% if h.usuario %}
+                                <small class="text-muted"><i class="fas fa-user"></i> {{ h.usuario.nome or h.usuario.username }}</small>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <div class="p-3 text-muted small">Sem histórico ainda.</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <a href="{{ url_for('crm.kanban') }}" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i> Salvar Lead
+            </button>
+        </div>
+    </form>
+</div>
+
+{% block extra_js %}
+<script>
+(function() {
+    const statusSel = document.getElementById('statusSelect');
+    const motivoWrap = document.getElementById('motivoPerdaWrap');
+    const retomadaWrap = document.getElementById('dataRetomadaWrap');
+    function atualizar() {
+        const v = statusSel.value;
+        motivoWrap.style.display = (v === 'Perdido') ? 'block' : 'none';
+        retomadaWrap.style.display = (v === 'Congelado') ? 'block' : 'none';
+        const sel = motivoWrap.querySelector('select');
+        if (sel) sel.required = (v === 'Perdido');
+    }
+    statusSel.addEventListener('change', atualizar);
+    atualizar();
+})();
+</script>
+{% endblock %}
+{% endblock %}

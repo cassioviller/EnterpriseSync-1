@@ -5953,3 +5953,214 @@ class OrcamentoItem(db.Model):
 
     def __repr__(self):
         return f'<OrcamentoItem {self.id} svc={self.servico_id}>'
+
+
+# ============================================================================
+# Task #42 — CRM de Leads com Kanban e criação automática de Cliente
+# ============================================================================
+
+class LeadStatus(Enum):
+    """Status do lead = colunas do Kanban (rótulos fixos do sistema).
+    A ordem aqui é a ordem em que aparecem no quadro.
+    """
+    EM_FILA = "Em fila"
+    EM_ANDAMENTO = "Em andamento"
+    ENVIADO = "Enviado"
+    VALIDACAO = "Validação"
+    APROVADO = "Aprovado"
+    FEEDBACK = "Feedback"
+    CONGELADO = "Congelado"
+    PERDIDO = "Perdido"
+
+
+def _crm_lista_table_args(table_name):
+    return (
+        db.UniqueConstraint('admin_id', 'nome', name=f'uq_{table_name}_admin_nome'),
+        db.Index(f'ix_{table_name}_admin', 'admin_id'),
+    )
+
+
+class CrmResponsavel(db.Model):
+    __tablename__ = 'crm_responsavel'
+    __table_args__ = _crm_lista_table_args('crm_responsavel')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CrmOrigem(db.Model):
+    __tablename__ = 'crm_origem'
+    __table_args__ = _crm_lista_table_args('crm_origem')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CrmCadencia(db.Model):
+    __tablename__ = 'crm_cadencia'
+    __table_args__ = _crm_lista_table_args('crm_cadencia')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CrmSituacao(db.Model):
+    __tablename__ = 'crm_situacao'
+    __table_args__ = _crm_lista_table_args('crm_situacao')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CrmTipoMaterial(db.Model):
+    __tablename__ = 'crm_tipo_material'
+    __table_args__ = _crm_lista_table_args('crm_tipo_material')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CrmTipoObra(db.Model):
+    __tablename__ = 'crm_tipo_obra'
+    __table_args__ = _crm_lista_table_args('crm_tipo_obra')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class CrmMotivoPerda(db.Model):
+    __tablename__ = 'crm_motivo_perda'
+    __table_args__ = _crm_lista_table_args('crm_motivo_perda')
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Lead(db.Model):
+    """Lead do CRM. Estágio do Kanban = `status` (LeadStatus enum)."""
+    __tablename__ = 'lead'
+    __table_args__ = (
+        db.Index('ix_lead_admin_status', 'admin_id', 'status'),
+        db.Index('ix_lead_admin_responsavel', 'admin_id', 'responsavel_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    # Datas
+    data_chegada = db.Column(db.Date, nullable=False, default=date.today)
+    data_envio = db.Column(db.Date, nullable=True)
+
+    # Identificação
+    nome = db.Column(db.String(200), nullable=False)
+    contato = db.Column(db.String(50), nullable=True)  # telefone
+    email = db.Column(db.String(200), nullable=True)
+
+    # FKs para listas mestras (todas opcionais — admin pode ainda não ter cadastrado)
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('crm_responsavel.id'), nullable=True)
+    origem_id = db.Column(db.Integer, db.ForeignKey('crm_origem.id'), nullable=True)
+    cadencia_id = db.Column(db.Integer, db.ForeignKey('crm_cadencia.id'), nullable=True)
+    situacao_id = db.Column(db.Integer, db.ForeignKey('crm_situacao.id'), nullable=True)
+    tipo_material_id = db.Column(db.Integer, db.ForeignKey('crm_tipo_material.id'), nullable=True)
+    tipo_obra_id = db.Column(db.Integer, db.ForeignKey('crm_tipo_obra.id'), nullable=True)
+    motivo_perda_id = db.Column(db.Integer, db.ForeignKey('crm_motivo_perda.id'), nullable=True)
+
+    # Localização e demanda
+    localizacao = db.Column(db.String(200), nullable=True)
+    detalhes_localizacao = db.Column(db.Text, nullable=True)
+    demanda = db.Column(db.Text, nullable=True)
+    pasta = db.Column(db.String(500), nullable=True)
+
+    # Comercial
+    valor_proposta = db.Column(db.Numeric(15, 2), nullable=True)
+    status = db.Column(db.String(40), nullable=False, default=LeadStatus.EM_FILA.value)
+    observacao = db.Column(db.Text, nullable=True)
+
+    # Congelado: data sugerida de retomada
+    data_retomada = db.Column(db.Date, nullable=True)
+
+    # Vínculos automáticos
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True, index=True)
+    proposta_id = db.Column(
+        db.Integer, db.ForeignKey('propostas_comerciais.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    obra_id = db.Column(
+        db.Integer, db.ForeignKey('obra.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+
+    # Auditoria
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Marcador para badge "parado há X dias" — atualizado a cada mudança de status
+    status_changed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relacionamentos
+    responsavel = db.relationship('CrmResponsavel', foreign_keys=[responsavel_id])
+    origem = db.relationship('CrmOrigem', foreign_keys=[origem_id])
+    cadencia = db.relationship('CrmCadencia', foreign_keys=[cadencia_id])
+    situacao = db.relationship('CrmSituacao', foreign_keys=[situacao_id])
+    tipo_material = db.relationship('CrmTipoMaterial', foreign_keys=[tipo_material_id])
+    tipo_obra = db.relationship('CrmTipoObra', foreign_keys=[tipo_obra_id])
+    motivo_perda = db.relationship('CrmMotivoPerda', foreign_keys=[motivo_perda_id])
+    cliente = db.relationship('Cliente', foreign_keys=[cliente_id], backref='leads')
+    proposta = db.relationship('Proposta', foreign_keys=[proposta_id], backref='leads')
+    obra = db.relationship('Obra', foreign_keys=[obra_id], backref='leads')
+    historico = db.relationship('LeadHistorico', backref='lead',
+                                cascade='all, delete-orphan',
+                                order_by='LeadHistorico.created_at.desc()')
+
+    @property
+    def dias_parado(self):
+        if not self.status_changed_at:
+            return 0
+        delta = datetime.utcnow() - self.status_changed_at
+        return max(0, delta.days)
+
+
+class LeadHistorico(db.Model):
+    """Timeline de alterações do lead.
+
+    Cada linha registra UMA mudança: o campo alterado, o valor antes/depois
+    (renderizado como string p/ exibição), e quem fez quando. Eventos
+    "sistema" (ex.: criação automática de cliente) usam usuario_id NULL.
+    """
+    __tablename__ = 'lead_historico'
+
+    id = db.Column(db.Integer, primary_key=True)
+    lead_id = db.Column(
+        db.Integer, db.ForeignKey('lead.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    campo = db.Column(db.String(60), nullable=False)  # ex.: "status", "responsavel", "sistema"
+    valor_antes = db.Column(db.String(255), nullable=True)
+    valor_depois = db.Column(db.String(255), nullable=True)
+    descricao = db.Column(db.Text, nullable=True)  # mensagem livre extra
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id])

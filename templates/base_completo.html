@@ -986,6 +986,28 @@
                             </ul>
                         </li>
 
+                        <!-- CRM de Leads -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="crmDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-funnel-dollar me-1"></i> CRM
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{{ url_for('crm.kanban') }}">
+                                    <i class="fas fa-columns me-1"></i> Kanban de Leads
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('crm.lista') }}">
+                                    <i class="fas fa-list me-1"></i> Lista de Leads
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('crm.novo') }}">
+                                    <i class="fas fa-plus me-1"></i> Novo Lead
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('crm.cadastros') }}">
+                                    <i class="fas fa-cog me-1"></i> Cadastros do CRM
+                                </a></li>
+                            </ul>
+                        </li>
+
                         <!-- Cadastros -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="cadastrosDropdown" role="button" data-bs-toggle="dropdown">
