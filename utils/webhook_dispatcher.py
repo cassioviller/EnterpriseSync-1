@@ -53,6 +53,11 @@ WEBHOOK_SOURCE = "obra"
 # tabela completa (campos do payload, ponto de emissão, exemplo n8n).
 WEBHOOK_EVENT_ALLOWLIST: set[str] = {
     # — Propostas comerciais —
+    # `proposta.enviada` é dono da Task #44 (em paralelo); reservado aqui
+    # para coexistência: como o tipo é ``set``, o merge é idempotente —
+    # se a outra task já registra esta chave, não há conflito; se ela não
+    # emitir, esta entrada é benigna (nenhum código aqui dispara o evento).
+    "proposta.enviada",
     "proposta.aprovada",
     "proposta.rejeitada",
     "proposta.expirando",
