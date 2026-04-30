@@ -2000,25 +2000,43 @@ function initRowDrag() {
       const snapshot = _preDragOrder;
       _preDragOrder = null;
 
+      let res;
       try {
-        const res = await fetch(`${URL_BASE}/reordenar${QS_CLIENTE}`, {
+        res = await fetch(`${URL_BASE}/reordenar${QS_CLIENTE}`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ ordem: newOrder }),
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.status !== 'ok') {
-          throw new Error(data.msg || data.error || `Erro ${res.status}`);
-        }
-        renderGantt();
-        toast('Ordem salva');
-      } catch (err) {
-        console.error('[cronograma] Falha ao salvar ordem', err);
-        // Rollback visual: restaura a ordem que existia antes do drag.
+      } catch (netErr) {
+        // Erro de rede (offline, DNS, conexão perdida) — distingue de erro de servidor.
+        console.error('[cronograma] Erro de rede ao salvar ordem', netErr);
         _restaurarOrdemDOM(tbody, snapshot);
         renderGantt();
-        toast('Não foi possível salvar a ordem (' + (err.message || err) + '). Restaurada a anterior.', 'error');
+        toast('Erro de rede ao salvar a ordem: ' + (netErr.message || netErr) + '. Restaurada a anterior.', 'error');
+        return;
       }
+      // Tenta JSON; se vier HTML/texto (ex.: erro 500 não tratado), expõe trecho —
+      // mesma robustez aplicada em salvarNovaTarefa, para que o motivo real do
+      // backend sempre apareça no toast (critério #5 da Task #37).
+      let data = null;
+      let rawText = '';
+      try {
+        data = await res.clone().json();
+      } catch(_) {
+        try { rawText = await res.text(); } catch(_) {}
+      }
+      if (!res.ok || !data || data.status !== 'ok') {
+        const motivo = (data && (data.msg || data.error))
+                    || (rawText && rawText.slice(0, 180))
+                    || `Erro ${res.status}`;
+        console.error('[cronograma] Falha ao salvar ordem', { status: res.status, data, rawText });
+        _restaurarOrdemDOM(tbody, snapshot);
+        renderGantt();
+        toast('Não foi possível salvar a ordem (' + motivo + '). Restaurada a anterior.', 'error');
+        return;
+      }
+      renderGantt();
+      toast('Ordem salva');
     },
   });
 }
