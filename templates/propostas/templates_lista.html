@@ -37,6 +37,11 @@
                         <tr>
                             <td>
                                 <strong>{{ t.nome }}</strong>
+                                {% if t.padrao %}
+                                <span class="badge bg-warning text-dark ms-1" title="Este é o template usado como base para novos templates">
+                                    <i class="fas fa-star"></i> Padrão
+                                </span>
+                                {% endif %}
                                 {% if t.descricao %}
                                 <div class="small text-muted">{{ t.descricao|truncate(80) }}</div>
                                 {% endif %}
@@ -51,6 +56,17 @@
                                 {% endif %}
                             </td>
                             <td class="text-end">
+                                {% if not t.padrao %}
+                                <form method="POST"
+                                      action="{{ url_for('propostas.marcar_padrao_template', id=t.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Marcar &quot;{{ t.nome|e }}&quot; como o template PADRÃO? Novos templates serão criados a partir dele (cláusulas e blocos ricos).');">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning"
+                                            title="Marcar como template padrão deste tenant">
+                                        <i class="far fa-star"></i> Padrão
+                                    </button>
+                                </form>
+                                {% endif %}
                                 <a href="{{ url_for('propostas.editar_template', id=t.id) }}"
                                    class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-edit"></i> Editar

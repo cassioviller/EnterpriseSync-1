@@ -12480,6 +12480,110 @@ def migration_147_proposta_orcamento_itens_inclusos_exclusos():
         raise
 
 
+def migration_148_proposta_templates_padrao():
+    """Task #47 — adiciona ``proposta_templates.padrao`` + índice parcial
+    único + backfill (oldest template per admin é marcado padrão).
+
+    - Adiciona coluna ``padrao BOOLEAN NOT NULL DEFAULT FALSE``
+      (idempotente via ``IF NOT EXISTS``).
+    - Cria índice parcial único garantindo no máximo um ``padrao=TRUE``
+      por ``admin_id`` (``CREATE UNIQUE INDEX IF NOT EXISTS ...
+      WHERE padrao = TRUE``).
+    - Backfill: para cada ``admin_id`` que ainda NÃO tem nenhum template
+      marcado como padrão, marca como padrão o template mais antigo
+      (menor ``criado_em``, desempate por menor ``id``). Idempotente:
+      não toca em admins que já têm um padrão definido.
+
+    Sem perda de dados — coluna nova com default FALSE e backfill
+    determinístico.
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 148: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+
+        # 1) Adicionar coluna padrao (idempotente)
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                     WHERE table_name='proposta_templates'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                         WHERE table_name='proposta_templates'
+                           AND column_name='padrao'
+                    ) THEN
+                        ALTER TABLE proposta_templates
+                          ADD COLUMN padrao BOOLEAN NOT NULL DEFAULT FALSE;
+                    END IF;
+                END IF;
+            END$$;
+        """)
+
+        # 2) Índice parcial único: no máximo um padrao=TRUE por admin
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+              uq_proposta_templates_padrao_por_admin
+              ON proposta_templates (admin_id)
+              WHERE padrao = TRUE
+        """)
+
+        # 3) Backfill: para cada admin sem padrão, marcar como padrão o
+        #    template mais antigo (criado_em, desempate por id). Usa
+        #    DISTINCT ON para pegar exatamente um por admin. NÃO toca em
+        #    admins que já têm padrão.
+        cursor.execute("""
+            UPDATE proposta_templates
+               SET padrao = TRUE
+             WHERE id IN (
+                SELECT DISTINCT ON (admin_id) id
+                  FROM proposta_templates
+                 WHERE admin_id IS NOT NULL
+                   AND admin_id NOT IN (
+                       SELECT admin_id
+                         FROM proposta_templates
+                        WHERE padrao = TRUE
+                          AND admin_id IS NOT NULL
+                   )
+                 ORDER BY admin_id, criado_em ASC NULLS LAST, id ASC
+             )
+        """)
+        n_backfilled = cursor.rowcount
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 148 CONCLUIDA: proposta_templates.padrao + índice + "
+            "backfill em %s template(s).", n_backfilled,
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 148 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
 def migration_149_webhook_entrega():
     """Task #43 — Tabela ``webhook_entrega`` (fila/log de entregas para n8n).
 

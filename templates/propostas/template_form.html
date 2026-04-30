@@ -1,6 +1,25 @@
 {% extends "base_completo.html" %}
 {% block title %}{{ 'Editar' if template else 'Novo' }} Template - SIGE{% endblock %}
 
+{#
+  Task #47 — formulário unificado de PropostaTemplate.
+
+  Modos de uso:
+  - EDIÇÃO  : ``template`` é um objeto PropostaTemplate (todos os campos
+    vêm do banco). ``prefill`` é None.
+  - NOVO sem padrão configurado : ``template`` e ``prefill`` são None
+    (formulário em branco; banner orienta marcar um padrão).
+  - NOVO a partir do padrão     : ``template`` é None, ``prefill`` é um
+    dict com TODOS os campos ricos + lista de cláusulas copiadas do
+    template padrão do tenant. O usuário só edita o que quiser.
+
+  O macro ``v(campo, default='')`` resolve o valor a renderizar
+  preferindo template > prefill > default (cobre os 3 modos).
+#}
+{% macro v(campo, default='') -%}
+{%- if template -%}{{ template[campo] if template[campo] is not none else default }}{%- elif prefill and campo in prefill -%}{{ prefill[campo] }}{%- else -%}{{ default }}{%- endif -%}
+{%- endmacro %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -12,11 +31,40 @@
         </a>
     </div>
 
+    {# Task #47 — banner contextual no fluxo "Novo Template" #}
+    {% if not template %}
+        {% if padrao_origem %}
+        <div class="alert alert-info d-flex align-items-start" role="alert">
+            <i class="fas fa-star me-2 mt-1 text-warning"></i>
+            <div>
+                <strong>Pré-preenchido a partir do template padrão "{{ padrao_origem.nome }}".</strong>
+                <div class="small">
+                    Todos os blocos (apresentação, objeto, condições, garantias, inclusos/exclusos, cláusulas, etc.) foram
+                    copiados do padrão. Edite o que precisar e salve como um novo template — o padrão permanece intacto.
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-warning d-flex align-items-start" role="alert">
+            <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
+            <div>
+                <strong>Nenhum template padrão configurado.</strong>
+                <div class="small">
+                    Marque um template existente como <em>Padrão</em> na
+                    <a href="{{ url_for('propostas.listar_templates') }}">lista de templates</a>
+                    para que novos templates sejam criados pré-preenchidos com seus blocos e cláusulas.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
     <form method="POST"
           action="{{ url_for('propostas.atualizar_template', id=template.id) if template else url_for('propostas.criar_template') }}">
         {# Task #174 — sentinela: ver editar.html. Permite remover todas as
            cláusulas via UI sem que o backend "preserve" dados antigos. #}
         <input type="hidden" name="clausulas_payload_present" value="1">
+
         <div class="card mb-3">
             <div class="card-header"><strong>Dados do Template</strong></div>
             <div class="card-body">
@@ -25,25 +73,136 @@
                         <label class="form-label">Nome <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="nome" required maxlength="100"
                                value="{{ template.nome if template else '' }}"
-                               placeholder="Ex: Estrutura Metálica Padrão">
+                               placeholder="{{ (prefill.placeholder_nome if prefill and prefill.placeholder_nome else 'Ex: Estrutura Metálica Padrão') }}">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Categoria</label>
                         <input type="text" class="form-control" name="categoria" maxlength="50"
-                               value="{{ template.categoria if template else '' }}"
+                               value="{{ v('categoria') }}"
                                placeholder="Ex: Estrutura Metálica">
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="ativoCheck" name="ativo"
-                                   {% if (template and template.ativo) or not template %}checked{% endif %}>
+                                   {% if template %}{% if template.ativo %}checked{% endif %}{% else %}checked{% endif %}>
                             <label class="form-check-label" for="ativoCheck">Ativo</label>
                         </div>
                     </div>
                     <div class="col-12">
                         <label class="form-label">Descrição (opcional)</label>
                         <textarea class="form-control" name="descricao" rows="2"
-                                  placeholder="Descrição livre do template">{{ template.descricao if template else '' }}</textarea>
+                                  placeholder="Descrição livre do template">{{ v('descricao') }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Task #47 — Apresentação #}
+        <div class="card mb-3">
+            <div class="card-header"><strong>Apresentação da Proposta</strong>
+                <small class="text-muted ms-2">Texto introdutório que aparece no topo da proposta gerada.</small>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control" name="texto_apresentacao" rows="6"
+                          placeholder="Ex: Apresentamos a seguir nossa proposta comercial...">{{ v('texto_apresentacao') }}</textarea>
+            </div>
+        </div>
+
+        {# Task #47 — Seções da proposta #}
+        <div class="card mb-3">
+            <div class="card-header"><strong>Seções da Proposta</strong>
+                <small class="text-muted ms-2">Blocos longos renderizados em ordem na proposta final.</small>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Objeto</label>
+                        <textarea class="form-control" name="secao_objeto" rows="6"
+                                  placeholder="Descrição do objeto da proposta">{{ v('secao_objeto') }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Condições de entrega</label>
+                        <textarea class="form-control" name="condicoes_entrega" rows="5"
+                                  placeholder="Prazos, logística, responsabilidades de entrega">{{ v('condicoes_entrega') }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Considerações gerais</label>
+                        <textarea class="form-control" name="consideracoes_gerais" rows="5"
+                                  placeholder="Observações que valem para toda a proposta">{{ v('consideracoes_gerais') }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Validade da proposta (texto)</label>
+                        <textarea class="form-control" name="secao_validade" rows="3"
+                                  placeholder="Ex: Esta proposta tem validade de 7 dias corridos a partir da data de emissão.">{{ v('secao_validade') }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Task #47 — Comerciais #}
+        <div class="card mb-3">
+            <div class="card-header"><strong>Condições Comerciais</strong></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Condições de pagamento</label>
+                        <textarea class="form-control" name="condicoes_pagamento" rows="5"
+                                  placeholder="Ex: 50% na assinatura, 50% na entrega...">{{ v('condicoes_pagamento') }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Garantias</label>
+                        <textarea class="form-control" name="garantias" rows="5"
+                                  placeholder="Garantias oferecidas (legal, contratual, prazos)">{{ v('garantias') }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Task #47 — Itens / inclusos / exclusos #}
+        <div class="card mb-3">
+            <div class="card-header"><strong>Itens Inclusos / Exclusos / Outras Condições</strong>
+                <small class="text-muted ms-2">Listas e textos auxiliares aplicados aos itens da proposta.</small>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Itens inclusos (padrão)</label>
+                        <textarea class="form-control" name="itens_inclusos" rows="6"
+                                  placeholder="Liste por item ou parágrafo o que está incluído no escopo padrão">{{ v('itens_inclusos') }}</textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Itens exclusos (padrão)</label>
+                        <textarea class="form-control" name="itens_exclusos" rows="6"
+                                  placeholder="Liste por item ou parágrafo o que NÃO está incluído">{{ v('itens_exclusos') }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Outras condições (texto livre)</label>
+                        <textarea class="form-control" name="condicoes" rows="4"
+                                  placeholder="Texto livre para condições adicionais">{{ v('condicoes') }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Task #47 — Prazos & impostos #}
+        <div class="card mb-3">
+            <div class="card-header"><strong>Prazos e Impostos</strong></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Prazo de entrega (dias)</label>
+                        <input type="number" min="0" step="1" class="form-control" name="prazo_entrega_dias"
+                               value="{{ v('prazo_entrega_dias') }}" placeholder="Ex: 30">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Validade (dias)</label>
+                        <input type="number" min="0" step="1" class="form-control" name="validade_dias"
+                               value="{{ v('validade_dias') }}" placeholder="Ex: 7">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">% de Nota Fiscal</label>
+                        <input type="number" min="0" max="100" step="0.01" class="form-control" name="percentual_nota_fiscal"
+                               value="{{ v('percentual_nota_fiscal') }}" placeholder="Ex: 13.5">
                     </div>
                 </div>
             </div>
@@ -59,6 +218,36 @@
                 <div id="clausulasContainer">
                     {% if template %}
                         {% for clausula in template.clausulas|sort(attribute='ordem') %}
+                        <div class="clausula-item border rounded p-3 mb-2">
+                            <input type="hidden" class="clausula-ordem" name="clausula_ordem" value="{{ clausula.ordem }}">
+                            <div class="row g-2 align-items-start">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1 small text-muted">Título</label>
+                                    <input type="text" class="form-control" name="clausula_titulo"
+                                           value="{{ clausula.titulo or '' }}"
+                                           placeholder="Ex: Condições de Pagamento">
+                                </div>
+                                <div class="col-md-7">
+                                    <label class="form-label mb-1 small text-muted">Texto (vazio = remover)</label>
+                                    <textarea class="form-control" name="clausula_texto" rows="3">{{ clausula.texto or '' }}</textarea>
+                                </div>
+                                <div class="col-md-1 d-flex flex-column gap-1 pt-md-4">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary clausula-up" title="Mover para cima">
+                                        <i class="fas fa-arrow-up"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary clausula-down" title="Mover para baixo">
+                                        <i class="fas fa-arrow-down"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger clausula-remove" title="Remover">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% elif prefill and prefill.clausulas %}
+                        {# Task #47 — cláusulas pré-preenchidas a partir do template padrão #}
+                        {% for clausula in prefill.clausulas %}
                         <div class="clausula-item border rounded p-3 mb-2">
                             <input type="hidden" class="clausula-ordem" name="clausula_ordem" value="{{ clausula.ordem }}">
                             <div class="row g-2 align-items-start">

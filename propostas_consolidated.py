@@ -1637,19 +1637,135 @@ def listar_templates():
         return redirect(url_for('propostas.index'))
 
 
+_TEMPLATE_RICH_TEXT_FIELDS = (
+    # Apresentação
+    'texto_apresentacao',
+    # Seções da proposta
+    'secao_objeto', 'condicoes_entrega', 'consideracoes_gerais', 'secao_validade',
+    # Comerciais
+    'condicoes_pagamento', 'garantias',
+    # Itens
+    'itens_inclusos', 'itens_exclusos', 'condicoes',
+)
+_TEMPLATE_INT_FIELDS = ('prazo_entrega_dias', 'validade_dias')
+_TEMPLATE_DECIMAL_FIELDS = ('percentual_nota_fiscal',)
+
+
+def _to_int_or_none(v):
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _to_decimal_or_none(v):
+    if v is None:
+        return None
+    s = str(v).strip().replace(',', '.')
+    if not s:
+        return None
+    try:
+        from decimal import Decimal
+        return Decimal(s)
+    except Exception:
+        return None
+
+
+def _aplicar_campos_ricos_template_do_form(template):
+    """Task #47 — lê do request.form todos os campos ricos do
+    PropostaTemplate (texto + numéricos) e aplica no objeto.
+
+    Strings vazias viram NULL; números inválidos viram NULL (o modelo
+    tem defaults para os numéricos, mas aqui mantemos NULL para que o
+    SQLAlchemy use o default na inserção e preserve None na edição).
+    """
+    for campo in _TEMPLATE_RICH_TEXT_FIELDS:
+        raw = request.form.get(campo, None)
+        if raw is None:
+            continue
+        valor = raw.strip()
+        setattr(template, campo, valor or None)
+    for campo in _TEMPLATE_INT_FIELDS:
+        if campo in request.form:
+            setattr(template, campo, _to_int_or_none(request.form.get(campo)))
+    for campo in _TEMPLATE_DECIMAL_FIELDS:
+        if campo in request.form:
+            setattr(template, campo, _to_decimal_or_none(request.form.get(campo)))
+
+
+def _construir_prefill_do_padrao(padrao):
+    """Task #47 — monta dict pré-preenchimento (campos de identificação +
+    todos os blocos ricos + cláusulas) a partir do template padrão. Usado
+    pelo formulário "Novo Template" para herdar o layout completo.
+
+    Nome volta vazio (com placeholder na UI). Categoria/descrição/ativo
+    e todos os blocos vêm do padrão. Cláusulas vêm como lista de
+    dicts ``{titulo, texto, ordem}`` (mesma forma que o JS do form
+    espera renderizar).
+    """
+    if not padrao:
+        return None
+    prefill = {
+        'nome': '',
+        'placeholder_nome': f'Cópia de {padrao.nome}',
+        'categoria': padrao.categoria or '',
+        'descricao': padrao.descricao or '',
+        'ativo': True,
+    }
+    for campo in _TEMPLATE_RICH_TEXT_FIELDS:
+        prefill[campo] = getattr(padrao, campo, None) or ''
+    for campo in _TEMPLATE_INT_FIELDS + _TEMPLATE_DECIMAL_FIELDS:
+        v = getattr(padrao, campo, None)
+        prefill[campo] = '' if v is None else str(v)
+    prefill['clausulas'] = [
+        {
+            'titulo': c.titulo or '',
+            'texto': c.texto or '',
+            'ordem': c.ordem or (i + 1),
+        }
+        for i, c in enumerate(sorted(padrao.clausulas or [], key=lambda x: x.ordem or 0))
+    ]
+    return prefill
+
+
 @propostas_bp.route('/templates/novo', methods=['GET'])
 @login_required
 @admin_required
 def novo_template():
-    """Task #174 — formulário de criação de PropostaTemplate."""
-    return render_template('propostas/template_form.html', template=None)
+    """Task #47 — formulário de criação de PropostaTemplate.
+
+    Se o tenant tem um template marcado como padrão, o formulário abre
+    pré-preenchido com TODOS os blocos ricos e cláusulas do padrão.
+    O usuário só edita o que quiser e salva como novo. Se não houver
+    padrão, abre vazio (comportamento legado) e a UI orienta a marcar
+    um padrão na lista.
+    """
+    admin_id = get_admin_id()
+    padrao = (
+        PropostaTemplate.query
+        .filter_by(admin_id=admin_id, padrao=True, ativo=True)
+        .first()
+    )
+    prefill = _construir_prefill_do_padrao(padrao)
+    return render_template(
+        'propostas/template_form.html',
+        template=None,
+        prefill=prefill,
+        padrao_origem=padrao,
+    )
 
 
 @propostas_bp.route('/templates/criar', methods=['POST'])
 @login_required
 @admin_required
 def criar_template():
-    """Task #174 — persiste novo PropostaTemplate + cláusulas configuráveis."""
+    """Task #174/#47 — persiste novo PropostaTemplate + cláusulas
+    configuráveis + todos os blocos ricos do form."""
     try:
         admin_id = get_admin_id()
         nome = (request.form.get('nome') or '').strip()
@@ -1670,6 +1786,8 @@ def criar_template():
             criado_por=current_user.id,
             itens_padrao=[],
         )
+        # Task #47 — aplicar todos os blocos ricos vindos do form
+        _aplicar_campos_ricos_template_do_form(template)
         db.session.add(template)
         db.session.flush()
 
@@ -1698,6 +1816,8 @@ def editar_template(id):
         return render_template(
             'propostas/template_form.html',
             template=template,
+            prefill=None,
+            padrao_origem=None,
         )
     except Exception as e:
         logger.error(f"ERRO EDITAR TEMPLATE: {str(e)}")
@@ -1709,7 +1829,8 @@ def editar_template(id):
 @login_required
 @admin_required
 def atualizar_template(id):
-    """Task #174 — atualiza PropostaTemplate + regrava cláusulas."""
+    """Task #174/#47 — atualiza PropostaTemplate + regrava cláusulas +
+    aplica todos os blocos ricos vindos do form."""
     try:
         admin_id = get_admin_id()
         template = PropostaTemplate.query.filter_by(
@@ -1728,6 +1849,9 @@ def atualizar_template(id):
         template.descricao = descricao or None
         template.ativo = request.form.get('ativo', 'off') in ('on', 'true', '1')
 
+        # Task #47 — aplicar todos os blocos ricos vindos do form
+        _aplicar_campos_ricos_template_do_form(template)
+
         n = _processar_clausulas_template_form(template, admin_id)
 
         db.session.commit()
@@ -1738,6 +1862,44 @@ def atualizar_template(id):
         logger.error(f"ERRO ATUALIZAR TEMPLATE: {str(e)}")
         flash(f'Erro ao atualizar template: {str(e)}', 'error')
         return redirect(url_for('propostas.editar_template', id=id))
+
+
+@propostas_bp.route('/templates/<int:id>/marcar-padrao', methods=['POST'])
+@login_required
+@admin_required
+def marcar_padrao_template(id):
+    """Task #47 — marca o template como "padrão" do tenant.
+
+    Em uma única transação:
+      1) Zera ``padrao=FALSE`` em TODOS os templates do admin (respeita
+         o índice parcial único);
+      2) Marca o template alvo como ``padrao=TRUE``.
+
+    Restrito ao próprio admin (filtro por ``admin_id``). Se o template
+    não pertence ao tenant, 404.
+    """
+    try:
+        admin_id = get_admin_id()
+        template = PropostaTemplate.query.filter_by(
+            id=id, admin_id=admin_id
+        ).first_or_404()
+
+        # Zera todos para evitar conflito com índice parcial único
+        PropostaTemplate.query.filter_by(
+            admin_id=admin_id, padrao=True
+        ).update({'padrao': False}, synchronize_session=False)
+        template.padrao = True
+        db.session.commit()
+        flash(
+            f'Template "{template.nome}" definido como padrão. '
+            'Novos templates herdarão seu layout completo.',
+            'success',
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO MARCAR PADRAO TEMPLATE: {str(e)}")
+        flash(f'Erro ao marcar como padrão: {str(e)}', 'error')
+    return redirect(url_for('propostas.listar_templates'))
 
 
 @propostas_bp.route('/<int:id>/cronograma-revisar', methods=['GET'])
