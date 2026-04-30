@@ -82,6 +82,8 @@ PROPOSTA_NUMERO = "001.26"
 
 CARLOS_CPF = "900.901.001-01"
 PEDRO_CPF = "900.901.002-02"
+JOAO_CPF = "900.901.003-03"
+MARCOS_CPF = "900.901.004-04"
 
 
 def _admin_existente():
@@ -103,6 +105,23 @@ def _reset_dataset():
     aid = admin.id
     log.info(f"resetando dataset do admin Alfa (id={aid})")
 
+    # Etapa 0: limpa órfãos de runs anteriores (admin_id NULL com CPFs/códigos
+    # do dataset demo). Acontece quando uma rodada falhou no meio e a passagem
+    # dinâmica acabou nulificando admin_id em vez de deletar.
+    try:
+        db.session.execute(text("""
+            DELETE FROM rdo_mao_obra
+             WHERE funcionario_id IN (
+                SELECT id FROM funcionario
+                 WHERE admin_id IS NULL AND cpf LIKE '900.901%'
+            )
+        """))
+        db.session.execute(text(
+            "DELETE FROM funcionario WHERE admin_id IS NULL AND cpf LIKE '900.901%'"
+        ))
+    except Exception as _orph:
+        log.debug(f"limpeza de órfãos demo: {_orph}")
+
     # Etapa 1: NULL nas FKs cruzadas que impedem deleção em cadeia
     db.session.execute(text(
         "UPDATE medicao_obra SET conta_receber_id=NULL "
@@ -120,9 +139,62 @@ def _reset_dataset():
     db.session.execute(text(
         "UPDATE obra SET proposta_origem_id=NULL WHERE admin_id=:a"
     ), {"a": aid})
+    # plano_contas é auto-referente via conta_pai_codigo. Quebra o ciclo
+    # antes da deleção para que a passagem dinâmica consiga remover as
+    # linhas do tenant; sem isso, o DELETE FROM plano_contas WHERE
+    # admin_id=:a falha por FK self-reference e bloqueia a remoção
+    # final do próprio usuário (plano_contas_admin_id_fkey).
+    db.session.execute(text(
+        "UPDATE plano_contas SET conta_pai_codigo=NULL WHERE admin_id=:a"
+    ), {"a": aid})
+    # Pré-checagem multi-tenant: se OUTRO tenant tem
+    # partida_contabil/lancamento_contabil referenciando códigos do plano de
+    # contas DESTE admin, o reset NÃO PODE prosseguir — destruir esses
+    # registros violaria isolamento de tenants. Aborta com erro claro e
+    # deixa o operador limpar a inconsistência manualmente.
+    xt_partida = db.session.execute(text(
+        "SELECT COUNT(*) FROM partida_contabil pc "
+        "WHERE pc.conta_codigo IN "
+        "(SELECT codigo FROM plano_contas WHERE admin_id=:a) "
+        "AND pc.admin_id != :a"
+    ), {"a": aid}).scalar() or 0
+    if xt_partida > 0:
+        log.error(
+            f"reset abortado: {xt_partida} partida_contabil de OUTRO(S) "
+            f"tenant(s) referencia(m) o plano de contas do admin id={aid}. "
+            "Esses registros indicam pollution cross-tenant (provavelmente "
+            "de seeds/testes antigos) e devem ser removidos manualmente "
+            "antes de executar --reset. Reset NÃO mexe em outros tenants."
+        )
+        db.session.rollback()
+        raise RuntimeError(
+            f"cross-tenant plano_contas FK refs ({xt_partida}) — "
+            "limpe manualmente antes de re-tentar --reset"
+        )
 
     # Etapa 2: deleção em cascata manual (filhos antes dos pais)
     deletes = [
+        # ---- Pré-limpezas: quebra ciclos e zera FKs nullables que apontam
+        # para tabelas que serão deletadas mais adiante (fornecedor, cliente,
+        # almoxarifado_*). Sem isso o DELETE da tabela-mãe falha por FK.
+        # Ciclo almoxarifado_estoque <-> almoxarifado_movimento.
+        "UPDATE almoxarifado_estoque SET entrada_movimento_id=NULL WHERE admin_id=:a",
+        "UPDATE almoxarifado_movimento SET fornecedor_id=NULL WHERE admin_id=:a",
+        # Dependentes de fornecedor (delete antes de deletar fornecedor).
+        "DELETE FROM nota_fiscal WHERE fornecedor_id IN (SELECT id FROM fornecedor WHERE admin_id=:a)",
+        "DELETE FROM obra_servico_cotacao_interna WHERE fornecedor_id IN (SELECT id FROM fornecedor WHERE admin_id=:a)",
+        "UPDATE conta_pagar SET fornecedor_id=NULL WHERE fornecedor_id IN (SELECT id FROM fornecedor WHERE admin_id=:a)",
+        "UPDATE gestao_custo_pai SET fornecedor_id=NULL WHERE fornecedor_id IN (SELECT id FROM fornecedor WHERE admin_id=:a)",
+        # Dependentes de cliente.
+        "UPDATE lead SET cliente_id=NULL WHERE cliente_id IN (SELECT id FROM cliente WHERE admin_id=:a)",
+        # Centro de custo aponta para obra → precisa morrer antes da obra.
+        "DELETE FROM centro_custo WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM centro_custo WHERE admin_id=:a",
+        # Obras órfãs (admin_id pode ter sido nulificado por uma rodada de
+        # reset anterior, mas continuam apontando para clientes desse tenant).
+        # Capturar tudo que esteja ligado a clientes deste admin antes de
+        # tentar deletar a tabela cliente.
+        "UPDATE obra SET admin_id=:a WHERE admin_id IS NULL AND cliente_id IN (SELECT id FROM cliente WHERE admin_id=:a)",
         # Medição
         "DELETE FROM medicao_obra_item WHERE admin_id=:a",
         "DELETE FROM medicao_obra WHERE admin_id=:a",
@@ -149,7 +221,9 @@ def _reset_dataset():
         # ---- Alimentação ----
         "DELETE FROM alimentacao_lancamento_item WHERE lancamento_id IN "
         "(SELECT id FROM alimentacao_lancamento WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
+        "DELETE FROM alimentacao_funcionarios_assoc WHERE admin_id=:a",
         "DELETE FROM alimentacao_lancamento WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM alimentacao_lancamento WHERE admin_id=:a",
         # ---- Mapa de concorrência (filhos primeiro) ----
         "DELETE FROM mapa_cotacao WHERE mapa_id IN "
         "(SELECT id FROM mapa_concorrencia_v2 WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
@@ -161,10 +235,16 @@ def _reset_dataset():
         "DELETE FROM mapa_concorrencia WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
         # ---- Compras ----
         "DELETE FROM pedido_compra_item WHERE pedido_id IN "
-        "(SELECT id FROM pedido_compra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a))",
-        "DELETE FROM pedido_compra WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "(SELECT id FROM pedido_compra WHERE admin_id=:a)",
+        "DELETE FROM pedido_compra WHERE admin_id=:a",
+        # ---- Almoxarifado (movimentos/estoque/itens/categorias do tenant) ----
+        "DELETE FROM almoxarifado_movimento WHERE admin_id=:a",
+        "DELETE FROM almoxarifado_estoque WHERE admin_id=:a",
+        "DELETE FROM almoxarifado_item WHERE admin_id=:a",
+        "DELETE FROM almoxarifado_categoria WHERE admin_id=:a",
         # ---- Transporte ----
-        "DELETE FROM lancamento_transporte WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
+        "DELETE FROM lancamento_transporte WHERE admin_id=:a",
+        "DELETE FROM categoria_transporte WHERE admin_id=:a",
         # ---- Serviços ----
         "DELETE FROM historico_produtividade_servico WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
         "DELETE FROM servico_obra_real WHERE obra_id IN (SELECT id FROM obra WHERE admin_id=:a)",
@@ -214,6 +294,8 @@ def _reset_dataset():
         "DELETE FROM conta_receber WHERE admin_id=:a",
         "DELETE FROM configuracao_empresa WHERE admin_id=:a",
         "DELETE FROM calendario_empresa WHERE admin_id=:a",
+        "DELETE FROM restaurante WHERE admin_id=:a",
+        "DELETE FROM fornecedor WHERE admin_id=:a",
         # Tabelas com admin_id FK para usuario que podem ter sobrado
         "DELETE FROM alimentacao_item WHERE admin_id=:a",
         "DELETE FROM almoxarifado_estoque WHERE admin_id=:a",
@@ -227,31 +309,54 @@ def _reset_dataset():
         "DELETE FROM receita WHERE admin_id=:a",
         "DELETE FROM fluxo_caixa WHERE admin_id=:a",
         "DELETE FROM weekly_plan WHERE admin_id=:a",
+        # Contabilidade — partida_contabil e conciliacao_bancaria têm FK
+        # para lancamento_contabil.id; precisam ser apagadas antes para que
+        # a passagem dinâmica consiga deletar lancamento_contabil
+        # (que tem admin_id NOT NULL e bloqueia o DELETE final do usuário).
+        "DELETE FROM partida_contabil WHERE admin_id=:a OR lancamento_id IN "
+        "(SELECT id FROM lancamento_contabil WHERE admin_id=:a)",
+        "DELETE FROM conciliacao_bancaria WHERE admin_id=:a OR lancamento_id IN "
+        "(SELECT id FROM lancamento_contabil WHERE admin_id=:a)",
+        "DELETE FROM lancamento_contabil WHERE admin_id=:a",
         "DELETE FROM usuario WHERE admin_id=:a",
         # NÃO incluir "DELETE FROM usuario WHERE id=:a" aqui —
         # essa deleção final do próprio admin fica após o cleanup dinâmico.
     ]
     # Executa cada DELETE dentro de um SAVEPOINT individual.
     # Se uma tabela não existir ou tiver FK inesperado, o SAVEPOINT é
-    # revertido e o loop continua — garantindo que o admin seja deletado.
-    skipped = []
+    # revertido e o statement é re-tentado em passes seguintes — assim
+    # uma falha por dependência ainda não limpa converge depois.
+    pending_sql = list(deletes)
     deleted_total = 0
-    for sql in deletes:
-        try:
-            db.session.execute(text("SAVEPOINT sp_reset_cleanup"))
-            result = db.session.execute(text(sql), {"a": aid})
-            db.session.execute(text("RELEASE SAVEPOINT sp_reset_cleanup"))
-            deleted_total += result.rowcount if result.rowcount and result.rowcount > 0 else 0
-        except Exception as _e:
-            db.session.execute(text("ROLLBACK TO SAVEPOINT sp_reset_cleanup"))
-            skipped.append(f"{sql[:70]} → {type(_e).__name__}: {str(_e)[:60]}")
+    for _pass in range(5):
+        next_pending = []
+        progress = False
+        prev_pending_count = len(pending_sql)
+        for sql in pending_sql:
+            try:
+                db.session.execute(text("SAVEPOINT sp_reset_cleanup"))
+                result = db.session.execute(text(sql), {"a": aid})
+                db.session.execute(text("RELEASE SAVEPOINT sp_reset_cleanup"))
+                rc = result.rowcount if result.rowcount and result.rowcount > 0 else 0
+                deleted_total += rc
+                # Sucesso (independente de rowcount) já é progresso porque
+                # remove a tabela do conjunto pendente para a próxima passagem.
+                progress = True
+            except Exception as _e:
+                db.session.execute(text("ROLLBACK TO SAVEPOINT sp_reset_cleanup"))
+                next_pending.append(sql)
+        pending_sql = next_pending
+        # Convergiu se nada pendente OU se nenhum DELETE saiu da fila.
+        if not pending_sql or len(pending_sql) == prev_pending_count:
+            break
+    skipped_persistent = pending_sql
     log.info(
         f"reset explícito: {deleted_total} registro(s) removido(s), "
-        f"{len(skipped)} statement(s) pulado(s)"
+        f"{len(skipped_persistent)} statement(s) pulado(s)"
     )
-    if skipped:
-        for s in skipped:
-            log.warning(f"reset skip: {s}")
+    if skipped_persistent:
+        for sql in skipped_persistent:
+            log.warning(f"reset skip persistente: {sql[:90]}")
 
     # Passagem dinâmica: para cada par (tabela, coluna) que tem FK apontando
     # para usuario.id onde o valor = aid, tenta DELETE ou NULL.
@@ -277,27 +382,46 @@ def _reset_dataset():
               AND kcu.table_schema = 'public'
             ORDER BY kcu.table_name
         """)).fetchall()
-        dyn_ok, dyn_skip = 0, 0
-        for (tbl, col, nullable) in fk_cols:
-            try:
-                db.session.execute(text("SAVEPOINT sp_dynclean"))
-                if nullable == "YES":
-                    db.session.execute(
-                        text(f"UPDATE {tbl} SET {col}=NULL WHERE {col}=:a"),
-                        {"a": aid},
-                    )
-                else:
-                    db.session.execute(
-                        text(f"DELETE FROM {tbl} WHERE {col}=:a"),
-                        {"a": aid},
-                    )
-                db.session.execute(text("RELEASE SAVEPOINT sp_dynclean"))
-                dyn_ok += 1
-            except Exception as _de:
-                db.session.execute(text("ROLLBACK TO SAVEPOINT sp_dynclean"))
-                dyn_skip += 1
-                log.debug(f"dyn-clean skip {tbl}.{col}: {_de}")
+        # Loop de convergência: a ordem alfabética inicial pode falhar
+        # quando uma tabela ainda tem dependentes não-limpos. Repetimos
+        # até nenhum DELETE adicional acontecer (max 5 passes).
+        pending = list(fk_cols)
+        dyn_ok = 0
+        for _pass in range(5):
+            still_pending = []
+            progress = False
+            for (tbl, col, nullable) in pending:
+                try:
+                    db.session.execute(text("SAVEPOINT sp_dynclean"))
+                    # Para colunas chamadas exatamente "admin_id" sempre
+                    # DELETE — nulificar ali deixa registros órfãos do tenant
+                    # (e quebra o reset idempotente). Para colunas nullable
+                    # diferentes, NULL é seguro (autoria/responsável/etc.).
+                    if nullable == "YES" and col != "admin_id":
+                        db.session.execute(
+                            text(f"UPDATE {tbl} SET {col}=NULL WHERE {col}=:a"),
+                            {"a": aid},
+                        )
+                    else:
+                        db.session.execute(
+                            text(f"DELETE FROM {tbl} WHERE {col}=:a"),
+                            {"a": aid},
+                        )
+                    db.session.execute(text("RELEASE SAVEPOINT sp_dynclean"))
+                    dyn_ok += 1
+                    progress = True
+                except Exception as _de:
+                    db.session.execute(text("ROLLBACK TO SAVEPOINT sp_dynclean"))
+                    still_pending.append((tbl, col, nullable))
+                    log.debug(f"dyn-clean retry {tbl}.{col}: {_de}")
+            pending = still_pending
+            if not progress or not pending:
+                break
+        dyn_skip = len(pending)
         log.info(f"reset dinâmico: {dyn_ok} FK(s) limpas, {dyn_skip} FK(s) puladas")
+        if pending:
+            for (tbl, col, _) in pending:
+                log.warning(f"dyn-clean PERSISTENT skip: {tbl}.{col}")
     except Exception as _ie:
         log.warning(f"passagem dinâmica fk→usuario falhou: {_ie}")
 
@@ -329,6 +453,13 @@ def _seed():
         TarefaCronograma, RDO, RDOMaoObra, RDOServicoSubatividade,
         RDOEquipamento, RDOOcorrencia,
         ContaReceber, Orcamento, OrcamentoItem,
+        # Task #55 — ciclo completo: compras + alimentação + transporte
+        Fornecedor, AlmoxarifadoCategoria, AlmoxarifadoItem, PedidoCompra,
+        PedidoCompraItem,
+        Restaurante, AlimentacaoItem, AlimentacaoLancamento,
+        AlimentacaoLancamentoItem,
+        CategoriaTransporte, LancamentoTransporte,
+        CentroCusto,
     )
     from services.orcamento_view_service import (
         snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -408,7 +539,40 @@ def _seed():
         email="pedro@construtoraalfa.com.br",
         telefone="(11) 90000-0002",
     )
-    db.session.add_all([carlos, pedro]); db.session.flush()
+    # Task #55 — 3 diaristas no total (Pedro + João + Marcos), todos com
+    # VA/VT/PIX. RDO finalizado deve gerar 1 SALARIO + 1 VA + 1 VT por
+    # diarista/dia em GestaoCustoFilho.
+    joao = Funcionario(
+        codigo="ALF003",
+        nome="João Lima",
+        cpf=JOAO_CPF,
+        data_admissao=date(2025, 8, 1),
+        salario=0.0,
+        valor_diaria=180.00,
+        tipo_remuneracao="diaria",
+        jornada_semanal=44,
+        ativo=True, admin_id=aid,
+        valor_va=22.00, valor_vt=12.00,
+        chave_pix=JOAO_CPF,
+        email="joao@construtoraalfa.com.br",
+        telefone="(11) 90000-0003",
+    )
+    marcos = Funcionario(
+        codigo="ALF004",
+        nome="Marcos Alves",
+        cpf=MARCOS_CPF,
+        data_admissao=date(2025, 10, 1),
+        salario=0.0,
+        valor_diaria=180.00,
+        tipo_remuneracao="diaria",
+        jornada_semanal=44,
+        ativo=True, admin_id=aid,
+        valor_va=22.00, valor_vt=12.00,
+        chave_pix=MARCOS_CPF,
+        email="marcos@construtoraalfa.com.br",
+        telefone="(11) 90000-0004",
+    )
+    db.session.add_all([carlos, pedro, joao, marcos]); db.session.flush()
 
     # 5) Insumos básicos com preço base ------------------------------------
     insumos_def = [
@@ -712,18 +876,28 @@ def _seed():
         db.session.add(rdo); db.session.flush()
 
         for folha in folhas:
+            # Mensalista (Carlos) + 3 diaristas (Pedro, João, Marcos).
+            # Cada diarista alocado em RDO finalizado dispara, em
+            # services.rdo_custos.gerar_custos_mao_obra_rdo, 1 GCF
+            # SALARIO (diária) + 1 GCF ALIMENTACAO (VA) + 1 GCF
+            # TRANSPORTE (VT). Mensalista: nada (folha mensal cobre).
             db.session.add(RDOMaoObra(
                 admin_id=aid, rdo_id=rdo.id,
-                funcionario_id=carlos.id, funcao_exercida="Pedreiro",
+                funcionario_id=carlos.id, funcao_exercida="Pedreiro (mensalista)",
                 horas_trabalhadas=horas, horas_extras=0.0,
                 tarefa_cronograma_id=folha.id,
             ))
-            db.session.add(RDOMaoObra(
-                admin_id=aid, rdo_id=rdo.id,
-                funcionario_id=pedro.id, funcao_exercida="Encarregado (diária)",
-                horas_trabalhadas=horas, horas_extras=0.0,
-                tarefa_cronograma_id=folha.id,
-            ))
+            for _diar, _func in (
+                (pedro,  "Encarregado (diária)"),
+                (joao,   "Servente (diária)"),
+                (marcos, "Servente (diária)"),
+            ):
+                db.session.add(RDOMaoObra(
+                    admin_id=aid, rdo_id=rdo.id,
+                    funcionario_id=_diar.id, funcao_exercida=_func,
+                    horas_trabalhadas=horas, horas_extras=0.0,
+                    tarefa_cronograma_id=folha.id,
+                ))
             perc_anterior = _perc_anteriores.get(idx, 0.0)
             db.session.add(RDOServicoSubatividade(
                 rdo_id=rdo.id,
@@ -990,6 +1164,192 @@ def _seed():
         proposta_t118.id, obra_t118.id, len(_qs),
     )
 
+    # 11.7) Task #55 — Compras: 1 Fornecedor + 1 PedidoCompra finalizada
+    # à vista, vinculada à obra (gera GestaoCustoPai MATERIAL PAGO +
+    # entrada/saída no almoxarifado).
+    fornecedor_alf = Fornecedor(
+        admin_id=aid,
+        nome="Materiais São Paulo Ltda",
+        razao_social="Materiais São Paulo Ltda",
+        nome_fantasia="Materiais SP",
+        cnpj="98.765.432/0001-10",
+        endereco="Av. dos Construtores, 1000 — São Paulo / SP",
+        cidade="São Paulo", estado="SP",
+        telefone="(11) 4444-5555",
+        email="vendas@materiaissp.com.br",
+        contato_responsavel="Roberto Lima",
+        tipo_fornecedor="MATERIAL",
+        chave_pix="98765432000110",
+        ativo=True,
+    )
+    db.session.add(fornecedor_alf); db.session.flush()
+
+    cat_almox = AlmoxarifadoCategoria(
+        admin_id=aid, nome="Materiais Básicos",
+        tipo_controle_padrao="CONSUMIVEL",
+        permite_devolucao_padrao=False,
+    )
+    db.session.add(cat_almox); db.session.flush()
+    item_cimento = AlmoxarifadoItem(
+        admin_id=aid, codigo="CIM-CPII-50",
+        nome="Cimento CP II 50kg",
+        categoria_id=cat_almox.id,
+        tipo_controle="CONSUMIVEL",
+        permite_devolucao=False, estoque_minimo=10, unidade="sc",
+    )
+    item_bloco = AlmoxarifadoItem(
+        admin_id=aid, codigo="BLOC-9X19X19",
+        nome="Bloco cerâmico 9x19x19",
+        categoria_id=cat_almox.id,
+        tipo_controle="CONSUMIVEL",
+        permite_devolucao=False, estoque_minimo=200, unidade="un",
+    )
+    db.session.add_all([item_cimento, item_bloco]); db.session.flush()
+
+    pedido = PedidoCompra(
+        admin_id=aid,
+        numero="NF-2026-0001",
+        fornecedor_id=fornecedor_alf.id,
+        data_compra=date(2026, 2, 6),
+        obra_id=obra.id,
+        condicao_pagamento="a_vista",
+        parcelas=1,
+        valor_total=Decimal("1500.00"),
+        observacoes="Compra inicial de cimento e blocos para o Bloco A.",
+        tipo_compra="normal",
+    )
+    db.session.add(pedido); db.session.flush()
+    db.session.add_all([
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido.id,
+            almoxarifado_item_id=item_cimento.id,
+            descricao="Cimento CP II 50kg",
+            quantidade=Decimal("20"),
+            preco_unitario=Decimal("38.50"),
+            subtotal=Decimal("770.00"),
+        ),
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido.id,
+            almoxarifado_item_id=item_bloco.id,
+            descricao="Bloco cerâmico 9x19x19",
+            quantidade=Decimal("608"),
+            preco_unitario=Decimal("1.20"),
+            subtotal=Decimal("729.60"),
+        ),
+    ])
+    db.session.flush()
+
+    # Processa via fluxo oficial — gera GCP MATERIAL PAGO + entrada/saída.
+    # processar_compra_normal espera tuplas (desc, qtd, preco, almox_id,
+    # subtotal), padrão da view compras.criar_compra.
+    from compras_views import processar_compra_normal
+    itens_validos = [
+        (it.descricao, it.quantidade, it.preco_unitario,
+         it.almoxarifado_item_id, it.subtotal)
+        for it in pedido.itens
+    ]
+    processar_compra_normal(pedido, itens_validos, aid, aid)
+    log.info(
+        f"Task #55: pedido de compra {pedido.numero} (R$ "
+        f"{float(pedido.valor_total):.2f}) finalizado → GCP MATERIAL PAGO + "
+        f"entrada/saída no almoxarifado"
+    )
+
+    # 11.8) Task #55 — Alimentação V2: Restaurante + Item + Lançamento
+    # vinculado à obra (com 3 diaristas como participantes).
+    restaurante = Restaurante(
+        admin_id=aid,
+        nome="Restaurante Bom Prato",
+        endereco="Rua das Acácias, 200 — São Paulo / SP",
+        telefone="(11) 3333-2222",
+        razao_social="Bom Prato Refeições Ltda",
+        cnpj="11.222.333/0001-44",
+        pix="bompato@pix.com.br",
+        nome_conta="Bom Prato Refeições Ltda",
+    )
+    db.session.add(restaurante); db.session.flush()
+
+    item_marmita = AlimentacaoItem(
+        admin_id=aid,
+        nome="Marmita executiva",
+        preco_padrao=Decimal("18.00"),
+        descricao="Marmita executiva — opção do dia",
+        icone="fas fa-utensils", ordem=1,
+        ativo=True, is_default=True,
+    )
+    db.session.add(item_marmita); db.session.flush()
+
+    cc_obra = CentroCusto(
+        admin_id=aid,
+        codigo=f"CC-{obra.codigo}",
+        nome=f"Centro de custo — {obra.nome}",
+        descricao="Centro de custo automático da obra (Task #55).",
+        tipo="obra", ativo=True, obra_id=obra.id,
+    )
+    db.session.add(cc_obra); db.session.flush()
+
+    # 1 lançamento de alimentação na 1ª semana (3 diaristas almoçaram).
+    almoco = AlimentacaoLancamento(
+        admin_id=aid,
+        data=date(2026, 2, 5),
+        valor_total=Decimal("54.00"),  # 3 marmitas × R$ 18,00
+        descricao="Almoço de campo — 3 diaristas (Pedro, João, Marcos).",
+        restaurante_id=restaurante.id,
+        obra_id=obra.id,
+    )
+    db.session.add(almoco); db.session.flush()
+    # Inserção direta na tabela de associação porque ela carrega admin_id
+    # NOT NULL (multi-tenant), e o backref `.funcionarios = [...]` do
+    # SQLAlchemy não preenche essa coluna automaticamente.
+    from models import alimentacao_funcionarios_assoc as _aa
+    db.session.execute(_aa.insert(), [
+        {"lancamento_id": almoco.id, "funcionario_id": diar.id, "admin_id": aid}
+        for diar in (pedro, joao, marcos)
+    ])
+    for diar in (pedro, joao, marcos):
+        db.session.add(AlimentacaoLancamentoItem(
+            admin_id=aid,
+            lancamento_id=almoco.id,
+            item_id=item_marmita.id,
+            nome_item="Marmita executiva",
+            preco_unitario=Decimal("18.00"),
+            quantidade=1,
+            subtotal=Decimal("18.00"),
+            funcionario_id=diar.id,
+            centro_custo_id=cc_obra.id,
+        ))
+    db.session.flush()
+    log.info(
+        f"Task #55: AlimentacaoLancamento #{almoco.id} "
+        f"(R$ {float(almoco.valor_total):.2f}) — 3 diaristas no restaurante "
+        f"{restaurante.nome}"
+    )
+
+    # 11.9) Task #55 — Transporte V2: Categoria + Lançamento vinculado à
+    # obra (combustível abastecido por encarregado).
+    cat_transp = CategoriaTransporte(
+        admin_id=aid, nome="Combustível", icone="fas fa-gas-pump",
+    )
+    db.session.add(cat_transp); db.session.flush()
+
+    transp = LancamentoTransporte(
+        admin_id=aid,
+        categoria_id=cat_transp.id,
+        funcionario_id=pedro.id,
+        centro_custo_id=cc_obra.id,
+        obra_id=obra.id,
+        data_lancamento=date(2026, 2, 6),
+        valor=Decimal("180.00"),
+        descricao="Combustível para caminhonete da obra (semana 1).",
+    )
+    db.session.add(transp); db.session.flush()
+    log.info(
+        f"Task #55: LancamentoTransporte #{transp.id} "
+        f"(R$ {float(transp.valor):.2f}) — combustível para a obra"
+    )
+
+    db.session.commit()
+
     # 12) Medição quinzenal #001 + APROVAÇÃO → ContaReceber OBR-MED -------
     medicao, err = gerar_medicao_quinzenal(
         obra_id=obra.id, admin_id=aid,
@@ -1016,6 +1376,8 @@ def _seed():
         "cliente_id": cliente.id,
         "carlos_id": carlos.id,
         "pedro_id": pedro.id,
+        "joao_id": joao.id,
+        "marcos_id": marcos.id,
         "servico_alvenaria_id": serv_alv.id,
         "servico_contrapiso_id": serv_pis.id,
         "servico_mobilizacao_id": serv_mob.id,
@@ -1027,6 +1389,14 @@ def _seed():
         "obra_codigo": obra.codigo,
         "n_tarefas": n_tarefas,
         "n_rdos": len(rdos_dados),
+        "fornecedor_id": fornecedor_alf.id,
+        "pedido_compra_id": pedido.id,
+        "pedido_compra_numero": pedido.numero,
+        "pedido_compra_valor": float(pedido.valor_total),
+        "alimentacao_lancamento_id": almoco.id,
+        "alimentacao_valor": float(almoco.valor_total),
+        "transporte_lancamento_id": transp.id,
+        "transporte_valor": float(transp.valor),
         "medicao_id": medicao_aprovada.id,
         "medicao_numero": medicao_aprovada.numero,
         "conta_receber_id": cr.id if cr else None,
@@ -1058,6 +1428,8 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
     log.info(f"    cliente_id         = {info['cliente_id']}  ({CLIENTE_NOME})")
     log.info(f"    carlos_id          = {info['carlos_id']}  (mensalista R$ 2.800)")
     log.info(f"    pedro_id           = {info['pedro_id']}  (diarista R$ 180/dia)")
+    log.info(f"    joao_id            = {info['joao_id']}  (diarista R$ 180/dia)")
+    log.info(f"    marcos_id          = {info['marcos_id']}  (diarista R$ 180/dia)")
     log.info(f"    servico_alvenaria  = {info['servico_alvenaria_id']}  "
              f"(template {info['template_alvenaria_id']})")
     log.info(f"    servico_contrapiso = {info['servico_contrapiso_id']}  "
@@ -1072,6 +1444,14 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
     log.info(f"    cronograma         = {info['n_tarefas']} tarefas "
              f"materializadas (3 níveis)")
     log.info(f"    rdos finalizados   = {info['n_rdos']}")
+    log.info(f"    fornecedor_id      = {info['fornecedor_id']}")
+    log.info(f"    pedido_compra_id   = {info['pedido_compra_id']}  "
+             f"({info['pedido_compra_numero']} — R$ "
+             f"{info['pedido_compra_valor']:.2f}, à vista, MATERIAL PAGO)")
+    log.info(f"    alimentacao_id     = {info['alimentacao_lancamento_id']}  "
+             f"(R$ {info['alimentacao_valor']:.2f} — 3 diaristas)")
+    log.info(f"    transporte_id      = {info['transporte_lancamento_id']}  "
+             f"(R$ {info['transporte_valor']:.2f} — combustível)")
     log.info(f"    medicao_id         = {info['medicao_id']}  "
              f"(#{info['medicao_numero']:03d} APROVADA)")
     log.info(f"    conta_receber_id   = {info['conta_receber_id']}  "
@@ -1238,6 +1618,10 @@ def main(argv=None):
                 f"plantando dataset Alfa (ambiente={args.ambiente})…"
             )
             info = _seed()
+            # Após plantar (caminho fresh ou --reset), gera GestaoCustoFilho
+            # SALARIO/VA/VT para os RDOs finalizados da demo. O seed cria os
+            # RDOMaoObra mas não dispara gerar_custos_mao_obra_rdo.
+            _backfill_custos_rdo_demo(info["admin_id"])
             _imprimir_demo_pronta(info, args.ambiente)
             return 0
 

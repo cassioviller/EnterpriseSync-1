@@ -11,6 +11,22 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app import app, db  # noqa: E402
 
 
+def _garantir_cliente_id(admin_id):
+    """Task #178: obra.cliente_id é NOT NULL. Garante um Cliente para o
+    admin (criando um se inexistente) e devolve seu id."""
+    from models import Cliente
+    cliente = Cliente.query.filter_by(admin_id=admin_id).first()
+    if cliente is None:
+        cliente = Cliente(
+            nome=f'Cliente fixture {uuid.uuid4().hex[:6]}',
+            email=f'cli-{uuid.uuid4().hex[:8]}@test.local',
+            admin_id=admin_id,
+        )
+        db.session.add(cliente)
+        db.session.commit()
+    return cliente.id
+
+
 class ResumoCustosObraBaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -30,6 +46,7 @@ class ResumoCustosObraBaseTest(unittest.TestCase):
         obra = Obra(
             nome=nome,
             admin_id=admin.id,
+            cliente_id=_garantir_cliente_id(admin.id),
             data_inicio=date.today(),
             valor_contrato=Decimal('100000.00'),
             orcamento=Decimal('100000.00'),
@@ -306,6 +323,7 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         obra = Obra(
             nome='Obra #14 Fallback',
             admin_id=admin.id,
+            cliente_id=_garantir_cliente_id(admin.id),
             data_inicio=date.today(),
             valor_contrato=Decimal('0'),
             orcamento=Decimal('0'),
@@ -360,6 +378,7 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         obra = Obra(
             nome='Obra #15 Isolamento',
             admin_id=tenant_a.id,
+            cliente_id=_garantir_cliente_id(tenant_a.id),
             data_inicio=date.today(),
             valor_contrato=Decimal('100000'),
             orcamento=Decimal('100000'),
@@ -424,6 +443,7 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         obra = Obra(
             nome='Obra #16 Override',
             admin_id=admin.id,
+            cliente_id=_garantir_cliente_id(admin.id),
             data_inicio=date.today(),
             valor_contrato=Decimal('100000'),
             orcamento=Decimal('100000'),
@@ -484,6 +504,7 @@ class TestRecalcularObraVinculoDireto(ResumoCustosObraBaseTest):
             self.skipTest('Nenhum Usuario admin no banco')
         obra = Obra(
             nome=nome, admin_id=admin.id,
+            cliente_id=_garantir_cliente_id(admin.id),
             data_inicio=date.today(),
             valor_contrato=Decimal('100000'),
             orcamento=Decimal('100000'),

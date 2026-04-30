@@ -25,6 +25,7 @@ from models import (
     RDO, RDOMaoObra, RDOServicoSubatividade,
     ServicoObraReal, ObraServicoCusto,
     GestaoCustoPai, GestaoCustoFilho,
+    Cliente,
 )
 from werkzeug.security import generate_password_hash
 from flask_login import login_user
@@ -90,11 +91,21 @@ class AutoLinkRunner:
         )
         db.session.add_all([self.func, self.func2])
 
+        cliente = Cliente(
+            nome=f'Cliente Auto Link {s}',
+            email=f'cli_auto_link_{s}@test.local',
+            admin_id=admin.id,
+        )
+        db.session.add(cliente)
+        db.session.flush()
+        self.cliente = cliente
+
         self.obra = Obra(
             nome=f'Obra Auto Link {s}',
             codigo=f'OAL{admin.id}',
             data_inicio=date.today(),
             admin_id=admin.id,
+            cliente_id=cliente.id,
             ativo=True,
         )
         db.session.add(self.obra)
@@ -158,6 +169,7 @@ class AutoLinkRunner:
             Servico.query.filter_by(admin_id=admin_id).delete(synchronize_session=False)
             Funcionario.query.filter_by(admin_id=admin_id).delete(synchronize_session=False)
             Obra.query.filter_by(admin_id=admin_id).delete(synchronize_session=False)
+            Cliente.query.filter_by(admin_id=admin_id).delete(synchronize_session=False)
             Usuario.query.filter_by(id=admin_id).delete(synchronize_session=False)
             db.session.commit()
         except Exception as e:

@@ -32,9 +32,21 @@ from models import (  # noqa: E402
     Proposta,
     PropostaItem,
     Servico,
+    Usuario,
 )
 
-ADMIN_ID = 63
+
+def _resolver_admin_id():
+    """Localiza o admin de testes (Alfa) ou cai para o primeiro admin
+    com Servico ativo. Evita hard-code que quebra após reseed."""
+    u = Usuario.query.filter_by(username='admin_alfa').first()
+    if u:
+        return u.id
+    s = Servico.query.filter_by(ativo=True).first()
+    if s and s.admin_id:
+        return s.admin_id
+    u = Usuario.query.first()
+    return u.id if u else None
 
 
 def _unique_numero():
@@ -43,13 +55,15 @@ def _unique_numero():
 
 def test_servico_id_persiste_em_proposta_item():
     with app.app_context():
-        svc = Servico.query.filter_by(admin_id=ADMIN_ID, ativo=True).first()
-        cli = Cliente.query.first()
+        admin_id = _resolver_admin_id()
+        assert admin_id is not None, "seed: nenhum Usuario admin no banco"
+        svc = Servico.query.filter_by(admin_id=admin_id, ativo=True).first()
+        cli = Cliente.query.filter_by(admin_id=admin_id).first() or Cliente.query.first()
         assert svc is not None, "seed: nenhum Servico ativo no admin de teste"
         assert cli is not None, "seed: nenhum Cliente"
 
         p = Proposta(
-            admin_id=ADMIN_ID,
+            admin_id=admin_id,
             cliente_id=cli.id,
             cliente_nome=cli.nome,
             numero=_unique_numero(),
@@ -59,7 +73,7 @@ def test_servico_id_persiste_em_proposta_item():
         db.session.add(p)
         db.session.flush()
         pi = PropostaItem(
-            admin_id=ADMIN_ID,
+            admin_id=admin_id,
             proposta_id=p.id,
             item_numero=1,
             ordem=1,
@@ -84,14 +98,16 @@ def test_servico_id_persiste_em_proposta_item():
 
 def test_servico_id_persiste_em_item_medicao_e_propaga_para_osc():
     with app.app_context():
-        svc = Servico.query.filter_by(admin_id=ADMIN_ID, ativo=True).first()
-        obra = Obra.query.filter_by(admin_id=ADMIN_ID).first()
+        admin_id = _resolver_admin_id()
+        assert admin_id is not None, "seed: nenhum Usuario admin no banco"
+        svc = Servico.query.filter_by(admin_id=admin_id, ativo=True).first()
+        obra = Obra.query.filter_by(admin_id=admin_id).first()
         assert svc is not None, "seed: Servico ativo necessário"
         assert obra is not None, "seed: Obra necessária"
 
         imc = ItemMedicaoComercial(
             obra_id=obra.id,
-            admin_id=ADMIN_ID,
+            admin_id=admin_id,
             nome="IMC linkado ao catálogo",
             quantidade=1,
             valor_comercial=2000,
