@@ -43,10 +43,25 @@ logger = logging.getLogger(__name__)
 WEBHOOK_SOURCE = "obra"
 
 # Allowlist de eventos que PODEM sair para o n8n.
-# Começa vazia de propósito (nada vaza por engano). As tarefas seguintes
-# (notificação de proposta enviada, catálogo de eventos do sistema) adicionam
-# nomes aqui. Convenção de nomenclatura: "dominio.acao" (ex.: "proposta.enviada").
-WEBHOOK_EVENT_ALLOWLIST: set[str] = set()
+# Convenção de nomenclatura: "dominio.acao" (ex.: "proposta.enviada").
+#
+# Task #45 — catálogo inicial de eventos do sistema. Cada nome aqui é
+# emitido EM PARALELO ao evento legado correspondente (proposta_aprovada,
+# rdo_finalizado etc.) — os legados continuam orquestrando handlers
+# internos de negócio; estes nomes em formato `dominio.acao` saem pelo
+# canal externo do n8n. Veja `docs/notificacoes/README.md` para a
+# tabela completa (campos do payload, ponto de emissão, exemplo n8n).
+WEBHOOK_EVENT_ALLOWLIST: set[str] = {
+    # — Propostas comerciais —
+    "proposta.aprovada",
+    "proposta.rejeitada",
+    "proposta.expirando",
+    # — Obras —
+    "obra.rdo_publicado",
+    "obra.medicao_publicada",
+    "obra.cronograma_atualizado",
+    "obra.concluida",
+}
 
 # Backoff em segundos por número da tentativa que acabou de falhar.
 # Tabela completa do ciclo de vida com `MAX_TENTATIVAS = 4`:

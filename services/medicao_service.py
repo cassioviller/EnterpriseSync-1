@@ -193,6 +193,14 @@ def fechar_medicao(medicao_id, admin_id):
         medicao.conta_receber_id = cr.get('conta_receber_id')
         db.session.commit()
 
+    # Task #45 — catálogo `dominio.acao`: obra.medicao_publicada.
+    # Best-effort: nunca propaga exceção (webhook é canal externo).
+    try:
+        from utils.catalogo_eventos import emit_obra_medicao_publicada
+        emit_obra_medicao_publicada(medicao, admin_id)
+    except Exception as _e_cat:
+        logger.warning(f"#45: emit obra.medicao_publicada falhou (best-effort): {_e_cat}")
+
     return medicao, None
 
 

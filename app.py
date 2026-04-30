@@ -799,6 +799,10 @@ try:
     from init_planejamento_custos_cli import init_planejamento_custos
     app.cli.add_command(init_planejamento_custos)
     logging.info("[OK] Comando CLI init-planejamento-custos registrado")
+    # Task #45 — job diário de notificação `proposta.expirando` para n8n.
+    from notificacoes_cli import emitir_propostas_expirando_cmd
+    app.cli.add_command(emitir_propostas_expirando_cmd)
+    logging.info("[OK] Comando CLI emitir-propostas-expirando registrado")
 except ImportError as e:
     logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
 

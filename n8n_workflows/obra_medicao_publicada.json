@@ -1,0 +1,77 @@
+{
+  "name": "SIGE — Obra Medição Publicada (E-mail para o cliente)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sige-obra-medicao-publicada",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": { "rawBody": true }
+      },
+      "id": "webhook-in",
+      "name": "Webhook (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "sige-obra-medicao-publicada"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Validação HMAC-SHA256 (X-Signature) — segredo em $env.N8N_WEBHOOK_SECRET.\nconst crypto = require('crypto');\nconst secret = $env.N8N_WEBHOOK_SECRET || '';\nconst given  = ($input.first().json.headers || {})['x-signature'] || '';\nlet body = $input.first().json.body ? JSON.stringify($input.first().json.body) : '';\ntry {\n  if ($input.first().binary && $input.first().binary.data) {\n    body = Buffer.from($input.first().binary.data, 'base64').toString('utf8');\n  }\n} catch (e) {}\nif (!secret) return [{ json: { ...$input.first().json, _signature_skipped: 'no_secret' } }];\nconst expected = crypto.createHmac('sha256', secret).update(body, 'utf8').digest('hex');\nconst ok = expected.length === given.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(given));\nif (!ok) throw new Error('Assinatura HMAC inválida (X-Signature não confere)');\nreturn [{ json: { ...$input.first().json, _signature_ok: true } }];"
+      },
+      "id": "validate-hmac",
+      "name": "Validar Assinatura HMAC",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normaliza payload do evento `obra.medicao_publicada`.\nconst body = $input.first().json.body || $input.first().json;\nconst d = (body && body.data) || {};\nreturn [{\n  json: {\n    obra_id:           d.obra_id           || null,\n    obra_nome:         d.obra_nome         || 'Obra',\n    cliente_nome:      d.cliente_nome      || 'Cliente',\n    cliente_email:     d.cliente_email     || '',\n    medicao_id:                d.medicao_id                || null,\n    numero_medicao:            d.numero_medicao            || '',\n    valor_medido_periodo:      d.valor_medido_periodo      || 0,\n    valor_a_faturar_periodo:   d.valor_a_faturar_periodo   || 0,\n    percentual_executado:      d.percentual_executado      || 0,\n    data_aprovacao:            d.data_aprovacao            || '',\n    portal_obra_url:   d.portal_obra_url   || '',\n    admin_id:          body.admin_id       || null\n  }\n}];"
+      },
+      "id": "extract",
+      "name": "Extrair Dados",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "string": [ { "value1": "={{ $json[\"cliente_email\"] }}", "operation": "isNotEmpty" } ] }
+      },
+      "id": "if-has-email",
+      "name": "Tem e-mail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SIGE_FROM_EMAIL }}",
+        "toEmail":   "={{ $json[\"cliente_email\"] }}",
+        "subject":   "Medição {{ $json[\"numero_medicao\"] }} disponível — {{ $json[\"obra_nome\"] }}",
+        "text": "Olá {{ $json[\"cliente_nome\"] }},\n\nA medição quinzenal *{{ $json[\"numero_medicao\"] }}* da obra *{{ $json[\"obra_nome\"] }}* foi fechada e está disponível para visualização.\n\n• Valor medido no período: R$ {{ $json[\"valor_medido_periodo\"] }}\n• Valor a faturar: R$ {{ $json[\"valor_a_faturar_periodo\"] }}\n• % executado da obra: {{ $json[\"percentual_executado\"] }}%\n\nAcesse o portal para conferir os itens medidos:\n{{ $json[\"portal_obra_url\"] }}\n\n— Equipe SIGE"
+      },
+      "id": "send-email",
+      "name": "Enviar E-mail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1140, 300],
+      "credentials": { "smtp": { "id": "REPLACE_WITH_YOUR_SMTP_CREDENTIAL_ID", "name": "SMTP do SIGE" } }
+    }
+  ],
+  "connections": {
+    "Webhook (POST)":          { "main": [[ { "node": "Validar Assinatura HMAC", "type": "main", "index": 0 } ]] },
+    "Validar Assinatura HMAC": { "main": [[ { "node": "Extrair Dados", "type": "main", "index": 0 } ]] },
+    "Extrair Dados":           { "main": [[ { "node": "Tem e-mail?", "type": "main", "index": 0 } ]] },
+    "Tem e-mail?":             { "main": [[ { "node": "Enviar E-mail", "type": "main", "index": 0 } ], []] }
+  },
+  "active": false,
+  "settings": {},
+  "tags": [ { "name": "sige" }, { "name": "obras" }, { "name": "medicao" } ],
+  "_meta": {
+    "description": "Workflow exemplo para o evento `obra.medicao_publicada` do SIGE (disparado ao fechar a medição quinzenal).",
+    "env_obrigatorias": [ "N8N_WEBHOOK_SECRET", "SIGE_FROM_EMAIL" ]
+  }
+}

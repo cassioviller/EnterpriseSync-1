@@ -1316,7 +1316,15 @@ def finalizar_rdo(id):
             logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
         except Exception as e:
             logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
-        
+
+        # Task #45 — catálogo `dominio.acao`: emite obra.rdo_publicado
+        # em paralelo ao legado (canal externo n8n).
+        try:
+            from utils.catalogo_eventos import emit_obra_rdo_publicado
+            emit_obra_rdo_publicado(rdo, admin_id)
+        except Exception as _e_cat:
+            logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
+
         flash(f'RDO {rdo.numero_rdo} finalizado com sucesso!', 'success')
         return redirect(url_for('main.visualizar_rdo', id=id))
         
@@ -1466,7 +1474,15 @@ def duplicar_rdo(id):
             db.session.add(nova_mao)
         
         db.session.commit()
-        
+
+        # Task #45 — catálogo `dominio.acao`: novo RDO já nasce
+        # Finalizado, então também é uma "publicação" que vale notificar.
+        try:
+            from utils.catalogo_eventos import emit_obra_rdo_publicado
+            emit_obra_rdo_publicado(novo_rdo, admin_id)
+        except Exception as _e_cat:
+            logger.warning(f"#45: emit obra.rdo_publicado (duplicar) falhou: {_e_cat}")
+
         flash(f'RDO duplicado com sucesso! Novo RDO: {novo_rdo.numero_rdo}', 'success')
         return redirect(url_for('main.editar_rdo', id=novo_rdo.id))
         
@@ -1533,7 +1549,14 @@ def atualizar_rdo(id):
                 logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
             except Exception as e:
                 logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
-        
+
+            # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
+            try:
+                from utils.catalogo_eventos import emit_obra_rdo_publicado
+                emit_obra_rdo_publicado(rdo, admin_id)
+            except Exception as _e_cat:
+                logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
+
         if finalizar:
             flash(f'RDO {rdo.numero_rdo} atualizado e finalizado com sucesso!', 'success')
         else:
@@ -4504,6 +4527,13 @@ def salvar_rdo_flexivel():
                 logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id} (salvar_rdo_flexivel)")
             except Exception as ev_err:
                 logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {ev_err}")
+
+            # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
+            try:
+                from utils.catalogo_eventos import emit_obra_rdo_publicado
+                emit_obra_rdo_publicado(rdo, admin_id)
+            except Exception as _e_cat:
+                logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
 
             flash(f'RDO {numero_rdo} salvo com sucesso!', 'success')
             logger.info(f"[OK] RDO {numero_rdo} salvo com {len(subactivities)} subatividades")

@@ -223,3 +223,175 @@ acompanha:
 * **Sem confirmação de entrega** — o SIGE não escuta callbacks do n8n
   de "lido"/"recebido" nesta versão. Se for necessário, vira uma
   evolução futura.
+
+---
+
+## 10. Catálogo inicial de eventos (Task #45)
+
+A allowlist em `utils/webhook_dispatcher.py` já está populada com **7
+eventos prontos para n8n**, todos no formato `dominio.acao`. Os
+emissores reais ficam em `utils/catalogo_eventos.py` (helpers
+`emit_*`) — o resto do código apenas chama esses helpers nos pontos
+de negócio. Cada chamada é **best-effort** (try/except no helper) e
+roda **paralela** ao evento legado equivalente, para não quebrar
+nenhum handler interno.
+
+| Evento                        | Quando dispara                                                                 | Ponto de emissão                                            | Workflow exemplo                                  |
+| ----------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------- |
+| `proposta.aprovada`           | Aprovação pelo admin **ou** pelo cliente no portal (após commit + criar obra)  | `propostas_consolidated.py` (rota admin + rota portal)      | `n8n_workflows/proposta_aprovada.json`            |
+| `proposta.rejeitada`          | Rejeição pelo admin **ou** pelo cliente no portal (após commit, com motivo)    | `propostas_consolidated.py` (rota admin + rota portal)      | `n8n_workflows/proposta_rejeitada.json`           |
+| `proposta.expirando`          | Job diário (`flask emitir-propostas-expirando`) — 3 dias antes do vencimento   | `notificacoes_cli.py`                                       | `n8n_workflows/proposta_expirando.json`           |
+| `obra.rdo_publicado`          | RDO criado/finalizado (4 rotas: criar normal, criar via wizard, editar, duplicar) | `views/rdo.py` (`rdo_finalizado` + paralelo)                | `n8n_workflows/obra_rdo_publicado.json`           |
+| `obra.medicao_publicada`      | Fechamento da medição quinzenal (após commit)                                  | `services/medicao_service.py::fechar_medicao`               | `n8n_workflows/obra_medicao_publicada.json`       |
+| `obra.cronograma_atualizado`  | Cronograma inicial revisado/aceito (gate de revisão)                           | `views/obras.py::cronograma_revisar_inicial_post`           | `n8n_workflows/obra_cronograma_atualizado.json`   |
+| `obra.concluida`              | Obra muda para status "Concluída" pela primeira vez (transição, não re-edit)   | `views/obras.py::editar_obra` (compara `status_anterior`)   | `n8n_workflows/obra_concluida.json`               |
+
+### 10.1. Campos de payload por evento
+
+Todos os payloads vêm dentro do campo `data` do envelope padrão
+(seção 3). Aqui o **conteúdo de `data`** para cada evento:
+
+> Os campos abaixo descrevem o conteúdo de `data` para cada evento.
+> Bloco `proposta.*` compartilha o sub-bloco `_payload_proposta`
+> (`proposta_id`, `proposta_numero`, `proposta_versao`,
+> `cliente_nome`, `cliente_email`, `cliente_telefone`,
+> `valor_total` (number), `portal_url`). Bloco `obra.*` compartilha
+> `_payload_obra_basico` (`obra_id`, `obra_nome`, `obra_codigo`,
+> `cliente_nome`, `cliente_email`, `cliente_telefone`,
+> `portal_obra_url`). Os campos abaixo são os **adicionais** de cada
+> evento, definidos em `utils/catalogo_eventos.py`.
+
+#### `proposta.aprovada`
+```jsonc
+{
+  // ...campos comuns de proposta...
+  "data_aprovacao": "2026-04-30",     // YYYY-MM-DD (date.today())
+  "aprovada_por":   "admin",          // "admin" | "cliente"
+  "obra_id":        45                // null se aprovada sem criar obra
+}
+```
+
+#### `proposta.rejeitada`
+```jsonc
+{
+  // ...campos comuns de proposta...
+  "data_rejeicao":  "2026-04-30",     // YYYY-MM-DD
+  "rejeitada_por":  "cliente",        // "admin" | "cliente"
+  "motivo":         "Prazo muito longo"  // string truncada a 500 chars
+}
+```
+
+#### `proposta.expirando`
+```jsonc
+{
+  // ...campos comuns de proposta...
+  "data_validade":  "2026-05-03",     // YYYY-MM-DD (data_envio.date() + validade_dias)
+  "dias_restantes": 3,
+  "validade_dias":  30
+}
+```
+
+#### `obra.rdo_publicado`
+```jsonc
+{
+  // ...campos comuns de obra...
+  "rdo_id":         9876,
+  "numero_rdo":     "RDO-2026-04-30-001",
+  "data_relatorio": "2026-04-30",
+  "status":         "Finalizado"
+}
+```
+
+#### `obra.medicao_publicada`
+```jsonc
+{
+  // ...campos comuns de obra...
+  "medicao_id":              12,
+  "numero_medicao":          "MED-2026-08",
+  "valor_medido_periodo":    85000.00,   // number (float)
+  "valor_a_faturar_periodo": 85000.00,
+  "percentual_executado":    42.5,
+  "data_aprovacao":          "2026-04-30"
+}
+```
+
+#### `obra.cronograma_atualizado`
+```jsonc
+{
+  // ...campos comuns de obra...
+  "tarefas_geradas":   18,
+  "data_atualizacao":  "2026-04-30T13:42:11Z",
+  "motivo":            "revisao_inicial"     // ou "replanejamento"
+}
+```
+
+#### `obra.concluida`
+```jsonc
+{
+  // ...campos comuns de obra...
+  "data_conclusao":     "2026-04-30",   // YYYY-MM-DD
+  "data_inicio":        "2025-11-15",
+  "data_previsao_fim":  "2026-05-30",
+  "valor_contrato":     1850000.00      // number (float)
+}
+```
+
+### 10.2. Job diário `proposta.expirando`
+
+O evento `proposta.expirando` **não tem trigger** dentro do fluxo de
+propostas (é varredura, não reação). Para emiti-lo todo dia rode o
+comando CLI:
+
+```bash
+flask emitir-propostas-expirando            # janela padrão = 3 dias
+flask emitir-propostas-expirando --janela=5 # propostas que expiram nos próximos 5 dias
+flask emitir-propostas-expirando --dry-run  # só lista, não emite (útil em staging)
+```
+
+Ele varre todas as propostas com:
+
+* `status` ∈ {`enviada`, `visualizada`, `em_negociacao`}
+* data de expiração ≤ hoje + `janela` (calculada como
+  `data_envio.date() + validade_dias` — não há coluna dedicada).
+
+**Idempotência por dia** — antes de emitir, o job consulta
+`webhook_entrega` (filtros: `event = 'proposta.expirando'` +
+`func.date(created_at) = hoje` + `payload['data']['proposta_id']
+= proposta.id`). Se já existir entrega de hoje para a mesma
+proposta, ele pula. Há fallback Python (filtro em memória) caso o
+backend não suporte o operador JSON `->>`.
+
+#### Cron / scheduler
+
+Crie um cron job (host) ou um `cronWorkflow` no Replit Deploy/host
+que rode 1x por dia:
+
+```cron
+# Crontab — todo dia às 09:00 horário do servidor
+0 9 * * * cd /app && /app/venv/bin/flask emitir-propostas-expirando
+```
+
+No **Replit Deploy** com Scheduled Deployments, basta apontar o
+schedule para o mesmo comando. O job é seguro mesmo se rodar 2x no
+mesmo dia (idempotência cobre).
+
+---
+
+## 11. Como adicionar um 8º evento ao catálogo
+
+1. **Allowlist** — adicione `"dominio.acao"` em
+   `utils/webhook_dispatcher.py::WEBHOOK_EVENT_ALLOWLIST`.
+2. **Helper de emissão** — crie `emit_dominio_acao(...)` em
+   `utils/catalogo_eventos.py` seguindo o padrão dos existentes
+   (try/except, monta payload completo, chama
+   `EventManager.emit("dominio.acao", payload, admin_id=...)`).
+3. **Pontos de emissão** — chame o helper **após o commit** da
+   transação principal e **paralelo** ao evento legado equivalente,
+   se existir.
+4. **JSON exemplo** — copie um arquivo de `n8n_workflows/`
+   (ex.: `obra_concluida.json`) e adapte o path do webhook + Function
+   "Extrair Dados" + textos de e-mail/WhatsApp.
+5. **Documentação** — adicione uma linha na tabela da seção 10 e um
+   bloco de payload em 10.1.
+6. **Teste** — atualize `tests/test_task_45_catalogo_eventos.py`
+   cobrindo o novo helper.

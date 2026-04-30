@@ -827,7 +827,11 @@ def editar_obra(id):
                 logger.warning(f"Falha no rollback preventivo ao editar obra: {rollback_error}")
             
                 logger.info(f"[CONFIG] INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
-            
+
+            # Task #45 — captura status anterior ANTES da edição para
+            # detectar transição → 'Concluída' e emitir obra.concluida.
+            status_anterior = (obra.status or '').strip()
+
             # Atualizar dados básicos da obra
             obra.nome = request.form.get('nome')
             obra.endereco = request.form.get('endereco', '')
@@ -932,6 +936,24 @@ def editar_obra(id):
             try:
                 db.session.commit()
                 logger.info(f"[OK] OBRA {obra.id} ATUALIZADA: {servicos_processados} serviços processados")
+
+                # Task #45 — catálogo `dominio.acao`: obra.concluida
+                # disparado APENAS na transição (status_anterior != 'Concluída'
+                # AND novo == 'Concluída'). Mantém canal idempotente.
+                # Comparação resiliente a acento (Concluída/Concluida/CONCLUÍDA).
+                try:
+                    import unicodedata as _ud
+                    def _norm(s: str) -> str:
+                        s = (s or '').strip().lower()
+                        return ''.join(c for c in _ud.normalize('NFKD', s)
+                                       if not _ud.combining(c))
+                    if (_norm(obra.status) == 'concluida'
+                            and _norm(status_anterior) != 'concluida'):
+                        from utils.catalogo_eventos import emit_obra_concluida
+                        emit_obra_concluida(obra, obra.admin_id)
+                except Exception as _e_cat:
+                    logger.warning(f"#45: emit obra.concluida falhou (best-effort): {_e_cat}")
+
                 flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
                 return redirect(url_for('main.detalhes_obra', id=obra.id))
                 
@@ -2138,6 +2160,20 @@ def cronograma_revisar_inicial_post(id):
                 logger.warning(f"#200: recalcular_cronograma falhou para obra={obra.id}: {_e_eng}")
         obra.cronograma_revisado_em = datetime.utcnow()
         db.session.commit()
+
+        # Task #45 — catálogo `dominio.acao`: obra.cronograma_atualizado.
+        # Cobre primeira revisão E replanejamento (após botão "Revisar de
+        # novo" → cronograma_revisar_reset → este POST de novo).
+        try:
+            from utils.catalogo_eventos import emit_obra_cronograma_atualizado
+            emit_obra_cronograma_atualizado(
+                obra, admin_id,
+                tarefas_geradas=criadas,
+                motivo='revisao_inicial',
+            )
+        except Exception as _e_cat:
+            logger.warning(f"#45: emit obra.cronograma_atualizado falhou (best-effort): {_e_cat}")
+
         if criadas > 0:
             flash(
                 f'Cronograma revisado e gerado: {criadas} tarefa(s) criada(s). '

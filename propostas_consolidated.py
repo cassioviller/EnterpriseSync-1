@@ -2074,6 +2074,14 @@ def aprovar(id):
         ))
         db.session.commit()
 
+        # Task #45 — catálogo `dominio.acao`: emite proposta.aprovada em
+        # paralelo ao legado `proposta_aprovada` (canal externo n8n).
+        try:
+            from utils.catalogo_eventos import emit_proposta_aprovada
+            emit_proposta_aprovada(proposta, admin_id, aprovada_por='admin')
+        except Exception as _e_cat:
+            logger.warning(f"#45: emit proposta.aprovada falhou (best-effort): {_e_cat}")
+
         flash('Proposta aprovada com sucesso!', 'success')
         logger.debug(f"DEBUG APROVAR: Proposta {proposta.numero} aprovada")
         return redirect(url_for('propostas.visualizar', id=proposta.id))
@@ -2094,20 +2102,30 @@ def rejeitar(id):
         proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
         proposta.status = 'rejeitada'
+        motivo_form = request.form.get('motivo', 'Sem motivo especificado')
         
         # Registrar no histórico
         historico = PropostaHistorico(
             proposta_id=proposta.id,
             usuario_id=current_user.id,
             acao='rejeitada',
-            observacao=request.form.get('motivo', 'Sem motivo especificado'),
+            observacao=motivo_form,
             admin_id=admin_id
         )
         db.session.add(historico)
         
         # Commit transacional único (tudo ou nada)
         db.session.commit()
-        
+
+        # Task #45 — catálogo `dominio.acao`: emite proposta.rejeitada
+        # (canal externo n8n).
+        try:
+            from utils.catalogo_eventos import emit_proposta_rejeitada
+            emit_proposta_rejeitada(proposta, admin_id,
+                                    rejeitada_por='admin', motivo=motivo_form)
+        except Exception as _e_cat:
+            logger.warning(f"#45: emit proposta.rejeitada falhou (best-effort): {_e_cat}")
+
         logger.debug(f"DEBUG REJEITAR: Proposta {proposta.numero} rejeitada")
         flash('Proposta rejeitada.', 'warning')
         
@@ -2235,6 +2253,13 @@ def aprovar_proposta_cliente(token):
         proposta.data_resposta_cliente = proposta.data_resposta_cliente or datetime.utcnow()
         db.session.commit()
 
+        # Task #45 — catálogo `dominio.acao`: emite proposta.aprovada (cliente).
+        try:
+            from utils.catalogo_eventos import emit_proposta_aprovada
+            emit_proposta_aprovada(proposta, admin_id, aprovada_por='cliente')
+        except Exception as _e_cat:
+            _log.warning(f"#45: emit proposta.aprovada (cliente) falhou (best-effort): {_e_cat}")
+
         cronograma_pendente = not bool(proposta.cronograma_default_json)
         flash('Proposta aprovada com sucesso!', 'success')
         return render_template(
@@ -2256,10 +2281,32 @@ def rejeitar_proposta_cliente(token):
     try:
         proposta.status = 'rejeitada'
         proposta.data_resposta_cliente = datetime.utcnow()
-        proposta.observacoes_cliente = request.form.get('observacoes', '')
+        observacoes_cliente = request.form.get('observacoes', '')
+        proposta.observacoes_cliente = observacoes_cliente
         
         db.session.commit()
-        
+
+        # Task #45 — catálogo `dominio.acao`: emite proposta.rejeitada (cliente).
+        # Reaproveita resolução de admin_id idêntica à do aprovar_proposta_cliente.
+        try:
+            admin_id = None
+            if proposta.criado_por:
+                from models import Usuario
+                usuario = Usuario.query.get(proposta.criado_por)
+                if usuario:
+                    admin_id = usuario.admin_id or usuario.id
+            if not admin_id and proposta.admin_id:
+                admin_id = proposta.admin_id
+            from utils.catalogo_eventos import emit_proposta_rejeitada
+            emit_proposta_rejeitada(proposta, admin_id,
+                                    rejeitada_por='cliente',
+                                    motivo=observacoes_cliente)
+        except Exception as _e_cat:
+            import logging as _lg
+            _lg.getLogger(__name__).warning(
+                f"#45: emit proposta.rejeitada (cliente) falhou (best-effort): {_e_cat}"
+            )
+
         flash('Sua resposta foi registrada.', 'info')
         return render_template('propostas/rejeitada.html', proposta=proposta)
         

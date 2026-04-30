@@ -1,0 +1,110 @@
+{
+  "name": "SIGE — Proposta Aprovada (Email + WhatsApp via Evolution API)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sige-proposta-aprovada",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": { "rawBody": true }
+      },
+      "id": "webhook-in",
+      "name": "Webhook (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "sige-proposta-aprovada"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Validação HMAC-SHA256 (X-Signature) — segredo em $env.N8N_WEBHOOK_SECRET.\nconst crypto = require('crypto');\nconst secret = $env.N8N_WEBHOOK_SECRET || '';\nconst given  = ($input.first().json.headers || {})['x-signature'] || '';\nlet body = $input.first().json.body ? JSON.stringify($input.first().json.body) : '';\ntry {\n  if ($input.first().binary && $input.first().binary.data) {\n    body = Buffer.from($input.first().binary.data, 'base64').toString('utf8');\n  }\n} catch (e) {}\nif (!secret) return [{ json: { ...$input.first().json, _signature_skipped: 'no_secret' } }];\nconst expected = crypto.createHmac('sha256', secret).update(body, 'utf8').digest('hex');\nconst ok = expected.length === given.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(given));\nif (!ok) throw new Error('Assinatura HMAC inválida (X-Signature não confere)');\nreturn [{ json: { ...$input.first().json, _signature_ok: true } }];"
+      },
+      "id": "validate-hmac",
+      "name": "Validar Assinatura HMAC",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normaliza payload do evento `proposta.aprovada`.\nconst body = $input.first().json.body || $input.first().json;\nconst d = (body && body.data) || {};\nreturn [{\n  json: {\n    cliente_nome:     d.cliente_nome     || 'Cliente',\n    cliente_email:    d.cliente_email    || '',\n    cliente_telefone: d.cliente_telefone || '',\n    proposta_numero:  d.proposta_numero  || '',\n    proposta_versao:  d.proposta_versao  || 1,\n    valor_total:      d.valor_total      || 0,\n    aprovada_por:     d.aprovada_por     || 'admin',\n    obra_id:          d.obra_id          || null,\n    portal_url:       d.portal_url       || '',\n    admin_id:         body.admin_id      || null,\n    occurred_at:      body.occurred_at   || null\n  }\n}];"
+      },
+      "id": "extract",
+      "name": "Extrair Dados",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "string": [ { "value1": "={{ $json[\"cliente_email\"] }}", "operation": "isNotEmpty" } ] }
+      },
+      "id": "if-has-email",
+      "name": "Tem e-mail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "conditions": { "string": [ { "value1": "={{ $json[\"cliente_telefone\"] }}", "operation": "isNotEmpty" } ] }
+      },
+      "id": "if-has-phone",
+      "name": "Tem WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.SIGE_FROM_EMAIL }}",
+        "toEmail":   "={{ $json[\"cliente_email\"] }}",
+        "subject":   "Recebemos a aprovação da proposta {{ $json[\"proposta_numero\"] }} v{{ $json[\"proposta_versao\"] }}",
+        "text": "Olá {{ $json[\"cliente_nome\"] }},\n\nObrigado por aprovar a proposta nº {{ $json[\"proposta_numero\"] }} (versão {{ $json[\"proposta_versao\"] }}). A obra correspondente já foi aberta no nosso sistema e nossa equipe entrará em contato com os próximos passos (cronograma, programação de início e documentação).\n\n• Valor aprovado: R$ {{ $json[\"valor_total\"] }}\n• Portal da obra/proposta: {{ $json[\"portal_url\"] }}\n\nQualquer dúvida, é só responder este e-mail."
+      },
+      "id": "send-email",
+      "name": "Enviar E-mail (SMTP/SendGrid)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1140, 200],
+      "credentials": { "smtp": { "id": "REPLACE_WITH_YOUR_SMTP_CREDENTIAL_ID", "name": "SMTP do SIGE" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey",       "value": "={{ $env.EVOLUTION_API_KEY }}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ] },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json[\"cliente_telefone\"] }}\",\n  \"text\":   \"Olá *{{ $json[\\\"cliente_nome\\\"] }}*!\\n\\nRecebemos a aprovação da proposta *{{ $json[\\\"proposta_numero\\\"] }}* (v{{ $json[\\\"proposta_versao\\\"] }}). A obra já foi aberta no sistema e nossa equipe vai te procurar com os próximos passos.\\n\\n• Valor aprovado: R$ {{ $json[\\\"valor_total\\\"] }}\\n👉 Acompanhe: {{ $json[\\\"portal_url\\\"] }}\\n\\nObrigado pela confiança!\"\n}"
+      },
+      "id": "send-whatsapp",
+      "name": "Enviar WhatsApp (Evolution API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1140, 420]
+    }
+  ],
+  "connections": {
+    "Webhook (POST)":            { "main": [[ { "node": "Validar Assinatura HMAC", "type": "main", "index": 0 } ]] },
+    "Validar Assinatura HMAC":   { "main": [[ { "node": "Extrair Dados", "type": "main", "index": 0 } ]] },
+    "Extrair Dados":             { "main": [[
+      { "node": "Tem e-mail?",   "type": "main", "index": 0 },
+      { "node": "Tem WhatsApp?", "type": "main", "index": 0 }
+    ]] },
+    "Tem e-mail?":               { "main": [[ { "node": "Enviar E-mail (SMTP/SendGrid)", "type": "main", "index": 0 } ], []] },
+    "Tem WhatsApp?":             { "main": [[ { "node": "Enviar WhatsApp (Evolution API)", "type": "main", "index": 0 } ], []] }
+  },
+  "active": false,
+  "settings": {},
+  "tags": [ { "name": "sige" }, { "name": "propostas" } ],
+  "_meta": {
+    "description": "Workflow exemplo para o evento `proposta.aprovada` do SIGE. Avisa o cliente que a aprovação foi processada e a obra aberta.",
+    "env_obrigatorias": [ "N8N_WEBHOOK_SECRET", "SIGE_FROM_EMAIL", "EVOLUTION_API_URL", "EVOLUTION_INSTANCE", "EVOLUTION_API_KEY" ]
+  }
+}
