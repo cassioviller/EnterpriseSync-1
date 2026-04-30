@@ -285,13 +285,7 @@
             </div>
             {% endif %}
 
-            {# Task #34 — Cláusulas configuráveis da proposta
-               (Condições de Pagamento, Garantias, Considerações Gerais e
-               cláusulas extras vindas do PropostaTemplate). O painel de
-               revisão completo (com ações REVISADO / EDITAR / REMOVER)
-               fica em editar.html — aqui é só leitura, mostrando o mesmo
-               conteúdo que o PDF e o portal do cliente, mais um aviso
-               quando há itens pendentes que ainda travam o envio. #}
+            {# Task #34 — leitura das cláusulas configuráveis. Painel de revisão fica em editar.html. #}
             {% if proposta.clausulas %}
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
