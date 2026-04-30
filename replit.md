@@ -52,6 +52,7 @@ The system uses a Flask backend with SQLAlchemy ORM, a PostgreSQL database, and 
     -   **Catalog Import via Excel:** Functionality to import and export catalog data for inputs and schedule templates using Excel files, with multi-tenant scoping and validation.
     -   **RDO Task Weighting:** Allows employees to assign weights to principal tasks within an RDO, influencing hour distribution when multiple activities are recorded.
     -   **CRM Leads - Kanban + Master Lists:** New CRM module with Kanban view, lead management, and configurable master lists for CRM entities like responsibles, origins, cadences, situations, material types, and project types. Features lead status tracking, historical logging, and controlled transitions (e.g., preventing 'Lost' status without a reason).
+    -   **Proposta Sent Notification (Task #44):** When admin sends a proposal, the system emits the `proposta.enviada` event for n8n webhook delivery (e-mail to client) and renders a green WhatsApp button on the proposal detail page (pre-filled message + portal link, BR DDI normalization). Missing e-mail and/or phone produce non-blocking `flash` warnings; both the dispatch and the manual WhatsApp click are recorded in `PropostaHistorico` (`notificacao_disparada`, `whatsapp_aberto`).
 
 ### External Dependencies
 -   **Flask:** Web framework.

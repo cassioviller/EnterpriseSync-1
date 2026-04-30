@@ -9,9 +9,11 @@ Pontos importantes:
 
 * **Opt-in por configuração** — se ``N8N_WEBHOOK_URL`` não estiver no
   ambiente, o módulo não envia nada (no-op). Nada quebra.
-* **Allowlist explícita** — ``WEBHOOK_EVENT_ALLOWLIST`` começa **vazia**
-  para que nenhum evento vaze por engano. Tarefas seguintes (como a
-  notificação de proposta enviada) adicionam o que precisarem.
+* **Allowlist explícita** — ``WEBHOOK_EVENT_ALLOWLIST`` é a *whitelist*
+  estática deste módulo: somente eventos listados nela podem sair via
+  webhook. O catálogo inicial (Task #45) já cobre eventos de propostas e
+  obras — ver constante abaixo. Novas tarefas precisam adicionar o
+  evento explicitamente — nada vaza por engano.
 * **Idempotência da fila** — toda tentativa, sucesso ou falha, vai parar
   na tabela :class:`models.WebhookEntrega` para auditoria e retry.
 * **Retry com backoff** — falhas de rede/HTTP 5xx ficam em ``status='pendente'``
@@ -51,12 +53,12 @@ WEBHOOK_SOURCE = "obra"
 # internos de negócio; estes nomes em formato `dominio.acao` saem pelo
 # canal externo do n8n. Veja `docs/notificacoes/README.md` para a
 # tabela completa (campos do payload, ponto de emissão, exemplo n8n).
+#
+# Task #44 também usa `proposta.enviada` — como ``set`` o merge é
+# idempotente, então as duas tarefas coexistem sem conflito.
 WEBHOOK_EVENT_ALLOWLIST: set[str] = {
     # — Propostas comerciais —
-    # `proposta.enviada` é dono da Task #44 (em paralelo); reservado aqui
-    # para coexistência: como o tipo é ``set``, o merge é idempotente —
-    # se a outra task já registra esta chave, não há conflito; se ela não
-    # emitir, esta entrada é benigna (nenhum código aqui dispara o evento).
+    # Task #44: notifica cliente quando uma proposta é enviada (e-mail via n8n).
     "proposta.enviada",
     "proposta.aprovada",
     "proposta.rejeitada",

@@ -70,6 +70,121 @@ ALLOWED_EXTENSIONS = {'pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg', 'gif', 'doc', '
 
 # ===== HELPER FUNCTIONS =====
 
+def _telefone_so_digitos(telefone):
+    """Task #44 — Normaliza telefone para usar em wa.me (apenas dígitos com DDI).
+
+    Aceita formatos como ``(31) 99999-9999``, ``+55 31 99999-9999`` ou
+    ``31999999999``. Se o número não começar com DDI (10–11 dígitos = BR
+    sem DDI), prefixa ``55``. Strings vazias retornam ``''``.
+    """
+    if not telefone:
+        return ''
+    digitos = ''.join(ch for ch in str(telefone) if ch.isdigit())
+    if not digitos:
+        return ''
+    # Brasileiros sem DDI: 10 (fixo) ou 11 (celular). Adiciona 55.
+    if len(digitos) in (10, 11):
+        digitos = '55' + digitos
+    return digitos
+
+
+def _whatsapp_url_proposta(proposta, portal_url):
+    """Task #44 — Monta a URL ``https://wa.me/<num>?text=<msg>`` para a proposta.
+
+    Devolve ``None`` se o cliente não tiver telefone cadastrado.
+    """
+    from urllib.parse import quote
+    digitos = _telefone_so_digitos(proposta.cliente_telefone)
+    if not digitos:
+        return None
+    nome = (proposta.cliente_nome or 'Cliente').split(' ')[0]
+    try:
+        valor = float(proposta.valor_total or 0)
+    except (TypeError, ValueError):
+        valor = 0.0
+    valor_fmt = f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    msg = (
+        f"Olá, {nome}! Segue a proposta {proposta.numero} "
+        f"(versão {proposta.versao or 1}) no valor de {valor_fmt}.\n\n"
+        f"Acesse o portal para visualizar e responder: {portal_url}"
+    )
+    return f"https://wa.me/{digitos}?text={quote(msg)}"
+
+
+def _notificar_envio_proposta(proposta, admin_id):
+    """Task #44 — Emite ``proposta.enviada`` e registra no histórico.
+
+    * Sempre emite o evento (mesmo sem e-mail/telefone — o n8n decide via
+      Switch o que fazer com cada caso).
+    * Adiciona ``flash`` amarelo quando faltam e-mail e/ou telefone.
+    * Grava ``PropostaHistorico('notificacao_disparada')`` listando os
+      canais que foram tentados.
+    """
+    from event_manager import EventManager
+
+    portal_url = url_for(
+        'propostas.portal_cliente',
+        token=proposta.token_cliente,
+        _external=True,
+    )
+
+    tem_email = bool((proposta.cliente_email or '').strip())
+    tem_telefone = bool(_telefone_so_digitos(proposta.cliente_telefone))
+
+    if not tem_email and not tem_telefone:
+        flash(
+            'Cliente sem e-mail nem telefone cadastrado — o envio automático '
+            'não foi disparado e o botão WhatsApp ficará desabilitado. '
+            'Cadastre os dados do cliente ou copie o link manualmente.',
+            'warning',
+        )
+    elif not tem_email:
+        flash(
+            'Cliente sem e-mail cadastrado — o envio automático não foi '
+            'disparado. Use o botão WhatsApp ou copie o link manualmente.',
+            'warning',
+        )
+
+    # Validade absoluta: data_envio + validade_dias.
+    data_validade = None
+    try:
+        from datetime import timedelta as _td
+        if proposta.data_envio and proposta.validade_dias:
+            data_validade = (proposta.data_envio + _td(days=int(proposta.validade_dias))).date().isoformat()
+    except Exception:
+        data_validade = None
+
+    payload = {
+        'proposta_id': proposta.id,
+        'numero': proposta.numero,
+        'versao': int(proposta.versao or 1),
+        'cliente_nome': proposta.cliente_nome or '',
+        'cliente_email': (proposta.cliente_email or '').strip() or None,
+        'cliente_telefone': (proposta.cliente_telefone or '').strip() or None,
+        'valor_total': float(proposta.valor_total or 0),
+        'data_validade': data_validade,
+        'portal_url': portal_url,
+        'observacoes_envio': (request.form.get('observacoes_envio') or '').strip(),
+    }
+
+    EventManager.emit('proposta.enviada', payload, admin_id)
+
+    canais = []
+    if tem_email:
+        canais.append('e-mail')
+    if tem_telefone:
+        canais.append('whatsapp')
+    canais_txt = ', '.join(canais) if canais else 'nenhum (sem e-mail/telefone)'
+    db.session.add(PropostaHistorico(
+        proposta_id=proposta.id,
+        usuario_id=current_user.id,
+        acao='notificacao_disparada',
+        observacao=f'Notificação de envio disparada — canais tentados: {canais_txt}.',
+        admin_id=admin_id,
+    ))
+    db.session.commit()
+
+
 def _parse_engenheiro_id(raw_value, admin_id):
     """Task #173 — converte e valida engenheiro_id do form.
 
@@ -730,11 +845,22 @@ def visualizar(id):
         
             logger.debug(f"DEBUG VISUALIZAR: Proposta {proposta.numero} - {len(itens)} itens")
         
+        # Task #44 — pré-monta a URL do WhatsApp para o template.
+        # ``None`` quando o cliente não tem telefone cadastrado (botão fica
+        # desabilitado).
+        portal_url = url_for(
+            'propostas.portal_cliente',
+            token=proposta.token_cliente,
+            _external=True,
+        ) if proposta.token_cliente else ''
+        whatsapp_url = _whatsapp_url_proposta(proposta, portal_url)
+
         return render_template('propostas/detalhes_proposta.html',
                              proposta=proposta,
                              itens=itens,
                              arquivos=arquivos,
                              total_geral=total_geral,
+                             whatsapp_url_proposta=whatsapp_url,
                              date=date)
         
     except Exception as e:
@@ -1192,12 +1318,58 @@ def enviar(id):
             'Compartilhe o link do portal do cliente.',
             'success',
         )
+
+        # Task #44 — Notificar cliente via n8n + registrar no histórico.
+        # Best-effort: falhas no envio não impedem o status de mudar.
+        try:
+            _notificar_envio_proposta(proposta, admin_id)
+        except Exception as _en:
+            logger.exception(
+                'Task #44 — falha ao notificar envio da proposta %s', proposta.id
+            )
+            flash(
+                'A proposta foi marcada como enviada, mas houve erro ao '
+                f'disparar a notificação automática: {_en}. '
+                'Use o botão WhatsApp ou copie o link manualmente.',
+                'warning',
+            )
+
         return redirect(url_for('propostas.visualizar', id=id))
     except Exception as e:
         db.session.rollback()
         logger.exception('Task #31 — erro ao enviar proposta')
         flash(f'Erro ao enviar proposta: {e}', 'error')
         return redirect(url_for('propostas.editar', id=id))
+
+
+# ───────────── Task #44 — registrar clique no botão WhatsApp ─────────────
+@propostas_bp.route('/<int:id>/whatsapp/registrar', methods=['POST'])
+@login_required
+@admin_required
+def whatsapp_registrar(id):
+    """Task #44 — Registra no histórico que o admin abriu o WhatsApp.
+
+    Endpoint leve, idempotente do ponto de vista do usuário (clicar várias
+    vezes só gera várias entradas no log). Devolve JSON simples; nunca
+    bloqueia a abertura do ``wa.me`` (o cliente JS já abriu em paralelo).
+    """
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        db.session.add(PropostaHistorico(
+            proposta_id=proposta.id,
+            usuario_id=current_user.id,
+            acao='whatsapp_aberto',
+            observacao='WhatsApp aberto pelo admin a partir do portal da proposta.',
+            admin_id=admin_id,
+        ))
+        db.session.commit()
+        return jsonify({'ok': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Task #44 — erro ao registrar clique do WhatsApp (proposta %s)', id)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
 
 @propostas_bp.route('/editar/<int:id>', methods=['POST'])
 @login_required
