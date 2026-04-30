@@ -1,0 +1,95 @@
+CRM de Leads com Kanban e Automações
+What & Why
+Criar um módulo de CRM de Leads dentro do app, modelado na planilha "Controle dos Leads 2026 — SJC", com visão Kanban por estágio do funil, criação automática de Cliente ao cadastrar/atualizar um lead, e automações que mantenham o pipeline sincronizado com Propostas e Obras existentes — eliminando o trabalho manual de duplicar dados entre planilha, propostas e cadastro de clientes.
+
+Done looks like
+Cadastro e visão
+Novo menu "CRM" → "Leads" (multitenant: cada admin vê só os leads da sua empresa).
+Tela principal em Kanban, com colunas que representam o Status do lead: Em fila → Em andamento → Enviado → Validação → Aprovado → Feedback → Congelado → Perdido.
+Cada cartão mostra: Nome, Responsável, Origem, Tipo de Material, Valor da Proposta, Situação (estágio) e dias parado na coluna.
+Cartões podem ser arrastados entre colunas (mobile e desktop), o que dispara as automações descritas abaixo.
+Filtros no topo: Responsável, Origem, Tipo de Material, Tipo de Obra, mês de chegada, e busca por nome/contato.
+Visão alternativa em tabela/lista (mesmos filtros), para quem quiser o estilo planilha — botão alternar Kanban ↔ Tabela.
+Tela de detalhe/edição do lead com todos os campos da planilha:
+Data de Chegada (default = hoje), Data de Envio (preenchida automaticamente quando passar para "Enviado")
+Nome, Contato (telefone), E-mail
+Responsável (dropdown), Origem (dropdown), Cadência (dropdown)
+Situação (estágio do funil, dropdown), Tipo de Material (dropdown), Tipo de Obra (dropdown)
+Localização, Detalhes da localização, Demanda, Pasta
+Valor da Proposta, Status, Motivo da Perda (dropdown, obrigatório quando Status = Perdido), Observação
+Histórico de mudanças do lead (timeline simples: "Status mudou de X → Y por usuário Z em DD/MM HH:MM") visível no detalhe.
+Listas mestras (cadastros editáveis pelo admin)
+Responsáveis, Origens, Cadências, Situações, Tipos de Material, Tipos de Obra, Status, Motivos de Perda — todas vindas da aba "Base" da planilha como seed inicial, e editáveis em uma tela "Cadastros do CRM".
+Seed inicial padrão (criado para cada admin novo):
+Responsáveis: Comercial VEKS, Flávio, Luan, Ariane, Guilherme, Paulo Hervatin, Gabriela Lilian
+Origens: Loja, Indicação, Anúncio Meta Ads, Google, Site, Prospecção Ativa
+Cadências: Contato Dia 1, Contato Dia 3, Contato Dia 7, Contato Dia 15
+Situações (estágios): Levantar Necessidade, Em Negociação, Orçamento Enviado, Fechamento, Sem Retorno
+Tipos de Material: Drywall, Steel Frame, Material, Serviço, Obra Completa, Forros Removíveis, Projeto, Outros
+Tipos de Obra: Residencial, Empresarial, Empreendimento
+Status (kanban): Em fila, Em andamento, Enviado, Validação, Aprovado, Feedback, Congelado, Perdido
+Motivos de Perda: Sem Retorno, Preço do Produto, Desistência de Compra, Valor acima, Contato Agendado, Outros
+Criação automática de Cliente
+Ao salvar um lead com nome e (telefone OU e-mail) preenchidos:
+O sistema procura um Cliente do mesmo admin com mesmo telefone normalizado ou mesmo e-mail (case-insensitive); se achar, vincula o lead a esse Cliente e atualiza campos vazios do Cliente com os dados do lead (nunca sobrescreve dado já preenchido).
+Se não achar, cria automaticamente um Cliente novo com nome, telefone, e-mail e endereço (a partir de Localização + Detalhes da Loc.) e vincula ao lead.
+O usuário vê uma mensagem clara: "Cliente vinculado: {nome}" ou "Novo cliente criado: {nome}".
+A tela de Clientes passa a mostrar uma coluna/contador de "Leads ativos" por cliente, e link para ver os leads daquele cliente.
+Automações do pipeline
+Quando o lead muda de Status/Situação (via kanban ou edição), o sistema reage automaticamente:
+
+Situação muda para "Orçamento Enviado" ou Status muda para "Enviado":
+
+Preenche Data de Envio com a data atual (se ainda estiver vazia).
+Se o lead ainda não tem Proposta vinculada, mostra um botão de ação rápida "Gerar proposta a partir deste lead" que pré-preenche a tela de nova Proposta com cliente, contato, valor e responsável (não cria silenciosamente — confirma com 1 clique).
+Proposta vinculada muda de status no módulo de Propostas (já existente):
+
+Proposta enviada → Lead vai para Status Enviado (se ainda estiver em estágio anterior).
+Proposta aprovada → Lead vai para Status Aprovado e Situação Fechamento.
+Proposta rejeitada → Lead vai para Status Perdido e abre o campo Motivo da Perda para preenchimento (notificação).
+Status muda para "Aprovado" / Situação "Fechamento" (ganho):
+
+Garante que existe um Cliente vinculado (cria se ainda não houver, mesmo fluxo acima).
+Mostra ação rápida "Criar obra a partir deste lead" que pré-preenche a tela de nova Obra com cliente, tipo de obra, localização e valor (1 clique para confirmar; não cria silenciosamente).
+Status muda para "Perdido":
+
+Exige Motivo da Perda preenchido antes de salvar.
+Registra data/hora e usuário responsável pela mudança.
+Status muda para "Congelado":
+
+Pede uma observação curta e uma data sugerida para retomar (opcional). O lead some do kanban principal e aparece em uma aba "Congelados", com aviso quando a data de retomada chegar.
+Inatividade: leads em "Em andamento" ou "Enviado" sem mudança há mais de N dias (configurável por admin, default 7) ficam visualmente destacados no kanban (badge "parado há X dias").
+
+Multi-tenancy e permissões
+Todas as tabelas novas têm admin_id, e as queries filtram por admin do usuário logado (mesmo padrão do resto do app).
+Usuário com perfil de funcionário comum só vê leads onde ele é o Responsável; admin vê todos da empresa.
+Out of scope
+Importação dos dados históricos da planilha (Jun/25 → Lead.2026): não nesta tarefa. O módulo nasce vazio. Fica como tarefa separada se o usuário quiser depois.
+Integração com WhatsApp / Meta Ads / Google Ads para captar leads automaticamente — fica para depois.
+Relatórios analíticos avançados (taxa de conversão por origem, funil de receita previsto, ranking de vendedores) — esta tarefa entrega só os gráficos básicos do kanban (contagem e valor total por coluna).
+Notificação por e-mail/WhatsApp para o cliente — fica para depois (já existe Task #35 na fila para notificação de proposta).
+Edição em massa de leads (bulk update) — versão futura.
+Steps
+Modelagem de dados e seeds — Criar as tabelas: lead, lead_historico, e tabelas de listas mestras (crm_responsavel, crm_origem, crm_cadencia, crm_situacao, crm_tipo_material, crm_tipo_obra, crm_status, crm_motivo_perda), todas com admin_id. Adicionar FKs do lead para Cliente (nullable), Proposta (nullable) e Obra (nullable). Criar seed que popula as listas mestras automaticamente para cada admin novo (e roda uma vez para os admins já existentes).
+
+Blueprint e CRUD de leads — Criar crm_views.py com blueprint crm_bp (prefixo /crm), seguindo o padrão de clientes_views.py. Implementar listar (kanban + tabela), criar, editar, mudar status (endpoint dedicado para drag-and-drop), excluir, e a tela "Cadastros do CRM" para editar as listas mestras. Toda query filtrada por admin_id; usuário não-admin filtrado também por responsável.
+
+Criação/vínculo automático de Cliente — Helper vincular_ou_criar_cliente(lead) chamado no save do lead: normaliza telefone, busca por telefone/e-mail no Cliente do mesmo admin, vincula se achar (e completa campos vazios) ou cria novo. Mostra flash message informando o que aconteceu. Cobrir com testes unitários os 3 casos (achou, não achou, dados insuficientes).
+
+Automações do pipeline — Implementar as transições automáticas de status (lista acima): preenchimento de Data de Envio, exigência de Motivo da Perda, ações rápidas "Gerar proposta" e "Criar obra" (botões que abrem formulários pré-preenchidos), e a sincronização inversa (mudança de status de Proposta → atualiza Lead) via hook no save da Proposta. Registrar tudo no lead_historico.
+
+UI do Kanban — Template do kanban com colunas de Status (drag-and-drop funcional em desktop e mobile, reaproveitando a biblioteca já usada no cronograma se possível, ou Sortable.js). Cards com Nome, Responsável, Valor, Situação, badge de dias parado. Filtros no topo. Toggle Kanban ↔ Tabela. Tela de detalhe/edição com timeline de histórico. Visual alinhado ao resto do app (Bootstrap, mesma paleta).
+
+Menu, permissões e teste ponta-a-ponta — Adicionar item "CRM" no menu lateral (só para usuários com permissão), registrar o blueprint em app.py, e rodar teste e2e cobrindo: criar lead → ver criação automática de cliente → arrastar entre colunas no kanban → marcar como Perdido (exigir motivo) → marcar como Aprovado → gerar Obra a partir do lead.
+
+Relevant files
+models.py:235-316
+models.py:2536-2549
+models.py:2723-2820
+clientes_views.py
+templates/cadastros/clientes.html
+templates/cadastros/clientes_form.html
+propostas_consolidated.py
+app.py:332-628
+main.py
+attached_assets/3._Controle_dos_Leads_2026-_SJC_1777548971396.xlsx
