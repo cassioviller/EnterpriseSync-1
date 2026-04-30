@@ -20,10 +20,26 @@ ou o evento não estiver na allowlist, o dispatcher é no-op silencioso.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _fallback_external_base() -> str | None:
+    """Base URL absoluta para gerar links em contexto fora-de-request
+    (ex.: CLI ``flask emitir-propostas-expirando`` rodando em cron).
+
+    Ordem: ``PORTAL_BASE_URL`` → ``REPLIT_DEV_DOMAIN`` (com https) → None.
+    """
+    base = os.environ.get('PORTAL_BASE_URL')
+    if base:
+        return base.rstrip('/')
+    dev = os.environ.get('REPLIT_DEV_DOMAIN')
+    if dev:
+        return f'https://{dev}'.rstrip('/')
+    return None
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -47,34 +63,48 @@ def _iso_date(d: Any) -> str | None:
 
 
 def _portal_proposta_url(token: str | None) -> str | None:
-    """URL pública do portal do CLIENTE para acompanhar a proposta."""
+    """URL pública do portal do CLIENTE para acompanhar a proposta.
+
+    Tenta `url_for(..., _external=True)`. Em contexto sem request
+    (CLI/cron) cai em fallback baseado em env (``PORTAL_BASE_URL``
+    ou ``REPLIT_DEV_DOMAIN``) para que o lembrete continue acionável.
+    """
     if not token:
         return None
     try:
-        from flask import url_for, has_request_context, has_app_context
-        if not (has_app_context() or has_request_context()):
-            return None
-        return url_for('propostas.portal_cliente', token=token, _external=True)
+        from flask import url_for, has_request_context
+        if has_request_context():
+            return url_for('propostas.portal_cliente', token=token, _external=True)
     except Exception:
-        return None
+        pass
+    base = _fallback_external_base()
+    if base:
+        return f"{base}/propostas/cliente/{token}"
+    return None
 
 
 def _portal_obra_url(obra) -> str | None:
-    """URL pública do portal do CLIENTE para acompanhar a obra (se ativo)."""
+    """URL pública do portal do CLIENTE para acompanhar a obra (se ativo).
+
+    Mesma estratégia de fallback de :func:`_portal_proposta_url`.
+    """
     if obra is None:
         return None
-    try:
-        if not getattr(obra, 'portal_ativo', False):
-            return None
-        token = getattr(obra, 'token_cliente', None)
-        if not token:
-            return None
-        from flask import url_for, has_request_context, has_app_context
-        if not (has_app_context() or has_request_context()):
-            return None
-        return url_for('portal_obras.portal_obra', token=token, _external=True)
-    except Exception:
+    if not getattr(obra, 'portal_ativo', False):
         return None
+    token = getattr(obra, 'token_cliente', None)
+    if not token:
+        return None
+    try:
+        from flask import url_for, has_request_context
+        if has_request_context():
+            return url_for('portal_obras.portal_obra', token=token, _external=True)
+    except Exception:
+        pass
+    base = _fallback_external_base()
+    if base:
+        return f"{base}/portal/obra/{token}"
+    return None
 
 
 def _safe_emit(event_name: str, payload: dict, admin_id: int | None) -> None:
@@ -183,8 +213,38 @@ def _payload_obra_basico(obra) -> dict:
     }
 
 
+def _resumo_rdo(rdo) -> dict:
+    """Conta defensiva de equipe / atividades para o payload do RDO."""
+    resumo: dict[str, Any] = {
+        'total_funcionarios': 0,
+        'total_horas_trabalhadas': 0.0,
+        'total_subatividades': 0,
+        'percentual_medio': 0.0,
+    }
+    try:
+        from models import RDOMaoObra, RDOServicoSubatividade
+        mao = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+        resumo['total_funcionarios'] = len(mao)
+        resumo['total_horas_trabalhadas'] = round(
+            sum(_safe_float(getattr(m, 'horas_trabalhadas', 0)) for m in mao), 2
+        )
+        subs = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
+        resumo['total_subatividades'] = len(subs)
+        if subs:
+            resumo['percentual_medio'] = round(
+                sum(_safe_float(getattr(s, 'percentual_conclusao', 0)) for s in subs) / len(subs), 2
+            )
+    except Exception:
+        logger.exception("[catalogo_eventos] _resumo_rdo falhou (rdo_id=%s)", getattr(rdo, 'id', None))
+    return resumo
+
+
 def emit_obra_rdo_publicado(rdo, admin_id: int | None) -> None:
-    """Emite `obra.rdo_publicado` em paralelo ao legado `rdo_finalizado`."""
+    """Emite `obra.rdo_publicado` em paralelo ao legado `rdo_finalizado`.
+
+    Inclui resumo de equipe e atividades para que o consumidor n8n possa
+    montar mensagens ricas (Slack/WhatsApp) sem segundo round-trip.
+    """
     obra = _obra_lookup(getattr(rdo, 'obra_id', None), admin_id)
     payload = _payload_obra_basico(obra)
     payload.update({
@@ -192,7 +252,9 @@ def emit_obra_rdo_publicado(rdo, admin_id: int | None) -> None:
         'numero_rdo': getattr(rdo, 'numero_rdo', None),
         'data_relatorio': _iso_date(getattr(rdo, 'data_relatorio', None)),
         'status': getattr(rdo, 'status', None),
+        'comentario_geral': (getattr(rdo, 'comentario_geral', '') or '')[:500],
     })
+    payload.update(_resumo_rdo(rdo))
     _safe_emit('obra.rdo_publicado', payload, admin_id)
 
 

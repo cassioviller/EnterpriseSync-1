@@ -202,14 +202,24 @@ def test_emit_obra_rdo_publicado(admin, obra):
     rdo = SimpleNamespace(id=999, obra_id=obra.id,
                           numero_rdo='RDO-2026-04-30-001',
                           data_relatorio=date(2026, 4, 30),
-                          status='Finalizado')
+                          status='Finalizado',
+                          comentario_geral='Concretagem do bloco A finalizada.')
     with patch("event_manager.EventManager.emit") as m:
         catalogo_eventos.emit_obra_rdo_publicado(rdo, admin.id)
     ok = m.called and m.call_args.args[0] == 'obra.rdo_publicado'
     payload = m.call_args.args[1] if m.called else {}
-    step("5. emit_obra_rdo_publicado → 'obra.rdo_publicado' com obra resolvida",
-         ok and payload.get('rdo_id') == 999 and payload.get('obra_id') == obra.id and payload.get('numero_rdo') == 'RDO-2026-04-30-001',
-         f"obra_id={payload.get('obra_id')}, rdo_id={payload.get('rdo_id')}")
+    # Resumo é defensivo: rdo_id=999 não existe no DB → contadores em 0 (sem
+    # quebrar). O importante é que as chaves estejam presentes no payload.
+    tem_resumo = all(k in payload for k in (
+        'total_funcionarios', 'total_horas_trabalhadas',
+        'total_subatividades', 'percentual_medio',
+    ))
+    step("5. emit_obra_rdo_publicado → 'obra.rdo_publicado' com obra resolvida + resumo",
+         ok and payload.get('rdo_id') == 999 and payload.get('obra_id') == obra.id
+         and payload.get('numero_rdo') == 'RDO-2026-04-30-001'
+         and payload.get('comentario_geral', '').startswith('Concretagem')
+         and tem_resumo,
+         f"obra_id={payload.get('obra_id')}, rdo_id={payload.get('rdo_id')}, resumo_ok={tem_resumo}")
 
 
 def test_emit_obra_medicao_publicada(admin, obra):
