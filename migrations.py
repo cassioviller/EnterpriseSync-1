@@ -3845,6 +3845,7 @@ def executar_migracoes():
             (144, "Task #31 — versionamento + revisão obrigatória de propostas (proposta + proposta_clausula)", migration_144_proposta_versionamento_revisao),
             (145, "Task #38 — rdo_mao_obra.peso_distribuicao (peso da tarefa principal do funcionário)", migration_145_rdo_mao_obra_peso_distribuicao),
             (146, "Task #42 — CRM de Leads: 9 tabelas (lead, lead_historico, 7 listas mestras) + seed genérico (sem Responsáveis)", migration_146_crm_leads_e_seed_generico),
+            (147, "Task #18 hotfix — itens_inclusos/itens_exclusos em proposta_itens e orcamento_item", migration_147_proposta_orcamento_itens_inclusos_exclusos),
         ]
         
         # Executar cada migração com rastreamento
@@ -12366,4 +12367,112 @@ def migration_146_crm_leads_e_seed_generico():
                 connection.close()
             except Exception:
                 pass
+        raise
+
+
+def migration_147_proposta_orcamento_itens_inclusos_exclusos():
+    """Task #18 hotfix — adiciona ``itens_inclusos`` e ``itens_exclusos``
+    (TEXT NULL) às tabelas ``proposta_itens`` e ``orcamento_item``.
+
+    Esses campos foram adicionados aos modelos ``PropostaItem`` e
+    ``OrcamentoItem`` na Task #18 (composição expansível por serviço),
+    mas a migração de schema correspondente nunca foi registrada. Como
+    consequência, ambientes que já tinham essas tabelas (todos os
+    clientes existentes) ficam quebrados ao SELECT do ORM —
+    ``column proposta_itens.itens_inclusos does not exist`` — bloqueando
+    a abertura de propostas e orçamentos antigos.
+
+    Idempotente:
+      - Cada ``ALTER TABLE`` é guardado por ``IF NOT EXISTS`` na consulta
+        a ``information_schema.columns``.
+      - A própria existência de cada tabela é checada antes — em
+        ambiente novo, ``db.create_all()`` já cria as colunas pelo
+        modelo e esta migração apenas vê "já existe" e segue.
+
+    Sem backfill: registros históricos ficam com ``NULL`` nesses campos
+    (o usuário preenche ao editar).
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 147: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            DO $$
+            BEGIN
+                -- proposta_itens
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                     WHERE table_name='proposta_itens'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                         WHERE table_name='proposta_itens'
+                           AND column_name='itens_inclusos'
+                    ) THEN
+                        ALTER TABLE proposta_itens
+                          ADD COLUMN itens_inclusos TEXT NULL;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                         WHERE table_name='proposta_itens'
+                           AND column_name='itens_exclusos'
+                    ) THEN
+                        ALTER TABLE proposta_itens
+                          ADD COLUMN itens_exclusos TEXT NULL;
+                    END IF;
+                END IF;
+
+                -- orcamento_item
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                     WHERE table_name='orcamento_item'
+                ) THEN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                         WHERE table_name='orcamento_item'
+                           AND column_name='itens_inclusos'
+                    ) THEN
+                        ALTER TABLE orcamento_item
+                          ADD COLUMN itens_inclusos TEXT NULL;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                         WHERE table_name='orcamento_item'
+                           AND column_name='itens_exclusos'
+                    ) THEN
+                        ALTER TABLE orcamento_item
+                          ADD COLUMN itens_exclusos TEXT NULL;
+                    END IF;
+                END IF;
+            END$$;
+        """)
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 147 CONCLUIDA: itens_inclusos/itens_exclusos garantidos "
+            "em proposta_itens e orcamento_item."
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 147 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
         raise
