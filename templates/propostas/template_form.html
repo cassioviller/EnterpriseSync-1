@@ -65,6 +65,14 @@
            cláusulas via UI sem que o backend "preserve" dados antigos. #}
         <input type="hidden" name="clausulas_payload_present" value="1">
 
+        {# Task #47 — id do template padrão de origem. Usado pelo backend
+           para copiar `itens_padrao` (JSON) do padrão no momento do POST
+           (sem trafegar a lista bruta no form). Só presente no fluxo
+           "Novo a partir do padrão". #}
+        {% if not template and padrao_origem %}
+        <input type="hidden" name="padrao_origem_id" value="{{ padrao_origem.id }}">
+        {% endif %}
+
         <div class="card mb-3">
             <div class="card-header"><strong>Dados do Template</strong></div>
             <div class="card-body">

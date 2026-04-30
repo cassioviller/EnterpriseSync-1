@@ -1730,6 +1730,14 @@ def _construir_prefill_do_padrao(padrao):
         }
         for i, c in enumerate(sorted(padrao.clausulas or [], key=lambda x: x.ordem or 0))
     ]
+    # Task #47 (review patch) — copia itens_padrao do template padrão para
+    # que o novo template herde o "layout completo" (lista de itens-base
+    # padrão usada pelo gerar_proposta). Cópia rasa para evitar aliasing
+    # com o objeto JSON do padrão.
+    try:
+        prefill['itens_padrao'] = list(padrao.itens_padrao) if padrao.itens_padrao else []
+    except Exception:
+        prefill['itens_padrao'] = []
     return prefill
 
 
@@ -1777,6 +1785,25 @@ def criar_template():
         if not categoria:
             categoria = 'Geral'
 
+        # Task #47 (review patch) — se este novo template está sendo
+        # criado a partir do padrão (form veio de novo_template com
+        # padrao_origem_id), copiamos a lista `itens_padrao` (JSON) do
+        # padrão. Resolução server-side garante isolamento por tenant
+        # (filtro admin_id) — qualquer id forjado é ignorado.
+        itens_padrao_iniciais = []
+        padrao_origem_id_raw = (request.form.get('padrao_origem_id') or '').strip()
+        if padrao_origem_id_raw.isdigit():
+            padrao_src = PropostaTemplate.query.filter_by(
+                id=int(padrao_origem_id_raw),
+                admin_id=admin_id,
+                padrao=True,
+            ).first()
+            if padrao_src and padrao_src.itens_padrao:
+                try:
+                    itens_padrao_iniciais = list(padrao_src.itens_padrao)
+                except Exception:
+                    itens_padrao_iniciais = []
+
         template = PropostaTemplate(
             nome=nome[:100],
             categoria=categoria[:50],
@@ -1784,7 +1811,7 @@ def criar_template():
             ativo=request.form.get('ativo', 'on') in ('on', 'true', '1'),
             admin_id=admin_id,
             criado_por=current_user.id,
-            itens_padrao=[],
+            itens_padrao=itens_padrao_iniciais,
         )
         # Task #47 — aplicar todos os blocos ricos vindos do form
         _aplicar_campos_ricos_template_do_form(template)
