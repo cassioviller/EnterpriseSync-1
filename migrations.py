@@ -3846,6 +3846,7 @@ def executar_migracoes():
             (145, "Task #38 — rdo_mao_obra.peso_distribuicao (peso da tarefa principal do funcionário)", migration_145_rdo_mao_obra_peso_distribuicao),
             (146, "Task #42 — CRM de Leads: 9 tabelas (lead, lead_historico, 7 listas mestras) + seed genérico (sem Responsáveis)", migration_146_crm_leads_e_seed_generico),
             (147, "Task #18 hotfix — itens_inclusos/itens_exclusos em proposta_itens e orcamento_item", migration_147_proposta_orcamento_itens_inclusos_exclusos),
+            (148, "Task #47 — proposta_templates.padrao + índice parcial único + backfill (template mais antigo por admin)", migration_148_proposta_templates_padrao),
         ]
         
         # Executar cada migração com rastreamento
@@ -12476,3 +12477,5 @@ def migration_147_proposta_orcamento_itens_inclusos_exclusos():
         except Exception:
             pass
         raise
+
+

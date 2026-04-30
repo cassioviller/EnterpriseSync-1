@@ -3232,6 +3232,12 @@ Por conta do contratante o fornecimento de água e energia elétrica durante o p
     ativo = db.Column(db.Boolean, default=True)
     publico = db.Column(db.Boolean, default=False)  # Se pode ser usado por outros usuários
     uso_contador = db.Column(db.Integer, default=0)  # Quantas vezes foi usado
+
+    # Task #47 — flag de "template padrão" do tenant. Apenas UM template por
+    # admin pode estar marcado como padrão (índice parcial único na tabela).
+    # Quando o admin clica em "Novo Template", o formulário abre pré-preenchido
+    # com todos os campos ricos copiados deste template padrão.
+    padrao = db.Column(db.Boolean, default=False, nullable=False)
     
     # Relacionamentos
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
