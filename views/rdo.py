@@ -888,9 +888,12 @@ def visualizar_rdo(id):
             elif mo.tarefa_cronograma and mo.tarefa_cronograma.nome_tarefa:
                 nome_atividade = mo.tarefa_cronograma.nome_tarefa
             if nome_atividade:
+                # Task #38 — propagar peso_distribuicao para o template
+                # exibir o badge "principal X%" / "secundária Y%".
                 entry['atividades'].append({
                     'nome': nome_atividade,
                     'horas': horas,
+                    'peso_distribuicao': getattr(mo, 'peso_distribuicao', None),
                 })
 
         funcionarios = list(funcionarios_dict.values())

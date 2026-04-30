@@ -883,6 +883,12 @@ class RDOMaoObra(db.Model):
     produtividade_real = db.Column(db.Float, nullable=True)
     indice_produtividade = db.Column(db.Float, nullable=True)
 
+    # Task #38 — peso da tarefa principal do funcionário (pontos
+    # percentuais 0..100). Quando definido em ao menos uma linha do
+    # mesmo funcionário/dia, o helper utils.rdo_horas distribui as
+    # horas de jornada-base proporcionalmente em vez da divisão igual.
+    peso_distribuicao = db.Column(db.Integer, nullable=True)
+
     # Relacionamentos
     funcionario = db.relationship('Funcionario', backref='rdos_mao_obra', overlaps="rdos_mao_obra")
     subatividade = db.relationship('RDOServicoSubatividade', backref='mao_obra_registros', foreign_keys=[subatividade_id])

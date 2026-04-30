@@ -695,6 +695,39 @@
     </div>
 </div>
 
+<!-- Task #38 — Modal "Distribuição de horas" (peso da tarefa principal) -->
+<div id="modalDistribHoras" class="modal fade" tabindex="-1" aria-labelledby="modalDistribHorasTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalDistribHorasTitulo">
+                    <i class="fas fa-balance-scale me-2"></i>Distribuição de horas
+                </h5>
+                <button type="button" class="btn-close btn-close-white" id="btnFecharDistribHoras" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Algum funcionário aparece em mais de uma tarefa hoje. Você pode marcar a tarefa <strong>principal</strong> dele
+                    e digitar o % da jornada que ela representa — o restante é dividido igualmente entre as outras.
+                    Pular um card mantém a divisão igual.
+                </p>
+                <div id="distribHorasCards"></div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <small id="distribHorasResumo" class="text-muted">0 / 0 cards resolvidos</small>
+                <div>
+                    <button type="button" class="btn btn-outline-secondary me-2" id="btnPularTodosDistrib">
+                        Manter divisão igual em todos
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btnSalvarDistribHoras" disabled>
+                        Salvar RDO
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // JavaScript para funcionalidades da edição de RDO
 const obraIdAtual = {{ rdo.obra_id }};
@@ -1837,6 +1870,295 @@ document.addEventListener('DOMContentLoaded', function() {
         formRDO.addEventListener('submit', _salvarCronogramaESubmeter);
     }
     {% endif %}
+
+    // Task #38 — interceptar submit para abrir o painel "Distribuição de
+    // horas" SEMPRE que pelo menos 1 funcionário aparecer em ≥ 2 tarefas.
+    // Roda em qualquer modo (V1/V2). É plugado em capture phase para
+    // rodar ANTES do listener V2 acima — assim, ao confirmar o painel,
+    // o submit final reentra naturalmente na cadeia (cronograma + form).
+    rdoDistribHorasSetup();
 });
+
+// ── Task #38 — Painel "Distribuição de horas" ─────────────────────────────
+function rdoDistribHorasCollect() {
+    // Lê todos os inputs sub_func_<sub>_<func>_horas com valor > 0 e agrupa
+    // por funcionário. Retorna array de objetos { funcId, funcNome, tarefas: [{subId, subNome, horas}] }.
+    const formRDO = document.getElementById('formEditarRDO');
+    if (!formRDO) return [];
+
+    const subNomePorId = {};
+    try {
+        (subatividadesSalvas || []).forEach(s => {
+            if (s && s.id != null) subNomePorId[String(s.id)] = s.nome || `Subatividade ${s.id}`;
+        });
+    } catch (e) { /* ignora */ }
+    const funcNomePorId = {};
+    try {
+        (funcionariosTodosLista || []).forEach(f => {
+            if (f && f.id != null) funcNomePorId[String(f.id)] = f.nome || `Funcionário ${f.id}`;
+        });
+    } catch (e) { /* ignora */ }
+
+    const inputs = document.querySelectorAll('input[name^="sub_func_"][name$="_horas"]');
+    const porFunc = {};
+    inputs.forEach(inp => {
+        if (inp.disabled) return;
+        const m = (inp.name || '').match(/^sub_func_(\d+)_(\d+)_horas$/);
+        if (!m) return;
+        const subId = m[1];
+        const funcId = m[2];
+        const horas = parseFloat(inp.value);
+        if (isNaN(horas) || horas <= 0) return;
+        const fkey = String(funcId);
+        if (!porFunc[fkey]) {
+            porFunc[fkey] = {
+                funcId: parseInt(funcId, 10),
+                funcNome: funcNomePorId[fkey] || `Funcionário ${funcId}`,
+                tarefas: [],
+            };
+        }
+        porFunc[fkey].tarefas.push({
+            subId: parseInt(subId, 10),
+            subNome: subNomePorId[String(subId)] || `Subatividade ${subId}`,
+            horas: horas,
+        });
+    });
+
+    return Object.values(porFunc).filter(g => g.tarefas.length >= 2);
+}
+
+function rdoDistribHorasState() {
+    if (!window._rdoDistribState) window._rdoDistribState = { cards: [], resumoEl: null };
+    return window._rdoDistribState;
+}
+
+function rdoDistribHorasRenderCard(idx, grupo) {
+    const tarefasHtml = grupo.tarefas.map((t, i) => `
+        <button type="button" class="btn btn-sm btn-outline-primary distrib-tarefa-btn"
+                data-card-idx="${idx}" data-tarefa-idx="${i}"
+                style="text-align:left">
+            ${t.subNome}
+        </button>
+    `).join(' ');
+
+    const previewHtml = grupo.tarefas.map((t, i) => `
+        <span class="badge bg-light text-dark border me-1" data-preview-idx="${i}">
+            ${t.subNome}: <strong class="distrib-preview-h">—</strong>
+        </span>
+    `).join('');
+
+    return `
+        <div class="card mb-2 distrib-card" data-card-idx="${idx}" data-resolved="0" data-principal-idx="-1" data-peso="">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <strong>${grupo.funcNome}</strong>
+                        <small class="text-muted ms-2">${grupo.tarefas.length} tarefas hoje</small>
+                    </div>
+                    <span class="badge bg-secondary distrib-status">Pendente</span>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">${tarefasHtml}</div>
+                <div class="distrib-peso-box d-none align-items-center gap-2 mb-2">
+                    <label class="small text-muted mb-0">% da jornada na tarefa principal</label>
+                    <input type="number" class="form-control form-control-sm distrib-peso-input"
+                           min="0" max="100" step="1" value="70" style="width:80px">
+                    <span class="small text-muted">%</span>
+                </div>
+                <div class="distrib-preview small mb-1">${previewHtml}</div>
+                <button type="button" class="btn btn-link btn-sm p-0 distrib-pular-btn">
+                    Manter divisão igual neste funcionário
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function rdoDistribHorasAtualizarPreview(cardEl) {
+    const idx = parseInt(cardEl.dataset.cardIdx, 10);
+    const grupo = rdoDistribHorasState().cards[idx];
+    if (!grupo) return;
+    const principalIdx = parseInt(cardEl.dataset.principalIdx || '-1', 10);
+    const peso = parseInt(cardEl.dataset.peso || '', 10);
+    const baseHoras = Math.max(...grupo.tarefas.map(t => t.horas));
+    const n = grupo.tarefas.length;
+    let valoresH = [];
+    if (cardEl.dataset.resolved === 'skip') {
+        valoresH = grupo.tarefas.map(() => baseHoras / n);
+    } else if (principalIdx >= 0 && !isNaN(peso)) {
+        const pClamp = Math.max(0, Math.min(100, peso));
+        const restante = Math.max(0, 100 - pClamp);
+        const cota = n > 1 ? restante / (n - 1) : 0;
+        valoresH = grupo.tarefas.map((_, i) => {
+            const frac = (i === principalIdx) ? (pClamp / 100) : (cota / 100);
+            return baseHoras * frac;
+        });
+    } else {
+        valoresH = grupo.tarefas.map(() => baseHoras / n);
+    }
+    cardEl.querySelectorAll('[data-preview-idx]').forEach(el => {
+        const i = parseInt(el.getAttribute('data-preview-idx'), 10);
+        const strong = el.querySelector('.distrib-preview-h');
+        if (strong) strong.textContent = (valoresH[i] || 0).toFixed(2).replace('.', ',') + 'h';
+    });
+}
+
+function rdoDistribHorasMarcarPrincipal(cardEl, tarefaIdx) {
+    cardEl.dataset.principalIdx = String(tarefaIdx);
+    cardEl.dataset.resolved = '1';
+    cardEl.querySelectorAll('.distrib-tarefa-btn').forEach(btn => {
+        const i = parseInt(btn.dataset.tarefaIdx, 10);
+        btn.classList.toggle('btn-primary', i === tarefaIdx);
+        btn.classList.toggle('btn-outline-primary', i !== tarefaIdx);
+    });
+    const pesoBox = cardEl.querySelector('.distrib-peso-box');
+    if (pesoBox) {
+        pesoBox.classList.remove('d-none');
+        pesoBox.classList.add('d-flex');
+    }
+    if (!cardEl.dataset.peso) cardEl.dataset.peso = '70';
+    const status = cardEl.querySelector('.distrib-status');
+    if (status) {
+        status.classList.remove('bg-secondary', 'bg-light', 'text-dark');
+        status.classList.add('bg-success');
+        status.textContent = 'Definido';
+    }
+    rdoDistribHorasAtualizarPreview(cardEl);
+    rdoDistribHorasAtualizarResumo();
+}
+
+function rdoDistribHorasPularCard(cardEl) {
+    cardEl.dataset.principalIdx = '-1';
+    cardEl.dataset.peso = '';
+    cardEl.dataset.resolved = 'skip';
+    cardEl.querySelectorAll('.distrib-tarefa-btn').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    const pesoBox = cardEl.querySelector('.distrib-peso-box');
+    if (pesoBox) {
+        pesoBox.classList.add('d-none');
+        pesoBox.classList.remove('d-flex');
+    }
+    const status = cardEl.querySelector('.distrib-status');
+    if (status) {
+        status.classList.remove('bg-secondary', 'bg-success');
+        status.classList.add('bg-light', 'text-dark');
+        status.textContent = 'Divisão igual';
+    }
+    rdoDistribHorasAtualizarPreview(cardEl);
+    rdoDistribHorasAtualizarResumo();
+}
+
+function rdoDistribHorasAtualizarResumo() {
+    const cards = document.querySelectorAll('#distribHorasCards .distrib-card');
+    const total = cards.length;
+    let resolvidos = 0;
+    cards.forEach(c => { if (c.dataset.resolved && c.dataset.resolved !== '0') resolvidos += 1; });
+    const resumo = document.getElementById('distribHorasResumo');
+    if (resumo) resumo.textContent = `${resolvidos} / ${total} cards resolvidos`;
+    const btn = document.getElementById('btnSalvarDistribHoras');
+    if (btn) btn.disabled = resolvidos < total;
+}
+
+function rdoDistribHorasGravarHidden() {
+    // Limpa hidden inputs antigos.
+    document.querySelectorAll('input[data-distrib-hidden="1"]').forEach(el => el.remove());
+    const formRDO = document.getElementById('formEditarRDO');
+    if (!formRDO) return;
+    const cards = document.querySelectorAll('#distribHorasCards .distrib-card');
+    const cardsState = rdoDistribHorasState().cards;
+    cards.forEach(c => {
+        if (c.dataset.resolved !== '1') return; // skip = sem peso (NULL)
+        const idx = parseInt(c.dataset.cardIdx, 10);
+        const grupo = cardsState[idx];
+        const principalIdx = parseInt(c.dataset.principalIdx, 10);
+        const peso = parseInt(c.dataset.peso, 10);
+        if (!grupo || principalIdx < 0 || isNaN(peso)) return;
+        const tarefa = grupo.tarefas[principalIdx];
+        if (!tarefa) return;
+        const inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = `peso_dist_sub_${tarefa.subId}_func_${grupo.funcId}`;
+        inp.value = String(Math.max(0, Math.min(100, peso)));
+        inp.dataset.distribHidden = '1';
+        formRDO.appendChild(inp);
+    });
+}
+
+function rdoDistribHorasSetup() {
+    const formRDO = document.getElementById('formEditarRDO');
+    if (!formRDO) return;
+
+    let _bypass = false; // após confirmar o painel, deixar o submit fluir
+
+    function abrirModal(grupos) {
+        rdoDistribHorasState().cards = grupos;
+        const container = document.getElementById('distribHorasCards');
+        container.innerHTML = grupos.map((g, i) => rdoDistribHorasRenderCard(i, g)).join('');
+
+        // Listeners por card
+        container.querySelectorAll('.distrib-card').forEach(cardEl => {
+            cardEl.querySelectorAll('.distrib-tarefa-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tIdx = parseInt(btn.dataset.tarefaIdx, 10);
+                    rdoDistribHorasMarcarPrincipal(cardEl, tIdx);
+                });
+            });
+            const pesoInput = cardEl.querySelector('.distrib-peso-input');
+            if (pesoInput) {
+                pesoInput.addEventListener('input', () => {
+                    let v = parseInt(pesoInput.value, 10);
+                    if (isNaN(v)) v = 0;
+                    v = Math.max(0, Math.min(100, v));
+                    pesoInput.value = String(v);
+                    cardEl.dataset.peso = String(v);
+                    rdoDistribHorasAtualizarPreview(cardEl);
+                });
+            }
+            const pularBtn = cardEl.querySelector('.distrib-pular-btn');
+            if (pularBtn) pularBtn.addEventListener('click', () => rdoDistribHorasPularCard(cardEl));
+            // Preview inicial
+            rdoDistribHorasAtualizarPreview(cardEl);
+        });
+
+        rdoDistribHorasAtualizarResumo();
+        const modalEl = document.getElementById('modalDistribHoras');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+
+    // Listener em fase de captura — roda ANTES do listener V2 do cronograma.
+    formRDO.addEventListener('submit', function(e) {
+        if (_bypass) return; // já confirmado, deixar prosseguir
+        const grupos = rdoDistribHorasCollect();
+        if (!grupos.length) return; // nada a fazer
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        abrirModal(grupos);
+    }, true);
+
+    const btnFechar = document.getElementById('btnFecharDistribHoras');
+    if (btnFechar) btnFechar.addEventListener('click', () => {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDistribHoras')).hide();
+    });
+
+    const btnPularTodos = document.getElementById('btnPularTodosDistrib');
+    if (btnPularTodos) btnPularTodos.addEventListener('click', () => {
+        document.querySelectorAll('#distribHorasCards .distrib-card').forEach(c => rdoDistribHorasPularCard(c));
+    });
+
+    const btnSalvar = document.getElementById('btnSalvarDistribHoras');
+    if (btnSalvar) btnSalvar.addEventListener('click', () => {
+        rdoDistribHorasGravarHidden();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDistribHoras')).hide();
+        _bypass = true;
+        // Re-emite submit; outros listeners (cronograma V2) seguem normais.
+        if (typeof formRDO.requestSubmit === 'function') {
+            formRDO.requestSubmit();
+        } else {
+            formRDO.submit();
+        }
+    });
+}
 </script>
 {% endblock %}

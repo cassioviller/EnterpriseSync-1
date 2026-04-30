@@ -351,6 +351,10 @@ def salvar_edicao_rdo(rdo_id):
         import re as _re
         from utils.rdo_horas import normalizar_horas_funcionario
         _sub_func_pattern = _re.compile(r'^sub_func_(\d+)_(\d+)_horas$')
+        # Task #38 — peso da tarefa principal por funcionário
+        # (campo hidden gravado pelo painel "Distribuição de horas"):
+        #   peso_dist_sub_<sub_mestre_id>_func_<func_id> = <0..100>
+        _peso_pattern = _re.compile(r'^peso_dist_sub_(\d+)_func_(\d+)$')
 
         # Coletar todas as alocações por subatividade ANTES de gravar para
         # que a normalização (utils/rdo_horas) considere o conjunto de
@@ -379,7 +383,23 @@ def salvar_edicao_rdo(rdo_id):
                     (func_id, ('sub', sub_mestre_id), horas_trabalhadas, max(0.0, extras))
                 )
 
-        entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
+        # Task #38 — coleta de pesos enviados pelo painel
+        pesos: dict = {}
+        for campo, valor in request.form.items():
+            m = _peso_pattern.match(campo)
+            if not m:
+                continue
+            try:
+                sub_mestre_id = int(m.group(1))
+                func_id = int(m.group(2))
+                peso_int = max(0, min(100, int(float(valor))))
+            except (ValueError, TypeError):
+                continue
+            pesos[(func_id, ('sub', sub_mestre_id))] = peso_int
+
+        entradas_normalizadas = normalizar_horas_funcionario(
+            entradas_brutas, pesos=pesos
+        )
 
         # Processar vínculos per-subatividade (sub_func_{sub_mestre_id}_{func_id}_horas)
         func_ids_vinculados = set()
@@ -390,6 +410,7 @@ def salvar_edicao_rdo(rdo_id):
             if funcionario:
                 sub_db_id = sub_mestre_to_db_id.get(sub_mestre_id)
                 funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
+                peso_linha = pesos.get((func_id, atividade_key))
                 rdo_funcionario = RDOMaoObra(
                     rdo_id=rdo_id,
                     funcionario_id=func_id,
@@ -398,11 +419,17 @@ def salvar_edicao_rdo(rdo_id):
                     horas_extras=horas_extras_norm,
                     admin_id=admin_id,
                     subatividade_id=sub_db_id,
+                    peso_distribuicao=peso_linha,
                 )
                 db.session.add(rdo_funcionario)
                 func_ids_vinculados.add(func_id)
                 funcionarios_salvos += 1
-                logger.info(f"✅ Funcionário por subatividade: {funcionario.nome} → sub_mestre={sub_mestre_id} sub_db={sub_db_id} {horas_trabalhadas:.2f}h (extras {horas_extras_norm:.2f}h)")
+                logger.info(
+                    f"✅ Funcionário por subatividade: {funcionario.nome} → "
+                    f"sub_mestre={sub_mestre_id} sub_db={sub_db_id} "
+                    f"{horas_trabalhadas:.2f}h (extras {horas_extras_norm:.2f}h) "
+                    f"peso={peso_linha if peso_linha is not None else '—'}"
+                )
 
         # Processar funcionários sem vínculo de subatividade (campos horas_{func_id})
         for func_id in funcionarios_selecionados:

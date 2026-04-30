@@ -3843,6 +3843,7 @@ def executar_migracoes():
             (142, "Task #21 — Mapa V2: prazo/obs/condições por fornecedor + fornecedor_escolhido_id por item + relatorio_compra_mapa", migration_142_mapa_v2_relatorio_compra),
             (143, "Task #21 — relatorio_compra_mapa: UNIQUE (mapa_id, versao) p/ versionamento seguro sob concorrência", migration_143_relatorio_compra_unique_versao),
             (144, "Task #31 — versionamento + revisão obrigatória de propostas (proposta + proposta_clausula)", migration_144_proposta_versionamento_revisao),
+            (145, "Task #38 — rdo_mao_obra.peso_distribuicao (peso da tarefa principal do funcionário)", migration_145_rdo_mao_obra_peso_distribuicao),
         ]
         
         # Executar cada migração com rastreamento
@@ -12131,6 +12132,69 @@ def migration_144_proposta_versionamento_revisao():
         return True
     except Exception as e:
         logger.error("MIGRACAO 144 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_145_rdo_mao_obra_peso_distribuicao():
+    """Task #38 — rdo_mao_obra.peso_distribuicao (Integer NULL).
+
+    Adiciona à tabela ``rdo_mao_obra`` a coluna ``peso_distribuicao``
+    (Integer, nullable) usada para armazenar o peso (em pontos
+    percentuais 0..100) da tarefa marcada como **principal** pelo
+    apontador quando o mesmo funcionário aparece em mais de uma
+    atividade no RDO do dia.
+
+    NULL é o estado neutro: linhas legadas e novas linhas em RDOs
+    cujo apontador "manteve divisão igual" continuam com NULL e o
+    helper ``utils.rdo_horas.normalizar_horas_funcionario`` preserva
+    o comportamento histórico (divisão igual entre as N atividades).
+
+    Idempotente (IF NOT EXISTS). Sem backfill — RDOs antigos seguem
+    como estão.
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 145: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='rdo_mao_obra'
+                       AND column_name='peso_distribuicao'
+                ) THEN
+                    ALTER TABLE rdo_mao_obra
+                      ADD COLUMN peso_distribuicao INTEGER NULL;
+                END IF;
+            END$$;
+        """)
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 145 CONCLUIDA: rdo_mao_obra.peso_distribuicao adicionada (NULL).")
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 145 falhou: %s", e)
         try:
             connection.rollback()
             connection.close()

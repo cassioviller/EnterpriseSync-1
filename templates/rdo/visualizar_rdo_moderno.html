@@ -1620,12 +1620,33 @@ console.log('Initializing RDO view with light theme...');
                             <i class="fas fa-list-ul"></i>
                             {{ funcionario.atividades|length }} atividade{{ 's' if funcionario.atividades|length != 1 else '' }}
                         </small>
+                        {# Task #38 — calcula peso "secundária" (restante / N-1) para badges. #}
+                        {% set _ats = funcionario.atividades %}
+                        {% set _principal_peso = namespace(v=None) %}
+                        {% for _a in _ats %}
+                            {% if _a.peso_distribuicao is not none and _principal_peso.v is none %}
+                                {% set _principal_peso.v = _a.peso_distribuicao %}
+                            {% endif %}
+                        {% endfor %}
+                        {% set _n_outras = (_ats|length) - 1 %}
+                        {% set _peso_secund = ((100 - _principal_peso.v) // _n_outras) if (_principal_peso.v is not none and _n_outras > 0) else None %}
                         <ul class="list-unstyled mb-0" style="font-size: 0.82rem; padding-left: 0.25rem;">
-                            {% for a in funcionario.atividades %}
+                            {% for a in _ats %}
                             <li class="text-truncate" title="{{ a.nome }} ({{ '%.2f'|format(a.horas) }}h)">
                                 <i class="fas fa-angle-right text-muted"></i>
                                 {{ a.nome }}
                                 <span class="text-muted">({{ "%.2f"|format(a.horas) }}h)</span>
+                                {% if a.peso_distribuicao is not none %}
+                                    <span class="badge bg-primary ms-1" style="font-size:.65rem"
+                                          title="Tarefa marcada como principal pelo apontador">
+                                        principal {{ a.peso_distribuicao }}%
+                                    </span>
+                                {% elif _principal_peso.v is not none and _peso_secund is not none %}
+                                    <span class="badge bg-secondary ms-1" style="font-size:.65rem"
+                                          title="Restante da jornada dividido entre as tarefas não-principais">
+                                        secundária {{ _peso_secund }}%
+                                    </span>
+                                {% endif %}
                             </li>
                             {% endfor %}
                         </ul>

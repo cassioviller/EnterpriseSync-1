@@ -8,34 +8,45 @@ Regra de negócio
 ----------------
 A jornada-base do funcionário no dia é o MAIOR valor que ele entrou
 em qualquer linha do RDO (cobre o caso comum em que o usuário digita
-8h em todas as atividades). Esse total é dividido igualmente pelas
-``N`` atividades distintas em que ele participa, evitando que 8h em
-3 atividades vire 24h fictícias. A mesma regra é aplicada às
-``horas_extras`` para manter consistência.
+8h em todas as atividades). Por padrão esse total é dividido
+igualmente pelas ``N`` atividades distintas em que ele participa,
+evitando que 8h em 3 atividades vire 24h fictícias. A mesma regra é
+aplicada às ``horas_extras`` para manter consistência.
 
-Exemplo:
-    >>> entries = [(10, ('sub', 'A'), 8.0, 0.0),
-    ...            (10, ('sub', 'B'), 8.0, 0.0),
-    ...            (10, ('sub', 'C'), 8.0, 0.0)]
-    >>> normalizar_horas_funcionario(entries)
-    [(10, ('sub', 'A'), 2.6666..., 0.0),
-     (10, ('sub', 'B'), 2.6666..., 0.0),
-     (10, ('sub', 'C'), 2.6666..., 0.0)]
+Task #38 — distribuição com pesos
+---------------------------------
+O apontador pode marcar uma das tarefas do funcionário como
+**principal** com um peso livre de 0 a 100 (porcento da jornada-base).
+Quando o helper recebe o argumento ``pesos`` (dict
+``{(func_id, atividade_key): int_ou_None}``), ele aplica a
+distribuição abaixo, por funcionário:
 
-Funcionários que aparecem em apenas 1 atividade não são alterados.
+* Se nenhuma das linhas do funcionário tem peso → divisão igual
+  (comportamento histórico, sem regressão).
+* Se TODAS as linhas têm peso → distribuição proporcional aos pesos
+  (a jornada-base é repartida em ``peso_i / sum(pesos)``).
+* Caso misto (alguma linha com peso, outras com ``None``) → as linhas
+  com peso recebem ``peso_i / 100`` da jornada-base; o restante
+  ``max(0, 100 - sum_pesos)`` é dividido igualmente entre as linhas
+  ``None`` daquele funcionário.
+
+A mesma proporção é aplicada às ``horas_extras``.
+
+Funcionários que aparecem em apenas 1 atividade não são alterados,
+independente de existir peso (a UI não oferece o painel nesse caso).
+
 A função preserva qualquer campo extra a partir do índice 4 da tupla
-(útil para metadados como objetos de subatividade).
-
-Para fluxos onde a dimensão "atividade" não existe no formulário
-(ex.: ``criar_rdo`` JSON legado), use ``enumerate`` para gerar uma
-chave de atividade única por linha — assim duplicatas do mesmo
-funcionário ainda dividem horas corretamente.
+(útil para metadados como nome de função etc.).
 """
 
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Mapping, Optional, Tuple
 
 
-def normalizar_horas_funcionario(entries: Iterable[Tuple]) -> List[Tuple]:
+def normalizar_horas_funcionario(
+    entries: Iterable[Tuple],
+    *,
+    pesos: Optional[Mapping[Tuple, Optional[int]]] = None,
+) -> List[Tuple]:
     """Divide horas-base do funcionário pelas atividades distintas.
 
     Args:
@@ -44,16 +55,21 @@ def normalizar_horas_funcionario(entries: Iterable[Tuple]) -> List[Tuple]:
             onde ``atividade_key`` é qualquer valor hashable que
             identifica unicamente a atividade no RDO. Se a tupla tem
             apenas 3 elementos, ``horas_extras`` é assumido como 0.
+        pesos: dicionário opcional ``{(func_id, atividade_key): peso}``
+            com pesos em pontos percentuais (``0..100``) ou ``None``.
+            Quando ausente para uma chave, vale ``None``. Veja a regra
+            de distribuição no docstring do módulo.
 
     Returns:
         Lista com a mesma estrutura, com ``horas`` e ``horas_extras``
-        substituídas por ``max(...) / N`` para funcionários que
-        aparecem em N>1 atividades distintas. Campos extras a partir
+        substituídas pelo valor distribuído. Campos extras a partir
         do índice 4 são preservados.
     """
     entries_list = list(entries)
     if not entries_list:
         return entries_list
+
+    pesos = dict(pesos) if pesos else {}
 
     grupos: dict = {}
     for entry in entries_list:
@@ -65,7 +81,8 @@ def normalizar_horas_funcionario(entries: Iterable[Tuple]) -> List[Tuple]:
         chaves_distintas = {item[1] for item in items}
         n = len(chaves_distintas)
         if n <= 1:
-            # Garante shape de 4+ campos mesmo para entradas curtas
+            # Funcionário em 1 só atividade: passa direto (UI também
+            # não oferece o painel de pesos nesse caso).
             for item in items:
                 if len(item) >= 4:
                     resultado.append(item)
@@ -78,10 +95,64 @@ def normalizar_horas_funcionario(entries: Iterable[Tuple]) -> List[Tuple]:
             (float(item[3] or 0) if len(item) >= 4 else 0.0 for item in items),
             default=0.0,
         )
-        horas_norm = max_horas / n if n > 0 else 0.0
-        extras_norm = max_extras / n if n > 0 else 0.0
+
+        # Lê pesos para esse funcionário (mesma chave que o caller
+        # usou em entries). Pesos ausentes/None viram None.
+        pesos_por_chave = {}
         for item in items:
+            key = item[1]
+            peso = pesos.get((func_id, key))
+            if peso is None:
+                pesos_por_chave[key] = None
+            else:
+                try:
+                    pesos_por_chave[key] = max(0, min(100, int(peso)))
+                except (TypeError, ValueError):
+                    pesos_por_chave[key] = None
+
+        com_peso = {k: v for k, v in pesos_por_chave.items() if v is not None}
+        sem_peso = [k for k, v in pesos_por_chave.items() if v is None]
+
+        if not com_peso:
+            # Caminho histórico: divisão igual entre N atividades.
+            horas_norm = max_horas / n if n > 0 else 0.0
+            extras_norm = max_extras / n if n > 0 else 0.0
+            for item in items:
+                meta = tuple(item[4:]) if len(item) > 4 else ()
+                resultado.append(
+                    (item[0], item[1], horas_norm, extras_norm) + meta
+                )
+            continue
+
+        # Há pelo menos um peso definido — calcular fração por chave.
+        soma_pesos = sum(com_peso.values())
+        fracoes: dict = {}
+        if not sem_peso:
+            # Todas com peso: distribuição proporcional a soma_pesos.
+            # Se soma_pesos==0 → todas as horas viram 0 (caso extremo).
+            if soma_pesos > 0:
+                for k, v in com_peso.items():
+                    fracoes[k] = v / soma_pesos
+            else:
+                for k in com_peso:
+                    fracoes[k] = 0.0
+        else:
+            # Misto: peso conhecido = v/100; restante /n_sem_peso entre
+            # as None. Se sum_known >= 100, sobra 0 para as None.
+            restante = max(0.0, 100.0 - soma_pesos)
+            cota_sem = (restante / len(sem_peso)) / 100.0 if sem_peso else 0.0
+            for k, v in com_peso.items():
+                fracoes[k] = v / 100.0
+            for k in sem_peso:
+                fracoes[k] = cota_sem
+
+        for item in items:
+            key = item[1]
+            frac = fracoes.get(key, 0.0)
+            horas_norm = max_horas * frac
+            extras_norm = max_extras * frac
             meta = tuple(item[4:]) if len(item) > 4 else ()
-            novo = (item[0], item[1], horas_norm, extras_norm) + meta
-            resultado.append(novo)
+            resultado.append(
+                (item[0], item[1], horas_norm, extras_norm) + meta
+            )
     return resultado
