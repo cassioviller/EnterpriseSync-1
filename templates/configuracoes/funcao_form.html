@@ -47,6 +47,26 @@
                       rows="3" placeholder="Descrição opcional da função">{{ funcao.descricao if funcao else '' }}</textarea>
           </div>
 
+          <div class="mb-3">
+            <label for="insumo_id" class="form-label fw-semibold">
+              Insumo Equivalente (Mão de Obra)
+            </label>
+            <select class="form-select" id="insumo_id" name="insumo_id">
+              <option value="">— Sem insumo vinculado —</option>
+              {% for ins in insumos_mo or [] %}
+                <option value="{{ ins.id }}"
+                  {% if funcao and funcao.insumo_id == ins.id %}selected{% endif %}>
+                  {{ ins.nome }} ({{ ins.unidade }})
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              <i class="fas fa-info-circle me-1"></i>
+              Permite o auto-vínculo dos apontamentos de RDO desta função à
+              composição correta do serviço (Task #62).
+            </div>
+          </div>
+
           <div class="mb-4">
             <label for="salario_base" class="form-label fw-semibold">Salário Base (R$)</label>
             <div class="input-group">

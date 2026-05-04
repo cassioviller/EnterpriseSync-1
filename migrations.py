@@ -3849,6 +3849,7 @@ def executar_migracoes():
             (148, "Task #47 — proposta_templates.padrao + índice parcial único + backfill (template mais antigo por admin)", migration_148_proposta_templates_padrao),
             (149, "Task #43 — webhook_entrega (fila/log de notificações para n8n)", migration_149_webhook_entrega),
             (150, "Task #63 — Orçamento Operacional da Obra (3 tabelas + backfill)", migration_150_obra_orcamento_operacional),
+            (151, "Task #62 — vínculos Cronograma↔Subatividade↔Serviço↔Mão-de-obra", migration_151_vinculo_subatividade_composicao),
         ]
         
         # Executar cada migração com rastreamento
@@ -12810,6 +12811,200 @@ def migration_150_obra_orcamento_operacional():
         return True
     except Exception as e:
         logger.error("MIGRACAO 150 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_151_vinculo_subatividade_composicao():
+    """Task #62 — vínculos Cronograma↔Subatividade↔Serviço↔Mão-de-obra.
+
+    Aplica de forma idempotente:
+      - funcao.insumo_id (FK → insumo.id, ON DELETE SET NULL) + índice.
+      - subatividade_mestre.criada_via_cronograma BOOL DEFAULT FALSE.
+      - subatividade_mestre.precisa_revisao BOOL DEFAULT FALSE.
+      - tarefa_cronograma.servico_id (FK → servico.id, ON DELETE SET NULL)
+        + índice. Mantida nullable para tolerar dados legados.
+      - rdo_mao_obra.composicao_servico_id (FK → composicao_servico.id,
+        ON DELETE SET NULL) + índice.
+      - rdo_mao_obra.vinculo_status VARCHAR(40) + índice.
+      - Tabela ``subatividade_mao_obra`` (junção N:N
+        SubatividadeMestre × ComposicaoServico) com unique
+        (subatividade_mestre_id, composicao_servico_id).
+
+    Backfill retroativo:
+      - tarefa_cronograma.servico_id ← Servico.id quando o nome do Serviço
+        bate (case-insensitive) com TarefaCronograma.nome_tarefa do mesmo
+        admin_id (best-effort; o que não bate fica NULL — vai aparecer no
+        audit como "tarefa sem serviço" futuramente).
+      - rdo_mao_obra.vinculo_status='manual' onde já houver
+        composicao_servico_id manualmente preenchido (ninguém ainda terá
+        em produção, é só para garantir invariante).
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 151: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+
+        # 1) funcao.insumo_id
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='funcao' AND column_name='insumo_id'
+                ) THEN
+                    ALTER TABLE funcao
+                      ADD COLUMN insumo_id INTEGER NULL
+                      REFERENCES insumo(id) ON DELETE SET NULL;
+                    CREATE INDEX IF NOT EXISTS idx_funcao_insumo_id
+                      ON funcao(insumo_id);
+                END IF;
+            END$$;
+        """)
+
+        # 2) subatividade_mestre.criada_via_cronograma + precisa_revisao
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='subatividade_mestre'
+                       AND column_name='criada_via_cronograma'
+                ) THEN
+                    ALTER TABLE subatividade_mestre
+                      ADD COLUMN criada_via_cronograma BOOLEAN
+                      NOT NULL DEFAULT FALSE;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='subatividade_mestre'
+                       AND column_name='precisa_revisao'
+                ) THEN
+                    ALTER TABLE subatividade_mestre
+                      ADD COLUMN precisa_revisao BOOLEAN
+                      NOT NULL DEFAULT FALSE;
+                END IF;
+            END$$;
+        """)
+
+        # 3) tarefa_cronograma.servico_id
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='tarefa_cronograma'
+                       AND column_name='servico_id'
+                ) THEN
+                    ALTER TABLE tarefa_cronograma
+                      ADD COLUMN servico_id INTEGER NULL
+                      REFERENCES servico(id) ON DELETE SET NULL;
+                    CREATE INDEX IF NOT EXISTS idx_tarefa_cronograma_servico_id
+                      ON tarefa_cronograma(servico_id);
+                END IF;
+            END$$;
+        """)
+
+        # 4) rdo_mao_obra.composicao_servico_id + vinculo_status
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='rdo_mao_obra'
+                       AND column_name='composicao_servico_id'
+                ) THEN
+                    ALTER TABLE rdo_mao_obra
+                      ADD COLUMN composicao_servico_id INTEGER NULL
+                      REFERENCES composicao_servico(id) ON DELETE SET NULL;
+                    CREATE INDEX IF NOT EXISTS idx_rdo_mao_obra_composicao
+                      ON rdo_mao_obra(composicao_servico_id);
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name='rdo_mao_obra'
+                       AND column_name='vinculo_status'
+                ) THEN
+                    ALTER TABLE rdo_mao_obra
+                      ADD COLUMN vinculo_status VARCHAR(40) NULL;
+                    CREATE INDEX IF NOT EXISTS idx_rdo_mao_obra_vinculo_status
+                      ON rdo_mao_obra(vinculo_status);
+                END IF;
+            END$$;
+        """)
+
+        # 5) Tabela junção subatividade_mao_obra
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subatividade_mao_obra (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                subatividade_mestre_id INTEGER NOT NULL
+                    REFERENCES subatividade_mestre(id) ON DELETE CASCADE,
+                composicao_servico_id INTEGER NOT NULL
+                    REFERENCES composicao_servico(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_subatividade_composicao
+                    UNIQUE (subatividade_mestre_id, composicao_servico_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_subatividade_mao_obra_admin
+              ON subatividade_mao_obra(admin_id);
+            CREATE INDEX IF NOT EXISTS idx_subatividade_mao_obra_sub
+              ON subatividade_mao_obra(subatividade_mestre_id);
+            CREATE INDEX IF NOT EXISTS idx_subatividade_mao_obra_comp
+              ON subatividade_mao_obra(composicao_servico_id);
+        """)
+
+        # 6) Backfill: tarefa_cronograma.servico_id por nome (case-insensitive).
+        cursor.execute("""
+            UPDATE tarefa_cronograma t
+               SET servico_id = s.id
+              FROM servico s
+             WHERE t.servico_id IS NULL
+               AND s.admin_id = t.admin_id
+               AND lower(trim(s.nome)) = lower(trim(t.nome_tarefa))
+        """)
+        n_tarefas_backfill = cursor.rowcount
+
+        # 7) Marca como 'manual' RDOMaoObra que já tenham composicao seteada
+        cursor.execute("""
+            UPDATE rdo_mao_obra
+               SET vinculo_status = 'manual'
+             WHERE composicao_servico_id IS NOT NULL
+               AND vinculo_status IS NULL
+        """)
+        n_manual = cursor.rowcount
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 151 CONCLUIDA: vínculos Task#62 — "
+            "tarefas_backfill=%s, manual_pre=%s",
+            n_tarefas_backfill, n_manual,
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 151 falhou: %s", e)
         try:
             connection.rollback()
             connection.close()

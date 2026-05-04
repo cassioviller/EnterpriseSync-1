@@ -92,6 +92,60 @@
                      id="chkAtivo" {{ 'checked' if sub.ativo }}>
               <label class="form-check-label" for="chkAtivo">Ativo</label>
             </div>
+            {% if sub.precisa_revisao or sub.criada_via_cronograma %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="precisa_revisao" value="1"
+                     id="chkRev" {{ 'checked' if sub.precisa_revisao }}>
+              <label class="form-check-label text-warning" for="chkRev">
+                <i class="fas fa-exclamation-triangle"></i> Precisa revisão
+              </label>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Task #62: composições do serviço (N:N SubatividadeMaoObra) -->
+          <div class="col-12">
+            <hr class="my-3">
+            <label class="form-label fw-semibold mb-2">
+              <i class="fas fa-link me-1 text-primary"></i>
+              Composições de Mão de Obra do Serviço
+            </label>
+            {% if not sub.servico_id %}
+              <p class="text-muted small mb-0">
+                Selecione um serviço para esta subatividade para vincular composições.
+              </p>
+            {% elif not composicoes %}
+              <p class="text-muted small mb-0">
+                O serviço selecionado ainda não possui composições cadastradas.
+                <a href="{{ url_for('main.dashboard') }}">Cadastrar no módulo de Serviços.</a>
+              </p>
+            {% else %}
+              <p class="text-muted small mb-2">
+                Marque quais composições (linhas de Insumo) integram esta subatividade.
+                Apenas as marcadas serão consideradas no auto-vínculo de RDO.
+              </p>
+              <!-- garante que o form sempre envia o campo, mesmo vazio -->
+              <input type="hidden" name="composicoes_ids" value="">
+              <div class="border rounded p-2" style="max-height:280px;overflow:auto">
+                {% for c in composicoes %}
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox"
+                         name="composicoes_ids" value="{{ c.id }}"
+                         id="cmp{{ c.id }}"
+                         {{ 'checked' if c.id in composicoes_selecionadas_ids }}>
+                  <label class="form-check-label small" for="cmp{{ c.id }}">
+                    <span class="fw-semibold">{{ c.insumo.nome if c.insumo else '#'~c.insumo_id }}</span>
+                    <span class="text-muted">
+                      — coef {{ c.coeficiente }}{{ ' ' ~ (c.unidade or c.insumo.unidade if c.insumo else '') }}
+                      {% if c.insumo and c.insumo.tipo %}
+                        <span class="badge bg-light text-dark border ms-1">{{ c.insumo.tipo }}</span>
+                      {% endif %}
+                    </span>
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+            {% endif %}
           </div>
         </div>
         {% endif %}

@@ -1,0 +1,247 @@
+{% extends "base_completo.html" %}
+{% block title %}Vínculos a revisar — SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 py-2">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h4 class="mb-0 fw-bold">
+        <i class="fas fa-link-slash me-2 text-warning"></i>
+        Vínculos a revisar
+      </h4>
+      <nav aria-label="breadcrumb" class="mt-1">
+        <ol class="breadcrumb mb-0 small">
+          <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+          <li class="breadcrumb-item active">Vínculos / Auditoria</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <ul class="nav nav-tabs" id="auditTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-subs" data-bs-toggle="tab" data-bs-target="#pane-subs" type="button">
+        Subatividades a revisar
+        <span class="badge bg-warning text-dark ms-1">{{ subs_revisar|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-tarefas" data-bs-toggle="tab" data-bs-target="#pane-tarefas" type="button">
+        Tarefas sem serviço
+        <span class="badge bg-warning text-dark ms-1">{{ tarefas_sem_servico|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-mo" data-bs-toggle="tab" data-bs-target="#pane-mo" type="button">
+        Mão de obra (RDO)
+        <span class="badge bg-danger ms-1">{{ mao_obra_problema|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-funcoes" data-bs-toggle="tab" data-bs-target="#pane-funcoes" type="button">
+        Funções sem insumo
+        <span class="badge bg-secondary ms-1">{{ funcoes_sem_insumo|length }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content border border-top-0 p-3 bg-white">
+
+    <!-- ABA 1: Subatividades a revisar -->
+    <div class="tab-pane fade show active" id="pane-subs" role="tabpanel">
+      {% if not subs_revisar %}
+        <p class="text-muted mb-0">Nenhuma subatividade pendente de revisão. ✅</p>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Nome</th>
+                <th>Serviço</th>
+                <th>Origem</th>
+                <th>Composições</th>
+                <th>Criada em</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in subs_revisar %}
+              <tr>
+                <td class="fw-semibold">{{ s.nome }}</td>
+                <td>{{ s.servico.nome if s.servico else '—' }}</td>
+                <td>
+                  {% if s.criada_via_cronograma %}
+                    <span class="badge bg-info-subtle text-info border border-info-subtle">via cronograma</span>
+                  {% endif %}
+                  {% if s.precisa_revisao %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">precisa revisão</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-secondary-subtle text-secondary border">{{ s.composicoes_mao_obra|length }}</span>
+                </td>
+                <td class="small text-muted">{{ s.created_at.strftime('%d/%m/%Y') if s.created_at }}</td>
+                <td class="text-end">
+                  <a href="{{ url_for('cronograma.catalogo_editar_subatividade', sub_id=s.id) }}"
+                     class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-edit"></i> Editar
+                  </a>
+                  <form method="POST" class="d-inline"
+                        action="{{ url_for('vinculos_audit.marcar_subatividade_revisada', sub_id=s.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-success btn-sm"
+                            onclick="return confirm('Marcar como revisada?')">
+                      <i class="fas fa-check"></i> Marcar revisada
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- ABA 2: Tarefas sem servico_id -->
+    <div class="tab-pane fade" id="pane-tarefas" role="tabpanel">
+      {% if not tarefas_sem_servico %}
+        <p class="text-muted mb-0">Todas as tarefas estão associadas a um serviço. ✅</p>
+      {% else %}
+        <p class="text-muted small">
+          Estas tarefas foram criadas antes da nova regra de "serviço obrigatório".
+          Edite cada uma para vincular ao serviço correto.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Tarefa</th>
+                <th>Obra</th>
+                <th>Subatividade</th>
+                <th>Início</th>
+                <th>Duração</th>
+                <th>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tarefas_sem_servico %}
+              <tr>
+                <td class="fw-semibold">#{{ t.id }} — {{ t.nome_tarefa }}</td>
+                <td>
+                  <a href="{{ url_for('main.detalhes_obra', id=t.obra_id) }}">
+                    {{ t.obra_id }}
+                  </a>
+                </td>
+                <td class="small">{{ t.subatividade_mestre.nome if t.subatividade_mestre else '—' }}</td>
+                <td class="small">{{ t.data_inicio.strftime('%d/%m/%y') if t.data_inicio else '—' }}</td>
+                <td class="small">{{ t.duracao_dias }}d</td>
+                <td class="small">{{ '%.0f'|format(t.percentual_concluido or 0) }}%</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- ABA 3: RDOMaoObra com vinculo_status problemático -->
+    <div class="tab-pane fade" id="pane-mo" role="tabpanel">
+      {% if not mao_obra_problema %}
+        <p class="text-muted mb-0">Todos os apontamentos de mão-de-obra estão vinculados corretamente. ✅</p>
+      {% else %}
+        <p class="text-muted small">
+          Apontamentos com problemas de vínculo automático.
+          Para resolver: associe Função→Insumo, configure composições do serviço,
+          ou marque composições da subatividade.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>RDO</th>
+                <th>Data</th>
+                <th>Obra</th>
+                <th>Funcionário</th>
+                <th>Função</th>
+                <th>Status do vínculo</th>
+                <th>Horas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for mo, func, rdo, obra in mao_obra_problema %}
+              <tr>
+                <td><a href="{{ url_for('main.visualizar_rdo', id=rdo.id) }}">{{ rdo.numero_rdo }}</a></td>
+                <td class="small">{{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio }}</td>
+                <td class="small">{{ obra.nome }}</td>
+                <td>{{ func.nome }}</td>
+                <td class="small">{{ mo.funcao_exercida or '—' }}</td>
+                <td>
+                  {% set badge = {
+                    'sem_funcao': 'bg-secondary',
+                    'funcao_fora_composicao': 'bg-warning text-dark',
+                    'subatividade_sem_composicoes': 'bg-info text-dark',
+                    'ambiguo': 'bg-danger',
+                  }.get(mo.vinculo_status, 'bg-light text-dark') %}
+                  <span class="badge {{ badge }}">{{ mo.vinculo_status }}</span>
+                </td>
+                <td class="small">{{ '%.2f'|format(mo.horas_trabalhadas or 0) }}h</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- ABA 4: Funções sem insumo -->
+    <div class="tab-pane fade" id="pane-funcoes" role="tabpanel">
+      {% if not funcoes_sem_insumo %}
+        <p class="text-muted mb-0">Todas as funções têm insumo equivalente associado. ✅</p>
+      {% else %}
+        <p class="text-muted small">
+          Cada função precisa de um insumo (tipo MAO_OBRA) equivalente para o auto-vínculo
+          Funcionário→Composição funcionar.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Função</th>
+                <th>Funcionários</th>
+                <th>Salário base</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in funcoes_sem_insumo %}
+              <tr>
+                <td class="fw-semibold">{{ f.nome }}</td>
+                <td>{{ f.funcionarios|length }}</td>
+                <td class="small">R$ {{ '%.2f'|format(f.salario_base or 0) }}</td>
+                <td class="text-end">
+                  <a href="{{ url_for('configuracoes.editar_funcao', id=f.id) }}"
+                     class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-edit"></i> Vincular insumo
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

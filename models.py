@@ -56,9 +56,18 @@ class Funcao(db.Model):
     descricao = db.Column(db.Text)
     salario_base = db.Column(db.Float, default=0.0)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    # Task #62 — Insumo (tipo MAO_OBRA) equivalente desta função.
+    # Usado pelo auto-vínculo Função→ComposicaoServico no salvamento de RDO.
+    insumo_id = db.Column(
+        db.Integer,
+        db.ForeignKey('insumo.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     funcionarios = db.relationship('Funcionario', backref='funcao_ref', lazy=True)
+    insumo = db.relationship('Insumo', foreign_keys=[insumo_id])
 
 class HorarioTrabalho(db.Model):
     """
@@ -879,6 +888,18 @@ class RDOMaoObra(db.Model):
     subatividade_id = db.Column(db.Integer, db.ForeignKey('rdo_servico_subatividade.id', ondelete='CASCADE'), nullable=True)
     tarefa_cronograma_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'), nullable=True)
 
+    # Task #62 — vínculo automático Funcao→ComposicaoServico (preenchido
+    # no salvamento do RDO via services.vinculo_mao_obra).
+    composicao_servico_id = db.Column(
+        db.Integer,
+        db.ForeignKey('composicao_servico.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    # Status do auto-vínculo: 'auto', 'manual', 'ambiguo', 'sem_funcao',
+    # 'funcao_fora_composicao', 'subatividade_sem_composicoes'.
+    vinculo_status = db.Column(db.String(40), nullable=True, index=True)
+
     # Produtividade V2 (migration #97)
     produtividade_real = db.Column(db.Float, nullable=True)
     indice_produtividade = db.Column(db.Float, nullable=True)
@@ -1334,7 +1355,15 @@ class SubatividadeMestre(db.Model):
     
     # Multi-tenant
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    
+
+    # Task #62 — flag de origem e revisão pendente.
+    # Quando uma tarefa de cronograma é criada com nome de subatividade que
+    # NÃO corresponde a nenhuma SubatividadeMestre existente, criamos uma
+    # nova marcando criada_via_cronograma=True e precisa_revisao=True para
+    # que o gestor revise composições/unidade/meta no Catálogo depois.
+    criada_via_cronograma = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    precisa_revisao = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+
     # Controle
     ativo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -4650,6 +4679,15 @@ class TarefaCronograma(db.Model):
         nullable=True,
     )
     subatividade_mestre = db.relationship('SubatividadeMestre', backref='tarefas_cronograma')
+    # Task #62 — Serviço obrigatório das novas tarefas (nullable no DB
+    # para tolerar dados legados; a UI/POST exige o campo a partir de v9).
+    servico_id = db.Column(
+        db.Integer,
+        db.ForeignKey('servico.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    servico = db.relationship('Servico', foreign_keys=[servico_id])
     # Atualizado automaticamente pelo RDO
     percentual_concluido = db.Column(db.Float, default=0.0, nullable=False)
     # 'empresa' = conta na produtividade; 'terceiros' = só check de conclusão
@@ -5852,6 +5890,51 @@ class ComposicaoServico(db.Model):
 
     def __repr__(self):
         return f'<ComposicaoServico svc={self.servico_id} ins={self.insumo_id} coef={self.coeficiente}>'
+
+
+class SubatividadeMaoObra(db.Model):
+    """Task #62 — junção N:N entre SubatividadeMestre e ComposicaoServico
+    (linhas de mão-de-obra do serviço). Permite que uma subatividade aponte
+    para várias composições de mão-de-obra (várias funções/insumos), e que
+    uma composição apareça em várias subatividades do mesmo serviço.
+    """
+    __tablename__ = 'subatividade_mao_obra'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    subatividade_mestre_id = db.Column(
+        db.Integer,
+        db.ForeignKey('subatividade_mestre.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    composicao_servico_id = db.Column(
+        db.Integer,
+        db.ForeignKey('composicao_servico.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    subatividade = db.relationship(
+        'SubatividadeMestre',
+        backref=db.backref('composicoes_mao_obra', cascade='all, delete-orphan'),
+    )
+    composicao = db.relationship(
+        'ComposicaoServico',
+        backref=db.backref('subatividades_vinculadas', cascade='all, delete-orphan'),
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'subatividade_mestre_id', 'composicao_servico_id',
+            name='uq_subatividade_composicao',
+        ),
+    )
+
+    def __repr__(self):
+        return (
+            f'<SubatividadeMaoObra sub={self.subatividade_mestre_id} '
+            f'comp={self.composicao_servico_id}>'
+        )
 
 
 # ===================================================================

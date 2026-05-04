@@ -353,15 +353,27 @@ def funcoes():
 @admin_required
 def criar_funcao():
     """Criar função"""
+    from multitenant_helper import get_admin_id
+    from models import Insumo
+    admin_id = get_admin_id()
     if request.method == 'POST':
         try:
-            from multitenant_helper import get_admin_id
-            admin_id = get_admin_id()
+            # Task #62: insumo_id (tipo MAO_OBRA) opcional
+            raw_insumo = request.form.get('insumo_id') or ''
+            insumo_id = int(raw_insumo) if raw_insumo.strip() else None
+            if insumo_id:
+                ins = Insumo.query.filter_by(
+                    id=insumo_id, admin_id=admin_id, tipo='MAO_OBRA'
+                ).first()
+                if not ins:
+                    flash('Insumo selecionado é inválido ou não é do tipo MAO_OBRA.', 'warning')
+                    insumo_id = None
             funcao = Funcao(
                 nome=request.form['nome'],
                 descricao=request.form.get('descricao'),
                 salario_base=float(request.form.get('salario_base', 0)),
-                admin_id=admin_id
+                admin_id=admin_id,
+                insumo_id=insumo_id,
             )
             db.session.add(funcao)
             db.session.commit()
@@ -370,8 +382,16 @@ def criar_funcao():
         except Exception as e:
             db.session.rollback()
             flash(f'Erro ao criar função: {str(e)}', 'danger')
-    
-    return render_template('configuracoes/funcao_form.html', funcao=None)
+
+    insumos_mo = (
+        Insumo.query
+        .filter_by(admin_id=admin_id, tipo='MAO_OBRA', ativo=True)
+        .order_by(Insumo.nome).all()
+    )
+    return render_template(
+        'configuracoes/funcao_form.html',
+        funcao=None, insumos_mo=insumos_mo,
+    )
 
 @configuracoes_bp.route('/funcoes/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -392,6 +412,22 @@ def editar_funcao(id):
             funcao.descricao = request.form.get('descricao')
             novo_salario_base = float(request.form.get('salario_base', 0))
             funcao.salario_base = novo_salario_base
+            # Task #62: insumo_id (tipo MAO_OBRA)
+            from models import Insumo as _Insumo
+            if 'insumo_id' in request.form:
+                raw_insumo = request.form.get('insumo_id') or ''
+                novo_insumo_id = int(raw_insumo) if raw_insumo.strip() else None
+                if novo_insumo_id:
+                    ins = _Insumo.query.filter_by(
+                        id=novo_insumo_id, admin_id=admin_id, tipo='MAO_OBRA'
+                    ).first()
+                    if ins:
+                        funcao.insumo_id = ins.id
+                    else:
+                        flash('Insumo selecionado é inválido ou não é do tipo MAO_OBRA.', 'warning')
+                        funcao.insumo_id = None
+                else:
+                    funcao.insumo_id = None
             
             # ATUALIZAÇÃO EM MASSA: Se salário base mudou, atualizar todos funcionários
             funcionarios_atualizados = 0
@@ -428,7 +464,15 @@ def editar_funcao(id):
             db.session.rollback()
             flash(f'Erro ao atualizar função: {str(e)}', 'danger')
     
-    return render_template('configuracoes/funcao_form.html', funcao=funcao)
+    from models import Insumo as _Insumo2
+    insumos_mo = (
+        _Insumo2.query
+        .filter_by(admin_id=admin_id, tipo='MAO_OBRA', ativo=True)
+        .order_by(_Insumo2.nome).all()
+    )
+    return render_template(
+        'configuracoes/funcao_form.html', funcao=funcao, insumos_mo=insumos_mo,
+    )
 
 @configuracoes_bp.route('/funcoes/deletar/<int:id>', methods=['POST'])
 @login_required

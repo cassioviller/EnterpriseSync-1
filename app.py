@@ -744,6 +744,24 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}")
 
+    # Task #62 — Auditoria de vínculos Cronograma↔Subatividade↔Serviço↔MO
+    try:
+        from vinculos_audit_views import vinculos_audit_bp
+        app.register_blueprint(vinculos_audit_bp)
+        logging.info("[OK] Blueprint VINCULOS_AUDIT (Task #62) registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint VINCULOS_AUDIT não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint VINCULOS_AUDIT: {e}")
+
+    # Task #62 — listener SQLAlchemy: auto-vínculo Funcao→ComposicaoServico
+    try:
+        from services.vinculo_mao_obra import install_auto_link_listener
+        install_auto_link_listener()
+        logging.info("[OK] Auto-link listener (Task #62) instalado")
+    except Exception as e:
+        logging.error(f"[ERROR] Falha instalando auto-link listener Task#62: {e}")
+
     # Registrar blueprint SUBEMPREITEIROS (Task 57)
     try:
         from subempreiteiros_views import subempreiteiros_bp

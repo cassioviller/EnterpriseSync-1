@@ -14,6 +14,7 @@ from models import (
     db, Obra, TarefaCronograma, CalendarioEmpresa, RDOApontamentoCronograma,
     CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
     RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario,
+    ComposicaoServico, SubatividadeMaoObra,
 )
 from utils.cronograma_engine import (
     recalcular_cronograma,
@@ -300,6 +301,65 @@ def criar_tarefa(obra_id: int):
         if sub_obj is None:
             sub_mestre_id = None
 
+    # Task #62 — servico_id é obrigatório a partir de v9. Aceita id explícito;
+    # senão tenta resolver pelo nome da tarefa (case-insensitive). Se nada
+    # bater, devolve 400 para a UI exigir.
+    raw_servico_id = data.get('servico_id')
+    servico_id = None
+    try:
+        servico_id = int(raw_servico_id) if raw_servico_id else None
+    except (ValueError, TypeError):
+        servico_id = None
+    if servico_id is not None:
+        svc = Servico.query.filter_by(
+            id=servico_id, admin_id=admin_id, ativo=True
+        ).first()
+        if not svc:
+            servico_id = None
+    if servico_id is None:
+        # Fallback por nome (caso template/seed antigos)
+        svc_nome = (data.get('servico_nome') or '').strip()
+        if svc_nome:
+            svc = (
+                Servico.query
+                .filter(
+                    Servico.admin_id == admin_id,
+                    Servico.ativo.is_(True),
+                    db.func.lower(Servico.nome) == svc_nome.lower(),
+                )
+                .first()
+            )
+            if svc:
+                servico_id = svc.id
+    if servico_id is None:
+        return jsonify({
+            'status': 'error',
+            'msg': 'Serviço é obrigatório. Selecione um serviço para a tarefa.',
+        }), 400
+
+    # Task #62 — auto-criação de SubatividadeMestre por nome quando não veio explícito
+    if sub_mestre_id is None:
+        try:
+            from services.auto_subatividade_cronograma import garantir_subatividade
+            sub_obj, _criada = garantir_subatividade(nome, admin_id, servico_id)
+            if sub_obj is not None:
+                sub_mestre_id = sub_obj.id
+        except Exception as _e_sub:
+            logger.warning(f"[Task#62] auto-subatividade falhou: {_e_sub}")
+    else:
+        # Task #62 — consistência: tarefa.servico_id deve bater com a sub.servico_id
+        sub_existente = SubatividadeMestre.query.filter_by(
+            id=sub_mestre_id, admin_id=admin_id
+        ).first()
+        if sub_existente and sub_existente.servico_id and sub_existente.servico_id != servico_id:
+            return jsonify({
+                'status': 'error',
+                'msg': (
+                    f'Inconsistência: a subatividade pertence ao serviço '
+                    f'#{sub_existente.servico_id}, mas a tarefa foi enviada com serviço #{servico_id}.'
+                ),
+            }), 400
+
     tarefa = TarefaCronograma(
         obra_id=obra_id,
         tarefa_pai_id=tarefa_pai_id,
@@ -312,6 +372,7 @@ def criar_tarefa(obra_id: int):
         quantidade_total=float(data.get('quantidade_total') or 0) or None,
         unidade_medida=(data.get('unidade_medida') or '').strip() or None,
         subatividade_mestre_id=sub_mestre_id,
+        servico_id=servico_id,
         percentual_concluido=0.0,
         responsavel=responsavel,
         admin_id=admin_id,
@@ -1182,9 +1243,63 @@ def catalogo_nova_subatividade():
         admin_id=admin_id,
     )
     db.session.add(sub)
+    db.session.flush()
+
+    # Task #62 — vincular composições selecionadas (N:N SubatividadeMaoObra)
+    _sync_composicoes_subatividade(sub, request.form.getlist('composicoes_ids'), admin_id)
+
     db.session.commit()
     flash(f'Subatividade "{nome}" criada com sucesso.', 'success')
     return redirect(url_for('cronograma.catalogo_subatividades'))
+
+
+def _sync_composicoes_subatividade(sub: SubatividadeMestre, ids_raw: list, admin_id: int) -> None:
+    """Task #62 — sincroniza SubatividadeMaoObra para a subatividade.
+
+    ids_raw: lista de strings do form (composicoes_ids[]). Apenas IDs que
+    pertencem ao admin e (quando sub.servico_id está setado) ao mesmo serviço
+    são aceitos. Apaga os removidos e cria os novos. Idempotente.
+    """
+    novos_ids = set()
+    for raw in (ids_raw or []):
+        try:
+            novos_ids.add(int(raw))
+        except (ValueError, TypeError):
+            continue
+
+    if novos_ids:
+        # Multi-tenant: SEMPRE filtra por admin_id; restringe ao serviço da sub
+        # quando houver; aceita apenas composições de insumo MAO_OBRA.
+        from models import Insumo as _Insumo
+        q = (
+            ComposicaoServico.query
+            .join(_Insumo, ComposicaoServico.insumo_id == _Insumo.id)
+            .filter(
+                ComposicaoServico.id.in_(novos_ids),
+                ComposicaoServico.admin_id == admin_id,
+                _Insumo.tipo == 'MAO_OBRA',
+            )
+        )
+        if sub.servico_id:
+            q = q.filter(ComposicaoServico.servico_id == sub.servico_id)
+        composicoes_validas = {c.id for c in q.all()}
+        novos_ids = novos_ids & composicoes_validas
+
+    atuais = SubatividadeMaoObra.query.filter_by(
+        subatividade_mestre_id=sub.id
+    ).all()
+    atuais_ids = {l.composicao_servico_id for l in atuais}
+
+    for link in atuais:
+        if link.composicao_servico_id not in novos_ids:
+            db.session.delete(link)
+
+    for new_id in (novos_ids - atuais_ids):
+        db.session.add(SubatividadeMaoObra(
+            admin_id=admin_id,
+            subatividade_mestre_id=sub.id,
+            composicao_servico_id=new_id,
+        ))
 
 
 @cronograma_bp.route('/catalogo/novo-grupo', methods=['POST'])
@@ -1255,12 +1370,48 @@ def catalogo_editar_subatividade(sub_id: int):
                 sub.ordem_padrao = request.form.get('ordem_padrao', type=int, default=0)
                 sub.obrigatoria = request.form.get('obrigatoria') == '1'
                 sub.ativo = request.form.get('ativo') == '1'
+                # Task #62 — flag de revisão (auto-marcada via cronograma)
+                if 'precisa_revisao' in request.form:
+                    sub.precisa_revisao = request.form.get('precisa_revisao') == '1'
+                # Task #62 — sincroniza N:N composições
+                if 'composicoes_ids' in request.form or any(
+                    k.startswith('composicoes_ids') for k in request.form.keys()
+                ):
+                    _sync_composicoes_subatividade(
+                        sub, request.form.getlist('composicoes_ids'), admin_id
+                    )
                 db.session.commit()
                 flash(f'Subatividade "{sub.nome}" atualizada.', 'success')
                 return redirect(url_for('cronograma.catalogo_subatividades'))
 
     servicos = Servico.query.filter_by(admin_id=admin_id, ativo=True).order_by(Servico.nome).all()
-    return render_template('cronograma/catalogo_editar.html', sub=sub, servicos=servicos)
+    # Task #62 — composições disponíveis (apenas MO, do serviço da sub, do admin)
+    composicoes = []
+    if sub.servico_id:
+        from models import Insumo as _Insumo
+        composicoes = (
+            ComposicaoServico.query
+            .join(_Insumo, ComposicaoServico.insumo_id == _Insumo.id)
+            .filter(
+                ComposicaoServico.servico_id == sub.servico_id,
+                ComposicaoServico.admin_id == admin_id,
+                _Insumo.tipo == 'MAO_OBRA',
+            )
+            .order_by(ComposicaoServico.id)
+            .all()
+        )
+    composicoes_selecionadas_ids = {
+        l.composicao_servico_id
+        for l in SubatividadeMaoObra.query.filter_by(
+            subatividade_mestre_id=sub.id
+        ).all()
+    }
+    return render_template(
+        'cronograma/catalogo_editar.html',
+        sub=sub, servicos=servicos,
+        composicoes=composicoes,
+        composicoes_selecionadas_ids=composicoes_selecionadas_ids,
+    )
 
 
 @cronograma_bp.route('/catalogo/<int:sub_id>/excluir', methods=['POST'])
