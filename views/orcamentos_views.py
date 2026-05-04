@@ -206,6 +206,17 @@ def editar(id):
         .all()
     )
 
+    # Task #63 — banner: lista obras vinculadas a este orçamento que já têm
+    # Orçamento Operacional separado (edições aqui não afetam o operacional).
+    from models import Obra, Proposta, ObraOrcamentoOperacional
+    obras_com_operacional = (
+        db.session.query(Obra)
+        .join(Proposta, Proposta.id == Obra.proposta_origem_id)
+        .join(ObraOrcamentoOperacional, ObraOrcamentoOperacional.obra_id == Obra.id)
+        .filter(Proposta.orcamento_id == orc.id, Obra.admin_id == admin_id)
+        .all()
+    )
+
     return render_template(
         'orcamentos/editar.html',
         orcamento=orc,
@@ -213,6 +224,7 @@ def editar(id):
         templates_cronograma=templates_cronograma,
         composicao_padrao_por_item=composicao_padrao_por_item,
         templates_proposta=templates_proposta,
+        obras_com_operacional=obras_com_operacional,
     )
 
 

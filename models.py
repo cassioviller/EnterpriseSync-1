@@ -6199,3 +6199,131 @@ class WebhookEntrega(db.Model):
 
     def __repr__(self):
         return f'<WebhookEntrega {self.id} {self.event} {self.status}>'
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Task #63 — Orçamento Operacional da Obra
+# ════════════════════════════════════════════════════════════════════════
+
+class ObraOrcamentoOperacional(db.Model):
+    """Orçamento operacional 1:1 da obra (cópia editável separada do contrato).
+
+    Métricas e RDOs sempre leem daqui (pela versão vigente na data do RDO).
+    Edições no Orcamento original NÃO afetam o operacional.
+    """
+    __tablename__ = 'obra_orcamento_operacional'
+    __table_args__ = (
+        db.UniqueConstraint('obra_id', name='uq_op_obra'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    orcamento_origem_id = db.Column(db.Integer, db.ForeignKey('orcamento.id', ondelete='SET NULL'),
+                                    nullable=True)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    obra = db.relationship('Obra', backref=db.backref('orcamento_operacional', uselist=False,
+                                                       cascade='all, delete-orphan',
+                                                       passive_deletes=True))
+    orcamento_origem = db.relationship('Orcamento', foreign_keys=[orcamento_origem_id])
+    itens = db.relationship('ObraOrcamentoOperacionalItem',
+                            backref='operacional',
+                            cascade='all, delete-orphan',
+                            order_by='ObraOrcamentoOperacionalItem.id')
+
+
+class ObraOrcamentoOperacionalItem(db.Model):
+    """Item do orçamento operacional. 1..N versões temporais."""
+    __tablename__ = 'obra_orcamento_operacional_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    operacional_id = db.Column(db.Integer,
+                               db.ForeignKey('obra_orcamento_operacional.id', ondelete='CASCADE'),
+                               nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True, index=True)
+    orcamento_item_origem_id = db.Column(db.Integer,
+                                         db.ForeignKey('orcamento_item.id', ondelete='SET NULL'),
+                                         nullable=True)
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True)
+    descricao = db.Column(db.String(500), nullable=False)
+    unidade = db.Column(db.String(20), default='un')
+    quantidade = db.Column(db.Numeric(15, 4), default=1)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    versoes = db.relationship('ObraOrcamentoOperacionalItemVersao',
+                              backref='item',
+                              cascade='all, delete-orphan',
+                              order_by='ObraOrcamentoOperacionalItemVersao.vigente_de.desc()')
+
+
+class ObraOrcamentoOperacionalItemVersao(db.Model):
+    """Versão temporal de um item operacional.
+
+    Janela [vigente_de, vigente_ate). vigente_ate=NULL → versão atualmente ativa.
+    Para modo='retroativo', a versão atual é atualizada in-place E uma cópia
+    é gravada com vigente_ate=now() apenas para auditoria.
+    """
+    __tablename__ = 'obra_orcamento_operacional_item_versao'
+    __table_args__ = (
+        db.Index('idx_op_item_versao_lookup', 'item_id', 'vigente_de', 'vigente_ate'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer,
+                        db.ForeignKey('obra_orcamento_operacional_item.id', ondelete='CASCADE'),
+                        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True, index=True)
+    composicao_snapshot = db.Column(db.JSON, default=list)
+    margem_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    imposto_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    vigente_de = db.Column(db.DateTime, nullable=False, index=True)
+    vigente_ate = db.Column(db.DateTime, nullable=True, index=True)
+    modo_aplicacao = db.Column(db.String(30), default='clonagem_inicial')
+    motivo = db.Column(db.Text, nullable=True)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+# Hook SQLAlchemy: auto-clona o orçamento operacional na 1ª criação de RDO
+# da obra. Idempotente (garantir_operacional verifica se já existe).
+from sqlalchemy import event as _sa_event
+
+
+@_sa_event.listens_for(RDO, 'after_insert')
+def _rdo_after_insert_autoclone_operacional(mapper, connection, target):
+    """Ao inserir um RDO, agenda criação do operacional (se ainda não existir)
+    para depois do commit, num after_commit listener one-shot. A sessão pode
+    estar em estado 'committed' quando o callback dispara — então abrimos uma
+    transação nova explicitamente."""
+    obra_id = target.obra_id
+    if not obra_id:
+        return
+    sess = db.session
+
+    @_sa_event.listens_for(sess, 'after_commit', once=True)
+    def _do_clone(_session):
+        import logging as _logging
+        _log = _logging.getLogger(__name__)
+        # Defer com Timer para sair do callback after_commit (que mantém a
+        # session em estado 'committed' e impede SQL novo). 0s = próximo tick.
+        from threading import Timer
+        from flask import current_app
+        try:
+            app_obj = current_app._get_current_object()
+        except Exception:
+            return
+        def _run_in_app_ctx():
+            try:
+                with app_obj.app_context():
+                    from services.orcamento_operacional import garantir_operacional
+                    garantir_operacional(obra_id)
+            except Exception as _e:
+                _log.warning(
+                    "[orcamento_operacional] auto-clone falhou obra=%s: %s",
+                    obra_id, _e,
+                )
+        Timer(0, _run_in_app_ctx).start()

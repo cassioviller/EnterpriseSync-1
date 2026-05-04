@@ -611,6 +611,10 @@ with app.app_context():
     try:
         from views.orcamentos_views import orcamentos_bp
         app.register_blueprint(orcamentos_bp)
+
+        # Task #63 — Orçamento Operacional da Obra
+        from views.orcamento_operacional_views import orcamento_operacional_bp
+        app.register_blueprint(orcamento_operacional_bp)
         logging.info("[OK] Blueprint orcamentos registrado")
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint orcamentos: {e}")

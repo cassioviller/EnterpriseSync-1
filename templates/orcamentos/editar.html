@@ -96,6 +96,26 @@
     </div>
   </div>
 
+  {# Task #63 — banner: avisar que obras com operacional NÃO sofrem efeito daqui #}
+  {% if obras_com_operacional %}
+  <div class="alert alert-info d-flex align-items-start mb-3">
+    <i class="fas fa-info-circle me-2 mt-1"></i>
+    <div class="small">
+      <strong>Atenção:</strong> {{ obras_com_operacional|length }} obra(s) já possuem
+      <strong>Orçamento Operacional</strong> separado. Edições aqui
+      <strong>não afetam</strong> os cálculos de RDO/métricas das obras.
+      Para alterar o operacional de uma obra específica, use o botão
+      <em>"Atualizar do original"</em> dentro da tela de Orçamento Operacional
+      da obra.
+      <ul class="mb-0 mt-1">
+        {% for ob in obras_com_operacional %}
+        <li><a href="{{ url_for('orcamento_operacional.index', obra_id=ob.id) }}">{{ ob.nome }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
   {% if o.propostas_geradas %}
   <div class="card mb-3">
     <div class="card-header"><strong>Propostas geradas</strong>

@@ -3848,6 +3848,7 @@ def executar_migracoes():
             (147, "Task #18 hotfix — itens_inclusos/itens_exclusos em proposta_itens e orcamento_item", migration_147_proposta_orcamento_itens_inclusos_exclusos),
             (148, "Task #47 — proposta_templates.padrao + índice parcial único + backfill (template mais antigo por admin)", migration_148_proposta_templates_padrao),
             (149, "Task #43 — webhook_entrega (fila/log de notificações para n8n)", migration_149_webhook_entrega),
+            (150, "Task #63 — Orçamento Operacional da Obra (3 tabelas + backfill)", migration_150_obra_orcamento_operacional),
         ]
         
         # Executar cada migração com rastreamento
@@ -12651,6 +12652,164 @@ def migration_149_webhook_entrega():
         return True
     except Exception as e:
         logger.error("MIGRACAO 149 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_150_obra_orcamento_operacional():
+    """Task #63 — Orçamento Operacional da Obra (cópia editável separada).
+
+    Cria 3 tabelas:
+      - obra_orcamento_operacional (1:1 obra)
+      - obra_orcamento_operacional_item (N por operacional)
+      - obra_orcamento_operacional_item_versao (versionamento temporal por item)
+
+    Backfill: para cada obra existente, cria operacional clonado se ainda não
+    tiver — usa o serviço Python (precisa do app context). Executado de forma
+    best-effort: se uma obra falhar (ex: orçamento ausente), apenas loga e
+    continua.
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 150: DATABASE_URL ausente")
+        return False
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_orcamento_operacional (
+                id                   SERIAL PRIMARY KEY,
+                obra_id              INTEGER  NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                admin_id             INTEGER  NOT NULL REFERENCES usuario(id),
+                orcamento_origem_id  INTEGER  NULL REFERENCES orcamento(id) ON DELETE SET NULL,
+                criado_por_id        INTEGER  NULL REFERENCES usuario(id),
+                created_at           TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at           TIMESTAMP NULL,
+                CONSTRAINT uq_op_obra UNIQUE (obra_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_obra ON obra_orcamento_operacional (obra_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_admin ON obra_orcamento_operacional (admin_id)
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_orcamento_operacional_item (
+                id                          SERIAL PRIMARY KEY,
+                operacional_id              INTEGER NOT NULL REFERENCES obra_orcamento_operacional(id) ON DELETE CASCADE,
+                admin_id                    INTEGER NULL REFERENCES usuario(id),
+                orcamento_item_origem_id    INTEGER NULL REFERENCES orcamento_item(id) ON DELETE SET NULL,
+                servico_id                  INTEGER NULL REFERENCES servico(id),
+                descricao                   VARCHAR(500) NOT NULL,
+                unidade                     VARCHAR(20) DEFAULT 'un',
+                quantidade                  NUMERIC(15,4) DEFAULT 1,
+                created_at                  TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_item_op ON obra_orcamento_operacional_item (operacional_id)
+        """)
+        cursor.execute("""
+            ALTER TABLE obra_orcamento_operacional_item
+            ADD COLUMN IF NOT EXISTS admin_id INTEGER REFERENCES usuario(id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_item_admin
+                ON obra_orcamento_operacional_item (admin_id)
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS obra_orcamento_operacional_item_versao (
+                id                    SERIAL PRIMARY KEY,
+                item_id               INTEGER NOT NULL REFERENCES obra_orcamento_operacional_item(id) ON DELETE CASCADE,
+                admin_id              INTEGER NULL REFERENCES usuario(id),
+                composicao_snapshot   JSONB NULL,
+                margem_pct            NUMERIC(5,2) NULL,
+                imposto_pct           NUMERIC(5,2) NULL,
+                vigente_de            TIMESTAMP NOT NULL,
+                vigente_ate           TIMESTAMP NULL,
+                modo_aplicacao        VARCHAR(30) DEFAULT 'clonagem_inicial',
+                motivo                TEXT NULL,
+                criado_por_id         INTEGER NULL REFERENCES usuario(id),
+                created_at            TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """)
+        cursor.execute("""
+            ALTER TABLE obra_orcamento_operacional_item_versao
+            ADD COLUMN IF NOT EXISTS admin_id INTEGER REFERENCES usuario(id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_item_versao_admin
+                ON obra_orcamento_operacional_item_versao (admin_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_item_versao_lookup
+                ON obra_orcamento_operacional_item_versao (item_id, vigente_de, vigente_ate)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_item_versao_de
+                ON obra_orcamento_operacional_item_versao (vigente_de)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_op_item_versao_ate
+                ON obra_orcamento_operacional_item_versao (vigente_ate)
+        """)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        # Backfill best-effort: cria operacional para obras que JÁ têm RDO
+        # (alvo principal da retro-compat). Obras sem RDO ganharão o
+        # operacional automaticamente quando o 1º RDO for lançado, via
+        # event listener em models.py.
+        n_back = 0
+        n_fail = 0
+        try:
+            from models import db as _db, Obra, RDO
+            from services.orcamento_operacional import garantir_operacional
+            obras_com_rdo = (
+                _db.session.query(Obra.id)
+                .join(RDO, RDO.obra_id == Obra.id)
+                .distinct()
+                .all()
+            )
+            for (obra_id,) in obras_com_rdo:
+                try:
+                    garantir_operacional(obra_id)
+                    n_back += 1
+                except Exception as _e:
+                    n_fail += 1
+                    logger.warning(
+                        "MIGRACAO 150 backfill obra=%s falhou: %s", obra_id, _e
+                    )
+        except Exception as _e:
+            logger.warning("MIGRACAO 150 backfill ignorado (app context?): %s", _e)
+
+        logger.info(
+            "MIGRACAO 150 CONCLUIDA: 3 tabelas (operacional/item/versao) + "
+            "backfill em %s obra(s) (%s falhas).", n_back, n_fail,
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 150 falhou: %s", e)
         try:
             connection.rollback()
             connection.close()

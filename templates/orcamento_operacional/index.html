@@ -1,0 +1,363 @@
+{% extends "base_completo.html" %}
+{% block title %}Orçamento Operacional — {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h4 class="mb-1">
+        <i class="fas fa-tools me-2"></i>
+        Orçamento Operacional — {{ obra.nome }}
+      </h4>
+      <small class="text-muted">
+        Cópia editável da obra. Edições aqui <strong>não afetam</strong> o
+        orçamento original (contrato com o cliente). Métricas e RDOs leem
+        sempre da versão vigente na data do RDO.
+      </small>
+    </div>
+    <div>
+      <a href="/obras" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left me-1"></i> Voltar
+      </a>
+    </div>
+  </div>
+
+  {% if not operacional or not operacional.itens %}
+  <div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-1"></i>
+    Esta obra não possui itens no orçamento operacional. Isto acontece quando
+    a obra não tem orçamento original aprovado vinculado. Você pode preencher
+    manualmente abaixo (em breve) ou aprovar/vincular um orçamento à proposta
+    de origem da obra.
+  </div>
+  {% else %}
+
+  <ul class="nav nav-tabs mb-3" id="opTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-itens-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-itens" type="button" role="tab">
+        <i class="fas fa-list-ul me-1"></i>Itens ({{ operacional.itens|length }})
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-historico-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-historico" type="button" role="tab">
+        <i class="fas fa-history me-1"></i>Histórico ({{ historico|length }})
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-original-btn" data-bs-toggle="tab"
+              data-bs-target="#tab-original" type="button" role="tab">
+        <i class="fas fa-sync me-1"></i>Atualizar do original
+        {% if diffs %}<span class="badge bg-warning text-dark ms-1">{{ diffs|length }}</span>{% endif %}
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ───────── TAB: Itens ───────── -->
+    <div class="tab-pane fade show active" id="tab-itens" role="tabpanel">
+      {% for item in operacional.itens %}
+      {% set vig = versoes_atuais.get(item.id) %}
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <strong>Item — {{ item.descricao }}</strong>
+            <span class="badge bg-light text-muted ms-2">{{ item.unidade }}</span>
+            <span class="badge bg-secondary ms-1">qtd {{ item.quantidade }}</span>
+            {% if vig %}
+              <span class="badge bg-info text-dark ms-1"
+                    title="Vigente desde {{ vig.vigente_de.strftime('%d/%m/%Y %H:%M') }}">
+                <i class="fas fa-clock me-1"></i>versão atual desde {{ vig.vigente_de.strftime('%d/%m/%Y') }}
+              </span>
+            {% else %}
+              <span class="badge bg-warning text-dark ms-1">sem versão vigente</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('orcamento_operacional.salvar_item', obra_id=obra.id, item_id=item.id) }}"
+              class="card-body op-item-form" data-item-id="{{ item.id }}">
+          <div class="row g-2 mb-3">
+            <div class="col-md-3">
+              <label class="form-label small">Imposto % (item)</label>
+              <input class="form-control form-control-sm" type="text" inputmode="decimal" name="imposto_pct"
+                     placeholder="usa global"
+                     value="{{ ('%.2f'|format(vig.imposto_pct))|replace('.', ',') if vig and vig.imposto_pct is not none else '' }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Margem % (item)</label>
+              <input class="form-control form-control-sm" type="text" inputmode="decimal" name="margem_pct"
+                     placeholder="usa global"
+                     value="{{ ('%.2f'|format(vig.margem_pct))|replace('.', ',') if vig and vig.margem_pct is not none else '' }}">
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-2">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:130px">Tipo</th>
+                  <th>Insumo / componente</th>
+                  <th style="width:80px">Un.</th>
+                  <th style="width:120px">Coef.</th>
+                  <th style="width:140px">Preço unit. (R$)</th>
+                  <th style="width:140px" class="text-end">Subtotal / un.</th>
+                  <th style="width:40px"></th>
+                </tr>
+              </thead>
+              <tbody class="op-comp-tbody">
+                {% set _comp = (vig.composicao_snapshot if vig else []) or [] %}
+                {% for c in _comp %}
+                <tr>
+                  <td>
+                    <select class="form-select form-select-sm" name="comp_tipo">
+                      <option value="MAO_OBRA" {{ 'selected' if c.tipo == 'MAO_OBRA' }}>Mão de obra</option>
+                      <option value="MATERIAL" {{ 'selected' if c.tipo == 'MATERIAL' }}>Material</option>
+                      <option value="EQUIPAMENTO" {{ 'selected' if c.tipo == 'EQUIPAMENTO' }}>Equipamento</option>
+                      <option value="OUTROS" {{ 'selected' if c.tipo not in ['MAO_OBRA', 'MATERIAL', 'EQUIPAMENTO'] }}>Outros</option>
+                    </select>
+                    <input type="hidden" name="comp_insumo_id" value="{{ c.insumo_id or '' }}">
+                  </td>
+                  <td><input class="form-control form-control-sm" name="comp_nome" value="{{ c.nome }}"></td>
+                  <td><input class="form-control form-control-sm" name="comp_unidade" value="{{ c.unidade }}"></td>
+                  <td><input class="form-control form-control-sm" type="text" inputmode="decimal" name="comp_coeficiente"
+                             value="{{ ('%.4f'|format(c.coeficiente|float))|replace('.', ',') }}"></td>
+                  <td><input class="form-control form-control-sm" type="text" inputmode="decimal" name="comp_preco_unitario"
+                             value="{{ ('%.4f'|format(c.preco_unitario|float))|replace('.', ',') }}"></td>
+                  <td class="text-end text-muted">R$ {{ '%.4f'|format(c.subtotal_unitario|float)|replace('.', ',') }}</td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-link text-danger"
+                            onclick="if(confirm('Remover este componente?')) this.closest('tr').remove();">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="opAddCompRow(this)">
+              <i class="fas fa-plus me-1"></i> Adicionar componente
+            </button>
+          </div>
+
+          <div class="mt-3 d-flex justify-content-end">
+            <button type="button" class="btn btn-primary"
+                    onclick="abrirModalAplicar({{ item.id }})">
+              <i class="fas fa-save me-1"></i> Salvar alterações…
+            </button>
+          </div>
+
+          <!-- Modal de modo de aplicação -->
+          <div class="modal fade" id="modalAplicar{{ item.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">
+                    <i class="fas fa-question-circle me-2"></i>Como aplicar a edição?
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="text-muted small mb-3">
+                    Esta obra já tem RDOs lançados com a versão atual deste item.
+                    Escolha como a edição deve afetar os cálculos:
+                  </p>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio"
+                           name="modo_aplicacao" id="modo-novo-{{ item.id }}"
+                           value="a_partir_de_hoje" checked>
+                    <label class="form-check-label" for="modo-novo-{{ item.id }}">
+                      <strong>A partir de hoje</strong>
+                      <div class="text-muted small">
+                        Cria uma nova versão. Os RDOs já lançados <strong>mantêm</strong>
+                        os valores antigos. Recomendado para mudanças de preço de mercado.
+                      </div>
+                    </label>
+                  </div>
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio"
+                           name="modo_aplicacao" id="modo-retro-{{ item.id }}"
+                           value="retroativo">
+                    <label class="form-check-label" for="modo-retro-{{ item.id }}">
+                      <strong>Aplicar a todos os RDOs desta obra (retroativo)</strong>
+                      <div class="text-muted small">
+                        Atualiza a versão atual no lugar. <strong>Recalcula</strong>
+                        todos os RDOs já lançados. Use só para corrigir um erro.
+                      </div>
+                    </label>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label small">Motivo (opcional)</label>
+                    <input class="form-control form-control-sm" name="motivo"
+                           placeholder="Ex.: ajuste no preço do cimento">
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- ───────── TAB: Histórico ───────── -->
+    <div class="tab-pane fade" id="tab-historico" role="tabpanel">
+      <div class="card">
+        <div class="card-header"><strong>Histórico de alterações</strong></div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Data</th>
+                <th>Item</th>
+                <th>Modo</th>
+                <th>Vigência</th>
+                <th>Motivo</th>
+                <th class="text-end">Margem</th>
+                <th class="text-end">Imposto</th>
+                <th class="text-end"># componentes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ver, item in historico %}
+              <tr>
+                <td><small class="text-muted">{{ ver.created_at.strftime('%d/%m/%Y %H:%M') if ver.created_at else '—' }}</small></td>
+                <td><small>{{ item.descricao }}</small></td>
+                <td>
+                  {% if ver.modo_aplicacao == 'clonagem_inicial' %}
+                    <span class="badge bg-info text-dark">clonagem</span>
+                  {% elif ver.modo_aplicacao == 'a_partir_de_hoje' %}
+                    <span class="badge bg-success">nova versão</span>
+                  {% elif ver.modo_aplicacao == 'retroativo' %}
+                    <span class="badge bg-warning text-dark">retroativo</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ ver.modo_aplicacao or '—' }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <small>
+                    {{ ver.vigente_de.strftime('%d/%m/%Y') if ver.vigente_de else '—' }}
+                    →
+                    {% if ver.vigente_ate %}
+                      {{ ver.vigente_ate.strftime('%d/%m/%Y') }}
+                    {% else %}
+                      <em class="text-success">vigente</em>
+                    {% endif %}
+                  </small>
+                </td>
+                <td><small>{{ ver.motivo or '—' }}</small></td>
+                <td class="text-end"><small>{{ '%.2f%%'|format(ver.margem_pct|float)|replace('.', ',') if ver.margem_pct is not none else '—' }}</small></td>
+                <td class="text-end"><small>{{ '%.2f%%'|format(ver.imposto_pct|float)|replace('.', ',') if ver.imposto_pct is not none else '—' }}</small></td>
+                <td class="text-end"><small>{{ (ver.composicao_snapshot or [])|length }}</small></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── TAB: Atualizar do original ───────── -->
+    <div class="tab-pane fade" id="tab-original" role="tabpanel">
+      <div class="card">
+        <div class="card-header">
+          <strong>Diferenças vs. orçamento original</strong>
+          <small class="text-muted ms-2">
+            (apenas pra referência — clique em "Aplicar" pra puxar pro operacional)
+          </small>
+        </div>
+        <div class="card-body">
+          {% if not diffs %}
+            <div class="alert alert-success mb-0">
+              <i class="fas fa-check me-1"></i>
+              Operacional está <strong>alinhado</strong> com o orçamento original.
+              Nenhuma diferença encontrada.
+            </div>
+          {% else %}
+            <form method="POST" action="{{ url_for('orcamento_operacional.atualizar_do_original_route', obra_id=obra.id) }}">
+              <div class="alert alert-warning small">
+                <i class="fas fa-info-circle me-1"></i>
+                Mudanças no orçamento original (contrato) <strong>não</strong> afetam o
+                operacional automaticamente. Selecione abaixo o que deseja puxar.
+                A propagação cria <strong>nova versão</strong> a partir de hoje (RDOs
+                anteriores mantêm os valores que tinham).
+              </div>
+              <table class="table table-sm">
+                <thead><tr>
+                  <th><input type="checkbox" id="op-diff-all" onclick="document.querySelectorAll('input[name=item_ids]').forEach(c=>c.checked=this.checked)"></th>
+                  <th>Item</th>
+                  <th>Mudanças (operacional → original)</th>
+                </tr></thead>
+                <tbody>
+                  {% for d in diffs %}
+                  <tr>
+                    <td><input type="checkbox" name="item_ids" value="{{ d.item_id }}" checked></td>
+                    <td><strong>{{ d.descricao }}</strong></td>
+                    <td>
+                      <ul class="mb-0 small">
+                        {% for campo, op_val, or_val in d.mudancas %}
+                          <li><code>{{ campo }}</code>: {{ op_val }} → {{ or_val }}</li>
+                        {% endfor %}
+                      </ul>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <button type="submit" class="btn btn-warning">
+                <i class="fas fa-sync me-1"></i> Aplicar selecionados (nova versão a partir de hoje)
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function abrirModalAplicar(itemId) {
+  const modalEl = document.getElementById('modalAplicar' + itemId);
+  if (!modalEl) return;
+  const m = new bootstrap.Modal(modalEl);
+  m.show();
+}
+
+function opAddCompRow(btn) {
+  const tbody = btn.closest('.card-body').querySelector('.op-comp-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <select class="form-select form-select-sm" name="comp_tipo">
+        <option value="MAO_OBRA">Mão de obra</option>
+        <option value="MATERIAL" selected>Material</option>
+        <option value="EQUIPAMENTO">Equipamento</option>
+        <option value="OUTROS">Outros</option>
+      </select>
+      <input type="hidden" name="comp_insumo_id" value="">
+    </td>
+    <td><input class="form-control form-control-sm" name="comp_nome" placeholder="Nome do componente"></td>
+    <td><input class="form-control form-control-sm" name="comp_unidade" value="un"></td>
+    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" name="comp_coeficiente" value="0,0000"></td>
+    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" name="comp_preco_unitario" value="0,0000"></td>
+    <td class="text-end text-muted">—</td>
+    <td><button type="button" class="btn btn-sm btn-link text-danger"
+                onclick="if(confirm('Remover este componente?')) this.closest('tr').remove();">
+      <i class="fas fa-times"></i></button></td>`;
+  tbody.appendChild(tr);
+}
+</script>
+{% endblock %}
