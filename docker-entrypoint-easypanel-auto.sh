@@ -349,19 +349,48 @@ echo "==============================================" | tee -a "$LOG_FILE"
 #  de rodar em deploys EasyPanel sem variáveis configuradas no painel.)
 export SIGE_ENABLE_DEMO_SEED="${SIGE_ENABLE_DEMO_SEED:-true}"
 export SIGE_ALLOW_PROD_SEED="${SIGE_ALLOW_PROD_SEED:-1}"
+# Task #59 — Gate de refresh da demo Alfa via env-var no painel EasyPanel.
+# Quando SIGE_FORCE_RESEED ∈ {1,true,yes,on} (case-insensitive), o
+# entrypoint chama o seed com `--reset`, que apaga e replanta SOMENTE o
+# tenant Alfa (a salvaguarda multi-tenant da Task #55 garante que outros
+# tenants jamais são tocados — se houver poluição cross-tenant detectada,
+# o seed aborta com RuntimeError).
+#
+# IMPORTANTE: o operador deve DESATIVAR a flag (remover do painel ou
+# definir 0) APÓS o deploy de refresh. Caso contrário, todo deploy vai
+# replantar a demo, destruindo qualquer dado manual criado em cima do
+# tenant Alfa.
+export SIGE_FORCE_RESEED="${SIGE_FORCE_RESEED:-0}"
 
 echo "   SIGE_ENABLE_DEMO_SEED=$SIGE_ENABLE_DEMO_SEED" | tee -a "$LOG_FILE"
 echo "   SIGE_ALLOW_PROD_SEED=$SIGE_ALLOW_PROD_SEED" | tee -a "$LOG_FILE"
+echo "   SIGE_FORCE_RESEED=$SIGE_FORCE_RESEED" | tee -a "$LOG_FILE"
+
+# Normaliza valores válidos para a flag --reset do seed (case-insensitive).
+SEED_RESET_FLAG=""
+case "${SIGE_FORCE_RESEED,,}" in
+    1|true|yes|on)
+        SEED_RESET_FLAG="--reset"
+        echo "⚠️  SIGE_FORCE_RESEED ativo — seed vai REPLANTAR (--reset) o tenant Alfa." | tee -a "$LOG_FILE"
+        echo "    Após confirmar sucesso, REMOVA SIGE_FORCE_RESEED do painel" | tee -a "$LOG_FILE"
+        echo "    (ou defina 0) para evitar replantios em todo deploy futuro." | tee -a "$LOG_FILE"
+        ;;
+esac
 
 if [ "$SIGE_ENABLE_DEMO_SEED" = "true" ] && [ "$SIGE_ALLOW_PROD_SEED" = "1" ]; then
     if [ -f /app/scripts/seed_demo_alfa.py ]; then
         SEED_LOG="/tmp/sige_seed_demo_alfa.log"
         SEED_TIMEOUT="${SIGE_SEED_TIMEOUT:-300}"
-        echo "🌱 Executando seed demo Alfa (timeout ${SEED_TIMEOUT}s)..." | tee -a "$LOG_FILE"
+        if [ -n "$SEED_RESET_FLAG" ]; then
+            echo "🌱 Executando seed demo Alfa COM --reset (timeout ${SEED_TIMEOUT}s)..." | tee -a "$LOG_FILE"
+        else
+            echo "🌱 Executando seed demo Alfa (timeout ${SEED_TIMEOUT}s)..." | tee -a "$LOG_FILE"
+        fi
         # Usa um pipeline mas captura o exit code do python via PIPESTATUS
         # para detectar falhas de verdade (sem ser mascaradas pelo `tee`).
         set +e
-        timeout "$SEED_TIMEOUT" python3 /app/scripts/seed_demo_alfa.py --ambiente prod \
+        timeout "$SEED_TIMEOUT" python3 /app/scripts/seed_demo_alfa.py \
+            --ambiente prod $SEED_RESET_FLAG \
             2>&1 | tee -a "$SEED_LOG" | tee -a "$LOG_FILE"
         SEED_EXIT=${PIPESTATUS[0]}
         set -e

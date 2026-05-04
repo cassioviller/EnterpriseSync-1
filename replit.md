@@ -53,6 +53,14 @@ The system uses a Flask backend with SQLAlchemy ORM, a PostgreSQL database, and 
     -   **RDO Task Weighting:** Allows employees to assign weights to principal tasks within an RDO, influencing hour distribution when multiple activities are recorded.
     -   **CRM Leads - Kanban + Master Lists:** New CRM module with Kanban view, lead management, and configurable master lists for CRM entities like responsibles, origins, cadences, situations, material types, and project types. Features lead status tracking, historical logging, and controlled transitions (e.g., preventing 'Lost' status without a reason).
     -   **Proposta Sent Notification (Task #44):** When admin sends a proposal, the system emits the `proposta.enviada` event for n8n webhook delivery (e-mail to client) and renders a green WhatsApp button on the proposal detail page (pre-filled message + portal link, BR DDI normalization). Missing e-mail and/or phone produce non-blocking `flash` warnings; both the dispatch and the manual WhatsApp click are recorded in `PropostaHistorico` (`notificacao_disparada`, `whatsapp_aberto`).
+    -   **Demo Refresh Gate (Task #59):** EasyPanel deploys auto-run `seed_demo_alfa.py`, which is idempotent (no-op when admin Alfa already exists). To replant the Alfa demo with the latest dataset, set `SIGE_FORCE_RESEED=1` (also accepts `true`/`yes`/`on`) in the EasyPanel panel before the deploy — the entrypoint then passes `--reset` to the seed, wiping and replanting **only** the Alfa tenant (multi-tenant safeguard from Task #55 aborts if cross-tenant references exist). **Always remove the flag after the refresh deploy** to prevent every subsequent deploy from destroying manual data on top of the Alfa tenant.
+
+### Operating the Demo Refresh in Production
+
+To force a refresh of the `Construtora Alfa` demo tenant on the next EasyPanel deploy:
+1. EasyPanel → **Environment** → add `SIGE_FORCE_RESEED=1`.
+2. Trigger the deploy. In the deploy log expect: `⚠️  SIGE_FORCE_RESEED ativo — seed vai REPLANTAR (--reset) o tenant Alfa.` followed by `✅ seed demo Alfa concluído com sucesso (exit 0)`.
+3. **Remove `SIGE_FORCE_RESEED` from the panel** (or set it to `0`). Otherwise every future deploy will wipe and replant the Alfa demo.
 
 ### External Dependencies
 -   **Flask:** Web framework.
