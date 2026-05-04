@@ -231,7 +231,10 @@ def rdos():
                 'rdo': rdo_view,
                 'obra': rdo_view.obra,
                 'total_subatividades': getattr(rdo_view, 'total_atividades', len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0),
-                'total_funcionarios': len(rdo_view.mao_obra) if rdo_view.mao_obra else 0,
+                # Task #61b — funcionários ÚNICOS (rdo_view.mao_obra tem 1
+                # linha por (func × subatividade); contar bruto inflava o
+                # número, ex: 6 funcs × 5 subs = "30 funcionários").
+                'total_funcionarios': len({mo.funcionario_id for mo in rdo_view.mao_obra if mo.funcionario_id}) if rdo_view.mao_obra else 0,
                 'total_horas_trabalhadas': rdo_view.horas_totais,
                 'progresso_medio': rdo_view.progresso_total,
                 'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
@@ -356,7 +359,8 @@ def rdos():
                     'rdo': rdo_view,
                     'obra': rdo_view.obra,
                     'total_subatividades': getattr(rdo_view, 'total_atividades', len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0),
-                    'total_funcionarios': len(rdo_view.mao_obra) if rdo_view.mao_obra else 0,
+                    # Task #61b — funcionários ÚNICOS (ver comentário acima).
+                    'total_funcionarios': len({mo.funcionario_id for mo in rdo_view.mao_obra if mo.funcionario_id}) if rdo_view.mao_obra else 0,
                     'total_horas_trabalhadas': rdo_view.horas_totais,
                     'progresso_medio': rdo_view.progresso_total,
                     'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
@@ -941,25 +945,46 @@ def visualizar_rdo(id):
             db.joinedload(RDOMaoObra.tarefa_cronograma),
         ).filter_by(rdo_id=rdo.id).all()
 
+        # Task #61b — Normalização das horas (mesma lógica que a lista
+        # da Task #61 já aplica em utils/rdo_horas). Sem isso, RDOs
+        # antigos onde o apontador digitou 8h em CADA subatividade
+        # somariam 8h × N atividades = jornada inflada (ex.: 5 subs ×
+        # 8.8h = 44h por funcionário). A normalização divide a
+        # jornada-base entre as atividades distintas, respeitando
+        # pesos da Task #38 quando informados.
+        from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
+        entradas = []
+        pesos = {}
+        for mo in mao_obra_rows:
+            horas = float(mo.horas_trabalhadas or 0)
+            if horas <= 0 or not mo.funcionario_id:
+                continue
+            key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
+            entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+            peso = getattr(mo, 'peso_distribuicao', None)
+            if peso is not None:
+                pesos[(mo.funcionario_id, key)] = peso
+        norm = _norm_horas(entradas, pesos=pesos) if pesos else _norm_horas(entradas)
+        horas_norm_map = {(e[0], e[1]): (e[2], e[3]) for e in norm}
+
         # Agrupar por funcionário: 1 card por pessoa, com a lista de
-        # atividades em que ele aparece. Quando o mesmo funcionário
-        # consta em N atividades (subativ ou tarefa cronograma), as
-        # horas são SOMADAS — como o salvamento já normaliza
-        # (utils/rdo_horas), o total bate com a jornada-base do dia.
+        # atividades em que ele aparece. Horas usam o valor normalizado
+        # (NÃO o bruto), de forma que o card e o KPI HORAS TRABALHADAS
+        # batem com a jornada-base do dia, idênticos ao card da lista.
         funcionarios_dict = {}
         for mo in mao_obra_rows:
             if not mo.funcionario_id:
                 continue
+            key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
+            horas_n, extras_n = horas_norm_map.get((mo.funcionario_id, key), (0.0, 0.0))
             entry = funcionarios_dict.setdefault(mo.funcionario_id, {
                 'funcionario': mo.funcionario,
                 'horas_trabalhadas': 0.0,
                 'horas_extras': 0.0,
                 'atividades': [],
             })
-            horas = float(mo.horas_trabalhadas or 0)
-            extras = float(mo.horas_extras or 0)
-            entry['horas_trabalhadas'] += horas
-            entry['horas_extras'] += extras
+            entry['horas_trabalhadas'] += horas_n
+            entry['horas_extras'] += extras_n
 
             nome_atividade = None
             if mo.subatividade and mo.subatividade.nome_subatividade:
@@ -971,7 +996,7 @@ def visualizar_rdo(id):
                 # exibir o badge "principal X%" / "secundária Y%".
                 entry['atividades'].append({
                     'nome': nome_atividade,
-                    'horas': horas,
+                    'horas': horas_n,
                     'peso_distribuicao': getattr(mo, 'peso_distribuicao', None),
                 })
 
@@ -1118,6 +1143,46 @@ def visualizar_rdo(id):
         # Calcular total de horas trabalhadas (funcionarios agora é lista de
         # dicts agregados por funcionário — somar a chave já normalizada).
         total_horas_trabalhadas = sum(func.get('horas_trabalhadas') or 0 for func in funcionarios)
+
+        # Task #61b — Paridade lista↔detalhe para obras V2 (cronograma):
+        # quando a obra está em V2, o cálculo V1 acima retorna 0
+        # subatividades / 0% (porque RDOs V2 não usam RDOServicoSubatividade).
+        # Aqui sobrescrevemos progresso_obra, total_subatividades e
+        # total_subatividades_obra com a MESMA lógica que a lista usa
+        # (calcular_progresso_geral_obra_v2 + contagem de TarefaCronograma).
+        try:
+            from utils.tenant import is_v2_active
+            from models import RDOApontamentoCronograma as _RAC, TarefaCronograma as _TC
+            from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+
+            obra_em_v2 = is_v2_active() and (
+                db.session.query(_TC).filter_by(
+                    obra_id=rdo.obra_id, admin_id=admin_id_atual
+                ).first() is not None
+            )
+            if obra_em_v2:
+                aps_count = db.session.query(_RAC).filter_by(rdo_id=rdo.id).count()
+                # V2 puro: sem RDOServicoSubatividade — usar contagem
+                # de apontamentos do cronograma (ex.: 5 atividades).
+                if not subatividades:
+                    total_subatividades = aps_count
+                # Total da obra = nº de tarefas no cronograma (denominador
+                # da média ponderada do calcular_progresso_geral_obra_v2).
+                tarefas_count = db.session.query(_TC).filter_by(
+                    obra_id=rdo.obra_id, admin_id=admin_id_atual
+                ).count()
+                if tarefas_count > 0:
+                    total_subatividades_obra = tarefas_count
+                    peso_por_subatividade = 100.0 / tarefas_count
+                try:
+                    prog_v2 = calcular_progresso_geral_obra_v2(
+                        rdo.obra_id, rdo.data_relatorio, admin_id_atual
+                    )
+                    progresso_obra = round(prog_v2.get('progresso_geral_pct', 0) or 0, 1)
+                except Exception as _e_p:
+                    logger.warning(f"[Task#61b] V2 progresso falhou RDO {rdo.id}: {_e_p}")
+        except Exception as _e_v2:
+            logger.warning(f"[Task#61b] detecção V2 detalhe falhou: {_e_v2}")
         
         logger.debug(f"DEBUG VISUALIZAR RDO: ID={id}, Número={rdo.numero_rdo}")
         logger.debug(f"DEBUG SUBATIVIDADES: {len(subatividades)} encontradas")
