@@ -272,33 +272,46 @@
                                    value="{{ data_hoje }}" required>
                         </div>
                         
+                        <!-- Task #61 — clima alinhado à visualização: clima_geral, temperatura_media, condicoes_trabalho -->
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <label class="form-label">
                                         <i class="fas fa-cloud"></i>
-                                        Condições Climáticas
+                                        Clima geral
                                     </label>
-                                    <select class="form-control" id="clima" name="clima">
+                                    <select class="form-control" id="clima_geral" name="clima_geral">
                                         <option value="">Selecione</option>
-                                        <option value="ensolarado">☀️ Ensolarado</option>
-                                        <option value="parcialmente_nublado">⛅ Parcialmente Nublado</option>
-                                        <option value="nublado">☁️ Nublado</option>
-                                        <option value="chuva_leve">🌦️ Chuva Leve</option>
-                                        <option value="chuva_forte">🌧️ Chuva Forte</option>
-                                        <option value="tempestade">⛈️ Tempestade</option>
+                                        <option value="Ensolarado">☀️ Ensolarado</option>
+                                        <option value="Parcialmente Nublado">⛅ Parcialmente Nublado</option>
+                                        <option value="Nublado">☁️ Nublado</option>
+                                        <option value="Chuva Leve">🌦️ Chuva Leve</option>
+                                        <option value="Chuva Forte">🌧️ Chuva Forte</option>
+                                        <option value="Tempestade">⛈️ Tempestade</option>
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="form-group">
                                     <label class="form-label">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                        Local
+                                        <i class="fas fa-thermometer-half"></i>
+                                        Temperatura média
                                     </label>
-                                    <select class="form-control" id="local" name="local" required>
-                                        <option value="Campo" selected>🏗️ Campo</option>
-                                        <option value="Oficina">🔧 Oficina</option>
+                                    <input type="text" class="form-control" id="temperatura_media" name="temperatura_media" placeholder="Ex.: 28°C">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-hard-hat"></i>
+                                        Condições de trabalho
+                                    </label>
+                                    <select class="form-control" id="condicoes_trabalho" name="condicoes_trabalho">
+                                        <option value="">Selecione</option>
+                                        <option value="Ideais">Ideais</option>
+                                        <option value="Adequadas">Adequadas</option>
+                                        <option value="Limitadas">Limitadas</option>
+                                        <option value="Inadequadas">Inadequadas</option>
                                     </select>
                                 </div>
                             </div>
@@ -307,6 +320,85 @@
                     
             </div>
         </div>
+
+        <!-- Task #61 — Equipamentos (UI repetível) -->
+        <div class="rdo-card slide-in">
+            <div class="rdo-card-header" style="background:linear-gradient(135deg,#6f42c1 0%,#4a2a8a 100%)">
+                <h3><i class="fas fa-truck-pickup"></i> Equipamentos</h3>
+                <button type="button" class="btn btn-sm btn-light" onclick="adicionarLinhaRepetivel('equip-rows','equip')">
+                    <i class="fas fa-plus"></i> Adicionar
+                </button>
+            </div>
+            <div class="rdo-card-body">
+                <div id="equip-rows" data-equip-template>
+                    <!-- linhas adicionadas via JS -->
+                </div>
+                <small class="text-muted"><i class="fas fa-info-circle"></i> Deixe vazio para não registrar equipamentos.</small>
+            </div>
+        </div>
+
+        <!-- Task #61 — Ocorrências (UI repetível) -->
+        <div class="rdo-card slide-in">
+            <div class="rdo-card-header" style="background:linear-gradient(135deg,#dc3545 0%,#a71d2a 100%)">
+                <h3><i class="fas fa-exclamation-triangle"></i> Ocorrências</h3>
+                <button type="button" class="btn btn-sm btn-light" onclick="adicionarLinhaRepetivel('ocorr-rows','ocorr')">
+                    <i class="fas fa-plus"></i> Adicionar
+                </button>
+            </div>
+            <div class="rdo-card-body">
+                <div id="ocorr-rows" data-ocorr-template>
+                    <!-- linhas adicionadas via JS -->
+                </div>
+                <small class="text-muted"><i class="fas fa-info-circle"></i> Deixe vazio para não registrar ocorrências.</small>
+            </div>
+        </div>
+
+        <script>
+        // Task #61 — UI repetível para Equipamentos / Ocorrências (DOM-only).
+        function adicionarLinhaRepetivel(containerId, tipo) {
+            const cont = document.getElementById(containerId);
+            if (!cont) return;
+            const div = document.createElement('div');
+            div.className = 'row g-2 mb-2 align-items-end repet-row';
+            if (tipo === 'equip') {
+                div.innerHTML = `
+                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="equip_nome[]" placeholder="Nome do equipamento"></div>
+                    <div class="col-md-2"><input type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" placeholder="Qtd" value="1"></div>
+                    <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" placeholder="Horas" value="8"></div>
+                    <div class="col-md-3">
+                        <select class="form-control form-control-sm" name="equip_estado[]">
+                            <option value="Bom" selected>Bom</option><option value="Regular">Regular</option>
+                            <option value="Ruim">Ruim</option><option value="Em manutenção">Em manutenção</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>`;
+            } else {
+                div.innerHTML = `
+                    <div class="col-md-3">
+                        <select class="form-control form-control-sm" name="ocorr_tipo[]">
+                            <option value="Outros" selected>Outros</option><option value="Atraso">Atraso</option>
+                            <option value="Acidente">Acidente</option><option value="Falha de Equipamento">Falha de Equipamento</option>
+                            <option value="Material">Material</option><option value="Clima">Clima</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-control form-control-sm" name="ocorr_severidade[]">
+                            <option value="Baixa" selected>Baixa</option><option value="Média">Média</option>
+                            <option value="Alta">Alta</option><option value="Crítica">Crítica</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="ocorr_descricao[]" placeholder="Descrição da ocorrência"></div>
+                    <div class="col-md-2">
+                        <select class="form-control form-control-sm" name="ocorr_status[]">
+                            <option value="Pendente" selected>Pendente</option><option value="Em andamento">Em andamento</option>
+                            <option value="Resolvido">Resolvido</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>`;
+            }
+            cont.appendChild(div);
+        }
+        </script>
 
         {% if is_v2_active is defined and is_v2_active() %}
         <!-- ===== CRONOGRAMA V2: Apontamento de Produção Diária ===== -->

@@ -296,25 +296,169 @@
                                    value="{{ rdo.data_relatorio.strftime('%Y-%m-%d') }}" required>
                         </div>
                         
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-cloud"></i>
-                                Condições Climáticas
-                            </label>
-                            <select class="form-control" id="clima" name="clima">
-                                <option value="">Selecione</option>
-                                <option value="ensolarado" {% if rdo.clima_geral == 'ensolarado' %}selected{% endif %}>☀️ Ensolarado</option>
-                                <option value="parcialmente_nublado" {% if rdo.clima_geral == 'parcialmente_nublado' %}selected{% endif %}>⛅ Parcialmente Nublado</option>
-                                <option value="nublado" {% if rdo.clima_geral == 'nublado' %}selected{% endif %}>☁️ Nublado</option>
-                                <option value="chuva_leve" {% if rdo.clima_geral == 'chuva_leve' %}selected{% endif %}>🌦️ Chuva Leve</option>
-                                <option value="chuva_forte" {% if rdo.clima_geral == 'chuva_forte' %}selected{% endif %}>🌧️ Chuva Forte</option>
-                                <option value="tempestade" {% if rdo.clima_geral == 'tempestade' %}selected{% endif %}>⛈️ Tempestade</option>
-                            </select>
+                        <!-- Task #61 — clima alinhado à visualização -->
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-cloud"></i>
+                                        Clima geral
+                                    </label>
+                                    {% set _opts_clima = ['Ensolarado','Parcialmente Nublado','Nublado','Chuva Leve','Chuva Forte','Tempestade'] %}
+                                    <select class="form-control" id="clima_geral" name="clima_geral">
+                                        <option value="">Selecione</option>
+                                        {% for o in _opts_clima %}
+                                        <option value="{{ o }}" {% if rdo.clima_geral == o %}selected{% endif %}>{{ o }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-thermometer-half"></i>
+                                        Temperatura média
+                                    </label>
+                                    <input type="text" class="form-control" id="temperatura_media" name="temperatura_media"
+                                           value="{{ rdo.temperatura_media or '' }}" placeholder="Ex.: 28°C">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="fas fa-hard-hat"></i>
+                                        Condições de trabalho
+                                    </label>
+                                    {% set _opts_cond = ['Ideais','Adequadas','Limitadas','Inadequadas'] %}
+                                    <select class="form-control" id="condicoes_trabalho" name="condicoes_trabalho">
+                                        <option value="">Selecione</option>
+                                        {% for o in _opts_cond %}
+                                        <option value="{{ o }}" {% if rdo.condicoes_trabalho == o %}selected{% endif %}>{{ o }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
                 </div>
             </div>
+
+            <!-- Task #61 — Equipamentos (UI repetível) -->
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header" style="background:linear-gradient(135deg,#6f42c1 0%,#4a2a8a 100%)">
+                    <h3><i class="fas fa-truck-pickup"></i> Equipamentos</h3>
+                    <button type="button" class="btn btn-sm btn-light" onclick="adicionarLinhaRepetivelEdit('equip-rows-edit','equip')">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+                <div class="rdo-card-body">
+                    <div id="equip-rows-edit">
+                        {% for eq in (rdo.equipamentos or []) %}
+                        <div class="row g-2 mb-2 align-items-end repet-row">
+                            <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="equip_nome[]" value="{{ eq.nome_equipamento or '' }}"></div>
+                            <div class="col-md-2"><input type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" value="{{ eq.quantidade or 1 }}"></div>
+                            <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" value="{{ eq.horas_uso or 0 }}"></div>
+                            <div class="col-md-3">
+                                <select class="form-control form-control-sm" name="equip_estado[]">
+                                    {% for o in ['Bom','Regular','Ruim','Em manutenção'] %}
+                                    <option value="{{ o }}" {% if eq.estado_conservacao == o %}selected{% endif %}>{{ o }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task #61 — Ocorrências (UI repetível) -->
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header" style="background:linear-gradient(135deg,#dc3545 0%,#a71d2a 100%)">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Ocorrências</h3>
+                    <button type="button" class="btn btn-sm btn-light" onclick="adicionarLinhaRepetivelEdit('ocorr-rows-edit','ocorr')">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+                <div class="rdo-card-body">
+                    <div id="ocorr-rows-edit">
+                        {% for oc in (rdo.ocorrencias_rdo or []) %}
+                        <div class="row g-2 mb-2 align-items-end repet-row">
+                            <div class="col-md-3">
+                                <select class="form-control form-control-sm" name="ocorr_tipo[]">
+                                    {% for o in ['Outros','Atraso','Acidente','Falha de Equipamento','Material','Clima'] %}
+                                    <option value="{{ o }}" {% if oc.tipo_ocorrencia == o %}selected{% endif %}>{{ o }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-control form-control-sm" name="ocorr_severidade[]">
+                                    {% for o in ['Baixa','Média','Alta','Crítica'] %}
+                                    <option value="{{ o }}" {% if oc.severidade == o %}selected{% endif %}>{{ o }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="ocorr_descricao[]" value="{{ oc.descricao_ocorrencia or '' }}"></div>
+                            <div class="col-md-2">
+                                <select class="form-control form-control-sm" name="ocorr_status[]">
+                                    {% for o in ['Pendente','Em andamento','Resolvido'] %}
+                                    <option value="{{ o }}" {% if oc.status_resolucao == o %}selected{% endif %}>{{ o }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            function adicionarLinhaRepetivelEdit(containerId, tipo) {
+                const cont = document.getElementById(containerId);
+                if (!cont) return;
+                const div = document.createElement('div');
+                div.className = 'row g-2 mb-2 align-items-end repet-row';
+                if (tipo === 'equip') {
+                    div.innerHTML = `
+                        <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="equip_nome[]" placeholder="Nome do equipamento"></div>
+                        <div class="col-md-2"><input type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" value="1"></div>
+                        <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" value="8"></div>
+                        <div class="col-md-3">
+                            <select class="form-control form-control-sm" name="equip_estado[]">
+                                <option value="Bom" selected>Bom</option><option value="Regular">Regular</option>
+                                <option value="Ruim">Ruim</option><option value="Em manutenção">Em manutenção</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>`;
+                } else {
+                    div.innerHTML = `
+                        <div class="col-md-3">
+                            <select class="form-control form-control-sm" name="ocorr_tipo[]">
+                                <option value="Outros" selected>Outros</option><option value="Atraso">Atraso</option>
+                                <option value="Acidente">Acidente</option><option value="Falha de Equipamento">Falha de Equipamento</option>
+                                <option value="Material">Material</option><option value="Clima">Clima</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-control form-control-sm" name="ocorr_severidade[]">
+                                <option value="Baixa" selected>Baixa</option><option value="Média">Média</option>
+                                <option value="Alta">Alta</option><option value="Crítica">Crítica</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="ocorr_descricao[]" placeholder="Descrição"></div>
+                        <div class="col-md-2">
+                            <select class="form-control form-control-sm" name="ocorr_status[]">
+                                <option value="Pendente" selected>Pendente</option><option value="Em andamento">Em andamento</option>
+                                <option value="Resolvido">Resolvido</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>`;
+                }
+                cont.appendChild(div);
+            }
+            </script>
 
             {% if is_v2_active is defined and is_v2_active() %}
             <!-- ===== CRONOGRAMA V2: Apontamento de Produção Diária (Edição) ===== -->

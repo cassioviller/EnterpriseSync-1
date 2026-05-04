@@ -83,37 +83,69 @@ def listar_rdos():
         # Paginação
         rdos_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
         
-        # Processar dados dos RDOs
+        # Task #61 — MESMA lógica do detalhe: progresso V2 acumulado +
+        # normalização de horas (utils/rdo_horas).
+        from models import TarefaCronograma as _TC
+        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        from utils.rdo_horas import normalizar_horas_funcionario as _norm
+        _cprog: dict = {}
+        _cobra: dict = {}
+
         rdos_processados = []
         for rdo, obra in rdos_paginated.items:
-            # Contadores
-            total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
             total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
-            
-            # FÓRMULA PROGRESSO — usa subatividades ou apontamentos cronograma V2
             subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-            if subatividades:
-                soma_perc = sum(s.percentual_conclusao for s in subatividades)
-                total_sub = len(subatividades)
-                progresso_medio = round(soma_perc / total_sub, 1)
-                total_atividades = total_subatividades
-                logger.debug(f"[TARGET] CRUD PROGRESSO RDO {rdo.id}: {soma_perc}÷{total_sub} = {progresso_medio}%")
+            mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+
+            if rdo.obra_id not in _cobra:
+                _cobra[rdo.obra_id] = (
+                    db.session.query(_TC).filter_by(
+                        obra_id=rdo.obra_id, admin_id=admin_id
+                    ).first() is not None
+                )
+            obra_v2 = _cobra[rdo.obra_id]
+            aps_count = (
+                RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).count()
+                if obra_v2 else 0
+            )
+
+            if obra_v2:
+                ck = (rdo.obra_id, rdo.data_relatorio)
+                if ck not in _cprog:
+                    try:
+                        _cprog[ck] = calcular_progresso_geral_obra_v2(
+                            rdo.obra_id, rdo.data_relatorio, admin_id
+                        )
+                    except Exception as _e:
+                        logger.warning(f"[Task#61] V2 falhou RDO {rdo.id}: {_e}")
+                        _cprog[ck] = {'progresso_geral_pct': 0}
+                progresso_medio = round(_cprog[ck].get('progresso_geral_pct', 0) or 0, 1)
+            elif subatividades:
+                progresso_medio = round(
+                    sum(s.percentual_conclusao or 0 for s in subatividades) / len(subatividades), 1
+                )
             else:
-                # V2: usar percentual_realizado dos apontamentos de cronograma
-                apontamentos = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).all()
-                if apontamentos:
-                    progresso_medio = round(sum(a.percentual_realizado for a in apontamentos) / len(apontamentos), 1)
-                    total_atividades = len(apontamentos)
-                else:
-                    progresso_medio = 0
-                    total_atividades = 0
-            
+                progresso_medio = 0
+
+            entradas = []
+            for mo in mao_obra:
+                horas = float(mo.horas_trabalhadas or 0)
+                if horas <= 0 or not mo.funcionario_id:
+                    continue
+                key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
+                entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+            total_horas = round(sum(e[2] for e in _norm(entradas)), 1)
+
             rdos_processados.append({
                 'rdo': rdo,
                 'obra': obra,
-                'total_subatividades': total_atividades,
+                # Task #61 — V2 puro conta apontamentos quando não há subatividades.
+                'total_subatividades': len(subatividades) if subatividades else aps_count,
                 'total_funcionarios': total_funcionarios,
-                'progresso_medio': round(progresso_medio, 1),
+                'total_horas_trabalhadas': total_horas,
+                'progresso_medio': progresso_medio,
+                'progresso_label': 'Progresso geral' if obra_v2 else 'Progresso do dia',
+                'is_v2_progresso': obra_v2,
                 'status_cor': {
                     'Rascunho': 'warning',
                     'Finalizado': 'success',

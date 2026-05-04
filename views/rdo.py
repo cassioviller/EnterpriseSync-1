@@ -123,7 +123,18 @@ def rdos():
         obras = session.query(Obra).filter(Obra.admin_id == admin_id).order_by(Obra.nome).all()
         funcionarios = session.query(Funcionario).filter(Funcionario.admin_id == admin_id, Funcionario.ativo == True).order_by(Funcionario.nome).all()
         
-        # Mock simples sem modificar objetos
+        # Task #61 — listagem usa MESMA lógica do detalhe (funcionario_rdo_consolidado):
+        # progresso V2 acumulado via calcular_progresso_geral_obra_v2 +
+        # normalização de horas via utils/rdo_horas. Mantém a média simples
+        # de subatividades como fallback V1.
+        from models import RDOApontamentoCronograma as _RAC
+        from models import TarefaCronograma as _TC
+        from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
+
+        _cache_prog_v2: dict = {}
+        _cache_obra_v2: dict = {}
+
         class SimplePagination:
             def __init__(self, items):
                 self.items = []
@@ -132,37 +143,62 @@ def rdos():
                 self.page = 1
                 self.has_prev = False
                 self.has_next = False
-                # Criar objetos simples sem lazy loading
                 for rdo in items:
-                    # Calcular progresso real baseado nas subatividades
                     subatividades = session.query(RDOServicoSubatividade).filter(
                         RDOServicoSubatividade.rdo_id == rdo.id
                     ).all()
-                    
-                    if subatividades:
-                        # FÓRMULA SIMPLES: média das subatividades
-                        try:
-                            soma_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades)
-                            total_subatividades = len(subatividades)
-                            
-                            # FÓRMULA CORRETA: média simples
-                            progresso_real = round(soma_percentuais / total_subatividades, 1) if total_subatividades > 0 else 0
-                            
-                            logger.debug(f"DEBUG CARD FÓRMULA SIMPLES: RDO {rdo.id} = {soma_percentuais} ÷ {total_subatividades} = {progresso_real}%")
-                        except:
-                            # Fallback simples
-                            progresso_real = 0.0
-                            logger.debug(f"DEBUG CARD FALLBACK: RDO {rdo.id} = {progresso_real}%")
-                    else:
-                        progresso_real = 0
-                    
-                    # Calcular horas reais da mão de obra
                     mao_obra = session.query(RDOMaoObra).filter(
                         RDOMaoObra.rdo_id == rdo.id
                     ).all()
-                    
-                    horas_reais = sum(mo.horas_trabalhadas or 0 for mo in mao_obra) if mao_obra else 0
-                    
+
+                    # Detectar V2 (obra com TarefaCronograma)
+                    if rdo.obra_id not in _cache_obra_v2:
+                        _cache_obra_v2[rdo.obra_id] = (
+                            session.query(_TC).filter_by(
+                                obra_id=rdo.obra_id, admin_id=admin_id
+                            ).first() is not None
+                        )
+                    obra_em_v2 = _cache_obra_v2[rdo.obra_id]
+
+                    aps_count = (
+                        session.query(_RAC).filter_by(rdo_id=rdo.id).count()
+                        if obra_em_v2 else 0
+                    )
+                    # Task #61 — V2 puro conta apontamentos quando não há
+                    # RDOServicoSubatividade; cenários com subatividades usam
+                    # a contagem de subatividades (evita inflar híbridos).
+                    total_atividades = len(subatividades) if subatividades else aps_count
+
+                    if obra_em_v2:
+                        ck = (rdo.obra_id, rdo.data_relatorio)
+                        if ck not in _cache_prog_v2:
+                            try:
+                                _cache_prog_v2[ck] = calcular_progresso_geral_obra_v2(
+                                    rdo.obra_id, rdo.data_relatorio, admin_id
+                                )
+                            except Exception as _e:
+                                logger.warning(f"[Task#61] V2 falhou RDO {rdo.id}: {_e}")
+                                _cache_prog_v2[ck] = {'progresso_geral_pct': 0}
+                        progresso_real = _cache_prog_v2[ck].get('progresso_geral_pct', 0) or 0
+                    elif subatividades:
+                        soma = sum(s.percentual_conclusao or 0 for s in subatividades)
+                        progresso_real = soma / len(subatividades)
+                    else:
+                        progresso_real = 0
+
+                    # Horas: aplica normalização on-the-fly por (sub_id) p/
+                    # consistência com o detalhe — RDOs antigos podem ter
+                    # 8h em N subatividades.
+                    entradas = []
+                    for mo in mao_obra:
+                        horas = float(mo.horas_trabalhadas or 0)
+                        if horas <= 0 or not mo.funcionario_id:
+                            continue
+                        key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
+                        entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+                    norm = _norm_horas(entradas)
+                    horas_reais = sum(e[2] for e in norm)
+
                     obj = type('RDOView', (), {
                         'id': rdo.id,
                         'numero_rdo': rdo.numero_rdo,
@@ -171,6 +207,8 @@ def rdos():
                         'obra_id': rdo.obra_id,
                         'progresso_total': round(progresso_real, 1),
                         'horas_totais': round(horas_reais, 1),
+                        'total_atividades': total_atividades,
+                        'is_v2_progresso': obra_em_v2,
                         'obra': next((o for o in obras if o.id == rdo.obra_id), None),
                         'criado_por': None,
                         'servico_subatividades': subatividades,
@@ -192,10 +230,12 @@ def rdos():
             rdos_processados.append({
                 'rdo': rdo_view,
                 'obra': rdo_view.obra,
-                'total_subatividades': len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0,
+                'total_subatividades': getattr(rdo_view, 'total_atividades', len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0),
                 'total_funcionarios': len(rdo_view.mao_obra) if rdo_view.mao_obra else 0,
                 'total_horas_trabalhadas': rdo_view.horas_totais,
                 'progresso_medio': rdo_view.progresso_total,
+                'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
+                'is_v2_progresso': getattr(rdo_view, 'is_v2_progresso', False),
                 'status_cor': {
                     'Rascunho': 'warning',
                     'Finalizado': 'success',
@@ -242,34 +282,71 @@ def rdos():
                     
             rdos = MockPagination(rdos_basicos)
             
-            # Dados básicos com cálculo real de progresso
+            # Task #61 — fallback usa MESMA lógica V2 + normalização horas
+            from models import RDOApontamentoCronograma as _RAC2, TarefaCronograma as _TC2
+            from utils.cronograma_engine import calcular_progresso_geral_obra_v2 as _calc_v2
+            from utils.rdo_horas import normalizar_horas_funcionario as _norm
+            _cprog: dict = {}
+            _cobra: dict = {}
             for rdo in rdos.items:
                 try:
-                    # Buscar subatividades do RDO
                     subatividades = db.session.query(RDOServicoSubatividade).filter(
                         RDOServicoSubatividade.rdo_id == rdo.id
                     ).all()
-                    
-                    if subatividades:
-                        progresso_real = sum(sub.percentual_conclusao or 0 for sub in subatividades) / len(subatividades)
-                        rdo.progresso_total = round(progresso_real, 1)
-                    else:
-                        rdo.progresso_total = 0
-                    
-                    # Buscar mão de obra
                     mao_obra = db.session.query(RDOMaoObra).filter(
                         RDOMaoObra.rdo_id == rdo.id
                     ).all()
-                    
-                    rdo.horas_totais = sum(mo.horas_trabalhadas or 0 for mo in mao_obra) if mao_obra else 0
+
+                    if rdo.obra_id not in _cobra:
+                        _cobra[rdo.obra_id] = (
+                            db.session.query(_TC2).filter_by(
+                                obra_id=rdo.obra_id, admin_id=admin_id
+                            ).first() is not None
+                        )
+                    obra_v2 = _cobra[rdo.obra_id]
+                    aps_count = (
+                        db.session.query(_RAC2).filter_by(rdo_id=rdo.id).count()
+                        if obra_v2 else 0
+                    )
+                    if obra_v2:
+                        ck = (rdo.obra_id, rdo.data_relatorio)
+                        if ck not in _cprog:
+                            try:
+                                _cprog[ck] = _calc_v2(
+                                    rdo.obra_id, rdo.data_relatorio, admin_id
+                                )
+                            except Exception:
+                                _cprog[ck] = {'progresso_geral_pct': 0}
+                        rdo.progresso_total = round(_cprog[ck].get('progresso_geral_pct', 0) or 0, 1)
+                    elif subatividades:
+                        rdo.progresso_total = round(
+                            sum(s.percentual_conclusao or 0 for s in subatividades) / len(subatividades), 1
+                        )
+                    else:
+                        rdo.progresso_total = 0
+
+                    entradas = []
+                    for mo in mao_obra:
+                        horas = float(mo.horas_trabalhadas or 0)
+                        if horas <= 0 or not mo.funcionario_id:
+                            continue
+                        key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
+                        entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+                    norm = _norm(entradas)
+                    rdo.horas_totais = round(sum(e[2] for e in norm), 1)
                     rdo.servico_subatividades = subatividades
                     rdo.mao_obra = mao_obra
+                    # Task #61 — V2 puro: usa apontamentos quando não há subatividades.
+                    rdo.total_atividades = len(subatividades) if subatividades else aps_count
+                    rdo.is_v2_progresso = obra_v2
                 except Exception as calc_error:
                     logger.error(f"Erro cálculo RDO {rdo.id}: {calc_error}")
                     rdo.progresso_total = 0
                     rdo.horas_totais = 0
                     rdo.servico_subatividades = []
                     rdo.mao_obra = []
+                    rdo.total_atividades = 0
+                    rdo.is_v2_progresso = False
                 
                     logger.info(f"FALLBACK: Carregados {len(rdos.items)} RDOs básicos")
 
@@ -278,10 +355,12 @@ def rdos():
                 rdos_processados.append({
                     'rdo': rdo_view,
                     'obra': rdo_view.obra,
-                    'total_subatividades': len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0,
+                    'total_subatividades': getattr(rdo_view, 'total_atividades', len(rdo_view.servico_subatividades) if rdo_view.servico_subatividades else 0),
                     'total_funcionarios': len(rdo_view.mao_obra) if rdo_view.mao_obra else 0,
                     'total_horas_trabalhadas': rdo_view.horas_totais,
                     'progresso_medio': rdo_view.progresso_total,
+                    'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
+                    'is_v2_progresso': getattr(rdo_view, 'is_v2_progresso', False),
                     'status_cor': {
                         'Rascunho': 'warning',
                         'Finalizado': 'success',
@@ -1519,18 +1598,43 @@ def atualizar_rdo(id):
             flash(f'Já existe outro RDO ({rdo_existente.numero_rdo}) para esta obra na data {data_relatorio.strftime("%d/%m/%Y")}.', 'warning')
             return redirect(url_for('main.editar_rdo', id=id))
         
+        # Captura a data anterior ANTES de sobrescrever, para detectar
+        # mudança e regenerar o número do RDO mais à frente.
+        _old_data_relatorio = rdo.data_relatorio
         # Atualizar campos
         rdo.data_relatorio = data_relatorio
-        rdo.status = 'Finalizado'
+        # Permite o caller decidir se está finalizando ou só salvando.
+        finalizar = (request.form.get('acao') == 'finalizar') or \
+                    (request.form.get('finalizar') in ('1', 'true', 'on'))
+        rdo.status = 'Finalizado' if finalizar else (rdo.status or 'Rascunho')
+        # Task #61 — clima alinhado à visualização (3 campos)
+        _cg = (request.form.get('clima_geral') or '').strip()
+        _tm = (request.form.get('temperatura_media') or '').strip()
+        _ct = (request.form.get('condicoes_trabalho') or '').strip()
+        if _cg or 'clima_geral' in request.form:
+            rdo.clima_geral = _cg or None
+        if _tm or 'temperatura_media' in request.form:
+            rdo.temperatura_media = _tm or None
+        if _ct or 'condicoes_trabalho' in request.form:
+            rdo.condicoes_trabalho = _ct or None
+        # Compatibilidade legacy: tempo_manha/tarde/noite continuam sendo aceitos
         rdo.tempo_manha = request.form.get('tempo_manha', rdo.tempo_manha)
         rdo.tempo_tarde = request.form.get('tempo_tarde', rdo.tempo_tarde)
         rdo.tempo_noite = request.form.get('tempo_noite', rdo.tempo_noite)
-        rdo.observacoes_meteorologicas = request.form.get('observacoes_meteorologicas', '')
-        rdo.comentario_geral = request.form.get('comentario_geral', '')
+        rdo.comentario_geral = (
+            request.form.get('observacoes_gerais', '').strip()
+            or request.form.get('comentario_geral', '').strip()
+            or rdo.comentario_geral
+        )
+
+        # Task #61 — Equipamentos / Ocorrências (UI repetível inline).
+        # Fail-fast: erros propagam ao try/except externo, que faz rollback.
+        from utils.rdo_equip_ocorr import replace_equipamentos_ocorrencias
+        replace_equipamentos_ocorrencias(rdo.id, admin_id, request.form)
         
-        # Se mudou para data diferente, atualizar número do RDO
+        # Se mudou para data diferente, regenerar número do RDO
         # Task #12: gerar número globalmente único em vez da função livre inexistente
-        if rdo.data_relatorio != data_relatorio:
+        if _old_data_relatorio != data_relatorio:
             rdo.numero_rdo = _gerar_numero_rdo_unico(
                 rdo.obra_id, data_relatorio, admin_id
             )
@@ -2059,11 +2163,12 @@ def funcionario_rdo_consolidado():
                     )
                 obra_em_v2 = _cache_obra_v2[obra.id]
 
-                # ── Contador "X atividades" (Task #140 — bug 3) ──
-                # V1 conta subatividades; V2 conta tarefas-cronograma apontadas
-                # neste RDO. Quando ambos existem, somamos (cenários híbridos).
+                # ── Contador "X atividades" (Task #140 + Task #61) ──
+                # V1: usa subatividades. V2 puro (sem subatividades): usa
+                # apontamentos de cronograma. Cenários com subatividades
+                # NÃO somam apontamentos para evitar inflar a contagem.
                 aps_rdo_count = _RAC.query.filter_by(rdo_id=rdo.id).count() if obra_em_v2 else 0
-                total_atividades = total_subatividades + aps_rdo_count
+                total_atividades = total_subatividades if total_subatividades else aps_rdo_count
 
                 # ── Progresso (Task #140 — bugs 1 e 2) ──
                 # V2 = progresso GERAL ACUMULADO da obra até a data deste RDO
@@ -4018,7 +4123,17 @@ def salvar_rdo_flexivel():
             criado_por_id=_criado_por_id,
             data_relatorio=data_relatorio,
             local=request.form.get('local', 'Campo'),
-            admin_id=admin_id
+            admin_id=admin_id,
+            # Task #61 — clima alinhado à visualização
+            clima_geral=(request.form.get('clima_geral') or '').strip() or None,
+            temperatura_media=(request.form.get('temperatura_media') or '').strip() or None,
+            condicoes_trabalho=(request.form.get('condicoes_trabalho') or '').strip() or None,
+            # Observação geral (campo único)
+            comentario_geral=(
+                request.form.get('observacoes_gerais', '').strip()
+                or request.form.get('comentario_geral', '').strip()
+                or request.form.get('observacoes_finais', '').strip()
+            ),
         )
         
         # FASE 4: PERSISTIR COM TRANSAÇÃO ROBUSTA (Arquitetura Joris Kuypers INLINE)
@@ -4043,6 +4158,13 @@ def salvar_rdo_flexivel():
             db.session.flush()  # Para obter o ID
             
             logger.info(f"[SAVE] RDO {rdo.numero_rdo} criado com ID {rdo.id}")
+
+            # Task #61 — Equipamentos / Ocorrências (UI repetível inline).
+            # Fail-fast: qualquer erro propaga para o except externo, que faz
+            # rollback da transação inteira (RDO + subs + equip/ocorr).
+            from utils.rdo_equip_ocorr import replace_equipamentos_ocorrencias
+            _n_eq, _n_oc = replace_equipamentos_ocorrencias(rdo.id, admin_id, request.form)
+            logger.info(f"[Task#61] salvar_rdo_flexivel — eq={_n_eq} oc={_n_oc}")
             
             # Salvar todas as subatividades e montar mapa sub_mestre_id → obj
             logger.info(f"[SAVE] SALVANDO {len(subactivities)} SUBATIVIDADES")

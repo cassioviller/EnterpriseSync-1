@@ -1150,8 +1150,9 @@ console.log('Initializing RDO view with light theme...');
         </div>
     </div>
 
-    <!-- Seção Condições Climáticas -->
-    {% set tem_clima = rdo.clima_geral or rdo.temperatura_media or rdo.umidade_relativa is not none or rdo.vento_velocidade or rdo.precipitacao or rdo.condicoes_trabalho or rdo.observacoes_climaticas %}
+    <!-- Seção Condições Climáticas (Task #61: somente clima_geral, temperatura_media, condicoes_trabalho) -->
+    {% set tem_clima = rdo.clima_geral or rdo.temperatura_media or rdo.condicoes_trabalho %}
+    {% if tem_clima %}
     <div class="info-section">
         <div class="info-card">
             <div class="info-header">
@@ -1161,7 +1162,6 @@ console.log('Initializing RDO view with light theme...');
                 <h3>Condições Climáticas</h3>
             </div>
             <div class="info-body">
-                {% if tem_clima %}
                 <div class="clima-grid">
                     {% if rdo.clima_geral %}
                     <div class="clima-item">
@@ -1175,24 +1175,6 @@ console.log('Initializing RDO view with light theme...');
                         <span class="clima-value">{{ rdo.temperatura_media }}</span>
                     </div>
                     {% endif %}
-                    {% if rdo.umidade_relativa is not none %}
-                    <div class="clima-item">
-                        <span class="clima-label">Umidade relativa</span>
-                        <span class="clima-value">{{ rdo.umidade_relativa }}%</span>
-                    </div>
-                    {% endif %}
-                    {% if rdo.vento_velocidade %}
-                    <div class="clima-item">
-                        <span class="clima-label">Vento</span>
-                        <span class="clima-value">{{ rdo.vento_velocidade }}</span>
-                    </div>
-                    {% endif %}
-                    {% if rdo.precipitacao %}
-                    <div class="clima-item">
-                        <span class="clima-label">Precipitação</span>
-                        <span class="clima-value">{{ rdo.precipitacao }}</span>
-                    </div>
-                    {% endif %}
                     {% if rdo.condicoes_trabalho %}
                     <div class="clima-item">
                         <span class="clima-label">Condições de trabalho</span>
@@ -1200,18 +1182,10 @@ console.log('Initializing RDO view with light theme...');
                     </div>
                     {% endif %}
                 </div>
-                {% if rdo.observacoes_climaticas %}
-                <div class="obs-block mt-2">
-                    <strong><i class="fas fa-comment-dots"></i> Observações climáticas</strong>
-                    <div style="margin-top:.4rem">{{ rdo.observacoes_climaticas }}</div>
-                </div>
-                {% endif %}
-                {% else %}
-                <div class="empty-inline"><i class="fas fa-info-circle"></i> Nenhuma condição climática registrada.</div>
-                {% endif %}
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Seção Observações Gerais do RDO -->
     {% if rdo.comentario_geral and rdo.comentario_geral.strip() %}
@@ -1459,17 +1433,17 @@ console.log('Initializing RDO view with light theme...');
     </div>
     {% endif %}
 
-    <!-- Seção Equipamentos -->
+    <!-- Seção Equipamentos (Task #61: oculta quando vazia) -->
     {% set equipamentos_rdo = rdo.equipamentos|list if rdo.equipamentos else [] %}
+    {% if equipamentos_rdo %}
     <div class="info-section">
         <div class="info-card">
             <div class="info-header">
                 <div class="info-header-icon" style="background:linear-gradient(135deg,#6f42c1,#4a2a8a)">
                     <i class="fas fa-truck-pickup"></i>
                 </div>
-                <h3>Equipamentos {% if equipamentos_rdo %}({{ equipamentos_rdo|length }}){% endif %}</h3>
+                <h3>Equipamentos ({{ equipamentos_rdo|length }})</h3>
             </div>
-            {% if equipamentos_rdo %}
             <div class="equipamentos-grid">
                 {% for eq in equipamentos_rdo %}
                 <div class="equipamento-card">
@@ -1484,28 +1458,21 @@ console.log('Initializing RDO view with light theme...');
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <div style="padding: 2rem 1.5rem; text-align: center;">
-                <div style="font-size: 2.5rem; color: var(--gray-300); margin-bottom: .5rem;">
-                    <i class="fas fa-truck-pickup"></i>
-                </div>
-                <p class="empty-inline">Nenhum equipamento registrado neste RDO.</p>
-            </div>
-            {% endif %}
         </div>
     </div>
+    {% endif %}
 
-    <!-- Seção Ocorrências -->
+    <!-- Seção Ocorrências (Task #61: oculta quando vazia) -->
     {% set ocorrencias_rdo = rdo.ocorrencias_rdo|list if rdo.ocorrencias_rdo else [] %}
+    {% if ocorrencias_rdo %}
     <div class="info-section">
         <div class="info-card">
             <div class="info-header">
                 <div class="info-header-icon" style="background:linear-gradient(135deg,#dc3545,#a71d2a)">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
-                <h3>Ocorrências {% if ocorrencias_rdo %}({{ ocorrencias_rdo|length }}){% endif %}</h3>
+                <h3>Ocorrências ({{ ocorrencias_rdo|length }})</h3>
             </div>
-            {% if ocorrencias_rdo %}
             <div class="ocorrencias-list">
                 {% for oc in ocorrencias_rdo %}
                 {% set sev = (oc.severidade or 'Baixa')|lower %}
@@ -1572,16 +1539,9 @@ console.log('Initializing RDO view with light theme...');
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <div style="padding: 2rem 1.5rem; text-align: center;">
-                <div style="font-size: 2.5rem; color: var(--gray-300); margin-bottom: .5rem;">
-                    <i class="far fa-smile"></i>
-                </div>
-                <p class="empty-inline">Nenhuma ocorrência registrada neste RDO.</p>
-            </div>
-            {% endif %}
         </div>
     </div>
+    {% endif %}
 
     <!-- Seção Mão de Obra -->
     {% if funcionarios %}

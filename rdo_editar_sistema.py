@@ -186,7 +186,10 @@ def salvar_edicao_rdo(rdo_id):
         # Capturar dados do formulário
         obra_id = request.form.get('obra_id', type=int)
         data_relatorio = request.form.get('data_relatorio')
-        clima = request.form.get('clima', '').strip()
+        # Task #61 — clima alinhado à visualização (3 campos)
+        clima_geral = (request.form.get('clima_geral') or request.form.get('clima') or '').strip()
+        temperatura_media = (request.form.get('temperatura_media') or '').strip()
+        condicoes_trabalho = (request.form.get('condicoes_trabalho') or '').strip()
         # RDO V2: campo único de observações; mantém compat com observacoes_finais legado
         observacoes_gerais = request.form.get('observacoes_gerais', '').strip()
         observacoes_finais = request.form.get('observacoes_finais', '').strip()
@@ -207,7 +210,10 @@ def salvar_edicao_rdo(rdo_id):
         # Atualizar dados básicos do RDO
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
-        rdo.clima_geral = clima
+        # Task #61 — clima alinhado à visualização
+        rdo.clima_geral = clima_geral or None
+        rdo.temperatura_media = temperatura_media or None
+        rdo.condicoes_trabalho = condicoes_trabalho or None
         # Persistir o conteúdo unificado na coluna real (`comentario_geral`)
         rdo.comentario_geral = observacoes_unificadas
         # Manter atributos legados em memória para compatibilidade com código a jusante
@@ -467,6 +473,13 @@ def salvar_edicao_rdo(rdo_id):
                 logger.info(f"✅ entregas terceiros via salvar_edicao_rdo RDO {rdo.id}: marcadas={qtd_ent} revertidas={qtd_rev}")
         except Exception as e_ent:
             logger.error(f"Erro processando entregas terceiros (edicao): {e_ent}")
+
+        # Task #61 — Equipamentos / Ocorrências (UI repetível inline).
+        # Fail-fast: erros propagam ao try/except externo da edição, que
+        # faz rollback da transação inteira (o caller já trata IntegrityError).
+        from utils.rdo_equip_ocorr import replace_equipamentos_ocorrencias
+        _n_eq, _n_oc = replace_equipamentos_ocorrencias(rdo_id, admin_id, request.form)
+        logger.info(f"[Task#61] salvar_edicao_rdo — eq={_n_eq} oc={_n_oc}")
 
         # Confirmar salvamento
         db.session.commit()
