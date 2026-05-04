@@ -200,16 +200,21 @@ def atualizar_do_original_route(obra_id: int):
     """Propaga mudanças do orçamento original pro operacional (a partir de hoje)."""
     obra = _obra_do_admin_or_404(obra_id)
     item_ids_raw = request.form.getlist('item_ids')
-    item_ids = []
-    for r in item_ids_raw:
-        try:
-            item_ids.append(int(r))
-        except (TypeError, ValueError):
-            continue
+    # Distinguir "campo ausente" (None → propaga todos divergentes) de
+    # "campo presente sem seleção" (lista vazia → 0 atualizações).
+    if 'item_ids' in request.form:
+        item_ids = []
+        for r in item_ids_raw:
+            try:
+                item_ids.append(int(r))
+            except (TypeError, ValueError):
+                continue
+    else:
+        item_ids = None
     try:
         n = atualizar_do_original(
             obra_id=obra.id,
-            item_ids=item_ids or None,
+            item_ids=item_ids,
             criado_por_id=current_user.id,
         )
         if n:

@@ -237,7 +237,8 @@ def editar_item(
         )
         return nova
 
-    # modo == 'retroativo'
+    # modo == 'retroativo' — atualiza in-place (sem nova linha na tabela
+    # de versões); preserva a janela vigente_de/ate da versão atual.
     if not vigente:
         # Sem vigente: comporta-se como criação inicial
         vigente = ObraOrcamentoOperacionalItemVersao(
@@ -256,27 +257,21 @@ def editar_item(
         db.session.commit()
         return vigente
 
-    # Update in-place + linha de auditoria
+    # Update IN-PLACE — spec Task #63 step 4: retroativo NÃO cria nova linha
+    # na tabela de versões. A versão atual fica com os novos valores +
+    # criado_por_id + motivo + modo_aplicacao='retroativo' marcando o evento.
+    # (rastreabilidade de múltiplas edições retroativas vai via auditoria
+    # de eventos em outra história — fora do escopo desta task).
     vigente.composicao_snapshot = nova_composicao or []
     vigente.margem_pct = nova_margem_pct
     vigente.imposto_pct = novo_imposto_pct
-    auditoria = ObraOrcamentoOperacionalItemVersao(
-        item_id=item_id,
-        admin_id=item.admin_id,
-        composicao_snapshot=nova_composicao or [],
-        margem_pct=nova_margem_pct,
-        imposto_pct=novo_imposto_pct,
-        vigente_de=vigente.vigente_de,
-        vigente_ate=agora,  # marcador: registro de auditoria, não janela ativa
-        criado_por_id=criado_por_id,
-        motivo=motivo,
-        modo_aplicacao='retroativo',
-    )
-    db.session.add(auditoria)
+    vigente.criado_por_id = criado_por_id
+    vigente.motivo = motivo
+    vigente.modo_aplicacao = 'retroativo'
     db.session.commit()
     logger.info(
-        "[orcamento_operacional] item=%s editado RETROATIVO (in-place) auditoria=%s",
-        item_id, auditoria.id,
+        "[orcamento_operacional] item=%s editado RETROATIVO (in-place) versao=%s",
+        item_id, vigente.id,
     )
     return vigente
 

@@ -29,6 +29,10 @@
                     <i class="fas fa-plus"></i>
                     Novo RDO
                 </a>
+                <a href="{{ url_for('orcamento_operacional.index', obra_id=obra.id) }}" class="btn-modern btn-info" title="Orçamento Operacional da Obra (cópia editável separada do orçamento original)">
+                    <i class="fas fa-clipboard-list"></i>
+                    Orçamento Operacional
+                </a>
                 <a href="{{ url_for('main.editar_obra', id=obra.id) }}" class="btn-modern btn-warning">
                     <i class="fas fa-edit"></i>
                     Editar

@@ -205,10 +205,12 @@ class Runner:
                 db.session.refresh(vig_atual)
                 self.check(float(vig_atual.margem_pct) == 23.0,
                            f"retroativo: vigente atualizada in-place ({vig_atual.margem_pct})")
+                self.check(vig_atual.modo_aplicacao == 'retroativo',
+                           "retroativo: modo gravado na versão atual")
                 versoes_depois = ObraOrcamentoOperacionalItemVersao.query.filter_by(
                     item_id=item_op.id).count()
-                self.check(versoes_depois == versoes_antes + 1,
-                           f"retroativo: +1 linha auditoria ({versoes_antes}→{versoes_depois})")
+                self.check(versoes_depois == versoes_antes,
+                           f"retroativo: NÃO cria nova linha ({versoes_antes}→{versoes_depois})")
 
                 # ── 7) modo inválido levanta ──
                 try:
@@ -225,7 +227,14 @@ class Runner:
                 self.check(len(diffs) >= 1,
                            f"diff detecta mudança (≥1, real={len(diffs)})")
 
-                # ── 9) atualizar_do_original puxa de volta (a partir de hoje) ──
+                # ── 9) atualizar_do_original com lista vazia → 0 ──
+                n_empty = atualizar_do_original(obra.id, item_ids=[], criado_por_id=admin.id)
+                self.check(n_empty == 0,
+                           f"item_ids=[] resulta em 0 atualizações (real={n_empty})")
+                # diff ainda existe (nada foi propagado)
+                self.check(len(diff_com_original(obra.id)) >= 1,
+                           "lista vazia não propagou nada (diff ainda existe)")
+                # ── 9b) atualizar_do_original puxa de volta (a partir de hoje) ──
                 n = atualizar_do_original(obra.id, criado_por_id=admin.id)
                 self.check(n >= 1, f"atualizou ≥1 item do original (real={n})")
                 # após atualizar, diff zera
@@ -235,8 +244,12 @@ class Runner:
 
                 # ── 10) listar_versoes devolve histórico ordenado ──
                 lst = listar_versoes(item_op.id)
-                self.check(len(lst) >= 4,
-                           f"histórico tem ≥4 versões (real={len(lst)})")
+                # Histórico esperado (modo retroativo NÃO cria nova linha):
+                # 1) clone inicial (vigente_ate=now após edição #1)
+                # 2) edição a_partir_de_hoje (vigente; depois retroativo edita in-place)
+                # 3) atualizar_do_original → a_partir_de_hoje (vigente atual)
+                self.check(len(lst) >= 3,
+                           f"histórico tem ≥3 versões (real={len(lst)})")
 
                 # ── 11) Auto-clone via after_insert listener ──
                 # Cria uma 2ª obra SEM operacional, insere RDO, verifica que
