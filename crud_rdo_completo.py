@@ -93,9 +93,11 @@ def listar_rdos():
 
         rdos_processados = []
         for rdo, obra in rdos_paginated.items:
-            total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
             subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
             mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+            # Task #61b — funcionários ÚNICOS (RDOMaoObra tem 1 linha
+            # por func×subatividade; contar bruto inflava p/ "30").
+            total_funcionarios = len({mo.funcionario_id for mo in mao_obra if mo.funcionario_id})
 
             if rdo.obra_id not in _cobra:
                 _cobra[rdo.obra_id] = (

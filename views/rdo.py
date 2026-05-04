@@ -2210,15 +2210,28 @@ def funcionario_rdo_consolidado():
         from models import RDOApontamentoCronograma as _RAC
         from models import TarefaCronograma as _TC
         from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+        from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
         for rdo, obra in rdos_paginated.items:
             # Contadores básicos com proteção contra erros de schema
             try:
                 total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
-                total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
-
-                # [CONFIG] CALCULAR HORAS TRABALHADAS REAIS
+                # Task #61b — funcionários ÚNICOS (RDOMaoObra tem 1 linha
+                # por func×subatividade; contar bruto inflava p/ "30").
                 mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
-                total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
+                total_funcionarios = len({mo.funcionario_id for mo in mao_obra_lista if mo.funcionario_id})
+
+                # Task #61b — Horas normalizadas (mesma lógica do detalhe e
+                # da rota /rdos): jornada-base por funcionário dividida
+                # entre as N atividades distintas. Sem isso, 8.8h × 5 subs
+                # × 6 funcs = 264h fictícias em vez de 52.8h reais.
+                _entradas = []
+                for _mo in mao_obra_lista:
+                    _h = float(_mo.horas_trabalhadas or 0)
+                    if _h <= 0 or not _mo.funcionario_id:
+                        continue
+                    _key = ('sub', _mo.subatividade_id) if _mo.subatividade_id else ('row', _mo.id)
+                    _entradas.append((_mo.funcionario_id, _key, _h, float(_mo.horas_extras or 0)))
+                total_horas_trabalhadas = round(sum(e[2] for e in _norm_horas(_entradas)), 1)
 
                 # ── Detectar se a obra opera em modo V2 (cronograma) ──
                 if obra.id not in _cache_obra_v2:
@@ -2340,9 +2353,11 @@ def funcionario_rdo_consolidado():
                 try:
                     # Contar subatividades reais
                     total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
-                    
-                    # Contar funcionários reais
-                    total_funcionarios = RDOMaoObra.query.filter_by(rdo_id=rdo.id).count()
+
+                    # Task #61b — funcionários ÚNICOS + horas normalizadas
+                    # (mesma lógica do path principal, p/ paridade do fallback).
+                    mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
+                    total_funcionarios = len({mo.funcionario_id for mo in mao_obra_lista if mo.funcionario_id})
                     
                     # Calcular progresso médio real — V1: subatividades, V2: apontamentos cronograma
                     subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
@@ -2352,10 +2367,17 @@ def funcionario_rdo_consolidado():
                         from models import RDOApontamentoCronograma as _RAC
                         aps = _RAC.query.filter_by(rdo_id=rdo.id).all()
                         progresso_medio = sum(a.percentual_realizado for a in aps) / len(aps) if aps else 0
-                    
-                    # Calcular horas trabalhadas reais
-                    mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
-                    total_horas_trabalhadas = sum(mo.horas_trabalhadas or 0 for mo in mao_obra_lista)
+
+                    # Calcular horas trabalhadas reais (normalizadas)
+                    from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
+                    _ent = []
+                    for _mo in mao_obra_lista:
+                        _h = float(_mo.horas_trabalhadas or 0)
+                        if _h <= 0 or not _mo.funcionario_id:
+                            continue
+                        _k = ('sub', _mo.subatividade_id) if _mo.subatividade_id else ('row', _mo.id)
+                        _ent.append((_mo.funcionario_id, _k, _h, float(_mo.horas_extras or 0)))
+                    total_horas_trabalhadas = round(sum(e[2] for e in _norm_horas(_ent)), 1)
                     
                     logger.info(f"[STATS] FALLBACK RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio:.1f}% progresso")
                     
