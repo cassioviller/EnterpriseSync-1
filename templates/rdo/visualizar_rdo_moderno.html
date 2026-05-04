@@ -469,6 +469,21 @@ console.log('Initializing RDO view with light theme...');
     background-color: #6c757d !important;
 }
 
+/* Task #67 — Barras V2 (classes próprias p/ não colidir com .progress-bar local) */
+.v2-progress {
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    width: 100%;
+}
+.v2-progress-fill {
+    height: 100%;
+    background: #6c757d;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
 .subatividade-servico {
     display: flex;
     align-items: center;
@@ -1359,14 +1374,28 @@ console.log('Initializing RDO view with light theme...');
             <div class="p-4">
                 <div class="row g-3">
                 {% for ap in apontamentos_cronograma %}
-                {# "Sem plano": tarefa sem data_inicio/duração — não dá pra comparar #}
+                {# Task #67 — Status em 5 estados:
+                   - Sem plano (cinza): tarefa sem data_inicio/duração
+                   - Concluída (verde): realizado >= 100 e planejado <= 100 (no prazo/adiantada)
+                   - Concluída com atraso (laranja): realizado >= 100 e planejado > 100
+                   - Em dia (verde): realizado >= planejado, ainda em andamento
+                   - Atrasado (vermelho): realizado < planejado #}
                 {% set sem_plano = ap.sem_plano or ap.percentual_planejado is none %}
-                {% set status_ok = sem_plano or (ap.percentual_realizado >= ap.percentual_planejado) %}
+                {% set _real = ap.percentual_realizado or 0 %}
+                {% set _plan = ap.percentual_planejado or 0 %}
                 {% if sem_plano %}
                   {% set borda = '#6c757d' %}
                   {% set badge_bg = '#6c757d' %}
                   {% set badge_txt = 'Sem plano' %}
-                {% elif status_ok %}
+                {% elif _real >= 100 and _plan > 100 %}
+                  {% set borda = '#fd7e14' %}
+                  {% set badge_bg = '#fd7e14' %}
+                  {% set badge_txt = 'Concluída com atraso' %}
+                {% elif _real >= 100 %}
+                  {% set borda = '#28a745' %}
+                  {% set badge_bg = '#28a745' %}
+                  {% set badge_txt = 'Concluída' %}
+                {% elif _real >= _plan %}
                   {% set borda = '#28a745' %}
                   {% set badge_bg = '#28a745' %}
                   {% set badge_txt = 'Em dia' %}
@@ -1404,10 +1433,10 @@ console.log('Initializing RDO view with light theme...');
                                         {% if sem_plano %}—{% else %}{{ "%.1f"|format(ap.percentual_planejado) }}%{% endif %}
                                     </span>
                                 </div>
-                                <div class="progress" style="height:5px;background:#e9ecef">
+                                <div class="v2-progress">
                                     {% if not sem_plano %}
-                                    <div class="progress-bar bg-secondary"
-                                         style="width:{{ [ap.percentual_planejado, 100]|min }}%"
+                                    <div class="v2-progress-fill"
+                                         style="width:{{ [ap.percentual_planejado, 100]|min }}%;background:#6c757d"
                                          title="Planejado {{ '%.1f'|format(ap.percentual_planejado) }}%"></div>
                                     {% endif %}
                                 </div>
@@ -1417,8 +1446,8 @@ console.log('Initializing RDO view with light theme...');
                                     <span style="color:{{ borda }};font-weight:600">Realizado</span>
                                     <span style="color:{{ borda }};font-weight:600">{{ "%.1f"|format(ap.percentual_realizado) }}%</span>
                                 </div>
-                                <div class="progress" style="height:5px;background:#e9ecef">
-                                    <div class="progress-bar"
+                                <div class="v2-progress">
+                                    <div class="v2-progress-fill"
                                          style="width:{{ [ap.percentual_realizado, 100]|min }}%;background:{{ borda }}"
                                          title="Realizado {{ '%.1f'|format(ap.percentual_realizado) }}%"></div>
                                 </div>
