@@ -1421,6 +1421,66 @@ def _seed():
     _agora = datetime.utcnow()
     _hoje = date.today()
 
+    # Trajetória padrão por status final — garante 2 a 4 entradas em
+    # LeadHistorico por lead (criação + 1-3 transições), em datas
+    # crescentes igualmente espaçadas entre data_chegada e
+    # status_changed_at. Cobre o requisito do spec da Task #20.
+    # Cada item: (campo, valor_antes, valor_depois, descricao_curta).
+    _TRAJ = {
+        LeadStatus.EM_FILA: [
+            ("observacao", None, "triagem",
+             "Lead novo entrou na fila — aguardando primeira ligação."),
+        ],
+        LeadStatus.EM_ANDAMENTO: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+        ],
+        LeadStatus.ENVIADO: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+            ("status", LeadStatus.EM_ANDAMENTO.value, LeadStatus.ENVIADO.value,
+             "Proposta enviada ao cliente."),
+        ],
+        LeadStatus.VALIDACAO: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+            ("status", LeadStatus.EM_ANDAMENTO.value, LeadStatus.ENVIADO.value,
+             "Proposta enviada ao cliente."),
+            ("status", LeadStatus.ENVIADO.value, LeadStatus.VALIDACAO.value,
+             "Cliente em análise técnica da proposta."),
+        ],
+        LeadStatus.APROVADO: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+            ("status", LeadStatus.EM_ANDAMENTO.value, LeadStatus.ENVIADO.value,
+             "Proposta enviada ao cliente."),
+            ("status", LeadStatus.ENVIADO.value, LeadStatus.APROVADO.value,
+             "Proposta APROVADA — obra aberta no sistema."),
+        ],
+        LeadStatus.FEEDBACK: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+            ("status", LeadStatus.EM_ANDAMENTO.value, LeadStatus.ENVIADO.value,
+             "Proposta enviada ao cliente."),
+            ("status", LeadStatus.ENVIADO.value, LeadStatus.FEEDBACK.value,
+             "Cliente solicitou ajustes — aguardando devolutiva."),
+        ],
+        LeadStatus.CONGELADO: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+            ("status", LeadStatus.EM_ANDAMENTO.value, LeadStatus.CONGELADO.value,
+             "Cliente solicitou pausa — lead congelado."),
+        ],
+        LeadStatus.PERDIDO: [
+            ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
+             "Qualificação iniciada — primeiro contato realizado."),
+            ("status", LeadStatus.EM_ANDAMENTO.value, LeadStatus.ENVIADO.value,
+             "Proposta enviada ao cliente."),
+            ("status", LeadStatus.ENVIADO.value, LeadStatus.PERDIDO.value,
+             "Lead perdido — registrado motivo."),
+        ],
+    }
+
     def _criar_lead(
         *, nome, contato, email, responsavel, status, dias_parado,
         origem=None, cadencia=None, situacao=None, tipo_material=None,
@@ -1430,9 +1490,12 @@ def _seed():
         historico_extra=None,
     ):
         sc_at = _agora - _timedelta(days=int(dias_parado))
+        # data_chegada: 0-3 dias antes do status_changed_at, para que a
+        # trajetória de transições caiba dentro do intervalo.
+        chegada_dt = sc_at - _timedelta(days=max(2, min(int(dias_parado / 2), 7)))
         lead = Lead(
             admin_id=aid,
-            data_chegada=(sc_at.date() if dias_parado > 0 else _hoje),
+            data_chegada=chegada_dt.date(),
             data_envio=data_envio,
             nome=nome, contato=contato, email=email,
             responsavel_id=responsavel.id if responsavel else None,
@@ -1448,18 +1511,37 @@ def _seed():
             data_retomada=data_retomada,
             cliente_id=cliente_id, proposta_id=proposta_id, obra_id=obra_id,
             criado_por_id=aid, status_changed_at=sc_at,
-            created_at=sc_at, updated_at=sc_at,
+            created_at=chegada_dt, updated_at=sc_at,
         )
         db.session.add(lead); db.session.flush()
-        # Histórico mínimo: criação. usuario_id NULL = evento "sistema".
+        # 1) Entrada de criação (sempre, datada na chegada).
         db.session.add(LeadHistorico(
             lead_id=lead.id, admin_id=aid, campo="sistema",
-            valor_antes=None, valor_depois=status.value,
-            descricao=f"Lead criado pelo sistema (estágio inicial: {status.value}).",
+            valor_antes=None, valor_depois=LeadStatus.EM_FILA.value,
+            descricao=f"Lead criado pelo sistema (origem: {origem or 'manual'}).",
             usuario_id=None,
-            created_at=sc_at,
+            created_at=chegada_dt,
         ))
-        # Eventos extras opcionais.
+        # 2) Trajetória automática (1 a 3 entradas) — espaçada
+        # uniformemente entre chegada_dt+1d e sc_at.
+        trajetoria = _TRAJ.get(status, [])
+        n = len(trajetoria)
+        if n > 0:
+            intervalo = (sc_at - chegada_dt) - _timedelta(days=1)
+            if intervalo.total_seconds() <= 0:
+                intervalo = _timedelta(days=1)
+            passo = intervalo / n
+            base = chegada_dt + _timedelta(days=1)
+            for i, (campo, antes, depois, desc) in enumerate(trajetoria, start=1):
+                ts = (sc_at if i == n else base + (passo * (i - 1)))
+                db.session.add(LeadHistorico(
+                    lead_id=lead.id, admin_id=aid,
+                    campo=campo, valor_antes=antes, valor_depois=depois,
+                    descricao=desc, usuario_id=aid,
+                    created_at=ts,
+                ))
+        # 3) Eventos extras opcionais (sobre a trajetória, datados no
+        # final). Usados para detalhes pontuais como "primeira ligação OK".
         for ev in (historico_extra or []):
             db.session.add(LeadHistorico(
                 lead_id=lead.id, admin_id=aid,
@@ -1580,12 +1662,6 @@ def _seed():
         observacao="Lead originário da proposta 001.26 — APROVADO e em execução.",
         data_envio=_hoje - _timedelta(days=22),
         cliente_id=cliente.id, proposta_id=proposta.id, obra_id=obra.id,
-        historico_extra=[{
-            "campo": "status", "antes": LeadStatus.ENVIADO.value,
-            "depois": LeadStatus.APROVADO.value,
-            "descricao": "Cliente assinou proposta 001.26 — obra OBR-2026-001 aberta.",
-            "when": _agora - _timedelta(days=18),
-        }],
     ))
 
     # ---- Feedback (1) — aguardando resposta a ajustes solicitados.
@@ -1614,12 +1690,6 @@ def _seed():
         demanda="Cliente pediu para retomar após viagem.",
         valor_proposta=9800.00,
         data_retomada=_hoje + _timedelta(days=30),
-        historico_extra=[{
-            "campo": "status", "antes": LeadStatus.EM_ANDAMENTO.value,
-            "depois": LeadStatus.CONGELADO.value,
-            "descricao": "Cliente solicitou pausa de 30 dias.",
-            "when": _agora - _timedelta(days=20),
-        }],
     ))
 
     # ---- Perdido (2) — com motivo registrado.
@@ -1634,12 +1704,6 @@ def _seed():
         demanda="Cotação de cimento — fechou com concorrente.",
         valor_proposta=6200.00,
         data_envio=_hoje - _timedelta(days=20),
-        historico_extra=[{
-            "campo": "status", "antes": LeadStatus.ENVIADO.value,
-            "depois": LeadStatus.PERDIDO.value,
-            "descricao": "Perdido por preço — cliente fechou com concorrente.",
-            "when": _agora - _timedelta(days=15),
-        }],
     ))
     leads_criados.append(_criar_lead(
         nome="Fernando Brito", contato="(11) 99770-1010",
@@ -1652,12 +1716,6 @@ def _seed():
         demanda="Cliente desistiu da reforma após mudança de planos.",
         valor_proposta=48000.00,
         data_envio=_hoje - _timedelta(days=30),
-        historico_extra=[{
-            "campo": "status", "antes": LeadStatus.VALIDACAO.value,
-            "depois": LeadStatus.PERDIDO.value,
-            "descricao": "Cliente cancelou o projeto — adiado indefinidamente.",
-            "when": _agora - _timedelta(days=25),
-        }],
     ))
 
     db.session.commit()
@@ -1690,8 +1748,8 @@ def _seed():
         cliente_endereco=cliente_pin.endereco,
         titulo="Comercial Pinheiros — execução civil",
         descricao=(
-            "Execução de alvenaria de vedação e contrapiso para o "
-            "Comercial Pinheiros (lote único, 250 m²)."
+            "Execução de alvenaria de vedação, contrapiso e mobilização "
+            "de canteiro para o Comercial Pinheiros (1.500 m² úteis)."
         ),
         prazo_entrega_dias=180, validade_dias=15,
         status="rascunho",
@@ -1701,11 +1759,19 @@ def _seed():
     )
     db.session.add(proposta_pin); db.session.flush()
 
+    # Itens dimensionados para que a obra Pinheiros caia na faixa
+    # ~R$ 350-500k (spec da Task #20). Total = 1500*165 + 1500*95 +
+    # 25.000 = R$ 415.000. O 3º item (mobilização) usa serv_mob, que
+    # NÃO tem template — é tratado como verba financeira pura, não
+    # entra no cronograma materializado (mantém os mesmos dois
+    # serviços com folhas para os 10 RDOs de avanço).
     itens_pin_def = [
         ("Alvenaria de bloco cerâmico — Pinheiros",
-         Decimal("250.000"), "m2", Decimal("145.00"), serv_alv, 1),
+         Decimal("1500.000"), "m2", Decimal("165.00"), serv_alv, 1),
         ("Contrapiso desempenado — Pinheiros",
-         Decimal("250.000"), "m2", Decimal("70.00"), serv_pis, 2),
+         Decimal("1500.000"), "m2", Decimal("95.00"), serv_pis, 2),
+        ("Mobilização e canteiro — Pinheiros",
+         Decimal("1.000"), "vb", Decimal("25000.00"), serv_mob, 3),
     ]
     valor_pin = Decimal("0.00")
     propostaitem_pin_objs = []
@@ -1734,7 +1800,7 @@ def _seed():
         data_previsao_fim=date(2026, 7, 31),
         orcamento=float(valor_pin),
         valor_contrato=float(valor_pin),
-        area_total_m2=250.0,
+        area_total_m2=1500.0,
         status="Em andamento",
         cliente_id=cliente_pin.id,
         proposta_origem_id=proposta_pin.id, portal_ativo=True,
@@ -1786,24 +1852,42 @@ def _seed():
     )
     log.info(f"Task #20 Pinheiros: folhas do cronograma {len(folhas_pin)}")
 
+    # Mix de horas (6h-10h) e horas extras (0h-2h) por RDO — gera
+    # variação realista em Métricas (custo MO, produtividade,
+    # detalhe do funcionário). Mantém o mesmo valor para todos os
+    # funcionários daquele RDO (jornada do dia).
     rdos_pin_dados = [
-        # (idx, data, perc_destino, horas, perc_anterior)
-        (date(2026, 2, 3),  10.0, 8.0,  0.0),
-        (date(2026, 2, 10), 20.0, 8.0, 10.0),
-        (date(2026, 2, 17), 25.0, 8.0, 20.0),  # produtividade ABAIXO
-        (date(2026, 2, 24), 35.0, 8.0, 25.0),
-        (date(2026, 3, 3),  45.0, 8.0, 35.0),
-        (date(2026, 3, 10), 55.0, 8.0, 45.0),
-        (date(2026, 3, 17), 70.0, 8.0, 55.0),  # compensação
-        (date(2026, 3, 24), 80.0, 8.0, 70.0),
-        (date(2026, 3, 31), 90.0, 8.0, 80.0),
-        (date(2026, 4, 7), 100.0, 8.0, 90.0),
+        # (data, perc_destino, horas, horas_extras, perc_anterior)
+        (date(2026, 2, 3),  10.0, 8.0, 0.0,  0.0),  # arranque
+        (date(2026, 2, 10), 20.0, 9.0, 1.0, 10.0),  # extra leve
+        (date(2026, 2, 17), 25.0, 6.0, 0.0, 20.0),  # produtividade ABAIXO
+        (date(2026, 2, 24), 35.0, 8.0, 0.0, 25.0),  # ausência Marcos
+        (date(2026, 3, 3),  45.0, 10.0, 2.0, 35.0), # turno estendido
+        (date(2026, 3, 10), 55.0, 8.0, 0.0, 45.0),
+        (date(2026, 3, 17), 70.0, 9.5, 1.5, 55.0),  # compensação + ausência João
+        (date(2026, 3, 24), 80.0, 8.0, 0.0, 70.0),
+        (date(2026, 3, 31), 90.0, 7.0, 0.0, 80.0),  # dia chuvoso
+        (date(2026, 4, 7), 100.0, 8.5, 0.5, 90.0),  # entrega final
     ]
     omitir_diarista_no_idx = {4: marcos.id, 7: joao.id}
+    # Tipo + severidade da ocorrência por RDO — garante mix Baixa/Média
+    # conforme spec da Task #20.
+    ocorrencia_por_idx = {
+        1:  ("Observação", "Baixa",  "Início da obra — equipe nivelada."),
+        2:  ("Hora Extra", "Baixa",  "Extra leve para concluir a fundação do trecho A."),
+        3:  ("Atraso",     "Média",  "Produtividade abaixo do orçado (clima úmido na 3ª semana)."),
+        4:  ("Ausência",   "Média",  "Marcos faltou — ajustada distribuição de tarefas."),
+        5:  ("Hora Extra", "Média",  "Turno estendido para liberar trecho crítico antes do feriado."),
+        6:  ("Observação", "Baixa",  "Avanço dentro do planejado."),
+        7:  ("Ausência",   "Média",  "João ausente — equipe compensou com hora extra."),
+        8:  ("Observação", "Baixa",  "Avanço dentro do planejado."),
+        9:  ("Clima",      "Baixa",  "Chuva forte — jornada reduzida."),
+        10: ("Observação", "Baixa",  "Entrega final — checklist concluído."),
+    }
 
     from models import RDOApontamentoCronograma as _RAC_pin
     _v2_acum_pin = {}
-    for idx, (dt, perc_destino, horas, perc_anterior) in enumerate(
+    for idx, (dt, perc_destino, horas, horas_extras, perc_anterior) in enumerate(
         rdos_pin_dados, start=1
     ):
         omitir_id = omitir_diarista_no_idx.get(idx)
@@ -1811,11 +1895,15 @@ def _seed():
             numero_rdo=f"RDO-PIN-2026-{idx:03d}",
             data_relatorio=dt, obra_id=obra_pin.id,
             criado_por_id=aid, admin_id=aid,
-            clima_geral="Ensolarado", temperatura_media="25°C",
-            condicoes_trabalho="Ideais", local="Campo",
+            clima_geral=("Chuvoso" if idx == 9 else "Ensolarado"),
+            temperatura_media=("19°C" if idx == 9 else "25°C"),
+            condicoes_trabalho=("Adversas" if idx in (3, 9) else "Ideais"),
+            local="Campo",
             comentario_geral=(
                 f"Avanço semanal — meta {perc_destino:.0f}% "
-                f"(incremento de {perc_destino - perc_anterior:.0f}%)."
+                f"(incremento de {perc_destino - perc_anterior:.0f}%, "
+                f"jornada {horas:.1f}h"
+                f"{' + ' + str(horas_extras) + 'h extras' if horas_extras else ''})."
             ),
             status="Finalizado",
         )
@@ -1826,7 +1914,7 @@ def _seed():
                 admin_id=aid, rdo_id=rdo.id,
                 funcionario_id=carlos.id,
                 funcao_exercida="Pedreiro (mensalista)",
-                horas_trabalhadas=horas, horas_extras=0.0,
+                horas_trabalhadas=horas, horas_extras=horas_extras,
                 tarefa_cronograma_id=folha.id,
             ))
             for _diar, _func in (
@@ -1839,7 +1927,7 @@ def _seed():
                 db.session.add(RDOMaoObra(
                     admin_id=aid, rdo_id=rdo.id,
                     funcionario_id=_diar.id, funcao_exercida=_func,
-                    horas_trabalhadas=horas, horas_extras=0.0,
+                    horas_trabalhadas=horas, horas_extras=horas_extras,
                     tarefa_cronograma_id=folha.id,
                 ))
             db.session.add(RDOServicoSubatividade(
@@ -1873,21 +1961,27 @@ def _seed():
                     percentual_planejado=perc_destino,
                 ))
 
-        # Equipamento e ocorrência leves para dar realismo
-        if idx % 2 == 0:
+        # Equipamento varia (≥3 RDOs com equipamento, conforme spec).
+        if idx in (1, 4, 6, 9):
             db.session.add(RDOEquipamento(
                 admin_id=aid, rdo_id=rdo.id,
                 nome_equipamento="Betoneira 400L", quantidade=1,
-                horas_uso=4.0, estado_conservacao="Bom",
+                horas_uso=max(2.0, horas - 2.0), estado_conservacao="Bom",
             ))
+        if idx in (2, 5, 8):
+            db.session.add(RDOEquipamento(
+                admin_id=aid, rdo_id=rdo.id,
+                nome_equipamento="Andaime tubular (10m²)", quantidade=2,
+                horas_uso=horas, estado_conservacao="Bom",
+            ))
+        # Ocorrência por RDO com mix de severidade Baixa/Média.
+        _tipo_oc, _sev_oc, _desc_oc = ocorrencia_por_idx.get(
+            idx, ("Observação", "Baixa", "Avanço dentro do planejado.")
+        )
         db.session.add(RDOOcorrencia(
             admin_id=aid, rdo_id=rdo.id,
-            tipo_ocorrencia="Observação", severidade="Baixa",
-            descricao_ocorrencia=(
-                "Produtividade abaixo do orçado (clima úmido na 3ª semana)."
-                if idx == 3 else
-                f"Avanço semanal dentro do planejado ({perc_destino:.0f}%)."
-            ),
+            tipo_ocorrencia=_tipo_oc, severidade=_sev_oc,
+            descricao_ocorrencia=_desc_oc,
             status_resolucao="Resolvido",
         ))
 
