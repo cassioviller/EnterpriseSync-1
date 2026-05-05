@@ -1488,8 +1488,11 @@ def _seed():
     # Cada item: (campo, valor_antes, valor_depois, descricao_curta).
     _TRAJ = {
         LeadStatus.EM_FILA: [
-            ("observacao", None, "triagem",
-             "Lead novo entrou na fila — aguardando primeira ligação."),
+            # Lead permanece em EM_FILA: o evento real após a criação é
+            # a distribuição/atribuição do responsável durante a triagem
+            # (campo tipado responsavel_id), não uma transição de status.
+            ("responsavel_id", None, None,
+             "Lead distribuído ao responsável após triagem inicial."),
         ],
         LeadStatus.EM_ANDAMENTO: [
             ("status", LeadStatus.EM_FILA.value, LeadStatus.EM_ANDAMENTO.value,
@@ -1594,6 +1597,10 @@ def _seed():
             base = chegada_dt + _timedelta(days=1)
             for i, (campo, antes, depois, desc) in enumerate(trajetoria, start=1):
                 ts = (sc_at if i == n else base + (passo * (i - 1)))
+                # Para o evento responsavel_id (EM_FILA), o valor_depois
+                # é resolvido em runtime para o id real do responsável.
+                if campo == "responsavel_id" and depois is None:
+                    depois = (str(responsavel.id) if responsavel else None)
                 db.session.add(LeadHistorico(
                     lead_id=lead.id, admin_id=aid,
                     campo=campo, valor_antes=antes, valor_depois=depois,
@@ -1927,8 +1934,8 @@ def _seed():
     # em incrementos de 10%/semana). `perc_destino` é o REALIZADO,
     # que diverge do planejado nos RDOs 3-6 (atraso por produtividade
     # abaixo na 3ª semana → permanece -5% até a recuperação no idx 7).
-    # Essa divergência alimenta /metricas/empresa-por-servico (índice
-    # < 100 em alguns RDOs) e /metricas/divergencia/<servico_id>.
+    # Essa divergência alimenta /metricas/servico (Empresa por Serviço,
+    # índice < 100 em alguns RDOs) e /metricas/divergencia/servico/<id>.
     rdos_pin_dados = [
         # (data, perc_realizado, horas, horas_extras, perc_anterior, perc_planejado)
         (date(2026, 2, 3),  10.0, 8.0, 0.0,  0.0,  10.0),  # arranque (no plano)
