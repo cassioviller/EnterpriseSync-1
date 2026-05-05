@@ -108,6 +108,7 @@ def _get_operacional_cache(cache: dict, obra_id: int, servico_id: int, data_ref:
                 ObraOrcamentoOperacional.obra_id == obra_id,
                 ObraOrcamentoOperacionalItem.servico_id == servico_id,
             )
+            .order_by(ObraOrcamentoOperacionalItem.id)
             .first()
         )
         if not item:
@@ -504,6 +505,9 @@ def produtividade_por_servico(admin_id: int, data_inicio: date, data_fim: date,
 
     for m in metricas_sub:
         sid = m['servico_id']
+        if sid is None:
+            # Linhas de MO sem subatividade vinculada — ignorar no nível de serviço
+            continue
         agg = por_servico[sid]
         agg['servico_id'] = sid
         agg['servico_nome'] = m['servico_nome']
@@ -937,13 +941,15 @@ def ranking_funcionarios(admin_id: int, data_inicio: date, data_fim: date,
 
     if ordenar_por == 'produtividade':
         def _key(x):
-            return (-(x['prod_real_hh'] or -1e9), x['funcionario_nome'])
+            v = x['prod_real_hh']
+            return (0 if v is None else 1, -(v or 0), x['funcionario_nome'])
     elif ordenar_por == 'assiduidade':
         def _key(x):
             return (-x['assiduidade_pct'], x['funcionario_nome'])
     elif ordenar_por == 'lucratividade':
         def _key(x):
-            return (-(x['lucro_total'] or -1e9), x['funcionario_nome'])
+            v = x['lucro_total']
+            return (0 if v is None else 1, -(v or 0), x['funcionario_nome'])
     else:
         def _key(x):
             return x['funcionario_nome']
