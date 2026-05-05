@@ -3165,6 +3165,27 @@ def rdo_salvar_unificado():
 
         db.session.commit()
 
+        # Hook post-commit: garantir Orçamento Operacional no 1º RDO da obra.
+        # Executado APÓS o commit para que uma falha aqui nunca bloqueie o RDO
+        # (o RDO já foi salvo com sucesso acima).
+        if not rdo_id:
+            try:
+                from models import ObraOrcamentoOperacional as _ObraOpOrc
+                from services.orcamento_operacional import garantir_operacional as _garantir_op
+                if not _ObraOpOrc.query.filter_by(obra_id=rdo.obra_id).first():
+                    _garantir_op(rdo.obra_id, criado_por_id=current_user.id)
+                    logger.info(
+                        "[orcamento_operacional] operacional criado via hook RDO obra=%s",
+                        rdo.obra_id,
+                    )
+            except Exception as e_op:
+                logger.error(
+                    "[orcamento_operacional] erro no hook do 1º RDO obra=%s: %s",
+                    getattr(rdo, 'obra_id', '?'), e_op,
+                )
+
+        db.session.commit()
+
         # Gravar custo diário PRIMEIRO (fonte de verdade para o módulo financeiro)
         try:
             from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
@@ -3178,6 +3199,7 @@ def rdo_salvar_unificado():
             gerar_custos_mao_obra_rdo(rdo, admin_id_correto)
         except Exception as _ce:
             logger.warning("[rdo-custo] gerar_custos falhou no salvar_unificado: %s", _ce)
+
 
         if rdo_id:
             flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')

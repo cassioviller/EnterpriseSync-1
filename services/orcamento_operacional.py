@@ -58,10 +58,14 @@ def _data_inicial_vigencia(obra: Obra) -> datetime:
 def garantir_operacional(obra_id: int, criado_por_id: Optional[int] = None) -> ObraOrcamentoOperacional:
     """Garante que a obra tem um Orçamento Operacional clonado.
 
-    Idempotente: se já existe, devolve o existente sem alterar nada.
+    Idempotente e seguro contra inserção concorrente: se já existe, devolve o
+    existente sem alterar nada. Em caso de UniqueViolation (race condition entre
+    dois chamadores simultâneos), faz rollback parcial e retorna o existente.
     Se a obra não tem orçamento original aprovado, cria operacional VAZIO
     (preenchido manualmente depois) — não bloqueia o fluxo de RDO.
     """
+    from sqlalchemy.exc import IntegrityError
+
     op = ObraOrcamentoOperacional.query.filter_by(obra_id=obra_id).first()
     if op:
         return op
@@ -78,7 +82,21 @@ def garantir_operacional(obra_id: int, criado_por_id: Optional[int] = None) -> O
         criado_por_id=criado_por_id,
     )
     db.session.add(op)
-    db.session.flush()  # garante op.id
+    try:
+        db.session.flush()  # garante op.id
+    except IntegrityError:
+        # Corrida: outro chamador criou o operacional entre nossa leitura e
+        # a inserção. Fazemos rollback COMPLETO da sessão (IntegrityError
+        # invalida a sessão corrente) e devolvemos o existente já persistido.
+        db.session.rollback()
+        op = ObraOrcamentoOperacional.query.filter_by(obra_id=obra_id).first()
+        if op:
+            logger.info(
+                "[orcamento_operacional] corrida detectada obra=%s — retornando existente id=%s",
+                obra_id, op.id,
+            )
+            return op
+        raise
 
     if orc and orc.itens:
         vigente_de = _data_inicial_vigencia(obra)

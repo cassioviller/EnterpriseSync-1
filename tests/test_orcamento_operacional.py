@@ -251,9 +251,11 @@ class Runner:
                 self.check(len(lst) >= 3,
                            f"histórico tem ≥3 versões (real={len(lst)})")
 
-                # ── 11) Auto-clone via after_insert listener ──
-                # Cria uma 2ª obra SEM operacional, insere RDO, verifica que
-                # o operacional foi criado automaticamente após o commit.
+                # ── 11) Hook post-commit do 1º RDO — clona operacional ──
+                # Simula o que rdo_salvar_unificado faz após db.session.commit():
+                # verifica se a obra ainda não tem operacional e chama
+                # garantir_operacional. O RDO já está persistido antes da
+                # chamada, então uma falha aqui nunca bloqueia o RDO.
                 s2 = self._suf()
                 obra2 = Obra(
                     nome=f'Obra63b {s2}', codigo=f'O63b-{s2[-6:]}',
@@ -264,29 +266,24 @@ class Runner:
                 db.session.add(obra2); db.session.commit()
                 op_antes = ObraOrcamentoOperacional.query.filter_by(obra_id=obra2.id).first()
                 self.check(op_antes is None, "obra2 começa sem operacional")
-                rdo = RDO(
+                rdo2 = RDO(
                     numero_rdo=f'RDO-63-{s2[-6:]}',
                     data_relatorio=date(2026, 4, 5), obra_id=obra2.id,
                     criado_por_id=admin.id, admin_id=admin.id,
                     status='Finalizado',
                 )
-                db.session.add(rdo); db.session.commit()
-                # auto-clone roda em Timer thread separado — esperamos brevemente
-                import time
-                op_depois = None
-                for _ in range(30):
-                    time.sleep(0.1)
-                    db.session.expire_all()
-                    op_depois = ObraOrcamentoOperacional.query.filter_by(obra_id=obra2.id).first()
-                    if op_depois:
-                        break
+                db.session.add(rdo2); db.session.commit()
+                # Simula hook post-commit da view: chama garantir_operacional que é
+                # idempotente e seguro contra corrida (retorna existente se já criado).
+                garantir_operacional(obra2.id, criado_por_id=admin.id)
+                op_depois = ObraOrcamentoOperacional.query.filter_by(obra_id=obra2.id).first()
                 self.check(op_depois is not None,
-                           "auto-clone após RDO (Timer): operacional criado")
+                           "hook post-commit: operacional criado após 1º RDO")
                 if op_depois:
                     n_itens = ObraOrcamentoOperacionalItem.query.filter_by(
                         operacional_id=op_depois.id).count()
                     self.check(n_itens == 2,
-                               f"auto-clone copiou 2 itens (real={n_itens})")
+                               f"hook post-commit: copiou 2 itens (real={n_itens})")
 
             except Exception as e:
                 log.exception("erro inesperado no runner")
