@@ -776,6 +776,20 @@ def _seed():
     db.session.add_all([serv_alv, serv_pis, serv_mob, serv_pin])
     db.session.flush()
 
+    # Task #4 — back-link SubatividadeMestre → Servico. Cada subatividade
+    # mestre pertence ao serviço cujo CronogramaTemplate a referencia. Sem
+    # esse vínculo o auto-vínculo Função→ComposicaoServico (Task #62) não
+    # consegue casar a mão-de-obra à composição correta e a UI que filtra
+    # por serviço (cronograma, custos por serviço) fica vazia.
+    sub_marcacao.servico_id   = serv_alv.id
+    sub_elevacao.servico_id   = serv_alv.id
+    sub_chapisco.servico_id   = serv_alv.id
+    sub_prep_piso.servico_id  = serv_pis.id
+    sub_lancamento.servico_id = serv_pis.id
+    sub_massa.servico_id      = serv_pin.id
+    sub_pintura.servico_id    = serv_pin.id
+    db.session.flush()
+
     # Composição mínima do serviço de alvenaria (paramétrica)
     for nome_ins, coef in [
         ("Cimento CP II 50kg",     "0.04"),

@@ -2621,6 +2621,8 @@ def gerar_cronograma_cliente(obra_id):
                 quantidade_total=t.quantidade_total,
                 unidade_medida=t.unidade_medida,
                 subatividade_mestre_id=getattr(t, 'subatividade_mestre_id', None),
+                # Task #4 — preservar servico_id ao clonar p/ cronograma cliente
+                servico_id=getattr(t, 'servico_id', None),
                 percentual_concluido=t.percentual_concluido or 0.0,
                 responsavel=getattr(t, 'responsavel', 'empresa') or 'empresa',
                 ordem=t.ordem,

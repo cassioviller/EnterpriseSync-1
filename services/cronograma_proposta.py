@@ -435,6 +435,11 @@ def materializar_cronograma(
 
         # Nível 0 = nó raiz "Serviço" (grupo agregador)
         nome_serv = nivel0.get('servico_nome') or 'Serviço'
+        # Task #4 — servico_id da raiz e propagado para todas as tarefas-filhas
+        # (vem da árvore montada por montar_arvore_preview, que carrega
+        # servico_id do PropostaItem). Necessário para que a UI/serviço de
+        # custos por serviço funcione e para o auto-vínculo Função→Composição.
+        servico_id_no = nivel0.get('servico_id')
         chave_serv = _key_for(None, nome_serv, None)
         existente_serv = nat_idx.get(chave_serv)
         if existente_serv is not None:
@@ -442,6 +447,8 @@ def materializar_cronograma(
             tarefa_serv = existente_serv
             if tarefa_serv.gerada_por_proposta_item_id is None and pi_id:
                 tarefa_serv.gerada_por_proposta_item_id = pi_id
+            if tarefa_serv.servico_id is None and servico_id_no:
+                tarefa_serv.servico_id = servico_id_no
             logger.info(
                 f"#144: nó-raiz {nome_serv!r} já existia em obra={obra_id} "
                 f"(id={tarefa_serv.id}) — reuso (skip insert)"
@@ -458,6 +465,7 @@ def materializar_cronograma(
                 is_cliente=False,
                 responsavel='empresa',
                 gerada_por_proposta_item_id=pi_id,
+                servico_id=servico_id_no,
             )
             ordem_seq[0] += 10
             db.session.add(tarefa_serv)
@@ -496,6 +504,9 @@ def materializar_cronograma(
                     tarefa = existente
                     if tarefa.gerada_por_proposta_item_id is None and pi_id:
                         tarefa.gerada_por_proposta_item_id = pi_id
+                    # Task #4 — preencher servico_id quando faltar
+                    if tarefa.servico_id is None and servico_id_no:
+                        tarefa.servico_id = servico_id_no
                     logger.info(
                         f"#144: tarefa {nome_n!r} (sub={sub_id}, pai={pai_id}) "
                         f"já existia em obra={obra_id} (id={tarefa.id}) — reuso"
@@ -515,6 +526,7 @@ def materializar_cronograma(
                         is_cliente=False,
                         subatividade_mestre_id=sub_id,
                         gerada_por_proposta_item_id=pi_id,
+                        servico_id=servico_id_no,
                     )
                     ordem_seq[0] += 10
                     db.session.add(tarefa)

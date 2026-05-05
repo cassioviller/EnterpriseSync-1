@@ -1988,6 +1988,11 @@ def aplicar_template(obra_id: int):
 
                 is_grupo = no['tipo'] == 'grupo'
 
+                # Task #4 — propaga servico_id da SubatividadeMestre para
+                # que tarefas criadas via "Aplicar template" também tenham
+                # vínculo com o serviço (UI/custos por serviço, auto-vínculo
+                # Função→Composição, etc).
+                servico_id_no = sub.servico_id if sub else None
                 tarefa = TarefaCronograma(
                     obra_id=obra_id,
                     nome_tarefa=item.nome_tarefa,
@@ -2000,6 +2005,8 @@ def aplicar_template(obra_id: int):
                     ordem=ordem_base + ordem_seq[0] * 10,
                     admin_id=admin_id,
                     is_cliente=cliente_mode,
+                    subatividade_mestre_id=(sub.id if sub else None),
+                    servico_id=servico_id_no,
                 )
                 ordem_seq[0] += 1
                 db.session.add(tarefa)
