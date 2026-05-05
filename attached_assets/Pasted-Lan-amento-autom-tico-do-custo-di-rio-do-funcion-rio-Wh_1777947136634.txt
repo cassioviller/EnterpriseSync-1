@@ -1,0 +1,80 @@
+Lançamento automático do custo diário do funcionário
+What & Why
+Hoje o custo de mão de obra de um RDO é calculado pontualmente em services/rdo_custos.py quando o RDO é finalizado. O sistema já cria 3 entradas no contas a pagar (Mão de obra / Alimentação / Transporte — categorias MAO_OBRA_DIRETA, ALIMENTACAO, TRANSPORTE), mas tem buracos:
+
+Mensalista — dias do mês sem RDO ficam fora do custo. Se o pedreiro mensalista trabalhou 18 dias úteis num mês com 22, o sistema lança 18 × (salário/22) = 82% do salário. Os outros 4 dias (chuva, espera de material, transferido sem registrar) não viram custo em lugar nenhum — métrica subestimada e lucratividade da obra parece melhor do que é.
+Funcionário em 2 RDOs no mesmo dia (2 obras) — a regra "custo do dia = salário/dias_úteis" hoje gravaria custo cheio em cada RDO = 2× salário/dia. Precisa ratear proporcional às horas em cada um.
+Sem persistência por dia. Os dashboards de Métricas (Task #60) precisam ler rápido sem recalcular do zero — e o histórico precisa ser imune a mudanças futuras de salário.
+Idempotência frágil. Re-salvar o mesmo RDO pode duplicar entradas no contas a pagar.
+Done looks like
+Toda vez que um RDO é salvo (criado/editado/finalizado), pra cada funcionário lançado o sistema calcula e grava o custo do dia (folha base + VA + VT) numa tabela própria RDOCustoDiario, snapshotando os valores vigentes naquele dia.
+O custo/hora é derivado: custo_dia ÷ horas_lançadas_no_dia. Usado pra distribuir o custo entre subatividades proporcional às horas que ele lançou em cada uma.
+Funcionário em 2+ RDOs no mesmo dia (mais de uma obra): o custo do dia é rateado entre os RDOs proporcional às horas em cada um. Se trabalhou 5h na Obra A e 3h na Obra B, custo do dia se divide 5/8 e 3/8. A RDOCustoDiario desse dia tem N linhas (uma por RDO), cuja soma fecha exatamente o custo do dia.
+Mensalista — cobertura mensal completa: existe um job/processo que, ao fechar o mês (ou sob demanda), garante que pra cada mensalista todos os dias úteis do mês tenham uma entrada de custo. Os dias sem RDO entram como "Ocioso/Administrativo" (categoria nova MAO_OBRA_OCIOSA ou alocação a um centro de custo "Administrativo"), não atribuídos a nenhuma obra. A soma dos dias úteis do mês = salário do mês.
+Idempotência garantida: re-salvar o mesmo RDO atualiza a linha existente em RDOCustoDiario e as 3 entradas no contas a pagar (MAO_OBRA_DIRETA, ALIMENTACAO, TRANSPORTE), sem duplicar — chave de identidade no contas a pagar é (rdo_id, funcionario_id, componente).
+Mudar o salário/diária do funcionário não altera o custo dos RDOs já lançados (snapshot por dia).
+Existe obter_custo_funcionario_periodo(funcionario_id, data_inicio, data_fim) que devolve total + quebra por componente (folha + VA + VT) e por dia (incluindo dias ociosos).
+Migração retroativa preenche RDOCustoDiario de RDOs antigos com os valores atuais do funcionário, marcando como "calculado retroativamente".
+A tela do RDO mostra ao lado de cada funcionário o custo daquele dia pra ele (perfis com permissão de custo).
+Out of scope
+Folha de pagamento, encargos sociais, FGTS, INSS — só os 3 componentes operacionais (folha base proporcional + VA + VT).
+Mudar o cálculo da hora extra (segue 1,5× a hora normal como hoje em services/rdo_custos.py).
+Aviso/aprovação quando o custo do dia ultrapassa um limite.
+Cadastro de feriados (Task #33) — enquanto não houver, "dias úteis do mês" = seg-sex.
+Cadastro de afastamento (atestado/férias) — TODO discutido em conversa, fica pra task futura. Mensalista em férias gera custo "ocioso" por enquanto.
+Lançamento de horas/presença sem RDO — gatilho continua sendo "funcionário aparece num RDO" (exceto cobertura ociosa de mensalista).
+Cenários concretos
+Diarista em 1 RDO, 8h: João tem valor_diaria=200, valor_va=20, valor_vt=15. Custo do dia = 235; custo/hora = 29,38. 3 entradas no contas a pagar (200/20/15).
+Mensalista em 1 RDO, 9h (8 normais + 1 extra): Maria tem salario=4400, VA=22, VT=18, mês com 22 dias úteis. Custo base do dia = (4400/22) + 22 + 18 = 240. Hora normal = (4400/22)/8 = 25,00. Extra = 1,5 × 25,00 = 37,50. Custo do dia = 200 (folha 8h) + 37,50 (extra) + 22 (VA) + 18 (VT) = 277,50. 3 entradas no contas a pagar (237,50/22/18).
+Mensalista em 2 RDOs no mesmo dia (5h + 3h): total 8h normais. Custo do dia = 200 + 22 + 18 = 240. Rateio: Obra A 240×(5/8) = 150; Obra B 240×(3/8) = 90. Cada RDO tem sua entrada no contas a pagar correspondente.
+Mensalista em mês de 22 dias úteis com RDO em 18: 18 entradas vinculadas a obras + 4 entradas "ocioso/administrativo" (cada uma com folha + VA + VT = 240). Soma = 22 × 240 = 5.280. Coincide com salário+VA+VT do mês. ✓
+Steps
+Modelo de dados
+
+Nova tabela RDOCustoDiario: id, rdo_id (nullable — null pros dias ociosos), funcionario_id, data (date), tipo_remuneracao_snapshot (string), componente_folha (decimal), componente_va (decimal), componente_vt (decimal), componente_extra (decimal), custo_total_dia (decimal), horas_normais (decimal), horas_extras (decimal), custo_hora_normal (decimal), dias_uteis_mes_referencia (int, só pra mensalista), tipo_lancamento (enum: rdo, ocioso_mensal), created_at, updated_at.
+Índice único (rdo_id, funcionario_id, data) quando rdo_id não-null; índice único (funcionario_id, data) quando tipo_lancamento='ocioso_mensal' (pra evitar duplicar dia ocioso).
+Migration incluída.
+Serviço de cálculo do dia
+
+services/custo_funcionario_dia.py com:
+calcular_custo_funcionario_no_rdo(rdo, funcionario, horas_no_rdo, horas_totais_dia) → instância de RDOCustoDiario com rateio aplicado.
+dias_uteis_mes(ano, mes) (seg-sex; pluga feriados quando Task #33 estiver pronta).
+obter_custo_funcionario_periodo(funcionario_id, data_inicio, data_fim) lendo da tabela.
+gerar_dias_ociosos_mensalista(funcionario_id, ano, mes) cria/atualiza as linhas tipo_lancamento='ocioso_mensal' cobrindo só os dias úteis sem RDO.
+Hook no salvamento do RDO
+
+Após salvar RDOMaoObra, recalcular pra cada funcionário do RDO somando as horas dele em todos os RDOs daquele dia (mesmo tenant), aplicando o rateio.
+Se já existe linha (rdo_id, funcionario_id, data), atualiza; senão insere. Recalcula também as outras RDOCustoDiario daquele funcionário-dia (porque as proporções mudaram).
+Aplicar tanto em views/rdo.py (rdo_salvar_unificado) quanto em rdo_editar_sistema.py (salvar_edicao_rdo).
+Cobertura ociosa do mensalista
+
+Job app/jobs/cobertura_ociosa_mensalistas.py rodando todo dia 1 do mês (ou sob demanda) que, pra cada mensalista ativo no mês anterior, chama gerar_dias_ociosos_mensalista e cria as linhas + entradas no contas a pagar correspondentes.
+Idempotente: rodar duas vezes não duplica. Se um RDO atrasado for lançado depois pra um dia que já foi marcado ocioso, o sistema converte aquela linha de ociosa pra RDO no salvamento.
+Categoria no contas a pagar: nova MAO_OBRA_OCIOSA (mais o VA/VT como hoje).
+Exibição no RDO
+
+Na tela de visualização do RDO, mostrar ao lado do nome do funcionário o custo daquele dia pra ele (R$ X) com tooltip detalhando componentes (folha base + extra + VA + VT) e indicando se é rateio (ex.: "5/8h deste dia"). Visível só a perfis com permissão de custo.
+Refator do custo final do RDO + Contas a Pagar idempotente
+
+Em services/rdo_custos.py, fazer gerar_custos_mao_obra_rdo ler de RDOCustoDiario em vez de recalcular do zero. Centraliza fonte da verdade.
+Em utils/financeiro_integration.registrar_custo_automatico, garantir que pra cada (rdo_id, funcionario_id, componente) exista uma única entrada — re-salvar atualiza valor em vez de inserir nova. Persistir essa chave em GestaoCustoFilho.origem_chave_unica (campo novo string) ou via tabela auxiliar de mapeamento se origem_id for FK numérico estrito (definir na investigação técnica).
+Quando um RDO é apagado/cancelado: as entradas correspondentes em ContaPagar/GestaoCustoFilho viram status CANCELADO (preserva histórico contábil).
+Migração retroativa
+
+Script que percorre RDOs históricos e cria RDOCustoDiario com os valores atuais do funcionário, com flag/observação "calculado retroativamente".
+Pra mensalistas, opcionalmente roda o job de cobertura ociosa pros últimos N meses (configurável).
+Relatório final.
+Testes
+
+Pytest cobrindo: diarista simples, mensalista 1 RDO, mensalista com hora extra (componente_extra correto), mensalista em 2 RDOs no mesmo dia (rateio fecha = custo cheio do dia), mudança de salário não afeta RDOs antigos, idempotência (salvar 2× não duplica em RDOCustoDiario nem em ContaPagar), 3 entradas no contas a pagar pra mensalista (folha+VA+VT), cancelamento do RDO marca contas como CANCELADO, job de cobertura ociosa cria os dias certos, rodar job 2× é idempotente, RDO atrasado lançado num dia já marcado ocioso converte a linha.
+Relevant files
+models.py:177-213
+models.py:869-900
+models.py:1581-1618
+models.py:4729-4828
+services/rdo_custos.py
+utils/financeiro_integration.py
+views/rdo.py:2513-2564
+rdo_editar_sistema.py
+templates/rdo/visualizar.html
+templates/custos/gestao.html

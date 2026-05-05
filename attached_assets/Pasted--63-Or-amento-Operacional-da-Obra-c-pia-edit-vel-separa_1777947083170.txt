@@ -1,0 +1,72 @@
+#63 - Orçamento Operacional da Obra (cópia editável separada)
+What & Why
+Hoje todo cálculo de receita/lucro de RDO depende do composicao_snapshot do OrcamentoItem, que é a peça do contrato comercial. Esse snapshot pode ser editado a qualquer momento — inclusive depois que a obra começou e RDOs foram lançados. Isso causa dois problemas:
+
+Quebra retroativa silenciosa. O RDO foi feito sob uma realidade comercial; uma edição posterior no orçamento muda o cálculo de "lucro orçado vs. realizado" sem aviso.
+Confusão de papéis. O orçamento original é "o que vendemos". A obra precisa de um espelho técnico-operacional editável (preço de custo dos insumos pode mudar conforme a obra anda; o gestor precisa registrar isso sem mexer no contrato com o cliente).
+Solução: criar uma entidade nova "Orçamento Operacional da Obra" — uma cópia 100% editável dos itens do orçamento original, ligada à obra. Métricas SEMPRE leem dela. Edições no orçamento original (contrato) não afetam o operacional. Edições no operacional não voltam pro original.
+
+Quando o usuário edita o operacional, o sistema pergunta: aplicar só dali pra frente (versiona internamente; RDOs antigos mantêm o que tinham) ou aplicar retroativamente (recalcula tudo).
+
+Done looks like
+Quando uma obra recebe o primeiro RDO, o sistema clona automaticamente os OrcamentoItem do orçamento aprovado dela pra uma nova entidade ObraOrcamentoOperacional + ObraOrcamentoOperacionalItem (preserva composição, preços, margem, imposto). Se a obra não tem orçamento, o operacional pode ser criado vazio e preenchido manualmente depois.
+Existe uma tela "Orçamento da obra (operacional)" acessível a partir da obra. Lista os itens com composição, custos, margem, imposto. Cada campo é editável inline (sem reabrir o orçamento original).
+Ao salvar uma edição, o sistema pergunta num modal: "Aplicar a partir de hoje (RDOs antigos mantêm os valores que tinham)" ou "Aplicar a todos os RDOs desta obra (retroativo)". A escolha é gravada no histórico da edição.
+Existe versionamento interno só quando o usuário escolhe "a partir de hoje" — cada item operacional tem vigente_de/vigente_ate. Quando escolhe "retroativo", a versão atual é editada in-place sem criar nova linha (mas o evento fica registrado no histórico de auditoria).
+Existe obter_operacional_vigente(obra_id, item_id, data_referencia) que devolve a versão certa pra qualquer data dentro da obra.
+Tela tem aba "Histórico de alterações" com data, autor, motivo opcional, modo (a partir de hoje / retroativo) e diff resumido.
+Métricas (Task #60) leem sempre do operacional vigente na data do RDO. Sem toggle "preço atual / época" — o operacional já é "a verdade da obra".
+Edição do orçamento original (OrcamentoItem) NÃO altera o operacional, só mostra um aviso "esta obra já tem orçamento operacional separado; mudanças aqui não afetam a execução".
+Se o usuário quiser puxar mudanças do original pro operacional, há um botão explícito "Atualizar do orçamento original" que mostra um diff e pede confirmação item a item.
+Out of scope
+Reverter pra versão anterior pela UI (só leitura do histórico).
+Workflow de aprovação/assinatura pra mudanças no operacional.
+Versionamento de descrição/prazo/quantidade — só do que afeta cálculo (custo unitário dos insumos, coeficiente, margem, imposto).
+Fluxo de "operacionais paralelos" (mais de um operacional ativo na mesma obra).
+Notificação ao cliente quando o operacional muda — é interno.
+Steps
+Modelo de dados
+
+ObraOrcamentoOperacional: id, obra_id (FK, único: 1:1 com obra), orcamento_origem_id (FK opcional pro Orcamento original), created_at, criado_por_id.
+ObraOrcamentoOperacionalItem: id, operacional_id (FK), orcamento_item_origem_id (FK opcional pro OrcamentoItem original — pra manter rastro), servico_id, quantidade, unidade, descricao, e os campos versionáveis na tabela de versões abaixo.
+ObraOrcamentoOperacionalItemVersao: id, item_id (FK), composicao_snapshot (JSON), margem_pct, imposto_pct, vigente_de (datetime), vigente_ate (datetime, nullable se atual), criado_por_id, motivo (opcional), modo_aplicacao (a_partir_de_hoje|retroativo), created_at.
+Migration incluída.
+Clonagem automática no primeiro RDO
+
+Hook no salvamento do primeiro RDO de uma obra: se ObraOrcamentoOperacional ainda não existe, cria a partir do orçamento aprovado da obra (1 versão inicial de cada item, vigente_de = obra.data_inicio, vigente_ate = NULL).
+Se a obra não tem orçamento, cria operacional vazio e registra em log; não bloqueia o RDO.
+Tela "Orçamento da obra (operacional)"
+
+Acessível pela obra. Lista os itens com composição editável (pode adicionar/remover insumos, mudar preço, coef, margem, imposto).
+Botão "Salvar item" abre o modal de modo de aplicação.
+Aba "Histórico" lista versões com data, autor, motivo, modo, diff resumido (insumos cujo preco_unitario ou coeficiente mudou + alterações em margem/imposto).
+Botão "Atualizar do orçamento original" mostra diff item a item e pede confirmação.
+Modal "Como aplicar a edição?"
+
+Duas opções claras com exemplo: "A partir de hoje (RDOs antigos não mudam)" e "Aplicar a todos os RDOs desta obra (retroativo)".
+Campo opcional "Motivo da alteração".
+"A partir de hoje" → fecha versão atual com vigente_ate = now() e abre nova com vigente_de = now().
+"Retroativo" → atualiza in-place a versão atual, não cria nova; grava o evento no histórico com modo_aplicacao='retroativo' pra rastreabilidade.
+Serviço de leitura
+
+services/orcamento_operacional.py com:
+obter_operacional_vigente(obra_id, item_id, data_referencia) → dict {composicao, margem_pct, imposto_pct, versao_id, vigente_de, vigente_ate}.
+listar_versoes(item_id) pra a aba de histórico.
+clonar_do_orcamento(obra_id) pra a clonagem inicial e pro botão "Atualizar do original".
+Aviso na edição do orçamento original
+
+No template de edição de OrcamentoItem, banner discreto se a obra correspondente já tem operacional: "Esta obra já tem orçamento operacional separado. Mudanças aqui não afetam a execução. Use 'Atualizar do orçamento original' na tela operacional pra propagar."
+Migração de obras existentes
+
+Pra cada obra que já tem RDO lançado: criar o operacional clonando do orçamento original com 1 versão inicial (vigente_de = data do primeiro RDO).
+Pra obras com RDO mas sem orçamento: cria operacional vazio com aviso na tela.
+Relatório final.
+Testes
+
+Pytest cobrindo: criação automática no 1º RDO, edição "a partir de hoje" cria nova versão, edição "retroativa" atualiza in-place, obter_operacional_vigente com data anterior à 1ª versão (devolve a 1ª), data entre versões (devolve a vigente naquele intervalo), data atual (devolve aberta), edição do orçamento original não afeta operacional, botão "Atualizar do original" propaga corretamente, idempotência da clonagem (re-rodar não duplica).
+Relevant files
+models.py:5909-5961
+services/orcamento_view_service.py:30-117
+services/orcamento_service.py:29-118
+templates/orcamentos/editar.html
+views/rdo.py:2513-2564

@@ -1,0 +1,168 @@
+#60 - Métricas de produtividade (empresa, funcionário, ranking)
+What & Why
+Com o vínculo N:N entre subatividade ↔️ papéis de mão de obra (Task #62), o orçamento operacional editável da obra (Task #63) e o custo diário do funcionário gravado dia a dia (Task #64), agora dá pra construir métricas confiáveis para três usos:
+
+Empresa por serviço — produtividade média histórica realizada vs. coeficiente operacional, índice da equipe via gargalo, alerta de papel subutilizado. Vira referência pra atualizar o catálogo.
+Funcionário — quanto cada um produz e gera de lucro/prejuízo, comparando com a empresa, com os pares e com o que estava no operacional. Distingue dias single-role (só pessoas do mesmo papel) de dias em equipe mista.
+Ranking — ordenar funcionários por produtividade, assiduidade e lucratividade.
+Toda receita/lucro lê do Orçamento Operacional da Obra vigente na data do RDO (sem toggle "preço atual / época" — o operacional já é a verdade da obra).
+
+Done looks like
+Tela "Métricas › Empresa por serviço" lista os serviços do catálogo com: total de horas-homem por papel, total produzido, produtividade orçada do gargalo (1 ÷ coef do papel limitante), produtividade real média da equipe, índice realizado vs. orçado da equipe (%), custo real médio/un, receita líquida média/un, lucro real médio/un, e cobertura ("X% das horas com vínculo confirmado"). Cada linha mostra "papel mais usado como gargalo" e chip "papel subutilizado em N% dos dias" quando aplicável. Filtros por período e obra.
+Cada linha tem botão "Aplicar como referência no catálogo" que atualiza o coeficiente de cada linha de ComposicaoServico correspondente no catálogo (uma por papel) e cria registro de histórico no catálogo (ComposicaoServicoHistorico) com data, autor, valor anterior e novo. Aplica papel a papel — o usuário pode aceitar uns e rejeitar outros.
+Tela "Métricas › Funcionários" detalhada conforme "Especificação da tela Funcionários" abaixo.
+Tela "Ranking de funcionários" ordenável por produtividade, assiduidade ou lucratividade, com filtros (período, obra, função, serviço). Score composto opcional, exportação CSV.
+Os números fecham: a soma da receita líquida rateada de todos os funcionários numa subatividade volta exatamente à receita líquida total daquele dia (tolerância de arredondamento).
+Permissão restrita a perfis administrativos/gestores.
+Out of scope
+Mudar utils/rdo_horas.py.
+Metas individuais, bônus, folha de pagamento.
+Forecast com IA — só números históricos agregados.
+Análise por equipe persistente (cuadrillas).
+Cadastro de afastamento — assiduidade nesta entrega é número bruto sem juízo de valor (TODO declarado em conversa, fica pra task futura).
+Fórmulas (a fonte da verdade)
+Custo real do funcionário no dia (lido de RDOCustoDiario da Task #64)
+custo_dia       = componente_folha + componente_extra + componente_va + componente_vt
+custo_hora_real = custo_dia ÷ horas_lançadas_no_dia
+custo_dele_na_subatividade = custo_dia × (horas_dele_na_sub ÷ horas_dele_no_dia)
+
+Pra dias com RDO em 2 obras, cada RDOCustoDiario já vem rateada (Task #64).
+
+Receita por papel (lida do operacional vigente — Task #63)
+Pra cada subatividade executada, casando com as linhas do operacional pelos insumo_id declarados na SubatividadeMestre:
+
+custo_unit_papel       = operacional_vigente.composicao[insumo].custo_unitario
+preço_venda_unit       = Σ custo_unit_papel × (1 + margem%) × (1 + imposto%)
+imposto_unit           = preço_venda_unit × imposto%
+receita_líquida_unit   = preço_venda_unit − imposto_unit  =  Σ custo_unit_papel × (1 + margem%)
+
+Produção esperada da equipe (gargalo) e índice de equipe
+Pra cada subatividade num RDO, agrupando horas por papel (via RDOMaoObra.composicao_servico_id):
+
+capacidade(papel) = horas_do_papel_no_dia ÷ coef_do_papel
+producao_esperada_equipe = MIN ( capacidade(papel) ) sobre todos os papéis presentes
+papel_gargalo = papel cuja capacidade é o mínimo
+indice_equipe = quantidade_produzida ÷ producao_esperada_equipe   × 100
+folga(papel)  = capacidade(papel) − producao_esperada_equipe      (≥ 0)
+
+Alerta de papel subutilizado: quando folga(papel) ÷ capacidade(papel) ≥ 30%, marca o papel como subutilizado naquele dia. Threshold default 0.30 configurável no código.
+
+Produtividade individual vs. de equipe
+Pra cada RDOMaoObra numa subatividade:
+
+Se a subatividade no RDO tem um único papel presente (ex.: só pedreiros): produtividade individual normal.
+prod_real_dele = produção_dele ÷ horas_dele_no_serviço
+produção_dele = quantidade_produzida × (horas_dele ÷ horas_totais_do_papel_naquele_RDO)
+
+Se há 2+ papéis (equipe mista): individual não é mensurável separadamente; o funcionário leva o indice_equipe naquela subatividade. No card aparece "índice de equipe".
+Receita rateada por funcionário (vale pros dois casos)
+A receita líquida total da subatividade é rateada pelos papéis na proporção do esforço esperado (coef × produção real); dentro do papel, rateada por horas:
+
+esforço_esperado_papel  = coef_papel × quantidade_produzida
+total_esforço           = Σ esforço_esperado_papel  (sobre os papéis presentes)
+receita_papel           = receita_líquida_total × ( esforço_esperado_papel ÷ total_esforço )
+receita_dele            = receita_papel × ( horas_dele ÷ horas_totais_do_papel_naquele_RDO )
+lucro_real_dele         = receita_dele − custo_dele_na_subatividade
+
+Índices comparativos (na agregação por serviço)
+prod_orçada_papel(serviço)   = 1 ÷ coef_papel
+prod_real_dele(papel,serv)   = Σ produção_dele ÷ Σ horas_dele      (apenas dias single-role)
+prod_pares(papel,serv)       = (Σ produção − produção_dele) ÷ (Σ horas − horas_dele)
+prod_empresa(papel,serv)     = Σ produção ÷ Σ horas
+índice_vs_empresa = (prod_real_dele ÷ prod_empresa)  × 100
+índice_vs_pares   = (prod_real_dele ÷ prod_pares)    × 100
+índice_vs_orçado  = (prod_real_dele ÷ prod_orçada_papel) × 100
+
+Quando a maior parte das horas do funcionário no serviço foi em equipe mista, os índices individuais aparecem com aviso "baseado em X% das horas em equipe homogênea" e o card destaca o índice médio de equipe.
+
+Cobertura (qualidade do dado)
+"X% das horas com vínculo confirmado" = horas em RDOMaoObra com vinculo_status em (auto, manual).
+Quebra por motivo de não-confirmação: sem_funcao, funcao_fora_composicao, ambiguo, subatividade_sem_composicoes.
+Steps
+Camada de cálculo — services/metricas_produtividade.py com funções puras que recebem período + filtros e devolvem agregados:
+
+produtividade_por_servico(periodo, obra_id=None) — por serviço, agregados por papel + índice de equipe + papel-gargalo dominante + horas subutilizadas.
+producao_por_funcionario(periodo, ...) — separa horas single-role (com prod individual) das horas em equipe mista (com índice de equipe).
+assiduidade_funcionario(funcionario_id, periodo) — número bruto "X dias com RDO em Y dias úteis".
+ranking_funcionarios(periodo, criterio, ...).
+Lê de RDOMaoObra (com composicao_servico_id e vinculo_status), RDOServicoSubatividade, RDOCustoDiario, SubatividadeMestre (com composições N:N), ComposicaoServico (insumo + coef do catálogo, pra prod_orçada_papel) e do operacional via obter_operacional_vigente (Task #63) na data do RDO.
+Tela "Empresa por serviço" — Nova rota e template com a lista descrita acima, filtros (período default 90 dias, obra), indicador de gargalo dominante, chip "papel subutilizado em N% dos dias", botão "Aplicar como referência no catálogo" (POST que atualiza coef de cada linha de ComposicaoServico confirmada e grava ComposicaoServicoHistorico). Migration do histórico incluída.
+
+Tela "Funcionários" + detalhe individual — Conforme "Especificação da tela Funcionários" abaixo.
+
+Tela "Ranking" — Lista ordenável por produtividade, assiduidade ou lucratividade, com filtros (período, obra, função, serviço). Score composto opcional (média ponderada com pesos default no código). Top N + export CSV.
+
+Itens de menu e acesso — Grupo "Métricas" no menu lateral com os 3 itens, respeitando controle administrativo.
+
+Verificações de consistência e testes — Pytest cobrindo:
+
+Single-role (só pedreiros): produtividade individual e índice vs. orçado batem com cálculo manual.
+Equipe mista (Cenário B documentado em conversa: 3 pedreiros + 2 ajudantes): produção esperada por gargalo, índice de equipe, rateio por esforço esperado, lucro individual fechando com lucro total.
+Caso de papel subutilizado (Cenário A: 1 pedreiro + 2 ajudantes): alerta dispara, índice mostra a folga, lucro continua negativo apesar do índice 100%.
+Operacional editado retroativamente (Task #63 modo "retroativo"): métricas refletem o novo valor em RDOs antigos.
+Operacional editado "a partir de hoje": RDO antigo continua com valor antigo.
+Cobertura por motivo (sem_funcao, ambiguo, etc.) calculada certa.
+Funcionário em 2 RDOs no mesmo dia: custo individual lido das 2 RDOCustoDiario (Task #64) sem dupla contagem.
+Funcionário sem horas, sem custo cadastrado, único executor, obra sem operacional.
+Botão "Aplicar como referência" atualiza a linha certa do catálogo e grava histórico.
+Especificação da tela Funcionários
+Cabeçalho e filtros
+Título: "Métricas por funcionário".
+Filtros: Período (presets + custom, default últimos 30 dias), Obra (multi, default todas), Função (multi), Status (ativo/inativo/todos, default ativo).
+Ordenação: nome, produtividade, assiduidade, lucratividade.
+Busca por nome.
+Resumo geral (faixa acima dos cards)
+Funcionários ativos no período (com ≥ 1 RDO).
+Total de horas-homem (normais + extras).
+Lucratividade total real gerada (R$).
+Cobertura geral (% das horas com vínculo confirmado).
+Cards (um por funcionário)
+Cabeçalho: foto, nome, função (com chip do insumo de MO equivalente), obras em que apareceu.
+Horas trabalhadas: total + quebra "X normais + Y extras" + quebra "Z h sozinho no papel · W h em equipe mista".
+Produtividade:
+Bloco "Quando trabalhou sozinho no papel" (X% das horas): vs. Empresa, vs. Pares, vs. Orçado.
+Bloco "Quando trabalhou em equipe mista" (Y% das horas): índice médio da equipe ponderado por horas.
+Tooltip explicando.
+Assiduidade (bruta): X de Y dias úteis com RDO — sem juízo de valor (cadastro de afastamento é task futura).
+Lucratividade real (R$): valor + quebra "receita líquida R$… − custo real R$…".
+Botão "Ver detalhe →".
+Estados especiais
+Funcionário sem RDO no período: card cinza "Sem registros no período".
+100% em equipe mista: bloco "sozinho" oculto.
+100% sozinho: bloco "equipe" oculto.
+Subatividades sem produção: produtividade "—" + tooltip.
+Funcionário sem custo cadastrado: lucratividade "—" + aviso.
+Função sem insumo equivalente declarado (Task #62): banner amarelo "Vínculo da função pendente — métricas parciais" + link pra auditoria.
+Subatividade sem composições: horas entram em "cobertura como não confirmadas".
+Obra sem operacional: receita "—", lucratividade "—" + aviso. Custo continua aparecendo.
+Tela de detalhe (clicar em "Ver detalhe →")
+Cabeçalho do funcionário + filtros do mesmo período. Três seções:
+
+A) Tabela "Por serviço"
+
+| Serviço | Horas dele | Modo (sozinho/equipe) | Produção rateada | Prod. dele (un/h) | Prod. empresa | Prod. pares | Prod. orçada | Índ. vs Empresa | Índ. vs Pares | Índ. vs Orçado | Custo real | Receita líq. | Lucro real |
+
+Quando o serviço tem horas nos 2 modos, vira 2 linhas (sozinho/equipe) com agregado em negrito.
+
+B) Tabela "Por dia"
+
+| Data | Obra | RDO | Subatividades | Modo | Horas (n+ex) | Custo do dia | Produção rateada | Receita líq. | Lucro do dia |
+
+Coluna "Modo" mostra "sozinho" ou "equipe (gargalo: pedreiro)". Cada linha tem link pro RDO.
+
+C) Painel "Diagnóstico de equipe" — quando trabalhou em equipes mistas, lista os dias em que o papel dele foi gargalo vs. ficou subutilizado. Ajuda o gestor a saber se vale realocar.
+
+Relevant files
+utils/rdo_horas.py
+models.py:177-213
+models.py:406-442
+models.py:869-900
+models.py:1224-1280
+models.py:1310-1370
+models.py:5752-5847
+models.py:5825-5907
+models.py:5909-5961
+services/rdo_custos.py
+services/orcamento_view_service.py:30-117
+relatorios_funcionais.py:81-231
+views/dashboard.py:196
