@@ -1,19 +1,6 @@
-{# ────────────────────────────────────────────────────────────────────────
-   SIGE — Partials compartilhados (Task #15)
-   Macros de UI reutilizáveis para CRM e Métricas (e demais módulos
-   que estendem base_completo.html).
+{# Shared UI macros for CRM and Métricas (extends base_completo.html). #}
 
-   Como usar:
-     {% from "_partials/macros.html" import page_header, filter_card,
-                                            data_table_card, status_badge,
-                                            kpi_card, empty_state, back_link %}
-   ──────────────────────────────────────────────────────────────────────── #}
-
-
-{# ── 1. PAGE HEADER ─────────────────────────────────────────────────────
-   Cabeçalho padronizado com ícone, título, subtítulo opcional e área
-   de ações à direita (use {% call %} para passar botões).
-   ──────────────────────────────────────────────────────────────────── #}
+{# Page header with icon, title, optional subtitle and right-side actions slot. #}
 {% macro page_header(title, icon='fa-file', subtitle=None, icon_color='text-primary') %}
 <div class="sige-page-header d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
   <div class="flex-grow-1">
@@ -30,12 +17,7 @@
 </div>
 {% endmacro %}
 
-
-{# ── 2. FILTER CARD ─────────────────────────────────────────────────────
-   Container padronizado de filtros (form GET). O conteúdo dos campos
-   vem do bloco {% call %}. Botões "Filtrar" / "Limpar" são automáticos
-   se reset_url for fornecido.
-   ──────────────────────────────────────────────────────────────────── #}
+{# Filter form (GET) — auto-includes "Aplicar" / "Limpar" when reset_url is given. #}
 {% macro filter_card(action_url, reset_url=None, method='get', extra_class='') %}
 <form method="{{ method }}" action="{{ action_url }}" class="card sige-filter-card border-0 shadow-sm mb-3 {{ extra_class }}">
   <div class="card-body py-3">
@@ -44,7 +26,7 @@
       {% if reset_url %}
       <div class="col-12 col-sm-auto ms-sm-auto d-flex gap-2 sige-filter-actions">
         <button type="submit" class="btn btn-primary btn-sm">
-          <i class="fas fa-filter me-1" aria-hidden="true"></i> Filtrar
+          <i class="fas fa-check me-1" aria-hidden="true"></i> Aplicar
         </button>
         <a href="{{ reset_url }}" class="btn btn-outline-secondary btn-sm" title="Limpar filtros">
           <i class="fas fa-times" aria-hidden="true"></i><span class="visually-hidden">Limpar filtros</span>
@@ -56,12 +38,7 @@
 </form>
 {% endmacro %}
 
-
-{# ── 3. DATA TABLE CARD ────────────────────────────────────────────────
-   Wrapper de card + table-responsive. O conteúdo (thead/tbody) vem
-   do bloco {% call %}. Mostra empty_state automaticamente se has_data
-   for falsy.
-   ──────────────────────────────────────────────────────────────────── #}
+{# Card wrapping a responsive table; renders empty_state automatically when has_data is falsy. #}
 {% macro data_table_card(has_data=True, empty_message='Nenhum registro encontrado.', empty_icon='fa-inbox', dense=True, extra_classes='') %}
 <div class="card sige-table-card border-0 shadow-sm{% if dense %} sige-table-dense{% endif %}{% if extra_classes %} {{ extra_classes }}{% endif %}">
   {% if has_data %}
@@ -74,12 +51,7 @@
 </div>
 {% endmacro %}
 
-
-{# ── 4. STATUS BADGE (CRM) ─────────────────────────────────────────────
-   Mapa unificado de cores para os 8 estados do funil de vendas CRM.
-   Aceita o nome em PT (Em fila, Em andamento, Validação, etc.) e
-   normaliza para o slug correto.
-   ──────────────────────────────────────────────────────────────────── #}
+{# CRM funnel status badge — normalizes the 8 stage names to a slug + colored pill. #}
 {% macro status_badge(status) %}
 {%- set s = (status or '')|lower
               |replace('ã','a')|replace('é','e')|replace('í','i')
@@ -90,11 +62,7 @@
 </span>
 {% endmacro %}
 
-
-{# ── 5. KPI CARD ───────────────────────────────────────────────────────
-   Cartão compacto de KPI (label + valor grande + dica opcional).
-   color: success | danger | warning | primary | info | muted
-   ──────────────────────────────────────────────────────────────────── #}
+{# Compact KPI card. color: dark | primary | success | danger | warning | secondary | info. #}
 {% macro kpi_card(label, value, color='dark', icon=None, hint=None) %}
 <div class="card sige-kpi-card h-100">
   <div class="card-body py-3 text-center">
@@ -107,10 +75,7 @@
 </div>
 {% endmacro %}
 
-
-{# ── 6. EMPTY STATE ────────────────────────────────────────────────────
-   Estado vazio padronizado (usado dentro ou fora de cards).
-   ──────────────────────────────────────────────────────────────────── #}
+{# Empty-state block (icon + optional title + message). #}
 {% macro empty_state(message, icon='fa-inbox', title=None) %}
 <div class="sige-empty-state">
   <i class="fas {{ icon }}" aria-hidden="true"></i>
@@ -119,23 +84,14 @@
 </div>
 {% endmacro %}
 
-
-{# ── 7. BACK LINK ──────────────────────────────────────────────────────
-   Link "Voltar" padronizado, geralmente colocado acima do page_header
-   em telas de detalhe.
-   ──────────────────────────────────────────────────────────────────── #}
+{# Discrete "back" link, placed above page_header on detail screens. #}
 {% macro back_link(url, label='Voltar') %}
 <a href="{{ url }}" class="sige-back-link text-decoration-none small text-muted d-inline-flex align-items-center gap-1 mb-1">
   <i class="fas fa-arrow-left" aria-hidden="true"></i> {{ label }}
 </a>
 {% endmacro %}
 
-
-{# ── 8. AVATAR (iniciais) ─────────────────────────────────────────────
-   Avatar circular simples com as iniciais do nome (até 2 letras).
-   Usado em lead.responsavel (kanban) e nas listas de funcionários
-   (divergencia_servico). Cor neutra — gradient cinza.
-   ──────────────────────────────────────────────────────────────────── #}
+{# Circular avatar with up to 2 initials; namespace() is required for the loop accumulator. #}
 {% macro avatar(nome, size=24) %}
 {%- set partes = (nome or '').split() -%}
 {%- set ns = namespace(inic='') -%}
@@ -145,13 +101,7 @@
       title="{{ nome or '' }}">{{ ns.inic|upper or '?' }}</span>
 {% endmacro %}
 
-
-{# ── 9. MINI BAR ROW ──────────────────────────────────────────────────
-   Linha com label, barra horizontal colorida e valor. Usado nos cards
-   de funcionário em métricas/funcionarios.
-   color_class: bg-success | bg-primary | bg-warning | bg-danger | bg-secondary
-   pct: número 0-100 (será clampado).
-   ──────────────────────────────────────────────────────────────────── #}
+{# Label + horizontal mini-bar + value. color_class is a Bootstrap bg-* class. pct is clamped 0..100. #}
 {% macro mini_bar_row(label, pct, value_text, color_class='bg-primary') %}
 {%- set p = pct if pct is not none else 0 -%}
 {%- set p_clamped = ([p, 100]|min if p >= 0 else 0) -%}

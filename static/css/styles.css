@@ -393,12 +393,7 @@
     font-size: 0.875rem;
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   SIGE — Task #15: Estilos dos partials compartilhados
-   (CRM + Métricas — base_completo.html)
-   ════════════════════════════════════════════════════════════════════ */
-
-/* —— Page header —— */
+/* Page header */
 .sige-page-header h1 {
   font-weight: 700;
   color: #212529;
@@ -410,7 +405,7 @@
   margin: 0;
 }
 
-/* —— Filter card —— */
+/* Filter card */
 .sige-filter-card .form-control,
 .sige-filter-card .form-select {
   padding: 8px 12px !important;
@@ -430,7 +425,7 @@
 .sige-filter-actions .btn { min-width: 90px; }
 .sige-filter-actions .btn[title="Limpar filtros"] { min-width: 38px; padding: 6px 10px; }
 
-/* —— Status badge (CRM) —— */
+/* Status badge (CRM) */
 .sige-status-badge {
   display: inline-flex;
   align-items: center;
@@ -457,7 +452,7 @@
 .sige-status-congelado    { background:#dee2e6; color:#212529; border-color:#ced4da; }
 .sige-status-perdido      { background:#f8d7da; color:#842029; border-color:#f1aeb5; }
 
-/* —— KPI card —— */
+/* KPI card */
 .sige-kpi-card {
   border: 0 !important;
   background:#ffffff !important;
@@ -489,7 +484,7 @@
   margin-top: 0.15rem;
 }
 
-/* —— Empty state —— */
+/* Empty state */
 .sige-empty-state {
   padding: 2.5rem 1rem;
   text-align: center;
@@ -508,10 +503,10 @@
 }
 .sige-empty-state .sige-empty-message { font-size: 0.9rem; }
 
-/* —— Back link —— */
+/* Back link */
 .sige-back-link:hover { color: #198754 !important; text-decoration: underline !important; }
 
-/* —— Data table card (denso) —— */
+/* Data table card (denso) */
 .sige-table-card { overflow: hidden; }
 .sige-table-card .table { margin-bottom: 0 !important; }
 .sige-table-card .table thead th {
@@ -537,7 +532,7 @@
 .sige-table-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important; }
 .sige-filter-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important; }
 
-/* —— Pódio do ranking —— */
+/* Pódio do ranking */
 .sige-podio { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 12px; align-items: end; margin-bottom: 1.25rem; }
 .sige-podio .sige-podio-card {
   background: #fff;
@@ -561,11 +556,11 @@
   .sige-podio .sige-podio-card.first { transform: none; }
 }
 
-/* —— Mini progress (Métricas / Funcionários) —— */
+/* Mini progress (Métricas / Funcionários) */
 .sige-mini-progress { height: 5px; border-radius: 3px; background:#e9ecef; overflow: hidden; }
 .sige-mini-progress > div { height: 100%; transition: width 0.3s ease; }
 
-/* —— Cabeçalho de detalhe de funcionário —— */
+/* Cabeçalho de detalhe de funcionário */
 .sige-detail-header {
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   border-radius: 12px;
@@ -577,13 +572,7 @@
 /* Remove o hover-lift agressivo do base_completo nos KPI/podio (evita flicker) */
 .card.sige-kpi-card:hover { transform: translateY(-1px) !important; }
 
-/* ════════════════════════════════════════════════════════════════════
-   SIGE — Task #15 (rev 2): completar requisitos do plano
-   - avatar/inicial, sticky tables, vertical nav, timeline, mini-bars,
-     linha expansível na tabela de Serviços, "sem RDO" mais suave
-   ════════════════════════════════════════════════════════════════════ */
-
-/* —— Avatar com inicial —— */
+/* Avatar com inicial */
 .sige-avatar {
   display: inline-flex;
   align-items: center;
@@ -598,7 +587,7 @@
   letter-spacing: 0;
 }
 
-/* —— Cadastros: nav-pills vertical lateral —— */
+/* Cadastros: nav-pills vertical lateral */
 .sige-side-nav { padding: 0; margin: 0; }
 .sige-side-nav .nav-link {
   color: #495057;
@@ -615,7 +604,7 @@
 .sige-side-nav .nav-link.active { background: #198754 !important; color: #fff !important; border-color: #198754 !important; }
 .sige-side-nav .nav-link.active .badge { background: rgba(255,255,255,0.25) !important; color: #fff !important; }
 
-/* —— Timeline (histórico do lead) —— */
+/* Timeline (histórico do lead) */
 .sige-timeline { position: relative; padding: 6px 0; list-style: none; margin: 0; }
 .sige-timeline::before {
   content: '';
@@ -646,7 +635,7 @@
 .sige-timeline-item:last-child { padding-bottom: 0; }
 .sige-timeline-item .sige-timeline-time { font-size: 0.7rem; color: #adb5bd; }
 
-/* —— Sticky table headers —— */
+/* Sticky table headers */
 .sige-table-card.sige-table-sticky .table-responsive { max-height: 70vh; overflow-y: auto; }
 .sige-table-card.sige-table-sticky .table thead th {
   position: sticky;
@@ -656,7 +645,7 @@
   box-shadow: inset 0 -2px 0 #dee2e6;
 }
 
-/* —— Mini-bars coloridas (Assiduidade/Produtividade/Lucratividade) —— */
+/* Mini-bars coloridas (Assiduidade/Produtividade/Lucratividade) */
 .sige-mini-bars { display: flex; flex-direction: column; gap: 6px; }
 .sige-mini-bar-row {
   display: grid;
@@ -677,7 +666,7 @@
   font-size: 0.78rem;
 }
 
-/* —— Cartão "sem RDO" mais suave (substitui opacity-75) —— */
+/* Cartão "sem RDO" mais suave (substitui opacity-75) */
 .sige-card-empty {
   background: #f8f9fa !important;
   border: 1px dashed #ced4da !important;
@@ -688,7 +677,7 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
 }
 
-/* —— Linha expansível (empresa_servico) —— */
+/* Linha expansível (empresa_servico) */
 .sige-table-card .sige-row-toggle {
   cursor: pointer;
   background: transparent;
@@ -724,7 +713,7 @@
 }
 @media (max-width: 768px) { .sige-detail-grid { grid-template-columns: 1fr; } }
 
-/* —— Destaque do lucro do período no header de detalhe —— */
+/* Destaque do lucro do período no header de detalhe */
 .sige-detail-header .sige-period-lucro {
   display: inline-flex;
   flex-direction: column;

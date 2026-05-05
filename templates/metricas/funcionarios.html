@@ -18,7 +18,7 @@
     </a>
   {% endcall %}
 
-  {# KPI bar — agregados de negócio (Done looks like: HH normais/extras, lucro total) #}
+  {# KPI bar — totais agregados do período (HH normais/extras, lucro total). #}
   {% set agg = namespace(hh_norm=0, hh_extra=0, lucro=0, lucro_count=0) %}
   {% for m in metricas %}
     {% set agg.hh_norm = agg.hh_norm + (m.horas_normais or 0) %}
@@ -95,7 +95,7 @@
   <div class="row g-3">
     {% for m in metricas %}
     <div class="col-md-6 col-xl-4">
-      {# ── Card "sem RDO no período" — visual mais leve, sem opacity ── #}
+      {# Card "sem RDO no período" — visual mais leve, sem opacity #}
       {% if m.zero_rdo %}
       <div class="card sige-card-empty h-100">
         <div class="card-header d-flex align-items-center justify-content-between py-2 bg-transparent">
@@ -117,7 +117,7 @@
         </div>
       </div>
 
-      {# ── Card normal: funcionário com RDO ── #}
+      {# Card normal: funcionário com RDO #}
       {% else %}
       <div class="card h-100 shadow-sm {% if not m.tem_custo %}border-secondary{% elif m.lucro_total is not none and m.lucro_total < 0 %}border-danger{% else %}border-0{% endif %}">
         <div class="card-header d-flex align-items-center justify-content-between py-2 bg-white">
@@ -135,7 +135,7 @@
         </div>
         <div class="card-body py-3">
 
-          {# ── Linha 1: Horas / Extras / Assiduidade ── #}
+          {# Linha 1: Horas / Extras / Assiduidade #}
           <div class="row g-2 text-center">
             <div class="col-4">
               <div class="fw-bold">{{ '%.1f'|format(m.horas_normais) }}h</div>
@@ -156,7 +156,7 @@
                  style="width: {{ [m.assiduidade_pct, 100]|min }}%"></div>
           </div>
 
-          {# ── Linha 2: Produtividade / Custo / Lucro ── #}
+          {# Linha 2: Produtividade / Custo / Lucro #}
           <div class="row g-2 text-center border-top pt-2">
             <div class="col-4">
               {% if m.prod_real_hh is not none and m.modo_predominante == 'single_role' %}
@@ -192,7 +192,7 @@
             </div>
           </div>
 
-          {# ── Linha 3: vs. Empresa (single_role com prod) ── #}
+          {# Linha 3: vs. Empresa (single_role com prod) #}
           {% if m.modo_predominante == 'single_role' and m.prod_real_hh is not none and m.prod_empresa_media is not none %}
           <div class="row g-1 text-center border-top pt-2 mt-1">
             <div class="col-6">
@@ -234,7 +234,7 @@
           </div>
           {% endif %}
 
-          {# ── Mini-bars: Assiduidade / Produtividade / Lucratividade ── #}
+          {# Mini-bars: Assiduidade / Produtividade / Lucratividade #}
           <div class="sige-mini-bars border-top pt-2 mt-2">
             {% set _assid_color = 'bg-success' if m.assiduidade_pct >= 80 else ('bg-warning' if m.assiduidade_pct >= 50 else 'bg-danger') %}
             {{ mini_bar_row('Assiduidade', m.assiduidade_pct, '%.0f'|format(m.assiduidade_pct) ~ '%', _assid_color) }}
@@ -255,7 +255,7 @@
             {% endif %}
           </div>
 
-          {# ── Top 3 piores RDOs (drill-down Task #9) ── #}
+          {# Top 3 piores RDOs (drill-down) #}
           {% if m.top_rdos_problematicos %}
           <div class="border-top pt-2 mt-2">
             <div class="text-muted small mb-1">

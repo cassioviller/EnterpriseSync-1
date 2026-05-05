@@ -88,7 +88,7 @@
   </ul>
 
   <div class="tab-content">
-    {# ── A. Por Serviço ── #}
+    {# A. Por Serviço #}
     <div class="tab-pane fade show active" id="pane-servico" role="tabpanel">
       {% call data_table_card(has_data=(detalhe.por_servico|length > 0),
                                empty_message='Sem registros por serviço no período.',
@@ -160,7 +160,7 @@
       </div>
     </div>
 
-    {# ── B. Por Dia ── #}
+    {# B. Por Dia #}
     <div class="tab-pane fade" id="pane-dia" role="tabpanel">
       {% call data_table_card(has_data=(detalhe.por_dia|length > 0),
                                empty_message='Sem registros diários no período.',
@@ -210,7 +210,7 @@
       {% endcall %}
     </div>
 
-    {# ── C. Diagnóstico de Equipe ── #}
+    {# C. Diagnóstico de Equipe #}
     <div class="tab-pane fade" id="pane-diag" role="tabpanel">
       <div class="row g-3">
         <div class="col-md-6">

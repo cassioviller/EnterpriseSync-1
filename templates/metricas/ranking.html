@@ -85,7 +85,7 @@
     </div>
   {% else %}
 
-  {# ── Pódio dos top 3 ── #}
+  {# Pódio dos top 3 #}
   {% if lista|length >= 1 %}
   {% set top3 = lista[:3] %}
   {% set metric_label = {'produtividade':'un/h','assiduidade':'%','lucratividade':'lucro'}[ordenar_por] %}
@@ -141,7 +141,7 @@
   </div>
   {% endif %}
 
-  {# ── Tabela completa (todos, do 1º ao último) ── #}
+  {# Tabela completa (todos, do 1º ao último) #}
   {% call data_table_card(has_data=true) %}
     <table class="table table-hover align-middle mb-0">
       <thead>

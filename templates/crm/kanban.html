@@ -63,6 +63,7 @@
     background: #e9ecef;
     color: #495057;
 }
+.crm-card__badge.success { background: #d1e7dd; color: #0f5132; }
 .crm-card__badge.warning { background: #fff3cd; color: #664d03; }
 .crm-card__badge.danger { background: #f8d7da; color: #842029; }
 .crm-card__acoes { display: flex; gap: 4px; }
@@ -191,16 +192,16 @@
                         {% endif %}
                         <div class="crm-card__rodape">
                             <span>
-                                {% if lead.dias_parado >= 14 %}
+                                {% if lead.dias_parado > 14 %}
                                 <span class="crm-card__badge danger" title="Parado há {{ lead.dias_parado }} dias">
                                     <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
-                                {% elif lead.dias_parado >= 7 %}
+                                {% elif lead.dias_parado > 7 %}
                                 <span class="crm-card__badge warning" title="Parado há {{ lead.dias_parado }} dias">
                                     <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
                                 {% else %}
-                                <span class="crm-card__badge">
+                                <span class="crm-card__badge success" title="Parado há {{ lead.dias_parado }} dias">
                                     <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
                                 {% endif %}
