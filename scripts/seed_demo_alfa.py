@@ -1139,7 +1139,19 @@ def _seed():
         ))
 
         db.session.flush()
+
+        # Task #3 — recalcula produtividade snapshot (RDOMaoObra.produtividade_real
+        # / indice_produtividade) para alimentar /cronograma/api/produtividade.
+        # Sem isto, o dashboard de produtividade fica vazio para o demo.
+        from services.rdo_custos import recalcular_produtividade_rdo as _recalc_prod
+        _recalc_prod(rdo)
+
         log.info(f"RDO #{idx} ({dt.isoformat()}) finalizado — folhas a {perc_destino:.0f}%")
+
+    # Task #3 — sincroniza percentuais bottom-up: tarefas-pai do cronograma
+    # passam a refletir a média ponderada dos filhos (que os RDOs avançaram).
+    from utils.cronograma_engine import sincronizar_percentuais_obra as _sinc_perc
+    _sinc_perc(obra.id, aid)
 
     # 11.5) Task #118 — Demo: Orçamento com 4 cenários de override -----
     # (a) item com template padrão do serviço, sem override
@@ -2185,10 +2197,21 @@ def _seed():
         ))
 
         db.session.flush()
+
+        # Task #3 — recalcula produtividade snapshot por RDO (mesma rotina
+        # disparada pelo finalize handler em views/rdo.py).
+        from services.rdo_custos import recalcular_produtividade_rdo as _recalc_prod_pin
+        _recalc_prod_pin(rdo)
+
         log.info(
             f"Task #20 Pinheiros: RDO {idx}/{len(rdos_pin_dados)} "
             f"({dt.isoformat()}) finalizado — {perc_destino:.0f}%"
         )
+
+    # Task #3 — rolla as tarefas-pai do cronograma do Pinheiros para refletir
+    # o avanço dos filhos finalizados.
+    from utils.cronograma_engine import sincronizar_percentuais_obra as _sinc_perc_pin
+    _sinc_perc_pin(obra_pin.id, aid)
 
     db.session.commit()
 
