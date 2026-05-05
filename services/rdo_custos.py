@@ -76,31 +76,57 @@ def _custo_diario_rdo(rdo_id: int, funcionario_id: int):
 
 
 def remover_custos_rdo(rdo, admin_id) -> int:
-    """Remove GestaoCustoFilho ligados aos RDOMaoObra deste RDO.
+    """Remove GestaoCustoFilho ligados a este RDO (origens legadas e v2).
 
-    DEVE ser chamada ANTES de RDOMaoObra ser deletado pelo fluxo de
-    edição (precisamos dos IDs para casar com origem_id).
+    DEVE ser chamada ANTES de RDOMaoObra / RDOCustoDiario serem deletados
+    pelo fluxo de edição (precisamos dos IDs para casar com origem_id).
+    Cobre:
+      - origens legadas: rdo_mao_obra / rdo_mao_obra_va / rdo_mao_obra_vt
+        → identifica via RDOMaoObra.id
+      - origens v2: rdo_custo_diario / rdo_custo_diario_va / rdo_custo_diario_vt
+        → identifica via RDOCustoDiario.id (tipo_lancamento='rdo')
     Recalcula valor_total dos pais afetados; remove pais zerados PENDENTES.
+    Faz apenas flush — o commit é do chamador.
     """
     try:
         from app import db
-        from models import RDOMaoObra, GestaoCustoFilho, GestaoCustoPai
-        from sqlalchemy import func
+        from models import RDOMaoObra, RDOCustoDiario, GestaoCustoFilho, GestaoCustoPai
+        from sqlalchemy import func as sa_func
 
-        ids = [r.id for r in RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()]
-        if not ids:
-            return 0
+        # Coleta IDs das origens legadas (RDOMaoObra)
+        mao_obra_ids = [r.id for r in RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()]
+        # Coleta IDs das origens v2 (RDOCustoDiario tipo='rdo')
+        custo_dia_ids = [
+            r.id for r in RDOCustoDiario.query.filter_by(
+                rdo_id=rdo.id, tipo_lancamento='rdo'
+            ).all()
+        ]
 
-        origens = ['rdo_mao_obra', 'rdo_mao_obra_va', 'rdo_mao_obra_vt']
-        filhos = (
-            GestaoCustoFilho.query
-            .filter(
-                GestaoCustoFilho.admin_id == admin_id,
-                GestaoCustoFilho.origem_tabela.in_(origens),
-                GestaoCustoFilho.origem_id.in_(ids),
+        origens_legado = ['rdo_mao_obra', 'rdo_mao_obra_va', 'rdo_mao_obra_vt']
+        origens_v2 = ['rdo_custo_diario', 'rdo_custo_diario_va', 'rdo_custo_diario_vt']
+
+        filhos: list = []
+        if mao_obra_ids:
+            filhos += (
+                GestaoCustoFilho.query
+                .filter(
+                    GestaoCustoFilho.admin_id == admin_id,
+                    GestaoCustoFilho.origem_tabela.in_(origens_legado),
+                    GestaoCustoFilho.origem_id.in_(mao_obra_ids),
+                )
+                .all()
             )
-            .all()
-        )
+        if custo_dia_ids:
+            filhos += (
+                GestaoCustoFilho.query
+                .filter(
+                    GestaoCustoFilho.admin_id == admin_id,
+                    GestaoCustoFilho.origem_tabela.in_(origens_v2),
+                    GestaoCustoFilho.origem_id.in_(custo_dia_ids),
+                )
+                .all()
+            )
+
         if not filhos:
             return 0
 
@@ -115,7 +141,7 @@ def remover_custos_rdo(rdo, admin_id) -> int:
             if not pai:
                 continue
             total = (
-                db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
+                db.session.query(sa_func.coalesce(sa_func.sum(GestaoCustoFilho.valor), 0))
                 .filter_by(pai_id=pai.id)
                 .scalar()
             ) or Decimal('0.00')

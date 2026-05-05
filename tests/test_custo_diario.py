@@ -352,3 +352,94 @@ def test_7_remover_custo_diario():
 
         assert n == 1
         assert RDOCustoDiario.query.filter_by(rdo_id=rdo.id).count() == 0
+
+
+def test_8_edicao_rdo_atualiza_custos_financeiros():
+    """Editar RDO deve atualizar GestaoCustoFilho sem duplicar.
+
+    Fluxo:
+      1. Salvar RDO com funcionário (8h) e gerar custos v2
+      2. Remover custos financeiros (remover_custos_rdo) + custo diário
+         → simula hook do fluxo de edição
+      3. Recriar RDOMaoObra com horas diferentes (4h)
+      4. Gravar novo custo diário + gerar custos financeiros
+      5. Verificar: 1 GestaoCustoFilho (não 2), com valor atualizado
+    """
+    from models import GestaoCustoFilho, GestaoCustoPai
+
+    with app.app_context():
+        func = _func(tipo='salario', salario=3000.0, valor_va=0.0, valor_vt=0.0)
+        data = date(2026, 3, 5)
+        rdo = _rdo(_fx.obra, data, '08')
+        mo = _mo(rdo, func, horas=8.0)
+        rdo.status = 'Finalizado'
+        db.session.commit()
+
+        # 1) Gravar custo diário inicial (8h) + gerar financeiros
+        from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+        from services.rdo_custos import gerar_custos_mao_obra_rdo, remover_custos_rdo
+
+        gravar_custo_funcionario_rdo(rdo, _fx.admin.id)
+        gerar_custos_mao_obra_rdo(rdo, _fx.admin.id)
+
+        custo_dia_inicial = RDOCustoDiario.query.filter_by(
+            rdo_id=rdo.id, funcionario_id=func.id
+        ).first()
+        assert custo_dia_inicial is not None, "custo diário inicial não criado"
+        valor_inicial = float(custo_dia_inicial.custo_total_dia)
+
+        filhos_antes = GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.origem_tabela == 'rdo_custo_diario',
+            GestaoCustoFilho.origem_id == custo_dia_inicial.id,
+            GestaoCustoFilho.admin_id == _fx.admin.id,
+        ).count()
+        assert filhos_antes == 1, f"Esperava 1 filho antes da edição, encontrou {filhos_antes}"
+
+        # 2) Simula hook de edição: remover custos financeiros + custo diário
+        from services.custo_funcionario_dia import remover_custo_diario_rdo
+        remover_custos_rdo(rdo, _fx.admin.id)
+        remover_custo_diario_rdo(rdo.id)
+
+        # Remover linha de mão-de-obra (como o fluxo real de edição faz)
+        from models import RDOMaoObra
+        RDOMaoObra.query.filter_by(rdo_id=rdo.id).delete()
+        db.session.flush()
+
+        # 3) Recriar com horas reduzidas (4h)
+        mo2 = _mo(rdo, func, horas=4.0)
+        db.session.commit()
+
+        # 4) Gravar novo custo diário (4h) + gerar financeiros
+        gravar_custo_funcionario_rdo(rdo, _fx.admin.id)
+        gerar_custos_mao_obra_rdo(rdo, _fx.admin.id)
+
+        custo_dia_novo = RDOCustoDiario.query.filter_by(
+            rdo_id=rdo.id, funcionario_id=func.id
+        ).first()
+        assert custo_dia_novo is not None, "custo diário pós-edição não criado"
+        valor_novo = float(custo_dia_novo.custo_total_dia)
+
+        # Valor deve ter diminuído (4h < 8h)
+        assert valor_novo < valor_inicial, (
+            f"Custo com 4h ({valor_novo:.2f}) deveria ser < custo com 8h ({valor_inicial:.2f})"
+        )
+
+        # 5) Apenas 1 GestaoCustoFilho (não duplicado)
+        filhos_depois = GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.origem_tabela == 'rdo_custo_diario',
+            GestaoCustoFilho.origem_id == custo_dia_novo.id,
+            GestaoCustoFilho.admin_id == _fx.admin.id,
+        ).count()
+        assert filhos_depois == 1, (
+            f"Esperava 1 filho pós-edição, encontrou {filhos_depois}"
+        )
+
+        # Não há filhos órfãos do custo diário original (já deletados)
+        filhos_obsoletos = GestaoCustoFilho.query.filter(
+            GestaoCustoFilho.origem_tabela == 'rdo_custo_diario',
+            GestaoCustoFilho.origem_id == custo_dia_inicial.id,
+            GestaoCustoFilho.admin_id == _fx.admin.id,
+        ).count()
+        assert filhos_obsoletos == 0, (
+            f"Filhos do custo diário antigo deveriam ter sido removidos, encontrou {filhos_obsoletos}"
+        )
