@@ -1033,6 +1033,10 @@ def _seed():
     from models import RDOApontamentoCronograma as _RAC_seed
     _v2_acum_qty = {}
     for idx, (dt, perc_destino, horas) in enumerate(rdos_dados, start=1):
+        # Task #6 — cria como Rascunho e finaliza via mesmo caminho da rota
+        # (views.rdo.finalizar_rdo): status='Finalizado' + commit + emit
+        # 'rdo_finalizado'. O handler `event_manager.lancar_custos_rdo`
+        # gera GestaoCustoPai/Filho (SALARIO/VA/VT) — sem INSERT direto.
         rdo = RDO(
             numero_rdo=f"RDO-2026-{idx:03d}",
             data_relatorio=dt, obra_id=obra.id,
@@ -1040,7 +1044,7 @@ def _seed():
             clima_geral="Ensolarado", temperatura_media="26°C",
             condicoes_trabalho="Ideais", local="Campo",
             comentario_geral=f"Avanço da semana — meta atingida ({perc_destino:.0f}%).",
-            status="Finalizado",
+            status="Rascunho",
         )
         db.session.add(rdo); db.session.flush()
 
@@ -1145,6 +1149,19 @@ def _seed():
         # Sem isto, o dashboard de produtividade fica vazio para o demo.
         from services.rdo_custos import recalcular_produtividade_rdo as _recalc_prod
         _recalc_prod(rdo)
+
+        # Task #6 — finaliza pelo mesmo caminho da rota: muda status,
+        # commita, e emite 'rdo_finalizado'. O handler oficial
+        # `event_manager.lancar_custos_rdo` cria os GestaoCustoPai/Filho
+        # (SALARIO/VA/VT) — nada de INSERT direto em gestao_custo_*.
+        rdo.status = "Finalizado"
+        db.session.commit()
+        from event_manager import EventManager as _EM
+        _EM.emit('rdo_finalizado', {
+            'rdo_id': rdo.id,
+            'obra_id': rdo.obra_id,
+            'data_relatorio': str(rdo.data_relatorio),
+        }, aid)
 
         log.info(f"RDO #{idx} ({dt.isoformat()}) finalizado — folhas a {perc_destino:.0f}%")
 
@@ -2101,7 +2118,8 @@ def _seed():
                 f"jornada {horas:.1f}h"
                 f"{' + ' + str(horas_extras) + 'h extras' if horas_extras else ''})."
             ),
-            status="Finalizado",
+            # Task #6 — Rascunho; finalizado abaixo via emit do evento.
+            status="Rascunho",
         )
         db.session.add(rdo); db.session.flush()
 
@@ -2202,6 +2220,17 @@ def _seed():
         # disparada pelo finalize handler em views/rdo.py).
         from services.rdo_custos import recalcular_produtividade_rdo as _recalc_prod_pin
         _recalc_prod_pin(rdo)
+
+        # Task #6 — finaliza pelo mesmo caminho da rota: status='Finalizado',
+        # commit, emit 'rdo_finalizado'. O handler oficial cria os custos.
+        rdo.status = "Finalizado"
+        db.session.commit()
+        from event_manager import EventManager as _EM_pin
+        _EM_pin.emit('rdo_finalizado', {
+            'rdo_id': rdo.id,
+            'obra_id': rdo.obra_id,
+            'data_relatorio': str(rdo.data_relatorio),
+        }, aid)
 
         log.info(
             f"Task #20 Pinheiros: RDO {idx}/{len(rdos_pin_dados)} "
@@ -2354,8 +2383,8 @@ def _backfill_custos_rdo_demo(admin_id):
     try:
         from app import db
         from models import Usuario, Obra, RDO
-        from services.rdo_custos import gerar_custos_mao_obra_rdo
         from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+        from event_manager import EventManager
 
         admin = Usuario.query.get(admin_id)
         if admin and getattr(admin, 'versao_sistema', None) != 'v2':
@@ -2394,9 +2423,17 @@ def _backfill_custos_rdo_demo(admin_id):
                         f"backfill RDOCustoDiario {rdo.numero_rdo} "
                         f"falhou: {e}"
                     )
-                # 2) GestaoCustoFilho (V2) — alimenta a Gestão de Custos.
+                # 2) GestaoCustoFilho — Task #6: emite o MESMO evento da
+                #    rota oficial (`views.rdo.finalizar_rdo`). O handler
+                #    `event_manager.lancar_custos_rdo` cria os GCP/GCF
+                #    (SALARIO/VA/VT) e é idempotente por
+                #    (entidade_id, data, categoria) — re-emit é seguro.
                 try:
-                    total_obra += gerar_custos_mao_obra_rdo(rdo, admin_id) or 0
+                    EventManager.emit('rdo_finalizado', {
+                        'rdo_id': rdo.id,
+                        'obra_id': rdo.obra_id,
+                        'data_relatorio': str(rdo.data_relatorio),
+                    }, admin_id)
                 except Exception as e:
                     log.warning(f"backfill RDO {rdo.numero_rdo} falhou: {e}")
             total_geral += total_obra
@@ -2410,13 +2447,85 @@ def _backfill_custos_rdo_demo(admin_id):
                 f"backfill RDOCustoDiario: {custo_diario_total} "
                 f"linha(s) gravada(s) em {rdos_geral} RDO(s)."
             )
-        if not total_geral:
-            log.info(
-                f"backfill custos RDO: nada a inserir "
-                f"({rdos_geral} RDO(s) em {len(obras)} obra(s) já com custos)"
-            )
+        log.info(
+            f"backfill custos RDO: evento 'rdo_finalizado' re-emitido para "
+            f"{rdos_geral} RDO(s) em {len(obras)} obra(s) — handler "
+            f"`lancar_custos_rdo` é idempotente."
+        )
     except Exception:
         log.exception("backfill custos RDO falhou")
+
+
+def _verificar_custos_demo(admin_id, obra_id):
+    """Task #6 — verificação automática end-of-seed.
+
+    Garante que o tenant Alfa terminou o seed com os DOIS tipos de
+    GestaoCustoFilho na obra principal:
+      • SALARIO/MAO_OBRA_DIRETA originados de RDO (`origem_tabela`
+        IN ('rdo_mao_obra','rdo_custo_diario'))  ← via emit
+        'rdo_finalizado' → `lancar_custos_rdo`
+      • MATERIAL originados de PedidoCompra (`origem_tabela`
+        ='pedido_compra')                         ← via
+        `processar_compra_normal`
+
+    Se faltar qualquer uma das fontes, levanta RuntimeError com mensagem
+    clara — falha o seed alto e visível, em vez de produzir um demo
+    silenciosamente quebrado.
+    """
+    from app import db
+    from sqlalchemy import text
+
+    # Filtra por origem_tabela: garante que MAO_OBRA veio do fluxo do RDO
+    # (handler `lancar_custos_rdo`) e MATERIAL veio de uma compra
+    # (`processar_compra_normal`). Sem esse filtro a verificação aceitaria
+    # custos das mesmas categorias vindos de outras origens (ex.: ponto
+    # eletrônico, conta a pagar manual) — o que mascararia regressão no
+    # fluxo automático que esta task está protegendo.
+    rows = db.session.execute(text("""
+        SELECT
+            CASE
+              WHEN gcp.tipo_categoria IN ('MATERIAL','COMPRA')
+                   AND gcf.origem_tabela = 'pedido_compra'             THEN 'MATERIAL'
+              WHEN gcp.tipo_categoria IN ('SALARIO','MAO_OBRA_DIRETA')
+                   AND gcf.origem_tabela IN ('rdo_mao_obra',
+                                             'rdo_custo_diario')      THEN 'MAO_OBRA'
+              ELSE 'OUTRO'
+            END                                       AS bucket,
+            COUNT(*)                                  AS n,
+            COALESCE(SUM(gcf.valor), 0)               AS total
+        FROM gestao_custo_filho gcf
+        JOIN gestao_custo_pai   gcp ON gcp.id = gcf.pai_id
+        WHERE gcf.obra_id  = :o
+          AND gcf.admin_id = :a
+        GROUP BY 1
+    """), {"o": obra_id, "a": admin_id}).fetchall()
+
+    por_bucket = {r[0]: (int(r[1]), float(r[2] or 0)) for r in rows}
+    n_mo, v_mo  = por_bucket.get('MAO_OBRA', (0, 0.0))
+    n_mat, v_mat = por_bucket.get('MATERIAL', (0, 0.0))
+
+    log.info(
+        f"[VERIFY] obra={obra_id} → MAO_OBRA: {n_mo} GCF (R$ {v_mo:.2f}) | "
+        f"MATERIAL: {n_mat} GCF (R$ {v_mat:.2f})"
+    )
+
+    if n_mo == 0 or n_mat == 0:
+        faltando = []
+        if n_mo == 0:
+            faltando.append(
+                "MAO_OBRA (esperado via emit 'rdo_finalizado' → "
+                "`lancar_custos_rdo` nos RDOs da Bela Vista)"
+            )
+        if n_mat == 0:
+            faltando.append(
+                "MATERIAL (esperado via `processar_compra_normal` "
+                "no PedidoCompra NF-2026-0001)"
+            )
+        raise RuntimeError(
+            f"Task #6 verificação falhou: obra {obra_id} ficou sem "
+            f"GestaoCustoFilho de {' E '.join(faltando)}. "
+            f"Buckets atuais: {por_bucket!r}"
+        )
 
 
 def main(argv=None):
@@ -2508,10 +2617,13 @@ def main(argv=None):
                 f"plantando dataset Alfa (ambiente={args.ambiente})…"
             )
             info = _seed()
-            # Após plantar (caminho fresh ou --reset), gera GestaoCustoFilho
-            # SALARIO/VA/VT para os RDOs finalizados da demo. O seed cria os
-            # RDOMaoObra mas não dispara gerar_custos_mao_obra_rdo.
+            # Após plantar (caminho fresh ou --reset), grava RDOCustoDiario
+            # e re-emite 'rdo_finalizado' (idempotente) — fecha custos de
+            # mão-de-obra também para demos antigos.
             _backfill_custos_rdo_demo(info["admin_id"])
+            # Task #6 — verificação obrigatória: MAO_OBRA via evento RDO +
+            # MATERIAL via processar_compra_normal precisam existir.
+            _verificar_custos_demo(info["admin_id"], info["obra_id"])
             _imprimir_demo_pronta(info, args.ambiente)
             return 0
 
