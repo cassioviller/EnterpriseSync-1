@@ -174,6 +174,19 @@ def _reset_dataset():
 
     # Etapa 2: deleção em cascata manual (filhos antes dos pais)
     deletes = [
+        # ---- Task #20 — CRM (filhos primeiro). Lead tem FKs para
+        # cliente/proposta/obra/listas-mestras CRM e bloqueia a deleção
+        # delas se ficar para a passagem dinâmica. lead_historico tem
+        # ondelete='CASCADE' mas explicitar evita surpresas.
+        "DELETE FROM lead_historico WHERE admin_id=:a",
+        "DELETE FROM lead WHERE admin_id=:a",
+        "DELETE FROM crm_responsavel WHERE admin_id=:a",
+        "DELETE FROM crm_origem WHERE admin_id=:a",
+        "DELETE FROM crm_cadencia WHERE admin_id=:a",
+        "DELETE FROM crm_situacao WHERE admin_id=:a",
+        "DELETE FROM crm_tipo_material WHERE admin_id=:a",
+        "DELETE FROM crm_tipo_obra WHERE admin_id=:a",
+        "DELETE FROM crm_motivo_perda WHERE admin_id=:a",
         # ---- Pré-limpezas: quebra ciclos e zera FKs nullables que apontam
         # para tabelas que serão deletadas mais adiante (fornecedor, cliente,
         # almoxarifado_*). Sem isso o DELETE da tabela-mãe falha por FK.
@@ -460,6 +473,10 @@ def _seed():
         AlimentacaoLancamentoItem,
         CategoriaTransporte, LancamentoTransporte,
         CentroCusto,
+        # Task #20 — CRM Demo
+        Lead, LeadHistorico, CrmResponsavel, LeadStatus,
+        CrmOrigem, CrmCadencia, CrmSituacao, CrmTipoMaterial,
+        CrmTipoObra, CrmMotivoPerda,
     )
     from services.orcamento_view_service import (
         snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -1371,6 +1388,517 @@ def _seed():
         admin_id=aid, origem_tipo="OBRA_MEDICAO", origem_id=obra.id,
     ).first()
 
+    # 13) Task #20 — CRM Demo: 4 responsáveis + listas mestras + 12 leads -
+    # Popula listas mestras genéricas (origem/cadência/situação/tipo
+    # material/tipo obra/motivo perda) — necessário porque o seed cria o
+    # admin direto via SQL e não passa pelo fluxo de criação que dispara
+    # `seed_listas_mestras_crm`. Em seguida cria 4 responsáveis e 12
+    # leads cobrindo as 8 colunas do Kanban (incl. 1 Aprovado linkado à
+    # proposta+obra Bela Vista, 2 Perdidos com motivo). Aging variado
+    # (status_changed_at espalhado entre hoje e 25 dias atrás) para que
+    # o badge "parado há X dias" apareça em verde/amarelo/vermelho.
+    from datetime import timedelta as _timedelta
+    from crm_seeds import seed_listas_mestras_crm
+
+    _crm_inseridos = seed_listas_mestras_crm(aid, commit=False)
+    log.info(f"Task #20 CRM: listas mestras semeadas {_crm_inseridos}")
+
+    resp_ana = CrmResponsavel(admin_id=aid, nome="Ana Paula Costa", ativo=True)
+    resp_bruno = CrmResponsavel(admin_id=aid, nome="Bruno Mendes", ativo=True)
+    resp_carla = CrmResponsavel(admin_id=aid, nome="Carla Tavares", ativo=True)
+    resp_diego = CrmResponsavel(admin_id=aid, nome="Diego Santos", ativo=True)
+    db.session.add_all([resp_ana, resp_bruno, resp_carla, resp_diego])
+    db.session.flush()
+
+    # Mapas de FKs CRM (lookup por nome)
+    _origens = {o.nome: o for o in CrmOrigem.query.filter_by(admin_id=aid).all()}
+    _cadencias = {c.nome: c for c in CrmCadencia.query.filter_by(admin_id=aid).all()}
+    _situacoes = {s.nome: s for s in CrmSituacao.query.filter_by(admin_id=aid).all()}
+    _tipos_mat = {m.nome: m for m in CrmTipoMaterial.query.filter_by(admin_id=aid).all()}
+    _tipos_obra = {t.nome: t for t in CrmTipoObra.query.filter_by(admin_id=aid).all()}
+    _motivos = {p.nome: p for p in CrmMotivoPerda.query.filter_by(admin_id=aid).all()}
+
+    _agora = datetime.utcnow()
+    _hoje = date.today()
+
+    def _criar_lead(
+        *, nome, contato, email, responsavel, status, dias_parado,
+        origem=None, cadencia=None, situacao=None, tipo_material=None,
+        tipo_obra=None, motivo_perda=None, localizacao=None, demanda=None,
+        valor_proposta=None, observacao=None, data_envio=None,
+        data_retomada=None, cliente_id=None, proposta_id=None, obra_id=None,
+        historico_extra=None,
+    ):
+        sc_at = _agora - _timedelta(days=int(dias_parado))
+        lead = Lead(
+            admin_id=aid,
+            data_chegada=(sc_at.date() if dias_parado > 0 else _hoje),
+            data_envio=data_envio,
+            nome=nome, contato=contato, email=email,
+            responsavel_id=responsavel.id if responsavel else None,
+            origem_id=(_origens.get(origem).id if origem and _origens.get(origem) else None),
+            cadencia_id=(_cadencias.get(cadencia).id if cadencia and _cadencias.get(cadencia) else None),
+            situacao_id=(_situacoes.get(situacao).id if situacao and _situacoes.get(situacao) else None),
+            tipo_material_id=(_tipos_mat.get(tipo_material).id if tipo_material and _tipos_mat.get(tipo_material) else None),
+            tipo_obra_id=(_tipos_obra.get(tipo_obra).id if tipo_obra and _tipos_obra.get(tipo_obra) else None),
+            motivo_perda_id=(_motivos.get(motivo_perda).id if motivo_perda and _motivos.get(motivo_perda) else None),
+            localizacao=localizacao, demanda=demanda,
+            valor_proposta=(Decimal(str(valor_proposta)) if valor_proposta else None),
+            status=status.value, observacao=observacao,
+            data_retomada=data_retomada,
+            cliente_id=cliente_id, proposta_id=proposta_id, obra_id=obra_id,
+            criado_por_id=aid, status_changed_at=sc_at,
+            created_at=sc_at, updated_at=sc_at,
+        )
+        db.session.add(lead); db.session.flush()
+        # Histórico mínimo: criação. usuario_id NULL = evento "sistema".
+        db.session.add(LeadHistorico(
+            lead_id=lead.id, admin_id=aid, campo="sistema",
+            valor_antes=None, valor_depois=status.value,
+            descricao=f"Lead criado pelo sistema (estágio inicial: {status.value}).",
+            usuario_id=None,
+            created_at=sc_at,
+        ))
+        # Eventos extras opcionais.
+        for ev in (historico_extra or []):
+            db.session.add(LeadHistorico(
+                lead_id=lead.id, admin_id=aid,
+                campo=ev.get("campo", "observacao"),
+                valor_antes=ev.get("antes"),
+                valor_depois=ev.get("depois"),
+                descricao=ev.get("descricao"),
+                usuario_id=aid,
+                created_at=ev.get("when") or sc_at,
+            ))
+        return lead
+
+    leads_criados = []
+
+    # ---- Em fila (2) — recém-chegados, ainda não trabalhados.
+    leads_criados.append(_criar_lead(
+        nome="Marina Oliveira", contato="(11) 98765-1100",
+        email="marina.oliveira@example.com", responsavel=resp_ana,
+        status=LeadStatus.EM_FILA, dias_parado=1,
+        origem="Site", cadencia="Contato Dia 1",
+        situacao="Levantar Necessidade", tipo_material="Drywall",
+        tipo_obra="Residencial",
+        localizacao="Vila Mariana — São Paulo / SP",
+        demanda="Reforma de sala e cozinha integradas em apartamento.",
+        valor_proposta=18500.00,
+    ))
+    leads_criados.append(_criar_lead(
+        nome="Construtora Horizonte SA", contato="(11) 3300-1100",
+        email="compras@horizonte.com.br", responsavel=resp_bruno,
+        status=LeadStatus.EM_FILA, dias_parado=2,
+        origem="Indicação", cadencia="Contato Dia 1",
+        situacao="Levantar Necessidade", tipo_material="Steel Frame",
+        tipo_obra="Empresarial",
+        localizacao="Itaim Bibi — São Paulo / SP",
+        demanda="Forros removíveis para escritório novo (450 m²).",
+        valor_proposta=72000.00,
+    ))
+
+    # ---- Em andamento (2) — qualificados, em diálogo ativo.
+    leads_criados.append(_criar_lead(
+        nome="Patricia Almeida", contato="(11) 99100-2200",
+        email="patricia.almeida@example.com", responsavel=resp_carla,
+        status=LeadStatus.EM_ANDAMENTO, dias_parado=4,
+        origem="Anúncio Meta Ads", cadencia="Contato Dia 3",
+        situacao="Em Negociação", tipo_material="Material",
+        tipo_obra="Residencial",
+        localizacao="Tatuapé — São Paulo / SP",
+        demanda="Cotação de cimento e blocos para alvenaria.",
+        valor_proposta=8400.00,
+        historico_extra=[{
+            "campo": "observacao", "depois": "Primeira ligação OK",
+            "descricao": "Cliente aceitou receber visita técnica na quinta.",
+        }],
+    ))
+    leads_criados.append(_criar_lead(
+        nome="Empresa Skyline Ltda", contato="(11) 4040-3300",
+        email="projetos@skyline.com.br", responsavel=resp_diego,
+        status=LeadStatus.EM_ANDAMENTO, dias_parado=6,
+        origem="Google", cadencia="Contato Dia 3",
+        situacao="Em Negociação", tipo_material="Projeto",
+        tipo_obra="Empresarial",
+        localizacao="Faria Lima — São Paulo / SP",
+        demanda="Projeto executivo para retrofit de andar corporativo.",
+        valor_proposta=42000.00,
+    ))
+
+    # ---- Enviado (2) — proposta despachada, aguardando.
+    leads_criados.append(_criar_lead(
+        nome="Roberto Carvalho", contato="(11) 99220-4400",
+        email="roberto.c@example.com", responsavel=resp_ana,
+        status=LeadStatus.ENVIADO, dias_parado=8,
+        origem="Site", cadencia="Contato Dia 7",
+        situacao="Orçamento Enviado", tipo_material="Obra Completa",
+        tipo_obra="Residencial",
+        localizacao="Moema — São Paulo / SP",
+        demanda="Reforma completa de cobertura duplex.",
+        valor_proposta=185000.00,
+        data_envio=_hoje - _timedelta(days=8),
+    ))
+    leads_criados.append(_criar_lead(
+        nome="Edifício Aurora — síndico", contato="(11) 4050-5500",
+        email="sindico.aurora@example.com", responsavel=resp_bruno,
+        status=LeadStatus.ENVIADO, dias_parado=10,
+        origem="Indicação", cadencia="Contato Dia 7",
+        situacao="Orçamento Enviado", tipo_material="Serviço",
+        tipo_obra="Empreendimento",
+        localizacao="Pinheiros — São Paulo / SP",
+        demanda="Manutenção predial trimestral (fachada e hidráulica).",
+        valor_proposta=22500.00,
+        data_envio=_hoje - _timedelta(days=10),
+    ))
+
+    # ---- Validação (1) — proposta em análise técnica do cliente.
+    leads_criados.append(_criar_lead(
+        nome="Felipe Nogueira", contato="(11) 99330-6600",
+        email="felipe.n@example.com", responsavel=resp_carla,
+        status=LeadStatus.VALIDACAO, dias_parado=12,
+        origem="Prospecção Ativa", cadencia="Contato Dia 15",
+        situacao="Fechamento", tipo_material="Material",
+        tipo_obra="Residencial",
+        localizacao="Perdizes — São Paulo / SP",
+        demanda="Aprovação técnica de proposta de drywall para 2 dormitórios.",
+        valor_proposta=12800.00,
+        data_envio=_hoje - _timedelta(days=14),
+    ))
+
+    # ---- Aprovado (1) — convertido em proposta+obra (Bela Vista).
+    leads_criados.append(_criar_lead(
+        nome=CLIENTE_NOME, contato=CLIENTE_TELEFONE,
+        email=CLIENTE_EMAIL, responsavel=resp_diego,
+        status=LeadStatus.APROVADO, dias_parado=18,
+        origem="Indicação", cadencia="Contato Dia 15",
+        situacao="Fechamento", tipo_material="Obra Completa",
+        tipo_obra="Residencial",
+        localizacao="São Paulo / SP",
+        demanda="Execução civil — Residencial Bela Vista (250 m²).",
+        valor_proposta=float(valor_total),
+        observacao="Lead originário da proposta 001.26 — APROVADO e em execução.",
+        data_envio=_hoje - _timedelta(days=22),
+        cliente_id=cliente.id, proposta_id=proposta.id, obra_id=obra.id,
+        historico_extra=[{
+            "campo": "status", "antes": LeadStatus.ENVIADO.value,
+            "depois": LeadStatus.APROVADO.value,
+            "descricao": "Cliente assinou proposta 001.26 — obra OBR-2026-001 aberta.",
+            "when": _agora - _timedelta(days=18),
+        }],
+    ))
+
+    # ---- Feedback (1) — aguardando resposta a ajustes solicitados.
+    leads_criados.append(_criar_lead(
+        nome="Juliana Tavares", contato="(11) 99440-7700",
+        email="juliana.t@example.com", responsavel=resp_ana,
+        status=LeadStatus.FEEDBACK, dias_parado=11,
+        origem="Site", cadencia="Contato Dia 7",
+        situacao="Em Negociação", tipo_material="Forros Removíveis",
+        tipo_obra="Empresarial",
+        localizacao="Vila Olímpia — São Paulo / SP",
+        demanda="Ajuste de escopo solicitado — esperando devolutiva.",
+        valor_proposta=15600.00,
+        data_envio=_hoje - _timedelta(days=15),
+    ))
+
+    # ---- Congelado (1) — pausado, com data sugerida de retomada.
+    leads_criados.append(_criar_lead(
+        nome="Henrique Lopes", contato="(11) 99550-8800",
+        email="henrique.l@example.com", responsavel=resp_bruno,
+        status=LeadStatus.CONGELADO, dias_parado=20,
+        origem="Anúncio Meta Ads", cadencia="Contato Dia 15",
+        situacao="Sem Retorno", tipo_material="Material",
+        tipo_obra="Residencial",
+        localizacao="Saúde — São Paulo / SP",
+        demanda="Cliente pediu para retomar após viagem.",
+        valor_proposta=9800.00,
+        data_retomada=_hoje + _timedelta(days=30),
+        historico_extra=[{
+            "campo": "status", "antes": LeadStatus.EM_ANDAMENTO.value,
+            "depois": LeadStatus.CONGELADO.value,
+            "descricao": "Cliente solicitou pausa de 30 dias.",
+            "when": _agora - _timedelta(days=20),
+        }],
+    ))
+
+    # ---- Perdido (2) — com motivo registrado.
+    leads_criados.append(_criar_lead(
+        nome="Camila Ribeiro", contato="(11) 99660-9900",
+        email="camila.r@example.com", responsavel=resp_carla,
+        status=LeadStatus.PERDIDO, dias_parado=15,
+        origem="Google", cadencia="Contato Dia 7",
+        situacao="Sem Retorno", tipo_material="Material",
+        tipo_obra="Residencial", motivo_perda="Preço do Produto",
+        localizacao="Mooca — São Paulo / SP",
+        demanda="Cotação de cimento — fechou com concorrente.",
+        valor_proposta=6200.00,
+        data_envio=_hoje - _timedelta(days=20),
+        historico_extra=[{
+            "campo": "status", "antes": LeadStatus.ENVIADO.value,
+            "depois": LeadStatus.PERDIDO.value,
+            "descricao": "Perdido por preço — cliente fechou com concorrente.",
+            "when": _agora - _timedelta(days=15),
+        }],
+    ))
+    leads_criados.append(_criar_lead(
+        nome="Fernando Brito", contato="(11) 99770-1010",
+        email="fernando.b@example.com", responsavel=resp_diego,
+        status=LeadStatus.PERDIDO, dias_parado=25,
+        origem="Prospecção Ativa", cadencia="Contato Dia 15",
+        situacao="Sem Retorno", tipo_material="Obra Completa",
+        tipo_obra="Residencial", motivo_perda="Desistência de Compra",
+        localizacao="Butantã — São Paulo / SP",
+        demanda="Cliente desistiu da reforma após mudança de planos.",
+        valor_proposta=48000.00,
+        data_envio=_hoje - _timedelta(days=30),
+        historico_extra=[{
+            "campo": "status", "antes": LeadStatus.VALIDACAO.value,
+            "depois": LeadStatus.PERDIDO.value,
+            "descricao": "Cliente cancelou o projeto — adiado indefinidamente.",
+            "when": _agora - _timedelta(days=25),
+        }],
+    ))
+
+    db.session.commit()
+    log.info(
+        f"Task #20 CRM: {len(leads_criados)} leads criados em 8 estágios "
+        f"do Kanban; 4 responsáveis cadastrados"
+    )
+
+    # 14) Task #20 — 2ª obra "Comercial Pinheiros" + 10 RDOs Finalizados ----
+    # Dá volume real a Métricas (Carlos+3 diaristas em outra obra) e mostra
+    # o gestor com mais de uma obra em andamento simultaneamente.
+    # Reusa os Serviços de Alvenaria + Contrapiso (com cronograma 3 níveis).
+    cliente_pin = Cliente(
+        nome="Pinheiros Empreendimentos Ltda",
+        email="contato@pinheirosempreend.com.br",
+        telefone="(11) 3300-2200",
+        endereco="Av. Pedroso de Morais, 1000 — Pinheiros, São Paulo / SP",
+        cnpj="22.333.444/0001-55",
+        admin_id=aid,
+    )
+    db.session.add(cliente_pin); db.session.flush()
+
+    proposta_pin = Proposta(
+        numero="002.26",
+        data_proposta=date(2026, 1, 20),
+        cliente_id=cliente_pin.id,
+        cliente_nome=cliente_pin.nome,
+        cliente_telefone=cliente_pin.telefone,
+        cliente_email=cliente_pin.email,
+        cliente_endereco=cliente_pin.endereco,
+        titulo="Comercial Pinheiros — execução civil",
+        descricao=(
+            "Execução de alvenaria de vedação e contrapiso para o "
+            "Comercial Pinheiros (lote único, 250 m²)."
+        ),
+        prazo_entrega_dias=180, validade_dias=15,
+        status="rascunho",
+        valor_total=Decimal("0.00"),
+        criado_por=aid, admin_id=aid,
+        data_envio=datetime(2026, 1, 21, 9, 30),
+    )
+    db.session.add(proposta_pin); db.session.flush()
+
+    itens_pin_def = [
+        ("Alvenaria de bloco cerâmico — Pinheiros",
+         Decimal("250.000"), "m2", Decimal("145.00"), serv_alv, 1),
+        ("Contrapiso desempenado — Pinheiros",
+         Decimal("250.000"), "m2", Decimal("70.00"), serv_pis, 2),
+    ]
+    valor_pin = Decimal("0.00")
+    propostaitem_pin_objs = []
+    for idx, (desc, qtd, un, preco, serv, ordem) in enumerate(itens_pin_def, start=1):
+        sub = (qtd * preco).quantize(Decimal("0.01"))
+        valor_pin += sub
+        pi = PropostaItem(
+            admin_id=aid, proposta_id=proposta_pin.id,
+            item_numero=idx, descricao=desc,
+            quantidade=qtd, unidade=un,
+            preco_unitario=preco, ordem=ordem,
+            servico_id=serv.id,
+            quantidade_medida=qtd,
+            custo_unitario=Decimal(str(serv.custo_unitario)),
+            lucro_unitario=preco - Decimal(str(serv.custo_unitario)),
+            subtotal=sub,
+        )
+        db.session.add(pi); propostaitem_pin_objs.append(pi)
+    db.session.flush()
+    proposta_pin.valor_total = valor_pin
+
+    obra_pin = Obra(
+        nome="Comercial Pinheiros", codigo="OBR-2026-002",
+        endereco=cliente_pin.endereco,
+        data_inicio=date(2026, 2, 1),
+        data_previsao_fim=date(2026, 7, 31),
+        orcamento=float(valor_pin),
+        valor_contrato=float(valor_pin),
+        area_total_m2=250.0,
+        status="Em andamento",
+        cliente_id=cliente_pin.id,
+        proposta_origem_id=proposta_pin.id, portal_ativo=True,
+        responsavel_id=carlos.id, ativo=True, admin_id=aid,
+        data_inicio_medicao=date(2026, 2, 1),
+        valor_entrada=Decimal("0.00"), data_entrada=None,
+    )
+    db.session.add(obra_pin); db.session.flush()
+    proposta_pin.obra_id = obra_pin.id
+    proposta_pin.convertida_em_obra = True
+    proposta_pin.status = "aprovada"
+    proposta_pin.data_resposta_cliente = datetime(2026, 1, 28, 11, 0)
+
+    arvore_pin = montar_arvore_preview(proposta_pin, aid)
+    proposta_pin.cronograma_default_json = arvore_pin
+
+    for pi in propostaitem_pin_objs:
+        db.session.add(ItemMedicaoComercial(
+            admin_id=aid, obra_id=obra_pin.id,
+            nome=pi.descricao[:200],
+            valor_comercial=pi.subtotal,
+            servico_id=pi.servico_id,
+            quantidade=pi.quantidade,
+            proposta_item_id=pi.id,
+            status="PENDENTE",
+        ))
+    db.session.flush()
+
+    n_tarefas_pin = materializar_cronograma(
+        proposta_pin, aid, obra_pin.id, arvore_pin,
+    )
+    log.info(
+        f"Task #20 Pinheiros: cronograma materializado — {n_tarefas_pin} "
+        f"tarefas, valor R$ {float(valor_pin):.2f}"
+    )
+    db.session.flush()
+
+    # 10 RDOs Finalizados, semanais, terça-feira (03/02 → 07/04/2026).
+    # Progresso monotônico 10→100% em incrementos de 10%, com 1 RDO em
+    # produtividade ABAIXO do esperado (idx 3 = +5%) e compensação no
+    # idx 7 (+15%). 2 RDOs ficam com 1 diarista omitido (idx 4 sem
+    # Marcos; idx 7 sem João) — demonstra ausências em métricas.
+    folhas_pin = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_pin.id, admin_id=aid, is_cliente=False)
+        .filter(TarefaCronograma.subatividade_mestre_id.isnot(None))
+        .order_by(TarefaCronograma.ordem.asc())
+        .all()
+    )
+    log.info(f"Task #20 Pinheiros: folhas do cronograma {len(folhas_pin)}")
+
+    rdos_pin_dados = [
+        # (idx, data, perc_destino, horas, perc_anterior)
+        (date(2026, 2, 3),  10.0, 8.0,  0.0),
+        (date(2026, 2, 10), 20.0, 8.0, 10.0),
+        (date(2026, 2, 17), 25.0, 8.0, 20.0),  # produtividade ABAIXO
+        (date(2026, 2, 24), 35.0, 8.0, 25.0),
+        (date(2026, 3, 3),  45.0, 8.0, 35.0),
+        (date(2026, 3, 10), 55.0, 8.0, 45.0),
+        (date(2026, 3, 17), 70.0, 8.0, 55.0),  # compensação
+        (date(2026, 3, 24), 80.0, 8.0, 70.0),
+        (date(2026, 3, 31), 90.0, 8.0, 80.0),
+        (date(2026, 4, 7), 100.0, 8.0, 90.0),
+    ]
+    omitir_diarista_no_idx = {4: marcos.id, 7: joao.id}
+
+    from models import RDOApontamentoCronograma as _RAC_pin
+    _v2_acum_pin = {}
+    for idx, (dt, perc_destino, horas, perc_anterior) in enumerate(
+        rdos_pin_dados, start=1
+    ):
+        omitir_id = omitir_diarista_no_idx.get(idx)
+        rdo = RDO(
+            numero_rdo=f"RDO-PIN-2026-{idx:03d}",
+            data_relatorio=dt, obra_id=obra_pin.id,
+            criado_por_id=aid, admin_id=aid,
+            clima_geral="Ensolarado", temperatura_media="25°C",
+            condicoes_trabalho="Ideais", local="Campo",
+            comentario_geral=(
+                f"Avanço semanal — meta {perc_destino:.0f}% "
+                f"(incremento de {perc_destino - perc_anterior:.0f}%)."
+            ),
+            status="Finalizado",
+        )
+        db.session.add(rdo); db.session.flush()
+
+        for folha in folhas_pin:
+            db.session.add(RDOMaoObra(
+                admin_id=aid, rdo_id=rdo.id,
+                funcionario_id=carlos.id,
+                funcao_exercida="Pedreiro (mensalista)",
+                horas_trabalhadas=horas, horas_extras=0.0,
+                tarefa_cronograma_id=folha.id,
+            ))
+            for _diar, _func in (
+                (pedro,  "Encarregado (diária)"),
+                (joao,   "Servente (diária)"),
+                (marcos, "Servente (diária)"),
+            ):
+                if omitir_id and _diar.id == omitir_id:
+                    continue
+                db.session.add(RDOMaoObra(
+                    admin_id=aid, rdo_id=rdo.id,
+                    funcionario_id=_diar.id, funcao_exercida=_func,
+                    horas_trabalhadas=horas, horas_extras=0.0,
+                    tarefa_cronograma_id=folha.id,
+                ))
+            db.session.add(RDOServicoSubatividade(
+                rdo_id=rdo.id,
+                servico_id=(serv_alv.id if "alvenaria" in folha.nome_tarefa.lower()
+                            or "marcação" in folha.nome_tarefa.lower()
+                            or "chapisco" in folha.nome_tarefa.lower()
+                            else serv_pis.id),
+                nome_subatividade=folha.nome_tarefa,
+                descricao_subatividade=folha.nome_tarefa,
+                percentual_conclusao=perc_destino,
+                percentual_anterior=perc_anterior,
+                incremento_dia=perc_destino - perc_anterior,
+                ordem_execucao=folha.ordem, ativo=True,
+                admin_id=aid,
+                subatividade_mestre_id=folha.subatividade_mestre_id,
+            ))
+            folha.percentual_concluido = perc_destino
+
+            if folha.quantidade_total and folha.quantidade_total > 0:
+                qty_destino_acum = float(folha.quantidade_total) * (perc_destino / 100.0)
+                qty_anterior_acum = _v2_acum_pin.get(folha.id, 0.0)
+                qty_dia = max(0.0, qty_destino_acum - qty_anterior_acum)
+                _v2_acum_pin[folha.id] = qty_destino_acum
+                db.session.add(_RAC_pin(
+                    rdo_id=rdo.id, tarefa_cronograma_id=folha.id,
+                    admin_id=aid,
+                    quantidade_executada_dia=qty_dia,
+                    quantidade_acumulada=qty_destino_acum,
+                    percentual_realizado=perc_destino,
+                    percentual_planejado=perc_destino,
+                ))
+
+        # Equipamento e ocorrência leves para dar realismo
+        if idx % 2 == 0:
+            db.session.add(RDOEquipamento(
+                admin_id=aid, rdo_id=rdo.id,
+                nome_equipamento="Betoneira 400L", quantidade=1,
+                horas_uso=4.0, estado_conservacao="Bom",
+            ))
+        db.session.add(RDOOcorrencia(
+            admin_id=aid, rdo_id=rdo.id,
+            tipo_ocorrencia="Observação", severidade="Baixa",
+            descricao_ocorrencia=(
+                "Produtividade abaixo do orçado (clima úmido na 3ª semana)."
+                if idx == 3 else
+                f"Avanço semanal dentro do planejado ({perc_destino:.0f}%)."
+            ),
+            status_resolucao="Resolvido",
+        ))
+
+        db.session.flush()
+        log.info(
+            f"Task #20 Pinheiros: RDO {idx}/{len(rdos_pin_dados)} "
+            f"({dt.isoformat()}) finalizado — {perc_destino:.0f}%"
+        )
+
+    db.session.commit()
+
     return {
         "admin_id": aid,
         "cliente_id": cliente.id,
@@ -1403,6 +1931,13 @@ def _seed():
         "conta_receber_numero": cr.numero_documento if cr else None,
         "conta_receber_valor": float(cr.valor_original or 0) if cr else 0.0,
         "valor_total_proposta": float(valor_total),
+        # Task #20
+        "n_leads": len(leads_criados),
+        "n_responsaveis_crm": 4,
+        "obra_pinheiros_id": obra_pin.id,
+        "obra_pinheiros_codigo": obra_pin.codigo,
+        "n_rdos_pinheiros": len(rdos_pin_dados),
+        "valor_obra_pinheiros": float(valor_pin),
     }
 
 
@@ -1457,8 +1992,18 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
     log.info(f"    conta_receber_id   = {info['conta_receber_id']}  "
              f"({info['conta_receber_numero']} — R$ "
              f"{info['conta_receber_valor']:.2f})")
+    # Task #20 — CRM + 2ª obra
+    log.info(f"    crm_responsaveis   = {info.get('n_responsaveis_crm', 0)}  "
+             f"(Ana Paula, Bruno, Carla, Diego)")
+    log.info(f"    crm_leads          = {info.get('n_leads', 0)}  "
+             f"(distribuídos nas 8 colunas do Kanban)")
+    log.info(f"    obra_pinheiros_id  = {info.get('obra_pinheiros_id')}  "
+             f"({info.get('obra_pinheiros_codigo')} — Comercial Pinheiros, "
+             f"R$ {info.get('valor_obra_pinheiros', 0):.2f})")
+    log.info(f"    rdos_pinheiros     = {info.get('n_rdos_pinheiros', 0)}  "
+             f"(Finalizados — 10→100% em incremento de 10%/semana)")
     log.info("")
-    log.info("  Roteiro sugerido (10 telas, na ordem):")
+    log.info("  Roteiro sugerido (12 telas, na ordem):")
     log.info(f"   1) Dashboard         → {base_url}/dashboard")
     log.info(f"   2) Funcionários      → {base_url}/funcionarios")
     log.info(f"   3) Catálogo serviços → {base_url}/catalogo/servicos")
@@ -1469,6 +2014,8 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
     log.info(f"   8) RDOs              → {base_url}/rdo")
     log.info(f"   9) Medição           → {base_url}/obras/{info['obra_id']}/medicao")
     log.info(f"  10) Contas a Receber  → {base_url}/financeiro/contas-receber")
+    log.info(f"  11) CRM (Kanban)      → {base_url}/crm")
+    log.info(f"  12) Métricas          → {base_url}/metricas")
     log.info("=" * 72)
 
 
@@ -1476,10 +2023,11 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
 # Entry point com guarda de produção
 # ---------------------------------------------------------------------------
 def _backfill_custos_rdo_demo(admin_id):
-    """Roda gerar_custos_mao_obra_rdo() em todos os RDOs finalizados da
-    obra OBR-2026-001 do admin Alfa. Idempotente — só insere o que falta.
-    Também promove o admin Alfa para versao_sistema='v2' (a demo usa
-    diaristas + Gestão de Custos V2, recursos exclusivos do v2).
+    """Roda gerar_custos_mao_obra_rdo() em todos os RDOs finalizados de
+    TODAS as obras do admin Alfa (Bela Vista + Pinheiros + qualquer outra
+    futura). Idempotente — só insere o que falta. Também promove o admin
+    Alfa para versao_sistema='v2' (a demo usa diaristas + Gestão de Custos
+    V2, recursos exclusivos do v2).
     """
     try:
         from app import db
@@ -1495,35 +2043,36 @@ def _backfill_custos_rdo_demo(admin_id):
             admin.versao_sistema = 'v2'
             db.session.commit()
 
-        obra = (
-            Obra.query
-            .filter_by(admin_id=admin_id, codigo=OBRA_CODIGO)
-            .first()
-        )
-        if not obra:
-            log.info(f"backfill custos RDO: obra {OBRA_CODIGO} não encontrada")
+        obras = Obra.query.filter_by(admin_id=admin_id).all()
+        if not obras:
+            log.info("backfill custos RDO: nenhuma obra encontrada")
             return
 
-        rdos = (
-            RDO.query
-            .filter_by(obra_id=obra.id, status="Finalizado")
-            .all()
-        )
-        total = 0
-        for rdo in rdos:
-            try:
-                total += gerar_custos_mao_obra_rdo(rdo, admin_id) or 0
-            except Exception as e:
-                log.warning(f"backfill RDO {rdo.numero_rdo} falhou: {e}")
-        if total:
-            log.info(
-                f"backfill custos RDO: {total} lançamento(s) inserido(s) "
-                f"em {len(rdos)} RDO(s) da obra {OBRA_CODIGO}"
+        total_geral = 0
+        rdos_geral = 0
+        for obra in obras:
+            rdos = (
+                RDO.query
+                .filter_by(obra_id=obra.id, status="Finalizado")
+                .all()
             )
-        else:
+            rdos_geral += len(rdos)
+            total_obra = 0
+            for rdo in rdos:
+                try:
+                    total_obra += gerar_custos_mao_obra_rdo(rdo, admin_id) or 0
+                except Exception as e:
+                    log.warning(f"backfill RDO {rdo.numero_rdo} falhou: {e}")
+            total_geral += total_obra
+            if total_obra:
+                log.info(
+                    f"backfill custos RDO: {total_obra} lançamento(s) "
+                    f"inserido(s) em {len(rdos)} RDO(s) da obra {obra.codigo}"
+                )
+        if not total_geral:
             log.info(
                 f"backfill custos RDO: nada a inserir "
-                f"({len(rdos)} RDO(s) já com custos)"
+                f"({rdos_geral} RDO(s) em {len(obras)} obra(s) já com custos)"
             )
     except Exception:
         log.exception("backfill custos RDO falhou")
