@@ -678,6 +678,61 @@ def test_10_producao_rateada_secao_a():
         assert s_item['producao_rateada'] == pytest.approx(12.0, abs=0.01)
 
 
+def test_11a_indice_equipe_medio_equipe_mista():
+    """producao_por_funcionario expõe indice_equipe_medio para equipe_mista.
+
+    Equipe mista: pedreiro (coef=1 h/m²) + ajudante (coef=0.5 h/m²).
+    10m² produzidos. pedreiro 10h, ajudante 5h.
+    cap_ped = 10/1 = 10 m²; cap_ajd = 5/0.5 = 10 m².
+    producao_esperada = min(10, 10) = 10 m².
+    indice_equipe = 10 / 10 * 100 = 100 %.
+    indice_equipe_list for both employees must contain 100.
+    """
+    with app.app_context():
+        s = _suffix()
+
+        servico = _servico(f'MistoT11a {s}', 'm2')
+        # 2 papéis distintos → equipe_mista
+        ins_ped = _insumo(f'PedT11a {s}')
+        ins_ajd = _insumo(f'AjdT11a {s}')
+        comp_ped = _composicao(servico.id, ins_ped.id, 1.0)
+        comp_ajd = _composicao(servico.id, ins_ajd.id, 0.5)
+        db.session.commit()
+
+        data = date(2026, 5, 5)
+        func_ped = _func('PD11a')
+        func_ajd = _func('AJ11a')
+
+        rdo = _rdo(_fx.obra, data, '11a')
+        sub = _sub(rdo, servico.id, 'Sub11a', qty=10.0)
+        _mo(rdo, func_ped, 10.0, sub=sub, composicao_id=comp_ped.id, vinculo='auto')
+        _mo(rdo, func_ajd, 5.0, sub=sub, composicao_id=comp_ajd.id, vinculo='auto')
+        _custo_diario(rdo, func_ped, 100.0)
+        _custo_diario(rdo, func_ajd, 50.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import producao_por_funcionario
+        result = producao_por_funcionario(_fx.admin.id, data, data)
+
+        met_ped = next((r for r in result if r['funcionario_id'] == func_ped.id), None)
+        met_ajd = next((r for r in result if r['funcionario_id'] == func_ajd.id), None)
+        assert met_ped is not None and met_ajd is not None
+
+        # Ambos devem ter modo_predominante == equipe_mista
+        assert met_ped['modo_predominante'] == 'equipe_mista'
+        assert met_ajd['modo_predominante'] == 'equipe_mista'
+
+        # indice_equipe_medio deve estar presente (100%) para ambos
+        assert met_ped['indice_equipe_medio'] is not None, 'pedreiro deve ter indice_equipe_medio'
+        assert met_ajd['indice_equipe_medio'] is not None, 'ajudante deve ter indice_equipe_medio'
+        assert met_ped['indice_equipe_medio'] == pytest.approx(100.0, abs=1.0)
+        assert met_ajd['indice_equipe_medio'] == pytest.approx(100.0, abs=1.0)
+
+        # prod_real_hh deve ser None (não calculado para equipe_mista)
+        assert met_ped['prod_real_hh'] is None
+        assert met_ajd['prod_real_hh'] is None
+
+
 def test_11_obra_nome_e_modo_secao_b():
     """detalhe_funcionario Seção B inclui obra_nome e modo por dia."""
     with app.app_context():

@@ -663,6 +663,8 @@ def producao_por_funcionario(admin_id: int, data_inicio: date, data_fim: date,
         'prod_hh_list': [],
         'modos': [],
         'servicos_vistos': set(),
+        # índice de equipe acumulado para subatividades equipe_mista com indice_equipe
+        'indice_equipe_list': [],
     })
 
     # Processar registros de mão-de-obra individualmente
@@ -696,6 +698,11 @@ def producao_por_funcionario(admin_id: int, data_inicio: date, data_fim: date,
             for fid in m['func_metricas']:
                 func_agg[fid]['prod_hh_list'].append(prod_hh)
 
+        # Índice de equipe (equipe_mista com indice_equipe calculado)
+        if m['modo'] == 'equipe_mista' and m['indice_equipe'] is not None:
+            for fid in m['func_metricas']:
+                func_agg[fid]['indice_equipe_list'].append(m['indice_equipe'])
+
     # Buscar nome da função
     try:
         from models import Funcao
@@ -712,6 +719,12 @@ def producao_por_funcionario(admin_id: int, data_inicio: date, data_fim: date,
         lucro_total = (fa['receita_total'] - fa['custo_total']
                        if fa['receita_valida'] and fa['custo_valido'] else None)
         assiduidade = len(fa['dias_rdos']) / dias_uteis * 100 if dias_uteis > 0 else 0.0
+
+        # Índice médio de equipe (equipe_mista com orçamento): média dos indice_equipe
+        indice_equipe_medio = (
+            sum(fa['indice_equipe_list']) / len(fa['indice_equipe_list'])
+            if fa['indice_equipe_list'] else None
+        )
 
         resultado.append({
             'funcionario_id': fid,
@@ -731,9 +744,11 @@ def producao_por_funcionario(admin_id: int, data_inicio: date, data_fim: date,
             'tem_custo': fa['custo_valido'],
             'tem_receita': fa['receita_valida'],
             'n_servicos': len(fa['servicos_vistos']),
-            # Comparativos preenchidos após calcular a média da empresa (abaixo)
+            # single_role: comparativo vs média da empresa (preenchido abaixo)
             'prod_empresa_media': None,
             'indice_vs_pares_pct': None,
+            # equipe_mista: eficiência real / esperada orçada (qtd_real / qtd_esperada)
+            'indice_equipe_medio': indice_equipe_medio,
         })
 
     # ── Média da empresa (single_role com produtividade real) ────────────────

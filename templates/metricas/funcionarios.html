@@ -194,16 +194,20 @@
               {% endif %}
             </div>
           </div>
-          {% elif m.modo_predominante == 'equipe_mista' and m.indice_vs_pares_pct is not none %}
+          {% elif m.modo_predominante == 'equipe_mista' %}
           <div class="border-top pt-2 mt-1 text-center">
-            <div class="text-muted small">Índice equipe vs. orçado</div>
-            {% set idx = m.indice_vs_pares_pct %}
-            <div class="small fw-semibold
-              {% if idx >= 90 %}text-success
-              {% elif idx >= 70 %}text-warning
-              {% else %}text-danger{% endif %}">
-              {{ '%.0f'|format(idx) }}%
-            </div>
+            <div class="text-muted small">Índice equipe (real/orçado)</div>
+            {% if m.indice_equipe_medio is not none %}
+              {% set idx = m.indice_equipe_medio %}
+              <div class="small fw-semibold
+                {% if idx >= 90 %}text-success
+                {% elif idx >= 70 %}text-warning
+                {% else %}text-danger{% endif %}">
+                {{ '%.0f'|format(idx) }}%
+              </div>
+            {% else %}
+              <div class="small text-muted" title="Sem orçamento operacional para calcular índice">—</div>
+            {% endif %}
           </div>
           {% endif %}
 

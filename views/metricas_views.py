@@ -215,6 +215,7 @@ def funcionarios():
                 'tem_custo': False,
                 'tem_receita': False,
                 'n_servicos': 0,
+                'indice_equipe_medio': None,
                 'zero_rdo': True,
             })
     # Marcar funcionários com RDO (não-cinza)
