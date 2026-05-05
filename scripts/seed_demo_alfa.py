@@ -1253,7 +1253,11 @@ def _seed():
         montar_arvore_preview as _montar_arvore_t118,
     )
 
-    proposta_t118 = Proposta()
+    # IMPORTANTE: numero explícito para evitar colisão com a proposta "002.26"
+    # do Pinheiros (criada mais adiante). Sem isso, Proposta.__init__ chama
+    # gerar_numero_proposta() → conta 1 proposta no ano (001.26 Bela Vista) →
+    # gera "002.26", que colide com o numero explícito do Pinheiros.
+    proposta_t118 = Proposta(numero="E2E118.26", data_proposta=date(2026, 1, 15))
     proposta_t118.titulo = orc.titulo + " — Proposta E2E #118"
     proposta_t118.descricao = orc.descricao
     proposta_t118.cliente_id = orc.cliente_id
