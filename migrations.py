@@ -3850,6 +3850,7 @@ def executar_migracoes():
             (149, "Task #43 — webhook_entrega (fila/log de notificações para n8n)", migration_149_webhook_entrega),
             (150, "Task #63 — Orçamento Operacional da Obra (3 tabelas + backfill)", migration_150_obra_orcamento_operacional),
             (151, "Task #62 — vínculos Cronograma↔Subatividade↔Serviço↔Mão-de-obra", migration_151_vinculo_subatividade_composicao),
+            (152, "Task #2 — rdo_custo_diario: tabela + índices parciais para custo diário de mão-de-obra", migration_152_rdo_custo_diario),
         ]
         
         # Executar cada migração com rastreamento
@@ -12811,6 +12812,142 @@ def migration_150_obra_orcamento_operacional():
         return True
     except Exception as e:
         logger.error("MIGRACAO 150 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_152_rdo_custo_diario():
+    """Task #2 — Custo Diário do Funcionário.
+
+    Cria (idempotente) a tabela rdo_custo_diario e seus índices:
+      - Tabela com snapshot de custo por funcionário por RDO (ou dia ocioso).
+      - Índice parcial único (rdo_id, funcionario_id, data) WHERE rdo_id IS NOT NULL
+        para lançamentos tipo='rdo' — garante 1 linha por funcionário por RDO.
+      - Índice parcial único (funcionario_id, data) WHERE tipo_lancamento='ocioso_mensal'
+        para evitar duplicatas de dias ociosos.
+      - Índices de consulta para relatórios de custo por período.
+
+    Se o índice antigo uq_rdo_custo_rdo_func existir sem a coluna 'data',
+    ele é descartado e recriado com (rdo_id, funcionario_id, data).
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 152: DATABASE_URL ausente")
+        return False
+
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+
+        # 1) Criar a tabela (idempotente)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS rdo_custo_diario (
+                id                        SERIAL PRIMARY KEY,
+                rdo_id                    INTEGER REFERENCES rdo(id) ON DELETE SET NULL,
+                funcionario_id            INTEGER NOT NULL REFERENCES funcionario(id) ON DELETE CASCADE,
+                admin_id                  INTEGER NOT NULL REFERENCES usuario(id),
+                data                      DATE NOT NULL,
+                tipo_remuneracao_snapshot VARCHAR(20) NOT NULL,
+                componente_folha          NUMERIC(12,2) DEFAULT 0,
+                componente_va             NUMERIC(12,2) DEFAULT 0,
+                componente_vt             NUMERIC(12,2) DEFAULT 0,
+                componente_extra          NUMERIC(12,2) DEFAULT 0,
+                custo_total_dia           NUMERIC(12,2) NOT NULL DEFAULT 0,
+                horas_normais             FLOAT DEFAULT 0,
+                horas_extras              FLOAT DEFAULT 0,
+                custo_hora_normal         NUMERIC(12,4),
+                dias_uteis_mes_referencia INTEGER,
+                tipo_lancamento           VARCHAR(20) NOT NULL DEFAULT 'rdo',
+                retroativo                BOOLEAN DEFAULT FALSE,
+                created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # 2) Remover índice antigo uq_rdo_custo_rdo_func se NÃO incluir 'data'
+        #    (verificamos via pg_attribute + pg_index quantas colunas ele tem)
+        cursor.execute("""
+            SELECT COUNT(*)
+              FROM pg_index i
+              JOIN pg_class c ON c.oid = i.indexrelid
+              JOIN pg_attribute a ON a.attrelid = i.indrelid
+                                 AND a.attnum = ANY(i.indkey)
+             WHERE c.relname = 'uq_rdo_custo_rdo_func'
+               AND a.attname = 'data'
+        """)
+        row = cursor.fetchone()
+        tem_coluna_data = row and row[0] > 0
+
+        if not tem_coluna_data:
+            # Índice antigo sem 'data' — remove para recriar corretamente
+            cursor.execute("DROP INDEX IF EXISTS uq_rdo_custo_rdo_func")
+
+        # 3) Índice parcial único (rdo_id, funcionario_id, data) — lançamentos RDO
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_class WHERE relname = 'uq_rdo_custo_rdo_func'
+                ) THEN
+                    CREATE UNIQUE INDEX uq_rdo_custo_rdo_func
+                      ON rdo_custo_diario(rdo_id, funcionario_id, data)
+                      WHERE rdo_id IS NOT NULL;
+                END IF;
+            END$$;
+        """)
+
+        # 4) Índice parcial único (funcionario_id, data) — dias ociosos
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_class WHERE relname = 'uq_rdo_custo_ocioso_func_data'
+                ) THEN
+                    CREATE UNIQUE INDEX uq_rdo_custo_ocioso_func_data
+                      ON rdo_custo_diario(funcionario_id, data)
+                      WHERE tipo_lancamento = 'ocioso_mensal';
+                END IF;
+            END$$;
+        """)
+
+        # 5) Índices de consulta
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_rdo_custo_func_data
+              ON rdo_custo_diario(funcionario_id, data);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_rdo_custo_admin_data
+              ON rdo_custo_diario(admin_id, data);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS ix_rdo_custo_diario_rdo_id
+              ON rdo_custo_diario(rdo_id);
+        """)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info(
+            "MIGRACAO 152 CONCLUIDA: tabela rdo_custo_diario + índices criados/verificados"
+        )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 152 falhou: %s", e)
         try:
             connection.rollback()
             connection.close()

@@ -13,6 +13,12 @@ seguindo a mesma rotina já usada pelo handler ponto_registrado:
       custo proporcional = horas × valor_hora (+ extras × valor_hora × 1.5),
       somando todas as linhas do funcionário no mesmo RDO.
 
+Fonte de verdade para valores:
+  RDOCustoDiario (quando existir) é lido ANTES do cálculo manual —
+  assim a proporção de rateio entre RDOs do mesmo dia já foi aplicada.
+  O fallback para cálculo direto existe apenas para chamadas sem
+  RDOCustoDiario prévio (fluxo legado / testes).
+
 Anti-duplicação:
   - Se já existe RegistroPonto do mesmo (funcionário, data) no admin,
     o handler ponto_registrado já gerou o custo — pulamos no RDO.
@@ -54,6 +60,19 @@ def _existe_ponto_no_dia(funcionario_id, data_ref, admin_id) -> bool:
         )
     except Exception:
         return False
+
+
+def _custo_diario_rdo(rdo_id: int, funcionario_id: int):
+    """Retorna a linha RDOCustoDiario para (rdo_id, funcionario_id) ou None."""
+    try:
+        from models import RDOCustoDiario
+        return RDOCustoDiario.query.filter_by(
+            rdo_id=rdo_id,
+            funcionario_id=funcionario_id,
+            tipo_lancamento='rdo',
+        ).first()
+    except Exception:
+        return None
 
 
 def remover_custos_rdo(rdo, admin_id) -> int:
@@ -115,11 +134,19 @@ def remover_custos_rdo(rdo, admin_id) -> int:
 
 
 def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
-    """Gera GestaoCustoFilho a partir das linhas RDOMaoObra de um RDO finalizado.
+    """Gera GestaoCustoFilho a partir dos valores pré-computados em RDOCustoDiario.
 
     Retorna o número de filhos criados (0 se nada a fazer).
     Faz commit ao final. Em caso de erro, faz rollback e devolve 0
     sem propagar exceção (o salvamento do RDO em si não pode quebrar).
+
+    Ordem de chamada esperada:
+      1. gravar_custo_funcionario_rdo(rdo, admin_id)  ← cria RDOCustoDiario
+      2. gerar_custos_mao_obra_rdo(rdo, admin_id)     ← cria GestaoCustoFilho
+
+    Fonte de valores: RDOCustoDiario (componente_folha, componente_va,
+    componente_vt, componente_extra). Fallback para cálculo direto quando
+    o registro diário não existir (compatibilidade com fluxos legados).
     """
     try:
         if not _tenant_is_v2(admin_id):
@@ -140,8 +167,7 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
         if not registros:
             return 0
 
-        # Agrega por funcionário (1 lançamento por dia, mesmo que apareça em
-        # várias subatividades).
+        # Agrega por funcionário (1 lançamento por dia por tipo de custo)
         horas_por_func = {}
         extras_por_func = {}
         primeiro_por_func = {}
@@ -179,29 +205,63 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
             if ja:
                 continue
 
-            tipo_remun = (getattr(funcionario, 'tipo_remuneracao', 'salario')
-                          or 'salario')
             data_ref = rdo.data_relatorio
             data_str = data_ref.strftime('%d/%m/%Y')
 
-            if tipo_remun == 'diaria':
-                valor_diaria = float(getattr(funcionario, 'valor_diaria', 0) or 0)
-                if valor_diaria <= 0:
-                    logger.warning(
-                        f"[rdo-custo] Diarista {funcionario.nome} sem valor_diaria"
-                    )
-                    continue
+            # ── Lê valores de RDOCustoDiario (pré-calculado com rateio) ────
+            custo_dia = _custo_diario_rdo(rdo.id, func_id)
 
-                desc = (f"Diária - {funcionario.nome} - {data_str} "
-                        f"(RDO {rdo.numero_rdo})")
+            if custo_dia:
+                # Usa os componentes já proporcionais do registro diário
+                tipo_remun = custo_dia.tipo_remuneracao_snapshot
+                valor_folha = float(custo_dia.componente_folha or 0)
+                valor_va    = float(custo_dia.componente_va or 0)
+                valor_vt    = float(custo_dia.componente_vt or 0)
+                valor_extra = float(custo_dia.componente_extra or 0)
+                valor_total_folha = valor_folha + valor_extra  # SALARIO inclui extra
+            else:
+                # Fallback: calcula direto de RDOMaoObra (sem rateio cross-RDO)
+                tipo_remun = getattr(funcionario, 'tipo_remuneracao', 'salario') or 'salario'
+                if tipo_remun == 'diaria':
+                    valor_folha = float(getattr(funcionario, 'valor_diaria', 0) or 0)
+                    valor_extra = 0.0
+                    valor_total_folha = valor_folha
+                else:
+                    horas = horas_por_func.get(func_id, 0)
+                    extras = extras_por_func.get(func_id, 0)
+                    vh = calcular_valor_hora_periodo(funcionario, data_ref, data_ref) or 0
+                    valor_total_folha = horas * vh + extras * vh * 1.5
+                    valor_folha = valor_total_folha
+                    valor_extra = extras * vh * 1.5 if vh > 0 else 0.0
+                valor_va = float(getattr(funcionario, 'valor_va', 0) or 0)
+                valor_vt = float(getattr(funcionario, 'valor_vt', 0) or 0)
+
+            if valor_total_folha <= 0 and valor_va <= 0 and valor_vt <= 0:
+                logger.warning(
+                    f"[rdo-custo] {funcionario.nome} sem valor > 0 — pulando"
+                )
+                continue
+
+            # ── Lança custo de folha/salário ────────────────────────────────
+            if valor_total_folha > 0:
+                if tipo_remun == 'diaria':
+                    desc_folha = (f"Diária - {funcionario.nome} - {data_str} "
+                                  f"(RDO {rdo.numero_rdo})")
+                else:
+                    horas = horas_por_func.get(func_id, 0)
+                    extras = extras_por_func.get(func_id, 0)
+                    pedaco_extras = f" + {extras}h extras" if extras else ""
+                    desc_folha = (f"Mão de obra: {funcionario.nome} - {data_str} "
+                                  f"({horas}h{pedaco_extras}) (RDO {rdo.numero_rdo})")
+
                 f = registrar_custo_automatico(
                     admin_id=admin_id,
                     tipo_categoria='SALARIO',
                     entidade_nome=funcionario.nome,
                     entidade_id=funcionario.id,
                     data=data_ref,
-                    descricao=desc,
-                    valor=valor_diaria,
+                    descricao=desc_folha,
+                    valor=valor_total_folha,
                     obra_id=rdo.obra_id,
                     origem_tabela='rdo_mao_obra',
                     origem_id=primeiro.id,
@@ -210,71 +270,36 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                 if f:
                     criados += 1
 
-                # VA / VT do dia trabalhado
-                for tag, attr, cat in [
-                    ('VA', 'valor_va', 'ALIMENTACAO'),
-                    ('VT', 'valor_vt', 'TRANSPORTE'),
-                ]:
-                    v = float(getattr(funcionario, attr, 0) or 0)
-                    if v <= 0:
-                        continue
-                    origem_t = f'rdo_mao_obra_{tag.lower()}'
-                    ja2 = GestaoCustoFilho.query.filter_by(
-                        origem_tabela=origem_t,
-                        origem_id=primeiro.id,
-                        admin_id=admin_id,
-                    ).first()
-                    if ja2:
-                        continue
-                    fx = registrar_custo_automatico(
-                        admin_id=admin_id,
-                        tipo_categoria=cat,
-                        entidade_nome=funcionario.nome,
-                        entidade_id=funcionario.id,
-                        data=data_ref,
-                        descricao=(f"{tag} - {funcionario.nome} - {data_str} "
-                                   f"(RDO {rdo.numero_rdo})"),
-                        valor=v,
-                        obra_id=rdo.obra_id,
-                        origem_tabela=origem_t,
-                        origem_id=primeiro.id,
-                        force_v2=True,
-                    )
-                    if fx:
-                        criados += 1
-            else:
-                # Salarista / horista
-                horas = horas_por_func.get(func_id, 0)
-                extras = extras_por_func.get(func_id, 0)
-                if horas <= 0 and extras <= 0:
+            # ── VA / VT (por dia trabalhado) ─────────────────────────────────
+            for tag, v, cat in [
+                ('VA', valor_va, 'ALIMENTACAO'),
+                ('VT', valor_vt, 'TRANSPORTE'),
+            ]:
+                if v <= 0:
                     continue
-                vh = calcular_valor_hora_periodo(funcionario, data_ref, data_ref) or 0
-                if vh <= 0:
-                    logger.warning(
-                        f"[rdo-custo] {funcionario.nome} sem salário/valor_hora — "
-                        "pulando custo de mão de obra do RDO"
-                    )
-                    continue
-                valor = horas * vh + extras * vh * 1.5
-                if valor <= 0:
-                    continue
-                pedaco_extras = f" + {extras}h extras" if extras else ""
-                desc = (f"Mão de obra: {funcionario.nome} - {data_str} "
-                        f"({horas}h{pedaco_extras}) (RDO {rdo.numero_rdo})")
-                f = registrar_custo_automatico(
+                origem_t = f'rdo_mao_obra_{tag.lower()}'
+                ja2 = GestaoCustoFilho.query.filter_by(
+                    origem_tabela=origem_t,
+                    origem_id=primeiro.id,
                     admin_id=admin_id,
-                    tipo_categoria='SALARIO',
+                ).first()
+                if ja2:
+                    continue
+                fx = registrar_custo_automatico(
+                    admin_id=admin_id,
+                    tipo_categoria=cat,
                     entidade_nome=funcionario.nome,
                     entidade_id=funcionario.id,
                     data=data_ref,
-                    descricao=desc,
-                    valor=valor,
+                    descricao=(f"{tag} - {funcionario.nome} - {data_str} "
+                               f"(RDO {rdo.numero_rdo})"),
+                    valor=v,
                     obra_id=rdo.obra_id,
-                    origem_tabela='rdo_mao_obra',
+                    origem_tabela=origem_t,
                     origem_id=primeiro.id,
                     force_v2=True,
                 )
-                if f:
+                if fx:
                     criados += 1
 
         db.session.commit()

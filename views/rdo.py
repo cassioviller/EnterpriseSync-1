@@ -3150,12 +3150,19 @@ def rdo_salvar_unificado():
 
         db.session.commit()
 
-        # Gravar custo diário de mão-de-obra (idempotente)
+        # Gravar custo diário PRIMEIRO (fonte de verdade para o módulo financeiro)
         try:
             from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
             gravar_custo_funcionario_rdo(rdo, admin_id_correto)
         except Exception as _ce:
             logger.warning("[custo-dia] gravar falhou no salvar_unificado: %s", _ce)
+
+        # Gera GestaoCustoFilho lendo valores de RDOCustoDiario (idempotente)
+        try:
+            from services.rdo_custos import gerar_custos_mao_obra_rdo
+            gerar_custos_mao_obra_rdo(rdo, admin_id_correto)
+        except Exception as _ce:
+            logger.warning("[rdo-custo] gerar_custos falhou no salvar_unificado: %s", _ce)
 
         if rdo_id:
             flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')

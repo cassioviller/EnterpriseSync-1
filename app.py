@@ -825,6 +825,9 @@ try:
     from notificacoes_cli import emitir_propostas_expirando_cmd
     app.cli.add_command(emitir_propostas_expirando_cmd)
     logging.info("[OK] Comando CLI emitir-propostas-expirando registrado")
+    from cobertura_ociosa_cli import cobertura_ociosa_cmd
+    app.cli.add_command(cobertura_ociosa_cmd)
+    logging.info("[OK] Comando CLI cobertura-ociosa registrado")
 except ImportError as e:
     logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
 

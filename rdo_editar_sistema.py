@@ -490,19 +490,19 @@ def salvar_edicao_rdo(rdo_id):
         # Confirmar salvamento
         db.session.commit()
 
-        # Gera/atualiza custos de mão-de-obra desta edição (idempotente)
-        try:
-            from services.rdo_custos import gerar_custos_mao_obra_rdo
-            gerar_custos_mao_obra_rdo(rdo, admin_id)
-        except Exception as _e:
-            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
-
-        # Grava custo diário (persistência para métricas de produtividade)
+        # Grava custo diário PRIMEIRO (fonte de verdade para rdo_custos)
         try:
             from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
             gravar_custo_funcionario_rdo(rdo, admin_id)
         except Exception as _e:
             logger.error(f"[custo-dia] gravar_custo_funcionario_rdo falhou: {_e}")
+
+        # Gera/atualiza GestaoCustoFilho a partir de RDOCustoDiario (idempotente)
+        try:
+            from services.rdo_custos import gerar_custos_mao_obra_rdo
+            gerar_custos_mao_obra_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
 
         logger.info(f"✅ RDO editado com sucesso: {rdo.numero_rdo}")
         flash(f'RDO {rdo.numero_rdo} editado com sucesso!', 'success')

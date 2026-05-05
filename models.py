@@ -976,7 +976,7 @@ class RDOCustoDiario(db.Model):
     __table_args__ = (
         db.Index(
             'uq_rdo_custo_rdo_func',
-            'rdo_id', 'funcionario_id',
+            'rdo_id', 'funcionario_id', 'data',
             unique=True,
             postgresql_where=db.text("rdo_id IS NOT NULL"),
         ),
