@@ -600,6 +600,10 @@ def _seed():
         ("Hora servente",            "MAO_OBRA",    "h",  18.00),
         ("Diária encarregado",       "MAO_OBRA",    "dia", 200.00),
         ("Betoneira hora",           "EQUIPAMENTO", "h",  25.00),
+        # Insumos do 3º serviço (Pintura) usado na obra Pinheiros — Task #20.
+        ("Tinta acrílica 18L",       "MATERIAL",    "gl", 320.00),
+        ("Massa corrida 25kg",       "MATERIAL",    "sc",  68.00),
+        ("Hora pintor",              "MAO_OBRA",    "h",   30.00),
     ]
     insumos_obj = {}
     for nome, tipo, un, preco in insumos_def:
@@ -627,6 +631,10 @@ def _seed():
     sub_chapisco   = _sub("Chapisco",                12.0, "m²",       3.0)
     sub_prep_piso  = _sub("Preparação do contrapiso", 8.0, "m²",       4.0)
     sub_lancamento = _sub("Lançamento e desempeno",  20.0, "m²",       2.5)
+    # Subatividades do 3º serviço (Pintura) — Task #20.
+    sub_massa      = _sub("Massa corrida + lixamento", 16.0, "m²",     2.0)
+    sub_pintura    = _sub("Aplicação de tinta acrílica (2 demãos)",
+                          24.0, "m²",                                 1.5)
     db.session.flush()
 
     # Template Alvenaria
@@ -694,7 +702,37 @@ def _seed():
         ),
     ]); db.session.flush()
 
-    # 7) 3 Serviços de catálogo --------------------------------------------
+    # Template Pintura (3º serviço com folhas — alimenta Métricas
+    # "Empresa por Serviço" com ≥3 serviços com dados — Task #20).
+    tmpl_pin = CronogramaTemplate(
+        nome="Pintura interna — padrão",
+        descricao="Massa corrida → Aplicação de tinta (2 demãos)",
+        categoria="Acabamento", ativo=True, admin_id=aid,
+    )
+    db.session.add(tmpl_pin); db.session.flush()
+    g_pin = CronogramaTemplateItem(
+        template_id=tmpl_pin.id, nome_tarefa="Pintura",
+        ordem=30, duracao_dias=1, admin_id=aid,
+    )
+    db.session.add(g_pin); db.session.flush()
+    db.session.add_all([
+        CronogramaTemplateItem(
+            template_id=tmpl_pin.id, parent_item_id=g_pin.id,
+            subatividade_mestre_id=sub_massa.id,
+            nome_tarefa="Massa corrida + lixamento",
+            ordem=31, duracao_dias=3, quantidade_prevista=250.0,
+            responsavel="empresa", admin_id=aid,
+        ),
+        CronogramaTemplateItem(
+            template_id=tmpl_pin.id, parent_item_id=g_pin.id,
+            subatividade_mestre_id=sub_pintura.id,
+            nome_tarefa="Aplicação de tinta (2 demãos)",
+            ordem=32, duracao_dias=4, quantidade_prevista=250.0,
+            responsavel="empresa", admin_id=aid,
+        ),
+    ]); db.session.flush()
+
+    # 7) Serviços de catálogo (3 com template + 1 verba) -------------------
     serv_alv = Servico(
         nome="Alvenaria de bloco cerâmico",
         descricao="Alvenaria de vedação 9x19x19 com chapisco",
@@ -722,7 +760,17 @@ def _seed():
         preco_venda_unitario=Decimal("3500.00"),
         template_padrao_id=None, admin_id=aid,
     )
-    db.session.add_all([serv_alv, serv_pis, serv_mob]); db.session.flush()
+    serv_pin = Servico(
+        nome="Pintura interna acrílica",
+        descricao="Massa corrida + 2 demãos de tinta acrílica em parede",
+        categoria="Acabamento", unidade_medida="m2", unidade_simbolo="m²",
+        custo_unitario=20.00, complexidade=2, ativo=True,
+        imposto_pct=Decimal("8.0"), margem_lucro_pct=Decimal("25.0"),
+        preco_venda_unitario=Decimal("35.00"),
+        template_padrao_id=tmpl_pin.id, admin_id=aid,
+    )
+    db.session.add_all([serv_alv, serv_pis, serv_mob, serv_pin])
+    db.session.flush()
 
     # Composição mínima do serviço de alvenaria (paramétrica)
     for nome_ins, coef in [
@@ -746,6 +794,18 @@ def _seed():
     ]:
         db.session.add(ComposicaoServico(
             admin_id=aid, servico_id=serv_pis.id,
+            insumo_id=insumos_obj[nome_ins].id,
+            coeficiente=Decimal(coef),
+        ))
+    # Composição mínima da pintura (Task #20).
+    for nome_ins, coef in [
+        ("Tinta acrílica 18L",   "0.020"),  # ~1 galão p/ 50 m² (2 demãos)
+        ("Massa corrida 25kg",   "0.040"),  # ~1 sc p/ 25 m²
+        ("Hora pintor",          "0.350"),
+        ("Hora servente",        "0.150"),
+    ]:
+        db.session.add(ComposicaoServico(
+            admin_id=aid, servico_id=serv_pin.id,
             insumo_id=insumos_obj[nome_ins].id,
             coeficiente=Decimal(coef),
         ))
@@ -1761,17 +1821,20 @@ def _seed():
 
     # Itens dimensionados para que a obra Pinheiros caia na faixa
     # ~R$ 350-500k (spec da Task #20). Total = 1500*165 + 1500*95 +
-    # 25.000 = R$ 415.000. O 3º item (mobilização) usa serv_mob, que
-    # NÃO tem template — é tratado como verba financeira pura, não
-    # entra no cronograma materializado (mantém os mesmos dois
-    # serviços com folhas para os 10 RDOs de avanço).
+    # 1500*35 + 20.000 = R$ 462.500. Três serviços (Alvenaria, Contrapiso,
+    # Pintura) com TEMPLATE — alimentam Métricas "Empresa por Serviço"
+    # com ≥3 serviços com dados, conforme spec. O item 4 (mobilização)
+    # usa serv_mob (sem template) — verba financeira pura, não entra
+    # no cronograma materializado.
     itens_pin_def = [
         ("Alvenaria de bloco cerâmico — Pinheiros",
          Decimal("1500.000"), "m2", Decimal("165.00"), serv_alv, 1),
         ("Contrapiso desempenado — Pinheiros",
          Decimal("1500.000"), "m2", Decimal("95.00"), serv_pis, 2),
+        ("Pintura interna acrílica — Pinheiros",
+         Decimal("1500.000"), "m2", Decimal("35.00"), serv_pin, 3),
         ("Mobilização e canteiro — Pinheiros",
-         Decimal("1.000"), "vb", Decimal("25000.00"), serv_mob, 3),
+         Decimal("1.000"), "vb", Decimal("20000.00"), serv_mob, 4),
     ]
     valor_pin = Decimal("0.00")
     propostaitem_pin_objs = []
@@ -1933,12 +1996,18 @@ def _seed():
                     horas_trabalhadas=horas, horas_extras=horas_extras,
                     tarefa_cronograma_id=folha.id,
                 ))
+            _nome_low = folha.nome_tarefa.lower()
+            if ("pintura" in _nome_low or "tinta" in _nome_low
+                    or "massa" in _nome_low):
+                _serv_id = serv_pin.id
+            elif ("alvenaria" in _nome_low or "marcação" in _nome_low
+                    or "chapisco" in _nome_low):
+                _serv_id = serv_alv.id
+            else:
+                _serv_id = serv_pis.id
             db.session.add(RDOServicoSubatividade(
                 rdo_id=rdo.id,
-                servico_id=(serv_alv.id if "alvenaria" in folha.nome_tarefa.lower()
-                            or "marcação" in folha.nome_tarefa.lower()
-                            or "chapisco" in folha.nome_tarefa.lower()
-                            else serv_pis.id),
+                servico_id=_serv_id,
                 nome_subatividade=folha.nome_tarefa,
                 descricao_subatividade=folha.nome_tarefa,
                 percentual_conclusao=perc_destino,
@@ -2006,6 +2075,7 @@ def _seed():
         "servico_alvenaria_id": serv_alv.id,
         "servico_contrapiso_id": serv_pis.id,
         "servico_mobilizacao_id": serv_mob.id,
+        "servico_pintura_id": serv_pin.id,
         "template_alvenaria_id": tmpl_alv.id,
         "template_contrapiso_id": tmpl_pis.id,
         "proposta_id": proposta.id,
