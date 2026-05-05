@@ -1922,18 +1922,25 @@ def _seed():
     # variação realista em Métricas (custo MO, produtividade,
     # detalhe do funcionário). Mantém o mesmo valor para todos os
     # funcionários daquele RDO (jornada do dia).
+    #
+    # `perc_planejado` é o cronograma orçado (10/20/30/.../100% linear
+    # em incrementos de 10%/semana). `perc_destino` é o REALIZADO,
+    # que diverge do planejado nos RDOs 3-6 (atraso por produtividade
+    # abaixo na 3ª semana → permanece -5% até a recuperação no idx 7).
+    # Essa divergência alimenta /metricas/empresa-por-servico (índice
+    # < 100 em alguns RDOs) e /metricas/divergencia/<servico_id>.
     rdos_pin_dados = [
-        # (data, perc_destino, horas, horas_extras, perc_anterior)
-        (date(2026, 2, 3),  10.0, 8.0, 0.0,  0.0),  # arranque
-        (date(2026, 2, 10), 20.0, 9.0, 1.0, 10.0),  # extra leve
-        (date(2026, 2, 17), 25.0, 6.0, 0.0, 20.0),  # produtividade ABAIXO
-        (date(2026, 2, 24), 35.0, 8.0, 0.0, 25.0),  # ausência Marcos
-        (date(2026, 3, 3),  45.0, 10.0, 2.0, 35.0), # turno estendido
-        (date(2026, 3, 10), 55.0, 8.0, 0.0, 45.0),
-        (date(2026, 3, 17), 70.0, 9.5, 1.5, 55.0),  # compensação + ausência João
-        (date(2026, 3, 24), 80.0, 8.0, 0.0, 70.0),
-        (date(2026, 3, 31), 90.0, 7.0, 0.0, 80.0),  # dia chuvoso
-        (date(2026, 4, 7), 100.0, 8.5, 0.5, 90.0),  # entrega final
+        # (data, perc_realizado, horas, horas_extras, perc_anterior, perc_planejado)
+        (date(2026, 2, 3),  10.0, 8.0, 0.0,  0.0,  10.0),  # arranque (no plano)
+        (date(2026, 2, 10), 20.0, 9.0, 1.0, 10.0,  20.0),  # extra leve
+        (date(2026, 2, 17), 25.0, 6.0, 0.0, 20.0,  30.0),  # ABAIXO do orçado (-5%)
+        (date(2026, 2, 24), 35.0, 8.0, 0.0, 25.0,  40.0),  # ausência Marcos (-5%)
+        (date(2026, 3, 3),  45.0, 10.0, 2.0, 35.0, 50.0),  # turno estendido (-5%)
+        (date(2026, 3, 10), 55.0, 8.0, 0.0, 45.0,  60.0),  # ainda -5%
+        (date(2026, 3, 17), 70.0, 9.5, 1.5, 55.0,  70.0),  # COMPENSAÇÃO — alinhado
+        (date(2026, 3, 24), 80.0, 8.0, 0.0, 70.0,  80.0),
+        (date(2026, 3, 31), 90.0, 7.0, 0.0, 80.0,  90.0),  # dia chuvoso
+        (date(2026, 4, 7), 100.0, 8.5, 0.5, 90.0, 100.0),  # entrega final
     ]
     omitir_diarista_no_idx = {4: marcos.id, 7: joao.id}
     # Tipo + severidade da ocorrência por RDO — garante mix Baixa/Média
@@ -1953,9 +1960,8 @@ def _seed():
 
     from models import RDOApontamentoCronograma as _RAC_pin
     _v2_acum_pin = {}
-    for idx, (dt, perc_destino, horas, horas_extras, perc_anterior) in enumerate(
-        rdos_pin_dados, start=1
-    ):
+    for idx, (dt, perc_destino, horas, horas_extras, perc_anterior,
+              perc_planejado) in enumerate(rdos_pin_dados, start=1):
         omitir_id = omitir_diarista_no_idx.get(idx)
         rdo = RDO(
             numero_rdo=f"RDO-PIN-2026-{idx:03d}",
@@ -2030,7 +2036,7 @@ def _seed():
                     quantidade_executada_dia=qty_dia,
                     quantidade_acumulada=qty_destino_acum,
                     percentual_realizado=perc_destino,
-                    percentual_planejado=perc_destino,
+                    percentual_planejado=perc_planejado,
                 ))
 
         # Equipamento varia (≥3 RDOs com equipamento, conforme spec).
@@ -2183,8 +2189,11 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
     log.info(f"   8) RDOs              → {base_url}/rdo")
     log.info(f"   9) Medição           → {base_url}/obras/{info['obra_id']}/medicao")
     log.info(f"  10) Contas a Receber  → {base_url}/financeiro/contas-receber")
-    log.info(f"  11) CRM (Kanban)      → {base_url}/crm")
+    log.info(f"  11) CRM (Kanban)      → {base_url}/crm/")
+    log.info(f"      CRM (Lista)       → {base_url}/crm/lista")
     log.info(f"  12) Métricas          → {base_url}/metricas")
+    log.info(f"      Métricas/Serviço  → {base_url}/metricas/servico")
+    log.info(f"      Métricas/Função   → {base_url}/metricas/funcionarios")
     log.info("=" * 72)
 
 
