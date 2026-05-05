@@ -183,17 +183,61 @@ def funcionarios():
         metricas = []
         flash("Erro ao calcular métricas.", "danger")
 
-    # Filtro de status
+    # ── Funcionários ativos sem nenhum RDO no período → card cinza ──────────
+    from models import Funcionario, Funcao as FuncaoModel
+    ids_com_rdo = {m['funcionario_id'] for m in metricas}
+    query_sem_rdo = Funcionario.query.filter_by(admin_id=admin_id, ativo=True)
+    if funcao_ids_raw:
+        query_sem_rdo = query_sem_rdo.filter(Funcionario.funcao_id.in_(funcao_ids_raw))
+    funcao_nome_map = {f.id: f.nome for f in FuncaoModel.query.filter_by(admin_id=admin_id).all()}
+    from services.metricas_produtividade import _dias_uteis_periodo
+    dias_uteis = _dias_uteis_periodo(data_inicio, data_fim)
+    zero_rdo = []
+    for f in query_sem_rdo.all():
+        if f.id not in ids_com_rdo:
+            zero_rdo.append({
+                'funcionario_id': f.id,
+                'funcionario_nome': f.nome,
+                'funcao_id': f.funcao_id,
+                'funcao_nome': funcao_nome_map.get(f.funcao_id, ''),
+                'horas_normais': 0.0,
+                'horas_extras': 0.0,
+                'dias_com_rdo': 0,
+                'dias_uteis_periodo': dias_uteis,
+                'assiduidade_pct': 0.0,
+                'custo_total': None,
+                'receita_total': None,
+                'lucro_total': None,
+                'modo_predominante': None,
+                'prod_real_hh': None,
+                'prod_empresa_media': None,
+                'indice_vs_pares_pct': None,
+                'tem_custo': False,
+                'tem_receita': False,
+                'n_servicos': 0,
+                'zero_rdo': True,
+            })
+    # Marcar funcionários com RDO (não-cinza)
+    for m in metricas:
+        m.setdefault('zero_rdo', False)
+
+    # Filtro de status (zero_rdo nunca tem custo/receita)
     if status_filtro == 'com_custo':
         metricas = [m for m in metricas if m['tem_custo']]
+        zero_rdo = []
     elif status_filtro == 'sem_custo':
         metricas = [m for m in metricas if not m['tem_custo']]
     elif status_filtro == 'com_receita':
         metricas = [m for m in metricas if m['tem_receita']]
+        zero_rdo = []
+
+    # Combinar: funcionários com RDO primeiro, depois cinzas por nome
+    zero_rdo.sort(key=lambda x: x['funcionario_nome'])
+    todos = metricas + zero_rdo
 
     return render_template(
         'metricas/funcionarios.html',
-        metricas=metricas,
+        metricas=todos,
         obras=obras,
         funcoes=funcoes,
         data_inicio=data_inicio,
@@ -201,6 +245,8 @@ def funcionarios():
         obra_ids_sel=obra_ids_raw,
         funcao_ids_sel=funcao_ids_raw,
         status_filtro=status_filtro,
+        n_com_rdo=len(metricas),
+        n_sem_rdo=len(zero_rdo),
     )
 
 

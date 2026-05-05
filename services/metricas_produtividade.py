@@ -385,6 +385,7 @@ def _calcular_metricas_subatividade(regs_sub: list, op_cache: dict,
                 'custo_na_sub': None,
                 'receita_dele': None,
                 'lucro_dele': None,
+                'producao_rateada': None,
                 'modo': modo,
             }
         func_metricas[fid]['horas_na_sub'] += r['mo_horas']
@@ -394,6 +395,8 @@ def _calcular_metricas_subatividade(regs_sub: list, op_cache: dict,
         horas_sub = fm['horas_na_sub']
         custo_dia = fm['custo_total_dia']
 
+        # Nota: custo_total_dia em RDOCustoDiario já é prorated para este RDO,
+        # portanto o divisor correto é horas_neste_rdo (não horas_totais_do_dia).
         if custo_dia is not None and horas_rdo > 0:
             fm['custo_na_sub'] = custo_dia * (horas_sub / horas_rdo)
 
@@ -409,6 +412,10 @@ def _calcular_metricas_subatividade(regs_sub: list, op_cache: dict,
 
         if fm['custo_na_sub'] is not None and fm['receita_dele'] is not None:
             fm['lucro_dele'] = fm['receita_dele'] - fm['custo_na_sub']
+
+        # Produção rateada por horas (single_role: proporcional; equipe_mista: None)
+        if qtd is not None and total_hh > 0 and modo == 'single_role':
+            fm['producao_rateada'] = qtd * (horas_sub / total_hh)
 
     return {
         'rdo_id': r0['rdo_id'],
@@ -724,7 +731,20 @@ def producao_por_funcionario(admin_id: int, data_inicio: date, data_fim: date,
             'tem_custo': fa['custo_valido'],
             'tem_receita': fa['receita_valida'],
             'n_servicos': len(fa['servicos_vistos']),
+            # Comparativos preenchidos após calcular a média da empresa (abaixo)
+            'prod_empresa_media': None,
+            'indice_vs_pares_pct': None,
         })
+
+    # ── Média da empresa (single_role com produtividade real) ────────────────
+    vals_single = [r['prod_real_hh'] for r in resultado
+                   if r['prod_real_hh'] is not None and r['modo_predominante'] == 'single_role']
+    media_empresa = sum(vals_single) / len(vals_single) if vals_single else None
+
+    for r in resultado:
+        r['prod_empresa_media'] = media_empresa
+        if r['prod_real_hh'] is not None and media_empresa and media_empresa > 0:
+            r['indice_vs_pares_pct'] = r['prod_real_hh'] / media_empresa * 100
 
     return sorted(resultado, key=lambda x: x['funcionario_nome'])
 
@@ -762,6 +782,7 @@ def detalhe_funcionario(admin_id: int, funcionario_id: int,
     por_servico_agg: dict = defaultdict(lambda: {
         'servico_id': None, 'servico_nome': '', 'unidade': '',
         'horas': 0.0, 'custo': 0.0, 'receita': 0.0,
+        'producao_rateada': 0.0, 'producao_rateada_valida': False,
         'prod_list': [], 'indice_list': [], 'modo_list': [],
         'custo_valido': False, 'receita_valida': False,
     })
@@ -779,6 +800,10 @@ def detalhe_funcionario(admin_id: int, funcionario_id: int,
         if fm.get('receita_dele') is not None:
             agg['receita'] += fm['receita_dele']
             agg['receita_valida'] = True
+        # Produção rateada: apenas single_role tem valor; equipe_mista fica None
+        if fm.get('producao_rateada') is not None:
+            agg['producao_rateada'] += fm['producao_rateada']
+            agg['producao_rateada_valida'] = True
         if m['quantidade_produzida'] and m['total_hh'] > 0:
             agg['prod_list'].append(m['quantidade_produzida'] / m['total_hh'])
         if m['indice_equipe'] is not None:
@@ -796,6 +821,7 @@ def detalhe_funcionario(admin_id: int, funcionario_id: int,
             'horas': agg['horas'],
             'modo': 'equipe_mista' if agg['modo_list'].count('equipe_mista') > len(agg['modo_list'])/2 else 'single_role',
             'prod_media_hh': (sum(agg['prod_list'])/len(agg['prod_list']) if agg['prod_list'] else None),
+            'producao_rateada': agg['producao_rateada'] if agg['producao_rateada_valida'] else None,
             'indice_medio_pct': (sum(agg['indice_list'])/len(agg['indice_list']) if agg['indice_list'] else None),
             'custo': agg['custo'] if agg['custo_valido'] else None,
             'receita': agg['receita'] if agg['receita_valida'] else None,
@@ -804,10 +830,20 @@ def detalhe_funcionario(admin_id: int, funcionario_id: int,
     secao_a.sort(key=lambda x: x['servico_nome'])
 
     # ── Seção B: por dia ────────────────────────────────────────────────────
+    # Carregar nomes de obras para exibição
+    obra_ids_b = {m['obra_id'] for m in metricas_sub.values() if m.get('obra_id')}
+    try:
+        from models import Obra as ObraModel
+        obra_nome_map = {o.id: o.nome for o in ObraModel.query.filter(
+            ObraModel.id.in_(obra_ids_b)
+        ).all()} if obra_ids_b else {}
+    except Exception:
+        obra_nome_map = {}
+
     por_dia_agg: dict = defaultdict(lambda: {
-        'data': None, 'obra_id': None, 'rdo_id': None, 'rdo_numero': '',
+        'data': None, 'obra_id': None, 'obra_nome': '', 'rdo_id': None, 'rdo_numero': '',
         'horas': 0.0, 'custo': None, 'producao': None, 'receita': None,
-        'lucro': None, 'modo': 'single_role',
+        'lucro': None, 'modos': [],
     })
     for chave, m in metricas_sub.items():
         fm = m['func_metricas'].get(funcionario_id, {})
@@ -815,9 +851,11 @@ def detalhe_funcionario(admin_id: int, funcionario_id: int,
         d = por_dia_agg[dia_key]
         d['data'] = m['rdo_data']
         d['obra_id'] = m['obra_id']
+        d['obra_nome'] = obra_nome_map.get(m['obra_id'], f'Obra #{m["obra_id"]}')
         d['rdo_id'] = m['rdo_id']
         d['rdo_numero'] = m['rdo_numero']
         d['horas'] += fm.get('horas_na_sub', 0.0)
+        d['modos'].append(m['modo'])
         if fm.get('custo_na_sub') is not None:
             d['custo'] = (d['custo'] or 0.0) + fm['custo_na_sub']
         if m['quantidade_produzida'] is not None:
@@ -829,6 +867,8 @@ def detalhe_funcionario(admin_id: int, funcionario_id: int,
     for (dt, rid), d in sorted(por_dia_agg.items(), key=lambda x: x[0][0]):
         if d['receita'] is not None and d['custo'] is not None:
             d['lucro'] = d['receita'] - d['custo']
+        modos = d.pop('modos', [])
+        d['modo'] = 'equipe_mista' if modos.count('equipe_mista') > modos.count('single_role') else 'single_role'
         secao_b.append(d)
 
     # ── Seção C: diagnóstico de equipe ──────────────────────────────────────

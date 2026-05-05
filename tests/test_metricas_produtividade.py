@@ -597,3 +597,112 @@ def test_8_ausencia_de_dados():
 
         result3 = ranking_funcionarios(_fx.admin.id, di, df)
         assert result3 == []
+
+
+def test_9_prod_empresa_media_e_indice_vs_pares():
+    """producao_por_funcionario devolve prod_empresa_media e indice_vs_pares_pct."""
+    with app.app_context():
+        s = _suffix()
+
+        servico = _servico(f'AlvT9 {s}', 'm2')
+        ins = _insumo(f'PedT9 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        db.session.commit()
+
+        data = date(2026, 4, 10)
+        # Func A: 10m² em 8h  → 1.25 un/h
+        # Func B: 8m² em 8h   → 1.0 un/h
+        # Média esperada = (1.25 + 1.0) / 2 = 1.125
+        func_a = _func('A9')
+        func_b = _func('B9')
+
+        rdo_a = _rdo(_fx.obra, data, '9A')
+        rdo_b = _rdo(_fx.obra, data, '9B')
+        sub_a = _sub(rdo_a, servico.id, 'Sub A', qty=10.0)
+        sub_b = _sub(rdo_b, servico.id, 'Sub B', qty=8.0)
+        _mo(rdo_a, func_a, 8.0, sub=sub_a, composicao_id=comp.id, vinculo='auto')
+        _mo(rdo_b, func_b, 8.0, sub=sub_b, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo_a, func_a, 80.0)
+        _custo_diario(rdo_b, func_b, 80.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import producao_por_funcionario
+        result = producao_por_funcionario(_fx.admin.id, data, data)
+
+        met_a = next((r for r in result if r['funcionario_id'] == func_a.id), None)
+        met_b = next((r for r in result if r['funcionario_id'] == func_b.id), None)
+        assert met_a is not None and met_b is not None
+
+        # Ambos devem ter prod_empresa_media calculada
+        assert met_a['prod_empresa_media'] is not None
+        assert met_b['prod_empresa_media'] is not None
+        # Média deve incluir os dois (possivelmente com outros testes, mas média >= 0)
+        assert met_a['prod_empresa_media'] > 0
+        # Índice de A vs pares deve ser >= 100 pois A é mais produtivo
+        assert met_a['prod_real_hh'] is not None
+        assert met_a['indice_vs_pares_pct'] is not None
+        assert met_a['indice_vs_pares_pct'] >= met_b['indice_vs_pares_pct']
+
+
+def test_10_producao_rateada_secao_a():
+    """detalhe_funcionario Seção A inclui producao_rateada para single_role."""
+    with app.app_context():
+        s = _suffix()
+
+        servico = _servico(f'RatT10 {s}', 'm')
+        ins = _insumo(f'InsT10 {s}')
+        comp = _composicao(servico.id, ins.id, 0.5)
+        db.session.commit()
+
+        data = date(2026, 4, 15)
+        func_x = _func('X10')
+        func_y = _func('Y10')
+
+        rdo = _rdo(_fx.obra, data, 'T10')
+        sub = _sub(rdo, servico.id, 'Sub10', qty=20.0)
+        # 2 funcionários: X trabalha 6h, Y trabalha 4h → X rateado = 20*(6/10)=12
+        _mo(rdo, func_x, 6.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+        _mo(rdo, func_y, 4.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo, func_x, 60.0)
+        _custo_diario(rdo, func_y, 40.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import detalhe_funcionario
+        detalhe = detalhe_funcionario(_fx.admin.id, func_x.id, data, data)
+
+        assert detalhe['por_servico'], 'Seção A não pode estar vazia'
+        s_item = next((s for s in detalhe['por_servico'] if s['servico_id'] == servico.id), None)
+        assert s_item is not None
+        # producao_rateada = 20 * (6 / 10) = 12.0
+        assert s_item['producao_rateada'] is not None
+        assert s_item['producao_rateada'] == pytest.approx(12.0, abs=0.01)
+
+
+def test_11_obra_nome_e_modo_secao_b():
+    """detalhe_funcionario Seção B inclui obra_nome e modo por dia."""
+    with app.app_context():
+        s = _suffix()
+
+        servico = _servico(f'ObraT11 {s}', 'un')
+        ins = _insumo(f'InsT11 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        db.session.commit()
+
+        data = date(2026, 4, 20)
+        func = _func('Z11')
+
+        rdo = _rdo(_fx.obra, data, 'T11')
+        sub = _sub(rdo, servico.id, 'Sub11', qty=5.0)
+        _mo(rdo, func, 8.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo, func, 90.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import detalhe_funcionario
+        detalhe = detalhe_funcionario(_fx.admin.id, func.id, data, data)
+
+        assert detalhe['por_dia'], 'Seção B não pode estar vazia'
+        dia = detalhe['por_dia'][0]
+        assert 'obra_nome' in dia, 'obra_nome ausente na Seção B'
+        assert dia['obra_nome'], 'obra_nome não pode ser vazio'
+        assert 'modo' in dia, 'modo ausente na Seção B'
+        assert dia['modo'] in ('single_role', 'equipe_mista')

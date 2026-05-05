@@ -10,7 +10,10 @@
     </a>
     <div>
       <h2 class="mb-0"><i class="fas fa-user me-2 text-primary"></i> {{ func.nome }}</h2>
-      <div class="text-muted small">{{ func.funcao_ref.nome if func.funcao_ref else func.funcao_exercida if func.funcao_exercida is defined else '' }} · Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}</div>
+      <div class="text-muted small">
+        {{ func.funcao_ref.nome if func.funcao_ref else '' }}
+        &nbsp;·&nbsp;Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}
+      </div>
     </div>
   </div>
 
@@ -21,7 +24,9 @@
     </div>
   {% else %}
 
-  <!-- Seção A: Por Serviço -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Seção A: Por Serviço                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <h5 class="mt-2 mb-3 text-muted"><i class="fas fa-tools me-2"></i> A. Por Serviço</h5>
   {% if detalhe.por_servico %}
   <div class="card shadow-sm mb-4">
@@ -33,6 +38,9 @@
               <th>Serviço</th>
               <th class="text-center">Modo</th>
               <th class="text-end">Horas</th>
+              <th class="text-end" title="Produção atribuída a este funcionário (proporcional às horas, apenas single_role)">
+                Prod. rateada
+              </th>
               <th class="text-end">Prod. média (un/h)</th>
               <th class="text-center">Índice equipe %</th>
               <th class="text-end">Custo</th>
@@ -55,6 +63,16 @@
                 {% endif %}
               </td>
               <td class="text-end">{{ '%.1f'|format(s.horas) }}h</td>
+              <td class="text-end">
+                {% if s.producao_rateada is not none %}
+                  <span class="fw-semibold text-primary">
+                    {{ '%.3f'|format(s.producao_rateada) }}
+                    {% if s.unidade %}<span class="text-muted small"> {{ s.unidade }}</span>{% endif %}
+                  </span>
+                {% else %}
+                  <span class="text-muted" title="Não calculável em equipe mista">—</span>
+                {% endif %}
+              </td>
               <td class="text-end">
                 {% if s.prod_media_hh is not none %}{{ '%.3f'|format(s.prod_media_hh) }}
                 {% else %}<span class="text-muted">—</span>{% endif %}
@@ -92,11 +110,18 @@
       </div>
     </div>
   </div>
+  <div class="text-muted small mb-4">
+    <i class="fas fa-info-circle me-1"></i>
+    <em>Prod. rateada</em>: produção atribuída proporcionalmente às horas deste funcionário na subatividade (calculável apenas em equipe single_role).
+    O custo usa o custo diário já prorated para o RDO — divisor correto é <code>horas_neste_rdo</code>, não horas totais do dia.
+  </div>
   {% else %}
     <div class="alert alert-secondary mb-4">Sem registros por serviço no período.</div>
   {% endif %}
 
-  <!-- Seção B: Por Dia -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Seção B: Por Dia                                                        -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <h5 class="mb-3 text-muted"><i class="fas fa-calendar-alt me-2"></i> B. Por Dia</h5>
   {% if detalhe.por_dia %}
   <div class="card shadow-sm mb-4">
@@ -107,6 +132,8 @@
             <tr>
               <th>Data</th>
               <th>RDO</th>
+              <th>Obra</th>
+              <th class="text-center">Modo</th>
               <th class="text-end">Horas</th>
               <th class="text-end">Custo</th>
               <th class="text-end">Produção</th>
@@ -117,8 +144,16 @@
           <tbody>
             {% for d in detalhe.por_dia %}
             <tr>
-              <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
-              <td>{{ d.rdo_numero }}</td>
+              <td class="text-nowrap">{{ d.data.strftime('%d/%m/%Y') }}</td>
+              <td class="text-nowrap text-muted small">{{ d.rdo_numero }}</td>
+              <td class="text-nowrap">{{ d.obra_nome }}</td>
+              <td class="text-center">
+                {% if d.modo == 'single_role' %}
+                  <span class="badge bg-info text-dark">Solo</span>
+                {% else %}
+                  <span class="badge bg-secondary">Misto</span>
+                {% endif %}
+              </td>
               <td class="text-end">{{ '%.1f'|format(d.horas) }}h</td>
               <td class="text-end">
                 {% if d.custo is not none %}R$ {{ '%.2f'|format(d.custo) }}
@@ -150,7 +185,9 @@
     <div class="alert alert-secondary mb-4">Sem registros diários no período.</div>
   {% endif %}
 
-  <!-- Seção C: Diagnóstico de Equipe -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Seção C: Diagnóstico de Equipe                                          -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <h5 class="mb-3 text-muted"><i class="fas fa-stethoscope me-2"></i> C. Diagnóstico de Equipe</h5>
   <div class="row g-3 mb-4">
     <div class="col-md-6">
