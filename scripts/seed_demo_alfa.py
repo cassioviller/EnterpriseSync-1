@@ -214,6 +214,7 @@ def _reset_dataset():
         "DELETE FROM item_medicao_cronograma_tarefa WHERE admin_id=:a",
         "DELETE FROM item_medicao_comercial WHERE admin_id=:a",
         # RDO (todos os filhos antes do pai)
+        "DELETE FROM rdo_custo_diario WHERE admin_id=:a",
         "DELETE FROM rdo_servico_subatividade WHERE admin_id=:a",
         "DELETE FROM rdo_mao_obra WHERE admin_id=:a",
         "DELETE FROM rdo_mao_obra WHERE funcionario_id IN "
@@ -291,6 +292,7 @@ def _reset_dataset():
         "DELETE FROM propostas_comerciais WHERE admin_id=:a OR criado_por=:a",
         "DELETE FROM obra WHERE admin_id=:a",
         # Catálogo
+        "DELETE FROM subatividade_mao_obra WHERE admin_id=:a",
         "DELETE FROM composicao_servico WHERE admin_id=:a",
         "DELETE FROM cronograma_template_item WHERE admin_id=:a",
         "DELETE FROM cronograma_template WHERE admin_id=:a",
@@ -303,6 +305,7 @@ def _reset_dataset():
         "DELETE FROM orcamento WHERE admin_id=:a",
         # Pessoas / config
         "DELETE FROM funcionario WHERE admin_id=:a",
+        "DELETE FROM funcao WHERE admin_id=:a",
         "DELETE FROM cliente WHERE admin_id=:a",
         "DELETE FROM conta_receber WHERE admin_id=:a",
         "DELETE FROM configuracao_empresa WHERE admin_id=:a",
@@ -459,8 +462,9 @@ def _seed():
     from app import db
     from werkzeug.security import generate_password_hash
     from models import (
-        Usuario, TipoUsuario, Funcionario, Cliente, ConfiguracaoEmpresa,
-        Insumo, PrecoBaseInsumo, SubatividadeMestre, CronogramaTemplate,
+        Usuario, TipoUsuario, Funcao, Funcionario, Cliente, ConfiguracaoEmpresa,
+        Insumo, PrecoBaseInsumo, SubatividadeMestre, SubatividadeMaoObra,
+        CronogramaTemplate,
         CronogramaTemplateItem, Servico, ComposicaoServico,
         Proposta, PropostaItem, Obra, ItemMedicaoComercial,
         TarefaCronograma, RDO, RDOMaoObra, RDOServicoSubatividade,
@@ -811,6 +815,80 @@ def _seed():
         ))
     db.session.flush()
 
+    # 7.5) Funções (Task #62 — vínculo Função→Composição) ------------------
+    # Cada Função aponta para o Insumo MAO_OBRA equivalente. O listener
+    # services.vinculo_mao_obra.before_flush usa esse vínculo para
+    # preencher RDOMaoObra.composicao_servico_id automaticamente quando
+    # o RDO é salvo, alimentando as métricas de produtividade (Task #3).
+    funcao_pedreiro = Funcao(
+        nome="Pedreiro", admin_id=aid,
+        insumo_id=insumos_obj["Hora pedreiro"].id,
+        salario_base=2800.0,
+    )
+    funcao_servente = Funcao(
+        nome="Servente", admin_id=aid,
+        insumo_id=insumos_obj["Hora servente"].id,
+        salario_base=180.0,
+    )
+    funcao_encarregado = Funcao(
+        nome="Encarregado", admin_id=aid,
+        insumo_id=insumos_obj["Diária encarregado"].id,
+        salario_base=200.0,
+    )
+    db.session.add_all([funcao_pedreiro, funcao_servente, funcao_encarregado])
+    db.session.flush()
+
+    # Vincular Funcionários às suas Funções
+    carlos.funcao_id = funcao_pedreiro.id
+    pedro.funcao_id  = funcao_encarregado.id
+    joao.funcao_id   = funcao_servente.id
+    marcos.funcao_id = funcao_servente.id
+    db.session.flush()
+
+    # 7.6) SubatividadeMaoObra (Task #62 — N:N sub_mestre↔composicao) -----
+    # O resolver de vínculo exige links explícitos quando RDOMaoObra
+    # aponta para um RDOServicoSubatividade com subatividade_mestre_id
+    # definido. Mapeia cada subatividade às composições MAO_OBRA do
+    # serviço correspondente.
+    comps_alv_mo = ComposicaoServico.query.filter(
+        ComposicaoServico.servico_id == serv_alv.id,
+        ComposicaoServico.insumo_id.in_([
+            insumos_obj["Hora pedreiro"].id,
+            insumos_obj["Hora servente"].id,
+        ]),
+    ).all()
+    comps_pis_mo = ComposicaoServico.query.filter(
+        ComposicaoServico.servico_id == serv_pis.id,
+        ComposicaoServico.insumo_id.in_([
+            insumos_obj["Hora pedreiro"].id,
+            insumos_obj["Hora servente"].id,
+        ]),
+    ).all()
+    comps_pin_mo = ComposicaoServico.query.filter(
+        ComposicaoServico.servico_id == serv_pin.id,
+        ComposicaoServico.insumo_id.in_([
+            insumos_obj["Hora pintor"].id,
+            insumos_obj["Hora servente"].id,
+        ]),
+    ).all()
+    _smo_map = [
+        (sub_marcacao,   comps_alv_mo),
+        (sub_elevacao,   comps_alv_mo),
+        (sub_chapisco,   comps_alv_mo),
+        (sub_prep_piso,  comps_pis_mo),
+        (sub_lancamento, comps_pis_mo),
+        (sub_massa,      comps_pin_mo),
+        (sub_pintura,    comps_pin_mo),
+    ]
+    for _sm, _comps in _smo_map:
+        for _comp in _comps:
+            db.session.add(SubatividadeMaoObra(
+                admin_id=aid,
+                subatividade_mestre_id=_sm.id,
+                composicao_servico_id=_comp.id,
+            ))
+    db.session.flush()
+
     # 8) Proposta 001.26 com 4 itens ---------------------------------------
     proposta = Proposta(
         numero=PROPOSTA_NUMERO,
@@ -958,11 +1036,35 @@ def _seed():
             # services.rdo_custos.gerar_custos_mao_obra_rdo, 1 GCF
             # SALARIO (diária) + 1 GCF ALIMENTACAO (VA) + 1 GCF
             # TRANSPORTE (VT). Mensalista: nada (folha mensal cobre).
+            perc_anterior = _perc_anteriores.get(idx, 0.0)
+            _qty_total = float(folha.quantidade_total or 0.0)
+            _qty_dia_rss = max(
+                0.0,
+                _qty_total * (perc_destino - perc_anterior) / 100.0,
+            )
+            rss = RDOServicoSubatividade(
+                rdo_id=rdo.id,
+                servico_id=(serv_alv.id if "alvenaria" in folha.nome_tarefa.lower()
+                            or "marcação" in folha.nome_tarefa.lower()
+                            or "chapisco" in folha.nome_tarefa.lower()
+                            else serv_pis.id),
+                nome_subatividade=folha.nome_tarefa,
+                descricao_subatividade=folha.nome_tarefa,
+                percentual_conclusao=perc_destino,
+                percentual_anterior=perc_anterior,
+                incremento_dia=perc_destino - perc_anterior,
+                quantidade_produzida=_qty_dia_rss,
+                ordem_execucao=folha.ordem, ativo=True,
+                admin_id=aid,
+                subatividade_mestre_id=folha.subatividade_mestre_id,
+            )
+            db.session.add(rss); db.session.flush()
             db.session.add(RDOMaoObra(
                 admin_id=aid, rdo_id=rdo.id,
                 funcionario_id=carlos.id, funcao_exercida="Pedreiro (mensalista)",
                 horas_trabalhadas=horas, horas_extras=0.0,
                 tarefa_cronograma_id=folha.id,
+                subatividade_id=rss.id,
             ))
             for _diar, _func in (
                 (pedro,  "Encarregado (diária)"),
@@ -974,23 +1076,8 @@ def _seed():
                     funcionario_id=_diar.id, funcao_exercida=_func,
                     horas_trabalhadas=horas, horas_extras=0.0,
                     tarefa_cronograma_id=folha.id,
+                    subatividade_id=rss.id,
                 ))
-            perc_anterior = _perc_anteriores.get(idx, 0.0)
-            db.session.add(RDOServicoSubatividade(
-                rdo_id=rdo.id,
-                servico_id=(serv_alv.id if "alvenaria" in folha.nome_tarefa.lower()
-                            or "marcação" in folha.nome_tarefa.lower()
-                            or "chapisco" in folha.nome_tarefa.lower()
-                            else serv_pis.id),
-                nome_subatividade=folha.nome_tarefa,
-                descricao_subatividade=folha.nome_tarefa,
-                percentual_conclusao=perc_destino,
-                percentual_anterior=perc_anterior,
-                incremento_dia=perc_destino - perc_anterior,
-                ordem_execucao=folha.ordem, ativo=True,
-                admin_id=aid,
-                subatividade_mestre_id=folha.subatividade_mestre_id,
-            ))
             folha.percentual_concluido = perc_destino
 
             # Task #140 — Apontamento V2 (RDOApontamentoCronograma).
@@ -1989,12 +2076,41 @@ def _seed():
         db.session.add(rdo); db.session.flush()
 
         for folha in folhas_pin:
+            _nome_low = folha.nome_tarefa.lower()
+            if ("pintura" in _nome_low or "tinta" in _nome_low
+                    or "massa" in _nome_low):
+                _serv_id = serv_pin.id
+            elif ("alvenaria" in _nome_low or "marcação" in _nome_low
+                    or "chapisco" in _nome_low):
+                _serv_id = serv_alv.id
+            else:
+                _serv_id = serv_pis.id
+            _qty_total = float(folha.quantidade_total or 0.0)
+            _qty_dia_rss = max(
+                0.0,
+                _qty_total * (perc_destino - perc_anterior) / 100.0,
+            )
+            rss = RDOServicoSubatividade(
+                rdo_id=rdo.id,
+                servico_id=_serv_id,
+                nome_subatividade=folha.nome_tarefa,
+                descricao_subatividade=folha.nome_tarefa,
+                percentual_conclusao=perc_destino,
+                percentual_anterior=perc_anterior,
+                incremento_dia=perc_destino - perc_anterior,
+                quantidade_produzida=_qty_dia_rss,
+                ordem_execucao=folha.ordem, ativo=True,
+                admin_id=aid,
+                subatividade_mestre_id=folha.subatividade_mestre_id,
+            )
+            db.session.add(rss); db.session.flush()
             db.session.add(RDOMaoObra(
                 admin_id=aid, rdo_id=rdo.id,
                 funcionario_id=carlos.id,
                 funcao_exercida="Pedreiro (mensalista)",
                 horas_trabalhadas=horas, horas_extras=horas_extras,
                 tarefa_cronograma_id=folha.id,
+                subatividade_id=rss.id,
             ))
             for _diar, _func in (
                 (pedro,  "Encarregado (diária)"),
@@ -2008,28 +2124,8 @@ def _seed():
                     funcionario_id=_diar.id, funcao_exercida=_func,
                     horas_trabalhadas=horas, horas_extras=horas_extras,
                     tarefa_cronograma_id=folha.id,
+                    subatividade_id=rss.id,
                 ))
-            _nome_low = folha.nome_tarefa.lower()
-            if ("pintura" in _nome_low or "tinta" in _nome_low
-                    or "massa" in _nome_low):
-                _serv_id = serv_pin.id
-            elif ("alvenaria" in _nome_low or "marcação" in _nome_low
-                    or "chapisco" in _nome_low):
-                _serv_id = serv_alv.id
-            else:
-                _serv_id = serv_pis.id
-            db.session.add(RDOServicoSubatividade(
-                rdo_id=rdo.id,
-                servico_id=_serv_id,
-                nome_subatividade=folha.nome_tarefa,
-                descricao_subatividade=folha.nome_tarefa,
-                percentual_conclusao=perc_destino,
-                percentual_anterior=perc_anterior,
-                incremento_dia=perc_destino - perc_anterior,
-                ordem_execucao=folha.ordem, ativo=True,
-                admin_id=aid,
-                subatividade_mestre_id=folha.subatividade_mestre_id,
-            ))
             folha.percentual_concluido = perc_destino
 
             if folha.quantidade_total and folha.quantidade_total > 0:
@@ -2218,6 +2314,7 @@ def _backfill_custos_rdo_demo(admin_id):
         from app import db
         from models import Usuario, Obra, RDO
         from services.rdo_custos import gerar_custos_mao_obra_rdo
+        from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
 
         admin = Usuario.query.get(admin_id)
         if admin and getattr(admin, 'versao_sistema', None) != 'v2':
@@ -2235,6 +2332,7 @@ def _backfill_custos_rdo_demo(admin_id):
 
         total_geral = 0
         rdos_geral = 0
+        custo_diario_total = 0
         for obra in obras:
             rdos = (
                 RDO.query
@@ -2244,6 +2342,18 @@ def _backfill_custos_rdo_demo(admin_id):
             rdos_geral += len(rdos)
             total_obra = 0
             for rdo in rdos:
+                # 1) RDOCustoDiario (Task #2) — alimenta métricas de
+                #    produtividade/lucratividade (Task #3).
+                try:
+                    custo_diario_total += gravar_custo_funcionario_rdo(
+                        rdo, admin_id
+                    ) or 0
+                except Exception as e:
+                    log.warning(
+                        f"backfill RDOCustoDiario {rdo.numero_rdo} "
+                        f"falhou: {e}"
+                    )
+                # 2) GestaoCustoFilho (V2) — alimenta a Gestão de Custos.
                 try:
                     total_obra += gerar_custos_mao_obra_rdo(rdo, admin_id) or 0
                 except Exception as e:
@@ -2254,6 +2364,11 @@ def _backfill_custos_rdo_demo(admin_id):
                     f"backfill custos RDO: {total_obra} lançamento(s) "
                     f"inserido(s) em {len(rdos)} RDO(s) da obra {obra.codigo}"
                 )
+        if custo_diario_total:
+            log.info(
+                f"backfill RDOCustoDiario: {custo_diario_total} "
+                f"linha(s) gravada(s) em {rdos_geral} RDO(s)."
+            )
         if not total_geral:
             log.info(
                 f"backfill custos RDO: nada a inserir "
