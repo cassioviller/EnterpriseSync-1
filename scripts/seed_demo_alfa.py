@@ -2400,7 +2400,6 @@ def _backfill_custos_rdo_demo(admin_id):
             log.info("backfill custos RDO: nenhuma obra encontrada")
             return
 
-        total_geral = 0
         rdos_geral = 0
         custo_diario_total = 0
         for obra in obras:
@@ -2410,7 +2409,6 @@ def _backfill_custos_rdo_demo(admin_id):
                 .all()
             )
             rdos_geral += len(rdos)
-            total_obra = 0
             for rdo in rdos:
                 # 1) RDOCustoDiario (Task #2) — alimenta métricas de
                 #    produtividade/lucratividade (Task #3).
@@ -2436,12 +2434,6 @@ def _backfill_custos_rdo_demo(admin_id):
                     }, admin_id)
                 except Exception as e:
                     log.warning(f"backfill RDO {rdo.numero_rdo} falhou: {e}")
-            total_geral += total_obra
-            if total_obra:
-                log.info(
-                    f"backfill custos RDO: {total_obra} lançamento(s) "
-                    f"inserido(s) em {len(rdos)} RDO(s) da obra {obra.codigo}"
-                )
         if custo_diario_total:
             log.info(
                 f"backfill RDOCustoDiario: {custo_diario_total} "
@@ -2611,6 +2603,21 @@ def main(argv=None):
                 # GestaoCustoFilho. Necessário para deploys que plantaram a
                 # demo ANTES da geração automática existir.
                 _backfill_custos_rdo_demo(existente.id)
+                # Task #6 — verificação também no caminho idempotente, para
+                # detectar regressão em demos legados a cada re-execução.
+                from models import Obra
+                obra_principal = (
+                    Obra.query
+                    .filter_by(admin_id=existente.id, codigo="OBR-2026-001")
+                    .first()
+                )
+                if obra_principal:
+                    _verificar_custos_demo(existente.id, obra_principal.id)
+                else:
+                    log.warning(
+                        "verificação pulada: obra principal "
+                        "(OBR-2026-001) não encontrada no tenant Alfa"
+                    )
                 return 0
 
             log.info(
