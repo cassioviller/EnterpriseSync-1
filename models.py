@@ -925,6 +925,79 @@ class RDOMaoObra(db.Model):
         self.funcao_exercida = value
 
 
+class RDOCustoDiario(db.Model):
+    """Custo diário de mão-de-obra por funcionário, persistido no salvamento do RDO.
+
+    Garante imutabilidade histórica (mudança de salário não afeta registros
+    antigos), elimina dupla contagem quando o funcionário aparece em vários
+    RDOs no mesmo dia e fornece dados rápidos para as métricas de
+    produtividade (Task #3).
+
+    tipo_lancamento:
+      'rdo'           — gerado a partir de um RDO salvo/editado
+      'ocioso_mensal' — criado pelo job de cobertura para dias úteis sem RDO
+                        de mensalistas
+    """
+    __tablename__ = 'rdo_custo_diario'
+
+    id                         = db.Column(db.Integer, primary_key=True)
+    rdo_id                     = db.Column(
+        db.Integer, db.ForeignKey('rdo.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+    funcionario_id             = db.Column(
+        db.Integer, db.ForeignKey('funcionario.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    admin_id                   = db.Column(
+        db.Integer, db.ForeignKey('usuario.id'), nullable=False,
+    )
+    data                       = db.Column(db.Date, nullable=False)
+    tipo_remuneracao_snapshot  = db.Column(db.String(20), nullable=False)
+    componente_folha           = db.Column(db.Numeric(12, 2), default=0)
+    componente_va              = db.Column(db.Numeric(12, 2), default=0)
+    componente_vt              = db.Column(db.Numeric(12, 2), default=0)
+    componente_extra           = db.Column(db.Numeric(12, 2), default=0)
+    custo_total_dia            = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    horas_normais              = db.Column(db.Float, default=0.0)
+    horas_extras               = db.Column(db.Float, default=0.0)
+    custo_hora_normal          = db.Column(db.Numeric(12, 4), nullable=True)
+    dias_uteis_mes_referencia  = db.Column(db.Integer, nullable=True)
+    tipo_lancamento            = db.Column(db.String(20), nullable=False, default='rdo')
+    retroativo                 = db.Column(db.Boolean, default=False)
+    created_at                 = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at                 = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    rdo         = db.relationship('RDO', backref=db.backref('custos_diarios', lazy='dynamic'))
+    funcionario = db.relationship('Funcionario', backref=db.backref('custos_diarios', lazy='dynamic'))
+
+    __table_args__ = (
+        db.Index(
+            'uq_rdo_custo_rdo_func',
+            'rdo_id', 'funcionario_id',
+            unique=True,
+            postgresql_where=db.text("rdo_id IS NOT NULL"),
+        ),
+        db.Index(
+            'uq_rdo_custo_ocioso_func_data',
+            'funcionario_id', 'data',
+            unique=True,
+            postgresql_where=db.text("tipo_lancamento = 'ocioso_mensal'"),
+        ),
+        db.Index('idx_rdo_custo_func_data', 'funcionario_id', 'data'),
+        db.Index('idx_rdo_custo_admin_data', 'admin_id', 'data'),
+    )
+
+    def __repr__(self):
+        return (
+            f'<RDOCustoDiario func={self.funcionario_id} '
+            f'data={self.data} total={self.custo_total_dia} '
+            f'tipo={self.tipo_lancamento}>'
+        )
+
+
 class RDOEquipamento(db.Model):
     __tablename__ = 'rdo_equipamento'
     

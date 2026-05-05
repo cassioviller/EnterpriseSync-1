@@ -352,6 +352,12 @@ def salvar_edicao_rdo(rdo_id):
             remover_custos_rdo(rdo, admin_id)
         except Exception as _e:
             logger.warning(f"[rdo-custo] remover_custos_rdo falhou: {_e}")
+        # Remover também os custos diários (serão recalculados abaixo)
+        try:
+            from services.custo_funcionario_dia import remover_custo_diario_rdo
+            remover_custo_diario_rdo(rdo.id)
+        except Exception as _e:
+            logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
         RDOMaoObra.query.filter_by(rdo_id=rdo_id).delete()
         
         import re as _re
@@ -490,6 +496,13 @@ def salvar_edicao_rdo(rdo_id):
             gerar_custos_mao_obra_rdo(rdo, admin_id)
         except Exception as _e:
             logger.error(f"[rdo-custo] gerar_custos_mao_obra_rdo falhou: {_e}")
+
+        # Grava custo diário (persistência para métricas de produtividade)
+        try:
+            from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+            gravar_custo_funcionario_rdo(rdo, admin_id)
+        except Exception as _e:
+            logger.error(f"[custo-dia] gravar_custo_funcionario_rdo falhou: {_e}")
 
         logger.info(f"✅ RDO editado com sucesso: {rdo.numero_rdo}")
         flash(f'RDO {rdo.numero_rdo} editado com sucesso!', 'success')

@@ -1001,6 +1001,18 @@ def visualizar_rdo(id):
                 })
 
         funcionarios = list(funcionarios_dict.values())
+
+        # Mapa func_id → RDOCustoDiario para exibição de custo no card
+        custos_dia_map: dict = {}
+        try:
+            from models import RDOCustoDiario
+            custos = RDOCustoDiario.query.filter_by(
+                rdo_id=rdo.id,
+                tipo_lancamento='rdo',
+            ).all()
+            custos_dia_map = {c.funcionario_id: c for c in custos}
+        except Exception:
+            pass
         
         # Calcular estatísticas
         total_subatividades = len(subatividades)
@@ -1395,7 +1407,8 @@ def visualizar_rdo(id):
                              total_subatividades_obra=total_subatividades_obra,
                              peso_por_subatividade=peso_por_subatividade,
                              total_horas_trabalhadas=total_horas_trabalhadas,
-                             apontamentos_cronograma=apontamentos_cronograma)
+                             apontamentos_cronograma=apontamentos_cronograma,
+                             custos_dia_map=custos_dia_map)
         
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
@@ -3132,7 +3145,14 @@ def rdo_salvar_unificado():
             logger.error(f"Erro processando entregas terceiros (unificado): {e_ent}")
 
         db.session.commit()
-        
+
+        # Gravar custo diário de mão-de-obra (idempotente)
+        try:
+            from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+            gravar_custo_funcionario_rdo(rdo, admin_id_correto)
+        except Exception as _ce:
+            logger.warning("[custo-dia] gravar falhou no salvar_unificado: %s", _ce)
+
         if rdo_id:
             flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
         else:
