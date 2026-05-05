@@ -133,6 +133,68 @@ def remover_custos_rdo(rdo, admin_id) -> int:
         return 0
 
 
+def cancelar_custos_rdo(rdo_id: int, admin_id: int) -> int:
+    """Marca como CANCELADO os GestaoCustoPai ligados a este RDO.
+
+    Chamada quando um RDO é excluído permanentemente, preservando o histórico
+    financeiro para auditoria (em vez de deletar os registros).
+    Retorna o número de GestaoCustoPai cancelados.
+    Faz flush — o commit é responsabilidade do chamador.
+    """
+    try:
+        from app import db
+        from models import RDOMaoObra, GestaoCustoFilho, GestaoCustoPai, RDOCustoDiario
+
+        # Coleta IDs de origem: RDOMaoObra (legado) + RDOCustoDiario (v2)
+        mao_obra_ids = [
+            r.id for r in RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
+        ]
+        custo_dia_ids = [
+            r.id for r in RDOCustoDiario.query.filter_by(
+                rdo_id=rdo_id, tipo_lancamento='rdo'
+            ).all()
+        ]
+
+        origens_legado = ['rdo_mao_obra', 'rdo_mao_obra_va', 'rdo_mao_obra_vt']
+        origens_v2 = ['rdo_custo_diario', 'rdo_custo_diario_va', 'rdo_custo_diario_vt']
+
+        pai_ids: set[int] = set()
+
+        if mao_obra_ids:
+            for filho in GestaoCustoFilho.query.filter(
+                GestaoCustoFilho.admin_id == admin_id,
+                GestaoCustoFilho.origem_tabela.in_(origens_legado),
+                GestaoCustoFilho.origem_id.in_(mao_obra_ids),
+            ).all():
+                pai_ids.add(filho.pai_id)
+
+        if custo_dia_ids:
+            for filho in GestaoCustoFilho.query.filter(
+                GestaoCustoFilho.admin_id == admin_id,
+                GestaoCustoFilho.origem_tabela.in_(origens_v2),
+                GestaoCustoFilho.origem_id.in_(custo_dia_ids),
+            ).all():
+                pai_ids.add(filho.pai_id)
+
+        cancelados = 0
+        for pai_id in pai_ids:
+            pai = GestaoCustoPai.query.get(pai_id)
+            if pai and pai.status not in ('PAGO', 'QUITADO', 'CANCELADO'):
+                pai.status = 'CANCELADO'
+                cancelados += 1
+
+        if cancelados:
+            db.session.flush()
+        logger.info(
+            "[rdo-custo] RDO %s: %d GestaoCustoPai marcado(s) CANCELADO",
+            rdo_id, cancelados,
+        )
+        return cancelados
+    except Exception:
+        logger.exception("cancelar_custos_rdo falhou (rdo_id=%s)", rdo_id)
+        return 0
+
+
 def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
     """Gera GestaoCustoFilho a partir dos valores pré-computados em RDOCustoDiario.
 
@@ -196,15 +258,6 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                 )
                 continue
 
-            # Idempotência principal: já existe filho desta linha?
-            ja = GestaoCustoFilho.query.filter_by(
-                origem_tabela='rdo_mao_obra',
-                origem_id=primeiro.id,
-                admin_id=admin_id,
-            ).first()
-            if ja:
-                continue
-
             data_ref = rdo.data_relatorio
             data_str = data_ref.strftime('%d/%m/%Y')
 
@@ -212,15 +265,26 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
             custo_dia = _custo_diario_rdo(rdo.id, func_id)
 
             if custo_dia:
-                # Usa os componentes já proporcionais do registro diário
+                # Idempotência estável: chave (rdo_custo_diario_id, componente)
+                # custo_dia.id é único por (rdo_id, funcionario_id, data)
+                _origem_folha = 'rdo_custo_diario'
+                _origem_va    = 'rdo_custo_diario_va'
+                _origem_vt    = 'rdo_custo_diario_vt'
+                _origem_id    = custo_dia.id
+
                 tipo_remun = custo_dia.tipo_remuneracao_snapshot
                 valor_folha = float(custo_dia.componente_folha or 0)
                 valor_va    = float(custo_dia.componente_va or 0)
                 valor_vt    = float(custo_dia.componente_vt or 0)
                 valor_extra = float(custo_dia.componente_extra or 0)
-                valor_total_folha = valor_folha + valor_extra  # SALARIO inclui extra
+                valor_total_folha = valor_folha + valor_extra
             else:
-                # Fallback: calcula direto de RDOMaoObra (sem rateio cross-RDO)
+                # Fallback legado: idempotência por primeira linha RDOMaoObra
+                _origem_folha = 'rdo_mao_obra'
+                _origem_va    = 'rdo_mao_obra_va'
+                _origem_vt    = 'rdo_mao_obra_vt'
+                _origem_id    = primeiro.id
+
                 tipo_remun = getattr(funcionario, 'tipo_remuneracao', 'salario') or 'salario'
                 if tipo_remun == 'diaria':
                     valor_folha = float(getattr(funcionario, 'valor_diaria', 0) or 0)
@@ -240,6 +304,15 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                 logger.warning(
                     f"[rdo-custo] {funcionario.nome} sem valor > 0 — pulando"
                 )
+                continue
+
+            # Idempotência: já existe filho com esta chave?
+            ja = GestaoCustoFilho.query.filter_by(
+                origem_tabela=_origem_folha,
+                origem_id=_origem_id,
+                admin_id=admin_id,
+            ).first()
+            if ja:
                 continue
 
             # ── Lança custo de folha/salário ────────────────────────────────
@@ -263,24 +336,23 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                     descricao=desc_folha,
                     valor=valor_total_folha,
                     obra_id=rdo.obra_id,
-                    origem_tabela='rdo_mao_obra',
-                    origem_id=primeiro.id,
+                    origem_tabela=_origem_folha,
+                    origem_id=_origem_id,
                     force_v2=True,
                 )
                 if f:
                     criados += 1
 
             # ── VA / VT (por dia trabalhado) ─────────────────────────────────
-            for tag, v, cat in [
-                ('VA', valor_va, 'ALIMENTACAO'),
-                ('VT', valor_vt, 'TRANSPORTE'),
+            for tag, v, cat, _ot in [
+                ('VA', valor_va, 'ALIMENTACAO', _origem_va),
+                ('VT', valor_vt, 'TRANSPORTE',  _origem_vt),
             ]:
                 if v <= 0:
                     continue
-                origem_t = f'rdo_mao_obra_{tag.lower()}'
                 ja2 = GestaoCustoFilho.query.filter_by(
-                    origem_tabela=origem_t,
-                    origem_id=primeiro.id,
+                    origem_tabela=_ot,
+                    origem_id=_origem_id,
                     admin_id=admin_id,
                 ).first()
                 if ja2:
@@ -295,8 +367,8 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                                f"(RDO {rdo.numero_rdo})"),
                     valor=v,
                     obra_id=rdo.obra_id,
-                    origem_tabela=origem_t,
-                    origem_id=primeiro.id,
+                    origem_tabela=_ot,
+                    origem_id=_origem_id,
                     force_v2=True,
                 )
                 if fx:

@@ -419,6 +419,21 @@ def excluir_rdo(rdo_id):
             return redirect(url_for('main.rdos'))
         
         # Excluir TODAS as dependências em ordem (incluindo notificacoes!)
+
+        # V2: Cancelar registros financeiros ANTES de deletar RDOMaoObra/RDOCustoDiario
+        try:
+            from services.rdo_custos import cancelar_custos_rdo
+            cancelar_custos_rdo(rdo_id, admin_id)
+        except Exception as _e:
+            logger.warning(f"[rdo-custo] cancelar_custos_rdo falhou: {_e}")
+
+        # V2: Remover linhas de custo diário (flush; commit virá abaixo)
+        try:
+            from services.custo_funcionario_dia import remover_custo_diario_rdo
+            remover_custo_diario_rdo(rdo_id)
+        except Exception as _e:
+            logger.warning(f"[custo-dia] remover_custo_diario_rdo falhou: {_e}")
+
         db.session.query(NotificacaoCliente).filter(NotificacaoCliente.rdo_id == rdo_id).delete()
         db.session.query(RDOFoto).filter(RDOFoto.rdo_id == rdo_id).delete()
         db.session.query(RDOEquipamento).filter(RDOEquipamento.rdo_id == rdo_id).delete()

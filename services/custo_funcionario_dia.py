@@ -321,8 +321,10 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
 
 def remover_custo_diario_rdo(rdo_id: int) -> int:
     """Remove todas as linhas RDOCustoDiario tipo='rdo' associadas a um RDO.
+
     Deve ser chamada ANTES de deletar os RDOMaoObra (hook de edição).
-    Commita ao final.
+    Apenas faz flush — o commit é responsabilidade do chamador, garantindo
+    atomicidade com as demais operações da transação em curso.
     Retorna número de linhas removidas.
     """
     try:
@@ -331,16 +333,11 @@ def remover_custo_diario_rdo(rdo_id: int) -> int:
         n = RDOCustoDiario.query.filter_by(
             rdo_id=rdo_id, tipo_lancamento='rdo'
         ).delete(synchronize_session='fetch')
-        db.session.commit()
+        db.session.flush()
         logger.info("[custo-dia] removidas %d linhas do rdo_id=%s", n, rdo_id)
         return n
     except Exception:
         logger.exception("remover_custo_diario_rdo falhou (rdo_id=%s)", rdo_id)
-        try:
-            from app import db
-            db.session.rollback()
-        except Exception:
-            pass
         return 0
 
 
