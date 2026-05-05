@@ -88,7 +88,6 @@
   {# Pódio dos top 3 #}
   {% if lista|length >= 1 %}
   {% set top3 = lista[:3] %}
-  {% set metric_label = {'produtividade':'un/h','assiduidade':'%','lucratividade':'lucro'}[ordenar_por] %}
   <div class="sige-podio">
     {# 2º lugar à esquerda #}
     {% if top3|length >= 2 %}
