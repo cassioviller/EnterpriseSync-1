@@ -1839,10 +1839,13 @@ def _seed():
     db.session.flush()
 
     # 10 RDOs Finalizados, semanais, terça-feira (03/02 → 07/04/2026).
-    # Progresso monotônico 10→100% em incrementos de 10%, com 1 RDO em
-    # produtividade ABAIXO do esperado (idx 3 = +5%) e compensação no
-    # idx 7 (+15%). 2 RDOs ficam com 1 diarista omitido (idx 4 sem
-    # Marcos; idx 7 sem João) — demonstra ausências em métricas.
+    # Progresso monotônico 10→100% com VARIAÇÃO intencional de
+    # incrementos: a maioria dos RDOs avança +10%/semana, mas idx 3
+    # avança apenas +5% (produtividade ABAIXO do orçado, gera divergência
+    # em "Empresa por Serviço" → coluna Índice abaixo de 100%) e idx 7
+    # avança +15% (compensação que recupera o atraso). 2 RDOs ficam com
+    # 1 diarista omitido (idx 4 sem Marcos; idx 7 sem João) — demonstra
+    # ausências em Métricas.
     folhas_pin = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_pin.id, admin_id=aid, is_cliente=False)
@@ -2095,7 +2098,9 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
              f"({info.get('obra_pinheiros_codigo')} — Comercial Pinheiros, "
              f"R$ {info.get('valor_obra_pinheiros', 0):.2f})")
     log.info(f"    rdos_pinheiros     = {info.get('n_rdos_pinheiros', 0)}  "
-             f"(Finalizados — 10→100% em incremento de 10%/semana)")
+             f"(Finalizados — progresso monotônico 10→100% com variação "
+             f"semanal: 1 RDO em produtividade abaixo do orçado + 1 RDO "
+             f"de compensação)")
     log.info("")
     log.info("  Roteiro sugerido (12 telas, na ordem):")
     log.info(f"   1) Dashboard         → {base_url}/dashboard")
