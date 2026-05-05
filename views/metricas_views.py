@@ -14,6 +14,7 @@ import csv
 import io
 import logging
 from datetime import date, timedelta
+from functools import wraps
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for,
@@ -21,13 +22,37 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
-from auth import admin_required
 from app import db
 
 logger = logging.getLogger(__name__)
 
 metricas_bp = Blueprint('metricas', __name__, url_prefix='/metricas')
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Decorator de acesso — admin ou gestor de equipes
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _metricas_required(f):
+    """Permite SUPER_ADMIN, ADMIN e GESTOR_EQUIPES. Rejeita demais perfis."""
+    from models import TipoUsuario
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Acesso negado. Faça login primeiro.', 'danger')
+            return redirect(url_for('main.login'))
+        allowed = (TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN, TipoUsuario.GESTOR_EQUIPES)
+        if current_user.tipo_usuario not in allowed:
+            flash('Acesso negado. Restrito a administradores e gestores.', 'danger')
+            return redirect(url_for('main.dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers de rota
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _admin_id() -> int:
     return current_user.admin_id if getattr(current_user, 'admin_id', None) else current_user.id
@@ -53,7 +78,7 @@ def _default_periodo():
 
 @metricas_bp.route('/servico')
 @login_required
-@admin_required
+@_metricas_required
 def empresa_por_servico():
     admin_id = _admin_id()
     di_def, df_def = _default_periodo()
@@ -87,7 +112,7 @@ def empresa_por_servico():
 
 @metricas_bp.route('/servico/aplicar-referencia', methods=['POST'])
 @login_required
-@admin_required
+@_metricas_required
 def aplicar_referencia():
     admin_id = _admin_id()
     servico_id = request.form.get('servico_id', type=int)
@@ -131,7 +156,7 @@ def aplicar_referencia():
 
 @metricas_bp.route('/funcionarios')
 @login_required
-@admin_required
+@_metricas_required
 def funcionarios():
     admin_id = _admin_id()
     di_def, df_def = _default_periodo()
@@ -185,7 +210,7 @@ def funcionarios():
 
 @metricas_bp.route('/funcionarios/<int:funcionario_id>')
 @login_required
-@admin_required
+@_metricas_required
 def detalhe_funcionario(funcionario_id: int):
     admin_id = _admin_id()
     di_def, df_def = _default_periodo()
@@ -193,12 +218,10 @@ def detalhe_funcionario(funcionario_id: int):
     data_fim = _parse_date(request.args.get('data_fim'), df_def)
 
     from models import Funcionario
+    # Strict tenant isolation: only look up within the current admin's tenant.
     func = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
     if not func:
-        # Tenta também via tenant
-        func = Funcionario.query.get(funcionario_id)
-        if not func:
-            abort(404)
+        abort(404)
 
     try:
         from services.metricas_produtividade import detalhe_funcionario as det_svc
@@ -223,7 +246,7 @@ def detalhe_funcionario(funcionario_id: int):
 
 @metricas_bp.route('/ranking')
 @login_required
-@admin_required
+@_metricas_required
 def ranking():
     admin_id = _admin_id()
     di_def, df_def = _default_periodo()
@@ -270,6 +293,8 @@ def ranking():
         funcao_ids_sel=funcao_ids_raw,
         servico_id_sel=servico_id_raw,
         ordenar_por=ordenar_por,
+        # Pass raw query params so the template can build CSV export URL with filters
+        raw_query=request.args,
     )
 
 

@@ -88,15 +88,6 @@ def _receita_liquida_unit(composicao_snap: list, margem_pct, imposto_pct) -> Opt
     return preco_venda * (1.0 - imposto / 100.0)
 
 
-def _coef_papel_do_snapshot(composicao_snap: list, composicao_servico_id: int) -> Optional[float]:
-    """Retorna coeficiente do papel (pelo insumo_id) dentro do snapshot.
-
-    O snapshot armazena insumo_id e coeficiente. Como composicao_servico_id
-    mapeia para um (servico_id, insumo_id) via ComposicaoServico, precisamos
-    fazer lookup no DB apenas quando necessário.
-    """
-    return None  # ver _get_coef_papel que faz lookup no DB
-
 
 def _get_operacional_cache(cache: dict, obra_id: int, servico_id: int, data_ref: date):
     """Busca e cacheia o item operacional vigente para (obra_id, servico_id, data)."""
@@ -937,38 +928,81 @@ def assiduidade_funcionario(admin_id: int, funcionario_id: int,
 def aplicar_como_referencia(admin_id: int, servico_id: int, usuario_id: int,
                               data_inicio: date, data_fim: date) -> dict:
     """Atualiza os coeficientes das linhas MAO_OBRA de ComposicaoServico com a
-    produtividade real média apurada no período. Grava ComposicaoServicoHistorico.
+    produtividade real apurada **exclusivamente a partir de vínculos confirmados**
+    (vinculo_status in ('auto', 'manual')) no período. Grava ComposicaoServicoHistorico.
+
+    Apenas horas com vínculo confirmado são usadas para calcular coef_novo,
+    garantindo que horas ambíguas ou sem papel não contaminem o catálogo.
 
     Retorna {'atualizados': n, 'historicos': n}.
     """
     from models import (
-        ComposicaoServico, Insumo, ComposicaoServicoHistorico, Servico,
+        ComposicaoServico, ComposicaoServicoHistorico,
+        RDO, RDOMaoObra, RDOServicoSubatividade,
     )
     from app import db
+    from collections import defaultdict
 
-    metricas = produtividade_por_servico(admin_id, data_inicio, data_fim)
-    met_serv = next((m for m in metricas if m['servico_id'] == servico_id), None)
-    if not met_serv or not met_serv['pode_aplicar_referencia']:
+    # ── 1. Carregar registros do período apenas para o serviço solicitado ──────
+    q = (
+        db.session.query(
+            RDOMaoObra.composicao_servico_id,
+            db.func.sum(RDOMaoObra.horas_trabalhadas).label('horas'),
+        )
+        .join(RDO, RDOMaoObra.rdo_id == RDO.id)
+        .join(RDOServicoSubatividade,
+              (RDOServicoSubatividade.id == RDOMaoObra.subatividade_id) &
+              (RDOServicoSubatividade.servico_id == servico_id) &
+              (RDOServicoSubatividade.ativo.is_(True)))
+        .filter(
+            RDO.admin_id == admin_id,
+            RDO.data_relatorio >= data_inicio,
+            RDO.data_relatorio <= data_fim,
+            RDO.status == 'Finalizado',
+            RDOMaoObra.vinculo_status.in_(_VINCULOS_CONFIRMADOS),
+            RDOMaoObra.composicao_servico_id.isnot(None),
+        )
+        .group_by(RDOMaoObra.composicao_servico_id)
+        .all()
+    )
+
+    if not q:
         return {'atualizados': 0, 'historicos': 0}
 
-    if not met_serv['total_produzido'] or met_serv['total_produzido'] <= 0:
+    # ── 2. Somar produção confirmada para o serviço no período ──────────────
+    total_prod = (
+        db.session.query(db.func.sum(RDOServicoSubatividade.quantidade_produzida))
+        .join(RDO, RDOServicoSubatividade.rdo_id == RDO.id)
+        .filter(
+            RDO.admin_id == admin_id,
+            RDO.data_relatorio >= data_inicio,
+            RDO.data_relatorio <= data_fim,
+            RDO.status == 'Finalizado',
+            RDOServicoSubatividade.servico_id == servico_id,
+            RDOServicoSubatividade.ativo.is_(True),
+            RDOServicoSubatividade.quantidade_produzida.isnot(None),
+        )
+        .scalar()
+    )
+
+    if not total_prod or float(total_prod) <= 0:
         return {'atualizados': 0, 'historicos': 0}
 
+    total_prod_f = float(total_prod)
+
+    # ── 3. Calcular e gravar novos coeficientes por papel confirmado ─────────
     atualizados = 0
     historicos = 0
-    hoje = datetime.utcnow()
 
-    for papel in met_serv['papeis']:
-        cid = papel.get('composicao_id')
-        if not cid:
-            continue
-        hh = papel.get('hh', 0.0)
-        if hh <= 0 or met_serv['total_produzido'] <= 0:
+    for row in q:
+        cid = row.composicao_servico_id
+        hh = float(row.horas) if row.horas else 0.0
+        if hh <= 0 or not cid:
             continue
 
-        novo_coef = hh / met_serv['total_produzido']  # h / un → coef real
+        novo_coef = hh / total_prod_f  # h/un
 
-        cs = ComposicaoServico.query.get(cid)
+        cs = db.session.get(ComposicaoServico, cid)
         if not cs or cs.admin_id != admin_id:
             continue
 
@@ -984,7 +1018,10 @@ def aplicar_como_referencia(admin_id: int, servico_id: int, usuario_id: int,
             coeficiente_anterior=coef_anterior,
             coeficiente_novo=novo_coef,
             autor_id=usuario_id,
-            motivo=f'Referência real: {data_inicio}–{data_fim} ({met_serv["n_rdos"]} RDOs)',
+            motivo=(
+                f'Referência real (vínculos confirmados): '
+                f'{data_inicio}–{data_fim}'
+            ),
             data_referencia_inicio=data_inicio,
             data_referencia_fim=data_fim,
         )

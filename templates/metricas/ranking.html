@@ -5,7 +5,16 @@
 <div class="container-fluid py-4">
   <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
     <h2 class="mb-0"><i class="fas fa-trophy me-2 text-warning"></i> Ranking de Funcionários</h2>
-    <a href="{{ url_for('metricas.ranking', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat(), ordenar_por=ordenar_por, exportar='csv') }}"
+    {# Build CSV export URL preserving all active filters #}
+    {% set csv_params = [] %}
+    {% set _ = csv_params.append('data_inicio=' ~ data_inicio.isoformat()) %}
+    {% set _ = csv_params.append('data_fim=' ~ data_fim.isoformat()) %}
+    {% set _ = csv_params.append('ordenar_por=' ~ ordenar_por) %}
+    {% set _ = csv_params.append('exportar=csv') %}
+    {% for oid in obra_ids_sel %}{% set _ = csv_params.append('obra_ids=' ~ oid) %}{% endfor %}
+    {% for fid in funcao_ids_sel %}{% set _ = csv_params.append('funcao_ids=' ~ fid) %}{% endfor %}
+    {% if servico_id_sel %}{% set _ = csv_params.append('servico_id=' ~ servico_id_sel) %}{% endif %}
+    <a href="{{ url_for('metricas.ranking') }}?{{ csv_params|join('&') }}"
        class="btn btn-outline-success btn-sm">
       <i class="fas fa-file-csv me-1"></i> Exportar CSV
     </a>
