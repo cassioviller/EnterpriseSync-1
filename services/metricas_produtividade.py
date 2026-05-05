@@ -986,6 +986,293 @@ def assiduidade_funcionario(admin_id: int, funcionario_id: int,
     }
 
 
+def divergencias_por_servico(admin_id: int, servico_id: int,
+                              data_inicio: date, data_fim: date,
+                              obra_ids=None,
+                              ordenar_por: str = 'prejuizo') -> dict:
+    """Drill-down: lista RDOs/subatividades de um serviço ranqueados por
+    contribuição negativa (prejuízo, gap de produção ou excesso de custo).
+
+    Critérios de ordenação:
+      - 'prejuizo': maior lucro negativo primeiro
+      - 'excesso_custo': maior excesso de custo (custo - receita) primeiro
+      - 'gap_producao': maior gap entre produção esperada e realizada primeiro
+
+    O RDO com maior contribuição absoluta para o critério escolhido é marcado
+    com `is_principal_responsavel=True`.
+    """
+    regs_all = _carregar_dados_periodo(admin_id, data_inicio, data_fim,
+                                        obra_ids=obra_ids)
+    regs = [r for r in regs_all if r['sub_servico_id'] == servico_id]
+
+    keymap_valid = ('prejuizo', 'excesso_custo', 'gap_producao')
+    if ordenar_por not in keymap_valid:
+        ordenar_por = 'prejuizo'
+
+    base = {
+        'servico_id': servico_id,
+        'servico_nome': '',
+        'unidade': '',
+        'periodo': {'inicio': data_inicio, 'fim': data_fim},
+        'totais': None,
+        'rdos': [],
+        'ordenar_por': ordenar_por,
+    }
+    if not regs:
+        return base
+
+    op_cache: dict = {}
+    coef_cache: dict = {}
+    nome_cache: dict = {}
+
+    por_sub: dict = defaultdict(list)
+    for r in regs:
+        por_sub[(r['rdo_id'], r['sub_id'])].append(r)
+
+    metricas_sub = []
+    for chave, sub_regs in por_sub.items():
+        m = _calcular_metricas_subatividade(sub_regs, op_cache, coef_cache, nome_cache)
+        if m and m['servico_id'] == servico_id:
+            metricas_sub.append(m)
+
+    if not metricas_sub:
+        return base
+
+    obra_ids_set = {m['obra_id'] for m in metricas_sub if m.get('obra_id')}
+    try:
+        from models import Obra as ObraModel
+        obra_nome_map = {o.id: o.nome for o in
+                          ObraModel.query.filter(ObraModel.id.in_(obra_ids_set)).all()
+                         } if obra_ids_set else {}
+    except Exception:
+        obra_nome_map = {}
+
+    rdos_out = []
+    for m in metricas_sub:
+        qtd = m['quantidade_produzida']
+        prod_esp = m['producao_esperada'] or 0.0
+        receita = m['receita_liq_total']
+        custo = m['total_custo'] or 0.0
+        lucro = (receita - custo) if receita is not None else None
+        prejuizo = -lucro if (lucro is not None and lucro < 0) else 0.0
+        gap_producao = max(0.0, prod_esp - (qtd or 0.0)) if qtd is not None else 0.0
+        excesso_custo = max(0.0, custo - receita) if (receita is not None and receita > 0) else 0.0
+
+        funcs_lista = []
+        for fid, fm in m['func_metricas'].items():
+            funcs_lista.append({
+                'funcionario_id': fid,
+                'funcionario_nome': fm.get('func_nome', ''),
+                'horas': fm.get('horas_na_sub', 0.0),
+                'custo': fm.get('custo_na_sub'),
+                'receita': fm.get('receita_dele'),
+                'lucro': fm.get('lucro_dele'),
+                'papel_nome': nome_cache.get(fm.get('composicao_id'), ''),
+            })
+        funcs_lista.sort(key=lambda x: -(x['horas'] or 0))
+
+        rdos_out.append({
+            'rdo_id': m['rdo_id'],
+            'rdo_numero': m['rdo_numero'],
+            'rdo_data': m['rdo_data'],
+            'obra_id': m['obra_id'],
+            'obra_nome': obra_nome_map.get(m['obra_id'], f'Obra #{m["obra_id"]}'),
+            'sub_id': m['sub_id'],
+            'total_hh': m['total_hh'],
+            'cobertura_pct': m['cobertura_pct'],
+            'modo': m['modo'],
+            'quantidade_produzida': qtd,
+            'producao_esperada': m['producao_esperada'],
+            'indice_pct': m['indice_equipe'],
+            'custo_real': custo if custo > 0 else None,
+            'receita_orcada': receita,
+            'lucro': lucro,
+            'prejuizo': prejuizo,
+            'gap_producao': gap_producao,
+            'excesso_custo': excesso_custo,
+            'papel_gargalo_nome': m['papel_gargalo_nome'],
+            'papel_subutilizado_nome': m['papel_subutilizado_nome'],
+            'funcionarios': funcs_lista,
+            'is_principal_responsavel': False,
+            'contribuicao_pct': 0.0,
+        })
+
+    keymap = {
+        'prejuizo': lambda x: (-(x['prejuizo'] or 0), -(x['custo_real'] or 0)),
+        'excesso_custo': lambda x: (-(x['excesso_custo'] or 0), -(x['prejuizo'] or 0)),
+        'gap_producao': lambda x: (-(x['gap_producao'] or 0), -(x['prejuizo'] or 0)),
+    }
+    rdos_out.sort(key=keymap[ordenar_por])
+
+    valor_field = {'prejuizo': 'prejuizo',
+                   'excesso_custo': 'excesso_custo',
+                   'gap_producao': 'gap_producao'}[ordenar_por]
+    soma_total = sum((x[valor_field] or 0) for x in rdos_out)
+    if soma_total > 0:
+        for x in rdos_out:
+            v = x[valor_field] or 0
+            x['contribuicao_pct'] = (v / soma_total * 100) if v > 0 else 0.0
+        if (rdos_out[0][valor_field] or 0) > 0:
+            rdos_out[0]['is_principal_responsavel'] = True
+
+    total_hh = sum(m['total_hh'] for m in metricas_sub)
+    qtds_validas = [m['quantidade_produzida'] for m in metricas_sub
+                    if m['quantidade_produzida'] is not None]
+    total_prod = sum(qtds_validas) if qtds_validas else None
+    total_custo = sum(m['total_custo'] or 0 for m in metricas_sub)
+    receitas_validas = [m['receita_liq_total'] for m in metricas_sub
+                        if m['receita_liq_total'] is not None]
+    total_receita = sum(receitas_validas) if receitas_validas else None
+    indices = [m['indice_equipe'] for m in metricas_sub if m['indice_equipe'] is not None]
+    indice_medio = sum(indices) / len(indices) if indices else None
+    rdos_distintos = {m['rdo_id'] for m in metricas_sub}
+
+    primeiro = metricas_sub[0]
+    return {
+        'servico_id': servico_id,
+        'servico_nome': primeiro['servico_nome'],
+        'unidade': primeiro['unidade'],
+        'periodo': {'inicio': data_inicio, 'fim': data_fim},
+        'totais': {
+            'n_rdos': len(rdos_distintos),
+            'n_subs': len(metricas_sub),
+            'total_hh': total_hh,
+            'total_produzido': total_prod,
+            'total_custo': total_custo if total_custo > 0 else None,
+            'total_receita': total_receita,
+            'lucro_total': (total_receita - total_custo) if total_receita is not None else None,
+            'indice_medio_pct': indice_medio,
+        },
+        'rdos': rdos_out,
+        'ordenar_por': ordenar_por,
+    }
+
+
+def top_rdos_por_funcionario(admin_id: int, funcionario_id: int,
+                              data_inicio: date, data_fim: date,
+                              top_n: int = 3,
+                              _ctx: dict | None = None) -> list:
+    """Retorna os top-N RDOs em que o funcionário teve a pior contribuição
+    no período (maior prejuízo individual ou maior custo sem produção).
+
+    Ordem:
+      1) RDOs com lucro negativo (mais negativo primeiro)
+      2) RDOs sem dados de receita (maior custo primeiro)
+      3) RDOs com lucro positivo (menor lucro primeiro — "menos bom")
+
+    Performance: aceita um `_ctx` opcional com chaves:
+      - 'regs': resultado pré-carregado de `_carregar_dados_periodo`
+      - 'por_sub_all': dict {(rdo_id, sub_id) -> [regs]} já agrupado
+      - 'metricas_sub_cache': dict {(rdo_id, sub_id) -> métricas calculadas}
+      - 'op_cache', 'coef_cache', 'nome_cache': caches de cálculo
+      - 'obra_nome_map': dict {obra_id -> nome}
+    Permite chamar para muitos funcionários sem recarregar tudo a cada vez.
+    """
+    if _ctx is None:
+        _ctx = {}
+
+    regs = _ctx.get('regs')
+    if regs is None:
+        regs = _carregar_dados_periodo(admin_id, data_inicio, data_fim)
+        _ctx['regs'] = regs
+
+    regs_func = [r for r in regs if r['mo_func_id'] == funcionario_id]
+    if not regs_func:
+        return []
+
+    op_cache = _ctx.setdefault('op_cache', {})
+    coef_cache = _ctx.setdefault('coef_cache', {})
+    nome_cache = _ctx.setdefault('nome_cache', {})
+    metricas_sub_cache = _ctx.setdefault('metricas_sub_cache', {})
+
+    por_sub_all = _ctx.get('por_sub_all')
+    if por_sub_all is None:
+        por_sub_all = defaultdict(list)
+        for r in regs:
+            por_sub_all[(r['rdo_id'], r['sub_id'])].append(r)
+        _ctx['por_sub_all'] = por_sub_all
+
+    chaves_func = {(r['rdo_id'], r['sub_id']) for r in regs_func}
+
+    obra_nome_map = _ctx.get('obra_nome_map')
+    if obra_nome_map is None:
+        obra_ids_set = {r['rdo_obra_id'] for r in regs}
+        try:
+            from models import Obra as ObraModel
+            obra_nome_map = {o.id: o.nome for o in
+                              ObraModel.query.filter(ObraModel.id.in_(obra_ids_set)).all()
+                             } if obra_ids_set else {}
+        except Exception:
+            obra_nome_map = {}
+        _ctx['obra_nome_map'] = obra_nome_map
+
+    por_rdo: dict = defaultdict(lambda: {
+        'rdo_id': None, 'rdo_numero': '', 'rdo_data': None,
+        'obra_id': None, 'obra_nome': '',
+        'horas_dele': 0.0, 'custo_dele': 0.0, 'receita_dele': 0.0,
+        'tem_custo': False, 'tem_receita': False,
+        'servicos': set(),
+    })
+    for chave in chaves_func:
+        m = metricas_sub_cache.get(chave)
+        if m is None and chave not in metricas_sub_cache:
+            sub_regs = por_sub_all.get(chave, [])
+            m = _calcular_metricas_subatividade(
+                sub_regs, op_cache, coef_cache, nome_cache,
+            )
+            metricas_sub_cache[chave] = m
+        if not m:
+            continue
+        fm = m['func_metricas'].get(funcionario_id)
+        if not fm:
+            continue
+        rid = m['rdo_id']
+        d = por_rdo[rid]
+        d['rdo_id'] = rid
+        d['rdo_numero'] = m['rdo_numero']
+        d['rdo_data'] = m['rdo_data']
+        d['obra_id'] = m['obra_id']
+        d['obra_nome'] = obra_nome_map.get(m['obra_id'], f'Obra #{m["obra_id"]}')
+        d['horas_dele'] += fm.get('horas_na_sub', 0.0)
+        if fm.get('custo_na_sub') is not None:
+            d['custo_dele'] += fm['custo_na_sub']
+            d['tem_custo'] = True
+        if fm.get('receita_dele') is not None:
+            d['receita_dele'] += fm['receita_dele']
+            d['tem_receita'] = True
+        if m['servico_nome']:
+            d['servicos'].add(m['servico_nome'])
+
+    resultado = []
+    for rid, d in por_rdo.items():
+        lucro = (d['receita_dele'] - d['custo_dele']) if (d['tem_receita'] and d['tem_custo']) else None
+        resultado.append({
+            'rdo_id': d['rdo_id'],
+            'rdo_numero': d['rdo_numero'],
+            'rdo_data': d['rdo_data'],
+            'obra_id': d['obra_id'],
+            'obra_nome': d['obra_nome'],
+            'horas_dele': d['horas_dele'],
+            'custo_dele': d['custo_dele'] if d['tem_custo'] else None,
+            'receita_dele': d['receita_dele'] if d['tem_receita'] else None,
+            'lucro_dele': lucro,
+            'servicos': sorted(d['servicos']),
+        })
+
+    def _key(x):
+        l = x['lucro_dele']
+        if l is not None and l < 0:
+            return (0, l)
+        if l is None:
+            c = x['custo_dele'] or 0
+            return (1, -c)
+        # lucro positivo: menor lucro primeiro (= menos bom = "pior" entre positivos)
+        return (2, l)
+
+    resultado.sort(key=_key)
+    return resultado[:top_n]
+
+
 def aplicar_como_referencia(admin_id: int, servico_id: int, usuario_id: int,
                               data_inicio: date, data_fim: date) -> dict:
     """Atualiza os coeficientes das linhas MAO_OBRA de ComposicaoServico com a

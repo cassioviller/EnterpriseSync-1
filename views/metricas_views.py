@@ -232,6 +232,31 @@ def funcionarios():
         metricas = [m for m in metricas if m['tem_receita']]
         zero_rdo = []
 
+    # ── Top 3 piores RDOs (Task #9) ─────────────────────────────────────────
+    # Para funcionários com lucro negativo OU custo alto sem receita, busca
+    # os RDOs em que ele teve a pior contribuição. Usa um contexto compartilhado
+    # (_ctx) para que `_carregar_dados_periodo` rode UMA vez por request, e as
+    # métricas de cada subatividade sejam memoizadas entre funcionários.
+    from services.metricas_produtividade import top_rdos_por_funcionario
+    funcs_alvo = [
+        m for m in metricas
+        if (m.get('lucro_total') is not None and m['lucro_total'] < 0)
+        or (m.get('tem_custo') and not m.get('tem_receita'))
+    ]
+    for m in metricas:
+        m['top_rdos_problematicos'] = []
+    if funcs_alvo:
+        ctx_compartilhado: dict = {}
+        for m in funcs_alvo:
+            try:
+                m['top_rdos_problematicos'] = top_rdos_por_funcionario(
+                    admin_id, m['funcionario_id'], data_inicio, data_fim,
+                    top_n=3, _ctx=ctx_compartilhado,
+                )
+            except Exception:
+                logger.exception("top_rdos_por_funcionario falhou func=%s",
+                                 m['funcionario_id'])
+
     # Combinar: funcionários com RDO primeiro, depois cinzas por nome
     zero_rdo.sort(key=lambda x: x['funcionario_nome'])
     todos = metricas + zero_rdo
@@ -248,6 +273,54 @@ def funcionarios():
         status_filtro=status_filtro,
         n_com_rdo=len(metricas),
         n_sem_rdo=len(zero_rdo),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Drill-down: Responsáveis pela divergência de um serviço (Task #9)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@metricas_bp.route('/divergencia/servico/<int:servico_id>')
+@login_required
+@_metricas_required
+def divergencia_servico(servico_id: int):
+    admin_id = _admin_id()
+    di_def, df_def = _default_periodo()
+
+    data_inicio = _parse_date(request.args.get('data_inicio'), di_def)
+    data_fim = _parse_date(request.args.get('data_fim'), df_def)
+    obra_id_raw = request.args.get('obra_id', type=int)
+    ordenar_por = request.args.get('ordenar_por', 'prejuizo')
+
+    from models import Servico, Obra
+    # Tenant isolation: serviço deve pertencer ao admin atual
+    servico = Servico.query.filter_by(id=servico_id, admin_id=admin_id).first()
+    if not servico:
+        abort(404)
+
+    obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+    obra_ids = [obra_id_raw] if obra_id_raw else None
+
+    dados = None
+    try:
+        from services.metricas_produtividade import divergencias_por_servico
+        dados = divergencias_por_servico(
+            admin_id, servico_id, data_inicio, data_fim,
+            obra_ids=obra_ids, ordenar_por=ordenar_por,
+        )
+    except Exception:
+        logger.exception("divergencias_por_servico falhou")
+        flash("Erro ao calcular divergências.", "danger")
+
+    return render_template(
+        'metricas/divergencia_servico.html',
+        servico=servico,
+        dados=dados,
+        obras=obras,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        obra_id_sel=obra_id_raw,
+        ordenar_por=ordenar_por,
     )
 
 

@@ -761,3 +761,270 @@ def test_11_obra_nome_e_modo_secao_b():
         assert dia['obra_nome'], 'obra_nome não pode ser vazio'
         assert 'modo' in dia, 'modo ausente na Seção B'
         assert dia['modo'] in ('single_role', 'equipe_mista')
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Task #9 — Drill-down de responsáveis pela divergência
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_12_divergencias_por_servico_ranking_por_prejuizo():
+    """2 RDOs com prejuízo no mesmo serviço; o de maior prejuízo é
+    `is_principal_responsavel` e aparece em primeiro com `contribuicao_pct` > 50%.
+    """
+    with app.app_context():
+        s = _suffix()
+        servico = _servico(f'DivT12 {s}', 'm2')
+        ins = _insumo(f'PedT12 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)  # 1h/m²
+
+        snap = [{'insumo_id': ins.id, 'nome': 'Pedreiro T12',
+                  'coeficiente': 1.0, 'preco_unitario': 30.0, 'tipo': 'MAO_OBRA'}]
+        _operacional(_fx.obra, servico, snap, margem_pct=10.0, imposto_pct=0.0)
+        db.session.commit()
+
+        # RDO A: 8h, produziu pouco (3 m²) → muito prejuízo
+        rdo_a = _rdo(_fx.obra, date(2026, 5, 1), 'D12A')
+        f_a = _func('FA12')
+        sub_a = _sub(rdo_a, servico.id, 'Sub12A', qty=3.0)
+        _mo(rdo_a, f_a, 8.0, sub=sub_a, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo_a, f_a, 400.0)
+
+        # RDO B: 8h, produziu razoável (7 m²) → prejuízo menor
+        rdo_b = _rdo(_fx.obra, date(2026, 5, 2), 'D12B')
+        f_b = _func('FB12')
+        sub_b = _sub(rdo_b, servico.id, 'Sub12B', qty=7.0)
+        _mo(rdo_b, f_b, 8.0, sub=sub_b, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo_b, f_b, 200.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import divergencias_por_servico
+        d = divergencias_por_servico(_fx.admin.id, servico.id,
+                                      date(2026, 5, 1), date(2026, 5, 31),
+                                      ordenar_por='prejuizo')
+
+        assert d['servico_id'] == servico.id
+        assert len(d['rdos']) == 2, f"Esperado 2 RDOs, achei {len(d['rdos'])}"
+        primeiro = d['rdos'][0]
+        segundo = d['rdos'][1]
+        # RDO A tem prejuízo maior (mais custo + menos receita)
+        assert primeiro['rdo_id'] == rdo_a.id, \
+            f"Principal deveria ser RDO A, foi {primeiro['rdo_numero']}"
+        assert primeiro['is_principal_responsavel'] is True
+        assert segundo['is_principal_responsavel'] is False
+        assert primeiro['prejuizo'] > segundo['prejuizo']
+        assert primeiro['contribuicao_pct'] > segundo['contribuicao_pct']
+        # Funcionário de A aparece dentro do RDO A
+        nomes_a = [f['funcionario_nome'] for f in primeiro['funcionarios']]
+        assert any(f_a.nome == n for n in nomes_a)
+        # Totais agregados
+        assert d['totais']['n_rdos'] == 2
+        assert d['totais']['total_hh'] == pytest.approx(16.0, abs=0.01)
+
+
+def test_13_divergencias_filtro_periodo_e_tenant():
+    """RDOs fora do período são ignorados; serviço de outro admin = 404 lógico (lista vazia)."""
+    with app.app_context():
+        s = _suffix()
+        servico = _servico(f'DivT13 {s}', 'm2')
+        ins = _insumo(f'InsT13 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        db.session.commit()
+
+        # RDO dentro do período
+        rdo_in = _rdo(_fx.obra, date(2026, 6, 10), 'D13I')
+        f1 = _func('F13I')
+        sub_in = _sub(rdo_in, servico.id, 'In13', qty=4.0)
+        _mo(rdo_in, f1, 8.0, sub=sub_in, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo_in, f1, 200.0)
+
+        # RDO fora do período (agosto)
+        rdo_out = _rdo(_fx.obra, date(2026, 8, 10), 'D13O')
+        f2 = _func('F13O')
+        sub_out = _sub(rdo_out, servico.id, 'Out13', qty=4.0)
+        _mo(rdo_out, f2, 8.0, sub=sub_out, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo_out, f2, 200.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import divergencias_por_servico
+
+        # Filtro de período exclui rdo_out
+        d = divergencias_por_servico(_fx.admin.id, servico.id,
+                                      date(2026, 6, 1), date(2026, 6, 30))
+        ids = {r['rdo_id'] for r in d['rdos']}
+        assert rdo_in.id in ids
+        assert rdo_out.id not in ids
+
+        # Tenant isolation: chamar com admin_id inexistente devolve estrutura vazia
+        d_other = divergencias_por_servico(99999999, servico.id,
+                                            date(2026, 6, 1), date(2026, 6, 30))
+        assert d_other['rdos'] == []
+        assert d_other['totais'] is None
+
+
+def test_14_top_rdos_por_funcionario_pior_primeiro():
+    """3 RDOs do mesmo funcionário; top_n=2 retorna os 2 com pior lucro/custo.
+    Sem operacional → ordena por custo descendente.
+    """
+    with app.app_context():
+        s = _suffix()
+        servico = _servico(f'TopT14 {s}', 'un')
+        ins = _insumo(f'InsT14 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        db.session.commit()
+
+        func = _func('TOP14')
+
+        # 3 RDOs com custos diferentes (sem operacional, sem receita)
+        configs = [
+            (date(2026, 7, 1), 'T14A', 100.0),
+            (date(2026, 7, 2), 'T14B', 500.0),  # maior custo
+            (date(2026, 7, 3), 'T14C', 300.0),
+        ]
+        rdos_criados = []
+        for d, sufixo, custo in configs:
+            r = _rdo(_fx.obra, d, sufixo)
+            sub = _sub(r, servico.id, f'Sub{sufixo}', qty=2.0)
+            _mo(r, func, 8.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+            _custo_diario(r, func, custo)
+            rdos_criados.append((r, custo))
+        db.session.commit()
+
+        from services.metricas_produtividade import top_rdos_por_funcionario
+        top = top_rdos_por_funcionario(_fx.admin.id, func.id,
+                                        date(2026, 7, 1), date(2026, 7, 31),
+                                        top_n=2)
+        assert len(top) == 2, f"Esperado 2, retornou {len(top)}"
+        # Sem receita → todos lucro=None → ordena por custo desc
+        assert top[0]['custo_dele'] == pytest.approx(500.0, abs=0.01), \
+            f"Primeiro deveria ser custo 500, foi {top[0]['custo_dele']}"
+        assert top[1]['custo_dele'] == pytest.approx(300.0, abs=0.01)
+        assert top[0]['lucro_dele'] is None
+        assert top[0]['obra_nome'] == _fx.obra.nome
+        # serviço aparece na lista
+        assert any(servico.nome in t['servicos'] for t in top)
+
+
+def test_15_top_rdos_funcionario_lucro_negativo_primeiro():
+    """Funcionário com 1 RDO de prejuízo e 1 RDO de lucro:
+    o de prejuízo (lucro mais negativo) vem primeiro."""
+    with app.app_context():
+        s = _suffix()
+        servico = _servico(f'NegT15 {s}', 'm2')
+        ins = _insumo(f'InsT15 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        snap = [{'insumo_id': ins.id, 'nome': 'P15',
+                  'coeficiente': 1.0, 'preco_unitario': 30.0, 'tipo': 'MAO_OBRA'}]
+        _operacional(_fx.obra, servico, snap, margem_pct=20.0, imposto_pct=0.0)
+        db.session.commit()
+
+        func = _func('NEG15')
+
+        # RDO ruim: muito custo, pouca produção → prejuízo
+        r_ruim = _rdo(_fx.obra, date(2026, 9, 1), 'T15R')
+        sub_r = _sub(r_ruim, servico.id, 'SubR', qty=2.0)
+        _mo(r_ruim, func, 8.0, sub=sub_r, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(r_ruim, func, 400.0)
+
+        # RDO bom: produção alta, custo controlado → lucro
+        r_bom = _rdo(_fx.obra, date(2026, 9, 2), 'T15B')
+        sub_b = _sub(r_bom, servico.id, 'SubB', qty=10.0)
+        _mo(r_bom, func, 8.0, sub=sub_b, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(r_bom, func, 100.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import top_rdos_por_funcionario
+        top = top_rdos_por_funcionario(_fx.admin.id, func.id,
+                                        date(2026, 9, 1), date(2026, 9, 30),
+                                        top_n=3)
+        assert len(top) == 2
+        # Primeiro deve ser o RDO com lucro mais negativo
+        assert top[0]['rdo_id'] == r_ruim.id, \
+            f"Primeiro deveria ser RDO ruim, foi {top[0]['rdo_numero']}"
+        assert top[0]['lucro_dele'] is not None
+        assert top[0]['lucro_dele'] < 0, \
+            f"Primeiro deveria ter lucro negativo, foi {top[0]['lucro_dele']}"
+        # Segundo deve ter lucro maior (positivo ou menos negativo)
+        assert top[1]['lucro_dele'] > top[0]['lucro_dele']
+
+
+def test_16_top_rdos_positivos_menor_lucro_primeiro():
+    """Quando todos os RDOs têm lucro positivo, top_n retorna os de MENOR lucro
+    primeiro (isto é, os "menos bons" — coerente com 'pior contribuição')."""
+    with app.app_context():
+        s = _suffix()
+        servico = _servico(f'PosT16 {s}', 'm2')
+        ins = _insumo(f'InsT16 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        snap = [{'insumo_id': ins.id, 'nome': 'P16',
+                  'coeficiente': 1.0, 'preco_unitario': 30.0, 'tipo': 'MAO_OBRA'}]
+        _operacional(_fx.obra, servico, snap, margem_pct=50.0, imposto_pct=0.0)
+        db.session.commit()
+
+        func = _func('POS16')
+
+        # Todos lucrativos, mas com lucros diferentes (custo pequeno, produção alta)
+        configs = [
+            (date(2026, 10, 1), 'P16A', 50.0, 20.0),  # mais lucrativo
+            (date(2026, 10, 2), 'P16B', 80.0, 15.0),
+            (date(2026, 10, 3), 'P16C', 90.0, 12.0),  # menos lucrativo
+        ]
+        for d, sufixo, custo, qty in configs:
+            r = _rdo(_fx.obra, d, sufixo)
+            sub = _sub(r, servico.id, f'Sub{sufixo}', qty=qty)
+            _mo(r, func, 8.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+            _custo_diario(r, func, custo)
+        db.session.commit()
+
+        from services.metricas_produtividade import top_rdos_por_funcionario
+        top = top_rdos_por_funcionario(_fx.admin.id, func.id,
+                                        date(2026, 10, 1), date(2026, 10, 31),
+                                        top_n=2)
+        assert len(top) == 2
+        # Todos positivos
+        assert all(t['lucro_dele'] is not None and t['lucro_dele'] > 0 for t in top)
+        # Primeiro deve ser o de MENOR lucro (P16C)
+        assert top[0]['lucro_dele'] < top[1]['lucro_dele'], \
+            f"Esperado menor lucro primeiro: {top[0]['lucro_dele']} < {top[1]['lucro_dele']}"
+
+
+def test_17_top_rdos_ctx_compartilhado_evita_recarga():
+    """Chamar top_rdos para múltiplos funcionários com `_ctx` compartilhado
+    deve produzir os mesmos resultados que chamadas isoladas (consistência)
+    e popular o cache."""
+    with app.app_context():
+        s = _suffix()
+        servico = _servico(f'CtxT17 {s}', 'un')
+        ins = _insumo(f'InsT17 {s}')
+        comp = _composicao(servico.id, ins.id, 1.0)
+        db.session.commit()
+
+        f1 = _func('CTX1')
+        f2 = _func('CTX2')
+
+        rdo = _rdo(_fx.obra, date(2026, 11, 1), 'C17')
+        sub = _sub(rdo, servico.id, 'Sub17', qty=4.0)
+        _mo(rdo, f1, 4.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+        _mo(rdo, f2, 4.0, sub=sub, composicao_id=comp.id, vinculo='auto')
+        _custo_diario(rdo, f1, 100.0)
+        _custo_diario(rdo, f2, 100.0)
+        db.session.commit()
+
+        from services.metricas_produtividade import top_rdos_por_funcionario
+        ctx = {}
+        t1 = top_rdos_por_funcionario(_fx.admin.id, f1.id,
+                                       date(2026, 11, 1), date(2026, 11, 30),
+                                       top_n=3, _ctx=ctx)
+        # Após primeira chamada, regs e por_sub_all devem estar no ctx
+        assert 'regs' in ctx
+        assert 'por_sub_all' in ctx
+        assert 'metricas_sub_cache' in ctx
+        # Segunda chamada com mesmo ctx deve funcionar e dar resultado coerente
+        t2 = top_rdos_por_funcionario(_fx.admin.id, f2.id,
+                                       date(2026, 11, 1), date(2026, 11, 30),
+                                       top_n=3, _ctx=ctx)
+        assert len(t1) == 1
+        assert len(t2) == 1
+        assert t1[0]['rdo_id'] == rdo.id
+        assert t2[0]['rdo_id'] == rdo.id
+        # Cache de métricas reutilizado: chave única consultada
+        assert (rdo.id, sub.id) in ctx['metricas_sub_cache']

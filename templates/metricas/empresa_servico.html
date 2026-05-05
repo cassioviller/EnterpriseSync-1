@@ -73,6 +73,14 @@
             <tr>
               <td>
                 <strong>{{ m.servico_nome }}</strong>
+                {% set tem_divergencia = (m.indice_pct is not none and m.indice_pct < 100) or (m.lucro_real_medio_un is not none and m.lucro_real_medio_un < 0) %}
+                {% if tem_divergencia %}
+                <a href="{{ url_for('metricas.divergencia_servico', servico_id=m.servico_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat(), obra_id=obra_id_sel or '') }}"
+                   class="ms-2 text-decoration-none small"
+                   title="Ver responsáveis pela divergência">
+                  <i class="fas fa-search-dollar"></i> Ver responsáveis
+                </a>
+                {% endif %}
                 <div class="text-muted small">{{ m.n_rdos }} RDO(s){% if m.n_subs_sem_qty > 0 %} · <span class="text-warning">{{ m.n_subs_sem_qty }} sem quantidade</span>{% endif %}</div>
                 {% if m.papeis %}
                 <div class="text-muted small">
