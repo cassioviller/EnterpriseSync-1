@@ -210,6 +210,8 @@ def salvar_edicao_rdo(rdo_id):
         # Atualizar dados básicos do RDO
         rdo.obra_id = obra_id
         rdo.data_relatorio = data_relatorio
+        # Task #12: RDO sempre Finalizado (sem rascunho)
+        rdo.status = 'Finalizado'
         # Task #61 — clima alinhado à visualização
         rdo.clima_geral = clima_geral or None
         rdo.temperatura_media = temperatura_media or None
@@ -486,6 +488,19 @@ def salvar_edicao_rdo(rdo_id):
         from utils.rdo_equip_ocorr import replace_equipamentos_ocorrencias
         _n_eq, _n_oc = replace_equipamentos_ocorrencias(rdo_id, admin_id, request.form)
         logger.info(f"[Task#61] salvar_edicao_rdo — eq={_n_eq} oc={_n_oc}")
+
+        # Task #12: produtividade recalculada DENTRO da mesma transação
+        # que a edição (mesma semântica da finalização legada).
+        try:
+            from services.rdo_custos import recalcular_produtividade_rdo
+            recalcular_produtividade_rdo(rdo)
+        except Exception as _pe:
+            logger.error(
+                f"[produtividade] recalcular_produtividade_rdo falhou em "
+                f"salvar_edicao_rdo (RDO {rdo.id}): {_pe} — abortando"
+            )
+            db.session.rollback()
+            raise
 
         # Confirmar salvamento
         db.session.commit()

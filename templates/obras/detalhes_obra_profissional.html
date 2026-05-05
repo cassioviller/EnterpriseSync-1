@@ -1873,15 +1873,10 @@
                                 <td><strong>{{ rdo.numero_rdo or 'RDO-' + rdo.id|string }}</strong></td>
                                 <td>{{ rdo.data_relatorio.strftime('%d/%m/%Y') if rdo.data_relatorio else '-' }}</td>
                                 <td>
-                                    {% if rdo.status == 'Finalizado' %}
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>{{ rdo.status }}
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-warning">
-                                            <i class="fas fa-edit me-1"></i>{{ rdo.status or 'Rascunho' }}
-                                        </span>
-                                    {% endif %}
+                                    {% set _st = rdo.status or 'Finalizado' %}
+                                    <span class="badge {% if _st == 'Aprovado' %}bg-info{% else %}bg-success{% endif %}">
+                                        <i class="fas fa-check-circle me-1"></i>{{ _st }}
+                                    </span>
                                 </td>
                                 <td>
                                     {% if rdo.progresso_conclusao %}

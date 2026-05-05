@@ -726,34 +726,26 @@ def funcionario_dashboard_desktop():
         rdos_recentes = RDO.query.join(Obra).filter(
             Obra.admin_id == admin_id_correto
         ).order_by(RDO.data_relatorio.desc()).limit(10).all()
-        
-        # RDOs em rascunho que o funcionário pode editar
-        rdos_rascunho = RDO.query.join(Obra).filter(
-            Obra.admin_id == admin_id_correto,
-            RDO.status == 'Rascunho'
-        ).order_by(RDO.data_relatorio.desc()).limit(5).all()
-        
+
         logger.debug(f"DEBUG FUNCIONÁRIO DASHBOARD: Funcionário {funcionario_atual.nome if funcionario_atual else 'N/A'}")
         logger.debug(f"DEBUG: {len(obras_disponiveis)} obras disponíveis, {len(rdos_recentes)} RDOs recentes")
-        
-        return render_template('funcionario_dashboard.html', 
+
+        return render_template('funcionario_dashboard.html',
                              funcionario=funcionario_atual,
                              obras_disponiveis=obras_disponiveis,
                              rdos_recentes=rdos_recentes,
-                             rdos_rascunho=rdos_rascunho,
                              total_obras=len(obras_disponiveis),
                              total_rdos=len(rdos_recentes))
-                             
+
     except Exception as e:
         logger.error(f"ERRO FUNCIONÁRIO DASHBOARD: {str(e)}")
         import traceback
         logger.debug(f"TRACEBACK: {traceback.format_exc()}")
         flash('Erro ao carregar dashboard. Contate o administrador.', 'error')
-        return render_template('funcionario_dashboard.html', 
+        return render_template('funcionario_dashboard.html',
                              funcionario=None,
                              obras_disponiveis=[],
                              rdos_recentes=[],
-                             rdos_rascunho=[],
                              total_obras=0,
                              total_rdos=0)
 

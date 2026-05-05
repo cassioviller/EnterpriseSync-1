@@ -46,7 +46,13 @@ def _tenant_is_v2(admin_id: int) -> bool:
         return False
 
 
-def _existe_ponto_no_dia(funcionario_id, data_ref, admin_id) -> bool:
+def existe_ponto_no_dia(funcionario_id, data_ref, admin_id) -> bool:
+    """API pública: existe RegistroPonto para (funcionario, dia, admin)?
+
+    Usada como anti-duplicação contra o handler ponto_registrado, tanto
+    em ``gerar_custos_mao_obra_rdo`` quanto na verificação pós-fase-2
+    da migração #154.
+    """
     try:
         from models import RegistroPonto
         return (
@@ -60,6 +66,11 @@ def _existe_ponto_no_dia(funcionario_id, data_ref, admin_id) -> bool:
         )
     except Exception:
         return False
+
+
+# Alias legado: alguns chamadores internos referenciavam o helper
+# privado ``_existe_ponto_no_dia``. Mantido por compatibilidade.
+_existe_ponto_no_dia = existe_ponto_no_dia
 
 
 def _custo_diario_rdo(rdo_id: int, funcionario_id: int):
@@ -219,6 +230,73 @@ def cancelar_custos_rdo(rdo_id: int, admin_id: int) -> int:
     except Exception:
         logger.exception("cancelar_custos_rdo falhou (rdo_id=%s)", rdo_id)
         return 0
+
+
+def recalcular_produtividade_rdo(rdo) -> int:
+    """Recalcula RDOMaoObra.produtividade_real e indice_produtividade.
+
+    Fórmula canônica (taxa-da-equipe), idêntica à de
+    ``views/rdo.py::finalizar_rdo``:
+        taxa_equipe = sub.quantidade_produzida / Σ horas_trabalhadas (equipe)
+        indice      = taxa_equipe / sub.meta_produtividade_snapshot
+
+    Para cada subatividade do RDO com ``quantidade_produzida`` e
+    ``meta_produtividade_snapshot`` válidos, atribui a mesma taxa para
+    todos os funcionários vinculados (a diferença individual emerge da
+    média ponderada por horas ao longo dos dias). Funcionários sem horas
+    trabalhadas recebem ``None``.
+
+    Idempotente: re-executar sobrescreve com os mesmos valores.
+
+    Faz ``flush`` (não commit) — o caller deve commitar como parte da
+    transação maior. Retorna número de subatividades processadas.
+    """
+    try:
+        from app import db
+        from models import RDOMaoObra, RDOServicoSubatividade
+
+        subs_com_meta = RDOServicoSubatividade.query.filter(
+            RDOServicoSubatividade.rdo_id == rdo.id,
+            RDOServicoSubatividade.quantidade_produzida.isnot(None),
+            RDOServicoSubatividade.meta_produtividade_snapshot.isnot(None),
+            RDOServicoSubatividade.meta_produtividade_snapshot > 0,
+        ).all()
+
+        for sub in subs_com_meta:
+            maos_obra = RDOMaoObra.query.filter_by(
+                rdo_id=rdo.id, subatividade_id=sub.id
+            ).all()
+            horas_totais_equipe = sum(
+                float(mo.horas_trabalhadas or 0.0) for mo in maos_obra
+            )
+            if horas_totais_equipe <= 0:
+                for mo in maos_obra:
+                    mo.produtividade_real = None
+                    mo.indice_produtividade = None
+                continue
+            taxa_equipe = float(sub.quantidade_produzida) / horas_totais_equipe
+            for mo in maos_obra:
+                if mo.horas_trabalhadas and mo.horas_trabalhadas > 0:
+                    mo.produtividade_real = taxa_equipe
+                    mo.indice_produtividade = (
+                        taxa_equipe / float(sub.meta_produtividade_snapshot)
+                    )
+                else:
+                    mo.produtividade_real = None
+                    mo.indice_produtividade = None
+
+        db.session.flush()
+        logger.info(
+            "[PRODUTIVIDADE] RDO %s: %d subatividade(s) recalculada(s)",
+            getattr(rdo, 'numero_rdo', rdo.id), len(subs_com_meta),
+        )
+        return len(subs_com_meta)
+    except Exception:
+        logger.exception(
+            "recalcular_produtividade_rdo falhou (rdo_id=%s)",
+            getattr(rdo, 'id', '?'),
+        )
+        raise
 
 
 def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:

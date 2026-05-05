@@ -57,20 +57,6 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card bg-warning text-dark">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="card-title">RDOs Rascunho</h6>
-                            <h3 class="mb-0">{{ rdos_rascunho|length }}</h3>
-                        </div>
-                        <i class="fas fa-edit fa-2x opacity-75"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
             <div class="card bg-info text-white">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
@@ -124,7 +110,7 @@
         </div>
     </div>
 
-    <!-- RDOs Recentes e Rascunhos -->
+    <!-- RDOs Recentes -->
     <div class="row">
         <div class="col-md-6">
             <div class="card">
@@ -144,19 +130,10 @@
                                 <small class="text-muted">{{ rdo.obra.nome }} - {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</small>
                             </div>
                             <div>
-                                {% if rdo.status == 'Finalizado' %}
                                 <span class="badge bg-success">Finalizado</span>
-                                {% else %}
-                                <span class="badge bg-warning">Rascunho</span>
-                                {% endif %}
                                 <a href="{{ url_for('main.funcionario_visualizar_rdo', id=rdo.id) }}" class="btn btn-sm btn-outline-primary ms-1">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                {% if rdo.status == 'Rascunho' %}
-                                <a href="{{ url_for('main.funcionario_editar_rdo', id=rdo.id) }}" class="btn btn-sm btn-outline-warning ms-1">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}

@@ -3852,6 +3852,7 @@ def executar_migracoes():
             (151, "Task #62 — vínculos Cronograma↔Subatividade↔Serviço↔Mão-de-obra", migration_151_vinculo_subatividade_composicao),
             (152, "Task #2 — rdo_custo_diario: tabela + índices parciais para custo diário de mão-de-obra", migration_152_rdo_custo_diario),
             (153, "Task #3 — composicao_servico_historico: histórico de alterações de coeficiente via métricas", migration_153_composicao_servico_historico),
+            (154, "Task #12 — RDO sempre Finalizado: migrar Rascunho legado via pipeline (custo diário + gestão custo filho + produtividade)", migration_154_force_rdo_finalizado),
         ]
         
         # Executar cada migração com rastreamento
@@ -13034,6 +13035,239 @@ def migration_153_composicao_servico_historico():
         try:
             connection.rollback()
             connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_154_force_rdo_finalizado():
+    """Task #12 — RDO sempre Finalizado.
+
+    Para cada RDO ainda em status='Rascunho' (legado), aplica o mesmo
+    pipeline de finalização usado pelos endpoints de save:
+      1. status = 'Finalizado'
+      2. gravar_custo_funcionario_rdo(rdo, admin_id) — fonte de verdade
+         do custo diário (RDOCustoDiario)
+      3. gerar_custos_mao_obra_rdo(rdo, admin_id) — gera GestaoCustoFilho
+         a partir de RDOCustoDiario (idempotente)
+      4. recalcular_produtividade_rdo(rdo) — popula
+         RDOMaoObra.produtividade_real / indice_produtividade
+         (taxa-da-equipe), commitado na fase 1
+
+    Idempotente:
+      - Os dois serviços já são idempotentes (deduplicam por
+        rdo_id/funcionario_id/data e por origem_id de gestao_custo_filho).
+      - A query inicial só pega RDOs ainda em 'Rascunho'; após esta
+        migração rodar uma vez todos terão status='Finalizado' e o
+        próximo boot pula tudo (inclusive sem essa migração marcada,
+        a query retornaria 0 linhas).
+    """
+    try:
+        from app import db
+        from models import RDO
+
+        rascunhos = RDO.query.filter(RDO.status == 'Rascunho').all()
+        total = len(rascunhos)
+        if total == 0:
+            logger.info("MIGRACAO 154: nenhum RDO em Rascunho — nada a fazer")
+            return True
+
+        logger.info("MIGRACAO 154: finalizando %d RDO(s) em Rascunho via pipeline padrão", total)
+
+        from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+        from services.rdo_custos import (
+            gerar_custos_mao_obra_rdo,
+            recalcular_produtividade_rdo,
+        )
+
+        finalizados = 0
+        falhas = 0
+        # Atomicidade por RDO (best-effort dada a arquitetura dos serviços,
+        # que comitam/rollbackam internamente):
+        #
+        #   FASE 1 — status='Finalizado' + custo diário (RDOCustoDiario):
+        #     A mudança de status fica pendente na mesma sessão; o
+        #     ``gravar_custo_funcionario_rdo`` faz ``db.session.commit()``
+        #     ao final, persistindo status + RDOCustoDiario juntos. Se
+        #     falhar internamente, executa ``db.session.rollback()`` que
+        #     também reverte o status (atomicidade real). Detectamos via
+        #     re-leitura do RDO.status.
+        #
+        #   FASE 2 — GestaoCustoFilho + métricas de produtividade:
+        #     Roda só se a fase 1 deu certo. Como a fase 1 já commitou o
+        #     status, uma falha aqui deixaria o RDO 'Finalizado' sem
+        #     ``GestaoCustoFilho`` correspondente. Compensamos revertendo
+        #     o status para 'Rascunho' e contando como falha — o próximo
+        #     boot re-executará a migração para esse RDO.
+        #
+        # No final, se falhas > 0 levantamos exceção para que o
+        # ``migration_history`` NÃO marque a migração como concluída.
+        for rdo in rascunhos:
+            rdo_id = rdo.id
+            admin_id = rdo.admin_id or (rdo.obra.admin_id if rdo.obra else None)
+            if not admin_id:
+                logger.error(
+                    "MIGRACAO 154: RDO id=%s sem admin_id (obra=%s) — falha",
+                    rdo_id, rdo.obra_id,
+                )
+                falhas += 1
+                continue
+
+            # FASE 1: status + produtividade + custo diário
+            rdo.status = 'Finalizado'
+            db.session.add(rdo)
+            fase1_ok = True
+            try:
+                # Produtividade só faz flush — vai junto no commit do gravar_custo
+                recalcular_produtividade_rdo(rdo)
+                gravar_custo_funcionario_rdo(rdo, admin_id)
+            except Exception as _e_f1:
+                # Defensivo: o serviço normalmente engole exceções, mas se
+                # alguma escapar garantimos rollback explícito da sessão.
+                db.session.rollback()
+                logger.error(
+                    "MIGRACAO 154: exceção em gravar_custo_funcionario_rdo "
+                    "para RDO %s: %s", rdo_id, _e_f1,
+                )
+                fase1_ok = False
+
+            if fase1_ok:
+                # Detectar rollback interno do serviço (que retorna 0 em vez de raise)
+                db.session.expire_all()
+                rdo_check = db.session.get(RDO, rdo_id)
+                if rdo_check is None or rdo_check.status != 'Finalizado':
+                    logger.error(
+                        "MIGRACAO 154: gravar_custo_funcionario_rdo falhou "
+                        "(rollback interno, status permanece 'Rascunho') "
+                        "— RDO %s será re-tentado no próximo boot", rdo_id,
+                    )
+                    fase1_ok = False
+
+            if not fase1_ok:
+                falhas += 1
+                continue
+
+            # FASE 2 — status já persistido como 'Finalizado'
+            fase2_ok = True
+            try:
+                gerar_custos_mao_obra_rdo(rdo_check, admin_id)
+            except Exception as _e_f2:
+                # Defensivo (serviço normalmente engole exceções)
+                logger.error(
+                    "MIGRACAO 154: exceção em gerar_custos_mao_obra_rdo "
+                    "para RDO %s: %s", rdo_id, _e_f2,
+                )
+                fase2_ok = False
+
+            # Verificação pós-fase-2 (anti-silent-failure):
+            # ``gerar_custos_mao_obra_rdo`` engole exceções e retorna 0;
+            # detectamos comparando funcionários com horas em RDOMaoObra
+            # vs. presença de GestaoCustoFilho gerado a partir de
+            # RDOCustoDiario/RDOMaoObra do mesmo RDO+funcionário.
+            # Quem tem ponto eletrônico no dia é dispensado (handler
+            # ponto_registrado é a fonte canônica nesse caso).
+            if fase2_ok:
+                try:
+                    from models import RDOMaoObra, RDOCustoDiario, GestaoCustoFilho
+                    from services.rdo_custos import existe_ponto_no_dia
+                    mao_obras = RDOMaoObra.query.filter_by(rdo_id=rdo_id).all()
+                    func_ids_com_horas = {
+                        r.funcionario_id for r in mao_obras
+                        if r.funcionario_id and float(r.horas_trabalhadas or 0) > 0
+                    }
+                    if func_ids_com_horas:
+                        sem_cobertura = []
+                        for fid in func_ids_com_horas:
+                            if existe_ponto_no_dia(fid, rdo_check.data_relatorio, admin_id):
+                                continue
+                            cd_ids = [
+                                cd.id for cd in
+                                RDOCustoDiario.query.filter_by(
+                                    rdo_id=rdo_id, funcionario_id=fid
+                                ).all()
+                            ]
+                            mo_ids = [
+                                m.id for m in mao_obras if m.funcionario_id == fid
+                            ]
+                            tem_filho = False
+                            if cd_ids:
+                                tem_filho = GestaoCustoFilho.query.filter(
+                                    GestaoCustoFilho.origem_tabela.in_([
+                                        'rdo_custo_diario',
+                                        'rdo_custo_diario_va',
+                                        'rdo_custo_diario_vt',
+                                    ]),
+                                    GestaoCustoFilho.origem_id.in_(cd_ids),
+                                ).first() is not None
+                            if not tem_filho and mo_ids:
+                                tem_filho = GestaoCustoFilho.query.filter(
+                                    GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
+                                    GestaoCustoFilho.origem_id.in_(mo_ids),
+                                ).first() is not None
+                            if not tem_filho:
+                                sem_cobertura.append(fid)
+                        if sem_cobertura:
+                            logger.error(
+                                "MIGRACAO 154: RDO %s ficou Finalizado mas "
+                                "%d funcionário(s) sem GestaoCustoFilho nem "
+                                "ponto: %s — marcando como falha (fase 2 "
+                                "silenciosa)",
+                                rdo_id, len(sem_cobertura), sem_cobertura,
+                            )
+                            fase2_ok = False
+                except Exception as _e_chk:
+                    # Falha na verificação não invalida o pipeline; só log.
+                    logger.warning(
+                        "MIGRACAO 154: verificação pós-fase-2 do RDO %s "
+                        "falhou (não-bloqueante): %s", rdo_id, _e_chk,
+                    )
+
+            if not fase2_ok:
+                # Compensação: reverter status para 'Rascunho' garante a
+                # invariante "Finalizado ⇒ pipeline completo" e força retry.
+                try:
+                    db.session.rollback()
+                    rdo_revert = db.session.get(RDO, rdo_id)
+                    if rdo_revert and rdo_revert.status == 'Finalizado':
+                        rdo_revert.status = 'Rascunho'
+                        db.session.add(rdo_revert)
+                        db.session.commit()
+                        logger.info(
+                            "MIGRACAO 154: status do RDO %s revertido para "
+                            "'Rascunho' (compensação por falha na fase 2)",
+                            rdo_id,
+                        )
+                except Exception as _e_rev:
+                    db.session.rollback()
+                    logger.error(
+                        "MIGRACAO 154: falha ao reverter status do RDO %s "
+                        "(pode ficar 'Finalizado' sem GestaoCustoFilho — "
+                        "operador deve re-executar gerar_custos_mao_obra_rdo "
+                        "manualmente): %s", rdo_id, _e_rev,
+                    )
+                falhas += 1
+                continue
+
+            finalizados += 1
+
+        logger.info(
+            "MIGRACAO 154 CONCLUIDA: %d finalizado(s), %d falha(s) (de %d)",
+            finalizados, falhas, total,
+        )
+        # Falhas reais ⇒ levantamos para que migration_history NÃO marque
+        # como concluída, forçando re-execução no próximo boot até que
+        # todos os RDOs sejam migrados (ou que o operador corrija os dados).
+        if falhas > 0:
+            raise RuntimeError(
+                f"MIGRACAO 154: {falhas} RDO(s) Rascunho não foram migrados "
+                f"(de {total}). Verifique os logs e re-execute."
+            )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 154 falhou: %s", e)
+        try:
+            from app import db as _db
+            _db.session.rollback()
         except Exception:
             pass
         raise

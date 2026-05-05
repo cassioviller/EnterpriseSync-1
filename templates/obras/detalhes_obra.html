@@ -403,15 +403,10 @@
                                     {{ rdo.criado_por.nome }}
                                 </td>
                                 <td>
-                                    {% if rdo.status == 'Finalizado' %}
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>Finalizado
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-warning">
-                                            <i class="fas fa-edit me-1"></i>Rascunho
-                                        </span>
-                                    {% endif %}
+                                    {% set _st = rdo.status or 'Finalizado' %}
+                                    <span class="badge {% if _st == 'Aprovado' %}bg-info{% else %}bg-success{% endif %}">
+                                        <i class="fas fa-check-circle me-1"></i>{{ _st }}
+                                    </span>
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
@@ -746,8 +741,8 @@
                             </div>
                         </div>
                         <div class="rdo-status">
-                            <span class="badge {% if rdo.status == 'Finalizado' %}bg-success{% else %}bg-warning{% endif %}">
-                                {{ rdo.status }}
+                            <span class="badge {% if rdo.status == 'Aprovado' %}bg-info{% else %}bg-success{% endif %}">
+                                {{ rdo.status or 'Finalizado' }}
                             </span>
                         </div>
                     </div>
@@ -1347,15 +1342,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             {{ rdo.criado_por.nome }}
                         </td>
                         <td>
-                            {% if rdo.status == 'Finalizado' %}
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check-circle me-1"></i>Finalizado
-                                </span>
-                            {% else %}
-                                <span class="badge bg-warning">
-                                    <i class="fas fa-edit me-1"></i>Rascunho
-                                </span>
-                            {% endif %}
+                            {% set _st = rdo.status or 'Finalizado' %}
+                            <span class="badge {% if _st == 'Aprovado' %}bg-info{% else %}bg-success{% endif %}">
+                                <i class="fas fa-check-circle me-1"></i>{{ _st }}
+                            </span>
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm">

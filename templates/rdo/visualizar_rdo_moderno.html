@@ -345,6 +345,10 @@ console.log('Initializing RDO view with light theme...');
     background: var(--gradient-success); 
     color: white;
 }
+.status-aprovado {
+    background: linear-gradient(135deg, #0dcaf0, #0aa3c2);
+    color: white;
+}
 .status-em-andamento { 
     background: linear-gradient(135deg, var(--yellow-warning), #ffb700);
     color: white;
@@ -1154,11 +1158,8 @@ console.log('Initializing RDO view with light theme...');
                 <div class="info-row">
                     <span class="info-label">Status:</span>
                     <span class="info-value">
-                        {% set status_class = 'status-rascunho' %}
-                        {% if rdo.status == 'Finalizado' %}{% set status_class = 'status-finalizado' %}
-                        {% elif rdo.status in ['Em Andamento', 'Em andamento'] %}{% set status_class = 'status-em-andamento' %}
-                        {% endif %}
-                        <span class="status-badge {{ status_class }}">{{ rdo.status or 'Rascunho' }}</span>
+                        {% set _st = rdo.status or 'Finalizado' %}
+                        <span class="status-badge {% if _st == 'Aprovado' %}status-aprovado{% else %}status-finalizado{% endif %}">{{ _st }}</span>
                     </span>
                 </div>
             </div>

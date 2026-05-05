@@ -240,7 +240,6 @@ def rdos():
                 'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
                 'is_v2_progresso': getattr(rdo_view, 'is_v2_progresso', False),
                 'status_cor': {
-                    'Rascunho': 'warning',
                     'Finalizado': 'success',
                     'Aprovado': 'info'
                 }.get(rdo_view.status, 'secondary')
@@ -366,7 +365,6 @@ def rdos():
                     'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
                     'is_v2_progresso': getattr(rdo_view, 'is_v2_progresso', False),
                     'status_cor': {
-                        'Rascunho': 'warning',
                         'Finalizado': 'success',
                         'Aprovado': 'info'
                     }.get(rdo_view.status, 'secondary')
@@ -1700,10 +1698,8 @@ def atualizar_rdo(id):
         _old_data_relatorio = rdo.data_relatorio
         # Atualizar campos
         rdo.data_relatorio = data_relatorio
-        # Permite o caller decidir se está finalizando ou só salvando.
-        finalizar = (request.form.get('acao') == 'finalizar') or \
-                    (request.form.get('finalizar') in ('1', 'true', 'on'))
-        rdo.status = 'Finalizado' if finalizar else (rdo.status or 'Rascunho')
+        # Task #12: RDO sempre nasce/permanece Finalizado.
+        rdo.status = 'Finalizado'
         # Task #61 — clima alinhado à visualização (3 campos)
         _cg = (request.form.get('clima_geral') or '').strip()
         _tm = (request.form.get('temperatura_media') or '').strip()
@@ -1736,33 +1732,56 @@ def atualizar_rdo(id):
                 rdo.obra_id, data_relatorio, admin_id
             )
         
+        # Task #12: produtividade recalculada DENTRO da mesma transação que
+        # o save (igual à finalização legada). Os custos rodam pós-commit.
+        try:
+            from services.rdo_custos import recalcular_produtividade_rdo
+            recalcular_produtividade_rdo(rdo)
+        except Exception as _pe:
+            logger.warning(
+                "[produtividade] recalcular_produtividade_rdo falhou em "
+                "atualizar_rdo (RDO %s): %s — abortando save", rdo.id, _pe,
+            )
+            db.session.rollback()
+            flash('Erro ao recalcular produtividade do RDO.', 'error')
+            return redirect(url_for('main.editar_rdo', id=id))
+
         db.session.commit()
-        
-        # Emitir evento rdo_finalizado
-        if True:
-            try:
-                from event_manager import EventManager
-                EventManager.emit('rdo_finalizado', {
-                    'rdo_id': rdo.id,
-                    'obra_id': rdo.obra_id,
-                    'data_relatorio': str(rdo.data_relatorio)
-                }, admin_id)
-                logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
-            except Exception as e:
-                logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
 
-            # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
-            try:
-                from utils.catalogo_eventos import emit_obra_rdo_publicado
-                emit_obra_rdo_publicado(rdo, admin_id)
-            except Exception as _e_cat:
-                logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
+        # Task #12: pipeline de finalização (custos) idempotente
+        try:
+            from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+            gravar_custo_funcionario_rdo(rdo, admin_id)
+        except Exception as _ce:
+            logger.warning("[custo-dia] gravar_custo_funcionario_rdo falhou em atualizar_rdo: %s", _ce)
 
-        if finalizar:
-            flash(f'RDO {rdo.numero_rdo} atualizado e finalizado com sucesso!', 'success')
-        else:
-            flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
-        
+        try:
+            from services.rdo_custos import gerar_custos_mao_obra_rdo
+            gerar_custos_mao_obra_rdo(rdo, admin_id)
+        except Exception as _ce:
+            logger.warning("[rdo-custo] gerar_custos_mao_obra_rdo falhou em atualizar_rdo: %s", _ce)
+
+        # Emitir evento rdo_finalizado (handlers legados continuam consumindo)
+        try:
+            from event_manager import EventManager
+            EventManager.emit('rdo_finalizado', {
+                'rdo_id': rdo.id,
+                'obra_id': rdo.obra_id,
+                'data_relatorio': str(rdo.data_relatorio)
+            }, admin_id)
+            logger.info(f"[ALERT] Evento rdo_finalizado emitido para RDO {rdo.id}")
+        except Exception as e:
+            logger.error(f"[ERROR] Erro ao emitir evento rdo_finalizado: {e}")
+
+        # Task #45 — catálogo `dominio.acao`: obra.rdo_publicado.
+        try:
+            from utils.catalogo_eventos import emit_obra_rdo_publicado
+            emit_obra_rdo_publicado(rdo, admin_id)
+        except Exception as _e_cat:
+            logger.warning(f"#45: emit obra.rdo_publicado falhou (best-effort): {_e_cat}")
+
+        flash(f'RDO {rdo.numero_rdo} atualizado com sucesso!', 'success')
+
         return redirect(url_for('main.visualizar_rdo', id=id))
         
     except Exception as e:
@@ -2323,7 +2342,6 @@ def funcionario_rdo_consolidado():
                 'progresso_label': progresso_label,
                 'is_v2_progresso': obra_em_v2,
                 'status_cor': {
-                    'Rascunho': 'warning',
                     'Finalizado': 'success',
                     'Aprovado': 'info'
                 }.get(rdo.status, 'secondary')
@@ -2341,7 +2359,8 @@ def funcionario_rdo_consolidado():
         # Calcular estatísticas
         total_rdos = len(rdos_simples)
         rdos_finalizados = len([r for r in rdos_simples if r.status == 'Finalizado'])
-        rdos_andamento = len([r for r in rdos_simples if r.status in ['Rascunho', 'Em Andamento']])
+        # Task #12: RDO sempre Finalizado — não há mais 'Rascunho'/'Em Andamento'
+        rdos_andamento = 0
         
         # Progresso médio geral
         progresso_medio = sum(item['progresso_medio'] for item in rdos_processados) / len(rdos_processados) if rdos_processados else 0
@@ -2428,7 +2447,6 @@ def funcionario_rdo_consolidado():
                     'total_horas_trabalhadas': round(total_horas_trabalhadas, 1),
                     'progresso_medio': round(progresso_medio, 1),
                     'status_cor': {
-                        'Rascunho': 'warning',
                         'Finalizado': 'success',
                         'Aprovado': 'info'
                     }.get(rdo.status, 'secondary')
@@ -4643,7 +4661,15 @@ def salvar_rdo_flexivel():
                         logger.info(f"      - Novos objetos: {len(db.session.new)}")
                         logger.info(f"      - Objetos modificados: {len(db.session.dirty)}")
                         logger.info(f"      - Objetos deletados: {len(db.session.deleted)}")
-            
+
+            # Task #12: RDO sempre nasce 'Finalizado' (explícito, não só por
+            # default de modelo) + recalcular produtividade DENTRO da mesma
+            # transação que cria o RDO (mesma semântica da finalização legada).
+            rdo.status = 'Finalizado'
+            db.session.add(rdo)
+            from services.rdo_custos import recalcular_produtividade_rdo
+            recalcular_produtividade_rdo(rdo)
+
             db.session.commit()
             logger.info(f"[OK] [COMMIT] Commit executado com sucesso!")
             success = True
@@ -4793,6 +4819,26 @@ def salvar_rdo_flexivel():
             success = False
         
         if success:
+            # Task #12: pipeline de finalização (custos) idempotente — mesmo
+            # pipeline usado em atualizar_rdo / salvar_edicao_rdo.
+            try:
+                from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
+                gravar_custo_funcionario_rdo(rdo, admin_id)
+            except Exception as _ce:
+                logger.warning(
+                    "[custo-dia] gravar_custo_funcionario_rdo falhou em "
+                    "salvar_rdo_flexivel (RDO %s): %s", rdo.id, _ce,
+                )
+
+            try:
+                from services.rdo_custos import gerar_custos_mao_obra_rdo
+                gerar_custos_mao_obra_rdo(rdo, admin_id)
+            except Exception as _ce:
+                logger.warning(
+                    "[rdo-custo] gerar_custos_mao_obra_rdo falhou em "
+                    "salvar_rdo_flexivel (RDO %s): %s", rdo.id, _ce,
+                )
+
             # Emitir evento rdo_finalizado para lançamento automático de custos V2
             try:
                 from event_manager import EventManager

@@ -818,7 +818,7 @@ class RDO(db.Model):
     comentario_geral = db.Column(db.Text)
     
     # Status e controle
-    status = db.Column(db.String(20), default='Rascunho')  # Rascunho, Finalizado
+    status = db.Column(db.String(20), default='Finalizado')  # Task #12: RDO sempre Finalizado
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
