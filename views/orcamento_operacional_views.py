@@ -186,10 +186,10 @@ def salvar_item(obra_id: int, item_id: int):
             f'Item atualizado ({"nova versão a partir de hoje" if modo == "a_partir_de_hoje" else "aplicado retroativo"}).',
             'success',
         )
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         logger.exception('erro ao salvar item operacional')
-        flash(f'Erro: {e}', 'error')
+        flash('Não foi possível salvar este item. Verifique os dados informados e tente novamente.', 'danger')
     return redirect(url_for('orcamento_operacional.index', obra_id=obra.id))
 
 
@@ -221,8 +221,8 @@ def atualizar_do_original_route(obra_id: int):
             flash(f'{n} item(ns) atualizado(s) a partir do orçamento original.', 'success')
         else:
             flash('Nenhuma diferença encontrada (operacional já está alinhado com o original).', 'info')
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         logger.exception('erro ao atualizar do original')
-        flash(f'Erro: {e}', 'error')
+        flash('Não foi possível atualizar do orçamento original. Tente novamente.', 'danger')
     return redirect(url_for('orcamento_operacional.index', obra_id=obra.id))

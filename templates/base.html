@@ -764,20 +764,17 @@
                                     <li><a class="dropdown-item" href="{{ url_for('almoxarifado.dashboard') }}">
                                         <i class="fas fa-tachometer-alt me-2"></i> Dashboard
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_produtos') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.itens') }}">
                                         <i class="fas fa-boxes me-2"></i> Produtos
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_movimentacoes_estoque') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.movimentacoes') }}">
                                         <i class="fas fa-exchange-alt me-2"></i> Movimentações
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_categorias') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.categorias') }}">
                                         <i class="fas fa-tags me-2"></i> Categorias
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_fornecedores') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.fornecedores') }}">
                                         <i class="fas fa-truck me-2"></i> Fornecedores
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('almoxarifado.listar_notas_fiscais') }}">
-                                        <i class="fas fa-file-invoice me-2"></i> Notas Fiscais
                                     </a></li>
                                 </ul>
                             </div>
@@ -838,13 +835,13 @@
                                         <i class="fas fa-key me-2"></i> Acessos
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('main.departamentos') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('configuracoes.departamentos') }}">
                                         <i class="fas fa-sitemap me-2"></i> Departamentos
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('main.funcoes') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('configuracoes.funcoes') }}">
                                         <i class="fas fa-user-tie me-2"></i> Funções
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('main.horarios') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('configuracoes.horarios') }}">
                                         <i class="fas fa-clock me-2"></i> Horários de Trabalho
                                     </a></li>
                                 </ul>
@@ -864,26 +861,20 @@
                                     </a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><h6 class="dropdown-header">Sistema Avançado</h6></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.dashboard_integrado') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('frota.dashboard') }}">
                                         <i class="fas fa-tachometer-alt me-2"></i> Dashboard Integrado
                                     </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.listar_alocacoes') }}">
+                                    <li><a class="dropdown-item" href="{{ url_for('frota.lista') }}">
                                         <i class="fas fa-map-marked-alt me-2"></i> Alocações por Obra
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_obra.nova_alocacao') }}">
-                                        <i class="fas fa-plus-circle me-2"></i> Nova Alocação
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('veiculos_relatorios.index_relatorios') }}">
-                                        <i class="fas fa-chart-bar me-2"></i> Relatórios Avançados
                                     </a></li>
                                 </ul>
                             </div>
                             
-                            <a class="nav-link px-3 py-2" href="{{ url_for('alimentacao.listar_alimentacao') }}" style="white-space: nowrap;">
+                            <a class="nav-link px-3 py-2" href="{{ url_for('alimentacao.dashboard') }}" style="white-space: nowrap;">
                                 <i class="fas fa-utensils me-2"></i> Alimentação
                             </a>
                             
-                            <a class="nav-link px-3 py-2" href="{{ url_for('main.financeiro') }}" style="white-space: nowrap;">
+                            <a class="nav-link px-3 py-2" href="{{ url_for('financeiro.dashboard') }}" style="white-space: nowrap;">
                                 <i class="fas fa-dollar-sign me-2"></i> Financeiro
                             </a>
                             
@@ -895,7 +886,7 @@
                                 <i class="fas fa-calculator me-2"></i> Contabilidade
                             </a>
                             
-                            <a class="nav-link px-3 py-2" href="{{ url_for('main.relatorios') }}" style="white-space: nowrap;">
+                            <a class="nav-link px-3 py-2" href="{{ url_for('folha.relatorios') }}" style="white-space: nowrap;">
                                 <i class="fas fa-chart-bar me-2"></i> Relatórios
                             </a>
 
@@ -996,7 +987,9 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {% set _alert_cat = 'danger' if category == 'error'
+                                        else (category if category in ('success', 'danger', 'warning', 'info', 'primary', 'secondary') else 'success') %}
+                    <div class="alert alert-{{ _alert_cat }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>

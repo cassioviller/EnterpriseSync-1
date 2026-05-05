@@ -26,10 +26,14 @@
   {% if not operacional or not operacional.itens %}
   <div class="alert alert-warning">
     <i class="fas fa-exclamation-triangle me-1"></i>
-    Esta obra não possui itens no orçamento operacional. Isto acontece quando
-    a obra não tem orçamento original aprovado vinculado. Você pode preencher
-    manualmente abaixo (em breve) ou aprovar/vincular um orçamento à proposta
-    de origem da obra.
+    <strong>Esta obra ainda não possui itens no orçamento operacional.</strong>
+    O operacional é gerado automaticamente a partir do orçamento original
+    aprovado vinculado à proposta de origem da obra. Para ativá-lo:
+    <ol class="mb-0 mt-2">
+      <li>Verifique se a obra está vinculada a uma <strong>proposta</strong> com orçamento aprovado.</li>
+      <li>Garanta que o orçamento dessa proposta tenha <strong>itens com composição</strong> (insumos, mão-de-obra, etc.).</li>
+      <li>Recarregue esta página — a clonagem é feita automaticamente.</li>
+    </ol>
   </div>
   {% else %}
 
