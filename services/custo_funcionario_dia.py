@@ -10,6 +10,12 @@ Regras:
     proporção = horas_neste_rdo / total_horas_no_dia
 
 Idempotência: re-salvar o mesmo RDO atualiza a linha existente sem duplicar.
+
+Cross-RDO: ao salvar o RDO_A, recalcula também as linhas dos RDOs vizinhos
+  do mesmo dia para os mesmos funcionários (pois a proporção mudou).
+
+Ocioso→RDO: ao registrar custo tipo='rdo' para um funcionário+dia, remove a
+  linha ocioso_mensal correspondente (se existir) para evitar dupla contagem.
 """
 
 from __future__ import annotations
@@ -123,21 +129,93 @@ def calcular_custo_funcionario_no_rdo(
 
 
 # ────────────────────────────────────────────────────────────
+# Helpers internos
+# ────────────────────────────────────────────────────────────
+
+def _total_horas_dia(func_id: int, data_ref: date, admin_id: int) -> float:
+    """Soma de horas_trabalhadas de um funcionário em TODOS os RDOs do dia."""
+    from app import db
+    from models import RDOMaoObra, RDO
+    from sqlalchemy import func as sql_func
+
+    return float(
+        db.session.query(
+            sql_func.coalesce(sql_func.sum(RDOMaoObra.horas_trabalhadas), 0)
+        ).join(RDO, RDO.id == RDOMaoObra.rdo_id).filter(
+            RDOMaoObra.funcionario_id == func_id,
+            RDO.data_relatorio == data_ref,
+            RDO.admin_id == admin_id,
+        ).scalar() or 0.0
+    )
+
+
+def _gravar_registro(
+    rdo_id: int,
+    func_id: int,
+    admin_id: int,
+    data_ref: date,
+    comp: dict,
+) -> bool:
+    """Cria ou atualiza uma linha RDOCustoDiario; remove ocioso_mensal do mesmo dia."""
+    from app import db
+    from models import RDOCustoDiario
+
+    # Remove linha ocioso_mensal do mesmo funcionário/dia (se houver)
+    RDOCustoDiario.query.filter_by(
+        funcionario_id=func_id,
+        data=data_ref,
+        tipo_lancamento='ocioso_mensal',
+    ).delete(synchronize_session='fetch')
+
+    registro = RDOCustoDiario.query.filter_by(
+        rdo_id=rdo_id,
+        funcionario_id=func_id,
+    ).first()
+
+    if not registro:
+        registro = RDOCustoDiario(
+            rdo_id=rdo_id,
+            funcionario_id=func_id,
+            admin_id=admin_id,
+            tipo_lancamento='rdo',
+        )
+        db.session.add(registro)
+
+    registro.data                      = data_ref
+    registro.admin_id                  = admin_id
+    registro.tipo_remuneracao_snapshot = comp['tipo_remuneracao_snapshot']
+    registro.componente_folha          = comp['componente_folha']
+    registro.componente_va             = comp['componente_va']
+    registro.componente_vt             = comp['componente_vt']
+    registro.componente_extra          = comp['componente_extra']
+    registro.custo_total_dia           = comp['custo_total_dia']
+    registro.horas_normais             = comp['horas_normais']
+    registro.horas_extras              = comp['horas_extras']
+    registro.custo_hora_normal         = comp['custo_hora_normal']
+    registro.dias_uteis_mes_referencia = comp.get('dias_uteis_mes_referencia')
+    return True
+
+
+# ────────────────────────────────────────────────────────────
 # Hook principal: chamado após RDO salvo/editado
 # ────────────────────────────────────────────────────────────
 
 def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
     """
     Calcula e persiste RDOCustoDiario para cada funcionário do RDO.
-    Idempotente: re-salvar atualiza linha existente sem duplicar.
-    Recalcula a proporção considerando todos os RDOs do funcionário no dia.
 
-    Retorna número de linhas criadas/atualizadas.
+    Comportamento:
+      - Idempotente: re-salvar atualiza linha existente sem duplicar.
+      - Cross-RDO: recalcula proporção de TODOS os outros RDOs do mesmo dia
+        para os mesmos funcionários (total_horas_dia mudou após este save).
+      - Converte ocioso→rdo: remove linha ocioso_mensal do mesmo func/dia.
+      - Commita ao final (não depende de commit externo).
+
+    Retorna número de linhas criadas/atualizadas (RDO atual apenas).
     """
     try:
         from app import db
         from models import RDOMaoObra, Funcionario, RDOCustoDiario, RDO
-        from sqlalchemy import func as sql_func
 
         linhas_rdo = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
         if not linhas_rdo:
@@ -160,79 +238,109 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
             if not funcionario:
                 continue
 
-            total_horas_dia = db.session.query(
-                sql_func.coalesce(sql_func.sum(RDOMaoObra.horas_trabalhadas), 0)
-            ).join(RDO, RDO.id == RDOMaoObra.rdo_id).filter(
-                RDOMaoObra.funcionario_id == func_id,
-                RDO.data_relatorio == data_ref,
-                RDO.admin_id == admin_id,
-            ).scalar() or 0.0
-
+            total_horas = _total_horas_dia(func_id, data_ref, admin_id)
             horas_extras_no_rdo = extras_rdo.get(func_id, 0.0)
 
             comp = calcular_custo_funcionario_no_rdo(
                 funcionario,
                 horas_no_rdo,
-                float(total_horas_dia),
+                total_horas,
                 horas_extras_no_rdo,
                 data_ref,
             )
 
-            registro = RDOCustoDiario.query.filter_by(
-                rdo_id=rdo.id,
-                funcionario_id=func_id,
-            ).first()
-
-            if not registro:
-                registro = RDOCustoDiario(
-                    rdo_id=rdo.id,
-                    funcionario_id=func_id,
-                    admin_id=admin_id,
-                    tipo_lancamento='rdo',
-                )
-                db.session.add(registro)
-
-            registro.data                      = data_ref
-            registro.admin_id                  = admin_id
-            registro.tipo_remuneracao_snapshot = comp['tipo_remuneracao_snapshot']
-            registro.componente_folha          = comp['componente_folha']
-            registro.componente_va             = comp['componente_va']
-            registro.componente_vt             = comp['componente_vt']
-            registro.componente_extra          = comp['componente_extra']
-            registro.custo_total_dia           = comp['custo_total_dia']
-            registro.horas_normais             = comp['horas_normais']
-            registro.horas_extras              = comp['horas_extras']
-            registro.custo_hora_normal         = comp['custo_hora_normal']
-            registro.dias_uteis_mes_referencia = comp.get('dias_uteis_mes_referencia')
-
+            _gravar_registro(rdo.id, func_id, admin_id, data_ref, comp)
             atualizados += 1
 
-        db.session.flush()
+        # ── Cross-RDO: recalcular outros RDOs do mesmo dia ──────────────────
+        # Após atualizar este RDO, os funcionários que apareceram aqui também
+        # podem ter registros em outros RDOs do mesmo dia — suas proporções
+        # devem ser recalculadas porque total_horas_dia mudou.
+        func_ids = list(horas_rdo.keys())
+        outros_rdos = (
+            RDO.query
+            .join(RDOMaoObra, RDOMaoObra.rdo_id == RDO.id)
+            .filter(
+                RDO.data_relatorio == data_ref,
+                RDO.admin_id == admin_id,
+                RDO.id != rdo.id,
+                RDOMaoObra.funcionario_id.in_(func_ids),
+            )
+            .distinct()
+            .all()
+        )
+
+        for outro_rdo in outros_rdos:
+            linhas_outro = RDOMaoObra.query.filter(
+                RDOMaoObra.rdo_id == outro_rdo.id,
+                RDOMaoObra.funcionario_id.in_(func_ids),
+            ).all()
+
+            horas_outro: dict[int, float] = {}
+            extras_outro: dict[int, float] = {}
+            for linha in linhas_outro:
+                fid = linha.funcionario_id
+                horas_outro[fid] = horas_outro.get(fid, 0.0) + float(linha.horas_trabalhadas or 0)
+                extras_outro[fid] = extras_outro.get(fid, 0.0) + float(linha.horas_extras or 0)
+
+            for func_id, horas_no_outro in horas_outro.items():
+                funcionario = Funcionario.query.filter_by(
+                    id=func_id, admin_id=admin_id
+                ).first()
+                if not funcionario:
+                    continue
+
+                total_horas = _total_horas_dia(func_id, data_ref, admin_id)
+                comp = calcular_custo_funcionario_no_rdo(
+                    funcionario,
+                    horas_no_outro,
+                    total_horas,
+                    extras_outro.get(func_id, 0.0),
+                    data_ref,
+                )
+                _gravar_registro(outro_rdo.id, func_id, admin_id, data_ref, comp)
+
+        db.session.commit()
         logger.info(
-            "[custo-dia] RDO %s (%s): %d registro(s) gravados",
-            rdo.numero_rdo, data_ref, atualizados,
+            "[custo-dia] RDO %s (%s): %d registro(s) gravados; %d RDO(s) vizinho(s) recalculados",
+            rdo.numero_rdo, data_ref, atualizados, len(outros_rdos),
         )
         return atualizados
 
     except Exception:
-        logger.exception("gravar_custo_funcionario_rdo falhou (rdo_id=%s)", getattr(rdo, 'id', '?'))
+        logger.exception(
+            "gravar_custo_funcionario_rdo falhou (rdo_id=%s)", getattr(rdo, 'id', '?')
+        )
+        try:
+            from app import db
+            db.session.rollback()
+        except Exception:
+            pass
         return 0
 
 
 def remover_custo_diario_rdo(rdo_id: int) -> int:
-    """Remove todas as linhas RDOCustoDiario associadas a um RDO.
+    """Remove todas as linhas RDOCustoDiario tipo='rdo' associadas a um RDO.
     Deve ser chamada ANTES de deletar os RDOMaoObra (hook de edição).
+    Commita ao final.
     Retorna número de linhas removidas.
     """
     try:
         from app import db
         from models import RDOCustoDiario
-        n = RDOCustoDiario.query.filter_by(rdo_id=rdo_id, tipo_lancamento='rdo').delete()
-        db.session.flush()
+        n = RDOCustoDiario.query.filter_by(
+            rdo_id=rdo_id, tipo_lancamento='rdo'
+        ).delete(synchronize_session='fetch')
+        db.session.commit()
         logger.info("[custo-dia] removidas %d linhas do rdo_id=%s", n, rdo_id)
         return n
     except Exception:
         logger.exception("remover_custo_diario_rdo falhou (rdo_id=%s)", rdo_id)
+        try:
+            from app import db
+            db.session.rollback()
+        except Exception:
+            pass
         return 0
 
 
@@ -245,19 +353,32 @@ def obter_custo_funcionario_periodo(
     data_inicio: date,
     data_fim: date,
 ):
-    """Retorna lista de RDOCustoDiario para o funcionário no período."""
+    """
+    Retorna lista de RDOCustoDiario para o funcionário no período.
+
+    Regra de preferência por dia: se existirem registros tipo='rdo' e
+    tipo='ocioso_mensal' para o mesmo dia, retorna apenas os tipo='rdo'
+    (sem dupla contagem). Dias sem RDO retornam a linha ocioso_mensal.
+    """
     try:
         from models import RDOCustoDiario
-        return (
+        todos = (
             RDOCustoDiario.query
             .filter(
                 RDOCustoDiario.funcionario_id == funcionario_id,
                 RDOCustoDiario.data >= data_inicio,
                 RDOCustoDiario.data <= data_fim,
             )
-            .order_by(RDOCustoDiario.data)
+            .order_by(RDOCustoDiario.data, RDOCustoDiario.tipo_lancamento)
             .all()
         )
+
+        dias_com_rdo: set[date] = {r.data for r in todos if r.tipo_lancamento == 'rdo'}
+        return [
+            r for r in todos
+            if r.tipo_lancamento == 'rdo'
+            or r.data not in dias_com_rdo
+        ]
     except Exception:
         logger.exception("obter_custo_funcionario_periodo falhou")
         return []
@@ -274,11 +395,10 @@ def gerar_dias_ociosos_mensalista(
     admin_id: int,
 ) -> int:
     """
-    Cria entradas ocioso_mensal para dias úteis sem RDO de um mensalista.
-    Idempotente: não recria linha se já houver qualquer lançamento naquele dia.
-    Se um RDO atrasado chega para um dia ocioso, o gravar_custo_funcionario_rdo
-    criará/atualizará a linha com tipo='rdo' — a linha ociosa permanece intacta;
-    a lógica de consulta deve preferir o registro tipo='rdo' quando ambos existirem.
+    Cria entradas ocioso_mensal para dias úteis sem qualquer RDO de um mensalista.
+    Idempotente: não recria linha se já houver qualquer lançamento (rdo ou ocioso)
+    naquele dia.
+    Commita ao final.
     Retorna número de linhas criadas.
     """
     try:
@@ -340,7 +460,7 @@ def gerar_dias_ociosos_mensalista(
             criados += 1
 
         if criados:
-            db.session.flush()
+            db.session.commit()
         logger.info(
             "[custo-dia] ocioso func=%d %d/%d: %d dias criados",
             funcionario_id, ano, mes, criados,
@@ -352,4 +472,9 @@ def gerar_dias_ociosos_mensalista(
             "gerar_dias_ociosos_mensalista falhou func=%s %s/%s",
             funcionario_id, ano, mes,
         )
+        try:
+            from app import db
+            db.session.rollback()
+        except Exception:
+            pass
         return 0

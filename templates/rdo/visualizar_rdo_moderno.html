@@ -1603,7 +1603,8 @@ console.log('Initializing RDO view with light theme...');
                         </span>
                         {% endif %}
                     </div>
-                    {% if custos_dia_map is defined and funcionario.funcionario %}
+                    {% if custos_dia_map is defined and custos_dia_map and funcionario.funcionario
+                          and current_user.tipo_usuario.value in ['admin', 'super_admin'] %}
                     {% set _custo = custos_dia_map.get(funcionario.funcionario.id) %}
                     {% if _custo %}
                     <div class="mt-1 w-100" style="font-size:.78rem;">
