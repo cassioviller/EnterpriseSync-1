@@ -18,28 +18,53 @@
     </a>
   {% endcall %}
 
-  {# KPI bar de cabeçalho #}
+  {# KPI bar de cabeçalho — 6 totais agregados do período. #}
+  {% set agg = namespace(hh=0, custo=0, receita=0, lucro=0, idx_num=0, idx_den=0) %}
+  {% for m in metricas %}
+    {% set agg.hh = agg.hh + (m.total_hh or 0) %}
+    {% if m.custo_real_medio_un is not none and m.total_produzido %}
+      {% set agg.custo = agg.custo + m.custo_real_medio_un * m.total_produzido %}
+    {% endif %}
+    {% if m.receita_liq_media_un is not none and m.total_produzido %}
+      {% set agg.receita = agg.receita + m.receita_liq_media_un * m.total_produzido %}
+    {% endif %}
+    {% if m.lucro_real_medio_un is not none and m.total_produzido %}
+      {% set agg.lucro = agg.lucro + m.lucro_real_medio_un * m.total_produzido %}
+    {% endif %}
+    {% if m.indice_pct is not none and m.total_hh %}
+      {% set agg.idx_num = agg.idx_num + m.indice_pct * m.total_hh %}
+      {% set agg.idx_den = agg.idx_den + m.total_hh %}
+    {% endif %}
+  {% endfor %}
+  {% set idx_medio = (agg.idx_num / agg.idx_den) if agg.idx_den > 0 else None %}
+
   <div class="row g-2 mb-3">
-    <div class="col-6 col-md-3">
-      {{ kpi_card('Serviços com dados', metricas|length, color='dark', icon='fa-tools') }}
+    <div class="col-6 col-md-2">
+      {{ kpi_card('Serviços', metricas|length, color='dark', icon='fa-tools') }}
     </div>
-    <div class="col-6 col-md-3">
-      {# Jinja não persiste {% set %} fora do for — usar namespace() para contagem #}
-      {% set ns = namespace(n_div=0) %}
-      {% for m in metricas %}
-        {% if (m.indice_pct is not none and m.indice_pct < 100) or (m.lucro_real_medio_un is not none and m.lucro_real_medio_un < 0) %}
-          {% set ns.n_div = ns.n_div + 1 %}
-        {% endif %}
-      {% endfor %}
-      {{ kpi_card('Com divergências', ns.n_div, color=('danger' if ns.n_div > 0 else 'success'), icon='fa-exclamation-triangle') }}
+    <div class="col-6 col-md-2">
+      {{ kpi_card('Total HH', '%.0f'|format(agg.hh) ~ 'h', color='primary', icon='fa-clock') }}
     </div>
-    <div class="col-6 col-md-3">
-      {% set n_gargalo = metricas|selectattr('papel_gargalo_nome')|list|length %}
-      {{ kpi_card('Com gargalo', n_gargalo, color=('warning' if n_gargalo > 0 else 'dark'), icon='fa-compress-arrows-alt') }}
+    <div class="col-6 col-md-2">
+      {{ kpi_card('Custo total', agg.custo|brl, color='warning', icon='fa-coins') }}
     </div>
-    <div class="col-6 col-md-3">
-      {% set n_aplicar = metricas|selectattr('pode_aplicar_referencia')|list|length %}
-      {{ kpi_card('Pode atualizar catálogo', n_aplicar, color='primary', icon='fa-sync-alt') }}
+    <div class="col-6 col-md-2">
+      {{ kpi_card('Receita total', agg.receita|brl, color='info', icon='fa-file-invoice-dollar') }}
+    </div>
+    <div class="col-6 col-md-2">
+      {{ kpi_card('Lucro total', agg.lucro|brl,
+                  color=('success' if agg.lucro >= 0 else 'danger'),
+                  icon='fa-chart-line') }}
+    </div>
+    <div class="col-6 col-md-2">
+      {{ kpi_card('Índice médio',
+                  ('%.0f'|format(idx_medio) ~ '%') if idx_medio is not none else '—',
+                  color=('success' if idx_medio is not none and idx_medio >= 90
+                         else 'warning' if idx_medio is not none and idx_medio >= 70
+                         else 'danger' if idx_medio is not none
+                         else 'muted'),
+                  icon='fa-tachometer-alt',
+                  hint='ponderado por HH') }}
     </div>
   </div>
 

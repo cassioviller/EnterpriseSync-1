@@ -202,10 +202,10 @@
                   </td>
                   <td class="text-end small">{{ '%.1f'|format(f.horas) }}</td>
                   <td class="text-end small">
-                    {% if f.custo is not none %}{{ '%.0f'|format(f.custo) }}{% else %}—{% endif %}
+                    {% if f.custo is not none %}{{ f.custo|brl }}{% else %}—{% endif %}
                   </td>
                   <td class="text-end small {% if f.lucro is not none and f.lucro < 0 %}text-danger{% endif %}">
-                    {% if f.lucro is not none %}{{ '%.0f'|format(f.lucro) }}{% else %}—{% endif %}
+                    {% if f.lucro is not none %}{{ f.lucro|brl }}{% else %}—{% endif %}
                   </td>
                 </tr>
                 {% endfor %}
