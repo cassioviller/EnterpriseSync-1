@@ -14,6 +14,9 @@ Os casos vêm direto da seção "Steps → Testes" da Task #38:
   - 3 tarefas, sem peso (apontador pulou) → 8/3h cada.
   - Mistura: principal com peso, NULLs dividem o restante igual.
 
+Task #5 — hora extra removida do RDO. As tuplas agora seguem o
+formato ``(func_id, atividade_key, horas, *meta)`` (sem horas_extras).
+
 Executar com:
     pytest tests/utils/test_rdo_horas.py -q
 """
@@ -48,26 +51,26 @@ def _aprox(a: float, b: float, tol: float = 1e-6) -> bool:
 
 
 def test_funcionario_em_uma_tarefa_nao_altera():
-    entries = [(10, ('sub', 'A'), 8.0, 0.0)]
+    entries = [(10, ('sub', 'A'), 8.0)]
     resultado = normalizar_horas_funcionario(entries)
-    assert resultado == [(10, ('sub', 'A'), 8.0, 0.0)]
+    assert resultado == [(10, ('sub', 'A'), 8.0)]
 
 
 def test_funcionario_em_uma_tarefa_painel_nao_aparece_helper_sem_pesos():
     """Mesmo que o caller passe `pesos`, helper ignora se N==1 (sem painel)."""
-    entries = [(10, ('sub', 'A'), 8.0, 0.0)]
+    entries = [(10, ('sub', 'A'), 8.0)]
     resultado = normalizar_horas_funcionario(
         entries, pesos={(10, ('sub', 'A')): 70}
     )
-    assert resultado == [(10, ('sub', 'A'), 8.0, 0.0)]
+    assert resultado == [(10, ('sub', 'A'), 8.0)]
 
 
 def test_divisao_igual_entre_3_atividades_quando_sem_peso():
     """Cenário histórico: 3 tarefas, sem pesos → 8/3h cada (~2,67h)."""
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
-        (10, ('sub', 'C'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
+        (10, ('sub', 'C'), 8.0),
     ]
     resultado = normalizar_horas_funcionario(entries)
     horas = _horas_por_chave(resultado, 10)
@@ -76,16 +79,15 @@ def test_divisao_igual_entre_3_atividades_quando_sem_peso():
         assert _aprox(horas[k], esperado), f"chave {k}: {horas[k]} != {esperado}"
 
 
-def test_divisao_igual_preserva_horas_extras_e_metadados():
+def test_divisao_igual_preserva_metadados():
     entries = [
-        (10, ('sub', 'A'), 8.0, 2.0, 'pedreiro'),
-        (10, ('sub', 'B'), 8.0, 2.0, 'pedreiro'),
+        (10, ('sub', 'A'), 8.0, 'pedreiro'),
+        (10, ('sub', 'B'), 8.0, 'pedreiro'),
     ]
     resultado = normalizar_horas_funcionario(entries)
     for item in resultado:
         assert _aprox(item[2], 4.0)
-        assert _aprox(item[3], 1.0)
-        assert item[4] == 'pedreiro'
+        assert item[3] == 'pedreiro'
 
 
 # ── Distribuição com pesos (Task #38) ────────────────────────────────────
@@ -94,8 +96,8 @@ def test_divisao_igual_preserva_horas_extras_e_metadados():
 def test_2_tarefas_principal_70_gera_56h_e_24h():
     """Caso clássico do PRD: 8h, principal 70% → 5,6h / 2,4h."""
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 70}  # 'B' fica NULL
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -106,8 +108,8 @@ def test_2_tarefas_principal_70_gera_56h_e_24h():
 
 def test_2_tarefas_principal_50_gera_4h_e_4h():
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 50}
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -118,9 +120,9 @@ def test_2_tarefas_principal_50_gera_4h_e_4h():
 
 def test_3_tarefas_principal_80_gera_64h_e_08h_e_08h():
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
-        (10, ('sub', 'C'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
+        (10, ('sub', 'C'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 80}
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -132,9 +134,9 @@ def test_3_tarefas_principal_80_gera_64h_e_08h_e_08h():
 
 def test_3_tarefas_principal_100_gera_8h_e_zeros():
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
-        (10, ('sub', 'C'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
+        (10, ('sub', 'C'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 100}
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -146,9 +148,9 @@ def test_3_tarefas_principal_100_gera_8h_e_zeros():
 
 def test_3_tarefas_principal_0_gera_0h_e_4h_e_4h():
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
-        (10, ('sub', 'C'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
+        (10, ('sub', 'C'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 0}
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -161,9 +163,9 @@ def test_3_tarefas_principal_0_gera_0h_e_4h_e_4h():
 def test_mistura_peso_principal_e_outros_null_distribuem_restante():
     """3 tarefas, principal 60%, outras 2 NULL → 4,8h / 1,6h / 1,6h."""
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
-        (10, ('sub', 'C'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
+        (10, ('sub', 'C'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 60}
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -173,31 +175,14 @@ def test_mistura_peso_principal_e_outros_null_distribuem_restante():
     assert _aprox(horas[('sub', 'C')], 1.6)
 
 
-def test_pesos_aplicam_proporcionalmente_as_horas_extras():
-    """Mesma fração se aplica às horas extras (Task #38 out-of-scope #3)."""
-    entries = [
-        (10, ('sub', 'A'), 8.0, 2.0),
-        (10, ('sub', 'B'), 8.0, 2.0),
-    ]
-    pesos = {(10, ('sub', 'A')): 75}
-    resultado = normalizar_horas_funcionario(entries, pesos=pesos)
-    horas = _horas_por_chave(resultado, 10)
-    assert _aprox(horas[('sub', 'A')], 6.0)
-    assert _aprox(horas[('sub', 'B')], 2.0)
-    extras_a = next(item[3] for item in resultado if item[1] == ('sub', 'A'))
-    extras_b = next(item[3] for item in resultado if item[1] == ('sub', 'B'))
-    assert _aprox(extras_a, 1.5)  # 75% de 2,0
-    assert _aprox(extras_b, 0.5)  # 25% de 2,0
-
-
 def test_pesos_so_de_um_funcionario_nao_afetam_outro_grupo():
     """Funcionário 11 não tem pesos → mantém divisão igual mesmo
     quando o funcionário 10 tem pesos definidos no mesmo dict."""
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
-        (11, ('sub', 'A'), 8.0, 0.0),
-        (11, ('sub', 'C'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
+        (11, ('sub', 'A'), 8.0),
+        (11, ('sub', 'C'), 8.0),
     ]
     pesos = {(10, ('sub', 'A')): 70}
     resultado = normalizar_horas_funcionario(entries, pesos=pesos)
@@ -212,8 +197,8 @@ def test_pesos_so_de_um_funcionario_nao_afetam_outro_grupo():
 def test_pesos_clamp_acima_de_100_e_abaixo_de_0():
     """Apontador digitando 150 ou -10 → clamp 100/0 dentro do helper."""
     entries = [
-        (10, ('sub', 'A'), 8.0, 0.0),
-        (10, ('sub', 'B'), 8.0, 0.0),
+        (10, ('sub', 'A'), 8.0),
+        (10, ('sub', 'B'), 8.0),
     ]
     resultado_alto = normalizar_horas_funcionario(
         entries, pesos={(10, ('sub', 'A')): 150}

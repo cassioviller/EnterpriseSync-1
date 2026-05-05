@@ -1080,7 +1080,7 @@ def _seed():
             db.session.add(RDOMaoObra(
                 admin_id=aid, rdo_id=rdo.id,
                 funcionario_id=carlos.id, funcao_exercida="Pedreiro (mensalista)",
-                horas_trabalhadas=horas, horas_extras=0.0,
+                horas_trabalhadas=horas,
                 tarefa_cronograma_id=folha.id,
                 subatividade_id=rss.id,
             ))
@@ -1092,7 +1092,7 @@ def _seed():
                 db.session.add(RDOMaoObra(
                     admin_id=aid, rdo_id=rdo.id,
                     funcionario_id=_diar.id, funcao_exercida=_func,
-                    horas_trabalhadas=horas, horas_extras=0.0,
+                    horas_trabalhadas=horas,
                     tarefa_cronograma_id=folha.id,
                     subatividade_id=rss.id,
                 ))
@@ -2070,18 +2070,20 @@ def _seed():
     # abaixo na 3ª semana → permanece -5% até a recuperação no idx 7).
     # Essa divergência alimenta /metricas/servico (Empresa por Serviço,
     # índice < 100 em alguns RDOs) e /metricas/divergencia/servico/<id>.
+    # Task #5 — hora extra removida do RDO. Tuplas mantidas como
+    # (data, perc_realizado, horas, perc_anterior, perc_planejado).
     rdos_pin_dados = [
-        # (data, perc_realizado, horas, horas_extras, perc_anterior, perc_planejado)
-        (date(2026, 2, 3),  10.0, 8.0, 0.0,  0.0,  10.0),  # arranque (no plano)
-        (date(2026, 2, 10), 20.0, 9.0, 1.0, 10.0,  20.0),  # extra leve
-        (date(2026, 2, 17), 25.0, 6.0, 0.0, 20.0,  30.0),  # ABAIXO do orçado (-5%)
-        (date(2026, 2, 24), 35.0, 8.0, 0.0, 25.0,  40.0),  # ausência Marcos (-5%)
-        (date(2026, 3, 3),  45.0, 10.0, 2.0, 35.0, 50.0),  # turno estendido (-5%)
-        (date(2026, 3, 10), 55.0, 8.0, 0.0, 45.0,  60.0),  # ainda -5%
-        (date(2026, 3, 17), 70.0, 9.5, 1.5, 55.0,  70.0),  # COMPENSAÇÃO — alinhado
-        (date(2026, 3, 24), 80.0, 8.0, 0.0, 70.0,  80.0),
-        (date(2026, 3, 31), 90.0, 7.0, 0.0, 80.0,  90.0),  # dia chuvoso
-        (date(2026, 4, 7), 100.0, 8.5, 0.5, 90.0, 100.0),  # entrega final
+        # (data, perc_realizado, horas, perc_anterior, perc_planejado)
+        (date(2026, 2, 3),  10.0, 8.0,   0.0,  10.0),
+        (date(2026, 2, 10), 20.0, 9.0,  10.0,  20.0),
+        (date(2026, 2, 17), 25.0, 6.0,  20.0,  30.0),  # ABAIXO do orçado
+        (date(2026, 2, 24), 35.0, 8.0,  25.0,  40.0),  # ausência Marcos
+        (date(2026, 3, 3),  45.0, 10.0, 35.0,  50.0),  # turno estendido
+        (date(2026, 3, 10), 55.0, 8.0,  45.0,  60.0),
+        (date(2026, 3, 17), 70.0, 9.5,  55.0,  70.0),  # COMPENSAÇÃO
+        (date(2026, 3, 24), 80.0, 8.0,  70.0,  80.0),
+        (date(2026, 3, 31), 90.0, 7.0,  80.0,  90.0),  # dia chuvoso
+        (date(2026, 4, 7), 100.0, 8.5,  90.0, 100.0),  # entrega final
     ]
     omitir_diarista_no_idx = {4: marcos.id, 7: joao.id}
     # Tipo + severidade da ocorrência por RDO — garante mix Baixa/Média
@@ -2101,7 +2103,7 @@ def _seed():
 
     from models import RDOApontamentoCronograma as _RAC_pin
     _v2_acum_pin = {}
-    for idx, (dt, perc_destino, horas, horas_extras, perc_anterior,
+    for idx, (dt, perc_destino, horas, perc_anterior,
               perc_planejado) in enumerate(rdos_pin_dados, start=1):
         omitir_id = omitir_diarista_no_idx.get(idx)
         rdo = RDO(
@@ -2115,8 +2117,7 @@ def _seed():
             comentario_geral=(
                 f"Avanço semanal — meta {perc_destino:.0f}% "
                 f"(incremento de {perc_destino - perc_anterior:.0f}%, "
-                f"jornada {horas:.1f}h"
-                f"{' + ' + str(horas_extras) + 'h extras' if horas_extras else ''})."
+                f"jornada {horas:.1f}h)."
             ),
             # Task #6 — Rascunho; finalizado abaixo via emit do evento.
             status="Rascunho",
@@ -2156,7 +2157,7 @@ def _seed():
                 admin_id=aid, rdo_id=rdo.id,
                 funcionario_id=carlos.id,
                 funcao_exercida="Pedreiro (mensalista)",
-                horas_trabalhadas=horas, horas_extras=horas_extras,
+                horas_trabalhadas=horas,
                 tarefa_cronograma_id=folha.id,
                 subatividade_id=rss.id,
             ))
@@ -2170,7 +2171,7 @@ def _seed():
                 db.session.add(RDOMaoObra(
                     admin_id=aid, rdo_id=rdo.id,
                     funcionario_id=_diar.id, funcao_exercida=_func,
-                    horas_trabalhadas=horas, horas_extras=horas_extras,
+                    horas_trabalhadas=horas,
                     tarefa_cronograma_id=folha.id,
                     subatividade_id=rss.id,
                 ))

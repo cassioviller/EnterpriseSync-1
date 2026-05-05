@@ -5,9 +5,13 @@ Custo diário de mão-de-obra por funcionário, com persistência em RDOCustoDia
 
 Regras:
   Diarista  — custo = valor_diaria * proporção_horas + VA + VT
-  Mensalista — custo = salário / dias_úteis_mês * horas_no_rdo + extras (×1.5) + VA + VT
+  Mensalista — custo = salário / dias_úteis_mês * horas_no_rdo + VA + VT
   Rateio proporcional quando o funcionário aparece em >1 RDO no mesmo dia:
     proporção = horas_neste_rdo / total_horas_no_dia
+
+Task #5: hora extra foi removida do RDO. O componente_extra é sempre
+zero aqui — hora extra continua existindo no Ponto Eletrônico/Folha
+de Pagamento, mas não no RDO.
 
 Idempotência: re-salvar o mesmo RDO atualiza a linha existente sem duplicar.
 
@@ -49,17 +53,19 @@ def calcular_custo_funcionario_no_rdo(
     funcionario,
     horas_no_rdo: float,
     horas_totais_dia: float,
-    horas_extras_no_rdo: float,
     data_ref: date,
 ) -> dict:
     """
     Calcula os componentes de custo proporcional de um funcionário para um único RDO.
 
+    Task #5: hora extra foi removida do RDO. ``componente_extra`` e
+    ``horas_extras`` ficam sempre em zero — o cálculo de folha do RDO
+    é apenas ``horas × valor_hora`` (mais VA/VT).
+
     Args:
         funcionario       : instância de Funcionario
         horas_no_rdo      : horas normais que este funcionário trabalhou NESTE RDO
         horas_totais_dia  : total de horas normais do funcionário em TODOS os RDOs do dia
-        horas_extras_no_rdo: horas extras neste RDO
         data_ref          : date do RDO (usado para calcular días úteis do mês)
 
     Returns dict com campos:
@@ -77,7 +83,7 @@ def calcular_custo_funcionario_no_rdo(
     resultado: dict = {
         'tipo_remuneracao_snapshot': tipo,
         'horas_normais': float(horas_no_rdo),
-        'horas_extras': float(horas_extras_no_rdo),
+        'horas_extras': 0.0,
         'componente_folha': Decimal('0'),
         'componente_va': Decimal(str(round(valor_va * proporcao, 2))),
         'componente_vt': Decimal(str(round(valor_vt * proporcao, 2))),
@@ -94,11 +100,6 @@ def calcular_custo_funcionario_no_rdo(
             resultado['custo_hora_normal'] = Decimal(
                 str(round(valor_diaria / horas_no_rdo, 4))
             )
-        if horas_extras_no_rdo > 0 and resultado['custo_hora_normal']:
-            extra_valor = Decimal(str(
-                round(horas_extras_no_rdo * float(resultado['custo_hora_normal']) * 1.5, 2)
-            ))
-            resultado['componente_extra'] = extra_valor
     else:
         du = dias_uteis_mes(data_ref.year, data_ref.month)
         resultado['dias_uteis_mes_referencia'] = du
@@ -114,10 +115,6 @@ def calcular_custo_funcionario_no_rdo(
         custo_normal = float(horas_no_rdo) * vh
         resultado['componente_folha'] = Decimal(str(round(custo_normal, 2)))
         resultado['custo_hora_normal'] = Decimal(str(round(vh, 4))) if vh > 0 else None
-
-        if horas_extras_no_rdo > 0 and vh > 0:
-            extra_valor = Decimal(str(round(horas_extras_no_rdo * vh * 1.5, 2)))
-            resultado['componente_extra'] = extra_valor
 
     resultado['custo_total_dia'] = (
         resultado['componente_folha']
@@ -222,11 +219,9 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
             return 0
 
         horas_rdo: dict[int, float] = {}
-        extras_rdo: dict[int, float] = {}
         for linha in linhas_rdo:
             fid = linha.funcionario_id
             horas_rdo[fid] = horas_rdo.get(fid, 0.0) + float(linha.horas_trabalhadas or 0)
-            extras_rdo[fid] = extras_rdo.get(fid, 0.0) + float(linha.horas_extras or 0)
 
         data_ref = rdo.data_relatorio
         atualizados = 0
@@ -239,13 +234,11 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
                 continue
 
             total_horas = _total_horas_dia(func_id, data_ref, admin_id)
-            horas_extras_no_rdo = extras_rdo.get(func_id, 0.0)
 
             comp = calcular_custo_funcionario_no_rdo(
                 funcionario,
                 horas_no_rdo,
                 total_horas,
-                horas_extras_no_rdo,
                 data_ref,
             )
 
@@ -277,11 +270,9 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
             ).all()
 
             horas_outro: dict[int, float] = {}
-            extras_outro: dict[int, float] = {}
             for linha in linhas_outro:
                 fid = linha.funcionario_id
                 horas_outro[fid] = horas_outro.get(fid, 0.0) + float(linha.horas_trabalhadas or 0)
-                extras_outro[fid] = extras_outro.get(fid, 0.0) + float(linha.horas_extras or 0)
 
             for func_id, horas_no_outro in horas_outro.items():
                 funcionario = Funcionario.query.filter_by(
@@ -295,7 +286,6 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
                     funcionario,
                     horas_no_outro,
                     total_horas,
-                    extras_outro.get(func_id, 0.0),
                     data_ref,
                 )
                 _gravar_registro(outro_rdo.id, func_id, admin_id, data_ref, comp)

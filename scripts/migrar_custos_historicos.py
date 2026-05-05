@@ -70,11 +70,9 @@ def migrar(admin_id: int | None = None, limite_rdos: int | None = None) -> dict:
                     continue
 
                 horas_rdo: dict[int, float] = {}
-                extras_rdo: dict[int, float] = {}
                 for linha in linhas:
                     fid = linha.funcionario_id
                     horas_rdo[fid] = horas_rdo.get(fid, 0.0) + float(linha.horas_trabalhadas or 0)
-                    extras_rdo[fid] = extras_rdo.get(fid, 0.0) + float(linha.horas_extras or 0)
 
                 data_ref = rdo.data_relatorio
                 qualquer_criado = False
@@ -101,13 +99,10 @@ def migrar(admin_id: int | None = None, limite_rdos: int | None = None) -> dict:
                         RDO.admin_id == aid,
                     ).scalar() or 0.0
 
-                    horas_extras_no_rdo = extras_rdo.get(func_id, 0.0)
-
                     comp = calcular_custo_funcionario_no_rdo(
                         funcionario,
                         horas_no_rdo,
                         float(total_horas_dia),
-                        horas_extras_no_rdo,
                         data_ref,
                     )
 

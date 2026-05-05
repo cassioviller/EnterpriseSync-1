@@ -884,7 +884,8 @@ class RDOMaoObra(db.Model):
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
     funcao_exercida = db.Column(db.String(100), nullable=False)
     horas_trabalhadas = db.Column(db.Float, nullable=False)
-    horas_extras = db.Column(db.Float, nullable=True, default=0.0)
+    # Task #5 — coluna horas_extras removida do RDO. Hora extra continua
+    # apenas no Ponto Eletrônico/Folha de Pagamento.
     subatividade_id = db.Column(db.Integer, db.ForeignKey('rdo_servico_subatividade.id', ondelete='CASCADE'), nullable=True)
     tarefa_cronograma_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'), nullable=True)
 

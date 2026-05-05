@@ -195,7 +195,7 @@ def rdos():
                         if horas <= 0 or not mo.funcionario_id:
                             continue
                         key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
-                        entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+                        entradas.append((mo.funcionario_id, key, horas))
                     norm = _norm_horas(entradas)
                     horas_reais = sum(e[2] for e in norm)
 
@@ -333,7 +333,7 @@ def rdos():
                         if horas <= 0 or not mo.funcionario_id:
                             continue
                         key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
-                        entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+                        entradas.append((mo.funcionario_id, key, horas))
                     norm = _norm(entradas)
                     rdo.horas_totais = round(sum(e[2] for e in norm), 1)
                     rdo.servico_subatividades = subatividades
@@ -693,8 +693,9 @@ def criar_rdo():
                 # não tem dimensão de subatividade, usamos o índice da
                 # entrada como atividade_key — assim, o mesmo funcionário
                 # aparecendo N vezes na lista divide as horas por N.
+                # Task #5 — hora extra removida do RDO.
                 from utils.rdo_horas import normalizar_horas_funcionario
-                entradas_brutas = []  # (func_id, idx, horas, horas_extras, funcao)
+                entradas_brutas = []  # (func_id, idx, horas, funcao)
                 for i, mo_data in enumerate(mao_obra_list):
                     funcionario_id = mo_data.get('funcionario_id')
                     if not funcionario_id or funcionario_id == '':
@@ -705,28 +706,23 @@ def criar_rdo():
                         continue
                     if horas <= 0:
                         continue
-                    try:
-                        extras = float(mo_data.get('horas_extras', 0) or 0)
-                    except (ValueError, TypeError):
-                        extras = 0.0
                     funcao = mo_data.get('funcao', '').strip()
                     entradas_brutas.append(
-                        (int(funcionario_id), ('mo_idx', i), horas, max(0.0, extras), funcao)
+                        (int(funcionario_id), ('mo_idx', i), horas, funcao)
                     )
 
                 entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
                 for j, entrada in enumerate(entradas_normalizadas):
-                    func_id_n, _key, horas_n, extras_n = entrada[0], entrada[1], entrada[2], entrada[3]
-                    funcao_n = entrada[4] if len(entrada) > 4 else ''
+                    func_id_n, _key, horas_n = entrada[0], entrada[1], entrada[2]
+                    funcao_n = entrada[3] if len(entrada) > 3 else ''
                     mao_obra = RDOMaoObra()
                     mao_obra.rdo_id = rdo.id
                     mao_obra.funcionario_id = func_id_n
                     mao_obra.funcao_exercida = funcao_n
                     mao_obra.horas_trabalhadas = horas_n
-                    mao_obra.horas_extras = extras_n
                     mao_obra.admin_id = admin_id
                     db.session.add(mao_obra)
-                    logger.debug(f"DEBUG: Mão de obra {j+1} adicionada: Funcionário {func_id_n} - {horas_n:.2f}h (extras {extras_n:.2f}h)")
+                    logger.debug(f"DEBUG: Mão de obra {j+1} adicionada: Funcionário {func_id_n} - {horas_n:.2f}h")
 
             except (json.JSONDecodeError, ValueError) as e:
                 logger.error(f"Erro ao processar mão de obra: {e}")
@@ -965,6 +961,7 @@ def visualizar_rdo(id):
         # 8.8h = 44h por funcionário). A normalização divide a
         # jornada-base entre as atividades distintas, respeitando
         # pesos da Task #38 quando informados.
+        # Task #5 — hora extra removida do RDO.
         from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
         entradas = []
         pesos = {}
@@ -973,12 +970,12 @@ def visualizar_rdo(id):
             if horas <= 0 or not mo.funcionario_id:
                 continue
             key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
-            entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+            entradas.append((mo.funcionario_id, key, horas))
             peso = getattr(mo, 'peso_distribuicao', None)
             if peso is not None:
                 pesos[(mo.funcionario_id, key)] = peso
         norm = _norm_horas(entradas, pesos=pesos) if pesos else _norm_horas(entradas)
-        horas_norm_map = {(e[0], e[1]): (e[2], e[3]) for e in norm}
+        horas_norm_map = {(e[0], e[1]): e[2] for e in norm}
 
         # Agrupar por funcionário: 1 card por pessoa, com a lista de
         # atividades em que ele aparece. Horas usam o valor normalizado
@@ -989,15 +986,13 @@ def visualizar_rdo(id):
             if not mo.funcionario_id:
                 continue
             key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
-            horas_n, extras_n = horas_norm_map.get((mo.funcionario_id, key), (0.0, 0.0))
+            horas_n = horas_norm_map.get((mo.funcionario_id, key), 0.0)
             entry = funcionarios_dict.setdefault(mo.funcionario_id, {
                 'funcionario': mo.funcionario,
                 'horas_trabalhadas': 0.0,
-                'horas_extras': 0.0,
                 'atividades': [],
             })
             entry['horas_trabalhadas'] += horas_n
-            entry['horas_extras'] += extras_n
 
             nome_atividade = None
             if mo.subatividade and mo.subatividade.nome_subatividade:
@@ -2281,7 +2276,7 @@ def funcionario_rdo_consolidado():
                     if _h <= 0 or not _mo.funcionario_id:
                         continue
                     _key = ('sub', _mo.subatividade_id) if _mo.subatividade_id else ('row', _mo.id)
-                    _entradas.append((_mo.funcionario_id, _key, _h, float(_mo.horas_extras or 0)))
+                    _entradas.append((_mo.funcionario_id, _key, _h))
                 total_horas_trabalhadas = round(sum(e[2] for e in _norm_horas(_entradas)), 1)
 
                 # ── Detectar se a obra opera em modo V2 (cronograma) ──
@@ -2427,7 +2422,7 @@ def funcionario_rdo_consolidado():
                         if _h <= 0 or not _mo.funcionario_id:
                             continue
                         _k = ('sub', _mo.subatividade_id) if _mo.subatividade_id else ('row', _mo.id)
-                        _ent.append((_mo.funcionario_id, _k, _h, float(_mo.horas_extras or 0)))
+                        _ent.append((_mo.funcionario_id, _k, _h))
                     total_horas_trabalhadas = round(sum(e[2] for e in _norm_horas(_ent)), 1)
                     
                     logger.info(f"[STATS] FALLBACK RDO {rdo.id}: {total_subatividades} subatividades, {total_funcionarios} funcionários, {progresso_medio:.1f}% progresso")
@@ -3020,10 +3015,11 @@ def rdo_salvar_unificado():
         from utils.rdo_horas import normalizar_horas_funcionario
         logger.debug("DEBUG: Processando funcionários do formulário (legado)...")
 
-        # entradas: (func_id, atividade_key, horas, horas_extras, funcao)
+        # entradas: (func_id, atividade_key, horas, funcao)
+        # Task #5 — hora extra removida do RDO.
         entradas_brutas = []
 
-        # Path A — campos achatados funcionario_<id>_nome / _horas / _horas_extras / _funcao
+        # Path A — campos achatados funcionario_<id>_nome / _horas / _funcao
         for key, value in request.form.items():
             if not (key.startswith('funcionario_') and key.endswith('_nome')):
                 continue
@@ -3044,19 +3040,11 @@ def rdo_salvar_unificado():
                 continue
             if horas <= 0:
                 continue
-            extras_field = request.form.get(
-                f'funcionario_{funcionario_id}_horas_extras', ''
-            )
-            try:
-                extras = float(extras_field) if extras_field else 0.0
-            except (ValueError, TypeError):
-                extras = 0.0
             funcao_form = request.form.get(
                 f'funcionario_{funcionario_id}_funcao', ''
             ).strip()
             entradas_brutas.append(
-                (funcionario_id, ('flat-form', funcionario_id), horas,
-                 max(0.0, extras), funcao_form)
+                (funcionario_id, ('flat-form', funcionario_id), horas, funcao_form)
             )
 
         # Path B (legado) — lista JSON em 'mao_obra'
@@ -3078,13 +3066,9 @@ def rdo_salvar_unificado():
                         continue
                     if h <= 0:
                         continue
-                    try:
-                        ex = float(mo_data.get('horas_extras', 0) or 0)
-                    except (ValueError, TypeError):
-                        ex = 0.0
                     fc = (mo_data.get('funcao') or '').strip()
                     entradas_brutas.append(
-                        (fid, ('mao_obra_json', i), h, max(0.0, ex), fc)
+                        (fid, ('mao_obra_json', i), h, fc)
                     )
             except (json.JSONDecodeError, ValueError) as e:
                 logger.error(f"Erro ao processar mão de obra JSON: {e}")
@@ -3101,8 +3085,7 @@ def rdo_salvar_unificado():
         for entrada in entradas_normalizadas:
             func_id_n = entrada[0]
             horas_n = entrada[2]
-            extras_n = entrada[3]
-            funcao_n = entrada[4] if len(entrada) > 4 else ''
+            funcao_n = entrada[3] if len(entrada) > 3 else ''
             funcionario_obj = Funcionario.query.filter_by(
                 id=func_id_n, admin_id=admin_id_correto
             ).first()
@@ -3122,12 +3105,11 @@ def rdo_salvar_unificado():
                     if funcionario_obj.funcao_ref else 'Geral')
             )
             mao_obra.horas_trabalhadas = horas_n
-            mao_obra.horas_extras = extras_n
             mao_obra.admin_id = admin_id_correto
             db.session.add(mao_obra)
             logger.debug(
-                "DEBUG: Mão de obra (legado) func %s — %.2fh (extras %.2fh)",
-                func_id_n, horas_n, extras_n,
+                "DEBUG: Mão de obra (legado) func %s — %.2fh",
+                func_id_n, horas_n,
             )
         
         # Processar equipamentos
@@ -4396,7 +4378,8 @@ def salvar_rdo_flexivel():
             # Sem isso, "0" (string truthy) seria contado em N e roubaria
             # horas das atividades verdadeiras (ex.: 8h+8h+0h em 3 subs viraria
             # 8/3h em todas, incluindo a que deveria ser 0).
-            entradas_brutas = []  # (func_id, atividade_key, horas, horas_extras)
+            # Task #5 — hora extra removida do RDO.
+            entradas_brutas = []  # (func_id, atividade_key, horas)
             for field_name, field_value in request.form.items():
                 m = _func_pattern.match(field_name)
                 if m and field_value:
@@ -4408,15 +4391,8 @@ def salvar_rdo_flexivel():
                         continue
                     if horas <= 0:
                         continue
-                    extras_field = request.form.get(
-                        f'func_{sub_mestre_id_str}_{func_id}_horas_extras', ''
-                    )
-                    try:
-                        extras = float(extras_field) if extras_field else 0.0
-                    except (ValueError, TypeError):
-                        extras = 0.0
                     entradas_brutas.append(
-                        (func_id, ('sub', sub_mestre_id_str), horas, max(0.0, extras))
+                        (func_id, ('sub', sub_mestre_id_str), horas)
                     )
 
             # Entradas de cronograma V2 — chave ('cron', tarefa_id_or_None);
@@ -4448,20 +4424,8 @@ def salvar_rdo_flexivel():
                 if cron_key in seen_cron_keys:
                     continue
                 seen_cron_keys.add(cron_key)
-                if m_tarefa:
-                    extras_cron_field = request.form.get(
-                        f'cron_tarefa_{tarefa_id_cron}_func_{func_id_cron}_horas_extras', ''
-                    )
-                else:
-                    extras_cron_field = request.form.get(
-                        f'cron_func_{func_id_cron}_horas_extras', ''
-                    )
-                try:
-                    extras_cron = float(extras_cron_field) if extras_cron_field else 0.0
-                except (ValueError, TypeError):
-                    extras_cron = 0.0
                 entradas_brutas.append(
-                    (func_id_cron, ('cron', tarefa_id_cron), horas_cron, max(0.0, extras_cron))
+                    (func_id_cron, ('cron', tarefa_id_cron), horas_cron)
                 )
 
             # Normalizar (8h × N atividades → 8/N por atividade)
@@ -4477,7 +4441,8 @@ def salvar_rdo_flexivel():
 
             mao_obra_count = 0
             cron_func_count = 0
-            for func_id_sel, atividade_key, horas_norm, extras_norm in entradas_normalizadas:
+            for entrada in entradas_normalizadas:
+                func_id_sel, atividade_key, horas_norm = entrada[0], entrada[1], entrada[2]
                 # Tenant-safe: validar que funcionário pertence ao mesmo admin
                 funcionario = Funcionario.query.filter_by(
                     id=func_id_sel, admin_id=admin_id
@@ -4509,7 +4474,6 @@ def salvar_rdo_flexivel():
                         funcao_exercida=funcao_exercida,
                         admin_id=admin_id,
                         subatividade_id=subat_obj.id,
-                        horas_extras=extras_norm
                     )
                     db.session.add(mao_obra)
                     mao_obra_count += 1
@@ -4526,7 +4490,6 @@ def salvar_rdo_flexivel():
                         admin_id=admin_id,
                         subatividade_id=None,
                         tarefa_cronograma_id=atividade_id,
-                        horas_extras=extras_norm
                     )
                     db.session.add(mao_obra_cron)
                     mao_obra_count += 1

@@ -148,13 +148,12 @@ def _rdo(obra, data, numero_suffix):
     return r
 
 
-def _mo(rdo, func, horas, extras=0.0):
+def _mo(rdo, func, horas):
     mo = RDOMaoObra(
         rdo_id=rdo.id,
         funcionario_id=func.id,
         funcao_exercida='Pedreiro',
         horas_trabalhadas=horas,
-        horas_extras=extras,
         admin_id=_fx.admin.id,
     )
     db.session.add(mo)
@@ -189,13 +188,18 @@ def test_1_diarista_simples():
         assert reg.tipo_lancamento == 'rdo'
 
 
-def test_2_mensalista_hora_extra():
-    """Mensalista 8h normal + 1h extra: componente_extra = vh × 1.5."""
+def test_2_mensalista_sem_hora_extra_no_rdo():
+    """Task #5: mensalista 8h no RDO — folha = 8 × vh, sem componente extra.
+
+    Hora extra foi removida do RDO; a coluna RDOCustoDiario.horas_extras /
+    componente_extra continuam existindo (compat. histórica) mas devem ser
+    sempre zero para lançamentos de RDO.
+    """
     with app.app_context():
         func = _func(tipo='salario', salario=3300.0, valor_va=0.0, valor_vt=0.0)
         data = date(2026, 2, 11)
         rdo = _rdo(_fx.obra, data, '02')
-        _mo(rdo, func, horas=8.0, extras=1.0)
+        _mo(rdo, func, horas=8.0)
         db.session.commit()
 
         from services.custo_funcionario_dia import gravar_custo_funcionario_rdo
@@ -205,13 +209,12 @@ def test_2_mensalista_hora_extra():
             rdo_id=rdo.id, funcionario_id=func.id
         ).first()
         assert reg is not None
-        assert float(reg.horas_extras) == pytest.approx(1.0, abs=0.01)
-        assert float(reg.componente_extra) > 0
+        assert float(reg.horas_extras or 0) == pytest.approx(0.0, abs=0.01)
+        assert float(reg.componente_extra or 0) == pytest.approx(0.0, abs=0.01)
 
         from utils import calcular_valor_hora_periodo
         vh = calcular_valor_hora_periodo(func, data, data)
-        expected_extra = vh * 1.5 * 1.0
-        assert float(reg.componente_extra) == pytest.approx(expected_extra, abs=0.05)
+        assert float(reg.componente_folha) == pytest.approx(vh * 8.0, abs=0.05)
 
 
 def test_3_mensalista_dois_rdos_rateio():
@@ -254,7 +257,7 @@ def test_4_snapshot_imutavel_mudanca_salario():
         data = date(2026, 1, 15)
 
         from services.custo_funcionario_dia import calcular_custo_funcionario_no_rdo
-        comp = calcular_custo_funcionario_no_rdo(func, 8.0, 8.0, 0.0, data)
+        comp = calcular_custo_funcionario_no_rdo(func, 8.0, 8.0, data)
         custo_original = float(comp['custo_total_dia'])
 
         reg = RDOCustoDiario(

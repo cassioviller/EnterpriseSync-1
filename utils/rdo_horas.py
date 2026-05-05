@@ -10,8 +10,7 @@ A jornada-base do funcionário no dia é o MAIOR valor que ele entrou
 em qualquer linha do RDO (cobre o caso comum em que o usuário digita
 8h em todas as atividades). Por padrão esse total é dividido
 igualmente pelas ``N`` atividades distintas em que ele participa,
-evitando que 8h em 3 atividades vire 24h fictícias. A mesma regra é
-aplicada às ``horas_extras`` para manter consistência.
+evitando que 8h em 3 atividades vire 24h fictícias.
 
 Task #38 — distribuição com pesos
 ---------------------------------
@@ -30,13 +29,18 @@ distribuição abaixo, por funcionário:
   ``max(0, 100 - sum_pesos)`` é dividido igualmente entre as linhas
   ``None`` daquele funcionário.
 
-A mesma proporção é aplicada às ``horas_extras``.
-
 Funcionários que aparecem em apenas 1 atividade não são alterados,
 independente de existir peso (a UI não oferece o painel nesse caso).
 
-A função preserva qualquer campo extra a partir do índice 4 da tupla
+A função preserva qualquer campo extra a partir do índice 3 da tupla
 (útil para metadados como nome de função etc.).
+
+Task #5 — remoção de hora extra do RDO
+--------------------------------------
+A dimensão ``horas_extras`` foi removida do pipeline do RDO. As tuplas
+de entrada passaram a ter o formato ``(func_id, atividade_key, horas,
+*meta)`` e o helper não trata mais horas extras. Hora extra continua
+existindo no Ponto Eletrônico/Folha de Pagamento — fora do escopo do RDO.
 """
 
 from typing import Iterable, List, Mapping, Optional, Tuple
@@ -51,19 +55,19 @@ def normalizar_horas_funcionario(
 
     Args:
         entries: iterável de tuplas no formato
-            ``(func_id, atividade_key, horas, horas_extras=0, *extras)``
+            ``(func_id, atividade_key, horas, *meta)``
             onde ``atividade_key`` é qualquer valor hashable que
-            identifica unicamente a atividade no RDO. Se a tupla tem
-            apenas 3 elementos, ``horas_extras`` é assumido como 0.
+            identifica unicamente a atividade no RDO. Campos extras
+            a partir do índice 3 são preservados como metadados.
         pesos: dicionário opcional ``{(func_id, atividade_key): peso}``
             com pesos em pontos percentuais (``0..100``) ou ``None``.
             Quando ausente para uma chave, vale ``None``. Veja a regra
             de distribuição no docstring do módulo.
 
     Returns:
-        Lista com a mesma estrutura, com ``horas`` e ``horas_extras``
-        substituídas pelo valor distribuído. Campos extras a partir
-        do índice 4 são preservados.
+        Lista com a mesma estrutura, com ``horas`` substituído pelo
+        valor distribuído. Campos extras a partir do índice 3 são
+        preservados.
     """
     entries_list = list(entries)
     if not entries_list:
@@ -84,17 +88,10 @@ def normalizar_horas_funcionario(
             # Funcionário em 1 só atividade: passa direto (UI também
             # não oferece o painel de pesos nesse caso).
             for item in items:
-                if len(item) >= 4:
-                    resultado.append(item)
-                else:
-                    resultado.append((item[0], item[1], item[2], 0.0))
+                resultado.append(item)
             continue
 
         max_horas = max((float(item[2] or 0) for item in items), default=0.0)
-        max_extras = max(
-            (float(item[3] or 0) if len(item) >= 4 else 0.0 for item in items),
-            default=0.0,
-        )
 
         # Lê pesos para esse funcionário (mesma chave que o caller
         # usou em entries). Pesos ausentes/None viram None.
@@ -116,11 +113,10 @@ def normalizar_horas_funcionario(
         if not com_peso:
             # Caminho histórico: divisão igual entre N atividades.
             horas_norm = max_horas / n if n > 0 else 0.0
-            extras_norm = max_extras / n if n > 0 else 0.0
             for item in items:
-                meta = tuple(item[4:]) if len(item) > 4 else ()
+                meta = tuple(item[3:]) if len(item) > 3 else ()
                 resultado.append(
-                    (item[0], item[1], horas_norm, extras_norm) + meta
+                    (item[0], item[1], horas_norm) + meta
                 )
             continue
 
@@ -150,9 +146,8 @@ def normalizar_horas_funcionario(
             key = item[1]
             frac = fracoes.get(key, 0.0)
             horas_norm = max_horas * frac
-            extras_norm = max_extras * frac
-            meta = tuple(item[4:]) if len(item) > 4 else ()
+            meta = tuple(item[3:]) if len(item) > 3 else ()
             resultado.append(
-                (item[0], item[1], horas_norm, extras_norm) + meta
+                (item[0], item[1], horas_norm) + meta
             )
     return resultado

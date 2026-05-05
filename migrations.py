@@ -3853,6 +3853,7 @@ def executar_migracoes():
             (152, "Task #2 — rdo_custo_diario: tabela + índices parciais para custo diário de mão-de-obra", migration_152_rdo_custo_diario),
             (153, "Task #3 — composicao_servico_historico: histórico de alterações de coeficiente via métricas", migration_153_composicao_servico_historico),
             (154, "Task #12 — RDO sempre Finalizado: migrar Rascunho legado via pipeline (custo diário + gestão custo filho + produtividade)", migration_154_force_rdo_finalizado),
+            (155, "Task #5 — RDO: drop coluna rdo_mao_obra.horas_extras (hora extra removida do RDO)", migration_155_drop_rdo_mao_obra_horas_extras),
         ]
         
         # Executar cada migração com rastreamento
@@ -13270,6 +13271,55 @@ def migration_154_force_rdo_finalizado():
             _db.session.rollback()
         except Exception:
             pass
+        raise
+
+
+def migration_155_drop_rdo_mao_obra_horas_extras():
+    """Task #5 — remover hora extra do RDO.
+
+    Drop da coluna ``rdo_mao_obra.horas_extras`` (Float).
+
+    A dimensão de hora extra foi removida do pipeline do RDO (UI,
+    backend e cálculo de custo). Hora extra continua existindo no
+    Ponto Eletrônico/Folha de Pagamento — fora deste escopo.
+
+    Idempotente: usa ``DROP COLUMN IF EXISTS`` dentro de bloco DO
+    para verificar a existência antes de derrubar.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                     WHERE table_name = 'rdo_mao_obra'
+                       AND column_name = 'horas_extras'
+                ) THEN
+                    ALTER TABLE rdo_mao_obra DROP COLUMN horas_extras;
+                    RAISE NOTICE 'rdo_mao_obra.horas_extras removida';
+                ELSE
+                    RAISE NOTICE 'rdo_mao_obra.horas_extras já ausente';
+                END IF;
+            END$$;
+            """
+        )
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 155: rdo_mao_obra.horas_extras tratada com sucesso")
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 155 falhou: %s", e)
+        if connection is not None:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
         raise
 
 

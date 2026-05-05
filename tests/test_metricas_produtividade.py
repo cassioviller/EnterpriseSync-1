@@ -149,13 +149,12 @@ def _sub(rdo, servico_id, nome, qty=None):
     return s
 
 
-def _mo(rdo, func, horas, sub=None, composicao_id=None, vinculo='auto', extras=0.0):
+def _mo(rdo, func, horas, sub=None, composicao_id=None, vinculo='auto'):
     m = RDOMaoObra(
         rdo_id=rdo.id,
         funcionario_id=func.id,
         funcao_exercida='Pedreiro',
         horas_trabalhadas=horas,
-        horas_extras=extras,
         admin_id=_fx.admin.id,
         subatividade_id=sub.id if sub else None,
         composicao_servico_id=composicao_id,

@@ -1598,11 +1598,6 @@ console.log('Initializing RDO view with light theme...');
                     <div class="funcionario-horas">
                         <i class="fas fa-clock"></i>
                         <span>{{ "%.1f"|format(funcionario.horas_trabalhadas) }}h</span>
-                        {% if funcionario.horas_extras and funcionario.horas_extras > 0 %}
-                        <span class="badge bg-warning text-dark ms-2" style="font-size:.7rem" title="Horas extras">
-                            +{{ "%.1f"|format(funcionario.horas_extras) }}h extras
-                        </span>
-                        {% endif %}
                     </div>
                     {% if custos_dia_map is defined and custos_dia_map and funcionario.funcionario
                           and current_user.tipo_usuario.value in ['admin', 'super_admin'] %}
@@ -1610,16 +1605,10 @@ console.log('Initializing RDO view with light theme...');
                     {% if _custo %}
                     <div class="mt-1 w-100" style="font-size:.78rem;">
                         <span class="badge bg-success bg-opacity-75"
-                              title="Componentes: folha R$ {{ '%.2f'|format(_custo.componente_folha|float) }} | VA R$ {{ '%.2f'|format(_custo.componente_va|float) }} | VT R$ {{ '%.2f'|format(_custo.componente_vt|float) }}{% if _custo.componente_extra and _custo.componente_extra|float > 0 %} | Extras R$ {{ '%.2f'|format(_custo.componente_extra|float) }}{% endif %}{% if _custo.custo_hora_normal %} | R$/h {{ '%.2f'|format(_custo.custo_hora_normal|float) }}{% endif %}">
+                              title="Componentes: folha R$ {{ '%.2f'|format(_custo.componente_folha|float) }} | VA R$ {{ '%.2f'|format(_custo.componente_va|float) }} | VT R$ {{ '%.2f'|format(_custo.componente_vt|float) }}{% if _custo.custo_hora_normal %} | R$/h {{ '%.2f'|format(_custo.custo_hora_normal|float) }}{% endif %}">
                             <i class="fas fa-dollar-sign" style="font-size:.65rem"></i>
                             R$ {{ '%.2f'|format(_custo.custo_total_dia|float) }}/dia
                         </span>
-                        {% if _custo.horas_extras and _custo.horas_extras|float > 0 %}
-                        <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem"
-                              title="Extra = R$ {{ '%.2f'|format(_custo.componente_extra|float) }}">
-                            +{{ '%.1f'|format(_custo.horas_extras|float) }}h extra
-                        </span>
-                        {% endif %}
                     </div>
                     {% endif %}
                     {% endif %}

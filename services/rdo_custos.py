@@ -10,8 +10,9 @@ seguindo a mesma rotina já usada pelo handler ponto_registrado:
       1 custo de DIÁRIA + (opcional) VA + VT por dia, mesmo que o
       funcionário apareça em várias subatividades do mesmo RDO.
   - Salarista/horista:
-      custo proporcional = horas × valor_hora (+ extras × valor_hora × 1.5),
+      custo proporcional = horas × valor_hora,
       somando todas as linhas do funcionário no mesmo RDO.
+      Task #5: hora extra removida do RDO — componente_extra sempre 0.
 
 Fonte de verdade para valores:
   RDOCustoDiario (quando existir) é lido ANTES do cálculo manual —
@@ -335,14 +336,10 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
 
         # Agrega por funcionário (1 lançamento por dia por tipo de custo)
         horas_por_func = {}
-        extras_por_func = {}
         primeiro_por_func = {}
         for r in registros:
             horas_por_func[r.funcionario_id] = (
                 horas_por_func.get(r.funcionario_id, 0) + float(r.horas_trabalhadas or 0)
-            )
-            extras_por_func[r.funcionario_id] = (
-                extras_por_func.get(r.funcionario_id, 0) + float(r.horas_extras or 0)
             )
             primeiro_por_func.setdefault(r.funcionario_id, r)
 
@@ -380,8 +377,7 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                 valor_folha = float(custo_dia.componente_folha or 0)
                 valor_va    = float(custo_dia.componente_va or 0)
                 valor_vt    = float(custo_dia.componente_vt or 0)
-                valor_extra = float(custo_dia.componente_extra or 0)
-                valor_total_folha = valor_folha + valor_extra
+                valor_total_folha = valor_folha
             else:
                 # Fallback legado: idempotência por primeira linha RDOMaoObra
                 _origem_folha = 'rdo_mao_obra'
@@ -392,15 +388,14 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                 tipo_remun = getattr(funcionario, 'tipo_remuneracao', 'salario') or 'salario'
                 if tipo_remun == 'diaria':
                     valor_folha = float(getattr(funcionario, 'valor_diaria', 0) or 0)
-                    valor_extra = 0.0
                     valor_total_folha = valor_folha
                 else:
+                    # Task #5 — hora extra removida do RDO: cálculo é
+                    # apenas horas * valor_hora (sem extras).
                     horas = horas_por_func.get(func_id, 0)
-                    extras = extras_por_func.get(func_id, 0)
                     vh = calcular_valor_hora_periodo(funcionario, data_ref, data_ref) or 0
-                    valor_total_folha = horas * vh + extras * vh * 1.5
+                    valor_total_folha = horas * vh
                     valor_folha = valor_total_folha
-                    valor_extra = extras * vh * 1.5 if vh > 0 else 0.0
                 valor_va = float(getattr(funcionario, 'valor_va', 0) or 0)
                 valor_vt = float(getattr(funcionario, 'valor_vt', 0) or 0)
 
@@ -426,10 +421,8 @@ def gerar_custos_mao_obra_rdo(rdo, admin_id) -> int:
                                   f"(RDO {rdo.numero_rdo})")
                 else:
                     horas = horas_por_func.get(func_id, 0)
-                    extras = extras_por_func.get(func_id, 0)
-                    pedaco_extras = f" + {extras}h extras" if extras else ""
                     desc_folha = (f"Mão de obra: {funcionario.nome} - {data_str} "
-                                  f"({horas}h{pedaco_extras}) (RDO {rdo.numero_rdo})")
+                                  f"({horas}h) (RDO {rdo.numero_rdo})")
 
                 f = registrar_custo_automatico(
                     admin_id=admin_id,

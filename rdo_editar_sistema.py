@@ -374,7 +374,8 @@ def salvar_edicao_rdo(rdo_id):
         # que a normalização (utils/rdo_horas) considere o conjunto de
         # atividades em que cada funcionário aparece — ex.: 8h em 3
         # subatividades vira 8/3h por subatividade, não 24h fictícias.
-        entradas_brutas = []  # (func_id, ('sub', sub_mestre_id), horas, horas_extras)
+        # Task #5 — hora extra removida do RDO.
+        entradas_brutas = []  # (func_id, ('sub', sub_mestre_id), horas)
         for campo, valor in request.form.items():
             m = _sub_func_pattern.match(campo)
             if m and valor:
@@ -386,15 +387,8 @@ def salvar_edicao_rdo(rdo_id):
                     continue
                 if horas_trabalhadas <= 0:
                     continue
-                extras_field = request.form.get(
-                    f'sub_func_{sub_mestre_id}_{func_id}_horas_extras', ''
-                )
-                try:
-                    extras = float(extras_field) if extras_field else 0.0
-                except (ValueError, TypeError):
-                    extras = 0.0
                 entradas_brutas.append(
-                    (func_id, ('sub', sub_mestre_id), horas_trabalhadas, max(0.0, extras))
+                    (func_id, ('sub', sub_mestre_id), horas_trabalhadas)
                 )
 
         # Task #38 — coleta de pesos enviados pelo painel
@@ -418,7 +412,8 @@ def salvar_edicao_rdo(rdo_id):
         # Processar vínculos per-subatividade (sub_func_{sub_mestre_id}_{func_id}_horas)
         func_ids_vinculados = set()
         funcionarios_salvos = 0
-        for func_id, atividade_key, horas_trabalhadas, horas_extras_norm in entradas_normalizadas:
+        for entrada in entradas_normalizadas:
+            func_id, atividade_key, horas_trabalhadas = entrada[0], entrada[1], entrada[2]
             _, sub_mestre_id = atividade_key
             funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
             if funcionario:
@@ -430,7 +425,6 @@ def salvar_edicao_rdo(rdo_id):
                     funcionario_id=func_id,
                     funcao_exercida=funcao_exercida,
                     horas_trabalhadas=horas_trabalhadas,
-                    horas_extras=horas_extras_norm,
                     admin_id=admin_id,
                     subatividade_id=sub_db_id,
                     peso_distribuicao=peso_linha,
@@ -441,7 +435,7 @@ def salvar_edicao_rdo(rdo_id):
                 logger.info(
                     f"✅ Funcionário por subatividade: {funcionario.nome} → "
                     f"sub_mestre={sub_mestre_id} sub_db={sub_db_id} "
-                    f"{horas_trabalhadas:.2f}h (extras {horas_extras_norm:.2f}h) "
+                    f"{horas_trabalhadas:.2f}h "
                     f"peso={peso_linha if peso_linha is not None else '—'}"
                 )
 

@@ -135,7 +135,7 @@ def listar_rdos():
                 if horas <= 0 or not mo.funcionario_id:
                     continue
                 key = ('sub', mo.subatividade_id) if mo.subatividade_id else ('row', mo.id)
-                entradas.append((mo.funcionario_id, key, horas, float(mo.horas_extras or 0)))
+                entradas.append((mo.funcionario_id, key, horas))
             total_horas = round(sum(e[2] for e in _norm(entradas)), 1)
 
             rdos_processados.append({
@@ -363,10 +363,11 @@ def salvar_rdo():
         # (uma entrada por funcionário) e não possui dimensão de
         # subatividade — portanto a chave de atividade ('flat', func_id)
         # gera N=1 por funcionário e a normalização é no-op aqui. O helper
-        # é chamado para manter o pipeline (filtro horas<=0, parseamento de
-        # horas_extras, criação dos RDOMaoObra) idêntico aos demais fluxos.
+        # é chamado para manter o pipeline (filtro horas<=0, criação dos
+        # RDOMaoObra) idêntico aos demais fluxos.
+        # Task #5 — hora extra removida do RDO.
         from utils.rdo_horas import normalizar_horas_funcionario
-        entradas_brutas = []  # (func_id, ('flat', func_id), horas, horas_extras)
+        entradas_brutas = []  # (func_id, ('flat', func_id), horas)
         for key, value in request.form.items():
             if key.startswith('funcionario_') and key.endswith('_horas'):
                 try:
@@ -377,20 +378,13 @@ def salvar_rdo():
                     continue
                 if horas <= 0:
                     continue
-                extras_field = request.form.get(
-                    f'funcionario_{funcionario_id}_horas_extras', ''
-                )
-                try:
-                    extras = float(extras_field) if extras_field else 0.0
-                except (ValueError, TypeError):
-                    extras = 0.0
                 entradas_brutas.append(
-                    (funcionario_id, ('flat', funcionario_id), horas, max(0.0, extras))
+                    (funcionario_id, ('flat', funcionario_id), horas)
                 )
 
         entradas_normalizadas = normalizar_horas_funcionario(entradas_brutas)
         funcionarios_salvos = 0
-        for func_id_n, _key, horas_n, extras_n in entradas_normalizadas:
+        for func_id_n, _key, horas_n in entradas_normalizadas:
             funcionario = Funcionario.query.get(func_id_n)
             if funcionario:
                 mao_obra = RDOMaoObra(
@@ -398,7 +392,6 @@ def salvar_rdo():
                     funcionario_id=func_id_n,
                     funcao_exercida=funcionario.funcao_ref.nome if funcionario.funcao_ref else 'Geral',
                     horas_trabalhadas=horas_n,
-                    horas_extras=extras_n,
                     admin_id=admin_id
                 )
                 db.session.add(mao_obra)
