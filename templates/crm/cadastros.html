@@ -1,18 +1,15 @@
 {% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, back_link %}
 
 {% block title %}CRM — Cadastros{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-0"><i class="fas fa-cog text-primary me-2"></i>Cadastros do CRM</h1>
-            <p class="text-muted mb-0">Edite as listas que aparecem nos formulários de Lead</p>
-        </div>
-        <a href="{{ url_for('crm.kanban') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Voltar
-        </a>
-    </div>
+    {{ back_link(url_for('crm.kanban'), 'Voltar ao Kanban') }}
+    {% call page_header('Cadastros do CRM',
+                         icon='fa-cog',
+                         subtitle='Edite as listas que aparecem nos formulários de Lead.') %}
+    {% endcall %}
 
     <ul class="nav nav-tabs mb-3" role="tablist">
         {% for slug, info in listas_mestras.items() %}
@@ -44,7 +41,7 @@
                         </div>
                         <div class="col-md-3">
                             <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-plus me-1"></i> Adicionar
+                                <i class="fas fa-plus me-1" aria-hidden="true"></i> Adicionar
                             </button>
                         </div>
                     </form>
@@ -70,8 +67,8 @@
                                             <input type="text" name="nome" class="form-control form-control-sm"
                                                    value="{{ item.nome }}" maxlength="120">
                                             <button type="submit" class="btn btn-sm btn-outline-primary"
-                                                    title="Salvar">
-                                                <i class="fas fa-save"></i>
+                                                    title="Salvar" aria-label="Salvar alterações">
+                                                <i class="fas fa-save" aria-hidden="true"></i>
                                             </button>
                                         </form>
                                     </td>
@@ -88,8 +85,9 @@
                                               style="display:inline">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-sm btn-outline-secondary"
-                                                    title="{% if item.ativo %}Desativar{% else %}Reativar{% endif %}">
-                                                <i class="fas fa-{% if item.ativo %}pause{% else %}play{% endif %}"></i>
+                                                    title="{% if item.ativo %}Desativar{% else %}Reativar{% endif %}"
+                                                    aria-label="{% if item.ativo %}Desativar{% else %}Reativar{% endif %} item">
+                                                <i class="fas fa-{% if item.ativo %}pause{% else %}play{% endif %}" aria-hidden="true"></i>
                                             </button>
                                         </form>
                                         <form method="POST"
@@ -98,8 +96,8 @@
                                               onsubmit="return confirm('Excluir &quot;{{ item.nome }}&quot;?');">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                    title="Excluir">
-                                                <i class="fas fa-trash"></i>
+                                                    title="Excluir" aria-label="Excluir item">
+                                                <i class="fas fa-trash" aria-hidden="true"></i>
                                             </button>
                                         </form>
                                     </td>

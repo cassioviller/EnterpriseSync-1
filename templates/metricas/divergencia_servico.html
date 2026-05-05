@@ -1,155 +1,96 @@
-{% extends "base.html" %}
+{% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, filter_card, kpi_card, back_link, empty_state %}
+
 {% block title %}Divergência – {{ servico.nome }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid py-3">
+  {{ back_link(url_for('metricas.empresa_por_servico', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()),
+                'Voltar para Métricas por Serviço') }}
 
-  <!-- Cabeçalho -->
-  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <div>
-      <a href="{{ url_for('metricas.empresa_por_servico', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
-         class="text-decoration-none small text-muted">
-        <i class="fas fa-arrow-left me-1"></i> Voltar para Métricas por Serviço
-      </a>
-      <h2 class="mb-0 mt-1">
-        <i class="fas fa-search-dollar me-2 text-primary"></i>
-        Responsáveis pela divergência
-      </h2>
-      <div class="text-muted">
-        Serviço: <strong>{{ servico.nome }}</strong>
-        {% if servico.unidade_medida %} <span class="badge bg-light text-dark border">{{ servico.unidade_medida }}</span>{% endif %}
-      </div>
-    </div>
-    <div class="text-muted small text-end">
-      Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}
-    </div>
-  </div>
+  {% call page_header('Responsáveis pela divergência',
+                       icon='fa-search-dollar',
+                       subtitle='Serviço: ' ~ servico.nome ~ '  ·  Período: ' ~ data_inicio.strftime('%d/%m/%Y') ~ ' – ' ~ data_fim.strftime('%d/%m/%Y')) %}
+    {% if servico.unidade_medida %}
+      <span class="badge bg-light text-dark border">{{ servico.unidade_medida }}</span>
+    {% endif %}
+  {% endcall %}
 
-  <!-- Filtros -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-body py-3">
-      <form method="get" class="row g-2 align-items-end">
-        <div class="col-sm-2">
-          <label class="form-label fw-semibold mb-1">Data início</label>
-          <input type="date" name="data_inicio" class="form-control form-control-sm"
-                 value="{{ data_inicio.isoformat() }}">
-        </div>
-        <div class="col-sm-2">
-          <label class="form-label fw-semibold mb-1">Data fim</label>
-          <input type="date" name="data_fim" class="form-control form-control-sm"
-                 value="{{ data_fim.isoformat() }}">
-        </div>
-        <div class="col-sm-3">
-          <label class="form-label fw-semibold mb-1">Obra</label>
-          <select name="obra_id" class="form-select form-select-sm">
-            <option value="">Todas as obras</option>
-            {% for o in obras %}
-              <option value="{{ o.id }}" {% if obra_id_sel == o.id %}selected{% endif %}>{{ o.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-sm-3">
-          <label class="form-label fw-semibold mb-1">Ordenar por</label>
-          <select name="ordenar_por" class="form-select form-select-sm">
-            <option value="prejuizo" {% if ordenar_por=='prejuizo' %}selected{% endif %}>Maior prejuízo</option>
-            <option value="excesso_custo" {% if ordenar_por=='excesso_custo' %}selected{% endif %}>Maior excesso de custo</option>
-            <option value="gap_producao" {% if ordenar_por=='gap_producao' %}selected{% endif %}>Maior gap de produção</option>
-          </select>
-        </div>
-        <div class="col-sm-2">
-          <button type="submit" class="btn btn-primary btn-sm w-100">
-            <i class="fas fa-search me-1"></i> Filtrar
-          </button>
-        </div>
-      </form>
+  {# Filtros #}
+  {% call filter_card(url_for('metricas.divergencia_servico', servico_id=servico.id),
+                       reset_url=url_for('metricas.divergencia_servico', servico_id=servico.id)) %}
+    <div class="col-6 col-md-2">
+      <label class="form-label">Data início</label>
+      <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ data_inicio.isoformat() }}">
     </div>
-  </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Data fim</label>
+      <input type="date" name="data_fim" class="form-control form-control-sm" value="{{ data_fim.isoformat() }}">
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Obra</label>
+      <select name="obra_id" class="form-select form-select-sm">
+        <option value="">Todas as obras</option>
+        {% for o in obras %}
+          <option value="{{ o.id }}" {% if obra_id_sel == o.id %}selected{% endif %}>{{ o.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Ordenar por</label>
+      <select name="ordenar_por" class="form-select form-select-sm">
+        <option value="prejuizo" {% if ordenar_por=='prejuizo' %}selected{% endif %}>Maior prejuízo</option>
+        <option value="excesso_custo" {% if ordenar_por=='excesso_custo' %}selected{% endif %}>Maior excesso de custo</option>
+        <option value="gap_producao" {% if ordenar_por=='gap_producao' %}selected{% endif %}>Maior gap de produção</option>
+      </select>
+    </div>
+  {% endcall %}
 
   {% if not dados or not dados.rdos %}
-    <div class="alert alert-info">
-      <i class="fas fa-info-circle me-2"></i>
-      Nenhum RDO encontrado para este serviço no período / filtros selecionados.
-    </div>
+    {{ empty_state('Nenhum RDO encontrado para este serviço no período / filtros selecionados.',
+                    icon='fa-search',
+                    title='Sem divergências') }}
   {% else %}
 
-  <!-- Totais agregados -->
+  {# KPI bar — totais agregados #}
   {% if dados.totais %}
-  <div class="row g-2 mb-4">
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-2">{{ kpi_card('RDOs envolvidos', dados.totais.n_rdos, color='dark', icon='fa-clipboard-list') }}</div>
+    <div class="col-6 col-md-2">{{ kpi_card('Total HH', '%.1f'|format(dados.totais.total_hh) ~ 'h', color='dark', icon='fa-clock') }}</div>
     <div class="col-6 col-md-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <div class="text-muted small">RDOs envolvidos</div>
-          <div class="h5 mb-0">{{ dados.totais.n_rdos }}</div>
-        </div>
-      </div>
+      {{ kpi_card('Custo total',
+                   (dados.totais.total_custo|brl) if dados.totais.total_custo is not none else '—',
+                   color='danger', icon='fa-arrow-up') }}
     </div>
     <div class="col-6 col-md-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <div class="text-muted small">Total HH</div>
-          <div class="h5 mb-0">{{ '%.1f'|format(dados.totais.total_hh) }}h</div>
-        </div>
-      </div>
+      {{ kpi_card('Receita orçada',
+                   (dados.totais.total_receita|brl) if dados.totais.total_receita is not none else '—',
+                   color='primary', icon='fa-money-bill-wave') }}
     </div>
     <div class="col-6 col-md-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <div class="text-muted small">Custo total</div>
-          <div class="h5 mb-0 text-danger">
-            {% if dados.totais.total_custo is not none %}
-              R$ {{ '%.0f'|format(dados.totais.total_custo) }}
-            {% else %}—{% endif %}
-          </div>
-        </div>
-      </div>
+      {{ kpi_card('Lucro',
+                   (dados.totais.lucro_total|brl) if dados.totais.lucro_total is not none else '—',
+                   color=('danger' if dados.totais.lucro_total is not none and dados.totais.lucro_total < 0 else 'success'),
+                   icon='fa-balance-scale') }}
     </div>
     <div class="col-6 col-md-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <div class="text-muted small">Receita orçada</div>
-          <div class="h5 mb-0 text-primary">
-            {% if dados.totais.total_receita is not none %}
-              R$ {{ '%.0f'|format(dados.totais.total_receita) }}
-            {% else %}—{% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <div class="text-muted small">Lucro</div>
-          <div class="h5 mb-0 {% if dados.totais.lucro_total is not none and dados.totais.lucro_total < 0 %}text-danger{% else %}text-success{% endif %}">
-            {% if dados.totais.lucro_total is not none %}
-              R$ {{ '%.0f'|format(dados.totais.lucro_total) }}
-            {% else %}—{% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-2">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body py-2 text-center">
-          <div class="text-muted small">Índice médio</div>
-          <div class="h5 mb-0">
-            {% if dados.totais.indice_medio_pct is not none %}
-              {{ '%.0f'|format(dados.totais.indice_medio_pct) }}%
-            {% else %}—{% endif %}
-          </div>
-        </div>
-      </div>
+      {{ kpi_card('Índice médio',
+                   ('%.0f'|format(dados.totais.indice_medio_pct) ~ '%') if dados.totais.indice_medio_pct is not none else '—',
+                   color='dark', icon='fa-percent') }}
     </div>
   </div>
   {% endif %}
 
-  <!-- Lista de RDOs -->
+  {# Lista de RDOs #}
   {% for r in dados.rdos %}
-  <div class="card shadow-sm mb-3 {% if r.is_principal_responsavel %}border-danger border-2{% endif %}">
-    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 py-2
-                {% if r.is_principal_responsavel %}bg-danger bg-opacity-10{% endif %}">
+  <div class="card border-0 shadow-sm mb-3 sige-rdo-card {% if r.is_principal_responsavel %}sige-rdo-principal{% endif %}"
+       {% if r.is_principal_responsavel %}style="border-left: 4px solid #dc3545 !important;"{% endif %}>
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 bg-white">
       <div>
         {% if r.is_principal_responsavel %}
-          <span class="badge bg-danger me-2"><i class="fas fa-exclamation-triangle me-1"></i>Principal responsável</span>
+          <span class="sige-status-badge sige-status-perdido me-2">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Principal responsável
+          </span>
         {% endif %}
         <strong>{{ r.rdo_numero }}</strong>
         <span class="text-muted small ms-2">{{ r.rdo_data.strftime('%d/%m/%Y') }}</span>
@@ -165,7 +106,7 @@
 
     <div class="card-body py-3">
       <div class="row g-3">
-        <!-- Métricas principais -->
+        {# Métricas principais #}
         <div class="col-md-7">
           <div class="row g-2 text-center">
             <div class="col-3">
@@ -175,16 +116,14 @@
             <div class="col-3">
               <div class="text-muted small">Produzido</div>
               <div class="fw-semibold">
-                {% if r.quantidade_produzida is not none %}
-                  {{ '%.2f'|format(r.quantidade_produzida) }}
+                {% if r.quantidade_produzida is not none %}{{ '%.2f'|format(r.quantidade_produzida) }}
                 {% else %}—{% endif %}
               </div>
             </div>
             <div class="col-3">
               <div class="text-muted small">Esperado</div>
               <div class="fw-semibold">
-                {% if r.producao_esperada is not none %}
-                  {{ '%.2f'|format(r.producao_esperada) }}
+                {% if r.producao_esperada is not none %}{{ '%.2f'|format(r.producao_esperada) }}
                 {% else %}—{% endif %}
               </div>
             </div>
@@ -192,12 +131,9 @@
               <div class="text-muted small">Índice</div>
               <div>
                 {% if r.indice_pct is not none %}
-                  {% if r.indice_pct >= 90 %}
-                    <span class="badge bg-success">{{ '%.0f'|format(r.indice_pct) }}%</span>
-                  {% elif r.indice_pct >= 70 %}
-                    <span class="badge bg-warning text-dark">{{ '%.0f'|format(r.indice_pct) }}%</span>
-                  {% else %}
-                    <span class="badge bg-danger">{{ '%.0f'|format(r.indice_pct) }}%</span>
+                  {% if r.indice_pct >= 90 %}<span class="badge bg-success">{{ '%.0f'|format(r.indice_pct) }}%</span>
+                  {% elif r.indice_pct >= 70 %}<span class="badge bg-warning text-dark">{{ '%.0f'|format(r.indice_pct) }}%</span>
+                  {% else %}<span class="badge bg-danger">{{ '%.0f'|format(r.indice_pct) }}%</span>
                   {% endif %}
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </div>
@@ -207,19 +143,19 @@
             <div class="col-4">
               <div class="text-muted small">Custo real</div>
               <div class="fw-semibold text-danger">
-                {% if r.custo_real is not none %}R$ {{ '%.0f'|format(r.custo_real) }}{% else %}—{% endif %}
+                {% if r.custo_real is not none %}{{ r.custo_real|brl }}{% else %}—{% endif %}
               </div>
             </div>
             <div class="col-4">
               <div class="text-muted small">Receita</div>
               <div class="fw-semibold text-primary">
-                {% if r.receita_orcada is not none %}R$ {{ '%.0f'|format(r.receita_orcada) }}{% else %}—{% endif %}
+                {% if r.receita_orcada is not none %}{{ r.receita_orcada|brl }}{% else %}—{% endif %}
               </div>
             </div>
             <div class="col-4">
               <div class="text-muted small">Lucro</div>
               <div class="fw-semibold {% if r.lucro is not none and r.lucro < 0 %}text-danger{% else %}text-success{% endif %}">
-                {% if r.lucro is not none %}R$ {{ '%.0f'|format(r.lucro) }}{% else %}—{% endif %}
+                {% if r.lucro is not none %}{{ r.lucro|brl }}{% else %}—{% endif %}
               </div>
             </div>
           </div>
@@ -235,14 +171,14 @@
           {% endif %}
         </div>
 
-        <!-- Funcionários envolvidos -->
+        {# Funcionários envolvidos #}
         <div class="col-md-5 border-start">
           <div class="text-muted small mb-2">
-            <i class="fas fa-users me-1"></i>
+            <i class="fas fa-users me-1" aria-hidden="true"></i>
             Funcionários ({{ r.funcionarios|length }})
           </div>
           <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
-            <table class="table table-sm mb-0">
+            <table class="table table-sm align-middle mb-0">
               <thead>
                 <tr class="small text-muted">
                   <th>Nome</th>

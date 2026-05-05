@@ -1,4 +1,5 @@
 {% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, filter_card %}
 
 {% block title %}CRM — Kanban de Leads{% endblock %}
 
@@ -68,7 +69,7 @@
 .crm-card__acoes a { color: #6c757d; font-size: .85rem; }
 .crm-card__acoes a:hover { color: #0d6efd; }
 
-/* cores por status */
+/* Cores por status — alinhadas com .sige-status-* (badge / lista) */
 .status-em-fila        { background: #6c757d; }
 .status-em-andamento   { background: #0dcaf0; }
 .status-enviado        { background: #0d6efd; }
@@ -91,86 +92,75 @@
 
 {% block content %}
 <div class="container-fluid py-3">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-0">
-                <i class="fas fa-funnel-dollar text-primary me-2"></i>
-                CRM — Kanban de Leads
-            </h1>
-            <p class="text-muted mb-0">Arraste os cartões entre as colunas para mudar o estágio</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('crm.lista', **filtros) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-list me-1"></i> Visão lista
-            </a>
-            {% if is_admin %}
-            <a href="{{ url_for('crm.cadastros') }}" class="btn btn-outline-primary">
-                <i class="fas fa-cog me-1"></i> Cadastros
-            </a>
-            {% endif %}
-            <a href="{{ url_for('crm.novo') }}" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Novo Lead
-            </a>
-        </div>
-    </div>
+    {% call page_header('CRM — Kanban de Leads',
+                         icon='fa-funnel-dollar',
+                         subtitle='Arraste os cartões entre as colunas para mudar o estágio') %}
+        <a href="{{ url_for('crm.lista', **filtros) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-list me-1" aria-hidden="true"></i> Visão lista
+        </a>
+        {% if is_admin %}
+        <a href="{{ url_for('crm.cadastros') }}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-cog me-1" aria-hidden="true"></i> Cadastros
+        </a>
+        {% endif %}
+        <a href="{{ url_for('crm.novo') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1" aria-hidden="true"></i> Novo Lead
+        </a>
+    {% endcall %}
 
-    {# Filtros #}
-    <form method="GET" action="{{ url_for('crm.kanban') }}" class="card border-0 shadow-sm mb-3">
-        <div class="card-body py-2">
-            <div class="row g-2">
-                <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="busca"
-                           placeholder="Buscar nome / contato / e-mail / demanda..."
-                           value="{{ filtros.busca }}">
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="responsavel_id">
-                        <option value="">Todos os responsáveis</option>
-                        {% for r in listas.responsavel %}
-                        <option value="{{ r.id }}" {% if filtros.responsavel_id == r.id %}selected{% endif %}>{{ r.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="origem_id">
-                        <option value="">Todas as origens</option>
-                        {% for o in listas.origem %}
-                        <option value="{{ o.id }}" {% if filtros.origem_id == o.id %}selected{% endif %}>{{ o.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="tipo_obra_id">
-                        <option value="">Todos os tipos de obra</option>
-                        {% for t in listas.tipo_obra %}
-                        <option value="{{ t.id }}" {% if filtros.tipo_obra_id == t.id %}selected{% endif %}>{{ t.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <input type="month" class="form-control form-control-sm" name="mes_chegada" value="{{ filtros.mes_chegada }}">
-                </div>
-                <div class="col-md-1 d-flex gap-1">
-                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
-                        <i class="fas fa-filter"></i>
-                    </button>
-                    <a href="{{ url_for('crm.kanban') }}" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-times"></i>
-                    </a>
-                </div>
-            </div>
+    {# Filtros — partial filter_card #}
+    {% call filter_card(url_for('crm.kanban'), reset_url=url_for('crm.kanban')) %}
+        <div class="col-12 col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text" class="form-control form-control-sm" name="busca"
+                   placeholder="Nome, contato, e-mail, demanda..."
+                   value="{{ filtros.busca or '' }}">
         </div>
-    </form>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Responsável</label>
+            <select class="form-select form-select-sm" name="responsavel_id">
+                <option value="">Todos</option>
+                {% for r in listas.responsavel %}
+                <option value="{{ r.id }}" {% if filtros.responsavel_id == r.id %}selected{% endif %}>{{ r.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Origem</label>
+            <select class="form-select form-select-sm" name="origem_id">
+                <option value="">Todas</option>
+                {% for o in listas.origem %}
+                <option value="{{ o.id }}" {% if filtros.origem_id == o.id %}selected{% endif %}>{{ o.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Tipo de obra</label>
+            <select class="form-select form-select-sm" name="tipo_obra_id">
+                <option value="">Todos</option>
+                {% for t in listas.tipo_obra %}
+                <option value="{{ t.id }}" {% if filtros.tipo_obra_id == t.id %}selected{% endif %}>{{ t.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Mês de chegada</label>
+            <input type="month" class="form-control form-control-sm" name="mes_chegada" value="{{ filtros.mes_chegada or '' }}">
+        </div>
+    {% endcall %}
 
     <div class="crm-kanban-wrapper">
         <div class="crm-kanban">
             {% for col in colunas %}
-            {% set slug = col.nome|lower|replace('ã','a')|replace('é','e')|replace(' ','-') %}
+            {% set slug = col.nome|lower
+                                |replace('ã','a')|replace('é','e')|replace('í','i')
+                                |replace('ó','o')|replace('ú','u')|replace('ç','c')
+                                |replace(' ','-') %}
             <div class="crm-coluna" data-status="{{ col.nome }}">
                 <div class="crm-coluna__header status-{{ slug }}">
                     <span>{{ col.nome }} <span class="badge bg-light text-dark ms-1">{{ col.count }}</span></span>
                     {% if col.valor_total and col.valor_total > 0 %}
-                    <span class="small">R$ {{ "{:,.0f}".format(col.valor_total).replace(',', '.') }}</span>
+                    <span class="small">{{ col.valor_total|brl }}</span>
                     {% endif %}
                 </div>
                 <div class="crm-coluna__corpo crm-droppable" data-status="{{ col.nome }}">
@@ -179,44 +169,44 @@
                         <div class="crm-card__nome">{{ lead.nome }}</div>
                         {% if lead.responsavel %}
                         <div class="crm-card__linha">
-                            <i class="fas fa-user-tie text-muted me-1"></i>{{ lead.responsavel.nome }}
+                            <i class="fas fa-user-tie text-muted me-1" aria-hidden="true"></i>{{ lead.responsavel.nome }}
                         </div>
                         {% endif %}
                         {% if lead.tipo_material %}
                         <div class="crm-card__linha">
-                            <i class="fas fa-cube text-muted me-1"></i>{{ lead.tipo_material.nome }}
+                            <i class="fas fa-cube text-muted me-1" aria-hidden="true"></i>{{ lead.tipo_material.nome }}
                             {% if lead.tipo_obra %}<span class="text-muted">— {{ lead.tipo_obra.nome }}</span>{% endif %}
                         </div>
                         {% endif %}
                         {% if lead.localizacao %}
                         <div class="crm-card__linha">
-                            <i class="fas fa-map-marker-alt text-muted me-1"></i>{{ lead.localizacao }}
+                            <i class="fas fa-map-marker-alt text-muted me-1" aria-hidden="true"></i>{{ lead.localizacao }}
                         </div>
                         {% endif %}
                         {% if lead.valor_proposta %}
                         <div class="crm-card__linha crm-card__valor">
-                            R$ {{ "{:,.2f}".format(lead.valor_proposta).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                            {{ lead.valor_proposta|brl }}
                         </div>
                         {% endif %}
                         <div class="crm-card__rodape">
                             <span>
                                 {% if lead.dias_parado >= 14 %}
                                 <span class="crm-card__badge danger" title="Parado há {{ lead.dias_parado }} dias">
-                                    <i class="fas fa-clock"></i> {{ lead.dias_parado }}d
+                                    <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
                                 {% elif lead.dias_parado >= 7 %}
                                 <span class="crm-card__badge warning" title="Parado há {{ lead.dias_parado }} dias">
-                                    <i class="fas fa-clock"></i> {{ lead.dias_parado }}d
+                                    <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
                                 {% else %}
                                 <span class="crm-card__badge">
-                                    <i class="fas fa-clock"></i> {{ lead.dias_parado }}d
+                                    <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
                                 {% endif %}
                             </span>
                             <span class="crm-card__acoes">
-                                <a href="{{ url_for('crm.editar', lead_id=lead.id) }}" title="Editar">
-                                    <i class="fas fa-edit"></i>
+                                <a href="{{ url_for('crm.editar', lead_id=lead.id) }}" title="Editar lead" aria-label="Editar lead">
+                                    <i class="fas fa-edit" aria-hidden="true"></i>
                                 </a>
                             </span>
                         </div>
@@ -235,7 +225,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Motivo da Perda</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body">
                 <p>Para mover este lead para <strong>Perdido</strong>, selecione o motivo:</p>
@@ -297,7 +287,9 @@
         const classes = ['em-fila','em-andamento','enviado','validacao','aprovado','feedback','congelado','perdido'];
         classes.forEach(c => cardEl.classList.remove('status-' + c));
         const slug = novoStatus.toLowerCase()
-            .replace(/ã/g,'a').replace(/é/g,'e').replace(/ /g,'-');
+            .replace(/ã/g,'a').replace(/é/g,'e').replace(/í/g,'i')
+            .replace(/ó/g,'o').replace(/ú/g,'u').replace(/ç/g,'c')
+            .replace(/ /g,'-');
         cardEl.classList.add('status-' + slug);
     }
 

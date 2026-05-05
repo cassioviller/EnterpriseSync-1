@@ -1,141 +1,132 @@
 {% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, filter_card, data_table_card, status_badge %}
 
 {% block title %}CRM — Lista de Leads{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-3">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-0"><i class="fas fa-list text-primary me-2"></i>CRM — Lista de Leads</h1>
-            <p class="text-muted mb-0">{{ leads|length }} lead(s) encontrado(s)</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('crm.kanban', **filtros) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-columns me-1"></i> Kanban
-            </a>
-            {% if is_admin %}
-            <a href="{{ url_for('crm.cadastros') }}" class="btn btn-outline-primary">
-                <i class="fas fa-cog me-1"></i> Cadastros
-            </a>
-            {% endif %}
-            <a href="{{ url_for('crm.novo') }}" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Novo Lead
-            </a>
-        </div>
-    </div>
+    {% call page_header('CRM — Lista de Leads',
+                         icon='fa-list',
+                         subtitle=(leads|length|string) ~ ' lead(s) encontrado(s)') %}
+        <a href="{{ url_for('crm.kanban', **filtros) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-columns me-1" aria-hidden="true"></i> Kanban
+        </a>
+        {% if is_admin %}
+        <a href="{{ url_for('crm.cadastros') }}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-cog me-1" aria-hidden="true"></i> Cadastros
+        </a>
+        {% endif %}
+        <a href="{{ url_for('crm.novo') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1" aria-hidden="true"></i> Novo Lead
+        </a>
+    {% endcall %}
 
-    <form method="GET" action="{{ url_for('crm.lista') }}" class="card border-0 shadow-sm mb-3">
-        <div class="card-body py-2">
-            <div class="row g-2">
-                <div class="col-md-3">
-                    <input type="text" class="form-control form-control-sm" name="busca"
-                           placeholder="Buscar..." value="{{ filtros.busca }}">
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="responsavel_id">
-                        <option value="">Responsável (todos)</option>
-                        {% for r in listas.responsavel %}
-                        <option value="{{ r.id }}" {% if filtros.responsavel_id == r.id %}selected{% endif %}>{{ r.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="origem_id">
-                        <option value="">Origem (todas)</option>
-                        {% for o in listas.origem %}
-                        <option value="{{ o.id }}" {% if filtros.origem_id == o.id %}selected{% endif %}>{{ o.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select class="form-select form-select-sm" name="tipo_obra_id">
-                        <option value="">Tipo de Obra</option>
-                        {% for t in listas.tipo_obra %}
-                        <option value="{{ t.id }}" {% if filtros.tipo_obra_id == t.id %}selected{% endif %}>{{ t.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <input type="month" class="form-control form-control-sm" name="mes_chegada" value="{{ filtros.mes_chegada }}">
-                </div>
-                <div class="col-md-1 d-flex gap-1">
-                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">
-                        <i class="fas fa-filter"></i>
-                    </button>
-                    <a href="{{ url_for('crm.lista') }}" class="btn btn-sm btn-outline-secondary">
-                        <i class="fas fa-times"></i>
-                    </a>
-                </div>
-            </div>
+    {% call filter_card(url_for('crm.lista'), reset_url=url_for('crm.lista')) %}
+        <div class="col-12 col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text" class="form-control form-control-sm" name="busca"
+                   placeholder="Nome, contato, e-mail..." value="{{ filtros.busca or '' }}">
         </div>
-    </form>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Responsável</label>
+            <select class="form-select form-select-sm" name="responsavel_id">
+                <option value="">Todos</option>
+                {% for r in listas.responsavel %}
+                <option value="{{ r.id }}" {% if filtros.responsavel_id == r.id %}selected{% endif %}>{{ r.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Origem</label>
+            <select class="form-select form-select-sm" name="origem_id">
+                <option value="">Todas</option>
+                {% for o in listas.origem %}
+                <option value="{{ o.id }}" {% if filtros.origem_id == o.id %}selected{% endif %}>{{ o.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Tipo de obra</label>
+            <select class="form-select form-select-sm" name="tipo_obra_id">
+                <option value="">Todos</option>
+                {% for t in listas.tipo_obra %}
+                <option value="{{ t.id }}" {% if filtros.tipo_obra_id == t.id %}selected{% endif %}>{{ t.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label">Mês de chegada</label>
+            <input type="month" class="form-control form-control-sm" name="mes_chegada" value="{{ filtros.mes_chegada or '' }}">
+        </div>
+    {% endcall %}
 
-    <div class="card border-0 shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 small">
-                <thead class="table-light">
-                    <tr>
-                        <th>Chegada</th>
-                        <th>Nome</th>
-                        <th>Responsável</th>
-                        <th>Status</th>
-                        <th>Origem</th>
-                        <th>Tipo de Obra</th>
-                        <th class="text-end">Valor</th>
-                        <th>Cliente</th>
-                        <th class="text-end">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for lead in leads %}
-                    <tr>
-                        <td>{{ lead.data_chegada.strftime('%d/%m/%Y') if lead.data_chegada else '—' }}</td>
-                        <td>
-                            <strong>{{ lead.nome }}</strong>
-                            {% if lead.contato %}<div class="text-muted small">{{ lead.contato }}</div>{% endif %}
-                        </td>
-                        <td>{{ lead.responsavel.nome if lead.responsavel else '—' }}</td>
-                        <td><span class="badge bg-secondary">{{ lead.status }}</span></td>
-                        <td>{{ lead.origem.nome if lead.origem else '—' }}</td>
-                        <td>{{ lead.tipo_obra.nome if lead.tipo_obra else '—' }}</td>
-                        <td class="text-end">
-                            {% if lead.valor_proposta %}
-                                R$ {{ "{:,.2f}".format(lead.valor_proposta).replace(',', 'X').replace('.', ',').replace('X', '.') }}
-                            {% else %}—{% endif %}
-                        </td>
-                        <td>{{ lead.cliente.nome if lead.cliente else '—' }}</td>
-                        <td class="text-end">
-                            <a href="{{ url_for('crm.editar', lead_id=lead.id) }}"
-                               class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
-                            {% if is_admin %}
-                            <button type="button" class="btn btn-sm btn-outline-danger"
-                                    data-bs-toggle="modal" data-bs-target="#delLead{{ lead.id }}">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <div class="modal fade" id="delLead{{ lead.id }}" tabindex="-1">
-                                <div class="modal-dialog"><div class="modal-content">
-                                    <div class="modal-header"><h5 class="modal-title">Excluir lead</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">Confirmar exclusão de <strong>{{ lead.nome }}</strong>?</div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <form method="POST" action="{{ url_for('crm.excluir', lead_id=lead.id) }}">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-danger">Excluir</button>
-                                        </form>
-                                    </div>
-                                </div></div>
-                            </div>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="9" class="text-center text-muted py-4">Nenhum lead encontrado.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {% call data_table_card(has_data=(leads|length > 0),
+                             empty_message='Nenhum lead encontrado para os filtros atuais.',
+                             empty_icon='fa-funnel-dollar') %}
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Chegada</th>
+                    <th>Nome</th>
+                    <th>Responsável</th>
+                    <th>Status</th>
+                    <th>Origem</th>
+                    <th>Tipo de Obra</th>
+                    <th class="text-end">Valor</th>
+                    <th>Cliente</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in leads %}
+                <tr>
+                    <td class="text-nowrap">{{ lead.data_chegada.strftime('%d/%m/%Y') if lead.data_chegada else '—' }}</td>
+                    <td>
+                        <strong>{{ lead.nome }}</strong>
+                        {% if lead.contato %}<div class="text-muted small">{{ lead.contato }}</div>{% endif %}
+                    </td>
+                    <td>{{ lead.responsavel.nome if lead.responsavel else '—' }}</td>
+                    <td>{{ status_badge(lead.status) }}</td>
+                    <td>{{ lead.origem.nome if lead.origem else '—' }}</td>
+                    <td>{{ lead.tipo_obra.nome if lead.tipo_obra else '—' }}</td>
+                    <td class="text-end">
+                        {% if lead.valor_proposta %}{{ lead.valor_proposta|brl }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>{{ lead.cliente.nome if lead.cliente else '—' }}</td>
+                    <td class="text-end text-nowrap">
+                        <a href="{{ url_for('crm.editar', lead_id=lead.id) }}"
+                           class="btn btn-sm btn-outline-primary"
+                           title="Editar lead" aria-label="Editar lead">
+                            <i class="fas fa-edit" aria-hidden="true"></i>
+                        </a>
+                        {% if is_admin %}
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                data-bs-toggle="modal" data-bs-target="#delLead{{ lead.id }}"
+                                title="Excluir lead" aria-label="Excluir lead">
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                        <div class="modal fade" id="delLead{{ lead.id }}" tabindex="-1">
+                            <div class="modal-dialog"><div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Excluir lead</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div class="modal-body">Confirmar exclusão de <strong>{{ lead.nome }}</strong>?</div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <form method="POST" action="{{ url_for('crm.excluir', lead_id=lead.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-danger">Excluir</button>
+                                    </form>
+                                </div>
+                            </div></div>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endcall %}
 </div>
 {% endblock %}

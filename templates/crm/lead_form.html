@@ -1,4 +1,5 @@
 {% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, back_link %}
 
 {% block title %}{% if lead %}Editar Lead{% else %}Novo Lead{% endif %} - CRM{% endblock %}
 
@@ -14,27 +15,20 @@
 
 {% block content %}
 <div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h4 mb-0">
-                <i class="fas fa-user-plus text-primary me-2"></i>
-                {% if lead %}Editar Lead — {{ lead.nome }}{% else %}Novo Lead{% endif %}
-            </h1>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('crm.kanban') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-arrow-left me-1"></i> Voltar ao Kanban
-            </a>
-            {% if lead and lead.cliente %}
-            <a href="{{ url_for('crm.gerar_proposta', lead_id=lead.id) }}" class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-file-invoice me-1"></i> Gerar Proposta
-            </a>
-            <a href="{{ url_for('crm.criar_obra', lead_id=lead.id) }}" class="btn btn-outline-success btn-sm">
-                <i class="fas fa-hard-hat me-1"></i> Criar Obra
-            </a>
-            {% endif %}
-        </div>
-    </div>
+    {{ back_link(url_for('crm.kanban'), 'Voltar ao Kanban') }}
+    {% call page_header(
+        ('Editar Lead — ' ~ lead.nome) if lead else 'Novo Lead',
+        icon='fa-user-plus',
+        subtitle='Preencha os dados de identificação, classificação e demanda do lead.') %}
+        {% if lead and lead.cliente %}
+        <a href="{{ url_for('crm.gerar_proposta', lead_id=lead.id) }}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-file-invoice me-1" aria-hidden="true"></i> Gerar Proposta
+        </a>
+        <a href="{{ url_for('crm.criar_obra', lead_id=lead.id) }}" class="btn btn-outline-success btn-sm">
+            <i class="fas fa-hard-hat me-1" aria-hidden="true"></i> Criar Obra
+        </a>
+        {% endif %}
+    {% endcall %}
 
     <form method="POST" action="{% if lead %}{{ url_for('crm.editar', lead_id=lead.id) }}{% else %}{{ url_for('crm.novo') }}{% endif %}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -76,7 +70,7 @@
                                                  'Responsável') }}
                                 {% if not listas.responsavel %}
                                 <small class="text-warning">
-                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                     Nenhum responsável cadastrado.
                                     <a href="{{ url_for('crm.cadastros') }}#responsavel">Cadastrar</a>
                                 </small>
@@ -186,9 +180,9 @@
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white"><strong>Cliente vinculado</strong></div>
                     <div class="card-body small">
-                        <div><i class="fas fa-user me-1 text-muted"></i><strong>{{ lead.cliente.nome }}</strong></div>
-                        {% if lead.cliente.telefone %}<div><i class="fas fa-phone me-1 text-muted"></i>{{ lead.cliente.telefone }}</div>{% endif %}
-                        {% if lead.cliente.email %}<div><i class="fas fa-envelope me-1 text-muted"></i>{{ lead.cliente.email }}</div>{% endif %}
+                        <div><i class="fas fa-user me-1 text-muted" aria-hidden="true"></i><strong>{{ lead.cliente.nome }}</strong></div>
+                        {% if lead.cliente.telefone %}<div><i class="fas fa-phone me-1 text-muted" aria-hidden="true"></i>{{ lead.cliente.telefone }}</div>{% endif %}
+                        {% if lead.cliente.email %}<div><i class="fas fa-envelope me-1 text-muted" aria-hidden="true"></i>{{ lead.cliente.email }}</div>{% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -209,11 +203,11 @@
                                 <div class="text-muted">{{ h.descricao }}</div>
                                 {% else %}
                                 <div class="text-muted">
-                                    {{ h.valor_antes or '—' }} <i class="fas fa-arrow-right mx-1"></i> {{ h.valor_depois or '—' }}
+                                    {{ h.valor_antes or '—' }} <i class="fas fa-arrow-right mx-1" aria-hidden="true"></i> {{ h.valor_depois or '—' }}
                                 </div>
                                 {% endif %}
                                 {% if h.usuario %}
-                                <small class="text-muted"><i class="fas fa-user"></i> {{ h.usuario.nome or h.usuario.username }}</small>
+                                <small class="text-muted"><i class="fas fa-user" aria-hidden="true"></i> {{ h.usuario.nome or h.usuario.username }}</small>
                                 {% endif %}
                             </li>
                             {% endfor %}
@@ -230,7 +224,7 @@
         <div class="d-flex justify-content-end gap-2 mt-3">
             <a href="{{ url_for('crm.kanban') }}" class="btn btn-outline-secondary">Cancelar</a>
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save me-1"></i> Salvar Lead
+                <i class="fas fa-save me-1" aria-hidden="true"></i> Salvar Lead
             </button>
         </div>
     </form>

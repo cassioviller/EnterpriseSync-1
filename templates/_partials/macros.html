@@ -1,0 +1,131 @@
+{# ────────────────────────────────────────────────────────────────────────
+   SIGE — Partials compartilhados (Task #15)
+   Macros de UI reutilizáveis para CRM e Métricas (e demais módulos
+   que estendem base_completo.html).
+
+   Como usar:
+     {% from "_partials/macros.html" import page_header, filter_card,
+                                            data_table_card, status_badge,
+                                            kpi_card, empty_state, back_link %}
+   ──────────────────────────────────────────────────────────────────────── #}
+
+
+{# ── 1. PAGE HEADER ─────────────────────────────────────────────────────
+   Cabeçalho padronizado com ícone, título, subtítulo opcional e área
+   de ações à direita (use {% call %} para passar botões).
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro page_header(title, icon='fa-file', subtitle=None, icon_color='text-primary') %}
+<div class="sige-page-header d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+  <div class="flex-grow-1">
+    <h1 class="h3 mb-0">
+      <i class="fas {{ icon }} {{ icon_color }} me-2" aria-hidden="true"></i>{{ title }}
+    </h1>
+    {% if subtitle %}<p class="sige-subtitle mb-0">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller %}
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    {{ caller() }}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── 2. FILTER CARD ─────────────────────────────────────────────────────
+   Container padronizado de filtros (form GET). O conteúdo dos campos
+   vem do bloco {% call %}. Botões "Filtrar" / "Limpar" são automáticos
+   se reset_url for fornecido.
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro filter_card(action_url, reset_url=None, method='get', extra_class='') %}
+<form method="{{ method }}" action="{{ action_url }}" class="card sige-filter-card border-0 shadow-sm mb-3 {{ extra_class }}">
+  <div class="card-body py-3">
+    <div class="row g-2 align-items-end">
+      {{ caller() }}
+      {% if reset_url %}
+      <div class="col-12 col-sm-auto ms-sm-auto d-flex gap-2 sige-filter-actions">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="fas fa-filter me-1" aria-hidden="true"></i> Filtrar
+        </button>
+        <a href="{{ reset_url }}" class="btn btn-outline-secondary btn-sm" title="Limpar filtros">
+          <i class="fas fa-times" aria-hidden="true"></i><span class="visually-hidden">Limpar filtros</span>
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endmacro %}
+
+
+{# ── 3. DATA TABLE CARD ────────────────────────────────────────────────
+   Wrapper de card + table-responsive. O conteúdo (thead/tbody) vem
+   do bloco {% call %}. Mostra empty_state automaticamente se has_data
+   for falsy.
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro data_table_card(has_data=True, empty_message='Nenhum registro encontrado.', empty_icon='fa-inbox', dense=True) %}
+<div class="card sige-table-card border-0 shadow-sm{% if dense %} sige-table-dense{% endif %}">
+  {% if has_data %}
+  <div class="table-responsive">
+    {{ caller() }}
+  </div>
+  {% else %}
+  {{ empty_state(empty_message, icon=empty_icon) }}
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── 4. STATUS BADGE (CRM) ─────────────────────────────────────────────
+   Mapa unificado de cores para os 8 estados do funil de vendas CRM.
+   Aceita o nome em PT (Em fila, Em andamento, Validação, etc.) e
+   normaliza para o slug correto.
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro status_badge(status) %}
+{%- set s = (status or '')|lower
+              |replace('ã','a')|replace('é','e')|replace('í','i')
+              |replace('ó','o')|replace('ú','u')|replace('ç','c')
+              |replace(' ','-') -%}
+<span class="sige-status-badge sige-status-{{ s }}" title="Status: {{ status }}">
+  <span class="sige-status-dot" aria-hidden="true"></span>{{ status }}
+</span>
+{% endmacro %}
+
+
+{# ── 5. KPI CARD ───────────────────────────────────────────────────────
+   Cartão compacto de KPI (label + valor grande + dica opcional).
+   color: success | danger | warning | primary | info | muted
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro kpi_card(label, value, color='dark', icon=None, hint=None) %}
+<div class="card sige-kpi-card h-100">
+  <div class="card-body py-3 text-center">
+    <div class="sige-kpi-label">
+      {% if icon %}<i class="fas {{ icon }} me-1" aria-hidden="true"></i>{% endif %}{{ label }}
+    </div>
+    <div class="sige-kpi-value text-{{ color }}">{{ value }}</div>
+    {% if hint %}<div class="sige-kpi-hint">{{ hint }}</div>{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{# ── 6. EMPTY STATE ────────────────────────────────────────────────────
+   Estado vazio padronizado (usado dentro ou fora de cards).
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro empty_state(message, icon='fa-inbox', title=None) %}
+<div class="sige-empty-state">
+  <i class="fas {{ icon }}" aria-hidden="true"></i>
+  {% if title %}<div class="sige-empty-title">{{ title }}</div>{% endif %}
+  <div class="sige-empty-message">{{ message }}</div>
+</div>
+{% endmacro %}
+
+
+{# ── 7. BACK LINK ──────────────────────────────────────────────────────
+   Link "Voltar" padronizado, geralmente colocado acima do page_header
+   em telas de detalhe.
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro back_link(url, label='Voltar') %}
+<a href="{{ url }}" class="sige-back-link text-decoration-none small text-muted d-inline-flex align-items-center gap-1 mb-1">
+  <i class="fas fa-arrow-left" aria-hidden="true"></i> {{ label }}
+</a>
+{% endmacro %}

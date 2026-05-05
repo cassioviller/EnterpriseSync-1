@@ -1,73 +1,83 @@
-{% extends "base.html" %}
+{% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, filter_card, kpi_card, empty_state %}
+
 {% block title %}Métricas – Funcionários{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h2 class="mb-0"><i class="fas fa-users me-2 text-primary"></i> Métricas de Funcionários</h2>
-    <div class="text-muted small">
-      Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}
-      &nbsp;|&nbsp;
-      <span class="text-primary fw-semibold">{{ n_com_rdo }}</span> com RDO
-      {% if n_sem_rdo > 0 %}
-        &nbsp;·&nbsp;<span class="text-secondary fw-semibold">{{ n_sem_rdo }}</span> sem RDO
-      {% endif %}
+<div class="container-fluid py-3">
+  {% call page_header('Métricas de Funcionários',
+                       icon='fa-users',
+                       subtitle='Período: ' ~ data_inicio.strftime('%d/%m/%Y') ~ ' – ' ~ data_fim.strftime('%d/%m/%Y')) %}
+    <a href="{{ url_for('metricas.ranking', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-trophy me-1" aria-hidden="true"></i> Ranking
+    </a>
+    <a href="{{ url_for('metricas.empresa_por_servico', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
+       class="btn btn-outline-primary btn-sm">
+      <i class="fas fa-chart-bar me-1" aria-hidden="true"></i> Por serviço
+    </a>
+  {% endcall %}
+
+  {# KPI bar — totais do período #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+      {{ kpi_card('Funcionários no período', metricas|length, color='dark', icon='fa-id-badge') }}
+    </div>
+    <div class="col-6 col-md-3">
+      {{ kpi_card('Com RDO finalizado', n_com_rdo, color='primary', icon='fa-clipboard-check') }}
+    </div>
+    <div class="col-6 col-md-3">
+      {{ kpi_card('Sem RDO', n_sem_rdo, color=('secondary' if n_sem_rdo == 0 else 'warning'), icon='fa-calendar-times') }}
+    </div>
+    <div class="col-6 col-md-3">
+      {{ kpi_card('Dias do período',
+                   ((data_fim - data_inicio).days + 1),
+                   color='dark', icon='fa-calendar') }}
     </div>
   </div>
 
-  <!-- Filtros -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-body py-3">
-      <form method="get" class="row g-2 align-items-end">
-        <div class="col-sm-2">
-          <label class="form-label fw-semibold mb-1">Data início</label>
-          <input type="date" name="data_inicio" class="form-control form-control-sm"
-                 value="{{ data_inicio.isoformat() }}">
-        </div>
-        <div class="col-sm-2">
-          <label class="form-label fw-semibold mb-1">Data fim</label>
-          <input type="date" name="data_fim" class="form-control form-control-sm"
-                 value="{{ data_fim.isoformat() }}">
-        </div>
-        <div class="col-sm-3">
-          <label class="form-label fw-semibold mb-1">Obras</label>
-          <select name="obra_ids" class="form-select form-select-sm" multiple size="2">
-            {% for o in obras %}
-              <option value="{{ o.id }}" {% if o.id in obra_ids_sel %}selected{% endif %}>{{ o.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-sm-2">
-          <label class="form-label fw-semibold mb-1">Função</label>
-          <select name="funcao_ids" class="form-select form-select-sm" multiple size="2">
-            {% for f in funcoes %}
-              <option value="{{ f.id }}" {% if f.id in funcao_ids_sel %}selected{% endif %}>{{ f.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-sm-2">
-          <label class="form-label fw-semibold mb-1">Status</label>
-          <select name="status" class="form-select form-select-sm">
-            <option value="todos" {% if status_filtro=='todos' %}selected{% endif %}>Todos</option>
-            <option value="com_custo" {% if status_filtro=='com_custo' %}selected{% endif %}>Com custo</option>
-            <option value="sem_custo" {% if status_filtro=='sem_custo' %}selected{% endif %}>Sem custo</option>
-            <option value="com_receita" {% if status_filtro=='com_receita' %}selected{% endif %}>Com receita</option>
-          </select>
-        </div>
-        <div class="col-sm-1">
-          <button type="submit" class="btn btn-primary btn-sm w-100">
-            <i class="fas fa-search"></i>
-          </button>
-        </div>
-      </form>
+  {# Filtros #}
+  {% call filter_card(url_for('metricas.funcionarios'),
+                       reset_url=url_for('metricas.funcionarios')) %}
+    <div class="col-6 col-md-2">
+      <label class="form-label">Data início</label>
+      <input type="date" name="data_inicio" class="form-control form-control-sm"
+             value="{{ data_inicio.isoformat() }}">
     </div>
-  </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Data fim</label>
+      <input type="date" name="data_fim" class="form-control form-control-sm"
+             value="{{ data_fim.isoformat() }}">
+    </div>
+    <div class="col-12 col-md-3">
+      <label class="form-label">Obras</label>
+      <select name="obra_ids" class="form-select form-select-sm" multiple size="2">
+        {% for o in obras %}
+          <option value="{{ o.id }}" {% if o.id in obra_ids_sel %}selected{% endif %}>{{ o.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Função</label>
+      <select name="funcao_ids" class="form-select form-select-sm" multiple size="2">
+        {% for f in funcoes %}
+          <option value="{{ f.id }}" {% if f.id in funcao_ids_sel %}selected{% endif %}>{{ f.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="todos" {% if status_filtro=='todos' %}selected{% endif %}>Todos</option>
+        <option value="com_custo" {% if status_filtro=='com_custo' %}selected{% endif %}>Com custo</option>
+        <option value="sem_custo" {% if status_filtro=='sem_custo' %}selected{% endif %}>Sem custo</option>
+        <option value="com_receita" {% if status_filtro=='com_receita' %}selected{% endif %}>Com receita</option>
+      </select>
+    </div>
+  {% endcall %}
 
   {% if not metricas %}
-    <div class="alert alert-info">
-      <i class="fas fa-info-circle me-2"></i>
-      Nenhum funcionário encontrado para os filtros selecionados.
-    </div>
+    {{ empty_state('Nenhum funcionário encontrado para os filtros selecionados.', icon='fa-users') }}
   {% else %}
   <div class="row g-3">
     {% for m in metricas %}
@@ -83,13 +93,13 @@
           <span class="badge bg-secondary">Sem RDO</span>
         </div>
         <div class="card-body py-3 text-center text-secondary">
-          <i class="fas fa-calendar-times fa-2x mb-2 opacity-50"></i>
+          <i class="fas fa-calendar-times fa-2x mb-2 opacity-50" aria-hidden="true"></i>
           <div class="small">Nenhum RDO finalizado no período</div>
         </div>
         <div class="card-footer py-2 text-end bg-transparent">
           <a href="{{ url_for('metricas.detalhe_funcionario', funcionario_id=m.funcionario_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
              class="btn btn-outline-secondary btn-sm">
-            Ver detalhe <i class="fas fa-arrow-right ms-1"></i>
+            Ver detalhe <i class="fas fa-arrow-right ms-1" aria-hidden="true"></i>
           </a>
         </div>
       </div>
@@ -97,7 +107,7 @@
       {# ── Card normal: funcionário com RDO ── #}
       {% else %}
       <div class="card h-100 shadow-sm {% if not m.tem_custo %}border-secondary{% elif m.lucro_total is not none and m.lucro_total < 0 %}border-danger{% else %}border-0{% endif %}">
-        <div class="card-header d-flex align-items-center justify-content-between py-2">
+        <div class="card-header d-flex align-items-center justify-content-between py-2 bg-white">
           <div>
             <strong>{{ m.funcionario_nome }}</strong>
             <div class="text-muted small">{{ m.funcao_nome }}</div>
@@ -128,8 +138,8 @@
             </div>
           </div>
 
-          <div class="progress mt-2 mb-3" style="height:6px;" title="Assiduidade {{ '%.0f'|format(m.assiduidade_pct) }}%">
-            <div class="progress-bar {% if m.assiduidade_pct >= 80 %}bg-success{% elif m.assiduidade_pct >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+          <div class="sige-mini-progress mt-2 mb-3" title="Assiduidade {{ '%.0f'|format(m.assiduidade_pct) }}%">
+            <div class="{% if m.assiduidade_pct >= 80 %}bg-success{% elif m.assiduidade_pct >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
                  style="width: {{ [m.assiduidade_pct, 100]|min }}%"></div>
           </div>
 
@@ -149,7 +159,7 @@
             </div>
             <div class="col-4">
               {% if m.custo_total is not none %}
-                <div class="fw-bold text-danger">R$ {{ '%.0f'|format(m.custo_total) }}</div>
+                <div class="fw-bold text-danger">{{ m.custo_total|brl }}</div>
                 <div class="text-muted small">Custo</div>
               {% else %}
                 <div class="text-muted">—</div>
@@ -159,7 +169,7 @@
             <div class="col-4">
               {% if m.lucro_total is not none %}
                 <div class="fw-bold {% if m.lucro_total >= 0 %}text-success{% else %}text-danger{% endif %}">
-                  R$ {{ '%.0f'|format(m.lucro_total) }}
+                  {{ m.lucro_total|brl }}
                 </div>
                 <div class="text-muted small">Lucro</div>
               {% else %}
@@ -186,8 +196,8 @@
                   {% elif idx >= 75 %}text-warning
                   {% else %}text-danger{% endif %}">
                   {{ '%.0f'|format(idx) }}%
-                  {% if idx >= 105 %}<i class="fas fa-arrow-up"></i>
-                  {% elif idx < 90 %}<i class="fas fa-arrow-down"></i>{% endif %}
+                  {% if idx >= 105 %}<i class="fas fa-arrow-up" aria-hidden="true"></i>
+                  {% elif idx < 90 %}<i class="fas fa-arrow-down" aria-hidden="true"></i>{% endif %}
                 </div>
               {% else %}
                 <div class="small text-muted">—</div>
@@ -215,7 +225,7 @@
           {% if m.top_rdos_problematicos %}
           <div class="border-top pt-2 mt-2">
             <div class="text-muted small mb-1">
-              <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+              <i class="fas fa-exclamation-triangle text-danger me-1" aria-hidden="true"></i>
               Top RDOs com pior contribuição
             </div>
             <ul class="list-unstyled mb-0 small">
@@ -229,10 +239,10 @@
                 <div class="text-end">
                   {% if tr.lucro_dele is not none %}
                     <span class="{% if tr.lucro_dele < 0 %}text-danger{% else %}text-success{% endif %} fw-semibold">
-                      R$ {{ '%.0f'|format(tr.lucro_dele) }}
+                      {{ tr.lucro_dele|brl }}
                     </span>
                   {% elif tr.custo_dele is not none %}
-                    <span class="text-danger">R$ {{ '%.0f'|format(tr.custo_dele) }}</span>
+                    <span class="text-danger">{{ tr.custo_dele|brl }}</span>
                     <div class="text-muted" style="font-size: 0.7rem;">custo</div>
                   {% endif %}
                 </div>
@@ -246,7 +256,7 @@
         <div class="card-footer py-2 text-end bg-transparent">
           <a href="{{ url_for('metricas.detalhe_funcionario', funcionario_id=m.funcionario_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
              class="btn btn-outline-primary btn-sm">
-            Ver detalhe <i class="fas fa-arrow-right ms-1"></i>
+            Ver detalhe <i class="fas fa-arrow-right ms-1" aria-hidden="true"></i>
           </a>
         </div>
       </div>

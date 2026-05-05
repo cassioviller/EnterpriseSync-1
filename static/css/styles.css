@@ -392,3 +392,187 @@
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   SIGE — Task #15: Estilos dos partials compartilhados
+   (CRM + Métricas — base_completo.html)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* —— Page header —— */
+.sige-page-header h1 {
+  font-weight: 700;
+  color: #212529;
+  margin-bottom: 0.15rem;
+}
+.sige-page-header .sige-subtitle {
+  color: #6c757d;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* —— Filter card —— */
+.sige-filter-card .form-control,
+.sige-filter-card .form-select {
+  padding: 8px 12px !important;
+  font-size: 0.875rem !important;
+  min-height: 38px !important;
+  border-width: 1px !important;
+}
+.sige-filter-card .form-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.25rem;
+}
+.sige-filter-card .card-body { padding: 0.85rem 1rem; }
+.sige-filter-actions .btn { min-width: 90px; }
+.sige-filter-actions .btn[title="Limpar filtros"] { min-width: 38px; padding: 6px 10px; }
+
+/* —— Status badge (CRM) —— */
+.sige-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.sige-status-badge .sige-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+  background: currentColor;
+  opacity: 0.85;
+}
+.sige-status-em-fila      { background:#e9ecef; color:#495057; border-color:#dee2e6; }
+.sige-status-em-andamento { background:#cff4fc; color:#055160; border-color:#b6effb; }
+.sige-status-enviado      { background:#cfe2ff; color:#084298; border-color:#9ec5fe; }
+.sige-status-validacao    { background:#e2d4f8; color:#3d1f73; border-color:#d0baf3; }
+.sige-status-aprovado     { background:#d1e7dd; color:#0f5132; border-color:#a3cfbb; }
+.sige-status-feedback     { background:#ffe5d0; color:#7c3a06; border-color:#ffcfa3; }
+.sige-status-congelado    { background:#dee2e6; color:#212529; border-color:#ced4da; }
+.sige-status-perdido      { background:#f8d7da; color:#842029; border-color:#f1aeb5; }
+
+/* —— KPI card —— */
+.sige-kpi-card {
+  border: 0 !important;
+  background:#ffffff !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+  border-radius: 10px !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.sige-kpi-card:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08) !important;
+}
+.sige-kpi-card .card-body { padding: 0.9rem 0.75rem !important; }
+.sige-kpi-card .sige-kpi-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.sige-kpi-card .sige-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.sige-kpi-card .sige-kpi-hint {
+  font-size: 0.72rem;
+  color: #6c757d;
+  margin-top: 0.15rem;
+}
+
+/* —— Empty state —— */
+.sige-empty-state {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: #6c757d;
+}
+.sige-empty-state i {
+  font-size: 2.25rem;
+  opacity: 0.35;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+.sige-empty-state .sige-empty-title {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+.sige-empty-state .sige-empty-message { font-size: 0.9rem; }
+
+/* —— Back link —— */
+.sige-back-link:hover { color: #198754 !important; text-decoration: underline !important; }
+
+/* —— Data table card (denso) —— */
+.sige-table-card { overflow: hidden; }
+.sige-table-card .table { margin-bottom: 0 !important; }
+.sige-table-card .table thead th {
+  background: #f8f9fa !important;
+  color: #495057 !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  border-bottom: 2px solid #dee2e6 !important;
+  border-top: 0 !important;
+  white-space: nowrap;
+}
+.sige-table-card.sige-table-dense .table th,
+.sige-table-card.sige-table-dense .table td {
+  padding: 10px 14px !important;
+  font-size: 0.875rem !important;
+  vertical-align: middle !important;
+}
+.sige-table-card .table tbody tr:last-child td { border-bottom: 0 !important; }
+
+/* Permite que o hover do .card NÃO bagunçe o card-table dentro da página */
+.sige-table-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important; }
+.sige-filter-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important; }
+
+/* —— Pódio do ranking —— */
+.sige-podio { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 12px; align-items: end; margin-bottom: 1.25rem; }
+.sige-podio .sige-podio-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem 0.75rem;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  position: relative;
+  border-top: 4px solid transparent;
+}
+.sige-podio .sige-podio-card.first  { border-top-color:#f4b400; transform: translateY(-8px); }
+.sige-podio .sige-podio-card.second { border-top-color:#9aa0a6; }
+.sige-podio .sige-podio-card.third  { border-top-color:#cd7f32; }
+.sige-podio .sige-podio-medal { font-size: 1.5rem; margin-bottom: 0.25rem; }
+.sige-podio .sige-podio-name { font-weight: 700; font-size: 1rem; color:#212529; }
+.sige-podio .sige-podio-role { font-size: 0.78rem; color:#6c757d; margin-bottom: 0.5rem; }
+.sige-podio .sige-podio-metric { font-size: 1.1rem; font-weight: 700; color:#198754; }
+.sige-podio .sige-podio-metric-label { font-size: 0.7rem; color:#6c757d; text-transform: uppercase; letter-spacing: 0.04em; }
+@media (max-width: 575px) {
+  .sige-podio { grid-template-columns: 1fr; }
+  .sige-podio .sige-podio-card.first { transform: none; }
+}
+
+/* —— Mini progress (Métricas / Funcionários) —— */
+.sige-mini-progress { height: 5px; border-radius: 3px; background:#e9ecef; overflow: hidden; }
+.sige-mini-progress > div { height: 100%; transition: width 0.3s ease; }
+
+/* —— Cabeçalho de detalhe de funcionário —— */
+.sige-detail-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 1rem;
+}
+
+/* Remove o hover-lift agressivo do base_completo nos KPI/podio (evita flicker) */
+.card.sige-kpi-card:hover { transform: translateY(-1px) !important; }
