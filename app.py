@@ -835,41 +835,51 @@ except ImportError as e:
 # SCHEDULER: job mensal — cobertura ociosa de mensalistas (dia 1 de cada mês)
 # ─────────────────────────────────────────────────────────────────────────────
 try:
-    from apscheduler.schedulers.background import BackgroundScheduler
-    from apscheduler.triggers.cron import CronTrigger
+    # Gate: evita múltiplos schedulers em deploy multi-worker (gunicorn -w N).
+    # Defina SCHEDULER_ENABLED=0 em todos os workers exceto um, ou use
+    # a variável para desabilitar completamente e delegar ao CLI/cron externo.
+    _scheduler_enabled = os.environ.get('SCHEDULER_ENABLED', '1') not in ('0', 'false', 'False')
 
-    def _job_cobertura_ociosa():
-        """Executa o job de cobertura ociosa para todos os tenants ativos."""
-        from datetime import date
-        hoje = date.today()
-        if hoje.month == 1:
-            ano_ref, mes_ref = hoje.year - 1, 12
-        else:
-            ano_ref, mes_ref = hoje.year, hoje.month - 1
-        logging.info(
-            f"[scheduler] cobertura-ociosa iniciando: {ano_ref}/{mes_ref:02d}"
+    if _scheduler_enabled:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+
+        def _job_cobertura_ociosa():
+            """Executa o job de cobertura ociosa para todos os tenants ativos."""
+            from datetime import date
+            hoje = date.today()
+            if hoje.month == 1:
+                ano_ref, mes_ref = hoje.year - 1, 12
+            else:
+                ano_ref, mes_ref = hoje.year, hoje.month - 1
+            logging.info(
+                f"[scheduler] cobertura-ociosa iniciando: {ano_ref}/{mes_ref:02d}"
+            )
+            with app.app_context():
+                try:
+                    from jobs.cobertura_ociosa_mensalistas import executar
+                    resultado = executar(ano_ref, mes_ref, admin_id=None)
+                    total = sum(resultado.values())
+                    logging.info(
+                        f"[scheduler] cobertura-ociosa concluído: "
+                        f"{len(resultado)} funcionário(s), {total} dia(s)."
+                    )
+                except Exception as _e:
+                    logging.error(
+                        f"[scheduler] cobertura-ociosa falhou: {_e}", exc_info=True
+                    )
+
+        _scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
+        _scheduler.add_job(
+            _job_cobertura_ociosa,
+            trigger=CronTrigger(day=1, hour=6, minute=0),
+            id='cobertura_ociosa_mensalistas',
+            replace_existing=True,
         )
-        with app.app_context():
-            try:
-                from jobs.cobertura_ociosa_mensalistas import executar
-                resultado = executar(ano_ref, mes_ref, admin_id=None)
-                total = sum(resultado.values())
-                logging.info(
-                    f"[scheduler] cobertura-ociosa concluído: "
-                    f"{len(resultado)} funcionário(s), {total} dia(s)."
-                )
-            except Exception as _e:
-                logging.error(f"[scheduler] cobertura-ociosa falhou: {_e}", exc_info=True)
-
-    _scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
-    _scheduler.add_job(
-        _job_cobertura_ociosa,
-        trigger=CronTrigger(day=1, hour=6, minute=0),
-        id='cobertura_ociosa_mensalistas',
-        replace_existing=True,
-    )
-    _scheduler.start()
-    logging.info("[OK] APScheduler iniciado — job cobertura-ociosa em dia 1 às 06:00")
+        _scheduler.start()
+        logging.info("[OK] APScheduler iniciado — job cobertura-ociosa em dia 1 às 06:00")
+    else:
+        logging.info("[OK] APScheduler desabilitado via SCHEDULER_ENABLED=0")
 except Exception as _sched_err:
     logging.warning(f"[WARN] APScheduler não iniciado: {_sched_err}")
 
