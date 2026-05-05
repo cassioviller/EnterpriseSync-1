@@ -576,3 +576,173 @@
 
 /* Remove o hover-lift agressivo do base_completo nos KPI/podio (evita flicker) */
 .card.sige-kpi-card:hover { transform: translateY(-1px) !important; }
+
+/* ════════════════════════════════════════════════════════════════════
+   SIGE — Task #15 (rev 2): completar requisitos do plano
+   - avatar/inicial, sticky tables, vertical nav, timeline, mini-bars,
+     linha expansível na tabela de Serviços, "sem RDO" mais suave
+   ════════════════════════════════════════════════════════════════════ */
+
+/* —— Avatar com inicial —— */
+.sige-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6c757d, #495057);
+  color: #fff;
+  border-radius: 50%;
+  font-weight: 600;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+/* —— Cadastros: nav-pills vertical lateral —— */
+.sige-side-nav { padding: 0; margin: 0; }
+.sige-side-nav .nav-link {
+  color: #495057;
+  padding: 9px 12px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+}
+.sige-side-nav .nav-link:hover { background: #f8f9fa; border-color: #e9ecef; }
+.sige-side-nav .nav-link.active { background: #198754 !important; color: #fff !important; border-color: #198754 !important; }
+.sige-side-nav .nav-link.active .badge { background: rgba(255,255,255,0.25) !important; color: #fff !important; }
+
+/* —— Timeline (histórico do lead) —— */
+.sige-timeline { position: relative; padding: 6px 0; list-style: none; margin: 0; }
+.sige-timeline::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: #e9ecef;
+}
+.sige-timeline-item {
+  position: relative;
+  padding: 0 0 14px 32px;
+}
+.sige-timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #198754;
+  box-sizing: border-box;
+  z-index: 1;
+}
+.sige-timeline-item:last-child { padding-bottom: 0; }
+.sige-timeline-item .sige-timeline-time { font-size: 0.7rem; color: #adb5bd; }
+
+/* —— Sticky table headers —— */
+.sige-table-card.sige-table-sticky .table-responsive { max-height: 70vh; overflow-y: auto; }
+.sige-table-card.sige-table-sticky .table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f9fa !important;
+  box-shadow: inset 0 -2px 0 #dee2e6;
+}
+
+/* —— Mini-bars coloridas (Assiduidade/Produtividade/Lucratividade) —— */
+.sige-mini-bars { display: flex; flex-direction: column; gap: 6px; }
+.sige-mini-bar-row {
+  display: grid;
+  grid-template-columns: 95px 1fr 48px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+}
+.sige-mini-bar-row .sige-mini-bar-label {
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+.sige-mini-bar-row .sige-mini-bar-value {
+  text-align: right;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+/* —— Cartão "sem RDO" mais suave (substitui opacity-75) —— */
+.sige-card-empty {
+  background: #f8f9fa !important;
+  border: 1px dashed #ced4da !important;
+  box-shadow: none !important;
+}
+.sige-card-empty:hover {
+  transform: none !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+
+/* —— Linha expansível (empresa_servico) —— */
+.sige-table-card .sige-row-toggle {
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  color: #6c757d;
+  padding: 4px 8px;
+}
+.sige-table-card .sige-row-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
+.sige-table-card .sige-row-toggle i { transition: transform 0.18s ease; }
+.sige-row-detail-cell { background: #f8f9fa !important; padding: 0 !important; border-top: 0 !important; }
+.sige-row-detail-cell .collapse, .sige-row-detail-cell .collapsing { padding: 14px 24px; }
+.sige-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.sige-detail-grid .sige-detail-cell {
+  background: #fff;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+.sige-detail-grid .sige-detail-cell .sige-detail-label {
+  font-size: 0.7rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.sige-detail-grid .sige-detail-cell .sige-detail-value {
+  font-weight: 700;
+  margin-top: 2px;
+}
+@media (max-width: 768px) { .sige-detail-grid { grid-template-columns: 1fr; } }
+
+/* —— Destaque do lucro do período no header de detalhe —— */
+.sige-detail-header .sige-period-lucro {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  text-align: right;
+  min-width: 140px;
+}
+.sige-detail-header .sige-period-lucro .sige-period-lucro-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #6c757d;
+  font-weight: 600;
+}
+.sige-detail-header .sige-period-lucro .sige-period-lucro-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}

@@ -8,17 +8,34 @@
   {{ back_link(url_for('metricas.funcionarios', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()),
                 'Voltar para Funcionários') }}
 
-  {# Header de detalhe — card com nome, função e período #}
-  <div class="sige-detail-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-    <div>
-      <h1 class="h3 mb-0">
-        <i class="fas fa-user text-primary me-2" aria-hidden="true"></i>{{ func.nome }}
-      </h1>
-      <div class="text-muted small mt-1">
-        {% if func.funcao_ref %}<i class="fas fa-id-badge me-1" aria-hidden="true"></i>{{ func.funcao_ref.nome }}{% endif %}
-        <span class="ms-2"><i class="fas fa-calendar-alt me-1" aria-hidden="true"></i>{{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}</span>
+  {# Header de detalhe — nome + função + período + lucro do período em destaque #}
+  {% set ph = namespace(lucro=0, count=0) %}
+  {% for d in detalhe.por_dia %}
+    {% if d.lucro is not none %}
+      {% set ph.lucro = ph.lucro + (d.lucro|float) %}
+      {% set ph.count = ph.count + 1 %}
+    {% endif %}
+  {% endfor %}
+  <div class="sige-detail-header d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div class="d-flex align-items-center gap-3">
+      {% from "_partials/macros.html" import avatar %}
+      {{ avatar(func.nome, 56) }}
+      <div>
+        <h1 class="h3 mb-0">{{ func.nome }}</h1>
+        <div class="text-muted small mt-1">
+          {% if func.funcao_ref %}<i class="fas fa-id-badge me-1" aria-hidden="true"></i>{{ func.funcao_ref.nome }}{% endif %}
+          <span class="ms-2"><i class="fas fa-calendar-alt me-1" aria-hidden="true"></i>{{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}</span>
+        </div>
       </div>
     </div>
+    {% if ph.count > 0 %}
+    <div class="sige-period-lucro">
+      <span class="sige-period-lucro-label">Lucro do período</span>
+      <span class="sige-period-lucro-value {% if ph.lucro >= 0 %}text-success{% else %}text-danger{% endif %}">
+        {{ ph.lucro|brl }}
+      </span>
+    </div>
+    {% endif %}
   </div>
 
   {% if not detalhe.por_servico and not detalhe.por_dia %}

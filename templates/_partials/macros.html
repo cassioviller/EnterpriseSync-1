@@ -62,8 +62,8 @@
    do bloco {% call %}. Mostra empty_state automaticamente se has_data
    for falsy.
    ──────────────────────────────────────────────────────────────────── #}
-{% macro data_table_card(has_data=True, empty_message='Nenhum registro encontrado.', empty_icon='fa-inbox', dense=True) %}
-<div class="card sige-table-card border-0 shadow-sm{% if dense %} sige-table-dense{% endif %}">
+{% macro data_table_card(has_data=True, empty_message='Nenhum registro encontrado.', empty_icon='fa-inbox', dense=True, extra_classes='') %}
+<div class="card sige-table-card border-0 shadow-sm{% if dense %} sige-table-dense{% endif %}{% if extra_classes %} {{ extra_classes }}{% endif %}">
   {% if has_data %}
   <div class="table-responsive">
     {{ caller() }}
@@ -128,4 +128,38 @@
 <a href="{{ url }}" class="sige-back-link text-decoration-none small text-muted d-inline-flex align-items-center gap-1 mb-1">
   <i class="fas fa-arrow-left" aria-hidden="true"></i> {{ label }}
 </a>
+{% endmacro %}
+
+
+{# ── 8. AVATAR (iniciais) ─────────────────────────────────────────────
+   Avatar circular simples com as iniciais do nome (até 2 letras).
+   Usado em lead.responsavel (kanban) e nas listas de funcionários
+   (divergencia_servico). Cor neutra — gradient cinza.
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro avatar(nome, size=24) %}
+{%- set partes = (nome or '').split() -%}
+{%- set ns = namespace(inic='') -%}
+{%- for p in partes[:2] -%}{%- if p -%}{%- set ns.inic = ns.inic + p[0] -%}{%- endif -%}{%- endfor -%}
+<span class="sige-avatar"
+      style="width:{{ size }}px;height:{{ size }}px;font-size:{{ (size * 0.42)|round|int }}px"
+      title="{{ nome or '' }}">{{ ns.inic|upper or '?' }}</span>
+{% endmacro %}
+
+
+{# ── 9. MINI BAR ROW ──────────────────────────────────────────────────
+   Linha com label, barra horizontal colorida e valor. Usado nos cards
+   de funcionário em métricas/funcionarios.
+   color_class: bg-success | bg-primary | bg-warning | bg-danger | bg-secondary
+   pct: número 0-100 (será clampado).
+   ──────────────────────────────────────────────────────────────────── #}
+{% macro mini_bar_row(label, pct, value_text, color_class='bg-primary') %}
+{%- set p = pct if pct is not none else 0 -%}
+{%- set p_clamped = ([p, 100]|min if p >= 0 else 0) -%}
+<div class="sige-mini-bar-row">
+  <span class="sige-mini-bar-label">{{ label }}</span>
+  <div class="sige-mini-progress" title="{{ value_text }}">
+    <div class="{{ color_class }}" style="width: {{ '%.0f'|format(p_clamped) }}%"></div>
+  </div>
+  <span class="sige-mini-bar-value">{{ value_text }}</span>
+</div>
 {% endmacro %}

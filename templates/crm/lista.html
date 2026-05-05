@@ -1,5 +1,5 @@
 {% extends "base_completo.html" %}
-{% from "_partials/macros.html" import page_header, filter_card, data_table_card, status_badge %}
+{% from "_partials/macros.html" import page_header, filter_card, data_table_card, status_badge, kpi_card %}
 
 {% block title %}CRM — Lista de Leads{% endblock %}
 
@@ -20,6 +20,36 @@
             <i class="fas fa-plus me-1" aria-hidden="true"></i> Novo Lead
         </a>
     {% endcall %}
+
+    {# KPI bar — Total leads · Pipeline · Ticket médio · % Aprovados (calculado em-template, sem mudar a view) #}
+    {% set ns = namespace(total_valor=0, count_valor=0, count_aprov=0) %}
+    {% for l in leads %}
+      {% if l.valor_proposta %}
+        {% set ns.total_valor = ns.total_valor + (l.valor_proposta|float) %}
+        {% set ns.count_valor = ns.count_valor + 1 %}
+      {% endif %}
+      {% if l.status == 'Aprovado' %}{% set ns.count_aprov = ns.count_aprov + 1 %}{% endif %}
+    {% endfor %}
+    {% set ticket_medio = (ns.total_valor / ns.count_valor) if ns.count_valor > 0 else 0 %}
+    {% set pct_aprov = (ns.count_aprov * 100.0 / leads|length) if leads|length > 0 else 0 %}
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3">
+        {{ kpi_card('Total de Leads', leads|length, color='dark', icon='fa-funnel-dollar') }}
+      </div>
+      <div class="col-6 col-md-3">
+        {{ kpi_card('Valor em Pipeline', ns.total_valor|brl, color='primary', icon='fa-money-bill-wave',
+                     hint=(ns.count_valor|string) ~ ' lead(s) com valor') }}
+      </div>
+      <div class="col-6 col-md-3">
+        {{ kpi_card('Ticket Médio', ticket_medio|brl, color='dark', icon='fa-balance-scale') }}
+      </div>
+      <div class="col-6 col-md-3">
+        {{ kpi_card('Aprovados', '%.0f'|format(pct_aprov) ~ '%',
+                     color=('success' if pct_aprov >= 30 else ('warning' if pct_aprov >= 10 else 'secondary')),
+                     icon='fa-check-circle',
+                     hint=(ns.count_aprov|string) ~ ' de ' ~ (leads|length|string)) }}
+      </div>
+    </div>
 
     {% call filter_card(url_for('crm.lista'), reset_url=url_for('crm.lista')) %}
         <div class="col-12 col-md-3">

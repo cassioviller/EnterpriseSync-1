@@ -1,5 +1,5 @@
 {% extends "base_completo.html" %}
-{% from "_partials/macros.html" import page_header, filter_card %}
+{% from "_partials/macros.html" import page_header, filter_card, avatar %}
 
 {% block title %}CRM — Kanban de Leads{% endblock %}
 
@@ -168,8 +168,9 @@
                     <div class="crm-card status-{{ slug }}" data-lead-id="{{ lead.id }}">
                         <div class="crm-card__nome">{{ lead.nome }}</div>
                         {% if lead.responsavel %}
-                        <div class="crm-card__linha">
-                            <i class="fas fa-user-tie text-muted me-1" aria-hidden="true"></i>{{ lead.responsavel.nome }}
+                        <div class="crm-card__linha d-flex align-items-center gap-1">
+                            {{ avatar(lead.responsavel.nome, 18) }}
+                            <span>{{ lead.responsavel.nome }}</span>
                         </div>
                         {% endif %}
                         {% if lead.tipo_material %}

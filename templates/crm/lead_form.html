@@ -190,14 +190,14 @@
                 {% if lead %}
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white"><strong>Histórico</strong></div>
-                    <div class="card-body p-0">
+                    <div class="card-body">
                         {% if lead.historico %}
-                        <ul class="list-group list-group-flush small">
+                        <ul class="sige-timeline list-unstyled small p-0 mb-0">
                             {% for h in lead.historico %}
-                            <li class="list-group-item">
-                                <div class="d-flex justify-content-between">
+                            <li class="sige-timeline-item">
+                                <div class="d-flex justify-content-between align-items-baseline gap-2">
                                     <strong class="text-capitalize">{{ h.campo }}</strong>
-                                    <small class="text-muted">{{ h.created_at.strftime('%d/%m/%Y %H:%M') if h.created_at else '' }}</small>
+                                    <span class="sige-timeline-time text-nowrap">{{ h.created_at.strftime('%d/%m/%Y %H:%M') if h.created_at else '' }}</span>
                                 </div>
                                 {% if h.descricao %}
                                 <div class="text-muted">{{ h.descricao }}</div>
@@ -207,13 +207,15 @@
                                 </div>
                                 {% endif %}
                                 {% if h.usuario %}
-                                <small class="text-muted"><i class="fas fa-user" aria-hidden="true"></i> {{ h.usuario.nome or h.usuario.username }}</small>
+                                <small class="text-muted d-inline-flex align-items-center gap-1 mt-1">
+                                    <i class="fas fa-user" aria-hidden="true"></i> {{ h.usuario.nome or h.usuario.username }}
+                                </small>
                                 {% endif %}
                             </li>
                             {% endfor %}
                         </ul>
                         {% else %}
-                        <div class="p-3 text-muted small">Sem histórico ainda.</div>
+                        <div class="text-muted small">Sem histórico ainda.</div>
                         {% endif %}
                     </div>
                 </div>

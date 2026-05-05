@@ -1,5 +1,5 @@
 {% extends "base_completo.html" %}
-{% from "_partials/macros.html" import page_header, filter_card, kpi_card, back_link, empty_state %}
+{% from "_partials/macros.html" import page_header, filter_card, kpi_card, back_link, empty_state, avatar %}
 
 {% block title %}Divergência – {{ servico.nome }}{% endblock %}
 
@@ -191,9 +191,14 @@
                 {% for f in r.funcionarios %}
                 <tr>
                   <td>
-                    <a href="{{ url_for('metricas.detalhe_funcionario', funcionario_id=f.funcionario_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
-                       class="text-decoration-none">{{ f.funcionario_nome }}</a>
-                    {% if f.papel_nome %}<div class="text-muted small">{{ f.papel_nome }}</div>{% endif %}
+                    <div class="d-flex align-items-center gap-2">
+                      {{ avatar(f.funcionario_nome, 24) }}
+                      <div>
+                        <a href="{{ url_for('metricas.detalhe_funcionario', funcionario_id=f.funcionario_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
+                           class="text-decoration-none">{{ f.funcionario_nome }}</a>
+                        {% if f.papel_nome %}<div class="text-muted small">{{ f.papel_nome }}</div>{% endif %}
+                      </div>
+                    </div>
                   </td>
                   <td class="text-end small">{{ '%.1f'|format(f.horas) }}</td>
                   <td class="text-end small">

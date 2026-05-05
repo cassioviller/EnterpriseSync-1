@@ -1,5 +1,5 @@
 {% extends "base_completo.html" %}
-{% from "_partials/macros.html" import page_header, filter_card, kpi_card, empty_state %}
+{% from "_partials/macros.html" import page_header, filter_card, kpi_card, empty_state, mini_bar_row %}
 
 {% block title %}Métricas – Funcionários{% endblock %}
 
@@ -18,21 +18,34 @@
     </a>
   {% endcall %}
 
-  {# KPI bar — totais do período #}
+  {# KPI bar — agregados de negócio (Done looks like: HH normais/extras, lucro total) #}
+  {% set agg = namespace(hh_norm=0, hh_extra=0, lucro=0, lucro_count=0) %}
+  {% for m in metricas %}
+    {% set agg.hh_norm = agg.hh_norm + (m.horas_normais or 0) %}
+    {% set agg.hh_extra = agg.hh_extra + (m.horas_extras or 0) %}
+    {% if m.lucro_total is not none %}
+      {% set agg.lucro = agg.lucro + (m.lucro_total|float) %}
+      {% set agg.lucro_count = agg.lucro_count + 1 %}
+    {% endif %}
+  {% endfor %}
   <div class="row g-2 mb-3">
     <div class="col-6 col-md-3">
-      {{ kpi_card('Funcionários no período', metricas|length, color='dark', icon='fa-id-badge') }}
+      {{ kpi_card('Funcionários com RDO', n_com_rdo, color='primary', icon='fa-clipboard-check',
+                   hint=(n_sem_rdo|string) ~ ' sem RDO no período') }}
     </div>
     <div class="col-6 col-md-3">
-      {{ kpi_card('Com RDO finalizado', n_com_rdo, color='primary', icon='fa-clipboard-check') }}
+      {{ kpi_card('HH Normais', '%.0f'|format(agg.hh_norm) ~ 'h', color='dark', icon='fa-clock') }}
     </div>
     <div class="col-6 col-md-3">
-      {{ kpi_card('Sem RDO', n_sem_rdo, color=('secondary' if n_sem_rdo == 0 else 'warning'), icon='fa-calendar-times') }}
+      {{ kpi_card('HH Extras', '%.0f'|format(agg.hh_extra) ~ 'h',
+                   color=('warning' if agg.hh_extra > 0 else 'dark'), icon='fa-bolt') }}
     </div>
     <div class="col-6 col-md-3">
-      {{ kpi_card('Dias do período',
-                   ((data_fim - data_inicio).days + 1),
-                   color='dark', icon='fa-calendar') }}
+      {{ kpi_card('Lucro Total',
+                   (agg.lucro|brl) if agg.lucro_count > 0 else '—',
+                   color=('success' if agg.lucro >= 0 else 'danger'),
+                   icon='fa-balance-scale',
+                   hint=(agg.lucro_count|string) ~ ' func. com orçamento') }}
     </div>
   </div>
 
@@ -82,10 +95,10 @@
   <div class="row g-3">
     {% for m in metricas %}
     <div class="col-md-6 col-xl-4">
-      {# ── Card cinza: funcionário ativo sem RDO no período ── #}
+      {# ── Card "sem RDO no período" — visual mais leve, sem opacity ── #}
       {% if m.zero_rdo %}
-      <div class="card h-100 shadow-sm border-secondary opacity-75">
-        <div class="card-header d-flex align-items-center justify-content-between py-2 bg-secondary bg-opacity-10">
+      <div class="card sige-card-empty h-100">
+        <div class="card-header d-flex align-items-center justify-content-between py-2 bg-transparent">
           <div>
             <strong class="text-secondary">{{ m.funcionario_nome }}</strong>
             <div class="text-muted small">{{ m.funcao_nome }}</div>
@@ -220,6 +233,27 @@
             {% endif %}
           </div>
           {% endif %}
+
+          {# ── Mini-bars: Assiduidade / Produtividade / Lucratividade ── #}
+          <div class="sige-mini-bars border-top pt-2 mt-2">
+            {% set _assid_color = 'bg-success' if m.assiduidade_pct >= 80 else ('bg-warning' if m.assiduidade_pct >= 50 else 'bg-danger') %}
+            {{ mini_bar_row('Assiduidade', m.assiduidade_pct, '%.0f'|format(m.assiduidade_pct) ~ '%', _assid_color) }}
+
+            {# Produtividade: usa indice_vs_pares (single_role) ou indice_equipe_medio (mista) #}
+            {% set _prod_pct = m.indice_vs_pares_pct if m.indice_vs_pares_pct is not none else m.indice_equipe_medio %}
+            {% if _prod_pct is not none %}
+              {% set _prod_color = 'bg-success' if _prod_pct >= 105 else ('bg-primary' if _prod_pct >= 90 else ('bg-warning' if _prod_pct >= 75 else 'bg-danger')) %}
+              {{ mini_bar_row('Produtividade', _prod_pct, '%.0f'|format(_prod_pct) ~ '%', _prod_color) }}
+            {% endif %}
+
+            {# Lucratividade: margem (lucro / |custo|) clampada a 0..100 para a barra #}
+            {% if m.lucro_total is not none and m.custo_total and m.custo_total > 0 %}
+              {% set _margem = (m.lucro_total|float) / (m.custo_total|float) * 100 %}
+              {% set _bar_pct = ((_margem + 100) if _margem < 0 else (_margem * 2 + 50))|round(0, 'common') %}
+              {% set _lucr_color = 'bg-success' if _margem >= 20 else ('bg-primary' if _margem >= 0 else 'bg-danger') %}
+              {{ mini_bar_row('Lucratividade', _bar_pct, '%.0f'|format(_margem) ~ '%', _lucr_color) }}
+            {% endif %}
+          </div>
 
           {# ── Top 3 piores RDOs (drill-down Task #9) ── #}
           {% if m.top_rdos_problematicos %}

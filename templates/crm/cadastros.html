@@ -11,110 +11,130 @@
                          subtitle='Edite as listas que aparecem nos formulários de Lead.') %}
     {% endcall %}
 
-    <ul class="nav nav-tabs mb-3" role="tablist">
-        {% for slug, info in listas_mestras.items() %}
-        <li class="nav-item">
-            <a class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" href="#pane-{{ slug }}">
-                {{ info.label }}
-                <span class="badge bg-secondary ms-1">{{ dados[slug].itens|length }}</span>
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-
-    <div class="tab-content">
-        {% for slug, info in listas_mestras.items() %}
-        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="pane-{{ slug }}">
+    <div class="row g-3">
+        {# ── Coluna esquerda — navegação lateral (nav-pills vertical) ── #}
+        <aside class="col-md-3">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white">
-                    <strong>{{ info.label }}</strong>
-                    {% if slug == 'responsavel' %}
-                    <small class="text-muted ms-2">— Sem cadastro inicial; adicione o time da sua empresa.</small>
-                    {% endif %}
-                </div>
-                <div class="card-body">
-                    <form method="POST" action="{{ url_for('crm.cadastros_criar', slug=slug) }}" class="row g-2 mb-3">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="col-md-9">
-                            <input type="text" name="nome" class="form-control" required
-                                   maxlength="120" placeholder="Adicionar novo item...">
-                        </div>
-                        <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-plus me-1" aria-hidden="true"></i> Adicionar
-                            </button>
-                        </div>
-                    </form>
-
-                    {% if dados[slug].itens %}
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 60%">Nome</th>
-                                    <th>Status</th>
-                                    <th class="text-end" style="width: 220px">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in dados[slug].itens %}
-                                <tr>
-                                    <td>
-                                        <form method="POST"
-                                              action="{{ url_for('crm.cadastros_editar', slug=slug, item_id=item.id) }}"
-                                              class="d-flex gap-2">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <input type="text" name="nome" class="form-control form-control-sm"
-                                                   value="{{ item.nome }}" maxlength="120">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary"
-                                                    title="Salvar" aria-label="Salvar alterações">
-                                                <i class="fas fa-save" aria-hidden="true"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                    <td>
-                                        {% if item.ativo %}
-                                        <span class="badge bg-success">Ativo</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Inativo</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end">
-                                        <form method="POST"
-                                              action="{{ url_for('crm.cadastros_toggle', slug=slug, item_id=item.id) }}"
-                                              style="display:inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary"
-                                                    title="{% if item.ativo %}Desativar{% else %}Reativar{% endif %}"
-                                                    aria-label="{% if item.ativo %}Desativar{% else %}Reativar{% endif %} item">
-                                                <i class="fas fa-{% if item.ativo %}pause{% else %}play{% endif %}" aria-hidden="true"></i>
-                                            </button>
-                                        </form>
-                                        <form method="POST"
-                                              action="{{ url_for('crm.cadastros_excluir', slug=slug, item_id=item.id) }}"
-                                              style="display:inline"
-                                              onsubmit="return confirm('Excluir &quot;{{ item.nome }}&quot;?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                    title="Excluir" aria-label="Excluir item">
-                                                <i class="fas fa-trash" aria-hidden="true"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-light text-center mb-0">
-                        Nenhum item cadastrado.
-                    </div>
-                    {% endif %}
+                <div class="card-body p-2">
+                    <ul class="nav nav-pills sige-side-nav flex-column" role="tablist">
+                        {% for slug, info in listas_mestras.items() %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if loop.first %}active{% endif %}"
+                               data-bs-toggle="pill" href="#pane-{{ slug }}" role="tab">
+                                <span><i class="fas {{ info.icon|default('fa-list') }} me-2 opacity-75" aria-hidden="true"></i>{{ info.label }}</span>
+                                <span class="badge bg-secondary rounded-pill">{{ dados[slug].itens|length }}</span>
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
+        </aside>
+
+        {# ── Coluna direita — conteúdo das categorias ── #}
+        <div class="col-md-9">
+            <div class="tab-content">
+                {% for slug, info in listas_mestras.items() %}
+                <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="pane-{{ slug }}" role="tabpanel">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div>
+                                <strong>{{ info.label }}</strong>
+                                {% if slug == 'responsavel' %}
+                                <small class="text-muted ms-2">— Adicione o time da sua empresa.</small>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-light text-dark border">{{ dados[slug].itens|length }} item(ns)</span>
+                        </div>
+                        <div class="card-body">
+                            {# Form "Adicionar item" sempre visível no topo #}
+                            <form method="POST" action="{{ url_for('crm.cadastros_criar', slug=slug) }}" class="row g-2 mb-3">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="col-md-9">
+                                    <input type="text" name="nome" class="form-control" required
+                                           maxlength="120" placeholder="Adicionar novo item...">
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-plus me-1" aria-hidden="true"></i> Adicionar
+                                    </button>
+                                </div>
+                            </form>
+
+                            {% if dados[slug].itens %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 60%">Nome</th>
+                                            <th>Status</th>
+                                            <th class="text-end" style="width: 180px">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in dados[slug].itens %}
+                                        <tr>
+                                            <td>
+                                                <form method="POST"
+                                                      action="{{ url_for('crm.cadastros_editar', slug=slug, item_id=item.id) }}"
+                                                      class="d-flex gap-2">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="text" name="nome" class="form-control form-control-sm"
+                                                           value="{{ item.nome }}" maxlength="120">
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary"
+                                                            title="Salvar" aria-label="Salvar alterações">
+                                                        <i class="fas fa-save" aria-hidden="true"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            <td>
+                                                {% if item.ativo %}
+                                                <span class="badge bg-success">Ativo</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Inativo</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end">
+                                                {# Ações agrupadas em um único btn-group #}
+                                                <div class="btn-group btn-group-sm" role="group" aria-label="Ações do item">
+                                                    <form method="POST"
+                                                          action="{{ url_for('crm.cadastros_toggle', slug=slug, item_id=item.id) }}"
+                                                          style="display:inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button type="submit" class="btn btn-outline-secondary"
+                                                                title="{% if item.ativo %}Desativar{% else %}Reativar{% endif %}"
+                                                                aria-label="{% if item.ativo %}Desativar{% else %}Reativar{% endif %} item">
+                                                            <i class="fas fa-{% if item.ativo %}pause{% else %}play{% endif %}" aria-hidden="true"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form method="POST"
+                                                          action="{{ url_for('crm.cadastros_excluir', slug=slug, item_id=item.id) }}"
+                                                          style="display:inline"
+                                                          onsubmit="return confirm('Excluir &quot;{{ item.nome }}&quot;?');">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button type="submit" class="btn btn-outline-danger"
+                                                                title="Excluir" aria-label="Excluir item">
+                                                            <i class="fas fa-trash" aria-hidden="true"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-light text-center mb-0">
+                                Nenhum item cadastrado. Use o campo acima para adicionar o primeiro.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
-        {% endfor %}
     </div>
 </div>
 
