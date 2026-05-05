@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Métricas – Empresa por Serviço{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h2 class="mb-0"><i class="fas fa-chart-bar me-2 text-primary"></i> Métricas por Serviço</h2>
+    <div class="text-muted small">Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}</div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-3">
+          <label class="form-label fw-semibold mb-1">Data início</label>
+          <input type="date" name="data_inicio" class="form-control form-control-sm"
+                 value="{{ data_inicio.isoformat() }}">
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label fw-semibold mb-1">Data fim</label>
+          <input type="date" name="data_fim" class="form-control form-control-sm"
+                 value="{{ data_fim.isoformat() }}">
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label fw-semibold mb-1">Obra</label>
+          <select name="obra_id" class="form-select form-select-sm">
+            <option value="">Todas as obras</option>
+            {% for o in obras %}
+              <option value="{{ o.id }}" {% if obra_id_sel == o.id %}selected{% endif %}>{{ o.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="fas fa-search me-1"></i> Filtrar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if not metricas %}
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle me-2"></i>
+      Nenhum serviço com dados de RDO no período selecionado.
+    </div>
+  {% else %}
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Serviço</th>
+              <th class="text-center">Un</th>
+              <th class="text-end">Total HH</th>
+              <th class="text-end">Produzido</th>
+              <th class="text-end">Prod. Orçada<br><small class="fw-normal text-muted">(gargalo un/h)</small></th>
+              <th class="text-end">Prod. Real<br><small class="fw-normal text-muted">(un/h)</small></th>
+              <th class="text-center">Índice %</th>
+              <th class="text-end">Custo/un</th>
+              <th class="text-end">Receita/un</th>
+              <th class="text-end">Lucro/un</th>
+              <th class="text-center">Cobertura</th>
+              <th class="text-center">Gargalo</th>
+              <th class="text-center">Subutilizado</th>
+              <th class="text-center">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in metricas %}
+            <tr>
+              <td>
+                <strong>{{ m.servico_nome }}</strong>
+                <div class="text-muted small">{{ m.n_rdos }} RDO(s){% if m.n_subs_sem_qty > 0 %} · <span class="text-warning">{{ m.n_subs_sem_qty }} sem quantidade</span>{% endif %}</div>
+                {% if m.papeis %}
+                <div class="text-muted small">
+                  {% for p in m.papeis %}<span class="badge bg-secondary me-1">{{ p.nome }} {{ '%.1f'|format(p.hh) }}h</span>{% endfor %}
+                </div>
+                {% endif %}
+              </td>
+              <td class="text-center">{{ m.unidade or '—' }}</td>
+              <td class="text-end">{{ '%.1f'|format(m.total_hh) }}</td>
+              <td class="text-end">
+                {% if m.total_produzido is not none %}
+                  {{ '%.2f'|format(m.total_produzido) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if m.prod_orcada_gargalo is not none %}
+                  {{ '%.3f'|format(m.prod_orcada_gargalo) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if m.prod_real_media is not none %}
+                  {{ '%.3f'|format(m.prod_real_media) }}
+                {% else %}<span class="text-muted" title="Quantidade produzida não informada nos RDOs">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if m.indice_pct is not none %}
+                  {% if m.indice_pct >= 90 %}
+                    <span class="badge bg-success">{{ '%.0f'|format(m.indice_pct) }}%</span>
+                  {% elif m.indice_pct >= 70 %}
+                    <span class="badge bg-warning text-dark">{{ '%.0f'|format(m.indice_pct) }}%</span>
+                  {% else %}
+                    <span class="badge bg-danger">{{ '%.0f'|format(m.indice_pct) }}%</span>
+                  {% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if m.custo_real_medio_un is not none %}R$ {{ '%.2f'|format(m.custo_real_medio_un) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if m.receita_liq_media_un is not none %}R$ {{ '%.2f'|format(m.receita_liq_media_un) }}
+                {% else %}<span class="text-muted" title="Obra sem orçamento operacional">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if m.lucro_real_medio_un is not none %}
+                  {% if m.lucro_real_medio_un >= 0 %}
+                    <span class="text-success fw-semibold">R$ {{ '%.2f'|format(m.lucro_real_medio_un) }}</span>
+                  {% else %}
+                    <span class="text-danger fw-semibold">R$ {{ '%.2f'|format(m.lucro_real_medio_un) }}</span>
+                  {% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% set cob = m.cobertura_pct %}
+                {% if cob >= 80 %}
+                  <span class="badge bg-success">{{ '%.0f'|format(cob) }}%</span>
+                {% elif cob >= 50 %}
+                  <span class="badge bg-warning text-dark">{{ '%.0f'|format(cob) }}%</span>
+                {% else %}
+                  <span class="badge bg-danger">{{ '%.0f'|format(cob) }}%</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if m.papel_gargalo_nome %}
+                  <span class="badge bg-primary">{{ m.papel_gargalo_nome }}</span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if m.papel_subutilizado_nome %}
+                  <span class="badge bg-warning text-dark" title="Folga ≥ 30% da capacidade">{{ m.papel_subutilizado_nome }}</span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if m.pode_aplicar_referencia %}
+                <form method="post" action="{{ url_for('metricas.aplicar_referencia') }}"
+                      onsubmit="return confirm('Atualizar coeficientes de {{ m.servico_nome }} com a produtividade real do período?\nEsta ação altera o catálogo de serviços.');">
+                  <input type="hidden" name="servico_id" value="{{ m.servico_id }}">
+                  <input type="hidden" name="data_inicio" value="{{ data_inicio.isoformat() }}">
+                  <input type="hidden" name="data_fim" value="{{ data_fim.isoformat() }}">
+                  <button type="submit" class="btn btn-outline-primary btn-sm"
+                          title="Aplica produtividade real como referência no catálogo">
+                    <i class="fas fa-sync-alt me-1"></i> Aplicar
+                  </button>
+                </form>
+                {% else %}<span class="text-muted small">sem dados</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

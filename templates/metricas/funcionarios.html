@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Métricas – Funcionários{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h2 class="mb-0"><i class="fas fa-users me-2 text-primary"></i> Métricas de Funcionários</h2>
+    <div class="text-muted small">Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}</div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Data início</label>
+          <input type="date" name="data_inicio" class="form-control form-control-sm"
+                 value="{{ data_inicio.isoformat() }}">
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Data fim</label>
+          <input type="date" name="data_fim" class="form-control form-control-sm"
+                 value="{{ data_fim.isoformat() }}">
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label fw-semibold mb-1">Obras</label>
+          <select name="obra_ids" class="form-select form-select-sm" multiple size="2">
+            {% for o in obras %}
+              <option value="{{ o.id }}" {% if o.id in obra_ids_sel %}selected{% endif %}>{{ o.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Função</label>
+          <select name="funcao_ids" class="form-select form-select-sm" multiple size="2">
+            {% for f in funcoes %}
+              <option value="{{ f.id }}" {% if f.id in funcao_ids_sel %}selected{% endif %}>{{ f.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="todos" {% if status_filtro=='todos' %}selected{% endif %}>Todos</option>
+            <option value="com_custo" {% if status_filtro=='com_custo' %}selected{% endif %}>Com custo</option>
+            <option value="sem_custo" {% if status_filtro=='sem_custo' %}selected{% endif %}>Sem custo</option>
+            <option value="com_receita" {% if status_filtro=='com_receita' %}selected{% endif %}>Com receita</option>
+          </select>
+        </div>
+        <div class="col-sm-1">
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if not metricas %}
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle me-2"></i>
+      Nenhum funcionário com RDOs finalizados no período selecionado.
+    </div>
+  {% else %}
+  <div class="row g-3">
+    {% for m in metricas %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card h-100 shadow-sm {% if not m.tem_custo %}border-secondary{% elif m.lucro_total is not none and m.lucro_total < 0 %}border-danger{% else %}border-0{% endif %}">
+        <div class="card-header d-flex align-items-center justify-content-between py-2">
+          <div>
+            <strong>{{ m.funcionario_nome }}</strong>
+            <div class="text-muted small">{{ m.funcao_nome }}</div>
+          </div>
+          <div class="text-end">
+            {% if m.modo_predominante == 'single_role' %}
+              <span class="badge bg-info text-dark">Solo</span>
+            {% else %}
+              <span class="badge bg-secondary">Equipe Mista</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-body py-3">
+          <div class="row g-2 text-center">
+            <div class="col-4">
+              <div class="fw-bold">{{ '%.1f'|format(m.horas_normais) }}h</div>
+              <div class="text-muted small">Normais</div>
+            </div>
+            <div class="col-4">
+              <div class="fw-bold {% if m.horas_extras > 0 %}text-warning{% endif %}">{{ '%.1f'|format(m.horas_extras) }}h</div>
+              <div class="text-muted small">Extras</div>
+            </div>
+            <div class="col-4">
+              <div class="fw-bold">{{ m.dias_com_rdo }}/{{ m.dias_uteis_periodo }}</div>
+              <div class="text-muted small">Assiduidade</div>
+            </div>
+          </div>
+
+          <div class="progress mt-2 mb-3" style="height:6px;" title="Assiduidade {{ '%.0f'|format(m.assiduidade_pct) }}%">
+            <div class="progress-bar {% if m.assiduidade_pct >= 80 %}bg-success{% elif m.assiduidade_pct >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+                 style="width: {{ [m.assiduidade_pct, 100]|min }}%"></div>
+          </div>
+
+          <div class="row g-2 text-center border-top pt-2">
+            <div class="col-4">
+              {% if m.prod_real_hh is not none and m.modo_predominante == 'single_role' %}
+                <div class="fw-bold text-primary">{{ '%.3f'|format(m.prod_real_hh) }}</div>
+                <div class="text-muted small">un/h real</div>
+              {% elif m.modo_predominante == 'equipe_mista' %}
+                <div class="text-muted">—</div>
+                <div class="text-muted small">Equipe mista</div>
+              {% else %}
+                <div class="text-muted">—</div>
+                <div class="text-muted small">Sem produção</div>
+              {% endif %}
+            </div>
+            <div class="col-4">
+              {% if m.custo_total is not none %}
+                <div class="fw-bold text-danger">R$ {{ '%.0f'|format(m.custo_total) }}</div>
+                <div class="text-muted small">Custo</div>
+              {% else %}
+                <div class="text-muted">—</div>
+                <div class="text-muted small">Sem custo</div>
+              {% endif %}
+            </div>
+            <div class="col-4">
+              {% if m.lucro_total is not none %}
+                <div class="fw-bold {% if m.lucro_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  R$ {{ '%.0f'|format(m.lucro_total) }}
+                </div>
+                <div class="text-muted small">Lucro</div>
+              {% else %}
+                <div class="text-muted">—</div>
+                <div class="text-muted small">Sem orçamento</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="card-footer py-2 text-end bg-transparent">
+          <a href="{{ url_for('metricas.detalhe_funcionario', funcionario_id=m.funcionario_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
+             class="btn btn-outline-primary btn-sm">
+            Ver detalhe <i class="fas fa-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

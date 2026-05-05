@@ -3851,6 +3851,7 @@ def executar_migracoes():
             (150, "Task #63 — Orçamento Operacional da Obra (3 tabelas + backfill)", migration_150_obra_orcamento_operacional),
             (151, "Task #62 — vínculos Cronograma↔Subatividade↔Serviço↔Mão-de-obra", migration_151_vinculo_subatividade_composicao),
             (152, "Task #2 — rdo_custo_diario: tabela + índices parciais para custo diário de mão-de-obra", migration_152_rdo_custo_diario),
+            (153, "Task #3 — composicao_servico_historico: histórico de alterações de coeficiente via métricas", migration_153_composicao_servico_historico),
         ]
         
         # Executar cada migração com rastreamento
@@ -12948,6 +12949,88 @@ def migration_152_rdo_custo_diario():
         return True
     except Exception as e:
         logger.error("MIGRACAO 152 falhou: %s", e)
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
+        raise
+
+
+def migration_153_composicao_servico_historico():
+    """Task #3 — Métricas de Produtividade: tabela composicao_servico_historico.
+
+    Registra o histórico de alterações de coeficiente aplicadas via
+    "Aplicar como referência" nas telas de Métricas de Produtividade.
+    Campos:
+      - admin_id, composicao_servico_id (FK CASCADE), servico_id, insumo_id
+      - coeficiente_anterior, coeficiente_novo (NUMERIC 15,6)
+      - autor_id (FK usuario), motivo (TEXT)
+      - data_referencia_inicio / fim (DATE) — período de análise usado
+      - created_at
+    """
+    import psycopg2
+    from urllib.parse import urlparse
+
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        logger.error("MIGRACAO 153: DATABASE_URL ausente")
+        return False
+
+    parsed = urlparse(db_url)
+    connection = psycopg2.connect(
+        host=parsed.hostname,
+        port=parsed.port or 5432,
+        database=parsed.path.lstrip('/'),
+        user=parsed.username,
+        password=parsed.password,
+        sslmode='disable' if 'sslmode=disable' in (db_url or '') else 'prefer',
+    )
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS composicao_servico_historico (
+                id                      SERIAL PRIMARY KEY,
+                admin_id                INTEGER NOT NULL REFERENCES usuario(id),
+                composicao_servico_id   INTEGER NOT NULL
+                    REFERENCES composicao_servico(id) ON DELETE CASCADE,
+                servico_id              INTEGER REFERENCES servico(id) ON DELETE CASCADE,
+                insumo_id               INTEGER REFERENCES insumo(id) ON DELETE CASCADE,
+                coeficiente_anterior    NUMERIC(15,6) NOT NULL,
+                coeficiente_novo        NUMERIC(15,6) NOT NULL,
+                autor_id                INTEGER REFERENCES usuario(id),
+                motivo                  TEXT,
+                data_referencia_inicio  DATE,
+                data_referencia_fim     DATE,
+                created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_csh_admin_id
+              ON composicao_servico_historico(admin_id);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_csh_composicao_servico_id
+              ON composicao_servico_historico(composicao_servico_id);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_csh_servico_id
+              ON composicao_servico_historico(servico_id);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_csh_created_at
+              ON composicao_servico_historico(created_at);
+        """)
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 153 CONCLUIDA: composicao_servico_historico criada")
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 153 falhou: %s", e)
         try:
             connection.rollback()
             connection.close()

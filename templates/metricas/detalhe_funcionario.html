@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Detalhe – {{ func.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center mb-3 gap-3">
+    <a href="{{ url_for('metricas.funcionarios', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left me-1"></i> Voltar
+    </a>
+    <div>
+      <h2 class="mb-0"><i class="fas fa-user me-2 text-primary"></i> {{ func.nome }}</h2>
+      <div class="text-muted small">{{ func.funcao_ref.nome if func.funcao_ref else func.funcao_exercida if func.funcao_exercida is defined else '' }} · Período: {{ data_inicio.strftime('%d/%m/%Y') }} – {{ data_fim.strftime('%d/%m/%Y') }}</div>
+    </div>
+  </div>
+
+  {% if not detalhe.por_servico and not detalhe.por_dia %}
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle me-2"></i>
+      Nenhum RDO finalizado para este funcionário no período selecionado.
+    </div>
+  {% else %}
+
+  <!-- Seção A: Por Serviço -->
+  <h5 class="mt-2 mb-3 text-muted"><i class="fas fa-tools me-2"></i> A. Por Serviço</h5>
+  {% if detalhe.por_servico %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Serviço</th>
+              <th class="text-center">Modo</th>
+              <th class="text-end">Horas</th>
+              <th class="text-end">Prod. média (un/h)</th>
+              <th class="text-center">Índice equipe %</th>
+              <th class="text-end">Custo</th>
+              <th class="text-end">Receita</th>
+              <th class="text-end">Lucro</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in detalhe.por_servico %}
+            <tr>
+              <td>
+                <strong>{{ s.servico_nome }}</strong>
+                {% if s.unidade %}<span class="text-muted small"> ({{ s.unidade }})</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if s.modo == 'single_role' %}
+                  <span class="badge bg-info text-dark">Solo</span>
+                {% else %}
+                  <span class="badge bg-secondary">Misto</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ '%.1f'|format(s.horas) }}h</td>
+              <td class="text-end">
+                {% if s.prod_media_hh is not none %}{{ '%.3f'|format(s.prod_media_hh) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                {% if s.indice_medio_pct is not none %}
+                  {% if s.indice_medio_pct >= 90 %}
+                    <span class="badge bg-success">{{ '%.0f'|format(s.indice_medio_pct) }}%</span>
+                  {% elif s.indice_medio_pct >= 70 %}
+                    <span class="badge bg-warning text-dark">{{ '%.0f'|format(s.indice_medio_pct) }}%</span>
+                  {% else %}
+                    <span class="badge bg-danger">{{ '%.0f'|format(s.indice_medio_pct) }}%</span>
+                  {% endif %}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if s.custo is not none %}R$ {{ '%.2f'|format(s.custo) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if s.receita is not none %}R$ {{ '%.2f'|format(s.receita) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if s.lucro is not none %}
+                  <span class="fw-semibold {% if s.lucro >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    R$ {{ '%.2f'|format(s.lucro) }}
+                  </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+    <div class="alert alert-secondary mb-4">Sem registros por serviço no período.</div>
+  {% endif %}
+
+  <!-- Seção B: Por Dia -->
+  <h5 class="mb-3 text-muted"><i class="fas fa-calendar-alt me-2"></i> B. Por Dia</h5>
+  {% if detalhe.por_dia %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Data</th>
+              <th>RDO</th>
+              <th class="text-end">Horas</th>
+              <th class="text-end">Custo</th>
+              <th class="text-end">Produção</th>
+              <th class="text-end">Receita</th>
+              <th class="text-end">Lucro dia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in detalhe.por_dia %}
+            <tr>
+              <td>{{ d.data.strftime('%d/%m/%Y') }}</td>
+              <td>{{ d.rdo_numero }}</td>
+              <td class="text-end">{{ '%.1f'|format(d.horas) }}h</td>
+              <td class="text-end">
+                {% if d.custo is not none %}R$ {{ '%.2f'|format(d.custo) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if d.producao is not none %}{{ '%.3f'|format(d.producao) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if d.receita is not none %}R$ {{ '%.2f'|format(d.receita) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if d.lucro is not none %}
+                  <span class="fw-semibold {% if d.lucro >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    R$ {{ '%.2f'|format(d.lucro) }}
+                  </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+    <div class="alert alert-secondary mb-4">Sem registros diários no período.</div>
+  {% endif %}
+
+  <!-- Seção C: Diagnóstico de Equipe -->
+  <h5 class="mb-3 text-muted"><i class="fas fa-stethoscope me-2"></i> C. Diagnóstico de Equipe</h5>
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm border-primary">
+        <div class="card-header bg-primary text-white py-2">
+          <i class="fas fa-exclamation-triangle me-2"></i> Dias como Gargalo
+          <span class="badge bg-white text-primary ms-1">{{ detalhe.diagnostico.dias_gargalo|length }}</span>
+        </div>
+        <div class="card-body p-0">
+          {% if detalhe.diagnostico.dias_gargalo %}
+          <ul class="list-group list-group-flush">
+            {% for d in detalhe.diagnostico.dias_gargalo %}
+            <li class="list-group-item py-1">
+              <span class="fw-semibold">{{ d.data.strftime('%d/%m/%Y') }}</span>
+              <span class="text-muted ms-2">{{ d.rdo_numero }}</span>
+              <div class="text-muted small">{{ d.servico }}</div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+            <div class="p-3 text-muted">Nenhum dia como gargalo no período.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm border-warning">
+        <div class="card-header bg-warning text-dark py-2">
+          <i class="fas fa-arrow-down me-2"></i> Dias Subutilizado
+          <span class="badge bg-white text-warning ms-1">{{ detalhe.diagnostico.dias_subutilizado|length }}</span>
+        </div>
+        <div class="card-body p-0">
+          {% if detalhe.diagnostico.dias_subutilizado %}
+          <ul class="list-group list-group-flush">
+            {% for d in detalhe.diagnostico.dias_subutilizado %}
+            <li class="list-group-item py-1">
+              <span class="fw-semibold">{{ d.data.strftime('%d/%m/%Y') }}</span>
+              <span class="text-muted ms-2">{{ d.rdo_numero }}</span>
+              <div class="text-muted small">{{ d.servico }}</div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+            <div class="p-3 text-muted">Nenhum dia subutilizado no período.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}

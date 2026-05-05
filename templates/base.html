@@ -898,6 +898,27 @@
                             <a class="nav-link px-3 py-2" href="{{ url_for('main.relatorios') }}" style="white-space: nowrap;">
                                 <i class="fas fa-chart-bar me-2"></i> Relatórios
                             </a>
+
+                            <!-- Métricas — Task #3 -->
+                            {% if current_user.is_authenticated and current_user.tipo_usuario.name in ('SUPER_ADMIN', 'ADMIN', 'GESTOR_EQUIPES') %}
+                            <div class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle px-3 py-2" href="#" id="metricasDropdown"
+                                   role="button" data-bs-toggle="dropdown" aria-expanded="false" style="white-space: nowrap;">
+                                    <i class="fas fa-tachometer-alt me-2"></i> Métricas
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="metricasDropdown">
+                                    <li><a class="dropdown-item" href="{{ url_for('metricas.empresa_por_servico') }}">
+                                        <i class="fas fa-tools me-2"></i> Empresa por Serviço
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('metricas.funcionarios') }}">
+                                        <i class="fas fa-users me-2"></i> Funcionários
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('metricas.ranking') }}">
+                                        <i class="fas fa-trophy me-2"></i> Ranking
+                                    </a></li>
+                                </ul>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% else %}

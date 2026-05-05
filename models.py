@@ -6010,6 +6010,44 @@ class SubatividadeMaoObra(db.Model):
         )
 
 
+class ComposicaoServicoHistorico(db.Model):
+    """Histórico de alterações no coeficiente de uma linha de ComposicaoServico.
+
+    Criado quando o usuário aplica a produtividade real como referência no catálogo
+    (botão "Aplicar como referência" nas Métricas — Task #3).
+    Permite rastrear quando e por quem cada coeficiente foi alterado.
+    """
+    __tablename__ = 'composicao_servico_historico'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    composicao_servico_id = db.Column(
+        db.Integer,
+        db.ForeignKey('composicao_servico.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    servico_id = db.Column(db.Integer, db.ForeignKey('servico.id', ondelete='CASCADE'), nullable=True)
+    insumo_id = db.Column(db.Integer, db.ForeignKey('insumo.id', ondelete='CASCADE'), nullable=True)
+    coeficiente_anterior = db.Column(db.Numeric(15, 6), nullable=False)
+    coeficiente_novo = db.Column(db.Numeric(15, 6), nullable=False)
+    autor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    motivo = db.Column(db.Text, nullable=True)
+    data_referencia_inicio = db.Column(db.Date, nullable=True)
+    data_referencia_fim = db.Column(db.Date, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    composicao = db.relationship('ComposicaoServico',
+                                  backref=db.backref('historico', cascade='all, delete-orphan'))
+    autor = db.relationship('Usuario', foreign_keys=[autor_id])
+
+    def __repr__(self):
+        return (
+            f'<ComposicaoServicoHistorico comp={self.composicao_servico_id} '
+            f'{self.coeficiente_anterior}→{self.coeficiente_novo}>'
+        )
+
+
 # ===================================================================
 # Task #115 — Orçamento (camada interna) → Proposta (camada cliente)
 # ===================================================================

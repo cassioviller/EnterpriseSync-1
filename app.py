@@ -180,6 +180,12 @@ def _format_br(value, decimals=2):
     return formatted.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+@app.template_filter('enumerate')
+def enumerate_filter(iterable, start=0):
+    """Jinja2 filter: {{ lista|enumerate }} → list of (index, item)."""
+    return list(enumerate(iterable, start=start))
+
+
 @app.template_filter('brl')
 def brl_filter(value):
     return f"R$ {_format_br(value, 2)}"
@@ -797,6 +803,16 @@ with app.app_context():
         logging.info("[OK] Blueprint planejamento_custos registrado")
     except Exception as e:
         logging.error(f"[ERROR] Erro ao registrar blueprint planejamento_custos: {e}")
+
+    # Task #3 — Métricas de Produtividade e Lucratividade
+    try:
+        from views.metricas_views import metricas_bp
+        app.register_blueprint(metricas_bp)
+        logging.info("[OK] Blueprint METRICAS (Task #3) registrado")
+    except ImportError as e:
+        logging.warning(f"[WARN] Blueprint METRICAS não encontrado: {e}")
+    except Exception as e:
+        logging.error(f"[ERROR] Erro ao registrar blueprint METRICAS: {e}")
     
     # Sistema avançado de veículos removido (código obsoleto limpo)
     

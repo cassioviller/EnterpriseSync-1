@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Métricas – Ranking de Funcionários{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h2 class="mb-0"><i class="fas fa-trophy me-2 text-warning"></i> Ranking de Funcionários</h2>
+    <a href="{{ url_for('metricas.ranking', data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat(), ordenar_por=ordenar_por, exportar='csv') }}"
+       class="btn btn-outline-success btn-sm">
+      <i class="fas fa-file-csv me-1"></i> Exportar CSV
+    </a>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Data início</label>
+          <input type="date" name="data_inicio" class="form-control form-control-sm"
+                 value="{{ data_inicio.isoformat() }}">
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Data fim</label>
+          <input type="date" name="data_fim" class="form-control form-control-sm"
+                 value="{{ data_fim.isoformat() }}">
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Obras</label>
+          <select name="obra_ids" class="form-select form-select-sm" multiple size="2">
+            {% for o in obras %}
+              <option value="{{ o.id }}" {% if o.id in obra_ids_sel %}selected{% endif %}>{{ o.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Função</label>
+          <select name="funcao_ids" class="form-select form-select-sm" multiple size="2">
+            {% for f in funcoes %}
+              <option value="{{ f.id }}" {% if f.id in funcao_ids_sel %}selected{% endif %}>{{ f.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Serviço</label>
+          <select name="servico_id" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for s in servicos %}
+              <option value="{{ s.id }}" {% if servico_id_sel == s.id %}selected{% endif %}>{{ s.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <label class="form-label fw-semibold mb-1">Ordenar por</label>
+          <select name="ordenar_por" class="form-select form-select-sm">
+            <option value="produtividade" {% if ordenar_por=='produtividade' %}selected{% endif %}>Produtividade</option>
+            <option value="assiduidade" {% if ordenar_por=='assiduidade' %}selected{% endif %}>Assiduidade</option>
+            <option value="lucratividade" {% if ordenar_por=='lucratividade' %}selected{% endif %}>Lucratividade</option>
+          </select>
+        </div>
+        <div class="col-12 text-end">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-search me-1"></i> Filtrar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if not lista %}
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle me-2"></i>
+      Nenhum funcionário com RDOs finalizados no período selecionado.
+    </div>
+  {% else %}
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th class="text-center">#</th>
+              <th>Nome</th>
+              <th>Função</th>
+              <th class="text-end">HH Normal</th>
+              <th class="text-end">HH Extra</th>
+              <th class="text-center">Assiduidade</th>
+              <th class="text-end">Prod. Real (un/h)</th>
+              <th class="text-end">Custo Total</th>
+              <th class="text-end">Receita Total</th>
+              <th class="text-end">Lucro Total</th>
+              <th class="text-center">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i, f in lista|enumerate %}
+            <tr>
+              <td class="text-center">
+                {% if i == 0 %}<i class="fas fa-trophy text-warning"></i>
+                {% elif i == 1 %}<i class="fas fa-trophy text-secondary"></i>
+                {% elif i == 2 %}<i class="fas fa-trophy" style="color:#cd7f32"></i>
+                {% else %}{{ i + 1 }}{% endif %}
+              </td>
+              <td><strong>{{ f.funcionario_nome }}</strong></td>
+              <td>{{ f.funcao_nome }}</td>
+              <td class="text-end">{{ '%.1f'|format(f.horas_normais) }}h</td>
+              <td class="text-end">
+                {% if f.horas_extras > 0 %}
+                  <span class="text-warning">{{ '%.1f'|format(f.horas_extras) }}h</span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-center">
+                <span class="badge {% if f.assiduidade_pct >= 80 %}bg-success{% elif f.assiduidade_pct >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                  {{ '%.0f'|format(f.assiduidade_pct) }}%
+                </span>
+                <div class="text-muted small">{{ f.dias_com_rdo }}/{{ f.dias_uteis_periodo }} dias</div>
+              </td>
+              <td class="text-end">
+                {% if f.prod_real_hh is not none %}
+                  <strong class="text-primary">{{ '%.3f'|format(f.prod_real_hh) }}</strong>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if f.custo_total is not none %}R$ {{ '%.2f'|format(f.custo_total) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if f.receita_total is not none %}R$ {{ '%.2f'|format(f.receita_total) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if f.lucro_total is not none %}
+                  <span class="fw-bold {% if f.lucro_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    R$ {{ '%.2f'|format(f.lucro_total) }}
+                  </span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-center">
+                <a href="{{ url_for('metricas.detalhe_funcionario', funcionario_id=f.funcionario_id, data_inicio=data_inicio.isoformat(), data_fim=data_fim.isoformat()) }}"
+                   class="btn btn-outline-primary btn-sm">
+                  <i class="fas fa-search"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
