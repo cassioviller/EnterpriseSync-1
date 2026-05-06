@@ -140,8 +140,10 @@ def handle_csrf_error(e):
 from werkzeug.exceptions import RequestEntityTooLarge
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):
-    from flask import request, redirect, flash
+    from flask import request, redirect, flash, jsonify
     limit_mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"error": f"Arquivo muito grande. O limite máximo é {limit_mb} MB."}), 413
     flash(f'Arquivo muito grande. O limite máximo é {limit_mb} MB.', 'danger')
     referrer = request.referrer
     if referrer:
