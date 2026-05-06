@@ -465,126 +465,6 @@ def excluir_rdo(rdo_id):
         flash('Erro ao excluir RDO. Tente novamente.', 'error')
         return redirect(url_for('main.rdos'))
 
-@main_bp.route('/rdo/novo')
-@funcionario_required
-def novo_rdo():
-    """Formulário para criar novo RDO com pré-carregamento de atividades"""
-    try:
-        # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
-        logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
-        logger.info("[LOC] ROTA USADA: /rdo/novo (novo_rdo)")
-        logger.info("[DOC] TEMPLATE: rdo/novo.html (MODERNO)")
-        logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
-        # Buscar obras disponíveis
-        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
-        
-        # Buscar funcionários
-        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        
-        # Verificar se há obras disponíveis
-        if not obras:
-            flash('É necessário ter pelo menos uma obra cadastrada para criar um RDO.', 'warning')
-            return redirect(url_for('main.obras'))
-        
-        # Buscar obra selecionada para pré-carregamento
-        obra_id = request.args.get('obra_id', type=int)
-        atividades_anteriores = []
-        
-        if obra_id:
-            # Buscar RDO mais recente da obra para pré-carregar atividades
-            ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
-                RDO.data_relatorio.desc()
-            ).first()
-            
-            if ultimo_rdo:
-                # Já existe RDO anterior - carregar atividades do último RDO
-                # Carregar subatividades do último RDO
-                rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
-                atividades_anteriores = [
-                    {
-                        'descricao': rdo_sub.nome_subatividade,
-                        'percentual': rdo_sub.percentual_conclusao,
-                        'observacoes': rdo_sub.observacoes_tecnicas or ''
-                    }
-                    for rdo_sub in rdo_subatividades
-                ]
-                logger.debug(f"DEBUG: Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
-            else:
-                # Primeiro RDO da obra - carregar atividades dos serviços cadastrados via servico_obra_real
-                servicos_obra = db.session.query(ServicoObraReal, Servico).join(
-                    Servico, ServicoObraReal.servico_id == Servico.id
-                ).filter(
-                    ServicoObraReal.obra_id == obra_id,
-                    ServicoObraReal.ativo == True,
-                    ServicoObraReal.admin_id == admin_id  # Segurança multi-tenant
-                ).all()
-                
-                for servico_obra, servico in servicos_obra:
-                    # Buscar subatividades do serviço
-                    subatividades = SubatividadeMestre.query.filter_by(
-                        servico_id=servico.id, ativo=True
-                    ).order_by(SubatividadeMestre.ordem_padrao).all()
-                    
-                    # Criar lista de subatividades para o RDO
-                    subatividades_list = []
-                    for sub in subatividades:
-                        subatividades_list.append({
-                            'id': sub.id,
-                            'nome': sub.nome,
-                            'descricao': sub.descricao or '',
-                            'percentual': 0
-                        })
-                    
-                    atividades_anteriores.append({
-                        'descricao': servico.nome,
-                        'percentual': 0,  # Começar com 0% para primeiro RDO
-                        'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}',
-                        'servico_id': servico.id,
-                        'categoria': servico.categoria or 'geral',
-                        'subatividades': subatividades_list
-                    })
-                
-                    logger.debug(f"DEBUG: Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
-                for ativ in atividades_anteriores:
-                    logger.debug(f"DEBUG SERVIÇO: {ativ['descricao']} - {len(ativ['subatividades'])} subatividades")
-        
-        # Adicionar data atual para o template
-        data_hoje = date.today().strftime('%Y-%m-%d')
-
-        # Alertas de entregas / terceiros para a obra selecionada
-        # Referência temporal = data do RDO (param ?data=YYYY-MM-DD) ou hoje
-        entregas_alertas = []
-        if obra_id:
-            try:
-                from services.entregas_terceiros import calcular_alertas_terceiros
-                data_ref_str = request.args.get('data') or request.form.get('data_relatorio')
-                data_ref = date.today()
-                if data_ref_str:
-                    try:
-                        data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
-                    except (ValueError, TypeError):
-                        data_ref = date.today()
-                _aid = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None)
-                entregas_alertas = calcular_alertas_terceiros(obra_id, hoje=data_ref, admin_id=_aid)['detalhe']
-            except Exception as _e:
-                logger.error(f"Erro carregando alertas terceiros (novo_rdo): {_e}")
-                entregas_alertas = []
-
-        return render_template('rdo/novo.html', 
-                             obras=obras,
-                             funcionarios=funcionarios,
-                             obra_selecionada=obra_id,
-                             atividades_anteriores=atividades_anteriores,
-                             data_hoje=data_hoje,
-                             date=date,
-                             entregas_alertas=entregas_alertas)
-        
-    except Exception as e:
-        logger.error(f"ERRO NOVO RDO: {str(e)}")
-        return redirect(url_for('main.rdos'))
-
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
 def criar_rdo():
@@ -916,7 +796,7 @@ def criar_rdo():
         db.session.rollback()
         logger.error(f"ERRO CRIAR RDO: {str(e)}")
         flash(f'Erro ao criar RDO: {str(e)}', 'error')
-        return redirect(url_for('main.novo_rdo'))
+        return redirect(url_for('main.rdo_novo_unificado'))
 
 @main_bp.route('/rdo/<int:id>')
 def visualizar_rdo(id):
@@ -1503,53 +1383,6 @@ def finalizar_rdo(id):
         flash('Erro ao finalizar RDO.', 'error')
         return redirect(url_for('main.rdos'))
 
-@main_bp.route('/rdo/<int:id>/excluir_old', methods=['POST'])
-@admin_required
-def excluir_rdo_old(id):
-    """Excluir RDO com controle de acesso"""
-    try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
-        # Buscar RDO com verificação de acesso
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id
-        ).first_or_404()
-        
-        numero_rdo = rdo.numero_rdo
-        
-        # Excluir relacionamentos primeiro
-        # Excluir subatividades
-        RDOServicoSubatividade.query.filter_by(rdo_id=id).delete()
-        
-        # Excluir mão de obra
-        RDOMaoObra.query.filter_by(rdo_id=id).delete()
-        
-        # Excluir equipamentos se existir
-        try:
-            RDOEquipamento.query.filter_by(rdo_id=id).delete()
-        except:
-            pass  # Tabela pode não existir
-        
-        # Excluir ocorrências se existir
-        try:
-            RDOOcorrencia.query.filter_by(rdo_id=id).delete()
-        except:
-            pass  # Tabela pode não existir
-        
-        # Excluir o RDO principal
-        db.session.delete(rdo)
-        db.session.commit()
-        
-        flash(f'RDO {numero_rdo} excluído com sucesso!', 'success')
-        return redirect(url_for('main.rdos'))
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"ERRO EXCLUIR RDO: {str(e)}")
-        flash('Erro ao excluir RDO.', 'error')
-        return redirect(url_for('main.rdos'))
-
 @main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
 @admin_required
 def duplicar_rdo(id):
@@ -2124,7 +1957,54 @@ def rdo_novo_unificado():
         obra_selecionada = None
         if obra_id:
             obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
-        
+
+        # Pré-carregar atividades do RDO anterior (ou dos serviços da obra, se for o primeiro RDO)
+        atividades_anteriores = []
+        if obra_id:
+            try:
+                ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
+                    RDO.data_relatorio.desc()
+                ).first()
+                if ultimo_rdo:
+                    rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+                    atividades_anteriores = [
+                        {
+                            'descricao': rdo_sub.nome_subatividade,
+                            'percentual': rdo_sub.percentual_conclusao,
+                            'observacoes': rdo_sub.observacoes_tecnicas or ''
+                        }
+                        for rdo_sub in rdo_subatividades
+                    ]
+                    logger.debug(f"Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+                else:
+                    servicos_obra = db.session.query(ServicoObraReal, Servico).join(
+                        Servico, ServicoObraReal.servico_id == Servico.id
+                    ).filter(
+                        ServicoObraReal.obra_id == obra_id,
+                        ServicoObraReal.ativo == True,
+                        ServicoObraReal.admin_id == admin_id
+                    ).all()
+                    for servico_obra, servico in servicos_obra:
+                        subatividades_srv = SubatividadeMestre.query.filter_by(
+                            servico_id=servico.id, ativo=True
+                        ).order_by(SubatividadeMestre.ordem_padrao).all()
+                        subatividades_list = [
+                            {'id': sub.id, 'nome': sub.nome, 'descricao': sub.descricao or '', 'percentual': 0}
+                            for sub in subatividades_srv
+                        ]
+                        atividades_anteriores.append({
+                            'descricao': servico.nome,
+                            'percentual': 0,
+                            'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}',
+                            'servico_id': servico.id,
+                            'categoria': servico.categoria or 'geral',
+                            'subatividades': subatividades_list
+                        })
+                    logger.debug(f"Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
+            except Exception as _e_ativ:
+                logger.warning(f"Erro ao pré-carregar atividades anteriores: {_e_ativ}")
+                atividades_anteriores = []
+
         # Template unificado MODERNO para todos os usuários
         template = 'rdo/novo.html'  # SEMPRE usar template moderno
         
@@ -2161,6 +2041,7 @@ def rdo_novo_unificado():
                              obras=obras, 
                              funcionarios=funcionarios_dict,
                              obra_selecionada=obra_selecionada,
+                             atividades_anteriores=atividades_anteriores,
                              data_hoje=data_hoje,
                              date=date,
                              is_v2_active=is_v2_active,
@@ -3206,7 +3087,7 @@ def rdo_salvar_unificado():
         else:
             flash(f'RDO {rdo.numero_rdo} criado com sucesso!', 'success')
             
-        return redirect(url_for('main.rdo_visualizar_unificado', id=rdo.id))
+        return redirect(url_for('main.visualizar_rdo', id=rdo.id))
         
     except Exception as e:
         db.session.rollback()
@@ -3234,92 +3115,11 @@ def funcionario_criar_rdo():
     """Redirect para nova rota unificada de salvar"""
     return rdo_salvar_unificado()
 
-@main_bp.route('/rdo/<int:id>')
-@funcionario_required
-def rdo_visualizar_unificado(id):
-    """Interface unificada para visualizar RDO - Admin e Funcionário"""
-    try:
-        # Detecção de admin_id unificada
-        if current_user.tipo_usuario == TipoUsuario.ADMIN:
-            admin_id = current_user.id
-        elif current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            admin_id = current_user.admin_id
-        else:
-            admin_id = 10  # Fallback para desenvolvimento
-        
-        # Buscar RDO com verificação de acesso multitenant
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id
-        ).first_or_404()
-        
-        # Buscar funcionários para dropdown de mão de obra
-        funcionarios = Funcionario.query.filter_by(
-            admin_id=tenant_admin_id, 
-            ativo=True
-        ).order_by(Funcionario.nome).all()
-        
-        funcionarios_dict = [{
-            'id': f.id,
-            'nome': f.nome,
-            'email': f.email,
-            'funcao_ref': {
-                'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
-            } if f.funcao_ref else None
-        } for f in funcionarios]
-        
-        # Buscar obras disponíveis
-        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
-        
-        # Carregar subatividades salvas do RDO
-        subatividades_salvas = {}
-        rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-        
-        for rdo_subativ in rdo_subatividades:
-            # Usar nome da subatividade como chave
-            subatividades_salvas[rdo_subativ.nome_subatividade] = {
-                'percentual': rdo_subativ.percentual_conclusao,
-                'observacoes': rdo_subativ.observacoes_tecnicas or ''
-            }
-        
-        # Carregar equipe de trabalho salva
-        equipe_salva = {}
-        mao_obra_salva = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
-        
-        for mao_obra in mao_obra_salva:
-            equipe_salva[mao_obra.funcionario_id] = {
-                'horas': mao_obra.horas_trabalhadas,
-                'funcao': mao_obra.funcao_exercida or 'Funcionário'
-            }
-        
-            logger.debug(f"DEBUG VISUALIZAR RDO UNIFICADO: RDO {rdo.numero_rdo} - {len(subatividades_salvas)} subatividades, {len(equipe_salva)} funcionários")
-        
-        # Template baseado no tipo de usuário
-        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
-            template = 'rdo/novo.html'  # SEMPRE usar template moderno
-        else:
-            template = 'rdo/visualizar_rdo.html'
-        
-        return render_template(template, 
-                             obras=obras, 
-                             funcionarios=funcionarios_dict,
-                             obra_selecionada=rdo.obra,
-                             rdo=rdo,
-                             subatividades_salvas=subatividades_salvas,
-                             equipe_salva=equipe_salva,
-                             modo_edicao=True,
-                             date=date)
-        
-    except Exception as e:
-        logger.error(f"ERRO VISUALIZAR RDO UNIFICADO: {str(e)}")
-        flash('Erro ao carregar RDO.', 'error')
-        return redirect('/rdo')
-
 @main_bp.route('/funcionario/rdo/<int:id>')
 @funcionario_required
 def funcionario_visualizar_rdo(id):
     """Redirect para nova interface unificada"""
-    return redirect(url_for('main.rdo_visualizar_unificado', id=id))
+    return redirect(url_for('main.visualizar_rdo', id=id))
 
 @main_bp.route('/funcionario/rdo/<int:id>/editar', methods=['GET', 'POST'])
 @funcionario_required
