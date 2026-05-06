@@ -312,10 +312,10 @@ def _calcular_custos_obra_acumulado(admin_id, obras_ids=None):
         return []
 
 
-def _calcular_serie_temporal_custos(admin_id, obras_ids=None):
-    """Custo mensal por obra para gráfico de linha de acumulado ao longo do tempo.
+def _calcular_serie_temporal_custos(admin_id, data_inicio, data_fim, obras_ids=None):
+    """Custo mensal por obra — série temporal no período selecionado.
 
-    Agrega os custos mês a mês (sem recorte de período do dashboard).
+    Agrega os custos mês a mês dentro de [data_inicio, data_fim].
     Fontes:
     - gestao_custo_filho (por data_referencia) filtrado por status do pai
     - conta_pagar V1 por obra_id (por data_vencimento)
@@ -347,6 +347,7 @@ def _calcular_serie_temporal_custos(admin_id, obras_ids=None):
                 WHERE gcf.admin_id = :admin_id
                   AND gcp.status IN ('PENDENTE','SOLICITADO','AUTORIZADO','PAGO','PARCIAL')
                   AND gcf.data_referencia IS NOT NULL
+                  AND gcf.data_referencia BETWEEN :data_inicio AND :data_fim
                 UNION ALL
                 SELECT cp.obra_id, cp.admin_id,
                        DATE_TRUNC('month', cp.data_vencimento) AS data_mes,
@@ -355,12 +356,13 @@ def _calcular_serie_temporal_custos(admin_id, obras_ids=None):
                 WHERE cp.admin_id = :admin_id
                   AND cp.obra_id IS NOT NULL
                   AND cp.data_vencimento IS NOT NULL
+                  AND cp.data_vencimento BETWEEN :data_inicio AND :data_fim
             ) s ON s.obra_id = o.id AND s.admin_id = :admin_id
             WHERE o.admin_id = :admin_id
               {obras_filter}
             GROUP BY o.id, o.nome, DATE_TRUNC('month', s.data_mes)
             ORDER BY o.nome, ano_mes
-        """), {'admin_id': admin_id}).fetchall()
+        """), {'admin_id': admin_id, 'data_inicio': data_inicio, 'data_fim': data_fim}).fetchall()
 
         result = []
         for row in rows:

@@ -480,6 +480,9 @@ def dashboard():
             funcionarios_recentes = []
         if 'obras_ativas' not in locals():
             obras_ativas = []
+        # Guard para série temporal (evita UnboundLocalError)
+        if 'serie_temporal_custos' not in locals():
+            serie_temporal_custos = []
         # Guards para variáveis de propostas (evita UnboundLocalError)
         if 'propostas_aprovadas' not in locals():
             propostas_aprovadas = 0
@@ -904,9 +907,9 @@ def dashboard():
                 })
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
 
-        # 5c. Série temporal de custos por obra (para gráfico de linha de acumulado)
+        # 5c. Série temporal de custos por obra — respeitando o período selecionado
         serie_temporal_custos = safe_db_operation(
-            lambda: _calcular_serie_temporal_custos(admin_id, _oids),
+            lambda: _calcular_serie_temporal_custos(admin_id, data_inicio, data_fim, _oids),
             []
         )
         if not isinstance(serie_temporal_custos, list):
@@ -954,6 +957,8 @@ def dashboard():
         }
         funcionarios_por_departamento = {}
         custos_por_obra = {}
+        if 'serie_temporal_custos' not in locals():
+            serie_temporal_custos = []
     
     # Estatísticas dinâmicas calculadas
     funcionarios_ativos = total_funcionarios
