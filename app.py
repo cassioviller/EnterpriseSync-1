@@ -93,7 +93,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
@@ -136,6 +136,17 @@ def handle_csrf_error(e):
         return jsonify({"error": "CSRF token missing or invalid. Please refresh the page."}), 400
     flash('Sessão expirada. Por favor, tente novamente.', 'warning')
     return redirect(request.referrer or url_for('main.index'))
+
+from werkzeug.exceptions import RequestEntityTooLarge
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(e):
+    from flask import request, redirect, flash
+    limit_mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
+    flash(f'Arquivo muito grande. O limite máximo é {limit_mb} MB.', 'danger')
+    referrer = request.referrer
+    if referrer:
+        return redirect(referrer)
+    return redirect('/')
 
 limiter = Limiter(
     get_remote_address,

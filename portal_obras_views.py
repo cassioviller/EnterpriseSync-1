@@ -33,14 +33,15 @@ portal_obras_bp = Blueprint(
     'portal_obras', __name__, url_prefix='/portal'
 )
 
-_DEFAULT_UPLOAD_FOLDER = os.path.join('static', 'uploads', 'comprovantes')
-UPLOAD_FOLDER = os.environ.get('UPLOADS_PATH', _DEFAULT_UPLOAD_FOLDER)
-if not os.path.isabs(UPLOAD_FOLDER):
-    UPLOAD_FOLDER = os.path.join(os.getcwd(), UPLOAD_FOLDER)
-UPLOAD_FOLDER = os.path.join(UPLOAD_FOLDER, 'comprovantes')
+_UPLOADS_PATH_ENV = os.environ.get('UPLOADS_PATH', '')
+if _UPLOADS_PATH_ENV:
+    _base = _UPLOADS_PATH_ENV if os.path.isabs(_UPLOADS_PATH_ENV) else os.path.join(os.getcwd(), _UPLOADS_PATH_ENV)
+    UPLOAD_FOLDER = os.path.join(_base, 'comprovantes')
+else:
+    UPLOAD_FOLDER = os.path.join(os.getcwd(), 'static', 'uploads', 'comprovantes')
 
-ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'}
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
 def _ensure_upload_folder():
