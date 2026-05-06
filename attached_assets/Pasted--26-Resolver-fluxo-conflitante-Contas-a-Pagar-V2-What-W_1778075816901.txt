@@ -1,0 +1,27 @@
+#26 - Resolver fluxo conflitante "Contas a Pagar V2"
+What & Why
+Achado Alto da auditoria Task #17. A tela /financeiro/contas-pagar mostra um banner "Versão V2 ativa" orientando o usuário a usar Gestão de Custos, mas o botão principal "+ Nova Conta a Pagar" continua disponível no topo da tela. Mensagens contraditórias: o usuário não sabe se deve clicar no botão ou ir até Gestão de Custos.
+
+Em paralelo: a rota /financeiro/contas-pagar/nova redireciona em vez de renderizar (modal-only) e os filtros não têm botão "Aplicar" (onchange="this.form.submit()" dispara request a cada alteração — péssimo no celular).
+
+Done looks like
+Quando o tenant está em modo V2, o botão de lançamento direto é escondido (ou rebatizado para "Lançamento Direto (legado)" e movido para um menu secundário).
+O CTA principal aponta para "Nova Despesa via Gestão de Custos".
+Em modo V1, o comportamento atual é preservado.
+A rota /financeiro/contas-pagar/nova ou abre página dedicada, ou abre o modal corretamente após redirect (estado claro).
+Filtros ganham botão "Filtrar" explícito; remover onchange=this.form.submit() para evitar requests duplicados em mobile.
+Out of scope
+Refatorar o backend de Contas a Pagar.
+Mudar a integração com Gestão de Custos em si.
+Refazer a tela inteira — apenas ajuste de CTAs/filtros.
+Steps
+Detectar o flag V2 — entender onde o sistema decide "V2 ativo" e expor isso ao template (g.contas_pagar_v2_ativo ou similar).
+Reorganizar CTAs — esconder/realocar o botão de lançamento direto quando V2 ativo; promover o link para Gestão de Custos.
+Filtros — trocar onchange=this.form.submit() por botão "Filtrar"; preservar querystring atual.
+Tratamento de /contas-pagar/nova — escolher entre página dedicada ou redirect com ?abrir_modal=1 que efetivamente abre o modal.
+Validar — rodar smoke; testar em V1 e V2; testar no /dev/mobile-preview 360px.
+Relevant files
+templates/financeiro/contas_pagar.html
+views/financeiro_views.py (ou onde estiver o handler de contas a pagar)
+manual/relatorios/auditoria_modulos_criticos.md (seção 4)
+manual/25_financeiro.md
