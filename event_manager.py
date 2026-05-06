@@ -684,6 +684,15 @@ def lancar_custos_rdo(data: dict, admin_id: int):
                 f"RDO #{rdo.numero_rdo} - {funcionario.nome} ({funcao})"
                 f" - {data_rdo.strftime('%d/%m/%Y')} - 1 diária{sub_str}"
             )
+            # Task #7: defesa contra StringDataRightTruncation. A coluna
+            # custo_obra.descricao foi ampliada para 500 chars (migração
+            # 156), mas RDOs com muitos funcionários × muitas
+            # subatividades ainda podem exceder esse limite. Truncar com
+            # sufixo "..." mantém o INSERT vivo (custo é gravado) sem
+            # silenciar o lançamento como acontecia antes.
+            _DESC_MAX = 500
+            if len(descricao) > _DESC_MAX:
+                descricao = descricao[: _DESC_MAX - 3] + "..."
 
             # CustoObra — idempotente por rdo_id + funcionario_id + data + admin_id
             existing_custo = CustoObra.query.filter_by(

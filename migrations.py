@@ -3854,6 +3854,7 @@ def executar_migracoes():
             (153, "Task #3 — composicao_servico_historico: histórico de alterações de coeficiente via métricas", migration_153_composicao_servico_historico),
             (154, "Task #12 — RDO sempre Finalizado: migrar Rascunho legado via pipeline (custo diário + gestão custo filho + produtividade)", migration_154_force_rdo_finalizado),
             (155, "Task #5 — RDO: drop coluna rdo_mao_obra.horas_extras (hora extra removida do RDO)", migration_155_drop_rdo_mao_obra_horas_extras),
+            (156, "Task #7 — custo_obra.descricao: ampliar de VARCHAR(200) para VARCHAR(500) (RDO com muitas subatividades)", migration_156_custo_obra_descricao_500),
         ]
         
         # Executar cada migração com rastreamento
@@ -13314,6 +13315,67 @@ def migration_155_drop_rdo_mao_obra_horas_extras():
         return True
     except Exception as e:
         logger.error("MIGRACAO 155 falhou: %s", e)
+        if connection is not None:
+            try:
+                connection.rollback()
+                connection.close()
+            except Exception:
+                pass
+        raise
+
+
+def migration_156_custo_obra_descricao_500():
+    """Task #7 — ampliar custo_obra.descricao de VARCHAR(200) para VARCHAR(500).
+
+    Problema: o handler ``event_manager.lancar_custos_rdo`` monta uma
+    descrição que concatena o nome de TODAS as subatividades trabalhadas
+    pelo funcionário no RDO. Em obras com muitas subatividades por
+    funcionário (ex.: demo Comercial Pinheiros, 7 subs) o tamanho passa
+    de 200 chars, dispara ``StringDataRightTruncation`` e o INSERT em
+    ``custo_obra`` falha — o erro é apenas logado pelo
+    ``EventManager.emit`` e o lançamento de mão-de-obra do RDO é
+    silenciosamente perdido.
+
+    Solução: ampliar a coluna para 500 chars. O handler também passa a
+    truncar com sufixo "..." como defesa em profundidade.
+
+    Idempotente: ``ALTER COLUMN ... TYPE VARCHAR(500)`` é seguro de
+    re-executar (PostgreSQL normaliza para no-op quando o tipo já bate)
+    e o bloco DO checa o limite atual antes de aplicar.
+    """
+    connection = None
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            DO $$
+            DECLARE
+                cur_len INTEGER;
+            BEGIN
+                SELECT character_maximum_length INTO cur_len
+                  FROM information_schema.columns
+                 WHERE table_name = 'custo_obra'
+                   AND column_name = 'descricao';
+                IF cur_len IS NULL THEN
+                    RAISE NOTICE 'custo_obra.descricao não encontrada — skip';
+                ELSIF cur_len < 500 THEN
+                    ALTER TABLE custo_obra
+                      ALTER COLUMN descricao TYPE VARCHAR(500);
+                    RAISE NOTICE 'custo_obra.descricao ampliada de % para 500', cur_len;
+                ELSE
+                    RAISE NOTICE 'custo_obra.descricao já tem % chars — skip', cur_len;
+                END IF;
+            END$$;
+            """
+        )
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("MIGRACAO 156: custo_obra.descricao tratada com sucesso")
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 156 falhou: %s", e)
         if connection is not None:
             try:
                 connection.rollback()

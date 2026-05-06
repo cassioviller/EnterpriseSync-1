@@ -640,7 +640,10 @@ class CustoObra(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
     tipo = db.Column(db.String(20), nullable=False)  # 'mao_obra', 'material', 'servico', 'veiculo', 'alimentacao'
-    descricao = db.Column(db.String(200), nullable=False)
+    # Task #7: ampliado de 200 para 500 chars — RDOs com muitas
+    # subatividades por funcionário ultrapassavam 200 e disparavam
+    # StringDataRightTruncation, perdendo o lançamento de custo.
+    descricao = db.Column(db.String(500), nullable=False)
     valor = db.Column(db.Float, nullable=False)
     data = db.Column(db.Date, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

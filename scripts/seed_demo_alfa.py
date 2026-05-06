@@ -2449,21 +2449,29 @@ def _backfill_custos_rdo_demo(admin_id):
         log.exception("backfill custos RDO falhou")
 
 
-def _verificar_custos_demo(admin_id, obra_id):
-    """Task #6 — verificação automática end-of-seed.
+def _verificar_custos_demo(admin_id, obra_id, obra_label="Bela Vista",
+                           check_material=True):
+    """Task #6 / Task #7 — verificação automática end-of-seed.
 
-    Garante que o tenant Alfa terminou o seed com os DOIS tipos de
-    GestaoCustoFilho na obra principal:
+    Garante que o tenant Alfa terminou o seed com:
       • SALARIO/MAO_OBRA_DIRETA originados de RDO (`origem_tabela`
         IN ('rdo_mao_obra','rdo_custo_diario'))  ← via emit
         'rdo_finalizado' → `lancar_custos_rdo`
       • MATERIAL originados de PedidoCompra (`origem_tabela`
         ='pedido_compra')                         ← via
-        `processar_compra_normal`
+        `processar_compra_normal` (só na obra principal — Pinheiros
+        não tem PedidoCompra na demo)
 
-    Se faltar qualquer uma das fontes, levanta RuntimeError com mensagem
-    clara — falha o seed alto e visível, em vez de produzir um demo
-    silenciosamente quebrado.
+    Task #7: também valida a obra Pinheiros (passar
+    ``check_material=False``), que historicamente perdia o lançamento
+    de mão-de-obra por causa do truncamento de descrição em
+    ``custo_obra.descricao`` (StringDataRightTruncation silenciado pelo
+    EventManager). Sem essa cobertura, regressões no handler
+    ``lancar_custos_rdo`` ficavam invisíveis.
+
+    Se faltar qualquer uma das fontes esperadas, levanta RuntimeError
+    com mensagem clara — falha o seed alto e visível, em vez de
+    produzir um demo silenciosamente quebrado.
     """
     from app import db
     from sqlalchemy import text
@@ -2498,25 +2506,26 @@ def _verificar_custos_demo(admin_id, obra_id):
     n_mat, v_mat = por_bucket.get('MATERIAL', (0, 0.0))
 
     log.info(
-        f"[VERIFY] obra={obra_id} → MAO_OBRA: {n_mo} GCF (R$ {v_mo:.2f}) | "
+        f"[VERIFY] obra={obra_id} ({obra_label}) → "
+        f"MAO_OBRA: {n_mo} GCF (R$ {v_mo:.2f}) | "
         f"MATERIAL: {n_mat} GCF (R$ {v_mat:.2f})"
     )
 
-    if n_mo == 0 or n_mat == 0:
-        faltando = []
-        if n_mo == 0:
-            faltando.append(
-                "MAO_OBRA (esperado via emit 'rdo_finalizado' → "
-                "`lancar_custos_rdo` nos RDOs da Bela Vista)"
-            )
-        if n_mat == 0:
-            faltando.append(
-                "MATERIAL (esperado via `processar_compra_normal` "
-                "no PedidoCompra NF-2026-0001)"
-            )
+    faltando = []
+    if n_mo == 0:
+        faltando.append(
+            f"MAO_OBRA (esperado via emit 'rdo_finalizado' → "
+            f"`lancar_custos_rdo` nos RDOs de {obra_label})"
+        )
+    if check_material and n_mat == 0:
+        faltando.append(
+            "MATERIAL (esperado via `processar_compra_normal` "
+            "no PedidoCompra NF-2026-0001)"
+        )
+    if faltando:
         raise RuntimeError(
-            f"Task #6 verificação falhou: obra {obra_id} ficou sem "
-            f"GestaoCustoFilho de {' E '.join(faltando)}. "
+            f"Verificação falhou: obra {obra_id} ({obra_label}) ficou "
+            f"sem GestaoCustoFilho de {' E '.join(faltando)}. "
             f"Buckets atuais: {por_bucket!r}"
         )
 
@@ -2613,11 +2622,34 @@ def main(argv=None):
                     .first()
                 )
                 if obra_principal:
-                    _verificar_custos_demo(existente.id, obra_principal.id)
+                    _verificar_custos_demo(
+                        existente.id, obra_principal.id,
+                        obra_label="Bela Vista",
+                        check_material=True,
+                    )
                 else:
                     log.warning(
                         "verificação pulada: obra principal "
                         "(OBR-2026-001) não encontrada no tenant Alfa"
+                    )
+                # Task #7: Pinheiros tem 7 subatividades por funcionário
+                # — historicamente perdia o lançamento de custos por
+                # truncamento da descrição. Agora vai junto na verificação.
+                obra_pinheiros = (
+                    Obra.query
+                    .filter_by(admin_id=existente.id, codigo="OBR-2026-002")
+                    .first()
+                )
+                if obra_pinheiros:
+                    _verificar_custos_demo(
+                        existente.id, obra_pinheiros.id,
+                        obra_label="Comercial Pinheiros",
+                        check_material=False,
+                    )
+                else:
+                    log.warning(
+                        "verificação pulada: obra Pinheiros "
+                        "(OBR-2026-002) não encontrada no tenant Alfa"
                     )
                 return 0
 
@@ -2631,7 +2663,20 @@ def main(argv=None):
             _backfill_custos_rdo_demo(info["admin_id"])
             # Task #6 — verificação obrigatória: MAO_OBRA via evento RDO +
             # MATERIAL via processar_compra_normal precisam existir.
-            _verificar_custos_demo(info["admin_id"], info["obra_id"])
+            _verificar_custos_demo(
+                info["admin_id"], info["obra_id"],
+                obra_label="Bela Vista",
+                check_material=True,
+            )
+            # Task #7 — Pinheiros (7 subatividades por funcionário) também
+            # precisa terminar com lançamento completo de mão-de-obra.
+            obra_pinheiros_id = info.get("obra_pinheiros_id")
+            if obra_pinheiros_id:
+                _verificar_custos_demo(
+                    info["admin_id"], obra_pinheiros_id,
+                    obra_label="Comercial Pinheiros",
+                    check_material=False,
+                )
             _imprimir_demo_pronta(info, args.ambiente)
             return 0
 
