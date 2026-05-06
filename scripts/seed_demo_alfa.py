@@ -2426,36 +2426,76 @@ def _seed_custos_mes_atual(admin_id):
             log.warning("Task #18 seed: obras demo não encontradas — pulando")
             return
 
-        _ENTRADAS = [
-            ("Mão de Obra",     "MAO_OBRA_DIRETA", 1200.00, "Mão de obra mensal"),
-            ("Material",        "MATERIAL",        850.00,  "Materiais do mês"),
-            ("Despesa Geral",   "OUTROS",          320.00,  "Despesas gerais"),
-        ]
+        # Entradas diferenciadas por tipo de obra:
+        #   OBR-2026-001 Residencial Bela Vista  → mais Mão de Obra (250 m²)
+        #   OBR-2026-002 Comercial Pinheiros      → mais Material + Subempreitada (1 500 m²)
+        _ENTRADAS_POR_OBRA = {
+            "OBR-2026-001": [
+                # (entidade_nome, tipo_cat, valor, descricao_especifica)
+                ("Mão de Obra Direta",
+                 "MAO_OBRA_DIRETA", 4_200.00,
+                 "Pedreiros e serventes — semana 1 e 2, Bela Vista"),
+                ("Material de Construção",
+                 "MATERIAL",        1_850.00,
+                 "Argamassa, bloco cerâmico e tela soldada — Bela Vista"),
+                ("Equipamentos",
+                 "EQUIPAMENTO",       620.00,
+                 "Aluguel betoneira e andaime tubular — Bela Vista"),
+            ],
+            "OBR-2026-002": [
+                ("Material de Construção",
+                 "MATERIAL",        9_400.00,
+                 "Aço CA-50, forma metálica e concreto usinado — Pinheiros"),
+                ("Mão de Obra Direta",
+                 "MAO_OBRA_DIRETA", 5_800.00,
+                 "Equipe de estrutura e acabamento — semana 1 e 2, Pinheiros"),
+                ("Subempreitada Elétrica",
+                 "SUBEMPREITADA",   3_200.00,
+                 "Subempreitada instalações elétricas prediais — Pinheiros"),
+                ("Equipamentos Pesados",
+                 "EQUIPAMENTO",     1_150.00,
+                 "Locação grua torre e bomba de concreto — Pinheiros"),
+            ],
+        }
 
+        # ------------------------------------------------------------------ #
+        # Limpeza antes da inserção: garante que reseeds (inclusive com      #
+        # valores antigos do Task #18 original) resultem em dados atuais.    #
+        # Apaga GCFs demo_mes_atual do mês corrente para estas obras,        #
+        # depois remove os GCPs órfãos correspondentes.                      #
+        # ------------------------------------------------------------------ #
+        obra_ids = [o.id for o in obras]
+
+        gcfs_antigos = (
+            GestaoCustoFilho.query
+            .filter(
+                GestaoCustoFilho.obra_id.in_(obra_ids),
+                GestaoCustoFilho.admin_id == admin_id,
+                GestaoCustoFilho.origem_tabela == 'demo_mes_atual',
+                db.extract('year',  GestaoCustoFilho.data_referencia) == hoje.year,
+                db.extract('month', GestaoCustoFilho.data_referencia) == hoje.month,
+            )
+            .all()
+        )
+        pai_ids_antigos = list({gcf.pai_id for gcf in gcfs_antigos})
+        for gcf in gcfs_antigos:
+            db.session.delete(gcf)
+        db.session.flush()
+
+        # Remove GCPs que ficaram sem filhos após a limpeza
+        for pai_id in pai_ids_antigos:
+            pai = db.session.get(GestaoCustoPai, pai_id)
+            if pai and not pai.filhos:
+                db.session.delete(pai)
+        db.session.flush()
+
+        # ------------------------------------------------------------------ #
+        # Inserção dos novos lançamentos realistas                            #
+        # ------------------------------------------------------------------ #
         criados = 0
         for obra in obras:
-            for entidade_nome, tipo_cat, valor, descricao in _ENTRADAS:
-                # Idempotência: 1 GCF por obra/tipo/mês
-                ja_existe = db.session.execute(text("""
-                    SELECT gcf.id FROM gestao_custo_filho gcf
-                    JOIN gestao_custo_pai gcp ON gcp.id = gcf.pai_id
-                    WHERE gcf.obra_id       = :obra_id
-                      AND gcf.admin_id      = :admin_id
-                      AND gcf.origem_tabela = 'demo_mes_atual'
-                      AND gcp.tipo_categoria = :tipo_cat
-                      AND EXTRACT(year  FROM gcf.data_referencia) = :ano
-                      AND EXTRACT(month FROM gcf.data_referencia) = :mes
-                    LIMIT 1
-                """), {
-                    'obra_id':  obra.id,
-                    'admin_id': admin_id,
-                    'tipo_cat': tipo_cat,
-                    'ano':      hoje.year,
-                    'mes':      hoje.month,
-                }).first()
-                if ja_existe:
-                    continue
-
+            entradas = _ENTRADAS_POR_OBRA.get(obra.codigo, [])
+            for entidade_nome, tipo_cat, valor, descricao in entradas:
                 gcp = GestaoCustoPai(
                     admin_id=admin_id,
                     tipo_categoria=tipo_cat,
@@ -2473,7 +2513,7 @@ def _seed_custos_mes_atual(admin_id):
                     admin_id=admin_id,
                     obra_id=obra.id,
                     data_referencia=dia_ref,
-                    descricao=f"[Demo] {descricao} — {obra.nome}",
+                    descricao=descricao,
                     valor=valor,
                     origem_tabela='demo_mes_atual',
                 )
@@ -2481,8 +2521,10 @@ def _seed_custos_mes_atual(admin_id):
                 criados += 1
 
         db.session.commit()
+        removidos = len(gcfs_antigos)
         log.info(
-            f"Task #18 seed: {criados} lançamento(s) demo criados "
+            f"Task #18 seed: {removidos} entrada(s) antigas removidas, "
+            f"{criados} lançamento(s) demo criados "
             f"para {hoje.strftime('%m/%Y')} em {len(obras)} obra(s)"
         )
     except Exception as exc:
