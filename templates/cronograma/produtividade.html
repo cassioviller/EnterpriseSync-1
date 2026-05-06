@@ -1,4 +1,5 @@
 {% extends "base_completo.html" %}
+{% from "_partials/macros.html" import legenda_indice, indice_tooltip_js %}
 {% block title %}Dashboard de Produtividade{% endblock %}
 
 {% block content %}
@@ -28,6 +29,8 @@
       </a>
     </div>
   </div>
+
+  {{ legenda_indice() }}
 
   <!-- Filtros -->
   <div class="card border-0 shadow-sm mb-4" style="border-radius:12px">
@@ -89,7 +92,9 @@
             <div>
               <div class="text-muted small fw-semibold">Melhor Performer</div>
               <div id="cardMelhorNome" class="fw-bold text-truncate" style="max-width:140px">—</div>
-              <div id="cardMelhorIndice" class="text-success fw-bold fs-5">—</div>
+              <div id="cardMelhorIndice" class="text-success fw-bold fs-5"
+                   data-bs-toggle="tooltip" data-bs-placement="top"
+                   title="Índice = Produtividade real ÷ Meta cadastrada. Verde ≥ 1,0× | Amarelo 0,8–0,99× | Vermelho < 0,8×">—</div>
               <div id="cardMelhorSub" class="text-muted" style="font-size:.75rem">—</div>
             </div>
             <i class="fas fa-trophy text-warning fa-2x opacity-50"></i>
@@ -104,7 +109,9 @@
             <div>
               <div class="text-muted small fw-semibold">Pior Performer</div>
               <div id="cardPiorNome" class="fw-bold text-truncate" style="max-width:140px">—</div>
-              <div id="cardPiorIndice" class="text-danger fw-bold fs-5">—</div>
+              <div id="cardPiorIndice" class="text-danger fw-bold fs-5"
+                   data-bs-toggle="tooltip" data-bs-placement="top"
+                   title="Índice = Produtividade real ÷ Meta cadastrada. Verde ≥ 1,0× | Amarelo 0,8–0,99× | Vermelho < 0,8×">—</div>
               <div id="cardPiorSub" class="text-muted" style="font-size:.75rem">—</div>
             </div>
             <i class="fas fa-arrow-trend-down text-danger fa-2x opacity-50"></i>
@@ -118,7 +125,9 @@
           <div class="d-flex justify-content-between align-items-start">
             <div>
               <div class="text-muted small fw-semibold">Índice Médio Equipe</div>
-              <div id="cardMedia" class="fw-bold fs-3">—</div>
+              <div id="cardMedia" class="fw-bold fs-3"
+                   data-bs-toggle="tooltip" data-bs-placement="top"
+                   title="Índice = Produtividade real ÷ Meta cadastrada. Verde ≥ 1,0× | Amarelo 0,8–0,99× | Vermelho < 0,8×">—</div>
               <div id="cardMediaLabel" class="text-muted" style="font-size:.75rem">vs meta = 1,0</div>
             </div>
             <i class="fas fa-users text-primary fa-2x opacity-50"></i>
@@ -237,12 +246,23 @@
 {% endblock %}
 
 {% block scripts %}
+{{ indice_tooltip_js() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 let graficoBarras = null;
 let graficoLinha = null;
 const DATA_INICIO_DEFAULT = {{ data_inicio_default | tojson }};
 const DATA_FIM_DEFAULT = {{ data_fim_default | tojson }};
+const INDICE_TOOLTIP = window.SIGE_INDICE_TOOLTIP;
+
+function reinitTooltips() {
+    if (!window.bootstrap || !bootstrap.Tooltip) return;
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+        const inst = bootstrap.Tooltip.getInstance(el);
+        if (inst) inst.dispose();
+        new bootstrap.Tooltip(el);
+    });
+}
 
 function limparFiltros() {
     document.getElementById('filtroObra').value = '';
@@ -303,6 +323,7 @@ async function carregarDados() {
 
         document.getElementById('cardsResumo').style.display = '';
         document.getElementById('conteudoDados').style.display = '';
+        reinitTooltips();
     } catch (err) {
         console.error('Erro ao carregar produtividade:', err);
         document.getElementById('estadoCarregando').style.display = 'none';
@@ -353,7 +374,9 @@ function renderTabela(ranking) {
             <td class="text-end">${r.total_horas.toFixed(1)}h</td>
             <td class="text-end fw-semibold">${prodStr}</td>
             <td class="text-end text-info fw-semibold">${empStr}</td>
-            <td class="text-end fw-semibold ${r.badge === 'success' ? 'text-success' : r.badge === 'warning' ? 'text-warning' : 'text-danger'}">${vsMeta}</td>
+            <td class="text-end fw-semibold ${r.badge === 'success' ? 'text-success' : r.badge === 'warning' ? 'text-warning' : 'text-danger'}"
+                data-bs-toggle="tooltip" data-bs-placement="top"
+                title="${INDICE_TOOLTIP}">${vsMeta}</td>
             <td class="text-center">
                 <span class="badge ${vsEmpBadge}" style="font-size:.7rem">${vsEmpLabel}</span>
             </td>

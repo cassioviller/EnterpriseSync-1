@@ -101,6 +101,71 @@
       title="{{ nome or '' }}">{{ ns.inic|upper or '?' }}</span>
 {% endmacro %}
 
+{# Texto explicativo padrão do índice de produtividade (mantido em um único lugar). #}
+{% set INDICE_PRODUTIVIDADE_TOOLTIP = 'Índice = Produtividade real ÷ Meta cadastrada. Verde ≥ 1,0× | Amarelo 0,8–0,99× | Vermelho < 0,8×' %}
+
+{# Disponibiliza o texto canônico do tooltip do índice para JavaScript (window.SIGE_INDICE_TOOLTIP). #}
+{# Renderize uma vez por página antes de qualquer código JS que precise do texto. #}
+{% macro indice_tooltip_js() %}
+<script>window.SIGE_INDICE_TOOLTIP = {{ INDICE_PRODUTIVIDADE_TOOLTIP | tojson }};</script>
+{% endmacro %}
+
+{# Badge colorido do índice de produtividade (real/meta) com tooltip explicativo. #}
+{# `valor` é o índice numérico (ex.: 0.85 = 0,85×). Aceita None → badge cinza. #}
+{% macro badge_indice(valor, extra_style='font-size:.7rem') %}
+{%- if valor is none -%}
+<span class="badge bg-secondary"
+      style="{{ extra_style }}"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{{ INDICE_PRODUTIVIDADE_TOOLTIP }}">—</span>
+{%- else -%}
+{%- if valor >= 1.0 -%}{% set _cls = 'bg-success' %}
+{%- elif valor >= 0.8 -%}{% set _cls = 'bg-warning text-dark' %}
+{%- else -%}{% set _cls = 'bg-danger' %}
+{%- endif -%}
+<span class="badge {{ _cls }}"
+      style="{{ extra_style }}"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="{{ INDICE_PRODUTIVIDADE_TOOLTIP }}">{{ '%.2f'|format(valor) }}×</span>
+{%- endif -%}
+{% endmacro %}
+
+{# Bloco de legenda fixa explicando o índice de produtividade (cores + fórmula). #}
+{# Use no topo de qualquer tela que exiba o badge_indice. #}
+{% macro legenda_indice(compact=False) %}
+<div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-3 sige-legenda-indice"
+     role="note"
+     style="font-size:.78rem">
+  <span class="fw-semibold text-muted">
+    <i class="fas fa-info-circle text-primary me-1" aria-hidden="true"></i>
+    Como ler o Índice:
+  </span>
+  <span class="text-muted">
+    <strong>Índice = Produtividade real ÷ Meta cadastrada</strong>
+    da subatividade.
+  </span>
+  <span class="d-inline-flex align-items-center gap-1">
+    <span class="badge bg-success" style="font-size:.7rem">≥ 1,00×</span>
+    <span class="text-muted">no ritmo ou acima da meta</span>
+  </span>
+  <span class="d-inline-flex align-items-center gap-1">
+    <span class="badge bg-warning text-dark" style="font-size:.7rem">0,80–0,99×</span>
+    <span class="text-muted">abaixo da meta — investigar</span>
+  </span>
+  <span class="d-inline-flex align-items-center gap-1">
+    <span class="badge bg-danger" style="font-size:.7rem">&lt; 0,80×</span>
+    <span class="text-muted">muito abaixo — agir</span>
+  </span>
+  {% if not compact %}
+  <span class="text-muted ms-auto" style="font-size:.72rem">
+    Se o número parece estranho, revise a meta cadastrada no catálogo de subatividades.
+  </span>
+  {% endif %}
+</div>
+{% endmacro %}
+
 {# Label + horizontal mini-bar + value. color_class is a Bootstrap bg-* class. pct is clamped 0..100. #}
 {% macro mini_bar_row(label, pct, value_text, color_class='bg-primary') %}
 {%- set p = pct if pct is not none else 0 -%}

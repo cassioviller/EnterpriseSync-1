@@ -1,4 +1,5 @@
 {% extends "base_completo.html" %}
+{% from "_partials/macros.html" import badge_indice, legenda_indice %}
 
 {% block head %}
 <script>
@@ -1232,6 +1233,9 @@ console.log('Initializing RDO view with light theme...');
                 </div>
                 <h3>Panorama Completo da Obra - Subatividades ({{ total_subatividades }} executadas)</h3>
             </div>
+            {% if is_v2_active is defined and is_v2_active() and rdo.status == 'Finalizado' %}
+            {{ legenda_indice() }}
+            {% endif %}
             <div class="subatividades-section">
                 {% for servico_id, grupo in subatividades_por_servico.items() %}
                 <div class="servico-group">
@@ -1299,17 +1303,6 @@ console.log('Initializing RDO view with light theme...');
                                     <tbody>
                                     {% for mo in maos_sub %}
                                     {% set idx = mo.indice_produtividade %}
-                                    {% if idx is not none %}
-                                        {% if idx >= 1.0 %}
-                                            {% set badge_class = 'bg-success' %}
-                                        {% elif idx >= 0.8 %}
-                                            {% set badge_class = 'bg-warning text-dark' %}
-                                        {% else %}
-                                            {% set badge_class = 'bg-danger' %}
-                                        {% endif %}
-                                    {% else %}
-                                        {% set badge_class = 'bg-secondary' %}
-                                    {% endif %}
                                     <tr>
                                         <td class="py-0">{{ mo.funcionario.nome if mo.funcionario else '—' }}</td>
                                         <td class="py-0">{{ "%.1f"|format(mo.horas_trabalhadas) }}h</td>
@@ -1319,13 +1312,7 @@ console.log('Initializing RDO view with light theme...');
                                                 {% if subatividade.unidade_medida_snapshot %}{{ subatividade.unidade_medida_snapshot }}{% endif %}/h
                                             {% else %}—{% endif %}
                                         </td>
-                                        <td class="py-0">
-                                            {% if idx is not none %}
-                                            <span class="badge {{ badge_class }}" style="font-size:.7rem">
-                                                {{ "%.2f"|format(idx) }}×
-                                            </span>
-                                            {% else %}—{% endif %}
-                                        </td>
+                                        <td class="py-0">{{ badge_indice(idx) }}</td>
                                     </tr>
                                     {% endfor %}
                                     </tbody>
