@@ -359,13 +359,22 @@ html[data-bs-theme="dark"] .header-btn i {
                     <canvas id="custosObraChart" height="120"></canvas>
                     <div class="row mt-3 g-2">
                         {% for obra in custos_obra %}
+                        {% set periodo = obra.realizado_periodo if obra.realizado_periodo is defined else obra.realizado %}
+                        {% set acumulado = obra.realizado_acumulado if obra.realizado_acumulado is defined else obra.realizado %}
+                        {% set pct_acum = (acumulado / obra.orcamento * 100) | round(1) if obra.orcamento > 0 else 0 %}
                         <div class="col-md-4 col-lg-3">
                             <div class="border rounded p-2 {% if obra.estouro %}border-danger bg-danger bg-opacity-10{% else %}border-light{% endif %}">
                                 <div class="fw-semibold text-truncate small" title="{{ obra.nome }}">{{ obra.nome }}</div>
                                 <div class="d-flex justify-content-between mt-1 small">
-                                    <span class="text-muted">Realizado:</span>
+                                    <span class="text-muted">No período:</span>
                                     <span class="fw-bold {% if obra.estouro %}text-danger{% endif %}">
-                                        R$ {{ '{:,.2f}'.format(obra.realizado).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                        R$ {{ '{:,.2f}'.format(periodo).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Acumulado:</span>
+                                    <span class="fw-bold text-primary">
+                                        R$ {{ '{:,.2f}'.format(acumulado).replace(',', 'X').replace('.', ',').replace('X', '.') }}
                                     </span>
                                 </div>
                                 {% if obra.orcamento > 0 %}
@@ -374,11 +383,11 @@ html[data-bs-theme="dark"] .header-btn i {
                                     <span>R$ {{ '{:,.2f}'.format(obra.orcamento).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
                                 </div>
                                 <div class="progress mt-1" style="height:4px">
-                                    <div class="progress-bar {% if obra.estouro %}bg-danger{% elif obra.pct > 80 %}bg-warning{% else %}bg-success{% endif %}"
-                                         style="width:{{ [obra.pct, 100]|min }}%"></div>
+                                    <div class="progress-bar {% if pct_acum > 100 %}bg-danger{% elif pct_acum > 80 %}bg-warning{% else %}bg-success{% endif %}"
+                                         style="width:{{ [pct_acum, 100]|min }}%"></div>
                                 </div>
-                                <div class="text-end small {% if obra.estouro %}text-danger{% else %}text-muted{% endif %}">
-                                    {{ obra.pct }}%{% if obra.estouro %} ⚠ estouro{% endif %}
+                                <div class="text-end small {% if pct_acum > 100 %}text-danger{% else %}text-muted{% endif %}">
+                                    {{ pct_acum }}% acumulado{% if pct_acum > 100 %} ⚠ estouro{% endif %}
                                 </div>
                                 {% endif %}
                             </div>
@@ -948,11 +957,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Gráfico de Custos por Obra — Realizado vs Orçamento (barras agrupadas)
+    // Gráfico de Custos por Obra — Realizado no Período / Acumulado / Orçamento
     const ctxCustos = document.getElementById('custosObraChart');
     if (ctxCustos) {
-        const custosLabels = [{% for o in custos_obra %}'{{ o.nome | replace("'", "\\'") }}'{% if not loop.last %},{% endif %}{% endfor %}];
-        const custosRealizado = [{% for o in custos_obra %}{{ o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosLabels    = [{% for o in custos_obra %}'{{ o.nome | replace("'", "\\'") }}'{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosPeriodo   = [{% for o in custos_obra %}{{ o.realizado_periodo if o.realizado_periodo is defined else o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosAcumulado = [{% for o in custos_obra %}{{ o.realizado_acumulado if o.realizado_acumulado is defined else o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
         const custosOrcamento = [{% for o in custos_obra %}{{ o.orcamento }}{% if not loop.last %},{% endif %}{% endfor %}];
         new Chart(ctxCustos.getContext('2d'), {
             type: 'bar',
@@ -960,19 +970,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels: custosLabels,
                 datasets: [
                     {
-                        label: 'Realizado (R$)',
-                        data: custosRealizado,
-                        backgroundColor: custosRealizado.map((v, i) =>
+                        label: 'No Período (R$)',
+                        data: custosPeriodo,
+                        backgroundColor: custosPeriodo.map((v, i) =>
                             custosOrcamento[i] > 0 && v > custosOrcamento[i]
                                 ? 'rgba(220,53,69,0.80)' : 'rgba(13,110,253,0.80)'),
                         borderWidth: 0,
                         borderRadius: 4
                     },
                     {
+                        label: 'Acumulado Total (R$)',
+                        data: custosAcumulado,
+                        backgroundColor: custosAcumulado.map((v, i) =>
+                            custosOrcamento[i] > 0 && v > custosOrcamento[i]
+                                ? 'rgba(220,53,69,0.40)' : 'rgba(13,110,253,0.35)'),
+                        borderColor: custosAcumulado.map((v, i) =>
+                            custosOrcamento[i] > 0 && v > custosOrcamento[i]
+                                ? 'rgba(220,53,69,0.90)' : 'rgba(13,110,253,0.90)'),
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
                         label: 'Orçamento (R$)',
                         data: custosOrcamento,
-                        backgroundColor: 'rgba(108,117,125,0.35)',
-                        borderColor: 'rgba(108,117,125,0.70)',
+                        backgroundColor: 'rgba(108,117,125,0.25)',
+                        borderColor: 'rgba(108,117,125,0.60)',
                         borderWidth: 1,
                         borderRadius: 4
                     }

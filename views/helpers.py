@@ -217,8 +217,8 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim, obras_ids=None):
                     FROM conta_pagar cp
                     WHERE cp.obra_id = o.id
                       AND cp.admin_id = :admin_id
-                      AND (cp.data_emissao IS NULL
-                           OR cp.data_emissao BETWEEN :data_inicio AND :data_fim)
+                      AND (cp.data_vencimento IS NULL
+                           OR cp.data_vencimento BETWEEN :data_inicio AND :data_fim)
                 ), 0) AS custo_conta_pagar
             FROM obra o
             WHERE o.admin_id = :admin_id
@@ -248,6 +248,66 @@ def _calcular_custos_obra(admin_id, data_inicio, data_fim, obras_ids=None):
         return result
     except Exception as e:
         logger.error(f"Erro custos por obra: {e}")
+        db.session.rollback()
+        return []
+
+
+def _calcular_custos_obra_acumulado(admin_id, obras_ids=None):
+    """Custo Realizado acumulado por obra — sem recorte de data.
+
+    Soma todo o histórico da obra (desde o início), independente do período
+    selecionado no filtro do dashboard. Usa as mesmas fontes e filtros de
+    status de _calcular_custos_obra, mas sem restrição de data.
+
+    Retorna lista de dicts: {id, nome, realizado_acumulado, orcamento}
+    """
+    try:
+        obras_filter = ""
+        if obras_ids:
+            ids_sql = ",".join(str(int(i)) for i in obras_ids if str(i).isdigit())
+            if ids_sql:
+                obras_filter = f"AND o.id IN ({ids_sql})"
+
+        rows = db.session.execute(text(f"""
+            SELECT
+                o.id                          AS obra_id,
+                o.nome                        AS obra_nome,
+                COALESCE(o.orcamento, 0)      AS orcamento,
+                COALESCE((
+                    SELECT SUM(gcf.valor)
+                    FROM gestao_custo_filho gcf
+                    JOIN gestao_custo_pai gcp ON gcp.id = gcf.pai_id
+                    WHERE gcf.obra_id = o.id
+                      AND gcf.admin_id = :admin_id
+                      AND gcp.status IN ('PENDENTE','SOLICITADO','AUTORIZADO','PAGO','PARCIAL')
+                ), 0) AS custo_gestao,
+                COALESCE((
+                    SELECT SUM(cp.valor_original)
+                    FROM conta_pagar cp
+                    WHERE cp.obra_id = o.id
+                      AND cp.admin_id = :admin_id
+                ), 0) AS custo_conta_pagar
+            FROM obra o
+            WHERE o.admin_id = :admin_id
+              {obras_filter}
+            ORDER BY o.nome
+        """), {'admin_id': admin_id}).fetchall()
+
+        result = []
+        for row in rows:
+            realizado = float(row[3] or 0) + float(row[4] or 0)
+            orcamento = float(row[2] or 0)
+            if realizado > 0 or orcamento > 0:
+                result.append({
+                    'id': row[0],
+                    'nome': row[1],
+                    'realizado_acumulado': round(realizado, 2),
+                    'orcamento': round(orcamento, 2),
+                })
+
+        return result
+    except Exception as e:
+        logger.error(f"Erro custos obra acumulado: {e}")
         db.session.rollback()
         return []
 

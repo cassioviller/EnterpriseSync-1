@@ -2398,6 +2398,100 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
 
 
 # ---------------------------------------------------------------------------
+# Task #18 — lançamentos demo para o mês corrente (Realizado no Período)
+# ---------------------------------------------------------------------------
+def _seed_custos_mes_atual(admin_id):
+    """Cria lançamentos GestaoCustoPai/Filho no mês corrente para que o
+    gráfico 'Realizado no Período' mostre dados ao filtrar por Mês Atual.
+
+    Idempotente via origem_tabela='demo_mes_atual'. Executa tanto no
+    caminho fresh quanto no idempotente (reseed automático por deploy).
+    """
+    try:
+        from app import db
+        from models import GestaoCustoPai, GestaoCustoFilho, Obra
+        from sqlalchemy import text
+        from datetime import date
+
+        hoje = date.today()
+        dia_ref = hoje.replace(day=10)  # dia 10 do mês corrente
+
+        obras = (
+            Obra.query
+            .filter_by(admin_id=admin_id, ativo=True)
+            .filter(Obra.codigo.in_(["OBR-2026-001", "OBR-2026-002"]))
+            .all()
+        )
+        if not obras:
+            log.warning("Task #18 seed: obras demo não encontradas — pulando")
+            return
+
+        _ENTRADAS = [
+            ("Mão de Obra",     "MAO_OBRA_DIRETA", 1200.00, "Mão de obra mensal"),
+            ("Material",        "MATERIAL",        850.00,  "Materiais do mês"),
+            ("Despesa Geral",   "OUTROS",          320.00,  "Despesas gerais"),
+        ]
+
+        criados = 0
+        for obra in obras:
+            for entidade_nome, tipo_cat, valor, descricao in _ENTRADAS:
+                # Idempotência: 1 GCF por obra/tipo/mês
+                ja_existe = db.session.execute(text("""
+                    SELECT gcf.id FROM gestao_custo_filho gcf
+                    JOIN gestao_custo_pai gcp ON gcp.id = gcf.pai_id
+                    WHERE gcf.obra_id       = :obra_id
+                      AND gcf.admin_id      = :admin_id
+                      AND gcf.origem_tabela = 'demo_mes_atual'
+                      AND gcp.tipo_categoria = :tipo_cat
+                      AND EXTRACT(year  FROM gcf.data_referencia) = :ano
+                      AND EXTRACT(month FROM gcf.data_referencia) = :mes
+                    LIMIT 1
+                """), {
+                    'obra_id':  obra.id,
+                    'admin_id': admin_id,
+                    'tipo_cat': tipo_cat,
+                    'ano':      hoje.year,
+                    'mes':      hoje.month,
+                }).first()
+                if ja_existe:
+                    continue
+
+                gcp = GestaoCustoPai(
+                    admin_id=admin_id,
+                    tipo_categoria=tipo_cat,
+                    entidade_nome=entidade_nome,
+                    valor_total=valor,
+                    valor_solicitado=valor,
+                    status='PENDENTE',
+                    data_vencimento=dia_ref,
+                )
+                db.session.add(gcp)
+                db.session.flush()
+
+                gcf = GestaoCustoFilho(
+                    pai_id=gcp.id,
+                    admin_id=admin_id,
+                    obra_id=obra.id,
+                    data_referencia=dia_ref,
+                    descricao=f"[Demo] {descricao} — {obra.nome}",
+                    valor=valor,
+                    origem_tabela='demo_mes_atual',
+                )
+                db.session.add(gcf)
+                criados += 1
+
+        db.session.commit()
+        log.info(
+            f"Task #18 seed: {criados} lançamento(s) demo criados "
+            f"para {hoje.strftime('%m/%Y')} em {len(obras)} obra(s)"
+        )
+    except Exception as exc:
+        from app import db as _db
+        _db.session.rollback()
+        log.warning(f"Task #18 seed custos mês atual falhou (não crítico): {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Entry point com guarda de produção
 # ---------------------------------------------------------------------------
 def _backfill_custos_rdo_demo(admin_id):
@@ -2639,6 +2733,7 @@ def main(argv=None):
                 # GestaoCustoFilho. Necessário para deploys que plantaram a
                 # demo ANTES da geração automática existir.
                 _backfill_custos_rdo_demo(existente.id)
+                _seed_custos_mes_atual(existente.id)
                 # Task #6 — verificação também no caminho idempotente, para
                 # detectar regressão em demos legados a cada re-execução.
                 from models import Obra
@@ -2687,6 +2782,7 @@ def main(argv=None):
             # e re-emite 'rdo_finalizado' (idempotente) — fecha custos de
             # mão-de-obra também para demos antigos.
             _backfill_custos_rdo_demo(info["admin_id"])
+            _seed_custos_mes_atual(info["admin_id"])
             # Task #6 — verificação obrigatória: MAO_OBRA via evento RDO +
             # MATERIAL via processar_compra_normal precisam existir.
             _verificar_custos_demo(

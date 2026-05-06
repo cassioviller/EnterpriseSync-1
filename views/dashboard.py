@@ -5,7 +5,7 @@ from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, get_admin_id_robusta, get_admin_id_dinamico
+from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
 import calendar
 from sqlalchemy import func, desc, or_, and_, text, inspect
@@ -871,6 +871,16 @@ def dashboard():
             lambda: _calcular_custos_obra(admin_id, data_inicio, data_fim, _oids),
             {}
         )
+        # 5b. Acumulado total (sem filtro de data) — mesclado em seguida
+        _acum_raw = safe_db_operation(
+            lambda: _calcular_custos_obra_acumulado(admin_id, _oids),
+            []
+        )
+        _acum_by_id = {o['id']: o['realizado_acumulado'] for o in _acum_raw} if isinstance(_acum_raw, list) else {}
+        if isinstance(custos_por_obra, list):
+            for _item in custos_por_obra:
+                _item['realizado_periodo'] = _item.get('realizado', 0)
+                _item['realizado_acumulado'] = _acum_by_id.get(_item['id'], _item.get('realizado', 0))
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
         
         # Dados calculados reais
