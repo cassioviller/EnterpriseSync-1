@@ -401,10 +401,6 @@ def upload_comprovante(token: str, compra_id: int):
     if rel_path.startswith('static/'):
         compra.comprovante_pagamento_url = '/' + rel_path
     else:
-        uploads_base = os.path.relpath(
-            os.path.dirname(caminho),
-            os.path.join(os.getcwd(), 'static', 'uploads', 'comprovantes')
-        )
         filename_only = os.path.basename(caminho)
         compra.comprovante_pagamento_url = f'/persistent-uploads/comprovantes/{filename_only}'
     db.session.commit()
