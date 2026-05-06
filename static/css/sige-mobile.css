@@ -105,6 +105,63 @@
     }
     .sige-mobile-bottomnav__item:active { background: #f1f5f9; }
 
+    /* --- 2.4 Helpers de módulos críticos (RDO/Obras/Funcionários/Financeiro) --- */
+    /* Stack: empilha botões/ações em mobile com altura confortável de toque */
+    .sige-mobile-stack,
+    body.has-mobile-shell .btn-group:not(.btn-group-sm):not(.btn-group-toggle) {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+    .sige-mobile-stack > .btn,
+    .sige-mobile-stack > a,
+    body.has-mobile-shell .btn-group:not(.btn-group-sm):not(.btn-group-toggle) > .btn {
+        width: 100% !important;
+        min-height: 44px;
+        border-radius: 8px !important;
+    }
+    /* Filtros: força inputs/selects a 100% e empilha ações */
+    body.has-mobile-shell .card .form-control,
+    body.has-mobile-shell .card .form-select {
+        width: 100% !important;
+        font-size: 16px; /* evita zoom iOS */
+    }
+    /* Modais Bootstrap: full-screen no mobile para facilitar uso */
+    body.has-mobile-shell .modal-dialog:not(.modal-fullscreen):not(.modal-sm) {
+        margin: 0 !important;
+        max-width: 100% !important;
+        min-height: 100vh;
+    }
+    body.has-mobile-shell .modal-content {
+        border-radius: 0 !important;
+        min-height: 100vh;
+    }
+    /* Floating action button (já usado em RDO/Funcionários): garante posição
+       acima da bottom nav */
+    body.has-mobile-shell .floating-action {
+        bottom: calc(var(--sige-mobile-bottomnav-h) + 16px) !important;
+        z-index: 1038;
+    }
+    /* Header actions (obras_moderno): empilha em mobile */
+    body.has-mobile-shell .header-actions,
+    body.has-mobile-shell .obras-header .header-actions {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        width: 100%;
+    }
+    body.has-mobile-shell .header-actions > .btn-modern,
+    body.has-mobile-shell .header-actions > a {
+        width: 100% !important;
+        justify-content: center;
+    }
+    /* Stats grid (RDO/Obras): 2 colunas no mobile em vez de 4+ */
+    body.has-mobile-shell .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+
     /* --- 2.5 Drawer (offcanvas custom) — fica no body --- */
     /* z-index abaixo de modal Bootstrap (1055) — modais sempre dominam */
     .sige-mobile-drawer-backdrop {

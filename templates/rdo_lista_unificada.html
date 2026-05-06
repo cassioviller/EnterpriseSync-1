@@ -828,9 +828,10 @@ console.log('Initializing RDO with light theme...');
 
 {% block content %}
 
-<!-- Botão Flutuante Mobile para RDO -->
+<!-- Task #19 — Botão Flutuante Mobile para RDO (acima do bottom nav via CSS sige-mobile) -->
 <div class="floating-action d-lg-none">
-    <button class="btn btn-primary" onclick="window.location.href='/rdo/novo'">
+    <button class="btn btn-primary sige-mobile-fab" onclick="window.location.href='/rdo/novo'"
+            aria-label="Novo RDO">
         <i class="fas fa-plus"></i>
     </button>
 </div>
