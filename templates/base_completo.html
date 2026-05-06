@@ -679,11 +679,13 @@
                 aria-label="Abrir menu" onclick="window.SigeMobileDrawer.open()">
             <i class="fas fa-bars"></i>
         </button>
-        <a class="sige-mobile-shell__brand" href="{{ url_for('main.dashboard') }}">
+        {# Nome do tenant: para funcionário, usa o nome do admin (titular do tenant);
+           para o próprio admin, usa o nome dele. Fallback para username. #}
+        {% set _tenant_name = (current_user.admin.nome if current_user.admin else current_user.nome) or current_user.username %}
+        <a class="sige-mobile-shell__brand" href="{{ url_for('main.dashboard') }}"
+           title="{{ _tenant_name }}">
             <i class="fas fa-building"></i>
-            <span class="sige-mobile-shell__brand-text">
-                {{ current_user.username if current_user.is_authenticated else 'SIGE' }}
-            </span>
+            <span class="sige-mobile-shell__brand-text">{{ _tenant_name }}</span>
         </a>
         <a class="sige-mobile-shell__btn" aria-label="Sair"
            href="{{ url_for('main.logout') }}">

@@ -15,11 +15,7 @@ from models import TipoUsuario
 
 dev_bp = Blueprint("dev", __name__, url_prefix="/dev")
 
-_ALLOWED_ROLES = {
-    TipoUsuario.SUPER_ADMIN,
-    TipoUsuario.ADMIN,
-    TipoUsuario.GESTOR_EQUIPES,
-}
+_ALLOWED_ROLES = {TipoUsuario.SUPER_ADMIN}
 
 
 def _is_dev_environment() -> bool:
@@ -38,7 +34,7 @@ def mobile_preview():
 
     Acesso permitido a:
     - qualquer usuário autenticado em ambiente de dev (Replit/local);
-    - SUPER_ADMIN, ADMIN ou GESTOR_EQUIPES em produção.
+    - apenas SUPER_ADMIN em produção.
     """
     if not _is_dev_environment():
         try:
