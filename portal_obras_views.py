@@ -12,8 +12,8 @@ import secrets
 from datetime import date, datetime
 
 from flask import (
-    Blueprint, abort, flash, jsonify, redirect, render_template,
-    request, url_for,
+    Blueprint, abort, current_app, flash, jsonify, redirect,
+    render_template, request, url_for,
 )
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
@@ -41,7 +41,6 @@ else:
     UPLOAD_FOLDER = os.path.join(os.getcwd(), 'static', 'uploads', 'comprovantes')
 
 ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
 def _ensure_upload_folder():
@@ -385,11 +384,12 @@ def upload_comprovante(token: str, compra_id: int):
         flash('Tipo de arquivo não permitido. Envie imagem ou PDF.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
+    max_bytes = current_app.config.get('MAX_CONTENT_LENGTH', 5 * 1024 * 1024)
     arquivo.seek(0, 2)
     file_size = arquivo.tell()
     arquivo.seek(0)
-    if file_size > MAX_UPLOAD_BYTES:
-        flash(f'Arquivo muito grande. O limite é {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.', 'danger')
+    if file_size > max_bytes:
+        flash(f'Arquivo muito grande. O limite é {max_bytes // (1024 * 1024)} MB.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
     _ensure_upload_folder()
