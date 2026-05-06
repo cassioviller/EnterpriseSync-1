@@ -23,6 +23,7 @@ _Populate as you build_
 - **Shared Jinja macros:** `templates/_partials/macros.html`
 - **Manual do Usuário (conteúdo):** `manual/*.md` (sumário em `00_indice.md`, capítulos em `10_*.md` / `2x_*.md` / `3x_*.md`); imagens em `manual/imagens/`. Renderizado por `views/manual_views.py` em `/manual` (visualização) e `/manual/download` (HTML imprimível).
 - **Auditoria mobile + decisões de design (Task #19):** `manual/relatorios/auditoria_mobile.md`.
+- **Auditoria módulos de apoio (Task #18):** `manual/relatorios/auditoria_modulos_apoio.md`; capítulos preenchidos: `manual/20_dashboard.md`, `28_crm.md`, `29_metricas.md`, `30_catalogo.md`, `31_estoque.md`, `32_frota.md`, `33_alimentacao.md`, `34_portal_cliente.md`. Smoke: `scripts/smoke_test_modulos_apoio.py`.
 - **CSS mobile compartilhado:** `static/css/sige-mobile.css` (drawer + bottom nav + helpers `.sige-table-cards`, `.sige-mobile-hide`, `.sige-kpi-grid-mobile`).
 - **Página de preview de celular (dev):** `views/dev_views.py` em `/dev/mobile-preview` — iframe redimensionável (360 / 390 / 414 / 430 / 768 px) com atalhos para as telas críticas. Requer login.
 
