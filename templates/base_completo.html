@@ -919,24 +919,12 @@
                                 <i class="fas fa-utensils me-1"></i> Alimentação
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="alimentacaoDropdown">
-                                {% if is_v2_active() %}
                                 <li><a class="dropdown-item" href="{{ url_for('alimentacao.dashboard') }}">
                                     <i class="fas fa-chart-bar me-1"></i> Dashboard
                                 </a></li>
-                                {% else %}
-                                <li><a class="dropdown-item" href="/alimentacao">
-                                    <i class="fas fa-chart-bar me-1"></i> Dashboard
-                                </a></li>
-                                {% endif %}
-                                {% if is_v2_active() %}
                                 <li><a class="dropdown-item fw-semibold text-success" href="{{ url_for('alimentacao.lancamento_novo_v2') }}">
                                     <i class="fas fa-plus-circle me-1"></i> Novo Lançamento
                                 </a></li>
-                                {% else %}
-                                <li><a class="dropdown-item" href="{{ url_for('alimentacao.lancamento_novo') }}">
-                                    <i class="fas fa-plus me-1"></i> Novo Lançamento
-                                </a></li>
-                                {% endif %}
                                 <li><a class="dropdown-item" href="{{ url_for('alimentacao.lancamentos_lista') }}">
                                     <i class="fas fa-list me-1"></i> Lançamentos
                                 </a></li>
@@ -1240,8 +1228,11 @@
                 <a class="sige-mobile-drawer__link" href="{{ url_for('frota.lista') }}">
                     <i class="fas fa-car"></i> Veículos
                 </a>
-                <a class="sige-mobile-drawer__link" href="/alimentacao">
+                <a class="sige-mobile-drawer__link" href="{{ url_for('alimentacao.index') }}">
                     <i class="fas fa-utensils"></i> Alimentação
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('alimentacao.lancamento_novo_v2') }}">
+                    <i class="fas fa-plus-circle"></i> Novo Lançamento
                 </a>
             </div>
 

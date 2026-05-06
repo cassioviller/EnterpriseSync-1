@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 alimentacao_bp = Blueprint('alimentacao', __name__, url_prefix='/alimentacao')
 
+MAX_QTD_POR_ITEM = 200
+
 # ===== HELPER FUNCTION =====
 def get_admin_id():
     """Retorna admin_id do usuário atual"""
@@ -291,6 +293,30 @@ def lancamento_novo_v2():
     admin_id = get_admin_id()
     v2 = is_v2_active()
 
+    def _render_form(status=200):
+        """Carrega contexto do formulário e renderiza o template V2."""
+        _restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
+        _obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+        _funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        _itens = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
+        _centros = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).order_by(CentroCusto.nome).all()
+        _itens_json = [{'id': i.id, 'nome': i.nome, 'preco_padrao': float(i.preco_padrao),
+                        'icone': i.icone or 'fas fa-utensils', 'is_default': i.is_default}
+                       for i in _itens]
+        _centros_json = [{'id': c.id, 'nome': c.nome, 'codigo': c.codigo, 'obra_id': c.obra_id}
+                         for c in _centros]
+        _func_json = [{'id': f.id, 'nome': f.nome,
+                       'funcao': f.funcao_ref.nome if f.funcao_ref else ''}
+                      for f in _funcionarios]
+        _rest_sel = request.args.get('restaurante_id', type=int)
+        resp = render_template('alimentacao/lancamento_novo_v2.html',
+                               restaurantes=_restaurantes, obras=_obras,
+                               funcionarios=_funcionarios, itens_cadastrados=_itens,
+                               itens_json=_itens_json, centros_custo=_centros,
+                               centros_custo_json=_centros_json, funcionarios_json=_func_json,
+                               restaurante_id_selecionado=_rest_sel, v2=v2)
+        return resp, status
+
     if request.method == 'POST':
         try:
             logger.info(f"[ALIMENTACAO] Processando novo lancamento para admin_id={admin_id} v2={v2}")
@@ -350,9 +376,14 @@ def lancamento_novo_v2():
                     # V2: quantidade, funcionário e centro de custo por linha
                     qtd_raw = request.form.get(f'itens[{idx}][quantidade]', '1')
                     try:
-                        item_entry['quantidade'] = max(1, int(qtd_raw))
+                        qtd_int = int(qtd_raw)
                     except (ValueError, TypeError):
-                        item_entry['quantidade'] = 1
+                        flash(f'Quantidade inválida no item {idx + 1}: informe um número inteiro entre 1 e {MAX_QTD_POR_ITEM}.', 'error')
+                        return _render_form(status=422)
+                    if qtd_int < 1 or qtd_int > MAX_QTD_POR_ITEM:
+                        flash(f'Quantidade {qtd_int} fora do limite no item {idx + 1}: deve ser entre 1 e {MAX_QTD_POR_ITEM}.', 'error')
+                        return _render_form(status=422)
+                    item_entry['quantidade'] = qtd_int
 
                     func_id_raw = request.form.get(f'itens[{idx}][funcionario_id]')
                     if func_id_raw and func_id_raw != '0':
@@ -546,66 +577,8 @@ def lancamento_novo_v2():
             logger.error(traceback.format_exc())
             flash(f'Erro ao criar lançamento: {str(e)}', 'error')
 
-    # --- GET: carregar dados ---
-    restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
-    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
-    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-    itens_cadastrados = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
-    centros_custo = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).order_by(CentroCusto.nome).all()
-
-    # Criar item padrão "Marmita" se nenhum item existir
-    if not itens_cadastrados:
-        try:
-            item_marmita = AlimentacaoItem(
-                nome='Marmita',
-                preco_padrao=Decimal('18.00'),
-                descricao='Marmita padrão',
-                icone='fas fa-drumstick-bite',
-                is_default=True,
-                ordem=0,
-                admin_id=admin_id
-            )
-            db.session.add(item_marmita)
-            db.session.commit()
-            itens_cadastrados = [item_marmita]
-            logger.info(f"[OK] Item padrao Marmita criado para admin_id={admin_id}")
-        except Exception as e:
-            logger.error(f"Erro ao criar item padrao: {e}")
-            db.session.rollback()
-
-    itens_json = [{
-        'id': item.id,
-        'nome': item.nome,
-        'preco_padrao': float(item.preco_padrao),
-        'icone': item.icone or 'fas fa-utensils',
-        'is_default': item.is_default
-    } for item in itens_cadastrados]
-
-    centros_custo_json = [{
-        'id': cc.id,
-        'nome': cc.nome,
-        'codigo': cc.codigo,
-        'obra_id': cc.obra_id
-    } for cc in centros_custo]
-
-    funcionarios_json = [{
-        'id': f.id,
-        'nome': f.nome,
-        'funcao': f.funcao_ref.nome if f.funcao_ref else ''
-    } for f in funcionarios]
-
-    restaurante_id_selecionado = request.args.get('restaurante_id', type=int)
-
-    return render_template('alimentacao/lancamento_novo_v2.html',
-                         restaurantes=restaurantes,
-                         obras=obras,
-                         funcionarios=funcionarios,
-                         itens_cadastrados=itens_cadastrados,
-                         itens_json=itens_json,
-                         centros_custo=centros_custo,
-                         centros_custo_json=centros_custo_json,
-                         funcionarios_json=funcionarios_json,
-                         restaurante_id_selecionado=restaurante_id_selecionado)
+    # --- GET: renderizar formulário ---
+    return _render_form()
 
 
 # ===== API PARA ITENS CADASTRADOS =====
@@ -694,9 +667,8 @@ def item_editar(item_id):
 def dashboard():
     """Dashboard de Alimentação com KPIs e gráficos"""
     try:
-        from datetime import date
-        from dateutil.relativedelta import relativedelta
-        
+        from datetime import date, timedelta
+
         logger.info("📊 [ALIMENTACAO_DASHBOARD] Iniciando dashboard...")
         admin_id = get_admin_id()
         
@@ -771,8 +743,8 @@ def dashboard():
         # KPI 4: Custos do Mês Atual (com comparação)
         hoje = date.today()
         inicio_mes_atual = date(hoje.year, hoje.month, 1)
-        inicio_mes_anterior = (inicio_mes_atual - relativedelta(months=1))
-        fim_mes_anterior = inicio_mes_atual - relativedelta(days=1)
+        fim_mes_anterior = inicio_mes_atual - timedelta(days=1)
+        inicio_mes_anterior = date(fim_mes_anterior.year, fim_mes_anterior.month, 1)
         
         # 🔄 HÍBRIDO: Custos do mês atual (ambas as tabelas)
         custos_mes_atual_antigo = db.session.query(
@@ -850,17 +822,17 @@ def dashboard():
         top_func_antigo = top_func_antigo.group_by(Funcionario.id, Funcionario.nome).all()
         
         # Contar de modelo NOVO (many-to-many via association table)
-        from models import alimentacao_lancamento_funcionarios
+        from models import alimentacao_funcionarios_assoc
         top_func_novo = db.session.query(
             Funcionario.id,
             Funcionario.nome,
-            func.count(alimentacao_lancamento_funcionarios.c.lancamento_id).label('total')
+            func.count(alimentacao_funcionarios_assoc.c.lancamento_id).label('total')
         ).join(
-            alimentacao_lancamento_funcionarios,
-            Funcionario.id == alimentacao_lancamento_funcionarios.c.funcionario_id
+            alimentacao_funcionarios_assoc,
+            Funcionario.id == alimentacao_funcionarios_assoc.c.funcionario_id
         ).join(
             AlimentacaoLancamento,
-            AlimentacaoLancamento.id == alimentacao_lancamento_funcionarios.c.lancamento_id
+            AlimentacaoLancamento.id == alimentacao_funcionarios_assoc.c.lancamento_id
         ).filter(
             AlimentacaoLancamento.admin_id == admin_id,
             Funcionario.admin_id == admin_id

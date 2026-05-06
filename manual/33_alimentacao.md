@@ -13,13 +13,11 @@ O módulo **Alimentação** (`/alimentacao/`) centraliza **lançamentos de refei
 
 - **Menu superior → "Alimentação"** (dropdown):
   - `/alimentacao/dashboard` — Dashboard (KPIs e gráficos).
-  - `/alimentacao` — Tela inicial.
-  - `/alimentacao/lancamentos/novo-v2` — Novo lançamento (V2, recomendado).
-  - `/alimentacao/lancamentos/novo` — Novo lançamento (V1, legado).
+  - `/alimentacao/lancamentos/novo-v2` — **Novo Lançamento** (único item canônico no menu).
   - `/alimentacao/lancamentos` — Lista de lançamentos.
   - `/alimentacao/restaurantes` — CRUD de restaurantes.
-  - `/alimentacao/itens` — CRUD de itens.
-- Drawer mobile: **"Alimentação"** leva direto a `/alimentacao`.
+- **V1 legado** acessível pela URL direta `/alimentacao/lancamentos/novo` (exibe banner de aviso), mas não aparece no menu.
+- **Drawer mobile:** "Alimentação" (índice) + "Novo Lançamento" → V2.
 
 ## Fluxos principais
 
