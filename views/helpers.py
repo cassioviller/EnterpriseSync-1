@@ -312,6 +312,71 @@ def _calcular_custos_obra_acumulado(admin_id, obras_ids=None):
         return []
 
 
+def _calcular_serie_temporal_custos(admin_id, obras_ids=None):
+    """Custo mensal por obra para gráfico de linha de acumulado ao longo do tempo.
+
+    Agrega os custos mês a mês (sem recorte de período do dashboard).
+    Fontes:
+    - gestao_custo_filho (por data_referencia) filtrado por status do pai
+    - conta_pagar V1 por obra_id (por data_vencimento)
+
+    obras_ids: lista opcional de IDs; None = todas as obras.
+    Retorna lista de dicts ordenada por obra e mês:
+      {obra_id, nome, ano_mes (YYYY-MM), custo_mensal}
+    """
+    try:
+        obras_filter = ""
+        if obras_ids:
+            ids_sql = ",".join(str(int(i)) for i in obras_ids if str(i).isdigit())
+            if ids_sql:
+                obras_filter = f"AND o.id IN ({ids_sql})"
+
+        rows = db.session.execute(text(f"""
+            SELECT
+                o.id                                                    AS obra_id,
+                o.nome                                                  AS obra_nome,
+                TO_CHAR(DATE_TRUNC('month', s.data_mes), 'YYYY-MM')    AS ano_mes,
+                SUM(s.custo)                                            AS custo_mensal
+            FROM obra o
+            JOIN (
+                SELECT gcf.obra_id, gcf.admin_id,
+                       DATE_TRUNC('month', gcf.data_referencia) AS data_mes,
+                       gcf.valor AS custo
+                FROM gestao_custo_filho gcf
+                JOIN gestao_custo_pai gcp ON gcp.id = gcf.pai_id
+                WHERE gcf.admin_id = :admin_id
+                  AND gcp.status IN ('PENDENTE','SOLICITADO','AUTORIZADO','PAGO','PARCIAL')
+                  AND gcf.data_referencia IS NOT NULL
+                UNION ALL
+                SELECT cp.obra_id, cp.admin_id,
+                       DATE_TRUNC('month', cp.data_vencimento) AS data_mes,
+                       cp.valor_original AS custo
+                FROM conta_pagar cp
+                WHERE cp.admin_id = :admin_id
+                  AND cp.obra_id IS NOT NULL
+                  AND cp.data_vencimento IS NOT NULL
+            ) s ON s.obra_id = o.id AND s.admin_id = :admin_id
+            WHERE o.admin_id = :admin_id
+              {obras_filter}
+            GROUP BY o.id, o.nome, DATE_TRUNC('month', s.data_mes)
+            ORDER BY o.nome, ano_mes
+        """), {'admin_id': admin_id}).fetchall()
+
+        result = []
+        for row in rows:
+            result.append({
+                'obra_id':     row[0],
+                'nome':        row[1],
+                'ano_mes':     row[2],
+                'custo_mensal': round(float(row[3] or 0), 2),
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Erro série temporal custos: {e}")
+        db.session.rollback()
+        return []
+
+
 def get_admin_id_robusta(obra=None, current_user=None):
     """Sistema robusto de detecção de admin_id - PRIORIDADE TOTAL AO USUÁRIO LOGADO"""
     try:

@@ -5,7 +5,7 @@ from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, get_admin_id_robusta, get_admin_id_dinamico
+from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, _calcular_serie_temporal_custos, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
 import calendar
 from sqlalchemy import func, desc, or_, and_, text, inspect
@@ -903,7 +903,15 @@ def dashboard():
                     'estouro': _acum > _orc,
                 })
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
-        
+
+        # 5c. Série temporal de custos por obra (para gráfico de linha de acumulado)
+        serie_temporal_custos = safe_db_operation(
+            lambda: _calcular_serie_temporal_custos(admin_id, _oids),
+            []
+        )
+        if not isinstance(serie_temporal_custos, list):
+            serie_temporal_custos = []
+
         # Dados calculados reais
         # 🔒 admin_id já garantido pelas validações acima — nunca usar fallback fixo.
         
@@ -1108,7 +1116,8 @@ def dashboard():
                          acessos_unicos=acessos_unicos,
                          tempo_medio_portal=tempo_medio_portal,
                          feedbacks_positivos=feedbacks_positivos,
-                         downloads_pdf=downloads_pdf)
+                         downloads_pdf=downloads_pdf,
+                         serie_temporal_custos=serie_temporal_custos)
 
 # ===== USUÁRIOS DO SISTEMA =====
 
