@@ -9,23 +9,32 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h2><i class="fas fa-file-invoice-dollar me-2"></i>Contas a Pagar</h2>
+                {% if is_v2 %}
+                <a href="{{ url_for('gestao_custos.novo') }}" class="btn btn-success">
+                    <i class="fas fa-plus me-2"></i>Nova Despesa (Contas a Pagar)
+                </a>
+                {% else %}
                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNovaConta">
                     <i class="fas fa-plus me-2"></i>Nova Conta a Pagar
                 </button>
+                {% endif %}
             </div>
         </div>
     </div>
 
     {% if is_v2 %}
-    <!-- Banner V2: orientar para Gestão de Custos -->
+    <!-- Banner V2: orientar para Contas a Pagar V2 -->
     <div class="alert alert-warning d-flex align-items-start gap-3 mb-3" role="alert">
       <i class="fas fa-lightbulb fa-lg mt-1 text-warning flex-shrink-0"></i>
       <div>
         <strong>Versão V2 ativa</strong> — Para despesas operacionais (aluguel, energia, IPTU, honorários, etc.)
-        utilize a <strong>Gestão de Custos</strong> para que passem pelo fluxo de aprovação antes do pagamento.
+        utilize <strong>Contas a Pagar</strong> para que passem pelo fluxo de aprovação antes do pagamento.
         <br>
-        <a href="{{ url_for('gestao_custos.novo') }}?tipo=DESPESA_GERAL" class="btn btn-sm btn-warning mt-2">
-          <i class="fas fa-coins me-1"></i> Lançar Despesa Geral via Gestão de Custos
+        <a href="{{ url_for('gestao_custos.novo') }}" class="btn btn-sm btn-warning mt-2">
+          <i class="fas fa-coins me-1"></i> Nova Despesa via Contas a Pagar
+        </a>
+        <a href="#modalNovaConta" data-bs-toggle="modal" class="btn btn-sm btn-link mt-2 text-muted small">
+          Lançamento direto (legado)
         </a>
       </div>
     </div>
@@ -37,7 +46,7 @@
             <form method="get" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
-                    <select name="status" class="form-select" onchange="this.form.submit()">
+                    <select name="status" class="form-select">
                         <option value="">Todos</option>
                         <option value="PENDENTE" {% if request.args.get('status') == 'PENDENTE' %}selected{% endif %}>Pendente</option>
                         <option value="PARCIAL" {% if request.args.get('status') == 'PARCIAL' %}selected{% endif %}>Pago Parcial</option>
@@ -47,7 +56,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Obra</label>
-                    <select name="obra_id" class="form-select" onchange="this.form.submit()">
+                    <select name="obra_id" class="form-select">
                         <option value="">Todas as obras</option>
                         {% for obra in obras %}
                         <option value="{{ obra.id }}" {% if request.args.get('obra_id') == obra.id|string %}selected{% endif %}>
@@ -56,9 +65,12 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
                     <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-secondary">
-                        <i class="fas fa-times me-2"></i>Limpar Filtros
+                        <i class="fas fa-times me-1"></i>Limpar
                     </a>
                 </div>
             </form>
@@ -165,7 +177,7 @@
                             <td><small class="text-muted">{{ custo.data_criacao.strftime('%d/%m/%Y') }}</small></td>
                             <td>
                                 {{ custo.entidade_nome }}
-                                <span class="badge bg-primary ms-1" style="font-size:.6rem">Gestão V2</span>
+                                <span class="badge bg-primary ms-1" style="font-size:.6rem">Contas a Pagar V2</span>
                             </td>
                             <td>{{ custo.tipo_categoria }}</td>
                             <td><span class="text-muted">-</span></td>
