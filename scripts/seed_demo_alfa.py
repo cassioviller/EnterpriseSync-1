@@ -621,6 +621,32 @@ def _seed():
         insumos_obj[nome] = ins
 
     # 6) Catálogo de subatividades + 2 templates de cronograma -------------
+    #
+    # Task #11 — METAS DE PRODUTIVIDADE CALIBRADAS
+    # ─────────────────────────────────────────────
+    # A meta_produtividade é interpretada pelo handler como
+    #   indice = (qty_produzida ÷ Σ horas_equipe) ÷ meta
+    # ou seja, é uma produtividade por *homem-hora* (cada hora-pessoa
+    # registrada em RDOMaoObra conta no denominador). Isso muda
+    # bastante o número que faz sentido cadastrar — uma "meta de equipe"
+    # acaba dividida pelo nº de pessoas alocadas.
+    #
+    # Os valores abaixo foram calibrados de propósito para que o
+    # dashboard `/cronograma/produtividade` da obra Residencial Bela Vista
+    # mostre uma mistura realista de cores (verde / amarelo / vermelho),
+    # contando uma história de "obra com pontos fortes e atenção".
+    # Bela Vista usa 3 RDOs × 4 funcionários × 8h = 96 hh por
+    # subatividade, com qty_total vinda do template de cronograma.
+    # Faixas-alvo por sub (BV):
+    #   Marcação        → 0,833 ÷ 0,7 = 1,19× (verde)
+    #   Elevação        → 2,604 ÷ 2,0 = 1,30× (verde)
+    #   Chapisco        → 2,604 ÷ 3,0 = 0,87× (amarelo)
+    #   Prep contrapiso → 2,604 ÷ 3,5 = 0,74× (vermelho — investigar)
+    #   Lançamento      → 2,604 ÷ 2,7 = 0,96× (amarelo)
+    # Massa e Tinta (só Pin): calibrados contra a taxa do Pinheiros
+    # (~0,785 m²/hh) para amarelo/verde respectivamente.
+    # Referência: TCPO/PINI — faixas típicas de produtividade por
+    # homem-hora em obras residenciais populares (com pedreiro+servente).
     def _sub(nome, horas, unidade, meta, complex_=2):
         sm = SubatividadeMestre(
             tipo="subatividade", nome=nome, descricao=nome,
@@ -630,15 +656,15 @@ def _seed():
         )
         db.session.add(sm); return sm
 
-    sub_marcacao   = _sub("Marcação de paredes",      8.0, "m linear", 5.0)
-    sub_elevacao   = _sub("Elevação de alvenaria",   32.0, "m²",       1.5)
+    sub_marcacao   = _sub("Marcação de paredes",      8.0, "m linear", 0.7)
+    sub_elevacao   = _sub("Elevação de alvenaria",   32.0, "m²",       2.0)
     sub_chapisco   = _sub("Chapisco",                12.0, "m²",       3.0)
-    sub_prep_piso  = _sub("Preparação do contrapiso", 8.0, "m²",       4.0)
-    sub_lancamento = _sub("Lançamento e desempeno",  20.0, "m²",       2.5)
+    sub_prep_piso  = _sub("Preparação do contrapiso", 8.0, "m²",       3.5)
+    sub_lancamento = _sub("Lançamento e desempeno",  20.0, "m²",       2.7)
     # Subatividades do 3º serviço (Pintura) — Task #20.
-    sub_massa      = _sub("Massa corrida + lixamento", 16.0, "m²",     2.0)
+    sub_massa      = _sub("Massa corrida + lixamento", 16.0, "m²",     1.0)
     sub_pintura    = _sub("Aplicação de tinta acrílica (2 demãos)",
-                          24.0, "m²",                                 1.5)
+                          24.0, "m²",                                 0.7)
     db.session.flush()
 
     # Template Alvenaria
