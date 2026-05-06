@@ -664,10 +664,31 @@
     <!-- Task #191 — Theme refresh CSS (carregado por último para vencer especificidade) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/sige-theme.css') }}?v=task191">
 
+    <!-- Task #19 — Camada mobile compartilhada (drawer + bottom nav + helpers) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sige-mobile.css') }}?v=task19">
+
     {% block head %}{% endblock %}
     {% block styles %}{% endblock %}
 </head>
-<body>
+<body class="has-mobile-shell">
+
+    <!-- ============== Task #19 — SHELL MOBILE (header fixo) ============== -->
+    {% if current_user.is_authenticated %}
+    <header class="sige-mobile-shell" role="banner">
+        <button type="button" class="sige-mobile-shell__btn"
+                aria-label="Abrir menu" onclick="window.SigeMobileDrawer.open()">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a class="sige-mobile-shell__brand" href="{{ url_for('main.dashboard') }}">
+            <i class="fas fa-building"></i> SIGE
+        </a>
+        <a class="sige-mobile-shell__btn" aria-label="Sair"
+           href="{{ url_for('main.logout') }}">
+            <i class="fas fa-right-from-bracket"></i>
+        </a>
+    </header>
+    {% endif %}
+
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg fixed-top">
         <div class="container-fluid">
@@ -1125,6 +1146,228 @@
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     
     {% block scripts %}{% endblock %}
+
+    <!-- ============== Task #19 — DRAWER MOBILE + BOTTOM NAV ============== -->
+    {% if current_user.is_authenticated %}
+    {% set is_funcionario = current_user.tipo_usuario.name == 'FUNCIONARIO' %}
+    {% set _path = request.path %}
+    <div class="sige-mobile-drawer-backdrop" onclick="window.SigeMobileDrawer.close()"></div>
+    <aside class="sige-mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu principal" tabindex="-1">
+        <div class="sige-mobile-drawer__header">
+            <h2 class="sige-mobile-drawer__title">
+                <i class="fas fa-building me-2"></i> SIGE
+            </h2>
+            <button type="button" class="sige-mobile-drawer__close"
+                    aria-label="Fechar" onclick="window.SigeMobileDrawer.close()">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+        <div class="sige-mobile-drawer__body">
+
+            {% if is_funcionario %}
+            <div class="sige-mobile-drawer__group">
+                <a class="sige-mobile-drawer__link {% if '/rdo' in _path %}active{% endif %}"
+                   href="{{ url_for('main.funcionario_rdo_consolidado') }}">
+                    <i class="fas fa-clipboard-list"></i> RDOs
+                </a>
+                <a class="sige-mobile-drawer__link {% if '/frota' in _path %}active{% endif %}"
+                   href="{{ url_for('frota.lista') }}">
+                    <i class="fas fa-car"></i> Veículos
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('manual.index') }}">
+                    <i class="fas fa-book"></i> Manual do Usuário
+                </a>
+            </div>
+            {% else %}
+            <div class="sige-mobile-drawer__group">
+                <div class="sige-mobile-drawer__group-title">Operação</div>
+                <a class="sige-mobile-drawer__link {% if _path == '/dashboard' %}active{% endif %}"
+                   href="{{ url_for('main.dashboard') }}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a class="sige-mobile-drawer__link {% if '/obras' in _path and '/cronograma' not in _path %}active{% endif %}"
+                   href="{{ url_for('main.obras') }}">
+                    <i class="fas fa-hammer"></i> Obras
+                </a>
+                <a class="sige-mobile-drawer__link {% if '/rdo' in _path %}active{% endif %}"
+                   href="/funcionario/rdo/consolidado">
+                    <i class="fas fa-clipboard-list"></i> RDOs
+                </a>
+                <a class="sige-mobile-drawer__link {% if '/cronograma' in _path %}active{% endif %}"
+                   href="{{ url_for('cronograma.index') }}">
+                    <i class="fas fa-project-diagram"></i> Cronograma
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('main.funcionarios') }}">
+                    <i class="fas fa-users"></i> Funcionários
+                </a>
+                <a class="sige-mobile-drawer__link" href="/equipe">
+                    <i class="fas fa-user-friends"></i> Equipe
+                </a>
+                <a class="sige-mobile-drawer__link" href="/ponto">
+                    <i class="fas fa-clock"></i> Ponto
+                </a>
+            </div>
+
+            <div class="sige-mobile-drawer__group">
+                <div class="sige-mobile-drawer__group-title">Comercial &amp; Financeiro</div>
+                <a class="sige-mobile-drawer__link" href="/propostas/dashboard">
+                    <i class="fas fa-briefcase"></i> Propostas
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('financeiro.dashboard') }}">
+                    <i class="fas fa-dollar-sign"></i> Financeiro
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('financeiro.fluxo_caixa') }}">
+                    <i class="fas fa-water"></i> Fluxo de Caixa
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('gestao_custos.index') }}">
+                    <i class="fas fa-file-invoice-dollar"></i> Contas a Pagar
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('financeiro.listar_contas_receber') }}">
+                    <i class="fas fa-hand-holding-usd"></i> Contas a Receber
+                </a>
+            </div>
+
+            <div class="sige-mobile-drawer__group">
+                <div class="sige-mobile-drawer__group-title">Logística</div>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('almoxarifado.dashboard') }}">
+                    <i class="fas fa-boxes"></i> Almoxarifado
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('frota.lista') }}">
+                    <i class="fas fa-car"></i> Veículos
+                </a>
+                <a class="sige-mobile-drawer__link" href="/alimentacao">
+                    <i class="fas fa-utensils"></i> Alimentação
+                </a>
+            </div>
+
+            <div class="sige-mobile-drawer__group">
+                <div class="sige-mobile-drawer__group-title">CRM &amp; Cadastros</div>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('crm.kanban') }}">
+                    <i class="fas fa-funnel-dollar"></i> CRM de Leads
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('clientes.listar') }}">
+                    <i class="fas fa-user-tie"></i> Clientes
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('almoxarifado.fornecedores') }}">
+                    <i class="fas fa-truck"></i> Fornecedores
+                </a>
+            </div>
+
+            <div class="sige-mobile-drawer__group">
+                <div class="sige-mobile-drawer__group-title">Conta</div>
+                <a class="sige-mobile-drawer__link" href="/configuracoes">
+                    <i class="fas fa-cog"></i> Configurações
+                </a>
+                <a class="sige-mobile-drawer__link" href="/relatorios">
+                    <i class="fas fa-chart-bar"></i> Relatórios
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('manual.index') }}">
+                    <i class="fas fa-book"></i> Manual do Usuário
+                </a>
+                <a class="sige-mobile-drawer__link text-danger" href="{{ url_for('main.logout') }}">
+                    <i class="fas fa-right-from-bracket"></i> Sair
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </aside>
+
+    <!-- Bottom navigation -->
+    <nav class="sige-mobile-bottomnav" role="navigation" aria-label="Atalhos rápidos">
+        {% if is_funcionario %}
+        <a class="sige-mobile-bottomnav__item {% if '/rdo' in _path %}active{% endif %}"
+           href="{{ url_for('main.funcionario_rdo_consolidado') }}">
+            <i class="fas fa-clipboard-list"></i><span>RDOs</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item {% if '/frota' in _path %}active{% endif %}"
+           href="{{ url_for('frota.lista') }}">
+            <i class="fas fa-car"></i><span>Veículos</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item" href="#" onclick="window.SigeMobileDrawer.open(); return false;">
+            <i class="fas fa-bars"></i><span>Mais</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item" href="{{ url_for('main.logout') }}">
+            <i class="fas fa-right-from-bracket"></i><span>Sair</span>
+        </a>
+        {% else %}
+        <a class="sige-mobile-bottomnav__item {% if _path == '/dashboard' %}active{% endif %}"
+           href="{{ url_for('main.dashboard') }}">
+            <i class="fas fa-tachometer-alt"></i><span>Início</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item {% if '/obras' in _path and '/cronograma' not in _path %}active{% endif %}"
+           href="{{ url_for('main.obras') }}">
+            <i class="fas fa-hammer"></i><span>Obras</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item {% if '/rdo' in _path %}active{% endif %}"
+           href="/funcionario/rdo/consolidado">
+            <i class="fas fa-clipboard-list"></i><span>RDOs</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item {% if '/financeiro' in _path %}active{% endif %}"
+           href="{{ url_for('financeiro.dashboard') }}">
+            <i class="fas fa-dollar-sign"></i><span>Financeiro</span>
+        </a>
+        <a class="sige-mobile-bottomnav__item" href="#" onclick="window.SigeMobileDrawer.open(); return false;">
+            <i class="fas fa-bars"></i><span>Mais</span>
+        </a>
+        {% endif %}
+    </nav>
+
+    <script>
+    (function(){
+        var drawer = document.querySelector('.sige-mobile-drawer');
+        var lastFocus = null;
+
+        function focusables(){
+            if (!drawer) return [];
+            return Array.prototype.slice.call(
+                drawer.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+            ).filter(function(el){ return el.offsetParent !== null; });
+        }
+
+        window.SigeMobileDrawer = {
+            open: function(){
+                lastFocus = document.activeElement;
+                document.body.classList.add('sige-mobile-drawer-open');
+                if (drawer) {
+                    drawer.setAttribute('aria-hidden', 'false');
+                    setTimeout(function(){
+                        var f = focusables();
+                        (f[0] || drawer).focus();
+                    }, 50);
+                }
+            },
+            close: function(){
+                document.body.classList.remove('sige-mobile-drawer-open');
+                if (drawer) drawer.setAttribute('aria-hidden', 'true');
+                if (lastFocus && typeof lastFocus.focus === 'function') {
+                    try { lastFocus.focus(); } catch(_) {}
+                }
+            }
+        };
+
+        if (drawer) drawer.setAttribute('aria-hidden', 'true');
+
+        document.addEventListener('keydown', function(e){
+            if (!document.body.classList.contains('sige-mobile-drawer-open')) return;
+            if (e.key === 'Escape') {
+                window.SigeMobileDrawer.close();
+                return;
+            }
+            // Focus trap
+            if (e.key === 'Tab') {
+                var f = focusables();
+                if (!f.length) return;
+                var first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault(); last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault(); first.focus();
+                }
+            }
+        });
+    })();
+    </script>
+    {% endif %}
     
     <script>
         // Inicialização global do sistema

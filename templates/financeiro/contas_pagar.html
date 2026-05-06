@@ -105,7 +105,7 @@
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover sige-table-cards">
                     <thead>
                         <tr>
                             <th>Vencimento</th>
@@ -122,20 +122,20 @@
                     <tbody>
                         {% for conta in contas %}
                         <tr class="{% if conta.status == 'VENCIDO' %}table-danger{% endif %}">
-                            <td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ conta.fornecedor.razao_social if conta.fornecedor else '-' }}</td>
-                            <td>{{ conta.descricao }}</td>
-                            <td>
+                            <td data-label="Vencimento">{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                            <td data-label="Fornecedor">{{ conta.fornecedor.razao_social if conta.fornecedor else '-' }}</td>
+                            <td data-label="Descrição">{{ conta.descricao }}</td>
+                            <td data-label="Obra">
                                 {% if conta.obra %}
                                 <span class="badge bg-secondary">{{ conta.obra.nome }}</span>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>{{ conta.valor_original|brl }}</td>
-                            <td>{{ conta.valor_pago|brl }}</td>
-                            <td>{{ conta.saldo|brl }}</td>
-                            <td>
+                            <td data-label="Valor Original">{{ conta.valor_original|brl }}</td>
+                            <td data-label="Valor Pago">{{ conta.valor_pago|brl }}</td>
+                            <td data-label="Saldo">{{ conta.saldo|brl }}</td>
+                            <td data-label="Status">
                                 {% if conta.status == 'PENDENTE' %}
                                 <span class="badge bg-warning">Pendente</span>
                                 {% elif conta.status == 'PARCIAL' %}
@@ -146,7 +146,7 @@
                                 <span class="badge bg-danger">Vencido</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td data-label="Ações">
                                 {% if conta.status != 'PAGO' %}
                                 <button class="btn btn-sm btn-primary" 
                                         onclick="abrirModalBaixa({{ conta.id }}, '{{ conta.descricao }}', {{ conta.saldo }})">

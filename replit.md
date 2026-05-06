@@ -22,6 +22,9 @@ _Populate as you build_
 - **Theme/Styling:** `static/css/styles.css` (with `.sige-*` namespace for shared partials)
 - **Shared Jinja macros:** `templates/_partials/macros.html`
 - **Manual do Usuário (conteúdo):** `manual/*.md` (sumário em `00_indice.md`, capítulos em `10_*.md` / `2x_*.md` / `3x_*.md`); imagens em `manual/imagens/`. Renderizado por `views/manual_views.py` em `/manual` (visualização) e `/manual/download` (HTML imprimível).
+- **Auditoria mobile + decisões de design (Task #19):** `manual/relatorios/auditoria_mobile.md`.
+- **CSS mobile compartilhado:** `static/css/sige-mobile.css` (drawer + bottom nav + helpers `.sige-table-cards`, `.sige-mobile-hide`, `.sige-kpi-grid-mobile`).
+- **Página de preview de celular (dev):** `views/dev_views.py` em `/dev/mobile-preview` — iframe redimensionável (360 / 390 / 414 / 430 / 768 px) com atalhos para as telas críticas. Requer login.
 
 ## Architecture decisions
 -   **Multi-tenancy and Security:** Implemented with data isolation, RBAC, CSRF, restricted CORS, rate limiting, and secure key handling.
@@ -29,6 +32,7 @@ _Populate as you build_
 -   **Atomic DB Transactions:** Utilizes `safe_db_operation` for atomic transactions and automated error diagnostics.
 -   **Operational Budget per Obra:** Each `Obra` maintains an editable, versioned copy of its `Orcamento` via `ObraOrcamentoOperacional`, cloning on the first RDO.
 -   **Unified UI Theme:** All new and migrated screens (CRM, Métricas) extend `base_completo.html` and use shared Jinja macros for consistent design.
+-   **Mobile shell (Task #19):** Em telas <= 991px, `base_completo.html` esconde a navbar desktop e exibe um shell mobile composto por header fixo, **drawer offcanvas** lateral (menu agrupado por seções) e **bottom nav** com 5 atalhos. CSS namespaceado em `static/css/sige-mobile.css` (`.sige-mobile-*`). Tabelas críticas marcadas com `.sige-table-cards` viram cards verticais via CSS, usando `data-label` em cada `<td>`. Cronograma esconde o Gantt no mobile (`.sige-mobile-hide`) e mostra um aviso "melhor em tela maior".
 
 ## Product
 -   **Commercial Management:** Proposal generation, automated calculations, client portal, service catalog, parametric budgeting.

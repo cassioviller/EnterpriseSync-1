@@ -379,6 +379,14 @@ try:
 except Exception as e:
     logging.error(f"[ERROR] Erro ao registrar blueprint Manual: {e}")
 
+# Task #19 — Ferramentas de desenvolvimento (mobile preview)
+try:
+    from views.dev_views import dev_bp
+    app.register_blueprint(dev_bp)
+    logging.info("[OK] Blueprint dev_tools (mobile preview) registrado")
+except Exception as e:
+    logging.error(f"[ERROR] Erro ao registrar blueprint dev_tools: {e}")
+
 ponto_import_error = None
 try:
     from ponto_views import ponto_bp

@@ -90,7 +90,7 @@
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover sige-table-cards">
                     <thead>
                         <tr>
                             <th>Vencimento</th>
@@ -107,20 +107,20 @@
                     <tbody>
                         {% for conta in contas %}
                         <tr class="{% if conta.status == 'VENCIDO' %}table-danger{% endif %}">
-                            <td>{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ conta.cliente_nome }}</td>
-                            <td>{{ conta.descricao }}</td>
-                            <td>
+                            <td data-label="Vencimento">{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
+                            <td data-label="Cliente">{{ conta.cliente_nome }}</td>
+                            <td data-label="Descrição">{{ conta.descricao }}</td>
+                            <td data-label="Obra">
                                 {% if conta.obra %}
                                 <span class="badge bg-secondary">{{ conta.obra.nome }}</span>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>{{ conta.valor_original|brl }}</td>
-                            <td>{{ conta.valor_recebido|brl }}</td>
-                            <td>{{ conta.saldo|brl }}</td>
-                            <td>
+                            <td data-label="Valor Original">{{ conta.valor_original|brl }}</td>
+                            <td data-label="Valor Recebido">{{ conta.valor_recebido|brl }}</td>
+                            <td data-label="Saldo">{{ conta.saldo|brl }}</td>
+                            <td data-label="Status">
                                 {% if conta.status == 'PENDENTE' %}
                                 <span class="badge bg-warning">Pendente</span>
                                 {% elif conta.status == 'PARCIAL' %}

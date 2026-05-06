@@ -1,0 +1,285 @@
+/* ============================================================================
+   SIGE v9.0 — Camada Mobile compartilhada (Task #19)
+   Tudo aqui usa o namespace .sige-mobile-* OU vive dentro de
+   @media (max-width: 991.98px) para não vazar para o desktop.
+   ========================================================================== */
+
+/* ---------- Tokens ---------- */
+:root {
+    --sige-mobile-header-h: 56px;
+    --sige-mobile-bottomnav-h: 64px;
+    --sige-mobile-drawer-w: 84vw;
+    --sige-mobile-drawer-max: 340px;
+    --sige-mobile-primary: #198754;
+    --sige-mobile-primary-soft: #d1e7dd;
+    --sige-mobile-text: #1f2937;
+    --sige-mobile-muted: #6b7280;
+    --sige-mobile-border: #e5e7eb;
+    --sige-mobile-bg: #f8f9fa;
+    --sige-mobile-bg-elev: #ffffff;
+    --sige-mobile-shadow: 0 -2px 12px rgba(0,0,0,.06);
+}
+
+/* ============================================================================
+   1. Visibilidade — defaults: shell mobile escondido, navbar desktop visível
+   ========================================================================== */
+.sige-mobile-shell,
+.sige-mobile-bottomnav,
+.sige-mobile-only {
+    display: none !important;
+}
+
+/* ============================================================================
+   2. Quebra mobile: <= 991.98px (lg do Bootstrap 5)
+   ========================================================================== */
+@media (max-width: 991.98px) {
+
+    /* --- 2.1 Esconde a navbar antiga e o seu offset de margin-top --- */
+    body.has-mobile-shell nav.navbar.fixed-top { display: none !important; }
+    body.has-mobile-shell main {
+        margin-top: var(--sige-mobile-header-h) !important;
+        padding-bottom: calc(var(--sige-mobile-bottomnav-h) + 12px) !important;
+    }
+
+    /* --- 2.2 Mostra o shell mobile --- */
+    .sige-mobile-shell,
+    .sige-mobile-bottomnav { display: flex !important; }
+    .sige-mobile-only { display: block !important; }
+    .sige-desktop-only { display: none !important; }
+
+    /* --- 2.3 Header mobile (topo fixo) --- */
+    .sige-mobile-shell {
+        position: fixed; top: 0; left: 0; right: 0;
+        height: var(--sige-mobile-header-h);
+        background: linear-gradient(135deg, #198754 0%, #157347 100%);
+        color: #fff;
+        z-index: 1040;
+        align-items: center;
+        padding: 0 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.12);
+        gap: 8px;
+    }
+    .sige-mobile-shell__brand {
+        font-weight: 700; color: #fff !important;
+        text-decoration: none; font-size: 1.05rem;
+        display: inline-flex; align-items: center; gap: 8px;
+        flex: 1; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sige-mobile-shell__btn {
+        background: transparent; border: none; color: #fff;
+        width: 44px; height: 44px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 10px;
+        font-size: 1.15rem;
+    }
+    .sige-mobile-shell__btn:active { background: rgba(255,255,255,.15); }
+
+    /* --- 2.4 Bottom nav fixo --- */
+    .sige-mobile-bottomnav {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: var(--sige-mobile-bottomnav-h);
+        background: var(--sige-mobile-bg-elev);
+        border-top: 1px solid var(--sige-mobile-border);
+        box-shadow: var(--sige-mobile-shadow);
+        z-index: 1039;
+        justify-content: space-around;
+        padding: 4px 6px env(safe-area-inset-bottom, 4px);
+    }
+    .sige-mobile-bottomnav__item {
+        flex: 1 1 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 2px;
+        text-decoration: none;
+        color: var(--sige-mobile-muted);
+        font-size: .68rem; font-weight: 600;
+        padding: 4px 2px;
+        border-radius: 10px;
+        min-height: 56px;
+    }
+    .sige-mobile-bottomnav__item i { font-size: 1.15rem; }
+    .sige-mobile-bottomnav__item.active {
+        color: var(--sige-mobile-primary);
+        background: var(--sige-mobile-primary-soft);
+    }
+    .sige-mobile-bottomnav__item:active { background: #f1f5f9; }
+
+    /* --- 2.5 Drawer (offcanvas custom) — fica no body --- */
+    /* z-index abaixo de modal Bootstrap (1055) — modais sempre dominam */
+    .sige-mobile-drawer-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(15,23,42,.55);
+        z-index: 1045; opacity: 0; pointer-events: none;
+        transition: opacity .2s ease;
+    }
+    .sige-mobile-drawer {
+        position: fixed; top: 0; bottom: 0; left: 0;
+        width: var(--sige-mobile-drawer-w); max-width: var(--sige-mobile-drawer-max);
+        background: #fff; color: var(--sige-mobile-text);
+        z-index: 1046;
+        transform: translateX(-105%);
+        transition: transform .25s ease;
+        display: flex; flex-direction: column;
+        box-shadow: 4px 0 20px rgba(0,0,0,.18);
+    }
+    body.sige-mobile-drawer-open .sige-mobile-drawer { transform: translateX(0); }
+    body.sige-mobile-drawer-open .sige-mobile-drawer-backdrop {
+        opacity: 1; pointer-events: auto;
+    }
+    .sige-mobile-drawer__header {
+        padding: 16px;
+        background: linear-gradient(135deg, #198754 0%, #157347 100%);
+        color: #fff;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .sige-mobile-drawer__title { font-weight: 700; font-size: 1.05rem; margin: 0; }
+    .sige-mobile-drawer__close {
+        background: transparent; border: none; color: #fff;
+        width: 36px; height: 36px; border-radius: 8px;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .sige-mobile-drawer__body {
+        flex: 1; overflow-y: auto;
+        padding: 8px 0;
+    }
+    .sige-mobile-drawer__group {
+        padding: 4px 0;
+        border-bottom: 1px solid var(--sige-mobile-border);
+    }
+    .sige-mobile-drawer__group-title {
+        font-size: .7rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .5px;
+        color: var(--sige-mobile-muted);
+        padding: 12px 16px 6px;
+    }
+    .sige-mobile-drawer__link {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 16px;
+        color: var(--sige-mobile-text);
+        text-decoration: none;
+        font-size: .95rem;
+        min-height: 48px;
+    }
+    .sige-mobile-drawer__link i {
+        width: 22px; text-align: center;
+        color: var(--sige-mobile-muted);
+    }
+    .sige-mobile-drawer__link:active { background: #f1f5f9; }
+    .sige-mobile-drawer__link.active {
+        background: var(--sige-mobile-primary-soft);
+        color: var(--sige-mobile-primary);
+        font-weight: 600;
+    }
+    .sige-mobile-drawer__link.active i { color: var(--sige-mobile-primary); }
+    .sige-mobile-drawer__footer {
+        border-top: 1px solid var(--sige-mobile-border);
+        padding: 8px 0;
+    }
+
+    /* --- 2.6 Tipografia / inputs anti-zoom no iOS --- */
+    .form-control, .form-select, input[type="date"], input[type="text"],
+    input[type="email"], input[type="number"], input[type="password"],
+    input[type="tel"], input[type="search"], textarea, select {
+        font-size: 16px !important;
+    }
+
+    /* --- 2.7 Botões de ação em rodapé do header viram full-width --- */
+    .header-actions, .obras-header .header-actions,
+    .d-flex.gap-2.flex-wrap.justify-content-end {
+        width: 100% !important;
+    }
+    .header-actions > a,
+    .header-actions > button {
+        flex: 1 1 100% !important;
+        justify-content: center !important;
+    }
+
+    /* --- 2.8 Wrapper de tabela com hint de scroll --- */
+    .sige-table-scroll {
+        position: relative;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+    }
+    .sige-table-scroll::after {
+        content: "← deslize →";
+        display: block;
+        text-align: center;
+        font-size: .7rem;
+        color: var(--sige-mobile-muted);
+        padding: 6px 0;
+    }
+
+    /* --- 2.9 Tabela vira cards (.sige-table-cards) --- */
+    .sige-table-cards thead { display: none !important; }
+    .sige-table-cards, .sige-table-cards tbody,
+    .sige-table-cards tr, .sige-table-cards td {
+        display: block !important; width: 100% !important;
+    }
+    .sige-table-cards tr {
+        background: #fff;
+        border: 1px solid var(--sige-mobile-border);
+        border-radius: 12px;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    .sige-table-cards td {
+        border: none !important;
+        padding: 4px 0 !important;
+        text-align: left !important;
+    }
+    .sige-table-cards td[data-label]::before {
+        content: attr(data-label) ": ";
+        font-weight: 600;
+        color: var(--sige-mobile-muted);
+        margin-right: 6px;
+    }
+
+    /* --- 2.10 Aviso "melhor em tela maior" --- */
+    .sige-mobile-only-notice {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #9a3412;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin: 12px 0;
+        font-size: .9rem;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .sige-mobile-only-notice i { font-size: 1.3rem; color: #ea580c; }
+
+    /* --- 2.11 Esconde elementos marcados como Desktop-only --- */
+    .sige-mobile-hide { display: none !important; }
+
+    /* --- 2.12 Ajustes finos em containers existentes --- */
+    .container-fluid { padding-left: 12px !important; padding-right: 12px !important; }
+
+    /* Filtros em linha viram empilhados */
+    .filters-body .form-grid,
+    .filters-card .form-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* KPIs do financeiro 2x2 */
+    .sige-kpi-grid-mobile { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .sige-kpi-grid-mobile > [class*="col-"] { width: 100% !important; padding: 0 !important; }
+    .sige-kpi-grid-mobile .card-body { padding: .85rem !important; }
+    .sige-kpi-grid-mobile .card-body h4 { font-size: 1rem !important; margin: 0 !important; }
+    .sige-kpi-grid-mobile .card-body h6 { font-size: .72rem !important; }
+    .sige-kpi-grid-mobile .card-body i { display: none !important; }
+
+    /* Header genérico de página: título + botões empilhados */
+    .d-flex.justify-content-between.align-items-center {
+        flex-wrap: wrap !important; gap: 8px !important;
+    }
+}
+
+/* ============================================================================
+   3. Tela bem pequena (<=420px) — apertos finais
+   ========================================================================== */
+@media (max-width: 420px) {
+    .sige-mobile-bottomnav__item { font-size: .62rem; }
+    .sige-mobile-shell__brand { font-size: 1rem; }
+}
