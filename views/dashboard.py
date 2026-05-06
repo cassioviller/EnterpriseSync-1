@@ -876,11 +876,32 @@ def dashboard():
             lambda: _calcular_custos_obra_acumulado(admin_id, _oids),
             []
         )
-        _acum_by_id = {o['id']: o['realizado_acumulado'] for o in _acum_raw} if isinstance(_acum_raw, list) else {}
-        if isinstance(custos_por_obra, list):
-            for _item in custos_por_obra:
-                _item['realizado_periodo'] = _item.get('realizado', 0)
-                _item['realizado_acumulado'] = _acum_by_id.get(_item['id'], _item.get('realizado', 0))
+        _acum_by_id = {o['id']: o for o in _acum_raw} if isinstance(_acum_raw, list) else {}
+        if not isinstance(custos_por_obra, list):
+            custos_por_obra = []
+        # Enriquecer obras já no período
+        _periodo_ids = set()
+        for _item in custos_por_obra:
+            _item['realizado_periodo'] = _item.get('realizado', 0)
+            _acum_entry = _acum_by_id.get(_item['id'])
+            _item['realizado_acumulado'] = _acum_entry['realizado_acumulado'] if _acum_entry else _item.get('realizado', 0)
+            _periodo_ids.add(_item['id'])
+        # Adicionar obras com acumulado > 0 mas sem custo no período atual
+        for _obra_id, _acum_entry in _acum_by_id.items():
+            if _obra_id not in _periodo_ids:
+                _orc = _acum_entry.get('orcamento', 0)
+                _acum = _acum_entry.get('realizado_acumulado', 0)
+                _pct = round((_acum / _orc * 100), 1) if _orc else 0
+                custos_por_obra.append({
+                    'id': _obra_id,
+                    'nome': _acum_entry.get('nome', ''),
+                    'realizado': 0,
+                    'realizado_periodo': 0,
+                    'realizado_acumulado': _acum,
+                    'orcamento': _orc,
+                    'pct': _pct,
+                    'estouro': _acum > _orc,
+                })
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
         
         # Dados calculados reais
