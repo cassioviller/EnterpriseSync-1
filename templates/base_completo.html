@@ -680,7 +680,10 @@
             <i class="fas fa-bars"></i>
         </button>
         <a class="sige-mobile-shell__brand" href="{{ url_for('main.dashboard') }}">
-            <i class="fas fa-building"></i> SIGE
+            <i class="fas fa-building"></i>
+            <span class="sige-mobile-shell__brand-text">
+                {{ current_user.username if current_user.is_authenticated else 'SIGE' }}
+            </span>
         </a>
         <a class="sige-mobile-shell__btn" aria-label="Sair"
            href="{{ url_for('main.logout') }}">
@@ -1180,7 +1183,7 @@
             </div>
             {% else %}
             <div class="sige-mobile-drawer__group">
-                <div class="sige-mobile-drawer__group-title">Operação</div>
+                <button type="button" class="sige-mobile-drawer__group-title" aria-expanded="true" data-sige-accordion>Operação<i class="fas fa-chevron-down sige-mobile-drawer__chev" aria-hidden="true"></i></button>
                 <a class="sige-mobile-drawer__link {% if _path == '/dashboard' %}active{% endif %}"
                    href="{{ url_for('main.dashboard') }}">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -1209,7 +1212,7 @@
             </div>
 
             <div class="sige-mobile-drawer__group">
-                <div class="sige-mobile-drawer__group-title">Comercial &amp; Financeiro</div>
+                <button type="button" class="sige-mobile-drawer__group-title" aria-expanded="true" data-sige-accordion>Comercial &amp; Financeiro<i class="fas fa-chevron-down sige-mobile-drawer__chev" aria-hidden="true"></i></button>
                 <a class="sige-mobile-drawer__link" href="/propostas/dashboard">
                     <i class="fas fa-briefcase"></i> Propostas
                 </a>
@@ -1228,7 +1231,7 @@
             </div>
 
             <div class="sige-mobile-drawer__group">
-                <div class="sige-mobile-drawer__group-title">Logística</div>
+                <button type="button" class="sige-mobile-drawer__group-title" aria-expanded="true" data-sige-accordion>Logística<i class="fas fa-chevron-down sige-mobile-drawer__chev" aria-hidden="true"></i></button>
                 <a class="sige-mobile-drawer__link" href="{{ url_for('almoxarifado.dashboard') }}">
                     <i class="fas fa-boxes"></i> Almoxarifado
                 </a>
@@ -1241,7 +1244,7 @@
             </div>
 
             <div class="sige-mobile-drawer__group">
-                <div class="sige-mobile-drawer__group-title">CRM &amp; Cadastros</div>
+                <button type="button" class="sige-mobile-drawer__group-title" aria-expanded="true" data-sige-accordion>CRM &amp; Cadastros<i class="fas fa-chevron-down sige-mobile-drawer__chev" aria-hidden="true"></i></button>
                 <a class="sige-mobile-drawer__link" href="{{ url_for('crm.kanban') }}">
                     <i class="fas fa-funnel-dollar"></i> CRM de Leads
                 </a>
@@ -1254,7 +1257,7 @@
             </div>
 
             <div class="sige-mobile-drawer__group">
-                <div class="sige-mobile-drawer__group-title">Conta</div>
+                <button type="button" class="sige-mobile-drawer__group-title" aria-expanded="true" data-sige-accordion>Conta<i class="fas fa-chevron-down sige-mobile-drawer__chev" aria-hidden="true"></i></button>
                 <a class="sige-mobile-drawer__link" href="/configuracoes">
                     <i class="fas fa-cog"></i> Configurações
                 </a>
@@ -1365,6 +1368,47 @@
                 }
             }
         });
+
+        // Accordion: clique no título alterna o grupo
+        document.addEventListener('click', function(e){
+            var btn = e.target.closest('[data-sige-accordion]');
+            if (!btn) return;
+            var group = btn.closest('.sige-mobile-drawer__group');
+            if (!group) return;
+            var collapsed = group.classList.toggle('is-collapsed');
+            btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        });
+
+        // Swipe-to-close (arrasta do drawer para a esquerda)
+        if (drawer) {
+            var startX = null, startY = null, currentX = null, dragging = false;
+            drawer.addEventListener('touchstart', function(e){
+                if (!document.body.classList.contains('sige-mobile-drawer-open')) return;
+                var t = e.touches[0];
+                startX = t.clientX; startY = t.clientY; currentX = startX;
+                dragging = true;
+                drawer.style.transition = 'none';
+            }, {passive: true});
+            drawer.addEventListener('touchmove', function(e){
+                if (!dragging) return;
+                var t = e.touches[0];
+                var dx = t.clientX - startX;
+                var dy = t.clientY - startY;
+                if (Math.abs(dy) > Math.abs(dx)) { dragging = false; drawer.style.transition = ''; drawer.style.transform = ''; return; }
+                if (dx < 0) {
+                    currentX = t.clientX;
+                    drawer.style.transform = 'translateX(' + dx + 'px)';
+                }
+            }, {passive: true});
+            drawer.addEventListener('touchend', function(){
+                if (!dragging) return;
+                dragging = false;
+                drawer.style.transition = '';
+                drawer.style.transform = '';
+                var dx = (currentX || startX) - startX;
+                if (dx < -60) window.SigeMobileDrawer.close();
+            });
+        }
     })();
     </script>
     {% endif %}

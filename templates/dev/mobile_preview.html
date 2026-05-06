@@ -57,6 +57,14 @@
       <option value="768x1024">768 × 1024 (iPad portrait)</option>
     </select>
 
+    <label class="meta">Orientação:</label>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Orientação">
+      <input type="radio" class="btn-check" name="orient" id="orientP" value="portrait" autocomplete="off">
+      <label class="btn btn-outline-light" for="orientP" title="Retrato"><i class="fas fa-mobile-screen"></i></label>
+      <input type="radio" class="btn-check" name="orient" id="orientL" value="landscape" autocomplete="off">
+      <label class="btn btn-outline-light" for="orientL" title="Paisagem"><i class="fas fa-mobile-screen fa-rotate-90"></i></label>
+    </div>
+
     <button class="btn btn-sm btn-success" id="btnReload"><i class="fas fa-rotate-right me-1"></i>Recarregar</button>
     <a class="btn btn-sm btn-outline-light" id="btnOpen" target="_blank" rel="noopener">
       <i class="fas fa-up-right-from-square me-1"></i>Abrir em nova aba
@@ -84,6 +92,7 @@
   const initialTarget = {{ target|tojson }};
   const initialW = {{ width|tojson }};
   const initialH = {{ height|tojson }};
+  const initialOrient = {{ orientation|tojson }};
   const sel = document.getElementById('selTarget');
   const inp = document.getElementById('inpCustom');
   const size = document.getElementById('selSize');
@@ -91,6 +100,15 @@
   const frame = document.getElementById('frame');
   const btnReload = document.getElementById('btnReload');
   const btnOpen = document.getElementById('btnOpen');
+  const orientRadios = document.querySelectorAll('input[name="orient"]');
+  function currentOrient(){
+    for (const r of orientRadios) if (r.checked) return r.value;
+    return 'portrait';
+  }
+  for (const r of orientRadios) if (r.value === initialOrient) r.checked = true;
+  if (!document.querySelector('input[name="orient"]:checked')) {
+    document.getElementById('orientP').checked = true;
+  }
 
   // Set initial target
   let matched = false;
@@ -110,7 +128,8 @@
     return sel.value;
   }
   function applySize() {
-    const [w, h] = size.value.split('x');
+    let [w, h] = size.value.split('x').map(Number);
+    if (currentOrient() === 'landscape') { const t = w; w = h; h = t; }
     dev.style.width = w + 'px';
     dev.style.height = h + 'px';
   }
@@ -123,6 +142,7 @@
     const [w, h] = size.value.split('x');
     url.searchParams.set('w', w);
     url.searchParams.set('h', h);
+    url.searchParams.set('orientation', currentOrient());
     history.replaceState({}, '', url.toString());
   }
   sel.addEventListener('change', () => {
@@ -131,7 +151,9 @@
   });
   inp.addEventListener('change', reload);
   size.addEventListener('change', () => { applySize(); reload(); });
+  for (const r of orientRadios) r.addEventListener('change', () => { applySize(); reload(); });
   btnReload.addEventListener('click', reload);
+  applySize();
 })();
 </script>
 </body>
