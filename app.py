@@ -371,6 +371,14 @@ try:
 except Exception as e:
     logging.error(f"[ERROR] Erro ao registrar blueprint CRM: {e}")
 
+# Task #16 — Manual do Usuário
+try:
+    from views.manual_views import manual_bp
+    app.register_blueprint(manual_bp)
+    logging.info("[OK] Blueprint Manual do Usuário registrado")
+except Exception as e:
+    logging.error(f"[ERROR] Erro ao registrar blueprint Manual: {e}")
+
 ponto_import_error = None
 try:
     from ponto_views import ponto_bp

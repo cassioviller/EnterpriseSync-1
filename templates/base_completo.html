@@ -1048,7 +1048,11 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             {% if current_user.is_authenticated and current_user.tipo_usuario.name == 'FUNCIONARIO' %}
-                                <!-- Menu simplificado para funcionários: apenas Sair -->
+                                <!-- Menu simplificado para funcionários -->
+                                <li><a class="dropdown-item" href="{{ url_for('manual.index') }}">
+                                    <i class="fas fa-book me-1"></i> Manual do Usuário
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="{{ url_for('main.logout') }}">
                                     <i class="fas fa-sign-out-alt me-1"></i> Sair
                                 </a></li>
@@ -1078,6 +1082,10 @@
                                 </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('catalogo.servicos_list') }}">
                                     <i class="fas fa-clipboard-list me-1"></i> Catálogo de Serviços
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('manual.index') }}">
+                                    <i class="fas fa-book me-1"></i> Manual do Usuário
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="{{ url_for('main.logout') }}">

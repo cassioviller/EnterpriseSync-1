@@ -16,11 +16,12 @@ _Populate as you build_
 
 ## Where things live
 - **Core application logic:** `views/` Python package (domain-specific modules)
-- **Base HTML template:** `base_completo.html`
+- **Base HTML template:** `templates/base_completo.html`
 - **Database Schema:** Defined implicitly by SQLAlchemy models
 - **API Contracts:** _Populate as you build_
 - **Theme/Styling:** `static/css/styles.css` (with `.sige-*` namespace for shared partials)
 - **Shared Jinja macros:** `templates/_partials/macros.html`
+- **Manual do Usuário (conteúdo):** `manual/*.md` (sumário em `00_indice.md`, capítulos em `10_*.md` / `2x_*.md` / `3x_*.md`); imagens em `manual/imagens/`. Renderizado por `views/manual_views.py` em `/manual` (visualização) e `/manual/download` (HTML imprimível).
 
 ## Architecture decisions
 -   **Multi-tenancy and Security:** Implemented with data isolation, RBAC, CSRF, restricted CORS, rate limiting, and secure key handling.

@@ -45,4 +45,5 @@ dependencies = [
     "thefuzz>=0.22.1",
     "python-levenshtein>=0.27.3",
     "playwright>=1.58.0",
+    "markdown>=3.10",
 ]

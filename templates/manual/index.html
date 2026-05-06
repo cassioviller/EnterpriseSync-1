@@ -1,0 +1,81 @@
+{% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, empty_state %}
+
+{% block title %}Manual do Usuário — SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  {% call page_header('Manual do Usuário', icon='fa-book', subtitle='Guia completo de uso do SIGE — atualizado conforme as auditorias dos módulos.') %}
+    <a href="{{ url_for('manual.download') }}" target="_blank" class="btn btn-primary btn-sm">
+      <i class="fas fa-download me-1"></i> Baixar manual (HTML para imprimir/PDF)
+    </a>
+  {% endcall %}
+
+  {% if not capitulos %}
+    {{ empty_state('Nenhum capítulo encontrado em manual/.', icon='fa-book') }}
+  {% else %}
+  <div class="row g-3">
+    <aside class="col-lg-3">
+      <div class="card border-0 shadow-sm sige-manual-toc" style="position: sticky; top: 90px;">
+        <div class="card-body py-3">
+          <h6 class="text-uppercase text-muted small mb-2">
+            <i class="fas fa-list me-1"></i> Sumário
+          </h6>
+          <nav class="nav flex-column small">
+            {% for cap in capitulos %}
+              <a class="nav-link py-1 px-2 d-flex justify-content-between align-items-center text-truncate"
+                 href="#{{ cap.anchor }}"
+                 title="{{ cap.titulo }}">
+                <span class="text-truncate">{{ cap.titulo }}</span>
+                {% if cap.em_construcao %}
+                <span class="badge bg-secondary ms-2" style="font-size:.6rem">Em construção</span>
+                {% endif %}
+              </a>
+            {% endfor %}
+          </nav>
+        </div>
+      </div>
+    </aside>
+
+    <section class="col-lg-9">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body py-4 px-4 sige-manual-conteudo">
+          {% for cap in capitulos %}
+            <article id="{{ cap.anchor }}" class="sige-manual-capitulo mb-5">
+              <h2 class="h4 mb-3 pb-2 border-bottom">
+                {{ cap.titulo }}
+                {% if cap.em_construcao %}
+                <span class="badge bg-secondary align-middle" style="font-size:.65rem">Em construção</span>
+                {% endif %}
+              </h2>
+              <div class="sige-manual-md">
+                {{ cap.html|safe }}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  .sige-manual-conteudo { font-size: .95rem; line-height: 1.6; }
+  .sige-manual-md h1, .sige-manual-md h2 { margin-top: 1.4rem; }
+  .sige-manual-md h3 { margin-top: 1.2rem; font-size: 1.1rem; }
+  .sige-manual-md table { width: 100%; margin: 1rem 0; }
+  .sige-manual-md table th, .sige-manual-md table td { border: 1px solid #dee2e6; padding: .4rem .6rem; }
+  .sige-manual-md img { max-width: 100%; height: auto; border-radius: 4px; }
+  .sige-manual-md blockquote {
+    border-left: 4px solid #0d6efd;
+    background: #f8f9fa;
+    padding: .5rem 1rem;
+    color: #495057;
+    margin: 1rem 0;
+  }
+  .sige-manual-toc .nav-link { color: #495057; border-radius: 4px; }
+  .sige-manual-toc .nav-link:hover { background: #f0f3f7; color: #0d6efd; }
+  html { scroll-behavior: smooth; scroll-padding-top: 90px; }
+</style>
+{% endblock %}
