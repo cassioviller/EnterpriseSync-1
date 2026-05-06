@@ -4,8 +4,9 @@ Atualmente expõe:
 - /dev/mobile-preview : iframe redimensionável para testar telas em tamanhos
   de celular dentro do próprio preview do Replit, sem depender de DevTools.
 
-Acesso restrito a SUPER_ADMIN, ADMIN ou GESTOR_EQUIPES (usuário final
-e funcionário operacional não devem ver ferramentas de dev).
+Acesso restrito a SUPER_ADMIN em produção (usuário final e funcionário
+operacional não devem ver ferramentas de dev). Em ambiente de dev
+(FLASK_ENV=development ou Replit) qualquer usuário logado acessa.
 """
 import os
 from flask import Blueprint, abort, render_template, request
