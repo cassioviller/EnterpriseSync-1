@@ -1,0 +1,105 @@
+<!-- Compras para aprovação ───────────────────────────────────── -->
+{% if compras_pendentes %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-clipboard-check"></i></span>
+        <h2 class="section-title">Compras para sua aprovação</h2>
+        <span class="section-counter">{{ compras_pendentes|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="row-list">
+            {% for c in compras_pendentes %}
+            <div class="compra-row">
+                <div class="compra-info">
+                    <div class="compra-fornec">{{ c.fornecedor.nome }}</div>
+                    <div class="compra-meta">
+                        <i class="far fa-calendar"></i> {{ c.data_compra.strftime('%d/%m/%Y') }}
+                        {% if c.numero %}&nbsp;·&nbsp;NF {{ c.numero }}{% endif %}
+                    </div>
+                    {% if c.fornecedor.chave_pix %}
+                    <div class="compra-pix"><i class="fas fa-key"></i> PIX <code>{{ c.fornecedor.chave_pix }}</code></div>
+                    {% endif %}
+                </div>
+                <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
+                <span class="pill pill-warning"><i class="fas fa-clock"></i> Pendente</span>
+                <div class="compra-acoes">
+                    <form method="POST" action="{{ url_for('portal_obras.aprovar_compra', token=obra.token_cliente, compra_id=c.id) }}">
+                        <button class="btn btn-portal-success" aria-label="Aprovar compra de {{ c.fornecedor.nome }}">
+                            <i class="fas fa-check me-1"></i> Aprovar
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('portal_obras.recusar_compra', token=obra.token_cliente, compra_id=c.id) }}">
+                        <button class="btn btn-portal-danger" aria-label="Recusar compra de {{ c.fornecedor.nome }}">
+                            <i class="fas fa-times me-1"></i> Recusar
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Compras resolvidas ──────────────────────────────────────── -->
+{% if compras_resolvidas %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-shopping-cart"></i></span>
+        <h2 class="section-title">Compras resolvidas</h2>
+        <span class="section-counter">{{ compras_resolvidas|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="row-list">
+            {% for c in compras_resolvidas %}
+            {% set status = c.status_aprovacao_cliente %}
+            <div class="compra-row">
+                <div class="compra-info">
+                    <div class="compra-fornec">{{ c.fornecedor.nome }}</div>
+                    <div class="compra-meta">
+                        <i class="far fa-calendar"></i> {{ c.data_compra.strftime('%d/%m/%Y') }}
+                        {% if c.numero %}&nbsp;·&nbsp;NF {{ c.numero }}{% endif %}
+                    </div>
+                    {% if c.fornecedor.chave_pix %}
+                    <div class="compra-pix"><i class="fas fa-key"></i> PIX <code>{{ c.fornecedor.chave_pix }}</code></div>
+                    {% endif %}
+                </div>
+                <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
+                <div>
+                    {% if status == 'APROVADO' %}
+                    <span class="pill pill-success"><i class="fas fa-check-circle"></i> Aprovado</span>
+                    {% elif status == 'RECUSADO' %}
+                    <span class="pill pill-danger"><i class="fas fa-times-circle"></i> Recusado</span>
+                    {% endif %}
+                </div>
+                <div class="compra-acoes">
+                    {% if status == 'APROVADO' and not c.comprovante_pagamento_url %}
+                    <form method="POST"
+                          action="{{ url_for('portal_obras.upload_comprovante', token=obra.token_cliente, compra_id=c.id) }}"
+                          enctype="multipart/form-data"
+                          class="upload-comprovante"
+                          onsubmit="this.querySelector('button').disabled = true;">
+                        <label class="file-label" for="comp_{{ c.id }}">
+                            <i class="fas fa-paperclip"></i> Anexar comprovante
+                        </label>
+                        <input type="file" id="comp_{{ c.id }}" name="comprovante"
+                               accept="image/*,.pdf" required
+                               onchange="this.form.querySelector('.file-name').textContent = this.files[0]?.name || ''; this.form.querySelector('button').style.display = 'inline-flex';">
+                        <span class="file-name"></span>
+                        <button type="submit" class="btn btn-portal-primary" style="display:none;">
+                            <i class="fas fa-upload me-1"></i> Enviar
+                        </button>
+                    </form>
+                    {% elif c.comprovante_pagamento_url %}
+                    <a href="{{ c.comprovante_pagamento_url }}" target="_blank" rel="noopener"
+                       class="btn btn-portal-outline">
+                        <i class="far fa-file-alt me-1"></i> Ver comprovante
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}

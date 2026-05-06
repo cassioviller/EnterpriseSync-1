@@ -93,6 +93,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True

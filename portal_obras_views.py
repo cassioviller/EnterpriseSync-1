@@ -33,8 +33,14 @@ portal_obras_bp = Blueprint(
     'portal_obras', __name__, url_prefix='/portal'
 )
 
-UPLOAD_FOLDER = os.path.join('static', 'uploads', 'comprovantes')
+_DEFAULT_UPLOAD_FOLDER = os.path.join('static', 'uploads', 'comprovantes')
+UPLOAD_FOLDER = os.environ.get('UPLOADS_PATH', _DEFAULT_UPLOAD_FOLDER)
+if not os.path.isabs(UPLOAD_FOLDER):
+    UPLOAD_FOLDER = os.path.join(os.getcwd(), UPLOAD_FOLDER)
+UPLOAD_FOLDER = os.path.join(UPLOAD_FOLDER, 'comprovantes')
+
 ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 def _ensure_upload_folder():
@@ -378,12 +384,28 @@ def upload_comprovante(token: str, compra_id: int):
         flash('Tipo de arquivo não permitido. Envie imagem ou PDF.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
+    arquivo.seek(0, 2)
+    file_size = arquivo.tell()
+    arquivo.seek(0)
+    if file_size > MAX_UPLOAD_BYTES:
+        flash(f'Arquivo muito grande. O limite é {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.', 'danger')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
     _ensure_upload_folder()
-    nome_seguro = f"comprovante_{compra_id}_{secrets.token_hex(6)}{ext}"
+    nome_seguro = f"comprovante_{compra_id}_{secrets.token_hex(8)}{ext}"
     caminho = os.path.join(UPLOAD_FOLDER, nome_seguro)
     arquivo.save(caminho)
 
-    compra.comprovante_pagamento_url = '/' + caminho.replace('\\', '/')
+    rel_path = os.path.relpath(caminho, os.getcwd()).replace('\\', '/')
+    if rel_path.startswith('static/'):
+        compra.comprovante_pagamento_url = '/' + rel_path
+    else:
+        uploads_base = os.path.relpath(
+            os.path.dirname(caminho),
+            os.path.join(os.getcwd(), 'static', 'uploads', 'comprovantes')
+        )
+        filename_only = os.path.basename(caminho)
+        compra.comprovante_pagamento_url = f'/persistent-uploads/comprovantes/{filename_only}'
     db.session.commit()
     logger.info(f"[PORTAL] Comprovante enviado para compra {compra_id} — obra {obra.id}")
     flash('Comprovante enviado com sucesso!', 'success')
