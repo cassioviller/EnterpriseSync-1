@@ -2145,11 +2145,16 @@ def produtividade_dashboard():
         .order_by(Funcionario.nome)
         .all()
     )
+    from datetime import date as _date, timedelta as _td
+    data_fim_default = _date.today()
+    data_inicio_default = data_fim_default - _td(days=30)
     return render_template(
         'cronograma/produtividade.html',
         obras=obras,
         subatividades=subatividades,
         funcionarios=funcionarios,
+        data_inicio_default=data_inicio_default.isoformat(),
+        data_fim_default=data_fim_default.isoformat(),
     )
 
 

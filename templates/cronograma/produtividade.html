@@ -53,11 +53,11 @@
         </div>
         <div class="col-sm-6 col-md-2">
           <label class="form-label small fw-semibold mb-1">Data início</label>
-          <input type="date" id="filtroDataInicio" class="form-control form-control-sm">
+          <input type="date" id="filtroDataInicio" class="form-control form-control-sm" value="{{ data_inicio_default }}">
         </div>
         <div class="col-sm-6 col-md-2">
           <label class="form-label small fw-semibold mb-1">Data fim</label>
-          <input type="date" id="filtroDataFim" class="form-control form-control-sm">
+          <input type="date" id="filtroDataFim" class="form-control form-control-sm" value="{{ data_fim_default }}">
         </div>
         <div class="col-sm-6 col-md-2">
           <label class="form-label small fw-semibold mb-1">Funcionário</label>
@@ -142,8 +142,8 @@
     </div>
   </div>
 
-  <!-- Estado vazio inicial -->
-  <div id="estadoVazio" class="text-center py-5">
+  <!-- Estado vazio inicial (oculto por padrão, auto-load assume controle) -->
+  <div id="estadoVazio" class="text-center py-5" style="display:none">
     <i class="fas fa-chart-bar fa-4x text-muted opacity-25 mb-3"></i>
     <h5 class="text-muted">Selecione os filtros e clique em "Aplicar Filtros"</h5>
     <p class="text-muted small">Os dados de produtividade aparecem somente em RDOs finalizados com subatividades do catálogo.</p>
@@ -158,8 +158,13 @@
   <!-- Sem dados -->
   <div id="estadoSemDados" class="text-center py-5" style="display:none">
     <i class="fas fa-search fa-4x text-muted opacity-25 mb-3"></i>
-    <h5 class="text-muted">Nenhum dado de produtividade encontrado</h5>
-    <p class="text-muted small">Tente outros filtros ou finalize RDOs com subatividades do catálogo e quantidade produzida preenchida.</p>
+    <h5 class="text-muted" id="estadoSemDadosTitulo">Nenhum dado de produtividade encontrado</h5>
+    <p class="text-muted small mb-2" id="estadoSemDadosDetalhe">
+      Para aparecer aqui, o RDO precisa estar <strong>Finalizado</strong>, com subatividades vinculadas ao
+      catálogo (<code>subatividade_mestre_id</code>) e produtividade real calculada (quantidade produzida
+      e horas apontadas).
+    </p>
+    <p class="text-muted small">Você também pode ajustar o período ou os demais filtros acima.</p>
   </div>
 
   <!-- Conteúdo com dados -->
@@ -236,17 +241,22 @@
 <script>
 let graficoBarras = null;
 let graficoLinha = null;
+const DATA_INICIO_DEFAULT = {{ data_inicio_default | tojson }};
+const DATA_FIM_DEFAULT = {{ data_fim_default | tojson }};
 
 function limparFiltros() {
     document.getElementById('filtroObra').value = '';
     document.getElementById('filtroSub').value = '';
-    document.getElementById('filtroDataInicio').value = '';
-    document.getElementById('filtroDataFim').value = '';
+    document.getElementById('filtroDataInicio').value = DATA_INICIO_DEFAULT;
+    document.getElementById('filtroDataFim').value = DATA_FIM_DEFAULT;
     document.getElementById('filtroFuncionario').value = '';
-    document.getElementById('estadoVazio').style.display = '';
-    document.getElementById('estadoSemDados').style.display = 'none';
-    document.getElementById('conteudoDados').style.display = 'none';
-    document.getElementById('cardsResumo').style.display = 'none';
+    carregarDados();
+}
+
+function formatarDataBR(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
 }
 
 async function carregarDados() {
@@ -274,6 +284,14 @@ async function carregarDados() {
         document.getElementById('estadoCarregando').style.display = 'none';
 
         if (!data.ranking || data.ranking.length === 0) {
+            const di = document.getElementById('filtroDataInicio').value;
+            const df = document.getElementById('filtroDataFim').value;
+            const tit = document.getElementById('estadoSemDadosTitulo');
+            if (di && df) {
+                tit.textContent = `Nenhum RDO finalizado com produtividade calculada entre ${formatarDataBR(di)} e ${formatarDataBR(df)}`;
+            } else {
+                tit.textContent = 'Nenhum RDO finalizado com produtividade calculada no período selecionado';
+            }
             document.getElementById('estadoSemDados').style.display = '';
             return;
         }
@@ -402,6 +420,10 @@ function renderBarras(barra) {
         },
     });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    carregarDados();
+});
 
 function renderLinha(linha) {
     if (graficoLinha) graficoLinha.destroy();
