@@ -364,7 +364,7 @@ except ImportError:
     logging.warning("Relatórios funcionais não disponível")
 
 try:
-    from almoxarifado_views import almoxarifado_bp
+    from views.almoxarifado import almoxarifado_bp
     app.register_blueprint(almoxarifado_bp)
     logging.info("[OK] Blueprint almoxarifado registrado")
 except ImportError:
