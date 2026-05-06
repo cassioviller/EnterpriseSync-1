@@ -1,0 +1,33 @@
+30 - Quebrar portal_obra.html e endurecer upload de comprovante
+What & Why
+Dois achados da auditoria Task #18 no Portal do Cliente, atacáveis em conjunto porque vivem no mesmo arquivo:
+
+Alto — templates/portal/portal_obra.html tem ~1300 linhas num único arquivo (galeria, cronograma, RDOs, fotos, mapas, formulários de aprovação/comprovante). Manutenção complicada e renderização lenta em obras grandes.
+Médio — Uploads de comprovante vão para static/uploads/comprovantes/ sem limite de tamanho nem prefixo com hash; servidos pela própria rota estática do Flask. Risco de encher disco e de colisão de nome.
+Done looks like
+portal_obra.html virou um shell curto (~150 linhas) que faz {% include %} de parciais em templates/portal/_partials/:
+_resumo.html, _cronograma.html, _rdos.html, _fotos.html, _compras.html, _comprovante.html.
+Comportamento visual e fluxos para o cliente final permanecem idênticos.
+Upload de comprovante:
+Limite de tamanho via MAX_CONTENT_LENGTH (ex.: 5 MB) com mensagem amigável quando excedido.
+Nome do arquivo prefixado com hash secrets.token_hex(8) para evitar colisão.
+Pasta de destino configurável via env (default mantém static/uploads/comprovantes/ para não quebrar deploys atuais).
+Whitelist de extensões (.pdf, .png, .jpg, .jpeg, .webp).
+Out of scope
+Implementar antivírus ou storage S3.
+Histórico de acessos do portal (achado Baixo separado).
+Regenerar token / token expiry — coberto pela Task #23.
+Steps
+Mapear seções — abrir portal_obra.html e identificar blocos lógicos; listar variáveis Jinja usadas em cada um (já vêm do contexto da view).
+Extrair parciais — criar templates/portal/_partials/ e mover cada bloco preservando indentação e referências a url_for(...) e csrf_token().
+Reduzir o shell — portal_obra.html final só carrega base + includes na ordem original.
+Endurecer upload — no handler do POST de comprovante: validar tamanho, extensão, gerar hash de nome, gravar caminho no banco.
+Validar — abrir o portal de uma obra do demo Alfa (após Task #23 estar mergeada para haver token), navegar todas as seções e fazer um upload válido e um excedendo o limite.
+Relevant files
+templates/portal/portal_obra.html (~1300 linhas — quebrar)
+templates/portal/portal_inativo.html
+portal_obras_views.py (handler do upload de comprovante)
+manual/34_portal_cliente.md
+manual/relatorios/auditoria_modulos_apoio.md (seção 8)
+Dependencies
+Corrigir Portal do Cliente: gerar token automaticamente ao ativar

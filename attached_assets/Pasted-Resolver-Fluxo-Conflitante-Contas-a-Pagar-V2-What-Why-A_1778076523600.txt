@@ -1,0 +1,25 @@
+Resolver Fluxo Conflitante Contas a Pagar V2
+What & Why
+Achado Alto da auditoria Task #17. A tela /financeiro/contas-pagar exibe simultaneamente um banner "Versão V2 ativa — use Gestão de Custos" e o botão "+ Nova Conta a Pagar" em destaque no cabeçalho. Mensagens contraditórias: o usuário não sabe qual caminho seguir. Em paralelo, os dois <select> de filtro usam onchange="this.form.submit()" disparando uma requisição a cada seleção — péssimo em mobile e causa double-request quando os dois filtros mudam na mesma sessão.
+
+Done looks like
+Modo V2 ativo: o botão "Nova Conta a Pagar" é ocultado no cabeçalho; em seu lugar aparece "Nova Despesa via Gestão de Custos" apontando para o fluxo correto. O lançamento direto legado fica acessível via link secundário discreto ("Lançamento Direto (legado)") abaixo do banner, para não bloquear usuários em transição.
+Modo V1 (sem flag V2): comportamento atual preservado integralmente.
+Filtros: onchange="this.form.submit()" removido dos dois <select> (status e obra); adicionado botão "Filtrar" explícito; a querystring atual é preservada ao aplicar novos filtros.
+A rota /financeiro/contas-pagar/nova ou abre o modal corretamente com ?abrir_modal=1 (JS detecta e abre o modal ao carregar a página), ou o link no template é ajustado para abrir o modal diretamente sem navegar para /nova.
+Smoke test de Contas a Pagar continua verde.
+Out of scope
+Refatorar o backend de Contas a Pagar.
+Mudar a integração com Gestão de Custos em si.
+Reescrever a tela inteira.
+Steps
+Detectar flag V2 no template — confirmar que is_v2 já está disponível no contexto do template contas_pagar.html (atualmente usado nas linhas ~19 e ~162); se vier do handler, garantir que é repassado de forma consistente.
+Reorganizar CTAs no cabeçalho — quando is_v2 é verdadeiro, ocultar o botão "Nova Conta a Pagar" e exibir "Nova Despesa via Gestão de Custos" como CTA principal, mais link secundário discreto para lançamento direto legado.
+Corrigir filtros — remover onchange="this.form.submit()" dos dois selects de filtro; adicionar botão "Filtrar" no formulário GET; verificar que "Limpar Filtros" continua funcional.
+Tratar /contas-pagar/nova — verificar o handler no financeiro_views.py; se a rota faz redirect, ajustar o link no template para abrir o modal diretamente (atributo data-bs-toggle="modal") sem navegar; ou adicionar lógica ?abrir_modal=1 com JS que abre o modal ao detectar o parâmetro.
+Validar — testar em V1 e V2; abrir no /dev/mobile-preview a 360 px; confirmar que selects não disparam requisições ao mudar.
+Relevant files
+templates/financeiro/contas_pagar.html:1-66
+views/financeiro_views.py
+manual/relatorios/auditoria_modulos_criticos.md
+manual/25_financeiro.md
