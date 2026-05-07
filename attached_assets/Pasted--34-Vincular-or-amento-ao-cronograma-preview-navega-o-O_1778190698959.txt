@@ -1,0 +1,70 @@
+#34 - Vincular orçamento ao cronograma — preview + navegação
+O que & Por quê
+Diagnóstico read-only confirmou que o ciclo Orçamento → Proposta → Cronograma funciona corretamente no código e no banco (Task #118 e Task #102 já implementadas). O problema é de UX/visibilidade:
+
+Não há preview do cronograma na tela do orçamento. O usuário escolhe cronograma_template_override_id por linha de item na tela de edição do orçamento, mas só consegue ver o cronograma resultante depois de: gerar proposta → aprovar proposta → abrir cronograma da obra — três passos de distância.
+
+Não há link de navegação do orçamento para o cronograma. Quando o orçamento já gerou uma proposta aprovada (com cronograma materializado), a tela do orçamento não mostra nenhum atalho para ir direto ao cronograma da obra correspondente.
+
+montar_arvore_preview() só aceita Proposta. O serviço services/cronograma_proposta.py opera sobre PropostaItem, não sobre OrcamentoItem, então não é possível reutilizá-lo diretamente para exibir o preview antes da proposta existir.
+
+Done looks like
+Existe a função montar_arvore_preview_orcamento(orcamento, admin_id) em services/cronograma_proposta.py, que opera sobre OrcamentoItem da mesma forma que montar_arvore_preview opera sobre PropostaItem:
+
+Para cada item: usa cronograma_template_override_id do item (precedência), caindo back para servico.template_padrao_id
+Retorna a mesma estrutura de árvore (sem_template, filhos, horas_totais_estimadas, marcado)
+Idêntica lógica de diagnóstico de itens sem template
+O editor de orçamento (/orcamentos/<id>/editar) tem um accordion "📅 Preview do Cronograma" colapsável abaixo dos itens que:
+
+Chama montar_arvore_preview_orcamento e renderiza a árvore (serviço → grupos → subatividades) igual ao formato da tela de revisão de proposta
+Mostra um resumo de horas por serviço
+Indica itens sem template com aviso em amarelo
+Renderiza vazio (com mensagem orientativa) se nenhum item tiver template
+O modal "Gerar Proposta" no orçamento também mostra um resumo de quantas tarefas de cronograma serão geradas automaticamente, baseado na árvore preview
+
+Quando o orçamento já tem proposta_id preenchido e essa proposta está aprovada e a obra tem cronograma (tarefa_cronograma count > 0), aparece na tela do orçamento um banner/link "→ Ver Cronograma da Obra" que navega para /cronograma/<obra_id>
+
+O endpoint GET /orcamentos/<id>/preview-cronograma (JSON) retorna a árvore serializada para eventual uso de AJAX (futuro)
+
+O scripts/seed_demo_alfa.py garante que o orçamento ORC-2026-0001 (id=10) tem pelo menos 2 dos 4 orcamento_items com cronograma_template_override_id explicitamente setado (para o demo mostrar o preview em ação). Hoje só o item #39 tem; adicionar também o item #37 com override para tmpl_alv_expresso.id.
+
+Os testes existentes (tests/test_orcamento_override_e2e.py, tests/test_e2e_orcamento_proposta.py) continuam passando
+
+Fora de escopo
+Refatorar services/cronograma_proposta.py (a nova função é adição pura, sem modificar as existentes)
+Permitir editar o cronograma diretamente da tela do orçamento (só preview)
+Mudar o fluxo de aprovação de proposta ou de geração de cronograma
+Criar nova tela de cronograma (usar a existente /cronograma/<obra_id>)
+Passos
+Adicionar montar_arvore_preview_orcamento(orcamento, admin_id) em services/cronograma_proposta.py
+
+Mesma lógica de montar_arvore_preview, mas iterando sobre orcamento.itens (OrcamentoItem) em vez de PropostaItem
+Reutilizar _expandir_template_para_arvore, _somar_horas_folhas e log de diagnóstico existentes
+Endpoint JSON GET /orcamentos/<id>/preview-cronograma em views/orcamentos_views.py
+
+Retorna { "arvore": [...], "total_horas": float, "n_sem_template": int }
+Accordion "Preview do Cronograma" em templates/orcamentos/editar.html
+
+Accordion Bootstrap colapsável (inicialmente fechado) abaixo da lista de itens
+Carregado via HTMX ou JS simples com fetch ao endpoint JSON acima
+Renderiza a árvore com indentação: serviço → grupo → subatividade, ícone de horas
+Items sem template mostram badge "sem cronograma" (amarelo)
+Banner de navegação para cronograma da obra
+
+Na view editar do orçamento, passar ao template: obra_com_cronograma (objeto Obra se proposta aprovada e cronograma existe)
+Template mostra card/banner "✅ Proposta aprovada — Cronograma gerado para {obra.nome} → Ver Cronograma" com link para /obras/<id>/cronograma ou /cronograma/<obra_id>
+Atualizar seed do demo
+
+Em scripts/seed_demo_alfa.py, garantir que OrcamentoItem item #37 também recebe cronograma_template_override_id=tmpl_alv.id (além do item #39 que já está)
+Validar com smoke test
+
+scripts/smoke_test_modulos_criticos.py deve passar
+tests/test_orcamento_override_e2e.py deve passar
+Arquivos relevantes
+services/cronograma_proposta.py (adicionar montar_arvore_preview_orcamento)
+views/orcamentos_views.py (adicionar endpoint JSON + carregar obra_com_cronograma no editar)
+templates/orcamentos/editar.html (accordion preview + banner navegação)
+models.py (Orcamento, OrcamentoItem, TarefaCronograma — consulta para banner)
+scripts/seed_demo_alfa.py (itens do orcamento id=10)
+tests/test_orcamento_override_e2e.py
+scripts/smoke_test_modulos_criticos.py
