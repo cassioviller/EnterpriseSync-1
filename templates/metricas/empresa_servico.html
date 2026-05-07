@@ -357,6 +357,12 @@
     el.classList.remove('d-none');
   }
 
+  function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+  }
+
   function formatCoef(v) {
     return Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 4, maximumFractionDigits: 6});
   }
@@ -400,7 +406,7 @@
           elTotal.textContent = data.items.length;
           elTbody.innerHTML = data.items.map(function (it) {
             return `<tr>
-              <td>${it.insumo_nome}</td>
+              <td>${escHtml(it.insumo_nome)}</td>
               <td class="text-end font-monospace">${formatCoef(it.coef_atual)}</td>
               <td class="text-end font-monospace fw-semibold">${formatCoef(it.coef_novo)}</td>
               <td class="text-center">${deltaBadge(it.delta_pct)}</td>
