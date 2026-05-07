@@ -116,6 +116,21 @@
   </div>
   {% endif %}
 
+  {# Task #34 — Banner de navegação para cronograma da obra aprovada #}
+  {% if obra_com_cronograma %}
+  <div class="alert alert-success d-flex align-items-center justify-content-between mb-3 py-2">
+    <div>
+      <i class="fas fa-check-circle me-2"></i>
+      <strong>Proposta aprovada</strong> — cronograma materializado para
+      <strong>{{ obra_com_cronograma.nome }}</strong>.
+    </div>
+    <a href="{{ url_for('cronograma.cronograma_obra', obra_id=obra_com_cronograma.id) }}"
+       class="btn btn-success btn-sm ms-3">
+      <i class="fas fa-calendar-alt me-1"></i> Ver Cronograma
+    </a>
+  </div>
+  {% endif %}
+
   {% if o.propostas_geradas %}
   <div class="card mb-3">
     <div class="card-header"><strong>Propostas geradas</strong>
@@ -534,6 +549,94 @@
   {% else %}
   <div class="alert alert-info">Nenhum item ainda. Adicione um serviço do catálogo acima.</div>
   {% endfor %}
+
+  {# Task #34 — Accordion: Preview do Cronograma a gerar #}
+  {% set _n_sem_tmpl = arvore_cronograma | selectattr('sem_template') | list | length %}
+  {% set _total_horas = arvore_cronograma | sum(attribute='horas_totais_estimadas') %}
+  <div class="accordion mb-3 mt-3" id="accordionCronograma">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="headCrono">
+        <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#collapsCrono"
+                aria-expanded="false" aria-controls="collapsCrono">
+          <i class="fas fa-calendar-alt me-2 text-primary"></i>
+          <strong>Preview do Cronograma a gerar</strong>
+          <span class="badge bg-secondary ms-2">{{ arvore_cronograma|length }} serviço(s)</span>
+          {% if _n_sem_tmpl > 0 %}
+          <span class="badge bg-warning text-dark ms-1">{{ _n_sem_tmpl }} sem template</span>
+          {% endif %}
+          {% if _total_horas > 0 %}
+          <span class="badge bg-light text-muted ms-1">{{ _total_horas|round(1) }}h estimadas</span>
+          {% endif %}
+        </button>
+      </h2>
+      <div id="collapsCrono" class="accordion-collapse collapse" aria-labelledby="headCrono">
+        <div class="accordion-body p-2">
+          {% if not arvore_cronograma %}
+          <div class="alert alert-info mb-0 small">
+            <i class="fas fa-info-circle me-1"></i>
+            Nenhum item no orçamento ainda. Adicione serviços com template de cronograma
+            para ver a prévia aqui.
+          </div>
+          {% else %}
+          <p class="text-muted small mb-2">
+            Quando a proposta gerada a partir deste orçamento for aprovada, o cronograma
+            abaixo será materializado automaticamente para a obra.
+          </p>
+          {% for no in arvore_cronograma %}
+          <div class="card mb-2 border-0 bg-light">
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-1 px-2">
+              <strong class="small">
+                <i class="fas fa-layer-group me-1 text-secondary"></i>{{ no.servico_nome }}
+              </strong>
+              <div class="d-flex gap-2 align-items-center">
+                {% if no.sem_template %}
+                <span class="badge bg-warning text-dark">
+                  <i class="fas fa-exclamation-triangle me-1"></i>sem template de cronograma
+                </span>
+                {% else %}
+                {% if no.origem_template == 'override' %}
+                <span class="badge bg-primary" title="Template definido por override nesta linha">override</span>
+                {% endif %}
+                <span class="badge bg-success">{{ no.template_nome }}</span>
+                {% if no.horas_totais_estimadas > 0 %}
+                <small class="text-muted">{{ no.horas_totais_estimadas|round(1) }}h</small>
+                {% endif %}
+                {% endif %}
+              </div>
+            </div>
+            {% if not no.sem_template and no.filhos %}
+            <ul class="list-group list-group-flush small">
+              {% for filho in no.filhos %}
+              <li class="list-group-item py-1 px-2 d-flex justify-content-between bg-transparent">
+                <span>
+                  {% if filho.filhos %}<i class="fas fa-folder-open text-muted me-1"></i>
+                  {% else %}<i class="fas fa-tasks text-muted me-1"></i>{% endif %}
+                  {{ filho.nome }}
+                </span>
+                <span class="text-muted">
+                  {{ filho.duracao_dias }}d
+                  {% if filho.horas_estimadas %} · {{ filho.horas_estimadas|round(1) }}h{% endif %}
+                </span>
+              </li>
+              {% for sub in filho.filhos %}
+              <li class="list-group-item py-1 px-3 d-flex justify-content-between bg-transparent border-top-0">
+                <span class="text-muted">
+                  <i class="fas fa-angle-right me-1"></i>{{ sub.nome }}
+                </span>
+                <span class="text-muted">{{ sub.duracao_dias }}d</span>
+              </li>
+              {% endfor %}
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
 

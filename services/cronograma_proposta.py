@@ -297,6 +297,103 @@ def _somar_horas_folhas(nos: list[dict]) -> float:
     return total
 
 
+def montar_arvore_preview_orcamento(orcamento, admin_id: int) -> list[dict]:
+    """Task #34 — Monta a árvore Serviço→Grupo→Subatividade a partir do Orçamento.
+
+    Opera sobre OrcamentoItem em vez de PropostaItem, permitindo exibir o preview
+    do cronograma diretamente na tela de edição do orçamento, antes de gerar uma
+    proposta. Mesma lógica de precedência override→padrão de montar_arvore_preview.
+
+    Estrutura retornada (lista, uma entrada por OrcamentoItem):
+        [{
+            'orcamento_item_id': int,
+            'servico_id': int | None,
+            'servico_nome': str,
+            'template_id': int | None,
+            'template_nome': str | None,
+            'origem_template': 'override' | 'padrao' | None,
+            'sem_template': bool,
+            'horas_totais_estimadas': float,
+            'marcado': bool,
+            'filhos': [ ...nós do template... ]
+        }, ...]
+    """
+    from models import OrcamentoItem
+
+    itens = (
+        OrcamentoItem.query
+        .filter_by(orcamento_id=orcamento.id)
+        .order_by(OrcamentoItem.ordem.asc(), OrcamentoItem.id.asc())
+        .all()
+    )
+    if not itens:
+        logger.debug(
+            f"montar_arvore_preview_orcamento: orc={orcamento.id} sem itens — árvore vazia"
+        )
+        return []
+
+    serv_ids = {it.servico_id for it in itens if it.servico_id}
+    servicos = {s.id: s for s in Servico.query.filter(
+        Servico.id.in_(serv_ids), Servico.admin_id == admin_id
+    ).all()} if serv_ids else {}
+
+    tmpl_ids = {s.template_padrao_id for s in servicos.values() if s.template_padrao_id}
+    tmpl_ids |= {
+        getattr(it, 'cronograma_template_override_id', None)
+        for it in itens
+        if getattr(it, 'cronograma_template_override_id', None)
+    }
+    tmpl_ids.discard(None)
+    templates = {t.id: t for t in CronogramaTemplate.query.filter(
+        CronogramaTemplate.id.in_(tmpl_ids),
+        CronogramaTemplate.admin_id == admin_id,
+    ).all()} if tmpl_ids else {}
+
+    logger.debug(
+        f"montar_arvore_preview_orcamento: orc={orcamento.id} admin={admin_id} — "
+        f"{len(itens)} item(ns), {len(servicos)} serviço(s), "
+        f"{len(tmpl_ids)} template_id(s) candidatos, {len(templates)} carregados"
+    )
+
+    arvore: list[dict] = []
+    for it in itens:
+        servico = servicos.get(it.servico_id) if it.servico_id else None
+        override_id = getattr(it, 'cronograma_template_override_id', None)
+        template_efetivo_id = override_id or (servico.template_padrao_id if servico else None)
+        tmpl = templates.get(template_efetivo_id) if template_efetivo_id else None
+        origem_template = ('override' if override_id and tmpl else
+                           ('padrao' if tmpl else None))
+        nome_serv = (servico.nome if servico else (it.descricao or f'Item {it.ordem}'))
+        if tmpl:
+            filhos = _expandir_template_para_arvore(tmpl, admin_id)
+            arvore.append({
+                'orcamento_item_id': it.id,
+                'servico_id': servico.id if servico else None,
+                'servico_nome': nome_serv,
+                'template_id': tmpl.id,
+                'template_nome': tmpl.nome,
+                'origem_template': origem_template,
+                'sem_template': False,
+                'horas_totais_estimadas': _somar_horas_folhas(filhos),
+                'marcado': True,
+                'filhos': filhos,
+            })
+        else:
+            arvore.append({
+                'orcamento_item_id': it.id,
+                'servico_id': it.servico_id,
+                'servico_nome': nome_serv,
+                'template_id': None,
+                'template_nome': None,
+                'origem_template': None,
+                'sem_template': True,
+                'horas_totais_estimadas': 0.0,
+                'marcado': False,
+                'filhos': [],
+            })
+    return arvore
+
+
 def tem_conteudo_para_revisar(proposta, admin_id: int) -> bool:
     """True se há pelo menos um PropostaItem com template efetivo e acessível:
     override por linha (Task #118) OU padrão do serviço (Task #102).

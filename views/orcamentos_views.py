@@ -20,7 +20,7 @@ from auth import admin_required
 from models import (
     Orcamento, OrcamentoItem, Servico, Cliente, Proposta, PropostaItem,
     PropostaHistorico, ConfiguracaoEmpresa, CronogramaTemplate,
-    PropostaTemplate, PropostaClausula,
+    PropostaTemplate, PropostaClausula, TarefaCronograma,
 )
 from services.orcamento_view_service import (
     snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -217,6 +217,36 @@ def editar(id):
         .all()
     )
 
+    # Task #34 — preview do cronograma: monta a árvore a partir dos OrcamentoItems.
+    from services.cronograma_proposta import montar_arvore_preview_orcamento
+    try:
+        arvore_cronograma = montar_arvore_preview_orcamento(orc, admin_id)
+    except Exception:
+        logger.exception('erro ao montar preview de cronograma do orcamento')
+        arvore_cronograma = []
+
+    # Task #34 — banner de navegação: obra com cronograma materializado
+    # derivado de proposta aprovada deste orçamento.
+    obra_com_cronograma = None
+    try:
+        proposta_aprovada = (
+            Proposta.query
+            .filter_by(orcamento_id=orc.id, status='aprovada', admin_id=admin_id)
+            .first()
+        )
+        if proposta_aprovada and proposta_aprovada.obra_id:
+            _obra = Obra.query.filter_by(
+                id=proposta_aprovada.obra_id, admin_id=admin_id
+            ).first()
+            if _obra:
+                n_tarefas = TarefaCronograma.query.filter_by(
+                    obra_id=_obra.id, admin_id=admin_id
+                ).count()
+                if n_tarefas > 0:
+                    obra_com_cronograma = _obra
+    except Exception:
+        logger.exception('erro ao verificar obra_com_cronograma')
+
     return render_template(
         'orcamentos/editar.html',
         orcamento=orc,
@@ -225,6 +255,8 @@ def editar(id):
         composicao_padrao_por_item=composicao_padrao_por_item,
         templates_proposta=templates_proposta,
         obras_com_operacional=obras_com_operacional,
+        arvore_cronograma=arvore_cronograma,
+        obra_com_cronograma=obra_com_cronograma,
     )
 
 
@@ -694,6 +726,33 @@ def gerar_proposta(id):
         logger.exception('erro ao gerar proposta do orcamento')
         flash(f'Erro ao gerar proposta: {e}', 'error')
         return redirect(url_for('orcamentos.editar', id=id))
+
+
+# ───────────── Task #34: JSON endpoint preview cronograma ────────────────────
+@orcamentos_bp.route('/<int:id>/preview-cronograma')
+@login_required
+@admin_required
+def preview_cronograma(id):
+    """Retorna a árvore de cronograma prevista para o orçamento (JSON).
+
+    Útil para AJAX futuro. Atualmente a view editar() já passa a árvore
+    ao template de forma síncrona — este endpoint serve como contrato da API.
+    """
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    from services.cronograma_proposta import montar_arvore_preview_orcamento
+    try:
+        arvore = montar_arvore_preview_orcamento(orc, admin_id)
+    except Exception as e:
+        logger.exception('preview_cronograma: erro ao montar árvore')
+        return jsonify({'erro': str(e), 'arvore': [], 'total_horas': 0, 'n_sem_template': 0}), 500
+    total_horas = sum(n.get('horas_totais_estimadas', 0.0) for n in arvore)
+    n_sem_template = sum(1 for n in arvore if n.get('sem_template'))
+    return jsonify({
+        'arvore': arvore,
+        'total_horas': round(total_horas, 2),
+        'n_sem_template': n_sem_template,
+    })
 
 
 # ───────────────────── API: composição prévia do serviço ─────────────────────

@@ -64,6 +64,37 @@ O módulo de **Propostas** é a porta de entrada do ciclo: a partir do catálogo
 3. Marque um como **"Padrão"** para que abra por default ao criar uma proposta nova.
 4. Templates pré-carregam cláusulas, condições comerciais e set de serviços.
 
+## Ciclo Orçamento → Modelo → Proposta
+
+O caminho recomendado para obras recorrentes é:
+
+**1. Crie um Modelo de Proposta** (`/propostas/templates/novo`)
+- Defina prazo padrão, validade, condições de pagamento, garantias e cláusulas.
+- Marque como **"Padrão"** para que apareça pré-selecionado no modal.
+
+**2. Monte o Orçamento** (`/orcamentos/`)
+- Adicione serviços do catálogo com quantidade, unidade e template de cronograma por linha.
+- O orçamento calcula custo, margem e preço de venda automaticamente.
+- O accordion **"Preview do Cronograma"** (abaixo dos itens) mostra quais tarefas serão
+  materializadas quando a proposta for aprovada — incluindo badges de override por linha.
+
+**3. Gere a Proposta a partir do Orçamento**
+- Clique em **"Gerar Proposta a partir do Orçamento"** (botão verde no topo).
+- O modal abre com a lista de modelos disponíveis — escolha um ou selecione "Sem modelo".
+- Com modelo: campos de prazo/validade/cláusulas são copiados do template e marcados como
+  **pendentes de revisão** (badges laranjas na tela de edição da proposta).
+
+**4. Revise e envie**
+- A proposta abre em modo edição (`/propostas/editar/<id>`).
+- Revise os campos pendentes (marcados em laranja) e confirme cláusula por cláusula.
+- Após revisar tudo, clique **"Enviar ao Cliente"** para gerar o link público.
+
+**Benefícios do ciclo**
+- **Rastreabilidade**: cada proposta exibe o orçamento de origem e o modelo usado.
+- **Cronograma automático**: a aprovação da proposta materializa o cronograma sem intervenção.
+- **Revisão obrigatória**: campos vindos do template ficam pendentes até o admin confirmar —
+  evita enviar prazos ou condições genéricas sem revisão.
+
 ## Dicas e cuidados
 
 - **Revise os itens** antes de aprovar — depois de aprovada, a proposta vira a base do orçamento operacional da obra.
