@@ -638,7 +638,8 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
                                 <label style="font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; display: block;">Qtd.</label>
                                 {% if is_v2_active() %}
                                 <input type="number" class="item-quantidade-input" name="itens[0][quantidade]"
-                                       value="1" min="1" step="1" onchange="calcularTotais()"
+                                       value="1" min="1" max="200" step="1" onchange="calcularTotais()"
+                                       title="Informe um valor entre 1 e 200 refeições"
                                        style="padding: 0.625rem; border: 1px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; width: 100%;">
                                 {% else %}
                                 <div class="item-quantidade" data-index="0">0</div>
@@ -851,7 +852,7 @@ function adicionarItem() {
     }
 
     const qtdField = isV2Active
-        ? `<input type="number" class="item-quantidade-input" name="itens[${itemIndex}][quantidade]" value="1" min="1" step="1" onchange="calcularTotais()" style="padding:0.625rem;border:1px solid #dee2e6;border-radius:8px;font-size:0.9rem;width:100%;">`
+        ? `<input type="number" class="item-quantidade-input" name="itens[${itemIndex}][quantidade]" value="1" min="1" max="200" step="1" onchange="calcularTotais()" title="Informe um valor entre 1 e 200 refeições" style="padding:0.625rem;border:1px solid #dee2e6;border-radius:8px;font-size:0.9rem;width:100%;">`
         : `<div class="item-quantidade" data-index="${itemIndex}">${document.querySelectorAll('input[name="funcionarios"]:checked').length}</div>`;
 
     const itemHtml = `

@@ -13,13 +13,12 @@ O módulo **Alimentação** (`/alimentacao/`) centraliza **lançamentos de refei
 
 - **Menu superior → "Alimentação"** (dropdown):
   - `/alimentacao/dashboard` — Dashboard (KPIs e gráficos).
-  - `/alimentacao` — Tela inicial.
-  - `/alimentacao/lancamentos/novo-v2` — Novo lançamento (V2, recomendado).
-  - `/alimentacao/lancamentos/novo` — Novo lançamento (V1, legado).
+  - `/alimentacao/lancamentos/novo-v2` — **Novo Lançamento** (único item recomendado).
   - `/alimentacao/lancamentos` — Lista de lançamentos.
   - `/alimentacao/restaurantes` — CRUD de restaurantes.
   - `/alimentacao/itens` — CRUD de itens.
-- Drawer mobile: **"Alimentação"** leva direto a `/alimentacao`.
+- Drawer mobile: **"Alimentação"** leva direto ao Novo Lançamento (V2).
+- **Versão legada (V1) — `/alimentacao/lancamentos/novo`:** acessível somente por URL direta (mantida para compatibilidade), não aparece mais no menu. A própria tela exibe um banner amarelo orientando o usuário a migrar para o Novo Lançamento.
 
 ## Fluxos principais
 
@@ -44,12 +43,13 @@ O módulo **Alimentação** (`/alimentacao/`) centraliza **lançamentos de refei
 5. Em V1, selecione os funcionários no bloco superior — eles serão **rateados igualmente** entre todos os itens.
 6. Submeta — o sistema valida tenant em **obra**, **restaurante**, **funcionários** e **centros de custo**, cria o lançamento e emite o evento `alimentacao_lancamento_criado`.
 
-### 4. Novo lançamento V1 (legado)
+### 4. Novo lançamento V1 (legado, fora do menu)
 
-1. **Menu → Alimentação → "Lançamento Simples"** (`/alimentacao/lancamentos/novo`).
-2. Preencha **Data**, **Restaurante**, **Obra**, **Valor total** e a **lista de funcionários**.
-3. O sistema rateia o valor pelos funcionários selecionados e grava na tabela `alimentacao_funcionarios_assoc`.
-4. O evento `alimentacao_lancamento_criado` também é emitido para integrar com o financeiro.
+1. Acesse **somente por URL direta:** `/alimentacao/lancamentos/novo` — o item foi removido do menu para evitar cadastros divergentes.
+2. A tela mostra um **banner amarelo** orientando a migrar para o Novo Lançamento (V2).
+3. Preencha **Data**, **Restaurante**, **Obra**, **Valor total** e a **lista de funcionários**.
+4. O sistema rateia o valor pelos funcionários selecionados e grava na tabela `alimentacao_funcionarios_assoc`.
+5. O evento `alimentacao_lancamento_criado` também é emitido para integrar com o financeiro.
 
 ### 5. Listar e filtrar lançamentos
 
@@ -60,7 +60,7 @@ O módulo **Alimentação** (`/alimentacao/`) centraliza **lançamentos de refei
 ### 6. Dashboard
 
 1. **Menu → Alimentação → Dashboard** (`/alimentacao/dashboard`) — KPIs (gasto total do mês, restaurante mais usado, top funcionários) e gráficos.
-2. **Atenção:** durante o smoke test, esta rota respondeu **302** (redirect) — verifique se o redirect leva à tela esperada antes de divulgar internamente.
+2. O item de menu aponta sempre para esta rota. O **302** observado no smoke ocorre apenas quando o `admin_id` não pode ser resolvido (sessão sem tenant) e redireciona para o login — comportamento esperado.
 
 ## Dicas e cuidados
 

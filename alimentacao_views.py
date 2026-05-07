@@ -350,9 +350,18 @@ def lancamento_novo_v2():
                     # V2: quantidade, funcionário e centro de custo por linha
                     qtd_raw = request.form.get(f'itens[{idx}][quantidade]', '1')
                     try:
-                        item_entry['quantidade'] = max(1, int(qtd_raw))
+                        qtd_int = int(qtd_raw)
                     except (ValueError, TypeError):
-                        item_entry['quantidade'] = 1
+                        qtd_int = 1
+                    QTD_MIN, QTD_MAX = 1, 200
+                    if qtd_int < QTD_MIN or qtd_int > QTD_MAX:
+                        flash(
+                            f"Quantidade inválida no item '{nome_item}': informe um valor entre "
+                            f"{QTD_MIN} e {QTD_MAX} refeições (recebido: {qtd_int}).",
+                            'error'
+                        )
+                        return redirect(url_for('alimentacao.lancamento_novo_v2'))
+                    item_entry['quantidade'] = qtd_int
 
                     func_id_raw = request.form.get(f'itens[{idx}][funcionario_id]')
                     if func_id_raw and func_id_raw != '0':

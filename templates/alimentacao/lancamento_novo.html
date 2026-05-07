@@ -346,6 +346,22 @@ select[multiple] option:checked {
         </div>
     </div>
 
+    <!-- Banner Legado -->
+    <div style="margin: 0 2rem 1rem 2rem;">
+        <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2" role="alert"
+             style="border-left: 4px solid #ffc107; background: #fff8e1; color: #664d03;">
+            <div>
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Versão legada.</strong>
+                Este formulário (V1) ratea um valor único entre funcionários e está mantido apenas por compatibilidade.
+                Use o <strong>Novo Lançamento</strong> para detalhar itens, quantidade, funcionário e centro de custo por linha.
+            </div>
+            <a href="{{ url_for('alimentacao.lancamento_novo_v2') }}" class="btn btn-warning btn-sm fw-semibold">
+                <i class="fas fa-arrow-right me-1"></i> Ir para o Novo Lançamento
+            </a>
+        </div>
+    </div>
+
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
