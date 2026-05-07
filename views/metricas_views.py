@@ -18,7 +18,7 @@ from functools import wraps
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for,
-    flash, abort, make_response,
+    flash, abort, make_response, jsonify,
 )
 from flask_login import login_required, current_user
 
@@ -110,6 +110,29 @@ def empresa_por_servico():
     )
 
 
+@metricas_bp.route('/servico/aplicar-referencia/preview')
+@login_required
+@_metricas_required
+def preview_referencia():
+    """Retorna JSON com a lista de mudanças que seriam aplicadas, sem persistir."""
+    admin_id = _admin_id()
+    di_def, df_def = _default_periodo()
+    servico_id = request.args.get('servico_id', type=int)
+    data_inicio = _parse_date(request.args.get('data_inicio'), di_def)
+    data_fim = _parse_date(request.args.get('data_fim'), df_def)
+
+    if not servico_id:
+        return jsonify({'erro': 'servico_id obrigatório', 'items': []}), 400
+
+    try:
+        from services.metricas_produtividade import preview_como_referencia
+        items = preview_como_referencia(admin_id, servico_id, data_inicio, data_fim)
+        return jsonify({'items': items, 'total': len(items)})
+    except Exception:
+        logger.exception("preview_como_referencia falhou")
+        return jsonify({'erro': 'Erro ao calcular preview', 'items': []}), 500
+
+
 @metricas_bp.route('/servico/aplicar-referencia', methods=['POST'])
 @login_required
 @_metricas_required
@@ -131,11 +154,18 @@ def aplicar_referencia():
         resultado = aplicar_como_referencia(
             admin_id, servico_id, current_user.id, data_inicio, data_fim
         )
-        if resultado['atualizados'] > 0:
+        n = resultado['atualizados']
+        if n > 0:
+            logger.info(
+                "[AUDITORIA] aplicar_referencia: usuario_id=%s admin_id=%s servico_id=%s "
+                "periodo=%s/%s atualizados=%s historicos=%s",
+                current_user.id, admin_id, servico_id,
+                data_inicio.isoformat(), data_fim.isoformat(),
+                n, resultado.get('historicos', 0),
+            )
             flash(
-                f"Referência aplicada: {resultado['atualizados']} coeficiente(s) "
-                f"atualizado(s) no catálogo.",
-                "success"
+                f"Referência aplicada: {n} coeficiente(s) atualizado(s) no catálogo.",
+                "success",
             )
         else:
             flash("Nenhum coeficiente precisou ser atualizado.", "info")

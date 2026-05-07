@@ -1273,6 +1273,97 @@ def top_rdos_por_funcionario(admin_id: int, funcionario_id: int,
     return resultado[:top_n]
 
 
+def preview_como_referencia(admin_id: int, servico_id: int,
+                             data_inicio: date, data_fim: date) -> list[dict]:
+    """Calcula o que aplicar_como_referencia faria SEM persistir nada.
+
+    Retorna lista de dicts:
+      {composicao_id, insumo_id, insumo_nome, coef_atual, coef_novo, delta_pct}
+    Lista vazia quando não há dados suficientes.
+    """
+    from models import (
+        ComposicaoServico, Insumo,
+        RDO, RDOMaoObra, RDOServicoSubatividade,
+    )
+    from app import db
+
+    q = (
+        db.session.query(
+            RDOMaoObra.composicao_servico_id,
+            db.func.sum(RDOMaoObra.horas_trabalhadas).label('horas'),
+        )
+        .join(RDO, RDOMaoObra.rdo_id == RDO.id)
+        .join(RDOServicoSubatividade,
+              (RDOServicoSubatividade.id == RDOMaoObra.subatividade_id) &
+              (RDOServicoSubatividade.servico_id == servico_id) &
+              (RDOServicoSubatividade.ativo.is_(True)))
+        .filter(
+            RDO.admin_id == admin_id,
+            RDO.data_relatorio >= data_inicio,
+            RDO.data_relatorio <= data_fim,
+            RDO.status == 'Finalizado',
+            RDOMaoObra.vinculo_status.in_(_VINCULOS_CONFIRMADOS),
+            RDOMaoObra.composicao_servico_id.isnot(None),
+        )
+        .group_by(RDOMaoObra.composicao_servico_id)
+        .all()
+    )
+
+    if not q:
+        return []
+
+    total_prod = (
+        db.session.query(db.func.sum(RDOServicoSubatividade.quantidade_produzida))
+        .join(RDO, RDOServicoSubatividade.rdo_id == RDO.id)
+        .filter(
+            RDO.admin_id == admin_id,
+            RDO.data_relatorio >= data_inicio,
+            RDO.data_relatorio <= data_fim,
+            RDO.status == 'Finalizado',
+            RDOServicoSubatividade.servico_id == servico_id,
+            RDOServicoSubatividade.ativo.is_(True),
+            RDOServicoSubatividade.quantidade_produzida.isnot(None),
+        )
+        .scalar()
+    )
+
+    if not total_prod or float(total_prod) <= 0:
+        return []
+
+    total_prod_f = float(total_prod)
+    resultado = []
+
+    for row in q:
+        cid = row.composicao_servico_id
+        hh = float(row.horas) if row.horas else 0.0
+        if hh <= 0 or not cid:
+            continue
+
+        cs = db.session.get(ComposicaoServico, cid)
+        if not cs or cs.admin_id != admin_id:
+            continue
+
+        coef_atual = float(cs.coeficiente)
+        coef_novo = round(hh / total_prod_f, 6)
+        if abs(coef_atual - coef_novo) < 1e-6:
+            continue
+
+        insumo = db.session.get(Insumo, cs.insumo_id) if cs.insumo_id else None
+        insumo_nome = insumo.nome if insumo else f'Insumo #{cs.insumo_id}'
+        delta_pct = ((coef_novo - coef_atual) / coef_atual * 100) if coef_atual else None
+
+        resultado.append({
+            'composicao_id': cid,
+            'insumo_id': cs.insumo_id,
+            'insumo_nome': insumo_nome,
+            'coef_atual': coef_atual,
+            'coef_novo': coef_novo,
+            'delta_pct': round(delta_pct, 1) if delta_pct is not None else None,
+        })
+
+    return resultado
+
+
 def aplicar_como_referencia(admin_id: int, servico_id: int, usuario_id: int,
                               data_inicio: date, data_fim: date) -> dict:
     """Atualiza os coeficientes das linhas MAO_OBRA de ComposicaoServico com a

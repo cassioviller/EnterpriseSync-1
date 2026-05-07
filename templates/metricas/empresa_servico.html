@@ -163,16 +163,15 @@
           </td>
           <td class="text-center">
             {% if m.pode_aplicar_referencia %}
-            <form method="post" action="{{ url_for('metricas.aplicar_referencia') }}"
-                  onsubmit="return confirm('Atualizar coeficientes de {{ m.servico_nome }} com a produtividade real do período?\nEsta ação altera o catálogo de serviços.');">
-              <input type="hidden" name="servico_id" value="{{ m.servico_id }}">
-              <input type="hidden" name="data_inicio" value="{{ data_inicio.isoformat() }}">
-              <input type="hidden" name="data_fim" value="{{ data_fim.isoformat() }}">
-              <button type="submit" class="btn btn-outline-primary btn-sm"
-                      title="Aplica produtividade real como referência no catálogo">
-                <i class="fas fa-sync-alt me-1" aria-hidden="true"></i> Aplicar
-              </button>
-            </form>
+            <button type="button" class="btn btn-outline-primary btn-sm sige-aplicar-ref-btn"
+                    data-servico-id="{{ m.servico_id }}"
+                    data-servico-nome="{{ m.servico_nome }}"
+                    data-data-inicio="{{ data_inicio.isoformat() }}"
+                    data-data-fim="{{ data_fim.isoformat() }}"
+                    data-preview-url="{{ url_for('metricas.preview_referencia') }}"
+                    title="Ver mudanças antes de aplicar ao catálogo">
+              <i class="fas fa-sync-alt me-1" aria-hidden="true"></i> Aplicar
+            </button>
             {% else %}<span class="text-muted small">sem dados</span>{% endif %}
           </td>
         </tr>
@@ -247,4 +246,191 @@
     </table>
   {% endcall %}
 </div>
+
+{# ── Modal de confirmação "Aplicar como Referência" ──────────────────────── #}
+<div class="modal fade" id="modalAplicarRef" tabindex="-1"
+     aria-labelledby="modalAplicarRefLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalAplicarRefLabel">
+          <i class="fas fa-sync-alt me-2" aria-hidden="true"></i>
+          Aplicar como Referência — <span id="modalServNome"></span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        {# Estado: carregando #}
+        <div id="modalLoadingState" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status" aria-label="Carregando..."></div>
+          <p class="mt-2 text-muted">Calculando mudanças…</p>
+        </div>
+
+        {# Estado: sem mudanças #}
+        <div id="modalEmptyState" class="d-none text-center py-4">
+          <i class="fas fa-check-circle fa-2x text-success mb-2" aria-hidden="true"></i>
+          <p class="mb-0">Nenhum coeficiente precisa ser atualizado para este período.</p>
+        </div>
+
+        {# Estado: erro #}
+        <div id="modalErrorState" class="d-none text-center py-4 text-danger">
+          <i class="fas fa-exclamation-triangle fa-2x mb-2" aria-hidden="true"></i>
+          <p id="modalErrorMsg" class="mb-0">Erro ao carregar preview.</p>
+        </div>
+
+        {# Estado: tabela de mudanças #}
+        <div id="modalTableState" class="d-none">
+          <div class="alert alert-warning d-flex align-items-start gap-2 py-2 mb-3">
+            <i class="fas fa-exclamation-triangle mt-1 flex-shrink-0" aria-hidden="true"></i>
+            <div>
+              <strong>Atenção:</strong> esta ação altera o <strong>catálogo de serviços</strong> permanentemente.
+              Os novos coeficientes serão usados em todos os orçamentos futuros.
+            </div>
+          </div>
+          <p class="text-muted small mb-2">
+            <span id="modalTotalItems" class="fw-semibold text-dark">0</span>
+            insumo(s) serão atualizados:
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-3">
+              <thead class="table-light">
+                <tr>
+                  <th>Insumo</th>
+                  <th class="text-end">Coef. Atual (h/un)</th>
+                  <th class="text-end">Coef. Novo (h/un)</th>
+                  <th class="text-center">Variação</th>
+                </tr>
+              </thead>
+              <tbody id="modalTbody"></tbody>
+            </table>
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="checkCiencia">
+            <label class="form-check-label fw-semibold" for="checkCiencia">
+              Entendi que isso altera o catálogo de serviços e afeta todos os orçamentos futuros.
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary d-none" id="btnConfirmarRef" disabled>
+          <i class="fas fa-check me-1" aria-hidden="true"></i> Confirmar atualização
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Formulário oculto que fará o POST real após confirmação #}
+<form id="formAplicarRef" method="post"
+      action="{{ url_for('metricas.aplicar_referencia') }}" class="d-none">
+  <input type="hidden" name="servico_id" id="formServId">
+  <input type="hidden" name="data_inicio" id="formDataInicio">
+  <input type="hidden" name="data_fim" id="formDataFim">
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  const modal = document.getElementById('modalAplicarRef');
+  if (!modal) return;
+  const bsModal = new bootstrap.Modal(modal);
+
+  const elLoading  = document.getElementById('modalLoadingState');
+  const elEmpty    = document.getElementById('modalEmptyState');
+  const elError    = document.getElementById('modalErrorState');
+  const elTable    = document.getElementById('modalTableState');
+  const elTbody    = document.getElementById('modalTbody');
+  const elTotal    = document.getElementById('modalTotalItems');
+  const elNome     = document.getElementById('modalServNome');
+  const btnConfirm = document.getElementById('btnConfirmarRef');
+  const checkCienc = document.getElementById('checkCiencia');
+
+  function showOnly(el) {
+    [elLoading, elEmpty, elError, elTable].forEach(e => e.classList.add('d-none'));
+    el.classList.remove('d-none');
+  }
+
+  function formatCoef(v) {
+    return Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 4, maximumFractionDigits: 6});
+  }
+
+  function deltaBadge(pct) {
+    if (pct === null || pct === undefined) return '<span class="text-muted">—</span>';
+    const cls = pct > 0 ? 'bg-danger' : 'bg-success';
+    const sign = pct > 0 ? '+' : '';
+    return `<span class="badge ${cls}">${sign}${Number(pct).toFixed(1)}%</span>`;
+  }
+
+  document.querySelectorAll('.sige-aplicar-ref-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const sid    = btn.dataset.servicoId;
+      const snome  = btn.dataset.servicoNome;
+      const di     = btn.dataset.dataInicio;
+      const df     = btn.dataset.dataFim;
+      const previewUrl = btn.dataset.previewUrl;
+
+      elNome.textContent = snome;
+      btnConfirm.classList.add('d-none');
+      btnConfirm.disabled = true;
+      checkCienc.checked = false;
+      elTbody.innerHTML = '';
+      showOnly(elLoading);
+      bsModal.show();
+
+      const url = `${previewUrl}?servico_id=${sid}&data_inicio=${di}&data_fim=${df}`;
+      fetch(url, {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.erro) {
+            document.getElementById('modalErrorMsg').textContent = data.erro;
+            showOnly(elError);
+            return;
+          }
+          if (!data.items || data.items.length === 0) {
+            showOnly(elEmpty);
+            return;
+          }
+          elTotal.textContent = data.items.length;
+          elTbody.innerHTML = data.items.map(function (it) {
+            return `<tr>
+              <td>${it.insumo_nome}</td>
+              <td class="text-end font-monospace">${formatCoef(it.coef_atual)}</td>
+              <td class="text-end font-monospace fw-semibold">${formatCoef(it.coef_novo)}</td>
+              <td class="text-center">${deltaBadge(it.delta_pct)}</td>
+            </tr>`;
+          }).join('');
+          showOnly(elTable);
+          btnConfirm.classList.remove('d-none');
+
+          checkCienc.addEventListener('change', function () {
+            btnConfirm.disabled = !checkCienc.checked;
+          }, {once: false});
+
+          document.getElementById('formServId').value    = sid;
+          document.getElementById('formDataInicio').value = di;
+          document.getElementById('formDataFim').value    = df;
+        })
+        .catch(function () {
+          document.getElementById('modalErrorMsg').textContent =
+            'Erro de comunicação. Tente novamente.';
+          showOnly(elError);
+        });
+    });
+  });
+
+  btnConfirm.addEventListener('click', function () {
+    if (!checkCienc.checked) return;
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Aplicando…';
+    document.getElementById('formAplicarRef').submit();
+  });
+})();
+</script>
 {% endblock %}

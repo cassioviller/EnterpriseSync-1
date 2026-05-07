@@ -1,0 +1,27 @@
+Preview/confirmação ao "Aplicar como referência" em Métricas
+What & Why
+Achado Alto da auditoria Task #18. A ação /metricas/servico/aplicar-referencia sobrescreve o coeficiente_padrao dos insumos do tipo mão-de-obra sem mostrar um preview do que será alterado. Atualmente o template usa um confirm() nativo do browser, sem nenhuma informação sobre o que vai mudar. Um clique acidental pode alterar coeficientes de muitos insumos em massa, afetando todos os orçamentos futuros que partirem desse catálogo.
+
+Done looks like
+Antes de aplicar, abre um modal Bootstrap de confirmação mostrando: lista de insumos afetados, coeficiente atual → coeficiente novo, quantidade total de itens.
+Botão "Confirmar" só ativa após o usuário marcar um checkbox "Entendi que isso muda o catálogo".
+Operação registrada em log de auditoria (quem aplicou, quando, quantos itens, valores antes/depois) para permitir reverter manualmente se necessário.
+Mensagem de feedback após aplicar: "X coeficientes atualizados".
+Out of scope
+Implementar "desfazer" automático.
+Mudar o cálculo das métricas em si.
+Refatorar o módulo Métricas.
+Steps
+Endpoint de preview — adicionar rota GET /metricas/servico/aplicar-referencia/preview em views/metricas_views.py que chama metricas_produtividade e retorna JSON com a lista de mudanças (insumo, coeficiente_atual, coeficiente_novo) sem persistir nada.
+Modal de confirmação — em templates/metricas/empresa_servico.html, substituir o onsubmit=confirm() por um botão que abre um modal Bootstrap; o modal busca o preview via fetch (ou form GET oculto) e exibe a tabela de mudanças + checkbox de ciência; só então o CTA envia o POST para o endpoint existente.
+Auditoria — no handler aplicar_referencia em views/metricas_views.py, após o resultado bem-sucedido, gravar um registro em tabela metricas_referencia_log (criar se não existir) com usuario_id, servico_id, criado_em, mudancas_json (snapshot antes/depois).
+Validar — conferir com o demo Alfa que coeficientes só mudam após passar pelo modal; verificar que o log é gravado corretamente.
+Relevant files
+views/metricas_views.py:113-148 (handler aplicar_referencia e _metricas_required)
+templates/metricas/empresa_servico.html:160-171 (botão com onsubmit=confirm() atual)
+templates/metricas/divergencia_servico.html (template da view de divergência, contexto adicional)
+services/metricas_produtividade.py (função aplicar_como_referencia)
+manual/29_metricas.md
+manual/relatorios/auditoria_modulos_apoio.md
+Dependencies
+Adicionar Métricas ao menu principal e popular Frota no demo
