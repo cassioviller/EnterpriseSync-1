@@ -1336,8 +1336,11 @@ def _seed():
     )
     db.session.add(orc); db.session.flush()
 
-    # (a) padrão herdado — Task #34: override explícito para tmpl_alv para que o
-    # preview de cronograma mostre 2 itens com template definido (além do item C).
+    # Task #34 — Demo exige >= 2 itens com cronograma_template_override_id definido
+    # para que o accordion "Preview do Cronograma" na tela do orçamento mostre a
+    # árvore em ação com múltiplos serviços e templates distintos.
+    # (a) override explícito para tmpl_alv (mesmo template padrão do serviço),
+    #     garantindo que o preview mostre a "origem=override" explicitamente.
     it_a = OrcamentoItem(
         admin_id=aid, orcamento_id=orc.id, ordem=1,
         servico_id=serv_alv.id, descricao="Alvenaria — Bloco A (cenário A: padrão)",

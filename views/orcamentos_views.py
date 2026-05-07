@@ -225,6 +225,24 @@ def editar(id):
         logger.exception('erro ao montar preview de cronograma do orcamento')
         arvore_cronograma = []
 
+    # Task #34 — contar subatividades (folhas) previstas no cronograma.
+    # Cada folha (nó sem filhos) vira uma TarefaCronograma ao aprovar a proposta.
+    def _contar_folhas(nos):
+        total = 0
+        for n in nos:
+            filhos = n.get('filhos') or []
+            if filhos:
+                total += _contar_folhas(filhos)
+            else:
+                total += 1
+        return total
+
+    n_tarefas_previstas = sum(
+        _contar_folhas(no.get('filhos') or [])
+        for no in arvore_cronograma
+        if not no.get('sem_template') and no.get('marcado')
+    )
+
     # Task #34 — banner de navegação: obra com cronograma materializado
     # derivado de proposta aprovada deste orçamento.
     obra_com_cronograma = None
@@ -256,6 +274,7 @@ def editar(id):
         templates_proposta=templates_proposta,
         obras_com_operacional=obras_com_operacional,
         arvore_cronograma=arvore_cronograma,
+        n_tarefas_previstas=n_tarefas_previstas,
         obra_com_cronograma=obra_com_cronograma,
     )
 
@@ -733,10 +752,32 @@ def gerar_proposta(id):
 @login_required
 @admin_required
 def preview_cronograma(id):
-    """Retorna a árvore de cronograma prevista para o orçamento (JSON).
+    """GET /orcamentos/<id>/preview-cronograma — árvore de cronograma prevista (JSON).
 
-    Útil para AJAX futuro. Atualmente a view editar() já passa a árvore
-    ao template de forma síncrona — este endpoint serve como contrato da API.
+    Serializa a mesma estrutura montada por montar_arvore_preview_orcamento:
+        {
+            "arvore": [
+                {
+                    "orcamento_item_id": int,
+                    "servico_id": int | null,
+                    "servico_nome": str,
+                    "template_id": int | null,
+                    "template_nome": str | null,
+                    "origem_template": "override" | "padrao" | null,
+                    "sem_template": bool,
+                    "horas_totais_estimadas": float,
+                    "marcado": bool,
+                    "filhos": [ ...nós do template... ]
+                }, ...
+            ],
+            "total_horas": float,
+            "n_sem_template": int,
+            "n_com_template": int
+        }
+
+    Usado pela view editar() de forma síncrona (server-side rendering) e
+    disponível como endpoint JSON para futuras chamadas AJAX/fetch.
+    Tenant-safe: filtra por admin_id via _admin_id().
     """
     admin_id = _admin_id()
     orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
@@ -745,13 +786,15 @@ def preview_cronograma(id):
         arvore = montar_arvore_preview_orcamento(orc, admin_id)
     except Exception as e:
         logger.exception('preview_cronograma: erro ao montar árvore')
-        return jsonify({'erro': str(e), 'arvore': [], 'total_horas': 0, 'n_sem_template': 0}), 500
+        return jsonify({'erro': str(e), 'arvore': [], 'total_horas': 0, 'n_sem_template': 0, 'n_com_template': 0}), 500
     total_horas = sum(n.get('horas_totais_estimadas', 0.0) for n in arvore)
     n_sem_template = sum(1 for n in arvore if n.get('sem_template'))
+    n_com_template = len(arvore) - n_sem_template
     return jsonify({
         'arvore': arvore,
         'total_horas': round(total_horas, 2),
         'n_sem_template': n_sem_template,
+        'n_com_template': n_com_template,
     })
 
 

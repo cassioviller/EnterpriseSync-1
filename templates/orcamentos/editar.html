@@ -5,6 +5,9 @@
 {% endblock %}
 {% block content %}
 {% set o = orcamento %}
+{# Task #34 — variáveis de preview de cronograma usadas no modal e no accordion #}
+{% set _n_sem_tmpl = arvore_cronograma | selectattr('sem_template') | list | length %}
+{% set _total_horas = arvore_cronograma | sum(attribute='horas_totais_estimadas') %}
 <div class="container-fluid py-3">
 
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -49,6 +52,26 @@
             validade e itens inclusos/exclusos. Você poderá <strong>revisar</strong> tudo antes
             de enviar ao cliente. O cliente vê apenas descrição e preço de venda dos serviços.
           </p>
+
+          {# Task #34 — Resumo do cronograma que será gerado automaticamente #}
+          {% set _n_com_tmpl = arvore_cronograma | rejectattr('sem_template') | list | length %}
+          {% if _n_com_tmpl > 0 %}
+          <div class="alert alert-info py-2 small mb-3">
+            <i class="fas fa-calendar-alt me-1"></i>
+            <strong>Cronograma automático:</strong>
+            {{ _n_com_tmpl }} serviço(s) · <strong>{{ n_tarefas_previstas }} tarefa(s)</strong> de cronograma serão criadas
+            {% if _n_sem_tmpl > 0 %}
+            · <span class="text-warning fw-bold">{{ _n_sem_tmpl }} sem template</span> (não terão tarefas)
+            {% endif %}
+            · <strong>{{ _total_horas|round(1) }}h</strong> estimadas.
+            O cronograma será materializado automaticamente quando a proposta for aprovada.
+          </div>
+          {% elif arvore_cronograma %}
+          <div class="alert alert-warning py-2 small mb-3">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Nenhum item possui template de cronograma — a proposta será gerada sem cronograma automático.
+          </div>
+          {% endif %}
 
           <div class="list-group">
             {# Opção sem modelo — mantém comportamento legado #}
@@ -551,8 +574,6 @@
   {% endfor %}
 
   {# Task #34 — Accordion: Preview do Cronograma a gerar #}
-  {% set _n_sem_tmpl = arvore_cronograma | selectattr('sem_template') | list | length %}
-  {% set _total_horas = arvore_cronograma | sum(attribute='horas_totais_estimadas') %}
   <div class="accordion mb-3 mt-3" id="accordionCronograma">
     <div class="accordion-item">
       <h2 class="accordion-header" id="headCrono">
@@ -577,6 +598,16 @@
             <i class="fas fa-info-circle me-1"></i>
             Nenhum item no orçamento ainda. Adicione serviços com template de cronograma
             para ver a prévia aqui.
+          </div>
+          {% elif _n_sem_tmpl == arvore_cronograma|length %}
+          {# Todos os itens sem template — estado vazio com orientação #}
+          <div class="alert alert-warning mb-0 small">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            <strong>Nenhum serviço tem template de cronograma configurado.</strong>
+            A proposta será gerada, mas <strong>não haverá cronograma automático</strong>.
+            Para ativar: acesse o <a href="{{ url_for('cronograma.listar_templates') }}">Catálogo de Templates</a>
+            e defina um template padrão para cada serviço, ou use o seletor de template
+            por linha nos itens abaixo.
           </div>
           {% else %}
           <p class="text-muted small mb-2">

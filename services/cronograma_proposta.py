@@ -1,11 +1,18 @@
 """
 Task #102 — Cronograma automático na aprovação da proposta.
+Task #34  — Preview de cronograma diretamente na tela do orçamento.
 
 Funções:
     - montar_arvore_preview(proposta, admin_id): monta a árvore consolidada
       Serviço → Grupo → Subatividade derivada do CronogramaTemplate vinculado a
       cada Serviço (Servico.template_padrao_id), com flag `marcado=True` por
-      padrão.
+      padrão. Opera sobre PropostaItem.
+    - montar_arvore_preview_orcamento(orcamento, admin_id): mesma lógica de
+      montar_arvore_preview, mas opera sobre OrcamentoItem — permite exibir o
+      preview do cronograma diretamente na tela de edição do orçamento, antes
+      de gerar a proposta. Respeita a precedência override > padrão do serviço
+      (Task #118). Retorna estrutura idêntica, porém com chave
+      `orcamento_item_id` em vez de `proposta_item_id`.
     - materializar_cronograma(proposta, admin_id, obra_id, arvore_marcada=None):
       cria TarefaCronograma (3 níveis) + ItemMedicaoCronogramaTarefa com peso
       por horas para cada nó marcado. Idempotente: nunca duplica para o mesmo
@@ -16,7 +23,7 @@ Funções:
 Decisões:
     - Peso é calculado por `duracao_estimada_horas` da SubatividadeMestre
       vinculada (fallback: divisão igual entre folhas marcadas).
-    - PropostaItem sem servico/template é exibido na árvore como
+    - PropostaItem/OrcamentoItem sem servico/template é exibido na árvore como
       `sem_template=True` e marcação default = False (não materializa tarefa).
     - Atomicidade é responsabilidade do caller (handler) — funções operam
       via db.session sem commit explícito.
