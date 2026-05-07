@@ -7,11 +7,34 @@
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h2><i class="fas fa-file-invoice-dollar me-2"></i>Contas a Pagar</h2>
+                {% if is_v2 %}
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="{{ url_for('gestao_custos.novo') }}?tipo=DESPESA_GERAL" class="btn btn-success">
+                        <i class="fas fa-coins me-2"></i>Nova Despesa via Gestão de Custos
+                    </a>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                            Mais ações
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('gestao_custos.novo') }}?tipo=DESPESA_GERAL"
+                                   title="Em V2 todo lançamento direto é redirecionado para Gestão de Custos">
+                                    <i class="fas fa-plus me-1"></i> Lançamento Direto (legado)
+                                    <small class="text-muted d-block ps-4">redireciona para Gestão de Custos</small>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                {% else %}
                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNovaConta">
                     <i class="fas fa-plus me-2"></i>Nova Conta a Pagar
                 </button>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -37,7 +60,7 @@
             <form method="get" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
-                    <select name="status" class="form-select" onchange="this.form.submit()">
+                    <select name="status" class="form-select">
                         <option value="">Todos</option>
                         <option value="PENDENTE" {% if request.args.get('status') == 'PENDENTE' %}selected{% endif %}>Pendente</option>
                         <option value="PARCIAL" {% if request.args.get('status') == 'PARCIAL' %}selected{% endif %}>Pago Parcial</option>
@@ -47,7 +70,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Obra</label>
-                    <select name="obra_id" class="form-select" onchange="this.form.submit()">
+                    <select name="obra_id" class="form-select">
                         <option value="">Todas as obras</option>
                         {% for obra in obras %}
                         <option value="{{ obra.id }}" {% if request.args.get('obra_id') == obra.id|string %}selected{% endif %}>
@@ -56,7 +79,10 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
+                <div class="col-md-6 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-2"></i>Filtrar
+                    </button>
                     <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-secondary">
                         <i class="fas fa-times me-2"></i>Limpar Filtros
                     </a>
@@ -333,5 +359,14 @@ function verDetalhes(contaId) {
     // Implementar visualização de detalhes
     alert('Detalhes da conta ' + contaId);
 }
+
+// Abrir modal automaticamente quando vier de /contas-pagar/nova (V1) com ?abrir_modal=1
+document.addEventListener('DOMContentLoaded', function() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('abrir_modal') === '1') {
+        var el = document.getElementById('modalNovaConta');
+        if (el) { new bootstrap.Modal(el).show(); }
+    }
+});
 </script>
 {% endblock %}
