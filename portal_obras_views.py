@@ -33,8 +33,12 @@ portal_obras_bp = Blueprint(
     'portal_obras', __name__, url_prefix='/portal'
 )
 
-UPLOAD_FOLDER = os.path.join('static', 'uploads', 'comprovantes')
-ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf'}
+UPLOAD_FOLDER = os.environ.get(
+    'COMPROVANTE_UPLOAD_DIR',
+    os.path.join('static', 'uploads', 'comprovantes'),
+)
+ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
+MAX_COMPROVANTE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 def _ensure_upload_folder():
@@ -373,19 +377,32 @@ def upload_comprovante(token: str, compra_id: int):
         flash('Nenhum arquivo selecionado.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
-    ext = os.path.splitext(arquivo.filename)[1].lower()
+    ext = os.path.splitext(secure_filename(arquivo.filename))[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        flash('Tipo de arquivo não permitido. Envie imagem ou PDF.', 'danger')
+        flash(
+            'Tipo de arquivo não permitido. Envie PDF, PNG, JPG ou WEBP (máx. 5 MB).',
+            'danger',
+        )
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    # Lê até MAX + 1 byte para detectar arquivos grandes sem consumir memória desnecessariamente
+    dados = arquivo.read(MAX_COMPROVANTE_BYTES + 1)
+    if len(dados) > MAX_COMPROVANTE_BYTES:
+        flash('Arquivo muito grande. O limite é 5 MB.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
     _ensure_upload_folder()
-    nome_seguro = f"comprovante_{compra_id}_{secrets.token_hex(6)}{ext}"
+    nome_seguro = f"comprovante_{compra_id}_{secrets.token_hex(8)}{ext}"
     caminho = os.path.join(UPLOAD_FOLDER, nome_seguro)
-    arquivo.save(caminho)
+    with open(caminho, 'wb') as fh:
+        fh.write(dados)
 
     compra.comprovante_pagamento_url = '/' + caminho.replace('\\', '/')
     db.session.commit()
-    logger.info(f"[PORTAL] Comprovante enviado para compra {compra_id} — obra {obra.id}")
+    logger.info(
+        "[PORTAL] Comprovante enviado para compra %s — obra %s — arquivo %s (%d bytes)",
+        compra_id, obra.id, nome_seguro, len(dados),
+    )
     flash('Comprovante enviado com sucesso!', 'success')
     return redirect(url_for('portal_obras.portal_obra', token=token))
 

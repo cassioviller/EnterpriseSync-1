@@ -1,0 +1,42 @@
+<!-- Compras para aprovação ───────────────────────────────────── -->
+{% if compras_pendentes %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-clipboard-check"></i></span>
+        <h2 class="section-title">Compras para sua aprovação</h2>
+        <span class="section-counter">{{ compras_pendentes|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="row-list">
+            {% for c in compras_pendentes %}
+            <div class="compra-row">
+                <div class="compra-info">
+                    <div class="compra-fornec">{{ c.fornecedor.nome }}</div>
+                    <div class="compra-meta">
+                        <i class="far fa-calendar"></i> {{ c.data_compra.strftime('%d/%m/%Y') }}
+                        {% if c.numero %}&nbsp;·&nbsp;NF {{ c.numero }}{% endif %}
+                    </div>
+                    {% if c.fornecedor.chave_pix %}
+                    <div class="compra-pix"><i class="fas fa-key"></i> PIX <code>{{ c.fornecedor.chave_pix }}</code></div>
+                    {% endif %}
+                </div>
+                <div class="compra-valor">{{ c.valor_total|float|brl }}</div>
+                <span class="pill pill-warning"><i class="fas fa-clock"></i> Pendente</span>
+                <div class="compra-acoes">
+                    <form method="POST" action="{{ url_for('portal_obras.aprovar_compra', token=obra.token_cliente, compra_id=c.id) }}">
+                        <button class="btn btn-portal-success" aria-label="Aprovar compra de {{ c.fornecedor.nome }}">
+                            <i class="fas fa-check me-1"></i> Aprovar
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('portal_obras.recusar_compra', token=obra.token_cliente, compra_id=c.id) }}">
+                        <button class="btn btn-portal-danger" aria-label="Recusar compra de {{ c.fornecedor.nome }}">
+                            <i class="fas fa-times me-1"></i> Recusar
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}

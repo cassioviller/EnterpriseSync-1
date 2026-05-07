@@ -1,0 +1,66 @@
+<!-- Medições ────────────────────────────────────────────────── -->
+{% if medicoes %}
+<section class="section">
+    <div class="section-head">
+        <span class="section-icon"><i class="fas fa-ruler-combined"></i></span>
+        <h2 class="section-title">Medições</h2>
+        <span class="section-counter">{{ medicoes|length }}</span>
+    </div>
+    <div class="card-portal">
+        <div class="row-list">
+            {% for m in medicoes %}
+            <div class="medicao-card">
+                <div class="medicao-head">
+                    <div>
+                        <span class="medicao-num">Medição #{{ "%03d"|format(m.numero) }}</span>
+                        {% if m.periodo_inicio and m.periodo_fim %}
+                        <span class="medicao-periodo">&nbsp;·&nbsp;{{ m.periodo_inicio.strftime('%d/%m/%Y') }} — {{ m.periodo_fim.strftime('%d/%m/%Y') }}</span>
+                        {% elif m.data_inicio and m.data_fim %}
+                        <span class="medicao-periodo">&nbsp;·&nbsp;{{ m.data_inicio.strftime('%d/%m/%Y') }} — {{ m.data_fim.strftime('%d/%m/%Y') }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="medicao-vals">
+                        <span class="medicao-perc">{{ m.percentual_executado|round(1) }}%</span>
+                        {% set val_display = m.valor_a_faturar_periodo if m.valor_a_faturar_periodo and m.valor_a_faturar_periodo|float > 0 else m.valor_medido %}
+                        {% if val_display and val_display|float > 0 %}
+                        <span class="medicao-valor">{{ val_display|float|brl }}</span>
+                        {% endif %}
+                        <span class="pill {% if m.status == 'APROVADO' %}pill-success{% elif m.status == 'FATURADO' %}pill-info{% else %}pill-warning{% endif %}">{{ m.status }}</span>
+                        <a href="{{ url_for('medicao.portal_pdf_extrato', medicao_id=m.id) }}?token={{ obra.token_cliente }}"
+                           target="_blank" rel="noopener"
+                           class="medicao-pdf"
+                           title="Baixar extrato em PDF" aria-label="Baixar extrato em PDF da medição {{ m.numero }}">
+                            <i class="fas fa-file-pdf"></i>
+                        </a>
+                    </div>
+                </div>
+                {% if m.valor_total_medido_periodo and m.valor_total_medido_periodo|float > 0 %}
+                <div class="medicao-meta">
+                    <span>Medido <strong>{{ m.valor_total_medido_periodo|float|brl }}</strong></span>
+                    {% if m.valor_entrada_abatido_periodo and m.valor_entrada_abatido_periodo|float > 0 %}
+                    <span>Entrada <strong class="negativo">−{{ m.valor_entrada_abatido_periodo|float|brl }}</strong></span>
+                    {% endif %}
+                    <span>A faturar <strong class="positivo">{{ (m.valor_a_faturar_periodo|float if m.valor_a_faturar_periodo else 0)|brl }}</strong></span>
+                </div>
+                {% endif %}
+                {% if medicao_contas and medicao_contas.get(m.id) %}
+                {% set cr = medicao_contas[m.id] %}
+                <div class="medicao-meta">
+                    <span>Conta a receber
+                        <span class="pill {% if cr.status == 'PAGO' or cr.status == 'RECEBIDO' %}pill-success{% elif cr.status == 'VENCIDO' %}pill-danger{% else %}pill-warning{% endif %}">{{ cr.status }}</span>
+                    </span>
+                    <span><strong>{{ cr.numero_documento }}</strong></span>
+                    {% if cr.data_vencimento %}
+                    <span>Venc. <strong>{{ cr.data_vencimento.strftime('%d/%m/%Y') }}</strong></span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if m.observacoes %}
+                <div class="medicao-obs">{{ m.observacoes }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
