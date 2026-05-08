@@ -637,6 +637,59 @@
             </div>
             {% endif %}
 
+            {# Task #65 — Seção V1: subatividades salvas com "Equipe do dia" por subatividade #}
+            {% if not (is_v2_active is defined and is_v2_active()) and subatividades_rdo_lista %}
+            <div class="rdo-card slide-in">
+                <div class="rdo-card-header" style="background:linear-gradient(135deg,#198754 0%,#0f5132 100%)">
+                    <h3><i class="fas fa-tasks"></i> Subatividades &amp; Equipe do Dia</h3>
+                </div>
+                <div class="rdo-card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="fas fa-info-circle"></i>
+                        Ajuste o percentual de cada subatividade e defina quais funcionários trabalharam nela.
+                    </p>
+                    {% for sub in subatividades_rdo_lista %}
+                    <div class="card mb-3 border-0 shadow-sm" id="card-sub-edit-{{ sub.id }}">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="badge bg-success">{{ loop.index }}</span>
+                                <strong>{{ sub.nome }}</strong>
+                                {% if sub.unidade_medida_snapshot %}
+                                <small class="text-muted">({{ sub.unidade_medida_snapshot }})</small>
+                                {% endif %}
+                            </div>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-sm-6">
+                                    <label class="form-label small mb-1">Percentual concluído (%)</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" min="0" max="100" step="1"
+                                               class="form-control"
+                                               name="subatividade_{{ sub.id }}"
+                                               value="{{ sub.percentual_conclusao|int }}"
+                                               form="formEditarRDO">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                                {% if sub.meta_produtividade_snapshot %}
+                                <div class="col-sm-6">
+                                    <label class="form-label small mb-1">Qtd produzida ({{ sub.unidade_medida_snapshot or 'un' }})</label>
+                                    <input type="number" min="0" step="any"
+                                           class="form-control form-control-sm"
+                                           name="qtd_{{ sub.id }}"
+                                           value="{{ sub.quantidade_produzida or '' }}"
+                                           form="formEditarRDO">
+                                </div>
+                                {% endif %}
+                            </div>
+                            {# Equipe por subatividade — injetada via JS no DOMContentLoaded #}
+                            <div id="equipe-edit-sub-{{ sub.id }}"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Seção de Funcionários -->
             <div class="rdo-card slide-in">
                 <div class="rdo-card-header">
@@ -950,8 +1003,14 @@ function toggleSubFuncHoras(subMestreId, funcId, checked) {
 // (removido) carregarServicosParaEdicao e funções relacionadas — RDO V2 usa apenas o painel de Cronograma.
 
 function carregarFuncionariosParaEdicao() {
+    // Task #65 — usar dados server-side (funcionariosTodosLista) em vez de fetch
+    // para evitar estado "carregando" permanente quando a API não responde.
+    if (funcionariosTodosLista && funcionariosTodosLista.length > 0) {
+        renderizarFuncionariosParaEdicao(funcionariosTodosLista);
+        return;
+    }
+    // Fallback: tenta API apenas se lista server-side estiver vazia
     const container = document.getElementById('funcionarios-container');
-    
     container.innerHTML = `
         <div class="text-center p-4">
             <div class="spinner-border text-success" role="status">
@@ -960,8 +1019,6 @@ function carregarFuncionariosParaEdicao() {
             <p class="mt-2 text-muted">Carregando funcionários...</p>
         </div>
     `;
-    
-    // Carregar funcionários do admin atual
     fetch('/api/funcionarios-ativos')
         .then(response => response.json())
         .then(data => {
@@ -1968,10 +2025,21 @@ async function excluirSubempreitada(id) {
 }
 {% endif %}
 
+// Task #65 — Injetar "Equipe do dia" nos cards V1 de subatividades
+function injetarEquipeSubatividadesV1() {
+    if (!subatividadesSalvas || subatividadesSalvas.length === 0) return;
+    subatividadesSalvas.forEach(function(sub) {
+        const container = document.getElementById('equipe-edit-sub-' + sub.id);
+        if (!container) return;
+        container.innerHTML = renderCamposEmpregadosPorSubatividade(sub.id);
+    });
+}
+
 // Carregar serviços e funcionários automaticamente ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de edição carregada - iniciando carregamento');
     carregarFuncionariosParaEdicao();
+    injetarEquipeSubatividadesV1(); // Task #65 — equipe por subatividade V1
     carregarGaleria(); // Carregar fotos também
     {% if is_v2_active is defined and is_v2_active() %}
     carregarTarefasRDOEdit();

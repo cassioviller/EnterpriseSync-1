@@ -903,7 +903,9 @@ def visualizar_rdo(id):
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
             db.joinedload(RDO.criado_por),
-            db.joinedload(RDO.fotos)
+            db.joinedload(RDO.fotos),
+            db.joinedload(RDO.equipamentos),
+            db.joinedload(RDO.ocorrencias_rdo),
         ).join(Obra).filter(
             RDO.id == id,
             Obra.admin_id == admin_id_atual
@@ -962,8 +964,18 @@ def visualizar_rdo(id):
                 'funcionario': mo.funcionario,
                 'horas_trabalhadas': 0.0,
                 'atividades': [],
+                'produtividade_real': None,
+                'indice_produtividade': None,
+                'custo_hora_normal': None,
             })
             entry['horas_trabalhadas'] += horas_n
+            # Task #65 — propagar métricas do RDOMaoObra para o dict (último valor não-nulo vence)
+            if getattr(mo, 'produtividade_real', None) is not None:
+                entry['produtividade_real'] = mo.produtividade_real
+            if getattr(mo, 'indice_produtividade', None) is not None:
+                entry['indice_produtividade'] = mo.indice_produtividade
+            if getattr(mo, 'custo_hora_normal', None) is not None:
+                entry['custo_hora_normal'] = float(mo.custo_hora_normal)
 
             nome_atividade = None
             if mo.subatividade and mo.subatividade.nome_subatividade:

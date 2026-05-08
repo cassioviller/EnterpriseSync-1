@@ -1686,6 +1686,39 @@ console.log('Initializing RDO view with light theme...');
                     </div>
                     {% endif %}
                     {% endif %}
+                    {# Task #65 — Métricas de produtividade do dia por funcionário #}
+                    {% if funcionario.produtividade_real is not none %}
+                    <div class="mt-1 w-100" style="font-size:.78rem;">
+                        <span class="badge bg-info bg-opacity-75"
+                              title="Produtividade real do dia: {{ '%.3f'|format(funcionario.produtividade_real) }} unid/h">
+                            <i class="fas fa-tachometer-alt" style="font-size:.65rem"></i>
+                            {{ '%.2f'|format(funcionario.produtividade_real) }} un/h
+                        </span>
+                        {% if funcionario.indice_produtividade is not none %}
+                        {% set _ip = funcionario.indice_produtividade %}
+                        {% if _ip >= 0.9 %}
+                        {% set _ip_cls = 'bg-success' %}
+                        {% elif _ip >= 0.7 %}
+                        {% set _ip_cls = 'bg-warning text-dark' %}
+                        {% else %}
+                        {% set _ip_cls = 'bg-danger' %}
+                        {% endif %}
+                        <span class="badge {{ _ip_cls }} bg-opacity-80 ms-1"
+                              title="Índice de produtividade (real / meta): {{ '%.2f'|format(_ip) }}">
+                            <i class="fas fa-chart-line" style="font-size:.65rem"></i>
+                            {{ '%.0f'|format(_ip * 100) }}%
+                        </span>
+                        {% endif %}
+                        {% if funcionario.custo_hora_normal is not none
+                              and current_user.tipo_usuario.value in ['admin', 'super_admin'] %}
+                        <span class="badge bg-secondary bg-opacity-75 ms-1"
+                              title="Custo/hora: R$ {{ '%.2f'|format(funcionario.custo_hora_normal) }}">
+                            <i class="fas fa-clock" style="font-size:.65rem"></i>
+                            R$ {{ '%.2f'|format(funcionario.custo_hora_normal) }}/h
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {% if funcionario.atividades %}
                     <div class="funcionario-atividades mt-2 w-100" style="text-align: left;">
                         <small class="text-muted d-block mb-1" style="font-weight: 600;">
