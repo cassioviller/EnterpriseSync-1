@@ -1037,7 +1037,26 @@ function _renderListaFuncEdit(subMestreId, lista, query) {
     }).join('');
 }
 
+// Sincroniza horas digitadas no input de volta para o estado em memória
+function sincronizarHorasSubatEdit(subMestreId, funcId, valor) {
+    const lista = _maoObraEditSubat[subMestreId];
+    if (!lista) return;
+    const entry = lista.find(function(f) { return f.id === funcId; });
+    if (entry) entry.horas = parseFloat(valor) || 0;
+}
+
+// Lê valores atuais do DOM antes de re-renderizar (evita sobrescrever edições manuais)
+function _syncHorasFromDOMEdit(subMestreId) {
+    const lista = _maoObraEditSubat[subMestreId];
+    if (!lista) return;
+    lista.forEach(function(func) {
+        const input = document.querySelector(`input[name="sub_func_${subMestreId}_${func.id}_horas"]`);
+        if (input) func.horas = parseFloat(input.value) || 0;
+    });
+}
+
 function adicionarFuncSubatEdit(subMestreId, funcId, funcNome, funcCargo) {
+    _syncHorasFromDOMEdit(subMestreId);
     if (!_maoObraEditSubat[subMestreId]) _maoObraEditSubat[subMestreId] = [];
     if (!_maoObraEditSubat[subMestreId].some(function(f) { return f.id === funcId; })) {
         _maoObraEditSubat[subMestreId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.0 });
@@ -1048,6 +1067,7 @@ function adicionarFuncSubatEdit(subMestreId, funcId, funcNome, funcCargo) {
 }
 
 function removerFuncSubatEdit(subMestreId, funcId) {
+    _syncHorasFromDOMEdit(subMestreId);
     if (_maoObraEditSubat[subMestreId]) {
         _maoObraEditSubat[subMestreId] = _maoObraEditSubat[subMestreId].filter(function(f) { return f.id !== funcId; });
         _renderEquipeEditSubat(subMestreId);
@@ -1072,6 +1092,7 @@ function _renderEquipeEditSubat(subMestreId) {
                    class="form-control form-control-sm"
                    style="width:65px;"
                    form="formEditarRDO"
+                   oninput="sincronizarHorasSubatEdit(${subMestreId}, ${func.id}, this.value)"
                    title="Horas nesta subatividade">
             <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1"
                     onclick="removerFuncSubatEdit(${subMestreId}, ${func.id})">
