@@ -465,6 +465,17 @@ def excluir_rdo(rdo_id):
         flash('Erro ao excluir RDO. Tente novamente.', 'error')
         return redirect(url_for('main.rdos'))
 
+@main_bp.route('/rdo/novo')
+@funcionario_required
+def novo_rdo():
+    """Rota legada — redireciona para o formulário moderno de RDO."""
+    obra_id = request.args.get('obra_id')
+    target = url_for('main.funcionario_rdo_novo')
+    if obra_id:
+        target += f'?obra_id={obra_id}'
+    return redirect(target)
+
+
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
 def criar_rdo():
