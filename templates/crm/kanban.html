@@ -53,22 +53,43 @@
 .crm-card.sortable-ghost { opacity: 0.4; background: #e9ecef; }
 .crm-card.sortable-chosen { box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 .crm-card__nome { font-weight: 600; color: #212529; margin-bottom: 4px; }
-.crm-card__linha { font-size: .82rem; color: #495057; margin-bottom: 2px; }
-.crm-card__valor { font-weight: 700; color: #198754; }
-.crm-card__rodape { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: .75rem; color: #6c757d; }
+.crm-card__linha { font-size: .82rem; color: #212529; margin-bottom: 2px; }
+.crm-card__valor {
+    display: inline-block;
+    font-weight: 700;
+    color: #1a5e35;
+    background: rgba(25,135,84,.10);
+    padding: 1px 8px;
+    border-radius: 12px;
+    margin-top: 2px;
+}
+.crm-card__rodape { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: .75rem; color: #212529; }
 .crm-card__badge {
     font-size: .7rem;
     padding: 2px 6px;
     border-radius: 4px;
     background: #e9ecef;
-    color: #495057;
+    color: #212529;
 }
-.crm-card__badge.success { background: #d1e7dd; color: #0f5132; }
-.crm-card__badge.warning { background: #fff3cd; color: #664d03; }
-.crm-card__badge.danger { background: #f8d7da; color: #842029; }
 .crm-card__acoes { display: flex; gap: 4px; }
 .crm-card__acoes a { color: #6c757d; font-size: .85rem; }
 .crm-card__acoes a:hover { color: #0d6efd; }
+
+/* Urgency backgrounds — faixas de dias parado */
+.crm-card--fresh   { color: #212529; }
+.crm-card--atencao { background: #fffbeb !important; color: #212529; }
+.crm-card--alerta  { background: #fff3e0 !important; color: #212529; }
+.crm-card--critico { background: #fdecea !important; color: #212529; }
+
+/* Pastel por status quando fresh (0–3 dias) */
+.crm-card--fresh.status-em-fila      { background: rgba(108,117,125,.10); }
+.crm-card--fresh.status-em-andamento { background: rgba(13,202,240,.10); }
+.crm-card--fresh.status-enviado      { background: rgba(13,110,253,.10); }
+.crm-card--fresh.status-validacao    { background: rgba(111,66,193,.10); }
+.crm-card--fresh.status-aprovado     { background: rgba(25,135,84,.10); }
+.crm-card--fresh.status-feedback     { background: rgba(253,126,20,.10); }
+.crm-card--fresh.status-congelado    { background: rgba(73,80,87,.10); }
+.crm-card--fresh.status-perdido      { background: rgba(220,53,69,.10); }
 
 /* Cores por status — alinhadas com .sige-status-* (badge / lista) */
 .status-em-fila        { background: #6c757d; }
@@ -166,7 +187,16 @@
                 </div>
                 <div class="crm-coluna__corpo crm-droppable" data-status="{{ col.nome }}">
                     {% for lead in col.leads %}
-                    <div class="crm-card status-{{ slug }}" data-lead-id="{{ lead.id }}">
+                    {% if lead.dias_parado >= 15 %}
+                        {% set urgencia = 'crm-card--critico' %}
+                    {% elif lead.dias_parado >= 7 %}
+                        {% set urgencia = 'crm-card--alerta' %}
+                    {% elif lead.dias_parado >= 4 %}
+                        {% set urgencia = 'crm-card--atencao' %}
+                    {% else %}
+                        {% set urgencia = 'crm-card--fresh' %}
+                    {% endif %}
+                    <div class="crm-card {{ urgencia }} status-{{ slug }}" data-lead-id="{{ lead.id }}">
                         <div class="crm-card__nome">{{ lead.nome }}</div>
                         {% if lead.responsavel %}
                         <div class="crm-card__linha d-flex align-items-center gap-1">
@@ -176,35 +206,25 @@
                         {% endif %}
                         {% if lead.tipo_material %}
                         <div class="crm-card__linha">
-                            <i class="fas fa-cube text-muted me-1" aria-hidden="true"></i>{{ lead.tipo_material.nome }}
-                            {% if lead.tipo_obra %}<span class="text-muted">— {{ lead.tipo_obra.nome }}</span>{% endif %}
+                            <i class="fas fa-cube me-1" aria-hidden="true"></i>{{ lead.tipo_material.nome }}
+                            {% if lead.tipo_obra %}<span>— {{ lead.tipo_obra.nome }}</span>{% endif %}
                         </div>
                         {% endif %}
                         {% if lead.localizacao %}
                         <div class="crm-card__linha">
-                            <i class="fas fa-map-marker-alt text-muted me-1" aria-hidden="true"></i>{{ lead.localizacao }}
+                            <i class="fas fa-map-marker-alt me-1" aria-hidden="true"></i>{{ lead.localizacao }}
                         </div>
                         {% endif %}
                         {% if lead.valor_proposta %}
-                        <div class="crm-card__linha crm-card__valor">
-                            {{ lead.valor_proposta|brl }}
+                        <div class="crm-card__linha">
+                            <span class="crm-card__valor">{{ lead.valor_proposta|brl }}</span>
                         </div>
                         {% endif %}
                         <div class="crm-card__rodape">
                             <span>
-                                {% if lead.dias_parado > 14 %}
-                                <span class="crm-card__badge danger" title="Parado há {{ lead.dias_parado }} dias">
+                                <span class="crm-card__badge" title="Parado há {{ lead.dias_parado }} dias">
                                     <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
                                 </span>
-                                {% elif lead.dias_parado > 7 %}
-                                <span class="crm-card__badge warning" title="Parado há {{ lead.dias_parado }} dias">
-                                    <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
-                                </span>
-                                {% else %}
-                                <span class="crm-card__badge success" title="Parado há {{ lead.dias_parado }} dias">
-                                    <i class="fas fa-clock" aria-hidden="true"></i> {{ lead.dias_parado }}d
-                                </span>
-                                {% endif %}
                             </span>
                             <span class="crm-card__acoes">
                                 <a href="{{ url_for('crm.editar', lead_id=lead.id) }}" title="Editar lead" aria-label="Editar lead">
