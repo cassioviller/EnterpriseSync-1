@@ -948,16 +948,6 @@ STATUS_MAP = {
     'feedback': 'Feedback',
 }
 
-LOOKUP_COLS = {
-    'Responsável':      ('responsavel',   CrmResponsavel),
-    'Origem':           ('origem',        CrmOrigem),
-    'Cadência':         ('cadencia',      CrmCadencia),
-    'Situação':         ('situacao',      CrmSituacao),
-    'Tipo de Material': ('tipo_material', CrmTipoMaterial),
-    'Tipo de obra':     ('tipo_obra',     CrmTipoObra),
-    'Motivo da Perda':  ('motivo_perda',  CrmMotivoPerda),
-}
-
 
 def _resolve_ou_criar_lookup(model, nome_val, admin_id, cache):
     """Busca ou cria item de lista mestra. cache = {tablename:nome_lower: id}."""
