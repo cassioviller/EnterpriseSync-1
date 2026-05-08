@@ -938,66 +938,147 @@ const funcionariosTodosLista = {{ (funcionarios_todos_list or [])|tojson }};
 // Vínculos existentes por subatividade mestre: {sub_mestre_id_str: {func_id_str: horas}}
 const funcionariosVinculadosPorSub = {{ (funcionarios_vinculados_por_sub or {})|tojson }};
 
-/**
- * Gera campos HTML para seleção de funcionários vinculados a uma subatividade específica.
- * Usa o formato sub_func_{sub_mestre_id}_{func_id}_horas para criar RDOMaoObra com subatividade_id.
- */
-function renderCamposEmpregadosPorSubatividade(subMestreId) {
-    if (!funcionariosTodosLista || funcionariosTodosLista.length === 0) return '';
-    // Vínculos existentes apenas para esta subatividade
-    const subKey = String(subMestreId);
-    const vinculadosNestaSub = funcionariosVinculadosPorSub[subKey] || {};
+// === EQUIPE DO DIA POR SUBATIVIDADE (Edição V1) ===
+// Estado: { subMestreId: [{id, nome, cargo, horas}] }
+const _maoObraEditSubat = {};
 
-    let html = `
-        <div class="mt-2 pt-2 border-top border-success border-opacity-25">
-            <div class="fw-semibold small text-success mb-1">
-                <i class="fas fa-users me-1"></i>Funcionários nesta subatividade
-            </div>
-            <div class="row g-1">
-    `;
-    funcionariosTodosLista.forEach(func => {
-        const funcKey = String(func.id);
-        const horasVinculadas = vinculadosNestaSub[funcKey];
-        const jaVinculadoNestaSub = horasVinculadas !== undefined;
-        const horasAtual = jaVinculadoNestaSub ? horasVinculadas : '';
-        html += `
-            <div class="col-12 col-sm-6" style="font-size:.8rem">
-                <div class="input-group input-group-sm">
-                    <div class="input-group-text p-1">
-                        <input class="form-check-input m-0"
-                               type="checkbox"
-                               id="chk_sub_${subMestreId}_${func.id}"
-                               onchange="toggleSubFuncHoras(${subMestreId},${func.id},this.checked)"
-                               ${jaVinculadoNestaSub ? 'checked' : ''}>
+// Pré-popular estado a partir dos vínculos existentes (campo-chave: sub_mestre_id)
+function _inicializarEquipeEditSubat() {
+    if (!subatividadesSalvas || subatividadesSalvas.length === 0) return;
+    subatividadesSalvas.forEach(function(sub) {
+        const subMestreId = sub.id; // id = subatividade_mestre_id (ver rdo_editar_sistema.py)
+        const subKey = String(subMestreId);
+        const vinculados = funcionariosVinculadosPorSub[subKey] || {};
+        _maoObraEditSubat[subMestreId] = [];
+        Object.entries(vinculados).forEach(function([funcIdStr, horas]) {
+            const funcId = parseInt(funcIdStr);
+            const funcObj = funcionariosTodosLista.find(function(f) { return f.id === funcId; });
+            if (funcObj) {
+                _maoObraEditSubat[subMestreId].push({
+                    id: funcId,
+                    nome: funcObj.nome,
+                    cargo: funcObj.funcao || funcObj.cargo || '',
+                    horas: horas || 8.0
+                });
+            }
+        });
+    });
+}
+
+function htmlEquipeSubatividade_Edit(subMestreId) {
+    return `
+        <div class="mt-2 pt-2 border-top">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <small class="fw-bold text-muted"><i class="fas fa-hard-hat"></i> Equipe do dia</small>
+                <div class="position-relative">
+                    <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2"
+                            onclick="abrirSeletorFuncEdit(${subMestreId})" title="Adicionar funcionário">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end shadow" id="dd-func-edit-${subMestreId}"
+                         style="max-height:220px;overflow-y:auto;min-width:220px;display:none;position:absolute;right:0;z-index:1050;">
+                        <div class="px-2 pt-1">
+                            <input type="text" class="form-control form-control-sm mb-1"
+                                   placeholder="Filtrar..." id="filtro-func-edit-${subMestreId}"
+                                   oninput="filtrarListaFuncEdit(${subMestreId}, this.value)">
+                        </div>
+                        <div id="lista-func-edit-${subMestreId}"></div>
                     </div>
-                    <label class="input-group-text flex-grow-1 text-start justify-content-start p-1"
-                           for="chk_sub_${subMestreId}_${func.id}">${func.nome}</label>
-                    <input type="number"
-                           class="form-control p-1"
-                           id="sub_func_horas_${subMestreId}_${func.id}"
-                           name="sub_func_${subMestreId}_${func.id}_horas"
-                           value="${horasAtual}"
-                           step="0.1" min="0" placeholder="h"
-                           form="formEditarRDO"
-                           style="max-width:60px"
-                           ${jaVinculadoNestaSub ? '' : 'disabled'}>
                 </div>
             </div>
-        `;
-    });
-    html += `
+            <div id="equipe-edit-sub-inner-${subMestreId}">
+                <p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>
             </div>
         </div>
     `;
-    return html;
 }
 
-function toggleSubFuncHoras(subMestreId, funcId, checked) {
-    const input = document.getElementById(`sub_func_horas_${subMestreId}_${funcId}`);
-    if (input) {
-        input.disabled = !checked;
-        if (!checked) input.value = '';
+function abrirSeletorFuncEdit(subMestreId) {
+    const dd = document.getElementById(`dd-func-edit-${subMestreId}`);
+    if (!dd) return;
+    const isOpen = dd.style.display !== 'none';
+    document.querySelectorAll('[id^="dd-func-edit-"]').forEach(function(el) { el.style.display = 'none'; });
+    if (isOpen) return;
+    _renderListaFuncEdit(subMestreId, funcionariosTodosLista, '');
+    dd.style.display = 'block';
+    setTimeout(function() {
+        document.addEventListener('click', function _close(e) {
+            if (!dd.contains(e.target)) {
+                dd.style.display = 'none';
+                document.removeEventListener('click', _close);
+            }
+        });
+    }, 100);
+}
+
+function filtrarListaFuncEdit(subMestreId, query) {
+    const filtered = funcionariosTodosLista.filter(function(f) {
+        return f.nome.toLowerCase().includes(query.toLowerCase());
+    });
+    _renderListaFuncEdit(subMestreId, filtered, query);
+}
+
+function _renderListaFuncEdit(subMestreId, lista, query) {
+    const container = document.getElementById(`lista-func-edit-${subMestreId}`);
+    if (!container) return;
+    const jaSelecionados = (_maoObraEditSubat[subMestreId] || []).map(function(f) { return f.id; });
+    const disponiveis = lista.filter(function(f) { return !jaSelecionados.includes(f.id); });
+    if (disponiveis.length === 0) {
+        container.innerHTML = '<p class="text-muted small px-3 py-2 mb-0">Nenhum disponível</p>';
+        return;
     }
+    container.innerHTML = disponiveis.map(function(f) {
+        const cargo = (f.funcao || f.cargo || '').replace(/'/g, "\\'");
+        const nome = f.nome.replace(/'/g, "\\'");
+        return `<button type="button" class="dropdown-item small py-1"
+                    onclick="adicionarFuncSubatEdit(${subMestreId}, ${f.id}, '${nome}', '${cargo}')">
+                    ${f.nome} <small class="text-muted">${f.funcao || f.cargo || ''}</small>
+                </button>`;
+    }).join('');
+}
+
+function adicionarFuncSubatEdit(subMestreId, funcId, funcNome, funcCargo) {
+    if (!_maoObraEditSubat[subMestreId]) _maoObraEditSubat[subMestreId] = [];
+    if (!_maoObraEditSubat[subMestreId].some(function(f) { return f.id === funcId; })) {
+        _maoObraEditSubat[subMestreId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.0 });
+        _renderEquipeEditSubat(subMestreId);
+    }
+    const dd = document.getElementById(`dd-func-edit-${subMestreId}`);
+    if (dd) dd.style.display = 'none';
+}
+
+function removerFuncSubatEdit(subMestreId, funcId) {
+    if (_maoObraEditSubat[subMestreId]) {
+        _maoObraEditSubat[subMestreId] = _maoObraEditSubat[subMestreId].filter(function(f) { return f.id !== funcId; });
+        _renderEquipeEditSubat(subMestreId);
+    }
+}
+
+function _renderEquipeEditSubat(subMestreId) {
+    const container = document.getElementById(`equipe-edit-sub-inner-${subMestreId}`);
+    if (!container) return;
+    const selecionados = _maoObraEditSubat[subMestreId] || [];
+    if (selecionados.length === 0) {
+        container.innerHTML = '<p class="text-muted small mb-0 fst-italic">Nenhum funcionário alocado</p>';
+        return;
+    }
+    container.innerHTML = selecionados.map(function(func) {
+        return `
+        <div class="d-flex align-items-center gap-1 mb-1">
+            <span class="badge bg-secondary text-truncate flex-grow-1" style="max-width:120px;" title="${func.nome}">${func.nome}</span>
+            <input type="number" step="0.5" min="0" max="24"
+                   name="sub_func_${subMestreId}_${func.id}_horas"
+                   value="${func.horas}"
+                   class="form-control form-control-sm"
+                   style="width:65px;"
+                   form="formEditarRDO"
+                   title="Horas nesta subatividade">
+            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1"
+                    onclick="removerFuncSubatEdit(${subMestreId}, ${func.id})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>`;
+    }).join('');
 }
 
 // (removido) carregarServicosParaEdicao e funções relacionadas — RDO V2 usa apenas o painel de Cronograma.
@@ -2025,13 +2106,16 @@ async function excluirSubempreitada(id) {
 }
 {% endif %}
 
-// Task #65 — Injetar "Equipe do dia" nos cards V1 de subatividades
+// Task #65 — Injetar "Equipe do dia" (dropdown + badges) nos cards V1 de subatividades
 function injetarEquipeSubatividadesV1() {
     if (!subatividadesSalvas || subatividadesSalvas.length === 0) return;
+    _inicializarEquipeEditSubat();
     subatividadesSalvas.forEach(function(sub) {
-        const container = document.getElementById('equipe-edit-sub-' + sub.id);
+        const subMestreId = sub.id;
+        const container = document.getElementById('equipe-edit-sub-' + subMestreId);
         if (!container) return;
-        container.innerHTML = renderCamposEmpregadosPorSubatividade(sub.id);
+        container.innerHTML = htmlEquipeSubatividade_Edit(subMestreId);
+        _renderEquipeEditSubat(subMestreId);
     });
 }
 
