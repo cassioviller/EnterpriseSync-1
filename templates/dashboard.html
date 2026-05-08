@@ -359,19 +359,31 @@ html[data-bs-theme="dark"] .header-btn i {
                     <canvas id="custosObraChart" height="120"></canvas>
                     <div class="row mt-3 g-2">
                         {% for obra in custos_obra %}
+                        {% set periodo = obra.realizado_periodo if obra.realizado_periodo is defined else obra.realizado %}
+                        {% set acumulado = obra.realizado_acumulado if obra.realizado_acumulado is defined else obra.realizado %}
+                        {% set pct_acum = (acumulado / obra.orcamento * 100) | round(1) if obra.orcamento > 0 else 0 %}
                         <div class="col-md-4 col-lg-3">
                             <div class="border rounded p-2 {% if obra.estouro %}border-danger bg-danger bg-opacity-10{% else %}border-light{% endif %}">
                                 <div class="fw-semibold text-truncate small" title="{{ obra.nome }}">{{ obra.nome }}</div>
                                 <div class="d-flex justify-content-between mt-1 small">
                                     <span class="text-muted">No período:</span>
                                     <span class="fw-bold {% if obra.estouro %}text-danger{% endif %}">
+<<<<<<< HEAD
                                         R$ {{ '{:,.2f}'.format(obra.get('realizado_periodo', obra.realizado)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+=======
+                                        R$ {{ '{:,.2f}'.format(periodo).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                                     </span>
                                 </div>
                                 <div class="d-flex justify-content-between small">
                                     <span class="text-muted">Acumulado:</span>
+<<<<<<< HEAD
                                     <span class="fw-bold">
                                         R$ {{ '{:,.2f}'.format(obra.get('realizado_acumulado', obra.realizado)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+=======
+                                    <span class="fw-bold text-primary">
+                                        R$ {{ '{:,.2f}'.format(acumulado).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                                     </span>
                                 </div>
                                 {% if obra.orcamento > 0 %}
@@ -380,11 +392,11 @@ html[data-bs-theme="dark"] .header-btn i {
                                     <span>R$ {{ '{:,.2f}'.format(obra.orcamento).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
                                 </div>
                                 <div class="progress mt-1" style="height:4px">
-                                    <div class="progress-bar {% if obra.estouro %}bg-danger{% elif obra.pct > 80 %}bg-warning{% else %}bg-success{% endif %}"
-                                         style="width:{{ [obra.pct, 100]|min }}%"></div>
+                                    <div class="progress-bar {% if pct_acum > 100 %}bg-danger{% elif pct_acum > 80 %}bg-warning{% else %}bg-success{% endif %}"
+                                         style="width:{{ [pct_acum, 100]|min }}%"></div>
                                 </div>
-                                <div class="text-end small {% if obra.estouro %}text-danger{% else %}text-muted{% endif %}">
-                                    {{ obra.pct }}%{% if obra.estouro %} ⚠ estouro{% endif %}
+                                <div class="text-end small {% if pct_acum > 100 %}text-danger{% else %}text-muted{% endif %}">
+                                    {{ pct_acum }}% acumulado{% if pct_acum > 100 %} ⚠ estouro{% endif %}
                                 </div>
                                 {% endif %}
                             </div>
@@ -403,6 +415,27 @@ html[data-bs-theme="dark"] .header-btn i {
             </div>
         </div>
     </div>
+
+    <!-- Gráfico de Linha: Acumulado Mês a Mês por Obra -->
+    {% if serie_temporal_custos %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i> Evolução do Custo Acumulado por Obra
+                    </h5>
+                    {% if data_inicio and data_fim %}
+                    <small class="text-muted">{{ data_inicio.strftime('%d/%m/%Y') }} a {{ data_fim.strftime('%d/%m/%Y') }} — acumulado mês a mês</small>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <canvas id="evolucaoAcumuladoChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- 📈 VISÃO GERAL - KPIs Principais -->
     <div class="section-header">
@@ -959,11 +992,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Gráfico de Custos por Obra — Realizado vs Orçamento (barras agrupadas)
+    // Gráfico de Custos por Obra — Realizado no Período / Acumulado / Orçamento
     const ctxCustos = document.getElementById('custosObraChart');
     if (ctxCustos) {
-        const custosLabels = [{% for o in custos_obra %}'{{ o.nome | replace("'", "\\'") }}'{% if not loop.last %},{% endif %}{% endfor %}];
-        const custosRealizado = [{% for o in custos_obra %}{{ o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosLabels    = [{% for o in custos_obra %}'{{ o.nome | replace("'", "\\'") }}'{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosPeriodo   = [{% for o in custos_obra %}{{ o.realizado_periodo if o.realizado_periodo is defined else o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
+        const custosAcumulado = [{% for o in custos_obra %}{{ o.realizado_acumulado if o.realizado_acumulado is defined else o.realizado }}{% if not loop.last %},{% endif %}{% endfor %}];
         const custosOrcamento = [{% for o in custos_obra %}{{ o.orcamento }}{% if not loop.last %},{% endif %}{% endfor %}];
         new Chart(ctxCustos.getContext('2d'), {
             type: 'bar',
@@ -971,19 +1005,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels: custosLabels,
                 datasets: [
                     {
-                        label: 'Realizado (R$)',
-                        data: custosRealizado,
-                        backgroundColor: custosRealizado.map((v, i) =>
+                        label: 'No Período (R$)',
+                        data: custosPeriodo,
+                        backgroundColor: custosPeriodo.map((v, i) =>
                             custosOrcamento[i] > 0 && v > custosOrcamento[i]
                                 ? 'rgba(220,53,69,0.80)' : 'rgba(13,110,253,0.80)'),
                         borderWidth: 0,
                         borderRadius: 4
                     },
                     {
+                        label: 'Acumulado Total (R$)',
+                        data: custosAcumulado,
+                        backgroundColor: custosAcumulado.map((v, i) =>
+                            custosOrcamento[i] > 0 && v > custosOrcamento[i]
+                                ? 'rgba(220,53,69,0.40)' : 'rgba(13,110,253,0.35)'),
+                        borderColor: custosAcumulado.map((v, i) =>
+                            custosOrcamento[i] > 0 && v > custosOrcamento[i]
+                                ? 'rgba(220,53,69,0.90)' : 'rgba(13,110,253,0.90)'),
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
                         label: 'Orçamento (R$)',
                         data: custosOrcamento,
-                        backgroundColor: 'rgba(108,117,125,0.35)',
-                        borderColor: 'rgba(108,117,125,0.70)',
+                        backgroundColor: 'rgba(108,117,125,0.25)',
+                        borderColor: 'rgba(108,117,125,0.60)',
                         borderWidth: 1,
                         borderRadius: 4
                     }
@@ -1015,6 +1061,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+<<<<<<< HEAD
     // Gráfico de Evolução Mensal de Custos por Obra (série temporal)
     const ctxSerie = document.getElementById('custosSerieChart');
     if (ctxSerie) {
@@ -1040,20 +1087,93 @@ document.addEventListener('DOMContentLoaded', function() {
             data: { labels: _meses, datasets: _datasets },
             options: {
                 responsive: true,
+=======
+    // Gráfico de Linha — Evolução do Acumulado por Obra mês a mês
+    const ctxEvolucao = document.getElementById('evolucaoAcumuladoChart');
+    if (ctxEvolucao) {
+        const serieRaw = {{ serie_temporal_custos | tojson }};
+        // Paleta de cores para até 8 obras
+        const palette = [
+            '#0d6efd','#198754','#dc3545','#fd7e14',
+            '#6f42c1','#20c997','#ffc107','#0dcaf0'
+        ];
+        // Agrupar por obra
+        const obraMap = {};
+        serieRaw.forEach(function(r) {
+            const key = r.obra_id;
+            if (!obraMap[key]) obraMap[key] = { nome: r.nome, meses: {} };
+            obraMap[key].meses[r.ano_mes] = r.custo_mensal;
+        });
+        // Coletar todos os meses únicos ordenados
+        const todosOsMeses = [...new Set(serieRaw.map(r => r.ano_mes))].sort();
+        // Formatar labels como "Jan/26"
+        const nomeMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const labels = todosOsMeses.map(function(am) {
+            const [ano, mes] = am.split('-');
+            return nomeMes[parseInt(mes) - 1] + '/' + ano.slice(2);
+        });
+        // Construir datasets com acumulado corrido por obra
+        const datasets = [];
+        let colorIdx = 0;
+        Object.values(obraMap).forEach(function(obra) {
+            let acum = 0;
+            const data = todosOsMeses.map(function(am) {
+                acum += (obra.meses[am] || 0);
+                return Math.round(acum * 100) / 100;
+            });
+            const cor = palette[colorIdx % palette.length];
+            datasets.push({
+                label: obra.nome,
+                data: data,
+                borderColor: cor,
+                backgroundColor: cor + '22',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.35,
+                fill: false
+            });
+            colorIdx++;
+        });
+        new Chart(ctxEvolucao.getContext('2d'), {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                 plugins: {
                     legend: { position: 'top' },
                     tooltip: {
                         callbacks: {
+<<<<<<< HEAD
                             label: ctx => ctx.dataset.label + ': R$ ' +
                                 ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2})
+=======
+                            label: function(ctx) {
+                                return ctx.dataset.label + ': R$ ' +
+                                    ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                            }
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                         }
                     }
                 },
                 scales: {
+<<<<<<< HEAD
                     x: { ticks: { maxRotation: 30 } },
                     y: {
                         beginAtZero: true,
                         ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 0}) }
+=======
+                    x: { ticks: { maxRotation: 30, minRotation: 0 } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(v) {
+                                return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 0});
+                            }
+                        }
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                     }
                 }
             }

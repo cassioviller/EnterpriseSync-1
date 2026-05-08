@@ -2,77 +2,69 @@
 A multi-tenant business management system for SMBs, designed to automate and streamline critical operations from sales to project execution and financial management.
 
 ## Run & Operate
-_Populate as you build_
+- **Start:** `.pythonlibs/bin/gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app`
+- **Entry point:** `main:app` (imports `app` from `app.py`, registers extra blueprints)
+- **Required env vars:** `DATABASE_URL`, `SESSION_SECRET`
+- **Optional env vars:** `N8N_WEBHOOK_URL`, `SIGE_ENABLE_DEMO_SEED`, `SIGE_ALLOW_PROD_SEED`, `SIGE_FORCE_RESEED`, `UPLOADS_PATH`
 
 ## Stack
-- **Framework:** Flask
-- **ORM:** SQLAlchemy
-- **Database:** PostgreSQL
-- **Frontend:** Bootstrap, Jinja2
-- **Deployment:** Docker
-- **Build Tool:** _Populate as you build_
-- **Validation:** _Populate as you build_
-- **Runtime:** Python (version implied by Flask/SQLAlchemy ecosystem)
+- **Framework:** Flask 3.x with Flask-Login, Flask-SQLAlchemy, Flask-Migrate, Flask-WTF, Flask-CORS, Flask-Limiter
+- **Runtime:** Python 3.11
+- **ORM:** SQLAlchemy 2.x
+- **Database:** PostgreSQL (via Replit's built-in PostgreSQL integration)
+- **Frontend:** Bootstrap + Jinja2 templates
+- **Server:** Gunicorn
 
 ## Where things live
-- **Core application logic:** `views/` Python package (domain-specific modules)
+- **Core app setup:** `app.py` (extensions, blueprints, context processors)
+- **Blueprint registration (extras):** `main.py`
+- **Models:** `models.py` (consolidated SQLAlchemy models)
+- **Migrations:** `migrations.py` (auto-run on startup)
+- **Views/blueprints:** `views/` package + many `*_views.py` files at root
 - **Base HTML template:** `templates/base_completo.html`
-- **Database Schema:** Defined implicitly by SQLAlchemy models
-- **API Contracts:** _Populate as you build_
-- **Theme/Styling:** `static/css/styles.css` (with `.sige-*` namespace for shared partials)
 - **Shared Jinja macros:** `templates/_partials/macros.html`
-- **Manual do Usuário (conteúdo):** `manual/*.md` (sumário em `00_indice.md`, capítulos em `10_*.md` / `2x_*.md` / `3x_*.md`); imagens em `manual/imagens/`. Renderizado por `views/manual_views.py` em `/manual` (visualização) e `/manual/download` (HTML imprimível).
-- **Auditoria mobile + decisões de design (Task #19):** `manual/relatorios/auditoria_mobile.md`.
-- **Auditoria módulos de apoio (Task #18):** `manual/relatorios/auditoria_modulos_apoio.md`; capítulos preenchidos: `manual/20_dashboard.md`, `28_crm.md`, `29_metricas.md`, `30_catalogo.md`, `31_estoque.md`, `32_frota.md`, `33_alimentacao.md`, `34_portal_cliente.md`. Smoke: `scripts/smoke_test_modulos_apoio.py`.
-- **CSS mobile compartilhado:** `static/css/sige-mobile.css` (drawer + bottom nav + helpers `.sige-table-cards`, `.sige-mobile-hide`, `.sige-kpi-grid-mobile`).
-- **Página de preview de celular (dev):** `views/dev_views.py` em `/dev/mobile-preview` — iframe redimensionável (360 / 390 / 414 / 430 / 768 px) com atalhos para as telas críticas. Requer login.
+- **Theme/Styling:** `static/css/styles.css` + `static/css/sige-mobile.css`
+- **Manual do Usuário:** `manual/*.md` rendered by `views/manual_views.py`
+- **Services/business logic:** `services/`
+- **Event handlers:** `handlers/`
+- **Utilities:** `utils/`
 
 ## Architecture decisions
--   **Multi-tenancy and Security:** Implemented with data isolation, RBAC, CSRF, restricted CORS, rate limiting, and secure key handling.
--   **Event-Driven Architecture:** Uses an `EventManager` (Observer Pattern) for automated cross-module data flow.
--   **Atomic DB Transactions:** Utilizes `safe_db_operation` for atomic transactions and automated error diagnostics.
--   **Operational Budget per Obra:** Each `Obra` maintains an editable, versioned copy of its `Orcamento` via `ObraOrcamentoOperacional`, cloning on the first RDO.
--   **Unified UI Theme:** All new and migrated screens (CRM, Métricas) extend `base_completo.html` and use shared Jinja macros for consistent design.
--   **Mobile shell (Task #19):** Em telas <= 991px, `base_completo.html` esconde a navbar desktop e exibe um shell mobile composto por header fixo, **drawer offcanvas** lateral (menu agrupado por seções) e **bottom nav** com 5 atalhos. CSS namespaceado em `static/css/sige-mobile.css` (`.sige-mobile-*`). Tabelas críticas marcadas com `.sige-table-cards` viram cards verticais via CSS, usando `data-label` em cada `<td>`. Cronograma esconde o Gantt no mobile (`.sige-mobile-hide`) e mostra um aviso "melhor em tela maior".
+- **Multi-tenancy:** Data isolation via `admin_id` on every table; RBAC with `TipoUsuario` enum (SUPER_ADMIN, ADMIN, FUNCIONARIO)
+- **Auth:** Flask-Login + internal `Usuario` model + Werkzeug password hashing (no external provider)
+- **Event-driven:** `EventManager` (Observer pattern) for cross-module automation (payroll, costs, webhooks)
+- **Auto-migrations:** `migrations.py` runs on every startup; `fix_all_admin_id_universal` ensures schema consistency
+- **Resilience patterns:** Circuit breakers (`utils/circuit_breaker`), SAGA (`utils/saga`), idempotency (`utils/idempotency`)
+- **Mobile shell:** `base_completo.html` renders drawer offcanvas + bottom nav on screens ≤991px; CSS in `sige-mobile.css`
 
 ## Product
--   **Commercial Management:** Proposal generation, automated calculations, client portal, service catalog, parametric budgeting.
--   **Employee & Payroll:** Registration, automated time clocking, flexible schedules, CLT-compliant payroll, PDF payslips.
--   **Construction Project Management:** Daily Work Reports (RDO) with dynamic service progress, consolidated routing, mobile photo uploads, project measurement, intelligent hour normalization.
--   **Financial & Accounting:** Double-entry bookkeeping, automated journal entries, chart of accounts, DRE, cash flow management.
--   **Logistics & Inventory:** Warehouse management, supplier CRUD, material flow, batch/lot selection, serialized items, optimistic locking.
--   **Fleet Management:** Vehicle management, expense tracking, TCO dashboards, critical alerts.
--   **Food Management:** Mobile-first interface for restaurant entries with dynamic multi-item launching and auto-cost calculation.
--   **Client Portal:** Token-based access for project progress, purchase approval, payment receipt uploads.
--   **Competitive Bidding:** Multi-supplier comparison tool with inline editing.
--   **Automated Project Scheduling (Cronograma V2):** MS-Project-style Gantt chart with task hierarchy and drag-and-drop, automated schedule creation.
--   **CRM Leads:** Kanban view, lead management, configurable master lists, status tracking, historical logging.
+- **Commercial:** Proposal generation, service catalog, parametric budgeting, client portal
+- **HR & Payroll:** Employee registration, time clocking (with facial recognition via DeepFace), CLT payroll, PDF payslips
+- **Construction:** Daily Work Reports (RDO), Gantt scheduling, project measurement, material tracking
+- **Financial:** Double-entry bookkeeping, DRE, cash flow, chart of accounts
+- **Logistics:** Warehouse management, supplier CRUD, material flow, serialized items
+- **Fleet:** Vehicle management, expense tracking, TCO dashboards
+- **Food:** Mobile-first restaurant entry management
+- **CRM:** Kanban leads, status tracking, configurable master lists
 
 ## User preferences
 - Priorizar soluções automáticas que funcionem no deploy
 - Evitar intervenção manual no banco de produção
 - Implementar logs detalhados para debugging
-- Sistema deve ser resiliente a diferenças entre ambientes
-- Interface moderna com cards elegantes em vez de listas simples
-- Design limpo e profissional com gradientes e animações suaves
+- Interface moderna com cards elegantes, gradientes e animações suaves
 - Template unificado em todas as páginas do sistema
-- Contraste adequado de texto (valores em preto) para melhor legibilidade
-- Proteção robusta contra erros de transação de banco de dados
-- Scripts automatizados para deploy de correções críticas em produção
-- Código de produção limpo, separado de testes para performance otimizada
-- Testes dedicados estruturados para validação contínua dos módulos consolidados
-- Links RDO devem apontar para rota moderna `/funcionario/rdo/consolidado` com funcionalidades completas
-- Ambiente de produção com 80 tabelas deve ser preservado durante migrações
 - Operações destrutivas (exclusão) devem usar POST via formulários JavaScript
 - Evitar auto-fill de campos que possam interferir em filtros de busca
 
 ## Gotchas
--   **Demo Refresh:** To reseed the 'Alfa' demo tenant, set `SIGE_FORCE_RESEED=1` in EasyPanel environment variables *before* deployment. **Crucially, remove this flag immediately after the deploy** to prevent subsequent deploys from wiping demo data.
--   **Cross-Tenant References:** The demo reseed process will abort if cross-tenant references are detected to safeguard production data.
+- **Gunicorn path:** Must use `.pythonlibs/bin/gunicorn` (not `python -m gunicorn`) in Replit
+- **Demo reseed:** Set `SIGE_FORCE_RESEED=1` before deploy to reseed Alfa tenant; remove immediately after
+- **Cross-tenant safety:** Demo reseed aborts if cross-tenant references detected
+- **APScheduler:** Not installed — scheduled jobs are disabled (non-critical)
+- **DeepFace model:** Downloads ~38MB SFace model on first boot; cached at `~/.deepface/weights/`
 
 ## Pointers
--   **Flask Documentation:** [https://flask.palletsprojects.com/](https://flask.palletsprojects.com/)
--   **SQLAlchemy Documentation:** [https://docs.sqlalchemy.org/](https://docs.sqlalchemy.org/)
--   **Bootstrap Documentation:** [https://getbootstrap.com/docs/](https://getbootstrap.com/docs/)
--   **Jinja2 Documentation:** [https://jinja.palletsprojects.com/](https://jinja.palletsprojects.com/)
--   **Sortable.js Documentation:** [https://sortablejs.github.io/Sortable/](https://sortablejs.github.io/Sortable/)
+- Flask: https://flask.palletsprojects.com/
+- SQLAlchemy: https://docs.sqlalchemy.org/
+- Bootstrap: https://getbootstrap.com/docs/
+- Jinja2: https://jinja.palletsprojects.com/

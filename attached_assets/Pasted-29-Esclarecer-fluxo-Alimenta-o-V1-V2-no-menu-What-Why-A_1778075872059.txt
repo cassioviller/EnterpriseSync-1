@@ -1,0 +1,34 @@
+29 - Esclarecer fluxo Alimentação V1 × V2 no menu
+What & Why
+Achado Alto da auditoria Task #18. Coexistem duas telas de novo lançamento linkadas no menu:
+
+V1: /alimentacao/lancamentos/novo (ratea por funcionário)
+V2: /alimentacao/lancamentos/novo-v2 (detalha por linha)
+O usuário não sabe qual usar e o cadastro fica inconsistente entre obras (algumas em V1, outras em V2). A V2 é a versão moderna e correta; a V1 deveria estar marcada como legado ou escondida atrás de uma flag.
+
+Em conjunto, dois achados Médio do mesmo módulo:
+
+/alimentacao/dashboard responde 302 (verificar se o redirect é desejado e ajustar o menu).
+V2 não valida quantidade máxima — 9999 num item de R$ 25 gera subtotal absurdo.
+Done looks like
+Menu mostra apenas "Novo Lançamento" apontando para V2.
+V1 fica acessível via URL direta (preservada para compatibilidade) mas com banner "Versão legada — use o Novo Lançamento" no topo.
+/alimentacao/dashboard ou renderiza tela própria, ou o item de menu aponta direto para o destino atual do redirect.
+V2 valida quantidade no range 1..200 (configurável) com mensagem amigável.
+Out of scope
+Migrar lançamentos antigos da V1 para o formato V2.
+Mapear alimentacao_funcionarios_assoc como relationship (achado Médio separado, fica para outra task de saneamento).
+Refazer o módulo do zero.
+Steps
+Ajustar menu — em templates/base_completo.html (e drawer mobile) trocar links V1/V2 por um único "Novo Lançamento" → V2.
+Banner na V1 — no template da V1, adicionar banner amarelo apontando para V2.
+Dashboard — investigar o redirect 302 e decidir entre página própria ou ajuste de menu.
+Validação V2 — adicionar limite na quantidade (min=1, max=200) no form e no handler do POST com mensagem clara.
+Validar — rodar smoke; abrir V1, V2 e dashboard como admin Alfa; testar limite com 1, 200, 9999.
+Relevant files
+templates/base_completo.html (itens de Alimentação)
+templates/alimentacao/lancamento_novo.html (V1)
+templates/alimentacao/lancamento_novo_v2.html (V2)
+alimentacao_views.py
+manual/33_alimentacao.md
+manual/relatorios/auditoria_modulos_apoio.md (seção 7)

@@ -1,0 +1,46 @@
+<script>
+// ── Mapa V2: seleção interativa ────────────────────────────────
+// Classes 'cell-min-val' e 'cell-min-prazo' são aplicadas server-side
+// e devem ser preservadas. Apenas 'cell-selected' é controlada por JS.
+(function() {
+    function applySelectionHighlight(mapaId, itemId) {
+        var radios = document.querySelectorAll(
+            'input.cotacao-radio[data-mapa="' + mapaId + '"][data-item="' + itemId + '"]'
+        );
+        radios.forEach(function(radio) {
+            var cell = radio.closest('td.cotacao-cell');
+            if (!cell) return;
+            if (radio.checked) cell.classList.add('cell-selected');
+            else cell.classList.remove('cell-selected');
+        });
+    }
+
+    document.querySelectorAll('td.cotacao-cell').forEach(function(cell) {
+        cell.addEventListener('click', function() {
+            var radio = cell.querySelector('input.cotacao-radio');
+            if (radio && !radio.disabled) {
+                radio.checked = true;
+                applySelectionHighlight(radio.dataset.mapa, radio.dataset.item);
+            }
+        });
+    });
+
+    document.querySelectorAll('th.forn-header').forEach(function(th) {
+        th.addEventListener('click', function() {
+            var mapaId = th.dataset.mapa;
+            var fornId = th.dataset.forn;
+            var radios = document.querySelectorAll(
+                'input.cotacao-radio[data-mapa="' + mapaId + '"][data-forn="' + fornId + '"]'
+            );
+            radios.forEach(function(radio) {
+                radio.checked = true;
+                applySelectionHighlight(mapaId, radio.dataset.item);
+            });
+        });
+    });
+
+    document.querySelectorAll('input.cotacao-radio:checked').forEach(function(radio) {
+        applySelectionHighlight(radio.dataset.mapa, radio.dataset.item);
+    });
+})();
+</script>

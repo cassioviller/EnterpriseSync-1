@@ -23,7 +23,7 @@ O **Portal do Cliente** (`/portal/obra/<token>`) dá acesso **público** (sem lo
 
 1. **Obras → Detalhes da obra → "Portal do Cliente"**.
 2. Marque a opção **"Ativar Portal"** e clique em **"Salvar"**.
-3. O sistema deveria preencher `obra.token_cliente` com um valor aleatório (`secrets.token_urlsafe(32)`) e exibir o link para copiar.
+3. O sistema preenche `obra.token_cliente` com um valor aleatório (`secrets.token_urlsafe(32)`) e exibe o link para copiar.
 4. **Atenção:** no demo Alfa há obras com `portal_ativo=True` mas `token_cliente=NULL` — confira se a ativação realmente gerou o token antes de enviar o link ao cliente.
 
 ### 2. Enviar o link ao cliente
@@ -51,15 +51,41 @@ O **Portal do Cliente** (`/portal/obra/<token>`) dá acesso **público** (sem lo
 ### 5. Enviar comprovante de pagamento
 
 1. O cliente clica em **"Enviar Comprovante"** dentro de um pedido aprovado.
-2. Faz upload de arquivo (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.pdf`) — limites de extensão definidos em `ALLOWED_EXTENSIONS`.
-3. O arquivo é gravado em `static/uploads/comprovantes/` com nome seguro.
+2. Faz upload de arquivo — extensões permitidas: `.png`, `.jpg`, `.jpeg`, `.webp`, `.pdf` (até **5 MB**).
+3. O arquivo é gravado com nome seguro (prefixo `comprovante_<id>_<hex>`) no diretório de comprovantes.
 4. O lançamento financeiro fica disponível para conferência do tenant.
+
+## Estrutura de templates
+
+O template principal `portal_obra.html` é um shell que inclui parciais:
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `templates/portal/_portal_styles.html` | Todos os estilos CSS do portal |
+| `templates/portal/_portal_hero.html` | Card de progresso + KPIs |
+| `templates/portal/_portal_cronograma.html` | Cronograma em árvore colapsável |
+| `templates/portal/_portal_compras.html` | Compras pendentes + resolvidas + upload de comprovante |
+| `templates/portal/_portal_medicoes.html` | Lista de medições |
+| `templates/portal/_portal_mapas_v2.html` | Mapas de concorrência V2 (abertos e concluídos) |
+| `templates/portal/_portal_rdos.html` | Lista de RDOs finalizados |
+| `templates/portal/_portal_scripts.html` | JavaScript do mapa V2 (seleção interativa) |
+
+Para mudanças visuais, edite a parcial correspondente ao trecho desejado — não é mais necessário navegar por 1300 linhas.
+
+## Configuração de upload (ambiente)
+
+| Variável | Significado | Padrão |
+|----------|-------------|--------|
+| `UPLOADS_PATH` | Diretório **base** para uploads persistentes (usado em produção/EasyPanel). O sistema cria `<UPLOADS_PATH>/comprovantes/` automaticamente. | `static/uploads/` (dentro do projeto) |
+| `MAX_CONTENT_LENGTH` | Limite de payload HTTP (5 MB). Configurado em `app.py`. | `5242880` (5 MB) |
+
+Em **desenvolvimento** (sem `UPLOADS_PATH`), os comprovantes ficam em `static/uploads/comprovantes/` e são servidos pelo Flask normalmente.  
+Em **produção**, defina `UPLOADS_PATH=/var/data/uploads` (ou o caminho do volume persistente); os arquivos serão acessíveis via `/persistent-uploads/comprovantes/<nome>`.
 
 ## Dicas e cuidados
 
 - **Token NULL com portal ativo** é uma falha de configuração — sem token, a URL não pode ser montada e o cliente não acessa. Reabra a tela da obra, desative e reative o portal para forçar a geração.
 - Compartilhar o **token** equivale a compartilhar o portal — qualquer pessoa com o link entra. Para revogar acesso, **desative o portal** ou **regenere o token**.
 - A separação entre `_get_obra_by_token` (usado em ações POST) e `_resolve_obra_for_view` (usado em GET) é proposital: ações destrutivas só rodam com portal ativo; visualizações permitem mostrar a tela amigável de "portal desativado".
-- Os uploads vão para `static/uploads/comprovantes/` — mantenha backup desse diretório no plano de cópia/restore.
+- Upload de comprovante: arquivos > 5 MB ou com extensão não permitida são rejeitados com mensagem amigável — sem exposição de stack trace ao cliente.
 - O portal **não** é multi-tenant no sentido de login: o token já carrega a obra (e o tenant). Não exponha o token em URLs públicas (Trello, redes sociais).
-- O template `portal_obra.html` é **grande (~1300 linhas)** — para mudanças visuais, edite com cuidado e teste em pelo menos uma obra com poucos e uma com muitos RDOs.

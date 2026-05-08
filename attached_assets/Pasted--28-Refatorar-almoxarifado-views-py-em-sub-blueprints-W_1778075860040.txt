@@ -1,0 +1,27 @@
+#28 - Refatorar almoxarifado_views.py em sub-blueprints
+What & Why
+Achado Alto da auditoria Task #18. almoxarifado_views.py é um god-file de ~140 KB com dashboard, CRUD de itens/categorias/fornecedores, entrada/saída/devolução, APIs de consulta e relatórios todos misturados. Manutenção é arriscada: cada alteração precisa ler o arquivo inteiro para evitar regressão, e o LSP fica lento.
+
+Done looks like
+O arquivo monolítico vira um pacote views/almoxarifado/ com sub-módulos por área:
+views/almoxarifado/__init__.py (registra o blueprint e re-exporta o que o resto do sistema importa).
+dashboard.py, itens.py, categorias.py, fornecedores.py, movimentos.py (entrada/saída/devolução), api.py (endpoints JSON), relatorios.py.
+Nenhuma URL muda; nenhuma assinatura de função importada externamente quebra.
+app.py continua importando o blueprint de um único ponto (o __init__.py).
+Smoke test do almoxarifado continua 100%; o roteiro do manual (31_estoque.md) continua válido sem ajustes.
+Out of scope
+Reescrever lógica de negócio (entrada/saída/lotes/serializados).
+Mudar contratos das APIs JSON consumidas pelo front.
+Otimizar o N+1 do dashboard (fica para task separada).
+Steps
+Mapear handlers — listar todas as rotas e funções públicas do arquivo atual; identificar imports externos para garantir compatibilidade.
+Criar pacote — views/almoxarifado/ com __init__.py registrando o blueprint vazio.
+Mover por área — recortar handlers para os sub-módulos correspondentes mantendo decorators e @blueprint.route(...) intactos.
+Atualizar imports — corrigir referências em app.py, em outras views e em scripts; manter o caminho de import antigo via re-export se houver consumidor externo.
+Validar — scripts/smoke_test_modulos_apoio.py precisa passar; abrir todas as telas do almoxarifado no demo Alfa.
+Relevant files
+almoxarifado_views.py (arquivo atual a ser quebrado)
+app.py (registro do blueprint)
+templates/almoxarifado/* (não devem ser alterados)
+manual/relatorios/auditoria_modulos_apoio.md (seção 5)
+scripts/smoke_test_modulos_apoio.py

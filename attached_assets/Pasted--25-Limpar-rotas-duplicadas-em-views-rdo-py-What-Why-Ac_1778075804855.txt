@@ -1,0 +1,28 @@
+#25 - Limpar rotas duplicadas em views/rdo.py
+What & Why
+Achado Alto da auditoria Task #17. Em views/rdo.py a mesma URL é registrada por duas funções diferentes:
+
+/rdo/novo aparece nas linhas ~468 e ~2088.
+/rdo/<int:id> aparece nas linhas ~921 e ~3237.
+Há ainda /rdo/excluir/<id> (linha ~402) e /rdo/<id>/excluir_old (linha ~1506) coexistindo.
+O Flask registra apenas o primeiro handler e ignora silenciosamente os demais — features adicionadas no segundo handler nunca rodam, sem erro visível. Isso já mascarou comportamentos no passado (hora extra removido só de uma cópia, etc.) e é um risco constante de regressão.
+
+Done looks like
+Cada URL do blueprint main_bp em views/rdo.py aparece uma única vez.
+Rotas obsoletas com sufixo _old removidas (após confirmar que nenhum template/JS aponta para elas).
+A funcionalidade ativa hoje (a versão que o Flask realmente serve) é preservada — nada de mudança de comportamento visível ao usuário.
+Smoke test scripts/smoke_test_modulos_criticos.py continua passando 100%.
+Out of scope
+Refatoração ampla do views/rdo.py.
+Mudanças na UI de RDO ou na lógica de cálculo.
+Limpeza de templates duplicados (novo_backup.html etc.) — coberto pela Task #21.
+Steps
+Mapear duplicatas — listar todas as URLs registradas em views/rdo.py e identificar colisões e handlers _old.
+Decidir o handler vencedor — para cada colisão, manter o mais recente/completo; comparar diffs para garantir que nenhum comportamento útil seja perdido.
+Remover duplicatas — apagar handlers redundantes ou renomear funções; se a versão antiga tinha lógica útil, migrá-la para o handler vencedor antes de remover.
+Confirmar consumidores — grep por nome de função e por path em templates/, static/js/ e em outras views, ajustando referências quando necessário.
+Validar — rodar scripts/smoke_test_modulos_criticos.py e abrir manualmente /rdo/novo, /rdo/<id>, /rdo/excluir/<id> no demo Alfa.
+Relevant files
+views/rdo.py:402,468,921,1506,2088,3237
+manual/relatorios/auditoria_modulos_criticos.md
+scripts/smoke_test_modulos_criticos.py

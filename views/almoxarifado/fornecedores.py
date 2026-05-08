@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import login_required
 from datetime import datetime
@@ -6,6 +7,16 @@ import logging
 from app import db
 from models import Fornecedor
 from . import almoxarifado_bp, get_admin_id
+=======
+from flask import render_template, request, redirect, url_for, flash
+from flask_login import login_required
+from app import db
+from models import Fornecedor
+from sqlalchemy import or_
+import logging
+
+from views.almoxarifado import almoxarifado_bp, get_admin_id
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +29,19 @@ def fornecedores():
     if not admin_id:
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
+<<<<<<< HEAD
     
     busca = request.args.get('busca', '').strip()
     
     query = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True)
     
+=======
+
+    busca = request.args.get('busca', '').strip()
+
+    query = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True)
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     if busca:
         query = query.filter(
             or_(
@@ -31,12 +50,22 @@ def fornecedores():
                 Fornecedor.cnpj.ilike(f'%{busca}%')
             )
         )
+<<<<<<< HEAD
     
     fornecedores = query.order_by(Fornecedor.razao_social).all()
     
     return render_template('almoxarifado/fornecedores.html', 
                          fornecedores=fornecedores,
                          busca=busca)
+=======
+
+    fornecedores = query.order_by(Fornecedor.razao_social).all()
+
+    return render_template('almoxarifado/fornecedores.html',
+                           fornecedores=fornecedores,
+                           busca=busca)
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 
 @almoxarifado_bp.route('/fornecedores/criar', methods=['GET', 'POST'])
 @login_required
@@ -46,18 +75,27 @@ def fornecedores_criar():
     if not admin_id:
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     if request.method == 'POST':
         try:
             razao_social = request.form.get('razao_social', '').strip()
             nome_fantasia = request.form.get('nome_fantasia', '').strip()
             cnpj = request.form.get('cnpj', '').replace('.', '').replace('/', '').replace('-', '').strip()
             inscricao_estadual = request.form.get('inscricao_estadual', '').strip()
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             endereco = request.form.get('endereco', '').strip()
             cidade = request.form.get('cidade', '').strip()
             estado = request.form.get('estado', '').strip()
             cep = request.form.get('cep', '').replace('-', '').strip()
+<<<<<<< HEAD
             
             telefone = request.form.get('telefone', '').strip()
             email = request.form.get('email', '').strip()
@@ -73,17 +111,39 @@ def fornecedores_criar():
                 return redirect(url_for('almoxarifado.fornecedores_criar'))
             
             # Verificar se CNPJ já existe
+=======
+
+            telefone = request.form.get('telefone', '').strip()
+            email = request.form.get('email', '').strip()
+            contato_responsavel = request.form.get('contato_responsavel', '').strip()
+
+            if not razao_social:
+                flash('Razão Social é obrigatória', 'danger')
+                return redirect(url_for('almoxarifado.fornecedores_criar'))
+
+            if not cnpj:
+                flash('CNPJ é obrigatório', 'danger')
+                return redirect(url_for('almoxarifado.fornecedores_criar'))
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             existe = Fornecedor.query.filter_by(cnpj=cnpj, admin_id=admin_id).first()
             if existe:
                 flash(f'Já existe um fornecedor cadastrado com o CNPJ {cnpj}', 'danger')
                 return redirect(url_for('almoxarifado.fornecedores_criar'))
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             tipo_fornecedor = request.form.get('tipo_fornecedor', 'OUTRO').strip()
             if tipo_fornecedor not in ('MATERIAL', 'PRESTADOR_SERVICO', 'OUTRO'):
                 tipo_fornecedor = 'OUTRO'
 
+<<<<<<< HEAD
             # Criar fornecedor
             # NOTA: Campo 'nome' é obrigatório no banco - usar razao_social como valor
+=======
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             chave_pix = request.form.get('chave_pix', '').strip()
 
             fornecedor = Fornecedor(
@@ -103,6 +163,7 @@ def fornecedores_criar():
                 chave_pix=chave_pix or None,
                 admin_id=admin_id
             )
+<<<<<<< HEAD
             
             db.session.add(fornecedor)
             db.session.commit()
@@ -110,14 +171,30 @@ def fornecedores_criar():
             flash(f'Fornecedor "{razao_social}" cadastrado com sucesso!', 'success')
             return redirect(url_for('almoxarifado.fornecedores'))
             
+=======
+
+            db.session.add(fornecedor)
+            db.session.commit()
+
+            flash(f'Fornecedor "{razao_social}" cadastrado com sucesso!', 'success')
+            return redirect(url_for('almoxarifado.fornecedores'))
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erro ao criar fornecedor: {str(e)}')
             flash(f'Erro ao cadastrar fornecedor: {str(e)}', 'danger')
             return redirect(url_for('almoxarifado.fornecedores_criar'))
+<<<<<<< HEAD
     
     return render_template('almoxarifado/fornecedores_form.html', fornecedor=None)
 
+=======
+
+    return render_template('almoxarifado/fornecedores_form.html', fornecedor=None)
+
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 @almoxarifado_bp.route('/fornecedores/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
 def fornecedores_editar(id):
@@ -126,20 +203,31 @@ def fornecedores_editar(id):
     if not admin_id:
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
+<<<<<<< HEAD
     
     fornecedor = Fornecedor.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
+=======
+
+    fornecedor = Fornecedor.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     if request.method == 'POST':
         try:
             razao_social = request.form.get('razao_social', '').strip()
             nome_fantasia = request.form.get('nome_fantasia', '').strip()
             cnpj = request.form.get('cnpj', '').replace('.', '').replace('/', '').replace('-', '').strip()
             inscricao_estadual = request.form.get('inscricao_estadual', '').strip()
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             endereco = request.form.get('endereco', '').strip()
             cidade = request.form.get('cidade', '').strip()
             estado = request.form.get('estado', '').strip()
             cep = request.form.get('cep', '').replace('-', '').strip()
+<<<<<<< HEAD
             
             telefone = request.form.get('telefone', '').strip()
             email = request.form.get('email', '').strip()
@@ -155,6 +243,21 @@ def fornecedores_editar(id):
                 return redirect(url_for('almoxarifado.fornecedores_editar', id=id))
             
             # Verificar se CNPJ já existe em outro fornecedor
+=======
+
+            telefone = request.form.get('telefone', '').strip()
+            email = request.form.get('email', '').strip()
+            contato_responsavel = request.form.get('contato_responsavel', '').strip()
+
+            if not razao_social:
+                flash('Razão Social é obrigatória', 'danger')
+                return redirect(url_for('almoxarifado.fornecedores_editar', id=id))
+
+            if not cnpj:
+                flash('CNPJ é obrigatório', 'danger')
+                return redirect(url_for('almoxarifado.fornecedores_editar', id=id))
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             existe = Fornecedor.query.filter(
                 Fornecedor.cnpj == cnpj,
                 Fornecedor.admin_id == admin_id,
@@ -163,13 +266,21 @@ def fornecedores_editar(id):
             if existe:
                 flash(f'Já existe outro fornecedor cadastrado com o CNPJ {cnpj}', 'danger')
                 return redirect(url_for('almoxarifado.fornecedores_editar', id=id))
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             tipo_fornecedor = request.form.get('tipo_fornecedor', 'OUTRO').strip()
             if tipo_fornecedor not in ('MATERIAL', 'PRESTADOR_SERVICO', 'OUTRO'):
                 tipo_fornecedor = 'OUTRO'
 
+<<<<<<< HEAD
             # Atualizar fornecedor
             fornecedor.nome = razao_social  # Campo legado obrigatório
+=======
+            fornecedor.nome = razao_social
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             fornecedor.razao_social = razao_social
             fornecedor.nome_fantasia = nome_fantasia or None
             fornecedor.cnpj = cnpj
@@ -183,6 +294,7 @@ def fornecedores_editar(id):
             fornecedor.contato_responsavel = contato_responsavel or None
             fornecedor.tipo_fornecedor = tipo_fornecedor
             fornecedor.chave_pix = request.form.get('chave_pix', '').strip() or None
+<<<<<<< HEAD
             fornecedor.updated_at = datetime.utcnow()
             
             db.session.commit()
@@ -190,10 +302,19 @@ def fornecedores_editar(id):
             flash(f'Fornecedor "{fornecedor.razao_social}" atualizado com sucesso!', 'success')
             return redirect(url_for('almoxarifado.fornecedores'))
             
+=======
+
+            db.session.commit()
+
+            flash(f'Fornecedor "{razao_social}" atualizado com sucesso!', 'success')
+            return redirect(url_for('almoxarifado.fornecedores'))
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erro ao atualizar fornecedor: {str(e)}')
             flash(f'Erro ao atualizar fornecedor: {str(e)}', 'danger')
+<<<<<<< HEAD
     
     return render_template('almoxarifado/fornecedores_form.html', fornecedor=fornecedor)
 
@@ -201,10 +322,21 @@ def fornecedores_editar(id):
 @login_required
 def fornecedores_deletar(id):
     """Deletar fornecedor (soft delete)"""
+=======
+
+    return render_template('almoxarifado/fornecedores_form.html', fornecedor=fornecedor)
+
+
+@almoxarifado_bp.route('/fornecedores/deletar/<int:id>', methods=['POST'])
+@login_required
+def fornecedores_deletar(id):
+    """Desativar fornecedor (soft delete)"""
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     admin_id = get_admin_id()
     if not admin_id:
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
+<<<<<<< HEAD
     
     fornecedor = Fornecedor.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     
@@ -222,4 +354,20 @@ def fornecedores_deletar(id):
         logger.error(f'Erro ao desativar fornecedor: {str(e)}')
         flash(f'Erro ao desativar fornecedor: {str(e)}', 'danger')
     
+=======
+
+    fornecedor = Fornecedor.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+    try:
+        from datetime import datetime as _dt
+        fornecedor.ativo = False
+        fornecedor.updated_at = _dt.utcnow()
+        db.session.commit()
+        flash(f'Fornecedor "{fornecedor.razao_social}" desativado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao desativar fornecedor: {str(e)}')
+        flash('Erro ao desativar fornecedor', 'danger')
+
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     return redirect(url_for('almoxarifado.fornecedores'))

@@ -330,6 +330,18 @@ select[multiple] option:checked {
 
 {% block content %}
 <div class="lancamento-form-container">
+    <!-- Banner de versão legada -->
+    <div style="margin: 1rem 2rem 0 2rem;">
+        <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+            <i class="fas fa-exclamation-triangle fa-lg"></i>
+            <div>
+                <strong>Versão legada</strong> — use
+                <a href="{{ url_for('alimentacao.lancamento_novo_v2') }}" class="alert-link">Novo Lançamento</a>
+                para o fluxo atual, que permite detalhar itens por funcionário e centro de custo.
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="page-header">
         <div class="header-content">

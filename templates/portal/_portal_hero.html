@@ -1,0 +1,41 @@
+<!-- Hero / progresso geral ───────────────────────────────────── -->
+<section class="section">
+    <div class="hero-card">
+        <div class="progress-ring-wrap">
+            <svg class="progress-ring" viewBox="0 0 120 120" aria-label="Progresso geral da obra">
+                <circle class="ring-bg" cx="60" cy="60" r="50"/>
+                <circle class="ring-fg" cx="60" cy="60" r="50"
+                        stroke-dasharray="314.16"
+                        stroke-dashoffset="{{ 314.16 - (314.16 * perc_geral / 100) }}"/>
+            </svg>
+            <div class="progress-pct">{{ perc_geral }}%</div>
+            <div class="progress-lbl">Progresso geral</div>
+        </div>
+        <div class="hero-stats">
+            <div class="kpi-grid">
+                <div class="kpi">
+                    <div class="kpi-val">{{ cronograma_cliente|length }}</div>
+                    <div class="kpi-lbl">Tarefas</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-val">{{ compras_pendentes|length }}</div>
+                    <div class="kpi-lbl">Compras<br>pendentes</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-val">{{ medicoes|length }}</div>
+                    <div class="kpi-lbl">Medições</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-val">{% if obra.data_inicio %}{{ (hoje - obra.data_inicio).days }}{% else %}—{% endif %}</div>
+                    <div class="kpi-lbl">Dias de obra</div>
+                </div>
+            </div>
+            <div class="obra-info">
+                <div><strong>Início:</strong> {{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '—' }}</div>
+                <div><strong>Previsão fim:</strong> {{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '—' }}</div>
+                <div><strong>Status:</strong> {{ obra.status }}</div>
+                <div><strong>Endereço:</strong> {{ obra.endereco or '—' }}</div>
+            </div>
+        </div>
+    </div>
+</section>

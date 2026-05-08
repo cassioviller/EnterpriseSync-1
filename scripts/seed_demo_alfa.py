@@ -2527,6 +2527,142 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
 
 
 # ---------------------------------------------------------------------------
+# Task #18 — lançamentos demo para o mês corrente (Realizado no Período)
+# ---------------------------------------------------------------------------
+def _seed_custos_mes_atual(admin_id):
+    """Cria lançamentos GestaoCustoPai/Filho no mês corrente para que o
+    gráfico 'Realizado no Período' mostre dados ao filtrar por Mês Atual.
+
+    Idempotente via origem_tabela='demo_mes_atual'. Executa tanto no
+    caminho fresh quanto no idempotente (reseed automático por deploy).
+    """
+    try:
+        from app import db
+        from models import GestaoCustoPai, GestaoCustoFilho, Obra
+        from sqlalchemy import text
+        from datetime import date
+
+        hoje = date.today()
+        dia_ref = hoje.replace(day=10)  # dia 10 do mês corrente
+
+        obras = (
+            Obra.query
+            .filter_by(admin_id=admin_id, ativo=True)
+            .filter(Obra.codigo.in_(["OBR-2026-001", "OBR-2026-002"]))
+            .all()
+        )
+        if not obras:
+            log.warning("Task #18 seed: obras demo não encontradas — pulando")
+            return
+
+        # Entradas diferenciadas por tipo de obra:
+        #   OBR-2026-001 Residencial Bela Vista  → mais Mão de Obra (250 m²)
+        #   OBR-2026-002 Comercial Pinheiros      → mais Material + Subempreitada (1 500 m²)
+        _ENTRADAS_POR_OBRA = {
+            "OBR-2026-001": [
+                # (entidade_nome, tipo_cat, valor, descricao_especifica)
+                ("Mão de Obra Direta",
+                 "MAO_OBRA_DIRETA", 4_200.00,
+                 "Pedreiros e serventes — semana 1 e 2, Bela Vista"),
+                ("Material de Construção",
+                 "MATERIAL",        1_850.00,
+                 "Argamassa, bloco cerâmico e tela soldada — Bela Vista"),
+                ("Equipamentos",
+                 "EQUIPAMENTO",       620.00,
+                 "Aluguel betoneira e andaime tubular — Bela Vista"),
+            ],
+            "OBR-2026-002": [
+                ("Material de Construção",
+                 "MATERIAL",        9_400.00,
+                 "Aço CA-50, forma metálica e concreto usinado — Pinheiros"),
+                ("Mão de Obra Direta",
+                 "MAO_OBRA_DIRETA", 5_800.00,
+                 "Equipe de estrutura e acabamento — semana 1 e 2, Pinheiros"),
+                ("Subempreitada Elétrica",
+                 "SUBEMPREITADA",   3_200.00,
+                 "Subempreitada instalações elétricas prediais — Pinheiros"),
+                ("Equipamentos Pesados",
+                 "EQUIPAMENTO",     1_150.00,
+                 "Locação grua torre e bomba de concreto — Pinheiros"),
+            ],
+        }
+
+        # ------------------------------------------------------------------ #
+        # Limpeza antes da inserção: garante que reseeds (inclusive com      #
+        # valores antigos do Task #18 original) resultem em dados atuais.    #
+        # Apaga GCFs demo_mes_atual do mês corrente para estas obras,        #
+        # depois remove os GCPs órfãos correspondentes.                      #
+        # ------------------------------------------------------------------ #
+        obra_ids = [o.id for o in obras]
+
+        gcfs_antigos = (
+            GestaoCustoFilho.query
+            .filter(
+                GestaoCustoFilho.obra_id.in_(obra_ids),
+                GestaoCustoFilho.admin_id == admin_id,
+                GestaoCustoFilho.origem_tabela == 'demo_mes_atual',
+                db.extract('year',  GestaoCustoFilho.data_referencia) == hoje.year,
+                db.extract('month', GestaoCustoFilho.data_referencia) == hoje.month,
+            )
+            .all()
+        )
+        pai_ids_antigos = list({gcf.pai_id for gcf in gcfs_antigos})
+        for gcf in gcfs_antigos:
+            db.session.delete(gcf)
+        db.session.flush()
+
+        # Remove GCPs que ficaram sem filhos após a limpeza
+        for pai_id in pai_ids_antigos:
+            pai = db.session.get(GestaoCustoPai, pai_id)
+            if pai and not pai.filhos:
+                db.session.delete(pai)
+        db.session.flush()
+
+        # ------------------------------------------------------------------ #
+        # Inserção dos novos lançamentos realistas                            #
+        # ------------------------------------------------------------------ #
+        criados = 0
+        for obra in obras:
+            entradas = _ENTRADAS_POR_OBRA.get(obra.codigo, [])
+            for entidade_nome, tipo_cat, valor, descricao in entradas:
+                gcp = GestaoCustoPai(
+                    admin_id=admin_id,
+                    tipo_categoria=tipo_cat,
+                    entidade_nome=entidade_nome,
+                    valor_total=valor,
+                    valor_solicitado=valor,
+                    status='PENDENTE',
+                    data_vencimento=dia_ref,
+                )
+                db.session.add(gcp)
+                db.session.flush()
+
+                gcf = GestaoCustoFilho(
+                    pai_id=gcp.id,
+                    admin_id=admin_id,
+                    obra_id=obra.id,
+                    data_referencia=dia_ref,
+                    descricao=descricao,
+                    valor=valor,
+                    origem_tabela='demo_mes_atual',
+                )
+                db.session.add(gcf)
+                criados += 1
+
+        db.session.commit()
+        removidos = len(gcfs_antigos)
+        log.info(
+            f"Task #18 seed: {removidos} entrada(s) antigas removidas, "
+            f"{criados} lançamento(s) demo criados "
+            f"para {hoje.strftime('%m/%Y')} em {len(obras)} obra(s)"
+        )
+    except Exception as exc:
+        from app import db as _db
+        _db.session.rollback()
+        log.warning(f"Task #18 seed custos mês atual falhou (não crítico): {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Entry point com guarda de produção
 # ---------------------------------------------------------------------------
 def _seed_custos_mes_atual(admin_id, obra_id):
@@ -2830,10 +2966,14 @@ def main(argv=None):
                 # GestaoCustoFilho. Necessário para deploys que plantaram a
                 # demo ANTES da geração automática existir.
                 _backfill_custos_rdo_demo(existente.id)
+<<<<<<< HEAD
                 from models import Obra as _ObraCheck
                 _op = _ObraCheck.query.filter_by(admin_id=existente.id, codigo="OBR-2026-001").first()
                 if _op:
                     _seed_custos_mes_atual(existente.id, _op.id)
+=======
+                _seed_custos_mes_atual(existente.id)
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                 # Task #6 — verificação também no caminho idempotente, para
                 # detectar regressão em demos legados a cada re-execução.
                 from models import Obra
@@ -2882,7 +3022,11 @@ def main(argv=None):
             # e re-emite 'rdo_finalizado' (idempotente) — fecha custos de
             # mão-de-obra também para demos antigos.
             _backfill_custos_rdo_demo(info["admin_id"])
+<<<<<<< HEAD
             _seed_custos_mes_atual(info["admin_id"], info["obra_id"])
+=======
+            _seed_custos_mes_atual(info["admin_id"])
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             # Task #6 — verificação obrigatória: MAO_OBRA via evento RDO +
             # MATERIAL via processar_compra_normal precisam existir.
             _verificar_custos_demo(

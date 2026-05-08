@@ -12,8 +12,13 @@ import secrets
 from datetime import date, datetime
 
 from flask import (
+<<<<<<< HEAD
     Blueprint, abort, current_app, flash, jsonify, redirect, render_template,
     request, url_for,
+=======
+    Blueprint, abort, current_app, flash, jsonify, redirect,
+    render_template, request, url_for,
+>>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 )
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
