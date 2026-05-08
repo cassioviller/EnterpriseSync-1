@@ -379,7 +379,7 @@ def upload_comprovante(token: str, compra_id: int):
         flash('Nenhum arquivo selecionado.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
-    ext = os.path.splitext(arquivo.filename)[1].lower()
+    ext = os.path.splitext(secure_filename(arquivo.filename))[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         flash('Tipo de arquivo não permitido. Envie imagem ou PDF.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))

@@ -560,6 +560,25 @@ def lancamento_novo_v2():
         _obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
         _funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
         _itens = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
+        # Criar item padrão "Marmita" se nenhum item existir (bootstrap para novos tenants)
+        if not _itens:
+            try:
+                _item_marmita = AlimentacaoItem(
+                    nome='Marmita',
+                    preco_padrao=Decimal('18.00'),
+                    descricao='Marmita padrão',
+                    icone='fas fa-drumstick-bite',
+                    is_default=True,
+                    ordem=0,
+                    admin_id=admin_id
+                )
+                db.session.add(_item_marmita)
+                db.session.commit()
+                _itens = [_item_marmita]
+                logger.info(f"[OK] Item padrao Marmita criado para admin_id={admin_id}")
+            except Exception as _e:
+                logger.error(f"Erro ao criar item padrao: {_e}")
+                db.session.rollback()
         _centros = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).order_by(CentroCusto.nome).all()
         _itens_json = [{'id': i.id, 'nome': i.nome, 'preco_padrao': float(i.preco_padrao),
                         'icone': i.icone or 'fas fa-utensils', 'is_default': i.is_default}
