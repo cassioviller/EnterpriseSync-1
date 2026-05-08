@@ -481,6 +481,8 @@ def _seed():
         Lead, LeadHistorico, CrmResponsavel, LeadStatus,
         CrmOrigem, CrmCadencia, CrmSituacao, CrmTipoMaterial,
         CrmTipoObra, CrmMotivoPerda,
+        # Task #31 — template de proposta no demo Alfa
+        PropostaTemplate, PropostaTemplateClausula,
     )
     from services.orcamento_view_service import (
         snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -1244,6 +1246,81 @@ def _seed():
         coeficiente=Decimal("0.08"),
     )); db.session.flush()
 
+    # Task #31 — PropostaTemplate completo para o demo Alfa (padrao=True).
+    # Criado antes do orçamento para estar disponível ao gerar propostas.
+    tmpl_proposta = PropostaTemplate(
+        nome="Padrão Construtora Alfa",
+        categoria="Residencial",
+        descricao="Template padrão para obras residenciais — Task #31 demo",
+        prazo_entrega_dias=120,
+        validade_dias=15,
+        percentual_nota_fiscal=Decimal("8.0"),
+        condicoes_pagamento=(
+            "30% na assinatura do contrato\n"
+            "40% na conclusão da estrutura\n"
+            "30% na entrega da obra"
+        ),
+        garantias=(
+            "Garantia de 5 anos na estrutura e 1 ano em acabamentos, "
+            "conforme o Código Civil Brasileiro."
+        ),
+        itens_inclusos=(
+            "Mão de obra especializada\n"
+            "Materiais inclusos no escopo\n"
+            "Limpeza final da obra"
+        ),
+        itens_exclusos=(
+            "Projetos arquitetônicos e complementares\n"
+            "Ligações definitivas de água e luz\n"
+            "Alvará de construção"
+        ),
+        consideracoes_gerais=(
+            "Prazo sujeito a condições climáticas. "
+            "Trabalho em dias úteis das 7h às 17h."
+        ),
+        padrao=True,
+        ativo=True,
+        admin_id=aid,
+        criado_por=aid,
+    )
+    db.session.add(tmpl_proposta)
+    db.session.flush()
+    db.session.add_all([
+        PropostaTemplateClausula(
+            proposta_template_id=tmpl_proposta.id,
+            admin_id=aid,
+            titulo="Condições de Pagamento",
+            texto=(
+                "O pagamento será efetuado em 3 parcelas: 30% na assinatura do contrato, "
+                "40% na conclusão da estrutura e 30% na entrega da obra."
+            ),
+            ordem=1,
+        ),
+        PropostaTemplateClausula(
+            proposta_template_id=tmpl_proposta.id,
+            admin_id=aid,
+            titulo="Garantias",
+            texto=(
+                "A Construtora Alfa garante a obra pelo prazo de 5 (cinco) anos para "
+                "estrutura e 1 (um) ano para acabamentos, conforme o Código Civil Brasileiro."
+            ),
+            ordem=2,
+        ),
+        PropostaTemplateClausula(
+            proposta_template_id=tmpl_proposta.id,
+            admin_id=aid,
+            titulo="Disposições Gerais",
+            texto=(
+                "Os serviços serão realizados de segunda a sexta, das 7h às 17h. "
+                "O prazo poderá ser reajustado em caso de condições climáticas adversas "
+                "ou solicitações adicionais do contratante."
+            ),
+            ordem=3,
+        ),
+    ])
+    db.session.flush()
+    log.info("Task #31: PropostaTemplate '%s' (padrao=True) criado com 3 cláusulas", tmpl_proposta.nome)
+
     orc = Orcamento(
         admin_id=aid,
         numero=f"ORC-2026-0001",
@@ -1403,6 +1480,54 @@ def _seed():
     log.info(
         "Task #118 E2E: Proposta #%s aprovada → Obra #%s, %d tarefas materializadas",
         proposta_t118.id, obra_t118.id, len(_qs),
+    )
+
+    # 11.6) Task #31 — Proposta com modelo de template (rascunho aguardando revisão).
+    proposta_com_tmpl = Proposta(numero="TMK31.26", data_proposta=date(2026, 2, 1))
+    proposta_com_tmpl.titulo = orc.titulo + " — Com Modelo de Proposta"
+    proposta_com_tmpl.descricao = orc.descricao
+    proposta_com_tmpl.cliente_id = orc.cliente_id
+    proposta_com_tmpl.cliente_nome = orc.cliente_nome or CLIENTE_NOME
+    proposta_com_tmpl.admin_id = aid
+    proposta_com_tmpl.criado_por = aid
+    proposta_com_tmpl.status = "rascunho"
+    proposta_com_tmpl.valor_total = orc.venda_total or 0
+    proposta_com_tmpl.orcamento_id = orc.id
+    proposta_com_tmpl.proposta_template_id = tmpl_proposta.id
+    proposta_com_tmpl.prazo_entrega_dias = tmpl_proposta.prazo_entrega_dias
+    proposta_com_tmpl.validade_dias = tmpl_proposta.validade_dias
+    proposta_com_tmpl.campos_pendentes_revisao = [
+        'prazo_entrega_dias', 'validade_dias', 'itens_inclusos',
+    ]
+    db.session.add(proposta_com_tmpl)
+    db.session.flush()
+
+    for _idx, _it in enumerate(orc.itens, start=1):
+        db.session.add(PropostaItem(
+            admin_id=aid,
+            proposta_id=proposta_com_tmpl.id,
+            item_numero=_idx, ordem=_idx,
+            descricao=_it.descricao,
+            quantidade=_it.quantidade,
+            unidade=_it.unidade,
+            preco_unitario=_it.preco_venda_unitario or 0,
+            subtotal=_it.venda_total or 0,
+            servico_id=_it.servico_id,
+            quantidade_medida=_it.quantidade,
+            cronograma_template_override_id=_it.cronograma_template_override_id,
+            composicao_snapshot=_it.composicao_snapshot or [],
+        ))
+    db.session.flush()
+
+    from propostas_consolidated import _copiar_clausulas_template_para_proposta
+    _n_clausulas = _copiar_clausulas_template_para_proposta(
+        tmpl_proposta, proposta_com_tmpl, aid
+    )
+    db.session.commit()
+    log.info(
+        "Task #31: Proposta %s (template '%s') criada — %d cláusulas, pendentes=%s",
+        proposta_com_tmpl.numero, tmpl_proposta.nome,
+        _n_clausulas, proposta_com_tmpl.campos_pendentes_revisao,
     )
 
     # 11.7) Task #55 — Compras: 1 Fornecedor + 1 PedidoCompra finalizada

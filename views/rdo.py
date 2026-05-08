@@ -468,26 +468,93 @@ def excluir_rdo(rdo_id):
 @main_bp.route('/rdo/novo')
 @funcionario_required
 def novo_rdo():
-    """Formulário de criação de RDO (novo)."""
+    """Formulário para criar novo RDO com pré-carregamento de atividades"""
     try:
+        logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        logger.info("[LOC] ROTA USADA: /rdo/novo (novo_rdo)")
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+
         obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+
         if not obras:
             flash('É necessário ter pelo menos uma obra cadastrada para criar um RDO.', 'warning')
             return redirect(url_for('main.obras'))
+
         obra_id = request.args.get('obra_id', type=int)
+        atividades_anteriores = []
+
+        if obra_id:
+            ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
+                RDO.data_relatorio.desc()
+            ).first()
+
+            if ultimo_rdo:
+                rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+                atividades_anteriores = [
+                    {
+                        'descricao': rdo_sub.nome_subatividade,
+                        'percentual': rdo_sub.percentual_conclusao,
+                        'observacoes': rdo_sub.observacoes_tecnicas or ''
+                    }
+                    for rdo_sub in rdo_subatividades
+                ]
+            else:
+                servicos_obra = db.session.query(ServicoObraReal, Servico).join(
+                    Servico, ServicoObraReal.servico_id == Servico.id
+                ).filter(
+                    ServicoObraReal.obra_id == obra_id,
+                    ServicoObraReal.ativo == True,
+                    ServicoObraReal.admin_id == admin_id
+                ).all()
+
+                for servico_obra, servico in servicos_obra:
+                    subatividades = SubatividadeMestre.query.filter_by(
+                        servico_id=servico.id, ativo=True
+                    ).order_by(SubatividadeMestre.ordem_padrao).all()
+                    subatividades_list = [
+                        {'id': sub.id, 'nome': sub.nome,
+                         'descricao': sub.descricao or '', 'percentual': 0}
+                        for sub in subatividades
+                    ]
+                    atividades_anteriores.append({
+                        'descricao': servico.nome,
+                        'percentual': 0,
+                        'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}',
+                        'servico_id': servico.id,
+                        'categoria': servico.categoria or 'geral',
+                        'subatividades': subatividades_list
+                    })
+
         data_hoje = date.today().strftime('%Y-%m-%d')
+
+        entregas_alertas = []
+        if obra_id:
+            try:
+                from services.entregas_terceiros import calcular_alertas_terceiros
+                data_ref_str = request.args.get('data') or request.form.get('data_relatorio')
+                data_ref = date.today()
+                if data_ref_str:
+                    try:
+                        data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        data_ref = date.today()
+                _aid = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None)
+                entregas_alertas = calcular_alertas_terceiros(obra_id, hoje=data_ref, admin_id=_aid)['detalhe']
+            except Exception as _e:
+                logger.error(f"Erro carregando alertas terceiros (novo_rdo): {_e}")
+                entregas_alertas = []
+
         return render_template('rdo/novo.html',
                                obras=obras,
                                funcionarios=funcionarios,
                                obra_selecionada=obra_id,
-                               atividades_anteriores=[],
+                               atividades_anteriores=atividades_anteriores,
                                data_hoje=data_hoje,
                                date=date,
-                               entregas_alertas=[])
+                               entregas_alertas=entregas_alertas)
     except Exception as e:
-        logger.error(f"ERRO NOVO RDO: {e}")
+        logger.error(f"ERRO NOVO RDO: {str(e)}")
         return redirect(url_for('main.rdos'))
 
 

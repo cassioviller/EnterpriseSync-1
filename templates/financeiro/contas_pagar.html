@@ -358,6 +358,13 @@ function verDetalhes(contaId) {
     alert('Detalhes da conta ' + contaId);
 }
 
-
+// Abrir modal automaticamente quando vier de /contas-pagar/nova (V1) com ?abrir_modal=1
+document.addEventListener('DOMContentLoaded', function() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('abrir_modal') === '1') {
+        var el = document.getElementById('modalNovaConta');
+        if (el) { new bootstrap.Modal(el).show(); }
+    }
+});
 </script>
 {% endblock %}

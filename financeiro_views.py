@@ -212,9 +212,11 @@ def criar_conta_pagar():
 @financeiro_bp.route('/contas-pagar/nova', methods=['GET', 'POST'])
 @login_required
 def nova_conta_pagar():
-    """Redireciona para Gestão de Custos"""
-    flash('O lançamento de novas despesas é feito pela Gestão de Custos.', 'info')
-    return redirect(url_for('gestao_custos.novo'))
+    """Em V2 redireciona para Gestão de Custos; em V1 abre o modal na listagem."""
+    if is_v2_active():
+        flash('O lançamento de novas despesas é feito pela Gestão de Custos.', 'info')
+        return redirect(url_for('gestao_custos.novo', tipo='DESPESA_GERAL'))
+    return redirect(url_for('financeiro.listar_contas_pagar', abrir_modal=1))
 
 
 @financeiro_bp.route('/contas-pagar/<int:conta_id>/pagar', methods=['GET', 'POST'])
