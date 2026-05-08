@@ -23,6 +23,7 @@ Rotas:
 """
 from __future__ import annotations
 
+import io
 import logging
 import re
 from datetime import datetime, date
@@ -30,7 +31,7 @@ from decimal import Decimal, InvalidOperation
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for,
-    flash, jsonify, abort,
+    flash, jsonify, abort, send_file,
 )
 from flask_login import login_required, current_user
 from sqlalchemy import or_
@@ -906,3 +907,352 @@ def cadastros_excluir(slug, item_id):
 def _redir_cadastros_erro(msg):
     flash(msg, 'danger')
     return redirect(url_for('crm.cadastros'))
+
+
+# ===========================================================================
+# IMPORTAÇÃO / EXPORTAÇÃO EXCEL
+# ===========================================================================
+
+CABECALHOS_MODELO = [
+    'Status', 'Data de Chegada', 'Data de Envio', 'Pasta', 'Nome',
+    'Localizaçao', 'Detalhes Loc.', 'Tipo de obra', 'Contato Lead',
+    'Responsável', 'Demanda', 'Origem', 'Cadência', 'Situação',
+    'Tipo de Material', 'Valor da Proposta', 'Motivo da Perda', 'Observação',
+]
+
+EXEMPLO_LINHAS = [
+    [
+        'Em andamento', '15/03/2025', '', 'Pasta A', 'João Silva',
+        'São Paulo', 'Zona Sul', 'Residencial', '(11) 99999-1234',
+        'Maria', 'Reforma completa', 'Indicação', 'Semanal', 'Visita agendada',
+        'Concreto', '85000', '', 'Cliente muito interessado',
+    ],
+    [
+        'Enviado', '20/04/2025', '25/04/2025', '', 'Empresa ABC Ltda',
+        'Campinas', 'Centro', 'Comercial', '(19) 3333-5678',
+        'Carlos', 'Construção nova sede', 'Google', 'Quinzenal', 'Proposta enviada',
+        'Alvenaria', '320000', '', '',
+    ],
+]
+
+STATUS_MAP = {
+    'perdido': 'Perdido',
+    'ganho': 'Aprovado',
+    'aprovado': 'Aprovado',
+    'congelado': 'Congelado',
+    'andamento': 'Em andamento',
+    'em andamento': 'Em andamento',
+    'enviado': 'Enviado',
+    'validação': 'Validação',
+    'validacao': 'Validação',
+    'feedback': 'Feedback',
+}
+
+LOOKUP_COLS = {
+    'Responsável':      ('responsavel',   CrmResponsavel),
+    'Origem':           ('origem',        CrmOrigem),
+    'Cadência':         ('cadencia',      CrmCadencia),
+    'Situação':         ('situacao',      CrmSituacao),
+    'Tipo de Material': ('tipo_material', CrmTipoMaterial),
+    'Tipo de obra':     ('tipo_obra',     CrmTipoObra),
+    'Motivo da Perda':  ('motivo_perda',  CrmMotivoPerda),
+}
+
+
+def _resolve_ou_criar_lookup(model, nome_val, admin_id, cache):
+    """Busca ou cria item de lista mestra. cache = {tablename:nome_lower: id}."""
+    if not nome_val:
+        return None
+    nome_val = str(nome_val).strip()
+    if not nome_val:
+        return None
+    ck = f'{model.__tablename__}:{nome_val.lower()}'
+    if ck in cache:
+        return cache[ck]
+    item = model.query.filter_by(admin_id=admin_id, nome=nome_val).first()
+    if not item:
+        item = model(admin_id=admin_id, nome=nome_val, ativo=True)
+        db.session.add(item)
+        db.session.flush()
+    cache[ck] = item.id
+    return item.id
+
+
+def _normalizar_status(raw):
+    if not raw:
+        return LeadStatus.EM_FILA.value
+    key = str(raw).strip().lower()
+    mapped = STATUS_MAP.get(key)
+    if mapped:
+        for s in LeadStatus:
+            if s.value == mapped:
+                return s.value
+    return LeadStatus.EM_FILA.value
+
+
+@crm_bp.route('/exportar_modelo')
+@login_required
+def exportar_modelo():
+    """Gera e devolve um .xlsx com aba 'Lead.2026' (modelo de importação)."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    admin_id = get_admin_id()
+    if not admin_id or not is_admin_user():
+        flash('Apenas administradores podem exportar o modelo.', 'danger')
+        return redirect(url_for('crm.lista'))
+
+    wb = openpyxl.Workbook()
+
+    # ---- Aba Lead.2026 ----
+    ws = wb.active
+    ws.title = 'Lead.2026'
+
+    header_fill = PatternFill(start_color='1F4E79', end_color='1F4E79', fill_type='solid')
+    header_font = Font(color='FFFFFF', bold=True, size=11)
+
+    for col_idx, cab in enumerate(CABECALHOS_MODELO, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=cab)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', wrap_text=True)
+        ws.column_dimensions[get_column_letter(col_idx)].width = 18
+
+    example_fill = PatternFill(start_color='EBF3FB', end_color='EBF3FB', fill_type='solid')
+    for row_idx, linha in enumerate(EXEMPLO_LINHAS, start=2):
+        for col_idx, val in enumerate(linha, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.fill = example_fill
+
+    ws.freeze_panes = 'A2'
+    ws.row_dimensions[1].height = 30
+
+    # ---- Aba Instruções ----
+    wi = wb.create_sheet('Instruções')
+    wi.column_dimensions['A'].width = 22
+    wi.column_dimensions['B'].width = 60
+
+    titulo_font = Font(bold=True, size=12)
+    secao_font = Font(bold=True, size=11, color='1F4E79')
+
+    wi['A1'] = 'INSTRUÇÕES DE IMPORTAÇÃO'
+    wi['A1'].font = titulo_font
+
+    wi['A3'] = 'Campo obrigatório:'
+    wi['A3'].font = secao_font
+    wi['B3'] = 'Nome  (linhas sem Nome são ignoradas)'
+
+    wi['A5'] = 'Datas:'
+    wi['A5'].font = secao_font
+    wi['B5'] = 'Formato DD/MM/AAAA  (ex: 15/03/2025)'
+
+    wi['A7'] = 'Valor da Proposta:'
+    wi['A7'].font = secao_font
+    wi['B7'] = 'Número sem símbolo (ex: 85000 ou 85000.50)'
+
+    wi['A9'] = 'Valores válidos de Status:'
+    wi['A9'].font = secao_font
+
+    status_info = [
+        ('Em fila', '(padrão quando em branco ou não reconhecido)'),
+        ('Em andamento', ''),
+        ('Enviado', ''),
+        ('Validação', ''),
+        ('Aprovado', '(também aceita "Ganho")'),
+        ('Feedback', ''),
+        ('Congelado', ''),
+        ('Perdido', ''),
+    ]
+    for i, (val, obs) in enumerate(status_info, start=10):
+        wi.cell(row=i, column=1, value=val)
+        wi.cell(row=i, column=2, value=obs)
+
+    linha_obs = 10 + len(status_info) + 1
+    wi.cell(row=linha_obs, column=1, value='Campos lookup:').font = secao_font
+    wi.cell(row=linha_obs, column=2,
+            value='Responsável, Origem, Cadência, Situação, Tipo de Material, '
+                  'Tipo de obra, Motivo da Perda — se o valor não existir nos cadastros, '
+                  'será criado automaticamente.')
+
+    # ---- Enviar como download ----
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        download_name='modelo_leads_crm.xlsx',
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@crm_bp.route('/importar', methods=['POST'])
+@login_required
+def importar():
+    """Importa leads a partir de um .xlsx com aba 'Lead.2026'."""
+    import openpyxl
+
+    admin_id = get_admin_id()
+    if not admin_id or not is_admin_user():
+        flash('Apenas administradores podem importar leads.', 'danger')
+        return redirect(url_for('crm.lista'))
+
+    arquivo = request.files.get('arquivo')
+    if not arquivo or not arquivo.filename:
+        flash('Selecione um arquivo .xlsx para importar.', 'danger')
+        return redirect(url_for('crm.lista'))
+
+    try:
+        wb = openpyxl.load_workbook(arquivo, read_only=True, data_only=True)
+    except Exception as e:
+        flash(f'Não foi possível abrir o arquivo: {e}', 'danger')
+        return redirect(url_for('crm.lista'))
+
+    if 'Lead.2026' not in wb.sheetnames:
+        flash(
+            'O arquivo não contém a aba "Lead.2026". '
+            'Use o modelo correto (botão "Baixar Modelo").',
+            'danger',
+        )
+        return redirect(url_for('crm.lista'))
+
+    ws = wb['Lead.2026']
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        flash('A aba "Lead.2026" está vazia.', 'warning')
+        return redirect(url_for('crm.lista'))
+
+    # Mapear cabeçalhos pelo nome (case-insensitive)
+    header_row = rows[0]
+    col_map = {}
+    for idx, h in enumerate(header_row):
+        if h is not None:
+            col_map[str(h).strip().lower()] = idx
+
+    def _get(row, col_name):
+        idx = col_map.get(col_name.lower())
+        if idx is None:
+            return None
+        val = row[idx] if idx < len(row) else None
+        if val is None:
+            return None
+        s = str(val).strip()
+        return s if s else None
+
+    lookup_cache = {}
+    importados = 0
+    ignorados_sem_nome = 0
+    duplicatas = 0
+    erros = 0
+
+    for row in rows[1:]:
+        if all(c is None for c in row):
+            continue
+
+        nome = _get(row, 'nome')
+        if not nome:
+            ignorados_sem_nome += 1
+            continue
+
+        contato_raw = _get(row, 'contato lead')
+        data_chegada = _to_date(_get(row, 'data de chegada'))
+        if not data_chegada:
+            data_chegada = date.today()
+
+        # Detecção de duplicata: nome + contato + data_chegada
+        dup_q = Lead.query.filter_by(
+            admin_id=admin_id,
+            nome=nome,
+            data_chegada=data_chegada,
+        )
+        if contato_raw:
+            dup_q = dup_q.filter(Lead.contato == contato_raw)
+        if dup_q.first():
+            duplicatas += 1
+            continue
+
+        try:
+            lead = Lead(
+                admin_id=admin_id,
+                nome=nome,
+                data_chegada=data_chegada,
+                data_envio=_to_date(_get(row, 'data de envio')),
+                pasta=_get(row, 'pasta'),
+                localizacao=_get(row, 'localizaçao'),
+                detalhes_localizacao=_get(row, 'detalhes loc.'),
+                contato=contato_raw,
+                demanda=_get(row, 'demanda'),
+                valor_proposta=_to_decimal(_get(row, 'valor da proposta')),
+                observacao=_get(row, 'observação'),
+                status=_normalizar_status(_get(row, 'status')),
+                criado_por_id=current_user.id,
+            )
+
+            # Resolver lookups
+            resp_nome = _get(row, 'responsável')
+            if resp_nome:
+                lead.responsavel_id = _resolve_ou_criar_lookup(
+                    CrmResponsavel, resp_nome, admin_id, lookup_cache)
+
+            orig_nome = _get(row, 'origem')
+            if orig_nome:
+                lead.origem_id = _resolve_ou_criar_lookup(
+                    CrmOrigem, orig_nome, admin_id, lookup_cache)
+
+            cad_nome = _get(row, 'cadência')
+            if cad_nome:
+                lead.cadencia_id = _resolve_ou_criar_lookup(
+                    CrmCadencia, cad_nome, admin_id, lookup_cache)
+
+            sit_nome = _get(row, 'situação')
+            if sit_nome:
+                lead.situacao_id = _resolve_ou_criar_lookup(
+                    CrmSituacao, sit_nome, admin_id, lookup_cache)
+
+            mat_nome = _get(row, 'tipo de material')
+            if mat_nome:
+                lead.tipo_material_id = _resolve_ou_criar_lookup(
+                    CrmTipoMaterial, mat_nome, admin_id, lookup_cache)
+
+            obra_nome = _get(row, 'tipo de obra')
+            if obra_nome:
+                lead.tipo_obra_id = _resolve_ou_criar_lookup(
+                    CrmTipoObra, obra_nome, admin_id, lookup_cache)
+
+            motivo_nome = _get(row, 'motivo da perda')
+            if motivo_nome:
+                lead.motivo_perda_id = _resolve_ou_criar_lookup(
+                    CrmMotivoPerda, motivo_nome, admin_id, lookup_cache)
+
+            if lead.status == LeadStatus.ENVIADO.value and not lead.data_envio:
+                lead.data_envio = date.today()
+
+            db.session.add(lead)
+            db.session.flush()
+            importados += 1
+
+        except Exception as e:
+            logger.warning(f'Erro ao importar linha (nome={nome}): {e}')
+            db.session.rollback()
+            erros += 1
+            continue
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao commitar importação de leads')
+        flash(f'Erro ao salvar leads: {e}', 'danger')
+        return redirect(url_for('crm.lista'))
+
+    partes = [f'{importados} lead(s) importado(s)']
+    if ignorados_sem_nome:
+        partes.append(f'{ignorados_sem_nome} ignorado(s) (sem nome)')
+    if duplicatas:
+        partes.append(f'{duplicatas} já existia(m)')
+    if erros:
+        partes.append(f'{erros} com erro (ver log)')
+
+    flash(', '.join(partes) + '.', 'success' if importados > 0 else 'warning')
+    return redirect(url_for('crm.lista'))

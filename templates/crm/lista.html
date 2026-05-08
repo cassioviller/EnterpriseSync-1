@@ -15,6 +15,13 @@
         <a href="{{ url_for('crm.cadastros') }}" class="btn btn-outline-primary btn-sm">
             <i class="fas fa-cog me-1" aria-hidden="true"></i> Cadastros
         </a>
+        <a href="{{ url_for('crm.exportar_modelo') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-file-excel me-1" aria-hidden="true"></i> Baixar Modelo
+        </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                data-bs-toggle="modal" data-bs-target="#modalImportarLeads">
+            <i class="fas fa-file-import me-1" aria-hidden="true"></i> Importar
+        </button>
         {% endif %}
         <a href="{{ url_for('crm.novo') }}" class="btn btn-primary btn-sm">
             <i class="fas fa-plus me-1" aria-hidden="true"></i> Novo Lead
@@ -143,6 +150,49 @@
         </table>
     {% endcall %}
 </div>
+
+{# Modal de importação Excel #}
+{% if is_admin %}
+<div class="modal fade" id="modalImportarLeads" tabindex="-1" aria-labelledby="modalImportarLeadsLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalImportarLeadsLabel">
+                    <i class="fas fa-file-import me-2 text-primary" aria-hidden="true"></i>
+                    Importar Leads via Excel
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form method="POST" action="{{ url_for('crm.importar') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Selecione um arquivo <strong>.xlsx</strong> com a aba <strong>"Lead.2026"</strong>.
+                        Use o botão <em>"Baixar Modelo"</em> para obter o arquivo no formato correto.
+                    </p>
+                    <div class="mb-3">
+                        <label for="arquivoImportLeads" class="form-label">Arquivo Excel (.xlsx)</label>
+                        <input type="file" class="form-control" id="arquivoImportLeads"
+                               name="arquivo" accept=".xlsx" required>
+                    </div>
+                    <div class="alert alert-info small py-2 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Linhas sem nome serão ignoradas. Duplicatas (mesmo nome + contato + data de chegada)
+                        não serão reimportadas. Campos de lista (Responsável, Origem, etc.) serão criados
+                        automaticamente se não existirem.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1" aria-hidden="true"></i> Importar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {# Modais de exclusão fora da tabela — Bootstrap 5 exige nível body para evitar re-layout/piscar #}
 {% if is_admin %}
