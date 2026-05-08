@@ -25,7 +25,9 @@
    ========================================================================== */
 .sige-mobile-shell,
 .sige-mobile-bottomnav,
-.sige-mobile-only {
+.sige-mobile-only,
+.sige-mobile-drawer,
+.sige-mobile-drawer-backdrop {
     display: none !important;
 }
 
@@ -165,19 +167,20 @@
     /* --- 2.5 Drawer (offcanvas custom) — fica no body --- */
     /* z-index abaixo de modal Bootstrap (1055) — modais sempre dominam */
     .sige-mobile-drawer-backdrop {
+        display: block !important;
         position: fixed; inset: 0;
         background: rgba(15,23,42,.55);
         z-index: 1045; opacity: 0; pointer-events: none;
         transition: opacity .2s ease;
     }
     .sige-mobile-drawer {
+        display: flex !important; flex-direction: column;
         position: fixed; top: 0; bottom: 0; left: 0;
         width: var(--sige-mobile-drawer-w); max-width: var(--sige-mobile-drawer-max);
         background: #fff; color: var(--sige-mobile-text);
         z-index: 1046;
         transform: translateX(-105%);
         transition: transform .25s ease;
-        display: flex; flex-direction: column;
         box-shadow: 4px 0 20px rgba(0,0,0,.18);
     }
     body.sige-mobile-drawer-open .sige-mobile-drawer { transform: translateX(0); }
