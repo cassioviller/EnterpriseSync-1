@@ -1130,11 +1130,16 @@ def importar():
         if h is not None:
             col_map[str(h).strip().lower()] = idx
 
-    def _get(row, col_name):
+    def _get_raw(row, col_name):
+        """Retorna o valor nativo da célula (preserva date/datetime do Excel)."""
         idx = col_map.get(col_name.lower())
         if idx is None:
             return None
-        val = row[idx] if idx < len(row) else None
+        return row[idx] if idx < len(row) else None
+
+    def _get_str(row, col_name):
+        """Retorna o valor como string limpa (None quando vazio)."""
+        val = _get_raw(row, col_name)
         if val is None:
             return None
         s = str(val).strip()
@@ -1150,17 +1155,18 @@ def importar():
         if all(c is None for c in row):
             continue
 
-        nome = _get(row, 'nome')
+        nome = _get_str(row, 'nome')
         if not nome:
             ignorados_sem_nome += 1
             continue
 
-        contato_raw = _get(row, 'contato lead')
-        data_chegada = _to_date(_get(row, 'data de chegada'))
+        # FIX 1: preservar tipo nativo para datas (date/datetime do openpyxl)
+        contato_raw = _get_str(row, 'contato lead')
+        data_chegada = _to_date(_get_raw(row, 'data de chegada'))
         if not data_chegada:
             data_chegada = date.today()
 
-        # Detecção de duplicata: nome + contato + data_chegada
+        # FIX 3: duplicata exata nos 3 campos; contato vazio → só casa com contato vazio/null
         dup_q = Lead.query.filter_by(
             admin_id=admin_id,
             nome=nome,
@@ -1168,59 +1174,64 @@ def importar():
         )
         if contato_raw:
             dup_q = dup_q.filter(Lead.contato == contato_raw)
+        else:
+            dup_q = dup_q.filter(
+                or_(Lead.contato.is_(None), Lead.contato == '')
+            )
         if dup_q.first():
             duplicatas += 1
             continue
 
+        # FIX 2: savepoint por linha — erro isola só esta linha, não desfaz as anteriores
+        sp = db.session.begin_nested()
         try:
             lead = Lead(
                 admin_id=admin_id,
                 nome=nome,
                 data_chegada=data_chegada,
-                data_envio=_to_date(_get(row, 'data de envio')),
-                pasta=_get(row, 'pasta'),
-                localizacao=_get(row, 'localizaçao'),
-                detalhes_localizacao=_get(row, 'detalhes loc.'),
+                data_envio=_to_date(_get_raw(row, 'data de envio')),
+                pasta=_get_str(row, 'pasta'),
+                localizacao=_get_str(row, 'localizaçao'),
+                detalhes_localizacao=_get_str(row, 'detalhes loc.'),
                 contato=contato_raw,
-                demanda=_get(row, 'demanda'),
-                valor_proposta=_to_decimal(_get(row, 'valor da proposta')),
-                observacao=_get(row, 'observação'),
-                status=_normalizar_status(_get(row, 'status')),
+                demanda=_get_str(row, 'demanda'),
+                valor_proposta=_to_decimal(_get_str(row, 'valor da proposta')),
+                observacao=_get_str(row, 'observação'),
+                status=_normalizar_status(_get_str(row, 'status')),
                 criado_por_id=current_user.id,
             )
 
-            # Resolver lookups
-            resp_nome = _get(row, 'responsável')
+            resp_nome = _get_str(row, 'responsável')
             if resp_nome:
                 lead.responsavel_id = _resolve_ou_criar_lookup(
                     CrmResponsavel, resp_nome, admin_id, lookup_cache)
 
-            orig_nome = _get(row, 'origem')
+            orig_nome = _get_str(row, 'origem')
             if orig_nome:
                 lead.origem_id = _resolve_ou_criar_lookup(
                     CrmOrigem, orig_nome, admin_id, lookup_cache)
 
-            cad_nome = _get(row, 'cadência')
+            cad_nome = _get_str(row, 'cadência')
             if cad_nome:
                 lead.cadencia_id = _resolve_ou_criar_lookup(
                     CrmCadencia, cad_nome, admin_id, lookup_cache)
 
-            sit_nome = _get(row, 'situação')
+            sit_nome = _get_str(row, 'situação')
             if sit_nome:
                 lead.situacao_id = _resolve_ou_criar_lookup(
                     CrmSituacao, sit_nome, admin_id, lookup_cache)
 
-            mat_nome = _get(row, 'tipo de material')
+            mat_nome = _get_str(row, 'tipo de material')
             if mat_nome:
                 lead.tipo_material_id = _resolve_ou_criar_lookup(
                     CrmTipoMaterial, mat_nome, admin_id, lookup_cache)
 
-            obra_nome = _get(row, 'tipo de obra')
+            obra_nome = _get_str(row, 'tipo de obra')
             if obra_nome:
                 lead.tipo_obra_id = _resolve_ou_criar_lookup(
                     CrmTipoObra, obra_nome, admin_id, lookup_cache)
 
-            motivo_nome = _get(row, 'motivo da perda')
+            motivo_nome = _get_str(row, 'motivo da perda')
             if motivo_nome:
                 lead.motivo_perda_id = _resolve_ou_criar_lookup(
                     CrmMotivoPerda, motivo_nome, admin_id, lookup_cache)
@@ -1230,13 +1241,13 @@ def importar():
 
             db.session.add(lead)
             db.session.flush()
+            sp.commit()
             importados += 1
 
         except Exception as e:
             logger.warning(f'Erro ao importar linha (nome={nome}): {e}')
-            db.session.rollback()
+            sp.rollback()
             erros += 1
-            continue
 
     try:
         db.session.commit()
@@ -1246,13 +1257,10 @@ def importar():
         flash(f'Erro ao salvar leads: {e}', 'danger')
         return redirect(url_for('crm.lista'))
 
-    partes = [f'{importados} lead(s) importado(s)']
-    if ignorados_sem_nome:
-        partes.append(f'{ignorados_sem_nome} ignorado(s) (sem nome)')
-    if duplicatas:
-        partes.append(f'{duplicatas} já existia(m)')
-    if erros:
-        partes.append(f'{erros} com erro (ver log)')
-
-    flash(', '.join(partes) + '.', 'success' if importados > 0 else 'warning')
+    flash(
+        f'{importados} importado(s), {ignorados_sem_nome} ignorado(s) (sem nome), '
+        f'{duplicatas} já existia(m)' +
+        (f', {erros} com erro (ver log)' if erros else '') + '.',
+        'success' if importados > 0 else 'warning',
+    )
     return redirect(url_for('crm.lista'))
