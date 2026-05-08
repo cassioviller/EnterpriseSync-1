@@ -1160,13 +1160,11 @@ def importar():
             ignorados_sem_nome += 1
             continue
 
-        # FIX 1: preservar tipo nativo para datas (date/datetime do openpyxl)
         contato_raw = _get_str(row, 'contato lead')
         data_chegada = _to_date(_get_raw(row, 'data de chegada'))
         if not data_chegada:
             data_chegada = date.today()
 
-        # FIX 3: duplicata exata nos 3 campos; contato vazio → só casa com contato vazio/null
         dup_q = Lead.query.filter_by(
             admin_id=admin_id,
             nome=nome,
@@ -1182,7 +1180,6 @@ def importar():
             duplicatas += 1
             continue
 
-        # FIX 2: savepoint por linha — erro isola só esta linha, não desfaz as anteriores
         sp = db.session.begin_nested()
         try:
             lead = Lead(
@@ -1258,8 +1255,8 @@ def importar():
         return redirect(url_for('crm.lista'))
 
     flash(
-        f'{importados} importado(s), {ignorados_sem_nome} ignorado(s) (sem nome), '
-        f'{duplicatas} já existia(m)' +
+        f'{importados} leads importados, {ignorados_sem_nome} ignorados (sem nome), '
+        f'{duplicatas} já existiam' +
         (f', {erros} com erro (ver log)' if erros else '') + '.',
         'success' if importados > 0 else 'warning',
     )
