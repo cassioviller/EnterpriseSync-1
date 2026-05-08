@@ -44,16 +44,23 @@
                                 <td><strong>{{ proposta.valor_total|brl }}</strong></td>
                                 <td>
                                     {% set status_class = {
-                                        'Rascunho': 'secondary',
-                                        'Enviada': 'warning',
-                                        'Aprovada': 'success',
-                                        'Rejeitada': 'danger',
-                                        'Expirada': 'dark',
-                                        'Cancelada': 'secondary'
+                                        'rascunho': 'secondary',
+                                        'enviada': 'warning',
+                                        'aprovada': 'success',
+                                        'rejeitada': 'danger',
+                                        'expirada': 'dark',
+                                        'cancelada': 'secondary'
                                     } %}
                                     <span class="badge bg-{{ status_class.get(proposta.status, 'secondary') }}">
-                                        {{ proposta.status }}
+                                        {{ proposta.status|capitalize }}
                                     </span>
+                                    {% if proposta.status == 'aprovada' and proposta.obra_id %}
+                                    <br><a href="{{ url_for('main.detalhes_obra', id=proposta.obra_id) }}"
+                                           class="badge bg-primary text-decoration-none mt-1"
+                                           title="Ver obra vinculada">
+                                        <i class="fas fa-hard-hat me-1"></i>Obra aberta
+                                    </a>
+                                    {% endif %}
                                 </td>
                                 <td>{{ proposta.criado_em.strftime('%d/%m/%Y %H:%M') if proposta.criado_em else '-' }}</td>
                                 <td>
@@ -70,7 +77,7 @@
                                             <i class="fas fa-eye"></i>
                                         </a>
                                         
-                                        {% if proposta.status == 'Rascunho' %}
+                                        {% if proposta.status == 'rascunho' %}
                                         <form method="POST" action="{{ url_for('propostas.enviar', id=proposta.id) }}" 
                                               style="display: inline;" onsubmit="return confirm('Enviar proposta para o cliente?')">
                                             <button type="submit" class="btn btn-sm btn-success" title="Enviar para Cliente">
@@ -79,8 +86,8 @@
                                         </form>
                                         {% endif %}
                                         
-                                        {% if proposta.token_acesso %}
-                                        <a href="{{ url_for('main.cliente_proposta', token=proposta.token_acesso) }}" 
+                                        {% if proposta.token_cliente %}
+                                        <a href="{{ url_for('propostas.portal_cliente', token=proposta.token_cliente) }}" 
                                            class="btn btn-sm btn-info" target="_blank" title="Ver Portal do Cliente">
                                             <i class="fas fa-external-link-alt"></i>
                                         </a>

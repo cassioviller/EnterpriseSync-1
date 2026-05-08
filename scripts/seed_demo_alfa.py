@@ -486,7 +486,7 @@ def _seed():
         # Task #31 — template de proposta no demo Alfa
         PropostaTemplate, PropostaTemplateClausula,
         # Task #46 — frota, folha, contabilidade, fluxo de caixa
-        Vehicle, VehicleExpense, VehicleUsage,
+        Veiculo, UsoVeiculo, CustoVeiculo,
         FolhaProcessada,
         PlanoContas, LancamentoContabil, PartidaContabil, FluxoCaixa,
     )
@@ -2408,29 +2408,25 @@ def _seed():
     db.session.commit()
 
     # 15) Frota — 2 veículos, despesas e utilizações --------------------------
-    veiculo_hilux = Vehicle(
+    veiculo_hilux = Veiculo(
         admin_id=aid,
         placa="ABC-1234",
         marca="Toyota", modelo="Hilux SRX 2.8 4WD",
         ano=2022, tipo="Picape",
         km_atual=42800, cor="Prata",
         combustivel="Diesel",
-        data_vencimento_ipva=date(2026, 3, 31),
-        data_vencimento_seguro=date(2026, 10, 15),
         data_ultima_manutencao=date(2026, 1, 15),
         data_proxima_manutencao=date(2026, 7, 15),
         km_proxima_manutencao=50000,
         ativo=True,
     )
-    veiculo_sprinter = Vehicle(
+    veiculo_sprinter = Veiculo(
         admin_id=aid,
         placa="DEF-5678",
         marca="Mercedes-Benz", modelo="Sprinter 415 CDI",
         ano=2021, tipo="Van",
         km_atual=68200, cor="Branco",
         combustivel="Diesel",
-        data_vencimento_ipva=date(2026, 2, 28),
-        data_vencimento_seguro=date(2026, 8, 30),
         data_ultima_manutencao=date(2025, 12, 10),
         data_proxima_manutencao=date(2026, 6, 10),
         km_proxima_manutencao=75000,
@@ -2440,7 +2436,7 @@ def _seed():
     db.session.flush()
 
     despesas_frota = [
-        VehicleExpense(
+        CustoVeiculo(
             admin_id=aid, veiculo_id=veiculo_hilux.id, obra_id=obra.id,
             data_custo=date(2026, 2, 5), tipo_custo="Combustível",
             valor=Decimal("280.00"),
@@ -2448,7 +2444,7 @@ def _seed():
             fornecedor="Posto Ipiranga", status_pagamento="Pago",
             forma_pagamento="Cartão", km_veiculo=41500,
         ),
-        VehicleExpense(
+        CustoVeiculo(
             admin_id=aid, veiculo_id=veiculo_hilux.id, obra_id=obra_pin.id,
             data_custo=date(2026, 3, 3), tipo_custo="Combustível",
             valor=Decimal("310.00"),
@@ -2456,7 +2452,7 @@ def _seed():
             fornecedor="Posto Shell", status_pagamento="Pago",
             forma_pagamento="Cartão", km_veiculo=42100,
         ),
-        VehicleExpense(
+        CustoVeiculo(
             admin_id=aid, veiculo_id=veiculo_hilux.id,
             data_custo=date(2026, 3, 20), tipo_custo="Manutenção",
             valor=Decimal("850.00"),
@@ -2464,7 +2460,7 @@ def _seed():
             fornecedor="AutoCentro Ltda", status_pagamento="Pago",
             forma_pagamento="PIX", km_veiculo=42500,
         ),
-        VehicleExpense(
+        CustoVeiculo(
             admin_id=aid, veiculo_id=veiculo_sprinter.id, obra_id=obra.id,
             data_custo=date(2026, 2, 5), tipo_custo="Combustível",
             valor=Decimal("420.00"),
@@ -2472,14 +2468,14 @@ def _seed():
             fornecedor="Posto Ipiranga", status_pagamento="Pago",
             forma_pagamento="Cartão", km_veiculo=67200,
         ),
-        VehicleExpense(
+        CustoVeiculo(
             admin_id=aid, veiculo_id=veiculo_sprinter.id,
             data_custo=date(2026, 2, 28), tipo_custo="IPVA",
             valor=Decimal("3480.00"),
             descricao="IPVA 2026 — parcela única",
             status_pagamento="Pago", forma_pagamento="Boleto",
         ),
-        VehicleExpense(
+        CustoVeiculo(
             admin_id=aid, veiculo_id=veiculo_sprinter.id, obra_id=obra_pin.id,
             data_custo=date(2026, 3, 10), tipo_custo="Combustível",
             valor=Decimal("390.00"),
@@ -2492,7 +2488,7 @@ def _seed():
     db.session.flush()
 
     utilizacoes_frota = [
-        VehicleUsage(
+        UsoVeiculo(
             admin_id=aid, veiculo_id=veiculo_hilux.id,
             funcionario_id=pedro.id, obra_id=obra.id,
             data_uso=date(2026, 2, 5),
@@ -2500,7 +2496,7 @@ def _seed():
             responsavel_veiculo=pedro.nome,
             observacoes="Transporte de material e equipe — Bela Vista",
         ),
-        VehicleUsage(
+        UsoVeiculo(
             admin_id=aid, veiculo_id=veiculo_sprinter.id,
             funcionario_id=pedro.id, obra_id=obra.id,
             data_uso=date(2026, 2, 5),
@@ -2508,7 +2504,7 @@ def _seed():
             responsavel_veiculo=pedro.nome,
             observacoes="Transporte de equipe (4 funcionários) — Bela Vista",
         ),
-        VehicleUsage(
+        UsoVeiculo(
             admin_id=aid, veiculo_id=veiculo_hilux.id,
             funcionario_id=carlos.id, obra_id=obra_pin.id,
             data_uso=date(2026, 3, 3),

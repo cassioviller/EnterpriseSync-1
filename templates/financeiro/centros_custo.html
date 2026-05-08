@@ -48,7 +48,7 @@
                                         </td>
                                         <td>
                                             {% if centro.obra %}
-                                                <a href="{{ url_for('main.obra_detalhes', id=centro.obra.id) }}">
+                                                <a href="{{ url_for('main.detalhes_obra', id=centro.obra.id) }}">
                                                     {{ centro.obra.nome }}
                                                 </a>
                                             {% else %}

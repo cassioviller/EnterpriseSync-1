@@ -170,7 +170,7 @@
               foi <span class="badge bg-success">aprovada</span>
               {% if _p.obra_id %}
               e a obra
-              <a href="{{ url_for('main.obra_detalhes', id=_p.obra_id) }}"
+              <a href="{{ url_for('main.detalhes_obra', id=_p.obra_id) }}"
                  class="fw-semibold text-success"><strong>foi aberta</strong></a>
               automaticamente.
               {% else %}
@@ -179,7 +179,7 @@
           </small>
       </div>
       {% if _p.obra_id %}
-      <a href="{{ url_for('main.obra_detalhes', id=_p.obra_id) }}"
+      <a href="{{ url_for('main.detalhes_obra', id=_p.obra_id) }}"
          class="btn btn-success btn-sm flex-shrink-0">
           <i class="fas fa-hard-hat me-1"></i>Ir para a Obra
       </a>
@@ -199,7 +199,7 @@
           — {{ p.titulo or '—' }}
           <span class="badge bg-{{ 'success' if p.status=='aprovada' else 'secondary' }} ms-1">{{ p.status }}</span>
           {% if p.obra_id %}
-          <a href="{{ url_for('main.obra_detalhes', id=p.obra_id) }}"
+          <a href="{{ url_for('main.detalhes_obra', id=p.obra_id) }}"
              class="badge bg-primary text-decoration-none ms-1">
               <i class="fas fa-hard-hat me-1"></i>Obra aberta
           </a>
