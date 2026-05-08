@@ -468,12 +468,27 @@ def excluir_rdo(rdo_id):
 @main_bp.route('/rdo/novo')
 @funcionario_required
 def novo_rdo():
-    """Rota legada — redireciona para o formulário moderno de RDO."""
-    obra_id = request.args.get('obra_id')
-    target = url_for('main.funcionario_rdo_novo')
-    if obra_id:
-        target += f'?obra_id={obra_id}'
-    return redirect(target)
+    """Formulário de criação de RDO (novo)."""
+    try:
+        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
+        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+        funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
+        if not obras:
+            flash('É necessário ter pelo menos uma obra cadastrada para criar um RDO.', 'warning')
+            return redirect(url_for('main.obras'))
+        obra_id = request.args.get('obra_id', type=int)
+        data_hoje = date.today().strftime('%Y-%m-%d')
+        return render_template('rdo/novo.html',
+                               obras=obras,
+                               funcionarios=funcionarios,
+                               obra_selecionada=obra_id,
+                               atividades_anteriores=[],
+                               data_hoje=data_hoje,
+                               date=date,
+                               entregas_alertas=[])
+    except Exception as e:
+        logger.error(f"ERRO NOVO RDO: {e}")
+        return redirect(url_for('main.rdos'))
 
 
 @main_bp.route('/rdo/criar', methods=['POST'])
