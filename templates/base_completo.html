@@ -1050,6 +1050,24 @@
                                 <i class="fas fa-chart-bar me-1"></i> Relatórios
                             </a>
                         </li>
+
+                        <!-- Métricas de Produtividade -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="metricasDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-chart-line me-1"></i> Métricas
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="metricasDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('metricas.empresa_por_servico') }}">
+                                    <i class="fas fa-layer-group me-1"></i> Empresa por Serviço
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('metricas.funcionarios') }}">
+                                    <i class="fas fa-hard-hat me-1"></i> Funcionários
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('metricas.ranking') }}">
+                                    <i class="fas fa-trophy me-1"></i> Ranking
+                                </a></li>
+                            </ul>
+                        </li>
                     {% endif %}
                 </ul>
                 
@@ -1246,6 +1264,19 @@
                 </a>
                 <a class="sige-mobile-drawer__link" href="{{ url_for('almoxarifado.fornecedores') }}">
                     <i class="fas fa-truck"></i> Fornecedores
+                </a>
+            </div>
+
+            <div class="sige-mobile-drawer__group">
+                <button type="button" class="sige-mobile-drawer__group-title" aria-expanded="true" data-sige-accordion>Métricas<i class="fas fa-chevron-down sige-mobile-drawer__chev" aria-hidden="true"></i></button>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('metricas.empresa_por_servico') }}">
+                    <i class="fas fa-layer-group"></i> Empresa por Serviço
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('metricas.funcionarios') }}">
+                    <i class="fas fa-hard-hat"></i> Funcionários
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('metricas.ranking') }}">
+                    <i class="fas fa-trophy"></i> Ranking
                 </a>
             </div>
 

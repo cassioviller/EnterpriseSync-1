@@ -1450,6 +1450,93 @@ console.log('Initializing RDO view with light theme...');
     </div>
     {% endif %}
 
+    {% if rdo.status == 'Finalizado' %}
+    <!-- Custos gerados pelo RDO → Contas a Pagar (dinâmico via GestaoCustoPai) -->
+    <div class="info-section">
+        <div class="info-card">
+            <div class="info-header">
+                <div class="info-header-icon" style="background:linear-gradient(135deg,#28a745,#145a23)">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <h3>Custos Gerados — Contas a Pagar
+                    {% if custos_gerados_rdo %}
+                    <span class="badge bg-success ms-2" style="font-size:.75rem">{{ custos_gerados_rdo|length }}</span>
+                    {% endif %}
+                </h3>
+            </div>
+            <div class="p-4">
+                {% if custos_gerados_rdo %}
+                <div class="alert alert-success border-0 mb-3" style="background:rgba(40,167,69,.08)">
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    <strong>{{ custos_gerados_rdo|length }} lançamento(s)</strong> foram gerados automaticamente em
+                    <strong>Contas a Pagar</strong> ao finalizar este RDO (mão de obra, VA e VT dos diaristas).
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-3">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Funcionário / Descrição</th>
+                                <th class="text-center">Categoria</th>
+                                <th class="text-end">Valor</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for gcp in custos_gerados_rdo %}
+                        {% set cat_map = {
+                            'MAO_OBRA_DIRETA': ('Mão de Obra','warning'),
+                            'SALARIO':         ('Salário','warning'),
+                            'ALIMENTACAO':     ('Vale Alim.','info'),
+                            'TRANSPORTE':      ('Vale Transp.','primary'),
+                        } %}
+                        {% set cat_info = cat_map.get(gcp.tipo_categoria, (gcp.tipo_categoria, 'secondary')) %}
+                        {% set status_cor = {'PAGO':'success','AUTORIZADO':'success','SOLICITADO':'warning','PENDENTE':'secondary','RECUSADO':'danger'}.get(gcp.status,'secondary') %}
+                        <tr>
+                            <td>
+                                <strong>{{ gcp.entidade_nome }}</strong>
+                                {% if gcp.numero_documento %}
+                                <small class="text-muted ms-1">#{{ gcp.numero_documento }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-{{ cat_info[1] }}">{{ cat_info[0] }}</span>
+                            </td>
+                            <td class="text-end fw-bold text-dark">{{ gcp.valor_total|float|brl if gcp.valor_total is defined else 'R$ —' }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-{{ status_cor }}">{{ gcp.status }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="2" class="text-end fw-semibold">Total gerado:</td>
+                                <td class="text-end fw-bold text-success">
+                                    {{ custos_gerados_rdo|sum(attribute='valor_total')|float|brl }}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info border-0" style="background:rgba(13,110,253,.06)">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Ao finalizar o RDO, custos de mão de obra (diárias, VA e VT de diaristas) são
+                    lançados automaticamente em <strong>Contas a Pagar</strong>.
+                    Nenhum custo foi encontrado vinculado a este RDO.
+                </div>
+                {% endif %}
+                <div class="text-end">
+                    <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-external-link-alt me-1"></i>Ver Contas a Pagar desta obra
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Seção Equipamentos (Task #61: oculta quando vazia) -->
     {% set equipamentos_rdo = rdo.equipamentos|list if rdo.equipamentos else [] %}
     {% if equipamentos_rdo %}

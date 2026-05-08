@@ -465,6 +465,7 @@ def excluir_rdo(rdo_id):
         flash('Erro ao excluir RDO. Tente novamente.', 'error')
         return redirect(url_for('main.rdos'))
 
+<<<<<<< HEAD
 @main_bp.route('/rdo/novo')
 @funcionario_required
 def novo_rdo():
@@ -558,6 +559,8 @@ def novo_rdo():
         return redirect(url_for('main.rdos'))
 
 
+=======
+>>>>>>> eebc978 (Git commit prior to rebase)
 @main_bp.route('/rdo/criar', methods=['POST'])
 @funcionario_required
 def criar_rdo():
@@ -998,7 +1001,24 @@ def visualizar_rdo(id):
                 custos_dia_map = {c.funcionario_id: c for c in custos}
             except Exception:
                 pass
-        
+
+        # Task #46 — Custos gerados pelo rdo_finalizado → GestaoCustoPai (Contas a Pagar)
+        custos_gerados_rdo = []
+        if _pode_ver_custos and rdo.status == 'Finalizado':
+            try:
+                from models import GestaoCustoPai, GestaoCustoFilho
+                mao_obra_ids = [mo.id for mo in mao_obra_rows]
+                if mao_obra_ids:
+                    _sub = db.session.query(GestaoCustoFilho.pai_id).filter(
+                        GestaoCustoFilho.origem_tabela == 'rdo_mao_obra',
+                        GestaoCustoFilho.origem_id.in_(mao_obra_ids),
+                    ).distinct().subquery()
+                    custos_gerados_rdo = GestaoCustoPai.query.filter(
+                        GestaoCustoPai.id.in_(_sub)
+                    ).order_by(GestaoCustoPai.data_criacao).all()
+            except Exception as _e_cgr:
+                logger.warning(f"[WARN] Falha ao buscar custos gerados do RDO {id}: {_e_cgr}")
+
         # Calcular estatísticas
         total_subatividades = len(subatividades)
         total_funcionarios = len(funcionarios)
@@ -1393,7 +1413,8 @@ def visualizar_rdo(id):
                              peso_por_subatividade=peso_por_subatividade,
                              total_horas_trabalhadas=total_horas_trabalhadas,
                              apontamentos_cronograma=apontamentos_cronograma,
-                             custos_dia_map=custos_dia_map)
+                             custos_dia_map=custos_dia_map,
+                             custos_gerados_rdo=custos_gerados_rdo)
         
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")
@@ -2011,6 +2032,147 @@ def api_percentuais_ultimo_rdo(obra_id):
         traceback.print_exc()
         return jsonify({'error': 'Erro interno'}), 500
 
+<<<<<<< HEAD
+=======
+
+@main_bp.route('/rdo/novo')
+@funcionario_required
+def rdo_novo_unificado():
+    """Interface unificada para criar RDO - Admin e Funcionário"""
+    try:
+        # Detecção de admin_id unificada
+        if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id = current_user.id
+        elif current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            admin_id = current_user.admin_id
+        else:
+            admin_id = 10  # Fallback para desenvolvimento
+        
+        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+        funcionarios = Funcionario.query.filter_by(
+            admin_id=admin_id, 
+            ativo=True
+        ).order_by(Funcionario.nome).all()
+        
+        if not obras:
+            flash('Não há obras disponíveis. Contate o administrador.', 'warning')
+            if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+                return redirect(url_for('main.funcionario_dashboard'))
+            else:
+                return redirect(url_for('main.dashboard'))
+        
+        funcionarios_dict = [{
+            'id': f.id,
+            'nome': f.nome,
+            'email': f.email,
+            'funcao_ref': {
+                'nome': f.funcao_ref.nome if f.funcao_ref else 'Função não definida'
+            } if f.funcao_ref else None
+        } for f in funcionarios]
+        
+        obra_id = request.args.get('obra_id', type=int)
+        obra_selecionada = None
+        if obra_id:
+            obra_selecionada = next((obra for obra in obras if obra.id == obra_id), None)
+
+        # Pré-carregar atividades do RDO anterior (ou dos serviços da obra, se for o primeiro RDO)
+        atividades_anteriores = []
+        if obra_id:
+            try:
+                ultimo_rdo = RDO.query.filter_by(obra_id=obra_id).order_by(
+                    RDO.data_relatorio.desc()
+                ).first()
+                if ultimo_rdo:
+                    rdo_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo.id).all()
+                    atividades_anteriores = [
+                        {
+                            'descricao': rdo_sub.nome_subatividade,
+                            'percentual': rdo_sub.percentual_conclusao,
+                            'observacoes': rdo_sub.observacoes_tecnicas or ''
+                        }
+                        for rdo_sub in rdo_subatividades
+                    ]
+                    logger.debug(f"Pré-carregando {len(atividades_anteriores)} atividades do RDO {ultimo_rdo.numero_rdo}")
+                else:
+                    servicos_obra = db.session.query(ServicoObraReal, Servico).join(
+                        Servico, ServicoObraReal.servico_id == Servico.id
+                    ).filter(
+                        ServicoObraReal.obra_id == obra_id,
+                        ServicoObraReal.ativo == True,
+                        ServicoObraReal.admin_id == admin_id
+                    ).all()
+                    for servico_obra, servico in servicos_obra:
+                        subatividades_srv = SubatividadeMestre.query.filter_by(
+                            servico_id=servico.id, ativo=True
+                        ).order_by(SubatividadeMestre.ordem_padrao).all()
+                        subatividades_list = [
+                            {'id': sub.id, 'nome': sub.nome, 'descricao': sub.descricao or '', 'percentual': 0}
+                            for sub in subatividades_srv
+                        ]
+                        atividades_anteriores.append({
+                            'descricao': servico.nome,
+                            'percentual': 0,
+                            'observacoes': f'Quantidade planejada: {servico_obra.quantidade_planejada} {servico.unidade_simbolo or servico.unidade_medida}',
+                            'servico_id': servico.id,
+                            'categoria': servico.categoria or 'geral',
+                            'subatividades': subatividades_list
+                        })
+                    logger.debug(f"Pré-carregando {len(atividades_anteriores)} serviços da obra como atividades")
+            except Exception as _e_ativ:
+                logger.warning(f"Erro ao pré-carregar atividades anteriores: {_e_ativ}")
+                atividades_anteriores = []
+
+        # Template unificado MODERNO para todos os usuários
+        template = 'rdo/novo.html'  # SEMPRE usar template moderno
+        
+        # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
+        logger.info("[TARGET] RDO VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")
+        logger.info("[LOC] ROTA USADA: /rdo/novo (rdo_novo_unificado)")
+        logger.debug(f"[DOC] TEMPLATE: {template} (MODERNO)")
+        logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
+        logger.debug(f"[LOCK] TIPO USUÁRIO: {current_user.tipo_usuario if hasattr(current_user, 'tipo_usuario') else 'N/A'}")
+        
+        # Adicionar data atual para o template
+        data_hoje = date.today().strftime('%Y-%m-%d')
+        
+        from utils.tenant import is_v2_active
+
+        entregas_alertas = []
+        if obra_selecionada:
+            try:
+                from services.entregas_terceiros import calcular_alertas_terceiros
+                data_ref_str = request.args.get('data') or request.form.get('data_relatorio')
+                data_ref = date.today()
+                if data_ref_str:
+                    try:
+                        data_ref = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        data_ref = date.today()
+                _aid = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else getattr(current_user, 'admin_id', None)
+                entregas_alertas = calcular_alertas_terceiros(obra_selecionada.id, hoje=data_ref, admin_id=_aid)['detalhe']
+            except Exception as _e:
+                logger.error(f"Erro carregando alertas terceiros (rdo_novo_unificado): {_e}")
+                entregas_alertas = []
+
+        return render_template(template, 
+                             obras=obras, 
+                             funcionarios=funcionarios_dict,
+                             obra_selecionada=obra_selecionada,
+                             atividades_anteriores=atividades_anteriores,
+                             data_hoje=data_hoje,
+                             date=date,
+                             is_v2_active=is_v2_active,
+                             entregas_alertas=entregas_alertas)
+        
+    except Exception as e:
+        logger.error(f"ERRO RDO NOVO UNIFICADO: {str(e)}")
+        flash('Erro ao carregar interface de RDO.', 'error')
+        if current_user.tipo_usuario == TipoUsuario.FUNCIONARIO:
+            return redirect(url_for('main.funcionario_dashboard'))
+        else:
+            return redirect(url_for('main.dashboard'))
+
+>>>>>>> eebc978 (Git commit prior to rebase)
 # RDO Lista Consolidada
 @main_bp.route('/funcionario/rdo/consolidado')
 @capture_db_errors

@@ -787,6 +787,27 @@
                 </div>
             </div>
         {% endif %}
+        <!-- Task #46: Origem da Obra (sinaliza fluxo Proposta → Obra) -->
+        {% if obra.proposta_origem_id %}
+        <div class="alert alert-primary d-flex align-items-center gap-3 mb-0"
+             style="border-radius:0;border-left:5px solid #0d6efd;">
+            <i class="fas fa-file-contract fa-lg text-primary flex-shrink-0"></i>
+            <div class="flex-grow-1 small">
+                <strong>Obra originada de Proposta Comercial.</strong>
+                Esta obra foi aberta automaticamente a partir da proposta
+                <a href="{{ url_for('propostas.visualizar', id=obra.proposta_origem_id) }}"
+                   class="fw-semibold text-primary">
+                    <i class="fas fa-external-link-alt fa-xs me-1"></i>Ver Proposta de Origem
+                </a>
+                {% if obra.token_cliente %}
+                — <a href="{{ url_for('portal_obras.portal_home', token=obra.token_cliente) }}"
+                     class="text-primary" target="_blank">
+                    <i class="fas fa-globe fa-xs me-1"></i>Portal do Cliente
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
         <!-- Header Principal da Obra -->
         <div class="obra-card" style="margin: 0; border-radius: 0;">
             <div class="obra-header-main">

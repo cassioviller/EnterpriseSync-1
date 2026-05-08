@@ -93,6 +93,13 @@
                                         <span class="badge bg-warning">Enviada</span>
                                     {% elif proposta.status == 'aprovada' %}
                                         <span class="badge bg-success">Aprovada</span>
+                                        {% if proposta.obra_id %}
+                                        <br><a href="{{ url_for('main.obra_detalhes', id=proposta.obra_id) }}"
+                                               class="badge bg-primary text-decoration-none mt-1"
+                                               title="Ver obra vinculada">
+                                            <i class="fas fa-hard-hat me-1"></i>Obra aberta
+                                        </a>
+                                        {% endif %}
                                     {% elif proposta.status == 'rejeitada' %}
                                         <span class="badge bg-danger">Rejeitada</span>
                                     {% endif %}

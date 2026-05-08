@@ -51,6 +51,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import secrets
 import sys
 from datetime import date, datetime
 from decimal import Decimal
@@ -321,6 +322,7 @@ def _reset_dataset():
         "DELETE FROM uso_veiculo WHERE admin_id=:a",
         "DELETE FROM frota_despesa WHERE admin_id=:a",
         "DELETE FROM frota_utilizacao WHERE admin_id=:a",
+        "DELETE FROM frota_veiculo WHERE admin_id=:a",
         "DELETE FROM outro_custo WHERE admin_id=:a",
         "DELETE FROM receita WHERE admin_id=:a",
         "DELETE FROM fluxo_caixa WHERE admin_id=:a",
@@ -483,6 +485,10 @@ def _seed():
         CrmTipoObra, CrmMotivoPerda,
         # Task #31 — template de proposta no demo Alfa
         PropostaTemplate, PropostaTemplateClausula,
+        # Task #46 — frota, folha, contabilidade, fluxo de caixa
+        Vehicle, VehicleExpense, VehicleUsage,
+        FolhaProcessada,
+        PlanoContas, LancamentoContabil, PartidaContabil, FluxoCaixa,
     )
     from services.orcamento_view_service import (
         snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -1006,6 +1012,7 @@ def _seed():
         status="Em andamento",
         cliente_id=cliente_obj.id,
         proposta_origem_id=proposta.id, portal_ativo=True,
+        token_cliente=secrets.token_urlsafe(32),
         responsavel_id=pedro.id, ativo=True, admin_id=aid,
         data_inicio_medicao=date(2026, 2, 1),
         valor_entrada=Decimal("0.00"), data_entrada=None,
@@ -2400,6 +2407,296 @@ def _seed():
 
     db.session.commit()
 
+    # 15) Frota — 2 veículos, despesas e utilizações --------------------------
+    veiculo_hilux = Vehicle(
+        admin_id=aid,
+        placa="ABC-1234",
+        marca="Toyota", modelo="Hilux SRX 2.8 4WD",
+        ano=2022, tipo="Picape",
+        km_atual=42800, cor="Prata",
+        combustivel="Diesel",
+        data_vencimento_ipva=date(2026, 3, 31),
+        data_vencimento_seguro=date(2026, 10, 15),
+        data_ultima_manutencao=date(2026, 1, 15),
+        data_proxima_manutencao=date(2026, 7, 15),
+        km_proxima_manutencao=50000,
+        ativo=True,
+    )
+    veiculo_sprinter = Vehicle(
+        admin_id=aid,
+        placa="DEF-5678",
+        marca="Mercedes-Benz", modelo="Sprinter 415 CDI",
+        ano=2021, tipo="Van",
+        km_atual=68200, cor="Branco",
+        combustivel="Diesel",
+        data_vencimento_ipva=date(2026, 2, 28),
+        data_vencimento_seguro=date(2026, 8, 30),
+        data_ultima_manutencao=date(2025, 12, 10),
+        data_proxima_manutencao=date(2026, 6, 10),
+        km_proxima_manutencao=75000,
+        ativo=True,
+    )
+    db.session.add_all([veiculo_hilux, veiculo_sprinter])
+    db.session.flush()
+
+    despesas_frota = [
+        VehicleExpense(
+            admin_id=aid, veiculo_id=veiculo_hilux.id, obra_id=obra.id,
+            data_custo=date(2026, 2, 5), tipo_custo="Combustível",
+            valor=Decimal("280.00"),
+            descricao="Abastecimento — obra Bela Vista",
+            fornecedor="Posto Ipiranga", status_pagamento="Pago",
+            forma_pagamento="Cartão", km_veiculo=41500,
+        ),
+        VehicleExpense(
+            admin_id=aid, veiculo_id=veiculo_hilux.id, obra_id=obra_pin.id,
+            data_custo=date(2026, 3, 3), tipo_custo="Combustível",
+            valor=Decimal("310.00"),
+            descricao="Abastecimento — obra Pinheiros",
+            fornecedor="Posto Shell", status_pagamento="Pago",
+            forma_pagamento="Cartão", km_veiculo=42100,
+        ),
+        VehicleExpense(
+            admin_id=aid, veiculo_id=veiculo_hilux.id,
+            data_custo=date(2026, 3, 20), tipo_custo="Manutenção",
+            valor=Decimal("850.00"),
+            descricao="Troca de óleo + filtros — revisão 40.000 km",
+            fornecedor="AutoCentro Ltda", status_pagamento="Pago",
+            forma_pagamento="PIX", km_veiculo=42500,
+        ),
+        VehicleExpense(
+            admin_id=aid, veiculo_id=veiculo_sprinter.id, obra_id=obra.id,
+            data_custo=date(2026, 2, 5), tipo_custo="Combustível",
+            valor=Decimal("420.00"),
+            descricao="Abastecimento — transporte equipe Bela Vista",
+            fornecedor="Posto Ipiranga", status_pagamento="Pago",
+            forma_pagamento="Cartão", km_veiculo=67200,
+        ),
+        VehicleExpense(
+            admin_id=aid, veiculo_id=veiculo_sprinter.id,
+            data_custo=date(2026, 2, 28), tipo_custo="IPVA",
+            valor=Decimal("3480.00"),
+            descricao="IPVA 2026 — parcela única",
+            status_pagamento="Pago", forma_pagamento="Boleto",
+        ),
+        VehicleExpense(
+            admin_id=aid, veiculo_id=veiculo_sprinter.id, obra_id=obra_pin.id,
+            data_custo=date(2026, 3, 10), tipo_custo="Combustível",
+            valor=Decimal("390.00"),
+            descricao="Abastecimento — transporte equipe Pinheiros",
+            fornecedor="Posto BR", status_pagamento="Pago",
+            forma_pagamento="Cartão", km_veiculo=68000,
+        ),
+    ]
+    db.session.add_all(despesas_frota)
+    db.session.flush()
+
+    utilizacoes_frota = [
+        VehicleUsage(
+            admin_id=aid, veiculo_id=veiculo_hilux.id,
+            funcionario_id=pedro.id, obra_id=obra.id,
+            data_uso=date(2026, 2, 5),
+            km_inicial=41500, km_final=41680, km_percorrido=180,
+            responsavel_veiculo=pedro.nome,
+            observacoes="Transporte de material e equipe — Bela Vista",
+        ),
+        VehicleUsage(
+            admin_id=aid, veiculo_id=veiculo_sprinter.id,
+            funcionario_id=pedro.id, obra_id=obra.id,
+            data_uso=date(2026, 2, 5),
+            km_inicial=67200, km_final=67340, km_percorrido=140,
+            responsavel_veiculo=pedro.nome,
+            observacoes="Transporte de equipe (4 funcionários) — Bela Vista",
+        ),
+        VehicleUsage(
+            admin_id=aid, veiculo_id=veiculo_hilux.id,
+            funcionario_id=carlos.id, obra_id=obra_pin.id,
+            data_uso=date(2026, 3, 3),
+            km_inicial=42100, km_final=42280, km_percorrido=180,
+            responsavel_veiculo=carlos.nome,
+            observacoes="Transporte de ferramenta — Pinheiros",
+        ),
+    ]
+    db.session.add_all(utilizacoes_frota)
+    db.session.flush()
+
+    log.info(
+        "Task #46 Frota: 2 veículos (Hilux + Sprinter), %d despesas, "
+        "%d utilizações registradas",
+        len(despesas_frota), len(utilizacoes_frota),
+    )
+
+    # 16) Folha Processada — Carlos (mensalista, fev/2026) -------------------
+    # Cálculos CLT simplificados (salário base R$ 2.800,00).
+    _sal_base   = Decimal("2800.00")
+    _inss_func  = Decimal("252.00")   # 9 % (faixa 1 tabela INSS 2026)
+    _irrf       = Decimal("0.00")     # isento na faixa
+    _fgts       = Decimal("224.00")   # 8 %
+    _inss_pat   = Decimal("560.00")   # 20 % encargo patronal
+    folha_carlos = FolhaProcessada(
+        admin_id=aid,
+        funcionario_id=carlos.id,
+        obra_id=obra.id,
+        ano=2026, mes=2,
+        salario_base=_sal_base,
+        salario_bruto=_sal_base,
+        total_proventos=_sal_base,
+        total_descontos=_inss_func + _irrf,
+        salario_liquido=_sal_base - _inss_func - _irrf,
+        inss_funcionario=_inss_func,
+        irrf=_irrf,
+        encargos_fgts=_fgts,
+        encargos_inss_patronal=_inss_pat,
+        custo_total_empresa=_sal_base + _fgts + _inss_pat,
+        horas_contratuais=Decimal("176.00"),
+        horas_trabalhadas=Decimal("176.00"),
+    )
+    db.session.add(folha_carlos)
+    db.session.flush()
+    log.info(
+        "Task #46 Folha: Carlos fev/2026 — líquido R$ %.2f, "
+        "custo empresa R$ %.2f",
+        float(folha_carlos.salario_liquido),
+        float(folha_carlos.custo_total_empresa),
+    )
+
+    # 17) Plano de Contas mínimo + Lançamentos + Fluxo de Caixa --------------
+    # PlanoContas usa codigo como PK simples; upsert por get-or-add.
+    def _upsert_conta(codigo, nome, tipo_conta, natureza, nivel,
+                      pai_codigo=None):
+        conta = PlanoContas.query.get(codigo)
+        if conta is None:
+            conta = PlanoContas(
+                codigo=codigo, nome=nome,
+                tipo_conta=tipo_conta, natureza=natureza,
+                nivel=nivel, conta_pai_codigo=pai_codigo,
+                aceita_lancamento=(nivel >= 3),
+                ativo=True, admin_id=aid,
+            )
+            db.session.add(conta)
+        return conta
+
+    _upsert_conta("1",      "Ativo",                   "ATIVO",    "DEVEDORA", 1)
+    _upsert_conta("1.1",    "Ativo Circulante",         "ATIVO",    "DEVEDORA", 2, "1")
+    _upsert_conta("1.1.01", "Caixa e Bancos",           "ATIVO",    "DEVEDORA", 3, "1.1")
+    _upsert_conta("1.1.02", "Contas a Receber",         "ATIVO",    "DEVEDORA", 3, "1.1")
+    _upsert_conta("2",      "Passivo",                  "PASSIVO",  "CREDORA",  1)
+    _upsert_conta("2.1",    "Passivo Circulante",       "PASSIVO",  "CREDORA",  2, "2")
+    _upsert_conta("2.1.01", "Contas a Pagar",           "PASSIVO",  "CREDORA",  3, "2.1")
+    _upsert_conta("3",      "Receita",                  "RECEITA",  "CREDORA",  1)
+    _upsert_conta("3.1",    "Receita de Obras",         "RECEITA",  "CREDORA",  2, "3")
+    _upsert_conta("3.1.01", "Receita Bruta de Obras",   "RECEITA",  "CREDORA",  3, "3.1")
+    _upsert_conta("4",      "Despesa",                  "DESPESA",  "DEVEDORA", 1)
+    _upsert_conta("4.1",    "Custos de Obra",           "DESPESA",  "DEVEDORA", 2, "4")
+    _upsert_conta("4.1.01", "Materiais de Construção",  "DESPESA",  "DEVEDORA", 3, "4.1")
+    _upsert_conta("4.1.02", "Mão de Obra Direta",       "DESPESA",  "DEVEDORA", 3, "4.1")
+    _upsert_conta("4.2",    "Salários e Encargos",      "DESPESA",  "DEVEDORA", 2, "4")
+    _upsert_conta("4.2.01", "Salários CLT",             "DESPESA",  "DEVEDORA", 3, "4.2")
+    _upsert_conta("4.3",    "Custos de Frota",          "DESPESA",  "DEVEDORA", 2, "4")
+    _upsert_conta("4.3.01", "Combustível",              "DESPESA",  "DEVEDORA", 3, "4.3")
+    _upsert_conta("4.3.02", "Manutenção e Revisão",     "DESPESA",  "DEVEDORA", 3, "4.3")
+    db.session.flush()
+    log.info("Task #46 PlanoContas: 19 contas (Ativo/Passivo/Receita/Despesa)")
+
+    # Lançamentos contábeis com partidas dobradas
+    def _lan(numero, data, historico, valor, debito, credito):
+        lan = LancamentoContabil(
+            numero=numero, data_lancamento=data,
+            historico=historico,
+            valor_total=Decimal(str(valor)),
+            origem="DEMO", admin_id=aid, usuario_id=aid,
+        )
+        db.session.add(lan); db.session.flush()
+        db.session.add(PartidaContabil(
+            lancamento_id=lan.id, sequencia=1,
+            conta_codigo=debito, tipo_partida="DEBITO",
+            valor=Decimal(str(valor)), admin_id=aid,
+        ))
+        db.session.add(PartidaContabil(
+            lancamento_id=lan.id, sequencia=2,
+            conta_codigo=credito, tipo_partida="CREDITO",
+            valor=Decimal(str(valor)), admin_id=aid,
+        ))
+        return lan
+
+    _lan(1, date(2026, 2, 15),
+         "Recebimento medição #001 — Residencial Bela Vista",
+         27750.00, "1.1.01", "3.1.01")
+    _lan(2, date(2026, 2, 28),
+         "Folha fev/2026 — Carlos Pereira (mensalista)",
+         float(folha_carlos.custo_total_empresa), "4.2.01", "2.1.01")
+    _lan(3, date(2026, 2, 6),
+         "Compra de materiais NF-2026-0001",
+         1500.00, "4.1.01", "1.1.01")
+    _lan(4, date(2026, 2, 5),
+         "Combustível frota — Hilux + Sprinter fev/2026",
+         700.00, "4.3.01", "1.1.01")
+    _lan(5, date(2026, 3, 20),
+         "Revisão Hilux 40.000 km",
+         850.00, "4.3.02", "2.1.01")
+    db.session.flush()
+    log.info("Task #46 Contabilidade: 5 lançamentos com partidas dobradas")
+
+    # Fluxo de Caixa — movimentos do período fev-mar/2026
+    fluxos_caixa = [
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 2, 15),
+            tipo_movimento="ENTRADA", categoria="receita",
+            valor=27750.0,
+            descricao="Medição #001 aprovada — Residencial Bela Vista (60%)",
+            obra_id=obra.id, referencia_tabela="medicao_obra",
+        ),
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 2, 28),
+            tipo_movimento="SAIDA", categoria="salario",
+            valor=float(folha_carlos.custo_total_empresa),
+            descricao="Folha fev/2026 — Carlos Pereira (custo total empresa)",
+            obra_id=obra.id, referencia_tabela="folha_processada",
+        ),
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 2, 6),
+            tipo_movimento="SAIDA", categoria="custo_obra",
+            valor=1500.0,
+            descricao="Materiais — NF-2026-0001 (cimento + blocos)",
+            obra_id=obra.id, referencia_tabela="pedido_compra",
+        ),
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 2, 5),
+            tipo_movimento="SAIDA", categoria="custo_veiculo",
+            valor=700.0,
+            descricao="Combustível Hilux + Sprinter — fev/2026",
+            obra_id=obra.id, referencia_tabela="frota_despesa",
+        ),
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 2, 5),
+            tipo_movimento="SAIDA", categoria="alimentacao",
+            valor=54.0,
+            descricao="Alimentação — 3 diaristas (almoço 05/02/2026)",
+            obra_id=obra.id, referencia_tabela="alimentacao_lancamento",
+        ),
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 2, 28),
+            tipo_movimento="SAIDA", categoria="custo_veiculo",
+            valor=3480.0,
+            descricao="IPVA 2026 — Sprinter 415 CDI",
+            referencia_tabela="frota_despesa",
+        ),
+    ]
+    db.session.add_all(fluxos_caixa)
+    db.session.flush()
+    log.info(
+        "Task #46 FluxoCaixa: %d movimentos (fev-mar/2026)",
+        len(fluxos_caixa),
+    )
+
+    db.session.commit()
+
     return {
         "admin_id": aid,
         "cliente_id": cliente.id,
@@ -2440,6 +2737,19 @@ def _seed():
         "obra_pinheiros_codigo": obra_pin.codigo,
         "n_rdos_pinheiros": len(rdos_pin_dados),
         "valor_obra_pinheiros": float(valor_pin),
+        # Task #46 — Frota
+        "veiculo_hilux_id": veiculo_hilux.id,
+        "veiculo_sprinter_id": veiculo_sprinter.id,
+        "n_despesas_frota": len(despesas_frota),
+        "n_utilizacoes_frota": len(utilizacoes_frota),
+        # Task #46 — Folha
+        "folha_carlos_id": folha_carlos.id,
+        "folha_carlos_liquido": float(folha_carlos.salario_liquido),
+        "folha_carlos_custo_empresa": float(folha_carlos.custo_total_empresa),
+        # Task #46 — Contabilidade / FluxoCaixa
+        "n_contas_plano": 19,
+        "n_lancamentos": 5,
+        "n_fluxos_caixa": len(fluxos_caixa),
     }
 
 
