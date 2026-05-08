@@ -481,8 +481,6 @@ def _seed():
         Lead, LeadHistorico, CrmResponsavel, LeadStatus,
         CrmOrigem, CrmCadencia, CrmSituacao, CrmTipoMaterial,
         CrmTipoObra, CrmMotivoPerda,
-        # Task #31 — template de proposta no demo Alfa
-        PropostaTemplate, PropostaTemplateClausula,
     )
     from services.orcamento_view_service import (
         snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -1246,81 +1244,6 @@ def _seed():
         coeficiente=Decimal("0.08"),
     )); db.session.flush()
 
-    # Task #31 — PropostaTemplate completo para o demo Alfa (padrao=True).
-    # Criado antes do orçamento para estar disponível ao gerar propostas.
-    tmpl_proposta = PropostaTemplate(
-        nome="Padrão Construtora Alfa",
-        categoria="Residencial",
-        descricao="Template padrão para obras residenciais — Task #31 demo",
-        prazo_entrega_dias=120,
-        validade_dias=15,
-        percentual_nota_fiscal=Decimal("8.0"),
-        condicoes_pagamento=(
-            "30% na assinatura do contrato\n"
-            "40% na conclusão da estrutura\n"
-            "30% na entrega da obra"
-        ),
-        garantias=(
-            "Garantia de 5 anos na estrutura e 1 ano em acabamentos, "
-            "conforme o Código Civil Brasileiro."
-        ),
-        itens_inclusos=(
-            "Mão de obra especializada\n"
-            "Materiais inclusos no escopo\n"
-            "Limpeza final da obra"
-        ),
-        itens_exclusos=(
-            "Projetos arquitetônicos e complementares\n"
-            "Ligações definitivas de água e luz\n"
-            "Alvará de construção"
-        ),
-        consideracoes_gerais=(
-            "Prazo sujeito a condições climáticas. "
-            "Trabalho em dias úteis das 7h às 17h."
-        ),
-        padrao=True,
-        ativo=True,
-        admin_id=aid,
-        criado_por=aid,
-    )
-    db.session.add(tmpl_proposta)
-    db.session.flush()
-    db.session.add_all([
-        PropostaTemplateClausula(
-            proposta_template_id=tmpl_proposta.id,
-            admin_id=aid,
-            titulo="Condições de Pagamento",
-            texto=(
-                "O pagamento será efetuado em 3 parcelas: 30% na assinatura do contrato, "
-                "40% na conclusão da estrutura e 30% na entrega da obra."
-            ),
-            ordem=1,
-        ),
-        PropostaTemplateClausula(
-            proposta_template_id=tmpl_proposta.id,
-            admin_id=aid,
-            titulo="Garantias",
-            texto=(
-                "A Construtora Alfa garante a obra pelo prazo de 5 (cinco) anos para "
-                "estrutura e 1 (um) ano para acabamentos, conforme o Código Civil Brasileiro."
-            ),
-            ordem=2,
-        ),
-        PropostaTemplateClausula(
-            proposta_template_id=tmpl_proposta.id,
-            admin_id=aid,
-            titulo="Disposições Gerais",
-            texto=(
-                "Os serviços serão realizados de segunda a sexta, das 7h às 17h. "
-                "O prazo poderá ser reajustado em caso de condições climáticas adversas "
-                "ou solicitações adicionais do contratante."
-            ),
-            ordem=3,
-        ),
-    ])
-    db.session.flush()
-    log.info("Task #31: PropostaTemplate '%s' (padrao=True) criado com 3 cláusulas", tmpl_proposta.nome)
-
     orc = Orcamento(
         admin_id=aid,
         numero=f"ORC-2026-0001",
@@ -1480,56 +1403,6 @@ def _seed():
     log.info(
         "Task #118 E2E: Proposta #%s aprovada → Obra #%s, %d tarefas materializadas",
         proposta_t118.id, obra_t118.id, len(_qs),
-    )
-
-    # 11.6) Task #31 — Proposta com modelo de template (rascunho aguardando revisão).
-    # Demonstra o fluxo: orçamento → modal "Gerar Proposta" → selecionar template.
-    # Fica em rascunho (campos_pendentes_revisao populado) para o admin revisar.
-    proposta_com_tmpl = Proposta(numero="TMK31.26", data_proposta=date(2026, 2, 1))
-    proposta_com_tmpl.titulo = orc.titulo + " — Com Modelo de Proposta"
-    proposta_com_tmpl.descricao = orc.descricao
-    proposta_com_tmpl.cliente_id = orc.cliente_id
-    proposta_com_tmpl.cliente_nome = orc.cliente_nome or CLIENTE_NOME
-    proposta_com_tmpl.admin_id = aid
-    proposta_com_tmpl.criado_por = aid
-    proposta_com_tmpl.status = "rascunho"
-    proposta_com_tmpl.valor_total = orc.venda_total or 0
-    proposta_com_tmpl.orcamento_id = orc.id
-    proposta_com_tmpl.proposta_template_id = tmpl_proposta.id
-    proposta_com_tmpl.prazo_entrega_dias = tmpl_proposta.prazo_entrega_dias
-    proposta_com_tmpl.validade_dias = tmpl_proposta.validade_dias
-    proposta_com_tmpl.campos_pendentes_revisao = [
-        'prazo_entrega_dias', 'validade_dias', 'itens_inclusos',
-    ]
-    db.session.add(proposta_com_tmpl)
-    db.session.flush()
-
-    for _idx, _it in enumerate(orc.itens, start=1):
-        db.session.add(PropostaItem(
-            admin_id=aid,
-            proposta_id=proposta_com_tmpl.id,
-            item_numero=_idx, ordem=_idx,
-            descricao=_it.descricao,
-            quantidade=_it.quantidade,
-            unidade=_it.unidade,
-            preco_unitario=_it.preco_venda_unitario or 0,
-            subtotal=_it.venda_total or 0,
-            servico_id=_it.servico_id,
-            quantidade_medida=_it.quantidade,
-            cronograma_template_override_id=_it.cronograma_template_override_id,
-            composicao_snapshot=_it.composicao_snapshot or [],
-        ))
-    db.session.flush()
-
-    from propostas_consolidated import _copiar_clausulas_template_para_proposta
-    _n_clausulas = _copiar_clausulas_template_para_proposta(
-        tmpl_proposta, proposta_com_tmpl, aid
-    )
-    db.session.commit()
-    log.info(
-        "Task #31: Proposta %s (template '%s') criada — %d cláusulas, pendentes=%s",
-        proposta_com_tmpl.numero, tmpl_proposta.nome,
-        _n_clausulas, proposta_com_tmpl.campos_pendentes_revisao,
     )
 
     # 11.7) Task #55 — Compras: 1 Fornecedor + 1 PedidoCompra finalizada
@@ -2531,6 +2404,68 @@ def _imprimir_demo_pronta(info: dict, ambiente: str):
 # ---------------------------------------------------------------------------
 # Entry point com guarda de produção
 # ---------------------------------------------------------------------------
+def _seed_custos_mes_atual(admin_id, obra_id):
+    """Garante que a demo possui lançamentos de GestaoCusto no mês corrente.
+
+    Isso faz com que o dashboard (filtro padrão = mês atual) mostre dados
+    reais em vez de cartões vazios logo após um seed fresh ou reset.
+    É completamente idempotente — verifica antes de inserir.
+    """
+    try:
+        from app import db
+        from models import GestaoCustoPai, GestaoCustoFilho, CentroCusto
+        from datetime import date
+        from decimal import Decimal
+
+        hoje = date.today()
+        mes_ref = date(hoje.year, hoje.month, 1)
+
+        ja_existe = GestaoCustoFilho.query.filter_by(
+            admin_id=admin_id, obra_id=obra_id
+        ).filter(GestaoCustoFilho.data_referencia >= mes_ref).first()
+
+        if ja_existe:
+            log.info(
+                "_seed_custos_mes_atual: já existem lançamentos para obra %s em %s — no-op",
+                obra_id, mes_ref.strftime('%Y-%m'),
+            )
+            return
+
+        centro = CentroCusto.query.filter_by(admin_id=admin_id, obra_id=obra_id).first()
+
+        pai = GestaoCustoPai(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            categoria='DESPESA_GERAL',
+            descricao='Despesas gerais demo — mês atual (seed)',
+            status='PAGO',
+            solicitante_id=admin_id,
+            centro_custo_id=centro.id if centro else None,
+        )
+        db.session.add(pai)
+        db.session.flush()
+
+        filho = GestaoCustoFilho(
+            admin_id=admin_id,
+            obra_id=obra_id,
+            pai_id=pai.id,
+            descricao='Aluguel escritório (demo)',
+            valor=Decimal('1200.00'),
+            data_referencia=hoje,
+            centro_custo_id=centro.id if centro else None,
+        )
+        db.session.add(filho)
+        db.session.commit()
+        log.info(
+            "_seed_custos_mes_atual: lançamento R$1.200 criado para obra %s em %s",
+            obra_id, hoje.isoformat(),
+        )
+    except Exception as exc:
+        from app import db
+        db.session.rollback()
+        log.warning("_seed_custos_mes_atual: falhou (não crítico): %s", exc)
+
+
 def _backfill_custos_rdo_demo(admin_id):
     """Roda gerar_custos_mao_obra_rdo() em todos os RDOs finalizados de
     TODAS as obras do admin Alfa (Bela Vista + Pinheiros + qualquer outra
@@ -2770,6 +2705,10 @@ def main(argv=None):
                 # GestaoCustoFilho. Necessário para deploys que plantaram a
                 # demo ANTES da geração automática existir.
                 _backfill_custos_rdo_demo(existente.id)
+                from models import Obra as _ObraCheck
+                _op = _ObraCheck.query.filter_by(admin_id=existente.id, codigo="OBR-2026-001").first()
+                if _op:
+                    _seed_custos_mes_atual(existente.id, _op.id)
                 # Task #6 — verificação também no caminho idempotente, para
                 # detectar regressão em demos legados a cada re-execução.
                 from models import Obra
@@ -2818,6 +2757,7 @@ def main(argv=None):
             # e re-emite 'rdo_finalizado' (idempotente) — fecha custos de
             # mão-de-obra também para demos antigos.
             _backfill_custos_rdo_demo(info["admin_id"])
+            _seed_custos_mes_atual(info["admin_id"], info["obra_id"])
             # Task #6 — verificação obrigatória: MAO_OBRA via evento RDO +
             # MATERIAL via processar_compra_normal precisam existir.
             _verificar_custos_demo(

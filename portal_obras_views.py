@@ -12,7 +12,7 @@ import secrets
 from datetime import date, datetime
 
 from flask import (
-    Blueprint, abort, flash, jsonify, redirect, render_template,
+    Blueprint, abort, current_app, flash, jsonify, redirect, render_template,
     request, url_for,
 )
 from flask_login import current_user, login_required
@@ -33,12 +33,14 @@ portal_obras_bp = Blueprint(
     'portal_obras', __name__, url_prefix='/portal'
 )
 
-UPLOAD_FOLDER = os.environ.get(
-    'COMPROVANTE_UPLOAD_DIR',
-    os.path.join('static', 'uploads', 'comprovantes'),
-)
+_UPLOADS_PATH_ENV = os.environ.get('UPLOADS_PATH', '')
+if _UPLOADS_PATH_ENV:
+    _base = _UPLOADS_PATH_ENV if os.path.isabs(_UPLOADS_PATH_ENV) else os.path.join(os.getcwd(), _UPLOADS_PATH_ENV)
+    UPLOAD_FOLDER = os.path.join(_base, 'comprovantes')
+else:
+    UPLOAD_FOLDER = os.path.join(os.getcwd(), 'static', 'uploads', 'comprovantes')
+
 ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
-MAX_COMPROVANTE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 def _ensure_upload_folder():
@@ -377,32 +379,32 @@ def upload_comprovante(token: str, compra_id: int):
         flash('Nenhum arquivo selecionado.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
-    ext = os.path.splitext(secure_filename(arquivo.filename))[1].lower()
+    ext = os.path.splitext(arquivo.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
-        flash(
-            'Tipo de arquivo não permitido. Envie PDF, PNG, JPG ou WEBP (máx. 5 MB).',
-            'danger',
-        )
+        flash('Tipo de arquivo não permitido. Envie imagem ou PDF.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
-    # Lê até MAX + 1 byte para detectar arquivos grandes sem consumir memória desnecessariamente
-    dados = arquivo.read(MAX_COMPROVANTE_BYTES + 1)
-    if len(dados) > MAX_COMPROVANTE_BYTES:
-        flash('Arquivo muito grande. O limite é 5 MB.', 'danger')
+    max_bytes = current_app.config.get('MAX_CONTENT_LENGTH', 5 * 1024 * 1024)
+    arquivo.seek(0, 2)
+    file_size = arquivo.tell()
+    arquivo.seek(0)
+    if file_size > max_bytes:
+        flash(f'Arquivo muito grande. O limite é {max_bytes // (1024 * 1024)} MB.', 'danger')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
     _ensure_upload_folder()
     nome_seguro = f"comprovante_{compra_id}_{secrets.token_hex(8)}{ext}"
     caminho = os.path.join(UPLOAD_FOLDER, nome_seguro)
-    with open(caminho, 'wb') as fh:
-        fh.write(dados)
+    arquivo.save(caminho)
 
-    compra.comprovante_pagamento_url = '/' + caminho.replace('\\', '/')
+    rel_path = os.path.relpath(caminho, os.getcwd()).replace('\\', '/')
+    if rel_path.startswith('static/'):
+        compra.comprovante_pagamento_url = '/' + rel_path
+    else:
+        filename_only = os.path.basename(caminho)
+        compra.comprovante_pagamento_url = f'/persistent-uploads/comprovantes/{filename_only}'
     db.session.commit()
-    logger.info(
-        "[PORTAL] Comprovante enviado para compra %s — obra %s — arquivo %s (%d bytes)",
-        compra_id, obra.id, nome_seguro, len(dados),
-    )
+    logger.info(f"[PORTAL] Comprovante enviado para compra {compra_id} — obra {obra.id}")
     flash('Comprovante enviado com sucesso!', 'success')
     return redirect(url_for('portal_obras.portal_obra', token=token))
 

@@ -363,9 +363,15 @@ html[data-bs-theme="dark"] .header-btn i {
                             <div class="border rounded p-2 {% if obra.estouro %}border-danger bg-danger bg-opacity-10{% else %}border-light{% endif %}">
                                 <div class="fw-semibold text-truncate small" title="{{ obra.nome }}">{{ obra.nome }}</div>
                                 <div class="d-flex justify-content-between mt-1 small">
-                                    <span class="text-muted">Realizado:</span>
+                                    <span class="text-muted">No período:</span>
                                     <span class="fw-bold {% if obra.estouro %}text-danger{% endif %}">
-                                        R$ {{ '{:,.2f}'.format(obra.realizado).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                        R$ {{ '{:,.2f}'.format(obra.get('realizado_periodo', obra.realizado)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Acumulado:</span>
+                                    <span class="fw-bold">
+                                        R$ {{ '{:,.2f}'.format(obra.get('realizado_acumulado', obra.realizado)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
                                     </span>
                                 </div>
                                 {% if obra.orcamento > 0 %}
@@ -385,6 +391,11 @@ html[data-bs-theme="dark"] .header-btn i {
                         </div>
                         {% endfor %}
                     </div>
+                    {% if serie_temporal_custos %}
+                    <hr class="my-3">
+                    <h6 class="fw-semibold mb-2"><i class="fas fa-chart-area me-1"></i> Evolução Mensal de Custos</h6>
+                    <canvas id="custosSerieChart" height="90"></canvas>
+                    {% endif %}
                     {% else %}
                     <p class="text-muted mb-0">Nenhum custo registrado no período.</p>
                     {% endif %}
@@ -1004,6 +1015,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Gráfico de Evolução Mensal de Custos por Obra (série temporal)
+    const ctxSerie = document.getElementById('custosSerieChart');
+    if (ctxSerie) {
+        const _serieRaw = {{ serie_temporal_custos | tojson }};
+        const _meses = [...new Set(_serieRaw.map(r => r.ano_mes))].sort();
+        const _obras = [...new Set(_serieRaw.map(r => r.nome))];
+        const _colors = ['#0d6efd','#198754','#dc3545','#fd7e14','#6f42c1','#20c997','#0dcaf0','#ffc107'];
+        const _datasets = _obras.map((nome, i) => ({
+            label: nome,
+            data: _meses.map(m => {
+                const r = _serieRaw.find(x => x.nome === nome && x.ano_mes === m);
+                return r ? r.custo_mensal : 0;
+            }),
+            borderColor: _colors[i % _colors.length],
+            backgroundColor: _colors[i % _colors.length] + '33',
+            fill: false,
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+        }));
+        new Chart(ctxSerie.getContext('2d'), {
+            type: 'line',
+            data: { labels: _meses, datasets: _datasets },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ctx.dataset.label + ': R$ ' +
+                                ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2})
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { maxRotation: 30 } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 0}) }
+                    }
+                }
+            }
+        });
+    }
+
     // Gráfico de Status de Propostas (com valores dinâmicos)
     const ctxPropostasStatus = document.getElementById('propostasStatusChart');
     if (ctxPropostasStatus) new Chart(ctxPropostasStatus.getContext('2d'), {

@@ -21,10 +21,8 @@
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('gestao_custos.novo') }}?tipo=DESPESA_GERAL"
-                                   title="Em V2 todo lançamento direto é redirecionado para Gestão de Custos">
-                                    <i class="fas fa-plus me-1"></i> Lançamento Direto (legado)
-                                    <small class="text-muted d-block ps-4">redireciona para Gestão de Custos</small>
+                                <a class="dropdown-item" href="{{ url_for('gestao_custos.novo') }}">
+                                    <i class="fas fa-plus me-1"></i> Nova Despesa (Gestão de Custos)
                                 </a>
                             </li>
                         </ul>
@@ -360,13 +358,6 @@ function verDetalhes(contaId) {
     alert('Detalhes da conta ' + contaId);
 }
 
-// Abrir modal automaticamente quando vier de /contas-pagar/nova (V1) com ?abrir_modal=1
-document.addEventListener('DOMContentLoaded', function() {
-    var params = new URLSearchParams(window.location.search);
-    if (params.get('abrir_modal') === '1') {
-        var el = document.getElementById('modalNovaConta');
-        if (el) { new bootstrap.Modal(el).show(); }
-    }
-});
+
 </script>
 {% endblock %}

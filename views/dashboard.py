@@ -5,7 +5,7 @@ from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, get_admin_id_robusta, get_admin_id_dinamico
+from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, _calcular_serie_temporal_custos, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
 import calendar
 from sqlalchemy import func, desc, or_, and_, text, inspect
@@ -480,6 +480,9 @@ def dashboard():
             funcionarios_recentes = []
         if 'obras_ativas' not in locals():
             obras_ativas = []
+        # Guard para série temporal (evita UnboundLocalError)
+        if 'serie_temporal_custos' not in locals():
+            serie_temporal_custos = []
         # Guards para variáveis de propostas (evita UnboundLocalError)
         if 'propostas_aprovadas' not in locals():
             propostas_aprovadas = 0
@@ -871,8 +874,47 @@ def dashboard():
             lambda: _calcular_custos_obra(admin_id, data_inicio, data_fim, _oids),
             {}
         )
+        # 5b. Acumulado total (sem filtro de data) — mesclado em seguida
+        _acum_raw = safe_db_operation(
+            lambda: _calcular_custos_obra_acumulado(admin_id, _oids),
+            []
+        )
+        _acum_by_id = {o['id']: o for o in _acum_raw} if isinstance(_acum_raw, list) else {}
+        if not isinstance(custos_por_obra, list):
+            custos_por_obra = []
+        # Enriquecer obras já no período
+        _periodo_ids = set()
+        for _item in custos_por_obra:
+            _item['realizado_periodo'] = _item.get('realizado', 0)
+            _acum_entry = _acum_by_id.get(_item['id'])
+            _item['realizado_acumulado'] = _acum_entry['realizado_acumulado'] if _acum_entry else _item.get('realizado', 0)
+            _periodo_ids.add(_item['id'])
+        # Adicionar obras com acumulado > 0 mas sem custo no período atual
+        for _obra_id, _acum_entry in _acum_by_id.items():
+            if _obra_id not in _periodo_ids:
+                _orc = _acum_entry.get('orcamento', 0)
+                _acum = _acum_entry.get('realizado_acumulado', 0)
+                _pct = round((_acum / _orc * 100), 1) if _orc else 0
+                custos_por_obra.append({
+                    'id': _obra_id,
+                    'nome': _acum_entry.get('nome', ''),
+                    'realizado': 0,
+                    'realizado_periodo': 0,
+                    'realizado_acumulado': _acum,
+                    'orcamento': _orc,
+                    'pct': _pct,
+                    'estouro': _acum > _orc,
+                })
         logger.debug(f"DEBUG FINAL - Custos por obra: {custos_por_obra}")
-        
+
+        # 5c. Série temporal de custos por obra — respeitando o período selecionado
+        serie_temporal_custos = safe_db_operation(
+            lambda: _calcular_serie_temporal_custos(admin_id, data_inicio, data_fim, _oids),
+            []
+        )
+        if not isinstance(serie_temporal_custos, list):
+            serie_temporal_custos = []
+
         # Dados calculados reais
         # 🔒 admin_id já garantido pelas validações acima — nunca usar fallback fixo.
         
@@ -915,6 +957,8 @@ def dashboard():
         }
         funcionarios_por_departamento = {}
         custos_por_obra = {}
+        if 'serie_temporal_custos' not in locals():
+            serie_temporal_custos = []
     
     # Estatísticas dinâmicas calculadas
     funcionarios_ativos = total_funcionarios
@@ -1077,7 +1121,8 @@ def dashboard():
                          acessos_unicos=acessos_unicos,
                          tempo_medio_portal=tempo_medio_portal,
                          feedbacks_positivos=feedbacks_positivos,
-                         downloads_pdf=downloads_pdf)
+                         downloads_pdf=downloads_pdf,
+                         serie_temporal_custos=serie_temporal_custos)
 
 # ===== USUÁRIOS DO SISTEMA =====
 
