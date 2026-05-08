@@ -3,25 +3,6 @@
 {% block title %}{{ obra.nome }} — Portal do Cliente{% endblock %}
 
 {% block extra_styles %}
-<<<<<<< HEAD
-{% include 'portal/_partials/_styles.html' %}
-{% endblock %}
-
-{% block content %}
-{% include 'portal/_partials/_resumo.html' %}
-{% include 'portal/_partials/_cronograma.html' %}
-{% include 'portal/_partials/_compras.html' %}
-{% include 'portal/_partials/_comprovante.html' %}
-{% include 'portal/_partials/_medicoes.html' %}
-{% include 'portal/_partials/_mapas_v2.html' %}
-{% include 'portal/_partials/_rdos.html' %}
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-{% include 'portal/_partials/_scripts.html' %}
-</script>
-=======
 {% include 'portal/_portal_styles.html' %}
 {% endblock %}
 
@@ -36,5 +17,4 @@
 
 {% block extra_scripts %}
 {% include 'portal/_portal_scripts.html' %}
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 {% endblock %}

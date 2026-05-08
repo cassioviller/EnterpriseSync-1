@@ -379,17 +379,10 @@ def lancamento_novo_v2():
                         qtd_int = int(qtd_raw)
                     except (ValueError, TypeError):
                         flash(f'Quantidade inválida no item {idx + 1}: informe um número inteiro entre 1 e {MAX_QTD_POR_ITEM}.', 'error')
-<<<<<<< HEAD
-                        return redirect(url_for('alimentacao.lancamento_novo_v2'))
-                    if qtd_int < 1 or qtd_int > MAX_QTD_POR_ITEM:
-                        flash(f'Quantidade {qtd_int} fora do limite no item {idx + 1}: deve ser entre 1 e {MAX_QTD_POR_ITEM}.', 'error')
-                        return redirect(url_for('alimentacao.lancamento_novo_v2'))
-=======
                         return _render_form(status=422)
                     if qtd_int < 1 or qtd_int > MAX_QTD_POR_ITEM:
                         flash(f'Quantidade {qtd_int} fora do limite no item {idx + 1}: deve ser entre 1 e {MAX_QTD_POR_ITEM}.', 'error')
                         return _render_form(status=422)
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                     item_entry['quantidade'] = qtd_int
 
                     func_id_raw = request.form.get(f'itens[{idx}][funcionario_id]')
@@ -585,52 +578,6 @@ def lancamento_novo_v2():
             flash(f'Erro ao criar lançamento: {str(e)}', 'error')
 
     # --- GET: renderizar formulário ---
-<<<<<<< HEAD
-    def _render_form(status=200):
-        """Carrega contexto do formulário e renderiza o template V2."""
-        _restaurantes = Restaurante.query.filter_by(admin_id=admin_id).order_by(Restaurante.nome).all()
-        _obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
-        _funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-        _itens = AlimentacaoItem.query.filter_by(admin_id=admin_id, ativo=True).order_by(AlimentacaoItem.ordem).all()
-        # Criar item padrão "Marmita" se nenhum item existir (bootstrap para novos tenants)
-        if not _itens:
-            try:
-                _item_marmita = AlimentacaoItem(
-                    nome='Marmita',
-                    preco_padrao=Decimal('18.00'),
-                    descricao='Marmita padrão',
-                    icone='fas fa-drumstick-bite',
-                    is_default=True,
-                    ordem=0,
-                    admin_id=admin_id
-                )
-                db.session.add(_item_marmita)
-                db.session.commit()
-                _itens = [_item_marmita]
-                logger.info(f"[OK] Item padrao Marmita criado para admin_id={admin_id}")
-            except Exception as _e:
-                logger.error(f"Erro ao criar item padrao: {_e}")
-                db.session.rollback()
-        _centros = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).order_by(CentroCusto.nome).all()
-        _itens_json = [{'id': i.id, 'nome': i.nome, 'preco_padrao': float(i.preco_padrao),
-                        'icone': i.icone or 'fas fa-utensils', 'is_default': i.is_default}
-                       for i in _itens]
-        _centros_json = [{'id': c.id, 'nome': c.nome, 'codigo': c.codigo, 'obra_id': c.obra_id}
-                         for c in _centros]
-        _func_json = [{'id': f.id, 'nome': f.nome,
-                       'funcao': f.funcao_ref.nome if f.funcao_ref else ''}
-                      for f in _funcionarios]
-        _rest_sel = request.args.get('restaurante_id', type=int)
-        resp = render_template('alimentacao/lancamento_novo_v2.html',
-                               restaurantes=_restaurantes, obras=_obras,
-                               funcionarios=_funcionarios, itens_cadastrados=_itens,
-                               itens_json=_itens_json, centros_custo=_centros,
-                               centros_custo_json=_centros_json, funcionarios_json=_func_json,
-                               restaurante_id_selecionado=_rest_sel, v2=v2)
-        return resp, status
-
-=======
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     return _render_form()
 
 

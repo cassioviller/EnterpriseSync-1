@@ -135,22 +135,6 @@
                                 title="Excluir lead" aria-label="Excluir lead">
                             <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
-                        <div class="modal fade" id="delLead{{ lead.id }}" tabindex="-1">
-                            <div class="modal-dialog"><div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Excluir lead</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                                </div>
-                                <div class="modal-body">Confirmar exclusão de <strong>{{ lead.nome }}</strong>?</div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                    <form method="POST" action="{{ url_for('crm.excluir', lead_id=lead.id) }}">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-danger">Excluir</button>
-                                    </form>
-                                </div>
-                            </div></div>
-                        </div>
                         {% endif %}
                     </td>
                 </tr>
@@ -159,4 +143,26 @@
         </table>
     {% endcall %}
 </div>
+
+{# Modais de exclusão fora da tabela — Bootstrap 5 exige nível body para evitar re-layout/piscar #}
+{% if is_admin %}
+{% for lead in leads %}
+<div class="modal fade" id="delLead{{ lead.id }}" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Excluir lead</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">Confirmar exclusão de <strong>{{ lead.nome }}</strong>?</div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <form method="POST" action="{{ url_for('crm.excluir', lead_id=lead.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger">Excluir</button>
+            </form>
+        </div>
+    </div></div>
+</div>
+{% endfor %}
+{% endif %}
 {% endblock %}

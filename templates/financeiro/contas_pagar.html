@@ -10,30 +10,9 @@
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h2><i class="fas fa-file-invoice-dollar me-2"></i>Contas a Pagar</h2>
                 {% if is_v2 %}
-<<<<<<< HEAD
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <a href="{{ url_for('gestao_custos.novo') }}?tipo=DESPESA_GERAL" class="btn btn-success">
-                        <i class="fas fa-coins me-2"></i>Nova Despesa via Gestão de Custos
-                    </a>
-                    <div class="dropdown">
-                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
-                                data-bs-toggle="dropdown" aria-expanded="false">
-                            Mais ações
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('gestao_custos.novo') }}">
-                                    <i class="fas fa-plus me-1"></i> Nova Despesa (Gestão de Custos)
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-=======
                 <a href="{{ url_for('gestao_custos.novo') }}" class="btn btn-success">
                     <i class="fas fa-plus me-2"></i>Nova Despesa (Contas a Pagar)
                 </a>
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                 {% else %}
                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNovaConta">
                     <i class="fas fa-plus me-2"></i>Nova Conta a Pagar
@@ -86,15 +65,9 @@
                         {% endfor %}
                     </select>
                 </div>
-<<<<<<< HEAD
-                <div class="col-md-6 d-flex align-items-end gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-filter me-2"></i>Filtrar
-=======
                 <div class="col-md-3 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search me-1"></i>Filtrar
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                     </button>
                     <a href="{{ url_for('financeiro.listar_contas_pagar') }}" class="btn btn-secondary">
                         <i class="fas fa-times me-1"></i>Limpar

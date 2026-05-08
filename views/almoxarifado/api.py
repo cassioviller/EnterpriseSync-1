@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-from flask import jsonify
-from flask_login import login_required
-from sqlalchemy import func
-from app import db
-from models import AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento, Funcionario
-from . import almoxarifado_bp, get_admin_id
-=======
 """Endpoints JSON do almoxarifado.
 
 Consumidores conhecidos:
@@ -24,7 +16,6 @@ import logging
 from views.almoxarifado import almoxarifado_bp, get_admin_id
 
 logger = logging.getLogger(__name__)
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 
 
 @almoxarifado_bp.route('/api/item/<int:id>')
@@ -34,20 +25,11 @@ def api_item_info(id):
     admin_id = get_admin_id()
     if not admin_id:
         return jsonify({'error': 'Não autenticado'}), 401
-<<<<<<< HEAD
-    
-    item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
-    if not item:
-        return jsonify({'error': 'Item não encontrado'}), 404
-    
-    # Calcular estoque atual
-=======
 
     item = AlmoxarifadoItem.query.filter_by(id=id, admin_id=admin_id).first()
     if not item:
         return jsonify({'error': 'Item não encontrado'}), 404
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     if item.tipo_controle == 'SERIALIZADO':
         estoque_atual = AlmoxarifadoEstoque.query.filter_by(
             item_id=id,
@@ -60,11 +42,7 @@ def api_item_info(id):
             status='DISPONIVEL',
             admin_id=admin_id
         ).scalar() or 0
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     return jsonify({
         'id': item.id,
         'nome': item.nome,
@@ -74,10 +52,7 @@ def api_item_info(id):
         'estoque_atual': estoque_atual
     })
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 @almoxarifado_bp.route('/api/estoque-disponivel/<int:item_id>')
 @login_required
 def api_estoque_disponivel(item_id):
@@ -85,32 +60,18 @@ def api_estoque_disponivel(item_id):
     admin_id = get_admin_id()
     if not admin_id:
         return jsonify({'error': 'Não autenticado'}), 401
-<<<<<<< HEAD
-    
-    item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
-    if not item:
-        return jsonify({'error': 'Item não encontrado'}), 404
-    
-    if item.tipo_controle == 'SERIALIZADO':
-        # Retorna lista de itens serializados disponíveis
-=======
 
     item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
     if not item:
         return jsonify({'error': 'Item não encontrado'}), 404
 
     if item.tipo_controle == 'SERIALIZADO':
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         itens_disponiveis = AlmoxarifadoEstoque.query.filter_by(
             item_id=item_id,
             status='DISPONIVEL',
             admin_id=admin_id
         ).all()
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         return jsonify({
             'tipo_controle': 'SERIALIZADO',
             'itens': [{
@@ -120,30 +81,19 @@ def api_estoque_disponivel(item_id):
             } for est in itens_disponiveis]
         })
     else:
-<<<<<<< HEAD
-        # Retorna quantidade total disponível
-=======
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         quantidade_total = db.session.query(func.sum(AlmoxarifadoEstoque.quantidade)).filter_by(
             item_id=item_id,
             status='DISPONIVEL',
             admin_id=admin_id
         ).scalar() or 0
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         return jsonify({
             'tipo_controle': 'CONSUMIVEL',
             'quantidade_disponivel': quantidade_total,
             'unidade': item.unidade
         })
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 @almoxarifado_bp.route('/api/lotes-disponiveis/<int:item_id>')
 @login_required
 def api_lotes_disponiveis(item_id):
@@ -151,35 +101,19 @@ def api_lotes_disponiveis(item_id):
     admin_id = get_admin_id()
     if not admin_id:
         return jsonify({'error': 'Não autenticado'}), 401
-<<<<<<< HEAD
-    
-    item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
-    if not item:
-        return jsonify({'error': 'Item não encontrado'}), 404
-    
-    # Buscar todos estoques disponíveis deste item ordenados por data (FIFO)
-=======
 
     item = AlmoxarifadoItem.query.filter_by(id=item_id, admin_id=admin_id).first()
     if not item:
         return jsonify({'error': 'Item não encontrado'}), 404
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     lotes = AlmoxarifadoEstoque.query.filter_by(
         item_id=item_id,
         status='DISPONIVEL',
         admin_id=admin_id
     ).order_by(AlmoxarifadoEstoque.created_at.asc()).all()
-<<<<<<< HEAD
-    
-    lotes_data = []
-    for lote in lotes:
-        # Buscar informação da nota fiscal do movimento de entrada
-=======
 
     lotes_data = []
     for lote in lotes:
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         nota_fiscal = None
         if lote.entrada_movimento_id:
             movimento_entrada = AlmoxarifadoMovimento.query.filter_by(
@@ -188,16 +122,6 @@ def api_lotes_disponiveis(item_id):
             ).first()
             if movimento_entrada:
                 nota_fiscal = movimento_entrada.nota_fiscal
-<<<<<<< HEAD
-        
-        # Para CONSUMIVEL, usar quantidade_disponivel; para SERIALIZADO, sempre 1
-        qtd_disponivel = float(lote.quantidade_disponivel) if lote.quantidade_disponivel else float(lote.quantidade)
-        
-        lotes_data.append({
-            'estoque_id': lote.id,
-            'lote': lote.lote,
-            'numero_serie': lote.numero_serie,  # Para itens SERIALIZADO
-=======
 
         qtd_disponivel = float(lote.quantidade_disponivel) if lote.quantidade_disponivel else float(lote.quantidade)
 
@@ -205,7 +129,6 @@ def api_lotes_disponiveis(item_id):
             'estoque_id': lote.id,
             'lote': lote.lote,
             'numero_serie': lote.numero_serie,
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             'quantidade_disponivel': qtd_disponivel,
             'quantidade_inicial': float(lote.quantidade_inicial) if lote.quantidade_inicial else float(lote.quantidade),
             'valor_unitario': float(lote.valor_unitario) if lote.valor_unitario else 0.0,
@@ -213,11 +136,7 @@ def api_lotes_disponiveis(item_id):
             'nota_fiscal': nota_fiscal,
             'data_validade': lote.data_validade.strftime('%d/%m/%Y') if lote.data_validade else None
         })
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     return jsonify({
         'success': True,
         'item_id': item_id,
@@ -228,10 +147,7 @@ def api_lotes_disponiveis(item_id):
         'total_disponivel': sum(l['quantidade_disponivel'] for l in lotes_data)
     })
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 @almoxarifado_bp.route('/api/itens-funcionario/<int:funcionario_id>')
 @login_required
 def api_itens_funcionario(funcionario_id):
@@ -239,16 +155,6 @@ def api_itens_funcionario(funcionario_id):
     admin_id = get_admin_id()
     if not admin_id:
         return jsonify({'error': 'Não autenticado'}), 401
-<<<<<<< HEAD
-    
-    funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
-    if not funcionario:
-        return jsonify({'error': 'Funcionário não encontrado'}), 404
-    
-    itens_retornaveis = []
-    
-    # 1. SERIALIZADOS em posse (status='EM_USO' e funcionario_atual_id)
-=======
 
     funcionario = Funcionario.query.filter_by(id=funcionario_id, admin_id=admin_id).first()
     if not funcionario:
@@ -257,22 +163,14 @@ def api_itens_funcionario(funcionario_id):
     from models import AlmoxarifadoItem as _Item
     itens_retornaveis = []
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     estoques_serializados = AlmoxarifadoEstoque.query.filter_by(
         funcionario_atual_id=funcionario_id,
         status='EM_USO',
         admin_id=admin_id
-<<<<<<< HEAD
-    ).join(AlmoxarifadoItem).filter(
-        AlmoxarifadoItem.tipo_controle == 'SERIALIZADO'
-    ).all()
-    
-=======
     ).join(_Item).filter(
         _Item.tipo_controle == 'SERIALIZADO'
     ).all()
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     for est in estoques_serializados:
         itens_retornaveis.append({
             'estoque_id': est.id,
@@ -283,29 +181,15 @@ def api_itens_funcionario(funcionario_id):
             'obra': est.obra.nome if est.obra else 'N/A',
             'data_saida': est.updated_at.strftime('%d/%m/%Y') if est.updated_at else 'N/A'
         })
-<<<<<<< HEAD
-    
-    # 2. CONSUMÍVEIS em posse do funcionário
-    # ✅ CORREÇÃO: Buscar TODOS os movimentos de SAÍDA (não apenas permite_devolucao=True)
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     movimentos_saida = AlmoxarifadoMovimento.query.filter_by(
         funcionario_id=funcionario_id,
         tipo_movimento='SAIDA',
         admin_id=admin_id
-<<<<<<< HEAD
-    ).join(AlmoxarifadoItem).filter(
-        AlmoxarifadoItem.tipo_controle == 'CONSUMIVEL'
-    ).all()
-    
-    # Agrupar por item e calcular quantidade disponível para devolução
-=======
     ).join(_Item).filter(
         _Item.tipo_controle == 'CONSUMIVEL'
     ).all()
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     consumiveis_dict = {}
     for mov in movimentos_saida:
         if mov.item_id not in consumiveis_dict:
@@ -315,41 +199,23 @@ def api_itens_funcionario(funcionario_id):
                 'quantidade_devolvida': 0
             }
         consumiveis_dict[mov.item_id]['quantidade_saida'] += mov.quantidade or 0
-<<<<<<< HEAD
-    
-    # Subtrair devoluções já feitas
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     movimentos_devolucao = AlmoxarifadoMovimento.query.filter_by(
         funcionario_id=funcionario_id,
         tipo_movimento='DEVOLUCAO',
         admin_id=admin_id
     ).all()
-<<<<<<< HEAD
-    
-    for mov in movimentos_devolucao:
-        if mov.item_id in consumiveis_dict:
-            consumiveis_dict[mov.item_id]['quantidade_devolvida'] += mov.quantidade or 0
-    
-    # Subtrair consumidos
-=======
 
     for mov in movimentos_devolucao:
         if mov.item_id in consumiveis_dict:
             consumiveis_dict[mov.item_id]['quantidade_devolvida'] += mov.quantidade or 0
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     movimentos_consumido = AlmoxarifadoMovimento.query.filter_by(
         funcionario_id=funcionario_id,
         tipo_movimento='CONSUMIDO',
         admin_id=admin_id
     ).all()
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     for mov in movimentos_consumido:
         if mov.item_id not in consumiveis_dict:
             consumiveis_dict[mov.item_id] = {
@@ -360,12 +226,7 @@ def api_itens_funcionario(funcionario_id):
         if 'quantidade_consumida' not in consumiveis_dict[mov.item_id]:
             consumiveis_dict[mov.item_id]['quantidade_consumida'] = 0
         consumiveis_dict[mov.item_id]['quantidade_consumida'] += mov.quantidade or 0
-<<<<<<< HEAD
-    
-    # Adicionar consumíveis com quantidade disponível > 0 (SAIDA - DEVOLUCAO - CONSUMIDO)
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     for item_id, dados in consumiveis_dict.items():
         quantidade_consumida = dados.get('quantidade_consumida', 0)
         qtd_disponivel = dados['quantidade_saida'] - dados['quantidade_devolvida'] - quantidade_consumida
@@ -376,13 +237,7 @@ def api_itens_funcionario(funcionario_id):
                 'tipo_controle': 'CONSUMIVEL',
                 'quantidade_disponivel': qtd_disponivel,
                 'unidade': dados['item'].unidade,
-<<<<<<< HEAD
-                'permite_devolucao': dados['item'].permite_devolucao  # ✅ Flag para frontend
-            })
-    
-=======
                 'permite_devolucao': dados['item'].permite_devolucao
             })
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     return jsonify({'itens': itens_retornaveis})

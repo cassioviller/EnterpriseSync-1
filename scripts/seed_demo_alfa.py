@@ -2966,14 +2966,7 @@ def main(argv=None):
                 # GestaoCustoFilho. Necessário para deploys que plantaram a
                 # demo ANTES da geração automática existir.
                 _backfill_custos_rdo_demo(existente.id)
-<<<<<<< HEAD
-                from models import Obra as _ObraCheck
-                _op = _ObraCheck.query.filter_by(admin_id=existente.id, codigo="OBR-2026-001").first()
-                if _op:
-                    _seed_custos_mes_atual(existente.id, _op.id)
-=======
                 _seed_custos_mes_atual(existente.id)
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
                 # Task #6 — verificação também no caminho idempotente, para
                 # detectar regressão em demos legados a cada re-execução.
                 from models import Obra
@@ -3022,11 +3015,7 @@ def main(argv=None):
             # e re-emite 'rdo_finalizado' (idempotente) — fecha custos de
             # mão-de-obra também para demos antigos.
             _backfill_custos_rdo_demo(info["admin_id"])
-<<<<<<< HEAD
-            _seed_custos_mes_atual(info["admin_id"], info["obra_id"])
-=======
             _seed_custos_mes_atual(info["admin_id"])
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             # Task #6 — verificação obrigatória: MAO_OBRA via evento RDO +
             # MATERIAL via processar_compra_normal precisam existir.
             _verificar_custos_demo(

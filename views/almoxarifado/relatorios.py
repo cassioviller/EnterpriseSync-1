@@ -1,19 +1,3 @@
-<<<<<<< HEAD
-from flask import flash, redirect, render_template, request, url_for
-from flask_login import login_required
-from datetime import datetime, timedelta
-from sqlalchemy import func, and_
-from app import db
-from models import (
-    AlmoxarifadoCategoria,
-    AlmoxarifadoItem,
-    AlmoxarifadoEstoque,
-    AlmoxarifadoMovimento,
-    Funcionario,
-    Obra,
-)
-from . import almoxarifado_bp, get_admin_id
-=======
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from app import db
@@ -26,7 +10,6 @@ import logging
 from views.almoxarifado import almoxarifado_bp, get_admin_id
 
 logger = logging.getLogger(__name__)
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
 
 
 @almoxarifado_bp.route('/relatorios')
@@ -37,22 +20,8 @@ def relatorios():
     if not admin_id:
         flash('Erro de autenticação', 'danger')
         return redirect(url_for('main.index'))
-<<<<<<< HEAD
-    
-    # Identificar qual relatório gerar
-    relatorio_tipo = request.args.get('tipo', '')
-    
-    # Dados para os filtros (multi-tenant)
-    categorias = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).order_by(AlmoxarifadoCategoria.nome).all()
-    funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
-    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
-    
-    dados_relatorio = None
-    
-    # ========================================
     # RELATÓRIO 1: POSIÇÃO DE ESTOQUE
     # ========================================
-=======
 
     relatorio_tipo = request.args.get('tipo', '')
 
@@ -62,35 +31,10 @@ def relatorios():
 
     dados_relatorio = None
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     if relatorio_tipo == 'posicao_estoque':
         categoria_id = request.args.get('categoria_id', type=int)
         tipo_controle = request.args.get('tipo_controle', '')
         condicao = request.args.get('condicao', '')
-<<<<<<< HEAD
-        
-        # Query base com multi-tenant
-        query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)
-        query = query.join(AlmoxarifadoItem, AlmoxarifadoEstoque.item_id == AlmoxarifadoItem.id)
-        query = query.join(AlmoxarifadoCategoria, AlmoxarifadoItem.categoria_id == AlmoxarifadoCategoria.id)
-        
-        # Filtros
-        if categoria_id:
-            query = query.filter(AlmoxarifadoItem.categoria_id == categoria_id)
-        
-        if tipo_controle:
-            query = query.filter(AlmoxarifadoItem.tipo_controle == tipo_controle)
-        
-        if condicao:
-            query = query.filter(AlmoxarifadoEstoque.status == condicao)
-        
-        # Ordenar por categoria e item
-        query = query.order_by(AlmoxarifadoCategoria.nome, AlmoxarifadoItem.nome)
-        
-        itens_estoque = query.all()
-        
-        # Agrupar por categoria
-=======
 
         query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, ativo=True)
         query = query.join(AlmoxarifadoItem, AlmoxarifadoEstoque.item_id == AlmoxarifadoItem.id)
@@ -109,32 +53,20 @@ def relatorios():
 
         itens_estoque = query.all()
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         estoque_por_categoria = {}
         for estoque in itens_estoque:
             cat_nome = estoque.item.categoria.nome
             if cat_nome not in estoque_por_categoria:
                 estoque_por_categoria[cat_nome] = []
             estoque_por_categoria[cat_nome].append(estoque)
-<<<<<<< HEAD
-        
-        # Calcular subtotais
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         subtotais = {}
         for cat, itens in estoque_por_categoria.items():
             subtotal = sum([(e.valor_unitario or 0) * (e.quantidade or 0) for e in itens])
             subtotais[cat] = subtotal
-<<<<<<< HEAD
-        
-        total_geral = sum(subtotais.values())
-        
-=======
 
         total_geral = sum(subtotais.values())
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         dados_relatorio = {
             'tipo': 'posicao_estoque',
             'estoque_por_categoria': estoque_por_categoria,
@@ -146,26 +78,16 @@ def relatorios():
                 'condicao': condicao
             }
         }
-<<<<<<< HEAD
-    
-    # ========================================
     # RELATÓRIO 2: MOVIMENTAÇÕES POR PERÍODO
     # ========================================
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     elif relatorio_tipo == 'movimentacoes':
         data_inicio = request.args.get('data_inicio', '')
         data_fim = request.args.get('data_fim', '')
         tipo_movimento = request.args.get('tipo_movimento', '')
         funcionario_id = request.args.get('funcionario_id', type=int)
         obra_id = request.args.get('obra_id', type=int)
-<<<<<<< HEAD
-        
-        # Query base com multi-tenant
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         query = AlmoxarifadoMovimento.query.filter_by(admin_id=admin_id)
         query = query.join(AlmoxarifadoItem, AlmoxarifadoMovimento.item_id == AlmoxarifadoItem.id)
         query = query.outerjoin(Funcionario, and_(
@@ -176,23 +98,14 @@ def relatorios():
             AlmoxarifadoMovimento.obra_id == Obra.id,
             Obra.admin_id == admin_id
         ))
-<<<<<<< HEAD
-        
-        # Filtros de data (obrigatório)
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         if data_inicio:
             try:
                 data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d')
                 query = query.filter(AlmoxarifadoMovimento.data_movimento >= data_inicio_obj)
             except ValueError:
                 pass
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         if data_fim:
             try:
                 data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d')
@@ -200,23 +113,6 @@ def relatorios():
                 query = query.filter(AlmoxarifadoMovimento.data_movimento < data_fim_obj)
             except ValueError:
                 pass
-<<<<<<< HEAD
-        
-        if tipo_movimento:
-            query = query.filter(AlmoxarifadoMovimento.tipo_movimento == tipo_movimento)
-        
-        if funcionario_id:
-            query = query.filter(AlmoxarifadoMovimento.funcionario_id == funcionario_id)
-        
-        if obra_id:
-            query = query.filter(AlmoxarifadoMovimento.obra_id == obra_id)
-        
-        query = query.order_by(AlmoxarifadoMovimento.data_movimento.desc())
-        
-        movimentos = query.all()
-        
-        # Agrupar por tipo
-=======
 
         if tipo_movimento:
             query = query.filter(AlmoxarifadoMovimento.tipo_movimento == tipo_movimento)
@@ -231,35 +127,21 @@ def relatorios():
 
         movimentos = query.all()
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         movimentos_por_tipo = {
             'ENTRADA': [],
             'SAIDA': [],
             'DEVOLUCAO': []
         }
-<<<<<<< HEAD
-        
-        for mov in movimentos:
-            if mov.tipo_movimento in movimentos_por_tipo:
-                movimentos_por_tipo[mov.tipo_movimento].append(mov)
-        
-        # Calcular subtotais por tipo
-=======
 
         for mov in movimentos:
             if mov.tipo_movimento in movimentos_por_tipo:
                 movimentos_por_tipo[mov.tipo_movimento].append(mov)
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         subtotais_tipo = {}
         for tipo, movs in movimentos_por_tipo.items():
             subtotal = sum([(m.quantidade or 0) for m in movs])
             subtotais_tipo[tipo] = subtotal
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         dados_relatorio = {
             'tipo': 'movimentacoes',
             'movimentos_por_tipo': movimentos_por_tipo,
@@ -272,23 +154,10 @@ def relatorios():
                 'obra_id': obra_id
             }
         }
-<<<<<<< HEAD
-    
-    # ========================================
-    # RELATÓRIO 3: ITENS POR FUNCIONÁRIO
-    # ========================================
-    elif relatorio_tipo == 'itens_funcionario':
-        funcionario_id = request.args.get('funcionario_id', type=int)
-        obra_id = request.args.get('obra_id', type=int)
-        
-        # Query base: Itens EM_USO com multi-tenant
-=======
-
     elif relatorio_tipo == 'itens_funcionario':
         funcionario_id = request.args.get('funcionario_id', type=int)
         obra_id = request.args.get('obra_id', type=int)
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         query = AlmoxarifadoEstoque.query.filter_by(admin_id=admin_id, status='EM_USO')
         query = query.join(AlmoxarifadoItem, AlmoxarifadoEstoque.item_id == AlmoxarifadoItem.id)
         query = query.join(Funcionario, and_(
@@ -299,21 +168,6 @@ def relatorios():
             AlmoxarifadoEstoque.obra_id == Obra.id,
             Obra.admin_id == admin_id
         ))
-<<<<<<< HEAD
-        
-        # Filtros
-        if funcionario_id:
-            query = query.filter(AlmoxarifadoEstoque.funcionario_atual_id == funcionario_id)
-        
-        if obra_id:
-            query = query.filter(AlmoxarifadoEstoque.obra_id == obra_id)
-        
-        query = query.order_by(Funcionario.nome, AlmoxarifadoEstoque.updated_at.desc())
-        
-        itens_funcionario = query.all()
-        
-        # Agrupar por funcionário
-=======
 
         if funcionario_id:
             query = query.filter(AlmoxarifadoEstoque.funcionario_atual_id == funcionario_id)
@@ -325,24 +179,12 @@ def relatorios():
 
         itens_funcionario = query.all()
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         itens_por_funcionario = {}
         for estoque in itens_funcionario:
             func_nome = estoque.funcionario_atual.nome if estoque.funcionario_atual else 'Sem Funcionário'
             if func_nome not in itens_por_funcionario:
                 itens_por_funcionario[func_nome] = []
             itens_por_funcionario[func_nome].append(estoque)
-<<<<<<< HEAD
-        
-        # Calcular subtotais
-        subtotais_func = {}
-        for func, itens in itens_por_funcionario.items():
-            subtotal = sum([(e.valor_unitario or 0) * (e.quantidade or 0) for e in itens])
-            subtotais_func[func] = subtotal
-        
-        total_geral = sum(subtotais_func.values())
-        
-=======
 
         subtotais_func = {}
         for func_key, itens in itens_por_funcionario.items():
@@ -351,7 +193,6 @@ def relatorios():
 
         total_geral = sum(subtotais_func.values())
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         dados_relatorio = {
             'tipo': 'itens_funcionario',
             'itens_por_funcionario': itens_por_funcionario,
@@ -362,53 +203,31 @@ def relatorios():
                 'obra_id': obra_id
             }
         }
-<<<<<<< HEAD
-    
-    # ========================================
     # RELATÓRIO 4: CONSUMO POR OBRA
     # ========================================
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
     elif relatorio_tipo == 'consumo_obra':
         obra_id = request.args.get('obra_id', type=int)
         data_inicio = request.args.get('data_inicio', '')
         data_fim = request.args.get('data_fim', '')
-<<<<<<< HEAD
-        
-        # Query: SAIDA não devolvida (CONSUMIVEL ou SERIALIZADO sem DEVOLUCAO)
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         query = AlmoxarifadoMovimento.query.filter_by(admin_id=admin_id, tipo_movimento='SAIDA')
         query = query.join(AlmoxarifadoItem, AlmoxarifadoMovimento.item_id == AlmoxarifadoItem.id)
         query = query.join(Obra, and_(
             AlmoxarifadoMovimento.obra_id == Obra.id,
             Obra.admin_id == admin_id
         ))
-<<<<<<< HEAD
-        
-        # Filtros
-        if obra_id:
-            query = query.filter(AlmoxarifadoMovimento.obra_id == obra_id)
-        
-=======
 
         if obra_id:
             query = query.filter(AlmoxarifadoMovimento.obra_id == obra_id)
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         if data_inicio:
             try:
                 data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d')
                 query = query.filter(AlmoxarifadoMovimento.data_movimento >= data_inicio_obj)
             except ValueError:
                 pass
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         if data_fim:
             try:
                 data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d')
@@ -416,37 +235,17 @@ def relatorios():
                 query = query.filter(AlmoxarifadoMovimento.data_movimento < data_fim_obj)
             except ValueError:
                 pass
-<<<<<<< HEAD
-        
-        query = query.order_by(Obra.nome, AlmoxarifadoMovimento.data_movimento.desc())
-        
-        saidas = query.all()
-        
-        # Agrupar por obra
-=======
 
         query = query.order_by(Obra.nome, AlmoxarifadoMovimento.data_movimento.desc())
 
         saidas = query.all()
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         consumo_por_obra = {}
         for saida in saidas:
             obra_nome = saida.obra.nome if saida.obra else 'Sem Obra'
             if obra_nome not in consumo_por_obra:
                 consumo_por_obra[obra_nome] = []
             consumo_por_obra[obra_nome].append(saida)
-<<<<<<< HEAD
-        
-        # Calcular subtotais
-        subtotais_obra = {}
-        for obra, saidas_obra in consumo_por_obra.items():
-            subtotal = sum([(s.valor_unitario or 0) * (s.quantidade or 0) for s in saidas_obra])
-            subtotais_obra[obra] = subtotal
-        
-        total_geral = sum(subtotais_obra.values())
-        
-=======
 
         subtotais_obra = {}
         for obra_key, saidas_obra in consumo_por_obra.items():
@@ -455,7 +254,6 @@ def relatorios():
 
         total_geral = sum(subtotais_obra.values())
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         dados_relatorio = {
             'tipo': 'consumo_obra',
             'consumo_por_obra': consumo_por_obra,
@@ -467,23 +265,10 @@ def relatorios():
                 'data_fim': data_fim
             }
         }
-<<<<<<< HEAD
-    
-    # ========================================
-    # RELATÓRIO 5: ALERTAS E PENDÊNCIAS
-    # ========================================
-    elif relatorio_tipo == 'alertas':
-        # 1. Estoque Baixo
-        itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).all()
-        estoque_baixo = []
-        
-=======
-
     elif relatorio_tipo == 'alertas':
         itens = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).all()
         estoque_baixo = []
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         for item in itens:
             if item.tipo_controle == 'SERIALIZADO':
                 qtd_atual = AlmoxarifadoEstoque.query.filter_by(
@@ -497,11 +282,7 @@ def relatorios():
                     status='DISPONIVEL',
                     admin_id=admin_id
                 ).scalar() or 0
-<<<<<<< HEAD
-            
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
             if qtd_atual < item.estoque_minimo:
                 estoque_baixo.append({
                     'item': item,
@@ -509,26 +290,14 @@ def relatorios():
                     'qtd_minima': item.estoque_minimo,
                     'diferenca': item.estoque_minimo - qtd_atual
                 })
-<<<<<<< HEAD
-        
-        # 2. Manutenção Pendente
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         manutencao = AlmoxarifadoEstoque.query.filter_by(
             admin_id=admin_id,
             status='EM_MANUTENCAO'
         ).join(AlmoxarifadoItem).all()
-<<<<<<< HEAD
-        
-        # 3. Itens não devolvidos há >30 dias
-        data_limite = datetime.now() - timedelta(days=30)
-        
-=======
 
         data_limite = datetime.now() - timedelta(days=30)
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         nao_devolvidos = AlmoxarifadoEstoque.query.filter(
             AlmoxarifadoEstoque.admin_id == admin_id,
             AlmoxarifadoEstoque.status == 'EM_USO',
@@ -540,12 +309,7 @@ def relatorios():
             AlmoxarifadoEstoque.obra_id == Obra.id,
             Obra.admin_id == admin_id
         )).all()
-<<<<<<< HEAD
-        
-        # Calcular dias pendentes
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         nao_devolvidos_com_dias = []
         for item in nao_devolvidos:
             dias_pendente = (datetime.now() - item.updated_at).days
@@ -553,11 +317,7 @@ def relatorios():
                 'item': item,
                 'dias_pendente': dias_pendente
             })
-<<<<<<< HEAD
-        
-=======
 
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
         dados_relatorio = {
             'tipo': 'alertas',
             'estoque_baixo': estoque_baixo,
@@ -565,15 +325,6 @@ def relatorios():
             'nao_devolvidos': nao_devolvidos_com_dias,
             'filtros': {}
         }
-<<<<<<< HEAD
-    
-    return render_template('almoxarifado/relatorios.html',
-                         categorias=categorias,
-                         funcionarios=funcionarios,
-                         obras=obras,
-                         dados_relatorio=dados_relatorio,
-                         relatorio_tipo=relatorio_tipo)
-=======
 
     return render_template('almoxarifado/relatorios.html',
                            categorias=categorias,
@@ -581,4 +332,3 @@ def relatorios():
                            obras=obras,
                            dados_relatorio=dados_relatorio,
                            relatorio_tipo=relatorio_tipo)
->>>>>>> 7d4bef6c2972b820519cd3cab2f33d3f0078ddd1
