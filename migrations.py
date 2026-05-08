@@ -3855,6 +3855,7 @@ def executar_migracoes():
             (154, "Task #12 — RDO sempre Finalizado: migrar Rascunho legado via pipeline (custo diário + gestão custo filho + produtividade)", migration_154_force_rdo_finalizado),
             (155, "Task #5 — RDO: drop coluna rdo_mao_obra.horas_extras (hora extra removida do RDO)", migration_155_drop_rdo_mao_obra_horas_extras),
             (156, "Task #7 — custo_obra.descricao: ampliar de VARCHAR(200) para VARCHAR(500) (RDO com muitas subatividades)", migration_156_custo_obra_descricao_500),
+            (157, "Task #69 — backfill produtividade_real/indice_produtividade em RDOMaoObra para RDOs Finalizados com dados suficientes", migration_157_backfill_produtividade_rdo),
         ]
         
         # Executar cada migração com rastreamento
@@ -13382,6 +13383,130 @@ def migration_156_custo_obra_descricao_500():
                 connection.close()
             except Exception:
                 pass
+        raise
+
+
+def migration_157_backfill_produtividade_rdo():
+    """Task #69 — backfill produtividade_real/indice_produtividade em RDOMaoObra.
+
+    Problema: RDOs nascem diretamente como 'Finalizado' via salvar_rdo_flexivel,
+    sem passar pela rota finalizar_rdo. Antes da Task #69 o cálculo de
+    produtividade_real só era feito nessa rota. Resultado: RDOMaoObra históricos
+    com quantidade_produzida e meta_produtividade_snapshot preenchidos mas
+    produtividade_real = NULL — invisíveis no Dashboard de Produtividade V2.
+
+    Esta migração corrige o histórico em lotes de 50 RDOs, chamando a mesma
+    função canônica recalcular_produtividade_rdo() usada pelo save atual.
+
+    Idempotente:
+      - Verifica globalmente se já existem RDOMaoObra com produtividade_real
+        não nulo ligados a subatividades com dados completos. Se não existir
+        nenhum candidato elegível, pula sem fazer nada.
+      - recalcular_produtividade_rdo() é idempotente (sobrescreve com os
+        mesmos valores em re-execuções).
+      - RDOs onde nenhuma subatividade tem quantidade_produzida +
+        meta_produtividade_snapshot são silenciosamente ignorados (sem dados
+        suficientes para calcular).
+    """
+    try:
+        from app import db
+        from models import RDO, RDOMaoObra, RDOServicoSubatividade
+        from services.rdo_custos import recalcular_produtividade_rdo
+
+        # Encontrar RDOs Finalizados que têm subatividades com dados suficientes
+        # mas ainda têm algum RDOMaoObra com produtividade_real NULL.
+        # Abordagem: buscar IDs de RDO que possuem pelo menos uma
+        # RDOServicoSubatividade com quantidade_produzida e meta > 0,
+        # e pelo menos um RDOMaoObra com produtividade_real NULL vinculado
+        # a uma dessas subatividades.
+        candidatos_ids = (
+            db.session.query(RDO.id)
+            .join(
+                RDOServicoSubatividade,
+                RDOServicoSubatividade.rdo_id == RDO.id,
+            )
+            .join(
+                RDOMaoObra,
+                (RDOMaoObra.rdo_id == RDO.id)
+                & (RDOMaoObra.subatividade_id == RDOServicoSubatividade.id),
+            )
+            .filter(
+                RDO.status == 'Finalizado',
+                RDOServicoSubatividade.quantidade_produzida.isnot(None),
+                RDOServicoSubatividade.meta_produtividade_snapshot.isnot(None),
+                RDOServicoSubatividade.meta_produtividade_snapshot > 0,
+                RDOMaoObra.produtividade_real.is_(None),
+            )
+            .distinct()
+            .all()
+        )
+
+        total = len(candidatos_ids)
+        if total == 0:
+            logger.info(
+                "MIGRACAO 157: nenhum RDO elegível para backfill de produtividade — nada a fazer"
+            )
+            return True
+
+        logger.info(
+            "MIGRACAO 157: %d RDO(s) com produtividade_real NULL elegíveis para backfill",
+            total,
+        )
+
+        rdo_ids = [row[0] for row in candidatos_ids]
+        processados = 0
+        sem_dados = 0
+        falhas = 0
+        BATCH = 50
+
+        for i in range(0, len(rdo_ids), BATCH):
+            lote = rdo_ids[i: i + BATCH]
+            rdos = RDO.query.filter(RDO.id.in_(lote)).all()
+            for rdo in rdos:
+                try:
+                    n = recalcular_produtividade_rdo(rdo)
+                    if n > 0:
+                        processados += 1
+                    else:
+                        sem_dados += 1
+                except Exception as _e:
+                    logger.error(
+                        "MIGRACAO 157: erro ao recalcular RDO %s (lote %d): %s",
+                        rdo.id, i // BATCH + 1, _e,
+                    )
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+                    falhas += 1
+            try:
+                db.session.commit()
+                logger.info(
+                    "MIGRACAO 157: lote %d-%d commitado (%d processados até agora)",
+                    i + 1, i + len(lote), processados,
+                )
+            except Exception as _ec:
+                logger.error("MIGRACAO 157: commit do lote %d falhou: %s", i // BATCH, _ec)
+                db.session.rollback()
+                falhas += len(lote)
+
+        logger.info(
+            "MIGRACAO 157 CONCLUIDA: %d processado(s), %d sem dados suficientes, %d falha(s) (de %d)",
+            processados, sem_dados, falhas, total,
+        )
+        if falhas > 0:
+            raise RuntimeError(
+                f"MIGRACAO 157: {falhas} RDO(s) não foram recalculados. "
+                "Verifique os logs e re-execute."
+            )
+        return True
+    except Exception as e:
+        logger.error("MIGRACAO 157 falhou: %s", e)
+        try:
+            from app import db as _db
+            _db.session.rollback()
+        except Exception:
+            pass
         raise
 
 
