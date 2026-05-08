@@ -742,6 +742,10 @@ def criar_rdo():
                     if descricao:
                         ocorrencia = RDOOcorrencia()
                         ocorrencia.rdo_id = rdo.id
+                        ocorrencia.admin_id = admin_id
+                        ocorrencia.tipo_ocorrencia = oc_data.get('tipo', 'Observação') or 'Observação'
+                        ocorrencia.severidade = oc_data.get('severidade', 'Baixa') or 'Baixa'
+                        ocorrencia.status_resolucao = oc_data.get('status', 'Pendente') or 'Pendente'
                         ocorrencia.descricao_ocorrencia = descricao
                         ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
                         ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
@@ -903,9 +907,9 @@ def visualizar_rdo(id):
         rdo = RDO.query.options(
             db.joinedload(RDO.obra),
             db.joinedload(RDO.criado_por),
-            db.joinedload(RDO.fotos),
-            db.joinedload(RDO.equipamentos),
-            db.joinedload(RDO.ocorrencias_rdo),
+            db.selectinload(RDO.fotos),
+            db.selectinload(RDO.equipamentos),
+            db.selectinload(RDO.ocorrencias_rdo),
         ).join(Obra).filter(
             RDO.id == id,
             Obra.admin_id == admin_id_atual
@@ -3007,6 +3011,10 @@ def rdo_salvar_unificado():
                     if descricao:
                         ocorrencia = RDOOcorrencia()
                         ocorrencia.rdo_id = rdo.id
+                        ocorrencia.admin_id = admin_id_correto
+                        ocorrencia.tipo_ocorrencia = oc_data.get('tipo', 'Observação') or 'Observação'
+                        ocorrencia.severidade = oc_data.get('severidade', 'Baixa') or 'Baixa'
+                        ocorrencia.status_resolucao = oc_data.get('status', 'Pendente') or 'Pendente'
                         ocorrencia.descricao_ocorrencia = descricao
                         ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
                         ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
