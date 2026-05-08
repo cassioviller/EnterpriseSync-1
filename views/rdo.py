@@ -1379,6 +1379,19 @@ def visualizar_rdo(id):
                 dados['subatividades'].sort(key=extrair_numero_subatividade)
                 logger.debug(f"[NUM] SUBATIVIDADES ORDENADAS PARA SERVIÇO {servico_id}: {len(dados['subatividades'])} itens")
         
+        # Task #71 — Índice de produtividade médio por subatividade
+        # Agrega os valores de indice_produtividade dos RDOMaoObra vinculados
+        # a cada RDOServicoSubatividade e expõe o dict ao template.
+        from collections import defaultdict as _dd
+        _ip_bucket: dict = _dd(list)
+        for _mo in mao_obra_rows:
+            if _mo.subatividade_id and getattr(_mo, 'indice_produtividade', None) is not None:
+                _ip_bucket[_mo.subatividade_id].append(float(_mo.indice_produtividade))
+        indice_medio_por_subatividade: dict = {
+            _sid: sum(_vals) / len(_vals)
+            for _sid, _vals in _ip_bucket.items()
+        }
+
         # V2: Buscar apontamentos de produção do cronograma para este RDO
         apontamentos_cronograma = []
         try:
@@ -1425,7 +1438,8 @@ def visualizar_rdo(id):
                              total_horas_trabalhadas=total_horas_trabalhadas,
                              apontamentos_cronograma=apontamentos_cronograma,
                              custos_dia_map=custos_dia_map,
-                             custos_gerados_rdo=custos_gerados_rdo)
+                             custos_gerados_rdo=custos_gerados_rdo,
+                             indice_medio_por_subatividade=indice_medio_por_subatividade)
         
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")

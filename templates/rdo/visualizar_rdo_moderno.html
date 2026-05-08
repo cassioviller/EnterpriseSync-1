@@ -1289,6 +1289,24 @@ console.log('Initializing RDO view with light theme...');
                             </div>
                             {% endif %}
 
+                            {# Task #71 — Índice de produtividade médio da equipe nesta subatividade #}
+                            {% set _ip_sub = indice_medio_por_subatividade.get(subatividade.id) if (indice_medio_por_subatividade is defined and subatividade.id is defined) else none %}
+                            {% if _ip_sub is not none %}
+                            <div class="mt-2 px-1 d-flex align-items-center gap-2" style="font-size:.82rem">
+                                <i class="fas fa-tachometer-alt text-muted" title="Índice de produtividade médio da equipe"></i>
+                                {% if _ip_sub >= 1.0 %}
+                                <span class="badge bg-success" style="font-size:.75rem" data-bs-toggle="tooltip" title="Índice ≥ 1.0 — equipe atingiu ou superou a meta">{{ "%.2f"|format(_ip_sub) }}×</span>
+                                <span class="text-success fw-semibold">{{ "%.0f"|format(_ip_sub * 100) }}% da meta</span>
+                                {% elif _ip_sub >= 0.8 %}
+                                <span class="badge bg-warning text-dark" style="font-size:.75rem" data-bs-toggle="tooltip" title="Índice entre 0.8 e 1.0 — próximo da meta">{{ "%.2f"|format(_ip_sub) }}×</span>
+                                <span class="text-warning fw-semibold">⚠️ {{ "%.0f"|format(_ip_sub * 100) }}% da meta</span>
+                                {% else %}
+                                <span class="badge bg-danger" style="font-size:.75rem" data-bs-toggle="tooltip" title="Índice < 0.8 — equipe abaixo da meta">{{ "%.2f"|format(_ip_sub) }}×</span>
+                                <span class="text-danger fw-semibold">🔴 {{ "%.0f"|format(_ip_sub * 100) }}% da meta</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
                             {% if is_v2_active is defined and is_v2_active() and rdo.status == 'Finalizado' %}
                             {% set maos_sub = subatividade.mao_obra_registros if subatividade.mao_obra_registros else [] %}
                             {% if maos_sub %}
