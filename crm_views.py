@@ -391,7 +391,7 @@ def lista():
 def _coletar_filtros():
     return {
         'busca': (request.args.get('busca') or '').strip(),
-        'responsavel_id': _to_int(request.args.get('responsavel_id')),
+        'vendedor_id': _to_int(request.args.get('vendedor_id')),
         'origem_id': _to_int(request.args.get('origem_id')),
         'tipo_material_id': _to_int(request.args.get('tipo_material_id')),
         'tipo_obra_id': _to_int(request.args.get('tipo_obra_id')),
@@ -409,8 +409,8 @@ def _aplicar_filtros(q, filtros):
             Lead.demanda.ilike(like),
             Lead.localizacao.ilike(like),
         ))
-    if filtros['responsavel_id']:
-        q = q.filter(Lead.responsavel_id == filtros['responsavel_id'])
+    if filtros['vendedor_id']:
+        q = q.filter(Lead.vendedor_id == filtros['vendedor_id'])
     if filtros['origem_id']:
         q = q.filter(Lead.origem_id == filtros['origem_id'])
     if filtros['tipo_material_id']:
@@ -494,9 +494,9 @@ def _salvar_lead(lead, listas, admin_id):
         novo_status = LeadStatus.EM_FILA.value
 
     # Validar TODAS as FKs contra o tenant (anti-cross-tenant injection)
-    fk_responsavel    = _validar_fk_tenant('responsavel',    request.form.get('responsavel_id'),    admin_id)
+    fk_vendedor       = _validar_fk_tenant('responsavel',    request.form.get('vendedor_id'),       admin_id)
+    fk_orcamentista   = _validar_fk_tenant('responsavel',    request.form.get('orcamentista_id'),   admin_id)
     fk_origem         = _validar_fk_tenant('origem',         request.form.get('origem_id'),         admin_id)
-    fk_cadencia       = _validar_fk_tenant('cadencia',       request.form.get('cadencia_id'),       admin_id)
     fk_situacao       = _validar_fk_tenant('situacao',       request.form.get('situacao_id'),       admin_id)
     fk_tipo_material  = _validar_fk_tenant('tipo_material',  request.form.get('tipo_material_id'),  admin_id)
     fk_tipo_obra      = _validar_fk_tenant('tipo_obra',      request.form.get('tipo_obra_id'),      admin_id)
@@ -543,9 +543,9 @@ def _salvar_lead(lead, listas, admin_id):
     lead.nome = nome
     lead.contato = (request.form.get('contato') or '').strip() or None
     lead.email = (request.form.get('email') or '').strip() or None
-    lead.responsavel_id = fk_responsavel
+    lead.vendedor_id = fk_vendedor
+    lead.orcamentista_id = fk_orcamentista
     lead.origem_id = fk_origem
-    lead.cadencia_id = fk_cadencia
     lead.situacao_id = fk_situacao
     lead.tipo_material_id = fk_tipo_material
     lead.tipo_obra_id = fk_tipo_obra

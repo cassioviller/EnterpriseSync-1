@@ -6295,6 +6295,7 @@ class Lead(db.Model):
     __table_args__ = (
         db.Index('ix_lead_admin_status', 'admin_id', 'status'),
         db.Index('ix_lead_admin_responsavel', 'admin_id', 'responsavel_id'),
+        db.Index('ix_lead_admin_vendedor', 'admin_id', 'vendedor_id'),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -6311,6 +6312,8 @@ class Lead(db.Model):
 
     # FKs para listas mestras (todas opcionais — admin pode ainda não ter cadastrado)
     responsavel_id = db.Column(db.Integer, db.ForeignKey('crm_responsavel.id'), nullable=True)
+    vendedor_id = db.Column(db.Integer, db.ForeignKey('crm_responsavel.id'), nullable=True)
+    orcamentista_id = db.Column(db.Integer, db.ForeignKey('crm_responsavel.id'), nullable=True)
     origem_id = db.Column(db.Integer, db.ForeignKey('crm_origem.id'), nullable=True)
     cadencia_id = db.Column(db.Integer, db.ForeignKey('crm_cadencia.id'), nullable=True)
     situacao_id = db.Column(db.Integer, db.ForeignKey('crm_situacao.id'), nullable=True)
@@ -6352,6 +6355,8 @@ class Lead(db.Model):
 
     # Relacionamentos
     responsavel = db.relationship('CrmResponsavel', foreign_keys=[responsavel_id])
+    vendedor = db.relationship('CrmResponsavel', foreign_keys=[vendedor_id])
+    orcamentista = db.relationship('CrmResponsavel', foreign_keys=[orcamentista_id])
     origem = db.relationship('CrmOrigem', foreign_keys=[origem_id])
     cadencia = db.relationship('CrmCadencia', foreign_keys=[cadencia_id])
     situacao = db.relationship('CrmSituacao', foreign_keys=[situacao_id])

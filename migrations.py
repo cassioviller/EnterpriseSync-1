@@ -3858,6 +3858,7 @@ def executar_migracoes():
             (157, "Task #69 — backfill produtividade_real/indice_produtividade em RDOMaoObra para RDOs Finalizados com dados suficientes", migration_157_backfill_produtividade_rdo),
             (158, "Task #77 — cliente_observacao: histórico de anotações livres por cliente (CRM)", migration_158_cliente_observacao),
             (159, "Task #84 — backfill composicao_servico_id/vinculo_status em rdo_mao_obra para registros históricos nulos", migration_159_backfill_composicao_servico_id),
+            (160, "Task #95 — CRM: adicionar vendedor_id e orcamentista_id na tabela lead + backfill de responsavel_id", migration_160_crm_vendedor_orcamentista),
         ]
         
         # Executar cada migração com rastreamento
@@ -13726,6 +13727,35 @@ def migration_158_cliente_observacao():
     """))
     db.session.commit()
     logger.info("✅ Tabela cliente_observacao criada.")
+
+
+def migration_160_crm_vendedor_orcamentista():
+    """Task #95 — Adiciona colunas vendedor_id e orcamentista_id na tabela lead.
+    Ambas são FKs opcionais para crm_responsavel (reutiliza o mesmo pool).
+    Copia responsavel_id → vendedor_id para leads que ainda não têm vendedor.
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE lead
+                ADD COLUMN IF NOT EXISTS vendedor_id INTEGER REFERENCES crm_responsavel(id),
+                ADD COLUMN IF NOT EXISTS orcamentista_id INTEGER REFERENCES crm_responsavel(id)
+        """))
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_lead_admin_vendedor
+                ON lead (admin_id, vendedor_id)
+        """))
+        db.session.execute(text("""
+            UPDATE lead
+               SET vendedor_id = responsavel_id
+             WHERE responsavel_id IS NOT NULL
+               AND vendedor_id IS NULL
+        """))
+        db.session.commit()
+        logger.info("[Migration 160] vendedor_id e orcamentista_id adicionados à tabela lead; backfill concluído.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 160] Falha: {e}")
+        raise
 
 
 def migration_159_backfill_composicao_servico_id():

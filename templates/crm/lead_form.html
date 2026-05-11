@@ -64,10 +64,10 @@
                                 <input type="date" name="data_envio" class="form-control"
                                        value="{% if lead and lead.data_envio %}{{ lead.data_envio.isoformat() }}{% endif %}">
                             </div>
-                            <div class="col-md-6">
-                                {{ select_lista('responsavel_id', listas.responsavel,
-                                                 (lead.responsavel_id if lead else None),
-                                                 'Responsável') }}
+                            <div class="col-md-3">
+                                {{ select_lista('vendedor_id', listas.responsavel,
+                                                 (lead.vendedor_id if lead else None),
+                                                 'Vendedor') }}
                                 {% if not listas.responsavel %}
                                 <small class="text-warning">
                                     <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
@@ -75,6 +75,11 @@
                                     <a href="{{ url_for('crm.cadastros') }}#responsavel">Cadastrar</a>
                                 </small>
                                 {% endif %}
+                            </div>
+                            <div class="col-md-3">
+                                {{ select_lista('orcamentista_id', listas.responsavel,
+                                                 (lead.orcamentista_id if lead else None),
+                                                 'Orçamentista') }}
                             </div>
                         </div>
                     </div>
@@ -87,10 +92,6 @@
                             <div class="col-md-4">
                                 {{ select_lista('origem_id', listas.origem,
                                                  (lead.origem_id if lead else None), 'Origem') }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ select_lista('cadencia_id', listas.cadencia,
-                                                 (lead.cadencia_id if lead else None), 'Cadência') }}
                             </div>
                             <div class="col-md-4">
                                 {{ select_lista('situacao_id', listas.situacao,
