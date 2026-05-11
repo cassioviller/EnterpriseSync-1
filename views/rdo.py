@@ -890,8 +890,10 @@ def criar_rdo():
         try:
             from services.vinculo_mao_obra import aplicar_vinculo_no_rdo
             _vc = aplicar_vinculo_no_rdo(rdo.id)
+            db.session.commit()
             logger.info(f"[Task#84] vinculo pós-criação RDO {rdo.id}: {_vc}")
         except Exception as _ve:
+            db.session.rollback()
             logger.error(f"[Task#84] aplicar_vinculo_no_rdo falhou em criar RDO {rdo.id}: {_ve}")
 
         flash(f'RDO {numero_rdo} criado com sucesso!', 'success')

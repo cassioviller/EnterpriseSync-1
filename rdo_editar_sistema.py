@@ -479,8 +479,10 @@ def salvar_edicao_rdo(rdo_id):
         try:
             from services.vinculo_mao_obra import aplicar_vinculo_no_rdo
             _vc = aplicar_vinculo_no_rdo(rdo_id)
+            db.session.commit()
             logger.info(f"[Task#84] vinculo pós-edição RDO {rdo_id}: {_vc}")
         except Exception as _ve:
+            db.session.rollback()
             logger.error(f"[Task#84] aplicar_vinculo_no_rdo falhou em salvar_edicao_rdo (RDO {rdo_id}): {_ve}")
 
         # Grava custo diário PRIMEIRO (fonte de verdade para rdo_custos)
