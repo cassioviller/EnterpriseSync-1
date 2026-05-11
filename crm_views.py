@@ -1277,6 +1277,32 @@ def importar():
 # DETALHE DO CLIENTE — histórico de leads e anotações
 # ===========================================================================
 
+def _pode_acessar_cliente(cliente_id, admin_id):
+    """Guarda de autorização para rotas de detalhe do Cliente.
+
+    Admin / gestor: acesso total ao tenant.
+    Funcionário comum: acesso somente se houver ao menos um lead vinculado
+    a este cliente onde ele figura como responsável (mesmo critério de
+    _pode_acessar_lead, mas a nível de cliente).
+    """
+    if is_admin_user():
+        return True
+    nome_user = (getattr(current_user, 'nome', '') or '').strip()
+    if not nome_user:
+        return False
+    accessible = (
+        Lead.query
+        .join(Lead.responsavel)
+        .filter(
+            Lead.cliente_id == cliente_id,
+            Lead.admin_id == admin_id,
+        )
+        .filter(Lead.responsavel.has(nome=nome_user))
+        .first()
+    )
+    return bool(accessible)
+
+
 @crm_bp.route('/clientes/<int:cliente_id>', methods=['GET'])
 @login_required
 def detalhe_cliente(cliente_id):
@@ -1286,8 +1312,14 @@ def detalhe_cliente(cliente_id):
         return redirect(url_for('crm.kanban'))
 
     cliente = Cliente.query.filter_by(id=cliente_id, admin_id=admin_id).first_or_404()
-    leads = Lead.query.filter_by(cliente_id=cliente_id, admin_id=admin_id)\
-                      .order_by(Lead.data_chegada.desc()).all()
+
+    if not _pode_acessar_cliente(cliente_id, admin_id):
+        flash('Sem permissão para acessar este cliente.', 'danger')
+        return redirect(url_for('crm.kanban'))
+
+    leads_q = Lead.query.filter_by(cliente_id=cliente_id, admin_id=admin_id)\
+                        .order_by(Lead.data_chegada.desc()).all()
+    leads = [l for l in leads_q if _pode_acessar_lead(l)]
     return render_template(
         'crm/cliente_detalhe.html',
         cliente=cliente,
@@ -1304,6 +1336,11 @@ def adicionar_observacao_cliente(cliente_id):
         return redirect(url_for('crm.kanban'))
 
     cliente = Cliente.query.filter_by(id=cliente_id, admin_id=admin_id).first_or_404()
+
+    if not _pode_acessar_cliente(cliente_id, admin_id):
+        flash('Sem permissão para adicionar anotações neste cliente.', 'danger')
+        return redirect(url_for('crm.kanban'))
+
     texto = (request.form.get('texto') or '').strip()
     if not texto:
         flash('A observação não pode estar em branco.', 'danger')
