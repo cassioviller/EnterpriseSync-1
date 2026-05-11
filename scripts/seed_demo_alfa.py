@@ -85,6 +85,7 @@ CARLOS_CPF = "900.901.001-01"
 PEDRO_CPF = "900.901.002-02"
 JOAO_CPF = "900.901.003-03"
 MARCOS_CPF = "900.901.004-04"
+ANA_CPF = "900.901.005-05"
 
 
 def _admin_existente():
@@ -489,6 +490,9 @@ def _seed():
         Veiculo, UsoVeiculo, CustoVeiculo,
         FolhaProcessada,
         PlanoContas, LancamentoContabil, PartidaContabil, FluxoCaixa,
+        # Task #89 — Orçamento Operacional (habilita Lucro/UN nas métricas)
+        ObraOrcamentoOperacional, ObraOrcamentoOperacionalItem,
+        ObraOrcamentoOperacionalItemVersao,
     )
     from services.orcamento_view_service import (
         snapshot_from_servico, recalcular_item, recalcular_orcamento,
@@ -601,7 +605,22 @@ def _seed():
         email="marcos@construtoraalfa.com.br",
         telefone="(11) 90000-0004",
     )
-    db.session.add_all([carlos, pedro, joao, marcos]); db.session.flush()
+    ana = Funcionario(
+        codigo="ALF005",
+        nome="Ana Santos",
+        cpf=ANA_CPF,
+        data_admissao=date(2025, 11, 1),
+        salario=0.0,
+        valor_diaria=180.00,
+        tipo_remuneracao="diaria",
+        jornada_semanal=44,
+        ativo=True, admin_id=aid,
+        valor_va=22.00, valor_vt=12.00,
+        chave_pix=ANA_CPF,
+        email="ana@construtoraalfa.com.br",
+        telefone="(11) 90000-0005",
+    )
+    db.session.add_all([carlos, pedro, joao, marcos, ana]); db.session.flush()
 
     # 5) Insumos básicos com preço base ------------------------------------
     insumos_def = [
@@ -825,12 +844,17 @@ def _seed():
     db.session.flush()
 
     # Composição mínima do serviço de alvenaria (paramétrica)
+    # Coeficientes calibrados para índice ~110% (verde) — Task #89.
+    # "Hora pedreiro" é o gargalo (max_coef), "Diária encarregado"
+    # adicionado para que Pedro tenha vínculo 'auto' em vez de
+    # 'funcao_fora_composicao', desbloqueando 100% de cobertura.
     for nome_ins, coef in [
         ("Cimento CP II 50kg",     "0.04"),
         ("Bloco cerâmico 9x19x19", "28.0"),
         ("Areia média m³",         "0.02"),
-        ("Hora pedreiro",          "0.60"),
+        ("Hora pedreiro",          "0.55"),   # 0.60 → 0.55 (calibrado)
         ("Hora servente",          "0.40"),
+        ("Diária encarregado",     "0.125"),  # novo — cobre Pedro
     ]:
         db.session.add(ComposicaoServico(
             admin_id=aid, servico_id=serv_alv.id,
@@ -838,11 +862,13 @@ def _seed():
             coeficiente=Decimal(coef),
         ))
     # Composição mínima do contrapiso
+    # Coeficientes calibrados para índice ~91% (ok) — Task #89.
     for nome_ins, coef in [
         ("Cimento CP II 50kg", "0.10"),
         ("Areia média m³",     "0.04"),
-        ("Hora pedreiro",      "0.30"),
+        ("Hora pedreiro",      "0.35"),   # 0.30 → 0.35 (calibrado)
         ("Hora servente",      "0.20"),
+        ("Diária encarregado", "0.075"),  # novo — cobre Pedro
     ]:
         db.session.add(ComposicaoServico(
             admin_id=aid, servico_id=serv_pis.id,
@@ -850,10 +876,11 @@ def _seed():
             coeficiente=Decimal(coef),
         ))
     # Composição mínima da pintura (Task #20).
+    # "Hora pintor" calibrado para índice ~82% (atenção) — Task #89.
     for nome_ins, coef in [
         ("Tinta acrílica 18L",   "0.020"),  # ~1 galão p/ 50 m² (2 demãos)
         ("Massa corrida 25kg",   "0.040"),  # ~1 sc p/ 25 m²
-        ("Hora pintor",          "0.350"),
+        ("Hora pintor",          "0.750"),  # 0.350 → 0.750 (calibrado)
         ("Hora servente",        "0.150"),
     ]:
         db.session.add(ComposicaoServico(
@@ -883,7 +910,14 @@ def _seed():
         insumo_id=insumos_obj["Diária encarregado"].id,
         salario_base=200.0,
     )
-    db.session.add_all([funcao_pedreiro, funcao_servente, funcao_encarregado])
+    # Task #89 — Pintor: função ligada a "Hora pintor" para que Ana
+    # receba vínculo 'auto' nas subatividades de Pintura.
+    funcao_pintor = Funcao(
+        nome="Pintor", admin_id=aid,
+        insumo_id=insumos_obj["Hora pintor"].id,
+        salario_base=180.0,
+    )
+    db.session.add_all([funcao_pedreiro, funcao_servente, funcao_encarregado, funcao_pintor])
     db.session.flush()
 
     # Vincular Funcionários às suas Funções
@@ -891,6 +925,7 @@ def _seed():
     pedro.funcao_id  = funcao_encarregado.id
     joao.funcao_id   = funcao_servente.id
     marcos.funcao_id = funcao_servente.id
+    ana.funcao_id    = funcao_pintor.id
     db.session.flush()
 
     # 7.6) SubatividadeMaoObra (Task #62 — N:N sub_mestre↔composicao) -----
@@ -898,11 +933,15 @@ def _seed():
     # aponta para um RDOServicoSubatividade com subatividade_mestre_id
     # definido. Mapeia cada subatividade às composições MAO_OBRA do
     # serviço correspondente.
+    # Task #89 — incluir "Diária encarregado" nos links de Alv e Contrapiso
+    # para que Pedro (Encarregado) receba vínculo 'auto' em vez de
+    # 'funcao_fora_composicao', alcançando 100% de cobertura.
     comps_alv_mo = ComposicaoServico.query.filter(
         ComposicaoServico.servico_id == serv_alv.id,
         ComposicaoServico.insumo_id.in_([
             insumos_obj["Hora pedreiro"].id,
             insumos_obj["Hora servente"].id,
+            insumos_obj["Diária encarregado"].id,
         ]),
     ).all()
     comps_pis_mo = ComposicaoServico.query.filter(
@@ -910,6 +949,7 @@ def _seed():
         ComposicaoServico.insumo_id.in_([
             insumos_obj["Hora pedreiro"].id,
             insumos_obj["Hora servente"].id,
+            insumos_obj["Diária encarregado"].id,
         ]),
     ).all()
     comps_pin_mo = ComposicaoServico.query.filter(
@@ -1112,17 +1152,18 @@ def _seed():
                 subatividade_mestre_id=folha.subatividade_mestre_id,
             )
             db.session.add(rss); db.session.flush()
+            # Task #89 — funcao_exercida limpo (sem sufixos "(mensalista)"/"(diária)")
             db.session.add(RDOMaoObra(
                 admin_id=aid, rdo_id=rdo.id,
-                funcionario_id=carlos.id, funcao_exercida="Pedreiro (mensalista)",
+                funcionario_id=carlos.id, funcao_exercida="Pedreiro",
                 horas_trabalhadas=horas,
                 tarefa_cronograma_id=folha.id,
                 subatividade_id=rss.id,
             ))
             for _diar, _func in (
-                (pedro,  "Encarregado (diária)"),
-                (joao,   "Servente (diária)"),
-                (marcos, "Servente (diária)"),
+                (pedro,  "Encarregado"),
+                (joao,   "Servente"),
+                (marcos, "Servente"),
             ):
                 db.session.add(RDOMaoObra(
                     admin_id=aid, rdo_id=rdo.id,
@@ -1204,6 +1245,85 @@ def _seed():
     # passam a refletir a média ponderada dos filhos (que os RDOs avançaram).
     from utils.cronograma_engine import sincronizar_percentuais_obra as _sinc_perc
     _sinc_perc(obra.id, aid)
+
+    # Task #89 — ObraOrcamentoOperacional para "Residencial Bela Vista".
+    # Sem esse registro, receita_liq_total = None e Lucro/UN exibe "—".
+    # composicao_snapshot espelha as composições seedadas acima (coefs
+    # calibrados) com os preços-base dos insumos.
+    _snap_alv = [
+        {"nome": "Cimento CP II 50kg",     "coeficiente": 0.04,  "preco_unitario": 38.50},
+        {"nome": "Bloco cerâmico 9x19x19", "coeficiente": 28.0,  "preco_unitario": 1.20},
+        {"nome": "Areia média m³",          "coeficiente": 0.02,  "preco_unitario": 95.00},
+        {"nome": "Hora pedreiro",           "coeficiente": 0.55,  "preco_unitario": 28.00},
+        {"nome": "Hora servente",           "coeficiente": 0.40,  "preco_unitario": 18.00},
+        {"nome": "Diária encarregado",      "coeficiente": 0.125, "preco_unitario": 200.00},
+    ]
+    _snap_pis = [
+        {"nome": "Cimento CP II 50kg",  "coeficiente": 0.10,  "preco_unitario": 38.50},
+        {"nome": "Areia média m³",       "coeficiente": 0.04,  "preco_unitario": 95.00},
+        {"nome": "Hora pedreiro",        "coeficiente": 0.35,  "preco_unitario": 28.00},
+        {"nome": "Hora servente",        "coeficiente": 0.20,  "preco_unitario": 18.00},
+        {"nome": "Diária encarregado",   "coeficiente": 0.075, "preco_unitario": 200.00},
+    ]
+    _snap_pin = [
+        {"nome": "Tinta acrílica 18L",  "coeficiente": 0.020, "preco_unitario": 320.00},
+        {"nome": "Massa corrida 25kg",  "coeficiente": 0.040, "preco_unitario": 68.00},
+        {"nome": "Hora pintor",         "coeficiente": 0.750, "preco_unitario": 30.00},
+        {"nome": "Hora servente",       "coeficiente": 0.150, "preco_unitario": 18.00},
+    ]
+    # Get-or-create: o hook after_insert do RDO pode ter disparado a clonagem
+    # automática antes de chegarmos aqui, portanto não tentamos INSERT cego.
+    _op_bv = ObraOrcamentoOperacional.query.filter_by(obra_id=obra.id).first()
+    if _op_bv is None:
+        _op_bv = ObraOrcamentoOperacional(
+            obra_id=obra.id, admin_id=aid, criado_por_id=aid,
+        )
+        db.session.add(_op_bv); db.session.flush()
+    for _serv_obj, _snap, _qty in [
+        (serv_alv, _snap_alv, Decimal("250.000")),
+        (serv_pis, _snap_pis, Decimal("250.000")),
+    ]:
+        _item = (
+            ObraOrcamentoOperacionalItem.query
+            .join(ObraOrcamentoOperacional,
+                  ObraOrcamentoOperacionalItem.operacional_id == ObraOrcamentoOperacional.id)
+            .filter(
+                ObraOrcamentoOperacional.obra_id == obra.id,
+                ObraOrcamentoOperacionalItem.servico_id == _serv_obj.id,
+            ).first()
+        )
+        if _item is None:
+            _item = ObraOrcamentoOperacionalItem(
+                operacional_id=_op_bv.id, admin_id=aid,
+                servico_id=_serv_obj.id,
+                descricao=_serv_obj.nome,
+                unidade=_serv_obj.unidade_medida,
+                quantidade=_qty,
+            )
+            db.session.add(_item); db.session.flush()
+        # Garante versão com composicao_snapshot + margem/imposto válidos.
+        # Se o auto-clone criou uma versão com snapshot vazio ou sem margem,
+        # sobrescreve com os dados calibrados do seed.
+        _ver = (
+            ObraOrcamentoOperacionalItemVersao.query
+            .filter_by(item_id=_item.id)
+            .first()
+        )
+        if _ver is None or not _ver.composicao_snapshot or _ver.margem_pct is None:
+            if _ver is not None:
+                db.session.delete(_ver)
+                db.session.flush()
+            db.session.add(ObraOrcamentoOperacionalItemVersao(
+                item_id=_item.id, admin_id=aid,
+                composicao_snapshot=_snap,
+                margem_pct=Decimal("25.0"),
+                imposto_pct=Decimal("8.0"),
+                vigente_de=datetime(2026, 2, 1),
+                vigente_ate=None,
+                modo_aplicacao='clonagem_inicial',
+            ))
+    db.session.flush()
+    log.info("Task #89: ObraOrcamentoOperacional garantido para Bela Vista")
 
     # 11.5) Task #118 — Demo: Orçamento com 4 cenários de override -----
     # (a) item com template padrão do serviço, sem override
@@ -2221,6 +2341,52 @@ def _seed():
     )
     log.info(f"Task #20 Pinheiros: folhas do cronograma {len(folhas_pin)}")
 
+    # Task #89 — escala quantidade_total das folhas de Alvenaria e
+    # Contrapiso para 1 500 m² (proposta Pinheiros) antes do loop de RDO.
+    #
+    # O template materializa quantidades absolutas (e não porcentagens do
+    # item da proposta), então tanto Bela Vista (250 m²) quanto Pinheiros
+    # (1 500 m²) recebem as mesmas folhas com ~580 m² de Alv e ~500 m² de
+    # Contrapiso. Com 10 RDOs × 4 trabalhadores, o total de HH de Pinheiros
+    # fica ~3× o de Bela Vista enquanto a quantidade produzida permanece
+    # idêntica — isso derruba o índice para ~34% (ao invés de 75–125%).
+    #
+    # A correção escala folha.quantidade_total antes que _qty_dia_rss seja
+    # calculada no loop de RDO, alinhando qty e HH ao volume real da obra.
+    #
+    # Pintura mantém quantidade_total inalterada (~500 m²) porque a equipe
+    # menor (3 vs 4 trabalhadores) já produz índice ~82%, dentro do alvo.
+    def _classifica_folha_pin(nome_tarefa):
+        """Devolve 'alv', 'pis' ou 'pin' — mesmo critério do loop de RDO."""
+        n = nome_tarefa.lower()
+        if "pintura" in n or "tinta" in n or "massa" in n:
+            return "pin"
+        if "alvenaria" in n or "marcação" in n or "chapisco" in n:
+            return "alv"
+        return "pis"
+
+    _alv_folhas_pin = [f for f in folhas_pin if _classifica_folha_pin(f.nome_tarefa) == "alv"]
+    _pis_folhas_pin = [f for f in folhas_pin if _classifica_folha_pin(f.nome_tarefa) == "pis"]
+    _alv_total_atual = sum(float(f.quantidade_total or 0) for f in _alv_folhas_pin)
+    _pis_total_atual = sum(float(f.quantidade_total or 0) for f in _pis_folhas_pin)
+
+    _TARGET_QTY_PIN = Decimal("1500.000")
+    if _alv_total_atual > 0:
+        _alv_scale = float(_TARGET_QTY_PIN) / _alv_total_atual
+        for _f in _alv_folhas_pin:
+            _f.quantidade_total = Decimal(str(round(float(_f.quantidade_total or 0) * _alv_scale, 3)))
+    if _pis_total_atual > 0:
+        _pis_scale = float(_TARGET_QTY_PIN) / _pis_total_atual
+        for _f in _pis_folhas_pin:
+            _f.quantidade_total = Decimal(str(round(float(_f.quantidade_total or 0) * _pis_scale, 3)))
+    db.session.flush()
+    log.info(
+        "Task #89: quantidade_total escalonada — Alv ×%.2f (→1500m²), "
+        "Contrapiso ×%.2f (→1500m²), Pintura inalterada",
+        _alv_scale if _alv_total_atual > 0 else 1.0,
+        _pis_scale if _pis_total_atual > 0 else 1.0,
+    )
+
     # Mix de horas (6h-10h) e horas extras (0h-2h) por RDO — gera
     # variação realista em Métricas (custo MO, produtividade,
     # detalhe do funcionário). Mantém o mesmo valor para todos os
@@ -2315,28 +2481,60 @@ def _seed():
                 subatividade_mestre_id=folha.subatividade_mestre_id,
             )
             db.session.add(rss); db.session.flush()
-            db.session.add(RDOMaoObra(
-                admin_id=aid, rdo_id=rdo.id,
-                funcionario_id=carlos.id,
-                funcao_exercida="Pedreiro (mensalista)",
-                horas_trabalhadas=horas,
-                tarefa_cronograma_id=folha.id,
-                subatividade_id=rss.id,
-            ))
-            for _diar, _func in (
-                (pedro,  "Encarregado (diária)"),
-                (joao,   "Servente (diária)"),
-                (marcos, "Servente (diária)"),
-            ):
-                if omitir_id and _diar.id == omitir_id:
-                    continue
+            # Task #89 — split de equipe por tipo de serviço:
+            # • Pintura → Ana (Pintor) + Serventes (João/Marcos). Sem Carlos
+            #   (Pedreiro) nem Pedro (Encarregado), que não têm vínculo na
+            #   composição de Pintura, evitando 'funcao_fora_composicao' e
+            #   garantindo cobertura 100% nesse serviço.
+            # • Alvenaria/Contrapiso → Carlos (Pedreiro) + Pedro (Encarregado)
+            #   + João/Marcos (Servente) — cobertura 100% após adição do
+            #   Encarregado nas composições.
+            # funcao_exercida limpo: sem sufixos "(mensalista)"/"(diária)".
+            if _serv_id == serv_pin.id:
                 db.session.add(RDOMaoObra(
                     admin_id=aid, rdo_id=rdo.id,
-                    funcionario_id=_diar.id, funcao_exercida=_func,
+                    funcionario_id=ana.id,
+                    funcao_exercida="Pintor",
                     horas_trabalhadas=horas,
                     tarefa_cronograma_id=folha.id,
                     subatividade_id=rss.id,
                 ))
+                for _diar, _func in (
+                    (joao,   "Servente"),
+                    (marcos, "Servente"),
+                ):
+                    if omitir_id and _diar.id == omitir_id:
+                        continue
+                    db.session.add(RDOMaoObra(
+                        admin_id=aid, rdo_id=rdo.id,
+                        funcionario_id=_diar.id, funcao_exercida=_func,
+                        horas_trabalhadas=horas,
+                        tarefa_cronograma_id=folha.id,
+                        subatividade_id=rss.id,
+                    ))
+            else:
+                db.session.add(RDOMaoObra(
+                    admin_id=aid, rdo_id=rdo.id,
+                    funcionario_id=carlos.id,
+                    funcao_exercida="Pedreiro",
+                    horas_trabalhadas=horas,
+                    tarefa_cronograma_id=folha.id,
+                    subatividade_id=rss.id,
+                ))
+                for _diar, _func in (
+                    (pedro,  "Encarregado"),
+                    (joao,   "Servente"),
+                    (marcos, "Servente"),
+                ):
+                    if omitir_id and _diar.id == omitir_id:
+                        continue
+                    db.session.add(RDOMaoObra(
+                        admin_id=aid, rdo_id=rdo.id,
+                        funcionario_id=_diar.id, funcao_exercida=_func,
+                        horas_trabalhadas=horas,
+                        tarefa_cronograma_id=folha.id,
+                        subatividade_id=rss.id,
+                    ))
             folha.percentual_concluido = perc_destino
 
             if folha.quantidade_total and folha.quantidade_total > 0:
@@ -2404,6 +2602,59 @@ def _seed():
     # o avanço dos filhos finalizados.
     from utils.cronograma_engine import sincronizar_percentuais_obra as _sinc_perc_pin
     _sinc_perc_pin(obra_pin.id, aid)
+
+    # Task #89 — ObraOrcamentoOperacional para "Comercial Pinheiros".
+    # Três serviços (Alv + Contrapiso + Pintura) — habilita Lucro/UN.
+    # Usa get-or-create para não conflitar com o hook after_insert do RDO.
+    _op_pin = ObraOrcamentoOperacional.query.filter_by(obra_id=obra_pin.id).first()
+    if _op_pin is None:
+        _op_pin = ObraOrcamentoOperacional(
+            obra_id=obra_pin.id, admin_id=aid, criado_por_id=aid,
+        )
+        db.session.add(_op_pin); db.session.flush()
+    for _serv_obj, _snap, _qty in [
+        (serv_alv, _snap_alv, Decimal("1500.000")),
+        (serv_pis, _snap_pis, Decimal("1500.000")),
+        (serv_pin, _snap_pin, Decimal("1500.000")),
+    ]:
+        _item_pin = (
+            ObraOrcamentoOperacionalItem.query
+            .join(ObraOrcamentoOperacional,
+                  ObraOrcamentoOperacionalItem.operacional_id == ObraOrcamentoOperacional.id)
+            .filter(
+                ObraOrcamentoOperacional.obra_id == obra_pin.id,
+                ObraOrcamentoOperacionalItem.servico_id == _serv_obj.id,
+            ).first()
+        )
+        if _item_pin is None:
+            _item_pin = ObraOrcamentoOperacionalItem(
+                operacional_id=_op_pin.id, admin_id=aid,
+                servico_id=_serv_obj.id,
+                descricao=_serv_obj.nome,
+                unidade=_serv_obj.unidade_medida,
+                quantidade=_qty,
+            )
+            db.session.add(_item_pin); db.session.flush()
+        _ver_pin = (
+            ObraOrcamentoOperacionalItemVersao.query
+            .filter_by(item_id=_item_pin.id)
+            .first()
+        )
+        if _ver_pin is None or not _ver_pin.composicao_snapshot or _ver_pin.margem_pct is None:
+            if _ver_pin is not None:
+                db.session.delete(_ver_pin)
+                db.session.flush()
+            db.session.add(ObraOrcamentoOperacionalItemVersao(
+                item_id=_item_pin.id, admin_id=aid,
+                composicao_snapshot=_snap,
+                margem_pct=Decimal("25.0"),
+                imposto_pct=Decimal("8.0"),
+                vigente_de=datetime(2026, 2, 1),
+                vigente_ate=None,
+                modo_aplicacao='clonagem_inicial',
+            ))
+    db.session.flush()
+    log.info("Task #89: ObraOrcamentoOperacional garantido para Pinheiros")
 
     db.session.commit()
 
@@ -2971,68 +3222,6 @@ def _seed_custos_mes_atual(admin_id):
 # ---------------------------------------------------------------------------
 # Entry point com guarda de produção
 # ---------------------------------------------------------------------------
-def _seed_custos_mes_atual(admin_id, obra_id):
-    """Garante que a demo possui lançamentos de GestaoCusto no mês corrente.
-
-    Isso faz com que o dashboard (filtro padrão = mês atual) mostre dados
-    reais em vez de cartões vazios logo após um seed fresh ou reset.
-    É completamente idempotente — verifica antes de inserir.
-    """
-    try:
-        from app import db
-        from models import GestaoCustoPai, GestaoCustoFilho, CentroCusto
-        from datetime import date
-        from decimal import Decimal
-
-        hoje = date.today()
-        mes_ref = date(hoje.year, hoje.month, 1)
-
-        ja_existe = GestaoCustoFilho.query.filter_by(
-            admin_id=admin_id, obra_id=obra_id
-        ).filter(GestaoCustoFilho.data_referencia >= mes_ref).first()
-
-        if ja_existe:
-            log.info(
-                "_seed_custos_mes_atual: já existem lançamentos para obra %s em %s — no-op",
-                obra_id, mes_ref.strftime('%Y-%m'),
-            )
-            return
-
-        centro = CentroCusto.query.filter_by(admin_id=admin_id, obra_id=obra_id).first()
-
-        pai = GestaoCustoPai(
-            admin_id=admin_id,
-            obra_id=obra_id,
-            categoria='DESPESA_GERAL',
-            descricao='Despesas gerais demo — mês atual (seed)',
-            status='PAGO',
-            solicitante_id=admin_id,
-            centro_custo_id=centro.id if centro else None,
-        )
-        db.session.add(pai)
-        db.session.flush()
-
-        filho = GestaoCustoFilho(
-            admin_id=admin_id,
-            obra_id=obra_id,
-            pai_id=pai.id,
-            descricao='Aluguel escritório (demo)',
-            valor=Decimal('1200.00'),
-            data_referencia=hoje,
-            centro_custo_id=centro.id if centro else None,
-        )
-        db.session.add(filho)
-        db.session.commit()
-        log.info(
-            "_seed_custos_mes_atual: lançamento R$1.200 criado para obra %s em %s",
-            obra_id, hoje.isoformat(),
-        )
-    except Exception as exc:
-        from app import db
-        db.session.rollback()
-        log.warning("_seed_custos_mes_atual: falhou (não crítico): %s", exc)
-
-
 def _backfill_custos_rdo_demo(admin_id):
     """Roda gerar_custos_mao_obra_rdo() em todos os RDOs finalizados de
     TODAS as obras do admin Alfa (Bela Vista + Pinheiros + qualquer outra
