@@ -593,6 +593,7 @@ def gerar_proposta(id):
         campos_pendentes = []
         if template:
             proposta.proposta_template_id = template.id
+            # Campos numéricos
             if template.prazo_entrega_dias:
                 proposta.prazo_entrega_dias = template.prazo_entrega_dias
                 campos_pendentes.append('prazo_entrega_dias')
@@ -601,24 +602,34 @@ def gerar_proposta(id):
                 campos_pendentes.append('validade_dias')
             if template.percentual_nota_fiscal is not None:
                 proposta.percentual_nota_fiscal = template.percentual_nota_fiscal
-            if template.itens_inclusos:
-                # Itens inclusos no template ficam como string com '\n'.
-                # Proposta.itens_inclusos é JSON (list[str]).
-                _inc = [
-                    ln.strip() for ln in str(template.itens_inclusos).splitlines()
-                    if ln and ln.strip()
-                ]
-                if _inc:
-                    proposta.itens_inclusos = _inc
-                    campos_pendentes.append('itens_inclusos')
-            if template.itens_exclusos:
-                _exc = [
-                    ln.strip() for ln in str(template.itens_exclusos).splitlines()
-                    if ln and ln.strip()
-                ]
-                if _exc:
-                    proposta.itens_exclusos = _exc
-                    campos_pendentes.append('itens_exclusos')
+            # Campos de texto — sempre sobrescrever o default do modelo
+            if template.condicoes_pagamento:
+                proposta.condicoes_pagamento = template.condicoes_pagamento
+                campos_pendentes.append('condicoes_pagamento')
+            if template.garantias:
+                proposta.garantias = template.garantias
+                campos_pendentes.append('garantias')
+            if template.consideracoes_gerais:
+                proposta.consideracoes_gerais = template.consideracoes_gerais
+                campos_pendentes.append('consideracoes_gerais')
+            if getattr(template, 'condicoes_entrega', None):
+                proposta.observacoes_entrega = template.condicoes_entrega
+                campos_pendentes.append('observacoes_entrega')
+            # Itens inclusos/exclusos — sempre sobrescrever (mesmo com [])
+            _inc = [
+                ln.strip() for ln in str(template.itens_inclusos or '').splitlines()
+                if ln and ln.strip()
+            ]
+            proposta.itens_inclusos = _inc
+            if _inc:
+                campos_pendentes.append('itens_inclusos')
+            _exc = [
+                ln.strip() for ln in str(template.itens_exclusos or '').splitlines()
+                if ln and ln.strip()
+            ]
+            proposta.itens_exclusos = _exc
+            if _exc:
+                campos_pendentes.append('itens_exclusos')
         proposta.campos_pendentes_revisao = campos_pendentes
 
         db.session.add(proposta)
@@ -643,44 +654,43 @@ def gerar_proposta(id):
             for cl in proposta.clausulas:
                 cl.revisado_em = None
 
-            # Task #31 — Carry-over de campos textuais do PropostaTemplate
-            # que NÃO estão modelados como cláusulas configuráveis (legacy
-            # / texto livre). Cada um vira uma cláusula extra na proposta,
-            # também marcada como pendente de revisão. Pula títulos que já
-            # vieram via _copiar_clausulas_template_para_proposta para não
-            # duplicar (heurística por título normalizado).
-            from propostas_consolidated import _normalizar_titulo_clausula
-            from models import PropostaClausula as _PCl
-            ja_titulos = {
-                _normalizar_titulo_clausula(c.titulo or '')
-                for c in proposta.clausulas
-            }
-            ordem_base = (max(
-                (c.ordem or 0) for c in proposta.clausulas
-            ) if proposta.clausulas else 0) + 1
-            extras_textuais = [
-                ('Apresentação', getattr(template, 'texto_apresentacao', None)),
-                ('Objeto', getattr(template, 'secao_objeto', None)),
-                ('Condições de Pagamento', getattr(template, 'condicoes_pagamento', None)),
-                ('Garantias', getattr(template, 'garantias', None)),
-                ('Considerações Gerais', getattr(template, 'consideracoes_gerais', None)),
-                ('Condições', getattr(template, 'condicoes', None)),
-            ]
-            for titulo, texto in extras_textuais:
-                if not (texto or '').strip():
-                    continue
-                if _normalizar_titulo_clausula(titulo) in ja_titulos:
-                    continue
-                db.session.add(_PCl(
-                    proposta_id=proposta.id,
-                    admin_id=admin_id,
-                    titulo=titulo[:200],
-                    texto=str(texto).strip(),
-                    ordem=ordem_base,
-                    revisado_em=None,
-                ))
-                ordem_base += 1
-                ja_titulos.add(_normalizar_titulo_clausula(titulo))
+            # Carry-over de campos textuais legados do PropostaTemplate
+            # APENAS quando nenhuma PropostaTemplateClausula foi copiada.
+            # Quando n_copiadas > 0 as cláusulas configuráveis já cobrem
+            # todo o conteúdo; o carry-over geraria duplicatas.
+            if n_copiadas == 0:
+                from propostas_consolidated import _normalizar_titulo_clausula
+                from models import PropostaClausula as _PCl
+                ja_titulos = {
+                    _normalizar_titulo_clausula(c.titulo or '')
+                    for c in proposta.clausulas
+                }
+                ordem_base = (max(
+                    (c.ordem or 0) for c in proposta.clausulas
+                ) if proposta.clausulas else 0) + 1
+                extras_textuais = [
+                    ('Apresentação', getattr(template, 'texto_apresentacao', None)),
+                    ('Objeto', getattr(template, 'secao_objeto', None)),
+                    ('Condições de Pagamento', getattr(template, 'condicoes_pagamento', None)),
+                    ('Garantias', getattr(template, 'garantias', None)),
+                    ('Considerações Gerais', getattr(template, 'consideracoes_gerais', None)),
+                    ('Condições', getattr(template, 'condicoes', None)),
+                ]
+                for titulo, texto in extras_textuais:
+                    if not (texto or '').strip():
+                        continue
+                    if _normalizar_titulo_clausula(titulo) in ja_titulos:
+                        continue
+                    db.session.add(_PCl(
+                        proposta_id=proposta.id,
+                        admin_id=admin_id,
+                        titulo=titulo[:200],
+                        texto=str(texto).strip(),
+                        ordem=ordem_base,
+                        revisado_em=None,
+                    ))
+                    ordem_base += 1
+                    ja_titulos.add(_normalizar_titulo_clausula(titulo))
 
         for idx, it in enumerate(orc.itens, start=1):
             pi = PropostaItem(
@@ -722,10 +732,17 @@ def gerar_proposta(id):
         if orc.status == 'rascunho':
             orc.status = 'fechado'
         db.session.commit()
-        # Task #31 — após gerar a proposta, sempre cair na tela de
-        # revisão (editar) — é onde o admin confere/marca cláusulas e
-        # campos vindos do modelo antes de enviar ao cliente. A tela
-        # de visualização permanece acessível pelo botão "Visualizar".
+
+        if template:
+            logger.info(
+                'gerar_proposta: proposta=%s template=%s '
+                'itens_inclusos=%d itens_exclusos=%d clausulas=%d',
+                proposta.numero, template.nome,
+                len(proposta.itens_inclusos or []),
+                len(proposta.itens_exclusos or []),
+                len(proposta.clausulas),
+            )
+
         if template:
             flash(
                 f'Proposta {proposta.numero} gerada a partir do modelo '

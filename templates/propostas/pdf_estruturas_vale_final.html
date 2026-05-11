@@ -601,9 +601,14 @@
             <div class="section-title">3. ITENS INCLUSOS NO FORNECIMENTO</div>
             {% if proposta.itens_inclusos %}
                 <div style="text-align: justify; line-height: 1.7;">
-                    {% set linhas = proposta.itens_inclusos.split('\n') %}
+                    {# itens_inclusos é JSON list[str]; suporta também string legada #}
+                    {% if proposta.itens_inclusos is string %}
+                        {% set linhas = proposta.itens_inclusos.split('\n') %}
+                    {% else %}
+                        {% set linhas = proposta.itens_inclusos %}
+                    {% endif %}
                     {% for linha in linhas %}
-                        {% if linha.strip() %}
+                        {% if linha and linha.strip() %}
                             {{ linha.strip() }};<br>
                         {% endif %}
                     {% endfor %}
@@ -624,9 +629,14 @@
             <div class="section-title">4. ITENS EXCLUSOS DO FORNECIMENTO</div>
             {% if proposta.itens_exclusos %}
                 <div style="text-align: justify; line-height: 1.7;">
-                    {% set linhas = proposta.itens_exclusos.split('\n') %}
+                    {# itens_exclusos é JSON list[str]; suporta também string legada #}
+                    {% if proposta.itens_exclusos is string %}
+                        {% set linhas = proposta.itens_exclusos.split('\n') %}
+                    {% else %}
+                        {% set linhas = proposta.itens_exclusos %}
+                    {% endif %}
                     {% for linha in linhas %}
-                        {% if linha.strip() %}
+                        {% if linha and linha.strip() %}
                             {{ linha.strip() }};<br>
                         {% endif %}
                     {% endfor %}

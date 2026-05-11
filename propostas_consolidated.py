@@ -683,6 +683,32 @@ def criar():
                     )
                 except Exception:
                     pass
+            # Override ALL text/list fields from the template so the
+            # proposal reflects exactly what the template defines.
+            if _template_proposta.condicoes_pagamento:
+                proposta.condicoes_pagamento = _template_proposta.condicoes_pagamento
+            if _template_proposta.garantias:
+                proposta.garantias = _template_proposta.garantias
+            if _template_proposta.consideracoes_gerais:
+                proposta.consideracoes_gerais = _template_proposta.consideracoes_gerais
+            if getattr(_template_proposta, 'condicoes_entrega', None):
+                proposta.observacoes_entrega = _template_proposta.condicoes_entrega
+            _inc = [
+                ln.strip() for ln in str(_template_proposta.itens_inclusos or '').splitlines()
+                if ln and ln.strip()
+            ]
+            proposta.itens_inclusos = _inc
+            _exc = [
+                ln.strip() for ln in str(_template_proposta.itens_exclusos or '').splitlines()
+                if ln and ln.strip()
+            ]
+            proposta.itens_exclusos = _exc
+            logger.info(
+                'criar proposta: template=%s itens_inclusos=%d '
+                'itens_exclusos=%d clausulas=%d',
+                _template_proposta.nome,
+                len(_inc), len(_exc), _copiadas_template,
+            )
 
         if not _copiadas_template:
             # Fallback: seed a partir das colunas de texto legadas
