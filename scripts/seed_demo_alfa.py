@@ -848,6 +848,8 @@ def _seed():
     # "Hora pedreiro" é o gargalo (max_coef), "Diária encarregado"
     # adicionado para que Pedro tenha vínculo 'auto' em vez de
     # 'funcao_fora_composicao', desbloqueando 100% de cobertura.
+    # "Betoneira hora" (EQUIPAMENTO) adicionado — Task #100: garante que
+    # composicao_snapshot exiba as 3 categorias (MAO_OBRA/MATERIAL/EQUIPAMENTO).
     for nome_ins, coef in [
         ("Cimento CP II 50kg",     "0.04"),
         ("Bloco cerâmico 9x19x19", "28.0"),
@@ -855,6 +857,7 @@ def _seed():
         ("Hora pedreiro",          "0.55"),   # 0.60 → 0.55 (calibrado)
         ("Hora servente",          "0.40"),
         ("Diária encarregado",     "0.125"),  # novo — cobre Pedro
+        ("Betoneira hora",         "0.050"),  # EQUIPAMENTO — Task #100
     ]:
         db.session.add(ComposicaoServico(
             admin_id=aid, servico_id=serv_alv.id,
@@ -863,12 +866,14 @@ def _seed():
         ))
     # Composição mínima do contrapiso
     # Coeficientes calibrados para índice ~91% (ok) — Task #89.
+    # "Betoneira hora" (EQUIPAMENTO) adicionado — Task #100.
     for nome_ins, coef in [
         ("Cimento CP II 50kg", "0.10"),
         ("Areia média m³",     "0.04"),
         ("Hora pedreiro",      "0.35"),   # 0.30 → 0.35 (calibrado)
         ("Hora servente",      "0.20"),
         ("Diária encarregado", "0.075"),  # novo — cobre Pedro
+        ("Betoneira hora",     "0.030"),  # EQUIPAMENTO — Task #100
     ]:
         db.session.add(ComposicaoServico(
             admin_id=aid, servico_id=serv_pis.id,
@@ -877,14 +882,28 @@ def _seed():
         ))
     # Composição mínima da pintura (Task #20).
     # "Hora pintor" calibrado para índice ~82% (atenção) — Task #89.
+    # "Betoneira hora" (EQUIPAMENTO) adicionado — Task #100.
     for nome_ins, coef in [
         ("Tinta acrílica 18L",   "0.020"),  # ~1 galão p/ 50 m² (2 demãos)
         ("Massa corrida 25kg",   "0.040"),  # ~1 sc p/ 25 m²
         ("Hora pintor",          "0.750"),  # 0.350 → 0.750 (calibrado)
         ("Hora servente",        "0.150"),
+        ("Betoneira hora",       "0.020"),  # EQUIPAMENTO (pistola de pintura/comp.) — Task #100
     ]:
         db.session.add(ComposicaoServico(
             admin_id=aid, servico_id=serv_pin.id,
+            insumo_id=insumos_obj[nome_ins].id,
+            coeficiente=Decimal(coef),
+        ))
+    # Composição mínima da mobilização — Task #100: garante que serv_mob
+    # também exiba as 3 categorias no snapshot das propostas-vitrine.
+    for nome_ins, coef in [
+        ("Hora servente",          "8.000"),  # MAO_OBRA: equipe de montagem
+        ("Areia média m³",         "0.500"),  # MATERIAL: lastro/nivelamento
+        ("Betoneira hora",         "2.000"),  # EQUIPAMENTO: betoneira de canteiro
+    ]:
+        db.session.add(ComposicaoServico(
+            admin_id=aid, servico_id=serv_mob.id,
             insumo_id=insumos_obj[nome_ins].id,
             coeficiente=Decimal(coef),
         ))
@@ -999,6 +1018,19 @@ def _seed():
     )
     db.session.add(proposta); db.session.flush()
 
+    # Task #100 — itens_inclusos/itens_exclusos por item (text, uma linha cada)
+    _INCLUSOS_BV = (
+        "Mão de obra especializada para execução dos serviços\n"
+        "Equipamentos e ferramentas necessários (incluindo betoneira)\n"
+        "EPI completo para toda a equipe\n"
+        "Limpeza diária do canteiro de obras"
+    )
+    _EXCLUSOS_BV = (
+        "Projetos estruturais e aprovações\n"
+        "Fornecimento de material (salvo onde especificado)\n"
+        "Taxas de ligação de água e energia\n"
+        "Andaimes e escoramento de grande porte"
+    )
     itens_def = [
         # (descricao, qtd, unidade, preco_unit, servico, ordem)
         ("Alvenaria de bloco cerâmico — Bloco A",
@@ -1027,6 +1059,8 @@ def _seed():
                 (preco - Decimal(str(serv.custo_unitario))) if serv else Decimal("0")
             ),
             subtotal=sub,
+            itens_inclusos=_INCLUSOS_BV,
+            itens_exclusos=_EXCLUSOS_BV,
         )
         db.session.add(pi)
         propostaitem_objs.append(pi)
@@ -1657,7 +1691,182 @@ def _seed():
         _n_clausulas, proposta_com_tmpl.campos_pendentes_revisao,
     )
 
-    # 11.7) Task #55 — Compras: 1 Fornecedor + 1 PedidoCompra finalizada
+    # 11.7) Task #100 — 2 propostas no funil (rascunho + enviada) ----------
+    # Demonstra o pipeline comercial com propostas ainda não aprovadas,
+    # usando os serviços já seedados para compor os itens com as 5 seções.
+    from services.orcamento_view_service import snapshot_from_servico as _snap_serv
+
+    _INCLUSOS_DEMO = (
+        "Mão de obra especializada para execução dos serviços\n"
+        "Equipamentos de pequeno porte (betoneira, andaime leve)\n"
+        "EPI completo para toda a equipe\n"
+        "Limpeza diária do canteiro de obras\n"
+        "Transporte e alimentação da equipe"
+    )
+    _EXCLUSOS_DEMO = (
+        "Projetos estruturais, elétricos e hidráulicos\n"
+        "Fornecimento de materiais (salvo onde especificado)\n"
+        "Taxas de ligação de água, gás e energia\n"
+        "Andaimes tubulares de grande porte\n"
+        "Técnico de segurança exclusivo"
+    )
+
+    # --- DEMO-A.26 : rascunho — Reforma comercial Loja Centro ---------------
+    proposta_demo_a = Proposta(
+        numero="DEMO-A.26",
+        data_proposta=date(2026, 4, 5),
+        cliente_nome="Comércio Loja Centro Ltda",
+        cliente_email="financeiro@lojacentro.com.br",
+        cliente_telefone="(11) 3210-5678",
+        cliente_endereco="Rua 25 de Março, 800 — São Paulo / SP",
+        titulo="Reforma comercial — Loja Centro",
+        descricao=(
+            "Reforma completa de loja no centro comercial: alvenaria interna, "
+            "contrapiso nivelado e pintura de acabamento em tinta acrílica."
+        ),
+        prazo_entrega_dias=60, validade_dias=15,
+        status="rascunho",
+        valor_total=Decimal("0.00"),
+        criado_por=aid, admin_id=aid,
+        itens_inclusos=[
+            "Mão de obra especializada para execução dos serviços",
+            "Equipamentos de pequeno porte (betoneira, andaime leve)",
+            "EPI completo para toda a equipe",
+            "Limpeza diária do canteiro de obras",
+            "Transporte e alimentação da equipe",
+        ],
+        itens_exclusos=[
+            "Projetos estruturais, elétricos e hidráulicos",
+            "Fornecimento de materiais (salvo onde especificado)",
+            "Taxas de ligação de água, gás e energia",
+            "Andaimes tubulares de grande porte",
+            "Técnico de segurança exclusivo",
+        ],
+    )
+    db.session.add(proposta_demo_a); db.session.flush()
+
+    _itens_demo_a = [
+        # (desc, qtd, un, preco, serv)
+        ("Alvenaria divisória interna",      Decimal("80.00"),  "m2", Decimal("145.00"), serv_alv),
+        ("Contrapiso nivelado",              Decimal("120.00"), "m2", Decimal("70.00"),  serv_pis),
+        ("Pintura acrílica — paredes",       Decimal("200.00"), "m2", Decimal("35.00"),  serv_pin),
+        ("Mobilização e desmobilização",     Decimal("1.00"),   "vb", Decimal("2800.00"), serv_mob),
+    ]
+    _vt_a = Decimal("0.00")
+    for _idx, (_desc, _qtd, _un, _preco, _serv) in enumerate(_itens_demo_a, start=1):
+        _sub = (_qtd * _preco).quantize(Decimal("0.01"))
+        _vt_a += _sub
+        _snap = list(_snap_serv(_serv)) if _serv else []
+        db.session.add(PropostaItem(
+            admin_id=aid, proposta_id=proposta_demo_a.id,
+            item_numero=_idx, ordem=_idx,
+            descricao=_desc,
+            quantidade=_qtd, unidade=_un,
+            preco_unitario=_preco,
+            custo_unitario=(Decimal(str(_serv.custo_unitario)) if _serv else _preco),
+            lucro_unitario=((_preco - Decimal(str(_serv.custo_unitario))) if _serv else Decimal("0")),
+            quantidade_medida=_qtd,
+            subtotal=_sub,
+            servico_id=(_serv.id if _serv else None),
+            composicao_snapshot=_snap,
+            itens_inclusos=_INCLUSOS_DEMO,
+            itens_exclusos=_EXCLUSOS_DEMO,
+        ))
+    proposta_demo_a.valor_total = _vt_a
+    db.session.flush()
+
+    # --- DEMO-B.26 : enviada — Galpão Industrial Zona Leste -----------------
+    proposta_demo_b = Proposta(
+        numero="DEMO-B.26",
+        data_proposta=date(2026, 4, 18),
+        cliente_nome="Indústria Zona Leste S.A.",
+        cliente_email="obras@zonaleste.ind.br",
+        cliente_telefone="(11) 2345-9900",
+        cliente_endereco="Av. Industrial, 3200 — São Paulo / SP",
+        titulo="Galpão Industrial Zona Leste",
+        descricao=(
+            "Execução de alvenaria estrutural, contrapiso industrial e "
+            "pintura epóxi em galpão de 800 m² na Zona Leste."
+        ),
+        prazo_entrega_dias=90, validade_dias=20,
+        status="enviada",
+        valor_total=Decimal("0.00"),
+        criado_por=aid, admin_id=aid,
+        data_envio=datetime(2026, 4, 19, 9, 0),
+        itens_inclusos=[
+            "Mão de obra especializada para execução dos serviços",
+            "Equipamentos de médio porte (betoneira 400L, andaime metálico)",
+            "EPI completo para toda a equipe",
+            "Limpeza diária do canteiro de obras",
+            "Transporte e alimentação da equipe",
+        ],
+        itens_exclusos=[
+            "Projetos estruturais e laudos técnicos",
+            "Fornecimento de aço, concreto e outros materiais estruturais",
+            "Taxas de habite-se e averbação",
+            "Pintura epóxi de acabamento especial (item separado)",
+            "Vigilância e seguro do canteiro",
+        ],
+    )
+    db.session.add(proposta_demo_b); db.session.flush()
+
+    _itens_demo_b = [
+        # (desc, qtd, un, preco, serv)
+        ("Alvenaria estrutural — pré-moldada",  Decimal("320.00"), "m2", Decimal("145.00"), serv_alv),
+        ("Contrapiso industrial e=6cm",         Decimal("800.00"), "m2", Decimal("70.00"),  serv_pis),
+        ("Pintura látex — áreas administrativas", Decimal("160.00"), "m2", Decimal("35.00"),  serv_pin),
+        ("Mobilização, container e canteiro",   Decimal("1.00"),   "vb", Decimal("5500.00"), serv_mob),
+    ]
+    _vt_b = Decimal("0.00")
+    for _idx, (_desc, _qtd, _un, _preco, _serv) in enumerate(_itens_demo_b, start=1):
+        _sub = (_qtd * _preco).quantize(Decimal("0.01"))
+        _vt_b += _sub
+        _snap = list(_snap_serv(_serv)) if _serv else []
+        db.session.add(PropostaItem(
+            admin_id=aid, proposta_id=proposta_demo_b.id,
+            item_numero=_idx, ordem=_idx,
+            descricao=_desc,
+            quantidade=_qtd, unidade=_un,
+            preco_unitario=_preco,
+            custo_unitario=(Decimal(str(_serv.custo_unitario)) if _serv else _preco),
+            lucro_unitario=((_preco - Decimal(str(_serv.custo_unitario))) if _serv else Decimal("0")),
+            quantidade_medida=_qtd,
+            subtotal=_sub,
+            servico_id=(_serv.id if _serv else None),
+            composicao_snapshot=_snap,
+            itens_inclusos=_INCLUSOS_DEMO,
+            itens_exclusos=_EXCLUSOS_DEMO,
+        ))
+    proposta_demo_b.valor_total = _vt_b
+    db.session.flush()
+
+    # Smoke-test Task #100 — confirmar que as 2 novas propostas têm as 5 seções
+    _pi_demo_a = PropostaItem.query.filter_by(
+        admin_id=aid, proposta_id=proposta_demo_a.id
+    ).all()
+    _pi_demo_b = PropostaItem.query.filter_by(
+        admin_id=aid, proposta_id=proposta_demo_b.id
+    ).all()
+    _pi_com_inclusos = sum(
+        1 for pi in _pi_demo_a + _pi_demo_b
+        if pi.itens_inclusos
+    )
+    _snap_com_3_tipos = sum(
+        1 for pi in _pi_demo_a + _pi_demo_b
+        if pi.composicao_snapshot and
+        {e.get("tipo") for e in pi.composicao_snapshot} >= {"MAO_OBRA", "MATERIAL", "EQUIPAMENTO"}
+    )
+    log.info(
+        "Task #100: DEMO-A.26=%s DEMO-B.26=%s | "
+        "%d/%d PropostaItem(s) com itens_inclusos | "
+        "%d/%d PropostaItem(s) com 3 tipos no snapshot",
+        proposta_demo_a.status, proposta_demo_b.status,
+        _pi_com_inclusos, len(_pi_demo_a) + len(_pi_demo_b),
+        _snap_com_3_tipos, len(_pi_demo_a) + len(_pi_demo_b),
+    )
+    db.session.commit()
+
+    # 11.8) Task #55 — Compras: 1 Fornecedor + 1 PedidoCompra finalizada
     # à vista, vinculada à obra (gera GestaoCustoPai MATERIAL PAGO +
     # entrada/saída no almoxarifado).
     fornecedor_alf = Fornecedor(
