@@ -3857,6 +3857,7 @@ def executar_migracoes():
             (156, "Task #7 — custo_obra.descricao: ampliar de VARCHAR(200) para VARCHAR(500) (RDO com muitas subatividades)", migration_156_custo_obra_descricao_500),
             (157, "Task #69 — backfill produtividade_real/indice_produtividade em RDOMaoObra para RDOs Finalizados com dados suficientes", migration_157_backfill_produtividade_rdo),
             (158, "Task #77 — cliente_observacao: histórico de anotações livres por cliente (CRM)", migration_158_cliente_observacao),
+            (159, "Task #84 — backfill composicao_servico_id/vinculo_status em rdo_mao_obra para registros históricos nulos", migration_159_backfill_composicao_servico_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -13725,3 +13726,51 @@ def migration_158_cliente_observacao():
     """))
     db.session.commit()
     logger.info("✅ Tabela cliente_observacao criada.")
+
+
+def migration_159_backfill_composicao_servico_id():
+    """Task #84 — Backfill composicao_servico_id e vinculo_status em rdo_mao_obra
+    para registros históricos que ficaram com composicao_servico_id = NULL.
+
+    A aplicação já instala um listener before_flush (install_auto_link_listener
+    em services/vinculo_mao_obra.py) que preenche esses campos em novos registros.
+    Esta migration retrocede para registros criados antes do listener existir ou
+    antes do Funcao.insumo_id ter sido configurado.
+
+    Processo idempotente: registros com vinculo_status='manual' não são tocados.
+    Re-executar a migration é seguro pois skippará registros já vinculados.
+    """
+    try:
+        from services.vinculo_mao_obra import aplicar_vinculo_em_linhas
+        from models import RDOMaoObra
+
+        linhas = RDOMaoObra.query.filter(
+            RDOMaoObra.composicao_servico_id.is_(None),
+            RDOMaoObra.vinculo_status != 'manual',
+        ).all()
+
+        total = len(linhas)
+        logger.info(f"[Migration 159] {total} registros rdo_mao_obra sem composicao_servico_id para processar")
+
+        if total == 0:
+            logger.info("[Migration 159] Nada a fazer — todos os registros já estão vinculados.")
+            return
+
+        counts = aplicar_vinculo_em_linhas(linhas)
+        db.session.commit()
+
+        auto = counts.get('auto', 0)
+        ambiguo = counts.get('ambiguo', 0)
+        sem_funcao = counts.get('sem_funcao', 0)
+        fora = counts.get('funcao_fora_composicao', 0)
+        sem_comp = counts.get('subatividade_sem_composicoes', 0)
+
+        logger.info(
+            f"[Migration 159] Backfill concluído: "
+            f"auto={auto} ambiguo={ambiguo} sem_funcao={sem_funcao} "
+            f"fora_composicao={fora} sub_sem_composicoes={sem_comp}"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 159] Falha no backfill: {e}")
+        raise
