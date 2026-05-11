@@ -701,62 +701,11 @@ def criar_rdo():
         else:
             logger.debug("DEBUG: Nenhuma mão de obra para processar")
             
-        # Processar equipamentos
-        equipamentos_json = request.form.get('equipamentos', '[]')
-        logger.debug(f"DEBUG: Equipamentos JSON recebido: {equipamentos_json}")
-        
-        if equipamentos_json and equipamentos_json != '[]':
-            try:
-                equipamentos_list = json.loads(equipamentos_json)
-                logger.debug(f"DEBUG: Processando {len(equipamentos_list)} equipamentos")
-                
-                for i, eq_data in enumerate(equipamentos_list):
-                    nome_equipamento = eq_data.get('nome', '').strip()
-                    if nome_equipamento:
-                        equipamento = RDOEquipamento()
-                        equipamento.rdo_id = rdo.id
-                        equipamento.nome_equipamento = nome_equipamento
-                        equipamento.quantidade = int(eq_data.get('quantidade', 1))
-                        equipamento.horas_uso = float(eq_data.get('horas_uso', 8))
-                        equipamento.estado_conservacao = eq_data.get('estado', 'Bom')
-                        db.session.add(equipamento)
-                        logger.debug(f"DEBUG: Equipamento {i+1} adicionado: {equipamento.nome_equipamento}")
-                        
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Erro ao processar equipamentos: {e}")
-                flash(f'Erro ao processar equipamentos: {e}', 'warning')
-        else:
-            logger.debug("DEBUG: Nenhum equipamento para processar")
-            
-        # Processar ocorrências
-        ocorrencias_json = request.form.get('ocorrencias', '[]')
-        logger.debug(f"DEBUG: Ocorrências JSON recebido: {ocorrencias_json}")
-        
-        if ocorrencias_json and ocorrencias_json != '[]':
-            try:
-                ocorrencias_list = json.loads(ocorrencias_json)
-                logger.debug(f"DEBUG: Processando {len(ocorrencias_list)} ocorrências")
-                
-                for i, oc_data in enumerate(ocorrencias_list):
-                    descricao = oc_data.get('descricao', '').strip()
-                    if descricao:
-                        ocorrencia = RDOOcorrencia()
-                        ocorrencia.rdo_id = rdo.id
-                        ocorrencia.admin_id = admin_id
-                        ocorrencia.tipo_ocorrencia = oc_data.get('tipo', 'Observação') or 'Observação'
-                        ocorrencia.severidade = oc_data.get('severidade', 'Baixa') or 'Baixa'
-                        ocorrencia.status_resolucao = oc_data.get('status', 'Pendente') or 'Pendente'
-                        ocorrencia.descricao_ocorrencia = descricao
-                        ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
-                        ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
-                        db.session.add(ocorrencia)
-                        logger.debug(f"DEBUG: Ocorrência {i+1} adicionada: {ocorrencia.descricao_ocorrencia}")
-                        
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Erro ao processar ocorrências: {e}")
-                flash(f'Erro ao processar ocorrências: {e}', 'warning')
-        else:
-            logger.debug("DEBUG: Nenhuma ocorrência para processar")
+        # Processar equipamentos e ocorrências via campos repetíveis (ocorr_tipo[], etc.)
+        # Alinhado ao padrão do path de edição — Task #83.
+        from utils.rdo_equip_ocorr import replace_equipamentos_ocorrencias
+        _n_eq, _n_oc = replace_equipamentos_ocorrencias(rdo.id, admin_id, request.form)
+        logger.info(f"[Task#83] criação RDO — eq={_n_eq} oc={_n_oc}")
         
         # [PHOTO] PROCESSAR FOTOS (v9.0) - Sistema Completo
         fotos_files = request.files.getlist('fotos[]')
@@ -3008,46 +2957,11 @@ def rdo_salvar_unificado():
                 func_id_n, horas_n,
             )
         
-        # Processar equipamentos
-        equipamentos_json = request.form.get('equipamentos', '[]')
-        if equipamentos_json and equipamentos_json != '[]':
-            try:
-                equipamentos_list = json.loads(equipamentos_json)
-                for i, eq_data in enumerate(equipamentos_list):
-                    nome_equipamento = eq_data.get('nome', '').strip()
-                    if nome_equipamento:
-                        equipamento = RDOEquipamento()
-                        equipamento.rdo_id = rdo.id
-                        equipamento.nome_equipamento = nome_equipamento
-                        equipamento.quantidade = int(eq_data.get('quantidade', 1))
-                        equipamento.horas_uso = float(eq_data.get('horas_uso', 8))
-                        equipamento.estado_conservacao = eq_data.get('estado', 'Bom')
-                        db.session.add(equipamento)
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Erro ao processar equipamentos: {e}")
-                flash(f'Erro ao processar equipamentos: {e}', 'warning')
-        
-        # Processar ocorrências
-        ocorrencias_json = request.form.get('ocorrencias', '[]')
-        if ocorrencias_json and ocorrencias_json != '[]':
-            try:
-                ocorrencias_list = json.loads(ocorrencias_json)
-                for i, oc_data in enumerate(ocorrencias_list):
-                    descricao = oc_data.get('descricao', '').strip()
-                    if descricao:
-                        ocorrencia = RDOOcorrencia()
-                        ocorrencia.rdo_id = rdo.id
-                        ocorrencia.admin_id = admin_id_correto
-                        ocorrencia.tipo_ocorrencia = oc_data.get('tipo', 'Observação') or 'Observação'
-                        ocorrencia.severidade = oc_data.get('severidade', 'Baixa') or 'Baixa'
-                        ocorrencia.status_resolucao = oc_data.get('status', 'Pendente') or 'Pendente'
-                        ocorrencia.descricao_ocorrencia = descricao
-                        ocorrencia.problemas_identificados = oc_data.get('problemas', '').strip()
-                        ocorrencia.acoes_corretivas = oc_data.get('acoes', '').strip()
-                        db.session.add(ocorrencia)
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Erro ao processar ocorrências: {e}")
-                flash(f'Erro ao processar ocorrências: {e}', 'warning')
+        # Processar equipamentos e ocorrências via campos repetíveis (ocorr_tipo[], etc.)
+        # Substituído path JSON legado — Task #83.
+        from utils.rdo_equip_ocorr import replace_equipamentos_ocorrencias
+        _n_eq, _n_oc = replace_equipamentos_ocorrencias(rdo.id, admin_id_correto, request.form)
+        logger.info(f"[Task#83] edição RDO legado — eq={_n_eq} oc={_n_oc}")
         
         # Log final antes de commitar
         total_subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).count()
