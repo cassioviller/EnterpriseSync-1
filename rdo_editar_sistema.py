@@ -473,6 +473,16 @@ def salvar_edicao_rdo(rdo_id):
         # Confirmar salvamento
         db.session.commit()
 
+        # Task #84 — Re-resolver vínculos catálogo após commit (defesa-em-profundidade
+        # além do listener before_flush; cobre casos onde vinculo_status já estava
+        # definido e o listener pularia a linha).
+        try:
+            from services.vinculo_mao_obra import aplicar_vinculo_no_rdo
+            _vc = aplicar_vinculo_no_rdo(rdo_id)
+            logger.info(f"[Task#84] vinculo pós-edição RDO {rdo_id}: {_vc}")
+        except Exception as _ve:
+            logger.error(f"[Task#84] aplicar_vinculo_no_rdo falhou em salvar_edicao_rdo (RDO {rdo_id}): {_ve}")
+
         # Grava custo diário PRIMEIRO (fonte de verdade para rdo_custos)
         try:
             from services.custo_funcionario_dia import gravar_custo_funcionario_rdo

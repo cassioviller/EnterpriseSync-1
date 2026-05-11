@@ -883,7 +883,17 @@ def criar_rdo():
             logger.warning(f"[WARN] Falha ao salvar apontamentos V2: {e_v2}")
 
         db.session.commit()
-        
+
+        # Task #84 — Resolver vínculos catálogo pós-criação (defense-in-depth
+        # além do listener before_flush; cobre casos onde vinculo_status
+        # ficou definido antes do commit e o listener pularia a linha).
+        try:
+            from services.vinculo_mao_obra import aplicar_vinculo_no_rdo
+            _vc = aplicar_vinculo_no_rdo(rdo.id)
+            logger.info(f"[Task#84] vinculo pós-criação RDO {rdo.id}: {_vc}")
+        except Exception as _ve:
+            logger.error(f"[Task#84] aplicar_vinculo_no_rdo falhou em criar RDO {rdo.id}: {_ve}")
+
         flash(f'RDO {numero_rdo} criado com sucesso!', 'success')
         return redirect(url_for('main.visualizar_rdo', id=rdo.id))
         
