@@ -13744,9 +13744,14 @@ def migration_159_backfill_composicao_servico_id():
         from services.vinculo_mao_obra import aplicar_vinculo_em_linhas
         from models import RDOMaoObra
 
+        from sqlalchemy import or_
+
         linhas = RDOMaoObra.query.filter(
             RDOMaoObra.composicao_servico_id.is_(None),
-            RDOMaoObra.vinculo_status != 'manual',
+            or_(
+                RDOMaoObra.vinculo_status.is_(None),
+                RDOMaoObra.vinculo_status != 'manual',
+            ),
         ).all()
 
         total = len(linhas)
@@ -13764,11 +13769,15 @@ def migration_159_backfill_composicao_servico_id():
         sem_funcao = counts.get('sem_funcao', 0)
         fora = counts.get('funcao_fora_composicao', 0)
         sem_comp = counts.get('subatividade_sem_composicoes', 0)
+        total_sem_vinculo = RDOMaoObra.query.filter(
+            RDOMaoObra.composicao_servico_id.is_(None)
+        ).count()
 
         logger.info(
             f"[Migration 159] Backfill concluído: "
             f"auto={auto} ambiguo={ambiguo} sem_funcao={sem_funcao} "
-            f"fora_composicao={fora} sub_sem_composicoes={sem_comp}"
+            f"fora_composicao={fora} sub_sem_composicoes={sem_comp} | "
+            f"total_processado={total} restante_sem_vinculo={total_sem_vinculo}"
         )
     except Exception as e:
         db.session.rollback()
