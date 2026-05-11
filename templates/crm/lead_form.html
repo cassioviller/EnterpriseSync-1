@@ -51,7 +51,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-1">E-mail</label>
-                                <input type="email" name="email" class="form-control" maxlength="200"
+                                <input type="text" name="email" class="form-control" maxlength="200"
                                        value="{{ valores.email if valores else '' }}">
                             </div>
                             <div class="col-md-3">
@@ -157,7 +157,7 @@
                             {% for s in status_enum %}
                             <option value="{{ s.value }}"
                                     {% if (lead and lead.status == s.value) or (not lead and s.value == 'Em fila') %}selected{% endif %}>
-                                {{ s.value }}
+                                {% if s.value == 'Feedback' %}Aguardando retorno{% else %}{{ s.value }}{% endif %}
                             </option>
                             {% endfor %}
                         </select>
@@ -178,7 +178,13 @@
 
                 {% if lead and lead.cliente %}
                 <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-header bg-white"><strong>Cliente vinculado</strong></div>
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <strong>Cliente vinculado</strong>
+                        <a href="{{ url_for('crm.detalhe_cliente', cliente_id=lead.cliente.id) }}"
+                           class="btn btn-outline-secondary btn-sm" title="Ver detalhe do cliente">
+                            <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+                        </a>
+                    </div>
                     <div class="card-body small">
                         <div><i class="fas fa-user me-1 text-muted" aria-hidden="true"></i><strong>{{ lead.cliente.nome }}</strong></div>
                         {% if lead.cliente.telefone %}<div><i class="fas fa-phone me-1 text-muted" aria-hidden="true"></i>{{ lead.cliente.telefone }}</div>{% endif %}

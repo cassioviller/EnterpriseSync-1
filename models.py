@@ -2650,6 +2650,34 @@ class Cliente(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     admin = db.relationship('Usuario', backref='clientes_administrados')
+    observacoes = db.relationship(
+        'ClienteObservacao', backref='cliente',
+        cascade='all, delete-orphan',
+        order_by='ClienteObservacao.created_at.desc()',
+        foreign_keys='ClienteObservacao.cliente_id',
+    )
+
+
+class ClienteObservacao(db.Model):
+    """Histórico de anotações livres sobre um Cliente."""
+    __tablename__ = 'cliente_observacao'
+    __table_args__ = (
+        db.Index('ix_cliente_obs_cliente', 'cliente_id'),
+        db.Index('ix_cliente_obs_admin', 'admin_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cliente.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    autor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    texto = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    autor = db.relationship('Usuario', foreign_keys=[autor_id])
 
 
 # Atualização de timestamp para verificar se o modelo é alterado
@@ -6169,8 +6197,8 @@ class LeadStatus(Enum):
     """
     EM_FILA = "Em fila"
     EM_ANDAMENTO = "Em andamento"
-    ENVIADO = "Enviado"
     VALIDACAO = "Validação"
+    ENVIADO = "Enviado"
     APROVADO = "Aprovado"
     FEEDBACK = "Feedback"
     CONGELADO = "Congelado"
@@ -6341,8 +6369,18 @@ class Lead(db.Model):
     def dias_parado(self):
         if not self.status_changed_at:
             return 0
-        delta = datetime.utcnow() - self.status_changed_at
-        return max(0, delta.days)
+        from datetime import timedelta
+        hoje = datetime.utcnow().date()
+        inicio = self.status_changed_at.date()
+        if hoje <= inicio:
+            return 0
+        dias = 0
+        d = inicio + timedelta(days=1)
+        while d <= hoje:
+            if d.weekday() < 5:
+                dias += 1
+            d += timedelta(days=1)
+        return dias
 
 
 class LeadHistorico(db.Model):

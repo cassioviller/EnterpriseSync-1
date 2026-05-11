@@ -41,7 +41,7 @@ from models import (
     Lead, LeadHistorico, LeadStatus,
     CrmResponsavel, CrmOrigem, CrmCadencia, CrmSituacao,
     CrmTipoMaterial, CrmTipoObra, CrmMotivoPerda,
-    Cliente, Proposta, Obra, Usuario, TipoUsuario,
+    Cliente, ClienteObservacao, Proposta, Obra, Usuario, TipoUsuario,
 )
 
 logger = logging.getLogger(__name__)
@@ -516,6 +516,14 @@ def _salvar_lead(lead, listas, admin_id):
             'crm/lead_form.html', lead=lead, listas=listas,
             valores=request.form, status_enum=LeadStatus,
         )
+    if novo_status == LeadStatus.ENVIADO.value:
+        vp_raw = request.form.get('valor_proposta')
+        if not _to_decimal(vp_raw):
+            flash('Para mover para "Enviado", informe o Valor da Proposta.', 'danger')
+            return render_template(
+                'crm/lead_form.html', lead=lead, listas=listas,
+                valores=request.form, status_enum=LeadStatus,
+            )
 
     is_new = lead is None
     status_anterior = None if is_new else lead.status
@@ -654,6 +662,13 @@ def mudar_status(lead_id):
                 'msg': 'Para marcar como Perdido, informe o Motivo da Perda.',
             }), 422
         lead.motivo_perda_id = motivo_id
+
+    if novo_status == LeadStatus.ENVIADO.value and not lead.valor_proposta:
+        return jsonify({
+            'ok': False,
+            'requer_proposta': True,
+            'msg': 'Para mover para "Enviado", preencha o Valor da Proposta no formulário do lead.',
+        }), 422
 
     status_anterior = lead.status
     lead.status = novo_status
@@ -946,6 +961,11 @@ STATUS_MAP = {
     'validação': 'Validação',
     'validacao': 'Validação',
     'feedback': 'Feedback',
+    'aguardando retorno': 'Feedback',
+}
+
+LEAD_STATUS_LABELS = {
+    'Feedback': 'Aguardando retorno',
 }
 
 
@@ -1047,10 +1067,10 @@ def exportar_modelo():
     status_info = [
         ('Em fila', '(padrão quando em branco ou não reconhecido)'),
         ('Em andamento', ''),
-        ('Enviado', ''),
         ('Validação', ''),
+        ('Enviado', ''),
         ('Aprovado', '(também aceita "Ganho")'),
-        ('Feedback', ''),
+        ('Aguardando retorno', '(também aceita "Feedback")'),
         ('Congelado', ''),
         ('Perdido', ''),
     ]
@@ -1251,3 +1271,56 @@ def importar():
         'success' if importados > 0 else 'warning',
     )
     return redirect(url_for('crm.lista'))
+
+
+# ===========================================================================
+# DETALHE DO CLIENTE — histórico de leads e anotações
+# ===========================================================================
+
+@crm_bp.route('/clientes/<int:cliente_id>', methods=['GET'])
+@login_required
+def detalhe_cliente(cliente_id):
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Não autenticado.', 'danger')
+        return redirect(url_for('crm.kanban'))
+
+    cliente = Cliente.query.filter_by(id=cliente_id, admin_id=admin_id).first_or_404()
+    leads = Lead.query.filter_by(cliente_id=cliente_id, admin_id=admin_id)\
+                      .order_by(Lead.data_chegada.desc()).all()
+    return render_template(
+        'crm/cliente_detalhe.html',
+        cliente=cliente,
+        leads=leads,
+        is_admin=is_admin_user(),
+    )
+
+
+@crm_bp.route('/clientes/<int:cliente_id>/observacao', methods=['POST'])
+@login_required
+def adicionar_observacao_cliente(cliente_id):
+    admin_id = get_admin_id()
+    if not admin_id:
+        return redirect(url_for('crm.kanban'))
+
+    cliente = Cliente.query.filter_by(id=cliente_id, admin_id=admin_id).first_or_404()
+    texto = (request.form.get('texto') or '').strip()
+    if not texto:
+        flash('A observação não pode estar em branco.', 'danger')
+        return redirect(url_for('crm.detalhe_cliente', cliente_id=cliente_id))
+
+    obs = ClienteObservacao(
+        cliente_id=cliente.id,
+        admin_id=admin_id,
+        autor_id=current_user.id,
+        texto=texto,
+    )
+    db.session.add(obs)
+    try:
+        db.session.commit()
+        flash('Observação adicionada.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao salvar observação do cliente')
+        flash(f'Erro ao salvar: {e}', 'danger')
+    return redirect(url_for('crm.detalhe_cliente', cliente_id=cliente_id))

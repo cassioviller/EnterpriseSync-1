@@ -53,12 +53,13 @@
 
 {# CRM funnel status badge — normalizes the 8 stage names to a slug + colored pill. #}
 {% macro status_badge(status) %}
+{%- set display = 'Aguardando retorno' if status == 'Feedback' else status -%}
 {%- set s = (status or '')|lower
               |replace('ã','a')|replace('é','e')|replace('í','i')
               |replace('ó','o')|replace('ú','u')|replace('ç','c')
               |replace(' ','-') -%}
-<span class="sige-status-badge sige-status-{{ s }}" title="Status: {{ status }}">
-  <span class="sige-status-dot" aria-hidden="true"></span>{{ status }}
+<span class="sige-status-badge sige-status-{{ s }}" title="Status: {{ display }}">
+  <span class="sige-status-dot" aria-hidden="true"></span>{{ display }}
 </span>
 {% endmacro %}
 

@@ -3856,6 +3856,7 @@ def executar_migracoes():
             (155, "Task #5 — RDO: drop coluna rdo_mao_obra.horas_extras (hora extra removida do RDO)", migration_155_drop_rdo_mao_obra_horas_extras),
             (156, "Task #7 — custo_obra.descricao: ampliar de VARCHAR(200) para VARCHAR(500) (RDO com muitas subatividades)", migration_156_custo_obra_descricao_500),
             (157, "Task #69 — backfill produtividade_real/indice_produtividade em RDOMaoObra para RDOs Finalizados com dados suficientes", migration_157_backfill_produtividade_rdo),
+            (158, "Task #77 — cliente_observacao: histórico de anotações livres por cliente (CRM)", migration_158_cliente_observacao),
         ]
         
         # Executar cada migração com rastreamento
@@ -13702,3 +13703,25 @@ def migration_151_vinculo_subatividade_composicao():
         except Exception:
             pass
         raise
+
+
+def migration_158_cliente_observacao():
+    """Task #77 — Cria tabela cliente_observacao para histórico de anotações por cliente no CRM."""
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS cliente_observacao (
+            id          SERIAL PRIMARY KEY,
+            cliente_id  INTEGER NOT NULL REFERENCES cliente(id) ON DELETE CASCADE,
+            admin_id    INTEGER NOT NULL REFERENCES usuario(id),
+            autor_id    INTEGER REFERENCES usuario(id),
+            texto       TEXT NOT NULL,
+            created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_cliente_obs_cliente ON cliente_observacao(cliente_id)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_cliente_obs_admin ON cliente_observacao(admin_id)
+    """))
+    db.session.commit()
+    logger.info("✅ Tabela cliente_observacao criada.")

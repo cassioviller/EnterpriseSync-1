@@ -1,0 +1,126 @@
+{% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header, back_link, status_badge %}
+
+{% block title %}Cliente — {{ cliente.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    {{ back_link(url_for('crm.kanban'), 'Voltar ao Kanban') }}
+    {% call page_header(cliente.nome, icon='fa-user', subtitle='Detalhe do cliente e histórico de leads') %}{% endcall %}
+
+    <div class="row g-3">
+        {# Coluna esquerda: dados do cliente + anotações #}
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white"><strong>Dados do cliente</strong></div>
+                <div class="card-body small">
+                    {% if cliente.email %}
+                    <div class="mb-1"><i class="fas fa-envelope me-2 text-muted"></i>{{ cliente.email }}</div>
+                    {% endif %}
+                    {% if cliente.telefone %}
+                    <div class="mb-1"><i class="fas fa-phone me-2 text-muted"></i>{{ cliente.telefone }}</div>
+                    {% endif %}
+                    {% if cliente.cnpj %}
+                    <div class="mb-1"><i class="fas fa-id-card me-2 text-muted"></i>{{ cliente.cnpj }}</div>
+                    {% endif %}
+                    {% if cliente.endereco %}
+                    <div class="mb-1"><i class="fas fa-map-marker-alt me-2 text-muted"></i>{{ cliente.endereco }}</div>
+                    {% endif %}
+                    <div class="text-muted mt-2">
+                        <i class="fas fa-calendar-plus me-1"></i>
+                        Cadastrado em {{ cliente.created_at.strftime('%d/%m/%Y') if cliente.created_at else '—' }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white"><strong>Anotações</strong></div>
+                <div class="card-body">
+                    <form method="POST"
+                          action="{{ url_for('crm.adicionar_observacao_cliente', cliente_id=cliente.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-2">
+                            <textarea name="texto" class="form-control form-control-sm" rows="3"
+                                      placeholder="Nova anotação..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-plus me-1"></i> Adicionar anotação
+                        </button>
+                    </form>
+
+                    {% if cliente.observacoes %}
+                    <ul class="sige-timeline list-unstyled small p-0 mb-0 mt-3">
+                        {% for obs in cliente.observacoes %}
+                        <li class="sige-timeline-item">
+                            <div class="d-flex justify-content-between align-items-baseline gap-2">
+                                <strong>{{ obs.autor.nome if obs.autor else 'Sistema' }}</strong>
+                                <span class="sige-timeline-time text-nowrap">
+                                    {{ obs.created_at.strftime('%d/%m/%Y %H:%M') if obs.created_at else '' }}
+                                </span>
+                            </div>
+                            <div class="text-muted mt-1">{{ obs.texto }}</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-muted small mt-3">Nenhuma anotação ainda.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Coluna direita: leads associados #}
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <strong>Leads vinculados</strong>
+                    <span class="badge bg-secondary ms-2">{{ leads|length }}</span>
+                </div>
+                {% if leads %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Chegada</th>
+                                <th>Nome</th>
+                                <th>Status</th>
+                                <th>Responsável</th>
+                                <th class="text-end">Valor</th>
+                                <th class="text-end">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lead in leads %}
+                            <tr>
+                                <td class="text-nowrap">
+                                    {{ lead.data_chegada.strftime('%d/%m/%Y') if lead.data_chegada else '—' }}
+                                </td>
+                                <td><strong>{{ lead.nome }}</strong></td>
+                                <td>{{ status_badge(lead.status) }}</td>
+                                <td>{{ lead.responsavel.nome if lead.responsavel else '—' }}</td>
+                                <td class="text-end">
+                                    {% if lead.valor_proposta %}
+                                    {{ lead.valor_proposta|brl }}
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('crm.editar', lead_id=lead.id) }}"
+                                       class="btn btn-sm btn-outline-primary" title="Editar lead">
+                                        <i class="fas fa-edit" aria-hidden="true"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="card-body text-muted small">Nenhum lead vinculado a este cliente.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

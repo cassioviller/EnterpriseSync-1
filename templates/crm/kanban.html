@@ -179,8 +179,9 @@
                                 |replace('ó','o')|replace('ú','u')|replace('ç','c')
                                 |replace(' ','-') %}
             <div class="crm-coluna" data-status="{{ col.nome }}">
+                {% set col_label = 'Aguardando retorno' if col.nome == 'Feedback' else col.nome %}
                 <div class="crm-coluna__header status-{{ slug }}">
-                    <span>{{ col.nome }} <span class="badge bg-light text-dark ms-1">{{ col.count }}</span></span>
+                    <span>{{ col_label }} <span class="badge bg-light text-dark ms-1">{{ col.count }}</span></span>
                     {% if col.valor_total and col.valor_total > 0 %}
                     <span class="small">{{ col.valor_total|brl }}</span>
                     {% endif %}
