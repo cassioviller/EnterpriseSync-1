@@ -2053,6 +2053,14 @@ document.addEventListener('DOMContentLoaded', function() {
     _inicializarEquipeV2Edit(); // Task #81 — pré-popular equipe V2 antes de renderizar cards
     carregarTarefasRDOEdit();
 
+    // Task #81 — garantir sync de badge/hidden mesmo ao fechar modal via backdrop ou ESC
+    const _modalEquipeV2EditEl = document.getElementById('modalEquipeTarefaV2Edit');
+    if (_modalEquipeV2EditEl) {
+        _modalEquipeV2EditEl.addEventListener('hidden.bs.modal', function() {
+            fecharModalEquipeV2Edit();
+        });
+    }
+
     // Interceptar submit do formulário principal para salvar cronograma antes
     const formRDO = document.getElementById('formEditarRDO');
     if (formRDO && rdoId) {
