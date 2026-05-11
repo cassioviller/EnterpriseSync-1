@@ -1814,14 +1814,14 @@ def _seed():
         aid, aid,
     )
 
-    # NF-2026-0003: contrapiso — cimento e areia
+    # NF-2026-0003: contrapiso — cimento e areia (pagamento a prazo 30 dias)
     pedido_bv3 = PedidoCompra(
         admin_id=aid, numero="NF-2026-0003",
         fornecedor_id=fornecedor_alf.id,
         data_compra=date(2026, 3, 12), obra_id=obra.id,
-        condicao_pagamento="a_vista", parcelas=1,
+        condicao_pagamento="30_dias", parcelas=1,
         valor_total=Decimal("7460.00"),
-        observacoes="Contrapiso — cimento e areia.",
+        observacoes="Contrapiso — cimento e areia. Pagamento 30 dias.",
         tipo_compra="normal",
     )
     db.session.add(pedido_bv3); db.session.flush()
@@ -1850,31 +1850,40 @@ def _seed():
         aid, aid,
     )
 
-    # NF-2026-0004: acabamento — tinta acrílica e massa corrida
+    # NF-2026-0004: alvenaria/contrapiso complemento — blocos, areia e cimento
+    # BV scope: apenas alv + pis (_snap_alv + _snap_pis), sem pintura.
+    # Quantidades = cobertura de desperdício (~2× baseline) para fase final.
     pedido_bv4 = PedidoCompra(
         admin_id=aid, numero="NF-2026-0004",
         fornecedor_id=fornecedor_alf.id,
         data_compra=date(2026, 4, 3), obra_id=obra.id,
         condicao_pagamento="a_vista", parcelas=1,
-        valor_total=Decimal("16840.00"),
-        observacoes="Acabamento — tinta acrílica e massa corrida.",
+        valor_total=Decimal("16775.00"),
+        observacoes="Complemento final — blocos cerâmicos, areia e cimento (fase de fechamento).",
         tipo_compra="normal",
     )
     db.session.add(pedido_bv4); db.session.flush()
     db.session.add_all([
         PedidoCompraItem(
             admin_id=aid, pedido_id=pedido_bv4.id,
-            almoxarifado_item_id=item_tinta.id,
-            descricao="Tinta acrílica 18L",
-            quantidade=Decimal("42"), preco_unitario=Decimal("320.00"),
-            subtotal=Decimal("13440.00"),
+            almoxarifado_item_id=item_bloco.id,
+            descricao="Bloco cerâmico 9x19x19",
+            quantidade=Decimal("10000"), preco_unitario=Decimal("1.20"),
+            subtotal=Decimal("12000.00"),
         ),
         PedidoCompraItem(
             admin_id=aid, pedido_id=pedido_bv4.id,
-            almoxarifado_item_id=item_massa.id,
-            descricao="Massa corrida 25kg",
-            quantidade=Decimal("50"), preco_unitario=Decimal("68.00"),
-            subtotal=Decimal("3400.00"),
+            almoxarifado_item_id=item_areia.id,
+            descricao="Areia média m³",
+            quantidade=Decimal("30"), preco_unitario=Decimal("95.00"),
+            subtotal=Decimal("2850.00"),
+        ),
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido_bv4.id,
+            almoxarifado_item_id=item_cimento.id,
+            descricao="Cimento CP II 50kg",
+            quantidade=Decimal("50"), preco_unitario=Decimal("38.50"),
+            subtotal=Decimal("1925.00"),
         ),
     ])
     db.session.flush()
@@ -2890,14 +2899,14 @@ def _seed():
         aid, aid,
     )
 
-    # NF-2026-0007: contrapiso Pinheiros — cimento e areia
+    # NF-2026-0007: contrapiso Pinheiros — cimento e areia (prazo 60 dias)
     pedido_pin7 = PedidoCompra(
         admin_id=aid, numero="NF-2026-0007",
         fornecedor_id=fornecedor_alf.id,
         data_compra=date(2026, 3, 25), obra_id=obra_pin.id,
-        condicao_pagamento="a_vista", parcelas=1,
+        condicao_pagamento="60_dias", parcelas=1,
         valor_total=Decimal("27725.00"),
-        observacoes="Contrapiso Pinheiros — cimento e areia.",
+        observacoes="Contrapiso Pinheiros — cimento e areia. Pagamento 60 dias.",
         tipo_compra="normal",
     )
     db.session.add(pedido_pin7); db.session.flush()
@@ -2926,14 +2935,17 @@ def _seed():
         aid, aid,
     )
 
-    # NF-2026-0008: pintura Pinheiros — tinta acrílica (lote principal)
+    # NF-2026-0008: pintura Pinheiros — tinta acrílica + massa corrida
+    # Tinta: _snap_pin coef 0.020 × 1500 m² = 30 un baseline.
+    # Quantidade 250 un = ~8× baseline (3 demãos + primer + retrabalho em projeto comercial).
+    # Massa: 400 un = ~7× baseline (60 un), aceito como sobreconsumo controlado.
     pedido_pin8 = PedidoCompra(
         admin_id=aid, numero="NF-2026-0008",
         fornecedor_id=fornecedor_alf.id,
         data_compra=date(2026, 4, 8), obra_id=obra_pin.id,
         condicao_pagamento="a_vista", parcelas=1,
-        valor_total=Decimal("163200.00"),
-        observacoes="Pintura Pinheiros — tinta acrílica 18L (lote principal).",
+        valor_total=Decimal("107200.00"),
+        observacoes="Pintura Pinheiros — tinta acrílica 18L e massa corrida 25kg.",
         tipo_compra="normal",
     )
     db.session.add(pedido_pin8); db.session.flush()
@@ -2942,8 +2954,15 @@ def _seed():
             admin_id=aid, pedido_id=pedido_pin8.id,
             almoxarifado_item_id=item_tinta.id,
             descricao="Tinta acrílica 18L",
-            quantidade=Decimal("510"), preco_unitario=Decimal("320.00"),
-            subtotal=Decimal("163200.00"),
+            quantidade=Decimal("250"), preco_unitario=Decimal("320.00"),
+            subtotal=Decimal("80000.00"),
+        ),
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido_pin8.id,
+            almoxarifado_item_id=item_massa.id,
+            descricao="Massa corrida 25kg",
+            quantidade=Decimal("400"), preco_unitario=Decimal("68.00"),
+            subtotal=Decimal("27200.00"),
         ),
     ])
     db.session.flush()
@@ -2955,14 +2974,14 @@ def _seed():
         aid, aid,
     )
 
-    # NF-2026-0009: acabamento Pinheiros — massa corrida + cimento complemento
+    # NF-2026-0009: acabamento Pinheiros — massa corrida complemento + cimento
     pedido_pin9 = PedidoCompra(
         admin_id=aid, numero="NF-2026-0009",
         fornecedor_id=fornecedor_alf.id,
         data_compra=date(2026, 4, 22), obra_id=obra_pin.id,
         condicao_pagamento="a_vista", parcelas=1,
-        valor_total=Decimal("31050.00"),
-        observacoes="Acabamento Pinheiros — massa corrida e cimento complemento.",
+        valor_total=Decimal("10650.00"),
+        observacoes="Acabamento Pinheiros — massa corrida complemento e cimento.",
         tipo_compra="normal",
     )
     db.session.add(pedido_pin9); db.session.flush()
@@ -2971,8 +2990,8 @@ def _seed():
             admin_id=aid, pedido_id=pedido_pin9.id,
             almoxarifado_item_id=item_massa.id,
             descricao="Massa corrida 25kg",
-            quantidade=Decimal("400"), preco_unitario=Decimal("68.00"),
-            subtotal=Decimal("27200.00"),
+            quantidade=Decimal("100"), preco_unitario=Decimal("68.00"),
+            subtotal=Decimal("6800.00"),
         ),
         PedidoCompraItem(
             admin_id=aid, pedido_id=pedido_pin9.id,
@@ -2990,11 +3009,56 @@ def _seed():
          for it in pedido_pin9.itens],
         aid, aid,
     )
+
+    # NF-2026-0010: estrutura final Pinheiros — blocos, areia e cimento (prazo 30 dias)
+    # Blocos: 30.000 un → total acumulado 62.000 un ≈ 1.5× baseline (42.000).
+    # Areia/cimento: reposição para argamassa de assentamento e rejunte final.
+    pedido_pin10 = PedidoCompra(
+        admin_id=aid, numero="NF-2026-0010",
+        fornecedor_id=fornecedor_alf.id,
+        data_compra=date(2026, 5, 5), obra_id=obra_pin.id,
+        condicao_pagamento="30_dias", parcelas=1,
+        valor_total=Decimal("82725.00"),
+        observacoes="Estrutura final Pinheiros — blocos, areia e cimento. Pagamento 30 dias.",
+        tipo_compra="normal",
+    )
+    db.session.add(pedido_pin10); db.session.flush()
+    db.session.add_all([
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido_pin10.id,
+            almoxarifado_item_id=item_bloco.id,
+            descricao="Bloco cerâmico 9x19x19",
+            quantidade=Decimal("30000"), preco_unitario=Decimal("1.20"),
+            subtotal=Decimal("36000.00"),
+        ),
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido_pin10.id,
+            almoxarifado_item_id=item_areia.id,
+            descricao="Areia média m³",
+            quantidade=Decimal("350"), preco_unitario=Decimal("95.00"),
+            subtotal=Decimal("33250.00"),
+        ),
+        PedidoCompraItem(
+            admin_id=aid, pedido_id=pedido_pin10.id,
+            almoxarifado_item_id=item_cimento.id,
+            descricao="Cimento CP II 50kg",
+            quantidade=Decimal("350"), preco_unitario=Decimal("38.50"),
+            subtotal=Decimal("13475.00"),
+        ),
+    ])
+    db.session.flush()
+    processar_compra_normal(
+        pedido_pin10,
+        [(it.descricao, it.quantidade, it.preco_unitario,
+          it.almoxarifado_item_id, it.subtotal)
+         for it in pedido_pin10.itens],
+        aid, aid,
+    )
     log.info(
-        "Task #96: 5 NFs Pinheiros → R$ %.2f + R$ %.2f + R$ %.2f + R$ %.2f + R$ %.2f",
+        "Task #96: 6 NFs Pinheiros → R$ %.2f + R$ %.2f + R$ %.2f + R$ %.2f + R$ %.2f + R$ %.2f",
         float(pedido_pin5.valor_total), float(pedido_pin6.valor_total),
         float(pedido_pin7.valor_total), float(pedido_pin8.valor_total),
-        float(pedido_pin9.valor_total),
+        float(pedido_pin9.valor_total), float(pedido_pin10.valor_total),
     )
 
     db.session.commit()
@@ -3225,23 +3289,28 @@ def _seed():
     # Task #96 — lançamentos das NFs adicionais Bela Vista
     _lan(6,  date(2026, 2, 20), "Compra materiais NF-2026-0002 — Bela Vista (alvenaria fase 1)",
          10865.00,  "4.1.01", "1.1.01")
-    _lan(7,  date(2026, 3, 12), "Compra materiais NF-2026-0003 — Bela Vista (contrapiso)",
-         7460.00,   "4.1.01", "1.1.01")
-    _lan(8,  date(2026, 4, 3),  "Compra materiais NF-2026-0004 — Bela Vista (acabamento pintura)",
-         16840.00,  "4.1.01", "1.1.01")
+    # NF-2026-0003: prazo 30 dias → crédito em Contas a Pagar (2.1.01)
+    _lan(7,  date(2026, 3, 12), "Compra materiais NF-2026-0003 — Bela Vista (contrapiso, 30 dias)",
+         7460.00,   "4.1.01", "2.1.01")
+    _lan(8,  date(2026, 4, 3),  "Compra materiais NF-2026-0004 — Bela Vista (complemento final)",
+         16775.00,  "4.1.01", "1.1.01")
     # Task #96 — lançamentos das NFs Pinheiros
     _lan(9,  date(2026, 3, 1),  "Compra materiais NF-2026-0005 — Pinheiros (alvenaria 1ª entrega)",
          33300.00,  "4.1.01", "1.1.01")
     _lan(10, date(2026, 3, 12), "Compra materiais NF-2026-0006 — Pinheiros (alvenaria 2ª entrega)",
          41425.00,  "4.1.01", "1.1.01")
-    _lan(11, date(2026, 3, 25), "Compra materiais NF-2026-0007 — Pinheiros (contrapiso)",
-         27725.00,  "4.1.01", "1.1.01")
-    _lan(12, date(2026, 4, 8),  "Compra materiais NF-2026-0008 — Pinheiros (pintura tinta)",
-         163200.00, "4.1.01", "1.1.01")
-    _lan(13, date(2026, 4, 22), "Compra materiais NF-2026-0009 — Pinheiros (massa corrida)",
-         31050.00,  "4.1.01", "1.1.01")
+    # NF-2026-0007: prazo 60 dias → crédito em Contas a Pagar (2.1.01)
+    _lan(11, date(2026, 3, 25), "Compra materiais NF-2026-0007 — Pinheiros (contrapiso, 60 dias)",
+         27725.00,  "4.1.01", "2.1.01")
+    _lan(12, date(2026, 4, 8),  "Compra materiais NF-2026-0008 — Pinheiros (pintura tinta+massa)",
+         107200.00, "4.1.01", "1.1.01")
+    _lan(13, date(2026, 4, 22), "Compra materiais NF-2026-0009 — Pinheiros (massa complemento)",
+         10650.00,  "4.1.01", "1.1.01")
+    # NF-2026-0010: prazo 30 dias → crédito em Contas a Pagar (2.1.01)
+    _lan(14, date(2026, 5, 5),  "Compra materiais NF-2026-0010 — Pinheiros (estrutura final, 30 dias)",
+         82725.00,  "4.1.01", "2.1.01")
     db.session.flush()
-    log.info("Task #46/#96 Contabilidade: 13 lançamentos com partidas dobradas")
+    log.info("Task #46/#96 Contabilidade: 14 lançamentos com partidas dobradas")
 
     # Fluxo de Caixa — movimentos do período fev-mar/2026
     fluxos_caixa = [
@@ -3314,8 +3383,8 @@ def _seed():
             admin_id=aid,
             data_movimento=date(2026, 4, 3),
             tipo_movimento="SAIDA", categoria="custo_obra",
-            valor=16840.0,
-            descricao="Materiais — NF-2026-0004 (acabamento pintura)",
+            valor=16775.0,
+            descricao="Materiais — NF-2026-0004 (BV complemento final blocos/areia/cimento)",
             obra_id=obra.id, referencia_tabela="pedido_compra",
         ),
         # Task #96 — NFs Pinheiros
@@ -3340,23 +3409,31 @@ def _seed():
             data_movimento=date(2026, 3, 25),
             tipo_movimento="SAIDA", categoria="custo_obra",
             valor=27725.0,
-            descricao="Materiais — NF-2026-0007 (Pinheiros contrapiso)",
+            descricao="Materiais — NF-2026-0007 (Pinheiros contrapiso, prazo 60 dias)",
             obra_id=obra_pin.id, referencia_tabela="pedido_compra",
         ),
         FluxoCaixa(
             admin_id=aid,
             data_movimento=date(2026, 4, 8),
             tipo_movimento="SAIDA", categoria="custo_obra",
-            valor=163200.0,
-            descricao="Materiais — NF-2026-0008 (Pinheiros pintura — tinta acrílica)",
+            valor=107200.0,
+            descricao="Materiais — NF-2026-0008 (Pinheiros pintura tinta+massa)",
             obra_id=obra_pin.id, referencia_tabela="pedido_compra",
         ),
         FluxoCaixa(
             admin_id=aid,
             data_movimento=date(2026, 4, 22),
             tipo_movimento="SAIDA", categoria="custo_obra",
-            valor=31050.0,
-            descricao="Materiais — NF-2026-0009 (Pinheiros massa corrida)",
+            valor=10650.0,
+            descricao="Materiais — NF-2026-0009 (Pinheiros massa complemento)",
+            obra_id=obra_pin.id, referencia_tabela="pedido_compra",
+        ),
+        FluxoCaixa(
+            admin_id=aid,
+            data_movimento=date(2026, 5, 5),
+            tipo_movimento="SAIDA", categoria="custo_obra",
+            valor=82725.0,
+            descricao="Materiais — NF-2026-0010 (Pinheiros estrutura final, prazo 30 dias)",
             obra_id=obra_pin.id, referencia_tabela="pedido_compra",
         ),
     ]
@@ -3420,11 +3497,11 @@ def _seed():
         "folha_carlos_custo_empresa": float(folha_carlos.custo_total_empresa),
         # Task #46/#96 — Contabilidade / FluxoCaixa
         "n_contas_plano": 19,
-        "n_lancamentos": 13,
+        "n_lancamentos": 14,
         "n_fluxos_caixa": len(fluxos_caixa),
         # Task #96 — compras adicionais
         "n_pedidos_bv": 4,
-        "n_pedidos_pin": 5,
+        "n_pedidos_pin": 6,
     }
 
 
