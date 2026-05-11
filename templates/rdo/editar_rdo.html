@@ -637,6 +637,57 @@
             </div>
             {% endif %}
 
+            {% if is_v2_active is defined and is_v2_active() %}
+            <!-- ── Modal: Equipe por Atividade Empresa (Cronograma V2 — Edição) ── -->
+            <div class="modal fade" id="modalEquipeTarefaV2Edit" tabindex="-1" aria-labelledby="modalEquipeTarefaV2EditLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                  <div class="modal-header text-white" style="background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%)">
+                    <h5 class="modal-title fw-bold" id="modalEquipeTarefaV2EditLabel">
+                      <i class="fas fa-users me-2"></i>
+                      <span id="modalEquipeTarefaV2EditTitulo">Equipe da Atividade</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="fecharModalEquipeV2Edit()"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="mb-3">
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0">
+                          <i class="fas fa-search text-muted"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0 ps-0"
+                               id="modalFuncFiltroV2Edit"
+                               placeholder="Buscar funcionário…"
+                               autocomplete="off"
+                               oninput="filtrarModalFuncV2Edit(this.value)">
+                      </div>
+                    </div>
+                    <div id="modalFuncListaV2Edit"
+                         style="max-height:180px;overflow-y:auto;border:1px solid #e9ecef;border-radius:8px;background:#fafafa">
+                      <div class="text-center p-3 text-muted small">
+                        <i class="fas fa-spinner fa-spin"></i> Carregando…
+                      </div>
+                    </div>
+                    <div class="mt-3">
+                      <div class="d-flex align-items-center gap-1 mb-2">
+                        <i class="fas fa-hard-hat text-primary small"></i>
+                        <span class="small fw-bold text-primary">Alocados nesta atividade</span>
+                      </div>
+                      <div id="modalEquipeSelecionadaV2Edit">
+                        <p class="text-muted small fst-italic mb-0">Nenhum funcionário alocado</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal" onclick="fecharModalEquipeV2Edit()">
+                      <i class="fas fa-check me-1"></i> Confirmar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
             {# Task #65 — Seção V1: subatividades salvas com "Equipe do dia" por subatividade #}
             {% if not (is_v2_active is defined and is_v2_active()) and subatividades_rdo_lista %}
             <div class="rdo-card slide-in">
@@ -1507,6 +1558,8 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
                 </button>
               </div>`;
         } else {
+            const equipeEdit = (_cronTaskEquipeEdit[t.id] || []);
+            const nEquipe = equipeEdit.length;
             acaoInner = `
               ${t.quantidade_total
                 ? `<small class="text-muted">Total: ${qty_total}</small>`
@@ -1528,7 +1581,17 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
                   <i class="fas fa-save fa-xs"></i>
                 </button>
                 <span class="text-muted small">${t.unidade_medida || ''}</span>
-              </div>` : ''}`;
+              </div>` : ''}
+              <button type="button"
+                      class="btn btn-sm ${nEquipe > 0 ? 'btn-primary' : 'btn-outline-secondary'} d-flex align-items-center gap-1 px-2"
+                      id="btn-equipe-v2edit-${t.id}"
+                      onclick="event.stopPropagation(); abrirModalEquipeV2Edit(${t.id}, '${nomeTarefaEsc}')"
+                      title="Alocar equipe nesta atividade">
+                <i class="fas fa-users"></i>
+                <span class="badge rounded-pill bg-light text-dark ms-1"
+                      id="badge-equipe-v2edit-${t.id}"
+                      style="${nEquipe > 0 ? '' : 'display:none'};font-size:.7rem">${nEquipe}</span>
+              </button>`;
         }
     }
     // Task #154: subgrupos (isPai) NUNCA mostram total/acumulado/equipe.
@@ -1987,12 +2050,16 @@ document.addEventListener('DOMContentLoaded', function() {
     injetarEquipeSubatividadesV1(); // Task #65 — equipe por subatividade V1
     carregarGaleria(); // Carregar fotos também
     {% if is_v2_active is defined and is_v2_active() %}
+    _inicializarEquipeV2Edit(); // Task #81 — pré-popular equipe V2 antes de renderizar cards
     carregarTarefasRDOEdit();
 
     // Interceptar submit do formulário principal para salvar cronograma antes
     const formRDO = document.getElementById('formEditarRDO');
     if (formRDO && rdoId) {
         async function _salvarCronogramaESubmeter(e) {
+            // Task #81 — sincronizar inputs hidden da equipe V2 antes do submit
+            _syncHiddenInputsEquipeV2Edit();
+
             // Coletar todos os inputs de quantidade cronograma com valor preenchido
             const qtyInputs = document.querySelectorAll('input[id^="qty_edit_"]');
             const pendentes = [];
@@ -2316,6 +2383,186 @@ function rdoDistribHorasSetup() {
             formRDO.submit();
         }
     });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Task #81 — Equipe por Atividade Empresa (Cronograma V2 — Edição)
+// Estado: { tarefa_cronograma_id: [{id, nome, cargo, horas}] }
+// ══════════════════════════════════════════════════════════════════════════
+let _cronTaskEquipeEdit = {};
+let _modalV2EditTarefaId = null;
+
+// Pré-popular a partir do banco: funcionariosVinculadosPorSub usa sub_mestre_id
+// como chave, que coincide com tarefa_id quando a alocação veio do fluxo V2.
+function _inicializarEquipeV2Edit() {
+    if (!funcionariosVinculadosPorSub) return;
+    Object.entries(funcionariosVinculadosPorSub).forEach(function([subIdStr, funcMap]) {
+        const tarefaId = parseInt(subIdStr, 10);
+        if (isNaN(tarefaId)) return;
+        _cronTaskEquipeEdit[tarefaId] = [];
+        Object.entries(funcMap).forEach(function([funcIdStr, horas]) {
+            const funcId = parseInt(funcIdStr, 10);
+            const funcObj = (funcionariosTodosLista || []).find(f => f.id === funcId);
+            if (funcObj) {
+                _cronTaskEquipeEdit[tarefaId].push({
+                    id: funcId,
+                    nome: funcObj.nome,
+                    cargo: funcObj.cargo || funcObj.funcao || '',
+                    horas: parseFloat(horas) || 8.0
+                });
+            }
+        });
+    });
+}
+
+function _atualizarBotaoEquipeV2Edit(tarefaId) {
+    const btn   = document.getElementById(`btn-equipe-v2edit-${tarefaId}`);
+    const badge = document.getElementById(`badge-equipe-v2edit-${tarefaId}`);
+    if (!btn || !badge) return;
+    const qtd = (_cronTaskEquipeEdit[tarefaId] || []).length;
+    badge.textContent = qtd;
+    badge.style.display = qtd > 0 ? '' : 'none';
+    btn.classList.toggle('btn-primary', qtd > 0);
+    btn.classList.toggle('btn-outline-secondary', qtd === 0);
+}
+
+function _syncHiddenInputsEquipeV2Edit() {
+    const form = document.getElementById('formEditarRDO');
+    if (!form) return;
+    form.querySelectorAll('input[name^="sub_func_"][data-v2edit="1"]').forEach(el => el.remove());
+    Object.entries(_cronTaskEquipeEdit).forEach(([tarefaId, lista]) => {
+        lista.forEach(f => {
+            const h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = `sub_func_${tarefaId}_${f.id}_horas`;
+            h.value = f.horas;
+            h.dataset.v2edit = '1';
+            form.appendChild(h);
+        });
+    });
+}
+
+function abrirModalEquipeV2Edit(tarefaId, nomeTarefa) {
+    _modalV2EditTarefaId = tarefaId;
+
+    const titulo = document.getElementById('modalEquipeTarefaV2EditTitulo');
+    if (titulo) titulo.textContent = nomeTarefa || 'Equipe da Atividade';
+
+    const filtro = document.getElementById('modalFuncFiltroV2Edit');
+    if (filtro) filtro.value = '';
+
+    _renderModalFuncListaV2Edit('');
+    _renderModalEquipeSelecionadaV2Edit();
+
+    const el = document.getElementById('modalEquipeTarefaV2Edit');
+    if (el) bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+function fecharModalEquipeV2Edit() {
+    if (_modalV2EditTarefaId === null) return;
+    _atualizarBotaoEquipeV2Edit(_modalV2EditTarefaId);
+    _syncHiddenInputsEquipeV2Edit();
+    _modalV2EditTarefaId = null;
+}
+
+function filtrarModalFuncV2Edit(query) {
+    _renderModalFuncListaV2Edit(query);
+}
+
+function _renderModalFuncListaV2Edit(query) {
+    const container = document.getElementById('modalFuncListaV2Edit');
+    if (!container) return;
+
+    const lista = funcionariosTodosLista || [];
+    const q = (query || '').toLowerCase();
+    const jaSel = (_cronTaskEquipeEdit[_modalV2EditTarefaId] || []).map(f => f.id);
+    const disponiveis = lista.filter(f =>
+        !jaSel.includes(f.id) &&
+        (!q || (f.nome || '').toLowerCase().includes(q))
+    );
+
+    if (lista.length === 0) {
+        container.innerHTML = '<p class="text-muted small text-center p-3 mb-0">Nenhum funcionário cadastrado</p>';
+        return;
+    }
+    if (disponiveis.length === 0) {
+        container.innerHTML = '<p class="text-muted small text-center p-3 mb-0">Todos já alocados ou nenhum encontrado</p>';
+        return;
+    }
+
+    container.innerHTML = disponiveis.map(f => {
+        const cargo = (f.funcao || f.cargo || '');
+        const nomeEsc = (f.nome || '').replace(/'/g, "\\'");
+        const cargoEsc = cargo.replace(/'/g, "\\'");
+        return `
+        <button type="button" class="btn btn-light btn-sm w-100 text-start d-flex align-items-center gap-2 border-0 border-bottom rounded-0 py-2 px-3"
+                onclick="adicionarFuncTarefaV2Edit(${f.id}, '${nomeEsc}', '${cargoEsc}')">
+            <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                  style="width:28px;height:28px;font-size:.7rem;font-weight:700">
+                ${(f.nome || '?').charAt(0).toUpperCase()}
+            </span>
+            <span class="flex-grow-1">
+                <span class="fw-semibold small">${f.nome}</span>
+                ${cargo ? `<br><small class="text-muted">${cargo}</small>` : ''}
+            </span>
+            <i class="fas fa-plus text-primary small"></i>
+        </button>`;
+    }).join('');
+}
+
+function _renderModalEquipeSelecionadaV2Edit() {
+    const container = document.getElementById('modalEquipeSelecionadaV2Edit');
+    if (!container) return;
+
+    const selecionados = _cronTaskEquipeEdit[_modalV2EditTarefaId] || [];
+    if (selecionados.length === 0) {
+        container.innerHTML = '<p class="text-muted small fst-italic mb-0">Nenhum funcionário alocado</p>';
+        return;
+    }
+
+    container.innerHTML = selecionados.map(f => `
+        <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3" style="background:#f0f4ff;border:1px solid #c7d7fc">
+            <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                  style="width:28px;height:28px;font-size:.7rem;font-weight:700">
+                ${(f.nome || '?').charAt(0).toUpperCase()}
+            </span>
+            <span class="flex-grow-1 small fw-semibold">${f.nome}</span>
+            <small class="text-muted me-1">${f.cargo || ''}</small>
+            <input type="number" class="form-control form-control-sm text-center"
+                   style="width:65px" min="0.5" max="24" step="0.5"
+                   value="${f.horas}"
+                   onchange="_atualizarHorasTarefaV2Edit(${f.id}, this.value)"
+                   title="Horas trabalhadas">
+            <small class="text-muted">h</small>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1"
+                    onclick="removerFuncTarefaV2Edit(${f.id})" title="Remover">
+                <i class="fas fa-times-circle"></i>
+            </button>
+        </div>`).join('');
+}
+
+function adicionarFuncTarefaV2Edit(funcId, funcNome, funcCargo) {
+    if (!_cronTaskEquipeEdit[_modalV2EditTarefaId]) _cronTaskEquipeEdit[_modalV2EditTarefaId] = [];
+    if (!_cronTaskEquipeEdit[_modalV2EditTarefaId].some(f => f.id === funcId)) {
+        _cronTaskEquipeEdit[_modalV2EditTarefaId].push({ id: funcId, nome: funcNome, cargo: funcCargo, horas: 8.8 });
+    }
+    _renderModalFuncListaV2Edit(document.getElementById('modalFuncFiltroV2Edit')?.value || '');
+    _renderModalEquipeSelecionadaV2Edit();
+}
+
+function removerFuncTarefaV2Edit(funcId) {
+    if (_cronTaskEquipeEdit[_modalV2EditTarefaId]) {
+        _cronTaskEquipeEdit[_modalV2EditTarefaId] = _cronTaskEquipeEdit[_modalV2EditTarefaId].filter(f => f.id !== funcId);
+    }
+    _renderModalFuncListaV2Edit(document.getElementById('modalFuncFiltroV2Edit')?.value || '');
+    _renderModalEquipeSelecionadaV2Edit();
+}
+
+function _atualizarHorasTarefaV2Edit(funcId, valor) {
+    const lista = _cronTaskEquipeEdit[_modalV2EditTarefaId];
+    if (!lista) return;
+    const entry = lista.find(f => f.id === funcId);
+    if (entry) entry.horas = parseFloat(valor) || 8.8;
 }
 </script>
 {% endblock %}
