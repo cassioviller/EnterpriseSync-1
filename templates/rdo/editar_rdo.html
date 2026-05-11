@@ -690,31 +690,6 @@
             </div>
             {% endif %}
 
-            <!-- Seção de Funcionários -->
-            <div class="rdo-card slide-in">
-                <div class="rdo-card-header">
-                    <h3>
-                        <i class="fas fa-users"></i>
-                        Mão de Obra
-                    </h3>
-                    <button type="button" class="btn-modern btn-success" onclick="carregarFuncionariosParaEdicao()">
-                        <i class="fas fa-sync"></i>
-                        Recarregar Funcionários
-                    </button>
-                </div>
-                <div class="rdo-card-body">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Seleção de Funcionários:</strong> Marque os funcionários que trabalharam neste RDO e defina suas funções e horas.
-                    </div>
-                    <div id="funcionarios-container">
-                        <div class="text-center p-4">
-                            <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
-                            <p class="text-muted">Carregando funcionários...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- ===== SEÇÃO DE ENTREGAS / TERCEIROS (legado: oculta no V2 — agora inline na lista do cronograma) ===== -->
             {% if entregas_alertas and entregas_alertas|length > 0 and not (is_v2_active is defined and is_v2_active()) %}
@@ -929,7 +904,6 @@
 // JavaScript para funcionalidades da edição de RDO
 const obraIdAtual = {{ rdo.obra_id }};
 const subatividadesAtuais = {{ (subatividades_data or [])|tojson }};
-const funcionariosAtuais = {{ (funcionarios_data or [])|tojson }};
 const rdoId = {{ rdo.id }};
 // Subatividades já salvas no RDO (para V2 que não usa ServicoObraReal)
 const subatividadesSalvas = {{ (subatividades_rdo_lista or [])|tojson }};
@@ -1103,139 +1077,6 @@ function _renderEquipeEditSubat(subMestreId) {
 }
 
 // (removido) carregarServicosParaEdicao e funções relacionadas — RDO V2 usa apenas o painel de Cronograma.
-
-function carregarFuncionariosParaEdicao() {
-    // Task #65 — usar dados server-side (funcionariosTodosLista) em vez de fetch
-    // para evitar estado "carregando" permanente quando a API não responde.
-    if (funcionariosTodosLista && funcionariosTodosLista.length > 0) {
-        renderizarFuncionariosParaEdicao(funcionariosTodosLista);
-        return;
-    }
-    // Fallback: tenta API apenas se lista server-side estiver vazia
-    const container = document.getElementById('funcionarios-container');
-    container.innerHTML = `
-        <div class="text-center p-4">
-            <div class="spinner-border text-success" role="status">
-                <span class="visually-hidden">Carregando...</span>
-            </div>
-            <p class="mt-2 text-muted">Carregando funcionários...</p>
-        </div>
-    `;
-    fetch('/api/funcionarios-ativos')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                renderizarFuncionariosParaEdicao(data.funcionarios);
-            } else {
-                renderizarErroFuncionarios();
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao carregar funcionários:', error);
-            renderizarErroFuncionarios();
-        });
-}
-
-function renderizarFuncionariosParaEdicao(funcionarios) {
-    const container = document.getElementById('funcionarios-container');
-    
-    if (funcionarios.length === 0) {
-        container.innerHTML = `
-            <div class="text-center p-4">
-                <i class="fas fa-user-slash fa-2x text-muted mb-3"></i>
-                <p class="text-muted">Nenhum funcionário ativo encontrado</p>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = `
-        <div class="funcionarios-grid">
-            <div class="row">
-    `;
-    
-    funcionarios.forEach(funcionario => {
-        // Verificar se funcionário já está no RDO
-        const isSelected = funcionariosAtuais.hasOwnProperty(funcionario.id);
-        
-        html += `
-            <div class="col-md-6 col-lg-4 mb-3">
-                <div class="funcionario-card">
-                    <div class="form-check">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               name="funcionarios_selecionados" 
-                               value="${funcionario.id}"
-                               id="func_${funcionario.id}"
-                               ${isSelected ? 'checked' : ''}
-                               form="formEditarRDO">
-                        <label class="form-check-label" for="func_${funcionario.id}">
-                            <div class="funcionario-info">
-                                <h6>${funcionario.nome}</h6>
-                                <small class="text-muted">${funcionario.cargo}</small>
-                            </div>
-                        </label>
-                    </div>
-                    <div class="funcionario-details" id="details_${funcionario.id}" style="display: none;">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label class="form-label">Função</label>
-                                <input type="text" 
-                                       class="form-control form-control-sm" 
-                                       name="funcao_${funcionario.id}"
-                                       value="${funcionariosAtuais[funcionario.id] ? funcionariosAtuais[funcionario.id].funcao : funcionario.cargo}"
-                                       form="formEditarRDO">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Horas</label>
-                                <input type="number" 
-                                       class="form-control form-control-sm" 
-                                       name="horas_${funcionario.id}"
-                                       value="${funcionariosAtuais[funcionario.id] ? funcionariosAtuais[funcionario.id].horas : 8}"
-                                       step="0.5"
-                                       min="0"
-                                       max="12"
-                                       form="formEditarRDO">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += `
-            </div>
-        </div>
-    `;
-    
-    container.innerHTML = html;
-    
-    // Adicionar evento para mostrar/ocultar detalhes
-    funcionarios.forEach(funcionario => {
-        const checkbox = document.getElementById(`func_${funcionario.id}`);
-        const details = document.getElementById(`details_${funcionario.id}`);
-        
-        checkbox.addEventListener('change', function() {
-            details.style.display = this.checked ? 'block' : 'none';
-        });
-        
-        // Se já estiver selecionado, mostrar detalhes
-        if (checkbox.checked) {
-            details.style.display = 'block';
-        }
-    });
-}
-
-function renderizarErroFuncionarios() {
-    const container = document.getElementById('funcionarios-container');
-    container.innerHTML = `
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Erro ao carregar funcionários:</strong> Não foi possível carregar a lista de funcionários ativos.
-        </div>
-    `;
-}
 
 // ===== SISTEMA DE FOTOS RDO v9.0 =====
 
@@ -2143,7 +1984,6 @@ function injetarEquipeSubatividadesV1() {
 // Carregar serviços e funcionários automaticamente ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Página de edição carregada - iniciando carregamento');
-    carregarFuncionariosParaEdicao();
     injetarEquipeSubatividadesV1(); // Task #65 — equipe por subatividade V1
     carregarGaleria(); // Carregar fotos também
     {% if is_v2_active is defined and is_v2_active() %}

@@ -81,10 +81,14 @@ def editar_rdo_form(rdo_id):
                 'funcao': func_rdo.funcao_exercida,
                 'horas': func_rdo.horas_trabalhadas
             }
-            # Obter o sub_mestre_id associado a este registro de mão de obra
+            # Obter o sub_mestre_id associado a este registro de mão de obra.
+            # Quando subatividade_mestre_id é nulo (registros legados), usa-se
+            # func_rdo.subatividade_id como chave — que é o mesmo valor que
+            # subatividades_rdo_lista usa como 'id' via fallback (or sub_rdo.id).
             if func_rdo.subatividade_id:
                 sub_obj = RDOServicoSubatividade.query.get(func_rdo.subatividade_id)
-                m_id = getattr(sub_obj, 'subatividade_mestre_id', None) if sub_obj else None
+                m_id = (getattr(sub_obj, 'subatividade_mestre_id', None) if sub_obj else None) \
+                       or func_rdo.subatividade_id
             else:
                 m_id = None
             if m_id:
@@ -342,10 +346,6 @@ def salvar_edicao_rdo(rdo_id):
 
         logger.info(f"🔗 Mapeamento sub_mestre→db_id: {sub_mestre_to_db_id}")
         
-        # Processar funcionários selecionados
-        funcionarios_selecionados = request.form.getlist('funcionarios_selecionados')
-        logger.info(f"👥 Funcionários selecionados: {len(funcionarios_selecionados)}")
-        
         # Limpar funcionários existentes do RDO
         from models import RDOMaoObra
         # Antes, remover os custos automáticos atrelados às linhas que vão sair.
@@ -439,32 +439,6 @@ def salvar_edicao_rdo(rdo_id):
                     f"peso={peso_linha if peso_linha is not None else '—'}"
                 )
 
-        # Processar funcionários sem vínculo de subatividade (campos horas_{func_id})
-        for func_id in funcionarios_selecionados:
-            try:
-                func_id = int(func_id)
-                if func_id in func_ids_vinculados:
-                    continue  # já criado com vínculo de subatividade
-                funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
-                horas_trabalhadas = max(0.0, float(request.form.get(f'horas_{func_id}', 8.0)))
-                funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
-                if funcionario:
-                    rdo_funcionario = RDOMaoObra(
-                        rdo_id=rdo_id,
-                        funcionario_id=func_id,
-                        funcao_exercida=funcao_exercida,
-                        horas_trabalhadas=horas_trabalhadas,
-                        admin_id=admin_id,
-                    )
-                    db.session.add(rdo_funcionario)
-                    funcionarios_salvos += 1
-                    logger.info(f"✅ Funcionário geral: {funcionario.nome} - {funcao_exercida} - {horas_trabalhadas}h")
-                else:
-                    logger.warning(f"⚠️ Funcionário {func_id} não encontrado ou não pertence ao admin")
-            except Exception as e:
-                logger.error(f"❌ Erro ao salvar funcionário {func_id}: {e}")
-                continue
-        
         logger.info(f"👥 Total de {funcionarios_salvos} funcionários salvos na edição")
 
         # Processar entregas / terceiros marcadas como concluidas no RDO
