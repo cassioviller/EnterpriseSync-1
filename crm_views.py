@@ -964,11 +964,6 @@ STATUS_MAP = {
     'aguardando retorno': 'Feedback',
 }
 
-LEAD_STATUS_LABELS = {
-    'Feedback': 'Aguardando retorno',
-}
-
-
 def _resolve_ou_criar_lookup(model, nome_val, admin_id, cache):
     """Busca ou cria item de lista mestra. cache = {tablename:nome_lower: id}."""
     if not nome_val:
@@ -1349,7 +1344,7 @@ def adicionar_observacao_cliente(cliente_id):
     obs = ClienteObservacao(
         cliente_id=cliente.id,
         admin_id=admin_id,
-        autor_id=current_user.id,
+        usuario_id=current_user.id,
         texto=texto,
     )
     db.session.add(obs)

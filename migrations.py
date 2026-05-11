@@ -13712,7 +13712,7 @@ def migration_158_cliente_observacao():
             id          SERIAL PRIMARY KEY,
             cliente_id  INTEGER NOT NULL REFERENCES cliente(id) ON DELETE CASCADE,
             admin_id    INTEGER NOT NULL REFERENCES usuario(id),
-            autor_id    INTEGER REFERENCES usuario(id),
+            usuario_id  INTEGER REFERENCES usuario(id),
             texto       TEXT NOT NULL,
             created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )

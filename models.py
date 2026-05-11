@@ -2673,11 +2673,11 @@ class ClienteObservacao(db.Model):
         nullable=False,
     )
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    autor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     texto = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-    autor = db.relationship('Usuario', foreign_keys=[autor_id])
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
 
 
 # Atualização de timestamp para verificar se o modelo é alterado

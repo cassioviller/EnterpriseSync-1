@@ -53,7 +53,7 @@
                         {% for obs in cliente.observacoes %}
                         <li class="sige-timeline-item">
                             <div class="d-flex justify-content-between align-items-baseline gap-2">
-                                <strong>{{ obs.autor.nome if obs.autor else 'Sistema' }}</strong>
+                                <strong>{{ obs.usuario.nome if obs.usuario else 'Sistema' }}</strong>
                                 <span class="sige-timeline-time text-nowrap">
                                     {{ obs.created_at.strftime('%d/%m/%Y %H:%M') if obs.created_at else '' }}
                                 </span>
