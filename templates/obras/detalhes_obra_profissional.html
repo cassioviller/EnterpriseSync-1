@@ -731,7 +731,12 @@
         gap: 1rem;
         align-items: stretch;
     }
-    .visao-geral-topo > .painel-estrategico { margin-bottom: 0 !important; }
+    /* Resumo de Custos (quando presente) ocupa linha inteira */
+    .visao-geral-topo > .obra-card { grid-column: 1 / -1; }
+    .visao-geral-topo > .painel-estrategico {
+        grid-column: auto;
+        margin-bottom: 0 !important;
+    }
     .visao-geral-topo > .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
         margin-bottom: 0;
