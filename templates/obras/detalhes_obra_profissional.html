@@ -805,7 +805,7 @@
                     <i class="fas fa-external-link-alt fa-xs me-1"></i>Ver Proposta de Origem
                 </a>
                 {% if obra.token_cliente %}
-                — <a href="{{ url_for('portal_obras.portal_home', token=obra.token_cliente) }}"
+                — <a href="{{ url_for('portal_obras.portal_obra', token=obra.token_cliente) }}"
                      class="text-primary" target="_blank">
                     <i class="fas fa-globe fa-xs me-1"></i>Portal do Cliente
                 </a>
