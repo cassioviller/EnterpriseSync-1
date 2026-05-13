@@ -201,6 +201,7 @@ def cronograma_obra(obra_id: int):
         hoje=hoje,
         nome_empresa=nome_empresa,
         modo_cliente=cliente_mode,
+        base_template='base_iframe.html' if cliente_mode else 'base_completo.html',
     )
 
 
