@@ -75,6 +75,27 @@
 .crm-card__acoes a { color: #6c757d; font-size: .85rem; }
 .crm-card__acoes a:hover { color: #0d6efd; }
 
+/* Prioridade — borda dourada + badge */
+.crm-card--prioridade {
+    border-left-color: #f59e0b !important;
+    box-shadow: 0 0 0 1.5px rgba(245,158,11,.25), 0 1px 3px rgba(0,0,0,.08) !important;
+}
+.crm-prioridade-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: .68rem;
+    font-weight: 700;
+    color: #92400e;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+}
+
 /* Urgency backgrounds — faixas de dias parado */
 .crm-card--fresh   { color: #212529; }
 .crm-card--atencao { background: #fffbeb !important; color: #212529; }
@@ -187,7 +208,7 @@
                     {% endif %}
                 </div>
                 <div class="crm-coluna__corpo crm-droppable" data-status="{{ col.nome }}">
-                    {% for lead in col.leads %}
+                    {% for lead in col.leads | sort(attribute='prioridade', reverse=True) %}
                     {% if lead.dias_parado >= 15 %}
                         {% set urgencia = 'crm-card--critico' %}
                     {% elif lead.dias_parado >= 7 %}
@@ -197,7 +218,10 @@
                     {% else %}
                         {% set urgencia = 'crm-card--fresh' %}
                     {% endif %}
-                    <div class="crm-card {{ urgencia }} status-{{ slug }}" data-lead-id="{{ lead.id }}">
+                    <div class="crm-card {{ urgencia }} status-{{ slug }}{% if lead.prioridade %} crm-card--prioridade{% endif %}" data-lead-id="{{ lead.id }}">
+                        {% if lead.prioridade %}
+                        <div><span class="crm-prioridade-badge"><i class="fas fa-star" aria-hidden="true"></i> Prioridade</span></div>
+                        {% endif %}
                         <div class="crm-card__nome">{{ lead.nome }}</div>
                         {% if lead.valor_proposta %}
                         <div class="crm-card__linha">

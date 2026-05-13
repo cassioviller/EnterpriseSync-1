@@ -6332,6 +6332,9 @@ class Lead(db.Model):
     status = db.Column(db.String(40), nullable=False, default=LeadStatus.EM_FILA.value)
     observacao = db.Column(db.Text, nullable=True)
 
+    # Prioridade — aparece no topo da coluna Kanban com tag visual
+    prioridade = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+
     # Congelado: data sugerida de retomada
     data_retomada = db.Column(db.Date, nullable=True)
 

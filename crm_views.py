@@ -558,6 +558,7 @@ def _salvar_lead(lead, listas, admin_id):
     lead.observacao = (request.form.get('observacao') or '').strip() or None
     lead.data_envio = _to_date(request.form.get('data_envio'))
     lead.data_retomada = _to_date(request.form.get('data_retomada'))
+    lead.prioridade = request.form.get('prioridade') == 'on'
     lead.status = novo_status
 
     # Garantir id antes de mexer em FK / histórico

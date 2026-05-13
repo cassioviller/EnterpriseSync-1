@@ -3859,6 +3859,7 @@ def executar_migracoes():
             (158, "Task #77 — cliente_observacao: histórico de anotações livres por cliente (CRM)", migration_158_cliente_observacao),
             (159, "Task #84 — backfill composicao_servico_id/vinculo_status em rdo_mao_obra para registros históricos nulos", migration_159_backfill_composicao_servico_id),
             (160, "Task #95 — CRM: adicionar vendedor_id e orcamentista_id na tabela lead + backfill de responsavel_id", migration_160_crm_vendedor_orcamentista),
+            (161, "CRM: adicionar coluna prioridade (boolean) na tabela lead", migration_161_lead_prioridade),
         ]
         
         # Executar cada migração com rastreamento
@@ -13727,6 +13728,23 @@ def migration_158_cliente_observacao():
     """))
     db.session.commit()
     logger.info("✅ Tabela cliente_observacao criada.")
+
+
+def migration_161_lead_prioridade():
+    """CRM — Adiciona coluna prioridade (boolean, default false) na tabela lead.
+    Leads marcados como prioritários aparecem no topo da coluna Kanban com destaque visual.
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE lead
+                ADD COLUMN IF NOT EXISTS prioridade BOOLEAN NOT NULL DEFAULT FALSE
+        """))
+        db.session.commit()
+        logger.info("[Migration 161] Coluna 'prioridade' adicionada à tabela lead.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 161] Falha: {e}")
+        raise
 
 
 def migration_160_crm_vendedor_orcamentista():

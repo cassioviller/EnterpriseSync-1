@@ -153,6 +153,16 @@
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-header bg-white"><strong>Estágio do Lead</strong></div>
                     <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch"
+                                   name="prioridade" id="checkPrioridade"
+                                   {% if lead and lead.prioridade %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="checkPrioridade">
+                                <i class="fas fa-star text-warning me-1" aria-hidden="true"></i> Prioridade
+                            </label>
+                            <div class="form-text">Card vai para o topo da coluna com destaque visual.</div>
+                        </div>
+
                         <label class="form-label small text-muted mb-1">Status</label>
                         <select name="status" class="form-select" id="statusSelect">
                             {% for s in status_enum %}
