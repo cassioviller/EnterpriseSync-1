@@ -345,6 +345,10 @@ console.log('Initializing RDO with light theme...');
     z-index: 1;
 }
 
+.filter-group.filter-periodo {
+    grid-column: span 2;
+}
+
 .filter-group label {
     display: block;
     font-weight: 600;
@@ -378,6 +382,12 @@ console.log('Initializing RDO with light theme...');
     display: flex;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.date-range .modern-date {
+    flex: 1 1 140px;
+    min-width: 130px;
 }
 
 .date-range span {
@@ -779,6 +789,9 @@ console.log('Initializing RDO with light theme...');
         grid-template-columns: 1fr; 
         gap: 1rem;
     }
+    .filter-group.filter-periodo {
+        grid-column: 1;
+    }
     .rdos-grid { 
         grid-template-columns: 1fr; 
         margin: 0 1rem 2rem 1rem;
@@ -906,7 +919,7 @@ console.log('Initializing RDO with light theme...');
                     </select>
                 </div>
                 
-                <div class="filter-group">
+                <div class="filter-group filter-periodo">
                     <label>Período</label>
                     <div class="date-range">
                         <input type="date" class="modern-date" name="data_inicio" value="{{ filters.data_inicio }}">
