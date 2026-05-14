@@ -6356,7 +6356,14 @@ class Lead(db.Model):
     # Marcador para badge "parado há X dias" — atualizado a cada mudança de status
     status_changed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Task #110 — Fluxo de aprovação do supervisor na coluna Validação
+    validacao_aprovada = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
+    validado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    validado_em = db.Column(db.DateTime, nullable=True)
+
     # Relacionamentos
+    validado_por = db.relationship('Usuario', foreign_keys=[validado_por_id])
+
     responsavel = db.relationship('CrmResponsavel', foreign_keys=[responsavel_id])
     vendedor = db.relationship('CrmResponsavel', foreign_keys=[vendedor_id])
     orcamentista = db.relationship('CrmResponsavel', foreign_keys=[orcamentista_id])

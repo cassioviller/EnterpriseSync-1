@@ -96,6 +96,31 @@
     text-transform: uppercase;
 }
 
+/* Validação — badge verde aprovado */
+.crm-validado-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: .68rem;
+    font-weight: 700;
+    color: #145523;
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    letter-spacing: .02em;
+}
+.crm-card--validado {
+    border-left-color: #198754 !important;
+}
+.btn-validar-lead {
+    font-size: .72rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
 /* Urgency backgrounds — faixas de dias parado */
 .crm-card--fresh   { color: #212529; }
 .crm-card--atencao { background: #fffbeb !important; color: #212529; }
@@ -218,9 +243,12 @@
                     {% else %}
                         {% set urgencia = 'crm-card--fresh' %}
                     {% endif %}
-                    <div class="crm-card {{ urgencia }} status-{{ slug }}{% if lead.prioridade %} crm-card--prioridade{% endif %}" data-lead-id="{{ lead.id }}">
+                    <div class="crm-card {{ urgencia }} status-{{ slug }}{% if lead.prioridade %} crm-card--prioridade{% endif %}{% if lead.validacao_aprovada %} crm-card--validado{% endif %}" data-lead-id="{{ lead.id }}">
                         {% if lead.prioridade %}
                         <div><span class="crm-prioridade-badge"><i class="fas fa-star" aria-hidden="true"></i> Prioridade</span></div>
+                        {% endif %}
+                        {% if lead.validacao_aprovada %}
+                        <div><span class="crm-validado-badge"><i class="fas fa-check-circle" aria-hidden="true"></i> Validado — pronto para envio</span></div>
                         {% endif %}
                         <div class="crm-card__nome">{{ lead.nome }}</div>
                         {% if lead.valor_proposta %}
@@ -252,6 +280,23 @@
                                 </span>
                             </span>
                             <span class="crm-card__acoes">
+                                {% if col.nome == 'Validação' %}
+                                    {% if not lead.validacao_aprovada %}
+                                    <form method="POST" action="{{ url_for('crm.aprovar_validacao', lead_id=lead.id) }}" class="d-inline" onsubmit="return confirm('Marcar orçamento como validado?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-success btn-validar-lead" title="Marcar como Validado">
+                                            <i class="fas fa-check" aria-hidden="true"></i> Validar
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <form method="POST" action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}" class="d-inline" onsubmit="return confirm('Pedir revisão e retornar para Em andamento?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-warning btn-validar-lead" title="Pedir Revisão">
+                                            <i class="fas fa-undo" aria-hidden="true"></i> Revisão
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
                                 <a href="{{ url_for('crm.editar', lead_id=lead.id) }}" title="Editar lead" aria-label="Editar lead">
                                     <i class="fas fa-edit" aria-hidden="true"></i>
                                 </a>

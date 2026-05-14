@@ -3860,6 +3860,7 @@ def executar_migracoes():
             (159, "Task #84 — backfill composicao_servico_id/vinculo_status em rdo_mao_obra para registros históricos nulos", migration_159_backfill_composicao_servico_id),
             (160, "Task #95 — CRM: adicionar vendedor_id e orcamentista_id na tabela lead + backfill de responsavel_id", migration_160_crm_vendedor_orcamentista),
             (161, "CRM: adicionar coluna prioridade (boolean) na tabela lead", migration_161_lead_prioridade),
+            (162, "Task #110 — CRM: validacao_aprovada, validado_por_id, validado_em na tabela lead", migration_162_lead_validacao),
         ]
         
         # Executar cada migração com rastreamento
@@ -13728,6 +13729,28 @@ def migration_158_cliente_observacao():
     """))
     db.session.commit()
     logger.info("✅ Tabela cliente_observacao criada.")
+
+
+def migration_162_lead_validacao():
+    """Task #110 — CRM: fluxo de aprovação do supervisor na coluna Validação.
+    Adiciona três colunas à tabela lead:
+      - validacao_aprovada BOOLEAN NOT NULL DEFAULT FALSE
+      - validado_por_id    INTEGER REFERENCES usuario(id)
+      - validado_em        TIMESTAMP
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE lead
+                ADD COLUMN IF NOT EXISTS validacao_aprovada BOOLEAN NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS validado_por_id INTEGER REFERENCES usuario(id),
+                ADD COLUMN IF NOT EXISTS validado_em TIMESTAMP
+        """))
+        db.session.commit()
+        logger.info("[Migration 162] Colunas de validação adicionadas à tabela lead.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 162] Falha: {e}")
+        raise
 
 
 def migration_161_lead_prioridade():

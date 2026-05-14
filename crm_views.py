@@ -460,6 +460,7 @@ def novo():
         listas=listas,
         valores=pre,
         status_enum=LeadStatus,
+        is_admin=is_admin_user(),
     )
 
 
@@ -484,6 +485,7 @@ def editar(lead_id):
         listas=listas,
         valores=lead,
         status_enum=LeadStatus,
+        is_admin=is_admin_user(),
     )
 
 
@@ -603,6 +605,128 @@ def _salvar_lead(lead, listas, admin_id):
     if cliente_msg:
         flash(cliente_msg, 'success')
     flash(f'Lead "{lead.nome}" salvo com sucesso.', 'success')
+    return redirect(url_for('crm.editar', lead_id=lead.id))
+
+
+@crm_bp.route('/<int:lead_id>/aprovar_validacao', methods=['POST'])
+@login_required
+def aprovar_validacao(lead_id):
+    """Marca o lead como validado. Disponível para todos os usuários autenticados do tenant."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação.', 'danger')
+        return redirect(url_for('crm.kanban'))
+
+    lead = Lead.query.filter_by(id=lead_id, admin_id=admin_id).first_or_404()
+
+    if lead.status != LeadStatus.VALIDACAO.value:
+        flash('Apenas leads na coluna "Validação" podem ser aprovados.', 'warning')
+        return redirect(url_for('crm.editar', lead_id=lead.id))
+
+    if lead.validacao_aprovada:
+        flash('Este lead já está validado.', 'info')
+        return redirect(url_for('crm.editar', lead_id=lead.id))
+
+    lead.validacao_aprovada = True
+    lead.validado_por_id = current_user.id
+    lead.validado_em = datetime.utcnow()
+
+    _registrar_historico(
+        lead, 'validação',
+        'Pendente', 'Aprovado',
+        descricao=f'Orçamento validado por {current_user.nome or current_user.username}.',
+    )
+
+    try:
+        db.session.commit()
+        flash('Orçamento validado com sucesso! O lead está pronto para envio ao cliente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao aprovar validação')
+        flash(f'Erro ao validar: {e}', 'danger')
+
+    return redirect(url_for('crm.editar', lead_id=lead.id))
+
+
+@crm_bp.route('/<int:lead_id>/rejeitar_validacao', methods=['POST'])
+@login_required
+def rejeitar_validacao(lead_id):
+    """Desfaz a validação e retorna o lead para "Em andamento".
+    Disponível para todos os usuários autenticados do tenant."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação.', 'danger')
+        return redirect(url_for('crm.kanban'))
+
+    lead = Lead.query.filter_by(id=lead_id, admin_id=admin_id).first_or_404()
+
+    if not lead.validacao_aprovada:
+        flash('Este lead não está validado.', 'info')
+        return redirect(url_for('crm.editar', lead_id=lead.id))
+
+    status_anterior = lead.status
+    lead.validacao_aprovada = False
+    lead.validado_por_id = None
+    lead.validado_em = None
+    lead.status = LeadStatus.EM_ANDAMENTO.value
+    lead.status_changed_at = datetime.utcnow()
+
+    _registrar_historico(
+        lead, 'validação',
+        'Aprovado', 'Revisão solicitada',
+        descricao=f'Validação desfeita por {current_user.nome or current_user.username}. Lead retornado para "Em andamento".',
+    )
+    if status_anterior != lead.status:
+        _registrar_historico(lead, 'status', status_anterior, lead.status)
+
+    try:
+        db.session.commit()
+        flash('Validação desfeita. Lead retornado para "Em andamento".', 'info')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao desfazer validação')
+        flash(f'Erro ao desfazer validação: {e}', 'danger')
+
+    return redirect(url_for('crm.editar', lead_id=lead.id))
+
+
+@crm_bp.route('/<int:lead_id>/enviar_proposta', methods=['POST'])
+@login_required
+def enviar_proposta(lead_id):
+    """Transição segura para o status "Enviado" a partir de um lead validado.
+    Reutiliza a mesma validação de valor_proposta do fluxo existente.
+    Disponível para todos os usuários autenticados do tenant."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação.', 'danger')
+        return redirect(url_for('crm.kanban'))
+
+    lead = Lead.query.filter_by(id=lead_id, admin_id=admin_id).first_or_404()
+    if not _pode_acessar_lead(lead):
+        abort(403)
+
+    if not lead.validacao_aprovada:
+        flash('O lead precisa estar validado antes de ser enviado ao cliente.', 'warning')
+        return redirect(url_for('crm.editar', lead_id=lead.id))
+
+    if not lead.valor_proposta:
+        flash('Preencha o Valor da Proposta antes de enviar ao cliente.', 'danger')
+        return redirect(url_for('crm.editar', lead_id=lead.id))
+
+    status_anterior = lead.status
+    lead.status = LeadStatus.ENVIADO.value
+    avisos = _aplicar_automacoes_status(lead, status_anterior)
+
+    try:
+        db.session.commit()
+        for a in avisos:
+            flash(a, 'info')
+        flash('Proposta marcada como enviada ao cliente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.exception('Erro ao enviar proposta')
+        flash(f'Erro: {e}', 'danger')
+
     return redirect(url_for('crm.editar', lead_id=lead.id))
 
 

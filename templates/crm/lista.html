@@ -123,7 +123,14 @@
                         {% if lead.contato %}<div class="text-muted small">{{ lead.contato }}</div>{% endif %}
                     </td>
                     <td>{{ lead.vendedor.nome if lead.vendedor else '—' }}</td>
-                    <td>{{ status_badge(lead.status) }}</td>
+                    <td>
+                        {{ status_badge(lead.status) }}
+                        {% if lead.validacao_aprovada %}
+                        <span class="badge bg-success ms-1" title="Orçamento validado pelo supervisor">
+                            <i class="fas fa-check-circle me-1" aria-hidden="true"></i>Validado
+                        </span>
+                        {% endif %}
+                    </td>
                     <td>{{ lead.origem.nome if lead.origem else '—' }}</td>
                     <td>{{ lead.tipo_obra.nome if lead.tipo_obra else '—' }}</td>
                     <td class="text-end">
