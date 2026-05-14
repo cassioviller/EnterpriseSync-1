@@ -121,6 +121,20 @@
     line-height: 1.4;
 }
 
+/* Indicadores de prazo */
+.prazo-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+.prazo-verde   { background: #198754; }
+.prazo-amarelo { background: #ffc107; }
+.prazo-laranja { background: #fd7e14; }
+.prazo-vermelho{ background: #dc3545; }
+
 /* Urgency backgrounds — faixas de dias parado */
 .crm-card--fresh   { color: #212529; }
 .crm-card--atencao { background: #fffbeb !important; color: #212529; }
@@ -271,6 +285,13 @@
                         <div class="crm-card__linha d-flex align-items-center gap-1">
                             <i class="fas fa-calculator me-1" aria-hidden="true"></i>
                             <span>{{ lead.orcamentista.nome }}</span>
+                        </div>
+                        {% endif %}
+                        {% if lead.prazo %}
+                        <div class="crm-card__linha d-flex align-items-center gap-1">
+                            <span class="prazo-dot {{ lead.prazo_cor }}" title="Indicador de prazo"></span>
+                            <i class="fas fa-flag me-1" aria-hidden="true"></i>
+                            <span title="Prazo: {{ lead.prazo.strftime('%d/%m/%Y') }}">{{ lead.prazo.strftime('%d/%m/%Y') }}</span>
                         </div>
                         {% endif %}
                         <div class="crm-card__rodape">

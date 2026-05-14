@@ -115,6 +115,12 @@
                                        value="{% if lead and lead.data_envio %}{{ lead.data_envio.isoformat() }}{% endif %}">
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label small text-muted mb-1">Prazo</label>
+                                <input type="date" name="prazo" class="form-control"
+                                       value="{% if lead and lead.prazo %}{{ lead.prazo.isoformat() }}{% endif %}">
+                                <div class="form-text">Data alvo de fechamento do lead.</div>
+                            </div>
+                            <div class="col-md-3">
                                 {{ select_lista('vendedor_id', listas.responsavel,
                                                  (lead.vendedor_id if lead else None),
                                                  'Vendedor') }}

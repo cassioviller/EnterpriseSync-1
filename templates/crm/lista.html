@@ -107,6 +107,7 @@
                     <th>Nome</th>
                     <th>Vendedor</th>
                     <th>Status</th>
+                    <th>Prazo</th>
                     <th>Origem</th>
                     <th>Tipo de Obra</th>
                     <th class="text-end">Valor</th>
@@ -129,6 +130,18 @@
                         <span class="badge bg-success ms-1" title="Orçamento validado pelo supervisor">
                             <i class="fas fa-check-circle me-1" aria-hidden="true"></i>Validado
                         </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-nowrap">
+                        {% if lead.prazo %}
+                        <span class="d-inline-flex align-items-center gap-1">
+                            <span class="prazo-dot {{ lead.prazo_cor }}"
+                                  style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{% if lead.prazo_cor == 'prazo-verde' %}#198754{% elif lead.prazo_cor == 'prazo-amarelo' %}#ffc107{% elif lead.prazo_cor == 'prazo-laranja' %}#fd7e14{% else %}#dc3545{% endif %};"
+                                  title="Indicador de prazo"></span>
+                            {{ lead.prazo.strftime('%d/%m/%Y') }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">—</span>
                         {% endif %}
                     </td>
                     <td>{{ lead.origem.nome if lead.origem else '—' }}</td>

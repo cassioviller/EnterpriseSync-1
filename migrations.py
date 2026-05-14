@@ -3861,6 +3861,7 @@ def executar_migracoes():
             (160, "Task #95 — CRM: adicionar vendedor_id e orcamentista_id na tabela lead + backfill de responsavel_id", migration_160_crm_vendedor_orcamentista),
             (161, "CRM: adicionar coluna prioridade (boolean) na tabela lead", migration_161_lead_prioridade),
             (162, "Task #110 — CRM: validacao_aprovada, validado_por_id, validado_em na tabela lead", migration_162_lead_validacao),
+            (163, "Task #113 — CRM: adicionar coluna prazo (Date, nullable) na tabela lead", migration_163_lead_prazo),
         ]
         
         # Executar cada migração com rastreamento
@@ -13729,6 +13730,23 @@ def migration_158_cliente_observacao():
     """))
     db.session.commit()
     logger.info("✅ Tabela cliente_observacao criada.")
+
+
+def migration_163_lead_prazo():
+    """Task #113 — Adiciona coluna prazo (Date, nullable) na tabela lead.
+    Permite registrar um prazo alvo por lead com indicador visual de cor no Kanban e lista.
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE lead
+                ADD COLUMN IF NOT EXISTS prazo DATE
+        """))
+        db.session.commit()
+        logger.info("[Migration 163] Coluna 'prazo' adicionada à tabela lead.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 163] Falha: {e}")
+        raise
 
 
 def migration_162_lead_validacao():

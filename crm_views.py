@@ -560,6 +560,13 @@ def _salvar_lead(lead, listas, admin_id):
     lead.observacao = (request.form.get('observacao') or '').strip() or None
     lead.data_envio = _to_date(request.form.get('data_envio'))
     lead.data_retomada = _to_date(request.form.get('data_retomada'))
+
+    # Task #113 — Prazo do lead com registro no histórico
+    novo_prazo = _to_date(request.form.get('prazo'))
+    if not is_new and str(lead.prazo or '') != str(novo_prazo or ''):
+        _registrar_historico(lead, 'prazo', lead.prazo, novo_prazo)
+    lead.prazo = novo_prazo
+
     lead.prioridade = request.form.get('prioridade') == 'on'
     lead.status = novo_status
 

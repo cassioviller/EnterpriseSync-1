@@ -6338,6 +6338,9 @@ class Lead(db.Model):
     # Congelado: data sugerida de retomada
     data_retomada = db.Column(db.Date, nullable=True)
 
+    # Task #113 — Prazo do lead (data alvo de fechamento)
+    prazo = db.Column(db.Date, nullable=True)
+
     # Vínculos automáticos
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=True, index=True)
     proposta_id = db.Column(
@@ -6379,6 +6382,40 @@ class Lead(db.Model):
     historico = db.relationship('LeadHistorico', backref='lead',
                                 cascade='all, delete-orphan',
                                 order_by='LeadHistorico.created_at.desc()')
+
+    @property
+    def prazo_cor(self):
+        """Retorna a classe CSS de cor para o indicador de prazo.
+        Calculado com base no percentual de dias decorridos entre
+        data_chegada e prazo (dias corridos).
+
+        Verde  < 50%   → prazo-verde
+        Amarelo 50–75% → prazo-amarelo
+        Laranja 75–90% → prazo-laranja
+        Vermelho ≥ 90% ou vencido → prazo-vermelho
+        None se prazo não preenchido.
+        """
+        if not self.prazo:
+            return None
+        hoje = date.today()
+        if hoje >= self.prazo:
+            return 'prazo-vermelho'
+        if not self.data_chegada:
+            return 'prazo-verde'
+        total = (self.prazo - self.data_chegada).days
+        if total <= 0:
+            return 'prazo-vermelho'
+        decorrido = (hoje - self.data_chegada).days
+        if decorrido < 0:
+            decorrido = 0
+        pct = decorrido / total * 100
+        if pct >= 90:
+            return 'prazo-vermelho'
+        if pct >= 75:
+            return 'prazo-laranja'
+        if pct >= 50:
+            return 'prazo-amarelo'
+        return 'prazo-verde'
 
     @property
     def dias_parado(self):
