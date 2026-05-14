@@ -50,6 +50,9 @@ def _admin_id() -> int:
 
 
 def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> dict:
+    sub_nome = None
+    if getattr(t, 'subatividade_mestre', None):
+        sub_nome = t.subatividade_mestre.nome
     return {
         'id': t.id,
         'obra_id': t.obra_id,
@@ -63,6 +66,8 @@ def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> d
         'quantidade_total': t.quantidade_total,
         'unidade_medida': t.unidade_medida,
         'subatividade_mestre_id': getattr(t, 'subatividade_mestre_id', None),
+        'subatividade_mestre_nome': sub_nome,
+        'servico_id': getattr(t, 'servico_id', None),
         'percentual_concluido': t.percentual_concluido or 0.0,
         'percentual_planejado': round(percentual_planejado, 1),
         'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
@@ -440,6 +445,35 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
             tarefa.subatividade_mestre_id = sub_obj.id if sub_obj else None
         else:
             tarefa.subatividade_mestre_id = None
+
+    if 'servico_id' in data:
+        try:
+            svc_val = data['servico_id']
+            svc_id = int(svc_val) if svc_val else None
+        except (ValueError, TypeError):
+            svc_id = None
+        if svc_id is not None:
+            svc_obj = Servico.query.filter_by(id=svc_id, admin_id=admin_id, ativo=True).first()
+            tarefa.servico_id = svc_obj.id if svc_obj else None
+        else:
+            tarefa.servico_id = None
+
+    # Consistency check (mirrors criar_tarefa): subatividade must belong to the declared serviço
+    if 'subatividade_mestre_id' in data or 'servico_id' in data:
+        new_sub_id = tarefa.subatividade_mestre_id
+        new_svc_id = tarefa.servico_id
+        if new_sub_id is not None and new_svc_id is not None:
+            sub_check = SubatividadeMestre.query.filter_by(
+                id=new_sub_id, admin_id=admin_id
+            ).first()
+            if sub_check and sub_check.servico_id and sub_check.servico_id != new_svc_id:
+                return jsonify({
+                    'status': 'error',
+                    'msg': (
+                        f'Inconsistência: a subatividade pertence ao serviço '
+                        f'#{sub_check.servico_id}, mas a tarefa foi enviada com serviço #{new_svc_id}.'
+                    ),
+                }), 400
 
     if 'responsavel' in data:
         resp = str(data['responsavel']).strip().lower()
@@ -1461,6 +1495,7 @@ def api_catalogo():
             'tipo': getattr(s, 'tipo', 'subatividade'),
             'unidade_medida': s.unidade_medida or '',
             'meta_produtividade': s.meta_produtividade,
+            'servico_id': s.servico_id,
         }
 
     grupos = [_sub_to_dict(s) for s in todos if getattr(s, 'tipo', 'subatividade') == 'grupo']

@@ -201,12 +201,15 @@ function criarNoArvore(nome, catalogoId, tipo, qtdPrevista) {
 
   li.innerHTML = `
     <div class="arvore-no-header d-flex align-items-center gap-2 p-2 rounded border bg-white shadow-sm"
-         style="cursor:${isGrupo ? 'grab' : 'grab'}">
+         style="cursor:grab">
       <i class="fas fa-grip-vertical text-muted small" style="cursor:grab"></i>
       <i class="fas ${isGrupo ? 'fa-folder text-warning' : 'fa-tasks text-primary'} small"></i>
-      <span class="fw-semibold text-dark small flex-grow-1">${escapeHtml(nome)}</span>
-      ${isGrupo ? '' : `
-        <input type="number" class="form-control form-control-sm qtd-prevista" style="width:80px"
+      <span class="fw-semibold text-dark small">${escapeHtml(nome)}</span>
+      ${isGrupo ? '<span class="flex-grow-1"></span>' : `
+        <select class="form-select form-select-sm catalogo-select flex-grow-1" style="max-width:220px;font-size:.75rem" title="Vínculo ao catálogo">
+          <option value="">— Sem vínculo —</option>
+        </select>
+        <input type="number" class="form-control form-control-sm qtd-prevista" style="width:72px"
                placeholder="Qtd" step="0.01" min="0" value="${qtdPrevista || ''}" title="Quantidade prevista">
       `}
       <span class="badge ${isGrupo ? 'bg-warning-subtle text-warning' : 'bg-primary-subtle text-primary'} border"
@@ -226,7 +229,48 @@ function criarNoArvore(nome, catalogoId, tipo, qtdPrevista) {
     atualizarVisibilidadeArvore();
   });
 
+  // Catalog link select: when changed, update data-catalogo-id on li
+  if (!isGrupo) {
+    const catSel = li.querySelector('.catalogo-select');
+    if (catSel) {
+      _popularCatalogoSelectNo(catSel, catalogoId);
+      catSel.addEventListener('change', function() {
+        const selOpt = this.options[this.selectedIndex];
+        const newId = selOpt ? (selOpt.dataset.subId || '') : '';
+        li.setAttribute('data-catalogo-id', newId);
+        // Update node nome from catalog if still generic
+        if (newId && selOpt && selOpt.dataset.nome) {
+          li.setAttribute('data-nome', selOpt.dataset.nome);
+          const nomSpan = li.querySelector('.arvore-no-header span.fw-semibold');
+          if (nomSpan) nomSpan.textContent = selOpt.dataset.nome;
+        }
+      });
+    }
+  }
+
   return li;
+}
+
+function _popularCatalogoSelectNo(sel, selectedId) {
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Sem vínculo —</option>';
+  todasSubs.forEach(s => {
+    const o = document.createElement('option');
+    o.value = 'sub_' + s.id;
+    o.dataset.subId = s.id;
+    o.dataset.nome = s.nome;
+    o.textContent = s.nome + (s.unidade_medida ? ' (' + s.unidade_medida + ')' : '');
+    if (String(s.id) === String(selectedId)) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function _popularTodosCatalogoSelects() {
+  document.querySelectorAll('.arvore-no[data-tipo="subatividade"] .catalogo-select').forEach(sel => {
+    const li = sel.closest('.arvore-no');
+    const curId = li ? li.getAttribute('data-catalogo-id') : '';
+    _popularCatalogoSelectNo(sel, curId);
+  });
 }
 
 function escapeHtml(text) {
@@ -319,7 +363,16 @@ function inicializarSortableCatalogo(container) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function serializarNo(li) {
-  const catalogoId = li.getAttribute('data-catalogo-id') || null;
+  // Prefer catalog link from the select (user may have changed it); fall back to data attribute
+  let catalogoId = li.getAttribute('data-catalogo-id') || null;
+  const catSel = li.querySelector(':scope > .arvore-no-header .catalogo-select');
+  if (catSel) {
+    const selOpt = catSel.options[catSel.selectedIndex];
+    const selSubId = selOpt ? (selOpt.dataset.subId || '') : '';
+    if (selSubId) catalogoId = selSubId;
+    else if (catSel.value === '') catalogoId = null; // explicitly cleared
+  }
+
   const nome = li.getAttribute('data-nome') || '';
   const tipo = li.getAttribute('data-tipo') || 'subatividade';
   const qtdInput = li.querySelector(':scope > .arvore-no-header .qtd-prevista');
@@ -358,6 +411,7 @@ async function carregarCatalogo() {
     todosGrupos = data.grupos || [];
     todasSubs = data.subatividades || [];
     renderizarCatalogo('');
+    _popularTodosCatalogoSelects();
   } catch(e) {
     document.getElementById('semGruposCatalogo').textContent = 'Erro ao carregar catálogo.';
     document.getElementById('semSubsCatalogo').textContent = '';

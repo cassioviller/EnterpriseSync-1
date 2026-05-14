@@ -103,16 +103,33 @@
             {% endif %}
           </div>
 
-          <!-- Task #62: composições do serviço (N:N SubatividadeMaoObra) -->
+          <!-- Vínculo ao Serviço do catálogo -->
           <div class="col-12">
             <hr class="my-3">
+            <label class="form-label fw-semibold">
+              <i class="fas fa-tools me-1 text-primary"></i>
+              Serviço vinculado
+            </label>
+            <select name="servico_id" class="form-select" id="selectServico">
+              <option value="">— Nenhum serviço —</option>
+              {% for svc in servicos %}
+                <option value="{{ svc.id }}" {{ 'selected' if sub.servico_id == svc.id }}>
+                  {{ svc.nome }}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Vincule esta subatividade a um serviço do catálogo para habilitar composições de mão de obra.</div>
+          </div>
+
+          <!-- Task #62: composições do serviço (N:N SubatividadeMaoObra) -->
+          <div class="col-12">
             <label class="form-label fw-semibold mb-2">
               <i class="fas fa-link me-1 text-primary"></i>
               Composições de Mão de Obra do Serviço
             </label>
             {% if not sub.servico_id %}
               <p class="text-muted small mb-0">
-                Selecione um serviço para esta subatividade para vincular composições.
+                Selecione um serviço acima para vincular composições.
               </p>
             {% elif not composicoes %}
               <p class="text-muted small mb-0">

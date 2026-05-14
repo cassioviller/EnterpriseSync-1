@@ -357,10 +357,19 @@
                      oninput="onNomeInput(this)"
                      onfocus="filtrarCatalogo(this.value)">
               <input type="hidden" id="nt_catalogo_id">
+              <input type="hidden" id="nt_servico_id">
               <div id="nt_catalogo_dropdown"
                    class="list-group shadow position-absolute w-100 d-none"
                    style="z-index:1060;max-height:240px;overflow-y:auto;top:100%;left:0;border-radius:0 0 .375rem .375rem"></div>
             </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">
+              <i class="fas fa-link me-1 text-primary"></i>Serviço / Subatividade do catálogo
+            </label>
+            <select id="nt_vinculo_select" class="form-select" onchange="onVinculoSelectChange(this)">
+              <option value="">— Sem vínculo de catálogo —</option>
+            </select>
             <div id="nt_meta_badge" class="d-none mt-1">
               <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle small">
                 <i class="fas fa-bullseye me-1"></i>Meta:
@@ -490,6 +499,22 @@
           <option value="terceiros">👷 Terceiros (somente confirmação)</option>
           <option value="subempreitada">🔨 Subempreitada (equipe terceirizada)</option>
         </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small text-uppercase text-muted">
+          <i class="fas fa-link me-1 text-primary"></i>Serviço / Subatividade do catálogo
+        </label>
+        <input type="hidden" id="ed_catalogo_id">
+        <input type="hidden" id="ed_servico_id">
+        <select id="ed_vinculo_select" class="form-select form-select-sm" onchange="onEdVinculoSelectChange(this)">
+          <option value="">— Sem vínculo de catálogo —</option>
+        </select>
+        <div id="ed_vinculo_badge" class="d-none mt-1">
+          <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle small" id="ed_vinculo_badge_text"></span>
+          <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-danger small" onclick="limparVinculoEditar()" title="Limpar vínculo">
+            <i class="fas fa-times-circle"></i>
+          </button>
+        </div>
       </div>
       <div class="col-6 d-none" id="ed_qtd_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">Quantidade</label>
@@ -1282,8 +1307,11 @@ function abrirModalNovaTarefa() {
   document.getElementById('nt_unidade').value = '';
   document.getElementById('nt_resp').value = 'empresa';
   document.getElementById('nt_catalogo_id').value = '';
+  document.getElementById('nt_servico_id').value = '';
   document.getElementById('nt_catalogo_dropdown').classList.add('d-none');
   document.getElementById('nt_meta_badge').classList.add('d-none');
+  const vinculoSel = document.getElementById('nt_vinculo_select');
+  if (vinculoSel) vinculoSel.value = '';
   _popularSelect('nt_pred', tarefas, '— Nenhuma —');
   _popularSelect('nt_pai',  tarefas, '— Nenhuma (tarefa raiz) —');
   carregarCatalogo();
@@ -1311,7 +1339,10 @@ function abrirModalNovaTarefa() {
 let catalogoCache = null;
 
 async function carregarCatalogo() {
-  if (catalogoCache) return;
+  if (catalogoCache) {
+    _popularVinculoSelect();
+    return;
+  }
   try {
     const res = await fetch('{{ url_for("cronograma.api_catalogo") }}');
     if (!res.ok) return;
@@ -1320,13 +1351,159 @@ async function carregarCatalogo() {
       subatividades: (data.subatividades || []).map(s => ({...s, _tipo: 'subatividade'})),
       servicos: (data.servicos || []).map(s => ({...s, _tipo: 'servico'})),
     };
+    _popularVinculoSelect();
   } catch(e) { /* silently ignore */ }
 }
 
-function onNomeInput(el) {
-  const catId = document.getElementById('nt_catalogo_id').value;
-  if (catId) {
+function _popularVinculoSelect() {
+  const sel = document.getElementById('nt_vinculo_select');
+  if (!sel || !catalogoCache) return;
+  const curVal = sel.value;
+  sel.innerHTML = '<option value="">— Sem vínculo de catálogo —</option>';
+  if (catalogoCache.subatividades.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Subatividades';
+    catalogoCache.subatividades.forEach(s => {
+      const o = document.createElement('option');
+      o.value = 'sub_' + s.id;
+      o.textContent = s.nome + (s.unidade_medida ? ' (' + s.unidade_medida + ')' : '');
+      o.dataset.subId = s.id;
+      o.dataset.svcId = s.servico_id || '';
+      o.dataset.meta = s.meta_produtividade || '';
+      o.dataset.unidade = s.unidade_medida || '';
+      grp.appendChild(o);
+    });
+    sel.appendChild(grp);
+  }
+  if (catalogoCache.servicos.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Serviços';
+    catalogoCache.servicos.forEach(s => {
+      const o = document.createElement('option');
+      o.value = 'svc_' + s.id;
+      o.textContent = s.nome;
+      o.dataset.subId = '';
+      o.dataset.svcId = s.id;
+      grp.appendChild(o);
+    });
+    sel.appendChild(grp);
+  }
+  if (curVal) sel.value = curVal;
+}
+
+function onVinculoSelectChange(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !sel.value) {
     document.getElementById('nt_catalogo_id').value = '';
+    document.getElementById('nt_servico_id').value = '';
+    document.getElementById('nt_meta_badge').classList.add('d-none');
+    return;
+  }
+  const subId = opt.dataset.subId || '';
+  const svcId = opt.dataset.svcId || '';
+  const meta   = opt.dataset.meta || '';
+  const unidade = opt.dataset.unidade || '';
+  document.getElementById('nt_catalogo_id').value = subId;
+  document.getElementById('nt_servico_id').value  = svcId;
+  const badge = document.getElementById('nt_meta_badge');
+  if (meta && subId) {
+    document.getElementById('nt_meta_valor').textContent = meta;
+    document.getElementById('nt_meta_unidade').textContent = unidade;
+    badge.classList.remove('d-none');
+  } else {
+    badge.classList.add('d-none');
+  }
+  // Auto-fill unidade if empty
+  if (unidade && !document.getElementById('nt_unidade').value) {
+    document.getElementById('nt_unidade').value = unidade;
+  }
+}
+
+function _popularEdVinculoSelect(currentSubId, currentSvcId) {
+  const sel = document.getElementById('ed_vinculo_select');
+  if (!sel || !catalogoCache) return;
+  sel.innerHTML = '<option value="">— Sem vínculo de catálogo —</option>';
+  if (catalogoCache.subatividades.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Subatividades';
+    catalogoCache.subatividades.forEach(s => {
+      const o = document.createElement('option');
+      o.value = 'sub_' + s.id;
+      o.textContent = s.nome + (s.unidade_medida ? ' (' + s.unidade_medida + ')' : '');
+      o.dataset.subId = s.id;
+      o.dataset.svcId = s.servico_id || '';
+      o.dataset.meta = s.meta_produtividade || '';
+      o.dataset.unidade = s.unidade_medida || '';
+      grp.appendChild(o);
+    });
+    sel.appendChild(grp);
+  }
+  if (catalogoCache.servicos.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Serviços';
+    catalogoCache.servicos.forEach(s => {
+      const o = document.createElement('option');
+      o.value = 'svc_' + s.id;
+      o.textContent = s.nome;
+      o.dataset.subId = '';
+      o.dataset.svcId = s.id;
+      grp.appendChild(o);
+    });
+    sel.appendChild(grp);
+  }
+  // Pre-select current value
+  if (currentSubId) {
+    sel.value = 'sub_' + currentSubId;
+  } else if (currentSvcId) {
+    sel.value = 'svc_' + currentSvcId;
+  }
+  _atualizarEdVinculoBadge();
+}
+
+function onEdVinculoSelectChange(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !sel.value) {
+    document.getElementById('ed_catalogo_id').value = '';
+    document.getElementById('ed_servico_id').value = '';
+    document.getElementById('ed_vinculo_badge').classList.add('d-none');
+    return;
+  }
+  const subId  = opt.dataset.subId || '';
+  const svcId  = opt.dataset.svcId || '';
+  document.getElementById('ed_catalogo_id').value = subId;
+  document.getElementById('ed_servico_id').value  = svcId;
+  _atualizarEdVinculoBadge();
+}
+
+function _atualizarEdVinculoBadge() {
+  const sel = document.getElementById('ed_vinculo_select');
+  const badge = document.getElementById('ed_vinculo_badge');
+  const badgeText = document.getElementById('ed_vinculo_badge_text');
+  if (!sel || !badge) return;
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && sel.value) {
+    badgeText.textContent = opt.textContent;
+    badge.classList.remove('d-none');
+  } else {
+    badge.classList.add('d-none');
+  }
+}
+
+function limparVinculoEditar() {
+  document.getElementById('ed_catalogo_id').value = '';
+  document.getElementById('ed_servico_id').value = '';
+  document.getElementById('ed_vinculo_select').value = '';
+  document.getElementById('ed_vinculo_badge').classList.add('d-none');
+}
+
+function onNomeInput(el) {
+  // Only clear the catalog link when the dedicated select has NO explicit value set.
+  // If the user chose a link via the dedicated select, typing in Nome should not erase it.
+  const vinculoSel = document.getElementById('nt_vinculo_select');
+  const hasExplicitLink = vinculoSel && vinculoSel.value;
+  if (!hasExplicitLink) {
+    document.getElementById('nt_catalogo_id').value = '';
+    document.getElementById('nt_servico_id').value = '';
     document.getElementById('nt_meta_badge').classList.add('d-none');
   }
   filtrarCatalogo(el.value);
@@ -1405,8 +1582,15 @@ function filtrarCatalogo(q) {
 function selecionarItemCatalogo(item) {
   document.getElementById('nt_nome').value = item.nome;
   document.getElementById('nt_unidade').value = item.unidade_medida || '';
-  document.getElementById('nt_catalogo_id').value = item._tipo === 'subatividade' ? item.id : '';
+  const subId = item._tipo === 'subatividade' ? item.id : '';
+  const svcId = item._tipo === 'subatividade' ? (item.servico_id || '') : (item.id || '');
+  document.getElementById('nt_catalogo_id').value = subId;
+  document.getElementById('nt_servico_id').value  = svcId;
   document.getElementById('nt_catalogo_dropdown').classList.add('d-none');
+
+  // Sync the dedicated select
+  const sel = document.getElementById('nt_vinculo_select');
+  if (sel) sel.value = subId ? 'sub_' + subId : (svcId ? 'svc_' + svcId : '');
 
   const badge = document.getElementById('nt_meta_badge');
   if (item.meta_produtividade && item._tipo === 'subatividade') {
@@ -1420,9 +1604,12 @@ function selecionarItemCatalogo(item) {
 
 function limparSelecaoCatalogo() {
   document.getElementById('nt_catalogo_id').value = '';
+  document.getElementById('nt_servico_id').value = '';
   document.getElementById('nt_meta_badge').classList.add('d-none');
   document.getElementById('nt_nome').value = '';
   document.getElementById('nt_unidade').value = '';
+  const sel = document.getElementById('nt_vinculo_select');
+  if (sel) sel.value = '';
   document.getElementById('nt_nome').focus();
 }
 
@@ -1436,7 +1623,22 @@ document.addEventListener('click', e => {
 async function salvarNovaTarefa() {
   const nome = document.getElementById('nt_nome').value.trim();
   if (!nome) { toast('Informe o nome da tarefa', 'warning'); return; }
-  const catId = document.getElementById('nt_catalogo_id').value;
+  // Derive catalog link directly from the dedicated select (single source of truth)
+  let subatividadeId = null, servicoId = null;
+  const vinculoSel = document.getElementById('nt_vinculo_select');
+  if (vinculoSel && vinculoSel.value) {
+    const opt = vinculoSel.options[vinculoSel.selectedIndex];
+    if (opt) {
+      subatividadeId = opt.dataset.subId ? parseInt(opt.dataset.subId) : null;
+      servicoId      = opt.dataset.svcId ? parseInt(opt.dataset.svcId) : null;
+    }
+  } else {
+    // Fallback: check hidden IDs (set by nome autocomplete when select not used)
+    const catId = document.getElementById('nt_catalogo_id').value;
+    const svcId = document.getElementById('nt_servico_id').value;
+    subatividadeId = catId ? parseInt(catId) : null;
+    servicoId      = svcId ? parseInt(svcId) : null;
+  }
   const body = {
     nome_tarefa:             nome,
     duracao_dias:            parseInt(document.getElementById('nt_duracao').value) || 1,
@@ -1446,7 +1648,8 @@ async function salvarNovaTarefa() {
     quantidade_total:        document.getElementById('nt_qtd').value || null,
     unidade_medida:          document.getElementById('nt_unidade').value.trim() || null,
     responsavel:             document.getElementById('nt_resp').value || 'empresa',
-    subatividade_mestre_id:  catId ? parseInt(catId) : null,
+    subatividade_mestre_id:  subatividadeId,
+    servico_id:              servicoId,
   };
   let res;
   try {
@@ -1515,6 +1718,21 @@ function abrirEditar(tarefaId) {
   document.getElementById('ed_qtd').value      = t.quantidade_total || '';
   document.getElementById('ed_unidade').value  = t.unidade_medida || '';
   document.getElementById('ed_resp').value     = t.responsavel || 'empresa';
+  document.getElementById('ed_catalogo_id').value = t.subatividade_mestre_id || '';
+  document.getElementById('ed_servico_id').value  = t.servico_id || '';
+  // Populate catalog link select (async: catalog may not be loaded yet)
+  if (catalogoCache) {
+    _popularEdVinculoSelect(t.subatividade_mestre_id, t.servico_id);
+  } else {
+    carregarCatalogo().then(() => _popularEdVinculoSelect(t.subatividade_mestre_id, t.servico_id));
+  }
+  // Show badge if there's a link name from server
+  if (t.subatividade_mestre_nome) {
+    document.getElementById('ed_vinculo_badge_text').textContent = t.subatividade_mestre_nome;
+    document.getElementById('ed_vinculo_badge').classList.remove('d-none');
+  } else {
+    document.getElementById('ed_vinculo_badge').classList.add('d-none');
+  }
 
   // Detectar se é tarefa pai (tem filhos)
   const temFilhos = tarefas.some(x => x.tarefa_pai_id === tarefaId);
@@ -1573,15 +1791,36 @@ function atualizarPercPreview() {
 
 async function salvarEditar() {
   const id = parseInt(document.getElementById('ed_id').value);
+  // Derive catalog link from the dedicated select (single source of truth)
+  let edSubId = null, edSvcId = null;
+  const edVinculoSel = document.getElementById('ed_vinculo_select');
+  if (edVinculoSel && edVinculoSel.value) {
+    const opt = edVinculoSel.options[edVinculoSel.selectedIndex];
+    if (opt) {
+      edSubId = opt.dataset.subId ? parseInt(opt.dataset.subId) : null;
+      edSvcId = opt.dataset.svcId ? parseInt(opt.dataset.svcId) : null;
+    }
+  } else {
+    // Fallback: use hidden IDs which are kept in sync by onEdVinculoSelectChange.
+    // If the user explicitly cleared the select, onEdVinculoSelectChange already set both hidden IDs to ''.
+    // If the subatividade is inactive (not in catalog), select is empty but hidden IDs still hold
+    // the original value from abrirEditar(), so we preserve it rather than silently erasing it.
+    const hCat = document.getElementById('ed_catalogo_id').value;
+    const hSvc = document.getElementById('ed_servico_id').value;
+    edSubId = hCat ? parseInt(hCat) : null;
+    edSvcId = hSvc ? parseInt(hSvc) : null;
+  }
   const body = {
-    nome_tarefa:       document.getElementById('ed_nome').value.trim(),
-    duracao_dias:      parseInt(document.getElementById('ed_duracao').value) || 1,
-    data_inicio:       document.getElementById('ed_inicio').value || null,
-    predecessora_id:   document.getElementById('ed_pred').value || null,
-    tarefa_pai_id:     document.getElementById('ed_pai').value || null,
-    quantidade_total:  document.getElementById('ed_qtd').value || null,
-    unidade_medida:    document.getElementById('ed_unidade').value.trim() || null,
-    responsavel:       document.getElementById('ed_resp').value || 'empresa',
+    nome_tarefa:            document.getElementById('ed_nome').value.trim(),
+    duracao_dias:           parseInt(document.getElementById('ed_duracao').value) || 1,
+    data_inicio:            document.getElementById('ed_inicio').value || null,
+    predecessora_id:        document.getElementById('ed_pred').value || null,
+    tarefa_pai_id:          document.getElementById('ed_pai').value || null,
+    quantidade_total:       document.getElementById('ed_qtd').value || null,
+    unidade_medida:         document.getElementById('ed_unidade').value.trim() || null,
+    responsavel:            document.getElementById('ed_resp').value || 'empresa',
+    subatividade_mestre_id: edSubId,
+    servico_id:             edSvcId,
     // percentual_concluido NÃO é enviado — calculado automaticamente pelo RDO (empresa) ou checkbox (terceiros)
   };
   if (!body.nome_tarefa) { toast('Nome da tarefa obrigatório', 'warning'); return; }
