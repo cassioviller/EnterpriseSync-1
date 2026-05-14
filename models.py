@@ -6615,3 +6615,95 @@ def _rdo_after_insert_autoclone_operacional(mapper, connection, target):
                     obra_id, _e,
                 )
         Timer(0, _run_in_app_ctx).start()
+
+
+# ============================================================
+# MÓDULO CUSTOS DO ESCRITÓRIO (Task #6)
+# ============================================================
+
+class CategoriaEscritorio(db.Model):
+    """Categorias de custo do escritório (aluguel, água, luz, etc.)"""
+    __tablename__ = 'categoria_escritorio'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    cor = db.Column(db.String(7), default='#6c757d')
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    despesas = db.relationship('DespesaEscritorio', backref='categoria', lazy=True)
+
+    __table_args__ = (
+        db.Index('idx_categoria_escritorio_admin', 'admin_id'),
+    )
+
+    @classmethod
+    def seed_defaults(cls, admin_id):
+        """Cria as 10 categorias padrão para o tenant se ainda não existirem."""
+        defaults = [
+            ('Aluguel',    '#e74c3c'),
+            ('Água',       '#3498db'),
+            ('Luz',        '#f39c12'),
+            ('Internet',   '#9b59b6'),
+            ('Telefone',   '#1abc9c'),
+            ('Salário PJ', '#2ecc71'),
+            ('Contador',   '#34495e'),
+            ('Limpeza',    '#e67e22'),
+            ('Segurança',  '#c0392b'),
+            ('Outros',     '#95a5a6'),
+        ]
+        for nome, cor in defaults:
+            existe = cls.query.filter_by(admin_id=admin_id, nome=nome).first()
+            if not existe:
+                db.session.add(cls(nome=nome, cor=cor, ativo=True, admin_id=admin_id))
+        db.session.commit()
+
+
+class DespesaEscritorio(db.Model):
+    """Despesas do escritório (recorrentes ou avulsas)"""
+    __tablename__ = 'despesa_escritorio'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), nullable=False)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_escritorio.id'), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    dia_vencimento = db.Column(db.Integer, nullable=False)  # 1–28
+    recorrente = db.Column(db.Boolean, default=True, nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    ocorrencias = db.relationship(
+        'DespesaEscritorioOcorrencia', backref='despesa', lazy=True,
+        cascade='all, delete-orphan'
+    )
+
+    __table_args__ = (
+        db.Index('idx_despesa_escritorio_admin', 'admin_id'),
+    )
+
+
+class DespesaEscritorioOcorrencia(db.Model):
+    """Ocorrência mensal ou avulsa de uma despesa do escritório"""
+    __tablename__ = 'despesa_escritorio_ocorrencia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    despesa_id = db.Column(db.Integer, db.ForeignKey('despesa_escritorio.id'), nullable=False)
+    competencia_ano = db.Column(db.Integer, nullable=False)
+    competencia_mes = db.Column(db.Integer, nullable=False)
+    data_vencimento = db.Column(db.Date, nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
+    conta_pagar_id = db.Column(db.Integer, db.ForeignKey('conta_pagar.id'), nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    conta_pagar = db.relationship('ContaPagar', backref='ocorrencia_escritorio', lazy=True)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'despesa_id', 'competencia_ano', 'competencia_mes',
+            name='uq_despesa_ocorrencia_mes'
+        ),
+        db.Index('idx_despesa_ocorrencia_admin', 'admin_id'),
+    )

@@ -3863,6 +3863,7 @@ def executar_migracoes():
             (162, "Task #110 — CRM: validacao_aprovada, validado_por_id, validado_em na tabela lead", migration_162_lead_validacao),
             (163, "Task #113 — CRM: adicionar coluna prazo (Date, nullable) na tabela lead", migration_163_lead_prazo),
             (164, "Task #119 — rdo_ocorrencia: adicionar colunas faltantes (tipo_ocorrencia, severidade, descricao_ocorrencia, etc.)", migrar_campos_rdo_ocorrencia),
+            (165, "Task #6 — Módulo Custos do Escritório (3 tabelas + seed 10 categorias padrão por tenant)", migration_165_custos_escritorio),
         ]
         
         # Executar cada migração com rastreamento
@@ -13712,6 +13713,89 @@ def migration_151_vinculo_subatividade_composicao():
         except Exception:
             pass
         raise
+
+
+def migration_165_custos_escritorio():
+    """Task #6 — Módulo Custos do Escritório: 3 tabelas + seed de categorias padrão para todos os admins."""
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS categoria_escritorio (
+            id         SERIAL PRIMARY KEY,
+            nome       VARCHAR(100) NOT NULL,
+            cor        VARCHAR(7)   NOT NULL DEFAULT '#6c757d',
+            ativo      BOOLEAN      NOT NULL DEFAULT TRUE,
+            admin_id   INTEGER      NOT NULL REFERENCES usuario(id),
+            created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_categoria_escritorio_admin
+            ON categoria_escritorio(admin_id)
+    """))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS despesa_escritorio (
+            id              SERIAL PRIMARY KEY,
+            nome            VARCHAR(200)   NOT NULL,
+            categoria_id    INTEGER        NOT NULL REFERENCES categoria_escritorio(id),
+            valor           NUMERIC(15, 2) NOT NULL,
+            dia_vencimento  INTEGER        NOT NULL,
+            recorrente      BOOLEAN        NOT NULL DEFAULT TRUE,
+            ativo           BOOLEAN        NOT NULL DEFAULT TRUE,
+            admin_id        INTEGER        NOT NULL REFERENCES usuario(id),
+            created_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_despesa_escritorio_admin
+            ON despesa_escritorio(admin_id)
+    """))
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS despesa_escritorio_ocorrencia (
+            id               SERIAL PRIMARY KEY,
+            despesa_id       INTEGER        NOT NULL REFERENCES despesa_escritorio(id) ON DELETE CASCADE,
+            competencia_ano  INTEGER        NOT NULL,
+            competencia_mes  INTEGER        NOT NULL,
+            data_vencimento  DATE           NOT NULL,
+            valor            NUMERIC(15, 2) NOT NULL,
+            conta_pagar_id   INTEGER        REFERENCES conta_pagar(id),
+            admin_id         INTEGER        NOT NULL REFERENCES usuario(id),
+            created_at       TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_despesa_ocorrencia_mes UNIQUE (despesa_id, competencia_ano, competencia_mes)
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_despesa_ocorrencia_admin
+            ON despesa_escritorio_ocorrencia(admin_id)
+    """))
+    db.session.commit()
+
+    # Seed 10 categorias padrão para cada admin existente
+    defaults = [
+        ('Aluguel',    '#e74c3c'),
+        ('Água',       '#3498db'),
+        ('Luz',        '#f39c12'),
+        ('Internet',   '#9b59b6'),
+        ('Telefone',   '#1abc9c'),
+        ('Salário PJ', '#2ecc71'),
+        ('Contador',   '#34495e'),
+        ('Limpeza',    '#e67e22'),
+        ('Segurança',  '#c0392b'),
+        ('Outros',     '#95a5a6'),
+    ]
+    admins = db.session.execute(text(
+        "SELECT id FROM usuario WHERE admin_id IS NULL"
+    )).fetchall()
+    for (admin_id,) in admins:
+        for nome, cor in defaults:
+            exists = db.session.execute(text(
+                "SELECT 1 FROM categoria_escritorio WHERE admin_id = :aid AND nome = :nome"
+            ), {'aid': admin_id, 'nome': nome}).fetchone()
+            if not exists:
+                db.session.execute(text(
+                    "INSERT INTO categoria_escritorio (nome, cor, ativo, admin_id) "
+                    "VALUES (:nome, :cor, TRUE, :aid)"
+                ), {'nome': nome, 'cor': cor, 'aid': admin_id})
+    db.session.commit()
+    logger.info("✅ Migration 165: tabelas e categorias padrão criadas.")
 
 
 def migration_158_cliente_observacao():

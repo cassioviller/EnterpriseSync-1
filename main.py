@@ -229,5 +229,15 @@ except Exception as e:
     logger.error(f"[WARN] CSRF exempt medicao portal: {e}")
 
 
+try:
+    from custos_escritorio_views import custos_escritorio_bp
+    app.register_blueprint(custos_escritorio_bp)
+    logger.info("[OK] Blueprint custos_escritorio registrado")
+except ImportError as e:
+    logger.warning(f"[WARN] custos_escritorio não encontrado: {e}")
+except Exception as e:
+    logger.error(f"[ERROR] Falha ao registrar custos_escritorio: {e}")
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

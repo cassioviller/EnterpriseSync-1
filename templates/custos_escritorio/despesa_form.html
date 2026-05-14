@@ -1,0 +1,104 @@
+{% extends 'base_completo.html' %}
+{% block title %}{{ 'Editar' if despesa else 'Nova' }} Despesa — Custos do Escritório{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+
+      <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('custos_escritorio.despesas') }}" class="btn btn-outline-secondary btn-sm me-3">
+          <i class="fas fa-arrow-left"></i>
+        </a>
+        <div>
+          <h4 class="mb-0 fw-bold">
+            <i class="fas fa-receipt me-2 text-primary"></i>
+            {{ 'Editar Despesa' if despesa else 'Nova Despesa' }}
+          </h4>
+        </div>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'danger' if cat == 'danger' else cat }} alert-dismissible fade show">
+            {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post">
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Nome da despesa <span class="text-danger">*</span></label>
+              <input type="text" name="nome" class="form-control"
+                     value="{{ despesa.nome if despesa else '' }}"
+                     placeholder="Ex.: Aluguel escritório, Conta de luz…" required>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Categoria <span class="text-danger">*</span></label>
+                <select name="categoria_id" class="form-select" required>
+                  <option value="">Selecione…</option>
+                  {% for cat in categorias %}
+                  <option value="{{ cat.id }}"
+                    {{ 'selected' if despesa and despesa.categoria_id == cat.id }}>
+                    {{ cat.nome }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Valor (R$) <span class="text-danger">*</span></label>
+                <input type="number" name="valor" class="form-control"
+                       step="0.01" min="0.01"
+                       value="{{ '%.2f'|format(despesa.valor|float) if despesa else '' }}"
+                       placeholder="0,00" required>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Dia de vencimento <span class="text-danger">*</span></label>
+                <input type="number" name="dia_vencimento" class="form-control"
+                       min="1" max="28"
+                       value="{{ despesa.dia_vencimento if despesa else 10 }}"
+                       required>
+                <div class="form-text">Entre 1 e 28 (evita problemas com meses curtos).</div>
+              </div>
+              <div class="col-md-6 d-flex align-items-end pb-1">
+                <div>
+                  <label class="form-label fw-semibold d-block">Tipo</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           name="recorrente" value="1" id="chkRecorrente"
+                           {{ 'checked' if not despesa or despesa.recorrente }}>
+                    <label class="form-check-label" for="chkRecorrente">
+                      Recorrente mensal
+                    </label>
+                  </div>
+                  <div class="form-text">
+                    Recorrente: gerada todo mês. Avulsa: gerada manualmente no painel.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i>Salvar
+              </button>
+              <a href="{{ url_for('custos_escritorio.despesas') }}" class="btn btn-outline-secondary">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

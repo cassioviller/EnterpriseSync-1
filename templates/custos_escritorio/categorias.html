@@ -1,0 +1,95 @@
+{% extends 'base_completo.html' %}
+{% block title %}Categorias — Custos do Escritório{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h4 class="mb-0 fw-bold">
+        <i class="fas fa-tags me-2 text-primary"></i>Categorias de Custo
+      </h4>
+      <small class="text-muted">Classifique as despesas do escritório por tipo</small>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('custos_escritorio.painel_mensal') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-calendar-alt me-1"></i>Painel Mensal
+      </a>
+      <a href="{{ url_for('custos_escritorio.nova_categoria') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Nova Categoria
+      </a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat == 'danger' else cat }} alert-dismissible fade show" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      {% if categorias %}
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width:48px"></th>
+            <th>Nome</th>
+            <th>Despesas vinculadas</th>
+            <th>Status</th>
+            <th class="text-end pe-3">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in categorias %}
+          <tr>
+            <td class="text-center">
+              <span class="d-inline-block rounded-circle"
+                    style="width:22px;height:22px;background:{{ c.cor }}"></span>
+            </td>
+            <td class="fw-semibold">{{ c.nome }}</td>
+            <td>
+              <span class="badge bg-secondary">
+                {{ c.despesas | selectattr('ativo') | list | length }} ativa(s)
+              </span>
+            </td>
+            <td>
+              {% if c.ativo %}
+                <span class="badge bg-success-subtle text-success border border-success">Ativa</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border">Inativa</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-3">
+              <a href="{{ url_for('custos_escritorio.editar_categoria', cat_id=c.id) }}"
+                 class="btn btn-sm btn-outline-primary me-1">
+                <i class="fas fa-pencil-alt"></i>
+              </a>
+              <form method="post"
+                    action="{{ url_for('custos_escritorio.toggle_categoria', cat_id=c.id) }}"
+                    class="d-inline">
+                <button type="submit" class="btn btn-sm {{ 'btn-outline-warning' if c.ativo else 'btn-outline-success' }}"
+                        title="{{ 'Desativar' if c.ativo else 'Ativar' }}">
+                  <i class="fas fa-{{ 'ban' if c.ativo else 'check' }}"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="fas fa-tags fa-3x mb-3 opacity-25"></i>
+        <p class="mb-2">Nenhuma categoria cadastrada ainda.</p>
+        <a href="{{ url_for('custos_escritorio.nova_categoria') }}" class="btn btn-primary btn-sm">
+          <i class="fas fa-plus me-1"></i>Criar primeira categoria
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
