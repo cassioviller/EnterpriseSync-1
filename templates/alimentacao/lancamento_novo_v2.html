@@ -326,30 +326,24 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
 
 /* V2: 6 colunas quando funcionário e centro_custo estão presentes */
 .item-fields.v2-fields {
-    grid-template-columns: 2fr 1.5fr 1.5fr 0.7fr 1fr 1fr;
+    grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 1fr;
 }
 
 @media (max-width: 768px) {
     .item-fields.v2-fields {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
     }
-    .item-fields.v2-fields > div:first-child {
-        grid-column: span 2;
-    }
-    .item-fields.v2-fields > div:nth-child(2) {
-        grid-column: span 2;
-    }
-    .item-fields.v2-fields > div:nth-child(3) {
-        grid-column: span 2;
+    .item-fields.v2-fields > div {
+        grid-column: span 1;
     }
 }
 
 @media (max-width: 576px) {
     .item-fields {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
     }
     .item-fields > div:first-child {
-        grid-column: span 2;
+        grid-column: span 1;
     }
 }
 
@@ -381,6 +375,8 @@ console.log('Initializing Novo Lançamento v2 - Mobile First...');
 }
 
 .item-fields input, .item-fields select {
+    width: 100%;
+    min-width: 0;
     padding: 0.625rem;
     border: 1px solid var(--gray-300);
     border-radius: 8px;
