@@ -302,9 +302,9 @@ def criar_tarefa(obra_id: int):
         if sub_obj is None:
             sub_mestre_id = None
 
-    # Task #62 — servico_id é obrigatório a partir de v9. Aceita id explícito;
-    # senão tenta resolver pelo nome da tarefa (case-insensitive). Se nada
-    # bater, devolve 400 para a UI exigir.
+    # Task #116 — servico_id é opcional. Aceita id explícito; senão tenta
+    # resolver pelo nome da tarefa (case-insensitive). Se nada bater, a tarefa
+    # é salva com servico_id=None (sem vínculo de serviço).
     raw_servico_id = data.get('servico_id')
     servico_id = None
     try:
@@ -333,10 +333,7 @@ def criar_tarefa(obra_id: int):
             if svc:
                 servico_id = svc.id
     if servico_id is None:
-        return jsonify({
-            'status': 'error',
-            'msg': 'Serviço é obrigatório. Selecione um serviço para a tarefa.',
-        }), 400
+        logger.info("[cronograma] Tarefa criada sem vínculo de serviço (servico_id=None é permitido)")
 
     # Task #62 — auto-criação de SubatividadeMestre por nome quando não veio explícito
     if sub_mestre_id is None:
