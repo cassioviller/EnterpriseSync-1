@@ -1,6 +1,10 @@
 {% extends "base_completo.html" %}
 {% block title %}Editar Proposta - SIGE{% endblock %}
 
+{% macro itens_str(itens) -%}
+{%- if itens is string -%}{{ itens | replace('\n', ';') }}{%- elif itens -%}{{ itens | join(';') }}{%- endif -%}
+{%- endmacro %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="card">
@@ -293,10 +297,10 @@
                                 <span class="badge bg-warning text-dark ms-1">REVISAR</span>
                                 {% endif %}
                             </label>
-                            <textarea class="form-control" name="itens_inclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_inclusos|join(';') if proposta.itens_inclusos else '' }}</textarea>
+                            <textarea class="form-control" name="itens_inclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ itens_str(proposta.itens_inclusos) }}</textarea>
                             {% if 'itens_inclusos' in _campos_pend %}
                             <input type="hidden" name="campo_revisao_original_itens_inclusos"
-                                   value="{{ proposta.itens_inclusos|join(';') if proposta.itens_inclusos else '' }}">
+                                   value="{{ itens_str(proposta.itens_inclusos) }}">
                             <div class="form-check small mt-1">
                                 <input class="form-check-input" type="checkbox"
                                        name="campo_revisao_ack" value="itens_inclusos"
@@ -315,10 +319,10 @@
                                 <span class="badge bg-warning text-dark ms-1">REVISAR</span>
                                 {% endif %}
                             </label>
-                            <textarea class="form-control" name="itens_exclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ proposta.itens_exclusos|join(';') if proposta.itens_exclusos else '' }}</textarea>
+                            <textarea class="form-control" name="itens_exclusos" rows="4" placeholder="Separe os itens com ponto e vírgula (;)">{{ itens_str(proposta.itens_exclusos) }}</textarea>
                             {% if 'itens_exclusos' in _campos_pend %}
                             <input type="hidden" name="campo_revisao_original_itens_exclusos"
-                                   value="{{ proposta.itens_exclusos|join(';') if proposta.itens_exclusos else '' }}">
+                                   value="{{ itens_str(proposta.itens_exclusos) }}">
                             <div class="form-check small mt-1">
                                 <input class="form-check-input" type="checkbox"
                                        name="campo_revisao_ack" value="itens_exclusos"

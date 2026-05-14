@@ -647,15 +647,21 @@ def criar():
         if request.form.get('consideracoes_gerais'):
             proposta.consideracoes_gerais = request.form.get('consideracoes_gerais')
         
-        # Processar itens inclusos/exclusos
-        itens_inclusos_raw = request.form.get('itens_inclusos', '')
-        if itens_inclusos_raw:
-            proposta.itens_inclusos = itens_inclusos_raw.replace(';', '\n').strip()
-        
-        itens_exclusos_raw = request.form.get('itens_exclusos', '')
-        if itens_exclusos_raw:
-            proposta.itens_exclusos = itens_exclusos_raw.replace(';', '\n').strip()
-        
+        # Processar itens inclusos/exclusos — sempre persiste como lista JSON.
+        # Aceita ';' e '\n' como separadores (retrocompatível com templates
+        # que usam newline). Campo presente mas vazio → [] (limpa a lista).
+        _inc_raw = request.form.get('itens_inclusos', None)
+        if _inc_raw is not None:
+            proposta.itens_inclusos = [
+                x.strip() for x in _inc_raw.replace('\n', ';').split(';') if x.strip()
+            ]
+
+        _exc_raw = request.form.get('itens_exclusos', None)
+        if _exc_raw is not None:
+            proposta.itens_exclusos = [
+                x.strip() for x in _exc_raw.replace('\n', ';').split(';') if x.strip()
+            ]
+
         db.session.add(proposta)
         db.session.flush()  # Obter ID da proposta antes de criar itens
 
@@ -1457,14 +1463,19 @@ def atualizar(id):
             request.form.get('engenheiro_id'), admin_id
         )
 
-        # Processar itens inclusos/exclusos
-        itens_inclusos_raw = request.form.get('itens_inclusos', '')
-        if itens_inclusos_raw:
-            proposta.itens_inclusos = itens_inclusos_raw.replace(';', '\n').strip()
+        # Processar itens inclusos/exclusos — sempre persiste como lista JSON.
+        # Aceita ';' e '\n' como separadores. Campo vazio → [] (limpa a lista).
+        _inc_raw = request.form.get('itens_inclusos', None)
+        if _inc_raw is not None:
+            proposta.itens_inclusos = [
+                x.strip() for x in _inc_raw.replace('\n', ';').split(';') if x.strip()
+            ]
 
-        itens_exclusos_raw = request.form.get('itens_exclusos', '')
-        if itens_exclusos_raw:
-            proposta.itens_exclusos = itens_exclusos_raw.replace(';', '\n').strip()
+        _exc_raw = request.form.get('itens_exclusos', None)
+        if _exc_raw is not None:
+            proposta.itens_exclusos = [
+                x.strip() for x in _exc_raw.replace('\n', ';').split(';') if x.strip()
+            ]
 
         # Task #174 — cláusulas configuráveis (substitui condicoes_pagamento,
         # garantias, consideracoes_gerais). Estratégia: deletar todas as
@@ -1491,9 +1502,12 @@ def atualizar(id):
 
         # Snapshot atual { (titulo_norm, texto_norm) -> revisado_em } para
         # casar pós-delete (mais robusto que trabalhar com IDs em UI livre).
+        # Nota: normaliza título vazio para '(sem título)' para alinhar com
+        # a chave gerada no loop abaixo e evitar miss por título vazio.
         _snap_revisado = {}
         for _c in (proposta.clausulas or []):
-            _key = ((_c.titulo or '').strip()[:200], (_c.texto or '').strip())
+            _tit_norm = (_c.titulo or '').strip()[:200] or '(sem título)'
+            _key = (_tit_norm, (_c.texto or '').strip())
             _snap_revisado[_key] = _c.revisado_em
 
         # Só processa se o formulário enviou o bloco — assim chamadas legadas
