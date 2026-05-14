@@ -133,7 +133,8 @@
                     </thead>
                     <tbody>
                         {% for conta in contas %}
-                        <tr class="{% if conta.status == 'VENCIDO' %}table-danger{% endif %}">
+                        <tr id="cp-{{ conta.id }}"
+                            class="{% if conta.status == 'VENCIDO' %}table-danger{% endif %}{% if highlight_id and conta.id == highlight_id %} table-primary fw-semibold{% endif %}">
                             <td data-label="Vencimento">{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
                             <td data-label="Fornecedor">{{ conta.fornecedor.razao_social if conta.fornecedor else '-' }}</td>
                             <td data-label="Descrição">{{ conta.descricao }}</td>

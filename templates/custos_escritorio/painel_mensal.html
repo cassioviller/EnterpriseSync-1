@@ -162,9 +162,9 @@
             </td>
             <td class="text-end pe-3">
               {% if row.cp_id %}
-              <a href="{{ url_for('financeiro.listar_contas_pagar') }}#cp-{{ row.cp_id }}"
+              <a href="{{ url_for('financeiro.listar_contas_pagar', highlight_id=row.cp_id) }}#cp-{{ row.cp_id }}"
                  class="btn btn-sm btn-outline-primary me-1"
-                 title="Ver em Contas a Pagar">
+                 title="Ver esta conta em Contas a Pagar">
                 <i class="fas fa-external-link-alt"></i>
               </a>
               {% endif %}

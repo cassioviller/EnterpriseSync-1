@@ -116,12 +116,17 @@ def listar_contas_pagar():
     # Filtros
     status = request.args.get('status')
     obra_id = request.args.get('obra_id', type=int)
+    highlight_id = request.args.get('highlight_id', type=int)
     
     contas = FinanceiroService.listar_contas_pagar(
         admin_id, 
         status=status, 
         obra_id=obra_id
     )
+
+    # Se highlight_id especificado, garantir que a conta aparece primeiro na lista
+    if highlight_id:
+        contas = sorted(contas, key=lambda c: (0 if c.id == highlight_id else 1))
     
     # Obras para filtro
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
@@ -211,6 +216,7 @@ def listar_contas_pagar():
         resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id,
+        highlight_id=highlight_id,
         datetime=datetime,
         custos_v2=custos_v2,
         is_v2=v2,

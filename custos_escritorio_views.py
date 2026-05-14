@@ -129,8 +129,14 @@ def nova_despesa():
                 flash('Preencha todos os campos corretamente (dia de vencimento entre 1 e 28).', 'warning')
                 return render_template('custos_escritorio/despesa_form.html',
                                        despesa=None, categorias=categorias)
+            # Validate categoria_id belongs to this tenant
+            cat = CategoriaEscritorio.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+            if not cat:
+                flash('Categoria inválida ou não pertence a este tenant.', 'danger')
+                return render_template('custos_escritorio/despesa_form.html',
+                                       despesa=None, categorias=categorias)
             desp = DespesaEscritorio(
-                nome=nome, categoria_id=categoria_id, valor=valor,
+                nome=nome, categoria_id=cat.id, valor=valor,
                 dia_vencimento=dia_vencimento, recorrente=recorrente,
                 ativo=True, admin_id=admin_id
             )
@@ -164,8 +170,14 @@ def editar_despesa(desp_id):
                 flash('Preencha todos os campos corretamente.', 'warning')
                 return render_template('custos_escritorio/despesa_form.html',
                                        despesa=desp, categorias=categorias)
+            # Validate categoria_id belongs to this tenant
+            cat = CategoriaEscritorio.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+            if not cat:
+                flash('Categoria inválida ou não pertence a este tenant.', 'danger')
+                return render_template('custos_escritorio/despesa_form.html',
+                                       despesa=desp, categorias=categorias)
             desp.nome = nome
-            desp.categoria_id = categoria_id
+            desp.categoria_id = cat.id
             desp.valor = valor
             desp.dia_vencimento = dia_vencimento
             desp.recorrente = recorrente
@@ -198,6 +210,11 @@ def toggle_despesa(desp_id):
 def criar_ocorrencia_avulsa(desp_id):
     admin_id = get_admin_id()
     desp = DespesaEscritorio.query.filter_by(id=desp_id, admin_id=admin_id).first_or_404()
+    if desp.recorrente:
+        flash('Ocorrências avulsas só podem ser criadas para despesas do tipo Avulsa (não recorrentes).', 'warning')
+        mes = request.form.get('mes_painel', date.today().month)
+        ano = request.form.get('ano_painel', date.today().year)
+        return redirect(url_for('custos_escritorio.painel_mensal', mes=mes, ano=ano))
     try:
         data_str = request.form.get('data_vencimento')
         valor_raw = request.form.get('valor', str(desp.valor)).replace(',', '.')
