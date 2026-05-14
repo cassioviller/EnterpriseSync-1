@@ -286,6 +286,7 @@ def painel_mensal():
     total_pendente = Decimal('0')
     total_pago = Decimal('0')
     total_geral = Decimal('0')
+    totais_por_categoria = {}  # {nome_categoria: {'total': Decimal, 'cor': str}}
     for oc in ocorrencias:
         status_cp = None
         cp_id = oc.conta_pagar_id
@@ -301,6 +302,12 @@ def painel_mensal():
             total_pago += oc.valor
         else:
             total_pendente += oc.valor
+        # Aggregate by category
+        cat_nome = oc.despesa.categoria.nome
+        cat_cor = oc.despesa.categoria.cor
+        if cat_nome not in totais_por_categoria:
+            totais_por_categoria[cat_nome] = {'total': Decimal('0'), 'cor': cat_cor}
+        totais_por_categoria[cat_nome]['total'] += oc.valor
 
     # Despesas avulsas ativas (para modal de criação avulsa)
     despesas_avulsas = DespesaEscritorio.query.filter_by(
@@ -320,6 +327,10 @@ def painel_mensal():
     MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
              'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
+    totais_categorias_sorted = sorted(
+        totais_por_categoria.items(), key=lambda x: x[1]['total'], reverse=True
+    )
+
     return render_template(
         'custos_escritorio/painel_mensal.html',
         ocorrencias=ocs_rich,
@@ -330,6 +341,7 @@ def painel_mensal():
         total_pendente=total_pendente,
         total_pago=total_pago,
         total_geral=total_geral,
+        totais_categorias=totais_categorias_sorted,
         despesas_avulsas=despesas_avulsas,
         hoje=hoje,
     )

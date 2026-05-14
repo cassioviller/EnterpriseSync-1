@@ -60,7 +60,7 @@
             </div>
 
             <div class="row g-3 mb-4">
-              <div class="col-md-6">
+              <div class="col-md-6" id="rowDiaVencimento">
                 <label class="form-label fw-semibold">Dia de vencimento <span class="text-danger">*</span></label>
                 <input type="number" name="dia_vencimento" class="form-control"
                        min="1" max="28"
@@ -95,6 +95,22 @@
               </a>
             </div>
           </form>
+
+<script>
+(function () {
+  var chk = document.getElementById('chkRecorrente');
+  var diaRow = document.getElementById('rowDiaVencimento');
+  function atualizarCampos() {
+    if (diaRow) {
+      diaRow.style.display = chk.checked ? '' : 'none';
+    }
+  }
+  if (chk) {
+    chk.addEventListener('change', atualizarCampos);
+    atualizarCampos();
+  }
+})();
+</script>
         </div>
       </div>
 

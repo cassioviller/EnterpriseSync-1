@@ -90,6 +90,31 @@
     </div>
   </div>
 
+  {# ── Totais por categoria ── #}
+  {% if totais_categorias %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-transparent">
+      <span class="fw-semibold"><i class="fas fa-tags me-1"></i>Totais por Categoria — {{ mes_nome }} {{ ano }}</span>
+    </div>
+    <div class="card-body py-2 px-3">
+      <div class="row g-2">
+        {% for cat_nome, info in totais_categorias %}
+        <div class="col-sm-6 col-md-4 col-lg-3">
+          <div class="d-flex align-items-center gap-2 py-1">
+            <span class="d-inline-block rounded-circle flex-shrink-0"
+                  style="width:12px;height:12px;background:{{ info.cor }}"></span>
+            <span class="text-truncate small fw-semibold flex-grow-1" title="{{ cat_nome }}">{{ cat_nome }}</span>
+            <span class="small text-success fw-bold ms-auto text-nowrap">
+              R$ {{ '%.2f'|format(info.total|float) }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Tabela de ocorrências ── #}
   <div class="card shadow-sm">
     <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
@@ -137,7 +162,7 @@
             </td>
             <td class="text-end pe-3">
               {% if row.cp_id %}
-              <a href="{{ url_for('gestao_custos.index') }}"
+              <a href="{{ url_for('financeiro.listar_contas_pagar') }}#cp-{{ row.cp_id }}"
                  class="btn btn-sm btn-outline-primary me-1"
                  title="Ver em Contas a Pagar">
                 <i class="fas fa-external-link-alt"></i>
