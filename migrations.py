@@ -3862,6 +3862,7 @@ def executar_migracoes():
             (161, "CRM: adicionar coluna prioridade (boolean) na tabela lead", migration_161_lead_prioridade),
             (162, "Task #110 — CRM: validacao_aprovada, validado_por_id, validado_em na tabela lead", migration_162_lead_validacao),
             (163, "Task #113 — CRM: adicionar coluna prazo (Date, nullable) na tabela lead", migration_163_lead_prazo),
+            (164, "Task #119 — rdo_ocorrencia: adicionar colunas faltantes (tipo_ocorrencia, severidade, descricao_ocorrencia, etc.)", migrar_campos_rdo_ocorrencia),
         ]
         
         # Executar cada migração com rastreamento
@@ -4381,6 +4382,9 @@ def migrar_campos_rdo_ocorrencia():
         campos_necessarios = [
             ("tipo_ocorrencia", "VARCHAR(50)", "NOT NULL DEFAULT 'Observação'"),
             ("severidade", "VARCHAR(20)", "DEFAULT 'Baixa'"),
+            ("descricao_ocorrencia", "TEXT", "NOT NULL DEFAULT ''"),
+            ("problemas_identificados", "TEXT"),
+            ("acoes_corretivas", "TEXT"),
             ("responsavel_acao", "VARCHAR(100)"),
             ("prazo_resolucao", "DATE"),
             ("status_resolucao", "VARCHAR(20)", "DEFAULT 'Pendente'"),

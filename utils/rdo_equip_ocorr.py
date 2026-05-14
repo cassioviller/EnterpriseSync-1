@@ -100,20 +100,27 @@ def persistir_equipamentos(rdo_id: int, admin_id: int, items: Iterable[dict]) ->
 def persistir_ocorrencias(rdo_id: int, admin_id: int, items: Iterable[dict]) -> int:
     n = 0
     for it in items:
-        oc = RDOOcorrencia(
-            rdo_id=rdo_id,
-            tipo_ocorrencia=it['tipo'],
-            severidade=it['severidade'],
-            descricao_ocorrencia=it['descricao'],
-            status_resolucao=it['status'],
-        )
-        if hasattr(oc, 'admin_id'):
-            try:
-                oc.admin_id = admin_id
-            except Exception:
-                pass
-        db.session.add(oc)
-        n += 1
+        try:
+            oc = RDOOcorrencia(
+                rdo_id=rdo_id,
+                tipo_ocorrencia=it['tipo'],
+                severidade=it['severidade'],
+                descricao_ocorrencia=it['descricao'],
+                status_resolucao=it['status'],
+            )
+            if hasattr(oc, 'admin_id'):
+                try:
+                    oc.admin_id = admin_id
+                except Exception:
+                    pass
+            db.session.add(oc)
+            n += 1
+        except Exception as exc:
+            logger.error(
+                f"[Task#119] Falha ao inserir ocorrência no RDO {rdo_id}: {exc} — dados: {it!r}",
+                exc_info=True,
+            )
+            raise
     return n
 
 
