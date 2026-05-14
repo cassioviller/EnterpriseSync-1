@@ -31,7 +31,7 @@
   {% endwith %}
 
   {# ── Navegação de mês ── #}
-  <div class="d-flex align-items-center gap-3 mb-4">
+  <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
     <a href="{{ url_for('custos_escritorio.painel_mensal', mes=mes_ant, ano=ano_ant) }}"
        class="btn btn-outline-secondary btn-sm">
       <i class="fas fa-chevron-left"></i>
@@ -41,6 +41,22 @@
        class="btn btn-outline-secondary btn-sm">
       <i class="fas fa-chevron-right"></i>
     </a>
+
+    {# Seletor de mês/ano direto #}
+    <form method="get" action="{{ url_for('custos_escritorio.painel_mensal') }}"
+          class="d-flex align-items-center gap-2 ms-2">
+      <select name="mes" class="form-select form-select-sm" style="width:auto">
+        {% for m_num, m_nome in [(1,'Jan'),(2,'Fev'),(3,'Mar'),(4,'Abr'),(5,'Mai'),(6,'Jun'),
+                                  (7,'Jul'),(8,'Ago'),(9,'Set'),(10,'Out'),(11,'Nov'),(12,'Dez')] %}
+        <option value="{{ m_num }}" {{ 'selected' if m_num == mes }}>{{ m_nome }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="ano" class="form-control form-control-sm"
+             value="{{ ano }}" min="2020" max="2099" style="width:80px">
+      <button type="submit" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-arrow-right"></i>
+      </button>
+    </form>
 
     {# Gerar mês #}
     <form method="post" action="{{ url_for('custos_escritorio.gerar_mes') }}" class="ms-auto">

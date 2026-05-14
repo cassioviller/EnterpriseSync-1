@@ -1542,6 +1542,13 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
             f"({len(_V2_CONTAS_SEED)} contas)"
         )
 
+        # Seed categorias de escritório (idempotente)
+        try:
+            from models import CategoriaEscritorio
+            CategoriaEscritorio.seed_defaults(admin_id)
+        except Exception as _ce:
+            logger.warning(f"[WARN] seed categorias escritório admin={admin_id}: {_ce}")
+
     except Exception as e:
         logger.error(f"[ERROR] seed_plano_contas_if_needed admin={admin_id}: {e}")
 

@@ -263,7 +263,7 @@ def excluir_ocorrencia(oc_id):
     mes, ano = oc.competencia_mes, oc.competencia_ano
 
     if oc.conta_pagar_id:
-        cp = ContaPagar.query.get(oc.conta_pagar_id)
+        cp = ContaPagar.query.filter_by(id=oc.conta_pagar_id, admin_id=admin_id).first()
         if cp and cp.status != 'PENDENTE':
             flash('Só é possível excluir ocorrências com Conta a Pagar ainda PENDENTE.', 'warning')
             return redirect(url_for('custos_escritorio.painel_mensal', mes=mes, ano=ano))
