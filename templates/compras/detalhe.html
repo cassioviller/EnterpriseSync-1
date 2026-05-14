@@ -93,7 +93,7 @@
           {% if custos_gestao %}
           <table class="table table-sm mb-0">
             <thead class="table-light">
-              <tr><th>Vencimento</th><th>Descrição</th><th class="text-end">Valor</th><th>Status</th></tr>
+              <tr><th>Vencimento</th><th>Descrição</th><th class="text-end">Valor</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {% for c in custos_gestao %}
@@ -112,6 +112,17 @@
                     {% else %}bg-warning text-dark{% endif %}">
                     {{ c.pai.status }}
                   </span>
+                </td>
+                <td>
+                  <button class="btn btn-outline-secondary btn-sm py-0 px-2"
+                          title="Editar lançamento"
+                          onclick="abrirModalEditarLancamento({{ c.pai.id }},
+                            {{ (c.pai.data_vencimento.strftime('%Y-%m-%d') if c.pai.data_vencimento else '') | tojson }},
+                            {{ c.pai.fornecedor_id | tojson }},
+                            {{ c.pai.entidade_id | tojson }},
+                            {{ (c.pai.observacoes or '') | tojson }})">
+                    <i class="fas fa-edit"></i>
+                  </button>
                 </td>
               </tr>
               {% endfor %}
@@ -231,4 +242,67 @@
     </div>
   </div>
 </div>
+
+<!-- Modal Editar Lançamento -->
+<div class="modal fade" id="modalEditarLancamento" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Lançamento Financeiro</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="formEditarLancamento">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Obra Vinculada</label>
+            <select name="obra_id" class="form-select">
+              <option value="">Sem obra específica</option>
+              {% for o in obras %}
+              <option value="{{ o.id }}">{{ o.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Data de Vencimento</label>
+            <input type="date" name="data_vencimento" class="form-control" id="editVencimento">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Fornecedor</label>
+            <select name="fornecedor_id" class="form-select">
+              <option value="">Manter atual</option>
+              {% for f in fornecedores %}
+              <option value="{{ f.id }}">{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Observações</label>
+            <input type="text" name="observacoes" class="form-control" id="editObservacoes" maxlength="300">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i>Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+var _urlEditarLancamento = {{ url_for('compras.editar_lancamento', gcp_id=0) | tojson }};
+
+function abrirModalEditarLancamento(gcpId, dataVenc, fornecedorId, obraId, observacoes) {
+  document.getElementById('formEditarLancamento').action = _urlEditarLancamento.replace('/0/', '/' + gcpId + '/');
+  document.getElementById('editVencimento').value = dataVenc || '';
+  document.getElementById('editObservacoes').value = observacoes || '';
+  var obraSel = document.querySelector('#modalEditarLancamento [name="obra_id"]');
+  if (obraSel) { obraSel.value = obraId || ''; }
+  var fornSel = document.querySelector('#modalEditarLancamento [name="fornecedor_id"]');
+  if (fornSel) { fornSel.value = fornecedorId || ''; }
+  new bootstrap.Modal(document.getElementById('modalEditarLancamento')).show();
+}
+</script>
 {% endblock %}

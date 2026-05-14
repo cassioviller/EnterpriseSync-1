@@ -165,9 +165,12 @@
                                     <i class="fas fa-dollar-sign"></i> Baixar
                                 </button>
                                 {% endif %}
-                                <button class="btn btn-sm btn-info" onclick="verDetalhes({{ conta.id }})">
-                                    <i class="fas fa-eye"></i>
+                                {% if conta.status in ('PAGO', 'PARCIAL') %}
+                                <button class="btn btn-sm btn-warning"
+                                        onclick="confirmarEstorno('cp', {{ conta.id }}, '{{ conta.descricao|replace("'", "\\'") }}')">
+                                    <i class="fas fa-undo"></i> Estornar
                                 </button>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -182,19 +185,32 @@
                             <td>{{ custo.tipo_categoria }}</td>
                             <td><span class="text-muted">-</span></td>
                             <td>{{ custo.valor_total|brl }}</td>
-                            <td>R$ 0,00</td>
-                            <td>{{ (custo.valor_solicitado or custo.valor_total)|brl }}</td>
+                            <td>{{ (custo.valor_pago or 0)|brl }}</td>
+                            <td>{{ (custo.saldo if custo.saldo is not none else (custo.valor_solicitado or custo.valor_total))|brl }}</td>
                             <td>
                                 {% if custo.status == 'SOLICITADO' %}
                                 <span class="badge bg-warning text-dark">Solicitado</span>
                                 {% elif custo.status == 'AUTORIZADO' %}
                                 <span class="badge bg-success">Autorizado</span>
+                                {% elif custo.status == 'PENDENTE' %}
+                                <span class="badge bg-warning text-dark">Pendente</span>
+                                {% elif custo.status == 'PAGO' %}
+                                <span class="badge bg-success">Pago</span>
+                                {% elif custo.status == 'PARCIAL' %}
+                                <span class="badge bg-info">Parcial</span>
                                 {% endif %}
                             </td>
                             <td>
+                                {% if custo.status in ('PAGO', 'PARCIAL') %}
+                                <button class="btn btn-sm btn-warning"
+                                        onclick="confirmarEstorno('gcp', {{ custo.id }}, '{{ custo.observacoes|default(custo.tipo_categoria)|replace("'", "\\'") }}')">
+                                    <i class="fas fa-undo"></i> Estornar
+                                </button>
+                                {% else %}
                                 <a href="{{ url_for('gestao_custos.index') }}" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-external-link-alt fa-xs"></i> Ver
                                 </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -275,6 +291,33 @@
     </div>
 </div>
 
+<!-- Modal Confirmar Estorno -->
+<div class="modal fade" id="modalEstorno" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-undo me-2"></i>Confirmar Estorno de Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Atenção:</strong> Esta ação irá reverter o pagamento para <strong>PENDENTE</strong>,
+                    zerando valor pago e data de pagamento. Essa operação não pode ser desfeita automaticamente.
+                </div>
+                <p><strong>Conta:</strong> <span id="estorno_descricao"></span></p>
+            </div>
+            <form method="post" id="formEstorno">
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-undo me-1"></i>Confirmar Estorno
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Baixar Pagamento -->
 <div class="modal fade" id="modalBaixaPagamento" tabindex="-1">
     <div class="modal-dialog">
@@ -330,14 +373,24 @@
 </div>
 
 <script>
+var _urlEstornarGcp   = {{ url_for('financeiro.estornar_gcp',  gcp_id=0)   | tojson }};
+var _urlEstornarConta = {{ url_for('financeiro.estornar_conta', conta_id=0) | tojson }};
+var _urlPagarConta    = {{ url_for('financeiro.pagar_conta',    conta_id=0) | tojson }};
+
+function confirmarEstorno(tipo, id, descricao) {
+    document.getElementById('estorno_descricao').textContent = descricao;
+    var base = tipo === 'gcp' ? _urlEstornarGcp : _urlEstornarConta;
+    document.getElementById('formEstorno').action = base.replace('/0/', '/' + id + '/');
+    new bootstrap.Modal(document.getElementById('modalEstorno')).show();
+}
+
 function abrirModalBaixa(contaId, descricao, saldo) {
     document.getElementById('baixa_conta_id').value = contaId;
     document.getElementById('baixa_descricao').textContent = descricao;
     document.getElementById('baixa_saldo').textContent = Number(saldo).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('baixa_valor').value = Number(saldo).toFixed(2);
     document.getElementById('baixa_valor').max = Number(saldo).toFixed(2);
-    // Atualizar action do formulário com conta_id
-    document.getElementById('formBaixaPagamento').action = `/financeiro/contas-pagar/${contaId}/pagar`;
+    document.getElementById('formBaixaPagamento').action = _urlPagarConta.replace('/0/', '/' + contaId + '/');
     new bootstrap.Modal(document.getElementById('modalBaixaPagamento')).show();
 }
 

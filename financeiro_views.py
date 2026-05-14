@@ -157,26 +157,42 @@ def listar_contas_pagar():
     
     # Gestão de Custos V2 — mostrar pendentes/autorizados no contas a pagar
     v2 = is_v2_active()
+    # custos_v2: lista para exibição na tabela (inclui PAGO/PARCIAL para acesso ao estorno)
     custos_v2 = []
     if v2:
         custos_v2 = GestaoCustoPai.query.filter(
             GestaoCustoPai.admin_id == admin_id,
-            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO'])
+            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL', 'PAGO'])
         ).order_by(GestaoCustoPai.data_criacao.desc()).all()
 
+    # KPI V2: query separada — apenas status abertos, sem limite de 200, para precisão dos cards
+    custos_v2_abertos = []
+    if v2:
+        custos_v2_abertos = GestaoCustoPai.query.filter(
+            GestaoCustoPai.admin_id == admin_id,
+            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL'])
+        ).all()
+
     # Incorporar custos V2 nos KPI cards usando regra canônica (valor_solicitado tem prioridade)
-    valor_v2 = sum(float(c.valor_solicitado or c.valor_total) for c in custos_v2)
+    # Usa saldo (valor aberto) para PARCIAL; caso saldo não esteja preenchido, cai
+    # em valor_solicitado/valor_total como fallback (itens PENDENTE/SOLICITADO/AUTORIZADO).
+    def _valor_aberto_v2(c):
+        if c.status == 'PARCIAL' and c.saldo is not None:
+            return float(c.saldo)
+        return float(c.valor_solicitado or c.valor_total)
+
+    valor_v2 = sum(_valor_aberto_v2(c) for c in custos_v2_abertos)
     semana = hoje + timedelta(days=7)
     # "a vencer": data_vencimento (se existir) ou data_criacao no intervalo [hoje, hoje+7d]
     def _data_ref_v2(c):
         return c.data_vencimento if c.data_vencimento else (c.data_criacao.date() if c.data_criacao else None)
     v2_a_vencer = sum(
-        float(c.valor_solicitado or c.valor_total) for c in custos_v2
+        _valor_aberto_v2(c) for c in custos_v2_abertos
         if _data_ref_v2(c) and hoje <= _data_ref_v2(c) <= semana
     )
     # "vencidas": data_vencimento (ou data_criacao) < hoje (overdue)
     v2_vencidas = sum(
-        float(c.valor_solicitado or c.valor_total) for c in custos_v2
+        _valor_aberto_v2(c) for c in custos_v2_abertos
         if _data_ref_v2(c) and _data_ref_v2(c) < hoje
     )
 
@@ -217,6 +233,83 @@ def nova_conta_pagar():
         flash('O lançamento de novas despesas é feito pela Gestão de Custos.', 'info')
         return redirect(url_for('gestao_custos.novo', tipo='DESPESA_GERAL'))
     return redirect(url_for('financeiro.listar_contas_pagar', abrir_modal=1))
+
+
+@financeiro_bp.route('/contas-pagar/<int:conta_id>/estornar', methods=['POST'])
+@login_required
+def estornar_conta(conta_id):
+    """Estorna um pagamento já baixado, revertendo status para PENDENTE."""
+    admin_id = get_admin_id()
+    conta = ContaPagar.query.filter_by(id=conta_id, admin_id=admin_id).first_or_404()
+
+    if conta.status not in ('PAGO', 'PARCIAL'):
+        flash('Apenas contas pagas ou parcialmente pagas podem ser estornadas.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_pagar'))
+
+    try:
+        conta.valor_pago = 0
+        conta.saldo = conta.valor_original
+        conta.data_pagamento = None
+        conta.forma_pagamento = None
+        conta.status = 'PENDENTE'
+
+        # Estornar todos os LancamentoContabil vinculados — atômico com o commit abaixo
+        from models import LancamentoContabil
+        lcs = LancamentoContabil.query.filter_by(
+            admin_id=admin_id,
+            origem='FINANCEIRO_PAGAR',
+            origem_id=conta_id
+        ).all()
+        for lc in lcs:
+            db.session.delete(lc)
+
+        db.session.commit()
+        flash(f'Pagamento estornado com sucesso. A conta voltou para PENDENTE.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao estornar conta {conta_id}: {e}")
+        flash('Erro ao estornar pagamento. Tente novamente.', 'danger')
+
+    return redirect(url_for('financeiro.listar_contas_pagar'))
+
+
+@financeiro_bp.route('/gestao-custo/<int:gcp_id>/estornar', methods=['POST'])
+@login_required
+def estornar_gcp(gcp_id):
+    """Estorna um GestaoCustoPai já pago, revertendo status para PENDENTE."""
+    admin_id = get_admin_id()
+    gcp = GestaoCustoPai.query.filter_by(id=gcp_id, admin_id=admin_id).first_or_404()
+
+    if gcp.status not in ('PAGO', 'PARCIAL'):
+        flash('Apenas lançamentos pagos ou parciais podem ser estornados.', 'warning')
+        return redirect(url_for('financeiro.listar_contas_pagar'))
+
+    try:
+        gcp.valor_pago = 0
+        gcp.saldo = gcp.valor_total
+        gcp.data_pagamento = None
+        gcp.forma_pagamento = None
+        gcp.status = 'PENDENTE'
+
+        # Estornar todos os LancamentoContabil vinculados — atômico com o commit abaixo.
+        # GCP payments usam origem='GESTAO_CUSTO_PAI' (distinto de 'FINANCEIRO_PAGAR').
+        from models import LancamentoContabil
+        lcs = LancamentoContabil.query.filter_by(
+            admin_id=admin_id,
+            origem='GESTAO_CUSTO_PAI',
+            origem_id=gcp_id
+        ).all()
+        for lc in lcs:
+            db.session.delete(lc)
+
+        db.session.commit()
+        flash('Pagamento estornado com sucesso. O lançamento voltou para PENDENTE.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao estornar GCP {gcp_id}: {e}")
+        flash('Erro ao estornar pagamento. Tente novamente.', 'danger')
+
+    return redirect(url_for('financeiro.listar_contas_pagar'))
 
 
 @financeiro_bp.route('/contas-pagar/<int:conta_id>/pagar', methods=['GET', 'POST'])

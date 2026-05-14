@@ -51,8 +51,8 @@ def _admin_id():
 #
 # Fluxo 1 — `processar_compra_normal`:
 #   - Gera GestaoCustoPai com tipo_categoria='MATERIAL' (uma por parcela)
-#   - Se condição 'a_vista' → status='PAGO' (e GCP autorizado/pago normalmente via
-#     o fluxo padrão da Gestão de Custos, que cria FluxoCaixa quando o usuário paga)
+#   - TODOS os GCPs nascem como status='PENDENTE', independente da condição de
+#     pagamento (inclusive 'a_vista'). A baixa é feita manualmente em Contas a Pagar.
 #   - Cria entrada no almoxarifado (AlmoxarifadoMovimento + AlmoxarifadoEstoque)
 #     para itens vinculados ao catálogo.
 #   - Usado tanto no POST inicial (tipo_compra='normal') como em compras
@@ -184,8 +184,6 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
 
     for idx, (data_venc, _) in enumerate(vencimentos, start=1):
         v = valor_parcela if idx < n_parcelas else round(valor_total - valor_parcela * (n_parcelas - 1), 2)
-        is_avista = (pedido.condicao_pagamento == 'a_vista')
-        status_gcp = 'PAGO' if is_avista else 'PENDENTE'
         desc_cp = f"Compra{(' NF ' + pedido.numero) if pedido.numero else ''} - {forn_nome}"
         if n_parcelas > 1:
             desc_cp += f" - Parcela {idx}/{n_parcelas}"
@@ -197,12 +195,12 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
             entidade_id=entidade_id,
             fornecedor_id=pedido.fornecedor_id,
             valor_total=v,
-            valor_pago=v if is_avista else 0,
-            saldo=0 if is_avista else v,
-            status=status_gcp,
+            valor_pago=0,
+            saldo=v,
+            status='PENDENTE',
             data_emissao=pedido.data_compra,
             data_vencimento=data_venc,
-            data_pagamento=pedido.data_compra if is_avista else None,
+            data_pagamento=None,
             numero_documento=pedido.numero,
             numero_parcela=idx,
             total_parcelas=n_parcelas,
@@ -737,6 +735,9 @@ def detalhe(pedido_id):
         for item_id, qtd_total in qtd_total_por_item_pedido.items()
     )
 
+    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+
     return render_template(
         'compras/detalhe.html',
         pedido=pedido,
@@ -748,6 +749,8 @@ def detalhe(pedido_id):
         qtd_recebida_detalhe=qtd_recebida_detalhe,
         tem_itens_almox=tem_itens_almox,
         todos_recebidos=todos_recebidos,
+        fornecedores=fornecedores,
+        obras=obras,
     )
 
 
@@ -862,6 +865,75 @@ def receber(pedido_id):
         flash(f'Erro ao registrar recebimento: {str(e)}', 'danger')
 
     return redirect(url_for('compras.detalhe', pedido_id=pedido_id))
+
+
+# ─────────────────────────────────────────────
+# EDIÇÃO DE LANÇAMENTO FINANCEIRO DE COMPRA
+# ─────────────────────────────────────────────
+@compras_bp.route('/lancamento/<int:gcp_id>/editar', methods=['POST'])
+@login_required
+def editar_lancamento(gcp_id):
+    """Edita campos financeiros/vínculo de um GestaoCustoPai originado de compra,
+    independentemente de estar PAGO ou PENDENTE.
+    Campos permitidos: obra_id, data_vencimento, fornecedor_id, observacoes.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    gcp = GestaoCustoPai.query.filter_by(id=gcp_id, admin_id=admin_id).first_or_404()
+
+    # Restrição de segurança: apenas GCPs originados de pedido_compra podem ser
+    # editados por esta rota — evita edição acidental de outros lançamentos.
+    filho_compra = GestaoCustoFilho.query.filter_by(
+        pai_id=gcp_id, origem_tabela='pedido_compra'
+    ).first()
+    if not filho_compra:
+        flash('Este lançamento não pode ser editado por esta rota.', 'danger')
+        return redirect(request.referrer or url_for('compras.index'))
+
+    try:
+        obra_id_raw = request.form.get('obra_id', '').strip()
+        obra_id = int(obra_id_raw) if obra_id_raw else None
+        if obra_id:
+            obra_check = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+            if not obra_check:
+                flash('Obra não encontrada ou sem permissão.', 'danger')
+                return redirect(request.referrer or url_for('compras.index'))
+            gcp.entidade_nome = obra_check.nome
+            gcp.entidade_id = obra_id
+        else:
+            gcp.entidade_nome = 'Sem obra'
+            gcp.entidade_id = None
+
+        data_venc_raw = request.form.get('data_vencimento', '').strip()
+        if data_venc_raw:
+            from datetime import datetime as _dt
+            gcp.data_vencimento = _dt.strptime(data_venc_raw, '%Y-%m-%d').date()
+
+        fornecedor_id_raw = request.form.get('fornecedor_id', '').strip()
+        if fornecedor_id_raw:
+            forn_id = int(fornecedor_id_raw)
+            forn_check = Fornecedor.query.filter_by(id=forn_id, admin_id=admin_id).first()
+            if forn_check:
+                gcp.fornecedor_id = forn_id
+
+        observacoes = request.form.get('observacoes', '').strip()
+        gcp.observacoes = observacoes[:300] if observacoes else None
+
+        # Sync GestaoCustoFilho obra_id
+        for filho in gcp.itens:
+            filho.obra_id = obra_id
+
+        db.session.commit()
+        flash('Lançamento atualizado com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] Falha ao editar lancamento GCP#{gcp_id}: {e}")
+        flash('Não foi possível atualizar o lançamento. Tente novamente.', 'danger')
+
+    return redirect(request.referrer or url_for('compras.index'))
 
 
 # ─────────────────────────────────────────────
