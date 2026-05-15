@@ -1,3 +1,7 @@
 # RDO Photos
 static/uploads/rdo/*
 static/uploads/relatorios_mapa/
+
+# Playwright test reports (runtime output, not source)
+tests/reports/*.html
+tests/reports/*.txt
