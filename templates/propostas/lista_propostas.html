@@ -54,7 +54,7 @@
                                     <span class="badge bg-{{ status_class.get(proposta.status, 'secondary') }}">
                                         {{ proposta.status|capitalize }}
                                     </span>
-                                    {% if proposta.status == 'aprovada' and proposta.obra_id %}
+                                    {% if proposta.status|lower == 'aprovada' and proposta.obra_id %}
                                     <br><a href="{{ url_for('main.detalhes_obra', id=proposta.obra_id) }}"
                                            class="badge bg-primary text-decoration-none mt-1"
                                            title="Ver obra vinculada">

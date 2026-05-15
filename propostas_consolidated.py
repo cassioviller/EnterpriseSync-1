@@ -954,11 +954,32 @@ def alterar_status(id):
         )
         
         db.session.add(historico)
+
+        # Quando aprovada via UI (SweetAlert2), emitir proposta_aprovada para
+        # criar Obra e LancamentoContabil (mesmo comportamento que /aprovar/<id>).
+        if novo_status == 'APROVADA':
+            from event_manager import EventManager
+            try:
+                EventManager.emit('proposta_aprovada', {
+                    'proposta_id': proposta.id,
+                    'cliente_nome': proposta.cliente_nome,
+                    'cliente_cpf_cnpj': None,
+                    'valor_total': float(proposta.valor_total or 0),
+                    'data_aprovacao': date.today().isoformat(),
+                }, admin_id, raise_on_error=True)
+            except Exception as _eh:
+                db.session.rollback()
+                logger.error(f"alterar_status APROVADA: handler exception: {_eh}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Falha ao aprovar: {_eh}',
+                }), 500
+
         db.session.commit()
         
         mensagens_status = {
             'ENVIADA': 'Proposta enviada com sucesso! O cliente pode visualizar e responder.',
-            'APROVADA': 'Proposta aprovada!',
+            'APROVADA': 'Proposta aprovada com sucesso!',
             'REJEITADA': 'Proposta rejeitada.',
             'EM_ANALISE': 'Proposta marcada como "Em Análise".',
             'RASCUNHO': 'Proposta voltou para rascunho.',
