@@ -164,15 +164,18 @@ def explodir_servico_para_quantidade(servico, quantidade,
           'detalhamento': [
               { 'insumo_id', 'nome', 'tipo', 'unidade',
                 'coeficiente', 'preco_unitario',
-                'quantidade_total', 'subtotal_unitario', 'subtotal_total' },
+                'quantidade_tecnica', 'quantidade_compra',
+                'fator_comercial', 'unidade_comercial',
+                'subtotal_unitario', 'subtotal_total' },
               ...
           ],
         }
 
-    Cada linha do detalhamento expressa:
-        quantidade_total   = coeficiente × quantidade do serviço
+    Cada linha do detalhamento expressa (Task #19):
+        quantidade_tecnica = coeficiente × quantidade do serviço (consumo exato)
+        quantidade_compra  = múltiplo do fator_comercial ≥ quantidade_tecnica (o que se compra)
         subtotal_unitario  = coeficiente × preco do insumo (custo por 1 unid serv.)
-        subtotal_total     = quantidade_total × preco do insumo (custo absoluto)
+        subtotal_total     = quantidade_compra × preco do insumo (custo real de compra)
     """
     base = calcular_precos_servico(servico, data_ref)
     qtd = Decimal(str(quantidade or 0))
@@ -197,20 +200,23 @@ def explodir_servico_para_quantidade(servico, quantidade,
             qtd * Decimal(str(categorias[c]['custo_unitario']))
         ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
+    import math as _math
     detalhamento = []
     for d in base.get('detalhamento', []):
         coef = Decimal(str(d['coeficiente']))
         preco = Decimal(str(d['preco_unitario']))
         fator = Decimal(str(d.get('fator_comercial') or 1)) or Decimal('1')
-        qtd_total = (coef * qtd).quantize(Decimal('0.0001'))
+        qtd_tecnica = (coef * qtd).quantize(Decimal('0.0001'))
         sub_unit = (coef * preco).quantize(Decimal('0.0001'))
-        sub_tot = (qtd_total * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        # Task #19 — qtd_comercial: arredonda para cima ao próximo múltiplo do fator
-        import math as _math
-        if fator > Decimal('1'):
-            qtd_com = (Decimal(str(_math.ceil(float(qtd_total) / float(fator)))) * fator).quantize(Decimal('0.0001'))
+        # Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator
+        if fator > Decimal('1') and qtd_tecnica > Decimal('0'):
+            qtd_compra = (
+                Decimal(str(_math.ceil(float(qtd_tecnica) / float(fator)))) * fator
+            ).quantize(Decimal('0.0001'))
         else:
-            qtd_com = qtd_total
+            qtd_compra = qtd_tecnica
+        # subtotal_total usa quantidade de compra (custo real, não técnico)
+        sub_tot = (qtd_compra * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         linha = {
             'insumo_id': d['insumo_id'],
             'nome': d['nome'],
@@ -218,8 +224,8 @@ def explodir_servico_para_quantidade(servico, quantidade,
             'unidade': d['unidade'],
             'coeficiente': float(coef),
             'preco_unitario': float(preco),
-            'quantidade_total': float(qtd_total),
-            'quantidade_comercial': float(qtd_com),
+            'quantidade_tecnica': float(qtd_tecnica),
+            'quantidade_compra': float(qtd_compra),
             'fator_comercial': float(fator),
             'unidade_comercial': d.get('unidade_comercial') or None,
             'subtotal_unitario': float(sub_unit),

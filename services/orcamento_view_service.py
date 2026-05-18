@@ -67,19 +67,40 @@ def aliquotas_efetivas(item, orcamento, servico=None) -> tuple[Decimal, Decimal]
 def recalcular_item(item, orcamento) -> dict:
     """Recalcula o item a partir do snapshot. Atualiza campos in-place.
 
+    Task #19: custo_unitario permanece técnico (coef × preço, base de pricing).
+    custo_total reflete quantidades comerciais arredondadas (o que realmente
+    se compra): Σ(qtd_compra_linha × preco_unitario).
+    venda_total = qtd × preco_unit (pricing não muda).
+    lucro_total = venda_total − custo_total_comercial.
+
+    Cada linha do snapshot é enriquecida com:
+      quantidade_tecnica  = coef × item.quantidade  (uso exato do projeto)
+      quantidade_compra   = múltiplo do fator ≥ qtd_tecnica (o que se compra)
+      subtotal_compra     = quantidade_compra × preco_unitario (custo real)
+
     Retorna dict com {custo_unit, preco_unit, custo_total, venda_total, lucro_total, erro}.
     """
     import math as _math
     snap = item.composicao_snapshot or []
-    custo_unit = Decimal('0')
+    qtd_item = _d(item.quantidade)
+    custo_unit = Decimal('0')   # técnico: Σ(coef × preço) — base de pricing
+    custo_compra = Decimal('0') # comercial: Σ(qtd_compra × preço) — custo real
     snap_norm = []
     for linha in snap:
         coef = _d(linha.get('coeficiente'))
         preco = _d(linha.get('preco_unitario'))
-        sub = (coef * preco).quantize(Decimal('0.0001'))
-        # Task #19 — preserva e recalcula campos de quantidade comercial
+        sub_unit = (coef * preco).quantize(Decimal('0.0001'))
         fator = _d(linha.get('fator_comercial') or 1) or Decimal('1')
         unidade_comercial = linha.get('unidade_comercial') or None
+        # Task #19 — quantidades por item (dependem da qtd total do item)
+        qtd_tec = (coef * qtd_item).quantize(Decimal('0.0001'))
+        if fator > Decimal('1') and qtd_tec > Decimal('0'):
+            qtd_com = (
+                Decimal(str(_math.ceil(float(qtd_tec) / float(fator)))) * fator
+            ).quantize(Decimal('0.0001'))
+        else:
+            qtd_com = qtd_tec
+        sub_compra = (qtd_com * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         snap_norm.append({
             'tipo': (linha.get('tipo') or 'MATERIAL').upper(),
             'insumo_id': linha.get('insumo_id'),
@@ -87,11 +108,15 @@ def recalcular_item(item, orcamento) -> dict:
             'unidade': linha.get('unidade') or 'un',
             'coeficiente': float(coef),
             'preco_unitario': float(preco),
-            'subtotal_unitario': float(sub),
+            'subtotal_unitario': float(sub_unit),
             'fator_comercial': float(fator),
             'unidade_comercial': unidade_comercial,
+            'quantidade_tecnica': float(qtd_tec),
+            'quantidade_compra': float(qtd_com),
+            'subtotal_compra': float(sub_compra),
         })
-        custo_unit += sub
+        custo_unit += sub_unit
+        custo_compra += sub_compra
     item.composicao_snapshot = snap_norm
 
     imp, mar = aliquotas_efetivas(item, orcamento, item.servico)
@@ -103,9 +128,8 @@ def recalcular_item(item, orcamento) -> dict:
     else:
         preco_unit = (custo_unit / divisor).quantize(Decimal('0.0001'))
 
-    qtd = _d(item.quantidade)
-    custo_total = (qtd * custo_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    venda_total = (qtd * preco_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    venda_total = (qtd_item * preco_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    custo_total = custo_compra.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     lucro_total = venda_total - custo_total
 
     item.custo_unitario = custo_unit.quantize(Decimal('0.0001'))
@@ -201,12 +225,19 @@ def composicao_venda_agrupada(snapshot, custo_unit, preco_venda_unit, quantidade
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
         qtd_total_insumo = (coef * qtd_serv).quantize(Decimal('0.0001'))
+        # Task #19 — propaga quantidades comerciais do snapshot (se persistidas)
+        qtd_compra = _d(linha.get('quantidade_compra') or 0) or qtd_total_insumo
+        unidade_comercial = linha.get('unidade_comercial') or None
+        fator_com = _d(linha.get('fator_comercial') or 1) or Decimal('1')
         grupos[tipo]['subtotal'] += venda_total_insumo
         grupos[tipo]['insumos'].append({
             'nome': linha.get('nome') or '',
             'unidade': linha.get('unidade') or 'un',
             'coeficiente': float(coef),
             'qtd_total': float(qtd_total_insumo),
+            'quantidade_compra': float(qtd_compra),
+            'unidade_comercial': unidade_comercial,
+            'fator_comercial': float(fator_com),
             'valor_unitario_venda': float(
                 venda_unit_insumo.quantize(Decimal('0.0001'))
             ),

@@ -119,7 +119,16 @@ Espera:
                   <tr>
                     <td class="ps-2" style="word-break: break-word;">{{ ins.nome }}</td>
                     <td class="text-end" style="white-space: nowrap;">
-                      {{ ins.qtd_total|num(2) }} {{ ins.unidade }}
+                      {%- if ins.fator_comercial is defined and ins.fator_comercial > 1 -%}
+                        <span class="text-muted small" title="Qtd. técnica">{{ ins.qtd_total|num(2) }} {{ ins.unidade }}</span><br>
+                        <span class="fw-semibold" title="Qtd. de compra (embalagem)">
+                          {{ ins.quantidade_compra|num(2) }}
+                          {% if ins.unidade_comercial %}{{ ins.unidade_comercial }}{% else %}{{ ins.unidade }}{% endif %}
+                          <i class="fas fa-shopping-cart fa-xs text-warning" title="Quantidade comercial (embalagem)"></i>
+                        </span>
+                      {%- else -%}
+                        {{ ins.qtd_total|num(2) }} {{ ins.unidade }}
+                      {%- endif -%}
                     </td>
                     <td class="text-end" style="white-space: nowrap;">{{ ins.valor_unitario_venda|brl }}</td>
                     <td class="text-end pe-2 fw-semibold" style="white-space: nowrap;">{{ ins.valor_total_venda|brl }}</td>
