@@ -206,7 +206,9 @@ class FinanceiroService:
     
     @staticmethod
     def listar_contas_pagar(admin_id: int, status: str = None, 
-                           obra_id: int = None, vencidas: bool = False) -> List[ContaPagar]:
+                           obra_id: int = None, vencidas: bool = False,
+                           responsavel_id: int = None,
+                           categoria: str = None) -> List[ContaPagar]:
         """Lista contas a pagar com filtros"""
         query = ContaPagar.query.filter_by(admin_id=admin_id)
         
@@ -215,6 +217,12 @@ class FinanceiroService:
         
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
+
+        if responsavel_id:
+            query = query.filter(ContaPagar.responsavel_id == responsavel_id)
+
+        if categoria:
+            query = query.filter(ContaPagar.origem_tipo == categoria)
         
         if vencidas:
             hoje = date.today()

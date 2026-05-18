@@ -10,7 +10,7 @@ from app import db
 from models import (AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento,
                     CentroCusto, ContaPagar, CustoObra,
                     Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem,
-                    GestaoCustoPai, GestaoCustoFilho)
+                    GestaoCustoPai, GestaoCustoFilho, Usuario)
 from utils.tenant import get_tenant_admin_id, is_v2_active
 
 logger = logging.getLogger(__name__)
@@ -174,7 +174,11 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
     from decimal import Decimal
     fornecedor = Fornecedor.query.get(pedido.fornecedor_id)
     obra = Obra.query.get(pedido.obra_id) if pedido.obra_id else None
-    vencimentos = _vencimentos(pedido.data_compra, pedido.condicao_pagamento, pedido.parcelas)
+    vencimentos = _vencimentos(
+        pedido.data_compra, pedido.condicao_pagamento, pedido.parcelas,
+        primeira_parcela=pedido.data_vencimento_primeira_parcela,
+        intervalo_dias=pedido.intervalo_parcelas_dias,
+    )
     n_parcelas = len(vencimentos)
     valor_total = float(pedido.valor_total)
     valor_parcela = round(valor_total / n_parcelas, 2)
@@ -205,6 +209,7 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
             numero_parcela=idx,
             total_parcelas=n_parcelas,
             observacoes=desc_cp[:300],
+            responsavel_id=pedido.responsavel_id,
         )
         db.session.add(gcp)
         db.session.flush()
@@ -220,6 +225,34 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
             origem_id=pedido.id,
         )
         db.session.add(gcf)
+
+        # Task #11 — Arquitetura de duas camadas (sem dupla contagem):
+        #   GCP (acima)  = camada de CUSTO: centro de custo da obra, DRE, relatórios.
+        #   ContaPagar   = camada de OBRIGAÇÃO FINANCEIRA (payables): contas a pagar,
+        #                  fluxo de caixa, Fechamento de Pagamentos.
+        # A tela de Contas a Pagar exclui GCPs de pedido_compra de custos_v2
+        # porque esses já aparecem como ContaPagar na tabela principal.
+        # Assim, cada tela consulta apenas sua camada e não há soma duplicada.
+        cp = ContaPagar(
+            admin_id=admin_id,
+            fornecedor_id=pedido.fornecedor_id,
+            obra_id=pedido.obra_id,
+            numero_documento=pedido.numero,
+            descricao=desc_cp[:500],
+            valor_original=v,
+            valor_pago=0,
+            saldo=v,
+            status='PENDENTE',
+            data_emissao=pedido.data_compra,
+            data_vencimento=data_venc,
+            origem_tipo='COMPRA',
+            origem_id=pedido.id,
+            pedido_compra_id=pedido.id,
+            parcela_numero=idx,
+            parcela_total=n_parcelas,
+            responsavel_id=pedido.responsavel_id,
+        )
+        db.session.add(cp)
 
     # Entrada automática no almoxarifado (ENTRADA + lote)
     movs_entrada = _gerar_entrada_almoxarifado(pedido, itens_validos, admin_id, usuario_id)
@@ -298,6 +331,7 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
         numero_parcela=1,
         total_parcelas=1,
         observacoes=desc_cp[:300],
+        responsavel_id=pedido.responsavel_id,
     )
     db.session.add(gcp)
     db.session.flush()
@@ -339,8 +373,13 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
     )
 
 
-def _vencimentos(data_compra, condicao, parcelas):
-    """Gera lista de (data_vencimento, valor_parcela) para ContaPagar."""
+def _vencimentos(data_compra, condicao, parcelas, primeira_parcela=None, intervalo_dias=None):
+    """Gera lista de (data_vencimento, valor_parcela) para ContaPagar / GCP.
+
+    Args:
+        primeira_parcela: date opcional — data do primeiro vencimento (Task #11).
+        intervalo_dias: int opcional — dias entre parcelas (default 30).
+    """
     if not isinstance(data_compra, date):
         data_compra = date.today()
 
@@ -348,13 +387,20 @@ def _vencimentos(data_compra, condicao, parcelas):
 
     if condicao in mapa_dias:
         dias = mapa_dias[condicao]
-        return [(data_compra + timedelta(days=dias), None)]  # valor definido depois
+        # Se data personalizada foi fornecida, usá-la; senão calcular como antes
+        data_venc = primeira_parcela if primeira_parcela else (data_compra + timedelta(days=dias))
+        return [(data_venc, None)]
 
-    # parcelado → N datas com intervalo de 30 dias
+    # parcelado → N datas
     parcelas = max(1, int(parcelas or 1))
+    intervalo = int(intervalo_dias) if intervalo_dias else 30
     datas = []
     for i in range(1, parcelas + 1):
-        datas.append((data_compra + timedelta(days=30 * i), None))
+        if primeira_parcela:
+            data_venc = primeira_parcela + timedelta(days=intervalo * (i - 1))
+        else:
+            data_venc = data_compra + timedelta(days=intervalo * i)
+        datas.append((data_venc, None))
     return datas
 
 
@@ -465,6 +511,8 @@ def nova():
     itens_catalogo = AlmoxarifadoItem.query.filter_by(admin_id=admin_id).order_by('nome').all()
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     funcionarios_json = [{'id': f.id, 'nome': f.nome} for f in funcionarios]
+    # Usuários ativos do tenant para seleção de responsável
+    usuarios = Usuario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
 
     return render_template(
         'compras/nova_compra.html',
@@ -473,6 +521,7 @@ def nova():
         itens_catalogo=itens_catalogo,
         funcionarios=funcionarios,
         funcionarios_json=funcionarios_json,
+        usuarios=usuarios,
         CONDICOES=CONDICOES,
         hoje=date.today().isoformat(),
     )
@@ -517,6 +566,21 @@ def nova_post():
         parcelas = int(request.form.get('parcelas', 1))
         numero = request.form.get('numero', '').strip() or None
         observacoes = request.form.get('observacoes', '').strip() or None
+        # Task #11 — Responsável e datas de parcela personalizadas
+        responsavel_id_raw = request.form.get('responsavel_id', '').strip()
+        responsavel_id = int(responsavel_id_raw) if responsavel_id_raw else None
+        # Multi-tenant validation: responsavel must belong to this tenant
+        if responsavel_id:
+            resp_ok = Usuario.query.filter_by(id=responsavel_id, admin_id=admin_id).first()
+            if not resp_ok:
+                responsavel_id = None
+        primeira_parcela_raw = request.form.get('data_primeira_parcela', '').strip()
+        data_primeira_parcela = (
+            datetime.strptime(primeira_parcela_raw, '%Y-%m-%d').date()
+            if primeira_parcela_raw else None
+        )
+        intervalo_parcelas_raw = request.form.get('intervalo_parcelas_dias', '').strip()
+        intervalo_parcelas_dias = int(intervalo_parcelas_raw) if intervalo_parcelas_raw else None
         obra_id = request.form.get('obra_id') or None
         if obra_id:
             try:
@@ -606,6 +670,9 @@ def nova_post():
             processada_apos_aprovacao=False,
             status_aprovacao_cliente='AGUARDANDO_APROVACAO_CLIENTE' if tipo_compra == 'aprovacao_cliente' else None,
             admin_id=admin_id,
+            responsavel_id=responsavel_id,
+            data_vencimento_primeira_parcela=data_primeira_parcela,
+            intervalo_parcelas_dias=intervalo_parcelas_dias,
         )
         db.session.add(pedido)
         db.session.flush()

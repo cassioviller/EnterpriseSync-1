@@ -1724,11 +1724,18 @@ class ContaPagar(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Task #11 — Compras Parceladas e Calendário de Pagamentos
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    parcela_numero = db.Column(db.Integer, nullable=True)
+    parcela_total = db.Column(db.Integer, nullable=True)
+    pedido_compra_id = db.Column(db.Integer, db.ForeignKey('pedido_compra.id', use_alter=True, name='fk_cp_pedido_compra'), nullable=True)
+    fechamento_id = db.Column(db.Integer, db.ForeignKey('fechamento_pagamento.id', use_alter=True, name='fk_cp_fechamento'), nullable=True)
     
     fornecedor = db.relationship('Fornecedor', backref='contas_pagar')
     obra = db.relationship('Obra', backref='contas_pagar')
     conta_contabil = db.relationship('PlanoContas', backref='contas_pagar_rel')
-    admin = db.relationship('Usuario', backref='contas_pagar_admin')
+    admin = db.relationship('Usuario', foreign_keys=[admin_id], backref='contas_pagar_admin')
+    responsavel = db.relationship('Usuario', foreign_keys=[responsavel_id], backref='contas_pagar_responsavel')
     
     __table_args__ = (
         db.Index('idx_conta_pagar_vencimento', 'data_vencimento'),
@@ -4673,11 +4680,17 @@ class PedidoCompra(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Task #11 — Compras Parceladas, Responsável e Calendário de Pagamentos
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    data_vencimento_primeira_parcela = db.Column(db.Date, nullable=True)
+    intervalo_parcelas_dias = db.Column(db.Integer, nullable=True)
+
     # Relacionamentos
     fornecedor = db.relationship('Fornecedor', backref='pedidos_compra', foreign_keys=[fornecedor_id])
     centro_custo = db.relationship('CentroCusto', backref='pedidos_compra', foreign_keys=[centro_custo_id])
     obra = db.relationship('Obra', backref='pedidos_compra', foreign_keys=[obra_id])
     itens = db.relationship('PedidoCompraItem', backref='pedido', lazy='dynamic', cascade='all, delete-orphan')
+    responsavel = db.relationship('Usuario', foreign_keys=[responsavel_id], backref='pedidos_compra_responsavel')
 
 
 class PedidoCompraItem(db.Model):
@@ -4931,11 +4944,15 @@ class GestaoCustoPai(db.Model):
     numero_parcela = db.Column(db.Integer, nullable=True)
     total_parcelas = db.Column(db.Integer, nullable=True)
     import_batch_id = db.Column(db.String(50), nullable=True)
+    # Task #11 — Responsável pela Compra e Fechamento de Pagamentos
+    responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    fechamento_id = db.Column(db.Integer, db.ForeignKey('fechamento_pagamento.id', use_alter=True, name='fk_gcp_fechamento'), nullable=True)
 
     itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
                             cascade='all, delete-orphan')
     fornecedor = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
     subempreiteiro = db.relationship('Subempreiteiro', foreign_keys=[subempreiteiro_id], backref='custos_lancados')
+    responsavel = db.relationship('Usuario', foreign_keys=[responsavel_id], backref='gestao_custo_responsavel')
     # conta_contabil: sem relationship ORM pois não há FK DB-level (veja nota acima).
     # Consultar PlanoContas.query.filter_by(codigo=self.conta_contabil_codigo) quando necessário.
 
@@ -6760,6 +6777,53 @@ class CategoriaFornecedor(db.Model):
     __table_args__ = (
         db.Index('idx_cat_fornecedor_admin', 'admin_id'),
     )
+
+
+# ================================
+# Task #11 — Calendário de Pagamentos
+# ================================
+
+class DiaPagamentoConfig(db.Model):
+    """Dias do mês configurados para fechamento de pagamentos (ex: dia 5, dia 20)."""
+    __tablename__ = 'dia_pagamento_config'
+
+    id = db.Column(db.Integer, primary_key=True)
+    dia_do_mes = db.Column(db.Integer, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('dia_do_mes', 'admin_id', name='uq_dia_pagamento_admin'),
+        db.Index('idx_dia_pagamento_admin', 'admin_id'),
+    )
+
+    def __repr__(self):
+        return f'<DiaPagamentoConfig dia={self.dia_do_mes}>'
+
+
+class FechamentoPagamento(db.Model):
+    """Registro de um fechamento de pagamentos (batch de contas a pagar)."""
+    __tablename__ = 'fechamento_pagamento'
+
+    id = db.Column(db.Integer, primary_key=True)
+    data_fechamento = db.Column(db.Date, nullable=False)
+    descricao = db.Column(db.String(200))
+    status = db.Column(db.String(20), default='ABERTO')
+    total_selecionado = db.Column(db.Numeric(15, 2), default=0)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    contas = db.relationship('ContaPagar', foreign_keys='ContaPagar.fechamento_id',
+                             backref='fechamento', lazy='dynamic')
+    gestao_custos = db.relationship('GestaoCustoPai', foreign_keys='GestaoCustoPai.fechamento_id',
+                                    backref='fechamento', lazy='dynamic')
+
+    __table_args__ = (
+        db.Index('idx_fechamento_admin', 'admin_id'),
+    )
+
+    def __repr__(self):
+        return f'<FechamentoPagamento {self.data_fechamento} {self.status}>'
 
 
 class CategoriaReembolso(db.Model):

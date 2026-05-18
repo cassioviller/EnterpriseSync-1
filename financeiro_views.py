@@ -9,8 +9,8 @@ from decimal import Decimal
 from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, Fornecedor, 
-    PlanoContas, Obra, CentroCusto, GestaoCustoPai, FluxoCaixa,
-    CategoriaFluxoCaixa
+    PlanoContas, Obra, CentroCusto, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa,
+    CategoriaFluxoCaixa, DiaPagamentoConfig, FechamentoPagamento, Usuario, TipoUsuario
 )
 from utils.tenant import is_v2_active
 from financeiro_service import FinanceiroService
@@ -117,12 +117,16 @@ def listar_contas_pagar():
     # Filtros
     status = request.args.get('status')
     obra_id = request.args.get('obra_id', type=int)
+    responsavel_id = request.args.get('responsavel_id', type=int)
     highlight_id = request.args.get('highlight_id', type=int)
+    categoria = request.args.get('categoria', '')
     
     contas = FinanceiroService.listar_contas_pagar(
         admin_id, 
         status=status, 
-        obra_id=obra_id
+        obra_id=obra_id,
+        responsavel_id=responsavel_id,
+        categoria=categoria or None,
     )
 
     # Se highlight_id especificado, garantir que a conta aparece primeiro na lista
@@ -131,7 +135,10 @@ def listar_contas_pagar():
     
     # Obras para filtro
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
-    
+
+    # Usuários para filtro de responsável (Task #11)
+    usuarios = Usuario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+
     # Bancos para dropdown de baixa
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()
     
@@ -161,14 +168,25 @@ def listar_contas_pagar():
         ContaPagar.data_pagamento <= hoje
     ).all())
     
-    # Gestão de Custos V2 — mostrar pendentes/autorizados no contas a pagar
+    # Gestão de Custos V2 — mostrar pendentes/autorizados no contas a pagar.
+    # Exclui GCPs gerados por pedido_compra: esses já aparecem na tabela principal
+    # como ContaPagar (origem_tipo='COMPRA'), então removê-los de custos_v2 evita
+    # que a mesma obrigação seja contada duas vezes.
     v2 = is_v2_active()
+
+    # Sub-query: IDs de GCP que têm filho com origem_tabela='pedido_compra'
+    _compra_gcp_ids = db.session.query(GestaoCustoFilho.pai_id).filter(
+        GestaoCustoFilho.admin_id == admin_id,
+        GestaoCustoFilho.origem_tabela == 'pedido_compra',
+    ).distinct().subquery()
+
     # custos_v2: lista para exibição na tabela (inclui PAGO/PARCIAL para acesso ao estorno)
     custos_v2 = []
     if v2:
         custos_v2 = GestaoCustoPai.query.filter(
             GestaoCustoPai.admin_id == admin_id,
-            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL', 'PAGO'])
+            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL', 'PAGO']),
+            ~GestaoCustoPai.id.in_(_compra_gcp_ids),
         ).order_by(GestaoCustoPai.data_criacao.desc()).all()
 
     # KPI V2: query separada — apenas status abertos, sem limite de 200, para precisão dos cards
@@ -176,7 +194,8 @@ def listar_contas_pagar():
     if v2:
         custos_v2_abertos = GestaoCustoPai.query.filter(
             GestaoCustoPai.admin_id == admin_id,
-            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL'])
+            GestaoCustoPai.status.in_(['SOLICITADO', 'AUTORIZADO', 'PENDENTE', 'PARCIAL']),
+            ~GestaoCustoPai.id.in_(_compra_gcp_ids),
         ).all()
 
     # Incorporar custos V2 nos KPI cards usando regra canônica (valor_solicitado tem prioridade)
@@ -209,6 +228,14 @@ def listar_contas_pagar():
         'pagas_mes': pagas_mes
     }
 
+    # Categorias disponíveis para filtro — construídas dinamicamente dos valores
+    # reais de origem_tipo no tenant (ex: 'COMPRA', 'ALIMENTACAO', 'CUSTO_ESCRITORIO')
+    categorias_disponiveis = db.session.query(ContaPagar.origem_tipo).filter(
+        ContaPagar.admin_id == admin_id,
+        ContaPagar.origem_tipo.isnot(None),
+    ).distinct().order_by(ContaPagar.origem_tipo).all()
+    categorias_disponiveis = [c[0] for c in categorias_disponiveis if c[0]]
+
     return render_template(
         'financeiro/contas_pagar.html',
         contas=contas,
@@ -217,10 +244,14 @@ def listar_contas_pagar():
         resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id,
+        responsavel_selecionado=responsavel_id,
+        categoria_selecionada=categoria,
+        usuarios=usuarios,
         highlight_id=highlight_id,
         datetime=datetime,
         custos_v2=custos_v2,
         is_v2=v2,
+        categorias_disponiveis=categorias_disponiveis,
     )
 
 
@@ -896,6 +927,329 @@ def inicializar_plano_contas():
         flash('Erro ao inicializar plano de contas', 'danger')
     
     return redirect(url_for('financeiro.plano_contas'))
+
+
+# ==================== CALENDÁRIO DE PAGAMENTOS (Task #11) ====================
+
+def _handle_calendario_post(admin_id):
+    """Shared POST handler for the calendar config route (both URL aliases)."""
+    action = request.form.get('action')
+    if action == 'add':
+        dia_raw = request.form.get('dia_do_mes', '').strip()
+        try:
+            dia = int(dia_raw)
+            if not (1 <= dia <= 28):
+                raise ValueError
+        except (TypeError, ValueError):
+            flash('Dia inválido. Informe um número entre 1 e 28.', 'danger')
+            return False
+
+        existe = DiaPagamentoConfig.query.filter_by(admin_id=admin_id, dia_do_mes=dia).first()
+        if existe:
+            flash(f'O dia {dia} já está configurado.', 'warning')
+        else:
+            db.session.add(DiaPagamentoConfig(dia_do_mes=dia, admin_id=admin_id))
+            db.session.commit()
+            flash(f'Dia {dia} adicionado ao calendário de pagamentos.', 'success')
+
+    elif action == 'remove':
+        dia_id = request.form.get('dia_id')
+        cfg = DiaPagamentoConfig.query.filter_by(id=dia_id, admin_id=admin_id).first()
+        if cfg:
+            db.session.delete(cfg)
+            db.session.commit()
+            flash(f'Dia {cfg.dia_do_mes} removido do calendário.', 'success')
+        else:
+            flash('Configuração não encontrada.', 'danger')
+    return True
+
+
+@financeiro_bp.route('/calendario-pagamentos', methods=['GET', 'POST'])
+@financeiro_bp.route('/calendario-pagamentos/configurar', methods=['GET', 'POST'])
+@login_required
+def calendario_pagamentos():
+    """Configura os dias do mês em que a empresa efetua pagamentos.
+
+    Accessible via both:
+      /financeiro/calendario-pagamentos
+      /financeiro/calendario-pagamentos/configurar   (spec alias)
+
+    Restricted to ADMIN and SUPER_ADMIN roles — FUNCIONARIOs cannot alter
+    the tenant payment calendar.
+    """
+    if current_user.tipo_usuario not in (TipoUsuario.SUPER_ADMIN, TipoUsuario.ADMIN):
+        flash('Apenas administradores podem configurar o calendário de pagamentos.', 'danger')
+        return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+    admin_id = get_admin_id()
+
+    if request.method == 'POST':
+        _handle_calendario_post(admin_id)
+        return redirect(url_for('financeiro.calendario_pagamentos'))
+
+    dias = DiaPagamentoConfig.query.filter_by(admin_id=admin_id).order_by(
+        DiaPagamentoConfig.dia_do_mes
+    ).all()
+    return render_template('financeiro/calendario_pagamentos.html', dias=dias)
+
+
+# ==================== FECHAMENTO DE PAGAMENTOS (Task #11) ====================
+
+def _calcular_janela_ciclo(data_selecionada, dias_ordenados):
+    """Calcula o intervalo (data_inicio, data_fim) do ciclo de pagamento.
+
+    Regra:
+    - dia[0] = D0: janela cobre 1º do mês até dia D0
+    - dia[i] = Di: janela cobre dia[i-1]+1 até Di
+    - Último dia configurado: Di+1 até FIM DO MÊS (garante que nenhuma conta
+      com vencimento após o último dia configurado fique sem ciclo)
+
+    Retorna (data_inicio_ciclo, data_fim_ciclo).
+    A data_inicio_ciclo serve para informação na UI; a query usa data_fim_ciclo
+    como limite máximo para o ciclo atual (contas futuras são "antecipar").
+    """
+    if not dias_ordenados:
+        return date(data_selecionada.year, 1, 1), date(data_selecionada.year, 12, 31)
+
+    from calendar import monthrange
+    ano, mes = data_selecionada.year, data_selecionada.month
+    dias = sorted(dias_ordenados)
+    _, ult_dia_mes = monthrange(ano, mes)
+
+    dia_sel = data_selecionada.day
+
+    idx_atual = None
+    for i, d in enumerate(dias):
+        if d >= dia_sel:
+            idx_atual = i
+            break
+
+    if idx_atual is None:
+        # Selecionado depois do último dia configurado → último ciclo do mês
+        idx_atual = len(dias) - 1
+
+    # Último ciclo do mês sempre se estende até EOM para capturar todas as contas
+    if idx_atual == len(dias) - 1:
+        dia_fim = ult_dia_mes
+    else:
+        dia_fim = min(dias[idx_atual], ult_dia_mes)
+    data_fim = date(ano, mes, dia_fim)
+
+    if idx_atual == 0:
+        data_inicio = date(ano, mes, 1)
+    else:
+        dia_inicio = dias[idx_atual - 1] + 1
+        dia_inicio = min(dia_inicio, ult_dia_mes)
+        data_inicio = date(ano, mes, dia_inicio)
+
+    return data_inicio, data_fim
+
+
+@financeiro_bp.route('/fechamento-pagamentos', methods=['GET', 'POST'])
+@login_required
+def fechamento_pagamentos():
+    """Fechamento de Pagamentos — ciclo de contas a pagar.
+
+    GET  — exibe seletor de data e lista de contas do ciclo selecionado (+ filters)
+    POST — salva o fechamento para as contas selecionadas
+    """
+    admin_id = get_admin_id()
+    hoje = date.today()
+
+    dias_config = DiaPagamentoConfig.query.filter_by(admin_id=admin_id).order_by(
+        DiaPagamentoConfig.dia_do_mes
+    ).all()
+    dias_vals = [d.dia_do_mes for d in dias_config]
+
+    # ── POST — salvar / fechar / reabrir ──────────────────────────────────────
+    if request.method == 'POST':
+        action = request.form.get('action', 'create')
+
+        if action == 'create':
+            data_raw = request.form.get('data_fechamento', '').strip()
+            descricao = request.form.get('descricao', '').strip() or None
+            cp_ids = request.form.getlist('conta_ids')
+
+            if not data_raw:
+                flash('Informe a data do fechamento.', 'danger')
+                return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+            try:
+                data_fechamento = datetime.strptime(data_raw, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Data inválida.', 'danger')
+                return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+            # Soft validation: warn if selected date day doesn't match any configured
+            # payment day.  The fechamento is still allowed (free-date behavior is
+            # intentional for ad-hoc closings), but the user gets a nudge.
+            if dias_vals and data_fechamento.day not in dias_vals:
+                dias_str = ', '.join(str(d) for d in sorted(dias_vals))
+                flash(
+                    f'Atenção: o dia {data_fechamento.day} não está nos dias configurados '
+                    f'({dias_str}). O fechamento foi criado assim mesmo.',
+                    'warning'
+                )
+
+            total = Decimal('0')
+            cps_selecionados = []
+            for cid in cp_ids:
+                try:
+                    cp = ContaPagar.query.filter_by(id=int(cid), admin_id=admin_id).first()
+                except (ValueError, TypeError):
+                    continue
+                if cp:
+                    cps_selecionados.append(cp)
+                    total += Decimal(str(cp.saldo or cp.valor_original or 0))
+
+            fechamento = FechamentoPagamento(
+                data_fechamento=data_fechamento,
+                descricao=descricao,
+                status='ABERTO',
+                total_selecionado=total,
+                admin_id=admin_id,
+            )
+            db.session.add(fechamento)
+            db.session.flush()
+
+            for cp in cps_selecionados:
+                cp.fechamento_id = fechamento.id
+
+            db.session.commit()
+            total_fmt = f"R$ {float(total):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            flash(
+                f'Fechamento criado com {len(cps_selecionados)} conta(s) — Total {total_fmt}',
+                'success'
+            )
+            return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+        elif action == 'fechar':
+            fech_id = request.form.get('fechamento_id')
+            fech = FechamentoPagamento.query.filter_by(id=fech_id, admin_id=admin_id).first()
+            if fech and fech.status == 'ABERTO':
+                fech.status = 'FECHADO'
+                db.session.commit()
+                flash('Fechamento encerrado com sucesso.', 'success')
+            return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+        elif action == 'reabrir':
+            fech_id = request.form.get('fechamento_id')
+            fech = FechamentoPagamento.query.filter_by(id=fech_id, admin_id=admin_id).first()
+            if fech and fech.status == 'FECHADO':
+                fech.status = 'ABERTO'
+                db.session.commit()
+                flash('Fechamento reaberto.', 'success')
+            return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+        return redirect(url_for('financeiro.fechamento_pagamentos'))
+
+    # ── GET — preparar a listagem com ciclo e filtros ─────────────────────────
+
+    # Data selecionada: vem do GET param, padrão = hoje
+    data_raw = request.args.get('data_fechamento', '').strip()
+    try:
+        data_sel = datetime.strptime(data_raw, '%Y-%m-%d').date() if data_raw else hoje
+    except ValueError:
+        data_sel = hoje
+
+    # Filtros opcionais
+    filtro_fornecedor_id = request.args.get('fornecedor_id', type=int)
+    filtro_obra_id = request.args.get('obra_id', type=int)
+    filtro_responsavel_id = request.args.get('responsavel_id', type=int)
+    filtro_status = request.args.get('status', '')
+    filtro_categoria = request.args.get('categoria', '')
+
+    # Janela do ciclo
+    data_inicio_ciclo, data_fim_ciclo = _calcular_janela_ciclo(data_sel, dias_vals)
+
+    # Antecipar window: inclui contas futuras de até 30 dias além do fim do ciclo
+    # para que o usuário possa marcar "Antecipar" e incluí-las neste fechamento.
+    from datetime import timedelta
+    data_fim_antecipar = data_fim_ciclo + timedelta(days=30)
+
+    # Query: ContaPagar é a fonte unificada de obrigações financeiras (payables).
+    # Inclui tanto contas manuais quanto parcelas geradas por compras (origem_tipo='COMPRA').
+    # Janela:
+    #   - overdue:  vencimento < data_inicio_ciclo  (sempre pre-selecionado)
+    #   - ciclo:    vencimento entre data_inicio_ciclo e data_fim_ciclo
+    #   - futura:   vencimento entre data_fim_ciclo+1 e data_fim_antecipar (marcável via Antecipar)
+    q = ContaPagar.query.filter(
+        ContaPagar.admin_id == admin_id,
+        ContaPagar.fechamento_id.is_(None),
+        ContaPagar.data_vencimento <= data_fim_antecipar,
+    )
+
+    # Status padrão: pendentes/parciais (se filtro explícito, usar ele)
+    if filtro_status:
+        q = q.filter(ContaPagar.status == filtro_status)
+    else:
+        q = q.filter(ContaPagar.status.in_(['PENDENTE', 'PARCIAL']))
+
+    if filtro_fornecedor_id:
+        q = q.filter(ContaPagar.fornecedor_id == filtro_fornecedor_id)
+    if filtro_obra_id:
+        q = q.filter(ContaPagar.obra_id == filtro_obra_id)
+    if filtro_responsavel_id:
+        q = q.filter(ContaPagar.responsavel_id == filtro_responsavel_id)
+    if filtro_categoria:
+        q = q.filter(ContaPagar.origem_tipo == filtro_categoria)
+
+    contas_ciclo = q.order_by(ContaPagar.data_vencimento).all()
+
+    # Listas para dropdowns de filtro
+    fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+    usuarios = Usuario.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
+
+    # Categorias disponíveis para filtro (tipos de origem presentes no tenant)
+    categorias_disponiveis = db.session.query(ContaPagar.origem_tipo).filter(
+        ContaPagar.admin_id == admin_id,
+        ContaPagar.origem_tipo.isnot(None),
+    ).distinct().order_by(ContaPagar.origem_tipo).all()
+    categorias_disponiveis = [c[0] for c in categorias_disponiveis if c[0]]
+
+    # Histórico de fechamentos
+    fechamentos = FechamentoPagamento.query.filter_by(admin_id=admin_id).order_by(
+        FechamentoPagamento.data_fechamento.desc()
+    ).all()
+
+    # Sugestão de próximas datas de pagamento (baseado nos dias configurados)
+    proximas_datas = []
+    if dias_vals:
+        from calendar import monthrange
+        for offset_mes in range(2):  # este mês e o próximo
+            ref = date(hoje.year, hoje.month, 1)
+            if hoje.month + offset_mes > 12:
+                ref = date(hoje.year + 1, (hoje.month + offset_mes) % 12 or 12, 1)
+            else:
+                ref = date(hoje.year, hoje.month + offset_mes, 1)
+            _, ult = monthrange(ref.year, ref.month)
+            for d in dias_vals:
+                dia_data = date(ref.year, ref.month, min(d, ult))
+                if dia_data >= hoje:
+                    proximas_datas.append(dia_data)
+        proximas_datas = sorted(set(proximas_datas))[:6]
+
+    return render_template(
+        'financeiro/fechamento_pagamentos.html',
+        fechamentos=fechamentos,
+        contas_ciclo=contas_ciclo,
+        dias_config=dias_config,
+        proximas_datas=proximas_datas,
+        data_sel=data_sel,
+        data_inicio_ciclo=data_inicio_ciclo,
+        data_fim_ciclo=data_fim_ciclo,
+        hoje=hoje.isoformat(),
+        fornecedores=fornecedores,
+        obras=obras,
+        usuarios=usuarios,
+        categorias_disponiveis=categorias_disponiveis,
+        filtro_fornecedor_id=filtro_fornecedor_id,
+        filtro_obra_id=filtro_obra_id,
+        filtro_responsavel_id=filtro_responsavel_id,
+        filtro_status=filtro_status,
+        filtro_categoria=filtro_categoria,
+    )
 
 
 # ==================== API JSON ====================

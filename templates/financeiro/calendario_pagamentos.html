@@ -1,0 +1,126 @@
+{% extends 'base_completo.html' %}
+
+{% block title %}Calendário de Pagamentos{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row g-4">
+
+    <!-- Header -->
+    <div class="col-12">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <h4 class="fw-bold mb-1">
+            <i class="fas fa-calendar-alt me-2 text-primary"></i>Calendário de Pagamentos
+          </h4>
+          <p class="text-muted mb-0 small">
+            Configure os dias do mês em que sua empresa efetua pagamentos.
+            Esses dias são usados para sugerir datas no fechamento de pagamentos.
+          </p>
+        </div>
+        <a href="{{ url_for('financeiro.fechamento_pagamentos') }}" class="btn btn-outline-primary btn-sm">
+          <i class="fas fa-lock me-1"></i> Ir para Fechamento de Pagamentos
+        </a>
+      </div>
+    </div>
+
+    <!-- Dias configurados -->
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent fw-semibold py-3">
+          <i class="fas fa-list me-2 text-primary"></i>Dias Configurados
+        </div>
+        <div class="card-body p-0">
+          {% if dias %}
+            <div class="row g-0 p-3">
+              {% for d in dias %}
+                <div class="col-6 col-sm-4 col-md-3 mb-3 px-2">
+                  <div class="d-flex align-items-center justify-content-between bg-light rounded-3 px-3 py-2 border">
+                    <span class="fs-5 fw-bold text-primary">Dia {{ d.dia_do_mes }}</span>
+                    <form method="POST" action="{{ url_for('financeiro.calendario_pagamentos') }}"
+                          onsubmit="return confirm('Remover dia {{ d.dia_do_mes }}?')">
+                      <input type="hidden" name="action" value="remove">
+                      <input type="hidden" name="dia_id" value="{{ d.id }}">
+                      <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-2" title="Remover">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center py-5 text-muted">
+              <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
+              <p class="mb-0">Nenhum dia configurado ainda.</p>
+              <small>Use o formulário ao lado para adicionar dias de pagamento.</small>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulário para adicionar -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent fw-semibold py-3">
+          <i class="fas fa-plus-circle me-2 text-success"></i>Adicionar Dia de Pagamento
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('financeiro.calendario_pagamentos') }}">
+            <input type="hidden" name="action" value="add">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Dia do Mês</label>
+              <input type="number" name="dia_do_mes" class="form-control form-control-lg"
+                     min="1" max="28" placeholder="Ex: 5"
+                     required>
+              <div class="form-text">
+                Informe um número entre 1 e 28 (máximo 28 para funcionar em todos os meses).
+                Dicas comuns: dia 5, dia 15, dia 20, dia 28.
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success w-100">
+              <i class="fas fa-plus me-1"></i> Adicionar Dia
+            </button>
+          </form>
+
+          <!-- Atalhos rápidos -->
+          <hr>
+          <p class="small text-muted mb-2 fw-semibold">Atalhos rápidos:</p>
+          <div class="d-flex flex-wrap gap-2">
+            {% for dia_rapido in [5, 10, 15, 20, 25, 28] %}{# all ≤ 28 — safe for all months #}
+              {% set ja_existe = dias | selectattr('dia_do_mes', 'equalto', dia_rapido) | list %}
+              {% if not ja_existe %}
+                <form method="POST" action="{{ url_for('financeiro.calendario_pagamentos') }}">
+                  <input type="hidden" name="action" value="add">
+                  <input type="hidden" name="dia_do_mes" value="{{ dia_rapido }}">
+                  <button type="submit" class="btn btn-outline-primary btn-sm">
+                    Dia {{ dia_rapido }}
+                  </button>
+                </form>
+              {% else %}
+                <button class="btn btn-primary btn-sm" disabled>
+                  <i class="fas fa-check me-1"></i>Dia {{ dia_rapido }}
+                </button>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Informativo -->
+      <div class="card border-0 shadow-sm mt-3 bg-primary bg-opacity-10 border-primary border-opacity-25">
+        <div class="card-body py-3">
+          <p class="mb-0 small text-primary">
+            <i class="fas fa-info-circle me-1"></i>
+            <strong>Como funciona:</strong> Os dias configurados aparecem como sugestão na tela de
+            <a href="{{ url_for('financeiro.fechamento_pagamentos') }}" class="text-primary fw-semibold">
+              Fechamento de Pagamentos</a>, facilitando selecionar as contas que vencem em cada ciclo.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,371 @@
+{% extends 'base_completo.html' %}
+
+{% block title %}Fechamento de Pagamentos{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row g-4">
+
+    <!-- Header -->
+    <div class="col-12">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <h4 class="fw-bold mb-1">
+            <i class="fas fa-lock me-2 text-danger"></i>Fechamento de Pagamentos
+          </h4>
+          <p class="text-muted mb-0 small">
+            Selecione a data do ciclo para ver as contas que se encaixam naquele período.
+            Depois marque as que serão incluídas no fechamento.
+          </p>
+        </div>
+        <a href="{{ url_for('financeiro.calendario_pagamentos') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-calendar-alt me-1"></i> Configurar Calendário
+        </a>
+      </div>
+    </div>
+
+    <!-- ── Seletor de data / ciclo ── -->
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <form method="GET" action="{{ url_for('financeiro.fechamento_pagamentos') }}" class="row g-3 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Data do Ciclo</label>
+              <input type="date" name="data_fechamento" class="form-control"
+                     value="{{ data_sel.isoformat() }}"
+                     onchange="this.form.submit()">
+              {% if dias_config %}
+                <div class="form-text">
+                  Dias configurados:
+                  {% for d in dias_config %}
+                    <span class="badge bg-primary-subtle text-primary me-1">dia {{ d.dia_do_mes }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="form-text">
+                  <a href="{{ url_for('financeiro.calendario_pagamentos') }}">Configure dias de pagamento</a>
+                  para usar o ciclo automático.
+                </div>
+              {% endif %}
+            </div>
+
+            {% if proximas_datas %}
+              <div class="col-md-5">
+                <label class="form-label fw-semibold">Próximas datas configuradas</label>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for pd in proximas_datas %}
+                    <a href="{{ url_for('financeiro.fechamento_pagamentos') }}?data_fechamento={{ pd.isoformat() }}"
+                       class="btn btn-sm {% if pd == data_sel %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                      {{ pd.strftime('%d/%m/%Y') }}
+                    </a>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+
+            <!-- Filtros adicionais -->
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Fornecedor</label>
+              <select name="fornecedor_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Todos</option>
+                {% for f in fornecedores %}
+                  <option value="{{ f.id }}" {% if filtro_fornecedor_id == f.id %}selected{% endif %}>
+                    {{ f.nome[:30] }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Obra</label>
+              <select name="obra_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Todas</option>
+                {% for o in obras %}
+                  <option value="{{ o.id }}" {% if filtro_obra_id == o.id %}selected{% endif %}>
+                    {{ o.nome[:25] }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Responsável</label>
+              <select name="responsavel_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Todos</option>
+                {% for u in usuarios %}
+                  <option value="{{ u.id }}" {% if filtro_responsavel_id == u.id %}selected{% endif %}>
+                    {{ u.nome[:25] }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Status</label>
+              <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Pendente/Parcial</option>
+                <option value="PENDENTE" {% if filtro_status == 'PENDENTE' %}selected{% endif %}>Pendente</option>
+                <option value="PARCIAL" {% if filtro_status == 'PARCIAL' %}selected{% endif %}>Parcial</option>
+                <option value="PAGO" {% if filtro_status == 'PAGO' %}selected{% endif %}>Pago</option>
+              </select>
+            </div>
+            {% if categorias_disponiveis %}
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">Categoria</label>
+              <select name="categoria" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Todas</option>
+                {% for cat in categorias_disponiveis %}
+                  <option value="{{ cat }}" {% if filtro_categoria == cat %}selected{% endif %}>
+                    {{ cat | replace('_', ' ') | title }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <div class="col-auto">
+              <a href="{{ url_for('financeiro.fechamento_pagamentos') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-times me-1"></i>Limpar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Janela do ciclo e tabela de contas ── -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <span class="fw-semibold">
+              <i class="fas fa-calendar-check me-2 text-primary"></i>
+              Ciclo: {{ data_inicio_ciclo.strftime('%d/%m/%Y') }} → {{ data_fim_ciclo.strftime('%d/%m/%Y') }}
+            </span>
+            <span class="badge bg-secondary ms-2">{{ contas_ciclo | length }}</span>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selecionarTodas(true)">
+              <i class="fas fa-check-square me-1"></i>Todas
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selecionarTodas(false)">
+              <i class="fas fa-square me-1"></i>Nenhuma
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <form method="POST" action="{{ url_for('financeiro.fechamento_pagamentos') }}" id="formFechamento">
+            <input type="hidden" name="action" value="create">
+            <input type="hidden" name="data_fechamento" value="{{ data_sel.isoformat() }}">
+
+            {% if contas_ciclo %}
+              <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light sticky-top">
+                    <tr>
+                      <th style="width:40px"></th>
+                      <th>Descrição / Parcela</th>
+                      <th>Fornecedor</th>
+                      <th>Responsável</th>
+                      <th>Vencimento</th>
+                      <th class="text-end">Saldo</th>
+                      <th class="text-center">Antecipar?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for cp in contas_ciclo %}
+                      {% set vencida = cp.data_vencimento < data_inicio_ciclo %}
+                      {% set futura = cp.data_vencimento > data_fim_ciclo %}
+                      <tr class="{% if vencida %}table-warning{% elif futura %}text-muted{% endif %}">
+                        <td>
+                          <input class="form-check-input conta-check" type="checkbox"
+                                 name="conta_ids" value="{{ cp.id }}"
+                                 {% if not futura %}checked{% endif %}
+                                 onchange="atualizarTotal()">
+                        </td>
+                        <td>
+                          <div class="small fw-semibold">{{ (cp.descricao or cp.origem_tipo or '—')[:60] }}</div>
+                          {% if cp.parcela_numero and cp.parcela_total %}
+                            <span class="badge bg-info-subtle text-info">
+                              {{ cp.parcela_numero }}/{{ cp.parcela_total }}
+                            </span>
+                          {% endif %}
+                          {% if cp.origem_tipo %}
+                          <span class="badge bg-light text-dark border ms-1" style="font-size:0.65rem">
+                            {{ cp.origem_tipo | replace('_', ' ') | title }}
+                          </span>
+                          {% endif %}
+                          {% if vencida %}
+                            <span class="badge bg-warning text-dark ms-1">
+                              <i class="fas fa-exclamation-triangle me-1"></i>Overdue
+                            </span>
+                          {% endif %}
+                        </td>
+                        <td class="small">
+                          {% if cp.fornecedor %}{{ cp.fornecedor.nome[:30] }}{% else %}-{% endif %}
+                        </td>
+                        <td class="small">
+                          {% if cp.responsavel %}
+                            <span class="badge bg-secondary-subtle text-secondary">
+                              <i class="fas fa-user me-1"></i>{{ cp.responsavel.nome }}
+                            </span>
+                          {% else %}
+                            <span class="text-muted">—</span>
+                          {% endif %}
+                        </td>
+                        <td class="small text-nowrap">
+                          {% if vencida %}
+                            <span class="text-danger fw-semibold">
+                              {{ cp.data_vencimento.strftime('%d/%m/%Y') }}
+                            </span>
+                          {% else %}
+                            {{ cp.data_vencimento.strftime('%d/%m/%Y') }}
+                          {% endif %}
+                        </td>
+                        <td class="text-end small fw-semibold">
+                          R$ {{ '%.2f' % (cp.saldo or cp.valor_original or 0)|float | replace('.', ',') }}
+                        </td>
+                        <td class="text-center">
+                          {% if futura %}
+                            <input class="form-check-input antecipar-check" type="checkbox"
+                                   data-conta-id="{{ cp.id }}"
+                                   title="Incluir esta conta futura neste fechamento"
+                                   onchange="anteciparConta(this, {{ cp.id }})">
+                          {% else %}
+                            <span class="text-muted small">—</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-5 text-muted">
+                <i class="fas fa-check-circle fa-3x mb-3 opacity-25 text-success"></i>
+                <p class="mb-0 fw-semibold">Nenhuma conta pendente neste ciclo.</p>
+                <small>Altere o período ou os filtros para ver outras contas.</small>
+              </div>
+            {% endif %}
+
+            {% if contas_ciclo %}
+              <div class="card-footer bg-light d-flex justify-content-between align-items-center flex-wrap gap-3 py-3">
+                <div>
+                  <div class="mb-2">
+                    <label class="form-label fw-semibold mb-1">Descrição do Fechamento</label>
+                    <input type="text" name="descricao" class="form-control form-control-sm"
+                           placeholder="Ex: Pagamentos 1ª quinzena de Maio" maxlength="200"
+                           style="width: 320px;">
+                  </div>
+                  <span class="small text-muted">
+                    Total selecionado: <strong class="text-success fs-6" id="totalSelecionado">R$ 0,00</strong>
+                  </span>
+                </div>
+                <button type="submit" class="btn btn-success">
+                  <i class="fas fa-lock me-1"></i> Criar Fechamento
+                </button>
+              </div>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Histórico de fechamentos ── -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent fw-semibold py-3">
+          <i class="fas fa-history me-2 text-secondary"></i>Histórico
+          <span class="badge bg-secondary ms-1">{{ fechamentos | length }}</span>
+        </div>
+        <div class="card-body p-0" style="max-height: 550px; overflow-y: auto;">
+          {% if fechamentos %}
+            <ul class="list-group list-group-flush">
+              {% for f in fechamentos %}
+                <li class="list-group-item px-3 py-2">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <div class="fw-semibold small">{{ f.data_fechamento.strftime('%d/%m/%Y') }}</div>
+                      <div class="text-muted small">{{ f.descricao or '—' }}</div>
+                      <div class="mt-1">
+                        {% if f.status == 'ABERTO' %}
+                          <span class="badge bg-warning text-dark"><i class="fas fa-unlock me-1"></i>Aberto</span>
+                        {% else %}
+                          <span class="badge bg-success"><i class="fas fa-lock me-1"></i>Fechado</span>
+                        {% endif %}
+                        <span class="badge bg-secondary ms-1">{{ f.contas.count() }} contas</span>
+                      </div>
+                      <div class="small text-success fw-semibold mt-1">
+                        R$ {{ '%.2f' % f.total_selecionado | replace('.', ',') }}
+                      </div>
+                    </div>
+                    <div class="d-flex flex-column gap-1">
+                      {% if f.status == 'ABERTO' %}
+                        <form method="POST" action="{{ url_for('financeiro.fechamento_pagamentos') }}"
+                              onsubmit="return confirm('Encerrar este fechamento?')">
+                          <input type="hidden" name="action" value="fechar">
+                          <input type="hidden" name="fechamento_id" value="{{ f.id }}">
+                          <button type="submit" class="btn btn-sm btn-danger" title="Fechar">
+                            <i class="fas fa-lock"></i>
+                          </button>
+                        </form>
+                      {% else %}
+                        <form method="POST" action="{{ url_for('financeiro.fechamento_pagamentos') }}">
+                          <input type="hidden" name="action" value="reabrir">
+                          <input type="hidden" name="fechamento_id" value="{{ f.id }}">
+                          <button type="submit" class="btn btn-sm btn-outline-warning" title="Reabrir">
+                            <i class="fas fa-unlock"></i>
+                          </button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-center py-4 text-muted small">
+              <i class="fas fa-lock fa-2x mb-2 opacity-25"></i>
+              <p class="mb-0">Nenhum fechamento ainda.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function selecionarTodas(sel) {
+  document.querySelectorAll('.conta-check').forEach(cb => cb.checked = sel);
+  atualizarTotal();
+}
+
+function anteciparConta(chk, contaId) {
+  const row = chk.closest('tr');
+  const contaChk = row.querySelector('.conta-check');
+  if (contaChk) {
+    contaChk.checked = chk.checked;
+    atualizarTotal();
+  }
+}
+
+function atualizarTotal() {
+  let total = 0;
+  document.querySelectorAll('.conta-check:checked').forEach(cb => {
+    const row = cb.closest('tr');
+    const cell = row.querySelector('td:nth-child(6)');
+    if (cell) {
+      const txt = cell.textContent.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+      total += parseFloat(txt) || 0;
+    }
+  });
+  const fmt = total.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const el = document.getElementById('totalSelecionado');
+  if (el) el.textContent = 'R$ ' + fmt;
+}
+
+// Calcular total inicial
+document.addEventListener('DOMContentLoaded', atualizarTotal);
+</script>
+{% endblock %}

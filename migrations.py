@@ -3865,6 +3865,8 @@ def executar_migracoes():
             (164, "Task #119 — rdo_ocorrencia: adicionar colunas faltantes (tipo_ocorrencia, severidade, descricao_ocorrencia, etc.)", migrar_campos_rdo_ocorrencia),
             (165, "Task #6 — Módulo Custos do Escritório (3 tabelas + seed 10 categorias padrão por tenant)", migration_165_custos_escritorio),
             (166, "Task #10 — Catálogos Auxiliares (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso, fornecedor_categorias M2M, fluxo_caixa.categoria_fluxo_caixa_id)", migration_166_catalogos_auxiliares),
+            (167, "Task #11 — Compras Parceladas: novos campos em conta_pagar/pedido_compra/gestao_custo_pai + tabelas dia_pagamento_config e fechamento_pagamento", migration_167_compras_parceladas),
+            (168, "Task #11 v2 — gestao_custo_pai.fechamento_id FK para fechamento_pagamento (fonte única de obrigação financeira de compras)", migration_168_gcp_fechamento_id),
         ]
         
         # Executar cada migração com rastreamento
@@ -13913,6 +13915,160 @@ def migration_158_cliente_observacao():
     """))
     db.session.commit()
     logger.info("✅ Tabela cliente_observacao criada.")
+
+
+def migration_167_compras_parceladas():
+    """Task #11 — Compras Parceladas, Responsável e Calendário de Pagamentos.
+
+    Adds:
+    - conta_pagar: responsavel_id, parcela_numero, parcela_total, pedido_compra_id, fechamento_id
+    - pedido_compra: responsavel_id, data_vencimento_primeira_parcela, intervalo_parcelas_dias
+    - gestao_custo_pai: responsavel_id
+    - Creates: dia_pagamento_config, fechamento_pagamento
+    """
+    try:
+        # 1. conta_pagar — novas colunas
+        db.session.execute(text("""
+            ALTER TABLE conta_pagar
+                ADD COLUMN IF NOT EXISTS responsavel_id INTEGER REFERENCES usuario(id),
+                ADD COLUMN IF NOT EXISTS parcela_numero INTEGER,
+                ADD COLUMN IF NOT EXISTS parcela_total INTEGER,
+                ADD COLUMN IF NOT EXISTS pedido_compra_id INTEGER,
+                ADD COLUMN IF NOT EXISTS fechamento_id INTEGER
+        """))
+
+        # 2. pedido_compra — novas colunas
+        db.session.execute(text("""
+            ALTER TABLE pedido_compra
+                ADD COLUMN IF NOT EXISTS responsavel_id INTEGER REFERENCES usuario(id),
+                ADD COLUMN IF NOT EXISTS data_vencimento_primeira_parcela DATE,
+                ADD COLUMN IF NOT EXISTS intervalo_parcelas_dias INTEGER
+        """))
+
+        # 3. gestao_custo_pai — responsavel_id
+        db.session.execute(text("""
+            ALTER TABLE gestao_custo_pai
+                ADD COLUMN IF NOT EXISTS responsavel_id INTEGER REFERENCES usuario(id)
+        """))
+
+        # 4. Tabela dia_pagamento_config
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS dia_pagamento_config (
+                id SERIAL PRIMARY KEY,
+                dia_do_mes INTEGER NOT NULL,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_dia_pagamento_admin UNIQUE (dia_do_mes, admin_id)
+            )
+        """))
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_dia_pagamento_admin
+                ON dia_pagamento_config(admin_id)
+        """))
+
+        # 5. Tabela fechamento_pagamento
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS fechamento_pagamento (
+                id SERIAL PRIMARY KEY,
+                data_fechamento DATE NOT NULL,
+                descricao VARCHAR(200),
+                status VARCHAR(20) DEFAULT 'ABERTO',
+                total_selecionado NUMERIC(15, 2) DEFAULT 0,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_fechamento_admin
+                ON fechamento_pagamento(admin_id)
+        """))
+
+        # 6. FK conta_pagar.pedido_compra_id (safe: skip if constraint already exists)
+        db.session.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_cp_pedido_compra'
+                ) THEN
+                    ALTER TABLE conta_pagar
+                        ADD CONSTRAINT fk_cp_pedido_compra
+                        FOREIGN KEY (pedido_compra_id) REFERENCES pedido_compra(id) ON DELETE SET NULL;
+                END IF;
+            END;
+            $$;
+        """))
+
+        # 7. FK conta_pagar.fechamento_id (safe: skip if constraint already exists)
+        db.session.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_cp_fechamento'
+                ) THEN
+                    ALTER TABLE conta_pagar
+                        ADD CONSTRAINT fk_cp_fechamento
+                        FOREIGN KEY (fechamento_id) REFERENCES fechamento_pagamento(id) ON DELETE SET NULL;
+                END IF;
+            END;
+            $$;
+        """))
+
+        db.session.commit()
+        logger.info("[Migration 167] Compras Parceladas e Calendário de Pagamentos aplicados com sucesso.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 167] Falha: {e}")
+        raise
+
+
+def migration_168_gcp_fechamento_id():
+    """Task #11 v2 — gestao_custo_pai.fechamento_id.
+
+    Arquitetura de fontes para compras parceladas:
+    - GestaoCustoPai (GCP) = camada de CUSTO: rastreamento no centro de custo da obra,
+      relatórios DRE e custo de obra.  Um GCP por parcela é criado por processar_compra_normal.
+    - ContaPagar = camada de OBRIGAÇÃO FINANCEIRA (payables): contas a pagar, fluxo de caixa,
+      Fechamento de Pagamentos.  Um ContaPagar por parcela é criado simultaneamente.
+
+    Este campo (fechamento_id no GCP) é mantido para referência histórica, mas o Fechamento
+    de Pagamentos usa ContaPagar.fechamento_id como fonte primária de seleção/fechamento.
+    Não há dupla contagem: cada tela consulta apenas sua camada (custos_v2 exclui GCPs de
+    pedido_compra porque esses já aparecem como ContaPagar na tabela principal).
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE gestao_custo_pai
+                ADD COLUMN IF NOT EXISTS fechamento_id INTEGER
+        """))
+
+        db.session.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'fk_gcp_fechamento'
+                ) THEN
+                    ALTER TABLE gestao_custo_pai
+                        ADD CONSTRAINT fk_gcp_fechamento
+                        FOREIGN KEY (fechamento_id)
+                        REFERENCES fechamento_pagamento(id)
+                        ON DELETE SET NULL;
+                END IF;
+            END;
+            $$;
+        """))
+
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_gcp_fechamento_id
+                ON gestao_custo_pai(fechamento_id)
+                WHERE fechamento_id IS NOT NULL
+        """))
+
+        db.session.commit()
+        logger.info("[Migration 168] gestao_custo_pai.fechamento_id adicionado com sucesso.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 168] Falha: {e}")
+        raise
 
 
 def migration_163_lead_prazo():

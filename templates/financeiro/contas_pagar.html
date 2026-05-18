@@ -44,7 +44,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Status</label>
                     <select name="status" class="form-select">
                         <option value="">Todos</option>
@@ -54,7 +54,7 @@
                         <option value="VENCIDO" {% if request.args.get('status') == 'VENCIDO' %}selected{% endif %}>Vencido</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Obra</label>
                     <select name="obra_id" class="form-select">
                         <option value="">Todas as obras</option>
@@ -65,7 +65,31 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end gap-2">
+                <div class="col-md-3">
+                    <label class="form-label">
+                        <i class="fas fa-user-tie me-1 text-primary"></i>Responsável
+                    </label>
+                    <select name="responsavel_id" class="form-select">
+                        <option value="">Todos os responsáveis</option>
+                        {% for u in usuarios %}
+                        <option value="{{ u.id }}" {% if responsavel_selecionado == u.id %}selected{% endif %}>
+                            {{ u.nome }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Categoria</label>
+                    <select name="categoria" class="form-select">
+                        <option value="">Todas as categorias</option>
+                        {% for cat in categorias_disponiveis %}
+                        <option value="{{ cat }}" {% if categoria_selecionada == cat %}selected{% endif %}>
+                            {{ cat | replace('_', ' ') | title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search me-1"></i>Filtrar
                     </button>
@@ -123,6 +147,8 @@
                             <th>Vencimento</th>
                             <th>Fornecedor</th>
                             <th>Descrição</th>
+                            <th>Parcela</th>
+                            <th>Responsável</th>
                             <th>Obra</th>
                             <th>Valor Original</th>
                             <th>Valor Pago</th>
@@ -138,6 +164,24 @@
                             <td data-label="Vencimento">{{ conta.data_vencimento.strftime('%d/%m/%Y') }}</td>
                             <td data-label="Fornecedor">{{ conta.fornecedor.razao_social if conta.fornecedor else '-' }}</td>
                             <td data-label="Descrição">{{ conta.descricao }}</td>
+                            <td data-label="Parcela">
+                                {% if conta.parcela_numero and conta.parcela_total %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle">
+                                    {{ conta.parcela_numero }}/{{ conta.parcela_total }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Responsável">
+                                {% if conta.responsavel %}
+                                <span class="badge bg-secondary-subtle text-secondary">
+                                    <i class="fas fa-user me-1"></i>{{ conta.responsavel.nome }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
                             <td data-label="Obra">
                                 {% if conta.obra %}
                                 <span class="badge bg-secondary">{{ conta.obra.nome }}</span>
@@ -178,13 +222,31 @@
                         {% if is_v2 and custos_v2 %}
                         {% for custo in custos_v2 %}
                         <tr class="table-warning">
-                            <td><small class="text-muted">{{ custo.data_criacao.strftime('%d/%m/%Y') }}</small></td>
+                            <td><small class="text-muted">{{ custo.data_criacao.strftime('%d/%m/%Y') if custo.data_criacao else '—' }}</small></td>
                             <td>
                                 {{ custo.entidade_nome }}
                                 <span class="badge bg-primary ms-1" style="font-size:.6rem">Contas a Pagar V2</span>
                             </td>
-                            <td>{{ custo.tipo_categoria }}</td>
-                            <td><span class="text-muted">-</span></td>
+                            <td>{{ custo.observacoes or custo.tipo_categoria }}</td>
+                            <td>
+                                {% if custo.numero_parcela and custo.total_parcelas %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle">
+                                    {{ custo.numero_parcela }}/{{ custo.total_parcelas }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if custo.responsavel %}
+                                <span class="badge bg-secondary-subtle text-secondary">
+                                    <i class="fas fa-user me-1"></i>{{ custo.responsavel.nome }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ custo.entidade_nome or '—' }}</td>
                             <td>{{ custo.valor_total|brl }}</td>
                             <td>{{ (custo.valor_pago or 0)|brl }}</td>
                             <td>{{ (custo.saldo if custo.saldo is not none else (custo.valor_solicitado or custo.valor_total))|brl }}</td>
@@ -218,7 +280,7 @@
                         {% endif %}
                         {% if not contas and not (is_v2 and custos_v2) %}
                         <tr>
-                            <td colspan="9" class="text-center text-muted py-4">
+                            <td colspan="11" class="text-center text-muted py-4">
                                 <i class="fas fa-inbox fa-3x mb-2"></i><br>
                                 Nenhuma conta a pagar encontrada
                             </td>

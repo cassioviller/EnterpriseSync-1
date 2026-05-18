@@ -845,6 +845,12 @@
                                 <li><a class="dropdown-item" href="{{ url_for('gestao_custos.index') }}">
                                     <i class="fas fa-file-invoice-dollar me-1"></i> Contas a Pagar
                                 </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.calendario_pagamentos') }}">
+                                    <i class="fas fa-calendar-alt me-1"></i> Calendário de Pagamentos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('financeiro.fechamento_pagamentos') }}">
+                                    <i class="fas fa-lock me-1"></i> Fechamento de Pagamentos
+                                </a></li>
                                 <li><a class="dropdown-item" href="{{ url_for('financeiro.listar_contas_receber') }}">
                                     <i class="fas fa-hand-holding-usd me-1"></i> Contas a Receber
                                 </a></li>
@@ -1026,7 +1032,7 @@
                         </li>
 
                         <!-- Catálogos (ADMIN/SUPER_ADMIN apenas) -->
-                        {% if current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
+                        {% if current_user.is_authenticated and current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('catalogos.hub') }}">
                                 <i class="fas fa-book-open me-1"></i> Catálogos
@@ -1244,6 +1250,12 @@
                 </a>
                 <a class="sige-mobile-drawer__link" href="{{ url_for('gestao_custos.index') }}">
                     <i class="fas fa-file-invoice-dollar"></i> Contas a Pagar
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('financeiro.calendario_pagamentos') }}">
+                    <i class="fas fa-calendar-alt"></i> Calendário de Pagamentos
+                </a>
+                <a class="sige-mobile-drawer__link" href="{{ url_for('financeiro.fechamento_pagamentos') }}">
+                    <i class="fas fa-lock"></i> Fechamento de Pagamentos
                 </a>
                 <a class="sige-mobile-drawer__link" href="{{ url_for('financeiro.listar_contas_receber') }}">
                     <i class="fas fa-hand-holding-usd"></i> Contas a Receber
