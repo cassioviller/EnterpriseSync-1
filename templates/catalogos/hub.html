@@ -1,0 +1,94 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Catálogos — SIGE{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-book-open text-primary me-2"></i>
+                Central de Catálogos
+            </h1>
+            <p class="text-muted mb-0">Gerencie os dados auxiliares do sistema em um único lugar.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- CategoriaFluxoCaixa -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style="width:48px;height:48px;background:linear-gradient(135deg,#198754,#157347);">
+                            <i class="fas fa-coins text-white fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Categorias de Fluxo de Caixa</h5>
+                            <small class="text-muted">Classifique entradas e saídas</small>
+                        </div>
+                    </div>
+                    <p class="text-muted small flex-grow-1">
+                        Crie e gerencie categorias para classificar lançamentos no Fluxo de Caixa e Contas a Pagar,
+                        separando por tipo (Entrada/Saída) e grupo financeiro.
+                    </p>
+                    <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" class="btn btn-primary mt-auto">
+                        <i class="fas fa-arrow-right me-1"></i> Acessar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- CategoriaFornecedor -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style="width:48px;height:48px;background:linear-gradient(135deg,#0d6efd,#0a58ca);">
+                            <i class="fas fa-truck text-white fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Categorias de Fornecedor</h5>
+                            <small class="text-muted">Segmente seus fornecedores</small>
+                        </div>
+                    </div>
+                    <p class="text-muted small flex-grow-1">
+                        Defina categorias para agrupar fornecedores por especialidade ou segmento.
+                        Cada fornecedor pode ter múltiplas categorias associadas.
+                    </p>
+                    <a href="{{ url_for('catalogos.categorias_fornecedor') }}" class="btn btn-primary mt-auto">
+                        <i class="fas fa-arrow-right me-1"></i> Acessar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- CategoriaReembolso -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style="width:48px;height:48px;background:linear-gradient(135deg,#6f42c1,#59359a);">
+                            <i class="fas fa-receipt text-white fs-5"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Categorias de Reembolso</h5>
+                            <small class="text-muted">Classifique reembolsos a funcionários</small>
+                        </div>
+                    </div>
+                    <p class="text-muted small flex-grow-1">
+                        Cadastre os tipos de despesas reembolsáveis (alimentação, combustível, hospedagem, etc.)
+                        para uso futuro nos pedidos de reembolso de funcionários.
+                    </p>
+                    <a href="{{ url_for('catalogos.categorias_reembolso') }}" class="btn btn-primary mt-auto">
+                        <i class="fas fa-arrow-right me-1"></i> Acessar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

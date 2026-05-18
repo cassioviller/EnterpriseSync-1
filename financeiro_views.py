@@ -9,7 +9,8 @@ from decimal import Decimal
 from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, Fornecedor, 
-    PlanoContas, Obra, CentroCusto, GestaoCustoPai, FluxoCaixa
+    PlanoContas, Obra, CentroCusto, GestaoCustoPai, FluxoCaixa,
+    CategoriaFluxoCaixa
 )
 from utils.tenant import is_v2_active
 from financeiro_service import FinanceiroService
@@ -335,7 +336,9 @@ def pagar_conta(conta_id):
             ).date()
             forma_pagamento = request.form.get('forma_pagamento')
             banco_id = request.form.get('banco_id', type=int) or None
-            
+            categoria_fc_id = request.form.get('categoria_fluxo_caixa_id', type=int) or None
+            criar_fc = request.form.get('criar_fluxo_caixa') == '1'
+
             FinanceiroService.baixar_pagamento(
                 conta_id=conta_id,
                 admin_id=admin_id,
@@ -344,7 +347,27 @@ def pagar_conta(conta_id):
                 forma_pagamento=forma_pagamento,
                 banco_id=banco_id
             )
-            
+
+            if criar_fc:
+                if categoria_fc_id:
+                    cfc = CategoriaFluxoCaixa.query.filter_by(id=categoria_fc_id, admin_id=admin_id).first()
+                    if not cfc:
+                        categoria_fc_id = None
+                fc = FluxoCaixa(
+                    admin_id=admin_id,
+                    tipo_movimento='SAIDA',
+                    data_movimento=data_pagamento,
+                    valor=float(valor_pago),
+                    descricao=f'Pagamento: {conta.descricao[:150] if conta.descricao else "Conta a pagar"}',
+                    categoria='OUTROS',
+                    banco_id=banco_id,
+                    categoria_fluxo_caixa_id=categoria_fc_id,
+                    referencia_tabela='conta_pagar',
+                    referencia_id=conta_id,
+                )
+                db.session.add(fc)
+                db.session.commit()
+
             flash(f'Pagamento de R$ {valor_pago} registrado com sucesso!', 'success')
             return redirect(url_for('financeiro.listar_contas_pagar'))
             
@@ -354,11 +377,13 @@ def pagar_conta(conta_id):
     
     # GET - exibir formulário
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()
-    
+    categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.nome).all()
+
     return render_template(
         'financeiro/pagar_conta.html',
         conta=conta,
-        bancos=bancos
+        bancos=bancos,
+        categorias_fc=categorias_fc
     )
 
 
@@ -640,6 +665,8 @@ def fluxo_caixa():
         for grupo_nome, chaves in _CAT_GRUPOS
     ]
     
+    categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.nome).all()
+
     return render_template(
         'financeiro/fluxo_caixa.html',
         fluxo=fluxo,
@@ -648,6 +675,7 @@ def fluxo_caixa():
         centros_custo=centros_custo,
         bancos=bancos,
         categorias_grupos=categorias_grupos,
+        categorias_fc=categorias_fc,
         data_inicio=data_inicio,
         data_fim=data_fim
     )
@@ -674,6 +702,7 @@ def novo_fluxo_caixa():
             categoria = 'OUTROS'
         banco_id = request.form.get('banco_id', type=int) or None
         obra_id = request.form.get('obra_id', type=int) or None
+        categoria_fc_id = request.form.get('categoria_fluxo_caixa_id', type=int) or None
 
         # Validar que banco e obra pertencem ao tenant
         if banco_id:
@@ -684,6 +713,10 @@ def novo_fluxo_caixa():
             ob = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
             if not ob:
                 obra_id = None
+        if categoria_fc_id:
+            cfc = CategoriaFluxoCaixa.query.filter_by(id=categoria_fc_id, admin_id=admin_id).first()
+            if not cfc:
+                categoria_fc_id = None
 
         fc = FluxoCaixa(
             admin_id=admin_id,
@@ -694,6 +727,7 @@ def novo_fluxo_caixa():
             categoria=categoria,
             banco_id=banco_id,
             obra_id=obra_id,
+            categoria_fluxo_caixa_id=categoria_fc_id,
         )
         db.session.add(fc)
         db.session.commit()

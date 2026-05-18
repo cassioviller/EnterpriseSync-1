@@ -3864,6 +3864,7 @@ def executar_migracoes():
             (163, "Task #113 — CRM: adicionar coluna prazo (Date, nullable) na tabela lead", migration_163_lead_prazo),
             (164, "Task #119 — rdo_ocorrencia: adicionar colunas faltantes (tipo_ocorrencia, severidade, descricao_ocorrencia, etc.)", migrar_campos_rdo_ocorrencia),
             (165, "Task #6 — Módulo Custos do Escritório (3 tabelas + seed 10 categorias padrão por tenant)", migration_165_custos_escritorio),
+            (166, "Task #10 — Catálogos Auxiliares (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso, fornecedor_categorias M2M, fluxo_caixa.categoria_fluxo_caixa_id)", migration_166_catalogos_auxiliares),
         ]
         
         # Executar cada migração com rastreamento
@@ -13713,6 +13714,100 @@ def migration_151_vinculo_subatividade_composicao():
         except Exception:
             pass
         raise
+
+
+def migration_166_catalogos_auxiliares():
+    """
+    Migration 166 — Task #10: Central de Catálogos e CRUDs Auxiliares.
+    Cria:
+      - categoria_fluxo_caixa
+      - categoria_fornecedor
+      - categoria_reembolso
+      - fornecedor_categorias (M2M)
+    Adiciona:
+      - fluxo_caixa.categoria_fluxo_caixa_id (FK nullable)
+    """
+    logger.info("=" * 80)
+    logger.info("📚 MIGRAÇÃO 166: Catálogos Auxiliares (Task #10)")
+    logger.info("=" * 80)
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS categoria_fluxo_caixa (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            tipo VARCHAR(10) NOT NULL DEFAULT 'SAIDA',
+            grupo_financeiro VARCHAR(100),
+            descricao TEXT,
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_cat_fluxo_caixa_admin
+        ON categoria_fluxo_caixa(admin_id)
+    """))
+    logger.info("✅ Tabela categoria_fluxo_caixa criada/verificada")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS categoria_fornecedor (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            descricao TEXT,
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_cat_fornecedor_admin
+        ON categoria_fornecedor(admin_id)
+    """))
+    logger.info("✅ Tabela categoria_fornecedor criada/verificada")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS categoria_reembolso (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            descricao TEXT,
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_cat_reembolso_admin
+        ON categoria_reembolso(admin_id)
+    """))
+    logger.info("✅ Tabela categoria_reembolso criada/verificada")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS fornecedor_categorias (
+            fornecedor_id INTEGER NOT NULL REFERENCES fornecedor(id) ON DELETE CASCADE,
+            categoria_fornecedor_id INTEGER NOT NULL REFERENCES categoria_fornecedor(id) ON DELETE CASCADE,
+            PRIMARY KEY (fornecedor_id, categoria_fornecedor_id)
+        )
+    """))
+    logger.info("✅ Tabela fornecedor_categorias (M2M) criada/verificada")
+
+    result = db.session.execute(text("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'fluxo_caixa' AND column_name = 'categoria_fluxo_caixa_id'
+    """))
+    if not result.fetchone():
+        db.session.execute(text("""
+            ALTER TABLE fluxo_caixa
+            ADD COLUMN categoria_fluxo_caixa_id INTEGER
+            REFERENCES categoria_fluxo_caixa(id) ON DELETE SET NULL
+        """))
+        logger.info("✅ Coluna fluxo_caixa.categoria_fluxo_caixa_id adicionada")
+    else:
+        logger.info("⏭️  Coluna fluxo_caixa.categoria_fluxo_caixa_id já existe")
+
+    db.session.commit()
+    logger.info("=" * 80)
+    logger.info("✅ MIGRAÇÃO 166 CONCLUÍDA: Catálogos Auxiliares implantados!")
+    logger.info("=" * 80)
 
 
 def migration_165_custos_escritorio():

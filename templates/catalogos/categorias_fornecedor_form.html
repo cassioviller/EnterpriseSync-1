@@ -1,0 +1,58 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if categoria else 'Nova' }} Categoria de Fornecedor{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('catalogos.hub') }}">Catálogos</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('catalogos.categorias_fornecedor') }}">Categorias de Fornecedor</a></li>
+                    <li class="breadcrumb-item active">{{ 'Editar' if categoria else 'Nova' }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-truck text-primary me-2"></i>
+                {{ 'Editar' if categoria else 'Nova' }} Categoria de Fornecedor
+            </h1>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label for="nome" class="form-label fw-semibold">Nome *</label>
+                            <input type="text" class="form-control" id="nome" name="nome"
+                                   value="{{ categoria.nome if categoria else '' }}"
+                                   required placeholder="Ex: Materiais de Construção">
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="descricao" class="form-label fw-semibold">Descrição</label>
+                            <textarea class="form-control" id="descricao" name="descricao" rows="3"
+                                      placeholder="Descreva este tipo de fornecedor...">{{ categoria.descricao if categoria else '' }}</textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if categoria else 'Criar' }} Categoria
+                            </button>
+                            <a href="{{ url_for('catalogos.categorias_fornecedor') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

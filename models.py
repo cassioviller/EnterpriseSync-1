@@ -768,12 +768,14 @@ class FluxoCaixa(db.Model):
     observacoes = db.Column(db.Text)
     import_batch_id = db.Column(db.String(50), nullable=True)
     banco_id = db.Column(db.Integer, db.ForeignKey('banco_empresa.id'), nullable=True)
+    categoria_fluxo_caixa_id = db.Column(db.Integer, db.ForeignKey('categoria_fluxo_caixa.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
     obra = db.relationship('Obra', overlaps="movimentos_caixa_lista")
     centro_custo = db.relationship('CentroCusto', overlaps="movimentos_caixa_lista")
     banco = db.relationship('BancoEmpresa', foreign_keys=[banco_id], overlaps="fluxos_caixa")
+    categoria_fluxo_caixa = db.relationship('CategoriaFluxoCaixa', foreign_keys=[categoria_fluxo_caixa_id])
 
 class RegistroAlimentacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1626,6 +1628,13 @@ class CategoriaProduto(db.Model):
     def __repr__(self):
         return f'<CategoriaProduto {self.nome}>'
 
+fornecedor_categorias = db.Table(
+    'fornecedor_categorias',
+    db.Column('fornecedor_id', db.Integer, db.ForeignKey('fornecedor.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('categoria_fornecedor_id', db.Integer, db.ForeignKey('categoria_fornecedor.id', ondelete='CASCADE'), primary_key=True),
+)
+
+
 class Fornecedor(db.Model):
     """Fornecedores para controle de compras e notas fiscais"""
     __tablename__ = 'fornecedor'
@@ -1667,6 +1676,12 @@ class Fornecedor(db.Model):
     # Relacionamentos
     notas_fiscais = db.relationship('NotaFiscal', backref='fornecedor', lazy='dynamic')
     admin = db.relationship('Usuario', backref='fornecedores_administrados')
+    categorias = db.relationship(
+        'CategoriaFornecedor',
+        secondary='fornecedor_categorias',
+        lazy='subquery',
+        backref=db.backref('fornecedores', lazy=True),
+    )
     
     # Índices
     __table_args__ = (
@@ -6706,4 +6721,58 @@ class DespesaEscritorioOcorrencia(db.Model):
             name='uq_despesa_ocorrencia_mes'
         ),
         db.Index('idx_despesa_ocorrencia_admin', 'admin_id'),
+    )
+
+
+# ============================================================
+# CATÁLOGOS AUXILIARES (Task #10)
+# ============================================================
+
+class CategoriaFluxoCaixa(db.Model):
+    """Categorias de fluxo de caixa gerenciadas pelo administrador."""
+    __tablename__ = 'categoria_fluxo_caixa'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(10), nullable=False, default='SAIDA')  # ENTRADA | SAIDA
+    grupo_financeiro = db.Column(db.String(100))
+    descricao = db.Column(db.Text)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('idx_cat_fluxo_caixa_admin', 'admin_id'),
+    )
+
+
+class CategoriaFornecedor(db.Model):
+    """Categorias de fornecedor (M2M com Fornecedor)."""
+    __tablename__ = 'categoria_fornecedor'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('idx_cat_fornecedor_admin', 'admin_id'),
+    )
+
+
+class CategoriaReembolso(db.Model):
+    """Categorias de reembolso a funcionários."""
+    __tablename__ = 'categoria_reembolso'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.Text)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('idx_cat_reembolso_admin', 'admin_id'),
     )

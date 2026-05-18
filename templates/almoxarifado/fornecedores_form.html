@@ -156,6 +156,40 @@
             </div>
         </div>
 
+        <!-- Categorias de Fornecedor -->
+        {% if categorias_fornecedor %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h6 class="mb-0"><i class="fas fa-tags me-2 text-primary"></i>Categorias do Fornecedor</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            {% for cat in categorias_fornecedor %}
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="categorias" value="{{ cat.id }}"
+                                           id="cat_{{ cat.id }}"
+                                           {% if fornecedor and cat in fornecedor.categorias %}checked{% endif %}>
+                                    <label class="form-check-label" for="cat_{{ cat.id }}">
+                                        {{ cat.nome }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text mt-2">
+                            Selecione todas as categorias que se aplicam a este fornecedor.
+                            <a href="{{ url_for('catalogos.categorias_fornecedor') }}" target="_blank">Gerenciar categorias</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Botões de Ação -->
         <div class="row">
             <div class="col-12">

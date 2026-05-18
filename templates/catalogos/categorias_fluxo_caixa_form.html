@@ -1,0 +1,74 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ 'Editar' if categoria else 'Nova' }} Categoria de Fluxo de Caixa{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('catalogos.hub') }}">Catálogos</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}">Categorias de Fluxo de Caixa</a></li>
+                    <li class="breadcrumb-item active">{{ 'Editar' if categoria else 'Nova' }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-coins text-success me-2"></i>
+                {{ 'Editar' if categoria else 'Nova' }} Categoria de Fluxo de Caixa
+            </h1>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label for="nome" class="form-label fw-semibold">Nome *</label>
+                            <input type="text" class="form-control" id="nome" name="nome"
+                                   value="{{ categoria.nome if categoria else '' }}"
+                                   required placeholder="Ex: Receitas de Serviços">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tipo" class="form-label fw-semibold">Tipo *</label>
+                            <select class="form-select" id="tipo" name="tipo">
+                                <option value="ENTRADA" {{ 'selected' if categoria and categoria.tipo == 'ENTRADA' else '' }}>Entrada</option>
+                                <option value="SAIDA" {{ 'selected' if not categoria or categoria.tipo == 'SAIDA' else '' }}>Saída</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="grupo_financeiro" class="form-label fw-semibold">Grupo Financeiro</label>
+                            <input type="text" class="form-control" id="grupo_financeiro" name="grupo_financeiro"
+                                   value="{{ categoria.grupo_financeiro if categoria else '' }}"
+                                   placeholder="Ex: Receitas Operacionais, Despesas Administrativas">
+                            <div class="form-text">Agrupamento para relatórios financeiros (opcional)</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="descricao" class="form-label fw-semibold">Descrição</label>
+                            <textarea class="form-control" id="descricao" name="descricao" rows="3"
+                                      placeholder="Descreva quando usar esta categoria...">{{ categoria.descricao if categoria else '' }}</textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {{ 'Atualizar' if categoria else 'Criar' }} Categoria
+                            </button>
+                            <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from app import db
-from models import Fornecedor
+from models import Fornecedor, CategoriaFornecedor
 from sqlalchemy import or_
 import logging
 
@@ -102,6 +102,16 @@ def fornecedores_criar():
             )
 
             db.session.add(fornecedor)
+            db.session.flush()
+
+            cat_ids = request.form.getlist('categorias')
+            if cat_ids:
+                cats = CategoriaFornecedor.query.filter(
+                    CategoriaFornecedor.id.in_([int(c) for c in cat_ids]),
+                    CategoriaFornecedor.admin_id == admin_id
+                ).all()
+                fornecedor.categorias = cats
+
             db.session.commit()
 
             flash(f'Fornecedor "{razao_social}" cadastrado com sucesso!', 'success')
@@ -113,7 +123,8 @@ def fornecedores_criar():
             flash(f'Erro ao cadastrar fornecedor: {str(e)}', 'danger')
             return redirect(url_for('almoxarifado.fornecedores_criar'))
 
-    return render_template('almoxarifado/fornecedores_form.html', fornecedor=None)
+    categorias_fornecedor = CategoriaFornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFornecedor.nome).all()
+    return render_template('almoxarifado/fornecedores_form.html', fornecedor=None, categorias_fornecedor=categorias_fornecedor)
 
 
 @almoxarifado_bp.route('/fornecedores/editar/<int:id>', methods=['GET', 'POST'])
@@ -179,6 +190,16 @@ def fornecedores_editar(id):
             fornecedor.tipo_fornecedor = tipo_fornecedor
             fornecedor.chave_pix = request.form.get('chave_pix', '').strip() or None
 
+            cat_ids = request.form.getlist('categorias')
+            if cat_ids:
+                cats = CategoriaFornecedor.query.filter(
+                    CategoriaFornecedor.id.in_([int(c) for c in cat_ids]),
+                    CategoriaFornecedor.admin_id == admin_id
+                ).all()
+            else:
+                cats = []
+            fornecedor.categorias = cats
+
             db.session.commit()
 
             flash(f'Fornecedor "{razao_social}" atualizado com sucesso!', 'success')
@@ -189,7 +210,16 @@ def fornecedores_editar(id):
             logger.error(f'Erro ao atualizar fornecedor: {str(e)}')
             flash(f'Erro ao atualizar fornecedor: {str(e)}', 'danger')
 
-    return render_template('almoxarifado/fornecedores_form.html', fornecedor=fornecedor)
+    linked_ids = {c.id for c in fornecedor.categorias} if fornecedor.categorias else set()
+    active_cats = CategoriaFornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFornecedor.nome).all()
+    active_ids = {c.id for c in active_cats}
+    inactive_linked = CategoriaFornecedor.query.filter(
+        CategoriaFornecedor.admin_id == admin_id,
+        CategoriaFornecedor.ativo == False,
+        CategoriaFornecedor.id.in_(linked_ids - active_ids)
+    ).order_by(CategoriaFornecedor.nome).all()
+    categorias_fornecedor = active_cats + inactive_linked
+    return render_template('almoxarifado/fornecedores_form.html', fornecedor=fornecedor, categorias_fornecedor=categorias_fornecedor)
 
 
 @almoxarifado_bp.route('/fornecedores/deletar/<int:id>', methods=['POST'])

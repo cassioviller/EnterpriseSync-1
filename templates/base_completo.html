@@ -1025,6 +1025,15 @@
                             </ul>
                         </li>
 
+                        <!-- Catálogos (ADMIN/SUPER_ADMIN apenas) -->
+                        {% if current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('catalogos.hub') }}">
+                                <i class="fas fa-book-open me-1"></i> Catálogos
+                            </a>
+                        </li>
+                        {% endif %}
+
                         <!-- Cadastros -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="cadastrosDropdown" role="button" data-bs-toggle="dropdown">

@@ -100,6 +100,19 @@
             </div>
           </div>
 
+          {% if categorias_fc %}
+          <div class="mb-3" id="blocoCategoriaCatalogo">
+            <label class="form-label fw-semibold">Categoria do catálogo <span class="text-muted fw-normal small">(opcional)</span></label>
+            <select class="form-select" name="categoria_fluxo_caixa_id">
+              <option value="">— Nenhuma —</option>
+              {% for cat in categorias_fc %}
+              <option value="{{ cat.id }}">{{ cat.nome }} ({{ cat.tipo }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Aplica-se ao lançamento de Fluxo de Caixa gerado pelo pagamento. <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" target="_blank">Gerenciar catálogos</a></div>
+          </div>
+          {% endif %}
+
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-success">
               <i class="fas fa-check me-1"></i> Confirmar Pagamento

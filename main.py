@@ -238,6 +238,15 @@ except ImportError as e:
 except Exception as e:
     logger.error(f"[ERROR] Falha ao registrar custos_escritorio: {e}")
 
+try:
+    from views.catalogos_views import catalogos_bp
+    app.register_blueprint(catalogos_bp)
+    logger.info("[OK] Blueprint catalogos registrado")
+except ImportError as e:
+    logger.warning(f"[WARN] catalogos não encontrado: {e}")
+except Exception as e:
+    logger.error(f"[ERROR] Falha ao registrar catalogos: {e}")
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
