@@ -95,9 +95,11 @@ def recalcular_item(item, orcamento) -> dict:
         # Task #19 — quantidades por item (dependem da qtd total do item)
         qtd_tec = (coef * qtd_item).quantize(Decimal('0.0001'))
         if fator > Decimal('1') and qtd_tec > Decimal('0'):
-            qtd_com = (
-                Decimal(str(_math.ceil(float(qtd_tec) / float(fator)))) * fator
-            ).quantize(Decimal('0.0001'))
+            # Divisão inteira com arredondamento para cima em puro Decimal
+            # (evita imprecisão de float ao converter Decimal → float → ceil)
+            from decimal import ROUND_CEILING
+            multiplos = (qtd_tec / fator).to_integral_value(rounding=ROUND_CEILING)
+            qtd_com = (multiplos * fator).quantize(Decimal('0.0001'))
         else:
             qtd_com = qtd_tec
         sub_compra = (qtd_com * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)

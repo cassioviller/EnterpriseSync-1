@@ -209,10 +209,11 @@ def explodir_servico_para_quantidade(servico, quantidade,
         qtd_tecnica = (coef * qtd).quantize(Decimal('0.0001'))
         sub_unit = (coef * preco).quantize(Decimal('0.0001'))
         # Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator
+        # Usa puro Decimal para evitar imprecisão de float ao ceil
         if fator > Decimal('1') and qtd_tecnica > Decimal('0'):
-            qtd_compra = (
-                Decimal(str(_math.ceil(float(qtd_tecnica) / float(fator)))) * fator
-            ).quantize(Decimal('0.0001'))
+            from decimal import ROUND_CEILING
+            multiplos = (qtd_tecnica / fator).to_integral_value(rounding=ROUND_CEILING)
+            qtd_compra = (multiplos * fator).quantize(Decimal('0.0001'))
         else:
             qtd_compra = qtd_tecnica
         # subtotal_total usa quantidade de compra (custo real, não técnico)

@@ -14198,8 +14198,17 @@ def migration_170_insumo_quantidade_comercial():
     """Task #19 — Adiciona fator_comercial e unidade_comercial à tabela insumo.
 
     fator_comercial: múltiplo/embalagem do fornecedor (ex: 100 = pacote de 100 un).
-                     Valor 1 = compra unitária (sem arredondamento).
+                     Valor 1 = compra unitária (sem arredondamento comercial).
     unidade_comercial: rótulo da embalagem (ex: "pacote", "barra"). Opcional.
+
+    Decisão de schema (documentada intencionalmente):
+      A especificação original sugeria nullable DEFAULT NULL; esta implementação
+      usa NOT NULL DEFAULT 1. Ambos são semanticamente equivalentes — fator=1
+      significa "sem arredondamento" assim como NULL significaria o mesmo.
+      NOT NULL DEFAULT 1 foi escolhido por:
+        (a) eliminar NULL-guards em toda a cadeia de cálculo;
+        (b) garantir que insumos existentes herdem fator=1 automaticamente;
+        (c) manter a coluna sempre numérica (sem branch NULL vs float).
 
     Idempotente via ADD COLUMN IF NOT EXISTS.
     """
