@@ -14032,24 +14032,26 @@ def migration_169_seed_categorias_catalogo():
 
         rows = db.session.execute(text("""
             SELECT id FROM usuario
-            WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN') AND ativo = true
+            WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
         """)).fetchall()
 
         admin_ids = [r[0] for r in rows]
         logger.info(f"[Migration 169] Seeding categorias catálogo para {len(admin_ids)} tenant(s)")
 
+        ok_count = 0
         for aid in admin_ids:
             try:
                 CategoriaFluxoCaixa.seed_defaults(aid)
                 CategoriaFornecedor.seed_defaults(aid)
                 CategoriaReembolso.seed_defaults(aid)
+                db.session.commit()
+                ok_count += 1
                 logger.info(f"[Migration 169] Seed OK para admin_id={aid}")
             except Exception as _e:
                 logger.warning(f"[Migration 169] Seed falhou para admin_id={aid}: {_e}")
                 db.session.rollback()
 
-        db.session.commit()
-        logger.info(f"[Migration 169] Concluída — {len(admin_ids)} tenant(s) processados.")
+        logger.info(f"[Migration 169] Concluída — {ok_count}/{len(admin_ids)} tenant(s) processados.")
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 169] Falha geral: {e}")

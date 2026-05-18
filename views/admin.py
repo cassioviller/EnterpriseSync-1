@@ -73,8 +73,10 @@ def criar_admin():
             CategoriaFluxoCaixa.seed_defaults(novo_admin.id)
             CategoriaFornecedor.seed_defaults(novo_admin.id)
             CategoriaReembolso.seed_defaults(novo_admin.id)
+            db.session.commit()
             logger.info(f"[OK] Categorias padrão criadas para admin {novo_admin.id}")
         except Exception as _seed_err:
+            db.session.rollback()
             logger.warning(f"[WARN] Seed categorias falhou para admin {novo_admin.id}: {_seed_err}")
 
         flash(f'Administrador {nome} criado com sucesso!', 'success')
