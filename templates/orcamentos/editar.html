@@ -531,20 +531,25 @@
               {% set _qtd_com = ((_qtd_tec / _fator)|round(0, 'ceil') * _fator) if _fator > 1 else _qtd_tec %}
               <td class="text-end text-muted js-subtotal-unit">R$ {{ c.subtotal_unitario|num(4) }}</td>
               <td class="text-end text-muted js-consumo-tot">{{ _qtd_tec|num(4) }} {{ c.unidade }}</td>
-              <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
-                         name="comp_fator_comercial"
-                         value="{{ _fator|num(4)|replace(',0000','') }}"
-                         title="Embalagem/múltiplo de compra"></td>
-              <td><input class="form-control form-control-sm" type="text"
-                         name="comp_unidade_comercial"
-                         placeholder="{{ c.unidade }}"
-                         value="{{ c.unidade_comercial or '' }}"
-                         title="Unidade comercial"></td>
+              <td>
+                <input type="hidden" name="comp_fator_comercial" value="{{ _fator|num(4)|replace(',0000','') }}">
+                <span class="form-control form-control-sm bg-light text-muted small"
+                      title="Embalagem (catálogo — não editável aqui)">
+                  {{ _fator|num(0) if _fator > 1 else '—' }}
+                </span>
+              </td>
+              <td>
+                <input type="hidden" name="comp_unidade_comercial" value="{{ c.unidade_comercial or '' }}">
+                <span class="form-control form-control-sm bg-light text-muted small"
+                      title="Unidade de compra (catálogo — não editável aqui)">
+                  {{ c.unidade_comercial or '—' }}
+                </span>
+              </td>
               <td class="text-end js-qtd-comercial
                 {%- if _fator > 1 %} fw-bold text-warning{% else %} text-muted{% endif %}">
                 {{ _qtd_com|num(4) }} {{ c.unidade_comercial or c.unidade }}
               </td>
-              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (_coef * _preco * _qtd)|brl }}</strong></td>
+              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (_qtd_com * _preco)|brl }}</strong></td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
@@ -753,8 +758,14 @@
     <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_preco_unitario" value="0"></td>
     <td class="text-end text-muted js-subtotal-unit">—</td>
     <td class="text-end text-muted js-consumo-tot">—</td>
-    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_fator_comercial" value="1" title="Embalagem"></td>
-    <td><input class="form-control form-control-sm" type="text" name="comp_unidade_comercial" placeholder="un" title="Un. Compra"></td>
+    <td>
+      <input type="hidden" name="comp_fator_comercial" value="1">
+      <span class="form-control form-control-sm bg-light text-muted small js-fator-display" title="Embalagem (catálogo)">—</span>
+    </td>
+    <td>
+      <input type="hidden" name="comp_unidade_comercial" value="">
+      <span class="form-control form-control-sm bg-light text-muted small js-unidade-com-display" title="Un. Compra (catálogo)">—</span>
+    </td>
     <td class="text-end text-muted js-qtd-comercial">—</td>
     <td class="text-end text-dark js-subtotal-tot">—</td>
     <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
@@ -811,6 +822,7 @@ function recalcItem(form){
   const mar = (marEl && String(marEl.value).trim() !== '') ? getNum(marEl) : ORC.mar_global;
 
   let custoUnit = 0;
+  let custoCompra = 0;  // Task #19: Σ(qtd_compra × preço) — custo real de compra
   form.querySelectorAll('.comp-tbody tr').forEach(tr => {
     const coef = getNum(tr.querySelector('input[name="comp_coeficiente"]'));
     const preco = getNum(tr.querySelector('input[name="comp_preco_unitario"]'));
@@ -822,9 +834,10 @@ function recalcItem(form){
     const fator = getNum(fatorEl) || 1;
     const sub = coef * preco;
     const qtdTec = coef * qtd;
-    const subTot = sub * qtd;
-    // Task #19 — qtd comercial: arredonda para cima ao próximo múltiplo do fator
+    // Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator (catálogo)
     const qtdCom = fator > 1 ? Math.ceil(qtdTec / fator) * fator : qtdTec;
+    // subtotal da linha usa quantidade de COMPRA (custo real, não técnico)
+    const subTot = qtdCom * preco;
     const subCell = tr.querySelector('.js-subtotal-unit') || tr.children[5];
     if (subCell) subCell.textContent = 'R$ ' + fmtBR(sub, 4);
     const consumoCell = tr.querySelector('.js-consumo-tot');
@@ -836,7 +849,8 @@ function recalcItem(form){
     }
     const subTotCell = tr.querySelector('.js-subtotal-tot');
     if (subTotCell) subTotCell.innerHTML = '<strong>' + fmtBRL(subTot) + '</strong>';
-    custoUnit += sub;
+    custoUnit += sub;        // custo_unitario: técnico (base de pricing)
+    custoCompra += subTot;  // custo_total: comercial (custo real de compra)
   });
   // Fórmula canônica idêntica a services/orcamento_view_service.py:
   //   preco_unit = custo_unit / (1 - imp/100 - mar/100)
@@ -844,7 +858,7 @@ function recalcItem(form){
   const erro = divisor <= 0;
   // Espelha quantize(0.0001) do backend antes de multiplicar por qtd.
   const precoUnit = erro ? 0 : Math.round((custoUnit / divisor) * 10000) / 10000;
-  const custoTot  = Math.round(custoUnit * qtd * 100) / 100;
+  const custoTot  = Math.round(custoCompra * 100) / 100;  // Task #19: usa custo comercial
   const vendaTot  = Math.round(precoUnit * qtd * 100) / 100;
   const lucroTot  = Math.round((vendaTot - custoTot) * 100) / 100;
   form.querySelector('.js-custo').textContent = fmtBRL(custoTot);
@@ -1040,11 +1054,17 @@ function _addInsumoRow(insumo) {
   node.querySelector('input[name="comp_unidade"]').value = insumo.unidade || 'un';
   node.querySelector('input[name="comp_coeficiente"]').value = coef;
   node.querySelector('input[name="comp_preco_unitario"]').value = insumo.preco || 0;
-  // Task #19 — preenche campos de quantidade comercial do catálogo
-  const fatorEl = node.querySelector('input[name="comp_fator_comercial"]');
-  if (fatorEl) fatorEl.value = insumo.fator_comercial && insumo.fator_comercial > 1 ? insumo.fator_comercial : 1;
-  const unComEl = node.querySelector('input[name="comp_unidade_comercial"]');
-  if (unComEl) unComEl.value = insumo.unidade_comercial || '';
+  // Task #19 — preenche campos de quantidade comercial do catálogo (read-only no editor)
+  const fator = (insumo.fator_comercial && insumo.fator_comercial > 1) ? insumo.fator_comercial : 1;
+  const unCom = insumo.unidade_comercial || '';
+  const fatorHid = node.querySelector('input[name="comp_fator_comercial"]');
+  if (fatorHid) fatorHid.value = fator;
+  const fatorSpan = node.querySelector('.js-fator-display');
+  if (fatorSpan) fatorSpan.textContent = fator > 1 ? fator : '—';
+  const unComHid = node.querySelector('input[name="comp_unidade_comercial"]');
+  if (unComHid) unComHid.value = unCom;
+  const unComSpan = node.querySelector('.js-unidade-com-display');
+  if (unComSpan) unComSpan.textContent = unCom || '—';
   _pickerTbody.appendChild(node);
   recalcAll();
   bootstrap.Modal.getInstance(document.getElementById('insumoPickerModal')).hide();
