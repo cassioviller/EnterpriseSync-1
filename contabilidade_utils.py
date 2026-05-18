@@ -1515,34 +1515,32 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
             {'aid': admin_id}
         ).scalar() or 0
 
-        if count > 0:
-            _v2_seeded_admins.add(admin_id)
-            return
+        if count == 0:
+            for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
+                db.session.execute(sql_text("""
+                    INSERT INTO plano_contas
+                        (codigo, nome, tipo_conta, natureza, nivel,
+                         conta_pai_codigo, aceita_lancamento, ativo, admin_id)
+                    VALUES
+                        (:codigo, :nome, :tipo, :natureza, :nivel,
+                         :pai, :aceita, true, :aid)
+                    ON CONFLICT (codigo) DO NOTHING
+                """), {
+                    'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
+                    'natureza': natureza, 'nivel': nivel, 'pai': pai,
+                    'aceita': aceita, 'aid': admin_id,
+                })
 
-        for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
-            db.session.execute(sql_text("""
-                INSERT INTO plano_contas
-                    (codigo, nome, tipo_conta, natureza, nivel,
-                     conta_pai_codigo, aceita_lancamento, ativo, admin_id)
-                VALUES
-                    (:codigo, :nome, :tipo, :natureza, :nivel,
-                     :pai, :aceita, true, :aid)
-                ON CONFLICT (codigo) DO NOTHING
-            """), {
-                'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
-                'natureza': natureza, 'nivel': nivel, 'pai': pai,
-                'aceita': aceita, 'aid': admin_id,
-            })
+            db.session.flush()
+            PlanoContas.invalidar_cache()
+            logger.info(
+                f"[OK] Plano de contas V2 seed para admin_id={admin_id} "
+                f"({len(_V2_CONTAS_SEED)} contas)"
+            )
 
-        db.session.flush()
         _v2_seeded_admins.add(admin_id)
-        PlanoContas.invalidar_cache()
-        logger.info(
-            f"[OK] Plano de contas V2 seed para admin_id={admin_id} "
-            f"({len(_V2_CONTAS_SEED)} contas)"
-        )
 
-        # Seed categorias padrão dos catálogos (idempotente)
+        # Seed categorias padrão dos catálogos — sempre chamado (idempotente por contagem)
         try:
             from models import CategoriaEscritorio, CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso
             CategoriaEscritorio.seed_defaults(admin_id)
