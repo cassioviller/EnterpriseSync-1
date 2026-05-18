@@ -6762,6 +6762,39 @@ class CategoriaFluxoCaixa(db.Model):
         db.Index('idx_cat_fluxo_caixa_admin', 'admin_id'),
     )
 
+    _DEFAULTS = [
+        ('SAIDA', 'Custo de Obra',              'Custos diretos de obra'),
+        ('SAIDA', 'Salários e Encargos',         'Folha de pagamento e encargos trabalhistas'),
+        ('SAIDA', 'Aluguel / Locação',           'Aluguel de equipamentos, espaços e imóveis'),
+        ('SAIDA', 'Material de Escritório',      'Suprimentos e material administrativo'),
+        ('SAIDA', 'Combustível e Frota',         'Abastecimento e manutenção de veículos'),
+        ('SAIDA', 'Serviços Terceirizados',      'Pagamento a subempreiteiros e prestadores'),
+        ('SAIDA', 'Impostos e Taxas',            'DAS, FGTS, INSS e demais tributos'),
+        ('SAIDA', 'Reembolsos a Funcionários',   'Ressarcimento de despesas dos colaboradores'),
+        ('SAIDA', 'Compras e Suprimentos',       'Aquisição de materiais e insumos'),
+        ('SAIDA', 'Outros Custos',               'Saídas diversas não categorizadas'),
+        ('ENTRADA', 'Receita de Serviços',       'Faturamento por prestação de serviços'),
+        ('ENTRADA', 'Receita de Obras',          'Medições e faturamento de obras'),
+        ('ENTRADA', 'Adiantamento de Clientes',  'Valores recebidos antecipadamente'),
+        ('ENTRADA', 'Outros Recebimentos',       'Entradas diversas não categorizadas'),
+    ]
+
+    @classmethod
+    def seed_defaults(cls, admin_id: int) -> None:
+        """Insere categorias padrão para o tenant se ainda não tiver nenhuma."""
+        existing = db.session.execute(
+            db.text('SELECT COUNT(*) FROM categoria_fluxo_caixa WHERE admin_id = :aid'),
+            {'aid': admin_id}
+        ).scalar() or 0
+        if existing:
+            return
+        for tipo, nome, descricao in cls._DEFAULTS:
+            db.session.execute(db.text("""
+                INSERT INTO categoria_fluxo_caixa (nome, tipo, descricao, ativo, admin_id)
+                VALUES (:nome, :tipo, :desc, true, :aid)
+            """), {'nome': nome, 'tipo': tipo, 'desc': descricao, 'aid': admin_id})
+        db.session.flush()
+
 
 class CategoriaFornecedor(db.Model):
     """Categorias de fornecedor (M2M com Fornecedor)."""
@@ -6777,6 +6810,34 @@ class CategoriaFornecedor(db.Model):
     __table_args__ = (
         db.Index('idx_cat_fornecedor_admin', 'admin_id'),
     )
+
+    _DEFAULTS = [
+        ('Materiais de Construção',    'Fornecedores de cimento, aço, tijolos e similares'),
+        ('Mão de Obra / Subempreiteiros', 'Empresas e profissionais de execução'),
+        ('Equipamentos e Ferramentas', 'Locação ou venda de máquinas e ferramentas'),
+        ('Serviços Terceirizados',     'Consultores, técnicos e prestadores gerais'),
+        ('Combustível e Lubrificantes','Postos e distribuidores de combustível'),
+        ('Alimentação e Refeições',    'Restaurantes, marmiteiros e similares'),
+        ('Material de Escritório',     'Papelaria, informática e suprimentos admin'),
+        ('Transporte e Logística',     'Fretes, entregas e transportadoras'),
+        ('Outros',                     'Fornecedores não enquadrados nas demais categorias'),
+    ]
+
+    @classmethod
+    def seed_defaults(cls, admin_id: int) -> None:
+        """Insere categorias padrão para o tenant se ainda não tiver nenhuma."""
+        existing = db.session.execute(
+            db.text('SELECT COUNT(*) FROM categoria_fornecedor WHERE admin_id = :aid'),
+            {'aid': admin_id}
+        ).scalar() or 0
+        if existing:
+            return
+        for nome, descricao in cls._DEFAULTS:
+            db.session.execute(db.text("""
+                INSERT INTO categoria_fornecedor (nome, descricao, ativo, admin_id)
+                VALUES (:nome, :desc, true, :aid)
+            """), {'nome': nome, 'desc': descricao, 'aid': admin_id})
+        db.session.flush()
 
 
 # ================================
@@ -6840,3 +6901,30 @@ class CategoriaReembolso(db.Model):
     __table_args__ = (
         db.Index('idx_cat_reembolso_admin', 'admin_id'),
     )
+
+    _DEFAULTS = [
+        ('Alimentação',         'Refeições e lanches em viagem ou serviço externo'),
+        ('Transporte Público',  'Ônibus, metrô, taxi e aplicativos de transporte'),
+        ('Combustível',         'Abastecimento de veículo próprio a serviço'),
+        ('Hospedagem',          'Hotel ou pousada em deslocamentos a trabalho'),
+        ('Estacionamento',      'Estacionamentos pagos durante atividade profissional'),
+        ('Material de Trabalho','Compra de insumos ou ferramentas necessários à atividade'),
+        ('Pedágio',             'Tarifas de pedágio em deslocamentos a serviço'),
+        ('Outros',              'Despesas diversas não cobertas pelas demais categorias'),
+    ]
+
+    @classmethod
+    def seed_defaults(cls, admin_id: int) -> None:
+        """Insere categorias padrão para o tenant se ainda não tiver nenhuma."""
+        existing = db.session.execute(
+            db.text('SELECT COUNT(*) FROM categoria_reembolso WHERE admin_id = :aid'),
+            {'aid': admin_id}
+        ).scalar() or 0
+        if existing:
+            return
+        for nome, descricao in cls._DEFAULTS:
+            db.session.execute(db.text("""
+                INSERT INTO categoria_reembolso (nome, descricao, ativo, admin_id)
+                VALUES (:nome, :desc, true, :aid)
+            """), {'nome': nome, 'desc': descricao, 'aid': admin_id})
+        db.session.flush()

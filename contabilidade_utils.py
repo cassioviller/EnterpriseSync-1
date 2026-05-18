@@ -1542,12 +1542,15 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
             f"({len(_V2_CONTAS_SEED)} contas)"
         )
 
-        # Seed categorias de escritório (idempotente)
+        # Seed categorias padrão dos catálogos (idempotente)
         try:
-            from models import CategoriaEscritorio
+            from models import CategoriaEscritorio, CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso
             CategoriaEscritorio.seed_defaults(admin_id)
+            CategoriaFluxoCaixa.seed_defaults(admin_id)
+            CategoriaFornecedor.seed_defaults(admin_id)
+            CategoriaReembolso.seed_defaults(admin_id)
         except Exception as _ce:
-            logger.warning(f"[WARN] seed categorias escritório admin={admin_id}: {_ce}")
+            logger.warning(f"[WARN] seed categorias catálogo admin={admin_id}: {_ce}")
 
     except Exception as e:
         logger.error(f"[ERROR] seed_plano_contas_if_needed admin={admin_id}: {e}")

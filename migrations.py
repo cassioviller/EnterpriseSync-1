@@ -3867,6 +3867,7 @@ def executar_migracoes():
             (166, "Task #10 — Catálogos Auxiliares (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso, fornecedor_categorias M2M, fluxo_caixa.categoria_fluxo_caixa_id)", migration_166_catalogos_auxiliares),
             (167, "Task #11 — Compras Parceladas: novos campos em conta_pagar/pedido_compra/gestao_custo_pai + tabelas dia_pagamento_config e fechamento_pagamento", migration_167_compras_parceladas),
             (168, "Task #11 v2 — gestao_custo_pai.fechamento_id FK para fechamento_pagamento (fonte única de obrigação financeira de compras)", migration_168_gcp_fechamento_id),
+            (169, "Task #17 — Seed de categorias padrão nos catálogos (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso) para todos os tenants existentes", migration_169_seed_categorias_catalogo),
         ]
         
         # Executar cada migração com rastreamento
@@ -14018,6 +14019,40 @@ def migration_167_compras_parceladas():
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 167] Falha: {e}")
+        raise
+
+
+def migration_169_seed_categorias_catalogo():
+    """Task #17 — Seed de categorias padrão nos catálogos de Fluxo de Caixa,
+    Fornecedor e Reembolso para todos os tenants (ADMIN + SUPER_ADMIN) existentes.
+    Idempotente: pula o tenant se já houver qualquer registro na tabela.
+    """
+    try:
+        from models import CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso
+
+        rows = db.session.execute(text("""
+            SELECT id FROM usuario
+            WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN') AND ativo = true
+        """)).fetchall()
+
+        admin_ids = [r[0] for r in rows]
+        logger.info(f"[Migration 169] Seeding categorias catálogo para {len(admin_ids)} tenant(s)")
+
+        for aid in admin_ids:
+            try:
+                CategoriaFluxoCaixa.seed_defaults(aid)
+                CategoriaFornecedor.seed_defaults(aid)
+                CategoriaReembolso.seed_defaults(aid)
+                logger.info(f"[Migration 169] Seed OK para admin_id={aid}")
+            except Exception as _e:
+                logger.warning(f"[Migration 169] Seed falhou para admin_id={aid}: {_e}")
+                db.session.rollback()
+
+        db.session.commit()
+        logger.info(f"[Migration 169] Concluída — {len(admin_ids)} tenant(s) processados.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 169] Falha geral: {e}")
         raise
 
 

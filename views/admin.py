@@ -68,11 +68,14 @@ def criar_admin():
         db.session.commit()
 
         try:
-            from models import CategoriaEscritorio
+            from models import CategoriaEscritorio, CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso
             CategoriaEscritorio.seed_defaults(novo_admin.id)
-            logger.info(f"[OK] Categorias escritório criadas para admin {novo_admin.id}")
+            CategoriaFluxoCaixa.seed_defaults(novo_admin.id)
+            CategoriaFornecedor.seed_defaults(novo_admin.id)
+            CategoriaReembolso.seed_defaults(novo_admin.id)
+            logger.info(f"[OK] Categorias padrão criadas para admin {novo_admin.id}")
         except Exception as _seed_err:
-            logger.warning(f"[WARN] Seed categorias escritório falhou para admin {novo_admin.id}: {_seed_err}")
+            logger.warning(f"[WARN] Seed categorias falhou para admin {novo_admin.id}: {_seed_err}")
 
         flash(f'Administrador {nome} criado com sucesso!', 'success')
         logger.info(f"[OK] SUPER ADMIN: Novo admin criado - {nome} ({email})")
