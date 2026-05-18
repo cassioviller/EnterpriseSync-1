@@ -1,0 +1,195 @@
+Antes de implementar, analise a estrutura atual do projeto e identifique os modelos, rotas, templates e serviços relacionados a financeiro, contas a pagar, compras, fornecedores, fluxo de caixa e cadastros auxiliares.
+
+Não remova funcionalidades existentes e não altere regras atuais sem necessidade. A implementação deve ser incremental e compatível com o que já existe.
+
+Preciso implementar melhorias no módulo financeiro, principalmente em Contas a Pagar, Compras e Cadastros Auxiliares.
+
+1. Calendário de Pagamentos
+
+Criar uma funcionalidade chamada Calendário de Pagamentos.
+
+A empresa deve conseguir configurar dias fixos de pagamento dentro do mês, por exemplo:
+- dia 5;
+- dia 20.
+
+Esses dias devem ser usados para montar fechamentos periódicos do contas a pagar.
+
+Criar uma tela chamada “Fechamento de Pagamentos”.
+
+Nessa tela, o usuário deve selecionar uma data de pagamento, por exemplo:
+- 05/06/2026;
+- 20/06/2026.
+
+Ao selecionar a data, o sistema deve listar automaticamente as contas a pagar que pertencem àquele ciclo.
+
+Regra sugerida:
+- No fechamento do dia 5, listar contas vencidas ou com vencimento até o dia 5.
+- No fechamento do dia 20, listar contas com vencimento após o dia 5 e até o dia 20.
+- Contas vencidas de ciclos anteriores que ainda estejam pendentes devem aparecer no próximo fechamento.
+- Contas com vencimento posterior ao ciclo selecionado não devem aparecer, salvo se houver opção de antecipar pagamento.
+
+A tela deve permitir filtros por:
+- fornecedor;
+- obra;
+- categoria;
+- responsável pela compra;
+- status.
+
+O usuário deve conseguir selecionar quais contas serão pagas naquele fechamento.
+
+2. Data de vencimento no Contas a Pagar
+
+Garantir que toda conta a pagar tenha data de vencimento.
+
+No módulo de compras, hoje existe data da compra, mas o financeiro precisa trabalhar também com data de vencimento.
+
+Ao registrar uma compra, o sistema deve permitir informar:
+- data da compra;
+- condição de pagamento;
+- quantidade de parcelas;
+- data de vencimento da primeira parcela;
+- intervalo entre parcelas, quando aplicável;
+- responsável pela compra.
+
+Se a compra for à vista:
+- gerar uma única conta a pagar;
+- data de vencimento igual à data informada.
+
+Se a compra for parcelada:
+- gerar uma conta a pagar para cada parcela;
+- cada parcela deve ter valor e vencimento próprios;
+- todas as parcelas devem ficar vinculadas à compra original;
+- exibir identificação da parcela, como 1/3, 2/3 e 3/3.
+
+Exemplo:
+Compra de R$ 3.000,00 em 3 parcelas:
+- Parcela 1/3: R$ 1.000,00 com vencimento em 05/06/2026;
+- Parcela 2/3: R$ 1.000,00 com vencimento em 05/07/2026;
+- Parcela 3/3: R$ 1.000,00 com vencimento em 05/08/2026.
+
+3. Responsável pela compra
+
+Adicionar o campo “Responsável pela Compra” no processo de compra.
+
+Esse campo deve permitir selecionar um usuário, funcionário ou responsável cadastrado, conforme a estrutura já existente no sistema.
+
+O responsável pela compra deve ser salvo na compra e também aparecer nas contas a pagar geradas a partir dessa compra.
+
+Esse campo deve aparecer:
+- na tela de compra;
+- na listagem de contas a pagar;
+- nos filtros do contas a pagar;
+- no fechamento de pagamentos.
+
+4. Categorias do Fluxo de Caixa
+
+Atualmente algumas categorias do fluxo de caixa parecem estar fixas no código.
+
+Criar um CRUD para Categorias do Fluxo de Caixa.
+
+Campos sugeridos:
+- nome;
+- tipo: entrada ou saída;
+- grupo financeiro;
+- descrição;
+- ativo/inativo.
+
+O sistema deve permitir:
+- cadastrar categoria;
+- editar categoria;
+- inativar categoria;
+- excluir somente se não houver registros vinculados;
+- listar categorias ativas nos formulários.
+
+Essas categorias devem ser usadas nos lançamentos financeiros e no fluxo de caixa, substituindo gradualmente categorias hardcoded, sem quebrar dados existentes.
+
+5. Categorias de Fornecedores
+
+Criar um CRUD para Categorias de Fornecedores.
+
+Campos sugeridos:
+- nome;
+- descrição;
+- ativo/inativo.
+
+No cadastro de fornecedores, permitir selecionar múltiplas categorias.
+
+Um fornecedor pode pertencer a várias categorias.
+
+Exemplos:
+- Restaurante;
+- Material de construção;
+- Ferragens;
+- Transporte;
+- Serviços;
+- Equipamentos;
+- Alimentação;
+- Outros.
+
+Implementar relacionamento muitos-para-muitos entre fornecedor e categoria de fornecedor, respeitando a estrutura atual do banco e do projeto.
+
+6. Categorias de Reembolso
+
+Criar um CRUD para Categorias de Reembolso.
+
+Importante:
+Não estou pedindo para criar lançamento financeiro de reembolso agora.
+Neste momento, preciso apenas do cadastro de categorias de reembolso para uso futuro.
+
+Campos sugeridos:
+- nome;
+- descrição;
+- ativo/inativo.
+
+Exemplos de categorias:
+- Combustível;
+- Pedágio;
+- Alimentação;
+- Estacionamento;
+- Transporte por aplicativo;
+- Material comprado pelo funcionário;
+- Outros.
+
+Essas categorias devem ficar disponíveis dentro da área de Catálogos/Cadastros Auxiliares.
+
+7. Central de Catálogos
+
+Criar uma área no sistema chamada “Catálogos” ou “Cadastros Auxiliares”.
+
+Essa área deve reunir os principais cadastros de apoio do sistema.
+
+Inicialmente, incluir:
+- Categorias do Fluxo de Caixa;
+- Categorias de Fornecedores;
+- Categorias de Reembolso;
+- Tipos de Material;
+- Tipos de Serviço;
+- Formas de Pagamento, se já existir estrutura;
+- Restaurantes, se já existir estrutura;
+- Fornecedores, se fizer sentido dentro da navegação atual.
+
+O objetivo é centralizar os cadastros auxiliares e evitar informações fixas no código.
+
+8. Cuidados técnicos
+
+Antes de alterar qualquer coisa:
+- verificar os models existentes;
+- verificar se já existem tabelas parecidas;
+- reaproveitar estruturas existentes sempre que possível;
+- não duplicar entidades sem necessidade;
+- criar migrations seguras;
+- preservar dados existentes;
+- manter compatibilidade com o fluxo atual de Gestão de Custos, Contas a Pagar e Fluxo de Caixa.
+
+Após implementar, testar:
+- criação de categorias;
+- edição de categorias;
+- inativação de categorias;
+- vínculo de múltiplas categorias ao fornecedor;
+- compra à vista gerando uma conta a pagar;
+- compra parcelada gerando várias contas a pagar;
+- data de vencimento aparecendo corretamente;
+- responsável pela compra aparecendo corretamente;
+- fechamento do dia 5;
+- fechamento do dia 20;
+- filtros por fornecedor, categoria, obra, responsável e status.
