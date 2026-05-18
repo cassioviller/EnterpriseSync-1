@@ -42,6 +42,9 @@ def snapshot_from_servico(servico) -> list:
             'coeficiente': coef,
             'preco_unitario': preco,
             'subtotal_unitario': round(coef * preco, 4),
+            # Task #19 — campos de quantidade comercial (snapshot do catálogo)
+            'fator_comercial': float(ins.fator_comercial or 1),
+            'unidade_comercial': ins.unidade_comercial or None,
         })
     return snap
 
@@ -66,6 +69,7 @@ def recalcular_item(item, orcamento) -> dict:
 
     Retorna dict com {custo_unit, preco_unit, custo_total, venda_total, lucro_total, erro}.
     """
+    import math as _math
     snap = item.composicao_snapshot or []
     custo_unit = Decimal('0')
     snap_norm = []
@@ -73,6 +77,9 @@ def recalcular_item(item, orcamento) -> dict:
         coef = _d(linha.get('coeficiente'))
         preco = _d(linha.get('preco_unitario'))
         sub = (coef * preco).quantize(Decimal('0.0001'))
+        # Task #19 — preserva e recalcula campos de quantidade comercial
+        fator = _d(linha.get('fator_comercial') or 1) or Decimal('1')
+        unidade_comercial = linha.get('unidade_comercial') or None
         snap_norm.append({
             'tipo': (linha.get('tipo') or 'MATERIAL').upper(),
             'insumo_id': linha.get('insumo_id'),
@@ -81,6 +88,8 @@ def recalcular_item(item, orcamento) -> dict:
             'coeficiente': float(coef),
             'preco_unitario': float(preco),
             'subtotal_unitario': float(sub),
+            'fator_comercial': float(fator),
+            'unidade_comercial': unidade_comercial,
         })
         custo_unit += sub
     item.composicao_snapshot = snap_norm

@@ -40,6 +40,29 @@
               real de cada serviço é editável e independente.
             </small>
           </div>
+          <div class="col-md-4">
+            <label class="form-label">
+              Embalagem / múltiplo de compra
+              <i class="fas fa-info-circle text-muted ms-1"
+                 data-bs-toggle="tooltip"
+                 title="Tamanho do pacote do fornecedor. Ex: 100 = pacote de 100 un; 6 = barra de 6 m. Deixe 1 para compra unitária sem arredondamento."></i>
+            </label>
+            <input name="fator_comercial" class="form-control" inputmode="decimal"
+                   placeholder="Ex.: 100"
+                   value="{{ ('%.4f'|format(insumo.fator_comercial|float))|replace('.', ',')|replace(',0000','') if insumo and insumo.fator_comercial else '1' }}">
+            <small class="form-text text-muted">
+              A quantidade de compra será sempre o menor múltiplo deste valor ≥ à quantidade técnica.
+            </small>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Unidade comercial <span class="text-muted">(opcional)</span></label>
+            <input name="unidade_comercial" class="form-control"
+                   placeholder="Ex.: pacote, barra, rolo"
+                   value="{{ insumo.unidade_comercial or '' if insumo else '' }}">
+            <small class="form-text text-muted">
+              Rótulo da embalagem. Se vazio, usa a unidade técnica.
+            </small>
+          </div>
           <div class="col-12">
             <label class="form-label">Descrição</label>
             <textarea name="descricao" class="form-control" rows="2">{{ insumo.descricao if insumo else '' }}</textarea>

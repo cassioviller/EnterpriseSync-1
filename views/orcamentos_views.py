@@ -390,12 +390,15 @@ def atualizar_item(item_id):
         coefs = request.form.getlist('comp_coeficiente')
         precos = request.form.getlist('comp_preco_unitario')
         ins_ids = request.form.getlist('comp_insumo_id')
+        fatores = request.form.getlist('comp_fator_comercial')
+        unids_com = request.form.getlist('comp_unidade_comercial')
         snap = []
         for i in range(len(nomes)):
             nm = (nomes[i] or '').strip()
             if not nm:
                 continue
             try:
+                fator_raw = fatores[i] if i < len(fatores) else '1'
                 snap.append({
                     'tipo': (tipos[i] if i < len(tipos) else 'MATERIAL') or 'MATERIAL',
                     'insumo_id': int(ins_ids[i]) if i < len(ins_ids) and ins_ids[i] else None,
@@ -404,6 +407,8 @@ def atualizar_item(item_id):
                     'coeficiente': _parse_br_number(coefs[i] if i < len(coefs) else 0, 0.0),
                     'preco_unitario': _parse_br_number(precos[i] if i < len(precos) else 0, 0.0),
                     'subtotal_unitario': 0.0,
+                    'fator_comercial': _parse_br_number(fator_raw, 1.0) or 1.0,
+                    'unidade_comercial': (unids_com[i] if i < len(unids_com) else '') or None,
                 })
             except (ValueError, IndexError):
                 continue

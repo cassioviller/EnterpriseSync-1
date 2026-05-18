@@ -85,6 +85,8 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
             'coeficiente': float(coef),
             'preco_unitario': float(preco_vig),
             'subtotal': float(sub),
+            'fator_comercial': float(comp.insumo.fator_comercial or 1),
+            'unidade_comercial': comp.insumo.unidade_comercial or None,
         })
 
     custo_unit_q = _q2(float(custo_total))
@@ -199,9 +201,16 @@ def explodir_servico_para_quantidade(servico, quantidade,
     for d in base.get('detalhamento', []):
         coef = Decimal(str(d['coeficiente']))
         preco = Decimal(str(d['preco_unitario']))
+        fator = Decimal(str(d.get('fator_comercial') or 1)) or Decimal('1')
         qtd_total = (coef * qtd).quantize(Decimal('0.0001'))
         sub_unit = (coef * preco).quantize(Decimal('0.0001'))
         sub_tot = (qtd_total * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        # Task #19 — qtd_comercial: arredonda para cima ao próximo múltiplo do fator
+        import math as _math
+        if fator > Decimal('1'):
+            qtd_com = (Decimal(str(_math.ceil(float(qtd_total) / float(fator)))) * fator).quantize(Decimal('0.0001'))
+        else:
+            qtd_com = qtd_total
         linha = {
             'insumo_id': d['insumo_id'],
             'nome': d['nome'],
@@ -210,6 +219,9 @@ def explodir_servico_para_quantidade(servico, quantidade,
             'coeficiente': float(coef),
             'preco_unitario': float(preco),
             'quantidade_total': float(qtd_total),
+            'quantidade_comercial': float(qtd_com),
+            'fator_comercial': float(fator),
+            'unidade_comercial': d.get('unidade_comercial') or None,
             'subtotal_unitario': float(sub_unit),
             'subtotal_total': float(sub_tot),
         }

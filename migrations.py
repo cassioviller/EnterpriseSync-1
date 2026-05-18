@@ -3868,6 +3868,7 @@ def executar_migracoes():
             (167, "Task #11 — Compras Parceladas: novos campos em conta_pagar/pedido_compra/gestao_custo_pai + tabelas dia_pagamento_config e fechamento_pagamento", migration_167_compras_parceladas),
             (168, "Task #11 v2 — gestao_custo_pai.fechamento_id FK para fechamento_pagamento (fonte única de obrigação financeira de compras)", migration_168_gcp_fechamento_id),
             (169, "Task #17 — Seed de categorias padrão nos catálogos (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso) para todos os tenants existentes", migration_169_seed_categorias_catalogo),
+            (170, "Task #19 — fator_comercial + unidade_comercial em insumo (quantidade comercial/embalagem)", migration_170_insumo_quantidade_comercial),
         ]
         
         # Executar cada migração com rastreamento
@@ -14190,6 +14191,32 @@ def migration_160_crm_vendedor_orcamentista():
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 160] Falha: {e}")
+        raise
+
+
+def migration_170_insumo_quantidade_comercial():
+    """Task #19 — Adiciona fator_comercial e unidade_comercial à tabela insumo.
+
+    fator_comercial: múltiplo/embalagem do fornecedor (ex: 100 = pacote de 100 un).
+                     Valor 1 = compra unitária (sem arredondamento).
+    unidade_comercial: rótulo da embalagem (ex: "pacote", "barra"). Opcional.
+
+    Idempotente via ADD COLUMN IF NOT EXISTS.
+    """
+    try:
+        db.session.execute(text("""
+            ALTER TABLE insumo
+            ADD COLUMN IF NOT EXISTS fator_comercial NUMERIC(15,4) NOT NULL DEFAULT 1
+        """))
+        db.session.execute(text("""
+            ALTER TABLE insumo
+            ADD COLUMN IF NOT EXISTS unidade_comercial VARCHAR(30)
+        """))
+        db.session.commit()
+        logger.info("[Migration 170] fator_comercial + unidade_comercial adicionados à tabela insumo")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 170] Falha: {e}")
         raise
 
 

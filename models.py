@@ -5943,6 +5943,13 @@ class Insumo(db.Model):
     # ao adicionar este insumo na composição de um serviço). NÃO é usado no
     # cálculo das composições já existentes; só pré-preenche o picker.
     coeficiente_padrao = db.Column(db.Numeric(15, 6), nullable=False, default=1)
+    # Task #19 — Quantidade Comercial: embalagem/múltiplo de fornecimento.
+    # fator_comercial = tamanho do pacote do fornecedor (ex: 100 parafusos, 6 m barra).
+    # 1.0 = compra unitária (sem arredondamento).
+    # qtd_compra = ceil(qtd_técnica / fator_comercial) × fator_comercial.
+    fator_comercial = db.Column(db.Numeric(15, 4), nullable=False, default=1)
+    # Unidade comercial (ex: "pacote", "barra") — opcional; se vazio usa `unidade`.
+    unidade_comercial = db.Column(db.String(30), nullable=True)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
