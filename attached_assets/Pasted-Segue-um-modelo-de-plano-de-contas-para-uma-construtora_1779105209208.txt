@@ -1,0 +1,532 @@
+Segue um **modelo de plano de contas para uma construtora**, pensado para empresa de **construção civil, obras por contrato, reformas, empreitadas, incorporação ou prestação de serviços de construção**.
+
+Você pode adaptar conforme o regime tributário: **Simples Nacional, Lucro Presumido ou Lucro Real**.
+
+---
+
+# PLANO DE CONTAS — CONSTRUTORA
+
+## 1. ATIVO
+
+### 1.1 Ativo Circulante
+
+#### 1.1.01 Disponibilidades
+
+| Código     | Conta                      |
+| ---------- | -------------------------- |
+| 1.1.01.001 | Caixa                      |
+| 1.1.01.002 | Banco Conta Movimento      |
+| 1.1.01.003 | Banco Aplicação Financeira |
+| 1.1.01.004 | Cartões a Receber          |
+| 1.1.01.005 | Conta Garantia / Caução    |
+
+---
+
+#### 1.1.02 Clientes e Contas a Receber
+
+| Código     | Conta                                         |
+| ---------- | --------------------------------------------- |
+| 1.1.02.001 | Clientes Nacionais                            |
+| 1.1.02.002 | Clientes — Obras Executadas                   |
+| 1.1.02.003 | Clientes — Medições a Receber                 |
+| 1.1.02.004 | Clientes — Retenções Contratuais a Receber    |
+| 1.1.02.005 | Duplicatas a Receber                          |
+| 1.1.02.006 | Adiantamentos a Clientes                      |
+| 1.1.02.007 | Provisão para Créditos de Liquidação Duvidosa |
+
+---
+
+#### 1.1.03 Estoques e Materiais
+
+| Código     | Conta                                     |
+| ---------- | ----------------------------------------- |
+| 1.1.03.001 | Estoque de Materiais de Construção        |
+| 1.1.03.002 | Estoque de Aço                            |
+| 1.1.03.003 | Estoque de Cimento, Areia e Pedra         |
+| 1.1.03.004 | Estoque de Materiais Elétricos            |
+| 1.1.03.005 | Estoque de Materiais Hidráulicos          |
+| 1.1.03.006 | Estoque de EPIs                           |
+| 1.1.03.007 | Materiais em Obras                        |
+| 1.1.03.008 | Almoxarifado Central                      |
+| 1.1.03.009 | Materiais para Revenda                    |
+| 1.1.03.010 | Perdas de Estoque / Ajustes de Inventário |
+
+---
+
+#### 1.1.04 Obras em Andamento
+
+| Código     | Conta                                      |
+| ---------- | ------------------------------------------ |
+| 1.1.04.001 | Obras em Andamento — Materiais             |
+| 1.1.04.002 | Obras em Andamento — Mão de Obra           |
+| 1.1.04.003 | Obras em Andamento — Serviços de Terceiros |
+| 1.1.04.004 | Obras em Andamento — Equipamentos          |
+| 1.1.04.005 | Obras em Andamento — Custos Indiretos      |
+| 1.1.04.006 | Obras em Andamento — Administração de Obra |
+| 1.1.04.007 | Obras em Andamento — Projetos e Licenças   |
+| 1.1.04.008 | Obras em Andamento — Encargos Trabalhistas |
+| 1.1.04.009 | Obras em Andamento — Transporte e Fretes   |
+| 1.1.04.010 | Obras em Andamento — Outros Custos         |
+
+> Essa parte é muito importante para construtora, porque permite controlar o custo acumulado por obra antes do reconhecimento do resultado.
+
+---
+
+#### 1.1.05 Adiantamentos
+
+| Código     | Conta                                     |
+| ---------- | ----------------------------------------- |
+| 1.1.05.001 | Adiantamento a Fornecedores               |
+| 1.1.05.002 | Adiantamento a Empregados                 |
+| 1.1.05.003 | Adiantamento de Salários                  |
+| 1.1.05.004 | Adiantamento de Férias                    |
+| 1.1.05.005 | Adiantamento para Obras                   |
+| 1.1.05.006 | Adiantamento a Sócios                     |
+| 1.1.05.007 | Adiantamento para Viagens e Deslocamentos |
+
+---
+
+#### 1.1.06 Tributos a Recuperar
+
+| Código     | Conta                                     |
+| ---------- | ----------------------------------------- |
+| 1.1.06.001 | INSS a Recuperar                          |
+| 1.1.06.002 | IRRF a Recuperar                          |
+| 1.1.06.003 | ISS a Recuperar                           |
+| 1.1.06.004 | PIS a Recuperar                           |
+| 1.1.06.005 | COFINS a Recuperar                        |
+| 1.1.06.006 | CSLL a Recuperar                          |
+| 1.1.06.007 | IRPJ a Recuperar                          |
+| 1.1.06.008 | Retenções sobre Notas Fiscais a Recuperar |
+
+---
+
+### 1.2 Ativo Não Circulante
+
+#### 1.2.01 Imobilizado
+
+| Código     | Conta                                |
+| ---------- | ------------------------------------ |
+| 1.2.01.001 | Máquinas e Equipamentos              |
+| 1.2.01.002 | Ferramentas                          |
+| 1.2.01.003 | Veículos                             |
+| 1.2.01.004 | Caminhões                            |
+| 1.2.01.005 | Betoneiras                           |
+| 1.2.01.006 | Andaimes                             |
+| 1.2.01.007 | Escoras e Formas                     |
+| 1.2.01.008 | Equipamentos de Topografia           |
+| 1.2.01.009 | Computadores e Periféricos           |
+| 1.2.01.010 | Móveis e Utensílios                  |
+| 1.2.01.011 | Benfeitorias em Imóveis de Terceiros |
+
+---
+
+#### 1.2.02 Depreciação Acumulada
+
+| Código     | Conta                                           |
+| ---------- | ----------------------------------------------- |
+| 1.2.02.001 | Depreciação Acumulada — Máquinas e Equipamentos |
+| 1.2.02.002 | Depreciação Acumulada — Ferramentas             |
+| 1.2.02.003 | Depreciação Acumulada — Veículos                |
+| 1.2.02.004 | Depreciação Acumulada — Caminhões               |
+| 1.2.02.005 | Depreciação Acumulada — Equipamentos de Obra    |
+| 1.2.02.006 | Depreciação Acumulada — Computadores            |
+| 1.2.02.007 | Depreciação Acumulada — Móveis e Utensílios     |
+
+---
+
+## 2. PASSIVO
+
+### 2.1 Passivo Circulante
+
+#### 2.1.01 Fornecedores
+
+| Código     | Conta                                   |
+| ---------- | --------------------------------------- |
+| 2.1.01.001 | Fornecedores Nacionais                  |
+| 2.1.01.002 | Fornecedores de Materiais de Construção |
+| 2.1.01.003 | Fornecedores de Aço                     |
+| 2.1.01.004 | Fornecedores de Concreto                |
+| 2.1.01.005 | Fornecedores de Equipamentos            |
+| 2.1.01.006 | Fornecedores de Serviços                |
+| 2.1.01.007 | Empreiteiros a Pagar                    |
+| 2.1.01.008 | Subempreiteiros a Pagar                 |
+| 2.1.01.009 | Fretes a Pagar                          |
+
+---
+
+#### 2.1.02 Obrigações Trabalhistas
+
+| Código     | Conta                                   |
+| ---------- | --------------------------------------- |
+| 2.1.02.001 | Salários a Pagar                        |
+| 2.1.02.002 | Pró-labore a Pagar                      |
+| 2.1.02.003 | Férias a Pagar                          |
+| 2.1.02.004 | 13º Salário a Pagar                     |
+| 2.1.02.005 | Rescisões a Pagar                       |
+| 2.1.02.006 | Pensão Alimentícia a Pagar              |
+| 2.1.02.007 | Vale Transporte a Pagar                 |
+| 2.1.02.008 | Vale Alimentação/Refeição a Pagar       |
+| 2.1.02.009 | Adiantamentos Descontados de Empregados |
+
+---
+
+#### 2.1.03 Encargos Sociais a Recolher
+
+| Código     | Conta                            |
+| ---------- | -------------------------------- |
+| 2.1.03.001 | INSS a Recolher                  |
+| 2.1.03.002 | FGTS a Recolher                  |
+| 2.1.03.003 | IRRF sobre Folha a Recolher      |
+| 2.1.03.004 | Contribuição Sindical a Recolher |
+| 2.1.03.005 | INSS Terceiros a Recolher        |
+| 2.1.03.006 | RAT/FAP a Recolher               |
+
+---
+
+#### 2.1.04 Obrigações Tributárias
+
+| Código     | Conta                             |
+| ---------- | --------------------------------- |
+| 2.1.04.001 | ISS a Recolher                    |
+| 2.1.04.002 | Simples Nacional a Recolher       |
+| 2.1.04.003 | PIS a Recolher                    |
+| 2.1.04.004 | COFINS a Recolher                 |
+| 2.1.04.005 | CSLL a Recolher                   |
+| 2.1.04.006 | IRPJ a Recolher                   |
+| 2.1.04.007 | IRRF a Recolher                   |
+| 2.1.04.008 | Retenções Federais a Recolher     |
+| 2.1.04.009 | Parcelamentos Tributários a Pagar |
+
+---
+
+#### 2.1.05 Empréstimos e Financiamentos
+
+| Código     | Conta                         |
+| ---------- | ----------------------------- |
+| 2.1.05.001 | Empréstimos Bancários a Pagar |
+| 2.1.05.002 | Financiamentos de Veículos    |
+| 2.1.05.003 | Financiamentos de Máquinas    |
+| 2.1.05.004 | Cartão de Crédito Empresarial |
+| 2.1.05.005 | Juros a Pagar                 |
+| 2.1.05.006 | Cheque Especial a Pagar       |
+
+---
+
+#### 2.1.06 Adiantamentos Recebidos
+
+| Código     | Conta                         |
+| ---------- | ----------------------------- |
+| 2.1.06.001 | Adiantamento de Clientes      |
+| 2.1.06.002 | Adiantamento por Obra         |
+| 2.1.06.003 | Sinal de Contrato Recebido    |
+| 2.1.06.004 | Cauções Recebidas             |
+| 2.1.06.005 | Retenções Contratuais a Pagar |
+
+---
+
+### 2.2 Passivo Não Circulante
+
+| Código     | Conta                                    |
+| ---------- | ---------------------------------------- |
+| 2.2.01.001 | Empréstimos de Longo Prazo               |
+| 2.2.01.002 | Financiamentos de Longo Prazo            |
+| 2.2.01.003 | Parcelamentos Tributários de Longo Prazo |
+| 2.2.01.004 | Provisões Judiciais                      |
+| 2.2.01.005 | Obrigações com Sócios de Longo Prazo     |
+
+---
+
+## 3. PATRIMÔNIO LÍQUIDO
+
+| Código     | Conta                            |
+| ---------- | -------------------------------- |
+| 3.1.01.001 | Capital Social                   |
+| 3.1.01.002 | Capital a Integralizar           |
+| 3.1.01.003 | Reservas de Capital              |
+| 3.1.01.004 | Reservas de Lucros               |
+| 3.1.01.005 | Lucros Acumulados                |
+| 3.1.01.006 | Prejuízos Acumulados             |
+| 3.1.01.007 | Lucros/Prejuízos do Exercício    |
+| 3.1.01.008 | Distribuição de Lucros           |
+| 3.1.01.009 | Ajustes de Exercícios Anteriores |
+
+---
+
+# 4. RECEITAS
+
+## 4.1 Receitas Operacionais
+
+| Código     | Conta                                     |
+| ---------- | ----------------------------------------- |
+| 4.1.01.001 | Receita de Serviços de Construção Civil   |
+| 4.1.01.002 | Receita de Execução de Obras              |
+| 4.1.01.003 | Receita de Reforma                        |
+| 4.1.01.004 | Receita de Empreitada Global              |
+| 4.1.01.005 | Receita de Mão de Obra                    |
+| 4.1.01.006 | Receita de Administração de Obras         |
+| 4.1.01.007 | Receita de Projetos                       |
+| 4.1.01.008 | Receita de Incorporação Imobiliária       |
+| 4.1.01.009 | Receita de Venda de Unidades Imobiliárias |
+| 4.1.01.010 | Receita de Medições de Obras              |
+| 4.1.01.011 | Receita de Serviços Complementares        |
+
+---
+
+## 4.2 Deduções da Receita
+
+| Código     | Conta                          |
+| ---------- | ------------------------------ |
+| 4.2.01.001 | ISS sobre Serviços             |
+| 4.2.01.002 | Simples Nacional sobre Receita |
+| 4.2.01.003 | PIS sobre Receita              |
+| 4.2.01.004 | COFINS sobre Receita           |
+| 4.2.01.005 | INSS Retido sobre Nota Fiscal  |
+| 4.2.01.006 | IRRF Retido sobre Serviços     |
+| 4.2.01.007 | CSRF Retida sobre Serviços     |
+| 4.2.01.008 | Descontos Concedidos           |
+| 4.2.01.009 | Cancelamentos de Receita       |
+
+---
+
+# 5. CUSTOS DAS OBRAS
+
+## 5.1 Custos Diretos de Obra
+
+| Código     | Conta                                |
+| ---------- | ------------------------------------ |
+| 5.1.01.001 | Custo com Materiais de Construção    |
+| 5.1.01.002 | Custo com Aço                        |
+| 5.1.01.003 | Custo com Cimento                    |
+| 5.1.01.004 | Custo com Areia, Pedra e Brita       |
+| 5.1.01.005 | Custo com Concreto Usinado           |
+| 5.1.01.006 | Custo com Madeira                    |
+| 5.1.01.007 | Custo com Materiais Elétricos        |
+| 5.1.01.008 | Custo com Materiais Hidráulicos      |
+| 5.1.01.009 | Custo com Acabamentos                |
+| 5.1.01.010 | Custo com EPIs                       |
+| 5.1.01.011 | Custo com Ferramentas de Baixo Valor |
+| 5.1.01.012 | Custo com Fretes de Materiais        |
+
+---
+
+## 5.2 Mão de Obra Direta
+
+| Código     | Conta                                   |
+| ---------- | --------------------------------------- |
+| 5.2.01.001 | Salários de Obra                        |
+| 5.2.01.002 | Encargos Sociais de Obra                |
+| 5.2.01.003 | Férias de Funcionários de Obra          |
+| 5.2.01.004 | 13º Salário de Funcionários de Obra     |
+| 5.2.01.005 | FGTS sobre Mão de Obra de Obra          |
+| 5.2.01.006 | INSS sobre Mão de Obra de Obra          |
+| 5.2.01.007 | Horas Extras de Obra                    |
+| 5.2.01.008 | Alimentação de Funcionários de Obra     |
+| 5.2.01.009 | Vale Transporte de Funcionários de Obra |
+| 5.2.01.010 | Alojamento de Funcionários de Obra      |
+| 5.2.01.011 | Diárias de Obra                         |
+
+---
+
+## 5.3 Serviços de Terceiros e Empreiteiros
+
+| Código     | Conta                             |
+| ---------- | --------------------------------- |
+| 5.3.01.001 | Serviços de Empreiteiros          |
+| 5.3.01.002 | Serviços de Subempreiteiros       |
+| 5.3.01.003 | Serviços de Engenharia            |
+| 5.3.01.004 | Serviços de Arquitetura           |
+| 5.3.01.005 | Serviços de Topografia            |
+| 5.3.01.006 | Serviços de Terraplanagem         |
+| 5.3.01.007 | Serviços de Fundação              |
+| 5.3.01.008 | Serviços de Estrutura             |
+| 5.3.01.009 | Serviços de Alvenaria             |
+| 5.3.01.010 | Serviços de Elétrica              |
+| 5.3.01.011 | Serviços de Hidráulica            |
+| 5.3.01.012 | Serviços de Pintura               |
+| 5.3.01.013 | Serviços de Acabamento            |
+| 5.3.01.014 | Locação de Mão de Obra            |
+| 5.3.01.015 | Serviços de Segurança do Trabalho |
+
+---
+
+## 5.4 Equipamentos, Máquinas e Locações
+
+| Código     | Conta                                   |
+| ---------- | --------------------------------------- |
+| 5.4.01.001 | Locação de Máquinas                     |
+| 5.4.01.002 | Locação de Equipamentos                 |
+| 5.4.01.003 | Locação de Andaimes                     |
+| 5.4.01.004 | Locação de Betoneira                    |
+| 5.4.01.005 | Locação de Caminhão                     |
+| 5.4.01.006 | Combustíveis de Máquinas e Equipamentos |
+| 5.4.01.007 | Manutenção de Máquinas de Obra          |
+| 5.4.01.008 | Manutenção de Veículos de Obra          |
+| 5.4.01.009 | Depreciação de Equipamentos de Obra     |
+
+---
+
+## 5.5 Custos Indiretos de Obra
+
+| Código     | Conta                              |
+| ---------- | ---------------------------------- |
+| 5.5.01.001 | Água e Energia da Obra             |
+| 5.5.01.002 | Telefone e Internet da Obra        |
+| 5.5.01.003 | Limpeza da Obra                    |
+| 5.5.01.004 | Segurança da Obra                  |
+| 5.5.01.005 | Transporte de Funcionários         |
+| 5.5.01.006 | Transporte de Materiais            |
+| 5.5.01.007 | Refeições de Obra                  |
+| 5.5.01.008 | Uniformes                          |
+| 5.5.01.009 | EPIs                               |
+| 5.5.01.010 | Licenças e Alvarás de Obra         |
+| 5.5.01.011 | ART/RRT                            |
+| 5.5.01.012 | Diário de Obra / Controle Técnico  |
+| 5.5.01.013 | Pequenas Compras de Obra           |
+| 5.5.01.014 | Perdas e Desperdícios de Materiais |
+
+---
+
+# 6. DESPESAS OPERACIONAIS
+
+## 6.1 Despesas Administrativas
+
+| Código     | Conta                            |
+| ---------- | -------------------------------- |
+| 6.1.01.001 | Salários Administrativos         |
+| 6.1.01.002 | Pró-labore                       |
+| 6.1.01.003 | Encargos Sociais Administrativos |
+| 6.1.01.004 | Aluguel do Escritório            |
+| 6.1.01.005 | Energia Elétrica do Escritório   |
+| 6.1.01.006 | Água e Esgoto                    |
+| 6.1.01.007 | Telefone e Internet              |
+| 6.1.01.008 | Material de Escritório           |
+| 6.1.01.009 | Sistemas e Softwares             |
+| 6.1.01.010 | Honorários Contábeis             |
+| 6.1.01.011 | Honorários Jurídicos             |
+| 6.1.01.012 | Consultorias                     |
+| 6.1.01.013 | Cartório                         |
+| 6.1.01.014 | Correios                         |
+| 6.1.01.015 | Despesas Bancárias               |
+| 6.1.01.016 | Manutenção do Escritório         |
+| 6.1.01.017 | Material de Limpeza              |
+| 6.1.01.018 | Copa e Cozinha                   |
+
+---
+
+## 6.2 Despesas Comerciais
+
+| Código     | Conta                               |
+| ---------- | ----------------------------------- |
+| 6.2.01.001 | Marketing e Publicidade             |
+| 6.2.01.002 | Tráfego Pago                        |
+| 6.2.01.003 | Comissões de Vendas                 |
+| 6.2.01.004 | Representantes Comerciais           |
+| 6.2.01.005 | Brindes e Materiais Promocionais    |
+| 6.2.01.006 | Despesas com Propostas e Orçamentos |
+| 6.2.01.007 | Visitas Comerciais                  |
+| 6.2.01.008 | Deslocamento Comercial              |
+| 6.2.01.009 | Hospedagem Comercial                |
+| 6.2.01.010 | Alimentação Comercial               |
+
+---
+
+## 6.3 Despesas com Veículos
+
+| Código     | Conta                  |
+| ---------- | ---------------------- |
+| 6.3.01.001 | Combustíveis           |
+| 6.3.01.002 | Manutenção de Veículos |
+| 6.3.01.003 | Seguro de Veículos     |
+| 6.3.01.004 | IPVA e Licenciamento   |
+| 6.3.01.005 | Pedágios               |
+| 6.3.01.006 | Estacionamentos        |
+| 6.3.01.007 | Multas de Trânsito     |
+
+---
+
+## 6.4 Despesas Tributárias
+
+| Código     | Conta                |
+| ---------- | -------------------- |
+| 6.4.01.001 | Taxas Municipais     |
+| 6.4.01.002 | Taxas Estaduais      |
+| 6.4.01.003 | Taxas Federais       |
+| 6.4.01.004 | Multas Fiscais       |
+| 6.4.01.005 | Juros sobre Tributos |
+| 6.4.01.006 | IPTU                 |
+| 6.4.01.007 | Licenças e Alvarás   |
+
+---
+
+# 7. RESULTADO FINANCEIRO
+
+## 7.1 Receitas Financeiras
+
+| Código     | Conta                                 |
+| ---------- | ------------------------------------- |
+| 7.1.01.001 | Juros Ativos                          |
+| 7.1.01.002 | Rendimentos de Aplicações Financeiras |
+| 7.1.01.003 | Descontos Obtidos                     |
+| 7.1.01.004 | Variações Monetárias Ativas           |
+
+---
+
+## 7.2 Despesas Financeiras
+
+| Código     | Conta                         |
+| ---------- | ----------------------------- |
+| 7.2.01.001 | Juros Passivos                |
+| 7.2.01.002 | Multas Pagas                  |
+| 7.2.01.003 | Tarifas Bancárias             |
+| 7.2.01.004 | IOF                           |
+| 7.2.01.005 | Descontos Concedidos          |
+| 7.2.01.006 | Juros de Empréstimos          |
+| 7.2.01.007 | Variações Monetárias Passivas |
+
+---
+
+# 8. CONTAS DE APURAÇÃO
+
+| Código     | Conta                                   |
+| ---------- | --------------------------------------- |
+| 8.1.01.001 | Apuração do Resultado do Exercício      |
+| 8.1.01.002 | Resultado do Exercício                  |
+| 8.1.01.003 | Transferência para Lucros Acumulados    |
+| 8.1.01.004 | Transferência para Prejuízos Acumulados |
+| 8.1.01.005 | Distribuição de Lucros do Exercício     |
+
+---
+
+# Estrutura resumida ideal
+
+Para construtora, eu recomendo separar assim:
+
+| Grupo                    | Finalidade                                                         |
+| ------------------------ | ------------------------------------------------------------------ |
+| Ativo                    | Bancos, clientes, estoques, obras em andamento e imobilizado       |
+| Passivo                  | Fornecedores, tributos, folha, empréstimos e adiantamentos         |
+| Patrimônio Líquido       | Capital, lucros, prejuízos e distribuição                          |
+| Receitas                 | Serviços, obras, reformas, medições e incorporação                 |
+| Custos de Obra           | Materiais, mão de obra, terceiros, equipamentos e custos indiretos |
+| Despesas Administrativas | Escritório, contabilidade, sistemas, administrativo                |
+| Resultado Financeiro     | Juros, tarifas, rendimentos e multas                               |
+| Apuração                 | Encerramento do resultado                                          |
+
+---
+
+# Observação importante
+
+Para uma construtora, o ideal é que o plano de contas permita controlar:
+
+1. **obra por obra**;
+2. **materiais por obra**;
+3. **mão de obra direta por obra**;
+4. **empreiteiros e terceiros por obra**;
+5. **medições a receber**;
+6. **retenções contratuais**;
+7. **adiantamentos de clientes**;
+8. **custos em andamento**;
+9. **resultado por obra**.
+
+A conta mais estratégica é **Obras em Andamento**, porque ela permite acumular custos antes de reconhecer o resultado final da obra.
