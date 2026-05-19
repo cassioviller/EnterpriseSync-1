@@ -109,8 +109,14 @@
               </div>
               <!-- Seção Subatividades -->
               <div>
-                <div class="text-uppercase text-muted" style="font-size:.68rem;font-weight:600;letter-spacing:.05em;padding:.25rem .5rem">
-                  Subatividades
+                <div class="d-flex align-items-center justify-content-between" style="padding:.25rem .5rem">
+                  <div class="text-uppercase text-muted" style="font-size:.68rem;font-weight:600;letter-spacing:.05em">
+                    Subatividades
+                  </div>
+                  <button type="button" class="btn btn-link btn-sm p-0 text-success" style="font-size:.75rem"
+                          onclick="qcAbrirSubatividadeMestre()" title="Criar nova subatividade no catálogo">
+                    <i class="fas fa-plus-circle"></i>
+                  </button>
                 </div>
                 <div id="listaSubsCatalogo">
                   <div class="text-muted small text-center py-2" id="semSubsCatalogo">Carregando...</div>
@@ -510,6 +516,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('itensJsonInput').value = JSON.stringify(arvore);
   });
 });
+
+function qcAbrirSubatividadeMestre() {
+  quickCreate({
+    title: 'Nova Subatividade no Catálogo',
+    endpoint: '/api/quick-create/subatividade-mestre',
+    fields: [
+      { name: 'nome', label: 'Nome', type: 'text', required: true, placeholder: 'Ex: Assentamento de piso cerâmico' },
+      { name: 'unidade_medida', label: 'Unidade de Medida', type: 'text', placeholder: 'Ex: m², m linear, un' },
+    ],
+    onSuccess: function (data) {
+      todasSubs.push({
+        id: data.id,
+        nome: data.nome,
+        unidade_medida: data.unidade_medida || '',
+        tipo: 'subatividade',
+      });
+      renderizarCatalogo(document.getElementById('buscaCatalogo').value || '');
+      _popularTodosCatalogoSelects();
+    },
+  });
+}
 </script>
 
 <style>

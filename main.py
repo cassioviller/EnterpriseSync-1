@@ -247,6 +247,16 @@ except ImportError as e:
 except Exception as e:
     logger.error(f"[ERROR] Falha ao registrar catalogos: {e}")
 
+try:
+    from views.quick_create_views import quick_create_bp
+    app.register_blueprint(quick_create_bp)
+    csrf.exempt(quick_create_bp)
+    logger.info("[OK] Blueprint quick_create registrado e CSRF-isento")
+except ImportError as e:
+    logger.warning(f"[WARN] quick_create não encontrado: {e}")
+except Exception as e:
+    logger.error(f"[ERROR] Falha ao registrar quick_create: {e}")
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

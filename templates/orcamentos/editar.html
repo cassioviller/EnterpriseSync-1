@@ -565,6 +565,10 @@
                 onclick="abrirInsumoPicker(this)" title="Buscar insumo do Catálogo">
           <i class="fas fa-search me-1"></i> Adicionar do Catálogo
         </button>
+        <button type="button" class="btn btn-sm btn-outline-success ms-1"
+                onclick="qcAbrirInsumoOrcamento(this)" title="Criar novo insumo no Catálogo sem sair da página">
+          <i class="fas fa-plus me-1"></i> Novo Insumo
+        </button>
         {% if it.servico_id %}
         {# HTML5 `form` attribute associa o submit ao <form> externo de reset
            (declarado abaixo, fora do form item-form, evitando nested forms). #}
@@ -1175,4 +1179,43 @@ function _addInsumoRow(insumo) {
     </div>
   </div>
 </div>
+
+<script>
+function qcAbrirInsumoOrcamento(btn) {
+  if (btn) {
+    _pickerTbody = btn.parentElement.querySelector('.comp-tbody');
+  }
+  quickCreate({
+    title: 'Novo Insumo no Catálogo',
+    endpoint: '/api/quick-create/insumo',
+    fields: [
+      { name: 'nome', label: 'Nome', type: 'text', required: true, placeholder: 'Ex: Cimento CP-II' },
+      { name: 'tipo', label: 'Tipo', type: 'select', required: true, default: 'MATERIAL',
+        options: [
+          { value: 'MATERIAL', label: 'Material' },
+          { value: 'MAO_OBRA', label: 'Mão de obra' },
+          { value: 'EQUIPAMENTO', label: 'Equipamento' },
+        ]
+      },
+      { name: 'unidade', label: 'Unidade', type: 'text', placeholder: 'Ex: kg, m², un', default: 'un' },
+    ],
+    onSuccess: function (data) {
+      if (_pickerTbody) {
+        var tipoEl = document.getElementById('insumoPickerTipo');
+        if (tipoEl) tipoEl.value = data.tipo || 'MATERIAL';
+        _addInsumoRow({
+          id: data.id,
+          nome: data.nome,
+          tipo: data.tipo,
+          unidade: data.unidade,
+          preco: 0,
+          coeficiente_padrao: null,
+          fator_comercial: 1,
+          unidade_comercial: '',
+        });
+      }
+    },
+  });
+}
+</script>
 {% endblock %}

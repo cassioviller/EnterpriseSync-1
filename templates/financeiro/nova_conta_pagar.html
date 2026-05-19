@@ -61,8 +61,14 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold">Fornecedor</label>
-            <select class="form-select" name="fornecedor_id">
+            <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+              <span>Fornecedor</span>
+              <button type="button" class="btn btn-link btn-sm p-0 text-success fw-normal"
+                      onclick="qcAbrirFornecedorCP()" title="Criar novo fornecedor sem sair da página">
+                <i class="fas fa-plus-circle me-1"></i>novo
+              </button>
+            </label>
+            <select class="form-select" name="fornecedor_id" id="fornecedorSelectCP">
               <option value="">— Selecione (opcional) —</option>
               {% for f in fornecedores %}
                 <option value="{{ f.id }}">{{ f.razao_social or f.nome }}</option>
@@ -110,4 +116,23 @@
 
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function qcAbrirFornecedorCP() {
+  quickCreate({
+    title: 'Novo Fornecedor',
+    endpoint: '/api/quick-create/fornecedor',
+    fields: [
+      { name: 'nome', label: 'Nome / Razão Social', type: 'text', required: true, placeholder: 'Ex: Distribuidora ABC' },
+      { name: 'cnpj', label: 'CNPJ / CPF', type: 'text', placeholder: 'Ex: 00.000.000/0001-00' },
+    ],
+    onSuccess: function (data) {
+      var sel = document.getElementById('fornecedorSelectCP');
+      if (sel) qcInjectOption(sel, data.id, data.label);
+    },
+  });
+}
+</script>
 {% endblock %}

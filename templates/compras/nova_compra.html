@@ -66,34 +66,26 @@
 
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label fw-semibold" for="fornecedorSelect">Fornecedor <span class="text-danger">*</span></label>
+                <label class="form-label fw-semibold d-flex justify-content-between align-items-center" for="fornecedorSelect">
+                  <span>Fornecedor <span class="text-danger">*</span></span>
+                  <button type="button" class="btn btn-link btn-sm p-0 text-success fw-normal"
+                          onclick="qcAbrirFornecedor()" title="Criar novo fornecedor sem sair da página">
+                    <i class="fas fa-plus-circle me-1"></i>novo
+                  </button>
+                </label>
+                <select name="fornecedor_id" id="fornecedorSelect" class="form-select select2-ajax" data-placeholder="Busque o fornecedor pelo nome…" required>
+                  <option value=""></option>
+                  {% for f in fornecedores %}
+                    <option value="{{ f.id }}">{{ f.nome }}</option>
+                  {% endfor %}
+                </select>
                 {% if fornecedores %}
-                  <select name="fornecedor_id" id="fornecedorSelect" class="form-select select2-ajax" data-placeholder="Busque o fornecedor pelo nome…" required>
-                    <option value=""></option>
-                    {% for f in fornecedores %}
-                      <option value="{{ f.id }}">{{ f.nome }}</option>
-                    {% endfor %}
-                  </select>
-                  <div class="form-text">
-                    {{ fornecedores|length }} fornecedor(es) ativo(s).
-                    <a href="{{ url_for('almoxarifado.fornecedores_criar') }}" class="text-decoration-none">
-                      <i class="fas fa-plus me-1"></i>Cadastrar novo
-                    </a>
-                  </div>
+                  <div class="form-text">{{ fornecedores|length }} fornecedor(es) ativo(s).</div>
                 {% else %}
-                  <div class="alert alert-warning d-flex align-items-start mb-0" role="alert">
-                    <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
-                    <div class="flex-grow-1">
-                      <strong>Nenhum fornecedor cadastrado.</strong>
-                      <div class="small mt-1">
-                        Cadastre pelo menos um fornecedor antes de registrar a compra.
-                      </div>
-                      <a href="{{ url_for('almoxarifado.fornecedores_criar') }}" class="btn btn-sm btn-warning mt-2">
-                        <i class="fas fa-plus me-1"></i>Cadastrar fornecedor agora
-                      </a>
-                    </div>
+                  <div class="form-text text-warning">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    Nenhum fornecedor cadastrado. Use o botão <strong>+ novo</strong> acima para criar um agora.
                   </div>
-                  <input type="hidden" name="fornecedor_id" value="">
                 {% endif %}
               </div>
               <div class="col-md-3">
@@ -467,6 +459,27 @@ atualizarTipoCompra();
 {% endblock %}
 
 {% block scripts %}
+<script>
+function qcAbrirFornecedor() {
+  quickCreate({
+    title: 'Novo Fornecedor',
+    endpoint: '/api/quick-create/fornecedor',
+    fields: [
+      { name: 'nome', label: 'Nome / Razão Social', type: 'text', required: true, placeholder: 'Ex: Distribuidora ABC' },
+      { name: 'cnpj', label: 'CNPJ / CPF', type: 'text', placeholder: 'Ex: 00.000.000/0001-00' },
+    ],
+    onSuccess: function (data) {
+      var sel = document.getElementById('fornecedorSelect');
+      if (!sel) return;
+      var opt = new Option(data.label, data.id, true, true);
+      sel.appendChild(opt);
+      if (window.jQuery && jQuery(sel).data('select2')) {
+        jQuery(sel).trigger('change');
+      }
+    },
+  });
+}
+</script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 (function() {

@@ -1588,5 +1588,13 @@
     };
 })();
 </script>
+
+<!-- Quick Create Modal — Task #30 (conteúdo injetado dinamicamente via quick_create.js) -->
+<div class="modal fade" id="quickCreateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" id="quickCreateModalContent"></div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/quick_create.js') }}"></script>
 </body>
 </html>

@@ -367,8 +367,12 @@
                             <div class="row">
                                 <div class="col-12">
                                     <div class="form-group">
-                                        <label for="cliente_busca" class="form-label">
-                                            <i class="fas fa-search"></i> Buscar Cliente *
+                                        <label for="cliente_busca" class="form-label d-flex justify-content-between align-items-center">
+                                            <span><i class="fas fa-search"></i> Buscar Cliente *</span>
+                                            <button type="button" class="btn btn-link btn-sm p-0 text-success fw-normal"
+                                                    onclick="qcAbrirClienteObra()" title="Criar novo cliente sem sair da página">
+                                              <i class="fas fa-plus-circle me-1"></i>novo cliente
+                                            </button>
                                         </label>
                                         <div class="position-relative">
                                             <input type="text"
@@ -389,7 +393,7 @@
                                         </div>
                                         <small class="text-muted d-block mt-1">
                                             Apenas clientes do cadastro podem ser vinculados.
-                                            Para criar um novo, abra
+                                            Para criar um novo, clique em <strong>novo cliente</strong> acima ou abra
                                             <a href="{{ url_for('clientes.criar') }}" target="_blank">
                                                 <i class="fas fa-external-link-alt"></i> Cadastro de Clientes
                                             </a>.
@@ -900,5 +904,28 @@ function obterLocalizacaoAtual(event) {
         });
     }
 })();
+
+function qcAbrirClienteObra() {
+  quickCreate({
+    title: 'Novo Cliente',
+    endpoint: '/api/quick-create/cliente',
+    fields: [
+      { name: 'nome', label: 'Nome', type: 'text', required: true, placeholder: 'Ex: João da Silva Construções' },
+      { name: 'email', label: 'E-mail', type: 'email', placeholder: 'contato@exemplo.com.br' },
+    ],
+    onSuccess: function (data) {
+      var busca = document.getElementById('cliente_busca');
+      var hidden = document.getElementById('cliente_id');
+      var resumo = document.getElementById('cliente_resumo');
+      if (busca) busca.value = data.label;
+      if (busca) busca.classList.remove('is-invalid');
+      if (hidden) hidden.value = data.id;
+      if (resumo) {
+        resumo.innerHTML = '<strong>' + data.label + '</strong>';
+        resumo.style.display = 'block';
+      }
+    },
+  });
+}
 </script>
 {% endblock %}
