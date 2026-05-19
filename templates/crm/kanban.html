@@ -309,19 +309,19 @@
                                             <i class="fas fa-check" aria-hidden="true"></i> Validar
                                         </button>
                                     </form>
-                                    <form method="POST" action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}" class="d-inline" onsubmit="return confirm('Pedir revisão e retornar para Em andamento?')">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-outline-secondary btn-validar-lead" title="Rejeitar — pedir revisão">
-                                            <i class="fas fa-times" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-validar-lead btn-rejeitar-validacao"
+                                            title="Rejeitar — pedir revisão"
+                                            data-action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}">
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </button>
                                     {% else %}
-                                    <form method="POST" action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}" class="d-inline" onsubmit="return confirm('Pedir revisão e retornar para Em andamento?')">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-outline-warning btn-validar-lead" title="Pedir Revisão">
-                                            <i class="fas fa-undo" aria-hidden="true"></i> Revisão
-                                        </button>
-                                    </form>
+                                    <button type="button"
+                                            class="btn btn-outline-warning btn-validar-lead btn-rejeitar-validacao"
+                                            title="Pedir Revisão"
+                                            data-action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}">
+                                        <i class="fas fa-undo" aria-hidden="true"></i> Revisão
+                                    </button>
                                     {% endif %}
                                 {% endif %}
                                 <a href="{{ url_for('crm.editar', lead_id=lead.id) }}" title="Editar lead" aria-label="Editar lead">
@@ -337,6 +337,34 @@
         </div>
     </div>
 </div>
+
+{# Modal de comentário de revisão (rejeitar validação) #}
+<div class="modal fade" id="modalRevisaoComentario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-undo me-2 text-warning" aria-hidden="true"></i>Solicitar Revisão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">O lead voltará para <strong>Em andamento</strong>. Deseja registrar um comentário sobre o motivo?</p>
+                <label for="revisaoComentarioTexto" class="form-label">Comentário / Motivo da revisão <span class="text-muted">(opcional)</span></label>
+                <textarea id="revisaoComentarioTexto" class="form-control" rows="3" placeholder="Ex: Valor fora do escopo, revisar medições..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="revisaoConfirmar">
+                    <i class="fas fa-undo me-1" aria-hidden="true"></i> Confirmar Revisão
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{# Formulário hidden para submissão da rejeição com comentário #}
+<form id="formRevisao" method="POST" action="" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="comentario_revisao" id="revisaoComentarioHidden">
+</form>
 
 {# Modal de motivo da perda #}
 <div class="modal fade" id="modalMotivoPerda" tabindex="-1">
@@ -466,6 +494,28 @@
                 });
             }
         });
+    });
+
+    // Modal revisão de validação
+    const modalRevisaoEl = document.getElementById('modalRevisaoComentario');
+    const modalRevisao = modalRevisaoEl ? new bootstrap.Modal(modalRevisaoEl) : null;
+    const formRevisao = document.getElementById('formRevisao');
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-rejeitar-validacao');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        if (!action) return;
+        formRevisao.action = action;
+        document.getElementById('revisaoComentarioTexto').value = '';
+        if (modalRevisao) modalRevisao.show();
+    });
+
+    document.getElementById('revisaoConfirmar')?.addEventListener('click', () => {
+        const comentario = document.getElementById('revisaoComentarioTexto').value.trim();
+        document.getElementById('revisaoComentarioHidden').value = comentario;
+        if (modalRevisao) modalRevisao.hide();
+        formRevisao.submit();
     });
 
     // Modal motivo perda
