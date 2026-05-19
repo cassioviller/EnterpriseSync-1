@@ -371,7 +371,7 @@ def funcionario_perfil(id):
     admin_id = get_tenant_admin_id()
     if not admin_id:
         admin_id = funcionario.admin_id if hasattr(funcionario, 'admin_id') else 10
-    obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
     
     # Buscar itens do almoxarifado em posse do funcionário (MULTI-TENANT)
     from models import AlmoxarifadoEstoque, AlmoxarifadoItem, AlmoxarifadoMovimento

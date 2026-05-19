@@ -396,6 +396,7 @@ def _coletar_filtros():
         'tipo_material_id': _to_int(request.args.get('tipo_material_id')),
         'tipo_obra_id': _to_int(request.args.get('tipo_obra_id')),
         'mes_chegada': (request.args.get('mes_chegada') or '').strip(),
+        'status': (request.args.get('status') or '').strip(),
     }
 
 
@@ -428,6 +429,8 @@ def _aplicar_filtros(q, filtros):
             )
         except (ValueError, TypeError):
             pass
+    if filtros['status'] and filtros['status'] in STATUS_VALIDOS:
+        q = q.filter(Lead.status == filtros['status'])
     return q
 
 

@@ -92,6 +92,15 @@
             </select>
         </div>
         <div class="col-6 col-md-2">
+            <label class="form-label">Status</label>
+            <select class="form-select form-select-sm" name="status">
+                <option value="">Todos</option>
+                {% for s in status_enum %}
+                <option value="{{ s.value }}" {% if filtros.status == s.value %}selected{% endif %}>{{ s.value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
             <label class="form-label">Mês de chegada</label>
             <input type="month" class="form-control form-control-sm" name="mes_chegada" value="{{ filtros.mes_chegada or '' }}">
         </div>

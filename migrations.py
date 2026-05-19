@@ -3869,6 +3869,7 @@ def executar_migracoes():
             (168, "Task #11 v2 — gestao_custo_pai.fechamento_id FK para fechamento_pagamento (fonte única de obrigação financeira de compras)", migration_168_gcp_fechamento_id),
             (169, "Task #17 — Seed de categorias padrão nos catálogos (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso) para todos os tenants existentes", migration_169_seed_categorias_catalogo),
             (170, "Task #19 — fator_comercial + unidade_comercial em insumo (quantidade comercial/embalagem)", migration_170_insumo_quantidade_comercial),
+            (171, "Task #23 — observacao_validacao em propostas_comerciais (nota interna de validação)", migration_171_proposta_observacao_validacao),
         ]
         
         # Executar cada migração com rastreamento
@@ -3914,6 +3915,16 @@ def executar_migracoes():
         logger.error(traceback.format_exc())
         # Não interromper a aplicação, apenas logar o erro
         pass
+
+def migration_171_proposta_observacao_validacao():
+    """Migration 171: adiciona coluna observacao_validacao em propostas_comerciais."""
+    db.session.execute(text("""
+        ALTER TABLE propostas_comerciais
+        ADD COLUMN IF NOT EXISTS observacao_validacao TEXT
+    """))
+    db.session.commit()
+    logger.info("[Migration 171] observacao_validacao adicionada em propostas_comerciais")
+
 
 def garantir_usuarios_producao():
     """

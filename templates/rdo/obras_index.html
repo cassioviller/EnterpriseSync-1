@@ -1,0 +1,84 @@
+{% extends "base_completo.html" %}
+{% from "_partials/macros.html" import page_header %}
+
+{% block title %}RDOs por Obra{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    {% call page_header('Relatórios Diários de Obra',
+                         icon='fa-hard-hat',
+                         subtitle='Selecione uma obra para ver seus RDOs') %}
+        <a href="{{ url_for('main.novo_rdo') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i> Novo RDO
+        </a>
+    {% endcall %}
+
+    {% if obras_cards %}
+    <div class="row g-3">
+        {% for item in obras_cards %}
+        {% set obra = item.obra %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <a href="{{ url_for('main.rdos', obra_id=obra.id) }}"
+               class="text-decoration-none">
+                <div class="card h-100 shadow-sm border-0 obra-card">
+                    <div class="card-body d-flex flex-column gap-2">
+                        <div class="d-flex align-items-start justify-content-between">
+                            <div>
+                                <h6 class="fw-bold mb-1 text-dark">{{ obra.nome }}</h6>
+                                {% if obra.codigo %}
+                                <span class="badge bg-secondary-subtle text-secondary small">{{ obra.codigo }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge rounded-pill bg-primary-subtle text-primary fs-6 ms-2">
+                                {{ item.total_rdos }}
+                                <span class="small fw-normal">RDO{{ 's' if item.total_rdos != 1 }}</span>
+                            </span>
+                        </div>
+
+                        {% if obra.endereco %}
+                        <p class="small text-muted mb-0">
+                            <i class="fas fa-map-marker-alt me-1"></i>{{ obra.endereco[:80] }}{% if obra.endereco|length > 80 %}…{% endif %}
+                        </p>
+                        {% endif %}
+
+                        <div class="mt-auto d-flex justify-content-between align-items-center">
+                            {% if item.ultimo_rdo %}
+                            <small class="text-muted">
+                                <i class="fas fa-calendar-check me-1"></i>
+                                Último: {{ item.ultimo_rdo.strftime('%d/%m/%Y') }}
+                            </small>
+                            {% else %}
+                            <small class="text-muted fst-italic">Sem RDOs ainda</small>
+                            {% endif %}
+                            <i class="fas fa-chevron-right text-muted small"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-hard-hat fa-3x text-muted mb-3 d-block"></i>
+        <h5 class="text-muted">Nenhuma obra ativa encontrada</h5>
+        <p class="text-muted small">Ative uma obra no cadastro de obras para poder criar RDOs.</p>
+        <a href="{{ url_for('main.obras') }}" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-building me-1"></i> Ir para Obras
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.obra-card {
+    transition: transform .15s ease, box-shadow .15s ease;
+    border: 1px solid #e5e7eb !important;
+}
+.obra-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,.1) !important;
+    border-color: #6366f1 !important;
+}
+</style>
+{% endblock %}

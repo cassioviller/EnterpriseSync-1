@@ -2981,6 +2981,10 @@ class Proposta(db.Model):
     )
     substituida_em = db.Column(db.DateTime, nullable=True)
 
+    # Task #23 — nota de validação escrita pelo supervisor (sem mudar o fluxo
+    # de aprovação — apenas campo de texto livre para comunicação interna).
+    observacao_validacao = db.Column(db.Text, nullable=True)
+
     # Task #31 — template aplicado na geração (informativo + base de comparação
     # na revisão). NULL = proposta sem template (editada manualmente).
     proposta_template_id = db.Column(

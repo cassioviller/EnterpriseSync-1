@@ -900,6 +900,24 @@ def visualizar(id):
         flash(f'Erro ao carregar proposta: {str(e)}', 'error')
         return redirect(url_for('propostas.index'))
 
+@propostas_bp.route('/<int:id>/observacao-validacao', methods=['POST'])
+@login_required
+@admin_required
+def salvar_observacao_validacao(id):
+    """Salva a nota interna de validação da proposta."""
+    try:
+        admin_id = get_admin_id()
+        proposta = Proposta.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+        proposta.observacao_validacao = (request.form.get('observacao_validacao') or '').strip() or None
+        db.session.commit()
+        flash('Observação de validação salva com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[observacao_validacao] Erro ao salvar: {e}")
+        flash('Erro ao salvar observação de validação.', 'danger')
+    return redirect(url_for('propostas.visualizar', id=id))
+
+
 @propostas_bp.route('/<int:id>/status', methods=['POST'])
 @login_required
 @admin_required

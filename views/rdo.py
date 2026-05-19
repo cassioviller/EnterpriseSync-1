@@ -105,7 +105,38 @@ def rdos():
         data_inicio = request.args.get('data_inicio', '')
         data_fim = request.args.get('data_fim', '')
         funcionario_filter = request.args.get('funcionario_id', type=int)
-        
+
+        # ─── Obra-first landing: quando nenhum obra_id selecionado, exibe
+        # cards de obras ativas com contagem de RDOs ───────────────────────
+        if not obra_filter:
+            obras_ativas = session.query(Obra).filter(
+                Obra.admin_id == admin_id,
+                Obra.ativo == True,
+            ).order_by(Obra.nome).all()
+
+            from sqlalchemy import func as _func
+            rdo_counts_raw = (
+                session.query(RDO.obra_id, _func.count(RDO.id), _func.max(RDO.data_relatorio))
+                .join(Obra)
+                .filter(Obra.admin_id == admin_id)
+                .group_by(RDO.obra_id)
+                .all()
+            )
+            rdo_counts = {row[0]: {'total': row[1], 'ultimo': row[2]} for row in rdo_counts_raw}
+
+            obras_cards = []
+            for obra in obras_ativas:
+                info = rdo_counts.get(obra.id, {'total': 0, 'ultimo': None})
+                obras_cards.append({
+                    'obra': obra,
+                    'total_rdos': info['total'],
+                    'ultimo_rdo': info['ultimo'],
+                })
+            session.close()
+            return render_template('rdo/obras_index.html',
+                                   obras_cards=obras_cards,
+                                   admin_id=admin_id)
+
         # Query isolada read-only
         rdos_query = session.query(RDO).join(Obra).filter(Obra.admin_id == admin_id)
         
@@ -120,7 +151,7 @@ def rdos():
         
         # Buscar dados sem modificação
         rdos_lista = rdos_query.limit(10).all()
-        obras = session.query(Obra).filter(Obra.admin_id == admin_id).order_by(Obra.nome).all()
+        obras = session.query(Obra).filter(Obra.admin_id == admin_id, Obra.ativo == True).order_by(Obra.nome).all()
         funcionarios = session.query(Funcionario).filter(Funcionario.admin_id == admin_id, Funcionario.ativo == True).order_by(Funcionario.nome).all()
         
         # Task #61 — listagem usa MESMA lógica do detalhe (funcionario_rdo_consolidado):
@@ -474,11 +505,11 @@ def novo_rdo():
         logger.info("[LOC] ROTA USADA: /rdo/novo (novo_rdo)")
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
 
-        obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
+        obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
         funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
 
         if not obras:
-            flash('É necessário ter pelo menos uma obra cadastrada para criar um RDO.', 'warning')
+            flash('É necessário ter pelo menos uma obra ativa cadastrada para criar um RDO.', 'warning')
             return redirect(url_for('main.obras'))
 
         obra_id = request.args.get('obra_id', type=int)
