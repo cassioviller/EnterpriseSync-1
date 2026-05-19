@@ -51,6 +51,14 @@
               <a href="{{ url_for('catalogo.servico_historico', servico_id=s.id) }}" class="btn btn-sm btn-outline-secondary" title="Histórico cross-obra">
                 <i class="fas fa-history"></i>
               </a>
+              <form method="POST" action="{{ url_for('catalogo.servico_excluir', servico_id=s.id) }}"
+                    class="d-inline js-confirm-excluir">
+                {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                <button class="btn btn-sm btn-outline-danger" title="Excluir serviço"
+                        data-nome="{{ s.nome }}">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
             </td>
           </tr>
           {% else %}
@@ -61,4 +69,17 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.js-confirm-excluir').forEach(function(form) {
+  form.addEventListener('submit', function(e) {
+    var btn = form.querySelector('button[data-nome]');
+    var nome = btn ? btn.getAttribute('data-nome') : 'este serviço';
+    if (!confirm('Excluir o serviço "' + nome + '"? Esta ação não pode ser desfeita.')) {
+      e.preventDefault();
+    }
+  });
+});
+</script>
 {% endblock %}

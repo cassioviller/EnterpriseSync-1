@@ -2,6 +2,7 @@
 {% block title %}Orçamento {{ orcamento.numero }}{% endblock %}
 {% block styles %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/servico_card.css') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.bootstrap5.min.css">
 {% endblock %}
 {% block content %}
 {% set o = orcamento %}
@@ -302,12 +303,12 @@
           <div class="input-group">
             <select class="form-select" name="servico_id" id="add-servico-select">
               <option value="">— item livre —</option>
-              {% for s in servicos %}
+              {% for s in (servicos or [])[:10] %}
                 <option value="{{ s.id }}" data-unidade="{{ s.unidade_medida }}">{{ s.nome }} ({{ s.unidade_medida }})</option>
               {% endfor %}
             </select>
             <button type="button" class="btn btn-outline-secondary"
-                    onclick="abrirEditarServico()" title="Editar serviço selecionado">
+                    onclick="abrirEditarServico()" title="Editar serviço selecionado" id="btn-editar-servico">
               <i class="fas fa-pen"></i>
             </button>
           </div>
@@ -900,7 +901,7 @@ document.addEventListener('input', e => {
 document.addEventListener('DOMContentLoaded', recalcAll);
 
 // Task #118 — Inline Servico CRUD: pós-save no iframe envia postMessage,
-// adicionamos a opção no <select>, selecionamos e fechamos o modal sem reload.
+// adicionamos a opção no <select>/TomSelect, selecionamos e fechamos o modal sem reload.
 window.addEventListener('message', function(ev) {
   if (ev.origin !== window.location.origin) return;
   const msg = ev.data || {};
@@ -909,10 +910,11 @@ window.addEventListener('message', function(ev) {
   if ((!isCriado && !isAtualizado) || !msg.servico) return;
   const sv = msg.servico;
   const label = `${sv.nome} (${sv.unidade || 'un'})`;
+  // Atualiza outros selects de servico_id (linhas de edição de itens existentes)
   document.querySelectorAll('select[name="servico_id"]').forEach(sel => {
+    if (sel.id === 'add-servico-select') return; // gerido pelo TomSelect abaixo
     const existing = [...sel.options].find(o => o.value === String(sv.id));
     if (existing) {
-      // Atualiza rótulo (caso edição tenha mudado nome/unidade)
       existing.text = label;
       existing.dataset.unidade = sv.unidade || 'un';
     } else {
@@ -921,12 +923,27 @@ window.addEventListener('message', function(ev) {
       sel.add(opt);
     }
   });
-  // Em criação, seleciona no formulário "Adicionar item" (preserva edições nas demais linhas)
-  if (isCriado) {
+  // Atualiza / adiciona no TomSelect do formulário "Adicionar item"
+  const ts = window._addServicoTS;
+  if (ts) {
+    // Usa nome e unidade separados (o render do TomSelect compõe o label exibido)
+    const optData = {id: String(sv.id), nome: sv.nome, unidade: sv.unidade || 'un'};
+    if (ts.options[String(sv.id)]) {
+      ts.updateOption(String(sv.id), optData);
+    } else {
+      ts.addOption(optData);
+    }
+    if (isCriado) {
+      ts.setValue(String(sv.id));
+    }
+  } else {
+    // Fallback: TomSelect não carregado, usa select nativo
     const addSel = document.getElementById('add-servico-select');
     if (addSel) {
-      addSel.value = String(sv.id);
-      addSel.dispatchEvent(new Event('change', {bubbles:true}));
+      const existing = [...addSel.options].find(o => o.value === String(sv.id));
+      if (existing) { existing.text = label; existing.dataset.unidade = sv.unidade || 'un'; }
+      else { const opt = new Option(label, String(sv.id)); opt.dataset.unidade = sv.unidade || 'un'; addSel.add(opt); }
+      if (isCriado) { addSel.value = String(sv.id); addSel.dispatchEvent(new Event('change', {bubbles:true})); }
     }
   }
   // Fecha modal
@@ -952,8 +969,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function abrirEditarServico() {
-  const sel = document.getElementById('add-servico-select');
-  const sid = sel && sel.value;
+  const ts = window._addServicoTS;
+  const sid = ts ? ts.getValue() : (document.getElementById('add-servico-select') || {}).value;
   if (!sid) {
     alert('Selecione um serviço para editar.');
     return;
@@ -1069,6 +1086,53 @@ function _addInsumoRow(insumo) {
   recalcAll();
   bootstrap.Modal.getInstance(document.getElementById('insumoPickerModal')).hide();
 }
+</script>
+
+<!-- Tom Select: autocomplete para "Serviço do catálogo" no formulário de adicionar item -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js"></script>
+<script>
+(function() {
+  var sel = document.getElementById('add-servico-select');
+  if (!sel || typeof TomSelect === 'undefined') return;
+  var ts = new TomSelect(sel, {
+    valueField: 'id',
+    labelField: 'nome',
+    searchField: 'nome',
+    placeholder: '— item livre —',
+    allowEmptyOption: true,
+    create: false,
+    persist: false,
+    shouldLoad: function(q) { return q.length > 0; },
+    load: function(query, callback) {
+      fetch('/api/catalogo/servicos/buscar?q=' + encodeURIComponent(query))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          data.forEach(function(d) { d.id = String(d.id); });
+          callback(data);
+        })
+        .catch(function() { callback(); });
+    },
+    render: {
+      option: function(item, escape) {
+        return '<div>' + escape(item.nome) + ' <small class="text-muted">(' + escape(item.unidade || 'un') + ')</small></div>';
+      },
+      item: function(item, escape) {
+        return '<div>' + escape(item.nome) + ' <small class="text-muted">(' + escape(item.unidade || 'un') + ')</small></div>';
+      }
+    },
+    onChange: function(value) {
+      var item = value ? this.options[value] : null;
+      var unidade = item ? (item.unidade || 'un') : 'un';
+      var form = sel.closest('.card-body') || sel.closest('form');
+      if (form) {
+        var unField = form.querySelector('input[name="unidade"]');
+        if (unField && value) unField.value = unidade;
+      }
+      if (window.recalcAll) recalcAll();
+    }
+  });
+  window._addServicoTS = ts;
+})();
 </script>
 
 <!-- Modal: Picker de Insumo do Catálogo (Task #118) -->

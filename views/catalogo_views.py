@@ -446,6 +446,40 @@ def servico_composicao_editar(servico_id, comp_id):
     return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
 
 
+@catalogo_bp.route('/servicos/<int:servico_id>/excluir', methods=['POST'])
+@login_required
+def servico_excluir(servico_id):
+    """Exclui um serviço do catálogo, com guard de integridade referencial."""
+    aid = _admin_id()
+    svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
+    from models import OrcamentoItem, PropostaItem
+    em_composicao = ComposicaoServico.query.filter_by(servico_id=svc.id).first()
+    if em_composicao:
+        flash(
+            f'Serviço "{svc.nome}" possui composição de insumos e não pode ser excluído. '
+            'Remova todos os insumos da composição antes de excluir.',
+            'error',
+        )
+        return redirect(url_for('catalogo.servicos_list'))
+    em_orcamento = OrcamentoItem.query.filter_by(servico_id=svc.id).first()
+    if em_orcamento:
+        flash(f'Serviço "{svc.nome}" está em uso em orçamentos e não pode ser excluído.', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+    em_proposta = PropostaItem.query.filter_by(servico_id=svc.id).first()
+    if em_proposta:
+        flash(f'Serviço "{svc.nome}" está em uso em propostas e não pode ser excluído.', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+    em_medicao = ItemMedicaoComercial.query.filter_by(servico_id=svc.id).first()
+    if em_medicao:
+        flash(f'Serviço "{svc.nome}" está em uso em medições e não pode ser excluído.', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+    nome = svc.nome
+    db.session.delete(svc)
+    db.session.commit()
+    flash(f'Serviço "{nome}" excluído com sucesso.', 'success')
+    return redirect(url_for('catalogo.servicos_list'))
+
+
 @catalogo_bp.route('/servicos/<int:servico_id>/preco', methods=['POST'])
 @login_required
 def servico_atualizar_preco(servico_id):

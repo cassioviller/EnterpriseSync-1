@@ -1,5 +1,8 @@
 {% extends "base_completo.html" %}
 {% block title %}Composição — {{ servico.nome }}{% endblock %}
+{% block styles %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.bootstrap5.min.css">
+{% endblock %}
 {% block content %}
 <div class="container py-4">
   <a href="{{ url_for('catalogo.servicos_list') }}" class="text-decoration-none small"><i class="fas fa-arrow-left"></i> Voltar ao catálogo</a>
@@ -106,11 +109,8 @@
           <label class="form-label small mb-1">Insumo</label>
           <select name="insumo_id" id="comp-insumo-select" required class="form-select">
             <option value="">— selecione —</option>
-            {% for i in insumos %}
-            <option value="{{ i.id }}"
-                    data-coef-padrao="{{ '%.6f'|format(i.coeficiente_padrao|float) }}">
-              {{ i.nome }} ({{ i.tipo }} / {{ i.unidade }}) — R$ {{ i.preco_vigente()|num(4) }}
-            </option>
+            {% for i in (insumos or [])[:10] %}
+            <option value="{{ i.id }}">{{ i.nome }} ({{ i.tipo }} / {{ i.unidade }})</option>
             {% endfor %}
           </select>
         </div>
@@ -193,24 +193,53 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js"></script>
   <script>
-    // Task #166: pré-preencher o coeficiente com o coeficiente_padrao do insumo
-    // selecionado. O usuário ainda pode editar antes de inserir; se ele já
-    // digitou um valor diferente do padrão "1", esse valor é respeitado.
+    // Tom Select: autocomplete com busca remota no campo de insumo
+    // Preserva o comportamento de pré-preenchimento do coeficiente_padrao (Task #166).
     (function () {
       var sel = document.getElementById('comp-insumo-select');
       var coefEl = document.getElementById('comp-coef-input');
-      if (!sel || !coefEl) return;
-      sel.addEventListener('change', function () {
-        var opt = sel.options[sel.selectedIndex];
-        if (!opt) return;
-        var padrao = opt.getAttribute('data-coef-padrao');
-        if (padrao == null) return;
-        var current = (coefEl.value || '').trim();
-        if (current === '' || Number(current) === 1) {
-          // Mostra com 4 casas, removendo zeros à direita desnecessários
-          var n = Number(padrao) || 1;
-          coefEl.value = (Math.round(n * 10000) / 10000).toString();
+      if (!sel || typeof TomSelect === 'undefined') return;
+
+      var ts = new TomSelect(sel, {
+        valueField: 'id',
+        labelField: 'nome',
+        searchField: 'nome',
+        placeholder: '— selecione —',
+        allowEmptyOption: true,
+        create: false,
+        persist: false,
+        shouldLoad: function(q) { return q.length > 0; },
+        load: function(query, callback) {
+          fetch('/api/catalogo/insumos/buscar?q=' + encodeURIComponent(query))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              data.forEach(function(d) { d.id = String(d.id); });
+              callback(data);
+            })
+            .catch(function() { callback(); });
+        },
+        render: {
+          option: function(item, escape) {
+            return '<div>' + escape(item.nome)
+              + ' <small class="text-muted">(' + escape(item.tipo || '') + ' / ' + escape(item.unidade || '') + ')'
+              + ' — R$ ' + escape(String(parseFloat(item.preco || 0).toFixed(4))) + '</small></div>';
+          },
+          item: function(item, escape) {
+            return '<div>' + escape(item.nome)
+              + ' <small class="text-muted">(' + escape(item.tipo || '') + ' / ' + escape(item.unidade || '') + ')</small></div>';
+          }
+        },
+        onChange: function(value) {
+          if (!coefEl || !value) return;
+          var item = this.options[value];
+          if (!item || item.coeficiente_padrao == null) return;
+          var current = (coefEl.value || '').trim();
+          if (current === '' || Number(current) === 1) {
+            var n = Number(item.coeficiente_padrao) || 1;
+            coefEl.value = (Math.round(n * 10000) / 10000).toString();
+          }
         }
       });
     })();
