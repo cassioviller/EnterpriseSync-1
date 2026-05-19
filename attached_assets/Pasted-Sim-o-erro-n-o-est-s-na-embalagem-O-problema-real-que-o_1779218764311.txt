@@ -1,0 +1,168 @@
+Sim, o erro **não está só na embalagem**.
+
+O problema real é que o orçamento está usando **uma base de custo diferente da tela de Serviço**.
+
+## Onde está o erro no código
+
+### 1. No Serviço, o custo é técnico
+
+Em `services/orcamento_service.py`, o custo do serviço é calculado assim:
+
+```txt
+custo_unitario = soma(coeficiente × preço do insumo)
+```
+
+No código, isso aparece como:
+
+```txt
+sub = coef * preco_vig
+custo_total += sub
+```
+
+Então, para o serviço **Forro**, o sistema chega em algo como:
+
+```txt
+Custo unitário do serviço = R$ 872,97
+```
+
+Esse é o valor da composição técnica do serviço. 
+
+---
+
+### 2. No Orçamento, o custo foi trocado para “custo de compra”
+
+Em `services/orcamento_view_service.py`, o orçamento passou a calcular o custo usando `custo_compra`.
+
+Quando tem embalagem, ele faz:
+
+```txt
+multiplos = ceil(qtd_técnica / embalagem)
+sub_compra = multiplos × preço
+custo_compra += sub_compra
+```
+
+Depois salva:
+
+```txt
+item.custo_total = custo_compra
+```
+
+Esse é o motivo de o orçamento estar mostrando custo baixo. Ele não está usando mais o mesmo custo do serviço. Está somando os subtotais de compra por pacote. 
+
+No seu print, o custo do orçamento está perto de:
+
+```txt
+17,26 + 2,28 + 1,16 + 46,00 + 1,38 + 1,04 + 5,90 + 89,90 + 6,40 + 6,43 + 11,70...
+≈ R$ 190,63
+```
+
+Ou seja: ele está somando a coluna **Subtotal**, não usando o custo unitário do serviço.
+
+---
+
+### 3. O JavaScript repete o mesmo erro na prévia
+
+Na tela do orçamento, o JS também tem duas bases:
+
+```txt
+custoUnit += sub        // base técnica
+custoCompra += subTot   // base de compra
+```
+
+Depois ele calcula:
+
+```txt
+venda = custoUnit / divisor
+custo = custoCompra
+```
+
+Então a venda sai de uma base e o custo sai de outra. Isso cria uma distorção: **custo baixo, venda alta, lucro artificialmente alto**. 
+
+## O erro não é embalagem; é separação errada entre “custo técnico” e “custo de compra”
+
+A embalagem pode continuar existindo, mas ela deve ser **informação operacional de compra**, não substituir o custo oficial do orçamento.
+
+Se o custo do orçamento deve ser igual ao custo do serviço, a regra correta é:
+
+```txt
+custo_total_orçamento = custo_unitário_do_serviço × quantidade_do_item
+```
+
+Para o seu caso:
+
+```txt
+Custo do serviço: R$ 872,97 por m²
+Quantidade no orçamento: 1 m²
+
+Custo correto do orçamento: R$ 872,97
+```
+
+Não deveria ser R$ 190,63.
+
+## Outro ponto importante: o orçamento usa snapshot
+
+Quando você adiciona um serviço ao orçamento, ele copia a composição do serviço para `composicao_snapshot`. Depois disso, o orçamento não fica necessariamente igual ao serviço original. O próprio código faz essa cópia em `adicionar_item()`, usando `snapshot_from_servico(servico)`. 
+
+E quando você salva o item no orçamento, ele reconstrói o snapshot com os campos da tela, podendo virar **composição customizada**. 
+
+No seu print aparece o selo:
+
+```txt
+composição customizada
+```
+
+Então tem dois motivos para divergir:
+
+```txt
+1. O orçamento usa snapshot próprio, não necessariamente o serviço atual.
+2. O cálculo do orçamento usa custo_compra, enquanto o serviço usa custo técnico.
+```
+
+## Correção que deve ser feita
+
+No backend, em `services/orcamento_view_service.py`, o erro está aqui conceitualmente:
+
+```python
+custo_total = custo_compra
+item.custo_total = custo_total
+```
+
+Deve ser:
+
+```python
+custo_total = qtd_item * custo_unit
+item.custo_total = custo_total
+```
+
+E deixar `subtotal_compra`, `quantidade_compra` e `quantidade_pacotes` apenas como informação auxiliar de compra.
+
+No JavaScript, em `templates/orcamentos/editar.html`, trocar:
+
+```python
+const custoTot = Math.round(custoCompra * 100) / 100;
+```
+
+por:
+
+```python
+const custoTot = Math.round(custoUnit * qtd * 100) / 100;
+```
+
+## Resumo direto
+
+Você está certo: **não é só embalagem**.
+
+O erro principal é este:
+
+```txt
+Serviço calcula custo técnico.
+Orçamento calcula custo de compra.
+```
+
+Por isso o custo no orçamento fica baixo. Para bater com o Serviço, o orçamento precisa usar:
+
+```txt
+custo_total = custo_unitário_do_serviço × quantidade
+```
+
+A coluna de embalagem deve servir só para mostrar quanto comprar, não para definir o custo oficial do orçamento.

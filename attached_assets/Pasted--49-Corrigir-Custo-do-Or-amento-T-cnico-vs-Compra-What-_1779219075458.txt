@@ -1,0 +1,55 @@
+#49 - Corrigir Custo do Orçamento: Técnico vs Compra
+
+What & Why
+The Orçamento currently reports custo_total using the commercial/purchase cost (custo_compra), calculated from rounded purchase/package quantities × price. This differs from the technical cost used by the Serviço catalog, which is Σ coeficiente × preço. As a result, the budget can show an artificially low cost and inflated profit.
+
+The purchase/commercial quantities are useful for procurement planning, but they must not replace the official cost basis of the budget.
+
+Current wrong behavior:
+- Backend: services/orcamento_view_service.py calculates custo_unit as the technical cost, but assigns item.custo_total from custo_compra.
+- Frontend: templates/orcamentos/editar.html calculates custoUnit and custoCompra, but uses custoCompra for the item cost summary.
+
+Done looks like
+- item.custo_total in the backend equals qtd_item × custo_unitario.
+- The budget editor live-preview shows the same cost as the backend.
+- lucro_total = venda_total − custo_total uses the corrected technical cost basis.
+- quantidade_compra and subtotal_compra remain calculated and stored as auxiliary purchase/procurement data.
+- The purchase subtotal columns may continue showing package/purchase information, but the official item/budget cost summary must use technical cost.
+- Existing budget items are recalculated on next save/recalculation.
+
+Out of scope
+- Changing the Proposal PDF or portal display.
+- Changing the pricing formula preco_unit = custo_unit / divisor.
+- Removing purchase/package columns.
+- Changing labels beyond what is needed to avoid confusion.
+
+Steps
+1. Backend:
+   In services/orcamento_view_service.py, inside recalcular_item(), change:
+   custo_total = custo_compra.quantize(...)
+
+   to:
+   custo_total = (qtd_item * custo_unit).quantize(...)
+
+   Then keep:
+   lucro_total = venda_total - custo_total
+
+   Keep quantidade_compra and subtotal_compra in the snapshot as auxiliary purchase data.
+
+2. Frontend:
+   In templates/orcamentos/editar.html, change:
+   const custoTot = Math.round(custoCompra * 100) / 100;
+
+   to:
+   const custoTot = Math.round(custoUnit * qtd * 100) / 100;
+
+3. Tests:
+   Run/update:
+   - tests/test_orcamento_pricing_parity.py
+   - tests/test_orcamento_service.py
+
+Relevant files
+- services/orcamento_view_service.py
+- templates/orcamentos/editar.html
+- tests/test_orcamento_pricing_parity.py
+- tests/test_orcamento_service.py
