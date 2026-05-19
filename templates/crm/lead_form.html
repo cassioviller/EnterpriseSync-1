@@ -30,6 +30,16 @@
         {% endif %}
     {% endcall %}
 
+    {% if lead and lead.comentario_revisao and not lead.validacao_aprovada and lead.status != 'Validação' %}
+    <div class="alert alert-danger border-0 shadow-sm mb-3 d-flex align-items-start gap-3" role="alert">
+        <div class="fs-3 text-danger"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></div>
+        <div class="flex-grow-1">
+            <h5 class="alert-heading mb-1">Revisão solicitada pelo supervisor</h5>
+            <p class="mb-0">{{ lead.comentario_revisao }}</p>
+        </div>
+    </div>
+    {% endif %}
+
     {% if lead and lead.validacao_aprovada %}
     <div class="alert alert-success border-0 shadow-sm mb-3 d-flex align-items-start gap-3" role="alert">
         <div class="fs-3 text-success"><i class="fas fa-check-circle" aria-hidden="true"></i></div>
@@ -53,13 +63,9 @@
                 {% else %}
                 <span class="text-muted small"><i class="fas fa-exclamation-triangle me-1 text-warning" aria-hidden="true"></i>Vincule um cliente antes de enviar.</span>
                 {% endif %}
-                <form method="POST" action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}" class="d-inline"
-                      onsubmit="return confirm('Pedir revisão e retornar o lead para Em andamento?')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-undo me-1" aria-hidden="true"></i> Pedir revisão
-                    </button>
-                </form>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRevisao">
+                    <i class="fas fa-undo me-1" aria-hidden="true"></i> Pedir revisão
+                </button>
             </div>
         </div>
     </div>
@@ -69,13 +75,48 @@
         <div class="flex-grow-1">
             <h5 class="alert-heading mb-1">Aguardando validação do supervisor</h5>
             <p class="mb-2 small">O orçamento está pronto para revisão. Após validar, o responsável poderá enviar a proposta ao cliente.</p>
-            <form method="POST" action="{{ url_for('crm.aprovar_validacao', lead_id=lead.id) }}" class="d-inline"
-                  onsubmit="return confirm('Marcar orçamento como validado?')">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-success btn-sm">
-                    <i class="fas fa-check me-1" aria-hidden="true"></i> Marcar como Validado
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <form method="POST" action="{{ url_for('crm.aprovar_validacao', lead_id=lead.id) }}" class="d-inline"
+                      onsubmit="return confirm('Marcar orçamento como validado?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fas fa-check me-1" aria-hidden="true"></i> Marcar como Validado
+                    </button>
+                </form>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalRevisao">
+                    <i class="fas fa-times me-1" aria-hidden="true"></i> Rejeitar e pedir revisão
                 </button>
-            </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if lead %}
+    <div class="modal fade" id="modalRevisao" tabindex="-1" aria-labelledby="modalRevisaoLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ url_for('crm.rejeitar_validacao', lead_id=lead.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalRevisaoLabel">
+                            <i class="fas fa-undo me-2 text-secondary"></i>Pedir revisão
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">O lead voltará para a coluna <strong>Em andamento</strong>. O responsável pelo orçamento verá o comentário abaixo assim que abrir o lead.</p>
+                        <label class="form-label fw-semibold">O que precisa ser corrigido? <span class="text-muted fw-normal">(opcional)</span></label>
+                        <textarea name="comentario_revisao" class="form-control" rows="4"
+                                  placeholder="Ex: Revisar o preço do item 3, verificar prazo de entrega com o fornecedor..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning btn-sm">
+                            <i class="fas fa-undo me-1"></i> Confirmar revisão
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     {% endif %}

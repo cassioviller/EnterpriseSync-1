@@ -6406,6 +6406,8 @@ class Lead(db.Model):
     validacao_aprovada = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
     validado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     validado_em = db.Column(db.DateTime, nullable=True)
+    # Comentário deixado pelo supervisor ao pedir revisão
+    comentario_revisao = db.Column(db.Text, nullable=True)
 
     # Relacionamentos
     validado_por = db.relationship('Usuario', foreign_keys=[validado_por_id])

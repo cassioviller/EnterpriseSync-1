@@ -3870,6 +3870,7 @@ def executar_migracoes():
             (169, "Task #17 — Seed de categorias padrão nos catálogos (categoria_fluxo_caixa, categoria_fornecedor, categoria_reembolso) para todos os tenants existentes", migration_169_seed_categorias_catalogo),
             (170, "Task #19 — fator_comercial + unidade_comercial em insumo (quantidade comercial/embalagem)", migration_170_insumo_quantidade_comercial),
             (171, "Task #23 — observacao_validacao em propostas_comerciais (nota interna de validação)", migration_171_proposta_observacao_validacao),
+            (172, "CRM — comentario_revisao em lead (comentário do supervisor ao pedir revisão)", migration_172_lead_comentario_revisao),
         ]
         
         # Executar cada migração com rastreamento
@@ -3924,6 +3925,16 @@ def migration_171_proposta_observacao_validacao():
     """))
     db.session.commit()
     logger.info("[Migration 171] observacao_validacao adicionada em propostas_comerciais")
+
+
+def migration_172_lead_comentario_revisao():
+    """Migration 172: adiciona coluna comentario_revisao em lead."""
+    db.session.execute(text("""
+        ALTER TABLE lead
+        ADD COLUMN IF NOT EXISTS comentario_revisao TEXT
+    """))
+    db.session.commit()
+    logger.info("[Migration 172] comentario_revisao adicionada em lead")
 
 
 def garantir_usuarios_producao():

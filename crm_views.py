@@ -640,6 +640,7 @@ def aprovar_validacao(lead_id):
     lead.validacao_aprovada = True
     lead.validado_por_id = current_user.id
     lead.validado_em = datetime.utcnow()
+    lead.comentario_revisao = None
 
     _registrar_historico(
         lead, 'validação',
@@ -675,16 +676,23 @@ def rejeitar_validacao(lead_id):
         return redirect(url_for('crm.editar', lead_id=lead.id))
 
     status_anterior = lead.status
+    comentario = (request.form.get('comentario_revisao') or '').strip()
+
     lead.validacao_aprovada = False
     lead.validado_por_id = None
     lead.validado_em = None
+    lead.comentario_revisao = comentario or None
     lead.status = LeadStatus.EM_ANDAMENTO.value
     lead.status_changed_at = datetime.utcnow()
+
+    descricao_hist = f'Revisão solicitada por {current_user.nome or current_user.username}.'
+    if comentario:
+        descricao_hist += f' Comentário: {comentario}'
 
     _registrar_historico(
         lead, 'validação',
         'Aprovado', 'Revisão solicitada',
-        descricao=f'Validação desfeita por {current_user.nome or current_user.username}. Lead retornado para "Em andamento".',
+        descricao=descricao_hist,
     )
     if status_anterior != lead.status:
         _registrar_historico(lead, 'status', status_anterior, lead.status)
