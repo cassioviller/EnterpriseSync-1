@@ -100,9 +100,11 @@ def recalcular_item(item, orcamento) -> dict:
             from decimal import ROUND_CEILING
             multiplos = (qtd_tec / fator).to_integral_value(rounding=ROUND_CEILING)
             qtd_com = (multiplos * fator).quantize(Decimal('0.0001'))
+            # subtotal = nº de pacotes × preço do pacote (não qtd_técnica × preço)
+            sub_compra = (multiplos * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
             qtd_com = qtd_tec
-        sub_compra = (qtd_com * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            sub_compra = (qtd_com * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         snap_norm.append({
             'tipo': (linha.get('tipo') or 'MATERIAL').upper(),
             'insumo_id': linha.get('insumo_id'),

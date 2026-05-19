@@ -214,6 +214,125 @@ def test_recalcular_item_coeficiente_como_consumo_por_unidade(admin_id):
     assert float(Decimal('0.5') * Decimal('15') * Decimal('10')) == 75.0
 
 
+def test_subtotal_compra_com_fator_comercial(admin_id):
+    """Task #46 — subtotal de compra usa nº de pacotes, não qtd_técnica total.
+
+    Cenário canônico do bug:
+      - Parafuso: coef=14.8148, qtd=100, fator=100, preço=R$46,00
+      - qtd_tecnica = 1481.48
+      - qtd_compra  = ceil(1481.48/100)*100 = 1500 (15 pacotes × 100 unidades)
+      - subtotal CORRETO = 15 × 46 = R$ 690,00
+      - subtotal ERRADO  = 1500 × 46 = R$ 69 000,00
+    """
+    from models import Orcamento, OrcamentoItem
+    from services.orcamento_view_service import recalcular_item
+
+    orc = Orcamento(
+        admin_id=admin_id,
+        numero='__t46-orc',
+        titulo='Task #46 fator_comercial test',
+        cliente_nome='Cliente teste',
+        criado_por=admin_id,
+        status='rascunho',
+        imposto_pct_global=Decimal('0'),
+        margem_pct_global=Decimal('0'),
+    )
+    db.session.add(orc)
+    db.session.flush()
+
+    item = OrcamentoItem(
+        admin_id=admin_id,
+        orcamento_id=orc.id,
+        ordem=1,
+        descricao='Fixação com parafuso',
+        unidade='m2',
+        quantidade=Decimal('100'),
+        composicao_snapshot=[
+            {
+                'tipo': 'MATERIAL', 'insumo_id': None,
+                'nome': 'Parafuso',
+                'unidade': 'un',
+                'coeficiente': 14.8148,
+                'preco_unitario': 46.0,
+                'subtotal_unitario': 0.0,
+                'fator_comercial': 100,
+                'unidade_comercial': 'pct',
+            },
+        ],
+    )
+    db.session.add(item)
+    db.session.flush()
+
+    r = recalcular_item(item, orc)
+    assert r['erro'] is None
+
+    snap = item.composicao_snapshot
+    assert len(snap) == 1
+    linha = snap[0]
+
+    assert linha['quantidade_tecnica'] == pytest.approx(1481.48, rel=1e-3)
+    assert linha['quantidade_compra'] == pytest.approx(1500.0, rel=1e-3)
+    assert linha['subtotal_compra'] == pytest.approx(690.0, rel=1e-2), (
+        f"subtotal_compra esperado ~690, obtido {linha['subtotal_compra']} "
+        "(bug: multiplicar por qtd_compra=1500 em vez de nº pacotes=15)"
+    )
+
+
+def test_subtotal_compra_sem_fator_comercial_inalterado(admin_id):
+    """Task #46 — itens sem embalagem (fator=1) devem continuar inalterados.
+
+    Cenário: coef=2, qtd=10, fator=1, preço=R$5 → subtotal = 20 × 5 = R$100
+    """
+    from models import Orcamento, OrcamentoItem
+    from services.orcamento_view_service import recalcular_item
+
+    orc = Orcamento(
+        admin_id=admin_id,
+        numero='__t46-orc-nofator',
+        titulo='Task #46 sem fator test',
+        cliente_nome='Cliente teste',
+        criado_por=admin_id,
+        status='rascunho',
+        imposto_pct_global=Decimal('0'),
+        margem_pct_global=Decimal('0'),
+    )
+    db.session.add(orc)
+    db.session.flush()
+
+    item = OrcamentoItem(
+        admin_id=admin_id,
+        orcamento_id=orc.id,
+        ordem=1,
+        descricao='Material sem embalagem',
+        unidade='m2',
+        quantidade=Decimal('10'),
+        composicao_snapshot=[
+            {
+                'tipo': 'MATERIAL', 'insumo_id': None,
+                'nome': 'Tinta',
+                'unidade': 'L',
+                'coeficiente': 2.0,
+                'preco_unitario': 5.0,
+                'subtotal_unitario': 0.0,
+                'fator_comercial': 1,
+                'unidade_comercial': None,
+            },
+        ],
+    )
+    db.session.add(item)
+    db.session.flush()
+
+    r = recalcular_item(item, orc)
+    assert r['erro'] is None
+
+    linha = item.composicao_snapshot[0]
+    assert linha['quantidade_tecnica'] == pytest.approx(20.0)
+    assert linha['quantidade_compra'] == pytest.approx(20.0)
+    assert linha['subtotal_compra'] == pytest.approx(100.0), (
+        f"subtotal_compra esperado 100.0, obtido {linha['subtotal_compra']}"
+    )
+
+
 # Permite rodar como script para CI legacy (`python tests/test_orcamento_service.py`)
 def run():
     with app.app_context():

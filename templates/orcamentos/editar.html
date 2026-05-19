@@ -550,7 +550,7 @@
                 {%- if _fator > 1 %} fw-bold text-warning{% else %} text-muted{% endif %}">
                 {{ _qtd_com|num(4) }} {{ c.unidade_comercial or c.unidade }}
               </td>
-              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (_qtd_com * _preco)|brl }}</strong></td>
+              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (((_qtd_tec / _fator)|round(0, 'ceil')) * _preco)|brl if _fator > 1 else (_qtd_tec * _preco)|brl }}</strong></td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
@@ -841,8 +841,10 @@ function recalcItem(form){
     const qtdTec = coef * qtd;
     // Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator (catálogo)
     const qtdCom = fator > 1 ? Math.ceil(qtdTec / fator) * fator : qtdTec;
-    // subtotal da linha usa quantidade de COMPRA (custo real, não técnico)
-    const subTot = qtdCom * preco;
+    // nº de pacotes (multiplier para subtotal quando fator > 1)
+    const qtdPacotes = fator > 1 ? Math.ceil(qtdTec / fator) : qtdTec;
+    // subtotal = nº de pacotes × preço do pacote (não qtd_técnica × preço)
+    const subTot = qtdPacotes * preco;
     const subCell = tr.querySelector('.js-subtotal-unit') || tr.children[5];
     if (subCell) subCell.textContent = 'R$ ' + fmtBR(sub, 4);
     const consumoCell = tr.querySelector('.js-consumo-tot');
