@@ -67,16 +67,18 @@ def aliquotas_efetivas(item, orcamento, servico=None) -> tuple[Decimal, Decimal]
 def recalcular_item(item, orcamento) -> dict:
     """Recalcula o item a partir do snapshot. Atualiza campos in-place.
 
-    Task #19: custo_unitario permanece técnico (coef × preço, base de pricing).
-    custo_total reflete quantidades comerciais arredondadas (o que realmente
-    se compra): Σ(qtd_compra_linha × preco_unitario).
-    venda_total = qtd × preco_unit (pricing não muda).
-    lucro_total = venda_total − custo_total_comercial.
+    custo_unitario = técnico: Σ(coef × preço) — base de pricing.
+    custo_total    = técnico: custo_unitario × qtd_item (custo do projeto).
+    venda_total    = qtd × preco_unit.
+    lucro_total    = venda_total − custo_total.
 
-    Cada linha do snapshot é enriquecida com:
+    Cada linha do snapshot é enriquecida com dados auxiliares de compra:
       quantidade_tecnica  = coef × item.quantidade  (uso exato do projeto)
       quantidade_compra   = múltiplo do fator ≥ qtd_tecnica (o que se compra)
-      subtotal_compra     = quantidade_compra × preco_unitario (custo real)
+      subtotal_compra     = nº_pacotes × preço_pacote (custo real de aquisição)
+
+    subtotal_compra / quantidade_compra são auxiliares de planejamento de compras
+    e NÃO alimentam custo_total.
 
     Retorna dict com {custo_unit, preco_unit, custo_total, venda_total, lucro_total, erro}.
     """
@@ -133,7 +135,7 @@ def recalcular_item(item, orcamento) -> dict:
         preco_unit = (custo_unit / divisor).quantize(Decimal('0.0001'))
 
     venda_total = (qtd_item * preco_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    custo_total = custo_compra.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    custo_total = (custo_unit * qtd_item).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     lucro_total = venda_total - custo_total
 
     item.custo_unitario = custo_unit.quantize(Decimal('0.0001'))

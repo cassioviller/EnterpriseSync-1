@@ -856,8 +856,8 @@ function recalcItem(form){
     }
     const subTotCell = tr.querySelector('.js-subtotal-tot');
     if (subTotCell) subTotCell.innerHTML = '<strong>' + fmtBRL(subTot) + '</strong>';
-    custoUnit += sub;        // custo_unitario: técnico (base de pricing)
-    custoCompra += subTot;  // custo_total: comercial (custo real de compra)
+    custoUnit += sub;        // custo_unitario: técnico (base de pricing e custo_total)
+    custoCompra += subTot;  // auxiliar: custo de compra (planejamento de materiais)
   });
   // Fórmula canônica idêntica a services/orcamento_view_service.py:
   //   preco_unit = custo_unit / (1 - imp/100 - mar/100)
@@ -865,7 +865,7 @@ function recalcItem(form){
   const erro = divisor <= 0;
   // Espelha quantize(0.0001) do backend antes de multiplicar por qtd.
   const precoUnit = erro ? 0 : Math.round((custoUnit / divisor) * 10000) / 10000;
-  const custoTot  = Math.round(custoCompra * 100) / 100;  // Task #19: usa custo comercial
+  const custoTot  = Math.round(custoUnit * qtd * 100) / 100;
   const vendaTot  = Math.round(precoUnit * qtd * 100) / 100;
   const lucroTot  = Math.round((vendaTot - custoTot) * 100) / 100;
   form.querySelector('.js-custo').textContent = fmtBRL(custoTot);
