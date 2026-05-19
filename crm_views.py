@@ -671,8 +671,9 @@ def rejeitar_validacao(lead_id):
 
     lead = Lead.query.filter_by(id=lead_id, admin_id=admin_id).first_or_404()
 
-    if not lead.validacao_aprovada:
-        flash('Este lead não está validado.', 'info')
+    pode_rejeitar = lead.validacao_aprovada or lead.status == LeadStatus.VALIDACAO.value
+    if not pode_rejeitar:
+        flash('Este lead não está em validação.', 'info')
         return redirect(url_for('crm.editar', lead_id=lead.id))
 
     status_anterior = lead.status
