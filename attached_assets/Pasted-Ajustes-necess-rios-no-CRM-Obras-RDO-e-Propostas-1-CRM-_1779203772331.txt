@@ -1,0 +1,128 @@
+Ajustes necessários no CRM, Obras, RDO e Propostas
+1. CRM — Lista com filtros parecidos com o Excel
+
+Hoje, ao acessar o CRM, existem opções como Kanban, Lista, Novo Lead e Cadastro CRM.
+
+Quando entro em Lista, aparecem colunas como:
+
+Chegada;
+Nome;
+Vendedor;
+Status;
+Outros dados do lead.
+
+O que precisa melhorar:
+
+Quero que a tela de Lista do CRM tenha filtros mais práticos, parecidos com os filtros que eu usava no Excel.
+
+Ajustes desejados
+
+Adicionar filtros por:
+
+Status;
+Vendedor;
+Nome;
+Data de chegada;
+Situação do lead.
+
+Exemplo:
+
+Se eu selecionar o status Congelado, a lista deve mostrar somente os leads congelados.
+
+Se eu selecionar Enviado, deve mostrar somente os enviados.
+
+Se eu selecionar um vendedor específico, deve mostrar somente os leads daquele vendedor.
+
+Critério de aceite
+
+A tela de Lista do CRM deve permitir filtrar os leads sem dificuldade, principalmente por status e vendedor, para facilitar a análise comercial.
+
+2. Obras Ativas / Alimentação — Atualizar lista de obras
+
+Na tela de obras ativas ou nas telas onde selecionamos obras, aparecem obras que já não estão mais em execução.
+
+Isso dificulta encontrar as obras corretas.
+
+Problema
+
+Na seleção de obras aparecem obras antigas/inativas/finalizadas, mesmo quando não deveriam aparecer.
+
+Além disso, alguns custos ainda não estão sendo puxados corretamente.
+
+Ajustes desejados
+Atualizar a listagem de obras ativas;
+Mostrar apenas obras realmente em execução nas telas operacionais;
+Separar claramente obras ativas, congeladas, finalizadas ou inativas;
+Evitar que obras antigas apareçam em telas de alimentação, RDO ou lançamento de custos;
+Verificar por que alguns custos ainda não estão sendo puxados.
+Critério de aceite
+
+Nas telas operacionais, devem aparecer somente as obras ativas/em execução, facilitando encontrar a obra correta.
+
+3. RDO — Melhorar organização por obra
+
+Hoje, ao abrir o RDO, aparece uma lista geral com vários RDOs misturados.
+
+Exemplo:
+
+Aparece Pabllo e Ana, depois Anderson, depois Anderson novamente, depois Pabllo e Ana mais embaixo.
+
+Isso dificulta visualizar todos os RDOs de uma obra específica.
+
+Ajuste desejado
+
+Ao abrir o módulo de RDO, a primeira tela deveria mostrar cards das obras.
+
+Exemplo de cards:
+
+Pabllo e Ana;
+Anderson;
+Outras obras ativas.
+
+Ao clicar no card da obra, o sistema deve abrir uma lista com todos os RDOs daquela obra, organizados em sequência.
+
+Funcionamento esperado
+Usuário entra no módulo de RDO;
+O sistema mostra cards das obras ativas;
+Usuário clica em uma obra;
+O sistema abre a lista de RDOs daquela obra;
+Os RDOs aparecem em ordem, preferencialmente por data.
+Critério de aceite
+
+O RDO não deve abrir diretamente uma lista misturada. Primeiro deve mostrar as obras, e depois os RDOs filtrados por obra.
+
+4. Propostas — Campo de observação nos cards/validação
+
+Nos cards das propostas, preciso de um item de observação.
+
+Quando eu estiver olhando uma proposta para validação e perceber que o orçamentista precisa alterar alguma coisa, quero conseguir registrar essa observação diretamente na proposta.
+
+Ajuste desejado
+
+Adicionar um campo de observação para validação da proposta.
+
+Esse campo deve permitir registrar comentários como:
+
+Item precisa ser alterado;
+Valor precisa ser revisado;
+Falta informação;
+Corrigir descrição;
+Revisar escopo;
+Ajustar composição.
+Critério de aceite
+
+Na tela de propostas/cards, deve existir um campo ou área de observação visível para registrar pendências de validação antes da aprovação da proposta.
+
+Prompt pronto para o agente
+
+Implemente melhorias nos módulos de CRM, Obras, RDO e Propostas do SIGE.
+
+No CRM, a tela de Lista deve receber filtros práticos semelhantes aos filtros do Excel, principalmente por status, vendedor, nome e data de chegada. Ao selecionar um status como “Congelado” ou “Enviado”, a lista deve exibir somente os leads correspondentes. Também deve ser possível filtrar por vendedor.
+
+Nas telas operacionais de obras, alimentação, custos e RDO, atualize a listagem para exibir somente obras realmente ativas/em execução. Obras finalizadas, antigas, congeladas ou inativas não devem aparecer como opção principal nessas telas. Verifique também por que alguns custos ainda não estão sendo puxados corretamente.
+
+No módulo de RDO, altere a tela inicial para exibir cards das obras ativas. Ao clicar em uma obra, o usuário deve ser direcionado para uma lista contendo somente os RDOs daquela obra, organizados em sequência por data. O objetivo é evitar uma lista geral misturada com RDOs de várias obras.
+
+No módulo de Propostas, adicionar um campo de observação/validação nos cards ou na tela de detalhe da proposta. Esse campo deve permitir que a pessoa que valida a proposta registre observações para o orçamentista corrigir, como alteração de item, revisão de valor, ajuste de escopo ou correção de descrição.
+
+Manter o padrão visual atual do sistema, sem quebrar funcionalidades existentes. Após implementar, testar se os filtros funcionam, se as obras exibidas são apenas as ativas, se os RDOs aparecem corretamente por obra e se as observações das propostas são salvas e exibidas corretamente.
