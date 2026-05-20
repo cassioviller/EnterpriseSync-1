@@ -250,8 +250,7 @@ except Exception as e:
 try:
     from views.quick_create_views import quick_create_bp
     app.register_blueprint(quick_create_bp)
-    csrf.exempt(quick_create_bp)
-    logger.info("[OK] Blueprint quick_create registrado e CSRF-isento")
+    logger.info("[OK] Blueprint quick_create registrado")
 except ImportError as e:
     logger.warning(f"[WARN] quick_create não encontrado: {e}")
 except Exception as e:
