@@ -1,6 +1,13 @@
 {% extends "base_completo.html" %}
 {% from "_partials/macros.html" import page_header, filter_card, data_table_card, status_badge, kpi_card %}
 
+{% block styles %}
+<style>
+body.modal-open .sige-table-card { transform: none !important; }
+body.modal-open .sige-table-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important; }
+</style>
+{% endblock %}
+
 {% block title %}CRM — Lista de Leads{% endblock %}
 
 {% block content %}
@@ -166,8 +173,8 @@
                             <i class="fas fa-edit" aria-hidden="true"></i>
                         </a>
                         {% if is_admin %}
-                        <button type="button" class="btn btn-sm btn-outline-danger"
-                                data-bs-toggle="modal" data-bs-target="#delLead{{ lead.id }}"
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-excluir-lead"
+                                data-lead-id="{{ lead.id }}" data-lead-nome="{{ lead.nome }}"
                                 title="Excluir lead" aria-label="Excluir lead">
                             <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
@@ -223,25 +230,51 @@
 </div>
 {% endif %}
 
-{# Modais de exclusão fora da tabela — Bootstrap 5 exige nível body para evitar re-layout/piscar #}
+{# Modal de exclusão único compartilhado — evita múltiplos backdrops e flickering #}
 {% if is_admin %}
-{% for lead in leads %}
-<div class="modal fade" id="delLead{{ lead.id }}" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title">Excluir lead</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+<div class="modal fade" id="confirmDeleteLeadModal" tabindex="-1" aria-labelledby="confirmDeleteLeadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDeleteLeadModalLabel">Excluir lead</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                Confirmar exclusão de <strong id="deleteLeadNome"></strong>?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="deleteLeadForm" method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                </form>
+            </div>
         </div>
-        <div class="modal-body">Confirmar exclusão de <strong>{{ lead.nome }}</strong>?</div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <form method="POST" action="{{ url_for('crm.excluir', lead_id=lead.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-danger">Excluir</button>
-            </form>
-        </div>
-    </div></div>
+    </div>
 </div>
-{% endfor %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if is_admin %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('confirmDeleteLeadModal');
+    if (!modal) return;
+    var nomeEl = document.getElementById('deleteLeadNome');
+    var form = document.getElementById('deleteLeadForm');
+
+    document.querySelectorAll('.btn-excluir-lead').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var leadId = btn.dataset.leadId;
+            var leadNome = btn.dataset.leadNome;
+            nomeEl.textContent = leadNome;
+            form.action = '/crm/' + leadId + '/excluir';
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        });
+    });
+});
+</script>
 {% endif %}
 {% endblock %}
