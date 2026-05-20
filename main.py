@@ -256,6 +256,15 @@ except ImportError as e:
 except Exception as e:
     logger.error(f"[ERROR] Falha ao registrar quick_create: {e}")
 
+try:
+    from cadastros_views import cadastros_hub_bp
+    app.register_blueprint(cadastros_hub_bp)
+    logger.info("[OK] Blueprint cadastros_hub registrado")
+except ImportError as e:
+    logger.warning(f"[WARN] cadastros_hub não encontrado: {e}")
+except Exception as e:
+    logger.error(f"[ERROR] Falha ao registrar cadastros_hub: {e}")
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)

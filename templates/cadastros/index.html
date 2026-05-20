@@ -1,0 +1,481 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Central de Cadastros{% endblock %}
+
+{% block styles %}
+<style>
+  .hub-hero {
+    background: linear-gradient(135deg, #1a6b3a 0%, #28a745 60%, #20c65a 100%);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    color: #fff;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(26,107,58,.25);
+  }
+  .hub-hero h1 { font-size: 1.9rem; font-weight: 700; margin-bottom: .35rem; }
+  .hub-hero p  { opacity: .88; font-size: 1.02rem; margin: 0; }
+
+  .hub-block-title {
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-bottom: .85rem;
+    padding-left: .25rem;
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+  }
+  .hub-block-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+  }
+
+  .hub-card {
+    display: flex;
+    align-items: flex-start;
+    gap: .9rem;
+    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    background: #fff;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow .18s, border-color .18s, transform .18s;
+    height: 100%;
+  }
+  .hub-card:hover {
+    box-shadow: 0 6px 22px rgba(0,0,0,.10);
+    border-color: #28a745;
+    transform: translateY(-2px);
+    text-decoration: none;
+    color: inherit;
+  }
+  .hub-card.disabled {
+    opacity: .58;
+    pointer-events: none;
+    cursor: default;
+  }
+  .hub-card__icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .hub-card__body { min-width: 0; flex: 1; }
+  .hub-card__title {
+    font-weight: 600;
+    font-size: .93rem;
+    line-height: 1.3;
+    margin-bottom: .18rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+  }
+  .hub-card__desc {
+    font-size: .78rem;
+    color: #6c757d;
+    line-height: 1.4;
+    margin: 0;
+  }
+  .badge-soon {
+    font-size: .62rem;
+    font-weight: 600;
+    background: #e9ecef;
+    color: #6c757d;
+    border-radius: 6px;
+    padding: .18em .5em;
+    white-space: nowrap;
+  }
+
+  /* Icon colour variants */
+  .ic-green  { background: #d4edda; color: #155724; }
+  .ic-blue   { background: #cce5ff; color: #004085; }
+  .ic-orange { background: #fff3cd; color: #856404; }
+  .ic-teal   { background: #d1ecf1; color: #0c5460; }
+  .ic-purple { background: #e2d9f3; color: #4a235a; }
+  .ic-red    { background: #f8d7da; color: #721c24; }
+  .ic-indigo { background: #dde3f8; color: #1a237e; }
+  .ic-pink   { background: #fde8f4; color: #880e4f; }
+  .ic-gray   { background: #e9ecef; color: #495057; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-3 px-lg-4">
+
+  <!-- Hero -->
+  <div class="hub-hero">
+    <div class="d-flex align-items-center gap-3">
+      <div style="font-size:2.6rem; opacity:.92;">
+        <i class="fas fa-layer-group"></i>
+      </div>
+      <div>
+        <h1><i class="fas fa-address-book me-2" style="opacity:.8;"></i>Central de Cadastros</h1>
+        <p>Acesse todos os cadastros auxiliares do sistema organizados por área. Clique em um card para ir diretamente ao módulo.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BLOCO 1 · COMERCIAL
+  ══════════════════════════════════════════ -->
+  <div class="mb-4">
+    <div class="hub-block-title">
+      <i class="fas fa-briefcase text-success"></i> Comercial
+    </div>
+    <div class="row g-3">
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('clientes.listar') }}" class="hub-card">
+          <div class="hub-card__icon ic-green"><i class="fas fa-user-tie"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Clientes</div>
+            <p class="hub-card__desc">Cadastro de clientes e contatos comerciais.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('crm.cadastros') }}" class="hub-card">
+          <div class="hub-card__icon ic-blue"><i class="fas fa-sliders-h"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Listas Mestras do CRM</div>
+            <p class="hub-card__desc">Responsáveis, origens, cadências, situações, tipos de obra e motivos de perda.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('catalogo.insumos_list') }}" class="hub-card">
+          <div class="hub-card__icon ic-orange"><i class="fas fa-cubes"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Catálogo de Insumos</div>
+            <p class="hub-card__desc">Insumos e materiais disponíveis para orçamentos e propostas.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('catalogo.servicos_list') }}" class="hub-card">
+          <div class="hub-card__icon ic-teal"><i class="fas fa-clipboard-list"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Catálogo de Serviços</div>
+            <p class="hub-card__desc">Serviços paramétricos usados em propostas e orçamentos.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('propostas.listar_templates') }}" class="hub-card">
+          <div class="hub-card__icon ic-purple"><i class="fas fa-file-contract"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Modelos de Proposta</div>
+            <p class="hub-card__desc">Templates reutilizáveis para geração de propostas comerciais.</p>
+          </div>
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BLOCO 2 · OBRAS E EXECUÇÃO
+  ══════════════════════════════════════════ -->
+  <div class="mb-4">
+    <div class="hub-block-title">
+      <i class="fas fa-hard-hat text-warning"></i> Obras e Execução
+    </div>
+    <div class="row g-3">
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('main.obras') }}" class="hub-card">
+          <div class="hub-card__icon ic-orange"><i class="fas fa-hammer"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Obras</div>
+            <p class="hub-card__desc">Lista de obras e projetos em andamento ou concluídos.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('subempreiteiros.listar') }}" class="hub-card">
+          <div class="hub-card__icon ic-red"><i class="fas fa-people-carry"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Subempreiteiros</div>
+            <p class="hub-card__desc">Empresas e profissionais parceiros contratados por obra.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('catalogos.hub') }}" class="hub-card">
+          <div class="hub-card__icon ic-teal"><i class="fas fa-book-open"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Hub de Catálogos</div>
+            <p class="hub-card__desc">Central de catálogos de composições e tabelas de referência.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-tags"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Tipos de Serviço <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Categorias de serviços executados para classificação nos RDOs.</p>
+          </div>
+        </span>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-file-alt"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Tipos de RDO <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Configuração dos modelos de Relatório Diário de Obra.</p>
+          </div>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BLOCO 3 · FINANCEIRO
+  ══════════════════════════════════════════ -->
+  <div class="mb-4">
+    <div class="hub-block-title">
+      <i class="fas fa-dollar-sign text-primary"></i> Financeiro
+    </div>
+    <div class="row g-3">
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('almoxarifado.fornecedores') }}" class="hub-card">
+          <div class="hub-card__icon ic-blue"><i class="fas fa-truck"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Fornecedores</div>
+            <p class="hub-card__desc">Empresas e pessoas físicas fornecedoras de materiais e serviços.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('financeiro.listar_bancos') }}" class="hub-card">
+          <div class="hub-card__icon ic-green"><i class="fas fa-university"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Bancos e Contas</div>
+            <p class="hub-card__desc">Contas bancárias e caixas utilizados nas movimentações financeiras.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-sitemap"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Plano de Contas <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Estrutura contábil e categorias para classificação de lançamentos.</p>
+          </div>
+        </span>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-code-branch"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Centros de Custo <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Centros de custo para alocação de despesas e receitas por projeto.</p>
+          </div>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BLOCO 4 · COMPRAS E ALMOXARIFADO
+  ══════════════════════════════════════════ -->
+  <div class="mb-4">
+    <div class="hub-block-title">
+      <i class="fas fa-boxes text-info"></i> Compras e Almoxarifado
+    </div>
+    <div class="row g-3">
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('almoxarifado.itens') }}" class="hub-card">
+          <div class="hub-card__icon ic-indigo"><i class="fas fa-box-open"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Itens do Almoxarifado</div>
+            <p class="hub-card__desc">Catálogo de materiais e produtos gerenciados no estoque.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('almoxarifado.categorias') }}" class="hub-card">
+          <div class="hub-card__icon ic-teal"><i class="fas fa-tags"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Categorias de Material</div>
+            <p class="hub-card__desc">Grupos e famílias de materiais para organização do estoque.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('almoxarifado.fornecedores') }}" class="hub-card">
+          <div class="hub-card__icon ic-blue"><i class="fas fa-truck-loading"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Fornecedores</div>
+            <p class="hub-card__desc">Cadastro de fornecedores vinculado ao módulo de compras.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-ruler-combined"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Unidades de Medida <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Unidades padronizadas (kg, m², un, h) para itens e movimentos.</p>
+          </div>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BLOCO 5 · RH / EQUIPE
+  ══════════════════════════════════════════ -->
+  <div class="mb-4">
+    <div class="hub-block-title">
+      <i class="fas fa-users text-danger"></i> RH / Equipe
+    </div>
+    <div class="row g-3">
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('main.funcionarios') }}" class="hub-card">
+          <div class="hub-card__icon ic-green"><i class="fas fa-id-badge"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Funcionários</div>
+            <p class="hub-card__desc">Registro completo de colaboradores e dados contratuais CLT.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="/configuracoes/departamentos" class="hub-card">
+          <div class="hub-card__icon ic-purple"><i class="fas fa-sitemap"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Departamentos</div>
+            <p class="hub-card__desc">Setores e estrutura organizacional da empresa.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="/configuracoes/funcoes" class="hub-card">
+          <div class="hub-card__icon ic-blue"><i class="fas fa-user-tag"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Funções</div>
+            <p class="hub-card__desc">Cargos e funções disponíveis para atribuição aos funcionários.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="/configuracoes/horarios" class="hub-card">
+          <div class="hub-card__icon ic-orange"><i class="fas fa-clock"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Horários de Trabalho</div>
+            <p class="hub-card__desc">Turnos, jornadas e escalas usados no controle de ponto.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-medal"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Tabela Salarial <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Faixas salariais e progressão de carreira por função.</p>
+          </div>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BLOCO 6 · APOIO OPERACIONAL
+  ══════════════════════════════════════════ -->
+  <div class="mb-4">
+    <div class="hub-block-title">
+      <i class="fas fa-cogs text-secondary"></i> Apoio Operacional
+    </div>
+    <div class="row g-3">
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('frota.lista') }}" class="hub-card">
+          <div class="hub-card__icon ic-indigo"><i class="fas fa-car"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Veículos</div>
+            <p class="hub-card__desc">Frota própria — cadastro, uso e controle de custos por veículo.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('alimentacao.restaurantes_lista') }}" class="hub-card">
+          <div class="hub-card__icon ic-orange"><i class="fas fa-store"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Restaurantes</div>
+            <p class="hub-card__desc">Estabelecimentos cadastrados para lançamento de alimentação.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('transporte.categorias') }}" class="hub-card">
+          <div class="hub-card__icon ic-teal"><i class="fas fa-route"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Categorias de Transporte</div>
+            <p class="hub-card__desc">Tipos de deslocamento usados nos lançamentos de transporte.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="/configuracoes/empresa" class="hub-card">
+          <div class="hub-card__icon ic-green"><i class="fas fa-building"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Dados da Empresa</div>
+            <p class="hub-card__desc">Razão social, CNPJ, endereço e informações institucionais.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <span class="hub-card disabled">
+          <div class="hub-card__icon ic-gray"><i class="fas fa-map-marker-alt"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Localidades / Regiões <span class="badge-soon">Em breve</span></div>
+            <p class="hub-card__desc">Cidades, estados e regiões para classificação geográfica de obras.</p>
+          </div>
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
