@@ -81,6 +81,22 @@
     padding-top: .6rem;
     border-top: 1px dashed #dee2e6;
   }
+
+  #deleteModal .modal-header {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: #fff;
+    border-radius: 12px 12px 0 0;
+  }
+  #deleteModal .modal-header .btn-close { filter: invert(1); }
+  #deleteModal .modal-footer { border-top: 1px solid #f0f0f0; }
+  .migrate-info {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    font-size: .88rem;
+  }
+  #deleteSpinner { display: none; }
 </style>
 {% endblock %}
 
@@ -167,7 +183,7 @@
 
       <!-- Exibição normal -->
       <span class="dd-item__nome view-mode-{{ item.id }}">
-        {{ item.nome }}
+        {{ item.valor }}
         {% if not item.ativo %}
           <span class="dd-item__badge bg-light text-muted border">Inativa</span>
         {% endif %}
@@ -176,7 +192,7 @@
       <!-- Edição inline -->
       <div class="inline-edit-form edit-mode-{{ item.id }}">
         <input type="text" class="form-control form-control-sm"
-               id="edit-val-{{ item.id }}" value="{{ item.nome }}" style="max-width:280px;">
+               id="edit-val-{{ item.id }}" value="{{ item.valor }}" style="max-width:280px;">
         <form method="POST"
               action="{{ url_for('cadastros_hub.dropdown_editar_opcao', slug=grupo.slug, opcao_id=item.id) }}"
               style="display:contents;">
@@ -212,6 +228,14 @@
             <i class="fas {% if item.ativo %}fa-eye-slash{% else %}fa-eye{% endif %}"></i>
           </button>
         </form>
+
+        <!-- Excluir -->
+        <button type="button"
+                class="btn-icon btn btn-outline-danger"
+                title="Excluir permanentemente"
+                onclick="iniciarExclusao({{ item.id }}, '{{ item.valor | e }}')">
+          <i class="fas fa-trash-alt"></i>
+        </button>
       </div>
       {% endif %}
 
@@ -223,6 +247,7 @@
       <i class="fas fa-info-circle me-1"></i>
       Opções desativadas são ocultadas nos formulários, mas preservadas no histórico.
       Use os botões <i class="fas fa-eye-slash"></i> / <i class="fas fa-eye"></i> para ativar ou desativar.
+      O botão <i class="fas fa-trash-alt"></i> remove a opção permanentemente.
     </p>
     {% endif %}
 
@@ -252,6 +277,75 @@
   </a>
 
 </div>
+
+<!-- Modal de exclusão / migração -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:14px; overflow:hidden;">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="deleteModalLabel">
+          <i class="fas fa-trash-alt me-2"></i> Excluir opção
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Loading -->
+        <div id="deleteSpinner" class="text-center py-3">
+          <div class="spinner-border text-danger" role="status"></div>
+          <p class="mt-2 text-muted small">Verificando uso...</p>
+        </div>
+
+        <!-- Sem uso (exclusão simples) -->
+        <div id="deleteSimples" style="display:none;">
+          <p class="mb-1">Você está prestes a excluir permanentemente a opção:</p>
+          <p class="fw-bold fs-5 text-danger mb-3" id="deleteNomeSimples"></p>
+          <p class="text-muted small">
+            <i class="fas fa-info-circle me-1"></i>
+            Esta opção não está em uso por nenhum registro. A exclusão é imediata e irreversível.
+          </p>
+        </div>
+
+        <!-- Em uso — precisa migrar -->
+        <div id="deleteMigrar" style="display:none;">
+          <div class="migrate-info mb-3">
+            <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+            A opção <strong id="deletNomeMigrar"></strong> está sendo usada por
+            <strong id="deleteTotalRegistros"></strong> registro(s).
+            Escolha para qual opção migrar esses registros antes de excluir:
+          </div>
+          <label class="form-label fw-semibold small">Opção de destino</label>
+          <select class="form-select form-select-sm" id="selectDestino">
+            <option value="">— Selecione —</option>
+          </select>
+          <p class="text-muted small mt-2">
+            <i class="fas fa-info-circle me-1"></i>
+            Todos os registros serão atualizados automaticamente para a opção selecionada.
+          </p>
+        </div>
+
+        <!-- Erro de carregamento -->
+        <div id="deleteErro" style="display:none;" class="alert alert-danger py-2">
+          <i class="fas fa-times-circle me-1"></i> Não foi possível verificar o uso. Tente novamente.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+          <i class="fas fa-times me-1"></i> Cancelar
+        </button>
+        <form id="deleteForm" method="POST" style="display:contents;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="opcao_destino_id" id="deleteDestinoInput" value="">
+          <button type="submit" id="deleteBtnConfirmar"
+                  class="btn btn-danger btn-sm" disabled>
+            <i class="fas fa-trash-alt me-1"></i> Excluir permanentemente
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -267,6 +361,65 @@ function toggleEdit(id, show) {
     const inp = document.getElementById('edit-val-' + id);
     if (inp) { inp.focus(); inp.select(); }
   }
+}
+
+function iniciarExclusao(opcaoId, opcaoNome) {
+  const modalEl = document.getElementById('deleteModal');
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  document.getElementById('deleteSpinner').style.display = 'block';
+  document.getElementById('deleteSimples').style.display = 'none';
+  document.getElementById('deleteMigrar').style.display = 'none';
+  document.getElementById('deleteErro').style.display = 'none';
+  document.getElementById('deleteBtnConfirmar').disabled = true;
+
+  const form = document.getElementById('deleteForm');
+  form.action = `/cadastros/dropdowns/{{ grupo.slug }}/${opcaoId}/excluir`;
+  document.getElementById('deleteDestinoInput').value = '';
+
+  modal.show();
+
+  fetch(`/cadastros/dropdowns/{{ grupo.slug }}/${opcaoId}/verificar-uso`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('deleteSpinner').style.display = 'none';
+
+    if (data.error) {
+      document.getElementById('deleteErro').style.display = 'block';
+      return;
+    }
+
+    if (!data.em_uso) {
+      document.getElementById('deleteNomeSimples').textContent = opcaoNome;
+      document.getElementById('deleteSimples').style.display = 'block';
+      document.getElementById('deleteBtnConfirmar').disabled = false;
+    } else {
+      document.getElementById('deletNomeMigrar').textContent = opcaoNome;
+      document.getElementById('deleteTotalRegistros').textContent = data.total;
+
+      const sel = document.getElementById('selectDestino');
+      sel.innerHTML = '<option value="">— Selecione —</option>';
+      data.opcoes_disponiveis.forEach(op => {
+        const opt = document.createElement('option');
+        opt.value = op.id;
+        opt.textContent = op.valor;
+        sel.appendChild(opt);
+      });
+
+      sel.onchange = function() {
+        document.getElementById('deleteDestinoInput').value = this.value;
+        document.getElementById('deleteBtnConfirmar').disabled = !this.value;
+      };
+
+      document.getElementById('deleteMigrar').style.display = 'block';
+    }
+  })
+  .catch(() => {
+    document.getElementById('deleteSpinner').style.display = 'none';
+    document.getElementById('deleteErro').style.display = 'block';
+  });
 }
 </script>
 {% endblock %}

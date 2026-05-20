@@ -1,5 +1,5 @@
 import logging
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 
 from app import db
@@ -116,23 +116,75 @@ def dropdown_toggle_ativo(slug, opcao_id):
     return redirect(url_for('cadastros_hub.dropdown_opcoes', slug=slug))
 
 
+@cadastros_hub_bp.route('/dropdowns/<slug>/<int:opcao_id>/verificar-uso')
+@login_required
+def dropdown_verificar_uso(slug, opcao_id):
+    """Retorna JSON com { em_uso, total, opcoes_disponiveis } para popular o modal de exclusão."""
+    from services.dropdown_service import contar_uso_opcao, get_dropdown_options
+    from models import DropdownOpcao
+    admin_id = _get_admin_id()
+    try:
+        total = contar_uso_opcao(slug, opcao_id, admin_id)
+        opcoes_raw = get_dropdown_options(slug, admin_id, incluir_inativos=False)
+        opcoes_disp = [
+            {'id': o.id, 'valor': o.valor}
+            for o in opcoes_raw
+            if o.id != opcao_id
+        ]
+        return jsonify({
+            'em_uso': total > 0,
+            'total': total,
+            'opcoes_disponiveis': opcoes_disp,
+        })
+    except Exception:
+        logger.exception('Erro ao verificar uso slug=%s id=%s', slug, opcao_id)
+        return jsonify({'error': 'Erro interno'}), 500
+
+
 @cadastros_hub_bp.route('/dropdowns/<slug>/<int:opcao_id>/excluir', methods=['POST'])
 @login_required
 def dropdown_excluir_opcao(slug, opcao_id):
-    """Política: sem exclusão física — desativa a opção."""
-    from services.dropdown_service import desativar_opcao
+    """Exclui fisicamente a opção, migrando registros se necessário."""
+    from services.dropdown_service import contar_uso_opcao, migrar_e_excluir_opcao, desativar_opcao
     admin_id = _get_admin_id()
+    opcao_destino_id = request.form.get('opcao_destino_id', type=int)
     try:
-        desativar_opcao(slug, opcao_id, admin_id)
-        db.session.commit()
-        flash('Opção desativada.', 'success')
+        total = contar_uso_opcao(slug, opcao_id, admin_id)
+        if total > 0:
+            if not opcao_destino_id:
+                flash(
+                    f'Esta opção está em uso por {total} registro(s). '
+                    'Selecione uma opção de destino para migrar antes de excluir.',
+                    'warning',
+                )
+                return redirect(url_for('cadastros_hub.dropdown_opcoes', slug=slug))
+            migrar_e_excluir_opcao(slug, opcao_id, opcao_destino_id, admin_id)
+            db.session.commit()
+            flash(f'Opção excluída. {total} registro(s) migrado(s) com sucesso.', 'success')
+        else:
+            from models import DropdownOpcao
+            crm = None
+            try:
+                from services.dropdown_service import _crm_model
+                crm = _crm_model(slug)
+            except Exception:
+                pass
+            opcao = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
+            if opcao:
+                if crm and opcao.ext_id:
+                    leg = crm.query.filter_by(id=opcao.ext_id, admin_id=admin_id).first()
+                    if leg:
+                        db.session.delete(leg)
+                db.session.delete(opcao)
+            db.session.commit()
+            flash('Opção excluída com sucesso.', 'success')
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'warning')
     except Exception:
         db.session.rollback()
-        logger.exception('Erro ao desativar opção slug=%s id=%s', slug, opcao_id)
-        flash('Erro inesperado. Tente novamente.', 'danger')
+        logger.exception('Erro ao excluir opção slug=%s id=%s', slug, opcao_id)
+        flash('Erro inesperado ao excluir. Tente novamente.', 'danger')
     return redirect(url_for('cadastros_hub.dropdown_opcoes', slug=slug))
 
 

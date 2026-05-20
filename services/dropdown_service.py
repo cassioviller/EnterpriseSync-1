@@ -222,6 +222,97 @@ def excluir_opcao(slug: str, opcao_id: int, admin_id: int):
     return desativar_opcao(slug, opcao_id, admin_id)
 
 
+# ---------------------------------------------------------------------------
+# Mapeamento slug → campos em Lead que referenciam o modelo legado CRM
+# Cada entrada é uma lista de nomes de coluna em Lead que usam o ext_id do
+# slug como FK.  Adicionar novos módulos aqui quando migrarem para o motor.
+# ---------------------------------------------------------------------------
+_SLUG_LEAD_FIELDS: dict[str, list[str]] = {
+    'crm_responsavel':   ['responsavel_id', 'vendedor_id', 'orcamentista_id'],
+    'crm_origem':        ['origem_id'],
+    'crm_cadencia':      ['cadencia_id'],
+    'crm_situacao':      ['situacao_id'],
+    'crm_tipo_material': ['tipo_material_id'],
+    'crm_tipo_obra':     ['tipo_obra_id'],
+    'crm_motivo_perda':  ['motivo_perda_id'],
+}
+
+
+def contar_uso_opcao(slug: str, opcao_id: int, admin_id: int) -> int:
+    """Conta quantos registros referenciam a opção pelo seu ext_id.
+
+    Retorna 0 quando o slug não tem mapeamento ainda (exclusão direta permitida).
+    """
+    from models import DropdownOpcao, Lead
+    opcao = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
+    if not opcao or not opcao.ext_id:
+        return 0
+
+    campos = _SLUG_LEAD_FIELDS.get(slug)
+    if not campos:
+        return 0
+
+    total = 0
+    for campo in campos:
+        col = getattr(Lead, campo, None)
+        if col is None:
+            continue
+        total += Lead.query.filter(
+            Lead.admin_id == admin_id,
+            col == opcao.ext_id,
+        ).count()
+    return total
+
+
+def migrar_e_excluir_opcao(slug: str, opcao_id: int,
+                            opcao_destino_id: int, admin_id: int):
+    """Migra todos os registros de opcao_id para opcao_destino_id e exclui fisicamente.
+
+    Executa tudo em uma única transação (flush sem commit — caller faz o commit).
+    Raises ValueError para entradas inválidas.
+    """
+    from models import DropdownOpcao, Lead
+
+    opcao_origem = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
+    if not opcao_origem:
+        raise ValueError('Opção de origem não encontrada.')
+
+    opcao_destino = DropdownOpcao.query.filter_by(id=opcao_destino_id, admin_id=admin_id).first()
+    if not opcao_destino:
+        raise ValueError('Opção de destino não encontrada.')
+
+    if opcao_origem.id == opcao_destino.id:
+        raise ValueError('Origem e destino não podem ser a mesma opção.')
+
+    if opcao_origem.grupo_id != opcao_destino.grupo_id:
+        raise ValueError('A opção de destino deve pertencer ao mesmo grupo que a opção excluída.')
+
+    campos = _SLUG_LEAD_FIELDS.get(slug, [])
+
+    if campos and opcao_origem.ext_id and opcao_destino.ext_id:
+        for campo in campos:
+            col = getattr(Lead, campo, None)
+            if col is None:
+                continue
+            Lead.query.filter(
+                Lead.admin_id == admin_id,
+                col == opcao_origem.ext_id,
+            ).update({campo: opcao_destino.ext_id}, synchronize_session='fetch')
+
+    crm = _crm_model(slug)
+    if crm and opcao_origem.ext_id:
+        leg = crm.query.filter_by(id=opcao_origem.ext_id, admin_id=admin_id).first()
+        if leg:
+            db.session.delete(leg)
+
+    db.session.delete(opcao_origem)
+    db.session.flush()
+    logger.info(
+        'migrar_e_excluir_opcao slug=%s opcao_id=%s → destino=%s admin=%s',
+        slug, opcao_id, opcao_destino_id, admin_id,
+    )
+
+
 def mover_opcao(slug: str, opcao_id: int, admin_id: int, direcao: str):
     """Troca a ordem de uma opção com a vizinha (direcao: 'cima' | 'baixo')."""
     from models import DropdownGrupo, DropdownOpcao
