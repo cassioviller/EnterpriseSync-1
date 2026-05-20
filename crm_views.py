@@ -437,6 +437,35 @@ def _aplicar_filtros(q, filtros):
 # ===========================================================================
 # ROTAS — CRUD DO LEAD
 # ===========================================================================
+@crm_bp.route('/clientes/buscar')
+@login_required
+def buscar_clientes():
+    """Autocomplete: retorna clientes do tenant cujo nome contenha o termo."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify([])
+    q = (request.args.get('q') or '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    clientes = (
+        Cliente.query
+        .filter_by(admin_id=admin_id)
+        .filter(Cliente.nome.ilike(f'%{q}%'))
+        .order_by(Cliente.nome)
+        .limit(10)
+        .all()
+    )
+    return jsonify([
+        {
+            'id': c.id,
+            'nome': c.nome,
+            'telefone': c.telefone or '',
+            'email': c.email or '',
+        }
+        for c in clientes
+    ])
+
+
 @crm_bp.route('/novo', methods=['GET', 'POST'])
 @login_required
 def novo():
@@ -576,18 +605,54 @@ def _salvar_lead(lead, listas, admin_id):
     # Garantir id antes de mexer em FK / histórico
     db.session.flush()
 
-    # Vínculo automático de Cliente
+    # Vínculo de Cliente — respeita cliente_id explícito do formulário
     cliente_msg = None
-    if not lead.cliente_id:
-        cliente, status_vinc = vincular_ou_criar_cliente(lead, admin_id)
-        if status_vinc == 'criado':
-            cliente_msg = f'Novo cliente criado: {cliente.nome}'
-            _registrar_historico(lead, 'sistema', None, cliente.nome,
-                                 descricao=f'Cliente criado automaticamente: {cliente.nome}')
-        elif status_vinc == 'vinculado':
-            cliente_msg = f'Cliente vinculado: {cliente.nome}'
-            _registrar_historico(lead, 'sistema', None, cliente.nome,
-                                 descricao=f'Cliente existente vinculado: {cliente.nome}')
+    cliente_id_form_raw = (request.form.get('cliente_id') or '').strip()
+
+    if cliente_id_form_raw:
+        # Usuário selecionou um cliente no autocomplete
+        try:
+            cliente_id_form = int(cliente_id_form_raw)
+            cliente_selecionado = Cliente.query.filter_by(
+                id=cliente_id_form, admin_id=admin_id
+            ).first()
+            if cliente_selecionado:
+                if lead.cliente_id != cliente_selecionado.id:
+                    action = 'trocado' if lead.cliente_id else 'vinculado'
+                    lead.cliente_id = cliente_selecionado.id
+                    cliente_msg = (
+                        f'Cliente trocado: {cliente_selecionado.nome}'
+                        if action == 'trocado'
+                        else f'Cliente vinculado: {cliente_selecionado.nome}'
+                    )
+                    _registrar_historico(
+                        lead, 'sistema', None, cliente_selecionado.nome,
+                        descricao=f'Cliente {action} manualmente: {cliente_selecionado.nome}',
+                    )
+        except (ValueError, TypeError):
+            pass
+    else:
+        # Formulário veio sem cliente_id — desvínculo explícito ou nome novo
+        if lead.cliente_id and not is_new:
+            # Havia cliente vinculado; usuário limpou — zerar antes de re-vincular
+            lead.cliente_id = None
+            _registrar_historico(
+                lead, 'sistema', None, None,
+                descricao='Cliente desvinculado manualmente.',
+            )
+        if not lead.cliente_id:
+            cliente, status_vinc = vincular_ou_criar_cliente(lead, admin_id)
+            if status_vinc == 'criado':
+                cliente_msg = f'Novo cliente criado automaticamente: {cliente.nome}'
+                _registrar_historico(lead, 'sistema', None, cliente.nome,
+                                     descricao=f'Cliente criado automaticamente: {cliente.nome}')
+            elif status_vinc == 'vinculado':
+                cliente_msg = f'Cliente vinculado: {cliente.nome}'
+                _registrar_historico(lead, 'sistema', None, cliente.nome,
+                                     descricao=f'Cliente existente vinculado: {cliente.nome}')
+            elif status_vinc == 'insuficiente' and not is_new and cliente_id_form_raw == '':
+                # Desvínculo sem re-vínculo possível
+                cliente_msg = 'Cliente desvinculado.'
 
     # Automações de status
     if is_new:

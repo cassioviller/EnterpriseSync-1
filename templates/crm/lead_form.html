@@ -123,6 +123,8 @@
 
     <form method="POST" action="{% if lead %}{{ url_for('crm.editar', lead_id=lead.id) }}{% else %}{{ url_for('crm.novo') }}{% endif %}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="cliente_id" id="clienteIdInput"
+               value="{{ lead.cliente_id if lead and lead.cliente_id else '' }}">
         <div class="row g-3">
             {# Coluna esquerda — formulário #}
             <div class="col-lg-8">
@@ -132,17 +134,28 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label small text-muted mb-1">Nome / Empresa *</label>
-                                <input type="text" name="nome" class="form-control" required maxlength="200"
-                                       value="{{ valores.nome if valores else '' }}">
+                                <div class="position-relative">
+                                    <input type="text" name="nome" id="nomeInput" class="form-control" required
+                                           maxlength="200" autocomplete="off"
+                                           value="{{ valores.nome if valores else '' }}">
+                                    <ul id="nomeDropdown" class="list-group shadow-sm position-absolute w-100"
+                                        style="z-index:1050;display:none;top:100%;left:0;max-height:220px;overflow-y:auto;"></ul>
+                                </div>
+                                <div id="clienteVinculadoResumoBadge" class="mt-1" style="display:none;">
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="fas fa-link me-1" aria-hidden="true"></i>
+                                        <span id="clienteVinculadoNome"></span>
+                                    </span>
+                                </div>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-1">Contato (telefone)</label>
-                                <input type="text" name="contato" class="form-control" maxlength="50"
+                                <input type="text" name="contato" id="contatoInput" class="form-control" maxlength="50"
                                        value="{{ valores.contato if valores else '' }}">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small text-muted mb-1">E-mail</label>
-                                <input type="text" name="email" class="form-control" maxlength="200"
+                                <input type="text" name="email" id="emailInput" class="form-control" maxlength="200"
                                        value="{{ valores.email if valores else '' }}">
                             </div>
                             <div class="col-md-3">
@@ -284,22 +297,46 @@
                     </div>
                 </div>
 
-                {% if lead and lead.cliente %}
-                <div class="card border-0 shadow-sm mb-3">
+                <div class="card border-0 shadow-sm mb-3" id="clienteVinculadoCard"
+                     {% if not (lead and lead.cliente) %}style="display:none"{% endif %}>
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <strong>Cliente vinculado</strong>
-                        <a href="{{ url_for('crm.detalhe_cliente', cliente_id=lead.cliente.id) }}"
-                           class="btn btn-outline-secondary btn-sm" title="Ver detalhe do cliente">
-                            <i class="fas fa-external-link-alt" aria-hidden="true"></i>
-                        </a>
+                        <div class="d-flex gap-1">
+                            {% if lead and lead.cliente %}
+                            <a href="{{ url_for('crm.detalhe_cliente', cliente_id=lead.cliente.id) }}"
+                               id="clienteVerDetalheLink"
+                               class="btn btn-outline-secondary btn-sm" title="Ver detalhe do cliente">
+                                <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+                            </a>
+                            {% else %}
+                            <span id="clienteVerDetalheLink" style="display:none"></span>
+                            {% endif %}
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="btnTrocarCliente"
+                                    title="Trocar cliente — foca no campo de busca">
+                                <i class="fas fa-exchange-alt me-1" aria-hidden="true"></i>Trocar
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="btnDesvincularCliente"
+                                    title="Desvincular cliente">
+                                <i class="fas fa-unlink me-1" aria-hidden="true"></i>Desvincular
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body small">
-                        <div><i class="fas fa-user me-1 text-muted" aria-hidden="true"></i><strong>{{ lead.cliente.nome }}</strong></div>
-                        {% if lead.cliente.telefone %}<div><i class="fas fa-phone me-1 text-muted" aria-hidden="true"></i>{{ lead.cliente.telefone }}</div>{% endif %}
-                        {% if lead.cliente.email %}<div><i class="fas fa-envelope me-1 text-muted" aria-hidden="true"></i>{{ lead.cliente.email }}</div>{% endif %}
+                    <div class="card-body small" id="clienteVinculadoInfo">
+                        {% if lead and lead.cliente %}
+                        <div><i class="fas fa-user me-1 text-muted" aria-hidden="true"></i><strong id="clienteCardNome">{{ lead.cliente.nome }}</strong></div>
+                        <div id="clienteCardTel" {% if not lead.cliente.telefone %}style="display:none"{% endif %}>
+                            <i class="fas fa-phone me-1 text-muted" aria-hidden="true"></i><span>{{ lead.cliente.telefone or '' }}</span>
+                        </div>
+                        <div id="clienteCardEmail" {% if not lead.cliente.email %}style="display:none"{% endif %}>
+                            <i class="fas fa-envelope me-1 text-muted" aria-hidden="true"></i><span>{{ lead.cliente.email or '' }}</span>
+                        </div>
+                        {% else %}
+                        <div><i class="fas fa-user me-1 text-muted" aria-hidden="true"></i><strong id="clienteCardNome"></strong></div>
+                        <div id="clienteCardTel" style="display:none"><i class="fas fa-phone me-1 text-muted" aria-hidden="true"></i><span></span></div>
+                        <div id="clienteCardEmail" style="display:none"><i class="fas fa-envelope me-1 text-muted" aria-hidden="true"></i><span></span></div>
+                        {% endif %}
                     </div>
                 </div>
-                {% endif %}
 
                 {% if lead %}
                 <div class="card border-0 shadow-sm mb-3">
@@ -350,18 +387,154 @@
 {% block scripts %}
 <script>
 (function() {
+    /* ── Status / Motivo de perda ───────────────────────────────────── */
     const statusSel = document.getElementById('statusSelect');
     const motivoWrap = document.getElementById('motivoPerdaWrap');
     const retomadaWrap = document.getElementById('dataRetomadaWrap');
-    function atualizar() {
+    function atualizarStatus() {
         const v = statusSel.value;
         motivoWrap.style.display = (v === 'Perdido') ? 'block' : 'none';
         retomadaWrap.style.display = (v === 'Congelado') ? 'block' : 'none';
         const sel = motivoWrap.querySelector('select');
         if (sel) sel.required = (v === 'Perdido');
     }
-    statusSel.addEventListener('change', atualizar);
-    atualizar();
+    statusSel.addEventListener('change', atualizarStatus);
+    atualizarStatus();
+
+    /* ── Autocomplete de clientes ───────────────────────────────────── */
+    const nomeInput    = document.getElementById('nomeInput');
+    const contatoInput = document.getElementById('contatoInput');
+    const emailInput   = document.getElementById('emailInput');
+    const clienteIdInput = document.getElementById('clienteIdInput');
+    const dropdown     = document.getElementById('nomeDropdown');
+    const badge        = document.getElementById('clienteVinculadoResumoBadge');
+    const badgeNome    = document.getElementById('clienteVinculadoNome');
+    const card         = document.getElementById('clienteVinculadoCard');
+    const cardNome     = document.getElementById('clienteCardNome');
+    const cardTel      = document.getElementById('clienteCardTel');
+    const cardEmail    = document.getElementById('clienteCardEmail');
+    const btnTrocar    = document.getElementById('btnTrocarCliente');
+    const btnDesvincular = document.getElementById('btnDesvincularCliente');
+
+    let debounceTimer = null;
+
+    function mostrarClienteVinculado(nome, telefone, email) {
+        /* Badge abaixo do campo nome */
+        badgeNome.textContent = nome;
+        badge.style.display = 'block';
+        /* Card lateral */
+        cardNome.textContent = nome;
+        if (cardTel) {
+            cardTel.querySelector('span').textContent = telefone || '';
+            cardTel.style.display = telefone ? '' : 'none';
+        }
+        if (cardEmail) {
+            cardEmail.querySelector('span').textContent = email || '';
+            cardEmail.style.display = email ? '' : 'none';
+        }
+        card.style.display = '';
+    }
+
+    function limparClienteVinculado() {
+        clienteIdInput.value = '';
+        badge.style.display = 'none';
+        badgeNome.textContent = '';
+        card.style.display = 'none';
+    }
+
+    function fecharDropdown() {
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+    }
+
+    function selecionarCliente(c) {
+        nomeInput.value   = c.nome;
+        contatoInput.value = c.telefone || '';
+        emailInput.value  = c.email || '';
+        clienteIdInput.value = c.id;
+        mostrarClienteVinculado(c.nome, c.telefone, c.email);
+        fecharDropdown();
+    }
+
+    /* Se já há cliente vinculado ao carregar a página, mostrar badge */
+    if (clienteIdInput.value) {
+        const nomeAtual = nomeInput.value;
+        const telAtual  = contatoInput.value;
+        const emailAtual = emailInput.value;
+        mostrarClienteVinculado(nomeAtual, telAtual, emailAtual);
+    }
+
+    nomeInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        /* Se o usuário apagou o nome, limpar vínculo */
+        if (!q) {
+            limparClienteVinculado();
+            fecharDropdown();
+            return;
+        }
+        /* Se o usuário modificou o texto após selecionar, limpar o id */
+        if (clienteIdInput.value && this.value !== badgeNome.textContent) {
+            limparClienteVinculado();
+        }
+        if (q.length < 2) { fecharDropdown(); return; }
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+            fetch('/crm/clientes/buscar?q=' + encodeURIComponent(q))
+                .then(function(r){ return r.json(); })
+                .then(function(lista) {
+                    if (!lista.length) { fecharDropdown(); return; }
+                    dropdown.innerHTML = '';
+                    lista.forEach(function(c) {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item list-group-item-action py-2 px-3';
+                        li.style.cursor = 'pointer';
+                        li.innerHTML =
+                            '<span class="fw-semibold">' + escHtml(c.nome) + '</span>' +
+                            (c.telefone ? ' <small class="text-muted ms-2"><i class="fas fa-phone fa-xs"></i> ' + escHtml(c.telefone) + '</small>' : '') +
+                            (c.email    ? ' <small class="text-muted ms-2"><i class="fas fa-envelope fa-xs"></i> ' + escHtml(c.email) + '</small>' : '');
+                        li.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            selecionarCliente(c);
+                        });
+                        dropdown.appendChild(li);
+                    });
+                    dropdown.style.display = 'block';
+                })
+                .catch(function(){ fecharDropdown(); });
+        }, 250);
+    });
+
+    nomeInput.addEventListener('blur', function() {
+        setTimeout(fecharDropdown, 200);
+    });
+
+    /* Botão Trocar — foca o campo nome */
+    if (btnTrocar) {
+        btnTrocar.addEventListener('click', function() {
+            nomeInput.focus();
+            nomeInput.select();
+        });
+    }
+
+    /* Botão Desvincular — limpa tudo */
+    if (btnDesvincular) {
+        btnDesvincular.addEventListener('click', function() {
+            nomeInput.value = '';
+            contatoInput.value = '';
+            emailInput.value = '';
+            limparClienteVinculado();
+            fecharDropdown();
+            nomeInput.focus();
+        });
+    }
+
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 })();
 </script>
 {% endblock %}
