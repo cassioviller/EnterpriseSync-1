@@ -527,7 +527,8 @@
               {% set _coef = c.coeficiente|float if c.coeficiente not in (none, '') else 0.0 %}
               {% set _preco = c.preco_unitario|float if c.preco_unitario not in (none, '') else 0.0 %}
               {% set _qtd = it.quantidade|float if it.quantidade is not none else 0.0 %}
-              {% set _fator = c.fator_comercial|float if c.fator_comercial not in (none, '', 0) else 1.0 %}
+              {% set _fator_raw = c.get('fator_comercial', 1) if c is mapping else c.fator_comercial %}
+              {% set _fator = _fator_raw|float if _fator_raw not in (none, '', 0) else 1.0 %}
               {% set _qtd_tec = _coef * _qtd %}
               {% set _qtd_com = ((_qtd_tec / _fator)|round(0, 'ceil') * _fator) if _fator > 1 else _qtd_tec %}
               <td class="text-end text-muted js-subtotal-unit">R$ {{ c.subtotal_unitario|num(4) }}</td>
