@@ -308,15 +308,15 @@ def _listas_para_form(admin_id):
     """Retorna dict com items ativos de cada lista, para popular selects.
     Itens inativos são EXCLUÍDOS para que não apareçam em novos cadastros,
     mas continuam disponíveis para exibição em leads antigos.
+
+    Usa dropdown_service como camada de acesso unificada; para slugs CRM
+    o serviço roteia para os modelos legados (CrmOrigem etc.) que são a
+    fonte de verdade das FKs em Lead.
     """
+    from services.dropdown_service import get_dropdown_options
     out = {}
-    for slug, info in LISTAS_MESTRAS.items():
-        out[slug] = (
-            info['model'].query
-            .filter_by(admin_id=admin_id, ativo=True)
-            .order_by(info['model'].nome.asc())
-            .all()
-        )
+    for slug in LISTAS_MESTRAS:
+        out[slug] = get_dropdown_options(f'crm_{slug}', admin_id)
     return out
 
 

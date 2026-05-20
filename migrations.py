@@ -3871,6 +3871,7 @@ def executar_migracoes():
             (170, "Task #19 — fator_comercial + unidade_comercial em insumo (quantidade comercial/embalagem)", migration_170_insumo_quantidade_comercial),
             (171, "Task #23 — observacao_validacao em propostas_comerciais (nota interna de validação)", migration_171_proposta_observacao_validacao),
             (172, "CRM — comentario_revisao em lead (comentário do supervisor ao pedir revisão)", migration_172_lead_comentario_revisao),
+            (173, "Motor universal de dropdowns — DropdownGrupo + DropdownOpcao + seed CRM", migration_173_dropdown_motor),
         ]
         
         # Executar cada migração com rastreamento
@@ -14306,3 +14307,89 @@ def migration_159_backfill_composicao_servico_id():
         db.session.rollback()
         logger.error(f"[Migration 159] Falha no backfill: {e}")
         raise
+
+
+def migration_173_dropdown_motor():
+    """Migration 173: cria tabelas dropdown_grupo e dropdown_opcao,
+    depois semeia DropdownGrupo para todos os slugs CRM em cada tenant.
+    Os modelos CRM legados permanecem como fonte de verdade das FKs em Lead.
+    """
+    from sqlalchemy import text as _t
+
+    # 1. Criar tabela dropdown_grupo
+    db.session.execute(_t("""
+        CREATE TABLE IF NOT EXISTS dropdown_grupo (
+            id         SERIAL PRIMARY KEY,
+            admin_id   INTEGER NOT NULL REFERENCES usuario(id),
+            slug       VARCHAR(80)  NOT NULL,
+            label      VARCHAR(120) NOT NULL,
+            modulo     VARCHAR(40)  NOT NULL DEFAULT 'geral',
+            descricao  TEXT,
+            editavel   BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+            CONSTRAINT uq_dropdown_grupo_slug_admin UNIQUE (slug, admin_id)
+        )
+    """))
+    db.session.execute(_t("""
+        CREATE INDEX IF NOT EXISTS ix_dropdown_grupo_admin
+            ON dropdown_grupo (admin_id)
+    """))
+
+    # 2. Criar tabela dropdown_opcao
+    db.session.execute(_t("""
+        CREATE TABLE IF NOT EXISTS dropdown_opcao (
+            id         SERIAL PRIMARY KEY,
+            admin_id   INTEGER NOT NULL REFERENCES usuario(id),
+            grupo_id   INTEGER NOT NULL REFERENCES dropdown_grupo(id) ON DELETE CASCADE,
+            valor      VARCHAR(200) NOT NULL,
+            ordem      INTEGER NOT NULL DEFAULT 0,
+            cor        VARCHAR(7),
+            ativo      BOOLEAN NOT NULL DEFAULT TRUE,
+            protegido  BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+            CONSTRAINT uq_dropdown_opcao_grupo_valor_admin UNIQUE (grupo_id, valor, admin_id)
+        )
+    """))
+    db.session.execute(_t("""
+        CREATE INDEX IF NOT EXISTS ix_dropdown_opcao_grupo
+            ON dropdown_opcao (grupo_id)
+    """))
+    db.session.execute(_t("""
+        CREATE INDEX IF NOT EXISTS ix_dropdown_opcao_admin
+            ON dropdown_opcao (admin_id)
+    """))
+
+    # 3. Semear DropdownGrupo para todos os slugs CRM em cada tenant ativo
+    crm_grupos = [
+        ('crm_responsavel',   'Responsáveis',      'crm'),
+        ('crm_origem',        'Origens',            'crm'),
+        ('crm_cadencia',      'Cadências',          'crm'),
+        ('crm_situacao',      'Situações',          'crm'),
+        ('crm_tipo_material', 'Tipos de Material',  'crm'),
+        ('crm_tipo_obra',     'Tipos de Obra',      'crm'),
+        ('crm_motivo_perda',  'Motivos de Perda',   'crm'),
+    ]
+
+    admins = db.session.execute(_t(
+        "SELECT id FROM usuario WHERE tipo_usuario IN ('ADMIN','SUPER_ADMIN') OR admin_id IS NULL"
+    )).fetchall()
+    admin_ids = [row[0] for row in admins]
+
+    seeded_groups = 0
+    for aid in admin_ids:
+        for slug, label, modulo in crm_grupos:
+            existing = db.session.execute(_t(
+                "SELECT id FROM dropdown_grupo WHERE slug = :s AND admin_id = :a"
+            ), {'s': slug, 'a': aid}).fetchone()
+            if not existing:
+                db.session.execute(_t("""
+                    INSERT INTO dropdown_grupo (admin_id, slug, label, modulo, editavel)
+                    VALUES (:a, :s, :l, :m, TRUE)
+                """), {'a': aid, 's': slug, 'l': label, 'm': modulo})
+                seeded_groups += 1
+
+    db.session.commit()
+    logger.info(
+        f"[Migration 173] Tabelas dropdown_grupo/dropdown_opcao criadas. "
+        f"Seeded {seeded_groups} DropdownGrupo(s) para slugs CRM."
+    )

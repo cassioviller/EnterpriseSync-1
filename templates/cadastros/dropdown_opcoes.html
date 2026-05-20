@@ -1,0 +1,243 @@
+{% extends "base_completo.html" %}
+
+{% block title %}{{ grupo.label }} — Cadastros{% endblock %}
+
+{% block styles %}
+<style>
+  .dd-hero {
+    background: linear-gradient(135deg, #1a6b3a 0%, #28a745 60%, #20c65a 100%);
+    border-radius: 14px;
+    padding: 1.6rem 1.8rem;
+    color: #fff;
+    margin-bottom: 1.8rem;
+    box-shadow: 0 6px 24px rgba(26,107,58,.22);
+  }
+  .dd-hero h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+  .dd-hero p  { opacity: .85; font-size: .93rem; margin: .25rem 0 0; }
+
+  .dd-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+  }
+
+  .dd-item {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .6rem .75rem;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    background: #fff;
+    margin-bottom: .5rem;
+    transition: box-shadow .15s;
+  }
+  .dd-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+  .dd-item.inactive { opacity: .5; }
+  .dd-item__nome {
+    flex: 1;
+    font-size: .93rem;
+    font-weight: 500;
+  }
+  .dd-item__badge {
+    font-size: .7rem;
+    padding: .18em .55em;
+    border-radius: 5px;
+  }
+  .dd-item__actions { display: flex; gap: .35rem; flex-shrink: 0; }
+
+  .btn-icon {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    font-size: .8rem;
+    padding: 0;
+  }
+
+  .inline-edit-form { display: none; }
+  .inline-edit-form.show { display: flex; align-items: center; gap: .4rem; }
+
+  .add-card {
+    border: 2px dashed #dee2e6;
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    margin-top: 1rem;
+    background: #f8f9fa;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-3 px-lg-4" style="max-width: 720px;">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ url_for('cadastros_hub.index') }}">Central de Cadastros</a></li>
+      <li class="breadcrumb-item active">{{ grupo.label }}</li>
+    </ol>
+  </nav>
+
+  <!-- Hero -->
+  <div class="dd-hero">
+    <div class="d-flex align-items-center gap-3">
+      <div style="font-size:2rem; opacity:.85;"><i class="fas fa-list-ul"></i></div>
+      <div>
+        <h1><i class="fas fa-sliders-h me-2" style="opacity:.8;"></i>{{ grupo.label }}</h1>
+        <p>Módulo: <strong>{{ grupo.modulo | upper }}</strong> — gerencie as opções desta lista.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show py-2" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Lista de opções -->
+  <div class="dd-card mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0 fw-bold text-secondary">
+        <i class="fas fa-list me-1"></i> Opções cadastradas
+        <span class="badge bg-secondary ms-1">{{ opcoes | length }}</span>
+      </h6>
+      {% if grupo.editavel %}
+      <small class="text-muted">{{ opcoes | selectattr('ativo') | list | length }} ativas</small>
+      {% endif %}
+    </div>
+
+    {% if not opcoes %}
+      <p class="text-muted small text-center py-3">
+        <i class="fas fa-inbox me-1"></i> Nenhuma opção cadastrada ainda.
+      </p>
+    {% endif %}
+
+    {% for item in opcoes %}
+    <div class="dd-item {% if not item.ativo %}inactive{% endif %}" id="item-{{ item.id }}">
+
+      {% if item.cor %}
+      <span style="width:10px;height:10px;border-radius:50%;background:{{ item.cor }};flex-shrink:0;display:inline-block;"></span>
+      {% endif %}
+
+      <!-- Exibição normal -->
+      <span class="dd-item__nome view-mode-{{ item.id }}">
+        {{ item.nome }}
+        {% if not item.ativo %}
+          <span class="dd-item__badge bg-light text-muted border">Inativa</span>
+        {% endif %}
+      </span>
+
+      <!-- Edição inline -->
+      <div class="inline-edit-form flex-grow-1 edit-mode-{{ item.id }}">
+        <input type="text" class="form-control form-control-sm"
+               id="edit-val-{{ item.id }}" value="{{ item.nome }}" style="max-width:280px;">
+        <form method="POST"
+              action="{{ url_for('cadastros_hub.dropdown_editar_opcao', slug=grupo.slug, opcao_id=item.id) }}"
+              style="display:contents;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="valor" id="edit-hidden-{{ item.id }}">
+          <button type="submit" class="btn btn-sm btn-success px-2"
+                  onclick="document.getElementById('edit-hidden-{{ item.id }}').value=document.getElementById('edit-val-{{ item.id }}').value;">
+            <i class="fas fa-check"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary px-2"
+                  onclick="toggleEdit({{ item.id }}, false)">
+            <i class="fas fa-times"></i>
+          </button>
+        </form>
+      </div>
+
+      {% if grupo.editavel %}
+      <div class="dd-item__actions view-mode-{{ item.id }}">
+        <!-- Editar -->
+        <button type="button" class="btn-icon btn btn-outline-primary"
+                title="Editar" onclick="toggleEdit({{ item.id }}, true)">
+          <i class="fas fa-pencil-alt"></i>
+        </button>
+
+        <!-- Toggle ativo -->
+        <form method="POST"
+              action="{{ url_for('cadastros_hub.dropdown_toggle_ativo', slug=grupo.slug, opcao_id=item.id) }}"
+              style="display:contents;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit"
+                  class="btn-icon btn {% if item.ativo %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                  title="{{ 'Desativar' if item.ativo else 'Ativar' }}">
+            <i class="fas {% if item.ativo %}fa-eye-slash{% else %}fa-eye{% endif %}"></i>
+          </button>
+        </form>
+
+        <!-- Excluir -->
+        {% set protegida = item.protegido if item.protegido is defined else False %}
+        {% if not protegida %}
+        <form method="POST"
+              action="{{ url_for('cadastros_hub.dropdown_excluir_opcao', slug=grupo.slug, opcao_id=item.id) }}"
+              style="display:contents;"
+              onsubmit="return confirm('Excluir a opção "{{ item.nome }}"? Esta ação não pode ser desfeita.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-icon btn btn-outline-danger" title="Excluir">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+
+    <!-- Adicionar nova opção -->
+    {% if grupo.editavel %}
+    <div class="add-card mt-3">
+      <form method="POST"
+            action="{{ url_for('cadastros_hub.dropdown_criar_opcao', slug=grupo.slug) }}"
+            class="d-flex gap-2 align-items-end flex-wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="flex-grow-1">
+          <label class="form-label small fw-semibold mb-1">Nova opção</label>
+          <input type="text" name="valor" class="form-control form-control-sm"
+                 placeholder="Digite o nome da opção..." required
+                 autocomplete="off" style="max-width:340px;">
+        </div>
+        <button type="submit" class="btn btn-success btn-sm px-3">
+          <i class="fas fa-plus me-1"></i> Adicionar
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <a href="{{ url_for('cadastros_hub.index') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left me-1"></i> Voltar à Central
+  </a>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit(id, show) {
+  document.querySelectorAll('.view-mode-' + id).forEach(el => {
+    el.style.display = show ? 'none' : '';
+  });
+  document.querySelectorAll('.edit-mode-' + id).forEach(el => {
+    el.classList.toggle('show', show);
+  });
+  if (show) {
+    const inp = document.getElementById('edit-val-' + id);
+    if (inp) { inp.focus(); inp.select(); }
+  }
+}
+</script>
+{% endblock %}

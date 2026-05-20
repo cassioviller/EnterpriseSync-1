@@ -145,11 +145,71 @@
       </div>
 
       <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-        <a href="{{ url_for('crm.cadastros') }}" class="hub-card">
-          <div class="hub-card__icon ic-blue"><i class="fas fa-sliders-h"></i></div>
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_responsavel') }}" class="hub-card">
+          <div class="hub-card__icon ic-blue"><i class="fas fa-user-check"></i></div>
           <div class="hub-card__body">
-            <div class="hub-card__title">Listas Mestras do CRM</div>
-            <p class="hub-card__desc">Responsáveis, origens, cadências, situações, tipos de obra e motivos de perda.</p>
+            <div class="hub-card__title">Responsáveis CRM</div>
+            <p class="hub-card__desc">Responsáveis, vendedores e orçamentistas dos leads.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_origem') }}" class="hub-card">
+          <div class="hub-card__icon ic-blue"><i class="fas fa-satellite-dish"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Origens de Lead</div>
+            <p class="hub-card__desc">Canais de captação (indicação, site, social, etc.).</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_situacao') }}" class="hub-card">
+          <div class="hub-card__icon ic-indigo"><i class="fas fa-traffic-light"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Situações do CRM</div>
+            <p class="hub-card__desc">Status de situação dos leads no pipeline comercial.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_tipo_obra') }}" class="hub-card">
+          <div class="hub-card__icon ic-orange"><i class="fas fa-drafting-compass"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Tipos de Obra</div>
+            <p class="hub-card__desc">Classificação de obras nos leads (reforma, construção, etc.).</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_tipo_material') }}" class="hub-card">
+          <div class="hub-card__icon ic-teal"><i class="fas fa-boxes"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Tipos de Material</div>
+            <p class="hub-card__desc">Tipos de material predominante em cada lead.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_cadencia') }}" class="hub-card">
+          <div class="hub-card__icon ic-purple"><i class="fas fa-phone-volume"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Cadências</div>
+            <p class="hub-card__desc">Frequência de acompanhamento e follow-up dos leads.</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+        <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug='crm_motivo_perda') }}" class="hub-card">
+          <div class="hub-card__icon ic-red"><i class="fas fa-times-circle"></i></div>
+          <div class="hub-card__body">
+            <div class="hub-card__title">Motivos de Perda</div>
+            <p class="hub-card__desc">Razões registradas ao marcar um lead como perdido.</p>
           </div>
         </a>
       </div>

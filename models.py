@@ -6900,6 +6900,61 @@ class FechamentoPagamento(db.Model):
         return f'<FechamentoPagamento {self.data_fechamento} {self.status}>'
 
 
+class DropdownGrupo(db.Model):
+    """Motor universal de dropdowns — grupo / lista mestra genérica."""
+    __tablename__ = 'dropdown_grupo'
+    __table_args__ = (
+        db.UniqueConstraint('slug', 'admin_id', name='uq_dropdown_grupo_slug_admin'),
+        db.Index('ix_dropdown_grupo_admin', 'admin_id'),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    admin_id   = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    slug       = db.Column(db.String(80), nullable=False)
+    label      = db.Column(db.String(120), nullable=False)
+    modulo     = db.Column(db.String(40), nullable=False, default='geral')
+    descricao  = db.Column(db.Text, nullable=True)
+    editavel   = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    opcoes = db.relationship(
+        'DropdownOpcao', backref='grupo', lazy='dynamic',
+        order_by='DropdownOpcao.ordem.asc()',
+        cascade='all, delete-orphan',
+    )
+
+    def __repr__(self):
+        return f'<DropdownGrupo {self.slug}>'
+
+
+class DropdownOpcao(db.Model):
+    """Motor universal de dropdowns — opção de um grupo."""
+    __tablename__ = 'dropdown_opcao'
+    __table_args__ = (
+        db.UniqueConstraint('grupo_id', 'valor', 'admin_id',
+                            name='uq_dropdown_opcao_grupo_valor_admin'),
+        db.Index('ix_dropdown_opcao_grupo', 'grupo_id'),
+        db.Index('ix_dropdown_opcao_admin', 'admin_id'),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    admin_id   = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    grupo_id   = db.Column(db.Integer, db.ForeignKey('dropdown_grupo.id', ondelete='CASCADE'), nullable=False)
+    valor      = db.Column(db.String(200), nullable=False)
+    ordem      = db.Column(db.Integer, default=0, nullable=False)
+    cor        = db.Column(db.String(7), nullable=True)
+    ativo      = db.Column(db.Boolean, default=True, nullable=False)
+    protegido  = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def nome(self):
+        return self.valor
+
+    def __repr__(self):
+        return f'<DropdownOpcao {self.grupo_id}:{self.valor}>'
+
+
 class CategoriaReembolso(db.Model):
     """Categorias de reembolso a funcionários."""
     __tablename__ = 'categoria_reembolso'
