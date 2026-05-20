@@ -51,7 +51,7 @@
             </dd>
             <dt class="col-sm-5 fw-bold">Total</dt>
             <dd class="col-sm-7 fw-bold text-dark fs-5">{{ pedido.valor_total|float|brl }}</dd>
-            {% if pedido.status_aprovacao_cliente %}
+            {% if pedido.tipo_compra == 'aprovacao_cliente' and pedido.status_aprovacao_cliente %}
             <dt class="col-sm-5">Aprovação Cliente</dt>
             <dd class="col-sm-7">
               {% set sa = pedido.status_aprovacao_cliente %}
