@@ -1383,7 +1383,19 @@
                 {% endif %}
                 <div class="info-item">
                     <div class="info-label"><i class="fas fa-user-tie"></i> Cliente</div>
-                    <div class="info-value">{{ obra.cliente_nome_efetivo if obra.cliente_nome_efetivo else 'Cliente Teste LTDA' }}</div>
+                    <div class="info-value d-flex align-items-center gap-2">
+                        <span id="cliente-nome-display">{{ obra.cliente_nome_efetivo if obra.cliente_nome_efetivo else 'Cliente Teste LTDA' }}</span>
+                        {% if current_user.is_authenticated %}{% if current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                style="font-size:0.78rem;"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalTrocarCliente"
+                                title="Trocar cliente vinculado">
+                            <i class="fas fa-exchange-alt me-1"></i>Trocar cliente
+                        </button>
+                        {% endif %}{% endif %}
+                    </div>
                 </div>
                 {% if obra.area_total_m2 and obra.area_total_m2 > 0 %}
                 <div class="info-item">
@@ -2961,5 +2973,161 @@ function compraObraRemoverItem(btn) {
     }
 })();
 </script>
+
+<!-- Modal: Trocar Cliente da Obra -->
+{% if current_user.is_authenticated %}{% if current_user.tipo_usuario.name in ('ADMIN', 'SUPER_ADMIN') %}
+<div class="modal fade" id="modalTrocarCliente" tabindex="-1" aria-labelledby="modalTrocarClienteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTrocarClienteLabel">
+                    <i class="fas fa-exchange-alt me-2 text-primary"></i>Trocar Cliente da Obra
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.trocar_cliente_obra', id=obra.id) }}" id="formTrocarCliente">
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        Cliente atual: <strong>{{ obra.cliente_nome_efetivo or '—' }}</strong>
+                    </p>
+                    <div class="mb-3 position-relative">
+                        <label class="form-label fw-semibold">Buscar novo cliente</label>
+                        <input type="text"
+                               id="tc_cliente_busca"
+                               class="form-control"
+                               placeholder="Digite o nome, e-mail ou CNPJ..."
+                               autocomplete="off">
+                        <div id="tc_cliente_resultados"
+                             class="list-group shadow-sm"
+                             style="display:none; position:absolute; z-index:1055; width:100%; max-height:220px; overflow-y:auto;"></div>
+                    </div>
+                    <div id="tc_cliente_resumo" class="alert alert-success py-2 small" style="display:none;"></div>
+                    <input type="hidden" name="cliente_id" id="tc_cliente_id">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="tc_btn_confirmar" disabled>
+                        <i class="fas fa-check me-1"></i>Confirmar troca
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var inputBusca = document.getElementById('tc_cliente_busca');
+    var inputId    = document.getElementById('tc_cliente_id');
+    var resultados = document.getElementById('tc_cliente_resultados');
+    var resumo     = document.getElementById('tc_cliente_resumo');
+    var btnConfirm = document.getElementById('tc_btn_confirmar');
+    if (!inputBusca) return;
+
+    var timer = null;
+
+    function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, function(c) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+        });
+    }
+
+    function fechar() { resultados.style.display = 'none'; resultados.innerHTML = ''; }
+
+    function selecionar(cli) {
+        inputId.value      = cli.id;
+        inputBusca.value   = cli.nome;
+        resumo.style.display = 'block';
+        resumo.innerHTML = '<strong>' + escapeHtml(cli.nome) + '</strong>'
+            + (cli.email    ? ' &middot; ' + escapeHtml(cli.email)    : '')
+            + (cli.telefone ? ' &middot; ' + escapeHtml(cli.telefone) : '')
+            + (cli.cnpj     ? ' &middot; CNPJ ' + escapeHtml(cli.cnpj) : '');
+        btnConfirm.disabled = false;
+        fechar();
+    }
+
+    function buscar(q) {
+        fetch('{{ url_for("clientes.api_buscar") }}?q=' + encodeURIComponent(q), {
+            credentials: 'same-origin',
+            headers: {'Accept': 'application/json'}
+        })
+        .then(function(r) { return r.ok ? r.json() : {results: []}; })
+        .then(function(data) {
+            var items = (data && data.results) || [];
+            if (!items.length) {
+                resultados.innerHTML = '<div class="list-group-item text-muted small">'
+                    + 'Nenhum cliente encontrado. '
+                    + '<a href="{{ url_for("clientes.criar") }}" target="_blank">Cadastrar novo</a>'
+                    + '</div>';
+                resultados.style.display = 'block';
+                return;
+            }
+            resultados.innerHTML = items.map(function(c, idx) {
+                return '<button type="button" class="list-group-item list-group-item-action" data-idx="' + idx + '">'
+                    + '<strong>' + escapeHtml(c.nome) + '</strong>'
+                    + (c.email    ? ' <small class="text-muted">' + escapeHtml(c.email) + '</small>' : '')
+                    + (c.telefone ? ' <small class="text-muted">· ' + escapeHtml(c.telefone) + '</small>' : '')
+                    + (c.cnpj    ? ' <small class="text-muted">· ' + escapeHtml(c.cnpj) + '</small>' : '')
+                    + '</button>';
+            }).join('');
+            resultados.style.display = 'block';
+            resultados.querySelectorAll('button[data-idx]').forEach(function(btn) {
+                btn.addEventListener('click', function() { selecionar(items[parseInt(btn.dataset.idx)]); });
+            });
+        })
+        .catch(function() { fechar(); });
+    }
+
+    inputBusca.addEventListener('input', function() {
+        inputId.value = '';
+        btnConfirm.disabled = true;
+        resumo.style.display = 'none';
+        resumo.innerHTML = '';
+        clearTimeout(timer);
+        var q = inputBusca.value.trim();
+        if (q.length >= 1) {
+            timer = setTimeout(function() { buscar(q); }, 220);
+        } else {
+            fechar();
+        }
+    });
+
+    inputBusca.addEventListener('focus', function() {
+        if (resultados.innerHTML) resultados.style.display = 'block';
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!resultados.contains(e.target) && e.target !== inputBusca) fechar();
+    });
+
+    // Limpar estado ao abrir o modal
+    var modal = document.getElementById('modalTrocarCliente');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function() {
+            inputBusca.value = '';
+            inputId.value = '';
+            resumo.style.display = 'none';
+            resumo.innerHTML = '';
+            btnConfirm.disabled = true;
+            fechar();
+        });
+        modal.addEventListener('shown.bs.modal', function() {
+            inputBusca.focus();
+        });
+    }
+
+    // Impede submit se nenhum cliente foi selecionado
+    var form = document.getElementById('formTrocarCliente');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!inputId.value) {
+                e.preventDefault();
+                inputBusca.focus();
+                inputBusca.classList.add('is-invalid');
+            }
+        });
+    }
+})();
+</script>
+{% endif %}{% endif %}
 
 {% endblock %}

@@ -1276,6 +1276,54 @@ def toggle_ativo_obra_api(obra_id):
         logger.error(f"[ERROR] ERRO AO TOGGLE OBRA: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# Trocar cliente vinculado à obra (inline, sem editar o formulário completo)
+@main_bp.route('/obras/<int:id>/trocar-cliente', methods=['POST'])
+@login_required
+def trocar_cliente_obra(id):
+    try:
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            flash('Admin não identificado.', 'error')
+            return redirect(url_for('main.obras'))
+
+        if not hasattr(current_user, 'tipo_usuario') or current_user.tipo_usuario not in (
+            TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN
+        ):
+            flash('Sem permissão para alterar o cliente da obra.', 'error')
+            return redirect(url_for('main.detalhes_obra', id=id))
+
+        obra = Obra.query.filter_by(id=id, admin_id=admin_id).first()
+        if not obra:
+            flash('Obra não encontrada.', 'error')
+            return redirect(url_for('main.obras'))
+
+        cliente_id_raw = (request.form.get('cliente_id') or '').strip()
+        try:
+            cliente_id = int(cliente_id_raw) if cliente_id_raw else None
+        except (TypeError, ValueError):
+            cliente_id = None
+
+        if not cliente_id:
+            flash('Selecione um cliente do cadastro antes de confirmar.', 'warning')
+            return redirect(url_for('main.detalhes_obra', id=id))
+
+        cliente = Cliente.query.filter_by(id=cliente_id, admin_id=admin_id).first()
+        if not cliente:
+            flash('Cliente não encontrado ou não pertence a este tenant.', 'error')
+            return redirect(url_for('main.detalhes_obra', id=id))
+
+        obra.cliente_id = cliente.id
+        db.session.commit()
+        flash(f'Cliente da obra atualizado para "{cliente.nome}".', 'success')
+        return redirect(url_for('main.detalhes_obra', id=id))
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[ERROR] trocar_cliente_obra: {str(e)}")
+        flash(f'Erro ao trocar cliente: {str(e)}', 'error')
+        return redirect(url_for('main.detalhes_obra', id=id))
+
+
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
 @main_bp.route('/obras/detalhes/<int:id>')
