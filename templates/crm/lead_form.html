@@ -637,11 +637,24 @@
     }
     function limparErro() { erroEl.classList.add('d-none'); erroEl.textContent = ''; }
 
+    var _csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var _csrfToken = _csrfMeta ? _csrfMeta.getAttribute('content') : '';
+
     function xhrFetch(url, opts) {
         opts = opts || {};
         opts.credentials = 'same-origin';
         opts.headers = Object.assign({'X-Requested-With': 'XMLHttpRequest'}, opts.headers || {});
-        return fetch(url, opts).then(function(r) { return r.json(); });
+        /* Inject CSRF token into POST FormData payloads */
+        if (opts.method === 'POST' && opts.body instanceof FormData && _csrfToken) {
+            opts.body.set('csrf_token', _csrfToken);
+        }
+        return fetch(url, opts).then(function(r) {
+            var ct = r.headers.get('Content-Type') || '';
+            if (!r.ok && !ct.includes('application/json')) {
+                return {success: false, message: 'Erro ' + r.status + ' — tente novamente.'};
+            }
+            return r.json();
+        });
     }
 
     function carregarItens() {
