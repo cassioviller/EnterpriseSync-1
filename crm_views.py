@@ -1010,28 +1010,42 @@ def cadastros():
 def cadastros_criar(slug):
     admin_id = get_admin_id()
     if not admin_id or not is_admin_user():
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Sem permissão.'}), 403
         return _redir_cadastros_erro('Sem permissão.')
     info = LISTAS_MESTRAS.get(slug)
     if not info:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Lista inválida.'}), 400
         return _redir_cadastros_erro('Lista inválida.')
     nome = (request.form.get('nome') or '').strip()
     if not nome:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Nome é obrigatório.'}), 400
         flash('Nome é obrigatório.', 'danger')
         return redirect(url_for('crm.cadastros') + f'#{slug}')
     if len(nome) > 120:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Nome muito longo (máx 120).'}), 400
         flash('Nome muito longo (máx 120).', 'danger')
         return redirect(url_for('crm.cadastros') + f'#{slug}')
     existe = info['model'].query.filter_by(admin_id=admin_id, nome=nome).first()
     if existe:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': f'Já existe "{nome}".'}), 409
         flash(f'Já existe "{nome}" em {info["label"]}.', 'warning')
         return redirect(url_for('crm.cadastros') + f'#{slug}')
     item = info['model'](admin_id=admin_id, nome=nome, ativo=True)
     db.session.add(item)
     try:
         db.session.commit()
+        if _is_xhr():
+            return jsonify({'success': True, 'id': item.id, 'nome': item.nome})
         flash(f'Adicionado "{nome}" em {info["label"]}.', 'success')
     except Exception as e:
         db.session.rollback()
+        if _is_xhr():
+            return jsonify({'success': False, 'message': str(e)}), 500
         flash(f'Erro ao adicionar: {e}', 'danger')
     return redirect(url_for('crm.cadastros') + f'#{slug}')
 
@@ -1041,13 +1055,19 @@ def cadastros_criar(slug):
 def cadastros_editar(slug, item_id):
     admin_id = get_admin_id()
     if not admin_id or not is_admin_user():
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Sem permissão.'}), 403
         return _redir_cadastros_erro('Sem permissão.')
     info = LISTAS_MESTRAS.get(slug)
     if not info:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Lista inválida.'}), 400
         return _redir_cadastros_erro('Lista inválida.')
     item = info['model'].query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
     novo_nome = (request.form.get('nome') or '').strip()
     if not novo_nome:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Nome é obrigatório.'}), 400
         flash('Nome é obrigatório.', 'danger')
         return redirect(url_for('crm.cadastros') + f'#{slug}')
     if novo_nome != item.nome:
@@ -1058,15 +1078,24 @@ def cadastros_editar(slug, item_id):
             .first()
         )
         if conflito:
+            if _is_xhr():
+                return jsonify({'success': False, 'message': f'Já existe "{novo_nome}".'}), 409
             flash(f'Já existe outro item com o nome "{novo_nome}".', 'warning')
             return redirect(url_for('crm.cadastros') + f'#{slug}')
         item.nome = novo_nome
         try:
             db.session.commit()
+            if _is_xhr():
+                return jsonify({'success': True, 'id': item.id, 'nome': item.nome})
             flash(f'Renomeado para "{novo_nome}".', 'success')
         except Exception as e:
             db.session.rollback()
+            if _is_xhr():
+                return jsonify({'success': False, 'message': str(e)}), 500
             flash(f'Erro: {e}', 'danger')
+    else:
+        if _is_xhr():
+            return jsonify({'success': True, 'id': item.id, 'nome': item.nome})
     return redirect(url_for('crm.cadastros') + f'#{slug}')
 
 
@@ -1098,9 +1127,13 @@ def cadastros_toggle(slug, item_id):
 def cadastros_excluir(slug, item_id):
     admin_id = get_admin_id()
     if not admin_id or not is_admin_user():
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Sem permissão.'}), 403
         return _redir_cadastros_erro('Sem permissão.')
     info = LISTAS_MESTRAS.get(slug)
     if not info:
+        if _is_xhr():
+            return jsonify({'success': False, 'message': 'Lista inválida.'}), 400
         return _redir_cadastros_erro('Lista inválida.')
     item = info['model'].query.filter_by(id=item_id, admin_id=admin_id).first_or_404()
     campo_lead = info['campo_lead']
@@ -1111,19 +1144,22 @@ def cadastros_excluir(slug, item_id):
         .first()
     )
     if em_uso:
-        flash(
-            f'Não é possível excluir "{item.nome}" — está em uso por leads. '
-            'Use "Desativar" para parar de aparecer em novos leads.',
-            'warning',
-        )
+        msg = f'Não é possível excluir "{item.nome}" — está em uso por leads.'
+        if _is_xhr():
+            return jsonify({'success': False, 'message': msg}), 409
+        flash(msg + ' Use "Desativar" para parar de aparecer em novos leads.', 'warning')
         return redirect(url_for('crm.cadastros') + f'#{slug}')
     nome = item.nome
     try:
         db.session.delete(item)
         db.session.commit()
+        if _is_xhr():
+            return jsonify({'success': True, 'id': item_id, 'nome': nome})
         flash(f'"{nome}" excluído.', 'success')
     except Exception as e:
         db.session.rollback()
+        if _is_xhr():
+            return jsonify({'success': False, 'message': str(e)}), 500
         flash(f'Erro: {e}', 'danger')
     return redirect(url_for('crm.cadastros') + f'#{slug}')
 
@@ -1131,6 +1167,33 @@ def cadastros_excluir(slug, item_id):
 def _redir_cadastros_erro(msg):
     flash(msg, 'danger')
     return redirect(url_for('crm.cadastros'))
+
+
+def _is_xhr():
+    """True quando a requisição é AJAX (modal inline)."""
+    return (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in request.headers.get('Accept', '')
+    )
+
+
+@crm_bp.route('/cadastros/<slug>/itens', methods=['GET'])
+@login_required
+def cadastros_itens(slug):
+    """Retorna JSON com itens ativos de uma lista mestra — usado pelo modal inline."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        return jsonify({'success': False, 'message': 'Sem autenticação'}), 401
+    info = LISTAS_MESTRAS.get(slug)
+    if not info:
+        return jsonify({'success': False, 'message': 'Lista inválida'}), 400
+    itens = (
+        info['model'].query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(info['model'].nome.asc())
+        .all()
+    )
+    return jsonify({'items': [{'id': it.id, 'nome': it.nome} for it in itens]})
 
 
 # ===========================================================================

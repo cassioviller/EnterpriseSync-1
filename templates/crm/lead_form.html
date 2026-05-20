@@ -199,21 +199,62 @@
                     <div class="card-header bg-white"><strong>Classificação</strong></div>
                     <div class="card-body">
                         <div class="row g-3">
+
+                            {# Macro local: label com botão "+" para admin #}
+                            {% macro label_com_mais(label, slug, select_id) %}
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <label class="form-label small text-muted mb-0">{{ label }}</label>
+                                {% if is_admin %}
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 text-primary lh-1 gerenciar-lista-btn"
+                                        data-slug="{{ slug }}"
+                                        data-label="{{ label }}"
+                                        data-select-id="{{ select_id }}"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalGerenciarLista"
+                                        title="Gerenciar opções de {{ label }}"
+                                        style="font-size:1.1rem;line-height:1;">
+                                    <i class="fas fa-plus-circle"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endmacro %}
+
                             <div class="col-md-4">
-                                {{ select_lista('origem_id', listas.origem,
-                                                 (lead.origem_id if lead else None), 'Origem') }}
+                                {{ label_com_mais('Origem', 'origem', 'sel_origem_id') }}
+                                <select class="form-select form-select-sm" name="origem_id" id="sel_origem_id">
+                                    <option value="">— Selecione —</option>
+                                    {% for it in listas.origem %}
+                                    <option value="{{ it.id }}" {% if lead and lead.origem_id == it.id %}selected{% endif %}>{{ it.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="col-md-4">
-                                {{ select_lista('situacao_id', listas.situacao,
-                                                 (lead.situacao_id if lead else None), 'Situação') }}
+                                {{ label_com_mais('Situação', 'situacao', 'sel_situacao_id') }}
+                                <select class="form-select form-select-sm" name="situacao_id" id="sel_situacao_id">
+                                    <option value="">— Selecione —</option>
+                                    {% for it in listas.situacao %}
+                                    <option value="{{ it.id }}" {% if lead and lead.situacao_id == it.id %}selected{% endif %}>{{ it.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="col-md-4">
-                                {{ select_lista('tipo_material_id', listas.tipo_material,
-                                                 (lead.tipo_material_id if lead else None), 'Tipo de Material') }}
+                                {{ label_com_mais('Tipo de Material', 'tipo_material', 'sel_tipo_material_id') }}
+                                <select class="form-select form-select-sm" name="tipo_material_id" id="sel_tipo_material_id">
+                                    <option value="">— Selecione —</option>
+                                    {% for it in listas.tipo_material %}
+                                    <option value="{{ it.id }}" {% if lead and lead.tipo_material_id == it.id %}selected{% endif %}>{{ it.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="col-md-4">
-                                {{ select_lista('tipo_obra_id', listas.tipo_obra,
-                                                 (lead.tipo_obra_id if lead else None), 'Tipo de Obra') }}
+                                {{ label_com_mais('Tipo de Obra', 'tipo_obra', 'sel_tipo_obra_id') }}
+                                <select class="form-select form-select-sm" name="tipo_obra_id" id="sel_tipo_obra_id">
+                                    <option value="">— Selecione —</option>
+                                    {% for it in listas.tipo_obra %}
+                                    <option value="{{ it.id }}" {% if lead and lead.tipo_obra_id == it.id %}selected{% endif %}>{{ it.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small text-muted mb-1">Valor estimado (R$)</label>
@@ -537,4 +578,235 @@
     }
 })();
 </script>
+
+{% if is_admin %}
+<!-- Modal Gerenciar Lista (Origem, Situação, Tipo de Material, Tipo de Obra) -->
+<div class="modal fade" id="modalGerenciarLista" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width:420px;">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold" id="modalGerenciarListaTitulo">Gerenciar Lista</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <!-- Adicionar novo item -->
+                <div class="d-flex gap-2 mb-3">
+                    <input type="text" id="glNovoNome" class="form-control form-control-sm"
+                           placeholder="Novo item..." maxlength="120" autocomplete="off">
+                    <button type="button" id="glBtnAdicionar"
+                            class="btn btn-primary btn-sm flex-shrink-0">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+                <div id="glErro" class="alert alert-warning py-1 small d-none mb-2"></div>
+                <!-- Lista de itens -->
+                <div id="glLista" style="max-height:280px;overflow-y:auto;">
+                    <div class="text-muted small text-center py-3" id="glCarregando">
+                        <i class="fas fa-spinner fa-spin me-1"></i>Carregando...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var BASE = '{{ url_for("crm.cadastros") }}/';  /* /crm/cadastros/ */
+
+    var modal        = document.getElementById('modalGerenciarLista');
+    var titulo       = document.getElementById('modalGerenciarListaTitulo');
+    var novoNomeInput= document.getElementById('glNovoNome');
+    var btnAdicionar = document.getElementById('glBtnAdicionar');
+    var listaEl      = document.getElementById('glLista');
+    var erroEl       = document.getElementById('glErro');
+
+    var currentSlug    = '';
+    var currentLabel   = '';
+    var currentSelectId= '';
+
+    function escH(s) {
+        return String(s || '').replace(/[&<>"']/g, function(c) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+        });
+    }
+
+    function mostrarErro(msg) {
+        erroEl.textContent = msg;
+        erroEl.classList.remove('d-none');
+    }
+    function limparErro() { erroEl.classList.add('d-none'); erroEl.textContent = ''; }
+
+    function xhrFetch(url, opts) {
+        opts = opts || {};
+        opts.credentials = 'same-origin';
+        opts.headers = Object.assign({'X-Requested-With': 'XMLHttpRequest'}, opts.headers || {});
+        return fetch(url, opts).then(function(r) { return r.json(); });
+    }
+
+    function carregarItens() {
+        listaEl.innerHTML = '<div class="text-muted small text-center py-3"><i class="fas fa-spinner fa-spin me-1"></i>Carregando...</div>';
+        xhrFetch(BASE + currentSlug + '/itens')
+        .then(function(data) {
+            renderizarItens(data.items || []);
+        })
+        .catch(function() {
+            listaEl.innerHTML = '<div class="text-danger small text-center py-2">Erro ao carregar.</div>';
+        });
+    }
+
+    function renderizarItens(items) {
+        if (!items.length) {
+            listaEl.innerHTML = '<div class="text-muted small text-center py-3">Nenhum item cadastrado.</div>';
+            return;
+        }
+        var html = '<ul class="list-group list-group-flush">';
+        items.forEach(function(it) {
+            html += '<li class="list-group-item px-0 py-2 d-flex align-items-center gap-2" data-id="' + it.id + '">'
+                  + '<span class="flex-grow-1 item-nome" style="font-size:.875rem;">' + escH(it.nome) + '</span>'
+                  + '<input type="text" class="form-control form-control-sm item-edit-input d-none" value="' + escH(it.nome) + '" maxlength="120" style="width:auto;flex:1;">'
+                  + '<button type="button" class="btn btn-link btn-sm p-0 text-secondary btn-editar" title="Renomear"><i class="fas fa-pencil-alt"></i></button>'
+                  + '<button type="button" class="btn btn-link btn-sm p-0 text-success btn-salvar d-none" title="Salvar"><i class="fas fa-check"></i></button>'
+                  + '<button type="button" class="btn btn-link btn-sm p-0 text-danger btn-excluir" title="Excluir"><i class="fas fa-trash-alt"></i></button>'
+                  + '</li>';
+        });
+        html += '</ul>';
+        listaEl.innerHTML = html;
+
+        listaEl.querySelectorAll('.btn-editar').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var li = btn.closest('li');
+                li.querySelector('.item-nome').classList.add('d-none');
+                li.querySelector('.item-edit-input').classList.remove('d-none');
+                li.querySelector('.btn-editar').classList.add('d-none');
+                li.querySelector('.btn-salvar').classList.remove('d-none');
+                li.querySelector('.item-edit-input').focus();
+                li.querySelector('.item-edit-input').select();
+            });
+        });
+
+        listaEl.querySelectorAll('.btn-salvar').forEach(function(btn) {
+            btn.addEventListener('click', function() { salvarEdicao(btn.closest('li')); });
+        });
+
+        listaEl.querySelectorAll('.item-edit-input').forEach(function(inp) {
+            inp.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); salvarEdicao(inp.closest('li')); }
+                if (e.key === 'Escape') { carregarItens(); }
+            });
+        });
+
+        listaEl.querySelectorAll('.btn-excluir').forEach(function(btn) {
+            btn.addEventListener('click', function() { excluirItem(btn.closest('li')); });
+        });
+    }
+
+    function salvarEdicao(li) {
+        var id = li.dataset.id;
+        var novoNome = li.querySelector('.item-edit-input').value.trim();
+        if (!novoNome) { mostrarErro('Nome não pode ficar vazio.'); return; }
+        limparErro();
+        var fd = new FormData();
+        fd.append('nome', novoNome);
+        xhrFetch(BASE + currentSlug + '/' + id + '/editar', {method: 'POST', body: fd})
+        .then(function(data) {
+            if (data.success) {
+                atualizarSelect(id, novoNome, li.querySelector('.item-nome').textContent);
+                carregarItens();
+            } else {
+                mostrarErro(data.message || 'Erro ao salvar.');
+            }
+        })
+        .catch(function() { mostrarErro('Erro de comunicação.'); });
+    }
+
+    function excluirItem(li) {
+        var nome = li.querySelector('.item-nome').textContent;
+        if (!confirm('Excluir "' + nome + '"?')) return;
+        var id = li.dataset.id;
+        limparErro();
+        var fd = new FormData();
+        xhrFetch(BASE + currentSlug + '/' + id + '/excluir', {method: 'POST', body: fd})
+        .then(function(data) {
+            if (data.success) {
+                removerDoSelect(id);
+                carregarItens();
+            } else {
+                mostrarErro(data.message || 'Não foi possível excluir.');
+            }
+        })
+        .catch(function() { mostrarErro('Erro de comunicação.'); });
+    }
+
+    function adicionarItem() {
+        var nome = novoNomeInput.value.trim();
+        if (!nome) { novoNomeInput.focus(); return; }
+        limparErro();
+        var fd = new FormData();
+        fd.append('nome', nome);
+        xhrFetch(BASE + currentSlug + '/criar', {method: 'POST', body: fd})
+        .then(function(data) {
+            if (data.success) {
+                novoNomeInput.value = '';
+                adicionarAoSelect(data.id, data.nome);
+                carregarItens();
+            } else {
+                mostrarErro(data.message || 'Erro ao adicionar.');
+            }
+        })
+        .catch(function() { mostrarErro('Erro de comunicação.'); });
+    }
+
+    function adicionarAoSelect(id, nome) {
+        var sel = document.getElementById(currentSelectId);
+        if (!sel) return;
+        var opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = nome;
+        sel.appendChild(opt);
+    }
+
+    function removerDoSelect(id) {
+        var sel = document.getElementById(currentSelectId);
+        if (!sel) return;
+        var opt = sel.querySelector('option[value="' + id + '"]');
+        if (opt) {
+            if (sel.value == id) sel.value = '';
+            opt.remove();
+        }
+    }
+
+    function atualizarSelect(id, novoNome, nomeAntigo) {
+        var sel = document.getElementById(currentSelectId);
+        if (!sel) return;
+        var opt = sel.querySelector('option[value="' + id + '"]');
+        if (opt) opt.textContent = novoNome;
+    }
+
+    // Captura dados do botão que abriu o modal
+    document.querySelectorAll('.gerenciar-lista-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            currentSlug     = btn.dataset.slug;
+            currentLabel    = btn.dataset.label;
+            currentSelectId = btn.dataset.selectId;
+            titulo.textContent = 'Gerenciar ' + currentLabel;
+            limparErro();
+            novoNomeInput.value = '';
+        });
+    });
+
+    if (modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            carregarItens();
+            novoNomeInput.focus();
+        });
+    }
+
+    btnAdicionar.addEventListener('click', adicionarItem);
+    novoNomeInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); adicionarItem(); }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
