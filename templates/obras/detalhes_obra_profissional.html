@@ -3099,19 +3099,35 @@ function compraObraRemoverItem(btn) {
         if (!resultados.contains(e.target) && e.target !== inputBusca) fechar();
     });
 
-    // Limpar estado ao abrir o modal
-    var modal = document.getElementById('modalTrocarCliente');
-    if (modal) {
-        modal.addEventListener('show.bs.modal', function() {
-            inputBusca.value = '';
+    // Pré-preencher com o cliente atual ao abrir o modal
+    var clienteAtualId   = '{{ obra.cliente_id or "" }}';
+    var clienteAtualNome = {{ (obra.cliente_nome_efetivo or '') | tojson }};
+
+    function preencherClienteAtual() {
+        if (clienteAtualId && clienteAtualNome) {
+            inputId.value    = clienteAtualId;
+            inputBusca.value = clienteAtualNome;
+            resumo.style.display = 'block';
+            resumo.innerHTML = '<strong>' + escapeHtml(clienteAtualNome) + '</strong>';
+            btnConfirm.disabled = false;
+        } else {
             inputId.value = '';
+            inputBusca.value = '';
             resumo.style.display = 'none';
             resumo.innerHTML = '';
             btnConfirm.disabled = true;
-            fechar();
+        }
+        fechar();
+    }
+
+    var modal = document.getElementById('modalTrocarCliente');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function() {
+            preencherClienteAtual();
         });
         modal.addEventListener('shown.bs.modal', function() {
             inputBusca.focus();
+            inputBusca.select();
         });
     }
 
