@@ -1,9 +1,18 @@
 """
 Motor universal de dropdowns.
 
-Para slugs CRM (crm_*), as operações são roteadas para os modelos legados
-(CrmOrigem, CrmTipoObra, etc.) que são a fonte de verdade das FKs em Lead.
-Para slugs genéricos, usa DropdownOpcao.
+Para slugs CRM (crm_*), as operações são sincronizadas bidirecionalmente
+com os modelos legados (CrmOrigem etc.) para manter compatibilidade com
+as FKs em Lead.  DropdownOpcao é sempre a fonte de verdade do motor.
+
+Uso em formulários CRM:
+    get_dropdown_options('crm_origem', admin_id, for_form=True)
+    → retorna wrappers com .id = ext_id (= crm_origem.id) para que os
+      selects do formulário gravem o FK correto em Lead.origem_id.
+
+Uso na tela de gestão (/cadastros/dropdowns/<slug>):
+    get_dropdown_options('crm_origem', admin_id, incluir_inativos=True)
+    → retorna DropdownOpcao "crus" com .id = opcao.id (usado nas rotas CRUD).
 """
 from __future__ import annotations
 import logging
@@ -21,16 +30,6 @@ _CRM_MODELO_MAP: dict[str, str] = {
     'crm_motivo_perda': 'CrmMotivoPerda',
 }
 
-_CRM_CAMPOS_LEAD: dict[str, list[str]] = {
-    'crm_responsavel':  ['responsavel_id', 'vendedor_id', 'orcamentista_id'],
-    'crm_origem':       ['origem_id'],
-    'crm_cadencia':     ['cadencia_id'],
-    'crm_situacao':     ['situacao_id'],
-    'crm_tipo_material': ['tipo_material_id'],
-    'crm_tipo_obra':    ['tipo_obra_id'],
-    'crm_motivo_perda': ['motivo_perda_id'],
-}
-
 CRM_GRUPOS_META: list[dict] = [
     {'slug': 'crm_responsavel',   'label': 'Responsáveis',      'modulo': 'crm', 'editavel': True},
     {'slug': 'crm_origem',        'label': 'Origens',            'modulo': 'crm', 'editavel': True},
@@ -42,7 +41,7 @@ CRM_GRUPOS_META: list[dict] = [
 ]
 
 
-def _crm_model(slug):
+def _crm_model(slug: str):
     """Retorna a classe do modelo legado CRM para o slug, ou None."""
     class_name = _CRM_MODELO_MAP.get(slug)
     if not class_name:
@@ -51,18 +50,20 @@ def _crm_model(slug):
     return getattr(_m, class_name, None)
 
 
+def is_crm_slug(slug: str) -> bool:
+    return slug in _CRM_MODELO_MAP
+
+
 def ensure_grupo(slug: str, admin_id: int):
-    """Retorna (ou cria) o DropdownGrupo para (slug, admin_id).
-    Para slugs CRM, o label e modulo são recuperados de CRM_GRUPOS_META.
-    """
+    """Retorna (ou cria) o DropdownGrupo para (slug, admin_id)."""
     from models import DropdownGrupo
     grupo = DropdownGrupo.query.filter_by(slug=slug, admin_id=admin_id).first()
     if grupo:
         return grupo
 
     meta = next((m for m in CRM_GRUPOS_META if m['slug'] == slug), None)
-    label   = meta['label']   if meta else slug.replace('_', ' ').title()
-    modulo  = meta['modulo']  if meta else 'geral'
+    label    = meta['label']    if meta else slug.replace('_', ' ').title()
+    modulo   = meta['modulo']   if meta else 'geral'
     editavel = meta['editavel'] if meta else True
 
     grupo = DropdownGrupo(
@@ -77,48 +78,72 @@ def ensure_grupo(slug: str, admin_id: int):
     return grupo
 
 
-def get_dropdown_options(slug: str, admin_id: int, incluir_inativos: bool = False):
-    """Retorna lista de opções para o grupo identificado por `slug`.
+def _next_ordem(grupo_id: int) -> int:
+    result = db.session.execute(
+        db.text('SELECT COALESCE(MAX(ordem), 0) FROM dropdown_opcao WHERE grupo_id = :gid'),
+        {'gid': grupo_id}
+    ).scalar() or 0
+    return result + 10
 
-    Para slugs CRM: retorna objetos do modelo legado (id, nome, ativo).
-    Para outros slugs: retorna DropdownOpcao (tem property .nome = .valor).
+
+def get_dropdown_options(slug: str, admin_id: int,
+                         incluir_inativos: bool = False,
+                         for_form: bool = False):
+    """Retorna opções para o grupo+admin a partir de DropdownOpcao.
+
+    for_form=True e slug CRM: retorna wrappers com .id = ext_id para que
+    os selects gravem o FK correto em Lead (ex: Lead.origem_id).
     """
-    crm = _crm_model(slug)
-    if crm:
-        q = crm.query.filter_by(admin_id=admin_id)
-        if not incluir_inativos:
-            q = q.filter_by(ativo=True)
-        return q.order_by(crm.nome.asc()).all()
-
     from models import DropdownGrupo, DropdownOpcao
     grupo = DropdownGrupo.query.filter_by(slug=slug, admin_id=admin_id).first()
     if not grupo:
         return []
+
     q = DropdownOpcao.query.filter_by(grupo_id=grupo.id, admin_id=admin_id)
     if not incluir_inativos:
         q = q.filter_by(ativo=True)
-    return q.order_by(DropdownOpcao.ordem.asc(), DropdownOpcao.id.asc()).all()
+    opcoes = q.order_by(DropdownOpcao.ordem.asc(), DropdownOpcao.id.asc()).all()
+
+    if for_form and slug in _CRM_MODELO_MAP:
+        from types import SimpleNamespace
+        return [
+            SimpleNamespace(
+                id=o.ext_id if o.ext_id else o.id,
+                nome=o.valor,
+                ativo=o.ativo,
+            )
+            for o in opcoes
+        ]
+    return opcoes
 
 
-def criar_opcao(slug: str, admin_id: int, valor: str, cor: str | None = None, ordem: int = 0):
-    """Cria uma nova opção. Lança ValueError se já existir."""
-    crm = _crm_model(slug)
-    if crm:
-        existing = crm.query.filter_by(admin_id=admin_id, nome=valor).first()
-        if existing:
-            raise ValueError(f'Já existe uma opção "{valor}" nesta lista.')
-        obj = crm(admin_id=admin_id, nome=valor, ativo=True)
-        db.session.add(obj)
-        db.session.flush()
-        return obj
-
-    from models import DropdownOpcao
+def criar_opcao(slug: str, admin_id: int, valor: str,
+                cor: str | None = None, ordem: int | None = None):
+    """Cria nova opção no motor e, para slugs CRM, sincroniza no modelo legado."""
+    from models import DropdownGrupo, DropdownOpcao
     grupo = ensure_grupo(slug, admin_id)
+
     existing = DropdownOpcao.query.filter_by(
         grupo_id=grupo.id, admin_id=admin_id, valor=valor
     ).first()
     if existing:
         raise ValueError(f'Já existe uma opção "{valor}" nesta lista.')
+
+    if ordem is None:
+        ordem = _next_ordem(grupo.id)
+
+    ext_id = None
+    crm = _crm_model(slug)
+    if crm:
+        leg = crm.query.filter_by(admin_id=admin_id, nome=valor).first()
+        if leg:
+            ext_id = leg.id
+        else:
+            leg = crm(admin_id=admin_id, nome=valor, ativo=True)
+            db.session.add(leg)
+            db.session.flush()
+            ext_id = leg.id
+
     opcao = DropdownOpcao(
         admin_id=admin_id,
         grupo_id=grupo.id,
@@ -126,27 +151,27 @@ def criar_opcao(slug: str, admin_id: int, valor: str, cor: str | None = None, or
         cor=cor,
         ordem=ordem,
         ativo=True,
+        ext_id=ext_id,
     )
     db.session.add(opcao)
     db.session.flush()
     return opcao
 
 
-def atualizar_opcao(slug: str, opcao_id: int, admin_id: int, novo_valor: str, cor: str | None = None):
-    """Atualiza o rótulo (e cor) de uma opção."""
-    crm = _crm_model(slug)
-    if crm:
-        obj = crm.query.filter_by(id=opcao_id, admin_id=admin_id).first()
-        if not obj:
-            raise ValueError('Opção não encontrada.')
-        obj.nome = novo_valor
-        db.session.flush()
-        return obj
-
+def atualizar_opcao(slug: str, opcao_id: int, admin_id: int,
+                    novo_valor: str, cor: str | None = None):
+    """Atualiza valor/cor e sincroniza no modelo legado (CRM)."""
     from models import DropdownOpcao
     opcao = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
     if not opcao:
         raise ValueError('Opção não encontrada.')
+
+    crm = _crm_model(slug)
+    if crm and opcao.ext_id:
+        leg = crm.query.filter_by(id=opcao.ext_id, admin_id=admin_id).first()
+        if leg:
+            leg.nome = novo_valor
+
     opcao.valor = novo_valor
     if cor is not None:
         opcao.cor = cor
@@ -155,78 +180,69 @@ def atualizar_opcao(slug: str, opcao_id: int, admin_id: int, novo_valor: str, co
 
 
 def toggle_ativo_opcao(slug: str, opcao_id: int, admin_id: int):
-    """Ativa ou desativa uma opção (toggle). Retorna o novo estado ativo."""
-    crm = _crm_model(slug)
-    if crm:
-        obj = crm.query.filter_by(id=opcao_id, admin_id=admin_id).first()
-        if not obj:
-            raise ValueError('Opção não encontrada.')
-        obj.ativo = not obj.ativo
-        db.session.flush()
-        return obj.ativo
-
+    """Ativa/desativa uma opção e sincroniza no modelo legado. Retorna novo estado."""
     from models import DropdownOpcao
     opcao = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
     if not opcao:
         raise ValueError('Opção não encontrada.')
-    opcao.ativo = not opcao.ativo
+
+    novo = not opcao.ativo
+    opcao.ativo = novo
+
+    crm = _crm_model(slug)
+    if crm and opcao.ext_id:
+        leg = crm.query.filter_by(id=opcao.ext_id, admin_id=admin_id).first()
+        if leg:
+            leg.ativo = novo
+
     db.session.flush()
-    return opcao.ativo
+    return novo
 
 
 def desativar_opcao(slug: str, opcao_id: int, admin_id: int):
-    """Desativa permanentemente uma opção (sem deleção física)."""
-    crm = _crm_model(slug)
-    if crm:
-        obj = crm.query.filter_by(id=opcao_id, admin_id=admin_id).first()
-        if not obj:
-            raise ValueError('Opção não encontrada.')
-        obj.ativo = False
-        db.session.flush()
-        return obj
-
+    """Desativa permanentemente uma opção (sem exclusão física)."""
     from models import DropdownOpcao
     opcao = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
     if not opcao:
         raise ValueError('Opção não encontrada.')
+
     opcao.ativo = False
+    crm = _crm_model(slug)
+    if crm and opcao.ext_id:
+        leg = crm.query.filter_by(id=opcao.ext_id, admin_id=admin_id).first()
+        if leg:
+            leg.ativo = False
+
     db.session.flush()
     return opcao
 
 
 def excluir_opcao(slug: str, opcao_id: int, admin_id: int):
-    """Exclui fisicamente uma opção — bloqueado se estiver em uso (CRM) ou protegida."""
-    crm = _crm_model(slug)
-    if crm:
-        from models import Lead
-        campos = _CRM_CAMPOS_LEAD.get(slug, [])
-        for campo in campos:
-            uso = Lead.query.filter(
-                Lead.admin_id == admin_id,
-                getattr(Lead, campo) == opcao_id,
-            ).first()
-            if uso:
-                raise ValueError(
-                    'Esta opção está em uso em leads e não pode ser excluída. '
-                    'Use "Desativar" para ocultá-la em novos registros.'
-                )
-        obj = crm.query.filter_by(id=opcao_id, admin_id=admin_id).first()
-        if not obj:
-            raise ValueError('Opção não encontrada.')
-        db.session.delete(obj)
-        db.session.flush()
-        return True
+    """Política: não há exclusão física — delega para desativar."""
+    return desativar_opcao(slug, opcao_id, admin_id)
 
-    from models import DropdownOpcao
-    opcao = DropdownOpcao.query.filter_by(id=opcao_id, admin_id=admin_id).first()
-    if not opcao:
+
+def mover_opcao(slug: str, opcao_id: int, admin_id: int, direcao: str):
+    """Troca a ordem de uma opção com a vizinha (direcao: 'cima' | 'baixo')."""
+    from models import DropdownGrupo, DropdownOpcao
+    grupo = DropdownGrupo.query.filter_by(slug=slug, admin_id=admin_id).first()
+    if not grupo:
+        raise ValueError('Grupo não encontrado.')
+
+    todas = (DropdownOpcao.query
+             .filter_by(grupo_id=grupo.id, admin_id=admin_id)
+             .order_by(DropdownOpcao.ordem.asc(), DropdownOpcao.id.asc())
+             .all())
+
+    idx = next((i for i, o in enumerate(todas) if o.id == opcao_id), None)
+    if idx is None:
         raise ValueError('Opção não encontrada.')
-    if opcao.protegido:
-        raise ValueError('Esta opção é protegida e não pode ser excluída.')
-    db.session.delete(opcao)
+
+    if direcao == 'cima' and idx > 0:
+        a, b = todas[idx], todas[idx - 1]
+        a.ordem, b.ordem = b.ordem, a.ordem
+    elif direcao == 'baixo' and idx < len(todas) - 1:
+        a, b = todas[idx], todas[idx + 1]
+        a.ordem, b.ordem = b.ordem, a.ordem
+
     db.session.flush()
-    return True
-
-
-def is_crm_slug(slug: str) -> bool:
-    return slug in _CRM_MODELO_MAP

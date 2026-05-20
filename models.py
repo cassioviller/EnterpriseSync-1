@@ -6945,6 +6945,7 @@ class DropdownOpcao(db.Model):
     cor        = db.Column(db.String(7), nullable=True)
     ativo      = db.Column(db.Boolean, default=True, nullable=False)
     protegido  = db.Column(db.Boolean, default=False, nullable=False)
+    ext_id     = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property

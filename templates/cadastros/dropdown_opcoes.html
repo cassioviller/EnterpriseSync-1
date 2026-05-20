@@ -26,15 +26,16 @@
     display: flex;
     align-items: center;
     gap: .75rem;
-    padding: .6rem .75rem;
+    padding: .55rem .75rem;
     border-radius: 8px;
     border: 1px solid #e9ecef;
     background: #fff;
-    margin-bottom: .5rem;
+    margin-bottom: .45rem;
     transition: box-shadow .15s;
   }
   .dd-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,.07); }
   .dd-item.inactive { opacity: .5; }
+
   .dd-item__nome {
     flex: 1;
     font-size: .93rem;
@@ -45,23 +46,25 @@
     padding: .18em .55em;
     border-radius: 5px;
   }
-  .dd-item__actions { display: flex; gap: .35rem; flex-shrink: 0; }
+  .dd-item__actions { display: flex; gap: .3rem; flex-shrink: 0; }
+  .dd-item__order   { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
 
   .btn-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 7px;
+    border-radius: 6px;
     border: none;
     cursor: pointer;
-    font-size: .8rem;
+    font-size: .75rem;
     padding: 0;
+    line-height: 1;
   }
 
   .inline-edit-form { display: none; }
-  .inline-edit-form.show { display: flex; align-items: center; gap: .4rem; }
+  .inline-edit-form.show { display: flex; align-items: center; gap: .4rem; flex: 1; }
 
   .add-card {
     border: 2px dashed #dee2e6;
@@ -69,6 +72,14 @@
     padding: 1rem 1.2rem;
     margin-top: 1rem;
     background: #f8f9fa;
+  }
+
+  .legend-inactive {
+    font-size: .78rem;
+    color: #6c757d;
+    margin-top: .6rem;
+    padding-top: .6rem;
+    border-top: 1px dashed #dee2e6;
   }
 </style>
 {% endblock %}
@@ -130,6 +141,30 @@
       <span style="width:10px;height:10px;border-radius:50%;background:{{ item.cor }};flex-shrink:0;display:inline-block;"></span>
       {% endif %}
 
+      <!-- Reorder buttons (cima / baixo) -->
+      {% if grupo.editavel %}
+      <div class="dd-item__order">
+        <form method="POST"
+              action="{{ url_for('cadastros_hub.dropdown_mover_opcao', slug=grupo.slug, opcao_id=item.id, direcao='cima') }}"
+              style="display:contents;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-icon btn btn-outline-secondary"
+                  title="Mover para cima" style="height:14px;">
+            <i class="fas fa-chevron-up" style="font-size:.6rem;"></i>
+          </button>
+        </form>
+        <form method="POST"
+              action="{{ url_for('cadastros_hub.dropdown_mover_opcao', slug=grupo.slug, opcao_id=item.id, direcao='baixo') }}"
+              style="display:contents;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-icon btn btn-outline-secondary"
+                  title="Mover para baixo" style="height:14px;">
+            <i class="fas fa-chevron-down" style="font-size:.6rem;"></i>
+          </button>
+        </form>
+      </div>
+      {% endif %}
+
       <!-- Exibição normal -->
       <span class="dd-item__nome view-mode-{{ item.id }}">
         {{ item.nome }}
@@ -139,7 +174,7 @@
       </span>
 
       <!-- Edição inline -->
-      <div class="inline-edit-form flex-grow-1 edit-mode-{{ item.id }}">
+      <div class="inline-edit-form edit-mode-{{ item.id }}">
         <input type="text" class="form-control form-control-sm"
                id="edit-val-{{ item.id }}" value="{{ item.nome }}" style="max-width:280px;">
         <form method="POST"
@@ -166,7 +201,7 @@
           <i class="fas fa-pencil-alt"></i>
         </button>
 
-        <!-- Toggle ativo -->
+        <!-- Toggle ativo (ativar / desativar) -->
         <form method="POST"
               action="{{ url_for('cadastros_hub.dropdown_toggle_ativo', slug=grupo.slug, opcao_id=item.id) }}"
               style="display:contents;">
@@ -177,25 +212,19 @@
             <i class="fas {% if item.ativo %}fa-eye-slash{% else %}fa-eye{% endif %}"></i>
           </button>
         </form>
-
-        <!-- Excluir -->
-        {% set protegida = item.protegido if item.protegido is defined else False %}
-        {% if not protegida %}
-        <form method="POST"
-              action="{{ url_for('cadastros_hub.dropdown_excluir_opcao', slug=grupo.slug, opcao_id=item.id) }}"
-              style="display:contents;"
-              onsubmit="return confirm('Excluir a opção "{{ item.nome }}"? Esta ação não pode ser desfeita.');">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-icon btn btn-outline-danger" title="Excluir">
-            <i class="fas fa-trash-alt"></i>
-          </button>
-        </form>
-        {% endif %}
       </div>
       {% endif %}
 
     </div>
     {% endfor %}
+
+    {% if opcoes %}
+    <p class="legend-inactive">
+      <i class="fas fa-info-circle me-1"></i>
+      Opções desativadas são ocultadas nos formulários, mas preservadas no histórico.
+      Use os botões <i class="fas fa-eye-slash"></i> / <i class="fas fa-eye"></i> para ativar ou desativar.
+    </p>
+    {% endif %}
 
     <!-- Adicionar nova opção -->
     {% if grupo.editavel %}

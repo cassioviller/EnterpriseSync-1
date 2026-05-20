@@ -119,17 +119,40 @@ def dropdown_toggle_ativo(slug, opcao_id):
 @cadastros_hub_bp.route('/dropdowns/<slug>/<int:opcao_id>/excluir', methods=['POST'])
 @login_required
 def dropdown_excluir_opcao(slug, opcao_id):
-    from services.dropdown_service import excluir_opcao
+    """Política: sem exclusão física — desativa a opção."""
+    from services.dropdown_service import desativar_opcao
     admin_id = _get_admin_id()
     try:
-        excluir_opcao(slug, opcao_id, admin_id)
+        desativar_opcao(slug, opcao_id, admin_id)
         db.session.commit()
-        flash('Opção excluída.', 'success')
+        flash('Opção desativada.', 'success')
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'warning')
     except Exception:
         db.session.rollback()
-        logger.exception('Erro ao excluir opção slug=%s id=%s', slug, opcao_id)
-        flash('Erro inesperado ao excluir. Tente novamente.', 'danger')
+        logger.exception('Erro ao desativar opção slug=%s id=%s', slug, opcao_id)
+        flash('Erro inesperado. Tente novamente.', 'danger')
+    return redirect(url_for('cadastros_hub.dropdown_opcoes', slug=slug))
+
+
+@cadastros_hub_bp.route('/dropdowns/<slug>/<int:opcao_id>/mover/<direcao>', methods=['POST'])
+@login_required
+def dropdown_mover_opcao(slug, opcao_id, direcao):
+    """Move uma opção para cima ou para baixo na lista (ordem)."""
+    from services.dropdown_service import mover_opcao
+    admin_id = _get_admin_id()
+    if direcao not in ('cima', 'baixo'):
+        flash('Direção inválida.', 'warning')
+        return redirect(url_for('cadastros_hub.dropdown_opcoes', slug=slug))
+    try:
+        mover_opcao(slug, opcao_id, admin_id, direcao)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'warning')
+    except Exception:
+        db.session.rollback()
+        logger.exception('Erro ao mover opção slug=%s id=%s', slug, opcao_id)
+        flash('Erro inesperado. Tente novamente.', 'danger')
     return redirect(url_for('cadastros_hub.dropdown_opcoes', slug=slug))

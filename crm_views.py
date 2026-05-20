@@ -316,7 +316,7 @@ def _listas_para_form(admin_id):
     from services.dropdown_service import get_dropdown_options
     out = {}
     for slug in LISTAS_MESTRAS:
-        out[slug] = get_dropdown_options(f'crm_{slug}', admin_id)
+        out[slug] = get_dropdown_options(f'crm_{slug}', admin_id, for_form=True)
     return out
 
 

@@ -3872,6 +3872,7 @@ def executar_migracoes():
             (171, "Task #23 — observacao_validacao em propostas_comerciais (nota interna de validação)", migration_171_proposta_observacao_validacao),
             (172, "CRM — comentario_revisao em lead (comentário do supervisor ao pedir revisão)", migration_172_lead_comentario_revisao),
             (173, "Motor universal de dropdowns — DropdownGrupo + DropdownOpcao + seed CRM", migration_173_dropdown_motor),
+            (174, "Motor de dropdowns v2 — ext_id + sync CRM→DropdownOpcao + seed padrão", migration_174_dropdown_ext_id_sync),
         ]
         
         # Executar cada migração com rastreamento
@@ -14393,3 +14394,117 @@ def migration_173_dropdown_motor():
         f"[Migration 173] Tabelas dropdown_grupo/dropdown_opcao criadas. "
         f"Seeded {seeded_groups} DropdownGrupo(s) para slugs CRM."
     )
+
+
+def migration_174_dropdown_ext_id_sync():
+    """Migration 174: adiciona ext_id em dropdown_opcao, sincroniza dados CRM
+    existentes para DropdownOpcao, e semeia opções padrão para tenants vazios.
+    """
+    from sqlalchemy import text
+
+    # 1. Adicionar coluna ext_id (idempotente)
+    db.session.execute(text("""
+        ALTER TABLE dropdown_opcao ADD COLUMN IF NOT EXISTS ext_id INTEGER
+    """))
+    db.session.commit()
+    logger.info("[Migration 174] Coluna ext_id adicionada em dropdown_opcao")
+
+    # 2. Sincronizar registros CRM → DropdownOpcao (ext_id = id do modelo legado)
+    CRM_MAP = [
+        ('crm_responsavel',   'crm_responsavel'),
+        ('crm_origem',        'crm_origem'),
+        ('crm_cadencia',      'crm_cadencia'),
+        ('crm_situacao',      'crm_situacao'),
+        ('crm_tipo_material', 'crm_tipo_material'),
+        ('crm_tipo_obra',     'crm_tipo_obra'),
+        ('crm_motivo_perda',  'crm_motivo_perda'),
+    ]
+
+    total_sync = 0
+    for slug, table in CRM_MAP:
+        result = db.session.execute(text(f"""
+            INSERT INTO dropdown_opcao (admin_id, grupo_id, valor, ordem, ativo, protegido, ext_id)
+            SELECT
+                t.admin_id,
+                dg.id,
+                t.nome,
+                (ROW_NUMBER() OVER (PARTITION BY t.admin_id ORDER BY t.id) * 10),
+                t.ativo,
+                false,
+                t.id
+            FROM {table} t
+            JOIN dropdown_grupo dg
+              ON dg.slug = :slug AND dg.admin_id = t.admin_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM dropdown_opcao do2
+                WHERE do2.grupo_id = dg.id
+                  AND do2.admin_id = t.admin_id
+                  AND do2.ext_id = t.id
+            )
+        """), {'slug': slug})
+        total_sync += result.rowcount
+
+    db.session.commit()
+    logger.info(f"[Migration 174] {total_sync} opção(ões) CRM sincronizadas para DropdownOpcao")
+
+    # 3. Seed de opções padrão para tenants que ficaram sem nenhuma opção
+    CRM_DEFAULTS = {
+        'crm_origem':        ['Indicação', 'Site', 'Redes Sociais', 'Telefone', 'Evento'],
+        'crm_cadencia':      ['Alta', 'Média', 'Baixa'],
+        'crm_situacao':      ['Em análise', 'Proposta enviada', 'Em negociação'],
+        'crm_tipo_material': ['Concreto', 'Alvenaria', 'Madeira', 'Steel Frame', 'Metálica', 'Misto'],
+        'crm_tipo_obra':     ['Residencial', 'Comercial', 'Industrial', 'Reforma', 'Infraestrutura'],
+        'crm_motivo_perda':  ['Preço', 'Concorrência', 'Prazo', 'Sem retorno', 'Outro'],
+    }
+
+    total_seed = 0
+    for slug, defaults in CRM_DEFAULTS.items():
+        crm_table = slug  # nome da tabela = slug
+        # Grupos sem nenhuma opção para este slug
+        empty_groups = db.session.execute(text("""
+            SELECT dg.id, dg.admin_id
+            FROM dropdown_grupo dg
+            WHERE dg.slug = :slug
+              AND NOT EXISTS (
+                  SELECT 1 FROM dropdown_opcao do2 WHERE do2.grupo_id = dg.id
+              )
+        """), {'slug': slug}).fetchall()
+
+        for gid, aid in empty_groups:
+            for i, nome in enumerate(defaults, 1):
+                # Verificar se já existe no modelo legado
+                existing_legacy = db.session.execute(text(f"""
+                    SELECT id FROM {crm_table}
+                    WHERE admin_id = :aid AND nome = :nome
+                """), {'aid': aid, 'nome': nome}).fetchone()
+
+                if existing_legacy:
+                    crm_id = existing_legacy[0]
+                else:
+                    r = db.session.execute(text(f"""
+                        INSERT INTO {crm_table} (admin_id, nome, ativo)
+                        VALUES (:aid, :nome, true)
+                        RETURNING id
+                    """), {'aid': aid, 'nome': nome})
+                    row = r.fetchone()
+                    if not row:
+                        continue
+                    crm_id = row[0]
+
+                # Inserir no motor de dropdowns (se ainda não existir)
+                existing_opcao = db.session.execute(text("""
+                    SELECT id FROM dropdown_opcao
+                    WHERE grupo_id = :gid AND admin_id = :aid AND valor = :nome
+                """), {'gid': gid, 'aid': aid, 'nome': nome}).fetchone()
+
+                if not existing_opcao:
+                    db.session.execute(text("""
+                        INSERT INTO dropdown_opcao
+                               (admin_id, grupo_id, valor, ordem, ativo, protegido, ext_id)
+                        VALUES (:aid, :gid, :nome, :ordem, true, false, :ext_id)
+                    """), {'aid': aid, 'gid': gid, 'nome': nome,
+                           'ordem': i * 10, 'ext_id': crm_id})
+                    total_seed += 1
+
+    db.session.commit()
+    logger.info(f"[Migration 174] {total_seed} opção(ões) padrão inseridas para tenants vazios")
