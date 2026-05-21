@@ -457,11 +457,12 @@ def fluxo_caixa_upload():
     # Lista plana para retrocompatibilidade
     CATEGORIAS_OPCOES = [(v, l) for _, grp in CATEGORIAS_GRUPOS for v, l in grp]
 
-    from models import BancoEmpresa, CategoriaFluxoCaixa
+    from models import BancoEmpresa, CategoriaFluxoCaixa, Obra
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
     categorias_tenant = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.tipo, CategoriaFluxoCaixa.nome).all()
     categorias_saida = [c for c in categorias_tenant if c.tipo == 'SAIDA']
     categorias_entrada = [c for c in categorias_tenant if c.tipo == 'ENTRADA']
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
 
     return render_template(
         'importacao/preview_fluxo.html',
@@ -477,6 +478,7 @@ def fluxo_caixa_upload():
         categorias_entrada=categorias_entrada,
         dados_json=dados_assinados,
         bancos=bancos,
+        obras=obras,
         total_saidas=len(saidas_auto) + len(saidas_manual),
         total_valor_saidas=sum(r.get('valor', 0) for r in saidas_auto + saidas_manual),
         total_valor_entradas=sum(r.get('valor', 0) for r in entradas),
@@ -504,6 +506,21 @@ def fluxo_caixa_confirmar():
     saidas_manual = payload.get('saidas_manual', [])
     entradas = payload.get('entradas', [])
 
+    # Pré-computar IDs de obras permitidas para este tenant (validação de ownership)
+    from models import Obra as ObraModel
+    _obras_tenant = ObraModel.query.filter_by(admin_id=admin_id, ativo=True).with_entities(ObraModel.id).all()
+    _allowed_obra_ids = {r[0] for r in _obras_tenant}
+
+    def _obra_segura(obra_val):
+        """Converte valor do form em obra_id validado contra o tenant. Retorna None se inválido."""
+        if not obra_val:
+            return None
+        try:
+            oid = int(obra_val)
+        except (ValueError, TypeError):
+            return None
+        return oid if oid in _allowed_obra_ids else None
+
     def _aplicar_categoria(row, cat_val, tipo_esperado=None):
         """Detecta prefixo cfc_<id> para categoria personalizada; senão usa tipo_categoria.
         Se tipo_esperado for fornecido ('ENTRADA' ou 'SAIDA'), valida tenant + tipo antes de aplicar.
@@ -530,6 +547,7 @@ def fluxo_caixa_confirmar():
 
     # Aplicar edições manuais nas saídas auto
     for i, row in enumerate(saidas_auto):
+        row['obra_id'] = _obra_segura(request.form.get(f'obra_auto_{i}', '').strip())
         cat_editada = request.form.get(f'cat_auto_{i}')
         if cat_editada:
             _aplicar_categoria(row, cat_editada, tipo_esperado='SAIDA')
@@ -556,6 +574,7 @@ def fluxo_caixa_confirmar():
 
     # Aplicar edições manuais das saídas manuais
     for i, row in enumerate(saidas_manual):
+        row['obra_id'] = _obra_segura(request.form.get(f'obra_manual_{i}', '').strip())
         cat_manual = request.form.get(f'cat_manual_{i}')
         if cat_manual:
             _aplicar_categoria(row, cat_manual, tipo_esperado='SAIDA')
@@ -582,8 +601,9 @@ def fluxo_caixa_confirmar():
             except ValueError:
                 pass
 
-    # Aplicar categorias personalizadas nas entradas
+    # Aplicar obra e categorias personalizadas nas entradas
     for i, row in enumerate(entradas):
+        row['obra_id'] = _obra_segura(request.form.get(f'obra_entrada_{i}', '').strip())
         cat_entrada = request.form.get(f'cat_entrada_{i}')
         if cat_entrada:
             _aplicar_categoria(row, cat_entrada, tipo_esperado='ENTRADA')

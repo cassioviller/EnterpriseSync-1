@@ -166,7 +166,21 @@
                 {% endif %}
               </td>
               <td>{{ r.descricao or '—' }}</td>
-              <td>{{ r.cc or '—' }}</td>
+              <td>
+                {% if obras %}
+                <select name="obra_entrada_{{ loop.index0 }}" class="form-select form-select-sm obra-select" style="min-width:150px;font-size:.8rem;">
+                  <option value="">— Administrativo —</option>
+                  {% for o in obras %}
+                  <option value="{{ o.id }}" {% if r.get('obra_id') == o.id %}selected{% endif %}>{{ o.nome }}</option>
+                  {% endfor %}
+                </select>
+                {% if r.cc %}
+                <small class="text-muted d-block" style="font-size:.72rem;" title="Texto original da planilha">{{ r.cc }}</small>
+                {% endif %}
+                {% else %}
+                {{ r.cc or '—' }}
+                {% endif %}
+              </td>
               <td class="text-end fw-semibold">{{ r.valor|brl }}</td>
               <td>
                 {% if r.status == 'PAGO' %}
@@ -292,7 +306,21 @@
                        placeholder="Descrição"
                        title="Edite a descrição">
               </td>
-              <td>{{ r.cc or '—' }}</td>
+              <td>
+                {% if obras %}
+                <select name="obra_auto_{{ loop.index0 }}" class="form-select form-select-sm obra-select" style="min-width:150px;font-size:.8rem;">
+                  <option value="">— Administrativo —</option>
+                  {% for o in obras %}
+                  <option value="{{ o.id }}" {% if r.get('obra_id') == o.id %}selected{% endif %}>{{ o.nome }}</option>
+                  {% endfor %}
+                </select>
+                {% if r.cc %}
+                <small class="text-muted d-block" style="font-size:.72rem;" title="Texto original da planilha">{{ r.cc }}</small>
+                {% endif %}
+                {% else %}
+                {{ r.cc or '—' }}
+                {% endif %}
+              </td>
               <!-- Valor editável -->
               <td class="text-end">
                 <input type="text"
@@ -404,6 +432,7 @@
               <th class="px-3" style="min-width:112px;">Data</th>
               <th style="min-width:140px;">Fornecedor</th>
               <th style="min-width:150px;">Descrição</th>
+              <th style="min-width:150px;">CC / Obra</th>
               <th class="text-end" style="min-width:90px;">Valor (R$)</th>
               <th>Status</th>
               <th>Categoria <span class="text-danger">*</span></th>
@@ -439,6 +468,22 @@
                        value="{{ r.descricao or '' }}"
                        placeholder="Descrição"
                        title="Edite a descrição">
+              </td>
+              <!-- CC / Obra -->
+              <td>
+                {% if obras %}
+                <select name="obra_manual_{{ loop.index0 }}" class="form-select form-select-sm obra-select" style="min-width:150px;font-size:.8rem;">
+                  <option value="">— Administrativo —</option>
+                  {% for o in obras %}
+                  <option value="{{ o.id }}" {% if r.get('obra_id') == o.id %}selected{% endif %}>{{ o.nome }}</option>
+                  {% endfor %}
+                </select>
+                {% if r.cc %}
+                <small class="text-muted d-block" style="font-size:.72rem;" title="Texto original da planilha">{{ r.cc }}</small>
+                {% endif %}
+                {% else %}
+                {{ r.cc or '—' }}
+                {% endif %}
               </td>
               <!-- Valor editável -->
               <td class="text-end">
@@ -711,7 +756,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var editableEls = document.querySelectorAll(
-    'table .inline-input, table .cat-select, table .banco-select'
+    'table .inline-input, table .cat-select, table .banco-select, table .obra-select'
   );
 
   editableEls.forEach(function(el) {
