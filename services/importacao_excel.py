@@ -1875,6 +1875,8 @@ class ImportacaoFluxoCaixa:
 
                 banco_id_row = row.get('banco_id') or None
 
+                cfc_id = row.get('categoria_fluxo_caixa_id') or None
+
                 if apenas_pagamento:
                     # ── Modo "Apenas Pagamento": cria apenas FluxoCaixa, sem GCP/GCF/ContaPagar
                     fc = FluxoCaixa(
@@ -1888,6 +1890,7 @@ class ImportacaoFluxoCaixa:
                         observacoes=obs or None,
                         import_batch_id=batch_id,
                         banco_id=banco_id_row,
+                        categoria_fluxo_caixa_id=cfc_id,
                     )
                     db.session.add(fc)
                     n_fluxo += 1
@@ -1937,6 +1940,7 @@ class ImportacaoFluxoCaixa:
                             referencia_tabela='gestao_custo_pai',
                             observacoes=obs or None,
                             import_batch_id=batch_id,
+                            categoria_fluxo_caixa_id=cfc_id,
                         )
                         db.session.add(fc)
                         n_fluxo += 1

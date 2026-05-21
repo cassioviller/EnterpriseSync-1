@@ -2,8 +2,9 @@
 Catálogos — Central de dados auxiliares gerenciados pelo administrador.
 Blueprint: catalogos_bp  prefix: /catalogos
 """
+import io
 import logging
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
 from flask_login import login_required, current_user
 from app import db
 from models import (
@@ -132,6 +133,117 @@ def categorias_fluxo_caixa_toggle(id):
     db.session.commit()
     estado = 'ativada' if cat.ativo else 'desativada'
     flash(f'Categoria "{cat.nome}" {estado}.', 'success')
+    return redirect(url_for('catalogos.categorias_fluxo_caixa'))
+
+
+@catalogos_bp.route('/categorias-fluxo-caixa/exportar-modelo', methods=['GET'])
+@login_required
+def categorias_fluxo_caixa_exportar_modelo():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Categorias'
+    headers = ['Nome', 'Tipo', 'Grupo Financeiro', 'Descrição']
+    header_fill = PatternFill(start_color='1e3a5f', end_color='1e3a5f', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF')
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+    ws.append(['Receita de Serviços', 'ENTRADA', 'Receitas Operacionais', 'Faturamento por prestação de serviços'])
+    ws.append(['Custo de Material', 'SAIDA', 'Custos Diretos', 'Materiais consumidos em obras'])
+    note_cell = ws.cell(row=4, column=1, value='NOTA: O campo Tipo deve ser exatamente ENTRADA ou SAIDA (sem acento).')
+    note_cell.font = Font(italic=True, color='888888')
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 28
+    ws.column_dimensions['D'].width = 45
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name='modelo_categorias_fluxo_caixa.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@catalogos_bp.route('/categorias-fluxo-caixa/importar', methods=['POST'])
+@login_required
+def categorias_fluxo_caixa_importar():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    arquivo = request.files.get('arquivo')
+    if not arquivo or arquivo.filename == '':
+        flash('Nenhum arquivo selecionado.', 'warning')
+        return redirect(url_for('catalogos.categorias_fluxo_caixa'))
+    ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
+    if ext != 'xlsx':
+        flash('Formato inválido. Use arquivo .xlsx.', 'danger')
+        return redirect(url_for('catalogos.categorias_fluxo_caixa'))
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(arquivo, data_only=True)
+        ws = wb.active
+        header_row = None
+        col_nome = col_tipo = col_grupo = col_desc = None
+        for rn in range(1, min(5, ws.max_row + 1)):
+            vals = [str(ws.cell(row=rn, column=c).value or '').strip().lower() for c in range(1, ws.max_column + 1)]
+            if 'nome' in vals:
+                header_row = rn
+                col_nome = next((i + 1 for i, v in enumerate(vals) if v == 'nome'), None)
+                col_tipo = next((i + 1 for i, v in enumerate(vals) if v == 'tipo'), None)
+                col_grupo = next((i + 1 for i, v in enumerate(vals) if 'grupo' in v), None)
+                col_desc = next((i + 1 for i, v in enumerate(vals) if 'descri' in v), None)
+                break
+        if not header_row or not col_nome or not col_tipo:
+            flash('Cabeçalho não encontrado. Use o modelo disponível para download.', 'danger')
+            return redirect(url_for('catalogos.categorias_fluxo_caixa'))
+        criadas = 0
+        ignoradas = 0
+        for rn in range(header_row + 1, ws.max_row + 1):
+            nome = str(ws.cell(row=rn, column=col_nome).value or '').strip()
+            tipo = str(ws.cell(row=rn, column=col_tipo).value or '').strip().upper()
+            if not nome or nome.lower().startswith('nota:'):
+                continue
+            if tipo not in ('ENTRADA', 'SAIDA'):
+                ignoradas += 1
+                continue
+            grupo = str(ws.cell(row=rn, column=col_grupo).value or '').strip() if col_grupo else ''
+            desc = str(ws.cell(row=rn, column=col_desc).value or '').strip() if col_desc else ''
+            existe = CategoriaFluxoCaixa.query.filter(
+                CategoriaFluxoCaixa.admin_id == admin_id,
+                db.func.lower(CategoriaFluxoCaixa.nome) == nome.lower(),
+                CategoriaFluxoCaixa.tipo == tipo,
+            ).first()
+            if existe:
+                ignoradas += 1
+                continue
+            cat = CategoriaFluxoCaixa(
+                nome=nome, tipo=tipo,
+                grupo_financeiro=grupo or None,
+                descricao=desc or None,
+                ativo=True, admin_id=admin_id,
+            )
+            db.session.add(cat)
+            criadas += 1
+        db.session.commit()
+        partes = []
+        if criadas:
+            partes.append(f'{criadas} categoria(s) criada(s)')
+        if ignoradas:
+            partes.append(f'{ignoradas} ignorada(s) (duplicada ou tipo inválido)')
+        flash(', '.join(partes) + '.' if partes else 'Nenhuma linha processada.', 'success' if criadas else 'warning')
+    except Exception as e:
+        logger.error(f'[IMPORTAR_CATEGORIAS] {e}', exc_info=True)
+        flash(f'Erro ao processar arquivo: {e}', 'danger')
     return redirect(url_for('catalogos.categorias_fluxo_caixa'))
 
 

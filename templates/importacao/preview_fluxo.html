@@ -304,6 +304,16 @@
                     {% endfor %}
                   </optgroup>
                   {% endfor %}
+                  {% if categorias_tenant %}
+                  <optgroup label="Categorias Personalizadas">
+                    {% for cat in categorias_tenant %}
+                    <option value="cfc_{{ cat.id }}"
+                      {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+                      {{ cat.nome }} ({{ 'Entrada' if cat.tipo == 'ENTRADA' else 'Saída' }})
+                    </option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endif %}
                 </select>
               </td>
               <!-- Score -->
@@ -443,6 +453,16 @@
                     {% endfor %}
                   </optgroup>
                   {% endfor %}
+                  {% if categorias_tenant %}
+                  <optgroup label="Categorias Personalizadas">
+                    {% for cat in categorias_tenant %}
+                    <option value="cfc_{{ cat.id }}"
+                      {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+                      {{ cat.nome }} ({{ 'Entrada' if cat.tipo == 'ENTRADA' else 'Saída' }})
+                    </option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endif %}
                 </select>
               </td>
               <!-- Apenas pagamento -->

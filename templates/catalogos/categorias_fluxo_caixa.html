@@ -15,10 +15,49 @@
             <h1 class="h3 mb-0"><i class="fas fa-coins text-success me-2"></i>Categorias de Fluxo de Caixa</h1>
             <p class="text-muted mb-0">Classifique entradas e saídas financeiras</p>
         </div>
-        <div class="col-auto">
+        <div class="col-auto d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('catalogos.categorias_fluxo_caixa_exportar_modelo') }}" class="btn btn-outline-success">
+                <i class="fas fa-file-excel me-1"></i> Exportar Modelo
+            </a>
+            <button type="button" class="btn btn-outline-primary"
+                    data-bs-toggle="collapse" data-bs-target="#importarCollapse" aria-expanded="false">
+                <i class="fas fa-upload me-1"></i> Importar via Excel
+            </button>
             <a href="{{ url_for('catalogos.categorias_fluxo_caixa_criar') }}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i> Nova Categoria
             </a>
+        </div>
+    </div>
+
+    <div class="collapse mb-4" id="importarCollapse">
+        <div class="card border-0 shadow-sm border-start border-primary border-3">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <i class="fas fa-file-upload text-primary"></i>
+                <h6 class="mb-0 text-primary">Importar Categorias via Excel</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Faça upload de um arquivo <code>.xlsx</code> com as colunas
+                    <strong>Nome</strong>, <strong>Tipo</strong> (ENTRADA ou SAIDA),
+                    <strong>Grupo Financeiro</strong> e <strong>Descrição</strong>.
+                    Categorias com mesmo nome e tipo serão ignoradas (sem duplicação).
+                </p>
+                <form method="POST" action="{{ url_for('catalogos.categorias_fluxo_caixa_importar') }}"
+                      enctype="multipart/form-data" class="d-flex align-items-center gap-3 flex-wrap">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div>
+                        <input type="file" name="arquivo" accept=".xlsx"
+                               class="form-control form-control-sm" style="min-width:260px;" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-upload me-1"></i> Importar
+                    </button>
+                    <a href="{{ url_for('catalogos.categorias_fluxo_caixa_exportar_modelo') }}"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-download me-1"></i> Baixar modelo
+                    </a>
+                </form>
+            </div>
         </div>
     </div>
 
