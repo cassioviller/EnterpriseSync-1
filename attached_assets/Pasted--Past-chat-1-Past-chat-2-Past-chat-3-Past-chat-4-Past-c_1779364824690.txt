@@ -1,0 +1,342 @@
+([Past chat][1])([Past chat][2])([Past chat][3])([Past chat][4])([Past chat][5])([Past chat][6])([Past chat][7])([Past chat][8])([Past chat][9])([Past chat][10])([Past chat][11])([Past chat][12])([Past chat][13])([Past chat][14])([Past chat][15])([Past chat][16])([Past chat][17])
+
+Analisei em **somente leitura** no repo `cassioviller/EnterpriseSync-1`.
+
+## Diagnóstico da Task #15
+
+A task faz sentido e está **parcialmente preparada**, mas ainda não completa.
+
+Hoje:
+
+1. A tela `templates/importacao/preview_fluxo.html` já tem `<select>` de categoria nas **saídas**, inclusive com `Categorias Personalizadas`. Porém a tabela de **Entradas** ainda só exibe dados de leitura: data, cliente, descrição, CC/obra, valor, status e fuzzy match. Não há `<select>` de categoria nas entradas. 
+
+2. A rota `fluxo_caixa_confirmar` já possui a função `_aplicar_categoria(row, cat_val)`, que entende o padrão `cfc_<id>` e grava `categoria_fluxo_caixa_id` no dicionário da linha. Mas ela só é aplicada em `saidas_auto` e `saidas_manual`, não em `entradas`. 
+
+3. No serviço `services/importacao_excel.py`, a criação de `ContaReceber` para entradas não recebe `categoria_fluxo_caixa_id`, e o `FluxoCaixa` criado quando a entrada está `PAGO` também não passa esse campo. 
+
+4. Atenção: pelo trecho do `models.py`, `ContaReceber` **não aparenta ter** a coluna `categoria_fluxo_caixa_id`. Então a parte do “Done looks like” que diz “sets categoria_fluxo_caixa_id on the ContaReceber or FluxoCaixa entry record” deve ser interpretada com cuidado: hoje, pelo código visto, o caminho seguro é gravar no `FluxoCaixa`. Para gravar também em `ContaReceber`, precisa migration/model. 
+
+---
+
+## Implementação recomendada
+
+### 1. No preview, adicionar coluna “Categoria” na tabela de Entradas
+
+Em `templates/importacao/preview_fluxo.html`, dentro da tabela de **Entradas**, incluir um `<th>Categoria</th>` e, em cada linha, um `<select>` assim:
+
+```html
+<th>Categoria</th>
+```
+
+E no `<tbody>` das entradas:
+
+```html
+<td>
+  <select name="cat_entrada_{{ loop.index0 }}" class="form-select form-select-sm cat-select">
+    <option value="">— Receita padrão —</option>
+
+    {% if categorias_entrada %}
+    <optgroup label="Categorias Personalizadas">
+      {% for cat in categorias_entrada %}
+      <option value="cfc_{{ cat.id }}"
+        {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+        {{ cat.nome }}
+      </option>
+      {% endfor %}
+    </optgroup>
+    {% endif %}
+  </select>
+</td>
+```
+
+Melhor do que usar `categorias_tenant` direto, porque a task pede filtro `tipo=ENTRADA`.
+
+---
+
+### 2. No `importacao_views.py`, separar categorias de entrada e saída
+
+Hoje ele busca:
+
+```python
+categorias_tenant = CategoriaFluxoCaixa.query.filter_by(
+    admin_id=admin_id,
+    ativo=True
+).order_by(CategoriaFluxoCaixa.tipo, CategoriaFluxoCaixa.nome).all()
+```
+
+Sugestão:
+
+```python
+categorias_saida = CategoriaFluxoCaixa.query.filter_by(
+    admin_id=admin_id,
+    ativo=True,
+    tipo='SAIDA'
+).order_by(CategoriaFluxoCaixa.nome).all()
+
+categorias_entrada = CategoriaFluxoCaixa.query.filter_by(
+    admin_id=admin_id,
+    ativo=True,
+    tipo='ENTRADA'
+).order_by(CategoriaFluxoCaixa.nome).all()
+```
+
+E no `render_template` passar:
+
+```python
+categorias_saida=categorias_saida,
+categorias_entrada=categorias_entrada,
+```
+
+Você pode manter `categorias_tenant` temporariamente para não quebrar os selects antigos, mas o ideal é trocar as saídas para usar `categorias_saida` e as entradas para usar `categorias_entrada`.
+
+---
+
+### 3. No confirmar, aplicar categoria também nas entradas
+
+Depois dos loops das saídas, adicionar:
+
+```python
+# Aplicar categoria personalizada nas entradas
+for i, row in enumerate(entradas):
+    cat_entrada = request.form.get(f'cat_entrada_{i}')
+    if cat_entrada:
+        _aplicar_categoria(row, cat_entrada)
+```
+
+Ponto importante: a função `_aplicar_categoria` hoje não valida se a categoria pertence ao admin nem se é `ENTRADA`. Para ficar mais seguro, dá para criar uma versão validada:
+
+```python
+def _aplicar_categoria(row, cat_val, tipo_esperado=None):
+    if not cat_val:
+        return
+
+    if cat_val.startswith('cfc_'):
+        try:
+            cat_id = int(cat_val[4:])
+        except ValueError:
+            return
+
+        q = CategoriaFluxoCaixa.query.filter_by(
+            id=cat_id,
+            admin_id=admin_id,
+            ativo=True
+        )
+
+        if tipo_esperado:
+            q = q.filter_by(tipo=tipo_esperado)
+
+        cat_obj = q.first()
+        if not cat_obj:
+            return
+
+        row['categoria_fluxo_caixa_id'] = cat_obj.id
+        row['tipo_categoria'] = row.get('tipo_categoria') or (
+            'RECEITA' if tipo_esperado == 'ENTRADA' else 'OUTROS'
+        )
+    else:
+        row['tipo_categoria'] = cat_val
+        row['categoria_fluxo_caixa_id'] = None
+```
+
+Uso:
+
+```python
+_aplicar_categoria(row, cat_editada, tipo_esperado='SAIDA')
+_aplicar_categoria(row, cat_manual, tipo_esperado='SAIDA')
+_aplicar_categoria(row, cat_entrada, tipo_esperado='ENTRADA')
+```
+
+---
+
+### 4. No `services/importacao_excel.py`, passar `categoria_fluxo_caixa_id` no FluxoCaixa de entradas
+
+No loop de entradas, antes de criar `ContaReceber`:
+
+```python
+cfc_id = row.get('categoria_fluxo_caixa_id')
+```
+
+No `FluxoCaixa` de entrada paga:
+
+```python
+fc = FluxoCaixa(
+    admin_id=admin_id,
+    data_movimento=data_obj,
+    tipo_movimento='ENTRADA',
+    categoria='receita',
+    valor=valor,
+    descricao=(row.get('descricao') or cliente)[:200],
+    obra_id=obra_id,
+    referencia_id=cr.id,
+    referencia_tabela='conta_receber',
+    import_batch_id=batch_id,
+    categoria_fluxo_caixa_id=cfc_id,
+)
+```
+
+Isso fecha o principal da task.
+
+---
+
+## Sobre gravar também em `ContaReceber`
+
+Pelo trecho analisado, `ContaReceber` não tem `categoria_fluxo_caixa_id`. Então há duas opções:
+
+### Opção A — mais segura e menor escopo
+
+Gravar a categoria personalizada apenas no `FluxoCaixa`.
+
+Vantagem: resolve o impacto prático da importação de fluxo, sem mexer no banco.
+
+### Opção B — mais completa
+
+Adicionar `categoria_fluxo_caixa_id` também em `ContaReceber`.
+
+Aí precisa:
+
+```python
+categoria_fluxo_caixa_id = db.Column(
+    db.Integer,
+    db.ForeignKey('categoria_fluxo_caixa.id'),
+    nullable=True
+)
+```
+
+E migration:
+
+```sql
+ALTER TABLE conta_receber
+ADD COLUMN categoria_fluxo_caixa_id INTEGER NULL;
+
+ALTER TABLE conta_receber
+ADD CONSTRAINT fk_conta_receber_categoria_fluxo_caixa
+FOREIGN KEY (categoria_fluxo_caixa_id)
+REFERENCES categoria_fluxo_caixa(id);
+```
+
+Depois, no `ContaReceber(...)`:
+
+```python
+categoria_fluxo_caixa_id=cfc_id,
+```
+
+Eu faria a **Opção A primeiro**, porque a task fala “ContaReceber or FluxoCaixa”, e o `FluxoCaixa` é o registro que realmente alimenta o fluxo.
+
+---
+
+## Prompt pronto para o Replit/Codex
+
+````md
+Implement Task #15 — Apply custom cash flow categories on entradas during cash flow import.
+
+Context:
+The import preview already supports custom category selection for saídas in `templates/importacao/preview_fluxo.html`, but the Entradas table is read-only and does not expose a category selector. Users who created custom ENTRADA categories must be able to assign them to incoming payments before confirming the import.
+
+Important constraints:
+- Do not remove existing behavior for saídas.
+- Do not break existing signed payload flow using `dados_json`.
+- Keep compatibility with existing `tipo_categoria` logic.
+- Custom categories must be tenant-safe: only categories from the current `admin_id`, active, and with matching `tipo` may be accepted.
+- For entradas, only show categories where `CategoriaFluxoCaixa.tipo == 'ENTRADA'`.
+- For saídas, prefer categories where `tipo == 'SAIDA'`.
+
+Files to update:
+1. `templates/importacao/preview_fluxo.html`
+2. `importacao_views.py`
+3. `services/importacao_excel.py`
+
+Required changes:
+
+1. In `importacao_views.py`, in the preview route:
+- Replace or complement `categorias_tenant` with:
+  - `categorias_saida`: active categories for current admin with `tipo='SAIDA'`
+  - `categorias_entrada`: active categories for current admin with `tipo='ENTRADA'`
+- Pass both lists to the template.
+
+2. In `templates/importacao/preview_fluxo.html`:
+- In the Entradas table, add a new column called `Categoria`.
+- For each entrada row, add:
+  - `<select name="cat_entrada_{{ loop.index0 }}" class="form-select form-select-sm cat-select">`
+  - default option: `— Receita padrão —`
+  - optgroup `Categorias Personalizadas`
+  - options from `categorias_entrada`
+  - values using format `cfc_{{ cat.id }}`
+  - preserve selected state if `r.get('categoria_fluxo_caixa_id') == cat.id`
+- Do not show SAIDA categories in the Entradas table.
+
+3. In `importacao_views.py`, inside `fluxo_caixa_confirmar`:
+- Update `_aplicar_categoria` so it can optionally validate category type:
+  - when value starts with `cfc_`, parse id
+  - query `CategoriaFluxoCaixa` by `id`, `admin_id`, `ativo=True`
+  - if `tipo_esperado` is passed, also validate `tipo`
+  - only set `row['categoria_fluxo_caixa_id']` if the category belongs to the current admin and has the expected type
+- Continue supporting legacy category strings for saídas.
+- Apply entrada categories with:
+
+```python
+for i, row in enumerate(entradas):
+    cat_entrada = request.form.get(f'cat_entrada_{i}')
+    if cat_entrada:
+        _aplicar_categoria(row, cat_entrada, tipo_esperado='ENTRADA')
+````
+
+* Apply saída categories with `tipo_esperado='SAIDA'`.
+
+4. In `services/importacao_excel.py`, in the Entradas import loop:
+
+* Read:
+
+```python
+cfc_id = row.get('categoria_fluxo_caixa_id')
+```
+
+* When creating `FluxoCaixa` for `status == 'PAGO'`, pass:
+
+```python
+categoria_fluxo_caixa_id=cfc_id
+```
+
+* Keep `categoria='receita'` for backward compatibility.
+
+5. Do not add `categoria_fluxo_caixa_id` to `ContaReceber` unless the model already has this column. If it does not exist, only persist the selected category on the `FluxoCaixa` record for paid entradas.
+
+Acceptance criteria:
+
+* Entradas preview rows display a category select.
+* The select only lists active custom categories with `tipo='ENTRADA'` for the current admin.
+* Confirming the import stores the selected category id in the entrada row payload before calling `ImportacaoFluxoCaixa.importar`.
+* Paid entradas create `FluxoCaixa` records with `categoria_fluxo_caixa_id` set.
+* Existing saídas category behavior continues working.
+* Invalid or cross-tenant category ids are ignored safely.
+* No duplicate entries are introduced.
+
+```
+
+## Resumo direto
+
+A task deve mexer em **3 pontos**:
+
+1. **Tela:** adicionar `<select>` de categoria nas Entradas.
+2. **Confirmar:** ler `cat_entrada_0`, `cat_entrada_1`, etc., e aplicar `categoria_fluxo_caixa_id`.
+3. **Serviço:** passar `categoria_fluxo_caixa_id` no `FluxoCaixa` criado para entradas `PAGO`.
+
+Eu não alterei o repositório.
+```
+
+[1]: https://chatgpt.com/c/685aea6d-a988-8011-bd5e-bb57dc8bd2e5 "Transcrição de contas contábeis"
+[2]: https://chatgpt.com/c/69d396b0-629c-83e9-9215-846b5aa47440 "Manual Módulo Financeiro SIGE"
+[3]: https://chatgpt.com/c/688beb1a-e300-8331-a228-436de1e08b81 "Equipe ideal para aplicativo"
+[4]: https://chatgpt.com/c/685aefd8-f6b0-8011-bff6-8cb2e94ba2a1 "Balancete Contábil Automático IA"
+[5]: https://chatgpt.com/c/685ae48c-e30c-8011-95b3-1d1960c312e9 "Automação Balancete Contábil"
+[6]: https://chatgpt.com/c/6777fea5-c93c-8011-8ec1-e25357fc8e75 "Saint Paul"
+[7]: https://chatgpt.com/c/69e11bc6-a610-83e9-aac3-19af820617c5 "Revisão de Lógica Estratégica"
+[8]: https://chatgpt.com/c/685c4295-662c-8011-bfff-197068c8a861 "Plano de Contas"
+[9]: https://chatgpt.com/c/69b2db53-e128-8326-9c5b-0e29897d4c78 "Planilha de entradas"
+[10]: https://chatgpt.com/c/69df849d-d0b0-83e9-9f6f-9ae74b60dca0 "Faturamento direto e DRE"
+[11]: https://chatgpt.com/c/687fdb86-7e64-8328-8d6e-43b4c18c103f "Balancete e Fluxo de Caixa"
+[12]: https://chatgpt.com/c/685bd2ff-46c4-8011-b93e-c1dda2380a6e "Erro conexão banco Replit"
+[13]: https://chatgpt.com/c/68472a35-8540-8011-ae3e-5ec10c06fdff "Meia Lua"
+[14]: https://chatgpt.com/c/6a0cbb7b-7430-83e9-ac45-363748cb2645 "Estratégia de vídeo comercial"
+[15]: https://chatgpt.com/c/68b86a76-b478-8321-b560-7b9e4ef3d613 "SIGE e Lean Construction"
+[16]: https://chatgpt.com/c/689115ad-9224-8321-a8f6-2148781cd5ce "Solução SIGE para Construção"
+[17]: https://chatgpt.com/c/6a072696-1380-83e9-a5e4-a00193d04a25 "Transcrição reunião 15/05/26"
