@@ -39,12 +39,7 @@ class ObraForm(FlaskForm):
     data_previsao_fim = DateField('Data de Previsão de Fim', validators=[Optional()])
     orcamento = FloatField('Orçamento', validators=[Optional(), NumberRange(min=0)])
 
-    status = SelectField('Status', choices=[
-        ('Em andamento', 'Em andamento'),
-        ('Concluída', 'Concluída'),
-        ('Pausada', 'Pausada'),
-        ('Cancelada', 'Cancelada')
-    ], default='Em andamento')
+    status = SelectField('Status', choices=[], validate_choice=False, default='Em Andamento')
     responsavel_id = SelectField('Responsável', coerce=int, validators=[Optional()])
 
 class VeiculoForm(FlaskForm):
@@ -52,19 +47,8 @@ class VeiculoForm(FlaskForm):
     marca = StringField('Marca', validators=[DataRequired(), Length(max=50)])
     modelo = StringField('Modelo', validators=[DataRequired(), Length(max=50)])
     ano = IntegerField('Ano', validators=[Optional(), NumberRange(min=1900, max=2030)])
-    tipo = SelectField('Tipo', choices=[
-        ('Carro', 'Carro'),
-        ('Caminhão', 'Caminhão'),
-        ('Moto', 'Moto'),
-        ('Van', 'Van'),
-        ('Outro', 'Outro')
-    ], validators=[DataRequired()])
-    status = SelectField('Status', choices=[
-        ('Disponível', 'Disponível'),
-        ('Em uso', 'Em uso'),
-        ('Manutenção', 'Manutenção'),
-        ('Indisponível', 'Indisponível')
-    ], default='Disponível')
+    tipo = SelectField('Tipo', choices=[], validate_choice=False, validators=[DataRequired()])
+    status = SelectField('Status', choices=[], validate_choice=False, default='Disponível')
     km_atual = IntegerField('KM Atual', validators=[Optional(), NumberRange(min=0)])
     data_ultima_manutencao = DateField('Data da Última Manutenção', validators=[Optional()])
     data_proxima_manutencao = DateField('Data da Próxima Manutenção', validators=[Optional()])
@@ -74,23 +58,8 @@ class VeiculoForm(FlaskForm):
 class ServicoForm(FlaskForm):
     nome = StringField('Nome', validators=[DataRequired(), Length(max=100)])
     descricao = TextAreaField('Descrição')
-    categoria = SelectField('Categoria', choices=[
-        ('estrutura', 'Estrutura'),
-        ('alvenaria', 'Alvenaria'),
-        ('revestimento', 'Revestimento'),
-        ('acabamento', 'Acabamento'),
-        ('instalacoes', 'Instalações'),
-        ('outros', 'Outros')
-    ], validators=[DataRequired()])
-    unidade_medida = SelectField('Unidade de Medida', choices=[
-        ('m2', 'Metro Quadrado (m²)'),
-        ('m3', 'Metro Cúbico (m³)'),
-        ('m', 'Metro Linear (m)'),
-        ('kg', 'Quilograma (kg)'),
-        ('ton', 'Tonelada (ton)'),
-        ('un', 'Unidade (un)'),
-        ('h', 'Hora (h)')
-    ], validators=[DataRequired()])
+    categoria = SelectField('Categoria', choices=[], validate_choice=False, validators=[DataRequired()])
+    unidade_medida = SelectField('Unidade de Medida', choices=[], validate_choice=False, validators=[DataRequired()])
     unidade_simbolo = StringField('Símbolo da Unidade', validators=[Optional(), Length(max=10)])
     custo_unitario = FloatField('Custo Unitário', validators=[Optional(), NumberRange(min=0)])
     complexidade = SelectField('Complexidade', choices=[
@@ -118,12 +87,7 @@ class AlimentacaoForm(FlaskForm):
     obra_id = SelectField('Obra', coerce=int, validators=[Optional()])
     restaurante_id = SelectField('Restaurante', coerce=int, validators=[Optional()])
     data = DateField('Data', validators=[DataRequired()], default=date.today)
-    tipo = SelectField('Tipo', choices=[
-        ('cafe', 'Café da Manhã'),
-        ('almoco', 'Almoço'),
-        ('jantar', 'Jantar'),
-        ('lanche', 'Lanche')
-    ], validators=[DataRequired()])
+    tipo = SelectField('Tipo', choices=[], validate_choice=False, validators=[DataRequired()])
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     observacoes = TextAreaField('Observações')
 
@@ -151,33 +115,9 @@ class RDOForm(FlaskForm):
     obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
     
     # Condições climáticas
-    tempo_manha = SelectField('Tempo da Manhã', choices=[
-        ('', 'Selecione...'),
-        ('Ensolarado', 'Ensolarado'),
-        ('Nublado', 'Nublado'),
-        ('Chuvoso', 'Chuvoso'),
-        ('Parcialmente Nublado', 'Parcialmente Nublado'),
-        ('Garoa', 'Garoa'),
-        ('Tempestade', 'Tempestade')
-    ])
-    tempo_tarde = SelectField('Tempo da Tarde', choices=[
-        ('', 'Selecione...'),
-        ('Ensolarado', 'Ensolarado'),
-        ('Nublado', 'Nublado'),
-        ('Chuvoso', 'Chuvoso'),
-        ('Parcialmente Nublado', 'Parcialmente Nublado'),
-        ('Garoa', 'Garoa'),
-        ('Tempestade', 'Tempestade')
-    ])
-    tempo_noite = SelectField('Tempo da Noite', choices=[
-        ('', 'Selecione...'),
-        ('Ensolarado', 'Ensolarado'),
-        ('Nublado', 'Nublado'),
-        ('Chuvoso', 'Chuvoso'),
-        ('Parcialmente Nublado', 'Parcialmente Nublado'),
-        ('Garoa', 'Garoa'),
-        ('Tempestade', 'Tempestade')
-    ])
+    tempo_manha = SelectField('Tempo da Manhã', choices=[], validate_choice=False)
+    tempo_tarde = SelectField('Tempo da Tarde', choices=[], validate_choice=False)
+    tempo_noite = SelectField('Tempo da Noite', choices=[], validate_choice=False)
     observacoes_meteorologicas = TextAreaField('Observações Meteorológicas')
     
     # Comentários
@@ -213,17 +153,10 @@ class RestauranteForm(FlaskForm):
     ativo = BooleanField('Ativo', default=True)
 
 
-class AlimentacaoMultiplaForm(FlaskForm):
+class AlimentacaoMultiplaForm(FlaskForm):  # noqa: E302
     """Formulário para lançamento de alimentação para múltiplos funcionários"""
     data = DateField('Data', validators=[DataRequired()], default=date.today)
-    tipo = SelectField('Tipo', choices=[
-        ('marmita', 'Marmita'),
-        ('refeicao_local', 'Refeição no Local'),
-        ('cafe', 'Café da Manhã'),
-        ('jantar', 'Jantar'),
-        ('lanche', 'Lanche'),
-        ('outros', 'Outros')
-    ], validators=[DataRequired()])
+    tipo = SelectField('Tipo', choices=[], validate_choice=False, validators=[DataRequired()])
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
     restaurante_id = SelectField('Restaurante (Opcional)', coerce=int, validators=[Optional()])
@@ -292,17 +225,7 @@ class CustoVeiculoForm(FlaskForm):
     obra_id = SelectField('Obra (Opcional)', coerce=int, validators=[Optional()])
     data_custo = DateField('Data do Custo', validators=[DataRequired()], default=date.today)
     valor = FloatField('Valor Total (R$)', validators=[DataRequired(), NumberRange(min=0)])
-    tipo_custo = SelectField('Tipo de Custo', choices=[
-        ('combustivel', 'Combustível'),
-        ('manutencao', 'Manutenção'),
-        ('seguro', 'Seguro'),
-        ('multa', 'Multa'),
-        ('lavagem', 'Lavagem'),
-        ('ipva', 'IPVA'),
-        ('licenciamento', 'Licenciamento'),
-        ('pneus', 'Pneus'),
-        ('outros', 'Outros')
-    ], validators=[DataRequired()])
+    tipo_custo = SelectField('Tipo de Custo', choices=[], validate_choice=False, validators=[DataRequired()])
     descricao = TextAreaField('Descrição')
     km_atual = IntegerField('KM Atual', validators=[Optional(), NumberRange(min=0)])
     fornecedor = StringField('Fornecedor/Posto', validators=[Optional(), Length(max=100)])
@@ -311,24 +234,12 @@ class CustoVeiculoForm(FlaskForm):
     litros_combustivel = FloatField('Litros Abastecidos', validators=[Optional(), NumberRange(min=0)])
     preco_por_litro = FloatField('Preço por Litro (R$)', validators=[Optional(), NumberRange(min=0)])
     posto_combustivel = StringField('Nome do Posto', validators=[Optional(), Length(max=100)])
-    tipo_combustivel = SelectField('Tipo de Combustível', choices=[
-        ('', 'Selecione...'),
-        ('gasolina', 'Gasolina'),
-        ('etanol', 'Etanol'),
-        ('diesel', 'Diesel'),
-        ('gnv', 'GNV')
-    ], validators=[Optional()])
+    tipo_combustivel = SelectField('Tipo de Combustível', choices=[], validate_choice=False, validators=[Optional()])
     tanque_cheio = BooleanField('Tanque Cheio?', default=False)
     
     # Campos para manutenção
     numero_nota_fiscal = StringField('Número da NF', validators=[Optional(), Length(max=50)])
-    categoria_manutencao = SelectField('Categoria da Manutenção', choices=[
-        ('', 'Selecione...'),
-        ('preventiva', 'Preventiva'),
-        ('corretiva', 'Corretiva'),
-        ('emergencial', 'Emergencial'),
-        ('revisao', 'Revisão')
-    ], validators=[Optional()])
+    categoria_manutencao = SelectField('Categoria da Manutenção', choices=[], validate_choice=False, validators=[Optional()])
     proxima_manutencao_km = IntegerField('Próxima Manutenção (KM)', validators=[Optional(), NumberRange(min=0)])
     proxima_manutencao_data = DateField('Próxima Manutenção (Data)', validators=[Optional()])
     
@@ -392,34 +303,14 @@ class ReceitaForm(FlaskForm):
     valor = FloatField('Valor', validators=[DataRequired(), NumberRange(min=0)])
     data_receita = DateField('Data da Receita', validators=[DataRequired()], default=date.today)
     data_recebimento = DateField('Data do Recebimento', validators=[Optional()])
-    status = SelectField('Status', choices=[
-        ('Pendente', 'Pendente'),
-        ('Recebido', 'Recebido'),
-        ('Cancelado', 'Cancelado')
-    ], default='Pendente')
-    forma_recebimento = SelectField('Forma de Recebimento', choices=[
-        ('', 'Selecione...'),
-        ('Dinheiro', 'Dinheiro'),
-        ('Transferência', 'Transferência Bancária'),
-        ('Cartão', 'Cartão'),
-        ('Cheque', 'Cheque'),
-        ('PIX', 'PIX'),
-        ('Outros', 'Outros')
-    ], validators=[Optional()])
+    status = SelectField('Status', choices=[], validate_choice=False, default='Pendente')
+    forma_recebimento = SelectField('Forma de Recebimento', choices=[], validate_choice=False, validators=[Optional()])
     observacoes = TextAreaField('Observações')
 
 class OrcamentoObraForm(FlaskForm):
     """Formulário para orçamento de obras"""
     obra_id = SelectField('Obra', coerce=int, validators=[DataRequired()])
-    categoria = SelectField('Categoria', choices=[
-        ('mao_obra', 'Mão de Obra'),
-        ('material', 'Material'),
-        ('equipamento', 'Equipamento'),
-        ('servicos_terceiros', 'Serviços de Terceiros'),
-        ('alimentacao', 'Alimentação'),
-        ('transporte', 'Transporte'),
-        ('outros', 'Outros')
-    ], validators=[DataRequired()])
+    categoria = SelectField('Categoria', choices=[], validate_choice=False, validators=[DataRequired()])
     orcamento_planejado = FloatField('Orçamento Planejado', validators=[DataRequired(), NumberRange(min=0)])
     receita_planejada = FloatField('Receita Planejada', validators=[Optional(), NumberRange(min=0)])
     observacoes = TextAreaField('Observações')
@@ -460,12 +351,7 @@ class ManutencaoVeiculoForm(FlaskForm):
     custo_veiculo_id = HiddenField('Custo Veículo ID')
     
     # Classificação da manutenção
-    tipo_manutencao = SelectField('Tipo de Manutenção', choices=[
-        ('preventiva', 'Preventiva'),
-        ('corretiva', 'Corretiva'),
-        ('emergencial', 'Emergencial'),
-        ('recall', 'Recall/Campanha')
-    ], validators=[DataRequired()])
+    tipo_manutencao = SelectField('Tipo de Manutenção', choices=[], validate_choice=False, validators=[DataRequired()])
     
     categoria = SelectField('Categoria', choices=[
         ('motor', 'Motor'),
@@ -480,12 +366,7 @@ class ManutencaoVeiculoForm(FlaskForm):
         ('outros', 'Outros')
     ], validators=[DataRequired()])
     
-    prioridade = SelectField('Prioridade', choices=[
-        ('baixa', 'Baixa'),
-        ('media', 'Média'),
-        ('alta', 'Alta'),
-        ('urgente', 'Urgente')
-    ], default='media', validators=[DataRequired()])
+    prioridade = SelectField('Prioridade', choices=[], validate_choice=False, default='Média', validators=[DataRequired()])
     
     # Dados da execução
     data_manutencao = DateField('Data da Manutenção', validators=[DataRequired()], default=date.today)

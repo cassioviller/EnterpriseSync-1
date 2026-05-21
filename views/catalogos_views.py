@@ -44,7 +44,11 @@ def hub():
     admin_id, err = _require_admin()
     if err:
         return err
-    return render_template('catalogos/hub.html')
+    from services.dropdown_service import get_grupos_por_modulo, MODULOS_LABELS
+    grupos_por_modulo = get_grupos_por_modulo(admin_id)
+    return render_template('catalogos/hub.html',
+                           grupos_por_modulo=grupos_por_modulo,
+                           modulos_labels=MODULOS_LABELS)
 
 
 # ============================================================

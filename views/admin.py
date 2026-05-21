@@ -79,6 +79,13 @@ def criar_admin():
             db.session.rollback()
             logger.warning(f"[WARN] Seed categorias falhou para admin {novo_admin.id}: {_seed_err}")
 
+        try:
+            from services.dropdown_service import seed_grupos_sistema
+            seed_grupos_sistema(novo_admin.id, commit=True)
+            logger.info(f"[OK] Grupos de dropdown seeded para admin {novo_admin.id}")
+        except Exception as _ddseed_err:
+            logger.warning(f"[WARN] Seed dropdown_service falhou para admin {novo_admin.id}: {_ddseed_err}")
+
         flash(f'Administrador {nome} criado com sucesso!', 'success')
         logger.info(f"[OK] SUPER ADMIN: Novo admin criado - {nome} ({email})")
         

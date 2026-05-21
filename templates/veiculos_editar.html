@@ -479,11 +479,9 @@ console.log('Initializing Editar Veículo with light theme...');
                         <label for="tipo">Tipo <span class="required">*</span></label>
                         <select id="tipo" name="tipo" class="modern-select" required>
                             <option value="">Selecione o tipo</option>
-                            <option value="Utilitário" {% if veiculo.tipo == 'Utilitário' %}selected{% endif %}>Utilitário</option>
-                            <option value="Caminhão" {% if veiculo.tipo == 'Caminhão' %}selected{% endif %}>Caminhão</option>
-                            <option value="Van" {% if veiculo.tipo == 'Van' %}selected{% endif %}>Van</option>
-                            <option value="Carro" {% if veiculo.tipo == 'Carro' %}selected{% endif %}>Carro</option>
-                            <option value="Motocicleta" {% if veiculo.tipo == 'Motocicleta' %}selected{% endif %}>Motocicleta</option>
+                            {% for t in (opcoes_veiculo_tipo or ['Carro','Caminhão','Moto','Van','Utilitário','Outro']) %}
+                            <option value="{{ t }}" {% if veiculo.tipo == t %}selected{% endif %}>{{ t }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -547,20 +545,18 @@ console.log('Initializing Editar Veículo with light theme...');
                     <div class="form-group">
                         <label for="combustivel">Combustível</label>
                         <select id="combustivel" name="combustivel" class="modern-select">
-                            <option value="Gasolina" {% if (veiculo.combustivel) == 'Gasolina' %}selected{% endif %}>Gasolina</option>
-                            <option value="Álcool" {% if veiculo.combustivel == 'Álcool' %}selected{% endif %}>Álcool</option>
-                            <option value="Diesel" {% if veiculo.combustivel == 'Diesel' %}selected{% endif %}>Diesel</option>
-                            <option value="Flex" {% if veiculo.combustivel == 'Flex' %}selected{% endif %}>Flex</option>
-                            <option value="GNV" {% if veiculo.combustivel == 'GNV' %}selected{% endif %}>GNV</option>
+                            {% for c in (opcoes_veiculo_combustivel or ['Gasolina','Etanol','Diesel','Flex','GNV','Elétrico']) %}
+                            <option value="{{ c }}" {% if veiculo.combustivel == c %}selected{% endif %}>{{ c }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     
                     <div class="form-group">
                         <label for="status">Status Inicial</label>
                         <select id="status" name="status" class="modern-select">
-                            <option value="Disponível" {% if (veiculo.status or 'Disponível') == 'Disponível' %}selected{% endif %}>Disponível</option>
-                            <option value="Manutenção" {% if veiculo.status == 'Manutenção' %}selected{% endif %}>Manutenção</option>
-                            <option value="Inativo" {% if veiculo.status == 'Inativo' %}selected{% endif %}>Inativo</option>
+                            {% for s in (opcoes_veiculo_status or ['Disponível','Em Uso','Manutenção','Indisponível']) %}
+                            <option value="{{ s }}" {% if veiculo.status == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>

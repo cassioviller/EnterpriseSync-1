@@ -349,9 +349,9 @@
                         <label class="form-label">Tipo</label>
                         <select name="tipo_movimento" class="form-select form-select-sm">
                             <option value="">Todos</option>
-                            <option value="ENTRADA" {% if dados_relatorio.filtros.tipo_movimento == 'ENTRADA' %}selected{% endif %}>Entrada</option>
-                            <option value="SAIDA" {% if dados_relatorio.filtros.tipo_movimento == 'SAIDA' %}selected{% endif %}>Saída</option>
-                            <option value="DEVOLUCAO" {% if dados_relatorio.filtros.tipo_movimento == 'DEVOLUCAO' %}selected{% endif %}>Devolução</option>
+                            {% for opt in (opcoes_almox_tipo_movimento or ['ENTRADA', 'SAIDA', 'DEVOLUCAO', 'AJUSTE']) %}
+                            <option value="{{ opt }}" {% if dados_relatorio.filtros.tipo_movimento == opt %}selected{% endif %}>{{ opt|title }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="col-md-2">

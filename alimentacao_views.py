@@ -277,10 +277,14 @@ def lancamento_novo():
     obras = Obra.query.filter_by(admin_id=admin_id).order_by(Obra.nome).all()
     funcionarios = Funcionario.query.filter_by(admin_id=admin_id).order_by(Funcionario.nome).all()
     
+    from services.dropdown_service import get_opcoes_valores
+    opcoes_alimentacao_tipo = get_opcoes_valores('alimentacao_tipo', admin_id)
+
     return render_template('alimentacao/lancamento_novo.html', 
                          restaurantes=restaurantes, 
                          obras=obras, 
-                         funcionarios=funcionarios)
+                         funcionarios=funcionarios,
+                         opcoes_alimentacao_tipo=opcoes_alimentacao_tipo)
 
 
 # ===== NOVO SISTEMA v2 - MÚLTIPLOS ITENS =====
@@ -632,7 +636,10 @@ def item_novo():
             logger.error(f"Erro ao criar item: {e}")
             flash('Erro ao cadastrar item', 'error')
     
-    return render_template('alimentacao/item_novo.html')
+    from services.dropdown_service import get_opcoes_valores
+    opcoes_alimentacao_tipo = get_opcoes_valores('alimentacao_tipo', admin_id)
+    return render_template('alimentacao/item_novo.html',
+                           opcoes_alimentacao_tipo=opcoes_alimentacao_tipo)
 
 
 @alimentacao_bp.route('/itens/<int:item_id>/editar', methods=['GET', 'POST'])

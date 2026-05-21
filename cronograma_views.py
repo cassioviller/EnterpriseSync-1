@@ -291,9 +291,11 @@ def criar_tarefa(obra_id: int):
         data_inicio, duracao, cal.considerar_sabado, cal.considerar_domingo
     )
 
-    responsavel = (data.get('responsavel') or 'empresa').strip().lower()
-    if responsavel not in ('empresa', 'terceiros', 'subempreitada'):
-        responsavel = 'empresa'
+    from services.dropdown_service import get_opcoes_valores as _get_resp_opcoes
+    _resp_validos = [v.lower() for v in _get_resp_opcoes('cronograma_responsavel', admin_id)] or ['empresa', 'terceiros', 'subempreitada']
+    responsavel = (data.get('responsavel') or _resp_validos[0]).strip().lower()
+    if responsavel not in _resp_validos:
+        responsavel = _resp_validos[0]
 
     sub_mestre_id = data.get('subatividade_mestre_id')
     try:
@@ -476,8 +478,10 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
                 }), 400
 
     if 'responsavel' in data:
+        from services.dropdown_service import get_opcoes_valores as _get_resp_opcoes2
+        _resp_ok = [v.lower() for v in _get_resp_opcoes2('cronograma_responsavel', admin_id)] or ['empresa', 'terceiros', 'subempreitada']
         resp = str(data['responsavel']).strip().lower()
-        if resp in ('empresa', 'terceiros', 'subempreitada'):
+        if resp in _resp_ok:
             tarefa.responsavel = resp
 
     if 'percentual_concluido' in data:

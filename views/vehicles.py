@@ -703,11 +703,23 @@ def editar_custo_veiculo(custo_id):
         ).first_or_404()
         
         form = CustoVeiculoForm(obj=custo)
+        from services.dropdown_service import populate_form_choices
+        populate_form_choices(form, tenant_admin_id)
         
         if form.validate_on_submit():
+            # Normalizar tipo_custo: converte labels do catálogo → código canônico
+            _TIPO_CUSTO_NORM = {
+                'combustível': 'combustivel', 'combustivel': 'combustivel',
+                'manutenção': 'manutencao',  'manutencao': 'manutencao',
+                'seguro': 'seguro', 'multa': 'multa', 'lavagem': 'lavagem',
+                'ipva': 'ipva', 'licenciamento': 'licenciamento',
+                'pneus': 'pneus', 'outros': 'outros',
+            }
+            tipo_custo_raw = (form.tipo_custo.data or '').strip()
+            tipo_custo_normalizado = _TIPO_CUSTO_NORM.get(tipo_custo_raw.lower(), tipo_custo_raw.lower())
             # Atualizar dados
             custo.data_custo = form.data_custo.data
-            custo.tipo_custo = form.tipo_custo.data
+            custo.tipo_custo = tipo_custo_normalizado
             custo.valor = form.valor.data
             custo.km_custo = form.km_custo.data
             custo.litros = form.litros.data
@@ -831,6 +843,8 @@ def novo_custo_veiculo(id):
     
     form = CustoVeiculoForm()
     form.veiculo_id.data = veiculo.id
+    from services.dropdown_service import populate_form_choices
+    populate_form_choices(form, admin_id)
     
     if form.validate_on_submit():
         try:
@@ -845,14 +859,29 @@ def novo_custo_veiculo(id):
                     flash(f'Erro: Quilometragem não pode diminuir. Atual: {veiculo.km_atual}km, Tentativa: {form.km_atual.data}km', 'error')
                     return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
             
+            # Normalizar tipo_custo: converte labels do catálogo → código canônico
+            _TIPO_CUSTO_NORM = {
+                'combustível': 'combustivel', 'combustivel': 'combustivel',
+                'manutenção': 'manutencao',  'manutencao': 'manutencao',
+                'seguro': 'seguro',
+                'multa': 'multa',
+                'lavagem': 'lavagem',
+                'ipva': 'ipva',
+                'licenciamento': 'licenciamento',
+                'pneus': 'pneus',
+                'outros': 'outros',
+            }
+            tipo_custo_raw = (form.tipo_custo.data or '').strip()
+            tipo_custo = _TIPO_CUSTO_NORM.get(tipo_custo_raw.lower(), tipo_custo_raw.lower())
+
             # Validar tipo de custo
-            tipos_validos = ['combustivel', 'manutencao', 'seguro', 'multa', 'ipva', 'licenciamento', 'pneus', 'outros']
-            if form.tipo_custo.data not in tipos_validos:
-                flash(f'Tipo de custo inválido. Use: {", ".join(tipos_validos)}', 'error')
+            tipos_validos = list(_TIPO_CUSTO_NORM.values())
+            if tipo_custo not in tipos_validos:
+                flash(f'Tipo de custo inválido: {tipo_custo_raw}', 'error')
                 return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
             
             # Validações específicas para combustível
-            if form.tipo_custo.data == 'combustivel':
+            if tipo_custo == 'combustivel':
                 if not form.litros_combustivel.data or form.litros_combustivel.data <= 0:
                     flash('Litros de combustível é obrigatório para abastecimentos.', 'error')
                     return render_template('veiculos/novo_custo.html', form=form, veiculo=veiculo)
@@ -867,28 +896,28 @@ def novo_custo_veiculo(id):
                 obra_id=form.obra_id.data if form.obra_id.data else None,
                 data_custo=form.data_custo.data,
                 valor=form.valor.data,
-                tipo_custo=form.tipo_custo.data,
+                tipo_custo=tipo_custo,
                 descricao=form.descricao.data,
                 km_atual=form.km_atual.data or veiculo.km_atual,
                 fornecedor=form.fornecedor.data,
                 # Campos específicos para combustível
-                litros_combustivel=form.litros_combustivel.data if form.tipo_custo.data == 'combustivel' else None,
-                preco_por_litro=form.preco_por_litro.data if form.tipo_custo.data == 'combustivel' else None,
-                posto_combustivel=form.posto_combustivel.data if form.tipo_custo.data == 'combustivel' else None,
-                tipo_combustivel=form.tipo_combustivel.data if form.tipo_custo.data == 'combustivel' else None,
-                tanque_cheio=form.tanque_cheio.data if form.tipo_custo.data == 'combustivel' else False,
+                litros_combustivel=form.litros_combustivel.data if tipo_custo == 'combustivel' else None,
+                preco_por_litro=form.preco_por_litro.data if tipo_custo == 'combustivel' else None,
+                posto_combustivel=form.posto_combustivel.data if tipo_custo == 'combustivel' else None,
+                tipo_combustivel=form.tipo_combustivel.data if tipo_custo == 'combustivel' else None,
+                tanque_cheio=form.tanque_cheio.data if tipo_custo == 'combustivel' else False,
                 # Campos para manutenção
-                numero_nota_fiscal=form.numero_nota_fiscal.data if form.tipo_custo.data == 'manutencao' else None,
-                categoria_manutencao=form.categoria_manutencao.data if form.tipo_custo.data == 'manutencao' else None,
-                proxima_manutencao_km=form.proxima_manutencao_km.data if form.tipo_custo.data == 'manutencao' else None,
-                proxima_manutencao_data=form.proxima_manutencao_data.data if form.tipo_custo.data == 'manutencao' else None,
+                numero_nota_fiscal=form.numero_nota_fiscal.data if tipo_custo == 'manutencao' else None,
+                categoria_manutencao=form.categoria_manutencao.data if tipo_custo == 'manutencao' else None,
+                proxima_manutencao_km=form.proxima_manutencao_km.data if tipo_custo == 'manutencao' else None,
+                proxima_manutencao_data=form.proxima_manutencao_data.data if tipo_custo == 'manutencao' else None,
                 # Controle financeiro
                 centro_custo=form.centro_custo.data,
                 admin_id=admin_id
             )
             
             # Calcular próxima manutenção automaticamente se for manutenção
-            if form.tipo_custo.data == 'manutencao':
+            if tipo_custo == 'manutencao':
                 custo.calcular_proxima_manutencao()
             
             db.session.add(custo)
@@ -904,7 +933,7 @@ def novo_custo_veiculo(id):
                     tipo_movimento='SAIDA',
                     categoria='custo_veiculo',
                     valor=form.valor.data,
-                    descricao=f'{form.tipo_custo.data.title()} - {veiculo.placa} - {form.descricao.data}',
+                    descricao=f'{tipo_custo.title()} - {veiculo.placa} - {form.descricao.data}',
                     referencia_id=custo.id,
                     referencia_tabela='custo_veiculo'
                 )

@@ -89,12 +89,9 @@
                                 <label class="form-label">Categoria *</label>
                                 <select class="form-select" name="categoria" required>
                                     <option value="">Selecione</option>
-                                    <option value="ferramentas">Ferramentas</option>
-                                    <option value="materiais_construcao">Materiais de Construção</option>
-                                    <option value="epis">EPIs</option>
-                                    <option value="eletricos">Materiais Elétricos</option>
-                                    <option value="hidraulicos">Materiais Hidráulicos</option>
-                                    <option value="consumiveis">Consumíveis</option>
+                                    {% for c in (opcoes_almox_categoria or ['Ferramentas','EPIs','Materiais de Construção','Elétrico','Hidráulico','Outros']) %}
+                                    <option value="{{ c }}">{{ c }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -103,12 +100,9 @@
                                 <label class="form-label">Unidade *</label>
                                 <select class="form-select" name="unidade_medida" required>
                                     <option value="">Selecione</option>
-                                    <option value="un">Unidade</option>
-                                    <option value="kg">Quilograma</option>
-                                    <option value="m">Metro</option>
-                                    <option value="m2">Metro²</option>
-                                    <option value="m3">Metro³</option>
-                                    <option value="l">Litro</option>
+                                    {% for u in (opcoes_almox_unidade or ['un','kg','m','m²','m³','l','cx','pç']) %}
+                                    <option value="{{ u }}">{{ u }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -169,10 +163,9 @@
                                 <label class="form-label">Tipo *</label>
                                 <select class="form-select" name="tipo_movimento" required>
                                     <option value="">Selecione</option>
-                                    <option value="entrada">Entrada</option>
-                                    <option value="saida">Saída</option>
-                                    <option value="devolucao">Devolução</option>
-                                    <option value="ajuste">Ajuste</option>
+                                    {% for m in (opcoes_almox_tipo_movimento or ['ENTRADA','SAIDA','DEVOLUCAO','AJUSTE']) %}
+                                    <option value="{{ m }}">{{ m }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>

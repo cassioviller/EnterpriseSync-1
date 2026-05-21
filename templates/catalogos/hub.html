@@ -1,94 +1,178 @@
 {% extends "base_completo.html" %}
 
-{% block title %}Catálogos — SIGE{% endblock %}
+{% block title %}Central de Catálogos — SIGE{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row mb-4">
+
+    <div class="row mb-4 align-items-center">
         <div class="col">
-            <h1 class="h3 mb-0">
-                <i class="fas fa-book-open text-primary me-2"></i>
-                Central de Catálogos
+            <h1 class="h3 mb-1">
+                <i class="fas fa-book-open text-primary me-2"></i>Central de Catálogos
             </h1>
-            <p class="text-muted mb-0">Gerencie os dados auxiliares do sistema em um único lugar.</p>
+            <p class="text-muted mb-0">Gerencie todas as listas de opções do sistema em um único lugar, sem precisar de atualização de código.</p>
         </div>
     </div>
 
-    <div class="row g-4">
-        <!-- CategoriaFluxoCaixa -->
+    {# ─── Seção 1: Catálogos com tabelas próprias ─────────────────────────────── #}
+    <div class="row mb-2">
+        <div class="col">
+            <h5 class="text-muted fw-semibold text-uppercase small ls-1">
+                <i class="fas fa-table me-1"></i>Catálogos com tabelas dedicadas
+            </h5>
+            <hr class="mt-1">
+        </div>
+    </div>
+    <div class="row g-3 mb-5">
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex flex-column">
                     <div class="d-flex align-items-center mb-3">
                         <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
-                             style="width:48px;height:48px;background:linear-gradient(135deg,#198754,#157347);">
-                            <i class="fas fa-coins text-white fs-5"></i>
+                             style="width:44px;height:44px;background:linear-gradient(135deg,#198754,#157347);">
+                            <i class="fas fa-coins text-white"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0">Categorias de Fluxo de Caixa</h5>
+                            <h6 class="mb-0">Categorias de Fluxo de Caixa</h6>
                             <small class="text-muted">Classifique entradas e saídas</small>
                         </div>
                     </div>
-                    <p class="text-muted small flex-grow-1">
-                        Crie e gerencie categorias para classificar lançamentos no Fluxo de Caixa e Contas a Pagar,
-                        separando por tipo (Entrada/Saída) e grupo financeiro.
-                    </p>
-                    <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" class="btn btn-primary mt-auto">
+                    <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" class="btn btn-sm btn-outline-success mt-auto">
                         <i class="fas fa-arrow-right me-1"></i> Acessar
                     </a>
                 </div>
             </div>
         </div>
-
-        <!-- CategoriaFornecedor -->
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex flex-column">
                     <div class="d-flex align-items-center mb-3">
                         <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
-                             style="width:48px;height:48px;background:linear-gradient(135deg,#0d6efd,#0a58ca);">
-                            <i class="fas fa-truck text-white fs-5"></i>
+                             style="width:44px;height:44px;background:linear-gradient(135deg,#0d6efd,#0a58ca);">
+                            <i class="fas fa-truck text-white"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0">Categorias de Fornecedor</h5>
+                            <h6 class="mb-0">Categorias de Fornecedor</h6>
                             <small class="text-muted">Segmente seus fornecedores</small>
                         </div>
                     </div>
-                    <p class="text-muted small flex-grow-1">
-                        Defina categorias para agrupar fornecedores por especialidade ou segmento.
-                        Cada fornecedor pode ter múltiplas categorias associadas.
-                    </p>
-                    <a href="{{ url_for('catalogos.categorias_fornecedor') }}" class="btn btn-primary mt-auto">
+                    <a href="{{ url_for('catalogos.categorias_fornecedor') }}" class="btn btn-sm btn-outline-primary mt-auto">
                         <i class="fas fa-arrow-right me-1"></i> Acessar
                     </a>
                 </div>
             </div>
         </div>
-
-        <!-- CategoriaReembolso -->
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex flex-column">
                     <div class="d-flex align-items-center mb-3">
                         <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
-                             style="width:48px;height:48px;background:linear-gradient(135deg,#6f42c1,#59359a);">
-                            <i class="fas fa-receipt text-white fs-5"></i>
+                             style="width:44px;height:44px;background:linear-gradient(135deg,#6f42c1,#59359a);">
+                            <i class="fas fa-receipt text-white"></i>
                         </div>
                         <div>
-                            <h5 class="mb-0">Categorias de Reembolso</h5>
+                            <h6 class="mb-0">Categorias de Reembolso</h6>
                             <small class="text-muted">Classifique reembolsos a funcionários</small>
                         </div>
                     </div>
-                    <p class="text-muted small flex-grow-1">
-                        Cadastre os tipos de despesas reembolsáveis (alimentação, combustível, hospedagem, etc.)
-                        para uso futuro nos pedidos de reembolso de funcionários.
-                    </p>
-                    <a href="{{ url_for('catalogos.categorias_reembolso') }}" class="btn btn-primary mt-auto">
+                    <a href="{{ url_for('catalogos.categorias_reembolso') }}" class="btn btn-sm btn-outline-purple mt-auto">
                         <i class="fas fa-arrow-right me-1"></i> Acessar
                     </a>
                 </div>
             </div>
         </div>
     </div>
+
+    {# ─── Seção 2: Motor universal de dropdowns por módulo ───────────────────── #}
+    <div class="row mb-2">
+        <div class="col">
+            <h5 class="text-muted fw-semibold text-uppercase small ls-1">
+                <i class="fas fa-sliders-h me-1"></i>Listas de seleção por módulo
+            </h5>
+            <hr class="mt-1">
+        </div>
+    </div>
+
+    {% set modulo_icons = {
+        'crm':          'fas fa-funnel-dollar',
+        'obras':        'fas fa-hard-hat',
+        'rdo':          'fas fa-clipboard-list',
+        'servicos':     'fas fa-tools',
+        'frota':        'fas fa-truck-moving',
+        'financeiro':   'fas fa-dollar-sign',
+        'almoxarifado': 'fas fa-boxes',
+        'alimentacao':  'fas fa-utensils',
+        'funcionarios': 'fas fa-users'
+    } %}
+    {% set modulo_colors = {
+        'crm':          '#e91e63',
+        'obras':        '#f57c00',
+        'rdo':          '#0097a7',
+        'servicos':     '#7b1fa2',
+        'frota':        '#1976d2',
+        'financeiro':   '#388e3c',
+        'almoxarifado': '#5d4037',
+        'alimentacao':  '#c62828',
+        'funcionarios': '#00695c'
+    } %}
+
+    {% for modulo, grupos in grupos_por_modulo.items() %}
+    {% set label_modulo = modulos_labels.get(modulo, modulo) %}
+    {% set icon = modulo_icons.get(modulo, 'fas fa-list') %}
+    {% set color = modulo_colors.get(modulo, '#546e7a') %}
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header d-flex align-items-center py-3 border-0"
+             style="background:linear-gradient(135deg,{{ color }},{{ color }}cc);border-radius:.5rem .5rem 0 0 !important;">
+            <i class="{{ icon }} text-white me-2"></i>
+            <h6 class="mb-0 text-white fw-semibold">{{ label_modulo }}</h6>
+            <span class="badge bg-white text-dark ms-auto">{{ grupos | length }} grupo(s)</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Lista</th>
+                            <th class="text-center" style="width:100px;">Opções ativas</th>
+                            <th class="text-end pe-4" style="width:120px;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for g in grupos %}
+                        <tr>
+                            <td class="ps-4">
+                                <span class="fw-medium">{{ g.label }}</span>
+                                <br><small class="text-muted font-monospace">{{ g.slug }}</small>
+                            </td>
+                            <td class="text-center">
+                                {% if g.total > 0 %}
+                                <span class="badge bg-success">{{ g.total }}</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">0 — usar padrão</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{{ url_for('cadastros_hub.dropdown_opcoes', slug=g.slug) }}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-pencil-alt me-1"></i> Gerenciar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not grupos_por_modulo %}
+    <div class="text-center py-5">
+        <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
+        <p class="text-muted">Carregando catálogos do sistema...</p>
+    </div>
+    {% endif %}
+
 </div>
 {% endblock %}

@@ -326,9 +326,13 @@ def relatorios():
             'filtros': {}
         }
 
+    from services.dropdown_service import get_opcoes_valores
+    opcoes_almox_tipo_movimento = get_opcoes_valores('almoxarifado_tipo_movimento', admin_id)
+
     return render_template('almoxarifado/relatorios.html',
                            categorias=categorias,
                            funcionarios=funcionarios,
                            obras=obras,
                            dados_relatorio=dados_relatorio,
-                           relatorio_tipo=relatorio_tipo)
+                           relatorio_tipo=relatorio_tipo,
+                           opcoes_almox_tipo_movimento=opcoes_almox_tipo_movimento)

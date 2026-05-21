@@ -257,10 +257,9 @@
                                     <label for="tipo" class="form-label fw-bold">Tipo de Refeição *</label>
                                     <select class="form-select form-select-lg" id="tipo" name="tipo" required>
                                         <option value="">Selecione...</option>
-                                        <option value="cafe">☕ Café da Manhã</option>
-                                        <option value="almoco">🍽️ Almoço</option>
-                                        <option value="lanche">🥪 Lanche</option>
-                                        <option value="jantar">🌙 Jantar</option>
+                                        {% for t in (opcoes_alimentacao_tipo or ['Café da Manhã','Almoço','Jantar','Lanche','Marmita','Refeição Local','Outros']) %}
+                                        <option value="{{ t }}">{{ t }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-3">

@@ -445,16 +445,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 class="modern-select" 
                                 required>
                             <option value="">Selecione o tipo</option>
-                            <option value="COMBUSTIVEL" {{ 'selected' if request.form.tipo == 'COMBUSTIVEL' else '' }}>Combustível</option>
-                            <option value="PEDAGIO" {{ 'selected' if request.form.tipo == 'PEDAGIO' else '' }}>Pedágio</option>
-                            <option value="MANUTENCAO" {{ 'selected' if request.form.tipo == 'MANUTENCAO' else '' }}>Manutenção</option>
-                            <option value="ESTACIONAMENTO" {{ 'selected' if request.form.tipo == 'ESTACIONAMENTO' else '' }}>Estacionamento</option>
-                            <option value="MULTA" {{ 'selected' if request.form.tipo == 'MULTA' else '' }}>Multa</option>
-                            <option value="SEGURO" {{ 'selected' if request.form.tipo == 'SEGURO' else '' }}>Seguro</option>
-                            <option value="IPVA" {{ 'selected' if request.form.tipo == 'IPVA' else '' }}>IPVA</option>
-                            <option value="LICENCIAMENTO" {{ 'selected' if request.form.tipo == 'LICENCIAMENTO' else '' }}>Licenciamento</option>
-                            <option value="LIMPEZA" {{ 'selected' if request.form.tipo == 'LIMPEZA' else '' }}>Limpeza</option>
-                            <option value="OUTROS" {{ 'selected' if request.form.tipo == 'OUTROS' else '' }}>Outros</option>
+                            {% for opt in (opcoes_custo_veiculo_tipo or ['Combustível','Manutenção','Seguro','Multa','Lavagem','IPVA','Licenciamento','Pneus','Outros']) %}
+                            <option value="{{ opt }}" {{ 'selected' if request.form.get('tipo') == opt else '' }}>{{ opt }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>

@@ -3873,6 +3873,9 @@ def executar_migracoes():
             (172, "CRM — comentario_revisao em lead (comentário do supervisor ao pedir revisão)", migration_172_lead_comentario_revisao),
             (173, "Motor universal de dropdowns — DropdownGrupo + DropdownOpcao + seed CRM", migration_173_dropdown_motor),
             (174, "Motor de dropdowns v2 — ext_id + sync CRM→DropdownOpcao + seed padrão", migration_174_dropdown_ext_id_sync),
+            (175, "Task #10 — seed grupos universais (Obras, RDO, Frota, Financeiro, Almoxarifado, Alimentação, Serviços, Funcionários)", migration_175_seed_novos_grupos),
+            (176, "Task #10 v2 — corrige valores incorretos de rdo_tempo/rdo_condicao_trabalho/rdo_status_equipamento para todos os tenants", migration_176_fix_rdo_slugs),
+            (177, "Task #10 v3 — corrige almoxarifado_tipo_movimento: SAÍDA→SAIDA, DEVOLUÇÃO→DEVOLUCAO para todos os tenants", migration_177_fix_almox_tipo_movimento),
         ]
         
         # Executar cada migração com rastreamento
@@ -14508,3 +14511,162 @@ def migration_174_dropdown_ext_id_sync():
 
     db.session.commit()
     logger.info(f"[Migration 174] {total_seed} opção(ões) padrão inseridas para tenants vazios")
+
+
+def migration_176_fix_rdo_slugs():
+    """Migration 176: corrige valores de rdo_tempo, rdo_condicao_trabalho e
+    rdo_status_equipamento para todos os tenants.
+
+    Migration 175 semeou valores incorretos para esses 3 slugs.
+    Este script:
+      - Remove opções erradas: 'Chuva Leve', 'Chuva Forte' (rdo_tempo),
+        'Limitadas', 'Inadequadas' (rdo_condicao_trabalho), 'Em manutenção' (rdo_status_equip).
+      - Adiciona opções corretas: 'Chuvoso', 'Garoa' (rdo_tempo),
+        'Difíceis', 'Inapropriadas' (rdo_condicao_trabalho), 'Inoperante' (rdo_status_equip).
+    Idempotente.
+    """
+    from sqlalchemy import text
+    from models import DropdownGrupo, DropdownOpcao
+
+    _CORRECTIONS: dict[str, tuple[list[str], list[str]]] = {
+        'rdo_tempo':              (['Chuva Leve', 'Chuva Forte'],          ['Chuvoso', 'Garoa']),
+        'rdo_condicao_trabalho':  (['Limitadas', 'Inadequadas'],           ['Difíceis', 'Inapropriadas']),
+        'rdo_status_equipamento': (['Em manutenção'],                      ['Inoperante']),
+    }
+
+    admins = db.session.execute(text("""
+        SELECT id FROM usuario
+        WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+        ORDER BY id
+    """)).fetchall()
+
+    for row in admins:
+        admin_id = row[0]
+        try:
+            for slug, (to_remove, to_add) in _CORRECTIONS.items():
+                grupo = DropdownGrupo.query.filter_by(slug=slug, admin_id=admin_id).first()
+                if not grupo:
+                    continue
+
+                for valor_errado in to_remove:
+                    wrong = DropdownOpcao.query.filter_by(
+                        grupo_id=grupo.id, admin_id=admin_id, valor=valor_errado
+                    ).first()
+                    if wrong:
+                        db.session.delete(wrong)
+
+                max_ordem = db.session.execute(
+                    text('SELECT COALESCE(MAX(ordem), 0) FROM dropdown_opcao WHERE grupo_id = :gid'),
+                    {'gid': grupo.id}
+                ).scalar() or 0
+
+                for i, valor_novo in enumerate(to_add, 1):
+                    exists = DropdownOpcao.query.filter_by(
+                        grupo_id=grupo.id, admin_id=admin_id, valor=valor_novo
+                    ).first()
+                    if not exists:
+                        db.session.add(DropdownOpcao(
+                            admin_id=admin_id,
+                            grupo_id=grupo.id,
+                            valor=valor_novo,
+                            ordem=max_ordem + i * 10,
+                            ativo=True,
+                        ))
+
+            db.session.flush()
+        except Exception as e:
+            logger.warning(f"[Migration 176] Erro admin_id={admin_id}: {e}")
+            db.session.rollback()
+
+    db.session.commit()
+    logger.info("[Migration 176] Correção de slugs RDO concluída.")
+
+
+def migration_177_fix_almox_tipo_movimento():
+    """Migration 177: corrige valores de almoxarifado_tipo_movimento — remove
+    acentos dos valores semeados incorretamente: SAÍDA→SAIDA, DEVOLUÇÃO→DEVOLUCAO.
+
+    Migration 175 semeou 'SAÍDA' e 'DEVOLUÇÃO' com acento. O backend
+    do almoxarifado usa os códigos canônicos sem acento (SAIDA, DEVOLUCAO),
+    então filtros e comparações de strings falhavam silenciosamente.
+    Idempotente.
+    """
+    from sqlalchemy import text
+    from models import DropdownGrupo, DropdownOpcao
+
+    CORRECOES = {
+        'SAÍDA':    'SAIDA',
+        'DEVOLUÇÃO': 'DEVOLUCAO',
+    }
+
+    admins = db.session.execute(text("""
+        SELECT id FROM usuario
+        WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+        ORDER BY id
+    """)).fetchall()
+
+    total_corrigidos = 0
+
+    for row in admins:
+        admin_id = row[0]
+        grupo = DropdownGrupo.query.filter_by(
+            slug='almoxarifado_tipo_movimento', admin_id=admin_id
+        ).first()
+        if not grupo:
+            continue
+
+        opcoes = DropdownOpcao.query.filter_by(
+            grupo_id=grupo.id, admin_id=admin_id
+        ).all()
+
+        for opcao in opcoes:
+            novo_valor = CORRECOES.get(opcao.valor)
+            if novo_valor:
+                already = DropdownOpcao.query.filter_by(
+                    grupo_id=grupo.id, admin_id=admin_id, valor=novo_valor
+                ).first()
+                if already:
+                    db.session.delete(opcao)
+                else:
+                    opcao.valor = novo_valor
+                total_corrigidos += 1
+
+    db.session.commit()
+    logger.info(f"[Migration 177] almoxarifado_tipo_movimento corrigido: {total_corrigidos} opção(ões) atualizadas.")
+
+
+def migration_175_seed_novos_grupos():
+    """Migration 175: seed grupos universais para todos os módulos.
+
+    Cria DropdownGrupo + DropdownOpcao padrão para cada slug dos módulos
+    Obras, RDO, Serviços, Frota, Financeiro, Almoxarifado, Alimentação e
+    Funcionários — para TODOS os admins ativos existentes.
+    Idempotente: não duplica registros já existentes.
+    """
+    from sqlalchemy import text
+    from services.dropdown_service import seed_grupos_sistema
+
+    admins = db.session.execute(text("""
+        SELECT id FROM usuario
+        WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+        ORDER BY id
+    """)).fetchall()
+
+    total_opcoes = 0
+    total_admins = 0
+
+    for row in admins:
+        admin_id = row[0]
+        try:
+            n = seed_grupos_sistema(admin_id, commit=False)
+            total_opcoes += n
+            total_admins += 1
+        except Exception as e:
+            logger.warning(f"[Migration 175] Erro seed admin_id={admin_id}: {e}")
+            db.session.rollback()
+
+    db.session.commit()
+    logger.info(
+        f"[Migration 175] seed concluído: {total_admins} admin(s), "
+        f"{total_opcoes} opção(ões) inserida(s)"
+    )

@@ -576,6 +576,7 @@ def novo_rdo():
                 logger.error(f"Erro carregando alertas terceiros (novo_rdo): {_e}")
                 entregas_alertas = []
 
+        from services.dropdown_service import get_opcoes_valores
         return render_template('rdo/novo.html',
                                obras=obras,
                                funcionarios=funcionarios,
@@ -583,7 +584,11 @@ def novo_rdo():
                                atividades_anteriores=atividades_anteriores,
                                data_hoje=data_hoje,
                                date=date,
-                               entregas_alertas=entregas_alertas)
+                               entregas_alertas=entregas_alertas,
+                               opcoes_rdo_tempo=get_opcoes_valores('rdo_tempo', admin_id),
+                               opcoes_rdo_condicao=get_opcoes_valores('rdo_condicao_trabalho', admin_id),
+                               opcoes_rdo_status_equipamento=get_opcoes_valores('rdo_status_equipamento', admin_id),
+                               )
     except Exception as e:
         logger.error(f"ERRO NOVO RDO: {str(e)}")
         return redirect(url_for('main.rdos'))
@@ -1811,6 +1816,7 @@ def editar_rdo(id):
             logger.error(f"Erro carregando alertas terceiros (editar_rdo): {_e}")
             entregas_alertas = []
 
+        from services.dropdown_service import get_opcoes_valores
         return render_template(
             'rdo/editar_rdo.html',
             rdo=rdo,
@@ -1818,6 +1824,9 @@ def editar_rdo(id):
             apontamentos_cronograma=apontamentos_cronograma,
             entregas_alertas=entregas_alertas,
             date=date,
+            opcoes_rdo_tempo=get_opcoes_valores('rdo_tempo', admin_id),
+            opcoes_rdo_condicao=get_opcoes_valores('rdo_condicao_trabalho', admin_id),
+            opcoes_rdo_status_equipamento=get_opcoes_valores('rdo_status_equipamento', admin_id),
         )
 
     except Exception as e:

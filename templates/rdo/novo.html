@@ -282,12 +282,9 @@
                                     </label>
                                     <select class="form-control" id="clima_geral" name="clima_geral">
                                         <option value="">Selecione</option>
-                                        <option value="Ensolarado">☀️ Ensolarado</option>
-                                        <option value="Parcialmente Nublado">⛅ Parcialmente Nublado</option>
-                                        <option value="Nublado">☁️ Nublado</option>
-                                        <option value="Chuva Leve">🌦️ Chuva Leve</option>
-                                        <option value="Chuva Forte">🌧️ Chuva Forte</option>
-                                        <option value="Tempestade">⛈️ Tempestade</option>
+                                        {% for c in opcoes_rdo_tempo %}
+                                        <option value="{{ c }}">{{ c }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
                             </div>
@@ -308,10 +305,9 @@
                                     </label>
                                     <select class="form-control" id="condicoes_trabalho" name="condicoes_trabalho">
                                         <option value="">Selecione</option>
-                                        <option value="Ideais">Ideais</option>
-                                        <option value="Adequadas">Adequadas</option>
-                                        <option value="Limitadas">Limitadas</option>
-                                        <option value="Inadequadas">Inadequadas</option>
+                                        {% for c in opcoes_rdo_condicao %}
+                                        <option value="{{ c }}">{{ c }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
                             </div>
@@ -355,6 +351,9 @@
 
         <script>
         // Task #61 — UI repetível para Equipamentos / Ocorrências (DOM-only).
+        const _equipEstadosRaw = {{ opcoes_rdo_status_equipamento | tojson }};
+        const equipEstadoOptions = _equipEstadosRaw.map((s, i) => `<option value="${s}"${i===0?' selected':''}>${s}</option>`).join('');
+
         function adicionarLinhaRepetivel(containerId, tipo) {
             const cont = document.getElementById(containerId);
             if (!cont) return;
@@ -367,8 +366,7 @@
                     <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" placeholder="Horas" value="8"></div>
                     <div class="col-md-3">
                         <select class="form-control form-control-sm" name="equip_estado[]">
-                            <option value="Bom" selected>Bom</option><option value="Regular">Regular</option>
-                            <option value="Ruim">Ruim</option><option value="Em manutenção">Em manutenção</option>
+                            ${equipEstadoOptions}
                         </select>
                     </div>
                     <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.repet-row').remove()"><i class="fas fa-times"></i></button></div>`;

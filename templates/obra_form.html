@@ -319,10 +319,9 @@
                                             <i class="fas fa-flag"></i>Status
                                         </label>
                                         <select class="form-select" id="status" name="status">
-                                            <option value="Em andamento" {{ 'selected' if obra and obra.status == 'Em andamento' else '' }}>Em andamento</option>
-                                            <option value="PLANEJAMENTO" {{ 'selected' if obra and obra.status == 'PLANEJAMENTO' else '' }}>Planejamento</option>
-                                            <option value="Pausada" {{ 'selected' if obra and obra.status == 'Pausada' else '' }}>Pausada</option>
-                                            <option value="Concluída" {{ 'selected' if obra and obra.status == 'Concluída' else '' }}>Concluída</option>
+                                            {% for s in (opcoes_obra_status or ['Em Andamento','Concluída','Pausada','Cancelada']) %}
+                                            <option value="{{ s }}" {{ 'selected' if obra and obra.status == s else '' }}>{{ s }}</option>
+                                            {% endfor %}
                                         </select>
                                     </div>
                                 </div>

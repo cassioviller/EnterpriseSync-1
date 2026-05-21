@@ -133,7 +133,12 @@ def novo():
             return redirect(url_for('main.login'))
         
         if request.method == 'GET':
-            return render_template('veiculos_novo.html')
+            from services.dropdown_service import get_opcoes_valores
+            return render_template('veiculos_novo.html',
+                opcoes_veiculo_tipo=get_opcoes_valores('veiculo_tipo', tenant_admin_id),
+                opcoes_veiculo_combustivel=get_opcoes_valores('veiculo_combustivel', tenant_admin_id),
+                opcoes_veiculo_status=get_opcoes_valores('veiculo_status', tenant_admin_id),
+            )
         
         # POST - Processar cadastro
         dados = request.form.to_dict()
@@ -144,7 +149,12 @@ def novo():
         for campo in campos_obrigatorios:
             if not dados.get(campo):
                 flash(f'Campo {campo.title()} é obrigatório.', 'error')
-                return render_template('veiculos_novo.html')
+                from services.dropdown_service import get_opcoes_valores
+                return render_template('veiculos_novo.html',
+                    opcoes_veiculo_tipo=get_opcoes_valores('veiculo_tipo', tenant_admin_id),
+                    opcoes_veiculo_combustivel=get_opcoes_valores('veiculo_combustivel', tenant_admin_id),
+                    opcoes_veiculo_status=get_opcoes_valores('veiculo_status', tenant_admin_id),
+                )
         
         # Criar novo veículo da frota
         try:
@@ -172,12 +182,17 @@ def novo():
             db.session.rollback()
             logger.error(f"[ERROR] [FROTA_NOVO] Erro ao salvar: {str(e)}")
             flash(f'Erro ao cadastrar veículo: {str(e)}', 'error')
-            return render_template('veiculos_novo.html')
+            from services.dropdown_service import get_opcoes_valores
+            return render_template('veiculos_novo.html',
+                opcoes_veiculo_tipo=get_opcoes_valores('veiculo_tipo', tenant_admin_id),
+                opcoes_veiculo_combustivel=get_opcoes_valores('veiculo_combustivel', tenant_admin_id),
+                opcoes_veiculo_status=get_opcoes_valores('veiculo_status', tenant_admin_id),
+            )
         
     except Exception as e:
         logger.error(f"[ERROR] [FROTA_NOVO] Erro: {str(e)}")
         flash('Erro ao cadastrar veículo. Tente novamente.', 'error')
-        return render_template('veiculos_novo.html')
+        return redirect(url_for('frota.lista'))
 
 
 # ===== ROTA: DETALHES DO VEÍCULO DA FROTA =====
@@ -301,7 +316,12 @@ def editar(id):
             return redirect(url_for('frota.lista'))
         
         if request.method == 'GET':
-            return render_template('veiculos_editar.html', veiculo=veiculo)
+            from services.dropdown_service import get_opcoes_valores
+            return render_template('veiculos_editar.html', veiculo=veiculo,
+                opcoes_veiculo_tipo=get_opcoes_valores('veiculo_tipo', tenant_admin_id),
+                opcoes_veiculo_combustivel=get_opcoes_valores('veiculo_combustivel', tenant_admin_id),
+                opcoes_veiculo_status=get_opcoes_valores('veiculo_status', tenant_admin_id),
+            )
         
         # POST - Processar edição
         dados = request.form.to_dict()
@@ -343,7 +363,12 @@ def editar(id):
             db.session.rollback()
             logger.error(f"[ERROR] [FROTA_EDITAR] Erro ao salvar: {str(e)}")
             flash(f'Erro ao atualizar veículo: {str(e)}', 'error')
-            return render_template('veiculos_editar.html', veiculo=veiculo)
+            from services.dropdown_service import get_opcoes_valores
+            return render_template('veiculos_editar.html', veiculo=veiculo,
+                opcoes_veiculo_tipo=get_opcoes_valores('veiculo_tipo', tenant_admin_id),
+                opcoes_veiculo_combustivel=get_opcoes_valores('veiculo_combustivel', tenant_admin_id),
+                opcoes_veiculo_status=get_opcoes_valores('veiculo_status', tenant_admin_id),
+            )
         
     except Exception as e:
         logger.error(f"[ERROR] [FROTA_EDITAR] Erro: {str(e)}")
@@ -539,6 +564,8 @@ def novo_custo(veiculo_id):
             flash('Veículo não encontrado.', 'error')
             return redirect(url_for('frota.lista'))
         
+        from services.dropdown_service import get_opcoes_valores as _gov
+
         if request.method == 'GET':
             # Buscar usos recentes para associação (opcional)
             usos = FrotaUtilizacao.query.filter_by(
@@ -552,7 +579,8 @@ def novo_custo(veiculo_id):
             return render_template('custo_veiculo_novo.html',
                                  veiculo=veiculo,
                                  usos=usos,
-                                 obras=obras)
+                                 obras=obras,
+                                 opcoes_custo_veiculo_tipo=_gov('custo_veiculo_tipo', tenant_admin_id))
         
         # POST - Processar criação do custo
         dados = request.form.to_dict()
@@ -573,7 +601,8 @@ def novo_custo(veiculo_id):
                 return render_template('custo_veiculo_novo.html',
                                      veiculo=veiculo,
                                      usos=usos,
-                                     obras=obras)
+                                     obras=obras,
+                                     opcoes_custo_veiculo_tipo=_gov('custo_veiculo_tipo', tenant_admin_id))
         
         try:
             # Criar novo custo da frota
@@ -638,7 +667,8 @@ def novo_custo(veiculo_id):
             return render_template('custo_veiculo_novo.html',
                                  veiculo=veiculo,
                                  usos=usos,
-                                 obras=obras)
+                                 obras=obras,
+                                 opcoes_custo_veiculo_tipo=_gov('custo_veiculo_tipo', tenant_admin_id))
         
     except Exception as e:
         logger.error(f"[ERROR] [FROTA_NOVO_CUSTO] Erro: {str(e)}")

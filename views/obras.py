@@ -420,11 +420,14 @@ def nova_obra():
         funcionarios = []
         servicos_disponiveis = []
     
+    from services.dropdown_service import get_opcoes_valores
+    opcoes_obra_status = get_opcoes_valores('obra_status', admin_id)
     return render_template('obra_form.html', 
                          titulo='Nova Obra', 
                          obra=None, 
                          funcionarios=funcionarios, 
-                         servicos_disponiveis=servicos_disponiveis)
+                         servicos_disponiveis=servicos_disponiveis,
+                         opcoes_obra_status=opcoes_obra_status)
 
 # ========== SISTEMA DE SERVIÇOS DA OBRA - REFATORADO COMPLETO ==========
 
@@ -1014,12 +1017,19 @@ def editar_obra(id):
         servicos_disponiveis = []
         servicos_obra = []
     
+    from services.dropdown_service import get_opcoes_valores
+    try:
+        _aid = admin_id
+    except NameError:
+        _aid = obra.admin_id if obra else 10
+    opcoes_obra_status = get_opcoes_valores('obra_status', _aid)
     return render_template('obra_form.html', 
                          titulo='Editar Obra', 
                          obra=obra, 
                          funcionarios=funcionarios, 
                          servicos_disponiveis=servicos_disponiveis,
-                         servicos_obra=servicos_obra)
+                         servicos_obra=servicos_obra,
+                         opcoes_obra_status=opcoes_obra_status)
 
 # CRUD OBRAS - Excluir Obra
 @main_bp.route('/obras/excluir/<int:id>', methods=['POST', 'GET'])
