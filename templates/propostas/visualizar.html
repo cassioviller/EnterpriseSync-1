@@ -152,7 +152,20 @@
                                 <tr>
                                     <td class="text-center">{{ item.item_numero }}</td>
                                     <td>{{ item.descricao }}</td>
-                                    <td class="text-center">{{ item.quantidade|num(3) }}</td>
+                                    <td class="text-center">
+                                      {{ item.quantidade|num(3) }}
+                                      {% if item.tipo_medicao_override is defined and item.tipo_medicao_override and item.tipo_medicao_override != 'UNITARIO' %}
+                                      <div class="small text-muted" title="Medição dimensional">
+                                        <i class="fas fa-ruler-combined" style="font-size:0.7em;"></i>
+                                        {% if item.tipo_medicao_override == 'AREA' %}{{ item.dim_largura|num(2) if item.dim_largura else '?' }}×{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m²
+                                        {% elif item.tipo_medicao_override == 'PERIMETRO' %}{{ item.dim_perimetro|num(2) if item.dim_perimetro else '?' }} m
+                                        {% elif item.tipo_medicao_override == 'PERIMETRO_PE_DIREITO' %}{{ item.dim_perimetro|num(2) if item.dim_perimetro else '?' }}×{{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m
+                                        {% elif item.tipo_medicao_override == 'AREA_PE_DIREITO' %}{{ item.dim_largura|num(2) if item.dim_largura else '?' }}×{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }}×{{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m
+                                        {% elif item.tipo_medicao_override == 'LINEAR' %}{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m
+                                        {% endif %}
+                                      </div>
+                                      {% endif %}
+                                    </td>
                                     <td class="text-center">{{ item.unidade }}</td>
                                     <td class="text-end">{{ item.preco_unitario|brl }}</td>
                                     {# Task #165: usa |float para evitar TypeError Decimal x float quando o

@@ -304,7 +304,7 @@
             <select class="form-select" name="servico_id" id="add-servico-select">
               <option value="">— item livre —</option>
               {% for s in (servicos or [])[:10] %}
-                <option value="{{ s.id }}" data-unidade="{{ s.unidade_medida }}" data-tmed="{{ s.tipo_medicao_efetivo }}">{{ s.nome }} ({{ s.unidade_medida }})</option>
+                <option value="{{ s.id }}" data-unidade="{{ s.unidade_medida }}" data-tipo-medicao="{{ s.tipo_medicao_efetivo }}">{{ s.nome }} ({{ s.unidade_medida }})</option>
               {% endfor %}
             </select>
             <button type="button" class="btn btn-outline-secondary"
@@ -1255,7 +1255,7 @@ function _addInsumoRow(insumo) {
         if (unField && value) unField.value = unidade;
       }
       // Task #36 — detectar tipo de medição, atualizar select e mostrar campos dimensionais
-      var tipo = item ? (item.tipo_medicao || item.tmed || 'UNITARIO') : 'UNITARIO';
+      var tipo = item ? (item.tipo_medicao || item.tipoMedicao || 'UNITARIO') : 'UNITARIO';
       var tipoSel = document.getElementById('add-tipo-medicao');
       if (tipoSel) tipoSel.value = tipo;
       updateAddDimFields(tipo);

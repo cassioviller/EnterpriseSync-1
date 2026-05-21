@@ -80,6 +80,23 @@ Espera:
       <div class="small text-muted">
         {{ _qtd|num(2) }} {{ item.unidade }} × {{ _preco_unit|brl }}
       </div>
+      {# Task #36 — dimensões ao lado da quantidade #}
+      {% if item.tipo_medicao_override is defined and item.tipo_medicao_override and item.tipo_medicao_override != 'UNITARIO' %}
+      <div class="small text-muted mt-1">
+        <i class="fas fa-ruler-combined me-1 text-primary" style="font-size:0.75em;"></i>
+        {% if item.tipo_medicao_override == 'AREA' %}
+          {{ item.dim_largura|num(2) if item.dim_largura else '?' }} × {{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m²
+        {% elif item.tipo_medicao_override == 'PERIMETRO' %}
+          {{ item.dim_perimetro|num(2) if item.dim_perimetro else '?' }} m (perímetro)
+        {% elif item.tipo_medicao_override == 'PERIMETRO_PE_DIREITO' %}
+          {{ item.dim_perimetro|num(2) if item.dim_perimetro else '?' }} × {{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m (parede)
+        {% elif item.tipo_medicao_override == 'AREA_PE_DIREITO' %}
+          {{ item.dim_largura|num(2) if item.dim_largura else '?' }} × {{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} × {{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m
+        {% elif item.tipo_medicao_override == 'LINEAR' %}
+          {{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m (linear)
+        {% endif %}
+      </div>
+      {% endif %}
       <div class="fs-5 fw-bold text-success">{{ _total_venda|brl }}</div>
     </div>
   </div>

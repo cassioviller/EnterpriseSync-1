@@ -459,7 +459,6 @@ class Servico(db.Model):
                 c.insumo.tipo_medicao
                 for c in (self.composicoes or [])
                 if c.insumo and getattr(c.insumo, 'tipo_medicao', None)
-                and c.insumo.tipo_medicao != 'UNITARIO'
             ]
             if tipos:
                 return Counter(tipos).most_common(1)[0][0]
