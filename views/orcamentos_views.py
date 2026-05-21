@@ -561,6 +561,12 @@ def duplicar(id):
                 # Task #18: copia inclusos/exclusos por serviço na revisão
                 itens_inclusos=it.itens_inclusos,
                 itens_exclusos=it.itens_exclusos,
+                # Task #36: copia medição dimensional na revisão
+                tipo_medicao_override=it.tipo_medicao_override,
+                dim_largura=it.dim_largura,
+                dim_comprimento=it.dim_comprimento,
+                dim_perimetro=it.dim_perimetro,
+                dim_pe_direito=it.dim_pe_direito,
             )
             db.session.add(novo_it)
         db.session.flush()
@@ -749,6 +755,12 @@ def gerar_proposta(id):
                 # Task #18: propaga inclusos/exclusos por serviço
                 itens_inclusos=it.itens_inclusos,
                 itens_exclusos=it.itens_exclusos,
+                # Task #36: propaga medição dimensional para exibição na proposta
+                tipo_medicao_override=it.tipo_medicao_override,
+                dim_largura=it.dim_largura,
+                dim_comprimento=it.dim_comprimento,
+                dim_perimetro=it.dim_perimetro,
+                dim_pe_direito=it.dim_pe_direito,
             )
             db.session.add(pi)
 

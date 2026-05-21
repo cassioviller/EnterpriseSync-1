@@ -3180,6 +3180,13 @@ class PropostaItem(db.Model):
     itens_inclusos = db.Column(db.Text)
     itens_exclusos = db.Column(db.Text)
 
+    # Task #36 — medição dimensional propagada do OrcamentoItem
+    tipo_medicao_override = db.Column(db.String(30), nullable=True)
+    dim_largura      = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_comprimento  = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_perimetro    = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_pe_direito   = db.Column(db.Numeric(15, 4), nullable=True)
+
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relacionamento com template (opcional)

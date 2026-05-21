@@ -3728,6 +3728,23 @@ def executar_migracoes():
         # PASSO 2: Executar migrações com rastreamento
         logger.info("🔄 Verificando migrações pendentes...")
         
+        # Task #36 v2 — local helper para migration_180 (proposta_itens dim fields)
+        def _migration_180_inline():
+            from sqlalchemy import text as _text
+            logger.info("[Migration 180] Iniciando — Medição Dimensional em proposta_itens")
+            for _col, _tipo in [
+                ('tipo_medicao_override', 'VARCHAR(30)'),
+                ('dim_largura', 'NUMERIC(15,4)'),
+                ('dim_comprimento', 'NUMERIC(15,4)'),
+                ('dim_perimetro', 'NUMERIC(15,4)'),
+                ('dim_pe_direito', 'NUMERIC(15,4)'),
+            ]:
+                db.session.execute(_text(
+                    f"ALTER TABLE proposta_itens ADD COLUMN IF NOT EXISTS {_col} {_tipo}"
+                ))
+            db.session.commit()
+            logger.info("[Migration 180] Concluída com sucesso")
+
         # ===== MIGRAÇÕES ATIVAS COM RASTREAMENTO =====
         migrations_to_run = [
             (20, "Sistema de Veículos Inteligente", _migration_20_unified_vehicle_system),
@@ -3878,6 +3895,7 @@ def executar_migracoes():
             (177, "Task #10 v3 — corrige almoxarifado_tipo_movimento: SAÍDA→SAIDA, DEVOLUÇÃO→DEVOLUCAO para todos os tenants", migration_177_fix_almox_tipo_movimento),
             (178, "Task #29 — Grupos Financeiros: criar tabela grupo_financeiro + coluna grupo_financeiro_id em categoria_fluxo_caixa", migration_178_grupo_financeiro),
             (179, "Task #36 — Medição dimensional: tipo_medicao em insumo/servico + campos dim_ em orcamento_item", migration_179_tipo_medicao),
+            (180, "Task #36 v2 — Medição dimensional: campos dim_ em proposta_itens (propagação orçamento → proposta)", _migration_180_inline),
         ]
         
         # Executar cada migração com rastreamento
@@ -14670,6 +14688,31 @@ def migration_179_tipo_medicao():
 
     db.session.commit()
     logger.info("[Migration 179] Concluída com sucesso")
+
+
+def migration_180_dim_proposta_itens():
+    """Migration 180: Task #36 v2 — Campos de medição dimensional em proposta_itens.
+
+    Propaga os mesmos 5 campos de OrcamentoItem para PropostaItem para que
+    os templates de proposta/PDF possam exibir as dimensões ao lado da quantidade.
+    Idempotente — usa ADD COLUMN IF NOT EXISTS.
+    """
+    from sqlalchemy import text
+    logger.info("[Migration 180] Iniciando — Medição Dimensional em proposta_itens")
+
+    for col, tipo in [
+        ('tipo_medicao_override', 'VARCHAR(30)'),
+        ('dim_largura', 'NUMERIC(15,4)'),
+        ('dim_comprimento', 'NUMERIC(15,4)'),
+        ('dim_perimetro', 'NUMERIC(15,4)'),
+        ('dim_pe_direito', 'NUMERIC(15,4)'),
+    ]:
+        db.session.execute(text(
+            f"ALTER TABLE proposta_itens ADD COLUMN IF NOT EXISTS {col} {tipo}"
+        ))
+
+    db.session.commit()
+    logger.info("[Migration 180] Concluída com sucesso")
 
 
 def migration_178_grupo_financeiro():
