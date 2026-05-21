@@ -105,8 +105,18 @@
             <label class="form-label fw-semibold">Categoria do catálogo <span class="text-muted fw-normal small">(opcional)</span></label>
             <select class="form-select" name="categoria_fluxo_caixa_id">
               <option value="">— Nenhuma —</option>
-              {% for cat in categorias_fc %}
-              <option value="{{ cat.id }}">{{ cat.nome }} ({{ cat.tipo }})</option>
+              {% for grupo, cats in categorias_fc | groupby('grupo_financeiro') %}
+                {% if grupo %}
+                  <optgroup label="{{ grupo }}">
+                    {% for cat in cats %}
+                    <option value="{{ cat.id }}">{{ cat.nome }}</option>
+                    {% endfor %}
+                  </optgroup>
+                {% else %}
+                  {% for cat in cats %}
+                  <option value="{{ cat.id }}">{{ cat.nome }} ({{ cat.tipo }})</option>
+                  {% endfor %}
+                {% endif %}
               {% endfor %}
             </select>
             <div class="form-text">Aplica-se ao lançamento de Fluxo de Caixa gerado pelo pagamento. <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" target="_blank">Gerenciar catálogos</a></div>

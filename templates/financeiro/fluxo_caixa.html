@@ -359,8 +359,18 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
               <label class="form-label fw-semibold">Categoria do catálogo</label>
               <select name="categoria_fluxo_caixa_id" class="form-select">
                 <option value="">— Nenhuma —</option>
-                {% for cat in categorias_fc %}
-                <option value="{{ cat.id }}">{{ cat.nome }} ({{ cat.tipo }})</option>
+                {% for grupo, cats in categorias_fc | groupby('grupo_financeiro') %}
+                  {% if grupo %}
+                    <optgroup label="{{ grupo }}">
+                      {% for cat in cats %}
+                      <option value="{{ cat.id }}">{{ cat.nome }}</option>
+                      {% endfor %}
+                    </optgroup>
+                  {% else %}
+                    {% for cat in cats %}
+                    <option value="{{ cat.id }}">{{ cat.nome }} ({{ cat.tipo }})</option>
+                    {% endfor %}
+                  {% endif %}
                 {% endfor %}
               </select>
               <div class="form-text">

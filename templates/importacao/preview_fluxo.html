@@ -202,11 +202,24 @@
               <td>
                 <select name="cat_entrada_{{ loop.index0 }}" class="form-select form-select-sm cat-select">
                   <option value="">— Receita padrão —</option>
-                  {% for cat in categorias_entrada %}
-                  <option value="cfc_{{ cat.id }}"
-                    {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
-                    {{ cat.nome }}
-                  </option>
+                  {% for grupo, cats in categorias_entrada | groupby('grupo_financeiro') %}
+                    {% if grupo %}
+                      <optgroup label="{{ grupo }}">
+                        {% for cat in cats %}
+                        <option value="cfc_{{ cat.id }}"
+                          {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+                          {{ cat.nome }}
+                        </option>
+                        {% endfor %}
+                      </optgroup>
+                    {% else %}
+                      {% for cat in cats %}
+                      <option value="cfc_{{ cat.id }}"
+                        {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+                        {{ cat.nome }}
+                      </option>
+                      {% endfor %}
+                    {% endif %}
                   {% endfor %}
                 </select>
               </td>
@@ -349,14 +362,16 @@
                   </optgroup>
                   {% endfor %}
                   {% if categorias_tenant %}
-                  <optgroup label="Categorias Personalizadas">
-                    {% for cat in categorias_tenant %}
-                    <option value="cfc_{{ cat.id }}"
-                      {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
-                      {{ cat.nome }} ({{ 'Entrada' if cat.tipo == 'ENTRADA' else 'Saída' }})
-                    </option>
-                    {% endfor %}
-                  </optgroup>
+                  {% for grupo, cats in categorias_tenant | groupby('grupo_financeiro') %}
+                    <optgroup label="{{ grupo or 'Personalizadas' }}">
+                      {% for cat in cats %}
+                      <option value="cfc_{{ cat.id }}"
+                        {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+                        {{ cat.nome }}
+                      </option>
+                      {% endfor %}
+                    </optgroup>
+                  {% endfor %}
                   {% endif %}
                 </select>
               </td>
@@ -515,14 +530,16 @@
                   </optgroup>
                   {% endfor %}
                   {% if categorias_tenant %}
-                  <optgroup label="Categorias Personalizadas">
-                    {% for cat in categorias_tenant %}
-                    <option value="cfc_{{ cat.id }}"
-                      {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
-                      {{ cat.nome }} ({{ 'Entrada' if cat.tipo == 'ENTRADA' else 'Saída' }})
-                    </option>
-                    {% endfor %}
-                  </optgroup>
+                  {% for grupo, cats in categorias_tenant | groupby('grupo_financeiro') %}
+                    <optgroup label="{{ grupo or 'Personalizadas' }}">
+                      {% for cat in cats %}
+                      <option value="cfc_{{ cat.id }}"
+                        {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
+                        {{ cat.nome }}
+                      </option>
+                      {% endfor %}
+                    </optgroup>
+                  {% endfor %}
                   {% endif %}
                 </select>
               </td>

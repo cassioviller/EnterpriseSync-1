@@ -459,7 +459,11 @@ def fluxo_caixa_upload():
 
     from models import BancoEmpresa, CategoriaFluxoCaixa, Obra
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
-    categorias_tenant = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.tipo, CategoriaFluxoCaixa.nome).all()
+    categorias_tenant = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(
+        CategoriaFluxoCaixa.tipo,
+        CategoriaFluxoCaixa.grupo_financeiro.nullslast(),
+        CategoriaFluxoCaixa.nome
+    ).all()
     categorias_saida = [c for c in categorias_tenant if c.tipo == 'SAIDA']
     categorias_entrada = [c for c in categorias_tenant if c.tipo == 'ENTRADA']
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()

@@ -94,7 +94,26 @@
                                 <span class="badge bg-danger">Saída</span>
                                 {% endif %}
                             </td>
-                            <td>{{ cat.grupo_financeiro or '<span class="text-muted">—</span>'|safe }}</td>
+                            <td>
+                                {% set CORES_GRUPO = {
+                                    "Receita Operacional": "#198754",
+                                    "Capital / Financiamento": "#0d6efd",
+                                    "Custo Direto de Obra": "#dc3545",
+                                    "Despesa Administrativa": "#fd7e14",
+                                    "Comercial": "#6610f2",
+                                    "Financeiro": "#0dcaf0",
+                                    "Tributário": "#d63384",
+                                    "Reembolsos / Repasses": "#20c997",
+                                    "Outros": "#6c757d"
+                                } %}
+                                {% if cat.grupo_financeiro %}
+                                <span class="badge" style="background:{{ CORES_GRUPO.get(cat.grupo_financeiro, '#6c757d') }}; font-size:0.78rem;">
+                                    {{ cat.grupo_financeiro }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if cat.ativo %}
                                 <span class="badge bg-success">Ativo</span>

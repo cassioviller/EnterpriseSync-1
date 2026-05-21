@@ -408,7 +408,10 @@ def pagar_conta(conta_id):
     
     # GET - exibir formulário
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()
-    categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.nome).all()
+    categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(
+        CategoriaFluxoCaixa.grupo_financeiro.nullslast(),
+        CategoriaFluxoCaixa.nome
+    ).all()
 
     return render_template(
         'financeiro/pagar_conta.html',
@@ -696,7 +699,10 @@ def fluxo_caixa():
         for grupo_nome, chaves in _CAT_GRUPOS
     ]
     
-    categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.nome).all()
+    categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(
+        CategoriaFluxoCaixa.grupo_financeiro.nullslast(),
+        CategoriaFluxoCaixa.nome
+    ).all()
 
     return render_template(
         'financeiro/fluxo_caixa.html',

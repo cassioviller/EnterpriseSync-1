@@ -26,6 +26,7 @@
                 <div class="card-body">
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" id="grupo_financeiro_inicial" value="{{ categoria.grupo_financeiro if categoria else '' }}">
 
                         <div class="mb-3">
                             <label for="nome" class="form-label fw-semibold">Nome *</label>
@@ -44,9 +45,9 @@
 
                         <div class="mb-3">
                             <label for="grupo_financeiro" class="form-label fw-semibold">Grupo Financeiro</label>
-                            <input type="text" class="form-control" id="grupo_financeiro" name="grupo_financeiro"
-                                   value="{{ categoria.grupo_financeiro if categoria else '' }}"
-                                   placeholder="Ex: Receitas Operacionais, Despesas Administrativas">
+                            <select class="form-select" id="grupo_financeiro" name="grupo_financeiro">
+                                <option value="">— Selecione um grupo —</option>
+                            </select>
                             <div class="form-text">Agrupamento para relatórios financeiros (opcional)</div>
                         </div>
 
@@ -71,4 +72,43 @@
         </div>
     </div>
 </div>
+
+<script>
+const GRUPOS_FINANCEIROS = {
+    ENTRADA: [
+        "Receita Operacional",
+        "Capital / Financiamento",
+        "Financeiro",
+        "Outros"
+    ],
+    SAIDA: [
+        "Custo Direto de Obra",
+        "Despesa Administrativa",
+        "Comercial",
+        "Financeiro",
+        "Tributário",
+        "Reembolsos / Repasses",
+        "Outros"
+    ]
+};
+
+function atualizarGrupos() {
+    const tipo = document.getElementById('tipo').value;
+    const sel = document.getElementById('grupo_financeiro');
+    const valorAtual = sel.value || document.getElementById('grupo_financeiro_inicial').value;
+
+    sel.innerHTML = '<option value="">— Selecione um grupo —</option>';
+    const opcoes = GRUPOS_FINANCEIROS[tipo] || [];
+    opcoes.forEach(function(g) {
+        const o = document.createElement('option');
+        o.value = g;
+        o.textContent = g;
+        if (g === valorAtual) o.selected = true;
+        sel.appendChild(o);
+    });
+}
+
+document.getElementById('tipo').addEventListener('change', atualizarGrupos);
+document.addEventListener('DOMContentLoaded', atualizarGrupos);
+</script>
 {% endblock %}
