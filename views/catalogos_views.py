@@ -4,11 +4,11 @@ Blueprint: catalogos_bp  prefix: /catalogos
 """
 import io
 import logging
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_login import login_required, current_user
 from app import db
 from models import (
-    CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso,
+    GrupoFinanceiro, CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso,
     FluxoCaixa, Fornecedor, TipoUsuario
 )
 
@@ -75,16 +75,25 @@ def categorias_fluxo_caixa_criar():
     if request.method == 'POST':
         nome = request.form.get('nome', '').strip()
         tipo = request.form.get('tipo', 'SAIDA').strip()
-        grupo = request.form.get('grupo_financeiro', '').strip()
+        grupo_id_raw = request.form.get('grupo_financeiro_id', '').strip()
         descricao = request.form.get('descricao', '').strip()
         if not nome:
             flash('Nome é obrigatório.', 'danger')
             return redirect(url_for('catalogos.categorias_fluxo_caixa_criar'))
         if tipo not in ('ENTRADA', 'SAIDA'):
             tipo = 'SAIDA'
+        grupo_id = int(grupo_id_raw) if grupo_id_raw.isdigit() else None
+        grupo_nome = None
+        if grupo_id:
+            gf = GrupoFinanceiro.query.filter_by(id=grupo_id, admin_id=admin_id).first()
+            if gf:
+                grupo_nome = gf.nome
+            else:
+                grupo_id = None
         cat = CategoriaFluxoCaixa(
             nome=nome, tipo=tipo,
-            grupo_financeiro=grupo or None,
+            grupo_financeiro=grupo_nome,
+            grupo_financeiro_id=grupo_id,
             descricao=descricao or None,
             ativo=True, admin_id=admin_id
         )
@@ -92,7 +101,8 @@ def categorias_fluxo_caixa_criar():
         db.session.commit()
         flash(f'Categoria "{nome}" criada com sucesso!', 'success')
         return redirect(url_for('catalogos.categorias_fluxo_caixa'))
-    return render_template('catalogos/categorias_fluxo_caixa_form.html', categoria=None)
+    grupos = GrupoFinanceiro.query.filter_by(admin_id=admin_id, ativo=True).order_by(GrupoFinanceiro.tipo, GrupoFinanceiro.nome).all()
+    return render_template('catalogos/categorias_fluxo_caixa_form.html', categoria=None, grupos=grupos)
 
 
 @catalogos_bp.route('/categorias-fluxo-caixa/editar/<int:id>', methods=['GET', 'POST'])
@@ -105,21 +115,31 @@ def categorias_fluxo_caixa_editar(id):
     if request.method == 'POST':
         nome = request.form.get('nome', '').strip()
         tipo = request.form.get('tipo', 'SAIDA').strip()
-        grupo = request.form.get('grupo_financeiro', '').strip()
+        grupo_id_raw = request.form.get('grupo_financeiro_id', '').strip()
         descricao = request.form.get('descricao', '').strip()
         if not nome:
             flash('Nome é obrigatório.', 'danger')
             return redirect(url_for('catalogos.categorias_fluxo_caixa_editar', id=id))
         if tipo not in ('ENTRADA', 'SAIDA'):
             tipo = cat.tipo
+        grupo_id = int(grupo_id_raw) if grupo_id_raw.isdigit() else None
+        grupo_nome = None
+        if grupo_id:
+            gf = GrupoFinanceiro.query.filter_by(id=grupo_id, admin_id=admin_id).first()
+            if gf:
+                grupo_nome = gf.nome
+            else:
+                grupo_id = None
         cat.nome = nome
         cat.tipo = tipo
-        cat.grupo_financeiro = grupo or None
+        cat.grupo_financeiro = grupo_nome
+        cat.grupo_financeiro_id = grupo_id
         cat.descricao = descricao or None
         db.session.commit()
         flash(f'Categoria "{nome}" atualizada com sucesso!', 'success')
         return redirect(url_for('catalogos.categorias_fluxo_caixa'))
-    return render_template('catalogos/categorias_fluxo_caixa_form.html', categoria=cat)
+    grupos = GrupoFinanceiro.query.filter_by(admin_id=admin_id, ativo=True).order_by(GrupoFinanceiro.tipo, GrupoFinanceiro.nome).all()
+    return render_template('catalogos/categorias_fluxo_caixa_form.html', categoria=cat, grupos=grupos)
 
 
 @catalogos_bp.route('/categorias-fluxo-caixa/toggle/<int:id>', methods=['POST'])
@@ -216,7 +236,7 @@ def categorias_fluxo_caixa_importar():
             if tipo not in ('ENTRADA', 'SAIDA'):
                 ignoradas += 1
                 continue
-            grupo = str(ws.cell(row=rn, column=col_grupo).value or '').strip() if col_grupo else ''
+            grupo_nome = str(ws.cell(row=rn, column=col_grupo).value or '').strip() if col_grupo else ''
             desc = str(ws.cell(row=rn, column=col_desc).value or '').strip() if col_desc else ''
             existe = CategoriaFluxoCaixa.query.filter(
                 CategoriaFluxoCaixa.admin_id == admin_id,
@@ -226,9 +246,22 @@ def categorias_fluxo_caixa_importar():
             if existe:
                 ignoradas += 1
                 continue
+            grupo_id = None
+            if grupo_nome:
+                gf = GrupoFinanceiro.query.filter(
+                    GrupoFinanceiro.admin_id == admin_id,
+                    db.func.lower(GrupoFinanceiro.nome) == grupo_nome.lower(),
+                    GrupoFinanceiro.tipo == tipo,
+                ).first()
+                if not gf:
+                    gf = GrupoFinanceiro(nome=grupo_nome, tipo=tipo, ativo=True, admin_id=admin_id)
+                    db.session.add(gf)
+                    db.session.flush()
+                grupo_id = gf.id
             cat = CategoriaFluxoCaixa(
                 nome=nome, tipo=tipo,
-                grupo_financeiro=grupo or None,
+                grupo_financeiro=grupo_nome or None,
+                grupo_financeiro_id=grupo_id,
                 descricao=desc or None,
                 ativo=True, admin_id=admin_id,
             )
@@ -449,3 +482,127 @@ def categorias_reembolso_deletar(id):
     db.session.commit()
     flash(f'Categoria "{cat.nome}" excluída.', 'success')
     return redirect(url_for('catalogos.categorias_reembolso'))
+
+
+# ============================================================
+# GrupoFinanceiro
+# ============================================================
+
+@catalogos_bp.route('/grupos-financeiros')
+@login_required
+def grupos_financeiros():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    grupos = GrupoFinanceiro.query.filter_by(admin_id=admin_id).order_by(GrupoFinanceiro.tipo, GrupoFinanceiro.nome).all()
+    return render_template('catalogos/grupos_financeiros.html', grupos=grupos)
+
+
+@catalogos_bp.route('/grupos-financeiros/api')
+@login_required
+def grupos_financeiros_api():
+    admin_id, err = _require_admin()
+    if err:
+        return jsonify([])
+    tipo = request.args.get('tipo', '').strip().upper()
+    q = GrupoFinanceiro.query.filter_by(admin_id=admin_id, ativo=True)
+    if tipo in ('ENTRADA', 'SAIDA'):
+        q = q.filter_by(tipo=tipo)
+    grupos = q.order_by(GrupoFinanceiro.nome).all()
+    return jsonify([{'id': g.id, 'nome': g.nome, 'tipo': g.tipo} for g in grupos])
+
+
+@catalogos_bp.route('/grupos-financeiros/criar', methods=['GET', 'POST'])
+@login_required
+def grupos_financeiros_criar():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    if request.method == 'POST':
+        nome = request.form.get('nome', '').strip()
+        tipo = request.form.get('tipo', 'SAIDA').strip()
+        descricao = request.form.get('descricao', '').strip()
+        if not nome:
+            flash('Nome é obrigatório.', 'danger')
+            return redirect(url_for('catalogos.grupos_financeiros_criar'))
+        if tipo not in ('ENTRADA', 'SAIDA'):
+            tipo = 'SAIDA'
+        existente = GrupoFinanceiro.query.filter(
+            GrupoFinanceiro.admin_id == admin_id,
+            db.func.lower(GrupoFinanceiro.nome) == nome.lower(),
+            GrupoFinanceiro.tipo == tipo,
+        ).first()
+        if existente:
+            flash(f'Já existe um grupo "{nome}" do tipo {tipo}.', 'warning')
+            return redirect(url_for('catalogos.grupos_financeiros_criar'))
+        g = GrupoFinanceiro(nome=nome, tipo=tipo, descricao=descricao or None, ativo=True, admin_id=admin_id)
+        db.session.add(g)
+        db.session.commit()
+        flash(f'Grupo financeiro "{nome}" criado com sucesso!', 'success')
+        return redirect(url_for('catalogos.grupos_financeiros'))
+    return render_template('catalogos/grupos_financeiros_form.html', grupo=None)
+
+
+@catalogos_bp.route('/grupos-financeiros/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def grupos_financeiros_editar(id):
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    grupo = GrupoFinanceiro.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    if request.method == 'POST':
+        nome = request.form.get('nome', '').strip()
+        tipo = request.form.get('tipo', 'SAIDA').strip()
+        descricao = request.form.get('descricao', '').strip()
+        if not nome:
+            flash('Nome é obrigatório.', 'danger')
+            return redirect(url_for('catalogos.grupos_financeiros_editar', id=id))
+        if tipo not in ('ENTRADA', 'SAIDA'):
+            tipo = grupo.tipo
+        duplicado = GrupoFinanceiro.query.filter(
+            GrupoFinanceiro.admin_id == admin_id,
+            GrupoFinanceiro.id != id,
+            db.func.lower(GrupoFinanceiro.nome) == nome.lower(),
+            GrupoFinanceiro.tipo == tipo,
+        ).first()
+        if duplicado:
+            flash(f'Já existe um grupo "{nome}" do tipo {tipo}.', 'warning')
+            return redirect(url_for('catalogos.grupos_financeiros_editar', id=id))
+        grupo.nome = nome
+        grupo.tipo = tipo
+        grupo.descricao = descricao or None
+        db.session.commit()
+        flash(f'Grupo financeiro "{nome}" atualizado com sucesso!', 'success')
+        return redirect(url_for('catalogos.grupos_financeiros'))
+    return render_template('catalogos/grupos_financeiros_form.html', grupo=grupo)
+
+
+@catalogos_bp.route('/grupos-financeiros/toggle/<int:id>', methods=['POST'])
+@login_required
+def grupos_financeiros_toggle(id):
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    grupo = GrupoFinanceiro.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    grupo.ativo = not grupo.ativo
+    db.session.commit()
+    estado = 'ativado' if grupo.ativo else 'desativado'
+    flash(f'Grupo financeiro "{grupo.nome}" {estado}.', 'success')
+    return redirect(url_for('catalogos.grupos_financeiros'))
+
+
+@catalogos_bp.route('/grupos-financeiros/deletar/<int:id>', methods=['POST'])
+@login_required
+def grupos_financeiros_deletar(id):
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    grupo = GrupoFinanceiro.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    em_uso = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, grupo_financeiro_id=grupo.id).first()
+    if em_uso:
+        flash(f'Não é possível excluir: o grupo "{grupo.nome}" está em uso por categorias de fluxo de caixa.', 'danger')
+        return redirect(url_for('catalogos.grupos_financeiros'))
+    db.session.delete(grupo)
+    db.session.commit()
+    flash(f'Grupo financeiro "{grupo.nome}" excluído.', 'success')
+    return redirect(url_for('catalogos.grupos_financeiros'))

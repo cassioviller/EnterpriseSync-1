@@ -26,7 +26,6 @@
                 <div class="card-body">
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" id="grupo_financeiro_inicial" value="{{ categoria.grupo_financeiro if categoria else '' }}">
 
                         <div class="mb-3">
                             <label for="nome" class="form-label fw-semibold">Nome *</label>
@@ -44,11 +43,21 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="grupo_financeiro" class="form-label fw-semibold">Grupo Financeiro</label>
-                            <select class="form-select" id="grupo_financeiro" name="grupo_financeiro">
+                            <label for="grupo_financeiro_id" class="form-label fw-semibold">Grupo Financeiro</label>
+                            <select class="form-select" id="grupo_financeiro_id" name="grupo_financeiro_id">
                                 <option value="">— Selecione um grupo —</option>
+                                {% for g in grupos %}
+                                <option value="{{ g.id }}"
+                                        data-tipo="{{ g.tipo }}"
+                                        {{ 'selected' if categoria and categoria.grupo_financeiro_id == g.id else '' }}>
+                                    {{ g.nome }}
+                                </option>
+                                {% endfor %}
                             </select>
-                            <div class="form-text">Agrupamento para relatórios financeiros (opcional)</div>
+                            <div class="form-text">
+                                Agrupamento para relatórios financeiros (opcional).
+                                <a href="{{ url_for('catalogos.grupos_financeiros') }}" target="_blank">Gerenciar grupos</a>
+                            </div>
                         </div>
 
                         <div class="mb-4">
@@ -74,41 +83,26 @@
 </div>
 
 <script>
-const GRUPOS_FINANCEIROS = {
-    ENTRADA: [
-        "Receita Operacional",
-        "Capital / Financiamento",
-        "Financeiro",
-        "Outros"
-    ],
-    SAIDA: [
-        "Custo Direto de Obra",
-        "Despesa Administrativa",
-        "Comercial",
-        "Financeiro",
-        "Tributário",
-        "Reembolsos / Repasses",
-        "Outros"
-    ]
-};
-
-function atualizarGrupos() {
+function filtrarGrupos() {
     const tipo = document.getElementById('tipo').value;
-    const sel = document.getElementById('grupo_financeiro');
-    const valorAtual = sel.value || document.getElementById('grupo_financeiro_inicial').value;
+    const sel = document.getElementById('grupo_financeiro_id');
+    const valorAtual = sel.value;
 
-    sel.innerHTML = '<option value="">— Selecione um grupo —</option>';
-    const opcoes = GRUPOS_FINANCEIROS[tipo] || [];
-    opcoes.forEach(function(g) {
-        const o = document.createElement('option');
-        o.value = g;
-        o.textContent = g;
-        if (g === valorAtual) o.selected = true;
-        sel.appendChild(o);
+    Array.from(sel.options).forEach(function(opt) {
+        if (!opt.value) return;
+        const optTipo = opt.getAttribute('data-tipo');
+        opt.hidden = (optTipo !== tipo);
+        if (opt.hidden && opt.selected) {
+            opt.selected = false;
+            sel.value = '';
+        }
     });
+    if (!sel.value && valorAtual) {
+        sel.value = valorAtual;
+    }
 }
 
-document.getElementById('tipo').addEventListener('change', atualizarGrupos);
-document.addEventListener('DOMContentLoaded', atualizarGrupos);
+document.getElementById('tipo').addEventListener('change', filtrarGrupos);
+document.addEventListener('DOMContentLoaded', filtrarGrupos);
 </script>
 {% endblock %}

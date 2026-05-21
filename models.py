@@ -6758,6 +6758,30 @@ class DespesaEscritorioOcorrencia(db.Model):
 # CATÁLOGOS AUXILIARES (Task #10)
 # ============================================================
 
+class GrupoFinanceiro(db.Model):
+    """Grupos financeiros para agrupamento de categorias de fluxo de caixa."""
+    __tablename__ = 'grupo_financeiro'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(10), nullable=False)  # ENTRADA | SAIDA
+    descricao = db.Column(db.Text)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('nome', 'tipo', 'admin_id', name='uq_grupo_financeiro_nome_tipo_admin'),
+        db.Index('idx_grupo_financeiro_admin', 'admin_id'),
+    )
+
+    categorias = db.relationship('CategoriaFluxoCaixa', backref='grupo_financeiro_rel',
+                                 lazy='dynamic', foreign_keys='CategoriaFluxoCaixa.grupo_financeiro_id')
+
+    def __repr__(self):
+        return f'<GrupoFinanceiro {self.tipo}:{self.nome}>'
+
+
 class CategoriaFluxoCaixa(db.Model):
     """Categorias de fluxo de caixa gerenciadas pelo administrador."""
     __tablename__ = 'categoria_fluxo_caixa'
@@ -6766,6 +6790,7 @@ class CategoriaFluxoCaixa(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.String(10), nullable=False, default='SAIDA')  # ENTRADA | SAIDA
     grupo_financeiro = db.Column(db.String(100))
+    grupo_financeiro_id = db.Column(db.Integer, db.ForeignKey('grupo_financeiro.id'), nullable=True)
     descricao = db.Column(db.Text)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)

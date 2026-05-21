@@ -3876,6 +3876,7 @@ def executar_migracoes():
             (175, "Task #10 — seed grupos universais (Obras, RDO, Frota, Financeiro, Almoxarifado, Alimentação, Serviços, Funcionários)", migration_175_seed_novos_grupos),
             (176, "Task #10 v2 — corrige valores incorretos de rdo_tempo/rdo_condicao_trabalho/rdo_status_equipamento para todos os tenants", migration_176_fix_rdo_slugs),
             (177, "Task #10 v3 — corrige almoxarifado_tipo_movimento: SAÍDA→SAIDA, DEVOLUÇÃO→DEVOLUCAO para todos os tenants", migration_177_fix_almox_tipo_movimento),
+            (178, "Task #29 — Grupos Financeiros: criar tabela grupo_financeiro + coluna grupo_financeiro_id em categoria_fluxo_caixa", migration_178_grupo_financeiro),
         ]
         
         # Executar cada migração com rastreamento
@@ -14633,6 +14634,51 @@ def migration_177_fix_almox_tipo_movimento():
 
     db.session.commit()
     logger.info(f"[Migration 177] almoxarifado_tipo_movimento corrigido: {total_corrigidos} opção(ões) atualizadas.")
+
+
+def migration_178_grupo_financeiro():
+    """Migration 178: Task #29 — Cadastro centralizado de Grupos Financeiros.
+
+    1. Cria tabela grupo_financeiro (se não existir).
+    2. Adiciona coluna grupo_financeiro_id (FK nullable) em categoria_fluxo_caixa (se não existir).
+    """
+    logger.info("[Migration 178] Iniciando — Grupos Financeiros")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS grupo_financeiro (
+            id SERIAL PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            tipo VARCHAR(10) NOT NULL,
+            descricao TEXT,
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_grupo_financeiro_nome_tipo_admin UNIQUE (nome, tipo, admin_id)
+        )
+    """))
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_grupo_financeiro_admin ON grupo_financeiro(admin_id)
+    """))
+
+    col_exists = db.session.execute(text("""
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'categoria_fluxo_caixa'
+          AND column_name = 'grupo_financeiro_id'
+        LIMIT 1
+    """)).first()
+
+    if not col_exists:
+        db.session.execute(text("""
+            ALTER TABLE categoria_fluxo_caixa
+            ADD COLUMN grupo_financeiro_id INTEGER REFERENCES grupo_financeiro(id)
+        """))
+        logger.info("[Migration 178] Coluna grupo_financeiro_id adicionada em categoria_fluxo_caixa")
+    else:
+        logger.info("[Migration 178] Coluna grupo_financeiro_id já existe — skip")
+
+    db.session.commit()
+    logger.info("[Migration 178] Concluída com sucesso")
 
 
 def migration_175_seed_novos_grupos():
