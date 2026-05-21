@@ -2023,6 +2023,7 @@ class ImportacaoFluxoCaixa:
                 db.session.flush()
 
                 if status == 'PAGO':
+                    cfc_id = row.get('categoria_fluxo_caixa_id') or None
                     fc = FluxoCaixa(
                         admin_id=admin_id,
                         data_movimento=data_obj,
@@ -2034,6 +2035,7 @@ class ImportacaoFluxoCaixa:
                         referencia_id=cr.id,
                         referencia_tabela='conta_receber',
                         import_batch_id=batch_id,
+                        categoria_fluxo_caixa_id=cfc_id,
                     )
                     db.session.add(fc)
                     n_fluxo += 1

@@ -460,6 +460,8 @@ def fluxo_caixa_upload():
     from models import BancoEmpresa, CategoriaFluxoCaixa
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
     categorias_tenant = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.tipo, CategoriaFluxoCaixa.nome).all()
+    categorias_saida = [c for c in categorias_tenant if c.tipo == 'SAIDA']
+    categorias_entrada = [c for c in categorias_tenant if c.tipo == 'ENTRADA']
 
     return render_template(
         'importacao/preview_fluxo.html',
@@ -471,6 +473,8 @@ def fluxo_caixa_upload():
         categorias_grupos=CATEGORIAS_GRUPOS,
         categorias_opcoes=CATEGORIAS_OPCOES,
         categorias_tenant=categorias_tenant,
+        categorias_saida=categorias_saida,
+        categorias_entrada=categorias_entrada,
         dados_json=dados_assinados,
         bancos=bancos,
         total_saidas=len(saidas_auto) + len(saidas_manual),
@@ -500,16 +504,26 @@ def fluxo_caixa_confirmar():
     saidas_manual = payload.get('saidas_manual', [])
     entradas = payload.get('entradas', [])
 
-    def _aplicar_categoria(row, cat_val):
-        """Detecta prefixo cfc_<id> para categoria personalizada; senão usa tipo_categoria."""
+    def _aplicar_categoria(row, cat_val, tipo_esperado=None):
+        """Detecta prefixo cfc_<id> para categoria personalizada; senão usa tipo_categoria.
+        Se tipo_esperado for fornecido ('ENTRADA' ou 'SAIDA'), valida tenant + tipo antes de aplicar.
+        IDs inválidos ou cross-tenant são silenciosamente ignorados.
+        """
         if not cat_val:
             return
         if cat_val.startswith('cfc_'):
             try:
-                row['categoria_fluxo_caixa_id'] = int(cat_val[4:])
-                row['tipo_categoria'] = row.get('tipo_categoria') or 'OUTROS'
+                cfc_id = int(cat_val[4:])
             except ValueError:
-                pass
+                return
+            from models import CategoriaFluxoCaixa
+            q = CategoriaFluxoCaixa.query.filter_by(id=cfc_id, admin_id=admin_id, ativo=True)
+            if tipo_esperado:
+                q = q.filter_by(tipo=tipo_esperado)
+            cfc = q.first()
+            if cfc:
+                row['categoria_fluxo_caixa_id'] = cfc.id
+                row['tipo_categoria'] = row.get('tipo_categoria') or 'OUTROS'
         else:
             row['tipo_categoria'] = cat_val
             row['categoria_fluxo_caixa_id'] = None
@@ -518,7 +532,7 @@ def fluxo_caixa_confirmar():
     for i, row in enumerate(saidas_auto):
         cat_editada = request.form.get(f'cat_auto_{i}')
         if cat_editada:
-            _aplicar_categoria(row, cat_editada)
+            _aplicar_categoria(row, cat_editada, tipo_esperado='SAIDA')
         # Checkbox "apenas pagamento"
         row['apenas_pagamento'] = request.form.get(f'apenas_pag_auto_{i}') is not None
         # Checkbox "reembolso"
@@ -544,7 +558,7 @@ def fluxo_caixa_confirmar():
     for i, row in enumerate(saidas_manual):
         cat_manual = request.form.get(f'cat_manual_{i}')
         if cat_manual:
-            _aplicar_categoria(row, cat_manual)
+            _aplicar_categoria(row, cat_manual, tipo_esperado='SAIDA')
         elif not row.get('tipo_categoria'):
             row['tipo_categoria'] = 'OUTROS'
         # Checkbox "apenas pagamento"
@@ -567,6 +581,12 @@ def fluxo_caixa_confirmar():
                 row['valor'] = float(valor_edit.replace(',', '.'))
             except ValueError:
                 pass
+
+    # Aplicar categorias personalizadas nas entradas
+    for i, row in enumerate(entradas):
+        cat_entrada = request.form.get(f'cat_entrada_{i}')
+        if cat_entrada:
+            _aplicar_categoria(row, cat_entrada, tipo_esperado='ENTRADA')
 
     todas_saidas = saidas_auto + saidas_manual
 
