@@ -97,8 +97,8 @@ console.log('Initializing RDO with light theme...');
 .page-header {
     background: linear-gradient(135deg, var(--sige-primary, #2563eb) 0%, var(--sige-header, #1e293b) 100%) !important;
     color: var(--sige-on-primary, #ffffff) !important;
-    padding: 3rem 0 !important;
-    margin: 0 0 3rem 0;
+    padding: 1.5rem 0 !important;
+    margin: 0 0 1.5rem 0;
     border-radius: 0 0 24px 24px !important;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
     position: relative;
@@ -223,14 +223,14 @@ console.log('Initializing RDO with light theme...');
 .stats-dashboard {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin: 0 2rem 3rem 2rem;
+    gap: 1.25rem;
+    margin: 0 1.5rem 1.5rem 1.5rem;
     padding: 0;
 }
 
 .stat-card {
     background: #ffffff !important;
-    padding: 2rem;
+    padding: 1.25rem;
     border-radius: 20px !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 6px 10px -5px rgba(0, 0, 0, 0.04) !important;
     border: 1px solid #e5e7eb !important;
@@ -296,10 +296,10 @@ console.log('Initializing RDO with light theme...');
 /* ===== SEÇÃO DE FILTROS PROFISSIONAL ===== */
 .filters-container {
     background: #ffffff !important;
-    padding: 2rem;
+    padding: 1.25rem;
     border-radius: 20px !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
-    margin: 0 2rem 3rem 2rem;
+    margin: 0 1.5rem 1.5rem 1.5rem;
     border: 1px solid #e5e7eb !important;
     position: relative;
     color: #374151 !important;
@@ -441,9 +441,9 @@ console.log('Initializing RDO with light theme...');
 /* ===== GRID DE CARDS RDO MODERNO ===== */
 .rdos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-    gap: 2rem;
-    margin: 0 2rem 3rem 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.25rem;
+    margin: 0 1.5rem 2rem 1.5rem;
     padding: 0;
 }
 
@@ -476,7 +476,7 @@ console.log('Initializing RDO with light theme...');
 
 .rdo-card-header {
     background: var(--gradient-card);
-    padding: 2rem;
+    padding: 1rem 1.25rem;
     border-bottom: 2px solid var(--gray-200);
     display: flex;
     justify-content: space-between;
@@ -490,7 +490,7 @@ console.log('Initializing RDO with light theme...');
 
 .rdo-obra-nome {
     margin: 0;
-    font-size: 1.4rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--gray-800);
     line-height: 1.3;
@@ -527,9 +527,9 @@ console.log('Initializing RDO with light theme...');
 }
 
 .status-badge {
-    padding: 0.75rem 1.25rem;
+    padding: 0.3rem 0.75rem;
     border-radius: 25px;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -546,19 +546,29 @@ console.log('Initializing RDO with light theme...');
     color: white;
     box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
 }
+.status-rascunho {
+    background: linear-gradient(135deg, #ffc107, #ffb700);
+    color: #212529;
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+.status-aprovado {
+    background: linear-gradient(135deg, #0dcaf0, #0d6efd);
+    color: white;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
 
 
 .rdo-card-body {
-    padding: 2rem;
+    padding: 1rem 1.25rem;
 }
 
 .rdo-date, .rdo-creator, .rdo-obra {
     display: flex;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.5rem;
     color: var(--gray-600);
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 500;
 }
 
@@ -570,9 +580,9 @@ console.log('Initializing RDO with light theme...');
 }
 
 .rdo-progress {
-    margin: 2rem 0;
+    margin: 0.75rem 0;
     background: var(--gray-50);
-    padding: 1.5rem;
+    padding: 0.75rem 1rem;
     border-radius: var(--border-radius);
     border: 1px solid var(--gray-200);
 }
@@ -585,7 +595,7 @@ console.log('Initializing RDO with light theme...');
 }
 
 .progress-header span {
-    font-size: 1rem;
+    font-size: 0.8rem;
     color: var(--gray-700);
     font-weight: 600;
     text-transform: uppercase;
@@ -594,12 +604,12 @@ console.log('Initializing RDO with light theme...');
 
 .progress-header strong {
     color: var(--primary-green);
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     font-weight: 800;
 }
 
 .progress-bar {
-    height: 12px;
+    height: 8px;
     background: var(--gray-300);
     border-radius: 6px;
     overflow: hidden;
@@ -617,9 +627,9 @@ console.log('Initializing RDO with light theme...');
 .rdo-stats {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 1.5rem;
-    margin-top: 2rem;
-    padding: 1.5rem;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
     background: var(--gray-50);
     border-radius: var(--border-radius);
     border: 1px solid var(--gray-200);
@@ -629,7 +639,7 @@ console.log('Initializing RDO with light theme...');
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    font-size: 1rem;
+    font-size: 0.8rem;
     color: var(--gray-700);
     font-weight: 600;
     text-align: center;
@@ -643,7 +653,7 @@ console.log('Initializing RDO with light theme...');
 
 .rdo-card-footer {
     background: var(--gray-100);
-    padding: 1.5rem 2rem;
+    padding: 0.75rem 1rem;
     display: flex;
     gap: 1rem;
     border-top: 1px solid var(--gray-200);
@@ -651,11 +661,11 @@ console.log('Initializing RDO with light theme...');
 
 .btn-action {
     flex: 1;
-    padding: 1rem 1.5rem;
+    padding: 0.5rem 1rem;
     border: none;
     border-radius: var(--border-radius);
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.85rem;
     text-decoration: none;
     text-align: center;
     transition: var(--transition);
@@ -764,7 +774,7 @@ console.log('Initializing RDO with light theme...');
 
 /* ===== RESPONSIVIDADE AVANÇADA ===== */
 @media (max-width: 1200px) {
-    .rdos-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+    .rdos-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
     .stats-dashboard { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
 }
 
@@ -885,8 +895,7 @@ console.log('Initializing RDO with light theme...');
             <i class="fas fa-filter"></i>
             <h3>Filtros e Ordenação</h3>
         </div>
-        <div class="filters-content">
-            <form method="GET" id="filtrosForm" style="display: contents;">
+        <form method="GET" id="filtrosForm" class="filters-content">
                 <div class="filter-group">
                     <label>Obra</label>
                     <select class="modern-select" name="obra_id">
@@ -903,7 +912,9 @@ console.log('Initializing RDO with light theme...');
                     <label>Status</label>
                     <select class="modern-select" name="status">
                         <option value="">Todos os status</option>
+                        <option value="Rascunho" {% if filters.status == "Rascunho" %}selected{% endif %}>Rascunho</option>
                         <option value="Finalizado" {% if filters.status == "Finalizado" %}selected{% endif %}>Finalizado</option>
+                        <option value="Aprovado" {% if filters.status == "Aprovado" %}selected{% endif %}>Aprovado</option>
                     </select>
                 </div>
                 
@@ -946,8 +957,7 @@ console.log('Initializing RDO with light theme...');
                         <i class="fas fa-times"></i> Limpar
                     </button>
                 </div>
-            </form>
-        </div>
+        </form>
     </div>
 
     <!-- Grid de Cards RDO -->
@@ -959,8 +969,10 @@ console.log('Initializing RDO with light theme...');
             <div class="rdo-card-header">
                 <div class="rdo-title-section">
                     <h3 class="rdo-obra-nome">{{ rdo.obra.nome }}</h3>
+                    <small class="text-muted" style="font-size:0.75rem;">#{{ rdo.id }} · {{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</small>
                 </div>
                 <div class="rdo-header-actions">
+                    <span class="status-badge status-{{ rdo.status|lower|replace(' ', '-') }}">{{ rdo.status }}</span>
                     <button class="btn-delete-rdo" onclick="confirmarExclusao({{ rdo.id }})" title="Excluir RDO">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -968,10 +980,6 @@ console.log('Initializing RDO with light theme...');
             </div>
             
             <div class="rdo-card-body">
-                <div class="rdo-date">
-                    <i class="fas fa-calendar"></i>
-                    <span>{{ rdo.data_relatorio.strftime('%d/%m/%Y') }}</span>
-                </div>
                 
                 
                 <div class="rdo-progress">
