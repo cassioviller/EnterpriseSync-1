@@ -336,35 +336,47 @@
             {% endfor %}
           </select>
         </div>
-        <!-- Task #36 — Campos dimensionais para cálculo automático de quantidade -->
-        <input type="hidden" name="tipo_medicao_override" id="add-tipo-medicao" value="">
-        <div class="col-12" id="add-dim-wrapper" style="display:none">
+        <!-- Task #36 — Medição dimensional: select sempre visível, dim fields aparecem conforme seleção -->
+        <div class="col-12">
           <div class="border rounded bg-light p-2">
-            <div class="small text-muted mb-2">
-              <i class="fas fa-ruler-combined me-1 text-primary"></i>
-              <strong><span id="add-dim-label"></span></strong>
-              <span class="ms-1 text-muted">— a quantidade será calculada automaticamente</span>
-            </div>
-            <div class="row g-2 align-items-end">
-              <div class="col dim-field-largura" style="display:none">
+            <div class="row g-2 align-items-end" id="add-dim-row">
+              <div class="col-md-3">
+                <label class="form-label small mb-1">
+                  <i class="fas fa-ruler-combined me-1 text-primary"></i>Tipo de medição
+                </label>
+                <select name="tipo_medicao_override" id="add-tipo-medicao" class="form-select form-select-sm"
+                        onchange="updateAddDimFields(this.value)">
+                  <option value="UNITARIO">📦 Unitário (qtd livre)</option>
+                  <option value="AREA">▭ Área (L × C)</option>
+                  <option value="PERIMETRO">⬡ Perímetro (m lineares)</option>
+                  <option value="PERIMETRO_PE_DIREITO">🧱 Parede (P × pé-dir)</option>
+                  <option value="AREA_PE_DIREITO">🏗 Alvenaria (L×C×pé-dir)</option>
+                  <option value="LINEAR">📏 Linear (comprimento)</option>
+                </select>
+              </div>
+              <div class="col add-dim-f-largura" style="display:none">
                 <label class="form-label small mb-1">Largura (m)</label>
-                <input name="dim_largura" id="add-dim-largura" type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
+                <input name="dim_largura" id="add-dim-largura" type="text" inputmode="decimal"
+                       class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
-              <div class="col dim-field-comprimento" style="display:none">
+              <div class="col add-dim-f-comprimento" style="display:none">
                 <label class="form-label small mb-1">Comprimento (m)</label>
-                <input name="dim_comprimento" id="add-dim-comprimento" type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
+                <input name="dim_comprimento" id="add-dim-comprimento" type="text" inputmode="decimal"
+                       class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
-              <div class="col dim-field-perimetro" style="display:none">
+              <div class="col add-dim-f-perimetro" style="display:none">
                 <label class="form-label small mb-1">Perímetro (m)</label>
-                <input name="dim_perimetro" id="add-dim-perimetro" type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
+                <input name="dim_perimetro" id="add-dim-perimetro" type="text" inputmode="decimal"
+                       class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
-              <div class="col dim-field-pe-direito" style="display:none">
+              <div class="col add-dim-f-pe-direito" style="display:none">
                 <label class="form-label small mb-1">Pé-direito (m)</label>
-                <input name="dim_pe_direito" id="add-dim-pe-direito" type="text" inputmode="decimal" class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
+                <input name="dim_pe_direito" id="add-dim-pe-direito" type="text" inputmode="decimal"
+                       class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
-              <div class="col-auto d-flex align-items-end">
+              <div class="col-auto d-flex align-items-end" id="add-dim-result-wrap" style="display:none">
                 <div class="text-center">
-                  <div class="small text-muted">Qtd</div>
+                  <div class="small text-muted">= Qtd</div>
                   <span class="badge bg-primary fs-6 px-3 py-2" id="add-dim-result">—</span>
                 </div>
               </div>
@@ -413,6 +425,24 @@
     <div class="card-header d-flex justify-content-between align-items-center">
       <div>
         <strong>Item #{{ it.ordem }} — {{ it.descricao }}</strong>
+        {# Task #36 — badge dimensional no header do card #}
+        {% if it.tipo_medicao_override and it.tipo_medicao_override != 'UNITARIO' %}
+          <span class="badge bg-light border text-secondary ms-2 fw-normal small" title="Medição dimensional">
+            <i class="fas fa-ruler-combined me-1 text-primary"></i>
+            {% if it.tipo_medicao_override == 'AREA' %}
+              {{ it.dim_largura|num(2) if it.dim_largura else '?' }} × {{ it.dim_comprimento|num(2) if it.dim_comprimento else '?' }} m²
+            {% elif it.tipo_medicao_override == 'PERIMETRO' %}
+              {{ it.dim_perimetro|num(2) if it.dim_perimetro else '?' }} m
+            {% elif it.tipo_medicao_override == 'PERIMETRO_PE_DIREITO' %}
+              {{ it.dim_perimetro|num(2) if it.dim_perimetro else '?' }}×{{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '?' }} m (parede)
+            {% elif it.tipo_medicao_override == 'AREA_PE_DIREITO' %}
+              {{ it.dim_largura|num(2) if it.dim_largura else '?' }}×{{ it.dim_comprimento|num(2) if it.dim_comprimento else '?' }}×{{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '?' }} m
+            {% elif it.tipo_medicao_override == 'LINEAR' %}
+              {{ it.dim_comprimento|num(2) if it.dim_comprimento else '?' }} m (linear)
+            {% endif %}
+            → {{ it.quantidade|num(4) }} {{ it.unidade }}
+          </span>
+        {% endif %}
         {% if it.servico %}
           <span class="badge bg-info text-dark ms-2" title="Serviço do catálogo">
             <i class="fas fa-link me-1"></i>{{ it.servico.nome }}
@@ -476,34 +506,60 @@
                  value="{{ it.margem_pct|num(2) if it.margem_pct is not none else '' }}"
                  placeholder="usa global">
         </div>
-        <!-- Task #36 — dimensões salvas: exibição + campos ocultos para preservar no save -->
-        {% if it.tipo_medicao_override and it.tipo_medicao_override != 'UNITARIO' %}
+        <!-- Task #36 — Medição dimensional editável para itens existentes -->
         <div class="col-12">
-          <div class="alert alert-info py-1 px-2 mb-0 small d-flex align-items-center gap-2">
-            <i class="fas fa-ruler-combined text-primary"></i>
-            <span>
-              <strong>Dimensões:</strong>
-              {% if it.tipo_medicao_override == 'AREA' %}
-                {{ it.dim_largura|num(2) if it.dim_largura else '?' }} × {{ it.dim_comprimento|num(2) if it.dim_comprimento else '?' }} m²
-              {% elif it.tipo_medicao_override == 'PERIMETRO' %}
-                {{ it.dim_perimetro|num(2) if it.dim_perimetro else '?' }} m (perímetro)
-              {% elif it.tipo_medicao_override == 'PERIMETRO_PE_DIREITO' %}
-                {{ it.dim_perimetro|num(2) if it.dim_perimetro else '?' }} × {{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '?' }} m (parede)
-              {% elif it.tipo_medicao_override == 'AREA_PE_DIREITO' %}
-                {{ it.dim_largura|num(2) if it.dim_largura else '?' }} × {{ it.dim_comprimento|num(2) if it.dim_comprimento else '?' }} × {{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '?' }} m (alvenaria)
-              {% elif it.tipo_medicao_override == 'LINEAR' %}
-                {{ it.dim_comprimento|num(2) if it.dim_comprimento else '?' }} m (linear)
-              {% endif %}
-              → <strong>{{ it.quantidade|num(4) }}</strong> {{ it.unidade }}
-            </span>
+          <div class="border rounded bg-light p-2">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label small mb-1">
+                  <i class="fas fa-ruler-combined me-1 text-primary"></i>Tipo de medição
+                </label>
+                {% set _tm = it.tipo_medicao_override or 'UNITARIO' %}
+                <select name="tipo_medicao_override" class="form-select form-select-sm dim-tipo-sel"
+                        onchange="updateItemDimFields(this)">
+                  <option value="UNITARIO"             {% if _tm=='UNITARIO' %}selected{% endif %}>📦 Unitário (qtd livre)</option>
+                  <option value="AREA"                 {% if _tm=='AREA' %}selected{% endif %}>▭ Área (L × C)</option>
+                  <option value="PERIMETRO"            {% if _tm=='PERIMETRO' %}selected{% endif %}>⬡ Perímetro (m lineares)</option>
+                  <option value="PERIMETRO_PE_DIREITO" {% if _tm=='PERIMETRO_PE_DIREITO' %}selected{% endif %}>🧱 Parede (P × pé-dir)</option>
+                  <option value="AREA_PE_DIREITO"      {% if _tm=='AREA_PE_DIREITO' %}selected{% endif %}>🏗 Alvenaria (L×C×pé-dir)</option>
+                  <option value="LINEAR"               {% if _tm=='LINEAR' %}selected{% endif %}>📏 Linear (comprimento)</option>
+                </select>
+              </div>
+              <div class="col dim-it-f-largura" style="{{ '' if _tm in ('AREA','AREA_PE_DIREITO') else 'display:none' }}">
+                <label class="form-label small mb-1">Largura (m)</label>
+                <input name="dim_largura" type="text" inputmode="decimal" class="form-control form-control-sm"
+                       placeholder="0,00" value="{{ it.dim_largura|num(2) if it.dim_largura else '' }}"
+                       oninput="calcDimItem(this)">
+              </div>
+              <div class="col dim-it-f-comprimento" style="{{ '' if _tm in ('AREA','AREA_PE_DIREITO','LINEAR') else 'display:none' }}">
+                <label class="form-label small mb-1">Comprimento (m)</label>
+                <input name="dim_comprimento" type="text" inputmode="decimal" class="form-control form-control-sm"
+                       placeholder="0,00" value="{{ it.dim_comprimento|num(2) if it.dim_comprimento else '' }}"
+                       oninput="calcDimItem(this)">
+              </div>
+              <div class="col dim-it-f-perimetro" style="{{ '' if _tm in ('PERIMETRO','PERIMETRO_PE_DIREITO') else 'display:none' }}">
+                <label class="form-label small mb-1">Perímetro (m)</label>
+                <input name="dim_perimetro" type="text" inputmode="decimal" class="form-control form-control-sm"
+                       placeholder="0,00" value="{{ it.dim_perimetro|num(2) if it.dim_perimetro else '' }}"
+                       oninput="calcDimItem(this)">
+              </div>
+              <div class="col dim-it-f-pe-direito" style="{{ '' if _tm in ('PERIMETRO_PE_DIREITO','AREA_PE_DIREITO') else 'display:none' }}">
+                <label class="form-label small mb-1">Pé-direito (m)</label>
+                <input name="dim_pe_direito" type="text" inputmode="decimal" class="form-control form-control-sm"
+                       placeholder="0,00" value="{{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '' }}"
+                       oninput="calcDimItem(this)">
+              </div>
+              <div class="col-auto d-flex align-items-end dim-it-result-wrap" style="{{ '' if _tm != 'UNITARIO' else 'display:none' }}">
+                <div class="text-center">
+                  <div class="small text-muted">= Qtd</div>
+                  <span class="badge bg-secondary fs-6 px-2 py-2 dim-it-result">
+                    {{ it.quantidade|num(4) if it.quantidade and _tm != 'UNITARIO' else '—' }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        {% endif %}
-        <input type="hidden" name="tipo_medicao_override" value="{{ it.tipo_medicao_override or '' }}">
-        <input type="hidden" name="dim_largura"     value="{{ it.dim_largura|num(4) if it.dim_largura else '' }}">
-        <input type="hidden" name="dim_comprimento" value="{{ it.dim_comprimento|num(4) if it.dim_comprimento else '' }}">
-        <input type="hidden" name="dim_perimetro"   value="{{ it.dim_perimetro|num(4) if it.dim_perimetro else '' }}">
-        <input type="hidden" name="dim_pe_direito"  value="{{ it.dim_pe_direito|num(4) if it.dim_pe_direito else '' }}">
         <div class="col-md-12">
           <label class="form-label small d-flex align-items-center gap-2">
             <span>Cronograma (override desta linha)</span>
@@ -1198,11 +1254,18 @@ function _addInsumoRow(insumo) {
         var unField = form.querySelector('input[name="unidade"]');
         if (unField && value) unField.value = unidade;
       }
-      // Task #36 — detectar tipo de medição e mostrar campos dimensionais
+      // Task #36 — detectar tipo de medição, atualizar select e mostrar campos dimensionais
       var tipo = item ? (item.tipo_medicao || item.tmed || 'UNITARIO') : 'UNITARIO';
-      var hiddenTipo = document.getElementById('add-tipo-medicao');
-      if (hiddenTipo) hiddenTipo.value = tipo;
+      var tipoSel = document.getElementById('add-tipo-medicao');
+      if (tipoSel) tipoSel.value = tipo;
       updateAddDimFields(tipo);
+      // Limpar dimensões anteriores ao trocar serviço
+      ['add-dim-largura','add-dim-comprimento','add-dim-perimetro','add-dim-pe-direito'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      var rEl = document.getElementById('add-dim-result');
+      if (rEl) rEl.textContent = '—';
       if (window.recalcAll) recalcAll();
     }
   });
@@ -1254,25 +1317,34 @@ function _addInsumoRow(insumo) {
 <script>
 // Task #36 — Medição Dimensional
 const _DIM_CFG = {
-  AREA:                 { label: 'Área (largura × comprimento)', fields: ['largura','comprimento'] },
-  PERIMETRO:            { label: 'Perímetro (m lineares)', fields: ['perimetro'] },
-  PERIMETRO_PE_DIREITO: { label: 'Parede (perímetro × pé-direito)', fields: ['perimetro','pe-direito'] },
-  AREA_PE_DIREITO:      { label: 'Alvenaria (L × C × pé-direito)', fields: ['largura','comprimento','pe-direito'] },
-  LINEAR:               { label: 'Linear (comprimento)', fields: ['comprimento'] },
-  UNITARIO:             { label: 'Unitário', fields: [] },
+  AREA:                 { fields: ['largura','comprimento'] },
+  PERIMETRO:            { fields: ['perimetro'] },
+  PERIMETRO_PE_DIREITO: { fields: ['perimetro','pe-direito'] },
+  AREA_PE_DIREITO:      { fields: ['largura','comprimento','pe-direito'] },
+  LINEAR:               { fields: ['comprimento'] },
+  UNITARIO:             { fields: [] },
 };
 
+function _dimCalc(tipo, L, C, P, H) {
+  if (tipo === 'AREA')                 return L * C;
+  if (tipo === 'PERIMETRO')            return P;
+  if (tipo === 'PERIMETRO_PE_DIREITO') return P * H;
+  if (tipo === 'AREA_PE_DIREITO')      return L * C * H;
+  if (tipo === 'LINEAR')               return C;
+  return null;
+}
+
+// ── Formulário "Adicionar Item" ──
 function updateAddDimFields(tipo) {
   var cfg = _DIM_CFG[tipo] || _DIM_CFG['UNITARIO'];
-  var wrapper = document.getElementById('add-dim-wrapper');
-  if (!wrapper) return;
-  wrapper.style.display = cfg.fields.length > 0 ? '' : 'none';
-  var labelEl = document.getElementById('add-dim-label');
-  if (labelEl) labelEl.textContent = cfg.label;
+  var row = document.getElementById('add-dim-row');
+  if (!row) return;
   ['largura','comprimento','perimetro','pe-direito'].forEach(function(f) {
-    var el = wrapper.querySelector('.dim-field-' + f);
+    var el = row.querySelector('.add-dim-f-' + f);
     if (el) el.style.display = cfg.fields.indexOf(f) >= 0 ? '' : 'none';
   });
+  var rw = document.getElementById('add-dim-result-wrap');
+  if (rw) rw.style.display = cfg.fields.length > 0 ? '' : 'none';
   calcDimAdd();
 }
 
@@ -1282,15 +1354,10 @@ function calcDimAdd() {
   var C = getNum(document.getElementById('add-dim-comprimento'));
   var P = getNum(document.getElementById('add-dim-perimetro'));
   var H = getNum(document.getElementById('add-dim-pe-direito'));
-  var qtd = null;
-  if      (tipo === 'AREA')                 qtd = L * C;
-  else if (tipo === 'PERIMETRO')            qtd = P;
-  else if (tipo === 'PERIMETRO_PE_DIREITO') qtd = P * H;
-  else if (tipo === 'AREA_PE_DIREITO')      qtd = L * C * H;
-  else if (tipo === 'LINEAR')               qtd = C;
+  var qtd = _dimCalc(tipo, L, C, P, H);
   var resultEl = document.getElementById('add-dim-result');
-  var wrapper = document.getElementById('add-dim-wrapper');
-  var form = wrapper ? wrapper.closest('form') : null;
+  var outerDiv = document.getElementById('add-dim-row');
+  var form = outerDiv ? outerDiv.closest('form') : null;
   var qtdInput = form ? form.querySelector('input[name="quantidade"]') : null;
   if (qtd !== null && qtd > 0) {
     var qtdStr = fmtBR(qtd, 4);
@@ -1300,6 +1367,46 @@ function calcDimAdd() {
     if (resultEl) resultEl.textContent = '—';
   }
   if (window.recalcAll) recalcAll();
+}
+
+// ── Itens existentes ──
+function updateItemDimFields(sel) {
+  var tipo = sel.value;
+  var cfg = _DIM_CFG[tipo] || _DIM_CFG['UNITARIO'];
+  var row = sel.closest('.row');
+  if (!row) return;
+  ['largura','comprimento','perimetro','pe-direito'].forEach(function(f) {
+    var el = row.querySelector('.dim-it-f-' + f);
+    if (el) el.style.display = cfg.fields.indexOf(f) >= 0 ? '' : 'none';
+  });
+  var rw = row.querySelector('.dim-it-result-wrap');
+  if (rw) rw.style.display = cfg.fields.length > 0 ? '' : 'none';
+  calcDimItem(sel);
+}
+
+function calcDimItem(el) {
+  var row = el.closest('.row');
+  if (!row) return;
+  var tipoSel = row.querySelector('.dim-tipo-sel');
+  var tipo = tipoSel ? tipoSel.value : 'UNITARIO';
+  var L = getNum(row.querySelector('input[name="dim_largura"]'));
+  var C = getNum(row.querySelector('input[name="dim_comprimento"]'));
+  var P = getNum(row.querySelector('input[name="dim_perimetro"]'));
+  var H = getNum(row.querySelector('input[name="dim_pe_direito"]'));
+  var qtd = _dimCalc(tipo, L, C, P, H);
+  var resultBadge = row.querySelector('.dim-it-result');
+  if (qtd !== null && qtd > 0) {
+    var qtdStr = fmtBR(qtd, 4);
+    if (resultBadge) resultBadge.textContent = qtdStr;
+    var form = el.closest('form');
+    if (form) {
+      var qtdInput = form.querySelector('input[name="quantidade"]');
+      if (qtdInput) { qtdInput.value = qtdStr; }
+    }
+    if (window.recalcAll) recalcAll();
+  } else {
+    if (resultBadge) resultBadge.textContent = '—';
+  }
 }
 
 function qcAbrirInsumoOrcamento(btn) {
