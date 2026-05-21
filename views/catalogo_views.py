@@ -504,6 +504,25 @@ def servico_atualizar_preco(servico_id):
     return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
 
 
+@catalogo_bp.route('/servicos/<int:servico_id>/editar', methods=['POST'])
+@login_required
+def servico_editar(servico_id):
+    """Atualiza dados básicos do serviço (nome, categoria, unidade, descrição)."""
+    aid = _admin_id()
+    svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
+    nome = (request.form.get('nome') or '').strip()
+    if not nome:
+        flash('Nome é obrigatório.', 'error')
+        return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
+    svc.nome = nome
+    svc.categoria = (request.form.get('categoria') or '').strip() or 'Geral'
+    svc.unidade_medida = (request.form.get('unidade_medida') or '').strip() or 'un'
+    svc.descricao = request.form.get('descricao') or None
+    db.session.commit()
+    flash('Serviço atualizado.', 'success')
+    return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Histórico cross-obra de um serviço
 # ──────────────────────────────────────────────────────────────────────

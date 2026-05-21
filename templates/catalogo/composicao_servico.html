@@ -10,7 +10,57 @@
 <div class="container py-4">
   <a href="{{ url_for('catalogo.servicos_list') }}" class="text-decoration-none small"><i class="fas fa-arrow-left"></i> Voltar ao catálogo</a>
   <h2 class="my-3"><i class="fas fa-cogs text-primary"></i> Composição & Preço — {{ servico.nome }}</h2>
-  <p class="text-muted">Unidade: <strong>{{ servico.unidade_medida }}</strong> · Categoria: <strong>{{ servico.categoria }}</strong></p>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <strong><i class="fas fa-tag text-primary me-1"></i> Dados do Serviço</strong>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              data-bs-toggle="collapse" data-bs-target="#formDadosServico"
+              aria-expanded="false">
+        <i class="fas fa-pencil-alt me-1"></i>Editar
+      </button>
+    </div>
+    <div class="card-body py-2">
+      <p class="mb-0 text-muted small">
+        Unidade: <strong>{{ servico.unidade_medida }}</strong> &nbsp;·&nbsp;
+        Categoria: <strong>{{ servico.categoria }}</strong>
+        {% if servico.descricao %}&nbsp;·&nbsp;<span>{{ servico.descricao }}</span>{% endif %}
+      </p>
+    </div>
+    <div class="collapse" id="formDadosServico">
+      <div class="card-body pt-0 border-top">
+        <form method="POST" action="{{ url_for('catalogo.servico_editar', servico_id=servico.id) }}"
+              class="row g-2 mt-1">
+          {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+          <div class="col-md-6">
+            <label class="form-label small mb-1">Nome <span class="text-danger">*</span></label>
+            <input name="nome" required class="form-control form-control-sm"
+                   value="{{ servico.nome }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small mb-1">Categoria</label>
+            <input name="categoria" class="form-control form-control-sm"
+                   value="{{ servico.categoria }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small mb-1">Unidade de medida</label>
+            <input name="unidade_medida" class="form-control form-control-sm"
+                   value="{{ servico.unidade_medida }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label small mb-1">Descrição</label>
+            <textarea name="descricao" class="form-control form-control-sm"
+                      rows="2">{{ servico.descricao or '' }}</textarea>
+          </div>
+          <div class="col-12 d-flex justify-content-end">
+            <button class="btn btn-sm btn-primary">
+              <i class="fas fa-save me-1"></i>Salvar alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <div class="row g-3 mb-3">
     <div class="col-md-4">
