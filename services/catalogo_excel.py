@@ -169,6 +169,7 @@ def _autosize(ws, widths: list[int]):
 # ──────────────────────────────────────────────────────────────────────
 INSUMO_HEADERS = [
     'nome', 'tipo', 'unidade', 'descricao', 'coeficiente_padrao', 'preco_base',
+    'fator_comercial', 'unidade_comercial',
 ]
 
 
@@ -186,13 +187,15 @@ def gerar_modelo_insumos_xlsx() -> bytes:
     _style_header(ws, len(INSUMO_HEADERS))
 
     exemplos = [
-        ['Pedreiro', 'MAO_OBRA', 'h', 'Hora de pedreiro contratado', '1', '35,00'],
-        ['Cimento CP-II 50kg', 'MATERIAL', 'sc', 'Saco de cimento Portland', '1', '38,50'],
-        ['Betoneira 400L', 'EQUIPAMENTO', 'h', 'Hora de uso de betoneira', '1', '12,00'],
+        ['Pedreiro', 'MAO_OBRA', 'h', 'Hora de pedreiro contratado', '1', '35,00', '1', ''],
+        ['Cimento CP-II 50kg', 'MATERIAL', 'sc', 'Saco de cimento Portland', '1', '38,50', '1', ''],
+        ['Parafuso M6x20', 'MATERIAL', 'un', 'Parafuso sextavado M6x20mm', '1', '0,15', '100', 'pacote'],
+        ['Barra Roscada 3/8"', 'MATERIAL', 'm', 'Barra roscada 3/8" (comprida)', '1', '8,50', '6', 'barra'],
+        ['Betoneira 400L', 'EQUIPAMENTO', 'h', 'Hora de uso de betoneira', '1', '12,00', '1', ''],
     ]
     for linha in exemplos:
         ws.append(linha)
-    _autosize(ws, [28, 14, 10, 36, 18, 14])
+    _autosize(ws, [28, 14, 10, 36, 18, 14, 16, 18])
 
     # Aba 2 — Instruções
     inst = wb.create_sheet('Instruções')
@@ -207,7 +210,7 @@ def gerar_modelo_insumos_xlsx() -> bytes:
                  'Se já existir um insumo com o mesmo nome, ele será atualizado.'),
         ('tipo', 'Obrigatório. Valores aceitos: MATERIAL, MAO_OBRA ou '
                  'EQUIPAMENTO (sem acento, em maiúsculas).'),
-        ('unidade', 'Obrigatório. Unidade de medida do insumo. Ex.: h '
+        ('unidade', 'Obrigatório. Unidade de medida técnica do insumo. Ex.: h '
                     '(hora), kg, m, m², m³, sc (saco), un, l, etc.'),
         ('descricao', 'Opcional. Texto livre para descrever o insumo.'),
         ('coeficiente_padrao', 'Opcional. Coeficiente padrão de consumo '
@@ -218,6 +221,14 @@ def gerar_modelo_insumos_xlsx() -> bytes:
                        'na data de hoje. Aceita "35,00", "35.00" ou "1.234,56". '
                        'Se vazio, o preço atual do insumo (caso exista) é '
                        'mantido.'),
+        ('fator_comercial', 'Opcional. Múltiplo de compra — tamanho do pacote '
+                            'comercial do fornecedor. Ex.: 100 (caixa de 100 parafusos), '
+                            '6 (barra de 6 m), 25 (saco de 25 kg). '
+                            'Padrão: 1 (compra unitária, sem arredondamento). '
+                            'Aceita "1,5" ou "1.5".'),
+        ('unidade_comercial', 'Opcional. Nome da embalagem comercial. '
+                              'Ex.: pacote, caixa, barra, fardo, rolo. '
+                              'Se vazio, utiliza a mesma unidade técnica do campo "unidade".'),
     ]
     for col, txt in linhas_inst:
         inst.append([col, txt])
@@ -345,6 +356,26 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                 })
                 continue
 
+            # Embalagem / múltiplo de compra (Task #19)
+            fator_dec, fator_invalido = _parse_decimal(_col(row, 'fator_comercial'))
+            if fator_invalido:
+                rejected.append({
+                    'linha': row_idx,
+                    'motivo': (f'fator_comercial inválido: '
+                               f'"{_col(row, "fator_comercial")}" não é numérico.'),
+                })
+                continue
+            if fator_dec is None:
+                fator_dec = Decimal('1')
+            if fator_dec <= 0:
+                rejected.append({
+                    'linha': row_idx,
+                    'motivo': 'fator_comercial deve ser maior que zero.',
+                })
+                continue
+
+            unidade_comercial = _str_or_none(_col(row, 'unidade_comercial'))
+
             chave = nome.strip().lower()
             ins = existentes.get(chave)
             if ins is None:
@@ -355,6 +386,8 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                     unidade=unidade,
                     descricao=descricao,
                     coeficiente_padrao=coef_dec,
+                    fator_comercial=fator_dec,
+                    unidade_comercial=unidade_comercial,
                 )
                 db.session.add(ins)
                 db.session.flush()
@@ -369,6 +402,10 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                 if descricao is not None:
                     ins.descricao = descricao
                 ins.coeficiente_padrao = coef_dec
+                ins.fator_comercial = fator_dec
+                # Só sobrescreve unidade_comercial se vier preenchida
+                if unidade_comercial is not None:
+                    ins.unidade_comercial = unidade_comercial
                 # Reativa caso esteja desativado (via "excluir" suave)
                 if not ins.ativo:
                     ins.ativo = True
