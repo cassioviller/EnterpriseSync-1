@@ -342,6 +342,13 @@ def adicionar_item(id):
         override_id = _parse_template_override(
             request.form.get('cronograma_template_override_id'), admin_id
         )
+        # Task #36 — medição dimensional
+        tipo_med = (request.form.get('tipo_medicao_override') or '').upper()
+        if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
+            tipo_med = None
+        def _dim(key):
+            v = request.form.get(key)
+            return _parse_br_decimal(v) if v and v.strip() else None
         item = OrcamentoItem(
             admin_id=admin_id,
             orcamento_id=orc.id,
@@ -352,6 +359,11 @@ def adicionar_item(id):
             quantidade=quantidade,
             composicao_snapshot=snap,
             cronograma_template_override_id=override_id,
+            tipo_medicao_override=tipo_med or None,
+            dim_largura=_dim('dim_largura'),
+            dim_comprimento=_dim('dim_comprimento'),
+            dim_perimetro=_dim('dim_perimetro'),
+            dim_pe_direito=_dim('dim_pe_direito'),
         )
         db.session.add(item)
         db.session.flush()
@@ -423,6 +435,23 @@ def atualizar_item(item_id):
             item.cronograma_template_override_id = _parse_template_override(
                 request.form.get('cronograma_template_override_id'), admin_id
             )
+        # Task #36 — medição dimensional
+        if 'tipo_medicao_override' in request.form:
+            tipo_med = (request.form.get('tipo_medicao_override') or '').upper()
+            item.tipo_medicao_override = tipo_med if tipo_med in (
+                'UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'
+            ) else None
+        def _rdim(key):
+            v = request.form.get(key)
+            return _parse_br_decimal(v) if v and v.strip() else None
+        if 'dim_largura' in request.form:
+            item.dim_largura = _rdim('dim_largura')
+        if 'dim_comprimento' in request.form:
+            item.dim_comprimento = _rdim('dim_comprimento')
+        if 'dim_perimetro' in request.form:
+            item.dim_perimetro = _rdim('dim_perimetro')
+        if 'dim_pe_direito' in request.form:
+            item.dim_pe_direito = _rdim('dim_pe_direito')
         recalcular_item(item, orc)
         recalcular_orcamento(orc)
         db.session.commit()

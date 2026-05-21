@@ -27,6 +27,23 @@
             <label class="form-label">Unidade</label>
             <input name="unidade" class="form-control" value="{{ insumo.unidade if insumo else 'un' }}">
           </div>
+          <div class="col-md-3">
+            <label class="form-label">
+              Tipo de medição
+              <i class="fas fa-info-circle text-muted ms-1"
+                 data-bs-toggle="tooltip"
+                 title="Define como a quantidade deste insumo é calculada ao adicioná-lo num orçamento."></i>
+            </label>
+            <select name="tipo_medicao" class="form-select">
+              {% set tm = insumo.tipo_medicao if insumo else 'UNITARIO' %}
+              <option value="UNITARIO"              {% if tm=='UNITARIO' %}selected{% endif %}>📦 Unitário (qtd livre)</option>
+              <option value="AREA"                  {% if tm=='AREA' %}selected{% endif %}>▭ Área (larg × compr)</option>
+              <option value="PERIMETRO"             {% if tm=='PERIMETRO' %}selected{% endif %}>⬡ Perímetro (m lineares)</option>
+              <option value="PERIMETRO_PE_DIREITO"  {% if tm=='PERIMETRO_PE_DIREITO' %}selected{% endif %}>🧱 Parede (perim × pé-dir)</option>
+              <option value="AREA_PE_DIREITO"       {% if tm=='AREA_PE_DIREITO' %}selected{% endif %}>🏗️ Alvenaria (larg × compr × pé-dir)</option>
+              <option value="LINEAR"               {% if tm=='LINEAR' %}selected{% endif %}>📏 Linear (comprimento)</option>
+            </select>
+          </div>
           <div class="col-md-4">
             <label class="form-label">Coeficiente padrão</label>
             <div class="input-group">

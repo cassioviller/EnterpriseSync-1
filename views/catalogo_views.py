@@ -109,6 +109,9 @@ def insumo_novo():
         fator_com = _to_decimal(fator_raw, '1') if fator_raw not in (None, '') else Decimal('1')
         if fator_com <= 0:
             fator_com = Decimal('1')
+        tipo_med = (request.form.get('tipo_medicao') or 'UNITARIO').upper()
+        if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
+            tipo_med = 'UNITARIO'
         ins = Insumo(
             admin_id=aid,
             nome=nome,
@@ -118,6 +121,7 @@ def insumo_novo():
             coeficiente_padrao=coef_padrao,
             fator_comercial=fator_com,
             unidade_comercial=(request.form.get('unidade_comercial') or '').strip() or None,
+            tipo_medicao=tipo_med,
         )
         db.session.add(ins)
         db.session.flush()
@@ -154,6 +158,10 @@ def insumo_editar(insumo_id):
             if fator_com > 0:
                 ins.fator_comercial = fator_com
         ins.unidade_comercial = (request.form.get('unidade_comercial') or '').strip() or None
+        tipo_med = (request.form.get('tipo_medicao') or 'UNITARIO').upper()
+        if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
+            tipo_med = 'UNITARIO'
+        ins.tipo_medicao = tipo_med
         db.session.commit()
         flash('Insumo atualizado.', 'success')
         return redirect(url_for('catalogo.insumo_editar', insumo_id=ins.id))
@@ -518,6 +526,11 @@ def servico_editar(servico_id):
     svc.categoria = (request.form.get('categoria') or '').strip() or 'Geral'
     svc.unidade_medida = (request.form.get('unidade_medida') or '').strip() or 'un'
     svc.descricao = request.form.get('descricao') or None
+    tipo_med = (request.form.get('tipo_medicao') or '').upper()
+    if tipo_med in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
+        svc.tipo_medicao = tipo_med
+    else:
+        svc.tipo_medicao = None
     db.session.commit()
     flash('Serviço atualizado.', 'success')
     return redirect(url_for('catalogo.servico_composicao', servico_id=svc.id))
@@ -604,6 +617,7 @@ def api_buscar_servicos():
         'preco_venda': float(s.preco_venda_unitario or 0),
         'custo': float(s.custo_unitario or 0),
         'categoria': s.categoria,
+        'tipo_medicao': s.tipo_medicao_efetivo,
     } for s in rows])
 
 

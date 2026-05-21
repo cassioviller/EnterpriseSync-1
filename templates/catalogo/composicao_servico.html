@@ -47,6 +47,24 @@
             <input name="unidade_medida" class="form-control form-control-sm"
                    value="{{ servico.unidade_medida }}">
           </div>
+          <div class="col-md-3">
+            <label class="form-label small mb-1">
+              Tipo de medição
+              <span class="text-muted" title="Vazio = derivar dos insumos da composição" data-bs-toggle="tooltip">
+                <i class="fas fa-info-circle"></i>
+              </span>
+            </label>
+            <select name="tipo_medicao" class="form-select form-select-sm">
+              {% set tm = servico.tipo_medicao or '' %}
+              <option value="" {% if not tm %}selected{% endif %}>— derivar dos insumos ({{ servico.tipo_medicao_efetivo }}) —</option>
+              <option value="UNITARIO"             {% if tm=='UNITARIO' %}selected{% endif %}>Unitário</option>
+              <option value="AREA"                 {% if tm=='AREA' %}selected{% endif %}>Área</option>
+              <option value="PERIMETRO"            {% if tm=='PERIMETRO' %}selected{% endif %}>Perímetro</option>
+              <option value="PERIMETRO_PE_DIREITO" {% if tm=='PERIMETRO_PE_DIREITO' %}selected{% endif %}>Parede</option>
+              <option value="AREA_PE_DIREITO"      {% if tm=='AREA_PE_DIREITO' %}selected{% endif %}>Alvenaria</option>
+              <option value="LINEAR"               {% if tm=='LINEAR' %}selected{% endif %}>Linear</option>
+            </select>
+          </div>
           <div class="col-12">
             <label class="form-label small mb-1">Descrição</label>
             <textarea name="descricao" class="form-control form-control-sm"

@@ -3877,6 +3877,7 @@ def executar_migracoes():
             (176, "Task #10 v2 — corrige valores incorretos de rdo_tempo/rdo_condicao_trabalho/rdo_status_equipamento para todos os tenants", migration_176_fix_rdo_slugs),
             (177, "Task #10 v3 — corrige almoxarifado_tipo_movimento: SAÍDA→SAIDA, DEVOLUÇÃO→DEVOLUCAO para todos os tenants", migration_177_fix_almox_tipo_movimento),
             (178, "Task #29 — Grupos Financeiros: criar tabela grupo_financeiro + coluna grupo_financeiro_id em categoria_fluxo_caixa", migration_178_grupo_financeiro),
+            (179, "Task #36 — Medição dimensional: tipo_medicao em insumo/servico + campos dim_ em orcamento_item", migration_179_tipo_medicao),
         ]
         
         # Executar cada migração com rastreamento
@@ -14634,6 +14635,41 @@ def migration_177_fix_almox_tipo_movimento():
 
     db.session.commit()
     logger.info(f"[Migration 177] almoxarifado_tipo_movimento corrigido: {total_corrigidos} opção(ões) atualizadas.")
+
+
+def migration_179_tipo_medicao():
+    """Migration 179: Task #36 — Campos de medição dimensional.
+
+    1. Adiciona tipo_medicao VARCHAR(30) DEFAULT 'UNITARIO' em insumo.
+    2. Adiciona tipo_medicao VARCHAR(30) nullable em servico.
+    3. Adiciona tipo_medicao_override, dim_largura, dim_comprimento,
+       dim_perimetro, dim_pe_direito em orcamento_item.
+    Idempotente — usa ADD COLUMN IF NOT EXISTS.
+    """
+    from sqlalchemy import text
+    logger.info("[Migration 179] Iniciando — Medição Dimensional")
+
+    db.session.execute(text("""
+        ALTER TABLE insumo
+        ADD COLUMN IF NOT EXISTS tipo_medicao VARCHAR(30) NOT NULL DEFAULT 'UNITARIO'
+    """))
+    db.session.execute(text("""
+        ALTER TABLE servico
+        ADD COLUMN IF NOT EXISTS tipo_medicao VARCHAR(30)
+    """))
+    for col, tipo in [
+        ('tipo_medicao_override', 'VARCHAR(30)'),
+        ('dim_largura', 'NUMERIC(15,4)'),
+        ('dim_comprimento', 'NUMERIC(15,4)'),
+        ('dim_perimetro', 'NUMERIC(15,4)'),
+        ('dim_pe_direito', 'NUMERIC(15,4)'),
+    ]:
+        db.session.execute(text(
+            f"ALTER TABLE orcamento_item ADD COLUMN IF NOT EXISTS {col} {tipo}"
+        ))
+
+    db.session.commit()
+    logger.info("[Migration 179] Concluída com sucesso")
 
 
 def migration_178_grupo_financeiro():

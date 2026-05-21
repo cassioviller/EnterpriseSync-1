@@ -436,6 +436,8 @@ class Servico(db.Model):
         index=True,
     )
     template_padrao = db.relationship('CronogramaTemplate', foreign_keys=[template_padrao_id])
+    # Task #36 — tipo de medição do serviço (nullable = derivar dos insumos da composição)
+    tipo_medicao = db.Column(db.String(30), nullable=True)
     # Multi-tenant obrigatório
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -445,6 +447,26 @@ class Servico(db.Model):
     # Removido: subatividades obsoletas - agora usamos SubatividadeMestre
     historico_produtividade = db.relationship('HistoricoProdutividadeServico', backref='servico', lazy=True)
     composicoes = db.relationship('ComposicaoServico', backref='servico', cascade='all, delete-orphan', lazy=True)
+
+    @property
+    def tipo_medicao_efetivo(self):
+        """Task #36: retorna tipo_medicao próprio ou deriva do mais frequente entre os insumos."""
+        if self.tipo_medicao:
+            return self.tipo_medicao
+        try:
+            from collections import Counter
+            tipos = [
+                c.insumo.tipo_medicao
+                for c in (self.composicoes or [])
+                if c.insumo and getattr(c.insumo, 'tipo_medicao', None)
+                and c.insumo.tipo_medicao != 'UNITARIO'
+            ]
+            if tipos:
+                return Counter(tipos).most_common(1)[0][0]
+        except Exception:
+            pass
+        return 'UNITARIO'
+
     servicos_obra = db.relationship('ServicoObra', backref='servico', lazy=True)
     servicos_reais = db.relationship('ServicoObraReal', backref='servico_real', lazy=True)
     admin = db.relationship('Usuario', backref='servicos_criados')
@@ -5954,6 +5976,8 @@ class Insumo(db.Model):
     fator_comercial = db.Column(db.Numeric(15, 4), nullable=False, default=1)
     # Unidade comercial (ex: "pacote", "barra") — opcional; se vazio usa `unidade`.
     unidade_comercial = db.Column(db.String(30), nullable=True)
+    # Task #36 — tipo de medição dimensional (UNITARIO|AREA|PERIMETRO|PERIMETRO_PE_DIREITO|AREA_PE_DIREITO|LINEAR)
+    tipo_medicao = db.Column(db.String(30), nullable=False, default='UNITARIO')
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -6219,6 +6243,12 @@ class OrcamentoItem(db.Model):
     # da linha do orçamento — propagados para PropostaItem em gerar_proposta.
     itens_inclusos = db.Column(db.Text)
     itens_exclusos = db.Column(db.Text)
+    # Task #36 — medição dimensional: tipo efetivo do item + dimensões usadas no cálculo
+    tipo_medicao_override = db.Column(db.String(30), nullable=True)
+    dim_largura = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_comprimento = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_perimetro = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_pe_direito = db.Column(db.Numeric(15, 4), nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     servico = db.relationship('Servico', foreign_keys=[servico_id])
