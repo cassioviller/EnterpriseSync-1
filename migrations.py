@@ -3728,6 +3728,17 @@ def executar_migracoes():
         # PASSO 2: Executar migrações com rastreamento
         logger.info("🔄 Verificando migrações pendentes...")
         
+        # Task #44 — local helper para migration_181 (dim_area_manual em orcamento_item e proposta_itens)
+        def _migration_181_inline():
+            from sqlalchemy import text as _text
+            logger.info("[Migration 181] Iniciando — dim_area_manual em orcamento_item e proposta_itens")
+            for _tbl in ('orcamento_item', 'proposta_itens'):
+                db.session.execute(_text(
+                    f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS dim_area_manual NUMERIC(15,4)"
+                ))
+            db.session.commit()
+            logger.info("[Migration 181] Concluída com sucesso")
+
         # Task #36 v2 — local helper para migration_180 (proposta_itens dim fields)
         def _migration_180_inline():
             from sqlalchemy import text as _text
@@ -3896,6 +3907,7 @@ def executar_migracoes():
             (178, "Task #29 — Grupos Financeiros: criar tabela grupo_financeiro + coluna grupo_financeiro_id em categoria_fluxo_caixa", migration_178_grupo_financeiro),
             (179, "Task #36 — Medição dimensional: tipo_medicao em insumo/servico + campos dim_ em orcamento_item", migration_179_tipo_medicao),
             (180, "Task #36 v2 — Medição dimensional: campos dim_ em proposta_itens (propagação orçamento → proposta)", _migration_180_inline),
+            (181, "Task #44 — Área manual: dim_area_manual em orcamento_item e proposta_itens", _migration_181_inline),
         ]
         
         # Executar cada migração com rastreamento

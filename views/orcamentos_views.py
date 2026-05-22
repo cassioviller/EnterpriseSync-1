@@ -364,6 +364,7 @@ def adicionar_item(id):
             dim_comprimento=_dim('dim_comprimento'),
             dim_perimetro=_dim('dim_perimetro'),
             dim_pe_direito=_dim('dim_pe_direito'),
+            dim_area_manual=_dim('dim_area_manual'),
         )
         db.session.add(item)
         db.session.flush()
@@ -452,6 +453,8 @@ def atualizar_item(item_id):
             item.dim_perimetro = _rdim('dim_perimetro')
         if 'dim_pe_direito' in request.form:
             item.dim_pe_direito = _rdim('dim_pe_direito')
+        if 'dim_area_manual' in request.form:
+            item.dim_area_manual = _rdim('dim_area_manual')
         recalcular_item(item, orc)
         recalcular_orcamento(orc)
         db.session.commit()
@@ -567,6 +570,7 @@ def duplicar(id):
                 dim_comprimento=it.dim_comprimento,
                 dim_perimetro=it.dim_perimetro,
                 dim_pe_direito=it.dim_pe_direito,
+                dim_area_manual=it.dim_area_manual,
             )
             db.session.add(novo_it)
         db.session.flush()
@@ -755,12 +759,13 @@ def gerar_proposta(id):
                 # Task #18: propaga inclusos/exclusos por serviço
                 itens_inclusos=it.itens_inclusos,
                 itens_exclusos=it.itens_exclusos,
-                # Task #36: propaga medição dimensional para exibição na proposta
+                # Task #36/#44: propaga medição dimensional para exibição na proposta
                 tipo_medicao_override=it.tipo_medicao_override,
                 dim_largura=it.dim_largura,
                 dim_comprimento=it.dim_comprimento,
                 dim_perimetro=it.dim_perimetro,
                 dim_pe_direito=it.dim_pe_direito,
+                dim_area_manual=it.dim_area_manual,
             )
             db.session.add(pi)
 

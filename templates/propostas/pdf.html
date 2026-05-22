@@ -216,11 +216,16 @@
                     <td class="number">
                       {{ item.quantidade|num(3) }}
                       {% if item.tipo_medicao_override is defined and item.tipo_medicao_override and item.tipo_medicao_override != 'UNITARIO' %}
+                      {% set _am = item.dim_area_manual if item.dim_area_manual is defined else none %}
                       <div style="font-size:0.75em; color:#666; margin-top:2px;">
-                        {% if item.tipo_medicao_override == 'AREA' %}{{ item.dim_largura|num(2) if item.dim_largura else '?' }}×{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m²
+                        {% if item.tipo_medicao_override == 'AREA' %}
+                          {% if _am %}{{ _am|num(2) }} m² (informada)
+                          {% else %}{{ item.dim_largura|num(2) if item.dim_largura else '?' }}×{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m²{% endif %}
                         {% elif item.tipo_medicao_override == 'PERIMETRO' %}{{ item.dim_perimetro|num(2) if item.dim_perimetro else '?' }} m
                         {% elif item.tipo_medicao_override == 'PERIMETRO_PE_DIREITO' %}{{ item.dim_perimetro|num(2) if item.dim_perimetro else '?' }}×{{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m
-                        {% elif item.tipo_medicao_override == 'AREA_PE_DIREITO' %}{{ item.dim_largura|num(2) if item.dim_largura else '?' }}×{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }}×{{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m
+                        {% elif item.tipo_medicao_override == 'AREA_PE_DIREITO' %}
+                          {% if _am %}{{ _am|num(2) }} m² (informada) × {{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m
+                          {% else %}{{ item.dim_largura|num(2) if item.dim_largura else '?' }}×{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }}×{{ item.dim_pe_direito|num(2) if item.dim_pe_direito else '?' }} m{% endif %}
                         {% elif item.tipo_medicao_override == 'LINEAR' %}{{ item.dim_comprimento|num(2) if item.dim_comprimento else '?' }} m
                         {% endif %}
                       </div>

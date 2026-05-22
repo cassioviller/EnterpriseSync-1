@@ -3186,6 +3186,7 @@ class PropostaItem(db.Model):
     dim_comprimento  = db.Column(db.Numeric(15, 4), nullable=True)
     dim_perimetro    = db.Column(db.Numeric(15, 4), nullable=True)
     dim_pe_direito   = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_area_manual  = db.Column(db.Numeric(15, 4), nullable=True)
 
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -6255,6 +6256,7 @@ class OrcamentoItem(db.Model):
     dim_comprimento = db.Column(db.Numeric(15, 4), nullable=True)
     dim_perimetro = db.Column(db.Numeric(15, 4), nullable=True)
     dim_pe_direito = db.Column(db.Numeric(15, 4), nullable=True)
+    dim_area_manual = db.Column(db.Numeric(15, 4), nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
     servico = db.relationship('Servico', foreign_keys=[servico_id])
