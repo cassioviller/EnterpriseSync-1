@@ -235,10 +235,10 @@ def insumo_excluir(insumo_id):
 @catalogo_bp.route('/insumos/modelo-excel')
 @login_required
 def insumos_modelo_excel():
-    """Baixa o modelo `.xlsx` para cadastro em massa de insumos."""
-    _admin_id()  # garante autenticação
+    """Baixa o `.xlsx` com os insumos cadastrados do tenant."""
+    aid = _admin_id()
     from services.catalogo_excel import gerar_modelo_insumos_xlsx
-    bio = gerar_modelo_insumos_xlsx()
+    bio = gerar_modelo_insumos_xlsx(admin_id=aid)
     return send_file(
         BytesIO_wrap(bio),
         as_attachment=True,

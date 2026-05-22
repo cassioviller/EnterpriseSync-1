@@ -31,6 +31,7 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from models import (
     CronogramaTemplate,
@@ -169,12 +170,22 @@ def _autosize(ws, widths: list[int]):
 # ──────────────────────────────────────────────────────────────────────
 INSUMO_HEADERS = [
     'nome', 'tipo', 'unidade', 'descricao', 'coeficiente_padrao', 'preco_base',
-    'fator_comercial', 'unidade_comercial',
+    'fator_comercial', 'unidade_comercial', 'tipo_medicao',
 ]
 
+TIPOS_MEDICAO_VALIDOS = {
+    'UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR',
+}
 
-def gerar_modelo_insumos_xlsx() -> bytes:
-    """Gera o modelo `.xlsx` de Insumos em memória.
+# String de opções para validação dropdown no Excel (max ~255 chars)
+_TIPOS_MEDICAO_DROPDOWN = '"UNITARIO,AREA,PERIMETRO,PERIMETRO_PE_DIREITO,AREA_PE_DIREITO,LINEAR"'
+
+
+def gerar_modelo_insumos_xlsx(admin_id: int) -> bytes:
+    """Gera o `.xlsx` de Insumos em memória com os dados reais do tenant.
+
+    Exporta todos os insumos ativos de `admin_id`. Se não houver nenhum,
+    exporta apenas o cabeçalho (sem linhas de exemplo).
 
     Retorna bytes prontos para serem enviados como `send_file`.
     """
@@ -186,16 +197,47 @@ def gerar_modelo_insumos_xlsx() -> bytes:
     ws.append(INSUMO_HEADERS)
     _style_header(ws, len(INSUMO_HEADERS))
 
-    exemplos = [
-        ['Pedreiro', 'MAO_OBRA', 'h', 'Hora de pedreiro contratado', '1', '35,00', '1', ''],
-        ['Cimento CP-II 50kg', 'MATERIAL', 'sc', 'Saco de cimento Portland', '1', '38,50', '1', ''],
-        ['Parafuso M6x20', 'MATERIAL', 'un', 'Parafuso sextavado M6x20mm', '1', '0,15', '100', 'pacote'],
-        ['Barra Roscada 3/8"', 'MATERIAL', 'm', 'Barra roscada 3/8" (comprida)', '1', '8,50', '6', 'barra'],
-        ['Betoneira 400L', 'EQUIPAMENTO', 'h', 'Hora de uso de betoneira', '1', '12,00', '1', ''],
-    ]
-    for linha in exemplos:
-        ws.append(linha)
-    _autosize(ws, [28, 14, 10, 36, 18, 14, 16, 18])
+    insumos = (
+        Insumo.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(Insumo.nome)
+        .all()
+    )
+
+    for ins in insumos:
+        # Pega o preço da vigência atual (sem data de fim)
+        preco_atual = next(
+            (p for p in sorted(ins.precos, key=lambda p: p.vigencia_inicio, reverse=True)
+             if p.vigencia_fim is None),
+            None,
+        )
+        preco_val = str(preco_atual.valor).replace('.', ',') if preco_atual else ''
+        coef_val = str(ins.coeficiente_padrao or '1').replace('.', ',')
+        fator_val = str(ins.fator_comercial or '1').replace('.', ',')
+        ws.append([
+            ins.nome or '',
+            ins.tipo or 'MATERIAL',
+            ins.unidade or 'un',
+            ins.descricao or '',
+            coef_val,
+            preco_val,
+            fator_val,
+            ins.unidade_comercial or '',
+            ins.tipo_medicao or 'UNITARIO',
+        ])
+
+    _autosize(ws, [28, 14, 10, 36, 18, 14, 16, 18, 22])
+
+    # Dropdown de tipo_medicao na coluna I (índice 9), linhas 2 a 5002
+    col_medicao = get_column_letter(INSUMO_HEADERS.index('tipo_medicao') + 1)
+    dv = DataValidation(
+        type='list',
+        formula1=_TIPOS_MEDICAO_DROPDOWN,
+        allow_blank=True,
+        showDropDown=False,
+    )
+    dv.sqref = f'{col_medicao}2:{col_medicao}5002'
+    ws.add_data_validation(dv)
 
     # Aba 2 — Instruções
     inst = wb.create_sheet('Instruções')
@@ -229,6 +271,11 @@ def gerar_modelo_insumos_xlsx() -> bytes:
         ('unidade_comercial', 'Opcional. Nome da embalagem comercial. '
                               'Ex.: pacote, caixa, barra, fardo, rolo. '
                               'Se vazio, utiliza a mesma unidade técnica do campo "unidade".'),
+        ('tipo_medicao', 'Opcional. Tipo de medição paramétrica do insumo. '
+                         'Valores aceitos (use o dropdown): UNITARIO, AREA, PERIMETRO, '
+                         'PERIMETRO_PE_DIREITO, AREA_PE_DIREITO, LINEAR. '
+                         'Se vazio ou inválido, mantém o valor existente '
+                         '(ou UNITARIO para novos insumos).'),
     ]
     for col, txt in linhas_inst:
         inst.append([col, txt])
@@ -376,6 +423,12 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
 
             unidade_comercial = _str_or_none(_col(row, 'unidade_comercial'))
 
+            # tipo_medicao — opcional; ignora se ausente ou inválido
+            tipo_medicao_raw = _str_or_none(_col(row, 'tipo_medicao'))
+            tipo_medicao = (tipo_medicao_raw or '').upper() or None
+            if tipo_medicao and tipo_medicao not in TIPOS_MEDICAO_VALIDOS:
+                tipo_medicao = None  # valor inválido → manter existente / padrão
+
             chave = nome.strip().lower()
             ins = existentes.get(chave)
             if ins is None:
@@ -388,6 +441,7 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                     coeficiente_padrao=coef_dec,
                     fator_comercial=fator_dec,
                     unidade_comercial=unidade_comercial,
+                    tipo_medicao=tipo_medicao or 'UNITARIO',
                 )
                 db.session.add(ins)
                 db.session.flush()
@@ -406,6 +460,9 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                 # Só sobrescreve unidade_comercial se vier preenchida
                 if unidade_comercial is not None:
                     ins.unidade_comercial = unidade_comercial
+                # Só aplica tipo_medicao se vier um valor válido
+                if tipo_medicao is not None:
+                    ins.tipo_medicao = tipo_medicao
                 # Reativa caso esteja desativado (via "excluir" suave)
                 if not ins.ativo:
                     ins.ativo = True
