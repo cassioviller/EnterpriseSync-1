@@ -103,7 +103,12 @@
       <form method="POST" action="{{ url_for('catalogo.insumo_novo_preco', insumo_id=insumo.id) }}" class="row g-2 align-items-end mb-3">
         {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <div class="col-md-3">
-          <label class="form-label small mb-1">Novo valor (R$)</label>
+          <label class="form-label small mb-1">
+            Valor por embalagem (R$)
+            <i class="fas fa-info-circle text-muted ms-1"
+               data-bs-toggle="tooltip"
+               title="Preço de compra por embalagem (ex.: R$ 60 por barra de 6 m). Divide-se pelo fator comercial para obter o preço por unidade técnica."></i>
+          </label>
           <input name="valor" required class="form-control" inputmode="decimal" placeholder="Ex.: 1.234,56">
         </div>
         <div class="col-md-3">

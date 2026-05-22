@@ -957,7 +957,7 @@ function recalcItem(form){
     const unCom = (unComEl && unComEl.value.trim()) ? unComEl.value.trim() : un;
     const fatorEl = tr.querySelector('input[name="comp_fator_comercial"]');
     const fator = getNum(fatorEl) || 1;
-    const sub = coef * preco;
+    const sub = coef * preco / fator;
     const qtdTec = coef * qtd;
     // Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator (catálogo)
     const qtdCom = fator > 1 ? Math.ceil(qtdTec / fator) * fator : qtdTec;

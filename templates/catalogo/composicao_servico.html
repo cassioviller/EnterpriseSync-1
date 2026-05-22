@@ -211,12 +211,16 @@
         <thead class="table-light">
           <tr>
             <th>Insumo</th><th>Tipo</th><th>Un. insumo</th>
-            <th class="text-end">Preço (R$)</th>
+            <th class="text-end"
+                title="Preço por unidade técnica do insumo (preço da embalagem ÷ fator comercial). Ex.: R$60 por barra de 6 m → R$10/m."
+                data-bs-toggle="tooltip">
+              Preço/un. técnica (R$)
+            </th>
             <th class="text-end" title="Consumo do insumo para produzir 1 {{ servico.unidade_medida }} do serviço"
                 data-bs-toggle="tooltip">
               Coef. (un / {{ servico.unidade_medida }})
             </th>
-            <th class="text-end" title="Custo deste insumo por 1 {{ servico.unidade_medida }} do serviço (coef × preço). Não é o custo total da linha — multiplique pela quantidade do item para ter o custo absoluto."
+            <th class="text-end" title="Custo deste insumo por 1 {{ servico.unidade_medida }} do serviço (coef × preço/un. técnica). Não é o custo total da linha — multiplique pela quantidade do item para ter o custo absoluto."
                 data-bs-toggle="tooltip">
               Custo / {{ servico.unidade_medida }}
             </th>

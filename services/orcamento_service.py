@@ -68,7 +68,9 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
     for comp in servico.composicoes:
         preco_vig = Decimal(str(comp.insumo.preco_vigente(data_ref)))
         coef = Decimal(str(comp.coeficiente or 0))
-        sub = (coef * preco_vig).quantize(Decimal('0.0001'))
+        fator_com = Decimal(str(comp.insumo.fator_comercial or 1)) or Decimal('1')
+        preco_unit = preco_vig / fator_com
+        sub = (coef * preco_unit).quantize(Decimal('0.0001'))
         custo_total += sub
         tipo = (comp.insumo.tipo or '').upper()
         if tipo == 'MATERIAL':
@@ -83,9 +85,10 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
             'unidade': comp.unidade or comp.insumo.unidade,
             'tipo': comp.insumo.tipo,
             'coeficiente': float(coef),
-            'preco_unitario': float(preco_vig),
+            'preco_unitario': float(preco_unit),
+            'preco_embalagem': float(preco_vig),
             'subtotal': float(sub),
-            'fator_comercial': float(comp.insumo.fator_comercial or 1),
+            'fator_comercial': float(fator_com),
             'unidade_comercial': comp.insumo.unidade_comercial or None,
         })
 
