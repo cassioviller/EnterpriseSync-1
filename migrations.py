@@ -3908,6 +3908,7 @@ def executar_migracoes():
             (179, "Task #36 — Medição dimensional: tipo_medicao em insumo/servico + campos dim_ em orcamento_item", migration_179_tipo_medicao),
             (180, "Task #36 v2 — Medição dimensional: campos dim_ em proposta_itens (propagação orçamento → proposta)", _migration_180_inline),
             (181, "Task #44 — Área manual: dim_area_manual em orcamento_item e proposta_itens", _migration_181_inline),
+            (182, "Task #28 — Substituir categorias padrão de fluxo de caixa pela estrutura de construção civil (44 categorias + grupo_financeiro) e migrar tenants existentes", migration_182_replace_categorias_fluxo_caixa),
         ]
         
         # Executar cada migração com rastreamento
@@ -14807,3 +14808,138 @@ def migration_175_seed_novos_grupos():
         f"[Migration 175] seed concluído: {total_admins} admin(s), "
         f"{total_opcoes} opção(ões) inserida(s)"
     )
+
+
+def migration_182_replace_categorias_fluxo_caixa():
+    """Task #28 — Substitui as categorias padrão de fluxo de caixa pela estrutura
+    completa de construção civil (45 categorias com grupo_financeiro), para todos
+    os tenants existentes.  Idempotente: seguro re-executar.
+
+    Para cada tenant ADMIN/SUPER_ADMIN:
+    1. Insere categorias novas ausentes (matched por lower(nome)+tipo).
+    2. Atualiza grupo_financeiro/descricao em categorias já existentes cujo
+       grupo_financeiro difere do novo padrão.
+    3. Resolve renames: migra fluxo_caixa rows para a nova categoria e
+       desativa a categoria antiga.
+    """
+    from models import CategoriaFluxoCaixa
+
+    NEW_DEFAULTS = CategoriaFluxoCaixa._DEFAULTS  # list of (tipo, nome, grupo, descricao)
+
+    RENAMES = [
+        ('Custo de Obra',            'Outros Custos de Obra'),
+        ('Aluguel / Locação',        'Aluguel e Locação Administrativa'),
+        ('Serviços Terceirizados',   'Serviços Terceirizados de Obra'),
+        ('Compras e Suprimentos',    'Materiais de Obra'),
+        ('Outros Custos',            'Outras Saídas'),
+    ]
+
+    try:
+        rows = db.session.execute(text("""
+            SELECT id FROM usuario
+            WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+        """)).fetchall()
+        admin_ids = [r[0] for r in rows]
+        logger.info(f"[Migration 182] Processando {len(admin_ids)} tenant(s)")
+
+        ok_count = 0
+        for aid in admin_ids:
+            try:
+                inserted = 0
+                updated = 0
+
+                for tipo, nome, grupo, descricao in NEW_DEFAULTS:
+                    existing = db.session.execute(text("""
+                        SELECT id, grupo_financeiro, descricao
+                        FROM categoria_fluxo_caixa
+                        WHERE admin_id = :aid
+                          AND lower(nome) = lower(:nome)
+                          AND tipo = :tipo
+                        LIMIT 1
+                    """), {'aid': aid, 'nome': nome, 'tipo': tipo}).fetchone()
+
+                    if existing:
+                        cat_id, cur_grupo, cur_desc = existing
+                        if cur_grupo != grupo or cur_desc != descricao:
+                            db.session.execute(text("""
+                                UPDATE categoria_fluxo_caixa
+                                SET grupo_financeiro = :grupo,
+                                    descricao = :desc
+                                WHERE id = :id
+                            """), {'grupo': grupo, 'desc': descricao, 'id': cat_id})
+                            updated += 1
+                    else:
+                        db.session.execute(text("""
+                            INSERT INTO categoria_fluxo_caixa
+                                (nome, tipo, grupo_financeiro, descricao, ativo, admin_id)
+                            VALUES (:nome, :tipo, :grupo, :desc, true, :aid)
+                        """), {'nome': nome, 'tipo': tipo, 'grupo': grupo,
+                               'desc': descricao, 'aid': aid})
+                        inserted += 1
+
+                renamed = 0
+                for old_nome, new_nome in RENAMES:
+                    old_cat = db.session.execute(text("""
+                        SELECT id FROM categoria_fluxo_caixa
+                        WHERE admin_id = :aid
+                          AND lower(nome) = lower(:nome)
+                          AND ativo = true
+                        LIMIT 1
+                    """), {'aid': aid, 'nome': old_nome}).fetchone()
+
+                    if not old_cat:
+                        continue
+
+                    old_id = old_cat[0]
+
+                    new_tipo = next(
+                        (t for t, n, _g, _d in NEW_DEFAULTS if n == new_nome),
+                        'SAIDA'
+                    )
+                    new_cat = db.session.execute(text("""
+                        SELECT id FROM categoria_fluxo_caixa
+                        WHERE admin_id = :aid
+                          AND lower(nome) = lower(:nome)
+                          AND tipo = :tipo
+                        LIMIT 1
+                    """), {'aid': aid, 'nome': new_nome, 'tipo': new_tipo}).fetchone()
+
+                    if not new_cat:
+                        logger.warning(
+                            f"[Migration 182] admin_id={aid}: categoria destino "
+                            f"'{new_nome}' não encontrada, pulando rename de '{old_nome}'"
+                        )
+                        continue
+
+                    new_id = new_cat[0]
+
+                    db.session.execute(text("""
+                        UPDATE fluxo_caixa
+                        SET categoria_fluxo_caixa_id = :new_id
+                        WHERE categoria_fluxo_caixa_id = :old_id
+                          AND admin_id = :aid
+                    """), {'new_id': new_id, 'old_id': old_id, 'aid': aid})
+
+                    db.session.execute(text("""
+                        UPDATE categoria_fluxo_caixa
+                        SET ativo = false
+                        WHERE id = :old_id
+                    """), {'old_id': old_id})
+
+                    renamed += 1
+
+                db.session.commit()
+                ok_count += 1
+                logger.info(
+                    f"[Migration 182] admin_id={aid}: "
+                    f"{inserted} inseridas, {updated} atualizadas, {renamed} renomeadas"
+                )
+            except Exception as _e:
+                logger.warning(f"[Migration 182] Falha para admin_id={aid}: {_e}")
+                db.session.rollback()
+
+        logger.info(f"[Migration 182] Concluída — {ok_count}/{len(admin_ids)} tenant(s) OK.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 182] Falha geral: {e}")
+        raise

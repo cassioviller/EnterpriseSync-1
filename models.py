@@ -6839,20 +6839,61 @@ class CategoriaFluxoCaixa(db.Model):
     )
 
     _DEFAULTS = [
-        ('SAIDA', 'Custo de Obra',              'Custos diretos de obra'),
-        ('SAIDA', 'Salários e Encargos',         'Folha de pagamento e encargos trabalhistas'),
-        ('SAIDA', 'Aluguel / Locação',           'Aluguel de equipamentos, espaços e imóveis'),
-        ('SAIDA', 'Material de Escritório',      'Suprimentos e material administrativo'),
-        ('SAIDA', 'Combustível e Frota',         'Abastecimento e manutenção de veículos'),
-        ('SAIDA', 'Serviços Terceirizados',      'Pagamento a subempreiteiros e prestadores'),
-        ('SAIDA', 'Impostos e Taxas',            'DAS, FGTS, INSS e demais tributos'),
-        ('SAIDA', 'Reembolsos a Funcionários',   'Ressarcimento de despesas dos colaboradores'),
-        ('SAIDA', 'Compras e Suprimentos',       'Aquisição de materiais e insumos'),
-        ('SAIDA', 'Outros Custos',               'Saídas diversas não categorizadas'),
-        ('ENTRADA', 'Receita de Serviços',       'Faturamento por prestação de serviços'),
-        ('ENTRADA', 'Receita de Obras',          'Medições e faturamento de obras'),
-        ('ENTRADA', 'Adiantamento de Clientes',  'Valores recebidos antecipadamente'),
-        ('ENTRADA', 'Outros Recebimentos',       'Entradas diversas não categorizadas'),
+        # (tipo, nome, grupo_financeiro, descricao)
+        # --- ENTRADAS ---
+        ('ENTRADA', 'Receita de Obras',                   'Receitas Operacionais',       'Medições e faturamento de obras'),
+        ('ENTRADA', 'Receita de Serviços',                'Receitas Operacionais',       'Faturamento por prestação de serviços'),
+        ('ENTRADA', 'Adiantamento de Clientes',           'Receitas Operacionais',       'Valores recebidos antecipadamente de clientes'),
+        ('ENTRADA', 'Reembolso de Cliente',               'Reembolsos e Repasses',       'Ressarcimentos e reembolsos recebidos de clientes'),
+        ('ENTRADA', 'Aporte de Sócios',                   'Capital e Financiamentos',    'Aporte de capital pelos sócios'),
+        ('ENTRADA', 'Empréstimos Recebidos',              'Capital e Financiamentos',    'Empréstimos e financiamentos captados'),
+        ('ENTRADA', 'Rendimentos Financeiros',            'Receitas Financeiras',        'Rendimentos de aplicações e contas bancárias'),
+        ('ENTRADA', 'Venda de Ativos',                    'Receitas Não Operacionais',   'Receita proveniente da venda de bens e equipamentos'),
+        ('ENTRADA', 'Outros Recebimentos',                'Outros',                      'Entradas diversas não categorizadas'),
+        # --- SAÍDAS: Custo Direto de Obra ---
+        ('SAIDA',   'Materiais de Obra',                  'Custo Direto de Obra',        'Aquisição de materiais e insumos para obras'),
+        ('SAIDA',   'Subempreitada',                      'Custo Direto de Obra',        'Pagamento a subempreiteiros por serviços de obra'),
+        ('SAIDA',   'Serviços Terceirizados de Obra',     'Custo Direto de Obra',        'Prestadores de serviços especializados em obra'),
+        ('SAIDA',   'Locação de Equipamentos',            'Custo Direto de Obra',        'Aluguel de equipamentos e máquinas para obra'),
+        ('SAIDA',   'Fretes e Entregas',                  'Custo Direto de Obra',        'Transporte e entrega de materiais para obra'),
+        ('SAIDA',   'Combustível e Frota',                'Custo Direto de Obra',        'Abastecimento e manutenção de veículos da frota'),
+        ('SAIDA',   'Manutenção de Frota e Equipamentos', 'Custo Direto de Obra',        'Reparos e revisões em veículos e equipamentos'),
+        ('SAIDA',   'Ferramentas e Consumíveis',          'Custo Direto de Obra',        'Ferramentas, peças de desgaste e materiais consumíveis'),
+        ('SAIDA',   'EPIs e Segurança do Trabalho',       'Custo Direto de Obra',        'Equipamentos de proteção individual e coletiva'),
+        ('SAIDA',   'Taxas de Obra / ART / Licenças',     'Custo Direto de Obra',        'ART, licenças, alvarás e taxas legais de obra'),
+        ('SAIDA',   'Transporte de Obra',                 'Custo Direto de Obra',        'Transporte de equipes e pessoal para o canteiro'),
+        ('SAIDA',   'Alimentação de Obra',                'Custo Direto de Obra',        'Refeições e alimentação dos trabalhadores em obra'),
+        ('SAIDA',   'Hospedagem de Obra',                 'Custo Direto de Obra',        'Hospedagem de equipes em obras fora da sede'),
+        ('SAIDA',   'Outros Custos de Obra',              'Custo Direto de Obra',        'Custos diretos de obra não enquadrados nas demais categorias'),
+        # --- SAÍDAS: Benefícios e Pessoal ---
+        ('SAIDA',   'Salários e Encargos',                'Benefícios e Pessoal',        'Folha de pagamento, FGTS, INSS e encargos trabalhistas'),
+        ('SAIDA',   'Benefício Transporte',               'Benefícios e Pessoal',        'Vale-transporte e auxílio-deslocamento'),
+        ('SAIDA',   'Benefício Alimentação',              'Benefícios e Pessoal',        'Vale-refeição e vale-alimentação'),
+        ('SAIDA',   'Reembolsos a Funcionários',          'Benefícios e Pessoal',        'Ressarcimento de despesas pagas pelos colaboradores'),
+        # --- SAÍDAS: Sócios e Capital ---
+        ('SAIDA',   'Pró-labore e Retirada de Sócios',   'Sócios e Capital',            'Remuneração e retiradas dos sócios'),
+        # --- SAÍDAS: Despesas Administrativas ---
+        ('SAIDA',   'Aluguel e Locação Administrativa',   'Despesas Administrativas',    'Aluguel de imóvel e locação de espaços administrativos'),
+        ('SAIDA',   'Água',                               'Despesas Administrativas',    'Consumo de água e saneamento'),
+        ('SAIDA',   'Luz / Energia Elétrica',             'Despesas Administrativas',    'Conta de energia elétrica'),
+        ('SAIDA',   'Internet',                           'Despesas Administrativas',    'Planos de internet fixa e corporativa'),
+        ('SAIDA',   'Telefone',                           'Despesas Administrativas',    'Planos de telefonia fixa e móvel'),
+        ('SAIDA',   'Contabilidade e Jurídico',           'Despesas Administrativas',    'Honorários contábeis, advocatícios e assessoria jurídica'),
+        ('SAIDA',   'Sistemas e Assinaturas',             'Despesas Administrativas',    'Softwares, licenças e assinaturas de ferramentas digitais'),
+        ('SAIDA',   'Material de Escritório',             'Despesas Administrativas',    'Suprimentos e materiais de uso administrativo'),
+        ('SAIDA',   'Manutenção Predial e Escritório',    'Despesas Administrativas',    'Reparos e conservação do imóvel e espaço de trabalho'),
+        ('SAIDA',   'Treinamentos e Capacitações',        'Despesas Administrativas',    'Cursos, treinamentos e desenvolvimento de equipe'),
+        # --- SAÍDAS: Despesas Comerciais ---
+        ('SAIDA',   'Marketing e Vendas',                 'Despesas Comerciais',         'Publicidade, marketing digital e ações comerciais'),
+        # --- SAÍDAS: Despesas Financeiras ---
+        ('SAIDA',   'Despesas Bancárias',                 'Despesas Financeiras',        'Tarifas, IOF e custos bancários'),
+        ('SAIDA',   'Despesa Financeira',                 'Despesas Financeiras',        'Juros, multas e encargos financeiros'),
+        # --- SAÍDAS: Capital e Financiamentos ---
+        ('SAIDA',   'Empréstimos e Financiamentos',       'Capital e Financiamentos',    'Amortização e pagamento de parcelas de empréstimos'),
+        # --- SAÍDAS: Tributos ---
+        ('SAIDA',   'Impostos e Taxas',                   'Tributos',                    'DAS, ISS, tributos municipais, estaduais e federais'),
+        # --- SAÍDAS: Outros ---
+        ('SAIDA',   'Outras Saídas',                      'Outros',                      'Saídas diversas não categorizadas'),
     ]
 
     @classmethod
@@ -6864,11 +6905,11 @@ class CategoriaFluxoCaixa(db.Model):
         ).scalar() or 0
         if existing:
             return
-        for tipo, nome, descricao in cls._DEFAULTS:
+        for tipo, nome, grupo_financeiro, descricao in cls._DEFAULTS:
             db.session.execute(db.text("""
-                INSERT INTO categoria_fluxo_caixa (nome, tipo, descricao, ativo, admin_id)
-                VALUES (:nome, :tipo, :desc, true, :aid)
-            """), {'nome': nome, 'tipo': tipo, 'desc': descricao, 'aid': admin_id})
+                INSERT INTO categoria_fluxo_caixa (nome, tipo, grupo_financeiro, descricao, ativo, admin_id)
+                VALUES (:nome, :tipo, :grupo, :desc, true, :aid)
+            """), {'nome': nome, 'tipo': tipo, 'grupo': grupo_financeiro, 'desc': descricao, 'aid': admin_id})
         db.session.flush()
 
 
