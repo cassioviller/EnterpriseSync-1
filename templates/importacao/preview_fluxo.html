@@ -387,18 +387,9 @@
               <!-- Categoria com optgroups -->
               <td>
                 <select name="cat_auto_{{ loop.index0 }}" class="form-select form-select-sm cat-select">
-                  {% for grupo_nome, grupo_itens in categorias_grupos %}
-                  <optgroup label="{{ grupo_nome }}">
-                    {% for val, label in grupo_itens %}
-                    <option value="{{ val }}" {% if r.tipo_categoria == val %}selected{% endif %}>
-                      {{ label }}
-                    </option>
-                    {% endfor %}
-                  </optgroup>
-                  {% endfor %}
-                  {% if categorias_tenant %}
-                  {% for grupo, cats in categorias_tenant | groupby('grupo_financeiro') %}
-                    <optgroup label="{{ grupo or 'Personalizadas' }}">
+                  <option value="">— Selecione —</option>
+                  {% for grupo, cats in categorias_saida | groupby('grupo_financeiro') %}
+                    <optgroup label="{{ grupo or 'Sem grupo' }}">
                       {% for cat in cats %}
                       <option value="cfc_{{ cat.id }}"
                         {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
@@ -407,7 +398,6 @@
                       {% endfor %}
                     </optgroup>
                   {% endfor %}
-                  {% endif %}
                 </select>
               </td>
               <!-- Score -->
@@ -591,19 +581,9 @@
               <td>
                 <select name="cat_manual_{{ loop.index0 }}"
                         class="form-select form-select-sm cat-select cat-manual-select">
-                  <option value="">— Outros (padrão) —</option>
-                  {% for grupo_nome, grupo_itens in categorias_grupos %}
-                  <optgroup label="{{ grupo_nome }}">
-                    {% for val, label in grupo_itens %}
-                    <option value="{{ val }}" {% if r.tipo_categoria == val %}selected{% endif %}>
-                      {{ label }}
-                    </option>
-                    {% endfor %}
-                  </optgroup>
-                  {% endfor %}
-                  {% if categorias_tenant %}
-                  {% for grupo, cats in categorias_tenant | groupby('grupo_financeiro') %}
-                    <optgroup label="{{ grupo or 'Personalizadas' }}">
+                  <option value="">— Selecione —</option>
+                  {% for grupo, cats in categorias_saida | groupby('grupo_financeiro') %}
+                    <optgroup label="{{ grupo or 'Sem grupo' }}">
                       {% for cat in cats %}
                       <option value="cfc_{{ cat.id }}"
                         {% if r.get('categoria_fluxo_caixa_id') == cat.id %}selected{% endif %}>
@@ -612,7 +592,6 @@
                       {% endfor %}
                     </optgroup>
                   {% endfor %}
-                  {% endif %}
                 </select>
               </td>
               <!-- Apenas pagamento -->

@@ -464,33 +464,6 @@ def fluxo_caixa_upload():
     }
     dados_assinados = _assinar_payload([payload], admin_id, 'fluxo_caixa')
 
-    # Categorias agrupadas (igual a Gestão de Custos V2)
-    CATEGORIAS_GRUPOS = [
-        ('Custo Direto de Obra', [
-            ('MATERIAL',        'Material de Obra'),
-            ('MAO_OBRA_DIRETA', 'Mão de Obra Direta'),
-            ('EQUIPAMENTO',     'Equipamento / Frota'),
-            ('SUBEMPREITADA',   'Subempreitada'),
-        ]),
-        ('Custo Indireto de Obra', [
-            ('ALIMENTACAO',    'Alimentação'),
-            ('TRANSPORTE',     'Transporte'),
-            ('CANTEIRO',       'Canteiro / Instalações'),
-            ('TAXAS_LICENCAS', 'Taxas e Licenças'),
-        ]),
-        ('Despesa Administrativa', [
-            ('SALARIO_ADMIN',      'Salário Administrativo'),
-            ('SALARIO',            'Salário (diárias/folha)'),
-            ('ALUGUEL_UTILITIES',  'Aluguel / Utilities'),
-            ('TRIBUTOS',           'Tributos / Impostos'),
-            ('DESPESA_FINANCEIRA', 'Despesa Financeira'),
-            ('RETIRADA_SOCIOS',    'Retirada de Sócios'),
-            ('OUTROS',             'Outros'),
-        ]),
-    ]
-    # Lista plana para retrocompatibilidade
-    CATEGORIAS_OPCOES = [(v, l) for _, grp in CATEGORIAS_GRUPOS for v, l in grp]
-
     from models import BancoEmpresa, CategoriaFluxoCaixa, Obra
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
     categorias_tenant = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(
@@ -509,8 +482,6 @@ def fluxo_caixa_upload():
         saidas_manual=saidas_manual,
         ignorados=ignorados,
         transferencias=transferencias,
-        categorias_grupos=CATEGORIAS_GRUPOS,
-        categorias_opcoes=CATEGORIAS_OPCOES,
         categorias_tenant=categorias_tenant,
         categorias_saida=categorias_saida,
         categorias_entrada=categorias_entrada,
