@@ -1410,10 +1410,11 @@ def _fuzzy_match_entidade(nome_excel, funcionarios, fornecedores):
     if melhor_s_score > THRESHOLD:
         return 'fornecedor', melhor_s_id, melhor_s_nome, melhor_s_score
 
-    # Nenhum match suficiente: retorna o melhor score geral (sem vínculo)
+    # Nenhum match acima do threshold: retorna o melhor candidato para sugestão
+    # (caller decide se usa como sugestão incerta ou descarta por score baixo)
     if melhor_f_score >= melhor_s_score:
-        return None, None, None, melhor_f_score
-    return None, None, None, melhor_s_score
+        return 'funcionario', melhor_f_id, melhor_f_nome, melhor_f_score
+    return 'fornecedor', melhor_s_id, melhor_s_nome, melhor_s_score
 
 
 class ImportacaoFluxoCaixa:
@@ -1512,8 +1513,12 @@ class ImportacaoFluxoCaixa:
                 obra_id = _match_cc_obra(cc, obras_dict)
 
                 # Fuzzy match do cliente
-                ent_tipo, ent_id, ent_nome_banco, ent_score = _fuzzy_match_entidade(
+                _CONF = 85
+                _SUGG = 40
+                ent_tipo, _ent_id_raw, ent_nome_banco, ent_score = _fuzzy_match_entidade(
                     cliente, funcionarios, fornecedores)
+                _confirmed_ent = ent_score > _CONF
+                _suggested_ent = _SUGG < ent_score <= _CONF and _ent_id_raw is not None
 
                 entradas.append({
                     'tipo': 'entrada',
@@ -1525,9 +1530,13 @@ class ImportacaoFluxoCaixa:
                     'obra_id': obra_id,
                     'valor': valor,
                     'status': status,
-                    'entidade_tipo': ent_tipo,
-                    'entidade_id': ent_id,
-                    'entidade_nome_banco': ent_nome_banco,
+                    'entidade_tipo': ent_tipo if _confirmed_ent else None,
+                    'entidade_id': _ent_id_raw if _confirmed_ent else None,
+                    'entidade_nome_banco': ent_nome_banco if _confirmed_ent else None,
+                    'entidade_nome': ent_nome_banco if _confirmed_ent else None,
+                    'entidade_sugerida_tipo': ent_tipo if _suggested_ent else None,
+                    'entidade_sugerida_id': _ent_id_raw if _suggested_ent else None,
+                    'entidade_sugerida_nome': ent_nome_banco if _suggested_ent else None,
                     'fuzzy_score': ent_score,
                 })
 
@@ -1585,10 +1594,15 @@ class ImportacaoFluxoCaixa:
                 obra_id = _match_cc_obra(cc, obras_dict)
 
                 # Fuzzy match do fornecedor
-                ent_tipo, ent_id, ent_nome_banco, ent_score = _fuzzy_match_entidade(
+                _CONF = 85
+                _SUGG = 40
+                ent_tipo, _ent_id_raw, ent_nome_banco, ent_score = _fuzzy_match_entidade(
                     fornecedor_nome, funcionarios, fornecedores)
+                _confirmed_ent = ent_score > _CONF
+                _suggested_ent = _SUGG < ent_score <= _CONF and _ent_id_raw is not None
+                ent_id = _ent_id_raw if _confirmed_ent else None
                 obs_fuzzy = None
-                if ent_score <= 85 and fornecedor_nome:
+                if not _confirmed_ent and not _suggested_ent and fornecedor_nome:
                     obs_fuzzy = f'[EXCEL] {fornecedor_nome} — vincular manualmente'
 
                 texto_busca = (desc + ' ' + fornecedor_nome).strip()
@@ -1622,9 +1636,13 @@ class ImportacaoFluxoCaixa:
                     'status': status,
                     'tipo_categoria': cat,
                     'eh_reembolso': eh_reembolso,
-                    'entidade_tipo': ent_tipo,
+                    'entidade_tipo': ent_tipo if _confirmed_ent else None,
                     'entidade_id': ent_id,
-                    'entidade_nome_banco': ent_nome_banco,
+                    'entidade_nome_banco': ent_nome_banco if _confirmed_ent else None,
+                    'entidade_nome': ent_nome_banco if _confirmed_ent else None,
+                    'entidade_sugerida_tipo': ent_tipo if _suggested_ent else None,
+                    'entidade_sugerida_id': _ent_id_raw if _suggested_ent else None,
+                    'entidade_sugerida_nome': ent_nome_banco if _suggested_ent else None,
                     'fuzzy_score': ent_score,
                     'observacoes': obs_fuzzy,
                     'sugestao_apenas_pagamento': False,  # será ajustado após todos os loops

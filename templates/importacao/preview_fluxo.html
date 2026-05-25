@@ -316,32 +316,34 @@
               <!-- Destinatário — Tom Select -->
               <td class="dest-wrap">
                 {% if r.entidade_id and r.entidade_tipo %}
-                  {% if r.fuzzy_score < 85 %}
-                    <span class="badge bg-warning text-dark mb-1 d-block" style="font-size:.62rem;">
-                      Match incerto ({{ r.fuzzy_score }}%) — confirme
-                    </span>
-                  {% endif %}
+                  {# match confirmado (score > 85) — sem badge, já está selecionado #}
+                {% elif r.entidade_sugerida_id and r.entidade_sugerida_tipo %}
+                  <span class="badge bg-warning text-dark mb-1 d-block" style="font-size:.62rem;">
+                    Match incerto ({{ r.fuzzy_score }}%) — confirme
+                  </span>
                 {% elif r.fornecedor %}
                   <span class="badge bg-light text-muted border mb-1 d-block" style="font-size:.62rem;">
                     Sem match — vincular manualmente
                   </span>
                 {% endif %}
+                {% set _init_id   = (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else
+                                    ((r.entidade_sugerida_tipo + ':' + r.entidade_sugerida_id|string) if r.entidade_sugerida_id else '') %}
+                {% set _init_nome = r.entidade_nome_banco or r.entidade_sugerida_nome or '' %}
+                {% set _init_tipo = r.entidade_tipo or r.entidade_sugerida_tipo or '' %}
                 <select class="destinatario-ts"
                         data-idx="{{ loop.index0 }}"
                         data-prefix="auto"
-                        data-init-id="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}"
-                        data-init-nome="{{ r.entidade_nome_banco or '' }}"
-                        data-init-tipo="{{ r.entidade_tipo or '' }}">
-                  {% if r.entidade_id and r.entidade_tipo %}
-                  <option value="{{ r.entidade_tipo }}:{{ r.entidade_id }}" selected>
-                    {{ r.entidade_nome_banco or r.fornecedor }}
-                  </option>
+                        data-init-id="{{ _init_id }}"
+                        data-init-nome="{{ _init_nome }}"
+                        data-init-tipo="{{ _init_tipo }}">
+                  {% if _init_id %}
+                  <option value="{{ _init_id }}" selected>{{ _init_nome or r.fornecedor }}</option>
                   {% endif %}
                 </select>
                 <input type="hidden"
                        name="destinatario_auto_{{ loop.index0 }}"
                        id="destinatario_auto_{{ loop.index0 }}"
-                       value="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}">
+                       value="{{ _init_id }}">
               </td>
               <!-- Descrição editável -->
               <td>
@@ -516,32 +518,34 @@
               <!-- Destinatário — Tom Select -->
               <td class="dest-wrap">
                 {% if r.entidade_id and r.entidade_tipo %}
-                  {% if r.fuzzy_score < 85 %}
-                    <span class="badge bg-warning text-dark mb-1 d-block" style="font-size:.62rem;">
-                      Match incerto ({{ r.fuzzy_score }}%) — confirme
-                    </span>
-                  {% endif %}
+                  {# match confirmado (score > 85) — sem badge, já está selecionado #}
+                {% elif r.entidade_sugerida_id and r.entidade_sugerida_tipo %}
+                  <span class="badge bg-warning text-dark mb-1 d-block" style="font-size:.62rem;">
+                    Match incerto ({{ r.fuzzy_score }}%) — confirme
+                  </span>
                 {% elif r.fornecedor %}
                   <span class="badge bg-light text-muted border mb-1 d-block" style="font-size:.62rem;">
                     Sem match — vincular manualmente
                   </span>
                 {% endif %}
+                {% set _init_id   = (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else
+                                    ((r.entidade_sugerida_tipo + ':' + r.entidade_sugerida_id|string) if r.entidade_sugerida_id else '') %}
+                {% set _init_nome = r.entidade_nome_banco or r.entidade_sugerida_nome or '' %}
+                {% set _init_tipo = r.entidade_tipo or r.entidade_sugerida_tipo or '' %}
                 <select class="destinatario-ts"
                         data-idx="{{ loop.index0 }}"
                         data-prefix="manual"
-                        data-init-id="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}"
-                        data-init-nome="{{ r.entidade_nome_banco or '' }}"
-                        data-init-tipo="{{ r.entidade_tipo or '' }}">
-                  {% if r.entidade_id and r.entidade_tipo %}
-                  <option value="{{ r.entidade_tipo }}:{{ r.entidade_id }}" selected>
-                    {{ r.entidade_nome_banco or r.fornecedor }}
-                  </option>
+                        data-init-id="{{ _init_id }}"
+                        data-init-nome="{{ _init_nome }}"
+                        data-init-tipo="{{ _init_tipo }}">
+                  {% if _init_id %}
+                  <option value="{{ _init_id }}" selected>{{ _init_nome or r.fornecedor }}</option>
                   {% endif %}
                 </select>
                 <input type="hidden"
                        name="destinatario_manual_{{ loop.index0 }}"
                        id="destinatario_manual_{{ loop.index0 }}"
-                       value="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}">
+                       value="{{ _init_id }}">
               </td>
               <!-- Descrição editável -->
               <td>
