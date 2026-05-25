@@ -92,10 +92,11 @@ def _obter_ou_criar_cliente_placeholder(admin_id: int) -> int:
     o cliente depois pela tela de edição da obra.
     """
     from models import Cliente, db
+    from sqlalchemy import func as _func
     NOME_PLACEHOLDER = 'A definir'
     cliente = (Cliente.query
                .filter_by(admin_id=admin_id)
-               .filter(Cliente.nome == NOME_PLACEHOLDER)
+               .filter(_func.lower(_func.trim(Cliente.nome)) == NOME_PLACEHOLDER.lower())
                .first())
     if not cliente:
         cliente = Cliente(
