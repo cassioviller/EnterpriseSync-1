@@ -583,9 +583,27 @@ def fluxo_caixa_confirmar():
             row['tipo_categoria'] = cat_val
             row['categoria_fluxo_caixa_id'] = None
 
+    # Pré-carregar IDs válidos do tenant para validação de ownership
+    from models import Fornecedor as _Forn, Funcionario as _Func
+    _allowed_forn_ids = {
+        r[0] for r in _Forn.query.filter_by(admin_id=admin_id, ativo=True)
+                                  .with_entities(_Forn.id).all()
+    }
+    _allowed_func_ids = {
+        r[0] for r in _Func.query.filter_by(admin_id=admin_id, ativo=True)
+                                  .with_entities(_Func.id).all()
+    }
+
     def _aplicar_destinatario(row, dest_val):
-        """Faz override de entidade_tipo/entidade_id a partir do valor 'tipo:id' do Tom Select."""
-        if not dest_val or ':' not in dest_val:
+        """Override de entidade_tipo/entidade_id a partir do valor 'tipo:id' do Tom Select.
+        Valor vazio limpa o vínculo. IDs fora do tenant são silenciosamente ignorados.
+        """
+        # Campo explicitamente limpo: apaga o vínculo fuzzy
+        if not dest_val:
+            row['entidade_tipo'] = None
+            row['entidade_id'] = None
+            return
+        if ':' not in dest_val:
             return
         partes = dest_val.split(':', 1)
         if len(partes) != 2:
@@ -593,8 +611,16 @@ def fluxo_caixa_confirmar():
         tipo, id_str = partes
         if tipo not in ('funcionario', 'fornecedor') or not id_str.isdigit():
             return
+        eid = int(id_str)
+        # Validação de ownership: ID deve pertencer ao tenant atual
+        if tipo == 'funcionario' and eid not in _allowed_func_ids:
+            logger.warning(f'[DEST] funcionario_id={eid} não pertence ao tenant {admin_id} — ignorado')
+            return
+        if tipo == 'fornecedor' and eid not in _allowed_forn_ids:
+            logger.warning(f'[DEST] fornecedor_id={eid} não pertence ao tenant {admin_id} — ignorado')
+            return
         row['entidade_tipo'] = tipo
-        row['entidade_id'] = int(id_str)
+        row['entidade_id'] = eid
 
     # Aplicar edições manuais nas saídas auto
     for i, row in enumerate(saidas_auto):

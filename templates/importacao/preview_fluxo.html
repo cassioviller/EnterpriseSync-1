@@ -315,6 +315,17 @@
               </td>
               <!-- Destinatário — Tom Select -->
               <td class="dest-wrap">
+                {% if r.entidade_id and r.entidade_tipo %}
+                  {% if r.fuzzy_score < 85 %}
+                    <span class="badge bg-warning text-dark mb-1 d-block" style="font-size:.62rem;">
+                      Match incerto ({{ r.fuzzy_score }}%) — confirme
+                    </span>
+                  {% endif %}
+                {% elif r.fornecedor %}
+                  <span class="badge bg-light text-muted border mb-1 d-block" style="font-size:.62rem;">
+                    Sem match — vincular manualmente
+                  </span>
+                {% endif %}
                 <select class="destinatario-ts"
                         data-idx="{{ loop.index0 }}"
                         data-prefix="auto"
@@ -504,6 +515,17 @@
               </td>
               <!-- Destinatário — Tom Select -->
               <td class="dest-wrap">
+                {% if r.entidade_id and r.entidade_tipo %}
+                  {% if r.fuzzy_score < 85 %}
+                    <span class="badge bg-warning text-dark mb-1 d-block" style="font-size:.62rem;">
+                      Match incerto ({{ r.fuzzy_score }}%) — confirme
+                    </span>
+                  {% endif %}
+                {% elif r.fornecedor %}
+                  <span class="badge bg-light text-muted border mb-1 d-block" style="font-size:.62rem;">
+                    Sem match — vincular manualmente
+                  </span>
+                {% endif %}
                 <select class="destinatario-ts"
                         data-idx="{{ loop.index0 }}"
                         data-prefix="manual"
@@ -823,6 +845,11 @@ document.addEventListener('DOMContentLoaded', function () {
     return '<div>' + escape(data.nome) + ' ' + (BADGE[data.tipo] || '') + '</div>';
   }
 
+  var LABEL_GRUPO = {
+    funcionario: 'Funcionários',
+    fornecedor:  'Fornecedores',
+  };
+
   document.querySelectorAll('.destinatario-ts').forEach(function(el) {
     var idx    = el.dataset.idx;
     var prefix = el.dataset.prefix;
@@ -843,12 +870,17 @@ document.addEventListener('DOMContentLoaded', function () {
       valueField:   'id',
       labelField:   'nome',
       searchField:  ['nome'],
-      maxOptions:   30,
-      placeholder:  '— Nenhum —',
+      maxOptions:   40,
+      placeholder:  'Buscar fornecedor ou funcionário…',
       allowEmptyOption: true,
       options:  options,
       items:    items,
-      plugins:  ['clear_button'],
+      optgroupField: 'tipo',
+      optgroups: [
+        { value: 'funcionario', label: LABEL_GRUPO.funcionario },
+        { value: 'fornecedor',  label: LABEL_GRUPO.fornecedor  },
+      ],
+      plugins:  ['clear_button', 'optgroup_columns'],
       load: function(query, callback) {
         if (query.length < 1) { callback(); return; }
         fetch('/importacao/api/entidades?q=' + encodeURIComponent(query))
