@@ -1,0 +1,789 @@
+#47 - Corrigir custo e preço por unidade técnica no Catálogo de Serviços
+
+Repositório analisado: cassioviller/EnterpriseSync-1
+
+What & Why
+
+O Catálogo de Serviços precisa mostrar corretamente quanto custa e quanto será vendido por unidade de medição do serviço: por m, m², m³, un, h ou qualquer unidade cadastrada em servico.unidade_medida.
+
+Hoje, a tela de composição já calcula o valor ao vivo usando a função calcular_precos_servico. Essa função considera:
+
+preço vigente do insumo
+dividido pelo fator_comercial
+multiplicado pelo coeficiente da composição
+somado aos demais insumos
+e depois aplica imposto e margem para chegar no preço de venda.
+
+A fórmula conceitual correta é:
+
+preco_unitario_tecnico_do_insumo = preco_vigente_do_insumo / fator_comercial
+
+custo_do_insumo_por_unidade_do_servico =
+coeficiente * preco_unitario_tecnico_do_insumo
+
+custo_unitario_do_servico =
+soma dos custos dos insumos por 1 unidade do serviço
+
+preco_venda_unitario =
+custo_unitario_do_servico / (1 - imposto_pct/100 - margem_lucro_pct/100)
+
+O problema é que a lista do Catálogo de Serviços não recalcula esse valor antes de exibir. Ela mostra os campos já gravados em Servico.custo_unitario e Servico.preco_venda_unitario. Esses campos podem estar defasados, principalmente porque alguns valores foram calculados antes da introdução da divisão por fator_comercial.
+
+Com isso, o usuário vê valores absurdamente inflados na lista do catálogo, por exemplo R$ 1.187,70, enquanto a tela de composição mostra o valor correto, por exemplo R$ 28,07.
+
+A intenção da funcionalidade não é apenas corrigir preço antigo. A intenção principal é que o sistema mostre claramente quanto custa e quanto vende cada serviço por unidade técnica, como:
+
+R$ 28,07 / m²
+R$ 35,09 / m²
+
+ou:
+
+R$ 120,00 / m
+R$ 150,00 / m
+
+O conceito de “por metro” deve ser interpretado como “por unidade do serviço”.
+
+Exemplos:
+
+Se servico.unidade_medida = "m", o valor é por metro linear.
+Se servico.unidade_medida = "m²" ou "m2", o valor é por metro quadrado.
+Se servico.unidade_medida = "m³" ou "m3", o valor é por metro cúbico.
+Se servico.unidade_medida = "un", o valor é por unidade.
+Se servico.unidade_medida = "h", o valor é por hora.
+
+O sistema não deve misturar preço de embalagem com preço técnico.
+
+Exemplo correto:
+
+Barra de aço com 6 m custa R$ 60,00.
+fator_comercial = 6.
+Preço técnico = 60 / 6 = R$ 10,00 por metro.
+Se o serviço consome 2 m de barra para produzir 1 m²:
+coeficiente = 2.
+Custo desse insumo no serviço = 2 * 10 = R$ 20,00 por m².
+
+Esse é o valor que deve entrar no custo unitário do serviço.
+
+
+Done looks like
+
+A lista do Catálogo de Serviços mostra custo unitário e preço de venda iguais aos valores da tela de composição.
+
+O valor exibido deixa claro a unidade do serviço:
+
+Custo / m²
+Venda / m²
+
+ou, no valor da linha:
+
+R$ 28,07 / m²
+R$ 35,09 / m²
+
+Serviços cadastrados como m mostram valor por metro linear.
+
+Serviços cadastrados como m² ou m2 mostram valor por metro quadrado.
+
+Serviços cadastrados como un mostram valor por unidade.
+
+Serviços cadastrados como h mostram valor por hora.
+
+Todos os serviços ativos com composição são recalculados uma vez por uma rotina idempotente de correção de dados.
+
+Serviços sem composição ficam com:
+
+custo_unitario = 0
+preco_venda_unitario = 0
+
+A rotina não apaga dados históricos.
+
+A rotina não altera OrcamentoItem, PropostaItem ou ItemMedicaoComercial.
+
+A tela de composição continua funcionando como está, pois ela já calcula ao vivo.
+
+Sempre que uma composição de serviço for criada, editada ou excluída, o serviço é recalculado.
+
+Sempre que o preço vigente de um insumo for atualizado, todos os serviços que usam esse insumo são recalculados.
+
+Sempre que o fator_comercial de um insumo for alterado, todos os serviços que usam esse insumo são recalculados.
+
+Sempre que a importação Excel alterar preço_base ou fator_comercial de um insumo, todos os serviços vinculados a esse insumo são recalculados.
+
+A lista do catálogo não volta a ficar stale após novas alterações.
+
+O cálculo preserva a separação entre:
+
+preço da embalagem
+fator comercial
+preço técnico por unidade
+coeficiente de consumo
+custo por unidade do serviço
+
+Os testes automatizados validam pelo menos estes cenários:
+
+1. Serviço por m² com fator_comercial = 1.
+2. Serviço por m² com fator_comercial maior que 1.
+3. Serviço por m com fator_comercial maior que 1.
+4. Serviço sem composição.
+5. Insumo sem preço vigente.
+6. Imposto + margem maior ou igual a 100%.
+7. Lista do catálogo mostrando o mesmo valor da tela de composição.
+8. Alteração de fator_comercial recalculando os serviços afetados.
+9. Importação Excel alterando fator_comercial recalculando serviços afetados.
+
+
+Out of scope
+
+Corrigir snapshots históricos de OrcamentoItem.
+
+Corrigir snapshots históricos de PropostaItem.
+
+Corrigir snapshots históricos de ItemMedicaoComercial.
+
+Alterar a lógica comercial de subtotal_compra do orçamento.
+
+Alterar a lógica de quantidade de compra por pacote no orçamento.
+
+Alterar a UI completa da tela de composição.
+
+Refatorar todo o módulo de orçamento.
+
+Criar nova estrutura de precificação por obra.
+
+Modificar histórico cross-obra.
+
+Alterar cálculos de medição comercial.
+
+Alterar cálculo de RDO, produção ou produtividade real.
+
+O ponto mais sensível fora do escopo é o snapshot do orçamento. Hoje, services/orcamento_view_service.py tem uma lógica própria para quantidade_tecnica, quantidade_compra e subtotal_compra. Essa lógica usa fator_comercial para calcular compra por pacote, barra, caixa etc. Portanto, ela não deve ser mexida nesta task sem uma task separada e testes específicos.
+
+Nesta task, o foco é:
+
+corrigir o Catálogo de Serviços
+corrigir os valores persistidos em Servico
+garantir que mudanças futuras mantenham esses valores sincronizados
+exibir claramente preço por unidade técnica do serviço
+
+
+Steps
+
+1. Confirmar a função canônica de cálculo
+
+Manter services/orcamento_service.py como fonte oficial do cálculo do catálogo.
+
+A função principal é:
+
+calcular_precos_servico(servico, data_ref=None)
+
+A função de persistência é:
+
+recalcular_servico_preco(servico, data_ref=None, persistir=True)
+
+Correção importante no plano original:
+
+Não usar:
+
+recalcular_servico_preco(..., commit=False)
+
+Esse parâmetro não existe no código real.
+
+Usar:
+
+recalcular_servico_preco(..., persistir=False)
+
+quando quiser calcular sem gravar.
+
+Ou usar diretamente:
+
+calcular_precos_servico(servico)
+
+quando o objetivo for apenas exibir o valor calculado.
+
+
+2. Corrigir a rota da lista do Catálogo de Serviços
+
+Arquivo:
+
+views/catalogo_views.py
+
+Rota:
+
+/catalogo/servicos
+
+Função:
+
+servicos_list
+
+Hoje, a função busca os serviços e envia para o template. O template exibe diretamente:
+
+s.custo_unitario
+s.preco_venda_unitario
+
+Ajuste necessário:
+
+Antes de renderizar, para cada serviço ativo com composição, calcular os valores atuais com calcular_precos_servico ou recalcular_servico_preco.
+
+A abordagem recomendada é criar um helper para evitar código duplicado:
+
+def sincronizar_preco_servico_se_diferente(servico, persistir=True):
+    calcula o preço vivo
+    compara com os campos salvos
+    se houver diferença relevante, atualiza custo_unitario e preco_venda_unitario
+    retorna o resultado calculado
+
+Critério de diferença:
+
+Comparar com arredondamento de 2 casas para preço/custo exibido.
+
+Exemplo:
+
+abs(valor_salvo - valor_calculado) > 0.01
+
+Isso evita update desnecessário por diferença mínima de Decimal/Float.
+
+Importante:
+
+Não fazer update pesado sem necessidade em toda abertura da lista.
+
+A lista pode funcionar como safety net, mas a origem principal de sincronização deve ser nos eventos de alteração de dados.
+
+
+3. Ajustar a UI da lista para deixar claro “por unidade”
+
+Arquivo:
+
+templates/catalogo/servicos_list.html
+
+Hoje os títulos são:
+
+Custo Unit.
+Preço Venda
+
+Alterar para algo mais claro:
+
+Custo / Unidade
+Venda / Unidade
+
+Ou melhor:
+
+Custo / {{ unidade }}
+Venda / {{ unidade }}
+
+Como a unidade muda por linha, uma boa solução é exibir no valor:
+
+{{ s.custo_unitario|brl }} / {{ s.unidade_medida }}
+{{ s.preco_venda_unitario|brl }} / {{ s.unidade_medida }}
+
+Exemplo visual:
+
+R$ 28,07 / m²
+R$ 35,09 / m²
+
+R$ 120,00 / m
+R$ 150,00 / m
+
+R$ 80,00 / un
+R$ 100,00 / un
+
+Essa mudança elimina a dúvida do usuário sobre “quanto é por m”.
+
+
+4. Criar backfill idempotente em migrations.py
+
+Arquivo:
+
+migrations.py
+
+Criar uma nova migration numerada, seguindo o padrão existente de migration_history.
+
+Objetivo:
+
+Recalcular todos os serviços antigos que ficaram com custo_unitario e preco_venda_unitario defasados.
+
+Fluxo:
+
+1. Buscar todos os serviços ativos.
+2. Para cada serviço, verificar se possui composição.
+3. Se tiver composição, rodar calcular_precos_servico.
+4. Se não houver erro, atualizar:
+   - custo_unitario
+   - preco_venda_unitario
+5. Se não tiver composição, garantir:
+   - custo_unitario = 0
+   - preco_venda_unitario = 0
+6. Logar por tenant/admin_id:
+   - total analisado
+   - total atualizado
+   - total sem composição
+   - total com erro
+7. Fazer commit ao final.
+8. A migration deve ser idempotente.
+
+Nome sugerido:
+
+Migration 167 - Recalcular preços unitários do catálogo por fator comercial
+
+ou, se a sequência real for outra:
+
+Migration XXX - Recalcular preços unitários do catálogo por fator comercial
+
+
+5. Auditar os handlers de composição
+
+Arquivo:
+
+views/catalogo_views.py
+
+Handlers relevantes:
+
+servico_composicao_add
+servico_composicao_editar
+servico_composicao_excluir
+
+Esses handlers já chamam recalcular_servico_preco(svc) depois de alterar a composição.
+
+A tarefa aqui não é recriar tudo.
+
+A tarefa é:
+
+1. Confirmar que os três fluxos chamam recalcular_servico_preco.
+2. Garantir que o commit acontece depois do recálculo.
+3. Garantir que erro de cálculo seja tratado.
+4. Garantir que serviço sem composição após exclusão fique zerado.
+
+Possível melhoria:
+
+Se depois de excluir a última linha da composição o cálculo retornar custo 0 e preço 0, persistir esses zeros.
+
+Hoje, recalcular_servico_preco só persiste se não houver erro. Como serviço sem composição não gera erro, deve persistir 0 normalmente.
+
+
+6. Corrigir recálculo ao editar insumo
+
+Arquivo:
+
+views/catalogo_views.py
+
+Função:
+
+insumo_editar
+
+Erro de lógica encontrado:
+
+A edição do insumo permite alterar fator_comercial, unidade_comercial, tipo_medicao, unidade, tipo, coeficiente_padrao etc.
+
+O campo fator_comercial afeta diretamente o cálculo do serviço, pois o preço técnico é:
+
+preco_vigente / fator_comercial
+
+Se o usuário mudar fator_comercial de 1 para 6, por exemplo, o custo do serviço pode cair de R$ 60,00 para R$ 10,00 por unidade técnica do insumo.
+
+Portanto, após salvar um insumo editado, deve recalcular todos os serviços que usam esse insumo.
+
+Fluxo recomendado:
+
+Antes de alterar, guardar valores antigos:
+
+fator_antigo = ins.fator_comercial
+unidade_antiga = ins.unidade
+tipo_antigo = ins.tipo
+unidade_comercial_antiga = ins.unidade_comercial
+
+Depois de alterar, verificar se algum campo relevante mudou.
+
+Campos relevantes para recálculo:
+
+fator_comercial
+unidade
+tipo
+ativo
+talvez tipo_medicao, se for usado na medição derivada
+
+Se mudou:
+
+svc_ids = {c.servico_id for c in ins.composicoes}
+
+Para cada serviço:
+
+s = Servico.query.get(sid)
+recalcular_servico_preco(s)
+
+Depois fazer um único commit.
+
+Mensagem de sucesso sugerida:
+
+Insumo atualizado. X serviço(s) recalculado(s).
+
+
+7. Corrigir recálculo ao importar Excel de insumos
+
+Arquivo:
+
+services/catalogo_excel.py
+
+Função:
+
+importar_insumos_xlsx
+
+Erro de lógica provável:
+
+A importação já aceita fator_comercial, unidade_comercial e tipo_medicao.
+
+Mas o conjunto servicos_a_recalcular parece ser preenchido principalmente quando preco_base é atualizado.
+
+Isso é insuficiente.
+
+Se o usuário importar uma planilha mudando apenas fator_comercial, o preço técnico muda, mas os serviços podem continuar com custo_unitario e preco_venda_unitario defasados.
+
+Correção:
+
+Sempre que um insumo existente for atualizado, comparar os campos que afetam cálculo.
+
+Campos mínimos:
+
+preco_base
+fator_comercial
+
+Campos recomendados:
+
+preco_base
+fator_comercial
+unidade
+tipo
+ativo
+
+Se qualquer campo relevante mudar, adicionar os serviços vinculados:
+
+for c in ins.composicoes:
+    servicos_a_recalcular.add(c.servico_id)
+
+Depois do processamento da planilha, recalcular todos os serviços no set servicos_a_recalcular.
+
+Mensagem final da importação já possui servicos_recalculados, então manter esse campo e garantir que ele reflita mudanças de fator_comercial também.
+
+
+8. Padronizar nomes internos do cálculo
+
+Arquivo:
+
+services/orcamento_service.py
+
+Hoje o detalhamento retorna:
+
+preco_unitario
+preco_embalagem
+fator_comercial
+unidade_comercial
+subtotal
+
+Manter compatibilidade, mas documentar melhor no código:
+
+preco_embalagem = preço vigente cadastrado em PrecoBaseInsumo
+fator_comercial = quantidade técnica contida na embalagem/comercialização
+preco_unitario = preço técnico após dividir pelo fator_comercial
+coeficiente = consumo técnico para 1 unidade do serviço
+subtotal = custo desse insumo para 1 unidade do serviço
+
+Comentário sugerido:
+
+# preco_vig representa o preço da embalagem ou unidade comercial.
+# fator_comercial representa quantas unidades técnicas existem nessa embalagem.
+# preco_unit representa o preço técnico usado no serviço.
+# Ex.: barra de 6m por R$60 => fator=6 => preco_unit=R$10/m.
+
+Isso evita que no futuro alguém volte a multiplicar coeficiente pelo preço da embalagem.
+
+
+9. Não misturar catálogo com orçamento nesta task
+
+Arquivo:
+
+services/orcamento_view_service.py
+
+Esse arquivo usa lógica de snapshot para orçamento. Ele calcula:
+
+quantidade_tecnica = coeficiente * quantidade do item
+quantidade_compra = múltiplo do fator_comercial maior ou igual à quantidade técnica
+subtotal_compra = número de pacotes * preço do pacote
+
+Essa regra é diferente da regra do catálogo.
+
+Catálogo responde:
+
+Quanto custa 1 m², 1 m, 1 un ou 1 h do serviço?
+
+Orçamento responde:
+
+Quanto esse item inteiro custa para a quantidade contratada, considerando compra técnica e eventualmente pacotes?
+
+Por isso, não alterar snapshot_from_servico nesta task sem uma task separada.
+
+Se for mexer no futuro, o snapshot ideal deveria separar explicitamente:
+
+preco_embalagem
+preco_unitario_tecnico
+fator_comercial
+unidade_comercial
+quantidade_tecnica
+quantidade_compra
+subtotal_tecnico
+subtotal_compra
+
+Mas isso é outra task.
+
+
+10. Adicionar testes automatizados
+
+Arquivo:
+
+tests/test_orcamento_service.py
+
+Já existem testes de cálculo paramétrico, coeficiente como consumo por unidade e fator_comercial em orçamento.
+
+Adicionar testes específicos para o catálogo.
+
+Teste 1:
+
+def test_catalogo_servico_por_m2_com_fator_comercial():
+    Insumo: barra de 6 m custa R$ 60.
+    fator_comercial = 6.
+    preço técnico esperado = R$ 10/m.
+    Serviço: unidade_medida = m².
+    coeficiente = 2.
+    custo_unitario esperado = R$ 20/m².
+
+Teste 2:
+
+def test_catalogo_servico_por_m_linear_com_fator_comercial():
+    Insumo: barra de 6 m custa R$ 60.
+    fator_comercial = 6.
+    preço técnico esperado = R$ 10/m.
+    Serviço: unidade_medida = m.
+    coeficiente = 1.
+    custo_unitario esperado = R$ 10/m.
+
+Teste 3:
+
+def test_recalcular_servico_apos_editar_fator_comercial():
+    Criar insumo com preco_base = 60 e fator_comercial = 1.
+    Criar serviço com coeficiente = 1.
+    Recalcular: custo esperado = 60.
+    Alterar fator_comercial para 6.
+    Recalcular serviços afetados.
+    Custo esperado = 10.
+
+Teste 4:
+
+def test_servico_sem_composicao_fica_zerado():
+    Criar serviço sem composição.
+    Recalcular.
+    custo_unitario = 0.
+    preco_venda_unitario = 0.
+
+Teste 5:
+
+def test_insumo_sem_preco_vigente_nao_quebra_calculo():
+    Criar insumo sem PrecoBaseInsumo.
+    Criar composição com coeficiente > 0.
+    Recalcular.
+    custo_unitario = 0.
+    preco_venda_unitario = 0.
+    sem exceção.
+
+Teste 6:
+
+def test_catalogo_lista_bate_com_composicao():
+    Criar serviço com composição.
+    Simular valor salvo antigo/inflado em Servico.custo_unitario.
+    Rodar helper de sincronização.
+    Confirmar que valor salvo/exibido bate com calcular_precos_servico.
+
+Teste 7:
+
+def test_importar_excel_alterando_fator_comercial_recalcula_servico():
+    Criar insumo usado em serviço.
+    Importar planilha alterando fator_comercial.
+    Confirmar que servicos_recalculados > 0.
+    Confirmar que custo_unitario do serviço mudou.
+
+
+Relevant files
+
+services/orcamento_service.py
+
+Responsável pelo cálculo principal do catálogo.
+
+Funções relevantes:
+
+calcular_precos_servico
+recalcular_servico_preco
+explodir_servico_para_quantidade
+
+views/catalogo_views.py
+
+Responsável por:
+
+lista de serviços
+tela de composição
+edição de composição
+exclusão de composição
+edição de insumo
+novo preço do insumo
+
+Funções relevantes:
+
+servicos_list
+servico_composicao
+servico_composicao_add
+servico_composicao_editar
+servico_composicao_excluir
+servico_atualizar_preco
+insumo_editar
+insumo_novo_preco
+
+templates/catalogo/servicos_list.html
+
+Responsável pela exibição do catálogo.
+
+Alterar para mostrar preço por unidade do serviço:
+
+R$ valor / unidade_medida
+
+templates/catalogo/composicao_servico.html
+
+Usar como referência de conceito, porque já apresenta:
+
+Preço/un. técnica
+Coeficiente por unidade do serviço
+Custo por unidade do serviço
+
+services/catalogo_excel.py
+
+Responsável pela importação Excel de insumos.
+
+Corrigir para recalcular serviços quando fator_comercial mudar, mesmo que preco_base não tenha sido alterado.
+
+migrations.py
+
+Adicionar backfill idempotente para recalcular serviços antigos.
+
+models.py
+
+Modelos relevantes:
+
+Servico
+Insumo
+PrecoBaseInsumo
+ComposicaoServico
+
+services/orcamento_view_service.py
+
+Não alterar nesta task sem cuidado.
+
+Esse arquivo possui lógica própria para orçamento e quantidade de compra. Deve ser tratado em task separada se necessário.
+
+tests/test_orcamento_service.py
+
+Adicionar testes de preço por m, m², fator_comercial e sincronização do catálogo.
+
+
+Risks
+
+1. Escrever no banco em toda abertura da lista pode causar lentidão se houver muitos serviços.
+
+Mitigação:
+
+Usar comparação antes de persistir.
+Persistir apenas quando houver diferença.
+Usar backfill e triggers como fonte principal de sincronização.
+
+2. Misturar preço técnico com preço de embalagem pode quebrar orçamento.
+
+Mitigação:
+
+Nesta task, não alterar snapshot_from_servico.
+Tratar orçamento em task separada.
+
+3. Alterar fator_comercial sem recalcular serviços mantém valores stale.
+
+Mitigação:
+
+Recalcular serviços afetados ao editar insumo e ao importar Excel.
+
+4. Serviço sem composição pode manter preço antigo.
+
+Mitigação:
+
+Quando serviço não tiver composição, zerar custo_unitario e preco_venda_unitario.
+
+5. Diferenças entre Decimal e Float podem gerar updates infinitos.
+
+Mitigação:
+
+Comparar valores arredondados com tolerância de R$ 0,01.
+
+
+Suggested implementation order
+
+1. Criar helper de sincronização de preço de serviço.
+2. Aplicar helper na lista do catálogo.
+3. Ajustar template para exibir “R$ / unidade”.
+4. Corrigir insumo_editar para recalcular serviços afetados por fator_comercial.
+5. Corrigir importação Excel para recalcular quando fator_comercial mudar.
+6. Criar migration de backfill.
+7. Adicionar testes.
+8. Rodar testes existentes para garantir que orçamento não quebrou.
+
+
+Suggested final issue text
+
+#47 - Corrigir custo e preço por unidade técnica no Catálogo de Serviços
+
+What & Why
+
+O Catálogo de Serviços precisa mostrar quanto custa e quanto vende cada serviço por unidade técnica, como R$ / m, R$ / m², R$ / un ou R$ / h. Hoje a tela de composição calcula corretamente usando preço vigente do insumo dividido por fator_comercial e multiplicado pelo coeficiente da composição, mas a lista do catálogo exibe valores gravados em Servico.custo_unitario e Servico.preco_venda_unitario. Esses valores podem estar defasados e foram calculados antes da introdução do fator_comercial, gerando preços inflados na lista.
+
+Done looks like
+
+A lista do Catálogo de Serviços mostra os mesmos valores da tela de composição.
+Os valores aparecem claramente como R$ / unidade_medida do serviço.
+Serviços por m mostram preço por metro linear.
+Serviços por m² mostram preço por metro quadrado.
+Serviços por un mostram preço por unidade.
+Serviços sem composição ficam zerados.
+Uma migration idempotente recalcula os serviços antigos.
+Alterações em composição, preço do insumo e fator_comercial recalculam os serviços afetados.
+Importação Excel que altere preço_base ou fator_comercial também recalcula os serviços afetados.
+O cálculo mantém separação entre preço da embalagem, fator_comercial, preço técnico e coeficiente.
+
+Out of scope
+
+Corrigir snapshots históricos de OrcamentoItem, PropostaItem ou ItemMedicaoComercial.
+Alterar lógica de subtotal_compra no orçamento.
+Alterar a tela de composição.
+Refatorar todo o módulo de orçamento.
+
+Steps
+
+1. Usar services/orcamento_service.py como fonte oficial do cálculo.
+2. Corrigir uso do parâmetro: usar persistir=False, não commit=False.
+3. Criar helper para sincronizar preço salvo do serviço quando diferente do cálculo vivo.
+4. Aplicar o helper na rota catalogo.servicos_list.
+5. Ajustar templates/catalogo/servicos_list.html para mostrar R$ valor / unidade_medida.
+6. Criar migration idempotente em migrations.py para recalcular todos os serviços antigos.
+7. Auditar handlers de composição para garantir recálculo em add/edit/delete.
+8. Corrigir insumo_editar para recalcular serviços quando fator_comercial mudar.
+9. Corrigir services/catalogo_excel.py para recalcular serviços quando fator_comercial mudar na importação.
+10. Adicionar testes automatizados para preço por m, m², fator_comercial e catálogo vs composição.
+
+Relevant files
+
+services/orcamento_service.py
+views/catalogo_views.py
+templates/catalogo/servicos_list.html
+templates/catalogo/composicao_servico.html
+services/catalogo_excel.py
+migrations.py
+models.py
+services/orcamento_view_service.py
+tests/test_orcamento_service.py

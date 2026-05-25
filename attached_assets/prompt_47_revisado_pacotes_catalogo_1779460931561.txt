@@ -1,0 +1,989 @@
+#47 - Corrigir cálculo do Catálogo de Serviços considerando pacote, quantidade vendida e custo médio por m/m²
+
+Repositório: cassioviller/EnterpriseSync-1
+
+What & Why
+
+O Catálogo de Serviços e a tela de Composição & Preço precisam calcular o custo real de venda considerando a quantidade vendida do serviço e os múltiplos de compra dos insumos.
+
+A lógica anterior de dividir o preço do insumo pelo fator_comercial e multiplicar pelo coeficiente mostra apenas um custo técnico proporcional por unidade. Esse cálculo é útil como referência técnica, mas não representa o custo real quando o insumo só pode ser comprado em pacote, caixa, barra, chapa, rolo, saco ou qualquer múltiplo mínimo de compra.
+
+Exemplo 1:
+
+Se o cliente comprar 2 m de um serviço, mas o insumo é vendido em barra de 6 m, o sistema não pode cobrar como se fosse usar/comprar só 2 m. Precisa considerar a compra de 6 m.
+
+Se a barra de 6 m custa R$ 60,00:
+
+Quantidade vendida do serviço: 2 m
+Quantidade técnica necessária: 2 m
+Fator comercial: 6 m
+Quantidade de compra: 6 m
+Número de pacotes/barras: 1
+Custo real de compra: R$ 60,00
+Custo médio por m vendido: R$ 60,00 / 2 = R$ 30,00 por m
+
+Se a quantidade vendida fosse 6 m:
+
+Quantidade vendida: 6 m
+Quantidade técnica necessária: 6 m
+Quantidade de compra: 6 m
+Custo real de compra: R$ 60,00
+Custo médio por m vendido: R$ 60,00 / 6 = R$ 10,00 por m
+
+Se a quantidade vendida fosse 7 m:
+
+Quantidade vendida: 7 m
+Quantidade técnica necessária: 7 m
+Fator comercial: 6 m
+Quantidade de compra: 12 m
+Número de barras: 2
+Custo real de compra: R$ 120,00
+Custo médio por m vendido: R$ 120,00 / 7 = R$ 17,14 por m
+
+Exemplo 2:
+
+Se o serviço usa 120 parafusos e o pacote tem 100 unidades, o sistema precisa comprar 200 parafusos, não 120.
+
+Quantidade técnica necessária: 120 parafusos
+Fator comercial: 100 parafusos por pacote
+Número de pacotes: ceil(120 / 100) = 2
+Quantidade de compra: 200 parafusos
+Custo real de compra: 2 pacotes * preço do pacote
+
+Portanto, o valor real do serviço NÃO pode ser calculado somente como:
+
+coeficiente * (preço / fator_comercial)
+
+Essa fórmula serve para custo técnico proporcional, mas ignora sobra, compra mínima e arredondamento para pacote.
+
+A fórmula correta para orçamento real deve ser baseada na quantidade vendida do serviço:
+
+quantidade_tecnica = coeficiente * quantidade_vendida_do_servico
+
+pacotes_necessarios = ceil(quantidade_tecnica / fator_comercial)
+
+quantidade_compra = pacotes_necessarios * fator_comercial
+
+custo_linha_real = pacotes_necessarios * preco_embalagem
+
+custo_total_real = soma dos custos reais das linhas
+
+custo_medio_por_unidade_do_servico =
+custo_total_real / quantidade_vendida_do_servico
+
+preco_venda_total =
+custo_total_real / (1 - imposto_pct/100 - margem_lucro_pct/100)
+
+preco_venda_medio_por_unidade =
+preco_venda_total / quantidade_vendida_do_servico
+
+A tela principal do catálogo está mais próxima do resultado esperado porque ela considera valores mais próximos da compra real por pacote. O problema não é simplesmente “preço stale”; o problema é que existem dois conceitos diferentes sendo misturados:
+
+1. Custo técnico proporcional por unidade.
+2. Custo real de compra considerando pacote e quantidade vendida.
+
+O sistema precisa separar esses dois conceitos e deixar claro qual está sendo usado.
+
+A tela de composição atualmente mostra valores baixos, como R$ 28,07/m², porque está calculando uma média técnica proporcional. Mas, se para executar poucos metros for necessário comprar pacotes inteiros de massa, placas, fitas ou parafusos, o custo real médio por m² pode ser muito maior.
+
+Por isso, o cálculo correto para venda/orçamento deve depender da quantidade do serviço.
+
+Importante:
+
+Não existe um “preço por m” universal quando há pacote mínimo de compra.
+
+O preço por m ou por m² muda conforme a quantidade vendida.
+
+Exemplo:
+
+2 m podem custar R$ 30/m.
+6 m podem custar R$ 10/m.
+7 m podem custar R$ 17,14/m.
+
+Todos usando a mesma barra de 6 m.
+
+
+Done looks like
+
+A tela de Composição & Preço permite informar uma quantidade de referência do serviço.
+
+Exemplo:
+
+Quantidade de referência: 1 m²
+Quantidade de referência: 2 m²
+Quantidade de referência: 10 m²
+Quantidade de referência: 100 m²
+
+Ao informar a quantidade de referência, o sistema calcula:
+
+1. Quantidade técnica de cada insumo.
+2. Fator comercial de cada insumo.
+3. Número de pacotes/barras/sacos/caixas necessários.
+4. Quantidade real de compra.
+5. Custo real da linha.
+6. Custo total real.
+7. Custo médio real por unidade do serviço.
+8. Preço de venda total.
+9. Preço de venda médio por unidade do serviço.
+
+A tela mostra claramente a diferença entre:
+
+Custo técnico proporcional
+Custo real de compra
+Custo médio real por m/m²/unidade
+
+Exemplo de colunas esperadas na composição:
+
+Insumo
+Tipo
+Unidade técnica
+Preço embalagem
+Fator comercial
+Coeficiente
+Qtd técnica
+Qtd compra
+Pacotes
+Custo técnico
+Custo real de compra
+
+O topo da tela deve mostrar:
+
+Custo técnico por m²
+Custo real para a quantidade informada
+Custo médio real por m²
+Preço de venda total
+Preço médio de venda por m²
+
+A lista do Catálogo de Serviços não deve fingir que existe um preço unitário fixo universal quando há fator comercial.
+
+A lista deve mostrar o valor calculado com base em uma quantidade de referência.
+
+Exemplo:
+
+Plaqueamento RF
+Unidade: m²
+Qtd ref.: 1 m²
+Custo médio real: R$ 1.187,70/m²
+Preço médio venda: R$ 1.649,58/m²
+
+ou:
+
+Plaqueamento RF
+Unidade: m²
+Qtd ref.: 10 m²
+Custo médio real: R$ X/m²
+Preço médio venda: R$ Y/m²
+
+O usuário deve conseguir alterar a quantidade de referência para simular o efeito do pacote.
+
+Serviços sem composição ficam com custo 0.
+
+Serviços com insumos sem preço vigente mostram alerta, mas não quebram a tela.
+
+O cálculo de pacotes usa sempre arredondamento para cima.
+
+Se fator_comercial for 1, o cálculo continua igual ao cálculo proporcional:
+
+quantidade_compra = quantidade_tecnica
+pacotes = quantidade_tecnica
+custo_linha_real = quantidade_tecnica * preço_unitario
+
+Se fator_comercial for maior que 1:
+
+pacotes = ceil(quantidade_tecnica / fator_comercial)
+quantidade_compra = pacotes * fator_comercial
+custo_linha_real = pacotes * preco_embalagem
+
+A alteração de composição, preço do insumo ou fator_comercial recalcula os serviços afetados.
+
+A importação Excel de insumos recalcula serviços quando mudar preço_base ou fator_comercial.
+
+Os valores da lista do catálogo e da tela de composição batem quando usam a mesma quantidade de referência.
+
+O cálculo técnico proporcional pode continuar existindo, mas não deve ser apresentado como custo real de venda quando existe pacote mínimo.
+
+
+Out of scope
+
+Corrigir snapshots históricos antigos já gerados em OrcamentoItem, PropostaItem ou ItemMedicaoComercial.
+
+Alterar medições comerciais já aprovadas.
+
+Alterar obras já criadas a partir de propostas antigas.
+
+Alterar histórico financeiro.
+
+Alterar RDO, produtividade real ou custos realizados.
+
+Criar nova política comercial de margem por faixa de quantidade.
+
+Criar cálculo automático de desperdício técnico além do arredondamento por pacote.
+
+Criar cálculo de frete, perdas, impostos de compra ou estoque mínimo.
+
+Nesta task, o foco é corrigir a lógica de cálculo do catálogo/orçamento para que o custo real considere pacote, quantidade vendida e fator_comercial.
+
+
+Correção conceitual importante
+
+O plano anterior dizia que o correto era dividir o preço vigente pelo fator_comercial e usar esse valor como base do custo por unidade.
+
+Isso está incompleto.
+
+A divisão por fator_comercial só dá o custo técnico proporcional.
+
+Mas para venda real, quando o fornecedor vende em pacote, caixa, saco, barra ou chapa, o sistema precisa considerar o pacote inteiro.
+
+Portanto, existem dois cálculos:
+
+1. Cálculo técnico proporcional
+
+preco_unitario_tecnico = preco_embalagem / fator_comercial
+
+custo_tecnico_linha_por_unidade =
+coeficiente * preco_unitario_tecnico
+
+Esse cálculo responde:
+
+Quanto custaria se eu pudesse comprar exatamente a quantidade usada?
+
+2. Cálculo real de compra
+
+quantidade_tecnica = coeficiente * quantidade_vendida
+
+pacotes = ceil(quantidade_tecnica / fator_comercial)
+
+quantidade_compra = pacotes * fator_comercial
+
+custo_real_linha = pacotes * preco_embalagem
+
+Esse cálculo responde:
+
+Quanto vou gastar de verdade para comprar os insumos necessários?
+
+Para orçamento e venda, o cálculo real de compra é o mais importante.
+
+O custo médio por m/m²/unidade deve ser:
+
+custo_medio_real = custo_total_real / quantidade_vendida
+
+
+Steps
+
+1. Criar nova função de cálculo por quantidade
+
+Arquivo:
+
+services/orcamento_service.py
+
+Criar uma função nova, sem destruir a função atual:
+
+calcular_precos_servico_por_quantidade(servico, quantidade, data_ref=None)
+
+Essa função deve receber:
+
+servico
+quantidade vendida ou quantidade de referência
+data_ref opcional
+
+Retorno sugerido:
+
+{
+    "quantidade": Decimal,
+    "unidade_servico": servico.unidade_medida,
+    "custo_tecnico_unitario": Decimal,
+    "custo_tecnico_total": Decimal,
+    "custo_real_total": Decimal,
+    "custo_medio_real_unitario": Decimal,
+    "preco_venda_total": Decimal,
+    "preco_venda_medio_unitario": Decimal,
+    "imposto_pct": Decimal,
+    "margem_lucro_pct": Decimal,
+    "erro": None ou string,
+    "detalhamento": [
+        {
+            "insumo_id": int,
+            "nome": str,
+            "tipo": str,
+            "unidade_tecnica": str,
+            "unidade_comercial": str,
+            "preco_embalagem": Decimal,
+            "fator_comercial": Decimal,
+            "coeficiente": Decimal,
+            "quantidade_tecnica": Decimal,
+            "pacotes": Decimal,
+            "quantidade_compra": Decimal,
+            "preco_unitario_tecnico": Decimal,
+            "custo_tecnico_linha": Decimal,
+            "custo_real_linha": Decimal
+        }
+    ]
+}
+
+Regra:
+
+Se quantidade <= 0, retornar erro ou usar quantidade 1 como fallback, mas a UI deve preferir bloquear quantidade inválida.
+
+Se fator_comercial <= 0, usar 1 como fallback e registrar alerta.
+
+Se preco_embalagem estiver vazio ou 0, o insumo entra com custo 0 e alerta no detalhamento.
+
+2. Implementar cálculo real por pacote
+
+Dentro de calcular_precos_servico_por_quantidade:
+
+Para cada composição:
+
+preco_embalagem = comp.insumo.preco_vigente(data_ref)
+coeficiente = comp.coeficiente
+fator_comercial = comp.insumo.fator_comercial or 1
+
+quantidade_tecnica = coeficiente * quantidade
+
+Se fator_comercial > 1:
+
+pacotes = ceil(quantidade_tecnica / fator_comercial)
+quantidade_compra = pacotes * fator_comercial
+custo_real_linha = pacotes * preco_embalagem
+
+Se fator_comercial <= 1:
+
+pacotes = quantidade_tecnica
+quantidade_compra = quantidade_tecnica
+custo_real_linha = quantidade_tecnica * preco_embalagem
+
+Também calcular o custo técnico proporcional:
+
+preco_unitario_tecnico = preco_embalagem / fator_comercial
+custo_tecnico_linha = quantidade_tecnica * preco_unitario_tecnico
+
+Ao final:
+
+custo_tecnico_total = soma custo_tecnico_linha
+custo_real_total = soma custo_real_linha
+custo_tecnico_unitario = custo_tecnico_total / quantidade
+custo_medio_real_unitario = custo_real_total / quantidade
+
+Aplicar imposto e margem sobre custo_real_total:
+
+divisor = 1 - imposto_pct/100 - margem_pct/100
+
+Se divisor <= 0:
+
+preco_venda_total = 0
+preco_venda_medio_unitario = 0
+erro = "imposto + margem >= 100%"
+
+Senão:
+
+preco_venda_total = custo_real_total / divisor
+preco_venda_medio_unitario = preco_venda_total / quantidade
+
+3. Manter função antiga como cálculo técnico
+
+A função atual calcular_precos_servico pode continuar existindo como cálculo técnico proporcional.
+
+Mas seu uso na tela precisa ficar claro.
+
+Ela não deve ser usada sozinha para definir custo real de venda quando houver fator_comercial maior que 1.
+
+Renomear conceitualmente nos comentários:
+
+calcular_precos_servico = cálculo técnico proporcional
+
+Nova função:
+
+calcular_precos_servico_por_quantidade = cálculo real de compra por quantidade vendida
+
+Se quiser evitar quebra de compatibilidade, manter o nome atual e apenas adicionar a nova função.
+
+
+4. Corrigir tela de Composição & Preço
+
+Arquivo:
+
+views/catalogo_views.py
+
+Rota:
+
+servico_composicao
+
+Adicionar suporte a query param ou form:
+
+quantidade_ref
+
+Exemplo:
+
+/catalogo/servicos/123/composicao?quantidade_ref=10
+
+Na view:
+
+quantidade_ref = request.args.get("quantidade_ref") ou 1
+
+calc_tecnico = calcular_precos_servico(svc)
+
+calc_real = calcular_precos_servico_por_quantidade(svc, quantidade_ref)
+
+Enviar ambos para o template:
+
+calc_tecnico
+calc_real
+quantidade_ref
+
+5. Corrigir template da composição
+
+Arquivo:
+
+templates/catalogo/composicao_servico.html
+
+Adicionar campo no topo:
+
+Quantidade de referência
+
+Exemplo:
+
+[ 10 ] m²   [Recalcular]
+
+No topo da tela, mostrar cards separados:
+
+Custo técnico proporcional por m²
+Custo real para 10 m²
+Custo médio real por m²
+Preço de venda total
+Preço médio de venda por m²
+
+Exemplo:
+
+Custo técnico proporcional: R$ 28,07 / m²
+Custo real de compra: R$ 1.187,70
+Custo médio real: R$ 118,77 / m²
+Preço venda total: R$ 1.649,58
+Preço médio venda: R$ 164,96 / m²
+
+A tabela da composição deve trocar/expandir as colunas:
+
+Preço/un. técnica
+Coef.
+Custo técnico / m²
+
+para algo mais completo:
+
+Preço embalagem
+Fator comercial
+Coef.
+Qtd técnica
+Pacotes
+Qtd compra
+Custo técnico
+Custo real
+
+Exemplo de linha:
+
+Parafuso
+Preço embalagem: R$ 46,00
+Fator: 100 un/pct
+Coeficiente: 120 un
+Qtd técnica: 120 un
+Pacotes: 2
+Qtd compra: 200 un
+Custo técnico: R$ 55,20
+Custo real: R$ 92,00
+
+6. Corrigir lista do Catálogo de Serviços
+
+Arquivo:
+
+views/catalogo_views.py
+
+Rota:
+
+servicos_list
+
+A lista não deve apresentar custo unitário como se fosse universal sem informar quantidade.
+
+Adicionar uma quantidade de referência global no filtro da lista:
+
+Quantidade ref.: [ 1 ] [m²/un conforme serviço]
+
+Como a lista tem serviços com unidades diferentes, há duas opções:
+
+Opção A - Quantidade referência única
+
+Campo no topo:
+
+Quantidade de referência para simulação: 1
+
+Cada serviço usa essa quantidade em sua própria unidade.
+
+Exemplo:
+
+1 m² para serviços m²
+1 m para serviços m
+1 un para serviços un
+
+Opção B - Campo por serviço
+
+Adicionar em Servico um campo:
+
+quantidade_referencia_catalogo
+
+Cada serviço pode ter sua própria quantidade padrão de cálculo.
+
+Exemplo:
+
+Plaqueamento RF: 10 m²
+Forro: 10 m²
+Parafusamento: 100 un
+
+Recomendação:
+
+Implementar primeiro a Opção A para resolver rápido.
+Depois criar a Opção B se fizer sentido comercial.
+
+Na lista, exibir:
+
+Qtd ref.
+Custo real total
+Custo médio / unidade
+Preço venda total
+Preço médio / unidade
+
+Ou, se quiser manter tabela simples:
+
+Custo Médio
+Preço Médio
+Qtd Ref.
+
+Exemplo:
+
+Nome: Plaqueamento RF
+Unidade: m²
+Qtd ref.: 1
+Custo médio: R$ 1.187,70 / m²
+Preço médio: R$ 1.649,58 / m²
+
+Se a quantidade ref mudar para 10:
+
+Qtd ref.: 10
+Custo médio: R$ 118,77 / m²
+Preço médio: R$ 164,96 / m²
+
+Assim o usuário entende o efeito da compra mínima.
+
+7. Corrigir persistência dos valores em Servico
+
+Problema:
+
+Servico.custo_unitario e Servico.preco_venda_unitario armazenam um valor unitário, mas agora o valor unitário depende da quantidade de referência.
+
+Existem duas opções:
+
+Opção A - Não persistir custo real por pacote em Servico
+
+Usar Servico.custo_unitario e Servico.preco_venda_unitario apenas para custo técnico proporcional.
+
+Calcular custo real por pacote ao vivo, com quantidade_ref.
+
+Vantagem:
+
+Não grava valor enganoso.
+Evita stale.
+Mais correto conceitualmente.
+
+Desvantagem:
+
+Lista recalcula ao vivo.
+
+Opção B - Persistir com quantidade de referência
+
+Adicionar campos em Servico:
+
+quantidade_referencia_catalogo
+custo_real_total_ref
+custo_medio_real_unitario_ref
+preco_venda_total_ref
+preco_venda_medio_unitario_ref
+
+Vantagem:
+
+Lista rápida.
+Mostra valor baseado em referência clara.
+
+Desvantagem:
+
+Precisa migration e recálculo quando mudar referência.
+
+Recomendação:
+
+Para esta task, usar Opção A se quiser corrigir rápido sem migration estrutural.
+
+Se o objetivo comercial é mostrar preço real por m/m² na lista, usar Opção B é mais robusta.
+
+8. Corrigir recálculo quando mudar composição
+
+Arquivo:
+
+views/catalogo_views.py
+
+Handlers:
+
+servico_composicao_add
+servico_composicao_editar
+servico_composicao_excluir
+
+Hoje esses handlers chamam recalcular_servico_preco(svc), mas isso recalcula apenas o custo técnico proporcional.
+
+Manter isso para compatibilidade, mas adicionar ou preparar chamada para cálculo real por quantidade quando existir quantidade_referencia_catalogo.
+
+Se usar Opção B:
+
+Após mudar composição:
+
+recalcular_servico_preco(svc)  # técnico
+recalcular_servico_preco_real_ref(svc)  # real por quantidade referência
+
+9. Corrigir recálculo quando mudar insumo
+
+Arquivo:
+
+views/catalogo_views.py
+
+Função:
+
+insumo_editar
+
+Quando mudar:
+
+preco_base
+fator_comercial
+unidade_comercial
+unidade
+tipo
+
+recalcular serviços afetados.
+
+Principalmente fator_comercial, porque ele altera diretamente:
+
+pacotes necessários
+quantidade_compra
+custo_real_linha
+custo médio por m/m²
+
+10. Corrigir importação Excel
+
+Arquivo:
+
+services/catalogo_excel.py
+
+Função:
+
+importar_insumos_xlsx
+
+Se a planilha alterar fator_comercial, recalcular todos os serviços que usam esse insumo.
+
+Não recalcular apenas quando preco_base mudar.
+
+Campos que devem disparar recálculo:
+
+preco_base
+fator_comercial
+unidade_comercial
+unidade
+tipo
+
+11. Corrigir orçamento para usar custo real por pacote quando necessário
+
+Arquivo:
+
+services/orcamento_view_service.py
+
+Esse arquivo já tem lógica próxima do correto:
+
+quantidade_tecnica = coeficiente * quantidade do item
+quantidade_compra = múltiplo do fator >= quantidade_tecnica
+subtotal_compra = número de pacotes * preço do pacote
+
+Essa lógica está mais alinhada com o que o usuário espera.
+
+Porém, revisar se o custo_total e venda_total do item estão usando custo_unit técnico ou custo real de compra.
+
+Hoje existe comentário dizendo que subtotal_compra é auxiliar de planejamento e NÃO alimenta custo_total.
+
+Para a regra de negócio atual, isso precisa ser revisto.
+
+Se a intenção é vender considerando que precisa comprar o pacote inteiro, então custo_total do orçamento deve usar custo real de compra, não apenas custo técnico proporcional.
+
+Correção necessária:
+
+Em recalcular_item, avaliar se:
+
+custo_total deve ser custo_compra
+preco_unit deve ser baseado em custo_compra / quantidade
+venda_total deve ser custo_compra / divisor
+
+Nova regra esperada:
+
+custo_total = custo_compra
+custo_unitario = custo_compra / quantidade
+preco_venda_unitario = custo_unitario / divisor
+venda_total = preco_venda_unitario * quantidade
+
+ou diretamente:
+
+venda_total = custo_compra / divisor
+preco_venda_unitario = venda_total / quantidade
+
+Isso faz o orçamento refletir pacote real.
+
+Exemplo:
+
+Quantidade vendida: 2 m
+Barra: 6 m por R$ 60
+custo_compra = R$ 60
+custo_unitario = 60 / 2 = R$ 30/m
+Com imposto 8% e lucro 20%:
+divisor = 0,72
+venda_total = 60 / 0,72 = R$ 83,33
+preco_venda_unitario = 83,33 / 2 = R$ 41,67/m
+
+Isso é diferente do cálculo técnico:
+
+preço técnico = 60 / 6 = 10/m
+custo técnico para 2m = 20
+venda técnica = 20 / 0,72 = 27,78
+preço técnico por m = 13,89/m
+
+O cálculo técnico subprecifica o serviço porque ignora que será necessário comprar a barra inteira.
+
+12. Adicionar opção de visualização técnica vs real
+
+Para não perder informação, exibir os dois valores:
+
+Custo técnico:
+Mostra o custo proporcional do consumo exato.
+
+Custo real:
+Mostra o custo que será pago considerando pacote.
+
+Custo médio real:
+Mostra quanto aquele custo real representa por unidade vendida.
+
+No orçamento e na venda, usar o custo real.
+
+Na análise técnica/produtividade, manter o custo técnico como referência se necessário.
+
+
+Tests
+
+Adicionar testes automatizados para os seguintes cenários.
+
+Teste 1 - Barra de 6 m vendendo 2 m
+
+Serviço unidade = m
+Quantidade vendida = 2
+Insumo preço embalagem = R$ 60
+Fator comercial = 6
+Coeficiente = 1
+
+Resultado esperado:
+
+quantidade_tecnica = 2
+pacotes = 1
+quantidade_compra = 6
+custo_real_total = 60
+custo_medio_real_unitario = 30
+
+Teste 2 - Barra de 6 m vendendo 6 m
+
+Quantidade vendida = 6
+
+Resultado esperado:
+
+quantidade_tecnica = 6
+pacotes = 1
+quantidade_compra = 6
+custo_real_total = 60
+custo_medio_real_unitario = 10
+
+Teste 3 - Barra de 6 m vendendo 7 m
+
+Quantidade vendida = 7
+
+Resultado esperado:
+
+quantidade_tecnica = 7
+pacotes = 2
+quantidade_compra = 12
+custo_real_total = 120
+custo_medio_real_unitario = 17,142857
+
+Teste 4 - Parafuso pacote 100 usando 120
+
+Quantidade técnica = 120
+Fator comercial = 100
+Preço pacote = R$ 46
+
+Resultado esperado:
+
+pacotes = 2
+quantidade_compra = 200
+custo_real_total = R$ 92
+
+Teste 5 - Fator comercial 1
+
+Quantidade técnica = 10
+Fator = 1
+Preço unitário = R$ 5
+
+Resultado esperado:
+
+quantidade_compra = 10
+custo_real_total = 50
+
+Teste 6 - Comparar técnico vs real
+
+Barra 6 m por R$ 60
+Venda 2 m
+
+Técnico:
+custo técnico = 20
+
+Real:
+custo real = 60
+
+O teste deve garantir que o sistema não usa o custo técnico como preço final de venda.
+
+Teste 7 - Orçamento usa custo real
+
+Criar OrcamentoItem com quantidade 2.
+Insumo barra 6 m.
+Garantir que item.custo_total = 60, não 20.
+
+Teste 8 - Catálogo com quantidade_ref
+
+Serviço com quantidade_ref = 2.
+Garantir que lista mostra custo médio real = 30/m.
+
+
+Relevant files
+
+services/orcamento_service.py
+
+Criar nova função:
+
+calcular_precos_servico_por_quantidade
+
+Manter função antiga como cálculo técnico proporcional.
+
+services/orcamento_view_service.py
+
+Revisar recalcular_item.
+
+Hoje já calcula quantidade_tecnica, quantidade_compra e subtotal_compra.
+
+Ajustar para que o custo real de pacote alimente custo_total, venda_total e preco_venda_unitario, se essa for a regra de negócio definida.
+
+views/catalogo_views.py
+
+Ajustar:
+
+servicos_list
+servico_composicao
+servico_composicao_add
+servico_composicao_editar
+servico_composicao_excluir
+insumo_editar
+insumo_novo_preco
+
+templates/catalogo/servicos_list.html
+
+Adicionar quantidade de referência e mostrar custo médio real.
+
+templates/catalogo/composicao_servico.html
+
+Adicionar quantidade de referência e detalhamento de pacote.
+
+services/catalogo_excel.py
+
+Recalcular serviços quando fator_comercial mudar.
+
+models.py
+
+Possível alteração se optar por persistir quantidade de referência:
+
+Servico.quantidade_referencia_catalogo
+Servico.custo_real_total_ref
+Servico.custo_medio_real_unitario_ref
+Servico.preco_venda_total_ref
+Servico.preco_venda_medio_unitario_ref
+
+migrations.py
+
+Criar migration apenas se forem adicionados novos campos.
+
+tests/test_orcamento_service.py
+
+Adicionar testes de pacote, barra, parafuso e custo médio real.
+
+
+Suggested implementation order
+
+1. Criar calcular_precos_servico_por_quantidade.
+2. Adicionar testes unitários da nova função.
+3. Ajustar tela de composição para receber quantidade_ref.
+4. Exibir técnico vs real na composição.
+5. Ajustar lista do catálogo para usar quantidade_ref.
+6. Revisar recalcular_item em services/orcamento_view_service.py para decidir se custo_total deve usar custo real de compra.
+7. Ajustar importação Excel e edição de insumo para recalcular serviços afetados.
+8. Rodar testes.
+9. Validar manualmente com os exemplos:
+   - 2 m vendidos com barra de 6 m.
+   - 120 parafusos com pacote de 100.
+   - Plaqueamento RF da tela enviada.
+
+
+Prompt final para implementação
+
+Corrija a Task #47 no repositório EnterpriseSync-1 considerando que o custo correto para venda/orçamento deve respeitar pacote mínimo, fator_comercial e quantidade vendida.
+
+Não trate fator_comercial apenas como divisor para achar custo técnico proporcional.
+
+A regra correta para venda é:
+
+quantidade_tecnica = coeficiente * quantidade_vendida
+pacotes = ceil(quantidade_tecnica / fator_comercial)
+quantidade_compra = pacotes * fator_comercial
+custo_real_linha = pacotes * preco_embalagem
+custo_real_total = soma das linhas
+custo_medio_real_unitario = custo_real_total / quantidade_vendida
+preco_venda_total = custo_real_total / (1 - imposto_pct/100 - margem_pct/100)
+preco_venda_medio_unitario = preco_venda_total / quantidade_vendida
+
+Mantenha também o cálculo técnico proporcional para referência:
+
+preco_unitario_tecnico = preco_embalagem / fator_comercial
+custo_tecnico_linha = quantidade_tecnica * preco_unitario_tecnico
+
+Mas o orçamento/venda deve usar o custo real de compra quando houver pacote.
+
+Exemplos obrigatórios:
+
+Se vendeu 2 m e o insumo é uma barra/pacote de 6 m, comprar 6 m.
+
+Se vendeu 7 m e o insumo é uma barra/pacote de 6 m, comprar 12 m.
+
+Se precisa de 120 parafusos e o pacote é de 100, comprar 200 parafusos.
+
+Ajuste a tela de composição para permitir quantidade de referência e mostrar:
+
+custo técnico proporcional
+custo real total
+custo médio real por unidade
+preço de venda total
+preço médio de venda por unidade
+
+Ajuste a lista do catálogo para não mostrar preço por m/m² como se fosse universal. Ela deve mostrar preço baseado em quantidade de referência.
+
+Revise services/orcamento_view_service.py, porque ele já calcula quantidade_compra e subtotal_compra, mas atualmente o comentário indica que subtotal_compra é auxiliar e não alimenta custo_total. Para a regra de negócio desejada, custo_total e venda_total devem considerar o custo real de compra quando houver pacote.
+
+Adicione testes para barra de 6 m, pacote de 100 parafusos e comparação entre custo técnico e custo real.
