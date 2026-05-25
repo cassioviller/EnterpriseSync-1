@@ -166,12 +166,28 @@ def cronograma_obra(obra_id: int):
     # (No modo cliente, sincroniza apenas o bottom-up dos pais; RDO não toca tarefas-cliente)
     sincronizar_percentuais_obra(obra_id, admin_id, cliente=cliente_mode)
 
-    tarefas = (
+    tarefas_raw = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
         .order_by(TarefaCronograma.ordem)
         .all()
     )
+
+    # Tree-flatten: interleave each root task with its children so that child
+    # rows appear immediately after their parent in the rendered table, rather
+    # than at the very end of the list.
+    filhas_map: dict[int, list] = {}
+    raiz: list = []
+    for t in tarefas_raw:
+        if t.tarefa_pai_id:
+            filhas_map.setdefault(t.tarefa_pai_id, []).append(t)
+        else:
+            raiz.append(t)
+    tarefas = []
+    for t in raiz:
+        tarefas.append(t)
+        for f in filhas_map.get(t.id, []):
+            tarefas.append(f)
 
     cal = get_calendario(admin_id)
 
