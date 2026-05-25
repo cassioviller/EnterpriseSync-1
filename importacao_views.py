@@ -11,8 +11,8 @@ import os
 import uuid
 from datetime import datetime
 
-from flask import (Blueprint, current_app, flash, redirect, render_template,
-                   request, send_file, url_for)
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, send_file, url_for)
 from flask_login import current_user, login_required
 
 from models import db
@@ -368,6 +368,40 @@ def custos_confirmar():
     return _handle_confirmar('custos')
 
 
+# ─── API: Entidades para autocomplete ────────────────────────────────────────
+
+@importacao_bp.route('/api/entidades')
+@login_required
+def api_entidades():
+    """Retorna lista JSON de fornecedores + funcionários para Tom Select."""
+    from models import Fornecedor, Funcionario
+    admin_id = get_admin_id_robusta()
+    q = request.args.get('q', '').strip()
+
+    results = []
+
+    func_q = Funcionario.query.filter_by(admin_id=admin_id, ativo=True)
+    if q:
+        func_q = func_q.filter(Funcionario.nome.ilike(f'%{q}%'))
+    for f in func_q.order_by(Funcionario.nome).limit(20).all():
+        results.append({'id': f'funcionario:{f.id}', 'nome': f.nome, 'tipo': 'funcionario'})
+
+    forn_q = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True)
+    if q:
+        forn_q = forn_q.filter(
+            db.or_(
+                Fornecedor.nome.ilike(f'%{q}%'),
+                Fornecedor.razao_social.ilike(f'%{q}%'),
+                Fornecedor.nome_fantasia.ilike(f'%{q}%'),
+            )
+        )
+    for f in forn_q.order_by(Fornecedor.nome).limit(20).all():
+        display = f.nome or f.razao_social or f.nome_fantasia or '?'
+        results.append({'id': f'fornecedor:{f.id}', 'nome': display, 'tipo': 'fornecedor'})
+
+    return jsonify(results)
+
+
 # ─── Fluxo de Caixa ─────────────────────────────────────────────────────────
 
 @importacao_bp.route('/fluxo-caixa/upload', methods=['POST'])
@@ -549,6 +583,19 @@ def fluxo_caixa_confirmar():
             row['tipo_categoria'] = cat_val
             row['categoria_fluxo_caixa_id'] = None
 
+    def _aplicar_destinatario(row, dest_val):
+        """Faz override de entidade_tipo/entidade_id a partir do valor 'tipo:id' do Tom Select."""
+        if not dest_val or ':' not in dest_val:
+            return
+        partes = dest_val.split(':', 1)
+        if len(partes) != 2:
+            return
+        tipo, id_str = partes
+        if tipo not in ('funcionario', 'fornecedor') or not id_str.isdigit():
+            return
+        row['entidade_tipo'] = tipo
+        row['entidade_id'] = int(id_str)
+
     # Aplicar edições manuais nas saídas auto
     for i, row in enumerate(saidas_auto):
         row['obra_id'] = _obra_segura(request.form.get(f'obra_auto_{i}', '').strip())
@@ -575,6 +622,8 @@ def fluxo_caixa_confirmar():
                 row['valor'] = float(valor_edit.replace(',', '.'))
             except ValueError:
                 pass
+        # Override de destinatário (Tom Select)
+        _aplicar_destinatario(row, request.form.get(f'destinatario_auto_{i}', '').strip())
 
     # Aplicar edições manuais das saídas manuais
     for i, row in enumerate(saidas_manual):
@@ -604,6 +653,8 @@ def fluxo_caixa_confirmar():
                 row['valor'] = float(valor_edit.replace(',', '.'))
             except ValueError:
                 pass
+        # Override de destinatário (Tom Select)
+        _aplicar_destinatario(row, request.form.get(f'destinatario_manual_{i}', '').strip())
 
     # Aplicar obra e categorias personalizadas nas entradas
     for i, row in enumerate(entradas):

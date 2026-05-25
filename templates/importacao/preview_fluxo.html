@@ -2,6 +2,7 @@
 {% block title %}Preview Fluxo de Caixa — SIGE{% endblock %}
 
 {% block head_extra %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 <style>
 /* Inputs inline — sem borda em repouso, com borda ao focar */
 .inline-input {
@@ -41,6 +42,13 @@
   color: #adb5bd;
   vertical-align: middle;
 }
+/* Tom Select destinatário — compacto */
+.dest-wrap { min-width: 170px; max-width: 220px; }
+.dest-wrap .ts-wrapper { font-size: .8rem; }
+.dest-wrap .ts-control { padding: 2px 6px; min-height: 28px; }
+.dest-wrap .ts-dropdown { font-size: .8rem; }
+.badge-tipo-func { background:#198754; color:#fff; font-size:.62rem; padding:1px 5px; border-radius:4px; vertical-align:middle; }
+.badge-tipo-forn { background:#0d6efd; color:#fff; font-size:.62rem; padding:1px 5px; border-radius:4px; vertical-align:middle; }
 </style>
 {% endblock %}
 
@@ -257,6 +265,11 @@
             <tr>
               <th class="px-3" style="min-width:112px;">Data</th>
               <th style="min-width:140px;">Fornecedor / Entidade</th>
+              <th style="min-width:170px;">Destinatário
+                <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
+                   data-bs-toggle="tooltip"
+                   title="Funcionário ou fornecedor vinculado. Clique para substituir o match automático."></i>
+              </th>
               <th style="min-width:150px;">Descrição</th>
               <th>CC</th>
               <th class="text-end" style="min-width:90px;">Valor (R$)</th>
@@ -295,20 +308,29 @@
               </td>
               <!-- Fornecedor (somente leitura) -->
               <td>
-                {% if r.entidade_nome_banco %}
-                  <span title="Match: {{ r.fuzzy_score }}% → {{ r.entidade_nome_banco }}">
-                    {{ r.fornecedor }}
-                  </span>
-                  <br><small class="text-success">→ {{ r.entidade_nome_banco }}</small>
-                {% else %}
-                  {{ r.fornecedor }}
-                  {% if r.observacoes %}
-                    <br><small class="text-warning">{{ r.observacoes }}</small>
-                  {% endif %}
-                {% endif %}
+                {{ r.fornecedor }}
                 {% if r.eh_reembolso %}
                   <span class="badge ms-1" style="background:#6610f2;font-size:.68rem;">Reembolso</span>
                 {% endif %}
+              </td>
+              <!-- Destinatário — Tom Select -->
+              <td class="dest-wrap">
+                <select class="destinatario-ts"
+                        data-idx="{{ loop.index0 }}"
+                        data-prefix="auto"
+                        data-init-id="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}"
+                        data-init-nome="{{ r.entidade_nome_banco or '' }}"
+                        data-init-tipo="{{ r.entidade_tipo or '' }}">
+                  {% if r.entidade_id and r.entidade_tipo %}
+                  <option value="{{ r.entidade_tipo }}:{{ r.entidade_id }}" selected>
+                    {{ r.entidade_nome_banco or r.fornecedor }}
+                  </option>
+                  {% endif %}
+                </select>
+                <input type="hidden"
+                       name="destinatario_auto_{{ loop.index0 }}"
+                       id="destinatario_auto_{{ loop.index0 }}"
+                       value="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}">
               </td>
               <!-- Descrição editável -->
               <td>
@@ -446,6 +468,11 @@
             <tr>
               <th class="px-3" style="min-width:112px;">Data</th>
               <th style="min-width:140px;">Fornecedor</th>
+              <th style="min-width:170px;">Destinatário
+                <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
+                   data-bs-toggle="tooltip"
+                   title="Funcionário ou fornecedor vinculado. Clique para substituir o match automático."></i>
+              </th>
               <th style="min-width:150px;">Descrição</th>
               <th style="min-width:150px;">CC / Obra</th>
               <th class="text-end" style="min-width:90px;">Valor (R$)</th>
@@ -474,6 +501,25 @@
                 {% if r.observacoes %}
                   <br><small class="text-warning">{{ r.observacoes }}</small>
                 {% endif %}
+              </td>
+              <!-- Destinatário — Tom Select -->
+              <td class="dest-wrap">
+                <select class="destinatario-ts"
+                        data-idx="{{ loop.index0 }}"
+                        data-prefix="manual"
+                        data-init-id="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}"
+                        data-init-nome="{{ r.entidade_nome_banco or '' }}"
+                        data-init-tipo="{{ r.entidade_tipo or '' }}">
+                  {% if r.entidade_id and r.entidade_tipo %}
+                  <option value="{{ r.entidade_tipo }}:{{ r.entidade_id }}" selected>
+                    {{ r.entidade_nome_banco or r.fornecedor }}
+                  </option>
+                  {% endif %}
+                </select>
+                <input type="hidden"
+                       name="destinatario_manual_{{ loop.index0 }}"
+                       id="destinatario_manual_{{ loop.index0 }}"
+                       value="{{ (r.entidade_tipo + ':' + r.entidade_id|string) if r.entidade_id else '' }}">
               </td>
               <!-- Descrição editável -->
               <td>
@@ -750,6 +796,7 @@
   </form>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 function marcarFuncionarios(prefix) {
   var cbs = document.querySelectorAll(
@@ -762,6 +809,59 @@ document.addEventListener('DOMContentLoaded', function () {
   var tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
   tooltipEls.forEach(function(el) { new bootstrap.Tooltip(el); });
   feather.replace();
+
+  // ── Tom Select: Destinatário ────────────────────────────────────────────
+  var BADGE = {
+    funcionario: '<span class="badge-tipo-func">Func</span>',
+    fornecedor:  '<span class="badge-tipo-forn">Forn</span>',
+  };
+
+  function renderOption(data, escape) {
+    return '<div>' + escape(data.nome) + ' ' + (BADGE[data.tipo] || '') + '</div>';
+  }
+  function renderItem(data, escape) {
+    return '<div>' + escape(data.nome) + ' ' + (BADGE[data.tipo] || '') + '</div>';
+  }
+
+  document.querySelectorAll('.destinatario-ts').forEach(function(el) {
+    var idx    = el.dataset.idx;
+    var prefix = el.dataset.prefix;
+    var hidden = document.getElementById('destinatario_' + prefix + '_' + idx);
+
+    var initId   = el.dataset.initId   || '';
+    var initNome = el.dataset.initNome || '';
+    var initTipo = el.dataset.initTipo || '';
+
+    var options  = [];
+    var items    = [];
+    if (initId && initNome) {
+      options = [{ id: initId, nome: initNome, tipo: initTipo }];
+      items   = [initId];
+    }
+
+    new TomSelect(el, {
+      valueField:   'id',
+      labelField:   'nome',
+      searchField:  ['nome'],
+      maxOptions:   30,
+      placeholder:  '— Nenhum —',
+      allowEmptyOption: true,
+      options:  options,
+      items:    items,
+      plugins:  ['clear_button'],
+      load: function(query, callback) {
+        if (query.length < 1) { callback(); return; }
+        fetch('/importacao/api/entidades?q=' + encodeURIComponent(query))
+          .then(function(r) { return r.json(); })
+          .then(function(data) { callback(data); })
+          .catch(function() { callback(); });
+      },
+      onChange: function(value) {
+        if (hidden) hidden.value = value || '';
+      },
+      render: { option: renderOption, item: renderItem },
+    });
+  });
 
   // ── Duplo clique para editar campos inline ──────────────────────────────
   function getDisplayText(el) {
