@@ -333,6 +333,232 @@ def test_subtotal_compra_sem_fator_comercial_inalterado(admin_id):
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Task #47 — calcular_precos_servico_por_quantidade
+# ──────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope='function')
+def servico_com_fator(admin_id):
+    """Serviço com 1 insumo em embalagem (barra de 6 m, R$60/barra, coef=1/m).
+
+    Cálculo esperado para qtd=2 m:
+        qtd_tecnica = 1 × 2 = 2 m
+        pacotes     = ceil(2 / 6) = 1 barra
+        qtd_compra  = 1 × 6 = 6 m
+        custo_real  = 1 × R$60 = R$60
+        custo_tecnico = 2 × (60/6) = 2 × 10 = R$20 (proporcional)
+
+    Cálculo esperado para qtd=7 m:
+        qtd_tecnica = 7 m
+        pacotes     = ceil(7/6) = 2 barras
+        qtd_compra  = 12 m
+        custo_real  = 2 × R$60 = R$120
+    """
+    ins = Insumo(
+        admin_id=admin_id,
+        nome='__test_barra_aco',
+        tipo='MATERIAL',
+        unidade='m',
+        fator_comercial=Decimal('6'),
+        unidade_comercial='barra',
+    )
+    db.session.add(ins)
+    db.session.flush()
+    db.session.add(PrecoBaseInsumo(
+        admin_id=admin_id, insumo_id=ins.id,
+        valor=60, vigencia_inicio=date(2020, 1, 1),
+    ))
+    svc = Servico(
+        admin_id=admin_id,
+        nome='__test_svc_fator',
+        categoria='Teste',
+        unidade_medida='m',
+        imposto_pct=0,
+        margem_lucro_pct=0,
+    )
+    db.session.add(svc)
+    db.session.flush()
+    db.session.add(ComposicaoServico(
+        admin_id=admin_id, servico_id=svc.id,
+        insumo_id=ins.id, coeficiente='1.0',
+    ))
+    db.session.flush()
+    return svc
+
+
+def test_calcular_por_quantidade_fator1_igual_proporcional(admin_id):
+    """Task #47 — fator=1: cálculo real = cálculo técnico proporcional."""
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    ins = Insumo(
+        admin_id=admin_id, nome='__test_t47_tinta',
+        tipo='MATERIAL', unidade='L', fator_comercial=Decimal('1'),
+    )
+    db.session.add(ins)
+    db.session.flush()
+    db.session.add(PrecoBaseInsumo(
+        admin_id=admin_id, insumo_id=ins.id,
+        valor=10, vigencia_inicio=date(2020, 1, 1),
+    ))
+    svc = Servico(
+        admin_id=admin_id, nome='__test_svc_t47_fator1',
+        categoria='Teste', unidade_medida='m2',
+        imposto_pct=0, margem_lucro_pct=0,
+    )
+    db.session.add(svc)
+    db.session.flush()
+    db.session.add(ComposicaoServico(
+        admin_id=admin_id, servico_id=svc.id,
+        insumo_id=ins.id, coeficiente='2.0',
+    ))
+    db.session.flush()
+
+    r = calcular_precos_servico_por_quantidade(svc, Decimal('5'))
+    assert r['erro'] is None
+    assert r['quantidade'] == Decimal('5')
+    assert not r['quantidade_fallback']
+    # fator=1 → custo_real = coef × qtd × preço = 2 × 5 × 10 = 100
+    assert float(r['custo_real_total']) == pytest.approx(100.0, rel=1e-4)
+    # custo_medio = 100 / 5 = 20
+    assert float(r['custo_medio_real_unitario']) == pytest.approx(20.0, rel=1e-4)
+    # sem imposto/margem → preco_venda_total = custo_real = 100
+    assert float(r['preco_venda_total']) == pytest.approx(100.0, rel=1e-2)
+    assert float(r['preco_venda_medio']) == pytest.approx(20.0, rel=1e-4)
+    d = r['detalhamento'][0]
+    assert d['pacotes'] == pytest.approx(10.0)  # 10 L técnicos = 10 pacotes de 1 L
+    assert d['quantidade_compra'] == pytest.approx(10.0)
+    assert d['custo_real'] == pytest.approx(100.0, rel=1e-4)
+
+
+def test_calcular_por_quantidade_compra_1_barra(servico_com_fator):
+    """Task #47 — fator=6 (barra 6 m): 2 m → 1 barra → custo real = R$60."""
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    r = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('2'))
+    assert r['erro'] is None
+    d = r['detalhamento'][0]
+    assert d['quantidade_tecnica'] == pytest.approx(2.0)
+    assert d['pacotes'] == pytest.approx(1.0), 'deve comprar 1 barra (6 m) para 2 m técnicos'
+    assert d['quantidade_compra'] == pytest.approx(6.0)
+    assert d['custo_real'] == pytest.approx(60.0), 'custo real = 1 barra × R$60'
+    assert float(r['custo_real_total']) == pytest.approx(60.0)
+    assert float(r['custo_medio_real_unitario']) == pytest.approx(30.0)  # 60/2
+
+
+def test_calcular_por_quantidade_compra_2_barras(servico_com_fator):
+    """Task #47 — fator=6 (barra 6 m): 7 m → ceil(7/6)=2 barras → custo R$120."""
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    r = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('7'))
+    assert r['erro'] is None
+    d = r['detalhamento'][0]
+    assert d['quantidade_tecnica'] == pytest.approx(7.0)
+    assert d['pacotes'] == pytest.approx(2.0), 'deve comprar 2 barras para 7 m técnicos'
+    assert d['quantidade_compra'] == pytest.approx(12.0)
+    assert d['custo_real'] == pytest.approx(120.0), 'custo real = 2 barras × R$60'
+    assert float(r['custo_real_total']) == pytest.approx(120.0)
+    assert float(r['custo_medio_real_unitario']) == pytest.approx(
+        120.0 / 7.0, rel=1e-3
+    )
+
+
+def test_calcular_por_quantidade_custo_tecnico_referencia(servico_com_fator):
+    """Task #47 — custo_tecnico_unitario preservado como referência proporcional."""
+    from services.orcamento_service import (
+        calcular_precos_servico_por_quantidade, calcular_precos_servico,
+    )
+
+    r = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('2'))
+    r_tec = calcular_precos_servico(servico_com_fator)
+    # custo técnico unitário: coef × (60/6) = 1 × 10 = R$10
+    assert float(r['custo_tecnico_unitario']) == pytest.approx(
+        float(r_tec['custo_unitario']), rel=1e-3
+    )
+    # custo real total é MAIOR que técnico para qtd=2 (compra 6m, usa 2m)
+    assert float(r['custo_real_total']) > float(r['custo_tecnico_unitario'])
+
+
+def test_calcular_por_quantidade_preco_venda_com_markup(servico_com_fator):
+    """Task #47 — preço de venda correto com imposto+margem para qtd=2 m.
+
+    custo_real = R$60, imposto=8%, margem=12%, divisor=0.80
+    preco_venda_total = 60 / 0.80 = R$75.00
+    preco_venda_medio = 75 / 2 = R$37.50
+    """
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    servico_com_fator.imposto_pct = 8
+    servico_com_fator.margem_lucro_pct = 12
+
+    r = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('2'))
+    assert r['erro'] is None
+    assert float(r['preco_venda_total']) == pytest.approx(75.0, rel=1e-3)
+    assert float(r['preco_venda_medio']) == pytest.approx(37.5, rel=1e-3)
+
+
+def test_calcular_por_quantidade_zero_usa_fallback(servico_com_fator):
+    """Task #47 — quantidade 0 ou negativa usa qtd=1 e sinaliza quantidade_fallback."""
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    r0 = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('0'))
+    assert r0['quantidade_fallback'] is True
+    assert r0['quantidade'] == Decimal('1')
+
+    r_neg = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('-5'))
+    assert r_neg['quantidade_fallback'] is True
+
+
+def test_calcular_por_quantidade_imposto_mais_margem_100(servico_com_fator):
+    """Task #47 — imposto+margem >= 100% sinaliza erro sem crashar."""
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    servico_com_fator.imposto_pct = 60
+    servico_com_fator.margem_lucro_pct = 50
+
+    r = calcular_precos_servico_por_quantidade(servico_com_fator, Decimal('2'))
+    assert r['erro'] is not None
+    assert float(r['preco_venda_total']) == 0.0
+
+
+def test_calcular_por_quantidade_escala_linear_sem_fator(admin_id):
+    """Task #47 — sem fator, custo_real escala linearmente com a quantidade."""
+    from services.orcamento_service import calcular_precos_servico_por_quantidade
+
+    ins = Insumo(
+        admin_id=admin_id, nome='__test_t47_escala',
+        tipo='MATERIAL', unidade='L', fator_comercial=Decimal('1'),
+    )
+    db.session.add(ins)
+    db.session.flush()
+    db.session.add(PrecoBaseInsumo(
+        admin_id=admin_id, insumo_id=ins.id,
+        valor=20, vigencia_inicio=date(2020, 1, 1),
+    ))
+    svc = Servico(
+        admin_id=admin_id, nome='__test_svc_t47_escala',
+        categoria='Teste', unidade_medida='un',
+        imposto_pct=0, margem_lucro_pct=0,
+    )
+    db.session.add(svc)
+    db.session.flush()
+    db.session.add(ComposicaoServico(
+        admin_id=admin_id, servico_id=svc.id,
+        insumo_id=ins.id, coeficiente='3.0',
+    ))
+    db.session.flush()
+
+    r1 = calcular_precos_servico_por_quantidade(svc, Decimal('1'))
+    r10 = calcular_precos_servico_por_quantidade(svc, Decimal('10'))
+    # sem fator: custo real deve escalar linearmente
+    assert float(r10['custo_real_total']) == pytest.approx(
+        float(r1['custo_real_total']) * 10, rel=1e-4
+    )
+    # custo médio unitário deve ser igual independente da quantidade
+    assert float(r10['custo_medio_real_unitario']) == pytest.approx(
+        float(r1['custo_medio_real_unitario']), rel=1e-4
+    )
+
+
 # Permite rodar como script para CI legacy (`python tests/test_orcamento_service.py`)
 def run():
     with app.app_context():

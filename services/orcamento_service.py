@@ -139,6 +139,163 @@ def recalcular_servico_preco(servico, data_ref: Optional[_date] = None,
 recalcular_servico = recalcular_servico_preco
 
 
+def calcular_precos_servico_por_quantidade(
+    servico,
+    quantidade,
+    data_ref: Optional[_date] = None,
+) -> dict:
+    """Task #47 — Calcula preço de venda considerando quantidade vendida e pacote.
+
+    Para cada insumo da composição:
+        quantidade_tecnica = coeficiente × quantidade_vendida
+        pacotes            = ceil(quantidade_tecnica / fator_comercial)
+        quantidade_compra  = pacotes × fator_comercial
+        custo_real_linha   = pacotes × preco_embalagem
+
+    custo_real_total          = Σ custo_real_linha
+    custo_medio_real_unitario = custo_real_total / quantidade_vendida
+    preco_venda_total         = custo_real_total / (1 − imp/100 − mar/100)
+    preco_venda_medio         = preco_venda_total / quantidade_vendida
+
+    Quando fator_comercial <= 1 cada unidade técnica é sua própria embalagem
+    (custo_real_linha = quantidade_tecnica × preco_por_unidade), igual ao
+    cálculo técnico proporcional.
+
+    Se quantidade <= 0, usa 1 como fallback e sinaliza via 'quantidade_fallback'.
+
+    Returns dict:
+        {
+          'quantidade': Decimal,
+          'quantidade_fallback': bool,
+          'custo_real_total':          Decimal,
+          'custo_medio_real_unitario': Decimal,
+          'preco_venda_total':         Decimal,
+          'preco_venda_medio':         Decimal,
+          'custo_tecnico_unitario':    Decimal,  # referência (cálculo proporcional)
+          'preco_tecnico_unitario':    Decimal,  # referência
+          'imposto_pct':               Decimal,
+          'margem_lucro_pct':          Decimal,
+          'detalhamento': [
+              {
+                'insumo_id', 'nome', 'tipo', 'unidade',
+                'preco_embalagem', 'fator_comercial', 'unidade_comercial',
+                'coeficiente',
+                'quantidade_tecnica', 'pacotes', 'quantidade_compra',
+                'custo_tecnico', 'custo_real',
+              }, ...
+          ],
+          'erro': Optional[str],
+        }
+    """
+    from decimal import ROUND_CEILING
+
+    data_ref = data_ref or _date.today()
+
+    qtd = Decimal(str(quantidade or 0))
+    quantidade_fallback = False
+    if qtd <= Decimal('0'):
+        qtd = Decimal('1')
+        quantidade_fallback = True
+
+    # Obter alíquotas (mesmo cascade de calcular_precos_servico)
+    imposto_pct = servico.imposto_pct
+    margem_pct = servico.margem_lucro_pct
+    if imposto_pct is None or margem_pct is None:
+        from models import ConfiguracaoEmpresa
+        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=servico.admin_id).first()
+        if cfg:
+            if imposto_pct is None:
+                imposto_pct = cfg.imposto_pct_padrao
+            if margem_pct is None:
+                margem_pct = cfg.lucro_pct_padrao
+    imposto_pct = Decimal(str(imposto_pct or 0))
+    margem_pct = Decimal(str(margem_pct or 0))
+
+    custo_real_total = Decimal('0')
+    custo_tecnico_total = Decimal('0')
+    detalhamento = []
+
+    for comp in servico.composicoes:
+        preco_embalagem = Decimal(str(comp.insumo.preco_vigente(data_ref)))
+        coef = Decimal(str(comp.coeficiente or 0))
+        fator = Decimal(str(comp.insumo.fator_comercial or 1)) or Decimal('1')
+
+        qtd_tecnica = (coef * qtd).quantize(Decimal('0.0001'))
+
+        if fator > Decimal('1') and qtd_tecnica > Decimal('0'):
+            pacotes = (qtd_tecnica / fator).to_integral_value(rounding=ROUND_CEILING)
+            qtd_compra = (pacotes * fator).quantize(Decimal('0.0001'))
+            custo_real_linha = (pacotes * preco_embalagem).quantize(
+                Decimal('0.0001')
+            )
+        else:
+            pacotes = qtd_tecnica
+            qtd_compra = qtd_tecnica
+            preco_unit = preco_embalagem / fator if fator > 0 else Decimal('0')
+            custo_real_linha = (qtd_tecnica * preco_unit).quantize(Decimal('0.0001'))
+
+        preco_unit_tec = preco_embalagem / fator if fator > 0 else Decimal('0')
+        custo_tecnico_linha = (coef * preco_unit_tec).quantize(Decimal('0.0001'))
+
+        custo_real_total += custo_real_linha
+        custo_tecnico_total += custo_tecnico_linha
+
+        detalhamento.append({
+            'insumo_id': comp.insumo_id,
+            'nome': comp.insumo.nome,
+            'tipo': comp.insumo.tipo,
+            'unidade': comp.unidade or comp.insumo.unidade,
+            'preco_embalagem': float(preco_embalagem),
+            'fator_comercial': float(fator),
+            'unidade_comercial': comp.insumo.unidade_comercial or None,
+            'coeficiente': float(coef),
+            'quantidade_tecnica': float(qtd_tecnica),
+            'pacotes': float(pacotes),
+            'quantidade_compra': float(qtd_compra),
+            'custo_tecnico': float(custo_tecnico_linha),
+            'custo_real': float(custo_real_linha),
+        })
+
+    custo_real_total_q = _q2(float(custo_real_total))
+    custo_medio = (custo_real_total / qtd).quantize(
+        Decimal('0.0001'), rounding=ROUND_HALF_UP
+    ) if qtd > 0 else Decimal('0')
+    custo_tecnico_q = _q2(float(custo_tecnico_total))
+
+    divisor = Decimal('1') - (imposto_pct / Decimal('100')) - (margem_pct / Decimal('100'))
+    erro = None
+    if divisor <= Decimal('0'):
+        preco_venda_total = Decimal('0.00')
+        preco_tecnico_unit = Decimal('0.00')
+        erro = 'imposto + margem >= 100% — ajuste os percentuais'
+    else:
+        preco_venda_total = (custo_real_total / divisor).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        preco_tecnico_unit = (custo_tecnico_total / divisor).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+
+    preco_venda_medio = (preco_venda_total / qtd).quantize(
+        Decimal('0.0001'), rounding=ROUND_HALF_UP
+    ) if qtd > 0 else Decimal('0')
+
+    return {
+        'quantidade': qtd,
+        'quantidade_fallback': quantidade_fallback,
+        'custo_real_total': custo_real_total_q,
+        'custo_medio_real_unitario': custo_medio,
+        'preco_venda_total': preco_venda_total,
+        'preco_venda_medio': preco_venda_medio,
+        'custo_tecnico_unitario': custo_tecnico_q,
+        'preco_tecnico_unitario': preco_tecnico_unit,
+        'imposto_pct': imposto_pct,
+        'margem_lucro_pct': margem_pct,
+        'detalhamento': detalhamento,
+        'erro': erro,
+    }
+
+
 def explodir_servico_para_quantidade(servico, quantidade,
                                      data_ref: Optional[_date] = None) -> dict:
     """Task #89: explode a composição × quantidade pedida.

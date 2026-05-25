@@ -431,6 +431,8 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
 
             chave = nome.strip().lower()
             ins = existentes.get(chave)
+            # Task #47 — rastrear mudança de fator_comercial ANTES da atualização
+            _fator_anterior = float(ins.fator_comercial or 1) if ins is not None else None
             if ins is None:
                 ins = Insumo(
                     admin_id=admin_id,
@@ -468,11 +470,21 @@ def importar_insumos_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
                     ins.ativo = True
                 updated += 1
 
+            # Task #47 — fator_comercial mudou em insumo existente → recalcular serviços
+            _fator_mudou = (
+                _fator_anterior is not None
+                and _fator_anterior != float(fator_dec)
+            )
+
             # Atualizar vigência de preço, se vier
             if preco_dec is not None and preco_dec > 0:
                 _aplicar_nova_vigencia_preco(ins, admin_id, preco_dec, hoje)
                 preco_atualizado += 1
                 # Recalcular serviços que usam esse insumo
+                for c in ins.composicoes:
+                    servicos_a_recalcular.add(c.servico_id)
+            elif _fator_mudou:
+                # fator_comercial mudou mas preço não: também recalcular
                 for c in ins.composicoes:
                     servicos_a_recalcular.add(c.servico_id)
 

@@ -67,26 +67,28 @@ def aliquotas_efetivas(item, orcamento, servico=None) -> tuple[Decimal, Decimal]
 def recalcular_item(item, orcamento) -> dict:
     """Recalcula o item a partir do snapshot. Atualiza campos in-place.
 
-    custo_unitario = técnico: Σ(coef × preço) — base de pricing.
-    custo_total    = técnico: custo_unitario × qtd_item (custo do projeto).
-    venda_total    = qtd × preco_unit.
-    lucro_total    = venda_total − custo_total.
+    Task #47 — custo_total e venda_total usam o custo real de compra por pacote
+    (não o custo técnico proporcional).
 
-    Cada linha do snapshot é enriquecida com dados auxiliares de compra:
+    custo_unitario_tecnico = Σ(coef × preço_unit) — custo proporcional por unidade
+    custo_compra           = Σ(nº_pacotes × preço_embalagem) — custo real total
+    custo_medio_unitario   = custo_compra / qtd_item — custo médio por unidade
+    preco_unit             = custo_medio_unitario / divisor — preço de venda por unidade
+    custo_total            = custo_compra (custo real de aquisição)
+    venda_total            = custo_compra / divisor (preço total de venda)
+    lucro_total            = venda_total − custo_total
+
+    Cada linha do snapshot é enriquecida com:
       quantidade_tecnica  = coef × item.quantidade  (uso exato do projeto)
       quantidade_compra   = múltiplo do fator ≥ qtd_tecnica (o que se compra)
       subtotal_compra     = nº_pacotes × preço_pacote (custo real de aquisição)
 
-    subtotal_compra / quantidade_compra são auxiliares de planejamento de compras
-    e NÃO alimentam custo_total.
-
     Retorna dict com {custo_unit, preco_unit, custo_total, venda_total, lucro_total, erro}.
     """
-    import math as _math
     snap = item.composicao_snapshot or []
     qtd_item = _d(item.quantidade)
-    custo_unit = Decimal('0')   # técnico: Σ(coef × preço) — base de pricing
-    custo_compra = Decimal('0') # comercial: Σ(qtd_compra × preço) — custo real
+    custo_unit_tec = Decimal('0')   # técnico proporcional: Σ(coef × preço_unit)
+    custo_compra = Decimal('0')     # real de compra: Σ(nº_pacotes × preço_emb)
     snap_norm = []
     for linha in snap:
         coef = _d(linha.get('coeficiente'))
@@ -94,7 +96,7 @@ def recalcular_item(item, orcamento) -> dict:
         sub_unit = (coef * preco).quantize(Decimal('0.0001'))
         fator = _d(linha.get('fator_comercial') or 1) or Decimal('1')
         unidade_comercial = linha.get('unidade_comercial') or None
-        # Task #19 — quantidades por item (dependem da qtd total do item)
+        # quantidades por item (dependem da qtd total do item)
         qtd_tec = (coef * qtd_item).quantize(Decimal('0.0001'))
         if fator > Decimal('1') and qtd_tec > Decimal('0'):
             # Divisão inteira com arredondamento para cima em puro Decimal
@@ -121,7 +123,7 @@ def recalcular_item(item, orcamento) -> dict:
             'quantidade_compra': float(qtd_com),
             'subtotal_compra': float(sub_compra),
         })
-        custo_unit += sub_unit
+        custo_unit_tec += sub_unit
         custo_compra += sub_compra
     item.composicao_snapshot = snap_norm
 
@@ -130,22 +132,32 @@ def recalcular_item(item, orcamento) -> dict:
     erro = None
     if divisor <= 0:
         preco_unit = Decimal('0')
+        venda_total = Decimal('0')
         erro = 'imposto + margem >= 100%'
     else:
-        preco_unit = (custo_unit / divisor).quantize(Decimal('0.0001'))
+        # Task #47: preço unitário baseado no custo médio real (custo_compra / qtd)
+        custo_medio = (custo_compra / qtd_item) if qtd_item > 0 else custo_compra
+        preco_unit = (custo_medio / divisor).quantize(Decimal('0.0001'))
+        venda_total = (custo_compra / divisor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-    venda_total = (qtd_item * preco_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    custo_total = (custo_unit * qtd_item).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    # Task #47: custo_total = custo real de compra (não custo técnico × qtd)
+    custo_total = custo_compra.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     lucro_total = venda_total - custo_total
 
-    item.custo_unitario = custo_unit.quantize(Decimal('0.0001'))
+    # custo_unitario armazena o custo médio real por unidade do serviço
+    custo_medio_unit = (custo_compra / qtd_item).quantize(
+        Decimal('0.0001'), rounding=ROUND_HALF_UP
+    ) if qtd_item > 0 else custo_compra.quantize(Decimal('0.0001'))
+
+    item.custo_unitario = custo_medio_unit
     item.preco_venda_unitario = preco_unit
     item.custo_total = custo_total
     item.venda_total = venda_total
     item.lucro_total = lucro_total
 
     return {
-        'custo_unit': float(custo_unit),
+        'custo_unit': float(custo_medio_unit),
+        'custo_unit_tecnico': float(custo_unit_tec),
         'preco_unit': float(preco_unit),
         'custo_total': float(custo_total),
         'venda_total': float(venda_total),

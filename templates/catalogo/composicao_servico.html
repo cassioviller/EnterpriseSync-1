@@ -80,40 +80,108 @@
     </div>
   </div>
 
+  <!-- Task #47: Quantidade de referência + cards de custo real -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+      <form method="GET" action="{{ url_for('catalogo.servico_composicao', servico_id=servico.id) }}" class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small mb-1"><i class="fas fa-layer-group me-1 text-primary"></i>Quantidade de referência</label>
+          <input name="quantidade_ref" type="number" min="0.001" step="0.001" class="form-control form-control-sm"
+                 style="max-width:130px;"
+                 value="{{ quantidade_ref|float|num(3) }}"
+                 title="Simule o custo real e o preço de venda para esta quantidade — leva em conta embalagens mínimas de compra">
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-sm btn-outline-primary"><i class="fas fa-sync-alt me-1"></i>Recalcular</button>
+        </div>
+        <div class="col-auto align-self-center">
+          <span class="text-muted small">O custo e preço reais variam com a quantidade quando há embalagem mínima (fator comercial).</span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if calc_real and calc_real.quantidade_fallback %}
+  <div class="alert alert-info py-2 px-3 mb-3 small">
+    <i class="fas fa-info-circle me-1"></i>
+    Quantidade de referência inválida — usando 1 {{ servico.unidade_medida }} como padrão.
+  </div>
+  {% endif %}
+
   <div class="row g-3 mb-3">
-    <div class="col-md-4">
+    <div class="col-md-3">
       <div class="card text-center shadow-sm h-100">
         <div class="card-body">
-          <small class="text-muted">CUSTO UNITÁRIO</small>
-          <h3 class="text-dark mb-0">{{ calc.custo_unitario|brl }}</h3>
+          <small class="text-muted">CUSTO TÉCNICO / un.</small>
+          <h4 class="text-secondary mb-0">{{ calc.custo_unitario|brl }}</h4>
+          <small class="text-muted">proporcional (sem embalagem)</small>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+      <div class="card text-center shadow-sm h-100 border-warning">
+        <div class="card-body">
+          <small class="text-muted">CUSTO REAL TOTAL</small>
+          <h4 class="text-warning mb-0">
+            {% if calc_real %}{{ calc_real.custo_real_total|brl }}{% else %}—{% endif %}
+          </h4>
+          <small class="text-muted">para {{ quantidade_ref|float|num(3) }} {{ servico.unidade_medida }}</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center shadow-sm h-100 border-info">
+        <div class="card-body">
+          <small class="text-muted">CUSTO MÉDIO REAL / un.</small>
+          <h4 class="text-info mb-0">
+            {% if calc_real %}{{ calc_real.custo_medio_real_unitario|brl }}{% else %}—{% endif %}
+          </h4>
+          <small class="text-muted">custo médio real por {{ servico.unidade_medida }}</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
       <div class="card text-center shadow-sm h-100 bg-light">
         <div class="card-body">
-          <small class="text-muted">PREÇO DE VENDA</small>
-          <h3 class="text-success mb-0">{{ calc.preco_venda|brl }}</h3>
-          <small class="text-muted">por {{ servico.unidade_medida }}</small>
+          <small class="text-muted">PREÇO VENDA TOTAL</small>
+          <h4 class="text-success mb-0">
+            {% if calc_real %}{{ calc_real.preco_venda_total|brl }}{% else %}{{ calc.preco_venda|brl }}{% endif %}
+          </h4>
+          <small class="text-muted">
+            {% if calc_real %}
+              <strong class="text-success">{{ calc_real.preco_venda_medio|brl }}</strong> / {{ servico.unidade_medida }}
+            {% endif %}
+          </small>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+  </div>
+
+  {% if calc_real and calc_real.erro %}
+  <div class="alert alert-danger py-2 px-3 mb-3 small">
+    <i class="fas fa-exclamation-triangle me-1"></i>{{ calc_real.erro }}
+  </div>
+  {% endif %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-12">
       <div class="card shadow-sm h-100">
         <div class="card-body">
           <form method="POST" action="{{ url_for('catalogo.servico_atualizar_preco', servico_id=servico.id) }}" class="row g-2 align-items-end">
             {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
-            <div class="col-6">
+            <div class="col-auto">
               <label class="form-label small mb-1">Imposto (%)</label>
-              <input name="imposto_pct" type="number" step="0.01" class="form-control form-control-sm" value="{{ calc.imposto_pct }}">
+              <input name="imposto_pct" type="number" step="0.01" class="form-control form-control-sm" style="max-width:100px;" value="{{ calc.imposto_pct }}">
             </div>
-            <div class="col-6">
+            <div class="col-auto">
               <label class="form-label small mb-1">Lucro (%)</label>
-              <input name="margem_lucro_pct" type="number" step="0.01" class="form-control form-control-sm" value="{{ calc.margem_lucro_pct }}">
+              <input name="margem_lucro_pct" type="number" step="0.01" class="form-control form-control-sm" style="max-width:100px;" value="{{ calc.margem_lucro_pct }}">
             </div>
-            <div class="col-12"><button class="btn btn-sm btn-primary w-100"><i class="fas fa-calculator"></i> Recalcular</button></div>
+            <div class="col-auto">
+              <button class="btn btn-sm btn-primary"><i class="fas fa-calculator me-1"></i>Salvar e Recalcular</button>
+            </div>
+            {% if calc.erro %}<div class="col-12"><div class="alert alert-danger py-1 px-2 mt-1 mb-0 small">{{ calc.erro }}</div></div>{% endif %}
           </form>
-          {% if calc.erro %}<div class="alert alert-danger py-1 px-2 mt-2 mb-0 small">{{ calc.erro }}</div>{% endif %}
         </div>
       </div>
     </div>
@@ -204,43 +272,75 @@
     </div>
   </div>
 
-  <div class="card shadow-sm">
-    <div class="card-header bg-light"><strong>Linhas da composição</strong></div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <strong>Linhas da composição</strong>
+      <small class="text-muted">Qtd. ref.: <strong>{{ quantidade_ref|float|num(3) }}</strong> {{ servico.unidade_medida }}</small>
+    </div>
     <div class="table-responsive">
-      <table class="table mb-0 align-middle">
+      <table class="table mb-0 align-middle" style="font-size:0.92rem;">
         <thead class="table-light">
           <tr>
-            <th>Insumo</th><th>Tipo</th><th>Un. insumo</th>
-            <th class="text-end"
-                title="Preço por unidade técnica do insumo (preço da embalagem ÷ fator comercial). Ex.: R$60 por barra de 6 m → R$10/m."
-                data-bs-toggle="tooltip">
-              Preço/un. técnica (R$)
+            <th>Insumo</th>
+            <th>Tipo</th>
+            <th>Un.</th>
+            <th class="text-end" title="Preço da embalagem comercial (o que o fornecedor cobra pelo pacote/caixa/barra)" data-bs-toggle="tooltip">
+              Preço embalagem
             </th>
-            <th class="text-end" title="Consumo do insumo para produzir 1 {{ servico.unidade_medida }} do serviço"
-                data-bs-toggle="tooltip">
-              Coef. (un / {{ servico.unidade_medida }})
+            <th class="text-end" title="Fator comercial — tamanho mínimo de compra. Ex.: barra de 6 m → fator=6" data-bs-toggle="tooltip">
+              Fator
             </th>
-            <th class="text-end" title="Custo deste insumo por 1 {{ servico.unidade_medida }} do serviço (coef × preço/un. técnica). Não é o custo total da linha — multiplique pela quantidade do item para ter o custo absoluto."
-                data-bs-toggle="tooltip">
-              Custo / {{ servico.unidade_medida }}
+            <th class="text-end" title="Consumo do insumo para produzir 1 {{ servico.unidade_medida }} do serviço" data-bs-toggle="tooltip">
+              Coef. / {{ servico.unidade_medida }}
+            </th>
+            <th class="text-end" title="Consumo técnico total = coef × quantidade de referência" data-bs-toggle="tooltip">
+              Qtd. técnica
+            </th>
+            <th class="text-end" title="Número de embalagens a comprar = ceil(qtd_técnica ÷ fator)" data-bs-toggle="tooltip">
+              Pacotes
+            </th>
+            <th class="text-end" title="Quantidade total a comprar = pacotes × fator" data-bs-toggle="tooltip">
+              Qtd. compra
+            </th>
+            <th class="text-end" title="Custo técnico proporcional (referência interna, não considera embalagem mínima)" data-bs-toggle="tooltip">
+              Custo técnico
+            </th>
+            <th class="text-end" title="Custo real de compra = nº_pacotes × preço_embalagem" data-bs-toggle="tooltip">
+              Custo real
             </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
+          {% set real_det = calc_real.detalhamento if calc_real else [] %}
+          {% set real_map = {} %}
+          {% for rd in real_det %}{% set _ = real_map.update({rd.insumo_id: rd}) %}{% endfor %}
           {% for d in calc.detalhamento %}
           {% set comp = servico.composicoes|selectattr('insumo_id','equalto',d.insumo_id)|first %}
+          {% set rd = real_map.get(d.insumo_id) %}
           <tr>
-            <td>{{ d.nome }}</td>
+            <td>
+              <strong>{{ d.nome }}</strong>
+              {% if d.unidade_comercial %}
+                <small class="text-muted">({{ d.unidade_comercial }})</small>
+              {% endif %}
+            </td>
             <td><span class="badge bg-secondary">{{ d.tipo }}</span></td>
             <td>{{ d.unidade }}</td>
-            <td class="text-end">{{ d.preco_unitario|num(4) }}</td>
+            <td class="text-end">{{ d.preco_embalagem|num(4) }}</td>
+            <td class="text-end">
+              {% if d.fator_comercial and d.fator_comercial > 1 %}
+                <span class="badge bg-info text-dark">{{ d.fator_comercial|num(4) }}</span>
+              {% else %}
+                {{ d.fator_comercial|num(4) }}
+              {% endif %}
+            </td>
             <td class="text-end" style="min-width:170px;">
               {% if comp %}
               <form method="POST" action="{{ url_for('catalogo.servico_composicao_editar', servico_id=servico.id, comp_id=comp.id) }}" class="d-flex gap-1 justify-content-end">
                 {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
                 <input name="coeficiente" type="number" step="0.0001" min="0.0001" required
-                       class="form-control form-control-sm text-end" style="max-width:110px;"
+                       class="form-control form-control-sm text-end" style="max-width:100px;"
                        value="{{ '%.4f'|format(d.coeficiente) }}">
                 <button class="btn btn-sm btn-outline-primary" title="Salvar coeficiente">
                   <i class="fas fa-check"></i>
@@ -250,7 +350,31 @@
                 {{ d.coeficiente|num(4) }}
               {% endif %}
             </td>
-            <td class="text-end text-dark"><strong>{{ d.subtotal|num(2) }}</strong></td>
+            {% if rd %}
+            <td class="text-end text-muted">{{ rd.quantidade_tecnica|num(4) }}</td>
+            <td class="text-end">
+              {% if rd.pacotes > rd.quantidade_tecnica %}
+                <span class="text-warning fw-bold">{{ rd.pacotes|num(0) }}</span>
+              {% else %}
+                {{ rd.pacotes|num(0) }}
+              {% endif %}
+            </td>
+            <td class="text-end text-muted">{{ rd.quantidade_compra|num(4) }}</td>
+            <td class="text-end text-muted">{{ rd.custo_tecnico|num(4) }}</td>
+            <td class="text-end">
+              {% if rd.custo_real > rd.custo_tecnico %}
+                <strong class="text-warning">{{ rd.custo_real|num(4) }}</strong>
+              {% else %}
+                <strong>{{ rd.custo_real|num(4) }}</strong>
+              {% endif %}
+            </td>
+            {% else %}
+            <td class="text-end text-muted">—</td>
+            <td class="text-end text-muted">—</td>
+            <td class="text-end text-muted">—</td>
+            <td class="text-end text-muted">{{ d.subtotal|num(4) }}</td>
+            <td class="text-end text-muted">—</td>
+            {% endif %}
             <td class="text-end">
               {% if comp %}
               <form method="POST" action="{{ url_for('catalogo.servico_composicao_excluir', servico_id=servico.id, comp_id=comp.id) }}" class="d-inline" onsubmit="return confirm('Remover linha?')">
@@ -261,13 +385,32 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="text-center text-muted py-4">Sem composição. Adicione insumos acima.</td></tr>
+          <tr><td colspan="12" class="text-center text-muted py-4">Sem composição. Adicione insumos acima.</td></tr>
           {% endfor %}
         </tbody>
         {% if calc.detalhamento %}
-        <tfoot class="table-light">
-          <tr><th colspan="5" class="text-end">Custo total por {{ servico.unidade_medida }} do serviço:</th>
-              <th class="text-end text-dark">{{ calc.custo_unitario|brl }}</th><th></th></tr>
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td colspan="9" class="text-end">Totais para {{ quantidade_ref|float|num(3) }} {{ servico.unidade_medida }}:</td>
+            <td class="text-end text-muted">{{ calc_real.custo_real_total|num(2) if calc_real else '—' }}</td>
+            <td class="text-end text-warning">{{ calc_real.custo_real_total|brl if calc_real else '—' }}</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="9" class="text-end">Custo médio real / {{ servico.unidade_medida }}:</td>
+            <td colspan="2" class="text-end text-info">{{ calc_real.custo_medio_real_unitario|brl if calc_real else calc.custo_unitario|brl }}</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="9" class="text-end">Preço de venda total ({{ quantidade_ref|float|num(3) }} {{ servico.unidade_medida }}):</td>
+            <td colspan="2" class="text-end text-success">{{ calc_real.preco_venda_total|brl if calc_real else '—' }}</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="9" class="text-end">Preço médio / {{ servico.unidade_medida }}:</td>
+            <td colspan="2" class="text-end text-success">{{ calc_real.preco_venda_medio|brl if calc_real else calc.preco_venda|brl }}</td>
+            <td></td>
+          </tr>
         </tfoot>
         {% endif %}
       </table>

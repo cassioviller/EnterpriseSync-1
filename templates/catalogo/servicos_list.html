@@ -13,12 +13,35 @@
       </a>
     </div>
   </div>
+
   <form method="get" class="mb-3">
-    <div class="input-group">
-      <input type="text" name="q" class="form-control" placeholder="Buscar serviço por nome..." value="{{ q or '' }}">
-      <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i></button>
+    <div class="row g-2 align-items-end">
+      <div class="col-md-7">
+        <input type="text" name="q" class="form-control" placeholder="Buscar serviço por nome..." value="{{ q or '' }}">
+      </div>
+      <div class="col-md-3">
+        <div class="input-group">
+          <span class="input-group-text" title="Quantidade de referência para cálculo do custo real de compra (considera embalagem comercial)">
+            <i class="fas fa-layer-group"></i>
+          </span>
+          <input type="number" name="quantidade_ref" min="0.001" step="0.001"
+                 class="form-control" placeholder="Qtd referência"
+                 value="{{ quantidade_ref|float|num(3) }}"
+                 title="Quantidade de referência — o custo real de compra e o preço médio de venda variam com a quantidade (embalagem comercial)">
+        </div>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100" type="submit"><i class="fas fa-search me-1"></i>Filtrar</button>
+      </div>
     </div>
+    {% if quantidade_ref and quantidade_ref != 1 %}
+    <div class="mt-1 small text-info">
+      <i class="fas fa-info-circle me-1"></i>
+      Custo e preço calculados para <strong>{{ quantidade_ref|float|num(3) }}</strong> unidades. O valor real de compra varia conforme a quantidade (embalagem mínima do fornecedor).
+    </div>
+    {% endif %}
   </form>
+
   <div class="card shadow-sm">
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle">
@@ -27,25 +50,56 @@
             <th>Nome</th>
             <th>Categoria</th>
             <th>Unidade</th>
-            <th class="text-end">Custo Unit.</th>
+            <th class="text-end" title="Custo técnico proporcional por unidade (sem considerar embalagem mínima)" data-bs-toggle="tooltip">
+              Custo Unit. Técnico
+            </th>
+            <th class="text-end" title="Custo médio real por unidade considerando {{ quantidade_ref|float|num(3) }} {{ '' }} — leva em conta embalagens mínimas de compra" data-bs-toggle="tooltip">
+              Custo Médio Real
+              <small class="text-muted d-block" style="font-weight:normal;">para {{ quantidade_ref|float|num(3) }} un.</small>
+            </th>
             <th class="text-end">Imp. %</th>
             <th class="text-end">Lucro %</th>
-            <th class="text-end">Preço Venda</th>
+            <th class="text-end" title="Preço médio de venda por unidade considerando {{ quantidade_ref|float|num(3) }} unidades" data-bs-toggle="tooltip">
+              Preço Médio / un.
+              <small class="text-muted d-block" style="font-weight:normal;">para {{ quantidade_ref|float|num(3) }} un.</small>
+            </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for s in servicos %}
+          {% set cr = s._calc_real %}
           <tr>
             <td><strong>{{ s.nome }}</strong></td>
             <td>{{ s.categoria or '—' }}</td>
             <td>{{ s.unidade_medida or '—' }}</td>
-            <td class="text-end">{{ s.custo_unitario|brl }}</td>
+            <td class="text-end text-muted">{{ s.custo_unitario|brl }}</td>
+            <td class="text-end">
+              {% if cr and cr.custo_medio_real_unitario %}
+                <strong>{{ cr.custo_medio_real_unitario|brl }}</strong>
+                {% if cr.custo_medio_real_unitario != s.custo_unitario|float %}
+                  <span class="badge bg-warning text-dark ms-1" title="O custo real difere do técnico — embalagem mínima impacta o custo" data-bs-toggle="tooltip">
+                    <i class="fas fa-box"></i>
+                  </span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">{{ s.custo_unitario|brl }}</span>
+              {% endif %}
+            </td>
             <td class="text-end">{{ (s.imposto_pct|float if s.imposto_pct is not none else 0)|num(2) }}</td>
             <td class="text-end">{{ (s.margem_lucro_pct|float if s.margem_lucro_pct is not none else 0)|num(2) }}</td>
-            <td class="text-end"><strong class="text-success">{{ s.preco_venda_unitario|brl }}</strong></td>
             <td class="text-end">
-              <a href="{{ url_for('catalogo.servico_composicao', servico_id=s.id) }}" class="btn btn-sm btn-outline-primary" title="Composição">
+              {% if cr and cr.preco_venda_medio %}
+                <strong class="text-success">{{ cr.preco_venda_medio|brl }}</strong>
+                {% if cr.erro %}
+                  <span class="badge bg-danger ms-1" title="{{ cr.erro }}" data-bs-toggle="tooltip"><i class="fas fa-exclamation"></i></span>
+                {% endif %}
+              {% else %}
+                <strong class="text-success">{{ s.preco_venda_unitario|brl }}</strong>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{{ url_for('catalogo.servico_composicao', servico_id=s.id, quantidade_ref=quantidade_ref|float) }}" class="btn btn-sm btn-outline-primary" title="Composição">
                 <i class="fas fa-cogs"></i>
               </a>
               <a href="{{ url_for('catalogo.servico_historico', servico_id=s.id) }}" class="btn btn-sm btn-outline-secondary" title="Histórico cross-obra">
@@ -62,7 +116,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-4">Nenhum serviço encontrado.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-4">Nenhum serviço encontrado.</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -28,6 +28,7 @@ from models import (
 from services.orcamento_service import (
     calcular_precos_servico, recalcular_servico_preco,
     explodir_servico_para_quantidade,
+    calcular_precos_servico_por_quantidade,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,6 +144,11 @@ def insumo_editar(insumo_id):
     aid = _admin_id()
     ins = Insumo.query.filter_by(id=insumo_id, admin_id=aid).first_or_404()
     if request.method == 'POST':
+        # Task #47 — capturar valores antigos ANTES de modificar
+        _old_tipo = ins.tipo
+        _old_unidade = ins.unidade
+        _old_fator = float(ins.fator_comercial or 1)
+
         ins.nome = (request.form.get('nome') or ins.nome).strip()
         ins.tipo = (request.form.get('tipo') or ins.tipo).upper()
         ins.unidade = (request.form.get('unidade') or ins.unidade)
@@ -162,8 +168,27 @@ def insumo_editar(insumo_id):
         if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
             tipo_med = 'UNITARIO'
         ins.tipo_medicao = tipo_med
+        # Task #47 — detectar mudanças que afetam custo real e recalcular serviços
+        _afetou_preco = (
+            ins.tipo != _old_tipo
+            or ins.unidade != _old_unidade
+            or float(ins.fator_comercial or 1) != _old_fator
+        )
+        svc_recalc = 0
+        if _afetou_preco:
+            db.session.flush()
+            from services.orcamento_service import recalcular_servico_preco as _recalc
+            svc_ids = {c.servico_id for c in ins.composicoes}
+            for sid in svc_ids:
+                s = Servico.query.get(sid)
+                if s:
+                    _recalc(s)
+            svc_recalc = len(svc_ids)
         db.session.commit()
-        flash('Insumo atualizado.', 'success')
+        msg = 'Insumo atualizado.'
+        if svc_recalc:
+            msg += f' {svc_recalc} serviço(s) recalculado(s).'
+        flash(msg, 'success')
         return redirect(url_for('catalogo.insumo_editar', insumo_id=ins.id))
     precos = sorted(ins.precos, key=lambda p: p.vigencia_inicio, reverse=True)
     return render_template('catalogo/insumo_form.html', insumo=ins, precos=precos)
@@ -308,11 +333,27 @@ def servicos_list():
     """Catálogo de Serviços — lista paramétrica com preço de venda."""
     aid = _admin_id()
     q = (request.args.get('q') or '').strip()
+    try:
+        quantidade_ref = Decimal(str(request.args.get('quantidade_ref') or '1'))
+        if quantidade_ref <= 0:
+            quantidade_ref = Decimal('1')
+    except Exception:
+        quantidade_ref = Decimal('1')
     qry = Servico.query.filter_by(admin_id=aid, ativo=True)
     if q:
         qry = qry.filter(Servico.nome.ilike(f'%{q}%'))
     servicos = qry.order_by(Servico.nome).all()
-    return render_template('catalogo/servicos_list.html', servicos=servicos, q=q)
+    # Task #47 — calcular custo médio real e preço médio para a quantidade de referência
+    for svc in servicos:
+        if svc.composicoes:
+            calc_real = calcular_precos_servico_por_quantidade(svc, quantidade_ref)
+            svc._calc_real = calc_real
+        else:
+            svc._calc_real = None
+    return render_template(
+        'catalogo/servicos_list.html',
+        servicos=servicos, q=q, quantidade_ref=quantidade_ref,
+    )
 
 
 @catalogo_bp.route('/servicos/novo', methods=['GET', 'POST'])
@@ -356,10 +397,21 @@ def servico_composicao(servico_id):
     svc = Servico.query.filter_by(id=servico_id, admin_id=aid).first_or_404()
     insumos_disp = Insumo.query.filter_by(admin_id=aid, ativo=True).order_by(Insumo.nome).all()
     templates_disp = CronogramaTemplate.query.filter_by(admin_id=aid, ativo=True).order_by(CronogramaTemplate.nome).all()
-    calc = calcular_precos_servico(svc)
+    # Task #47 — quantidade de referência para cálculo real
+    try:
+        quantidade_ref = Decimal(str(request.args.get('quantidade_ref') or '1'))
+        if quantidade_ref <= 0:
+            quantidade_ref = Decimal('1')
+    except Exception:
+        quantidade_ref = Decimal('1')
+    calc_tecnico = calcular_precos_servico(svc)
+    calc_real = calcular_precos_servico_por_quantidade(svc, quantidade_ref)
     return render_template(
         'catalogo/composicao_servico.html',
-        servico=svc, insumos=insumos_disp, calc=calc,
+        servico=svc, insumos=insumos_disp,
+        calc=calc_tecnico,
+        calc_real=calc_real,
+        quantidade_ref=quantidade_ref,
         templates_disponiveis=templates_disp,
     )
 
