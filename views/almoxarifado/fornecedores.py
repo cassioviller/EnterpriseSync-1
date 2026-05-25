@@ -1,8 +1,9 @@
-from flask import render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash, send_file
 from flask_login import login_required
 from app import db
 from models import Fornecedor, CategoriaFornecedor
 from sqlalchemy import or_
+import io
 import logging
 
 from views.almoxarifado import almoxarifado_bp, get_admin_id
@@ -236,6 +237,116 @@ def fornecedores_editar(id):
     ).order_by(CategoriaFornecedor.nome).all()
     categorias_fornecedor = active_cats + inactive_linked
     return render_template('almoxarifado/fornecedores_form.html', fornecedor=fornecedor, categorias_fornecedor=categorias_fornecedor)
+
+
+@almoxarifado_bp.route('/fornecedores/modelo-excel')
+@login_required
+def fornecedores_modelo_excel():
+    """Download do modelo Excel para importação de fornecedores."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+
+    try:
+        from services.fornecedor_excel import gerar_modelo_fornecedores_xlsx
+        conteudo = gerar_modelo_fornecedores_xlsx(admin_id)
+        return send_file(
+            io.BytesIO(conteudo),
+            as_attachment=True,
+            download_name='modelo_fornecedores.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+    except Exception as e:
+        logger.error(f'Erro ao gerar modelo Excel de fornecedores: {e}', exc_info=True)
+        flash(f'Erro ao gerar modelo: {e}', 'danger')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+
+@almoxarifado_bp.route('/fornecedores/importar-excel', methods=['POST'])
+@login_required
+def fornecedores_importar_excel():
+    """Recebe o arquivo Excel, processa e exibe preview antes de confirmar."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+
+    arquivo = request.files.get('arquivo')
+    if not arquivo or arquivo.filename == '':
+        flash('Nenhum arquivo selecionado.', 'warning')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+    ext = arquivo.filename.rsplit('.', 1)[-1].lower() if '.' in arquivo.filename else ''
+    if ext != 'xlsx':
+        flash('Formato inválido. Use arquivo .xlsx (Excel 2007 ou superior).', 'danger')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+    try:
+        from services.fornecedor_excel import importar_fornecedores_xlsx
+        resultado = importar_fornecedores_xlsx(arquivo.stream, admin_id)
+    except ValueError as e:
+        flash(str(e), 'danger')
+        return redirect(url_for('almoxarifado.fornecedores'))
+    except Exception as e:
+        logger.error(f'Erro ao processar planilha de fornecedores: {e}', exc_info=True)
+        flash(f'Erro inesperado ao processar planilha: {e}', 'danger')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+    linhas_validas = [l for l in resultado['linhas'] if l['status'] != 'erro']
+    if not linhas_validas and not resultado['erros']:
+        flash('A planilha está vazia ou não contém dados.', 'warning')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+    from importacao_views import _assinar_payload
+    dados_para_assinar = [l['dados'] for l in linhas_validas]
+    dados_assinados = _assinar_payload(dados_para_assinar, admin_id, 'fornecedores_excel')
+
+    return render_template(
+        'almoxarifado/fornecedores_importar_preview.html',
+        resultado=resultado,
+        dados_assinados=dados_assinados,
+    )
+
+
+@almoxarifado_bp.route('/fornecedores/importar-confirmar', methods=['POST'])
+@login_required
+def fornecedores_importar_confirmar():
+    """Confirma a importação de fornecedores após o preview."""
+    admin_id = get_admin_id()
+    if not admin_id:
+        flash('Erro de autenticação', 'danger')
+        return redirect(url_for('main.index'))
+
+    token = request.form.get('dados_json', '')
+    from importacao_views import _verificar_payload
+    rows = _verificar_payload(token, admin_id, 'fornecedores_excel')
+    if rows is None:
+        flash('Dados de preview inválidos ou adulterados — faça o upload novamente.', 'danger')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+    if not rows:
+        flash('Nenhum registro válido para importar.', 'warning')
+        return redirect(url_for('almoxarifado.fornecedores'))
+
+    try:
+        from services.fornecedor_excel import confirmar_importacao_fornecedores
+        linhas_validas = [{'dados': d} for d in rows if d]
+        resultado = confirmar_importacao_fornecedores(linhas_validas, admin_id)
+        criados = resultado['criados']
+        atualizados = resultado['atualizados']
+        partes = []
+        if criados:
+            partes.append(f'{criados} criado{"s" if criados != 1 else ""}')
+        if atualizados:
+            partes.append(f'{atualizados} atualizado{"s" if atualizados != 1 else ""}')
+        flash(f'Importação concluída: {", ".join(partes)}.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Erro ao confirmar importação de fornecedores: {e}', exc_info=True)
+        flash(f'Erro ao importar fornecedores: {e}', 'danger')
+
+    return redirect(url_for('almoxarifado.fornecedores'))
 
 
 @almoxarifado_bp.route('/fornecedores/deletar/<int:id>', methods=['POST'])
