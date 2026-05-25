@@ -165,6 +165,7 @@ def rdos():
 
         _cache_prog_v2: dict = {}
         _cache_obra_v2: dict = {}
+        _cache_prog_v1: dict = {}  # obra_id -> cumulative progress for non-V2 obras
 
         class SimplePagination:
             def __init__(self, items):
@@ -211,11 +212,27 @@ def rdos():
                                 logger.warning(f"[Task#61] V2 falhou RDO {rdo.id}: {_e}")
                                 _cache_prog_v2[ck] = {'progresso_geral_pct': 0}
                         progresso_real = _cache_prog_v2[ck].get('progresso_geral_pct', 0) or 0
-                    elif subatividades:
-                        soma = sum(s.percentual_conclusao or 0 for s in subatividades)
-                        progresso_real = soma / len(subatividades)
                     else:
-                        progresso_real = 0
+                        # Cumulative progress: latest known % for each distinct
+                        # subatividade across ALL RDOs of this obra, then averaged.
+                        if rdo.obra_id not in _cache_prog_v1:
+                            rows_v1 = session.query(
+                                RDOServicoSubatividade.nome_subatividade,
+                                RDOServicoSubatividade.percentual_conclusao,
+                                RDO.data_relatorio
+                            ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
+                                RDO.obra_id == rdo.obra_id,
+                                RDO.admin_id == admin_id
+                            ).all()
+                            latest_v1: dict = {}
+                            for nome, pct, data_rdo in rows_v1:
+                                if nome not in latest_v1 or (data_rdo and data_rdo > latest_v1[nome][1]):
+                                    latest_v1[nome] = (pct or 0, data_rdo)
+                            _cache_prog_v1[rdo.obra_id] = (
+                                sum(v[0] for v in latest_v1.values()) / len(latest_v1)
+                                if latest_v1 else 0
+                            )
+                        progresso_real = _cache_prog_v1[rdo.obra_id]
 
                     # Horas: aplica normalização on-the-fly por (sub_id) p/
                     # consistência com o detalhe — RDOs antigos podem ter
@@ -268,7 +285,7 @@ def rdos():
                 'total_funcionarios': len({mo.funcionario_id for mo in rdo_view.mao_obra if mo.funcionario_id}) if rdo_view.mao_obra else 0,
                 'total_horas_trabalhadas': rdo_view.horas_totais,
                 'progresso_medio': rdo_view.progresso_total,
-                'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
+                'progresso_label': 'Progresso geral',
                 'is_v2_progresso': getattr(rdo_view, 'is_v2_progresso', False),
                 'status_cor': {
                     'Finalizado': 'success',
@@ -321,6 +338,7 @@ def rdos():
             from utils.rdo_horas import normalizar_horas_funcionario as _norm
             _cprog: dict = {}
             _cobra: dict = {}
+            _cprog_v1: dict = {}  # obra_id -> cumulative progress for non-V2 obras
             for rdo in rdos.items:
                 try:
                     subatividades = db.session.query(RDOServicoSubatividade).filter(
@@ -351,12 +369,27 @@ def rdos():
                             except Exception:
                                 _cprog[ck] = {'progresso_geral_pct': 0}
                         rdo.progresso_total = round(_cprog[ck].get('progresso_geral_pct', 0) or 0, 1)
-                    elif subatividades:
-                        rdo.progresso_total = round(
-                            sum(s.percentual_conclusao or 0 for s in subatividades) / len(subatividades), 1
-                        )
                     else:
-                        rdo.progresso_total = 0
+                        # Cumulative progress: latest known % for each distinct
+                        # subatividade across ALL RDOs of this obra, then averaged.
+                        if rdo.obra_id not in _cprog_v1:
+                            rows_v1 = db.session.query(
+                                RDOServicoSubatividade.nome_subatividade,
+                                RDOServicoSubatividade.percentual_conclusao,
+                                RDO.data_relatorio
+                            ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
+                                RDO.obra_id == rdo.obra_id,
+                                RDO.admin_id == admin_id
+                            ).all()
+                            latest_v1: dict = {}
+                            for nome, pct, data_rdo in rows_v1:
+                                if nome not in latest_v1 or (data_rdo and data_rdo > latest_v1[nome][1]):
+                                    latest_v1[nome] = (pct or 0, data_rdo)
+                            _cprog_v1[rdo.obra_id] = (
+                                sum(v[0] for v in latest_v1.values()) / len(latest_v1)
+                                if latest_v1 else 0
+                            )
+                        rdo.progresso_total = round(_cprog_v1[rdo.obra_id], 1)
 
                     entradas = []
                     for mo in mao_obra:
@@ -393,7 +426,7 @@ def rdos():
                     'total_funcionarios': len({mo.funcionario_id for mo in rdo_view.mao_obra if mo.funcionario_id}) if rdo_view.mao_obra else 0,
                     'total_horas_trabalhadas': rdo_view.horas_totais,
                     'progresso_medio': rdo_view.progresso_total,
-                    'progresso_label': 'Progresso geral' if getattr(rdo_view, 'is_v2_progresso', False) else 'Progresso do dia',
+                    'progresso_label': 'Progresso geral',
                     'is_v2_progresso': getattr(rdo_view, 'is_v2_progresso', False),
                     'status_cor': {
                         'Finalizado': 'success',
