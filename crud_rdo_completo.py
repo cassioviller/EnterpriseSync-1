@@ -3,7 +3,7 @@
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto, RDOApontamentoCronograma
+from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto, RDOApontamentoCronograma, CustoObra, AlocacaoEquipe, MovimentacaoEstoque
 from datetime import datetime, date
 import json
 import logging
@@ -512,6 +512,11 @@ def excluir_rdo(rdo_id):
         RDOEquipamento.query.filter_by(rdo_id=rdo.id).delete()
         RDOOcorrencia.query.filter_by(rdo_id=rdo.id).delete()
         
+        # Nulificar FKs opcionais que não têm ondelete CASCADE
+        CustoObra.query.filter_by(rdo_id=rdo.id).update({'rdo_id': None})
+        AlocacaoEquipe.query.filter_by(rdo_gerado_id=rdo.id).update({'rdo_gerado_id': None})
+        MovimentacaoEstoque.query.filter_by(rdo_id=rdo.id).update({'rdo_id': None})
+
         # Excluir RDO
         db.session.delete(rdo)
         db.session.commit()

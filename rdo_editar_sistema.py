@@ -173,7 +173,7 @@ def salvar_edicao_rdo(rdo_id):
     Salvar alterações no RDO editado
     """
     try:
-        from models import RDO, RDOServicoSubatividade, SubatividadeMestre, TipoUsuario
+        from models import RDO, RDOServicoSubatividade, SubatividadeMestre, TipoUsuario, Funcionario
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
