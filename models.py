@@ -6934,33 +6934,110 @@ class CategoriaFornecedor(db.Model):
         db.Index('idx_cat_fornecedor_admin', 'admin_id'),
     )
 
+    # Lista completa especializada em construção civil (Task #58)
     _DEFAULTS = [
-        ('Materiais de Construção',    'Fornecedores de cimento, aço, tijolos e similares'),
-        ('Mão de Obra / Subempreiteiros', 'Empresas e profissionais de execução'),
-        ('Equipamentos e Ferramentas', 'Locação ou venda de máquinas e ferramentas'),
-        ('Serviços Terceirizados',     'Consultores, técnicos e prestadores gerais'),
-        ('Combustível e Lubrificantes','Postos e distribuidores de combustível'),
-        ('Alimentação e Refeições',    'Restaurantes, marmiteiros e similares'),
-        ('Material de Escritório',     'Papelaria, informática e suprimentos admin'),
-        ('Transporte e Logística',     'Fretes, entregas e transportadoras'),
-        ('Outros',                     'Fornecedores não enquadrados nas demais categorias'),
+        # Material de Construção Geral
+        'Material de Construção Geral',
+        'Areia, Pedra e Agregados',
+        'Cimento, Argamassa e Rejunte',
+        'Blocos, Tijolos e Alvenaria',
+        'Concreto Usinado',
+        'Ferragens para Construção',
+        'Aço, Vergalhão e Malha Pop',
+        'Madeiras e Compensados',
+        'Telhas e Coberturas',
+        'Calhas e Rufos',
+        'Impermeabilizantes',
+        'Mantas e Produtos de Vedação',
+        # Acabamentos
+        'Acabamentos',
+        'Pisos e Revestimentos',
+        'Porcelanato e Cerâmica',
+        'Pedras, Granitos e Mármores',
+        'Rodapés e Soleiras',
+        'Tintas e Texturas',
+        'Gesso e Drywall',
+        'Forros e Divisórias',
+        'Portas e Janelas',
+        'Vidros e Esquadrias',
+        'Louças e Metais',
+        'Bancadas e Cubas',
+        # Materiais Elétricos
+        'Material Elétrico',
+        'Fios e Cabos',
+        'Disjuntores e Quadros Elétricos',
+        'Tomadas, Interruptores e Placas',
+        'Iluminação e Luminárias',
+        'Postes, Eletrodutos e Canaletas',
+        'Materiais de Aterramento',
+        'Automação e Segurança Eletrônica',
+        # Materiais Hidráulicos
+        'Material Hidráulico',
+        'Tubos e Conexões',
+        'Registros e Válvulas',
+        "Caixas d'água e Reservatórios",
+        'Bombas e Pressurizadores',
+        'Esgoto e Drenagem',
+        'Ralos, Grelhas e Caixas de Inspeção',
+        'Aquecedores e Sistemas de Água Quente',
+        # Estrutura Metálica e Serralheria
+        'Perfis Metálicos',
+        'Chapas e Bobinas',
+        'Parafusos, Porcas e Arruelas',
+        'Solda, Eletrodos e Consumíveis',
+        'Telas, Gradis e Alambrados',
+        'Portões e Estruturas Metálicas',
+        'Galvanização e Tratamento Superficial',
+        # Apoio de Obra
+        'EPIs',
+        'Ferramentas Manuais',
+        'Ferramentas Elétricas',
+        'Máquinas e Equipamentos',
+        'Material de Limpeza de Obra',
+        'Material de Sinalização',
+        'Lonas, Plásticos e Proteções',
+        'Andaimes, Escoras e Formas',
+        'Fixadores, Buchas e Chumbadores',
+        'Colas, Selantes e Silicones',
+        # Administrativo / Escritório
+        'Contabilidade',
+        'Jurídico',
+        'Marketing e Publicidade',
+        'Tecnologia / Sistemas',
+        'Telefonia e Internet',
+        'Energia Elétrica',
+        'Água e Saneamento',
+        'Aluguel',
+        'Material de Escritório',
+        'Limpeza e Conservação',
+        'Alimentação / Refeitório',
+        'Combustível',
+        'Bancos e Tarifas',
+        'Seguros',
+        'Impostos e Taxas',
     ]
 
     @classmethod
     def seed_defaults(cls, admin_id: int) -> None:
-        """Insere categorias padrão para o tenant se ainda não tiver nenhuma."""
-        existing = db.session.execute(
-            db.text('SELECT COUNT(*) FROM categoria_fornecedor WHERE admin_id = :aid'),
-            {'aid': admin_id}
-        ).scalar() or 0
-        if existing:
-            return
-        for nome, descricao in cls._DEFAULTS:
-            db.session.execute(db.text("""
-                INSERT INTO categoria_fornecedor (nome, descricao, ativo, admin_id)
-                VALUES (:nome, :desc, true, :aid)
-            """), {'nome': nome, 'desc': descricao, 'aid': admin_id})
-        db.session.flush()
+        """Insere categorias padrão para o tenant, usando get-or-create por nome.
+        Admins que já têm categorias recebem apenas as que ainda não existem.
+        """
+        existing_names = set(
+            row[0] for row in db.session.execute(
+                db.text('SELECT nome FROM categoria_fornecedor WHERE admin_id = :aid'),
+                {'aid': admin_id}
+            ).fetchall()
+        )
+        inserted = 0
+        for nome in cls._DEFAULTS:
+            if nome not in existing_names:
+                db.session.execute(db.text("""
+                    INSERT INTO categoria_fornecedor (nome, ativo, admin_id)
+                    VALUES (:nome, true, :aid)
+                """), {'nome': nome, 'aid': admin_id})
+                inserted += 1
+        if inserted:
+            db.session.flush()
 
 
 # ================================

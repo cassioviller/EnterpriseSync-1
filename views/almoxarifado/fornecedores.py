@@ -123,6 +123,14 @@ def fornecedores_criar():
             flash(f'Erro ao cadastrar fornecedor: {str(e)}', 'danger')
             return redirect(url_for('almoxarifado.fornecedores_criar'))
 
+    # Auto-seed: garante que as categorias padrão existam para este tenant
+    if not CategoriaFornecedor.query.filter_by(admin_id=admin_id).first():
+        try:
+            CategoriaFornecedor.seed_defaults(admin_id)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     categorias_fornecedor = CategoriaFornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFornecedor.nome).all()
     return render_template('almoxarifado/fornecedores_form.html', fornecedor=None, categorias_fornecedor=categorias_fornecedor)
 
@@ -209,6 +217,14 @@ def fornecedores_editar(id):
             db.session.rollback()
             logger.error(f'Erro ao atualizar fornecedor: {str(e)}')
             flash(f'Erro ao atualizar fornecedor: {str(e)}', 'danger')
+
+    # Auto-seed: garante que as categorias padrão existam para este tenant
+    if not CategoriaFornecedor.query.filter_by(admin_id=admin_id).first():
+        try:
+            CategoriaFornecedor.seed_defaults(admin_id)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     linked_ids = {c.id for c in fornecedor.categorias} if fornecedor.categorias else set()
     active_cats = CategoriaFornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(CategoriaFornecedor.nome).all()

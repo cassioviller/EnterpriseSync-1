@@ -3910,6 +3910,7 @@ def executar_migracoes():
             (181, "Task #44 — Área manual: dim_area_manual em orcamento_item e proposta_itens", _migration_181_inline),
             (182, "Task #28 — Substituir categorias padrão de fluxo de caixa pela estrutura de construção civil (44 categorias + grupo_financeiro) e migrar tenants existentes", migration_182_replace_categorias_fluxo_caixa),
             (183, "Task #57 — FluxoCaixa: adicionar fornecedor_id e funcionario_id (destinatário do lançamento)", _migration_183_fluxo_caixa_destinatario),
+            (184, "Task #58 — Re-seed CategoriaFornecedor com lista completa de construção civil para todos os tenants", _migration_184_reseed_categoria_fornecedor),
         ]
         
         # Executar cada migração com rastreamento
@@ -14943,6 +14944,36 @@ def migration_182_replace_categorias_fluxo_caixa():
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 182] Falha geral: {e}")
+        raise
+
+
+def _migration_184_reseed_categoria_fornecedor():
+    """Task #58 — Re-seed CategoriaFornecedor com lista completa de construção civil."""
+    try:
+        from models import CategoriaFornecedor
+        # Coleta todos os admin_ids relevantes a partir das tabelas de dados
+        # (evita comparação de enum que requer cast específico do banco)
+        raw_ids = db.session.execute(db.text("""
+            SELECT DISTINCT admin_id FROM fornecedor WHERE admin_id IS NOT NULL
+            UNION
+            SELECT DISTINCT admin_id FROM categoria_fornecedor WHERE admin_id IS NOT NULL
+            UNION
+            SELECT DISTINCT admin_id FROM obra WHERE admin_id IS NOT NULL
+        """)).fetchall()
+        all_ids = {row[0] for row in raw_ids}
+        ok = 0
+        for aid in all_ids:
+            try:
+                CategoriaFornecedor.seed_defaults(aid)
+                db.session.commit()
+                ok += 1
+            except Exception as _e:
+                db.session.rollback()
+                logger.warning(f"[Migration 184] Falha para admin_id={aid}: {_e}")
+        logger.info(f"[Migration 184] Concluída — {ok}/{len(all_ids)} tenant(s) atualizados.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 184] Falha geral: {e}")
         raise
 
 

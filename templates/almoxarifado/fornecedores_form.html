@@ -156,39 +156,46 @@
             </div>
         </div>
 
-        <!-- Categorias de Fornecedor -->
-        {% if categorias_fornecedor %}
+        <!-- Categorias de Fornecedor — tags clicáveis -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-bottom">
+                    <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
                         <h6 class="mb-0"><i class="fas fa-tags me-2 text-primary"></i>Categorias do Fornecedor</h6>
+                        <small class="text-muted">Clique para selecionar / desselecionar</small>
                     </div>
                     <div class="card-body">
-                        <div class="row g-2">
+                        {% if categorias_fornecedor %}
+                        <div class="d-flex flex-wrap gap-2" id="cat-chips">
                             {% for cat in categorias_fornecedor %}
-                            <div class="col-auto">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox"
-                                           name="categorias" value="{{ cat.id }}"
-                                           id="cat_{{ cat.id }}"
-                                           {% if fornecedor and cat in fornecedor.categorias %}checked{% endif %}>
-                                    <label class="form-check-label" for="cat_{{ cat.id }}">
-                                        {{ cat.nome }}
-                                    </label>
-                                </div>
-                            </div>
+                            {% set is_active = fornecedor and cat in fornecedor.categorias %}
+                            <button type="button"
+                                    class="cat-chip btn btn-sm rounded-pill {% if is_active %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                                    data-cat-id="{{ cat.id }}"
+                                    title="{{ cat.nome }}">
+                                {% if is_active %}<i class="fas fa-check me-1 cat-check-icon" style="font-size:.7rem;"></i>{% endif %}
+                                {{ cat.nome }}
+                            </button>
+                            <input type="hidden"
+                                   name="categorias"
+                                   id="cat_hidden_{{ cat.id }}"
+                                   value="{{ cat.id }}"
+                                   {% if not is_active %}disabled{% endif %}>
                             {% endfor %}
                         </div>
                         <div class="form-text mt-2">
                             Selecione todas as categorias que se aplicam a este fornecedor.
                             <a href="{{ url_for('catalogos.categorias_fornecedor') }}" target="_blank">Gerenciar categorias</a>
                         </div>
+                        {% else %}
+                        <p class="text-muted mb-0 small">Nenhuma categoria cadastrada ainda.
+                            <a href="{{ url_for('catalogos.categorias_fornecedor') }}" target="_blank">Criar categorias</a>
+                        </p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
-        {% endif %}
 
         <!-- Botões de Ação -->
         <div class="row">
@@ -211,6 +218,34 @@
         </div>
     </form>
 </div>
+
+<!-- Chips de Categoria -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.cat-chip').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var catId = btn.dataset.catId;
+            var hidden = document.getElementById('cat_hidden_' + catId);
+            var isActive = btn.classList.contains('btn-primary');
+            if (isActive) {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-secondary');
+                var icon = btn.querySelector('.cat-check-icon');
+                if (icon) icon.remove();
+                if (hidden) hidden.disabled = true;
+            } else {
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-primary');
+                var icon = document.createElement('i');
+                icon.className = 'fas fa-check me-1 cat-check-icon';
+                icon.style.fontSize = '.7rem';
+                btn.insertBefore(icon, btn.firstChild);
+                if (hidden) hidden.disabled = false;
+            }
+        });
+    });
+});
+</script>
 
 <!-- Máscaras de Input -->
 <script>
