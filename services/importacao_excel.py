@@ -1190,8 +1190,19 @@ _PLANO_PARA_CATEGORIA = {
     'despesa financeira': 'OUTROS',
     'manutencao': 'OUTROS',
     'marketing': 'OUTROS',
-    'retirada dos socios': 'OUTROS',
-    'retirada de socios': 'OUTROS',
+    'retirada dos socios': 'PRO_LABORE',
+    'retirada de socios': 'PRO_LABORE',
+    'pro-labore': 'PRO_LABORE',
+    'prolabore': 'PRO_LABORE',
+    'distribuicao de lucros': 'PRO_LABORE',
+    # ── Receitas ──────────────────────────────────────────────────────────
+    'receita de servicos': 'RECEITA_SERVICO',
+    'receita de obra': 'RECEITA_SERVICO',
+    'receita de obras': 'RECEITA_SERVICO',
+    'honorarios recebidos': 'RECEITA_SERVICO',
+    'medicao': 'RECEITA_SERVICO',
+    'faturamento': 'RECEITA_SERVICO',
+    'servicos prestados': 'RECEITA_SERVICO',
 }
 
 def _categoria_por_plano(plano):
@@ -1219,6 +1230,9 @@ _KEYWORDS_CATEGORIA = [
         'encanador', 'pintor', 'gesseiro', 'serralheria', 'vidraca', 'empreitada',
         'armacao', 'carpinteiro', 'medicao', 'pintura', 'hidraulica', 'eletrica',
         'medicao', 'medir', 'contratado', 'terceirizado',
+        'topografia', 'sondagem', 'art ', 'anotacao de responsabilidade',
+        'projeto executivo', 'levantamento topografico', 'veks engenharia',
+        'veks', 'engenharia',
     ]),
     ('ALIMENTACAO', [
         'vale alimentacao', 'almoco', 'refeicao', 'marmita', 'pao', 'lanche',
@@ -1238,6 +1252,10 @@ _KEYWORDS_CATEGORIA = [
     ('TRIBUTOS', [
         'imposto', ' das', 'iss', 'taxa', 'prefeitura', 'simples nacional',
         'gps', 'fgts', 'darf', 'tributo', 'inss', 'contribuicao',
+    ]),
+    ('PRO_LABORE', [
+        'pro-labore', 'prolabore', 'distribuicao de lucros', 'retirada socio',
+        'retirada dos socios', 'retirada de socios',
     ]),
     ('OUTROS', [
         'tarifa', 'juros', 'multa', 'seguro', 'mensalidade', 'papelaria',
@@ -1533,6 +1551,11 @@ class ImportacaoFluxoCaixa:
                 status = 'PAGO' if 'pago' in _normalizar(status_raw) else 'PENDENTE'
                 obra_id = _match_cc_obra(cc, obras_dict)
 
+                # Classificar categoria da entrada (Nível 1: plano; Nível 2b: keywords)
+                cat_ent = _categoria_por_plano(plano)
+                if cat_ent is None:
+                    cat_ent = _classificar_keywords(desc + ' ' + plano)
+
                 # Fuzzy match do cliente
                 _CONF = 85
                 _SUGG = 40
@@ -1551,6 +1574,8 @@ class ImportacaoFluxoCaixa:
                     'obra_id': obra_id,
                     'valor': valor,
                     'status': status,
+                    'tipo_categoria': cat_ent,
+                    'categoria_fluxo_caixa_id': None,  # será resolvido pela view
                     'entidade_tipo': ent_tipo if _confirmed_ent else None,
                     'entidade_id': _ent_id_raw if _confirmed_ent else None,
                     'entidade_nome_banco': ent_nome_banco if _confirmed_ent else None,
@@ -1765,6 +1790,8 @@ class ImportacaoFluxoCaixa:
         n_fornecedores_criados = 0
         erros = []
         duplicados = 0
+        detalhe_entradas = []
+        detalhe_saidas = []
 
         # Garantir obra administrativa
         from datetime import date as _date
@@ -1785,6 +1812,9 @@ class ImportacaoFluxoCaixa:
 
         def _obra_efetiva(obra_id):
             return obra_id if obra_id else obra_adm_id
+
+        # Lookup reverso obra_id → nome para o relatório de detalhe
+        _obras_nome_map = {o.id: o.nome for o in Obra.query.filter_by(admin_id=admin_id).all()}
 
         def _ja_existe_saida(data_str, valor, fornecedor, aid):
             """Checa chave de não-duplicidade para saídas."""
@@ -2032,6 +2062,17 @@ class ImportacaoFluxoCaixa:
                 totais[cat]['count'] += 1
                 totais[cat]['valor'] += valor
 
+                # Detalhe para o relatório de resultado
+                _obra_oid = _obra_efetiva(obra_id)
+                detalhe_saidas.append({
+                    'data': data_str,
+                    'descricao': (row.get('descricao') or fornecedor)[:120],
+                    'valor': valor,
+                    'categoria': cat,
+                    'obra_nome': _obras_nome_map.get(_obra_oid, '—'),
+                    'modo': 'Manual' if not row.get('tipo_categoria') else 'Auto',
+                })
+
             # ── Entradas ─────────────────────────────────────────────────────
             for row in dados.get('entradas', []):
                 valor = float(row.get('valor') or 0)
@@ -2089,6 +2130,20 @@ class ImportacaoFluxoCaixa:
 
                 n_entradas += 1
 
+                # Detalhe para o relatório de resultado
+                _obra_oid_e = _obra_efetiva(obra_id)
+                _cfc_id_e = row.get('categoria_fluxo_caixa_id')
+                detalhe_entradas.append({
+                    'data': data_str,
+                    'descricao': (row.get('descricao') or cliente)[:120],
+                    'valor': valor,
+                    'categoria_id': _cfc_id_e,
+                    'tipo_categoria': row.get('tipo_categoria'),
+                    'obra_nome': _obras_nome_map.get(_obra_oid_e, '—'),
+                    'modo': 'Auto' if row.get('tipo_categoria') else 'Manual',
+                    'status': status,
+                })
+
             db.session.commit()
 
         except Exception as e:
@@ -2107,6 +2162,8 @@ class ImportacaoFluxoCaixa:
             'duplicados': duplicados,
             'totais': totais,
             'erros': erros,
+            'detalhe_entradas': detalhe_entradas,
+            'detalhe_saidas': detalhe_saidas,
         }
 
 

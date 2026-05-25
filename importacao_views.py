@@ -475,6 +475,27 @@ def fluxo_caixa_upload():
     categorias_entrada = [c for c in categorias_tenant if c.tipo == 'ENTRADA']
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
 
+    # Pré-selecionar categoria para entradas com tipo_categoria classificado
+    # Mapeia tipo_categoria → cfc_id buscando por keywords no nome da categoria
+    _CAT_ENT_KEYWORDS = {
+        'RECEITA_SERVICO': ['serviç', 'obra', 'honorar', 'faturamento', 'medicao', 'medição'],
+        'MAO_OBRA_DIRETA': ['servic', 'tercei', 'subempreit'],
+        'TRIBUTOS': ['imposto', 'tributo', 'tax'],
+        'OUTROS': ['outro'],
+    }
+    _cat_ent_map = {}
+    for cfc in categorias_entrada:
+        cfc_nome_lower = cfc.nome.lower()
+        for tipo_cat, kws in _CAT_ENT_KEYWORDS.items():
+            if tipo_cat not in _cat_ent_map:
+                if any(kw in cfc_nome_lower for kw in kws):
+                    _cat_ent_map[tipo_cat] = cfc.id
+                    break
+    for row in entradas:
+        tc = row.get('tipo_categoria')
+        if tc and not row.get('categoria_fluxo_caixa_id') and tc in _cat_ent_map:
+            row['categoria_fluxo_caixa_id'] = _cat_ent_map[tc]
+
     return render_template(
         'importacao/preview_fluxo.html',
         entradas=entradas,

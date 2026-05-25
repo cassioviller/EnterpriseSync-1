@@ -245,6 +245,165 @@
     {% endif %}
   </div>
 
+  {% set detalhe_entradas = resultado.get('detalhe_entradas', []) %}
+  {% set detalhe_saidas   = resultado.get('detalhe_saidas', []) %}
+  {% if (detalhe_entradas or detalhe_saidas) and not teve_falha_geral %}
+  <!-- Detalhamento linha a linha -->
+  <div class="mt-4">
+    <button class="btn btn-sm btn-outline-info" type="button"
+            data-bs-toggle="collapse" data-bs-target="#detalhesImportacao">
+      <i data-feather="list" style="width:14px;height:14px;"></i>
+      Ver detalhes da importação ({{ detalhe_entradas|length + detalhe_saidas|length }} linhas)
+    </button>
+
+    <div class="collapse mt-3" id="detalhesImportacao">
+      {% set CAT_BADGE_COR = {
+        'SALARIO':          '#1e3a5f',
+        'MAO_OBRA_DIRETA':  '#198754',
+        'MATERIAL':         '#dc3545',
+        'ALIMENTACAO':      '#fd7e14',
+        'TRANSPORTE':       '#6610f2',
+        'ALUGUEL_UTILITIES':'#0dcaf0',
+        'TRIBUTOS':         '#6c757d',
+        'EQUIPAMENTO':      '#0d6efd',
+        'PRO_LABORE':       '#6f42c1',
+        'RECEITA_SERVICO':  '#157347',
+        'OUTROS':           '#adb5bd',
+      } %}
+
+      <!-- Abas -->
+      <ul class="nav nav-tabs" id="detalheTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-entradas" data-bs-toggle="tab"
+                  data-bs-target="#painel-entradas" type="button" role="tab">
+            <i data-feather="arrow-down-circle" style="width:14px;height:14px;color:#198754;"></i>
+            Entradas <span class="badge bg-success ms-1">{{ detalhe_entradas|length }}</span>
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-saidas" data-bs-toggle="tab"
+                  data-bs-target="#painel-saidas" type="button" role="tab">
+            <i data-feather="arrow-up-circle" style="width:14px;height:14px;color:#dc3545;"></i>
+            Saídas <span class="badge bg-danger ms-1">{{ detalhe_saidas|length }}</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content border border-top-0 rounded-bottom shadow-sm bg-white" style="border-radius:0 0 12px 12px;">
+
+        <!-- Painel Entradas -->
+        <div class="tab-pane fade show active" id="painel-entradas" role="tabpanel">
+          {% if detalhe_entradas %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" style="font-size:.83rem;">
+              <thead class="table-light">
+                <tr>
+                  <th class="px-3">Data</th>
+                  <th>Descrição</th>
+                  <th class="text-end">Valor</th>
+                  <th>Categoria</th>
+                  <th>CC / Obra</th>
+                  <th>Status</th>
+                  <th class="text-center">Modo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in detalhe_entradas %}
+                <tr {% if not row.tipo_categoria %}style="background:#fff8e6;"{% endif %}>
+                  <td class="px-3 text-muted">{{ row.data }}</td>
+                  <td>{{ row.descricao }}</td>
+                  <td class="text-end fw-semibold text-success">{{ row.valor|brl }}</td>
+                  <td>
+                    {% if row.tipo_categoria %}
+                    <span class="badge"
+                          style="background:{{ CAT_BADGE_COR.get(row.tipo_categoria, '#adb5bd') }};font-size:.72rem;">
+                      {{ row.tipo_categoria }}
+                    </span>
+                    {% else %}
+                    <span class="badge" style="background:#fd7e14;font-size:.72rem;">Sem categoria</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted" style="font-size:.8rem;">{{ row.obra_nome }}</td>
+                  <td>
+                    {% if row.status == 'PAGO' %}
+                    <span class="badge bg-success" style="font-size:.7rem;">PAGO</span>
+                    {% else %}
+                    <span class="badge bg-secondary" style="font-size:.7rem;">PENDENTE</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if row.modo == 'Auto' %}
+                    <span class="badge bg-primary" style="font-size:.7rem;">Auto</span>
+                    {% else %}
+                    <span class="badge bg-secondary" style="font-size:.7rem;">Manual</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="py-4 text-center text-muted">Nenhuma entrada importada.</div>
+          {% endif %}
+        </div>
+
+        <!-- Painel Saídas -->
+        <div class="tab-pane fade" id="painel-saidas" role="tabpanel">
+          {% if detalhe_saidas %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" style="font-size:.83rem;">
+              <thead class="table-light">
+                <tr>
+                  <th class="px-3">Data</th>
+                  <th>Descrição</th>
+                  <th class="text-end">Valor</th>
+                  <th>Categoria</th>
+                  <th>CC / Obra</th>
+                  <th class="text-center">Modo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in detalhe_saidas %}
+                <tr {% if row.categoria == 'OUTROS' or not row.categoria %}style="background:#fff8e6;"{% endif %}>
+                  <td class="px-3 text-muted">{{ row.data }}</td>
+                  <td>{{ row.descricao }}</td>
+                  <td class="text-end fw-semibold text-danger">{{ row.valor|brl }}</td>
+                  <td>
+                    {% if row.categoria and row.categoria != 'OUTROS' %}
+                    <span class="badge"
+                          style="background:{{ CAT_BADGE_COR.get(row.categoria, '#adb5bd') }};font-size:.72rem;">
+                      {{ row.categoria }}
+                    </span>
+                    {% elif row.categoria == 'OUTROS' %}
+                    <span class="badge" style="background:#fd7e14;font-size:.72rem;">OUTROS</span>
+                    {% else %}
+                    <span class="badge" style="background:#fd7e14;font-size:.72rem;">Sem categoria</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted" style="font-size:.8rem;">{{ row.obra_nome }}</td>
+                  <td class="text-center">
+                    {% if row.modo == 'Auto' %}
+                    <span class="badge bg-primary" style="font-size:.7rem;">Auto</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark" style="font-size:.7rem;">Manual</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="py-4 text-center text-muted">Nenhuma saída importada.</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Form oculto de rollback -->
   <form id="formRollback" method="POST"
         action="{{ url_for('importacao.fluxo_caixa_rollback', batch_id=batch_id) }}"

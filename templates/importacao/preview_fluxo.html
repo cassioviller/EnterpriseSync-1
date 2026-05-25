@@ -182,7 +182,7 @@
               <td>{{ r.descricao or '—' }}</td>
               <td>
                 {% if obras %}
-                <select name="obra_entrada_{{ loop.index0 }}" class="form-select form-select-sm obra-select" style="min-width:150px;font-size:.8rem;">
+                <select name="obra_entrada_{{ loop.index0 }}" class="obra-ts" data-prefix="entrada" data-idx="{{ loop.index0 }}">
                   <option value="">— Administrativo —</option>
                   {% for o in obras %}
                   <option value="{{ o.id }}" {% if r.get('obra_id') == o.id %}selected{% endif %}>{{ o.nome }}</option>
@@ -362,7 +362,7 @@
               </td>
               <td>
                 {% if obras %}
-                <select name="obra_auto_{{ loop.index0 }}" class="form-select form-select-sm obra-select" style="min-width:150px;font-size:.8rem;">
+                <select name="obra_auto_{{ loop.index0 }}" class="obra-ts" data-prefix="auto" data-idx="{{ loop.index0 }}">
                   <option value="">— Administrativo —</option>
                   {% for o in obras %}
                   <option value="{{ o.id }}" {% if r.get('obra_id') == o.id %}selected{% endif %}>{{ o.nome }}</option>
@@ -555,7 +555,7 @@
               <!-- CC / Obra -->
               <td>
                 {% if obras %}
-                <select name="obra_manual_{{ loop.index0 }}" class="form-select form-select-sm obra-select" style="min-width:150px;font-size:.8rem;">
+                <select name="obra_manual_{{ loop.index0 }}" class="obra-ts" data-prefix="manual" data-idx="{{ loop.index0 }}">
                   <option value="">— Administrativo —</option>
                   {% for o in obras %}
                   <option value="{{ o.id }}" {% if r.get('obra_id') == o.id %}selected{% endif %}>{{ o.nome }}</option>
@@ -904,8 +904,23 @@ document.addEventListener('DOMContentLoaded', function () {
     return el.value || '';
   }
 
+  // ── Tom Select: CC/Obra ──────────────────────────────────────────────────
+  document.querySelectorAll('.obra-ts').forEach(function(el) {
+    new TomSelect(el, {
+      plugins: ['dropdown_input'],
+      placeholder: 'Buscar obra…',
+      allowEmptyOption: true,
+      maxOptions: 200,
+      render: {
+        no_results: function() {
+          return '<div class="no-results">Nenhuma obra encontrada</div>';
+        }
+      }
+    });
+  });
+
   var editableEls = document.querySelectorAll(
-    'table .inline-input, table .banco-select, table .obra-select'
+    'table .inline-input, table .banco-select'
   );
 
   editableEls.forEach(function(el) {
