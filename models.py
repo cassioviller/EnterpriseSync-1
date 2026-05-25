@@ -792,11 +792,17 @@ class FluxoCaixa(db.Model):
     categoria_fluxo_caixa_id = db.Column(db.Integer, db.ForeignKey('categoria_fluxo_caixa.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Task #57 — destinatário da saída (fornecedor ou funcionário vinculado na importação)
+    fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=True)
+
     # Relacionamentos
     obra = db.relationship('Obra', overlaps="movimentos_caixa_lista")
     centro_custo = db.relationship('CentroCusto', overlaps="movimentos_caixa_lista")
     banco = db.relationship('BancoEmpresa', foreign_keys=[banco_id], overlaps="fluxos_caixa")
     categoria_fluxo_caixa = db.relationship('CategoriaFluxoCaixa', foreign_keys=[categoria_fluxo_caixa_id])
+    fornecedor_ref = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
+    funcionario_ref = db.relationship('Funcionario', foreign_keys=[funcionario_id])
 
 class RegistroAlimentacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)

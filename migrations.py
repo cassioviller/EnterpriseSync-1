@@ -3909,6 +3909,7 @@ def executar_migracoes():
             (180, "Task #36 v2 — Medição dimensional: campos dim_ em proposta_itens (propagação orçamento → proposta)", _migration_180_inline),
             (181, "Task #44 — Área manual: dim_area_manual em orcamento_item e proposta_itens", _migration_181_inline),
             (182, "Task #28 — Substituir categorias padrão de fluxo de caixa pela estrutura de construção civil (44 categorias + grupo_financeiro) e migrar tenants existentes", migration_182_replace_categorias_fluxo_caixa),
+            (183, "Task #57 — FluxoCaixa: adicionar fornecedor_id e funcionario_id (destinatário do lançamento)", _migration_183_fluxo_caixa_destinatario),
         ]
         
         # Executar cada migração com rastreamento
@@ -14942,4 +14943,33 @@ def migration_182_replace_categorias_fluxo_caixa():
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 182] Falha geral: {e}")
+        raise
+
+
+def _migration_183_fluxo_caixa_destinatario():
+    """Task #57 — Adiciona fornecedor_id e funcionario_id ao fluxo_caixa."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE fluxo_caixa
+                ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER
+                    REFERENCES fornecedor(id) ON DELETE SET NULL;
+            """))
+            conn.execute(sa_text("""
+                ALTER TABLE fluxo_caixa
+                ADD COLUMN IF NOT EXISTS funcionario_id INTEGER
+                    REFERENCES funcionario(id) ON DELETE SET NULL;
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_fornecedor
+                    ON fluxo_caixa(fornecedor_id) WHERE fornecedor_id IS NOT NULL;
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_funcionario
+                    ON fluxo_caixa(funcionario_id) WHERE funcionario_id IS NOT NULL;
+            """))
+        logger.info("[Migration 183] fornecedor_id e funcionario_id adicionados a fluxo_caixa.")
+    except Exception as e:
+        logger.error(f"[Migration 183] Falha: {e}")
         raise

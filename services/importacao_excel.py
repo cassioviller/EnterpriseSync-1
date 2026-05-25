@@ -1877,6 +1877,12 @@ class ImportacaoFluxoCaixa:
 
                 cfc_id = row.get('categoria_fluxo_caixa_id') or None
 
+                # Derivar tipo de entidade uma vez, antes de qualquer branch
+                eh_forn_row = ent_tipo_row == 'fornecedor'
+                eh_func_row = ent_tipo_row == 'funcionario'
+                _fc_forn_id = ent_id if (ent_id and eh_forn_row) else None
+                _fc_func_id = ent_id if (ent_id and eh_func_row) else None
+
                 if apenas_pagamento:
                     # ── Modo "Apenas Pagamento": cria apenas FluxoCaixa, sem GCP/GCF/ContaPagar
                     fc = FluxoCaixa(
@@ -1891,6 +1897,8 @@ class ImportacaoFluxoCaixa:
                         import_batch_id=batch_id,
                         banco_id=banco_id_row,
                         categoria_fluxo_caixa_id=cfc_id,
+                        fornecedor_id=_fc_forn_id,
+                        funcionario_id=_fc_func_id,
                     )
                     db.session.add(fc)
                     n_fluxo += 1
@@ -1941,14 +1949,16 @@ class ImportacaoFluxoCaixa:
                             observacoes=obs or None,
                             import_batch_id=batch_id,
                             categoria_fluxo_caixa_id=cfc_id,
+                            fornecedor_id=_fc_forn_id,
+                            funcionario_id=_fc_func_id,
                         )
                         db.session.add(fc)
                         n_fluxo += 1
 
                     # ContaPagar para reembolsos
                     if row.get('eh_reembolso') and data_obj:
-                        eh_forn = ent_tipo_row == 'fornecedor'
-                        eh_func = ent_tipo_row == 'funcionario'
+                        eh_forn = eh_forn_row
+                        eh_func = eh_func_row
 
                         obs_parts = []
                         if cat:
