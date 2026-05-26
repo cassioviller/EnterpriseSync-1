@@ -1,0 +1,408 @@
+Sim — **a análise está no caminho certo**, mas eu faria alguns ajustes antes de mandar implementar. O ponto principal é: **não existe apenas um bug matemático; existe uma ambiguidade de conceito** entre “custo técnico por unidade” e “custo real de compra considerando embalagem”. 
+
+## Veredito geral
+
+A análise está **70% a 80% correta**.
+
+Ela acerta ao identificar a divergência central:
+
+```text
+Catálogo:
+preço técnico = preço vigente / fator comercial
+
+Orçamento:
+snapshot usa preco_vigente diretamente como preco_unitario
+```
+
+Isso realmente pode causar diferença entre Serviço e Orçamento, porque `snapshot_from_servico()` copia `preco_vigente()` para `preco_unitario`, enquanto o cálculo técnico do catálogo divide o preço pelo `fator_comercial`. 
+
+Mas existe uma brecha importante: **catálogo e orçamento não precisam obrigatoriamente mostrar o mesmo valor em todos os cenários**. Se o orçamento considera compra mínima por embalagem, ele pode ser maior que o custo técnico do catálogo para pequenas quantidades. O erro não é necessariamente eles serem diferentes; o erro é o sistema não deixar claro **qual valor representa o quê**.
+
+---
+
+## O que está correto na análise
+
+Está correto dizer que existe uma confusão entre:
+
+```text
+preço da embalagem
+preço unitário técnico
+preço unitário médio real
+```
+
+Exemplo:
+
+```text
+Pacote com 100 parafusos = R$ 50,00
+fator_comercial = 100
+
+Preço da embalagem = R$ 50,00
+Preço técnico por parafuso = R$ 0,50
+```
+
+Se o catálogo calcula:
+
+```text
+8 parafusos × 0,50 = R$ 4,00 por m²
+```
+
+e o orçamento calcula compra mínima:
+
+```text
+preciso de 8 parafusos
+mas compro 1 pacote
+custo real = R$ 50,00
+```
+
+então **os dois números podem estar corretos**, desde que sejam exibidos com nomes diferentes:
+
+```text
+Custo técnico por m²: R$ 4,00
+Custo real de compra para esta quantidade: R$ 50,00
+Custo médio real por m²: R$ 50,00 / quantidade
+```
+
+A análise também está correta ao apontar que a prévia em JavaScript precisa ser tratada com cuidado, porque a tela recalcula valores no navegador e pode divergir do backend salvo. O template do orçamento tem cálculo próprio em JS, além do cálculo Python no backend. 
+
+Também está correto que o sistema já tem boa base para métricas reais: `RDOServicoSubatividade` tem `quantidade_produzida`, `RDOMaoObra` tem `horas_trabalhadas`, `produtividade_real` e vínculo com `composicao_servico_id`, e `RDOCustoDiario` guarda custo real diário por funcionário.
+
+---
+
+## Brechas que eu encontrei
+
+### 1. Dizer que `custo_total` e `venda_total` estão corretos pode ser perigoso
+
+A análise diz que:
+
+```text
+custo_total e venda_total estão corretos
+```
+
+Eu mudaria para:
+
+```text
+custo_total e venda_total parecem corretos se a regra oficial for considerar custo real de compra por embalagem.
+```
+
+Porque depende da regra de negócio.
+
+Para orçamento de obra, faz sentido usar embalagem cheia no custo real. Mas para catálogo, faz sentido mostrar custo técnico por unidade. O sistema precisa guardar e exibir os dois.
+
+---
+
+### 2. O campo `preco_unitario` está semanticamente perigoso
+
+Esse é o maior problema.
+
+Hoje `preco_unitario` pode significar:
+
+```text
+preço técnico unitário
+ou
+preço da embalagem
+```
+
+Dependendo do arquivo.
+
+Esse nome é uma bomba futura. O ideal seria separar claramente:
+
+```text
+preco_embalagem
+fator_comercial
+preco_tecnico_unitario
+```
+
+Mesmo que no banco não dê para mudar tudo agora, pelo menos no snapshot e nas funções de cálculo deveria ficar claro.
+
+---
+
+### 3. Adicionar só `custo_unitario_tecnico` em `OrcamentoItem` pode não bastar
+
+A análise sugere adicionar:
+
+```text
+OrcamentoItem.custo_unitario_tecnico
+```
+
+Isso ajuda, mas talvez também precise guardar:
+
+```text
+custo_medio_real_unitario
+custo_compra_total
+preco_venda_unitario_real
+```
+
+Porque no orçamento existem duas visões:
+
+```text
+Visão técnica:
+quanto deveria custar proporcionalmente por unidade
+
+Visão real:
+quanto realmente vou gastar comprando pacotes, barras ou embalagens inteiras
+```
+
+Sem separar isso, o problema volta em outro lugar.
+
+---
+
+### 4. Métrica real por m² depende de vínculo material → serviço
+
+A análise já percebeu isso, mas esse é um dos pontos mais difíceis.
+
+Para saber “custo real de material por m²”, não basta saber que saiu material do almoxarifado para a obra. Precisa saber:
+
+```text
+esse material foi consumido em qual serviço?
+em qual subatividade?
+em qual item da medição?
+em qual período?
+```
+
+Se a saída de material só aponta para `obra_id`, você consegue custo real da obra, mas não custo real por serviço.
+
+Essa é uma dificuldade grande.
+
+---
+
+### 5. RDO registra produção, mas pode não garantir unidade compatível
+
+O sistema tem `quantidade_produzida` no RDO e `unidade_medida_snapshot`, o que é bom. 
+
+Mas a brecha é: o usuário pode registrar produção em uma unidade diferente da unidade do serviço.
+
+Exemplo:
+
+```text
+Serviço vendido em m²
+RDO lança produção em unidade
+ou lança percentual
+ou lança "feito parcial" sem quantidade
+```
+
+A métrica real só fica confiável se o sistema obrigar ou validar:
+
+```text
+serviço vendido em m² → RDO mede em m²
+serviço vendido em m linear → RDO mede em m linear
+serviço vendido em kg → RDO mede em kg
+```
+
+---
+
+### 6. Produtividade real não é só quantidade / horas
+
+A fórmula:
+
+```text
+produtividade_real = quantidade executada / horas reais
+```
+
+está correta como base.
+
+Mas tem brechas práticas:
+
+```text
+chuva
+retrabalho
+espera por material
+atividade feita por equipe mista
+funcionário ajudando em mais de um serviço no mesmo dia
+serviço com etapa preparatória sem produção visível
+```
+
+O sistema precisa permitir classificar horas como:
+
+```text
+produtivas
+improdutivas justificadas
+retrabalho
+espera
+deslocamento
+apoio
+```
+
+Senão a produtividade real pode punir o serviço errado.
+
+---
+
+### 7. Receita real por m² é mais difícil que custo real por m²
+
+Custo real por m²:
+
+```text
+custo real / quantidade executada
+```
+
+é relativamente direto.
+
+Mas lucro real por m² precisa de receita real reconhecida. A receita pode vir de:
+
+```text
+valor contratado
+medição aprovada
+valor faturado
+valor recebido
+retenções
+aditivos
+descontos
+glosas
+```
+
+Então a fórmula:
+
+```text
+lucro_real_unitario = (receita_reconhecida - custo_real_total) / quantidade_executada
+```
+
+está correta, mas precisa definir qual receita usar:
+
+```text
+receita contratada?
+receita medida?
+receita faturada?
+receita recebida?
+```
+
+Para obra, eu usaria primeiro **receita medida/aprovada**, não recebida.
+
+---
+
+## Dificuldade de implementação
+
+Eu classificaria assim:
+
+### Baixa dificuldade
+
+Corrigir nomenclatura e divergência de cálculo entre catálogo, orçamento e JS.
+
+```text
+Dificuldade: baixa/média
+Risco: médio
+```
+
+Arquivos principais:
+
+```text
+services/orcamento_service.py
+services/orcamento_view_service.py
+templates/orcamentos/editar.html
+views/orcamentos_views.py
+```
+
+Aqui o maior cuidado é não quebrar orçamento antigo salvo com snapshot antigo.
+
+---
+
+### Média dificuldade
+
+Separar oficialmente os conceitos:
+
+```text
+custo técnico unitário
+custo real de compra
+custo médio real unitário
+preço de venda técnico
+preço de venda real por quantidade
+```
+
+```text
+Dificuldade: média
+Risco: médio/alto
+```
+
+Provavelmente exige migration e backfill.
+
+---
+
+### Alta dificuldade
+
+Criar métricas reais por unidade de medida com base em RDO, custos, materiais e medição.
+
+```text
+Dificuldade: alta
+Risco: alto
+```
+
+Porque precisa garantir vínculo entre:
+
+```text
+RDO
+serviço
+subatividade
+mão de obra
+material
+custo financeiro
+quantidade executada
+medição comercial
+```
+
+O arquivo `metricas_produtividade.py` já faz bastante coisa: usa `RDOCustoDiario`, `RDOServicoSubatividade.quantidade_produzida`, vínculo `RDOMaoObra.composicao_servico_id`, coeficientes da composição e orçamento operacional vigente.  Mas ainda é uma camada de cálculo; transformar isso em sistema confiável de aprendizado operacional exige validação, telas, histórico e aprovação.
+
+---
+
+## Minha recomendação
+
+Não deixe o Claude/Replit implementar tudo de uma vez.
+
+Eu dividiria em 4 fases:
+
+```text
+FASE 1 — Corrigir divergência Catálogo × Orçamento
+Objetivo: separar preço técnico, preço embalagem e custo real.
+```
+
+```text
+FASE 2 — Padronizar unidade de medida
+Objetivo: todo serviço precisa ter unidade principal obrigatória e coerente com RDO.
+```
+
+```text
+FASE 3 — Consolidar métricas reais por serviço
+Objetivo: calcular custo real, horas reais, produção real e produtividade por unidade.
+```
+
+```text
+FASE 4 — Sugestão de atualização do catálogo
+Objetivo: sugerir novo coeficiente/margem com aprovação e histórico.
+```
+
+---
+
+## Ajuste que eu faria no texto antes de mandar implementar
+
+Eu mudaria esta frase:
+
+```text
+Conclusão: os campos custo_total e venda_total estão corretos.
+```
+
+Para:
+
+```text
+Conclusão: os campos custo_total e venda_total parecem coerentes com a regra de custo real por embalagem no orçamento. Porém, eles não devem ser comparados diretamente com o custo técnico unitário do catálogo sem deixar claro o conceito exibido. O sistema precisa separar oficialmente custo técnico unitário, custo real de compra e custo médio real unitário.
+```
+
+E adicionaria esta regra:
+
+```text
+O Catálogo deve mostrar:
+1. custo técnico unitário;
+2. preço de venda técnico unitário;
+3. opcionalmente, simulação por quantidade de referência considerando embalagem.
+
+O Orçamento deve mostrar:
+1. custo técnico unitário previsto;
+2. custo real de compra para a quantidade do item;
+3. custo médio real por unidade;
+4. preço de venda calculado sobre o custo real;
+5. lucro previsto total e por unidade.
+```
+
+---
+
+## Conclusão
+
+A análise está **boa**, mas tem uma brecha conceitual: ela trata parte da diferença como bug, quando parte pode ser diferença legítima entre **custo técnico proporcional** e **custo real de compra por embalagem**.
+
+A implementação é viável, mas não é pequena. A correção do cálculo é relativamente simples; a parte difícil é transformar isso em métrica real confiável por m²/unidade, porque depende de amarrar corretamente RDO, produção, custos reais, materiais e receita medida.
