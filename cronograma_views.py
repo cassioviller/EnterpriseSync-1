@@ -173,9 +173,10 @@ def cronograma_obra(obra_id: int):
         .all()
     )
 
-    # Tree-flatten: interleave each root task with its children so that child
-    # rows appear immediately after their parent in the rendered table, rather
-    # than at the very end of the list.
+    # Tree-flatten (recursive DFS): interleave each task with all its
+    # descendants so rows appear immediately after their parent in the rendered
+    # table, regardless of nesting depth.  Also builds a depth map so the
+    # template can indent each row proportionally.
     filhas_map: dict[int, list] = {}
     raiz: list = []
     for t in tarefas_raw:
@@ -183,11 +184,18 @@ def cronograma_obra(obra_id: int):
             filhas_map.setdefault(t.tarefa_pai_id, []).append(t)
         else:
             raiz.append(t)
-    tarefas = []
+
+    tarefas: list = []
+    nivel_map: dict[int, int] = {}  # task_id → depth (0 = root)
+
+    def _dfs(node, depth: int) -> None:
+        tarefas.append(node)
+        nivel_map[node.id] = depth
+        for child in filhas_map.get(node.id, []):
+            _dfs(child, depth + 1)
+
     for t in raiz:
-        tarefas.append(t)
-        for f in filhas_map.get(t.id, []):
-            tarefas.append(f)
+        _dfs(t, 0)
 
     cal = get_calendario(admin_id)
 
@@ -219,6 +227,7 @@ def cronograma_obra(obra_id: int):
         pai_ids=pai_ids,
         tarefas_pred_map=tarefas_pred_map,
         planejados_map=planejados_map,
+        nivel_map=nivel_map,
         hoje=hoje,
         nome_empresa=nome_empresa,
         modo_cliente=cliente_mode,

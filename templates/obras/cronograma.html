@@ -123,12 +123,14 @@
             {% set is_pai = t.id in pai_ids %}
             {% set perc = (t.percentual_concluido or 0)|int %}
             {% set plan = (planejados_map.get(t.id, 0))|int %}
+            {% set nivel = nivel_map.get(t.id, 0) %}
             <tr class="tarefa-row
                   {% if is_pai %}tarefa-pai{% endif %}
                   {% if t.tarefa_pai_id %}tarefa-filho d-none{% endif %}
                   {% if perc >= 100 %}row-done{% elif perc > 0 %}row-wip{% endif %}"
                 data-id="{{ t.id }}"
                 data-pai="{{ t.tarefa_pai_id or '' }}"
+                data-nivel="{{ nivel }}"
                 data-perc="{{ perc }}"
                 data-planejado="{{ plan }}"
                 data-inicio="{{ t.data_inicio.isoformat() if t.data_inicio else '' }}"
@@ -147,7 +149,7 @@
               {# Nome #}
               <td class="nome-cell">
                 <div class="d-flex align-items-center gap-1"
-                     style="padding-left:{{ '22px' if t.tarefa_pai_id else '0' }}">
+                     style="padding-left:{{ (nivel * 20) ~ 'px' }}">
                   {% if is_pai %}
                   <button class="btn-toggle toggle-btn" onclick="toggleFilhas({{ t.id }})"
                           data-expanded="false" title="Expandir/recolher subtarefas">
