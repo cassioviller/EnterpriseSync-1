@@ -83,6 +83,7 @@
           <div class="col-md-4 d-flex align-items-start pt-4">
             <div class="form-check form-switch mt-1">
               {% set _frac = insumo.fracionavel if insumo and insumo.fracionavel is not none else True %}
+              <input type="hidden" name="fracionavel" value="false">
               <input class="form-check-input" type="checkbox" role="switch"
                      id="chk_fracionavel" name="fracionavel" value="true"
                      {{ 'checked' if _frac else '' }}>

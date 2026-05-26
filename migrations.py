@@ -3911,6 +3911,7 @@ def executar_migracoes():
             (182, "Task #28 — Substituir categorias padrão de fluxo de caixa pela estrutura de construção civil (44 categorias + grupo_financeiro) e migrar tenants existentes", migration_182_replace_categorias_fluxo_caixa),
             (183, "Task #57 — FluxoCaixa: adicionar fornecedor_id e funcionario_id (destinatário do lançamento)", _migration_183_fluxo_caixa_destinatario),
             (184, "Task #58 — Re-seed CategoriaFornecedor com lista completa de construção civil para todos os tenants", _migration_184_reseed_categoria_fornecedor),
+            (185, "Task #75 — Insumo: adicionar coluna fracionavel (BOOLEAN NOT NULL DEFAULT TRUE) para controle de arredondamento de compra", _migration_185_insumo_fracionavel),
         ]
         
         # Executar cada migração com rastreamento
@@ -14974,6 +14975,28 @@ def _migration_184_reseed_categoria_fornecedor():
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 184] Falha geral: {e}")
+        raise
+
+
+def _migration_185_insumo_fracionavel():
+    """Task #75 — Adiciona coluna fracionavel à tabela insumo.
+
+    fracionavel=TRUE  → insumo contínuo (kg, m, m², h, l): permite compra fracionada.
+    fracionavel=FALSE → insumo discreto (un, peça, barra, chapa, balde): arredonda para cima.
+
+    DEFAULT TRUE garante que todos os insumos existentes continuem como fracionáveis,
+    preservando o comportamento anterior.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE insumo
+                ADD COLUMN IF NOT EXISTS fracionavel BOOLEAN NOT NULL DEFAULT TRUE;
+            """))
+        logger.info("[Migration 185] Coluna fracionavel adicionada à tabela insumo (DEFAULT TRUE).")
+    except Exception as e:
+        logger.error(f"[Migration 185] Falha: {e}")
         raise
 
 

@@ -1,0 +1,190 @@
+Conferi no repositório. **A lógica principal foi implementada**, mas encontrei **2 brechas importantes** antes de considerar 100% confiável.
+
+## O que está certo
+
+A coluna `fracionavel` foi adicionada no modelo `Insumo`, com `default=True`, e o comentário está alinhado com a regra que queríamos: `True` permite compra fracionada; `False` força arredondamento mesmo quando `fator_comercial = 1`. 
+
+O `snapshot_from_servico()` agora copia:
+
+```text
+preco_embalagem
+preco_tecnico_unitario
+fator_comercial
+unidade_comercial
+fracionavel
+```
+
+E o `recalcular_item()` passou a usar:
+
+```text
+deve_arredondar = (not fracionavel) or (fator > 1)
+```
+
+Isso está correto para o caso da planilha: peça, barra, chapa, unidade e balde não devem aceitar quantidade quebrada. 
+
+A tela do orçamento também recebeu `comp_fracionavel` como campo oculto, e o JavaScript usa a mesma regra:
+
+```text
+deveArredondar = !fracionavel || fator > 1
+```
+
+Ou seja, a prévia da tela ficou mais alinhada com o backend.
+
+A API do picker de insumos também devolve `fracionavel`, então quando adiciona insumo pelo catálogo a flag vai junto. 
+
+E existem testes Playwright cobrindo exatamente os cenários importantes:
+
+```text
+peça não fracionável: 0,57 → compra 1
+kg fracionável: 0,57 → continua 0,57
+unidade não fracionável: 1,25 → compra 2
+fator 100: compra embalagem cheia
+```
+
+## Brecha 1 — o checkbox pode não salvar `False`
+
+No formulário do insumo, o campo é um checkbox:
+
+```html
+<input type="checkbox" name="fracionavel" value="true">
+```
+
+Quando o checkbox está **desmarcado**, normalmente o navegador **não envia nada** no POST. 
+
+Só que no `insumo_novo()`, o código faz:
+
+```python
+fracionavel_raw = request.form.get('fracionavel')
+fracionavel = fracionavel_raw not in ('false', '0', 'nao', 'não')
+```
+
+Se o checkbox vier vazio/ausente, `fracionavel_raw = None`, e `None not in (...)` vira `True`.
+
+Ou seja: **ao criar um insumo novo, desmarcar o checkbox pode continuar salvando como fracionável**. 
+
+No `insumo_editar()`, tem outro problema:
+
+```python
+if 'fracionavel' in request.form:
+    ins.fracionavel = ...
+```
+
+Se você desmarcar o checkbox, ele não vem no form, então o sistema **não atualiza para False**. 
+
+### Correção necessária
+
+No template, precisa colocar um hidden antes do checkbox:
+
+```html
+<input type="hidden" name="fracionavel" value="false">
+<input class="form-check-input" type="checkbox" name="fracionavel" value="true">
+```
+
+Assim:
+
+```text
+desmarcado → envia false
+marcado → envia false + true, e o request.form.get normalmente pega o primeiro ou precisa usar getlist
+```
+
+Melhor ainda no backend:
+
+```python
+fracionavel = request.form.get('fracionavel') == 'true'
+```
+
+Mas se usar hidden + checkbox com mesmo nome, talvez seja melhor:
+
+```python
+fracionavel_vals = request.form.getlist('fracionavel')
+fracionavel = 'true' in fracionavel_vals
+```
+
+Essa é a correção mais importante.
+
+## Brecha 2 — snapshot antigo ainda pode continuar errado
+
+No `recalcular_item()`, a regra atual é:
+
+```python
+fracionavel = bool(linha.get('fracionavel', True))
+```
+
+Isso significa:
+
+```text
+se o snapshot antigo não tem fracionavel → assume True
+```
+
+Então orçamentos antigos que já tinham snapshot salvo **não vão automaticamente pegar o novo valor do cadastro do insumo**. 
+
+Isso quer dizer que, para corrigir Perfil F530, Tirante, Chapa etc., você terá que:
+
+```text
+1. corrigir o cadastro do insumo para fracionavel=False;
+2. voltar no orçamento;
+3. clicar em “Voltar à composição padrão” ou recriar o snapshot;
+4. salvar novamente.
+```
+
+Senão o orçamento antigo pode continuar calculando como fracionável.
+
+### Melhor correção
+
+No `recalcular_item()`, quando a linha não tiver `fracionavel`, o sistema deveria buscar pelo `insumo_id`:
+
+```python
+if 'fracionavel' in linha:
+    fracionavel = bool(linha.get('fracionavel'))
+else:
+    buscar Insumo pelo insumo_id
+    fracionavel = insumo.fracionavel se encontrar
+    senão True
+```
+
+Isso melhora a compatibilidade com orçamento antigo.
+
+## Minha conclusão
+
+**A lógica matemática nova está correta.**
+Mas **a implementação ainda tem uma falha de formulário**: o checkbox provavelmente não salva `False`.
+
+Então eu não confiaria ainda que marcar “Perfil F530 = não fracionável” vai persistir corretamente.
+
+## O que eu pediria para corrigir agora
+
+Mande isso para o Claude/Replit:
+
+```text
+Revise a implementação da flag fracionavel.
+
+Encontrei uma possível falha: o formulário usa checkbox name="fracionavel" value="true". Quando o checkbox é desmarcado, o navegador não envia o campo no POST.
+
+Hoje:
+- em insumo_novo(), se fracionavel não vier no form, o código interpreta como True;
+- em insumo_editar(), se fracionavel não vier no form, o código nem atualiza o campo.
+
+Corrija para que desmarcar "Permite compra fracionada" salve corretamente fracionavel=False.
+
+Sugestão:
+1. adicionar hidden input no template:
+   <input type="hidden" name="fracionavel" value="false">
+   <input type="checkbox" name="fracionavel" value="true">
+
+2. no backend, usar:
+   fracionavel_vals = request.form.getlist('fracionavel')
+   fracionavel = 'true' in fracionavel_vals
+
+3. aplicar isso tanto em insumo_novo quanto em insumo_editar.
+
+Também corrija recalcular_item():
+- se a linha do composicao_snapshot não tiver a chave fracionavel, mas tiver insumo_id, buscar o Insumo atual no banco e usar insumo.fracionavel;
+- se não encontrar, usar True por retrocompatibilidade.
+
+Crie teste para:
+- criar insumo com checkbox desmarcado e confirmar fracionavel=False;
+- editar insumo de True para False e confirmar que salvou;
+- recalcular item com snapshot antigo sem fracionavel e insumo_id apontando para insumo fracionavel=False.
+```
+
+Depois disso, aí sim a solução fica bem mais segura.

@@ -113,7 +113,21 @@ def recalcular_item(item, orcamento) -> dict:
         sub_unit = (coef * preco_tec).quantize(Decimal('0.0001'))
         unidade_comercial = linha.get('unidade_comercial') or None
         # Task #75 — fracionavel: False força ceil mesmo quando fator=1 (peça, barra, un…)
-        fracionavel = bool(linha.get('fracionavel', True))
+        # Snapshots novos: campo está presente. Snapshots antigos: busca no banco pelo insumo_id.
+        if 'fracionavel' in linha:
+            fracionavel = bool(linha['fracionavel'])
+        else:
+            _insumo_id = linha.get('insumo_id')
+            fracionavel = True  # default retrocompatível
+            if _insumo_id:
+                try:
+                    from models import Insumo as _Insumo
+                    from app import db as _db
+                    _ins = _db.session.get(_Insumo, int(_insumo_id))
+                    if _ins is not None:
+                        fracionavel = bool(_ins.fracionavel)
+                except Exception:
+                    pass
         # quantidades por item (dependem da qtd total do item)
         qtd_tec = (coef * qtd_item).quantize(Decimal('0.0001'))
         deve_arredondar = (not fracionavel) or (fator > Decimal('1'))

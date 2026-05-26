@@ -113,8 +113,8 @@ def insumo_novo():
         tipo_med = (request.form.get('tipo_medicao') or 'UNITARIO').upper()
         if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
             tipo_med = 'UNITARIO'
-        fracionavel_raw = request.form.get('fracionavel')
-        fracionavel = fracionavel_raw not in ('false', '0', 'nao', 'não')
+        fracionavel_vals = request.form.getlist('fracionavel')
+        fracionavel = 'true' in fracionavel_vals
         ins = Insumo(
             admin_id=aid,
             nome=nome,
@@ -167,9 +167,8 @@ def insumo_editar(insumo_id):
             if fator_com > 0:
                 ins.fator_comercial = fator_com
         ins.unidade_comercial = (request.form.get('unidade_comercial') or '').strip() or None
-        if 'fracionavel' in request.form:
-            fracionavel_raw = request.form.get('fracionavel')
-            ins.fracionavel = fracionavel_raw not in ('false', '0', 'nao', 'não')
+        fracionavel_vals = request.form.getlist('fracionavel')
+        ins.fracionavel = 'true' in fracionavel_vals
         tipo_med = (request.form.get('tipo_medicao') or 'UNITARIO').upper()
         if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
             tipo_med = 'UNITARIO'
