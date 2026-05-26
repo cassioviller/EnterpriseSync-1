@@ -544,7 +544,28 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
     if 'tarefa_pai_id' in data:
         pai_val = data['tarefa_pai_id']
-        tarefa.tarefa_pai_id = int(pai_val) if pai_val else None
+        novo_pai_id = int(pai_val) if pai_val else None
+        if novo_pai_id is not None:
+            # Evitar ciclo hierárquico: percorrer a cadeia ascendente do novo pai
+            # e garantir que tarefa_id não aparece como ancestral.
+            visitados = set()
+            cursor_id = novo_pai_id
+            ciclo = False
+            while cursor_id is not None:
+                if cursor_id == tarefa_id:
+                    ciclo = True
+                    break
+                if cursor_id in visitados:
+                    break  # cadeia corrompida, não loop infinito
+                visitados.add(cursor_id)
+                anc = TarefaCronograma.query.filter_by(id=cursor_id, admin_id=admin_id).first()
+                cursor_id = anc.tarefa_pai_id if anc else None
+            if ciclo:
+                return jsonify({
+                    'status': 'error',
+                    'msg': 'Hierarquia circular: uma tarefa não pode ser pai de seu próprio ancestral.',
+                }), 400
+        tarefa.tarefa_pai_id = novo_pai_id
 
     if 'ordem' in data:
         try:
@@ -610,14 +631,22 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
         id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).first_or_404()
 
-    # Desvincular filhas e tarefas que dependem desta como predecessora
-    TarefaCronograma.query.filter_by(tarefa_pai_id=tarefa_id).update({'tarefa_pai_id': None})
+    # Filhas: ao excluir um grupo intermediário, re-parentar os filhos para o
+    # avô (tarefa_pai_id do grupo excluído), preservando a hierarquia.
+    # Se o grupo excluído era raiz (sem pai), os filhos viram raiz também.
+    novo_pai = tarefa.tarefa_pai_id  # None se grupo raiz, id do avô se subgrupo
+    TarefaCronograma.query.filter_by(tarefa_pai_id=tarefa_id).update({'tarefa_pai_id': novo_pai})
     TarefaCronograma.query.filter_by(predecessora_id=tarefa_id).update({'predecessora_id': None})
 
     db.session.delete(tarefa)
     db.session.commit()
     logger.info(f"[OK] TarefaCronograma excluída id={tarefa_id} cliente={cliente_mode}")
-    return jsonify({'status': 'ok'})
+
+    # Devolver lista atualizada para o frontend re-renderizar hierarquia
+    todas = TarefaCronograma.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
+    ).order_by(TarefaCronograma.ordem, TarefaCronograma.id).all()
+    return jsonify({'status': 'ok', 'tarefas': [_tarefa_to_dict(t) for t in todas]})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

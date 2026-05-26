@@ -891,12 +891,39 @@ function initGanttToggle() {
 }
 
 // ── Toggle filhas ──
+// Oculta recursivamente todos os descendentes de um grupo e reseta o estado
+// de expansão dos subgrupos intermediários.
+function _ocultarDescendentes(paiId) {
+  const filhos = document.querySelectorAll(`.tarefa-row[data-pai="${paiId}"]`);
+  filhos.forEach(row => {
+    row.classList.add('d-none');
+    const childId = Number(row.dataset.id);
+    const childIcon = document.getElementById(`icon-${childId}`);
+    const childBtn  = childIcon?.closest('.toggle-btn');
+    if (childBtn) {
+      // Resetar estado do subgrupo para "fechado"
+      childBtn.dataset.expanded = 'false';
+      childIcon.className = 'fas fa-chevron-right fa-xs';
+      // Descer mais um nível (recursão)
+      _ocultarDescendentes(childId);
+    }
+  });
+}
+
 function toggleFilhas(paiId) {
-  const rows = document.querySelectorAll(`[data-pai="${paiId}"]`);
   const icon = document.getElementById(`icon-${paiId}`);
   const btn  = icon?.closest('.toggle-btn');
   const expanded = btn?.dataset.expanded === 'true';
-  rows.forEach(r => r.classList.toggle('d-none', expanded));
+
+  if (expanded) {
+    // Fechando: ocultar TODOS os descendentes em cascata
+    _ocultarDescendentes(paiId);
+  } else {
+    // Abrindo: mostrar apenas filhos diretos (subgrupos ficam recolhidos)
+    document.querySelectorAll(`.tarefa-row[data-pai="${paiId}"]`)
+      .forEach(r => r.classList.remove('d-none'));
+  }
+
   if (icon) icon.className = expanded ? 'fas fa-chevron-right fa-xs' : 'fas fa-chevron-down fa-xs';
   if (btn) btn.dataset.expanded = String(!expanded);
 }
@@ -1938,6 +1965,50 @@ async function excluirTarefa(id, nome, doContrato) {
     if (data.status === 'ok') {
       document.querySelector(`tr.tarefa-row[data-id="${id}"]`)?.remove();
       tarefas = tarefas.filter(t => t.id !== id);
+
+      // Se o backend devolveu a lista atualizada, sincronizar data-pai nas linhas
+      // que foram re-parentadas (filhos do grupo excluído herdaram um novo pai).
+      if (data.tarefas && data.tarefas.length) {
+        tarefas = data.tarefas;
+        // Atualizar data-pai e indentação de cada linha existente no DOM
+        data.tarefas.forEach(t => {
+          const row = document.querySelector(`tr.tarefa-row[data-id="${t.id}"]`);
+          if (!row) return;
+          const novoPai = t.tarefa_pai_id || '';
+          row.dataset.pai = novoPai;
+          // Indentação do nome
+          const nomeDiv = row.querySelector('.nome-cell > div');
+          if (nomeDiv) nomeDiv.style.paddingLeft = novoPai ? '22px' : '0';
+          // Classe de filho (escondido quando pai recolhido)
+          if (novoPai) {
+            row.classList.add('tarefa-filho');
+          } else {
+            row.classList.remove('tarefa-filho');
+            row.classList.remove('d-none');
+          }
+        });
+        // Recalcular quais linhas são tarefa-pai após a mudança
+        const paiIdsNovos = new Set(data.tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+        document.querySelectorAll('tr.tarefa-row').forEach(row => {
+          const rid = Number(row.dataset.id);
+          const ePai = paiIdsNovos.has(rid);
+          row.classList.toggle('tarefa-pai', ePai);
+          // Adicionar/remover botão de toggle no nome
+          const nomeDiv = row.querySelector('.nome-cell > div');
+          if (!nomeDiv) return;
+          const temToggle = !!nomeDiv.querySelector('.toggle-btn');
+          if (ePai && !temToggle) {
+            const placeholder = nomeDiv.querySelector('.toggle-placeholder');
+            if (placeholder) {
+              placeholder.outerHTML = `<button class="btn-toggle toggle-btn" onclick="toggleFilhas(${rid})" data-expanded="false" title="Expandir/recolher subtarefas"><i class="fas fa-chevron-right fa-xs" id="icon-${rid}"></i></button>`;
+            }
+          } else if (!ePai && temToggle) {
+            const btn = nomeDiv.querySelector('.toggle-btn');
+            if (btn) btn.outerHTML = '<span class="toggle-placeholder"></span>';
+          }
+        });
+      }
+
       renumerarTudo();
       renderGantt();
       toast('Tarefa excluída');
@@ -2216,15 +2287,20 @@ function initRowDrag() {
       const movedEl = evt.item;
       const movedId = parseInt(movedEl.dataset.id);
 
-      // Se o item movido é uma tarefa-pai, mantém o grupo coeso: arrasta os
-      // filhos imediatamente para logo após o pai. (Task #19 não suporta
-      // mover sub-itens entre pais, mas precisa preservar a hierarquia visual.)
+      // Se o item movido é uma tarefa-pai, mantém o grupo coeso: arrasta TODOS
+      // os descendentes (filhos, netos, etc.) para logo após o pai, preservando
+      // a ordem interna existente e suportando hierarquias aninhadas.
       if (movedEl.classList.contains('tarefa-pai')) {
-        const filhos = Array.from(
-          tbody.querySelectorAll(`.tarefa-row[data-pai="${movedId}"]`)
-        );
+        const coletarDescendentes = (grupId) => {
+          const result = [];
+          tbody.querySelectorAll(`.tarefa-row[data-pai="${grupId}"]`).forEach(c => {
+            result.push(c);
+            result.push(...coletarDescendentes(Number(c.dataset.id)));
+          });
+          return result;
+        };
         let anchor = movedEl;
-        filhos.forEach(c => { anchor.after(c); anchor = c; });
+        coletarDescendentes(movedId).forEach(c => { anchor.after(c); anchor = c; });
       }
 
       const newOrder = Array.from(tbody.querySelectorAll('.tarefa-row'))
