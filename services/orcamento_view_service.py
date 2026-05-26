@@ -28,11 +28,19 @@ def _q2(v) -> Decimal:
 
 
 def snapshot_from_servico(servico) -> list:
-    """Cria o snapshot inicial da composição a partir do catálogo do serviço."""
+    """Cria o snapshot inicial da composição a partir do catálogo do serviço.
+
+    Task #74 — separação semântica de conceitos de preço:
+      preco_unitario        = preco_embalagem (preço que se paga ao fornecedor)
+      preco_tecnico_unitario = preco_embalagem / fator_comercial (custo proporcional por unidade)
+      subtotal_unitario     = coef × preco_tecnico_unitario (custo técnico por 1 unidade do serviço)
+    """
     snap = []
     for c in (servico.composicoes or []):
         ins = c.insumo
-        preco = float(ins.preco_vigente()) if hasattr(ins, 'preco_vigente') else 0.0
+        preco_emb = float(ins.preco_vigente()) if hasattr(ins, 'preco_vigente') else 0.0
+        fator = float(ins.fator_comercial or 1) or 1.0
+        preco_tec = preco_emb / fator
         coef = float(c.coeficiente or 0)
         snap.append({
             'tipo': (ins.tipo or 'MATERIAL').upper(),
@@ -40,10 +48,12 @@ def snapshot_from_servico(servico) -> list:
             'nome': ins.nome,
             'unidade': c.unidade or ins.unidade or 'un',
             'coeficiente': coef,
-            'preco_unitario': preco,
-            'subtotal_unitario': round(coef * preco, 4),
+            'preco_unitario': preco_emb,                    # preço da embalagem (base de compra)
+            'preco_embalagem': preco_emb,                   # Task #74 — campo explícito para rastreabilidade
+            'preco_tecnico_unitario': round(preco_tec, 4),  # Task #74 — preço por unidade técnica
+            'subtotal_unitario': round(coef * preco_tec, 4),  # Task #74 — custo técnico correto (coef × preço_tec)
             # Task #19 — campos de quantidade comercial (snapshot do catálogo)
-            'fator_comercial': float(ins.fator_comercial or 1),
+            'fator_comercial': fator,
             'unidade_comercial': ins.unidade_comercial or None,
         })
     return snap
@@ -87,14 +97,18 @@ def recalcular_item(item, orcamento) -> dict:
     """
     snap = item.composicao_snapshot or []
     qtd_item = _d(item.quantidade)
-    custo_unit_tec = Decimal('0')   # técnico proporcional: Σ(coef × preço_unit)
+    custo_unit_tec = Decimal('0')   # técnico proporcional: Σ(coef × preço_tec)
     custo_compra = Decimal('0')     # real de compra: Σ(nº_pacotes × preço_emb)
     snap_norm = []
     for linha in snap:
         coef = _d(linha.get('coeficiente'))
-        preco = _d(linha.get('preco_unitario'))
-        sub_unit = (coef * preco).quantize(Decimal('0.0001'))
+        preco = _d(linha.get('preco_unitario'))   # preço da embalagem (backward compat)
         fator = _d(linha.get('fator_comercial') or 1) or Decimal('1')
+        # Task #74 — preço técnico por unidade = preço embalagem / fator_comercial
+        # Retrocompatível: snapshots legados têm preco_unitario = embalagem (fator divido aqui)
+        #                  novos snapshots também têm preco_unitario = embalagem (mesmo resultado)
+        preco_tec = (preco / fator).quantize(Decimal('0.00001')) if fator > Decimal('0') else Decimal('0')
+        sub_unit = (coef * preco_tec).quantize(Decimal('0.0001'))
         unidade_comercial = linha.get('unidade_comercial') or None
         # quantidades por item (dependem da qtd total do item)
         qtd_tec = (coef * qtd_item).quantize(Decimal('0.0001'))
@@ -104,7 +118,7 @@ def recalcular_item(item, orcamento) -> dict:
             from decimal import ROUND_CEILING
             multiplos = (qtd_tec / fator).to_integral_value(rounding=ROUND_CEILING)
             qtd_com = (multiplos * fator).quantize(Decimal('0.0001'))
-            # subtotal = nº de pacotes × preço do pacote (não qtd_técnica × preço)
+            # subtotal_compra = nº de pacotes × preço da embalagem (custo real de aquisição)
             sub_compra = (multiplos * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
             qtd_com = qtd_tec
@@ -115,8 +129,10 @@ def recalcular_item(item, orcamento) -> dict:
             'nome': linha.get('nome') or '',
             'unidade': linha.get('unidade') or 'un',
             'coeficiente': float(coef),
-            'preco_unitario': float(preco),
-            'subtotal_unitario': float(sub_unit),
+            'preco_unitario': float(preco),               # preço da embalagem (backward compat)
+            'preco_embalagem': float(preco),              # Task #74 — campo explícito
+            'preco_tecnico_unitario': float(preco_tec),   # Task #74 — preço por unidade técnica
+            'subtotal_unitario': float(sub_unit),         # Task #74 — custo técnico correto
             'fator_comercial': float(fator),
             'unidade_comercial': unidade_comercial,
             'quantidade_tecnica': float(qtd_tec),

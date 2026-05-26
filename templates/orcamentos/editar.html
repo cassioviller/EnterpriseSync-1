@@ -617,8 +617,8 @@
                   data-bs-toggle="tooltip">
                 Coef. (un / un. serviço)
               </th>
-              <th style="width:130px">Preço unit. (R$)</th>
-              <th style="width:120px" class="text-end" title="Custo deste insumo por 1 unidade do serviço (coef × preço)."
+              <th style="width:130px" title="Preço da embalagem / pacote pago ao fornecedor (base de cálculo de compra)." data-bs-toggle="tooltip">Preço embalagem (R$)</th>
+              <th style="width:120px" class="text-end" title="Custo técnico por 1 unidade do serviço: coef × (preço embalagem / fator). Comparável ao catálogo."
                   data-bs-toggle="tooltip">
                 Custo / un. serviço
               </th>
@@ -638,9 +638,9 @@
                   data-bs-toggle="tooltip">
                 Qtd. Compra
               </th>
-              <th style="width:130px" class="text-end" title="Custo total desta linha no item (qtd × coef × preço)."
+              <th style="width:130px" class="text-end" title="Custo real de compra desta linha: nº pacotes × preço embalagem. Representa o desembolso real ao fornecedor."
                   data-bs-toggle="tooltip">
-                Subtotal (R$)
+                Subtotal compra (R$)
               </th>
               <th style="width:40px"></th>
             </tr>
@@ -999,17 +999,18 @@ function recalcItem(form){
     }
     const subTotCell = tr.querySelector('.js-subtotal-tot');
     if (subTotCell) subTotCell.innerHTML = '<strong>' + fmtBRL(subTot) + '</strong>';
-    custoUnit += sub;        // custo_unitario: técnico (base de pricing e custo_total)
-    custoCompra += subTot;  // auxiliar: custo de compra (planejamento de materiais)
+    custoUnit += sub;        // custo técnico proporcional: Σ(coef × preço_emb / fator) — referência do catálogo
+    custoCompra += subTot;  // custo real de compra: Σ(nº_pacotes × preço_emb) — base de pricing e totais
   });
-  // Fórmula canônica idêntica a services/orcamento_view_service.py:
-  //   preco_unit = custo_unit / (1 - imp/100 - mar/100)
+  // Task #74 — alinha com recalcular_item() do backend:
+  //   custo_total  = custo_compra (custo real de aquisição, não custo_tec × qtd)
+  //   preco_unit   = (custo_compra / qtd) / divisor  (pricing sobre custo real médio)
+  //   venda_total  = custo_compra / divisor
   const divisor = 1 - (imp||0)/100 - (mar||0)/100;
   const erro = divisor <= 0;
-  // Espelha quantize(0.0001) do backend antes de multiplicar por qtd.
-  const precoUnit = erro ? 0 : Math.round((custoUnit / divisor) * 10000) / 10000;
-  const custoTot  = Math.round(custoUnit * qtd * 100) / 100;
-  const vendaTot  = Math.round(precoUnit * qtd * 100) / 100;
+  const custoTot  = Math.round(custoCompra * 100) / 100;
+  const precoUnit = erro ? 0 : Math.round(((custoCompra / (qtd || 1)) / divisor) * 10000) / 10000;
+  const vendaTot  = erro ? 0 : Math.round((custoCompra / divisor) * 100) / 100;
   const lucroTot  = Math.round((vendaTot - custoTot) * 100) / 100;
   form.querySelector('.js-custo').textContent = fmtBRL(custoTot);
   form.querySelector('.js-venda').textContent = fmtBRL(vendaTot);
