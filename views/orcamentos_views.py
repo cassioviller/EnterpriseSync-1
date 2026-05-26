@@ -405,6 +405,7 @@ def atualizar_item(item_id):
         ins_ids = request.form.getlist('comp_insumo_id')
         fatores = request.form.getlist('comp_fator_comercial')
         unids_com = request.form.getlist('comp_unidade_comercial')
+        fracs = request.form.getlist('comp_fracionavel')
         snap = []
         for i in range(len(nomes)):
             nm = (nomes[i] or '').strip()
@@ -412,6 +413,7 @@ def atualizar_item(item_id):
                 continue
             try:
                 fator_raw = fatores[i] if i < len(fatores) else '1'
+                frac_raw = fracs[i] if i < len(fracs) else 'true'
                 snap.append({
                     'tipo': (tipos[i] if i < len(tipos) else 'MATERIAL') or 'MATERIAL',
                     'insumo_id': int(ins_ids[i]) if i < len(ins_ids) and ins_ids[i] else None,
@@ -422,6 +424,7 @@ def atualizar_item(item_id):
                     'subtotal_unitario': 0.0,
                     'fator_comercial': _parse_br_number(fator_raw, 1.0) or 1.0,
                     'unidade_comercial': (unids_com[i] if i < len(unids_com) else '') or None,
+                    'fracionavel': frac_raw != 'false',  # Task #75
                 })
             except (ValueError, IndexError):
                 continue

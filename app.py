@@ -492,6 +492,18 @@ with app.app_context():
     db.create_all()
     logging.info("Database tables created/verified")
 
+    # Task #75 — adiciona coluna fracionavel ao insumo se ainda não existir
+    # (necessário para instâncias com banco criado antes desta task).
+    try:
+        with db.engine.connect() as _mc:
+            _mc.execute(db.text(
+                "ALTER TABLE insumo ADD COLUMN fracionavel BOOLEAN NOT NULL DEFAULT 1"
+            ))
+            _mc.commit()
+            logging.info("Migração Task #75: coluna fracionavel adicionada ao insumo")
+    except Exception:
+        pass  # coluna já existe — normal em toda reinicialização após a primeira
+
     # ------------------------------------------------------------------
     # Auto-seed demo Construtora Alfa (Task #113)
     # ------------------------------------------------------------------

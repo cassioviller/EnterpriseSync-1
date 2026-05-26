@@ -671,8 +671,10 @@
               {% set _qtd = it.quantidade|float if it.quantidade is not none else 0.0 %}
               {% set _fator_raw = c.get('fator_comercial', 1) if c is mapping else c.fator_comercial %}
               {% set _fator = _fator_raw|float if _fator_raw not in (none, '', 0) else 1.0 %}
+              {% set _fracionavel = (c.get('fracionavel', True) if c is mapping else True) %}
+              {% set _deve_arr = not _fracionavel or _fator > 1 %}
               {% set _qtd_tec = _coef * _qtd %}
-              {% set _qtd_com = ((_qtd_tec / _fator)|round(0, 'ceil') * _fator) if _fator > 1 else _qtd_tec %}
+              {% set _qtd_com = ((_qtd_tec / _fator)|round(0, 'ceil') * _fator) if _deve_arr else _qtd_tec %}
               <td class="text-end text-muted js-subtotal-unit">R$ {{ c.subtotal_unitario|num(4) }}</td>
               <td class="text-end text-muted js-consumo-tot">{{ _qtd_tec|num(4) }} {{ c.unidade }}</td>
               <td>
@@ -684,16 +686,17 @@
               </td>
               <td>
                 <input type="hidden" name="comp_unidade_comercial" value="{{ c.unidade_comercial or '' }}">
+                <input type="hidden" name="comp_fracionavel" value="{{ 'false' if not _fracionavel else 'true' }}">
                 <span class="form-control form-control-sm bg-light text-muted small"
                       title="Unidade de compra (catálogo — não editável aqui)">
                   {{ c.unidade_comercial or '—' }}
                 </span>
               </td>
               <td class="text-end js-qtd-comercial
-                {%- if _fator > 1 %} fw-bold text-warning{% else %} text-muted{% endif %}">
+                {%- if _deve_arr %} fw-bold text-warning{% else %} text-muted{% endif %}">
                 {{ _qtd_com|num(4) }} {{ c.unidade_comercial or c.unidade }}
               </td>
-              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (((_qtd_tec / _fator)|round(0, 'ceil')) * _preco)|brl if _fator > 1 else (_qtd_tec * _preco)|brl }}</strong></td>
+              <td class="text-end text-dark js-subtotal-tot"><strong>{{ (((_qtd_tec / _fator)|round(0, 'ceil')) * _preco)|brl if _deve_arr else (_qtd_tec * _preco)|brl }}</strong></td>
               <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
                 <i class="fas fa-times"></i></button></td>
             </tr>
@@ -912,6 +915,7 @@
     </td>
     <td>
       <input type="hidden" name="comp_unidade_comercial" value="">
+      <input type="hidden" name="comp_fracionavel" value="true">
       <span class="form-control form-control-sm bg-light text-muted small js-unidade-com-display" title="Un. Compra (catálogo)">—</span>
     </td>
     <td class="text-end text-muted js-qtd-comercial">—</td>
@@ -980,13 +984,17 @@ function recalcItem(form){
     const unCom = (unComEl && unComEl.value.trim()) ? unComEl.value.trim() : un;
     const fatorEl = tr.querySelector('input[name="comp_fator_comercial"]');
     const fator = getNum(fatorEl) || 1;
+    // Task #75 — fracionavel: false = ceil obrigatório mesmo com fator=1 (peça, barra, un…)
+    const fracEl = tr.querySelector('input[name="comp_fracionavel"]');
+    const fracionavel = !fracEl || fracEl.value !== 'false';
+    const deveArredondar = !fracionavel || fator > 1;
     const sub = coef * preco / fator;
     const qtdTec = coef * qtd;
-    // Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator (catálogo)
-    const qtdCom = fator > 1 ? Math.ceil(qtdTec / fator) * fator : qtdTec;
-    // nº de pacotes (multiplier para subtotal quando fator > 1)
-    const qtdPacotes = fator > 1 ? Math.ceil(qtdTec / fator) : qtdTec;
-    // subtotal = nº de pacotes × preço do pacote (não qtd_técnica × preço)
+    // Task #19/#75 — qtd_compra: arredonda para cima quando fator>1 OU insumo não fracionável
+    const qtdCom = deveArredondar ? Math.ceil(qtdTec / fator) * fator : qtdTec;
+    // nº de pacotes (multiplier para subtotal)
+    const qtdPacotes = deveArredondar ? Math.ceil(qtdTec / fator) : qtdTec;
+    // subtotal = nº de pacotes × preço do pacote (custo real de compra)
     const subTot = qtdPacotes * preco;
     const subCell = tr.querySelector('.js-subtotal-unit') || tr.children[5];
     if (subCell) subCell.textContent = 'R$ ' + fmtBR(sub, 4);
@@ -995,7 +1003,7 @@ function recalcItem(form){
     const qtdComCell = tr.querySelector('.js-qtd-comercial');
     if (qtdComCell) {
       qtdComCell.textContent = fmtBR(qtdCom, 4) + (unCom ? ' ' + unCom : '');
-      qtdComCell.className = 'text-end js-qtd-comercial ' + (fator > 1 ? 'fw-bold text-warning' : 'text-muted');
+      qtdComCell.className = 'text-end js-qtd-comercial ' + (deveArredondar ? 'fw-bold text-warning' : 'text-muted');
     }
     const subTotCell = tr.querySelector('.js-subtotal-tot');
     if (subTotCell) subTotCell.innerHTML = '<strong>' + fmtBRL(subTot) + '</strong>';
@@ -1232,6 +1240,9 @@ function _addInsumoRow(insumo) {
   if (unComHid) unComHid.value = unCom;
   const unComSpan = node.querySelector('.js-unidade-com-display');
   if (unComSpan) unComSpan.textContent = unCom || '—';
+  // Task #75 — propaga fracionavel do catálogo
+  const fracHid = node.querySelector('input[name="comp_fracionavel"]');
+  if (fracHid) fracHid.value = (insumo.fracionavel === false) ? 'false' : 'true';
   _pickerTbody.appendChild(node);
   recalcAll();
   bootstrap.Modal.getInstance(document.getElementById('insumoPickerModal')).hide();

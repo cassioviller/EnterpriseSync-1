@@ -113,6 +113,8 @@ def insumo_novo():
         tipo_med = (request.form.get('tipo_medicao') or 'UNITARIO').upper()
         if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
             tipo_med = 'UNITARIO'
+        fracionavel_raw = request.form.get('fracionavel')
+        fracionavel = fracionavel_raw not in ('false', '0', 'nao', 'não')
         ins = Insumo(
             admin_id=aid,
             nome=nome,
@@ -123,6 +125,7 @@ def insumo_novo():
             fator_comercial=fator_com,
             unidade_comercial=(request.form.get('unidade_comercial') or '').strip() or None,
             tipo_medicao=tipo_med,
+            fracionavel=fracionavel,
         )
         db.session.add(ins)
         db.session.flush()
@@ -164,6 +167,9 @@ def insumo_editar(insumo_id):
             if fator_com > 0:
                 ins.fator_comercial = fator_com
         ins.unidade_comercial = (request.form.get('unidade_comercial') or '').strip() or None
+        if 'fracionavel' in request.form:
+            fracionavel_raw = request.form.get('fracionavel')
+            ins.fracionavel = fracionavel_raw not in ('false', '0', 'nao', 'não')
         tipo_med = (request.form.get('tipo_medicao') or 'UNITARIO').upper()
         if tipo_med not in ('UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR'):
             tipo_med = 'UNITARIO'
@@ -746,6 +752,7 @@ def api_buscar_insumos():
         'coeficiente_padrao': float(i.coeficiente_padrao or 1),
         'fator_comercial': float(i.fator_comercial or 1),
         'unidade_comercial': i.unidade_comercial or None,
+        'fracionavel': bool(i.fracionavel) if i.fracionavel is not None else True,
     } for i in rows])
 
 

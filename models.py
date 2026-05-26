@@ -5984,11 +5984,16 @@ class Insumo(db.Model):
     coeficiente_padrao = db.Column(db.Numeric(15, 6), nullable=False, default=1)
     # Task #19 — Quantidade Comercial: embalagem/múltiplo de fornecimento.
     # fator_comercial = tamanho do pacote do fornecedor (ex: 100 parafusos, 6 m barra).
-    # 1.0 = compra unitária (sem arredondamento).
+    # 1.0 = compra unitária.
     # qtd_compra = ceil(qtd_técnica / fator_comercial) × fator_comercial.
     fator_comercial = db.Column(db.Numeric(15, 4), nullable=False, default=1)
     # Unidade comercial (ex: "pacote", "barra") — opcional; se vazio usa `unidade`.
     unidade_comercial = db.Column(db.String(30), nullable=True)
+    # Task #75 — fracionavel: True = pode comprar fração (kg, m, m², h…).
+    # False = unidade inteira obrigatória (peça, barra, chapa, un…) —
+    # força ceil mesmo quando fator_comercial = 1.
+    # Default True para retrocompatibilidade com dados existentes.
+    fracionavel = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     # Task #36 — tipo de medição dimensional (UNITARIO|AREA|PERIMETRO|PERIMETRO_PE_DIREITO|AREA_PE_DIREITO|LINEAR)
     tipo_medicao = db.Column(db.String(30), nullable=False, default='UNITARIO')
     ativo = db.Column(db.Boolean, default=True, nullable=False)

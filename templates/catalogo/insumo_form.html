@@ -80,6 +80,20 @@
               Rótulo da embalagem. Se vazio, usa a unidade técnica.
             </small>
           </div>
+          <div class="col-md-4 d-flex align-items-start pt-4">
+            <div class="form-check form-switch mt-1">
+              {% set _frac = insumo.fracionavel if insumo and insumo.fracionavel is not none else True %}
+              <input class="form-check-input" type="checkbox" role="switch"
+                     id="chk_fracionavel" name="fracionavel" value="true"
+                     {{ 'checked' if _frac else '' }}>
+              <label class="form-check-label" for="chk_fracionavel">
+                Permite compra fracionada
+                <i class="fas fa-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                   title="Marque para insumos contínuos (kg, m, m², h, l) onde a quantidade exata pode ser comprada. Desmarque para itens discretos (un, peça, barra, chapa, balde) onde a compra é sempre em número inteiro — 0,57 peça vira 1 peça."></i>
+              </label>
+              <small class="d-block form-text text-muted">Desmarcado = arredonda para cima mesmo com fator 1.</small>
+            </div>
+          </div>
           <div class="col-12">
             <label class="form-label">Descrição</label>
             <textarea name="descricao" class="form-control" rows="2">{{ insumo.descricao if insumo else '' }}</textarea>

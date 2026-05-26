@@ -55,6 +55,8 @@ def snapshot_from_servico(servico) -> list:
             # Task #19 — campos de quantidade comercial (snapshot do catálogo)
             'fator_comercial': fator,
             'unidade_comercial': ins.unidade_comercial or None,
+            # Task #75 — fracionavel: False → ceil mesmo quando fator=1 (peça, barra, un…)
+            'fracionavel': bool(ins.fracionavel) if ins.fracionavel is not None else True,
         })
     return snap
 
@@ -110,9 +112,12 @@ def recalcular_item(item, orcamento) -> dict:
         preco_tec = (preco / fator).quantize(Decimal('0.00001')) if fator > Decimal('0') else Decimal('0')
         sub_unit = (coef * preco_tec).quantize(Decimal('0.0001'))
         unidade_comercial = linha.get('unidade_comercial') or None
+        # Task #75 — fracionavel: False força ceil mesmo quando fator=1 (peça, barra, un…)
+        fracionavel = bool(linha.get('fracionavel', True))
         # quantidades por item (dependem da qtd total do item)
         qtd_tec = (coef * qtd_item).quantize(Decimal('0.0001'))
-        if fator > Decimal('1') and qtd_tec > Decimal('0'):
+        deve_arredondar = (not fracionavel) or (fator > Decimal('1'))
+        if deve_arredondar and qtd_tec > Decimal('0'):
             # Divisão inteira com arredondamento para cima em puro Decimal
             # (evita imprecisão de float ao converter Decimal → float → ceil)
             from decimal import ROUND_CEILING
@@ -135,6 +140,7 @@ def recalcular_item(item, orcamento) -> dict:
             'subtotal_unitario': float(sub_unit),         # Task #74 — custo técnico correto
             'fator_comercial': float(fator),
             'unidade_comercial': unidade_comercial,
+            'fracionavel': fracionavel,                   # Task #75 — propaga flag
             'quantidade_tecnica': float(qtd_tec),
             'quantidade_compra': float(qtd_com),
             'subtotal_compra': float(sub_compra),
