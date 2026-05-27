@@ -139,33 +139,36 @@
                                 </button>
                             </td>
                         </tr>
-                        <div class="modal fade" id="del{{ cat.id }}" tabindex="-1">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Excluir Categoria</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <p>Excluir <strong>{{ cat.nome }}</strong>?</p>
-                                        <p class="small text-muted mb-0">Categorias em uso por lançamentos de fluxo de caixa não podem ser excluídas.</p>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                        <form method="POST" action="{{ url_for('catalogos.categorias_fluxo_caixa_deletar', id=cat.id) }}" class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-danger">Excluir</button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
+
+    {% for cat in categorias %}
+    <div class="modal fade" id="del{{ cat.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Excluir Categoria</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Excluir <strong>{{ cat.nome }}</strong>?</p>
+                    <p class="small text-muted mb-0">Categorias em uso por lançamentos de fluxo de caixa não podem ser excluídas.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <form method="POST" action="{{ url_for('catalogos.categorias_fluxo_caixa_deletar', id=cat.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Excluir</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
     {% else %}
     <div class="alert alert-info border-0 shadow-sm">
         <i class="fas fa-info-circle me-2"></i>
