@@ -42,26 +42,11 @@ with app.app_context():
         logger.error(f"ERRO em executar_migracoes: {e}")
         sys.exit(1)
 
-    logger.info("Executando migracoes GestaoCustoPai (migrate_gestao_custos)...")
-    try:
-        import subprocess
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        migrate_script = os.path.join(script_dir, 'migrate_gestao_custos.py')
-        result = subprocess.run(
-            [sys.executable, migrate_script],
-            capture_output=True, text=True, timeout=120
-        )
-        if result.stdout:
-            logger.info(f"migrate_gestao_custos stdout: {result.stdout.strip()}")
-        if result.stderr:
-            logger.info(f"migrate_gestao_custos stderr: {result.stderr.strip()}")
-        if result.returncode != 0:
-            logger.error(f"migrate_gestao_custos falhou com codigo {result.returncode}")
-            sys.exit(1)
-        logger.info("migrate_gestao_custos concluido.")
-    except Exception as e:
-        logger.error(f"ERRO ao executar migrate_gestao_custos: {e}")
-        sys.exit(1)
+    # NOTA: o passo legado que tentava executar 'migrate_gestao_custos.py'
+    # foi removido — o arquivo nunca existiu na raiz e o subprocess
+    # retornava código 2, derrubando o deploy. A correção pontual de
+    # GestaoCustoPai do seed V2 vive em scripts/fix_gestao_custos_seed.py
+    # e roda sob demanda quando necessário (não pertence ao boot).
 
 logger.info("=== pre_start.py concluido com sucesso ===")
 sys.exit(0)

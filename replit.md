@@ -62,6 +62,7 @@ A multi-tenant business management system for SMBs, designed to automate and str
 - **Cross-tenant safety:** Demo reseed aborts if cross-tenant references detected
 - **APScheduler:** Not installed — scheduled jobs are disabled (non-critical)
 - **DeepFace model:** Downloads ~38MB SFace model on first boot; cached at `~/.deepface/weights/`
+- **RDOs legados em Rascunho:** A MIGRAÇÃO 154 foi aposentada do boot porque travava o deploy ao processar o pipeline de custos a cada inicialização. Para migrar RDOs em Rascunho legados, rodar sob demanda: `python scripts/migrar_rdos_rascunho_legados.py` (use `--dry-run` para listar antes; `--only 66,204` para escopo). RDOs que falharem aparecem em relatório claro para revisão humana, sem derrubar nada.
 
 ## Pointers
 - Flask: https://flask.palletsprojects.com/

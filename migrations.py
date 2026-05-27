@@ -3728,6 +3728,48 @@ def _migration_59_alimentacao_itens_sistema():
                 pass
 
 
+def _aposentar_migracoes_retiradas():
+    """Marca como 'success' no migration_history migrações que foram
+    removidas do boot mas precisam ficar registradas para nunca mais
+    serem re-executadas (idempotente — ON CONFLICT DO NOTHING).
+
+    Migrações aposentadas:
+      154 — Task #12 (RDO sempre Finalizado): saiu do boot porque rodava
+            o pipeline de custos a cada deploy e travava quando algum RDO
+            legado tinha funcionário sem cobertura. Agora roda sob demanda
+            via scripts/migrar_rdos_rascunho_legados.py.
+    """
+    try:
+        aposentadas = [
+            (154, "Task #12 — APOSENTADA do boot (roda via scripts/migrar_rdos_rascunho_legados.py)"),
+        ]
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        for num, nome in aposentadas:
+            cursor.execute(
+                """
+                INSERT INTO migration_history
+                  (migration_number, migration_name, executed_at, status)
+                VALUES (%s, %s, CURRENT_TIMESTAMP, 'success')
+                ON CONFLICT (migration_number) DO NOTHING
+                """,
+                (num, nome),
+            )
+        connection.commit()
+        cursor.close()
+        connection.close()
+        logger.info("✅ Migrações aposentadas marcadas no histórico (idempotente)")
+    except Exception as e:
+        logger.warning(f"⚠️  Falha ao aposentar migrações retiradas: {e}")
+        try:
+            if 'connection' in locals():
+                connection.rollback()
+                cursor.close()
+                connection.close()
+        except Exception:
+            pass
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -3746,6 +3788,10 @@ def executar_migracoes():
         logger.info("📋 Inicializando sistema de rastreamento...")
         ensure_migration_history_table()
         
+        # PASSO 1.5: Aposentar migrações que saíram do boot mas precisam
+        # ficar marcadas como 'success' no histórico (idempotente).
+        _aposentar_migracoes_retiradas()
+
         # PASSO 2: Carregar cache de migrações já aplicadas (1 query em vez de 164)
         logger.info("⚡ Carregando cache de migrações já aplicadas...")
         executed_cache = get_all_executed_migrations()
@@ -3904,7 +3950,12 @@ def executar_migracoes():
             (151, "Task #62 — vínculos Cronograma↔Subatividade↔Serviço↔Mão-de-obra", migration_151_vinculo_subatividade_composicao),
             (152, "Task #2 — rdo_custo_diario: tabela + índices parciais para custo diário de mão-de-obra", migration_152_rdo_custo_diario),
             (153, "Task #3 — composicao_servico_historico: histórico de alterações de coeficiente via métricas", migration_153_composicao_servico_historico),
-            (154, "Task #12 — RDO sempre Finalizado: migrar Rascunho legado via pipeline (custo diário + gestão custo filho + produtividade)", migration_154_force_rdo_finalizado),
+            # Migração 154 APOSENTADA do boot — agora roda sob demanda via
+            # scripts/migrar_rdos_rascunho_legados.py. Mantida marcada como
+            # 'success' no migration_history (via _aposentar_migracao_154)
+            # para garantir idempotência em ambientes que ainda não a tinham
+            # registrado. A função migration_154_force_rdo_finalizado segue
+            # viva como biblioteca usada pelo script avulso.
             (155, "Task #5 — RDO: drop coluna rdo_mao_obra.horas_extras (hora extra removida do RDO)", migration_155_drop_rdo_mao_obra_horas_extras),
             (156, "Task #7 — custo_obra.descricao: ampliar de VARCHAR(200) para VARCHAR(500) (RDO com muitas subatividades)", migration_156_custo_obra_descricao_500),
             (157, "Task #69 — backfill produtividade_real/indice_produtividade em RDOMaoObra para RDOs Finalizados com dados suficientes", migration_157_backfill_produtividade_rdo),
