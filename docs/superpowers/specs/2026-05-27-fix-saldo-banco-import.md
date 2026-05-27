@@ -1,139 +1,61 @@
 # Fix #1 — Saldo Bancário: Desacoplar Import + Arquitetura de Cálculo Real
 
 **Data:** 2026-05-27  
-**Escopo:** `importacao_views.py`, `gestao_custos_views.py`, `financeiro_service.py`, `BancoEmpresa`, `FluxoCaixa`  
+**Escopo:** `importacao_views.py`, `financeiro_views.py`, `financeiro_service.py`, `BancoEmpresa`, `FluxoCaixa`  
 **Tipo:** Bug crítico + pré-condição para saldo derivado
 
 ---
 
 ## Problema central
 
-`fluxo_caixa_confirmar()` commita saldo bancário **antes** de iniciar o import:
+`fluxo_caixa_confirmar()` commita saldo bancário **antes** do import:
 
 ```python
 db.session.commit()      # ← saldo gravado
 svc.importar(...)        # ← se falhar, saldo errado, import inexistente
 ```
 
-Esse é o bug a corrigir agora. O resto deste spec define o caminho para que
-`saldo_atual` seja eventualmente derivado de lançamentos reais — mas isso requer
-uma pré-condição que ainda não existe.
-
 ---
 
-## Decisão 1 — Arquitetura de saldo_atual: on-the-fly, sem persistência
-
-`saldo_atual` não será mais uma coluna gravada. Será uma função que computa
-sob demanda:
+## Três fases
 
 ```
-calcular_saldo_banco(banco_id, admin_id) =
-    banco.saldo_inicial
-    + Σ FluxoCaixa ENTRADA  (banco_id = id, data_movimento >= data_saldo_inicial)
-    - Σ FluxoCaixa SAIDA    (banco_id = id, data_movimento >= data_saldo_inicial)
+Fase 1  →  remove bug + adiciona UI de saldo_inicial no CRUD de banco
+Fase 2  →  banco_id obrigatório nos dois pontos de criação ausentes
+Fase 3  →  ativa calcular_saldo_banco() como fonte de verdade
 ```
 
-**Por que on-the-fly e não persistido com staleness marker:**  
-Persistir um valor derivado exige hookar todos os pontos de escrita de `FluxoCaixa`.
-Existem hoje pelo menos 4 pontos ativos de criação — 2 deles em `gestao_custos_views.py`
-sem `banco_id`. Qualquer hook que se esqueça de um ponto produz staleness silencioso,
-que é exatamente o problema que o staleness marker promete resolver mas não resolve
-(o marker só diz que está defasado, não corrije). On-the-fly elimina a classe inteira
-do problema ao custo de uma query indexada por leitura.
-
-**Pré-condição bloqueante:** on-the-fly só produz número correto quando
-`banco_id` é confiável em todos os registros relevantes. Isso não é verdade hoje.
-A coluna `saldo_atual` em `BancoEmpresa` é mantida intocada até que a
-pré-condição abaixo seja atendida.
-
-**Requisito de performance:** index composto `(banco_id, data_movimento)` em
-`fluxo_caixa` — já existente via `banco_id` FK. Confirmar ou adicionar index
-explícito na migração.
+Fase 1 vai para produção independente.  
+Fase 3 só ativa após Fase 2 validada em produção (critério abaixo).
 
 ---
 
-## Decisão 2 — Pré-condição: banco_id obrigatório em todos os pontos de escrita
+## Fase 1 — Fix imediato
 
-### Problema real
+### 1a. Remover bloco de saldo do import
 
-`banco_id` é nullable em `FluxoCaixa` e está ausente em dois pontos ativos:
+`importacao_views.py` — `fluxo_caixa_confirmar()`:
 
-| Arquivo | Função | banco_id? |
-|---------|--------|-----------|
-| `gestao_custos_views.py` ~L727 | pagamento de GestaoCustoPai | ❌ ausente |
-| `gestao_custos_views.py` ~L847 | pagamento parcial | ❌ ausente |
-| `financeiro_views.py` ~L387 | lançamento direto | ✅ presente |
-| `financeiro_views.py` ~L758 | lançamento direto | ✅ presente |
-| `services/importacao_excel.py` | import de fluxo | ✅ presente |
+- Remover o bloco `"Atualizar Saldo Inicial de Bancos"` inteiro (~20 linhas).
+- Remover os campos `saldo_inicial_<banco_id>` do template `preview_fluxo.html`.
+- Resultado: import passa a ter uma única transação atômica.
 
-Enquanto `banco_id` for ausente nesses pontos, qualquer cálculo derivado
-produz saldo menor que o real sem nenhum aviso. Não há solução de backfill
-para registros históricos sem banco_id — não se sabe a qual banco pertencem.
+### 1b. Adicionar data_saldo_inicial ao CRUD de banco existente
 
-### O que este spec define como escopo obrigatório
+`financeiro_views.py` tem duas rotas de criação de banco: `criar_banco()` (modal)
+e `novo_banco()` (página). Ambas já recebem `saldo_inicial`. Nesta fase:
 
-Antes de ativar `calcular_saldo_banco()` como fonte de verdade:
+- Adicionar `data_saldo_inicial` como campo opcional nos dois forms.
+- Regra de validação **apenas para escrita nova**:
+  se `saldo_inicial > 0` e `data_saldo_inicial` não informada → erro de validação,
+  não salva.
+- Bancos **existentes** com `saldo_inicial > 0` e `data_saldo_inicial = NULL`
+  não são bloqueados. A tela `listar_bancos` exibe um aviso inline por banco
+  nesse estado: *"Defina a data de referência do saldo inicial para habilitar
+  o cálculo automático."* Sem bloqueio de edição, sem migração forçada.
 
-1. **`gestao_custos_views.py` — dois pontos de criação de FluxoCaixa** precisam
-   receber `banco_id` como campo obrigatório no form de pagamento. Se o usuário
-   não selecionar um banco, o lançamento não cria FluxoCaixa (comportamento atual
-   já tem checkbox "criar lançamento no fluxo de caixa" — esse checkbox passa a
-   exigir banco selecionado).
+### 1c. Migração 186
 
-2. **Registros históricos sem `banco_id`** ficam fora do cálculo derivado para sempre,
-   a menos que o usuário os vincule manualmente via uma UI de reconciliação
-   (fora do escopo deste spec). A função `calcular_saldo_banco()` deve logar
-   quantos lançamentos do banco têm `banco_id = NULL` no período calculado,
-   para que o resultado possa ser marcado como "parcial" na UI se necessário.
-
-### O que NÃO é backfill automático
-
-Não existe migração que atribua `banco_id` a lançamentos históricos — não há
-dado no registro que permita inferir o banco com segurança. A tentativa
-produziria dados falsos. Lançamentos sem `banco_id` ficam fora do cálculo
-e isso é comunicado explicitamente.
-
----
-
-## Decisão 3 — Semântica de data_saldo_inicial
-
-Nova coluna em `BancoEmpresa`:
-
-```python
-data_saldo_inicial = db.Column(db.Date, nullable=True)
-```
-
-**Regra de negócio:**
-
-| saldo_inicial | data_saldo_inicial | Comportamento |
-|---|---|---|
-| 0 | NULL | soma todos os FluxoCaixa do banco desde sempre |
-| > 0 | NULL | inválido — validação impede salvar |
-| > 0 | data X | `saldo_inicial` representa saldo em X; soma FluxoCaixa a partir de X |
-
-**Por que `saldo_inicial > 0` + `data_saldo_inicial = NULL` é inválido:**  
-`saldo_inicial` existe para representar lançamentos históricos que não estão
-no sistema. Se `data_saldo_inicial` for NULL, o cálculo somaria `saldo_inicial`
-(que já resume um período) mais todos os lançamentos desde sempre — dupla
-contagem garantida. A validação deve ser feita na camada de serviço ao salvar
-`BancoEmpresa`, não apenas na UI.
-
----
-
-## O que muda em cada arquivo
-
-### Fase 1 — Fix imediato (bug do commit antecipado)
-
-**`importacao_views.py` — `fluxo_caixa_confirmar()`:**
-- Remover bloco `"Atualizar Saldo Inicial de Bancos"` (~20 linhas)
-- Remover campos `saldo_inicial_<id>` do template `preview_fluxo.html`
-- Resultado: import passa a ter uma única transação atômica
-
-**`models.py` — `BancoEmpresa`:**
-- Adicionar `data_saldo_inicial = db.Column(db.Date, nullable=True)`
-- Manter `saldo_atual` como está (ainda não é calculado on-the-fly)
-
-**`migrations.py` — migração 186:**
 ```sql
 ALTER TABLE banco_empresa
   ADD COLUMN IF NOT EXISTS data_saldo_inicial DATE;
@@ -143,108 +65,133 @@ CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_banco_data
   WHERE banco_id IS NOT NULL;
 ```
 
----
+Nenhum backfill de `data_saldo_inicial` em registros existentes — não há data
+confiável para inferir. Bancos existentes ficam em estado "incompleto" até o
+usuário preencher via UI.
 
-### Fase 2 — Pré-condição (banco_id obrigatório nos pagamentos)
+### Critérios de aceite — Fase 1
 
-**`gestao_custos_views.py` — dois pontos de criação de FluxoCaixa:**
-- Form de pagamento passa a exigir `banco_id` quando "criar lançamento no FC" está marcado
-- `FluxoCaixa(banco_id=banco_id_form, ...)` nos dois pontos
-- Validação: se `banco_id` não informado e checkbox marcado → erro de validação, não cria FC
-
----
-
-### Fase 3 — Saldo on-the-fly (só após Fase 2 em produção)
-
-**`financeiro_service.py` — nova função:**
-
-```python
-def calcular_saldo_banco(banco_id: int, admin_id: int) -> dict:
-    """
-    Retorna {'saldo': Decimal, 'cobertura_total': int, 'sem_banco_id': int}
-    Não persiste nada. Não faz commit.
-    """
-    banco = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
-    if not banco:
-        raise ValueError(f'BancoEmpresa {banco_id} não encontrado para admin {admin_id}')
-
-    q = FluxoCaixa.query.filter(
-        FluxoCaixa.admin_id == admin_id,
-        FluxoCaixa.banco_id == banco_id,
-    )
-    if banco.data_saldo_inicial:
-        q = q.filter(FluxoCaixa.data_movimento >= banco.data_saldo_inicial)
-
-    entradas = db.session.query(
-        db.func.coalesce(db.func.sum(FluxoCaixa.valor), 0)
-    ).filter(
-        FluxoCaixa.admin_id == admin_id,
-        FluxoCaixa.banco_id == banco_id,
-        FluxoCaixa.tipo_movimento == 'ENTRADA',
-        *([] if not banco.data_saldo_inicial else
-          [FluxoCaixa.data_movimento >= banco.data_saldo_inicial])
-    ).scalar()
-
-    saidas = db.session.query(
-        db.func.coalesce(db.func.sum(FluxoCaixa.valor), 0)
-    ).filter(
-        FluxoCaixa.admin_id == admin_id,
-        FluxoCaixa.banco_id == banco_id,
-        FluxoCaixa.tipo_movimento == 'SAIDA',
-        *([] if not banco.data_saldo_inicial else
-          [FluxoCaixa.data_movimento >= banco.data_saldo_inicial])
-    ).scalar()
-
-    sem_banco_id = FluxoCaixa.query.filter(
-        FluxoCaixa.admin_id == admin_id,
-        FluxoCaixa.banco_id == None,
-    ).count()
-
-    saldo = Decimal(str(banco.saldo_inicial or 0)) + Decimal(str(entradas)) - Decimal(str(saidas))
-
-    return {
-        'saldo': saldo,
-        'cobertura_parcial': sem_banco_id > 0,
-        'sem_banco_id': sem_banco_id,
-    }
-```
-
-**`BancoEmpresa` — coluna `saldo_atual` drop (migração 187, após Fase 2 validada):**
-
-```sql
--- Só executar após confirmar que banco_id está preenchido em >= 95% dos FluxoCaixa
-ALTER TABLE banco_empresa DROP COLUMN IF EXISTS saldo_atual;
-```
-
-Esta migração é separada e só executa após validação manual de cobertura.
-
----
-
-## Sequência de execução
-
-```
-Fase 1  → remove bug imediato, sem risco
-Fase 2  → torna banco_id confiável nos pagamentos de gestão de custos
-Fase 3  → ativa calcular_saldo_banco() + drop de saldo_atual (após validar cobertura)
-```
-
-Fase 1 pode ir para produção independente. Fases 2 e 3 são sequenciais.
-
----
-
-## Critérios de aceite por fase
-
-**Fase 1:**
-- [ ] `fluxo_caixa_confirmar()` sem nenhum `db.session.commit()` antes de `svc.importar()`
+- [ ] `fluxo_caixa_confirmar()` sem nenhum `commit` antes de `svc.importar()`
 - [ ] Falha no import → saldo bancário inalterado
 - [ ] Campo `saldo_inicial_<id>` removido do preview de import
+- [ ] Criar banco com `saldo_inicial > 0` sem `data_saldo_inicial` → erro de validação
+- [ ] Banco existente com `saldo_inicial > 0` e sem data → aviso na listagem, sem bloqueio
 - [ ] Migração 186 idempotente executada
 
-**Fase 2:**
-- [ ] Pagamento em `gestao_custos_views.py` exige banco selecionado para criar FC
-- [ ] Novos `FluxoCaixa` criados por pagamento de gestão de custos têm `banco_id` preenchido
+---
 
-**Fase 3:**
-- [ ] `calcular_saldo_banco()` retorna `cobertura_parcial: False` para novos bancos
-- [ ] Saldo exibido na UI vem de `calcular_saldo_banco()`, não de coluna persista
-- [ ] Coluna `saldo_atual` dropada após validação de cobertura >= 95%
+## Fase 2 — Pré-condição: banco_id em todos os pontos de escrita
+
+### Pontos atuais
+
+| Arquivo | Criação de FluxoCaixa | banco_id? |
+|---------|----------------------|-----------|
+| `gestao_custos_views.py` ~L727 | pagamento de GestaoCustoPai | ❌ |
+| `gestao_custos_views.py` ~L847 | pagamento parcial | ❌ |
+| `financeiro_views.py` ~L387 | lançamento direto | ✅ |
+| `financeiro_views.py` ~L758 | lançamento direto | ✅ |
+| `services/importacao_excel.py` | import de fluxo | ✅ |
+
+### O que muda
+
+Os dois pontos em `gestao_custos_views.py` passam a exigir `banco_id` no form
+de pagamento quando o checkbox "Criar lançamento no Fluxo de Caixa" está marcado.
+Se banco não selecionado e checkbox marcado → erro de validação, FC não criado.
+
+Registros históricos sem `banco_id` não têm backfill automático — não existe dado
+para inferir o banco. Ficam fora do cálculo derivado.
+
+### Critérios de aceite — Fase 2
+
+- [ ] Pagamento em `gestao_custos_views.py` com FC marcado exige banco selecionado
+- [ ] Novos FluxoCaixa criados via pagamento de gestão de custos têm `banco_id` preenchido
+- [ ] Nenhum novo FluxoCaixa criado por qualquer rota ativa sem `banco_id`
+
+---
+
+## Fase 3 — Cálculo on-the-fly (após Fase 2 validada)
+
+### Critério de ativação
+
+**100% dos FluxoCaixa criados após a data de deploy da Fase 2 têm `banco_id`
+preenchido.** Verificado via query antes de ativar:
+
+```sql
+SELECT COUNT(*)
+FROM fluxo_caixa
+WHERE created_at > '<data_deploy_fase2>'
+  AND banco_id IS NULL
+  AND admin_id IN (SELECT id FROM usuario WHERE tipo = 'admin');
+-- Resultado deve ser 0
+```
+
+Se não for zero, a Fase 2 tem pontos de escrita ainda descobertos. Não ativar.
+
+### calcular_saldo_banco()
+
+`financeiro_service.py` — nova função:
+
+```python
+def calcular_saldo_banco(banco_id: int, admin_id: int) -> Decimal:
+    """
+    Retorna saldo_atual calculado on-the-fly.
+    Não persiste nada. Não faz commit.
+
+    Formula:
+        saldo = banco.saldo_inicial
+              + Σ ENTRADA (banco_id, data >= data_saldo_inicial)
+              - Σ SAIDA   (banco_id, data >= data_saldo_inicial)
+
+    Lançamentos históricos sem banco_id ficam fora do cálculo por definição.
+    """
+```
+
+Sem retorno de cobertura, sem contagem de `banco_id = NULL`. A função calcula
+o saldo dos lançamentos que têm `banco_id` preenchido para este banco — ponto.
+O que está fora fica fora; isso é responsabilidade da Fase 2, não desta função.
+
+### saldo_atual → saldo_legado (rename, nunca drop)
+
+Migração 187:
+
+```sql
+ALTER TABLE banco_empresa
+  RENAME COLUMN saldo_atual TO saldo_legado;
+```
+
+`saldo_legado` é mantido como referência histórica e fallback de emergência.
+Nunca é dropado. A UI e `listar_bancos()` passam a exibir `calcular_saldo_banco()`
+como fonte de verdade; `saldo_legado` fica visível como "saldo anterior (legado)"
+apenas na tela de configuração do banco, para auditoria.
+
+### Atualização em listar_bancos()
+
+```python
+# Antes
+total_saldo = sum(b.saldo_atual for b in bancos if b.ativo)
+
+# Depois
+total_saldo = sum(calcular_saldo_banco(b.id, admin_id) for b in bancos if b.ativo)
+```
+
+### Critérios de aceite — Fase 3
+
+- [ ] Query de verificação retorna 0 FluxoCaixa sem banco_id criados após Fase 2
+- [ ] `calcular_saldo_banco()` retorna `Decimal`, sem campos de cobertura
+- [ ] `listar_bancos()` usa `calcular_saldo_banco()` — `saldo_legado` não aparece no total
+- [ ] Coluna `saldo_legado` existe, é somente leitura na UI do banco
+- [ ] Migração 187 idempotente
+
+---
+
+## Arquivos alterados por fase
+
+| Arquivo | Fase 1 | Fase 2 | Fase 3 |
+|---------|--------|--------|--------|
+| `importacao_views.py` | remove bloco saldo | — | — |
+| `templates/importacao/preview_fluxo.html` | remove campos saldo | — | — |
+| `financeiro_views.py` | add data_saldo_inicial nos forms + aviso listagem | banco_id obrigatório | usa calcular_saldo_banco() |
+| `gestao_custos_views.py` | — | banco_id obrigatório | — |
+| `financeiro_service.py` | — | — | add calcular_saldo_banco() |
+| `models.py` | add data_saldo_inicial | — | rename saldo_atual→saldo_legado |
+| `migrations.py` | migração 186 | — | migração 187 |
