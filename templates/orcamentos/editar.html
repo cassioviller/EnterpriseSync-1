@@ -160,8 +160,7 @@
   {% set _prop_aprovada = o.propostas_geradas | selectattr('status','equalto','aprovada') | list %}
   {% if _prop_aprovada %}
   {% set _p = _prop_aprovada[0] %}
-  <div class="alert alert-success d-flex align-items-center gap-3 mb-3"
-       style="border-left:5px solid #198754;">
+  <div class="alert alert-success d-flex align-items-center gap-3 mb-3">
       <i class="fas fa-check-circle fa-2x text-success flex-shrink-0"></i>
       <div class="flex-grow-1">
           <strong>Ciclo completo: Orçamento → Proposta → Obra</strong><br>
@@ -355,27 +354,27 @@
                 </select>
               </div>
               <div class="col add-dim-f-largura" style="display:none">
-                <label class="form-label small mb-1">Largura (m)</label>
+                <label class="form-label small mb-1" for="add-dim-largura">Largura (m)</label>
                 <input name="dim_largura" id="add-dim-largura" type="text" inputmode="decimal"
                        class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
               <div class="col add-dim-f-comprimento" style="display:none">
-                <label class="form-label small mb-1">Comprimento (m)</label>
+                <label class="form-label small mb-1" for="add-dim-comprimento">Comprimento (m)</label>
                 <input name="dim_comprimento" id="add-dim-comprimento" type="text" inputmode="decimal"
                        class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
               <div class="col add-dim-f-perimetro" style="display:none">
-                <label class="form-label small mb-1">Perímetro (m)</label>
+                <label class="form-label small mb-1" for="add-dim-perimetro">Perímetro (m)</label>
                 <input name="dim_perimetro" id="add-dim-perimetro" type="text" inputmode="decimal"
                        class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
               <div class="col add-dim-f-pe-direito" style="display:none">
-                <label class="form-label small mb-1">Pé-direito (m)</label>
+                <label class="form-label small mb-1" for="add-dim-pe-direito">Pé-direito (m)</label>
                 <input name="dim_pe_direito" id="add-dim-pe-direito" type="text" inputmode="decimal"
                        class="form-control form-control-sm" placeholder="0,00" oninput="calcDimAdd()">
               </div>
               <div class="col add-dim-f-area-manual" style="display:none">
-                <label class="form-label small mb-1">
+                <label class="form-label small mb-1" for="add-dim-area-manual">
                   Área total (m²) <span class="text-muted fst-italic" style="font-size:0.8em;">opcional — sobrepõe L×C</span>
                 </label>
                 <input name="dim_area_manual" id="add-dim-area-manual" type="text" inputmode="decimal"
@@ -398,12 +397,12 @@
   </div>
 
   <!-- Modal: Novo Serviço (Catálogo embedado) — Task #118 Passo 6 -->
-  <div class="modal fade" id="novoServicoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="novoServicoModal" tabindex="-1" aria-labelledby="novoServicoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="fas fa-plus-circle me-2"></i>Cadastrar novo serviço no Catálogo
+          <h5 class="modal-title" id="novoServicoModalLabel">
+            <i class="fas fa-plus-circle me-2" aria-hidden="true"></i>Cadastrar novo serviço no Catálogo
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
@@ -543,25 +542,29 @@
               <div class="col dim-it-f-largura" style="{{ '' if _tm in ('AREA','AREA_PE_DIREITO') else 'display:none' }}">
                 <label class="form-label small mb-1">Largura (m)</label>
                 <input name="dim_largura" type="text" inputmode="decimal" class="form-control form-control-sm"
-                       placeholder="0,00" value="{{ it.dim_largura|num(2) if it.dim_largura else '' }}"
+                       aria-label="Largura (m)" placeholder="0,00"
+                       value="{{ it.dim_largura|num(2) if it.dim_largura else '' }}"
                        oninput="calcDimItem(this)">
               </div>
               <div class="col dim-it-f-comprimento" style="{{ '' if _tm in ('AREA','AREA_PE_DIREITO','LINEAR') else 'display:none' }}">
                 <label class="form-label small mb-1">Comprimento (m)</label>
                 <input name="dim_comprimento" type="text" inputmode="decimal" class="form-control form-control-sm"
-                       placeholder="0,00" value="{{ it.dim_comprimento|num(2) if it.dim_comprimento else '' }}"
+                       aria-label="Comprimento (m)" placeholder="0,00"
+                       value="{{ it.dim_comprimento|num(2) if it.dim_comprimento else '' }}"
                        oninput="calcDimItem(this)">
               </div>
               <div class="col dim-it-f-perimetro" style="{{ '' if _tm in ('PERIMETRO','PERIMETRO_PE_DIREITO') else 'display:none' }}">
                 <label class="form-label small mb-1">Perímetro (m)</label>
                 <input name="dim_perimetro" type="text" inputmode="decimal" class="form-control form-control-sm"
-                       placeholder="0,00" value="{{ it.dim_perimetro|num(2) if it.dim_perimetro else '' }}"
+                       aria-label="Perímetro (m)" placeholder="0,00"
+                       value="{{ it.dim_perimetro|num(2) if it.dim_perimetro else '' }}"
                        oninput="calcDimItem(this)">
               </div>
               <div class="col dim-it-f-pe-direito" style="{{ '' if _tm in ('PERIMETRO_PE_DIREITO','AREA_PE_DIREITO') else 'display:none' }}">
                 <label class="form-label small mb-1">Pé-direito (m)</label>
                 <input name="dim_pe_direito" type="text" inputmode="decimal" class="form-control form-control-sm"
-                       placeholder="0,00" value="{{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '' }}"
+                       aria-label="Pé-direito (m)" placeholder="0,00"
+                       value="{{ it.dim_pe_direito|num(2) if it.dim_pe_direito else '' }}"
                        oninput="calcDimItem(this)">
               </div>
               <div class="col dim-it-f-area-manual" style="{{ '' if _tm in ('AREA','AREA_PE_DIREITO') else 'display:none' }}">
@@ -569,7 +572,8 @@
                   Área total (m²) <span class="text-muted fst-italic" style="font-size:0.8em;">opcional — sobrepõe L×C</span>
                 </label>
                 <input name="dim_area_manual" type="text" inputmode="decimal" class="form-control form-control-sm"
-                       placeholder="0,00" value="{{ it.dim_area_manual|num(2) if it.dim_area_manual else '' }}"
+                       aria-label="Área total (m²)" placeholder="0,00"
+                       value="{{ it.dim_area_manual|num(2) if it.dim_area_manual else '' }}"
                        oninput="calcDimItem(this)">
               </div>
               <div class="col-auto d-flex align-items-end dim-it-result-wrap" style="{{ '' if _tm != 'UNITARIO' else 'display:none' }}">
@@ -610,39 +614,39 @@
         <table class="table table-sm align-middle mb-2">
           <thead class="table-light">
             <tr>
-              <th style="width:130px">Tipo</th>
-              <th>Insumo / componente</th>
-              <th style="width:80px">Un.</th>
-              <th style="width:110px" title="Consumo do insumo para produzir 1 unidade do serviço (ex.: 0,347 placa por m²)."
+              <th scope="col" style="width:130px">Tipo</th>
+              <th scope="col">Insumo / componente</th>
+              <th scope="col" style="width:80px">Un.</th>
+              <th scope="col" style="width:110px" title="Consumo do insumo para produzir 1 unidade do serviço (ex.: 0,347 placa por m²)."
                   data-bs-toggle="tooltip">
                 Coef. (un / un. serviço)
               </th>
-              <th style="width:130px" title="Preço da embalagem / pacote pago ao fornecedor (base de cálculo de compra)." data-bs-toggle="tooltip">Preço embalagem (R$)</th>
-              <th style="width:120px" class="text-end" title="Custo técnico por 1 unidade do serviço: coef × (preço embalagem / fator). Comparável ao catálogo."
+              <th scope="col" style="width:130px" title="Preço da embalagem / pacote pago ao fornecedor (base de cálculo de compra)." data-bs-toggle="tooltip">Preço embalagem (R$)</th>
+              <th scope="col" style="width:120px" class="text-end" title="Custo técnico por 1 unidade do serviço: coef × (preço embalagem / fator). Comparável ao catálogo."
                   data-bs-toggle="tooltip">
                 Custo / un. serviço
               </th>
-              <th style="width:120px" class="text-end" title="Quantidade técnica: coef × quantidade do item. Calculado pelo projeto."
+              <th scope="col" style="width:120px" class="text-end" title="Quantidade técnica: coef × quantidade do item. Calculado pelo projeto."
                   data-bs-toggle="tooltip">
                 Qtd. Técnica
               </th>
-              <th style="width:90px" title="Embalagem/múltiplo de compra (ex: 100 parafusos, 6 m barra). Deixe 1 para compra unitária."
+              <th scope="col" style="width:90px" title="Embalagem/múltiplo de compra (ex: 100 parafusos, 6 m barra). Deixe 1 para compra unitária."
                   data-bs-toggle="tooltip">
                 Embalagem
               </th>
-              <th style="width:80px" title="Unidade comercial (ex: pacote, barra). Opcional."
+              <th scope="col" style="width:80px" title="Unidade comercial (ex: pacote, barra). Opcional."
                   data-bs-toggle="tooltip">
                 Un. Compra
               </th>
-              <th style="width:120px" class="text-end" title="Quantidade a comprar: mínimo múltiplo da embalagem ≥ qtd. técnica."
+              <th scope="col" style="width:120px" class="text-end" title="Quantidade a comprar: mínimo múltiplo da embalagem ≥ qtd. técnica."
                   data-bs-toggle="tooltip">
                 Qtd. Compra
               </th>
-              <th style="width:130px" class="text-end" title="Custo real de compra desta linha: nº pacotes × preço embalagem. Representa o desembolso real ao fornecedor."
+              <th scope="col" style="width:130px" class="text-end" title="Custo real de compra desta linha: nº pacotes × preço embalagem. Representa o desembolso real ao fornecedor."
                   data-bs-toggle="tooltip">
                 Subtotal compra (R$)
               </th>
-              <th style="width:40px"></th>
+              <th scope="col" style="width:40px"></th>
             </tr>
           </thead>
           <tbody class="comp-tbody">
@@ -650,7 +654,7 @@
             {% for c in _comp %}
             <tr>
               <td>
-                <select class="form-select form-select-sm" name="comp_tipo">
+                <select class="form-select form-select-sm" name="comp_tipo" aria-label="Tipo">
                   <option value="MAO_OBRA" {{ 'selected' if c.tipo=='MAO_OBRA' }}>Mão de obra</option>
                   <option value="MATERIAL" {{ 'selected' if c.tipo=='MATERIAL' }}>Material</option>
                   <option value="EQUIPAMENTO" {{ 'selected' if c.tipo=='EQUIPAMENTO' }}>Equipamento</option>
@@ -658,13 +662,13 @@
                 </select>
                 <input type="hidden" name="comp_insumo_id" value="{{ c.insumo_id or '' }}">
               </td>
-              <td><input class="form-control form-control-sm" name="comp_nome" value="{{ c.nome }}"></td>
-              <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="{{ c.unidade }}"></td>
+              <td><input class="form-control form-control-sm" name="comp_nome" aria-label="Insumo / componente" value="{{ c.nome }}"></td>
+              <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" aria-label="Unidade" value="{{ c.unidade }}"></td>
               <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
-                         name="comp_coeficiente"
+                         name="comp_coeficiente" aria-label="Coeficiente"
                          value="{{ c.coeficiente|num(4) if c.coeficiente not in (none, '') else '0,0000' }}"></td>
               <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001"
-                         name="comp_preco_unitario"
+                         name="comp_preco_unitario" aria-label="Preço embalagem"
                          value="{{ c.preco_unitario|num(4) if c.preco_unitario not in (none, '') else '0,0000' }}"></td>
               {% set _coef = c.coeficiente|float if c.coeficiente not in (none, '') else 0.0 %}
               {% set _preco = c.preco_unitario|float if c.preco_unitario not in (none, '') else 0.0 %}
@@ -697,8 +701,8 @@
                 {{ _qtd_com|num(4) }} {{ c.unidade_comercial or c.unidade }}
               </td>
               <td class="text-end text-dark js-subtotal-tot"><strong>{{ (((_qtd_tec / _fator)|round(0, 'ceil')) * _preco)|brl if _deve_arr else (_qtd_tec * _preco)|brl }}</strong></td>
-              <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
-                <i class="fas fa-times"></i></button></td>
+              <td><button type="button" class="btn btn-sm btn-link text-danger p-2" aria-label="Remover componente" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
+                <i class="fas fa-times" aria-hidden="true"></i></button></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -895,7 +899,7 @@
 <template id="comp-row-tmpl">
   <tr>
     <td>
-      <select class="form-select form-select-sm" name="comp_tipo">
+      <select class="form-select form-select-sm" name="comp_tipo" aria-label="Tipo">
         <option value="MAO_OBRA">Mão de obra</option>
         <option value="MATERIAL" selected>Material</option>
         <option value="EQUIPAMENTO">Equipamento</option>
@@ -903,10 +907,10 @@
       </select>
       <input type="hidden" name="comp_insumo_id" value="">
     </td>
-    <td><input class="form-control form-control-sm" name="comp_nome" placeholder="Descrição"></td>
-    <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" value="un"></td>
-    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_coeficiente" value="0"></td>
-    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_preco_unitario" value="0"></td>
+    <td><input class="form-control form-control-sm" name="comp_nome" aria-label="Insumo / componente" placeholder="Descrição"></td>
+    <td><input class="form-control form-control-sm js-unidade-insumo" name="comp_unidade" aria-label="Unidade" value="un"></td>
+    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_coeficiente" aria-label="Coeficiente" value="0"></td>
+    <td><input class="form-control form-control-sm" type="text" inputmode="decimal" step="0.0001" name="comp_preco_unitario" aria-label="Preço embalagem" value="0"></td>
     <td class="text-end text-muted js-subtotal-unit">—</td>
     <td class="text-end text-muted js-consumo-tot">—</td>
     <td>
@@ -920,8 +924,8 @@
     </td>
     <td class="text-end text-muted js-qtd-comercial">—</td>
     <td class="text-end text-dark js-subtotal-tot">—</td>
-    <td><button type="button" class="btn btn-sm btn-link text-danger" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
-      <i class="fas fa-times"></i></button></td>
+    <td><button type="button" class="btn btn-sm btn-link text-danger p-2" aria-label="Remover componente" onclick="if(confirm('Remover este componente da composição?')) this.closest('tr').remove();">
+      <i class="fas fa-times" aria-hidden="true"></i></button></td>
   </tr>
 </template>
 <script>
@@ -1309,11 +1313,11 @@ function _addInsumoRow(insumo) {
 </script>
 
 <!-- Modal: Picker de Insumo do Catálogo (Task #118) -->
-<div class="modal fade" id="insumoPickerModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="insumoPickerModal" tabindex="-1" aria-labelledby="insumoPickerLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-search me-2"></i>Adicionar insumo do Catálogo</h5>
+        <h5 class="modal-title" id="insumoPickerLabel"><i class="fas fa-search me-2" aria-hidden="true"></i>Adicionar insumo do Catálogo</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -1339,7 +1343,7 @@ function _addInsumoRow(insumo) {
         <div class="table-responsive" style="max-height:50vh;overflow:auto">
           <table class="table table-sm">
             <thead class="table-light"><tr>
-              <th>Insumo</th><th>Tipo</th><th>Un.</th><th class="text-end">Preço vigente</th>
+              <th scope="col">Insumo</th><th scope="col">Tipo</th><th scope="col">Un.</th><th scope="col" class="text-end">Preço vigente</th>
             </tr></thead>
             <tbody id="insumoPickerResults"></tbody>
           </table>

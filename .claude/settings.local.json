@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills *)",
+      "Bash(mkdir -p .claude/skills)",
+      "Bash(git clone *)",
+      "Read(//tmp/**)",
+      "Bash(cp /tmp/impeccable_tmp/PRODUCT.md /tmp/impeccable_tmp/DESIGN.md /tmp/impeccable_tmp/STYLE.md .)",
+      "Bash(rm -rf /tmp/impeccable_tmp)",
+      "Bash(grep -n \"style=\\\\|color:\\\\|background\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" templates/orcamentos/editar.html)",
+      "Bash(grep -rn \"#[0-9a-fA-F]\\\\{3,6\\\\}\" /home/runner/workspace/templates/orcamentos/ --include=\"*.html\")"
+    ]
+  }
+}
