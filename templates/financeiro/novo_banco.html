@@ -22,7 +22,7 @@
 
     <div class="card shadow-sm">
       <div class="card-body p-4">
-        <form method="POST">
+        <form method="POST" id="formNovoBanco">
 
           <div class="mb-3">
             <label class="form-label fw-semibold">Nome do Banco <span class="text-danger">*</span></label>
@@ -81,14 +81,17 @@
 
 {% block scripts %}
 <script>
-document.querySelector('form').addEventListener('submit', function(e) {
-    const saldo = parseFloat(document.getElementById('novoSaldoInicial').value || '0');
-    const data = document.getElementById('novoDataSaldoInicial').value;
-    if (saldo > 0 && !data) {
-        e.preventDefault();
-        alert('Informe a data de referência do saldo inicial.');
-        document.getElementById('novoDataSaldoInicial').focus();
-    }
-});
+const _formNovoBanco = document.getElementById('formNovoBanco');
+if (_formNovoBanco) {
+    _formNovoBanco.addEventListener('submit', function(e) {
+        const saldo = parseFloat(document.getElementById('novoSaldoInicial').value || '0');
+        const data = document.getElementById('novoDataSaldoInicial').value;
+        if (saldo > 0 && !data) {
+            e.preventDefault();
+            alert('Informe a data de referência do saldo inicial.');
+            document.getElementById('novoDataSaldoInicial').focus();
+        }
+    });
+}
 </script>
 {% endblock %}

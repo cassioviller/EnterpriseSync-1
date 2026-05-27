@@ -183,15 +183,18 @@
 
 <script>
 // Validação client-side: data obrigatória quando saldo inicial > 0
-document.querySelector('form[action*="criar_banco"]').addEventListener('submit', function(e) {
-    const saldo = parseFloat(document.getElementById('modalSaldoInicial').value || '0');
-    const data = document.getElementById('modalDataSaldoInicial').value;
-    if (saldo > 0 && !data) {
-        e.preventDefault();
-        alert('Informe a data de referência do saldo inicial.');
-        document.getElementById('modalDataSaldoInicial').focus();
-    }
-});
+const _formCriarBanco = document.querySelector('form[action*="criar_banco"]');
+if (_formCriarBanco) {
+    _formCriarBanco.addEventListener('submit', function(e) {
+        const saldo = parseFloat(document.getElementById('modalSaldoInicial').value || '0');
+        const data = document.getElementById('modalDataSaldoInicial').value;
+        if (saldo > 0 && !data) {
+            e.preventDefault();
+            alert('Informe a data de referência do saldo inicial.');
+            document.getElementById('modalDataSaldoInicial').focus();
+        }
+    });
+}
 
 function editarBanco(id) {
     // Implementar edição

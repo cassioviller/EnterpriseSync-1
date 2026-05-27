@@ -815,11 +815,6 @@ def pagar(pai_id):
         else:
             conta = conta_bancaria_manual_pagar
 
-        # Fase 2 Fix #1: banco obrigatório para registro de pagamento com FC
-        if not banco_id_str_pagar:
-            flash('Selecione o banco para registrar o pagamento no Fluxo de Caixa.', 'danger')
-            return redirect(url_for('gestao_custos.index'))
-
         # Valor autorizado (solicitado ou total)
         valor_autorizado = Decimal(str(pai.valor_solicitado or pai.valor_total))
         valor_pago_str = request.form.get('valor_pago', '').replace(',', '.')
@@ -860,6 +855,11 @@ def pagar(pai_id):
         }
         cat_fc = cat_mapa.get(pai.tipo_categoria, 'custo_obra')
         label = CATEGORIA_LABELS.get(pai.tipo_categoria, ('Custo',))[0]
+
+        # Fase 2 Fix #1: banco obrigatório para criar FluxoCaixa (pagar sempre cria FC)
+        if not banco_id_str_pagar:
+            flash('Selecione o banco para registrar o pagamento no Fluxo de Caixa.', 'danger')
+            return redirect(url_for('gestao_custos.index'))
 
         # Criar FluxoCaixa para o valor pago agora
         fc = FluxoCaixa(
