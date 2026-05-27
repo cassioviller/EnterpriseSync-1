@@ -1822,6 +1822,7 @@ class BancoEmpresa(db.Model):
     tipo_conta = db.Column(db.String(20))
     saldo_inicial = db.Column(db.Numeric(15, 2), default=0)
     saldo_atual = db.Column(db.Numeric(15, 2), default=0)
+    data_saldo_inicial = db.Column(db.Date, nullable=True)
     ativo = db.Column(db.Boolean, default=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

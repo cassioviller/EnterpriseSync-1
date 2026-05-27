@@ -742,49 +742,6 @@
   </div>
   {% endif %}
 
-  <!-- 6. SALDO INICIAL DE BANCOS -->
-  {% if bancos %}
-  <div class="mb-4">
-    <button class="btn btn-sm btn-outline-primary" type="button"
-            data-bs-toggle="collapse" data-bs-target="#saldoInicialCollapse">
-      <i data-feather="credit-card" style="width:14px;height:14px;"></i>
-      Saldo Inicial de Bancos ({{ bancos|length }}) — opcional
-    </button>
-    <div class="collapse mt-2" id="saldoInicialCollapse">
-      <div class="card border-0 shadow-sm" style="border-radius:14px;border-left:4px solid #0d6efd !important;">
-        <div class="card-header bg-transparent border-bottom py-2 px-4">
-          <small class="text-muted">
-            <i data-feather="info" style="width:12px;height:12px;"></i>
-            Informe o saldo inicial de cada conta bancária. Isso configura o ponto de partida para o controle de saldo.
-            Deixe em branco para não alterar.
-          </small>
-        </div>
-        <div class="card-body">
-          <div class="row g-3">
-            {% for b in bancos %}
-            <div class="col-md-6 col-lg-4">
-              <label class="form-label small fw-semibold text-muted text-uppercase">
-                {{ b.nome_banco }}
-                <small class="text-muted fw-normal">Ag {{ b.agencia }} / C {{ b.conta }}</small>
-              </label>
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">R$</span>
-                <input type="text" class="form-control"
-                       name="saldo_inicial_{{ b.id }}"
-                       placeholder="{{ '%.2f'|format(b.saldo_inicial or 0) }}"
-                       value="{{ '%.2f'|format(b.saldo_inicial) if b.saldo_inicial else '' }}">
-              </div>
-              {% if b.saldo_atual %}
-              <small class="text-muted">Saldo atual: {{ b.saldo_atual|brl }}</small>
-              {% endif %}
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
 
   <!-- Botão Confirmar -->
   <div class="d-flex gap-3 align-items-center mt-2">

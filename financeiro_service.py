@@ -698,7 +698,8 @@ class FinanceiroService:
     
     @staticmethod
     def criar_banco(admin_id: int, nome_banco: str, agencia: str,
-                   conta: str, tipo_conta: str, saldo_inicial: Decimal = Decimal('0')) -> BancoEmpresa:
+                   conta: str, tipo_conta: str, saldo_inicial: Decimal = Decimal('0'),
+                   data_saldo_inicial=None) -> BancoEmpresa:
         """Cria conta bancária"""
         try:
             banco = BancoEmpresa(
@@ -709,6 +710,7 @@ class FinanceiroService:
                 tipo_conta=tipo_conta,
                 saldo_inicial=saldo_inicial,
                 saldo_atual=saldo_inicial,
+                data_saldo_inicial=data_saldo_inicial,
                 ativo=True
             )
             

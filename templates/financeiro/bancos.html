@@ -50,8 +50,14 @@
                         <h4 class="{% if banco.saldo_atual >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {{ banco.saldo_atual|brl }}
                         </h4>
+                        {% if banco.saldo_inicial and banco.saldo_inicial > 0 and not banco.data_saldo_inicial %}
+                        <div class="alert alert-warning py-1 px-2 mt-1 mb-0" style="font-size:0.78rem;">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Defina a data de referência do saldo inicial para habilitar o cálculo automático.
+                        </div>
+                        {% endif %}
                     </div>
-                    
+
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-primary flex-fill" 
                                 onclick="editarBanco({{ banco.id }})">
@@ -149,8 +155,13 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Saldo Inicial *</label>
-                            <input type="number" name="saldo_inicial" class="form-control" 
+                            <input type="number" name="saldo_inicial" id="modalSaldoInicial" class="form-control"
                                    step="0.01" value="0.00" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data de Referência do Saldo</label>
+                            <input type="date" name="data_saldo_inicial" id="modalDataSaldoInicial" class="form-control">
+                            <div class="form-text">Obrigatório se saldo inicial &gt; 0.</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Status</label>
@@ -171,6 +182,17 @@
 </div>
 
 <script>
+// Validação client-side: data obrigatória quando saldo inicial > 0
+document.querySelector('form[action*="criar_banco"]').addEventListener('submit', function(e) {
+    const saldo = parseFloat(document.getElementById('modalSaldoInicial').value || '0');
+    const data = document.getElementById('modalDataSaldoInicial').value;
+    if (saldo > 0 && !data) {
+        e.preventDefault();
+        alert('Informe a data de referência do saldo inicial.');
+        document.getElementById('modalDataSaldoInicial').focus();
+    }
+});
+
 function editarBanco(id) {
     // Implementar edição
     alert('Editar banco ' + id);

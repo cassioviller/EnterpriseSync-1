@@ -841,7 +841,21 @@ def criar_banco():
         conta = request.form.get('conta')
         saldo_inicial = Decimal(request.form.get('saldo_inicial', '0'))
         ativo = request.form.get('ativo', '1') == '1'
-        
+
+        data_saldo_str = request.form.get('data_saldo_inicial', '').strip()
+        if saldo_inicial > 0 and not data_saldo_str:
+            flash('Informe a data de referência do saldo inicial.', 'danger')
+            return redirect(url_for('financeiro.listar_bancos'))
+
+        data_saldo_inicial = None
+        if data_saldo_str:
+            from datetime import date as date_type
+            try:
+                data_saldo_inicial = date_type.fromisoformat(data_saldo_str)
+            except ValueError:
+                flash('Data de saldo inicial inválida.', 'danger')
+                return redirect(url_for('financeiro.listar_bancos'))
+
         banco = BancoEmpresa(
             admin_id=admin_id,
             nome_banco=nome_banco,
@@ -850,6 +864,7 @@ def criar_banco():
             conta=conta,
             saldo_inicial=saldo_inicial,
             saldo_atual=saldo_inicial,
+            data_saldo_inicial=data_saldo_inicial,
             ativo=ativo
         )
         
@@ -879,14 +894,29 @@ def novo_banco():
             conta = request.form.get('conta')
             tipo_conta = request.form.get('tipo_conta')
             saldo_inicial = Decimal(request.form.get('saldo_inicial', '0'))
-            
+
+            data_saldo_str = request.form.get('data_saldo_inicial', '').strip()
+            if saldo_inicial > 0 and not data_saldo_str:
+                flash('Informe a data de referência do saldo inicial.', 'danger')
+                return render_template('financeiro/novo_banco.html')
+
+            data_saldo_inicial = None
+            if data_saldo_str:
+                from datetime import date as date_type
+                try:
+                    data_saldo_inicial = date_type.fromisoformat(data_saldo_str)
+                except ValueError:
+                    flash('Data de saldo inicial inválida.', 'danger')
+                    return render_template('financeiro/novo_banco.html')
+
             banco = FinanceiroService.criar_banco(
                 admin_id=admin_id,
                 nome_banco=nome_banco,
                 agencia=agencia,
                 conta=conta,
                 tipo_conta=tipo_conta,
-                saldo_inicial=saldo_inicial
+                saldo_inicial=saldo_inicial,
+                data_saldo_inicial=data_saldo_inicial,
             )
             
             flash(f'Banco {nome_banco} cadastrado com sucesso!', 'success')

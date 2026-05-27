@@ -55,8 +55,13 @@
               <label class="form-label fw-semibold">Saldo Inicial (R$)</label>
               <div class="input-group">
                 <span class="input-group-text">R$</span>
-                <input type="number" class="form-control" name="saldo_inicial" step="0.01" min="0" inputmode="decimal" value="0.00" placeholder="0,00">
+                <input type="number" class="form-control" name="saldo_inicial" id="novoSaldoInicial" step="0.01" min="0" inputmode="decimal" value="0.00" placeholder="0,00">
               </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Data de Referência do Saldo</label>
+              <input type="date" class="form-control" name="data_saldo_inicial" id="novoDataSaldoInicial">
+              <div class="form-text">Obrigatório se saldo inicial &gt; 0.</div>
             </div>
           </div>
 
@@ -72,4 +77,18 @@
 
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelector('form').addEventListener('submit', function(e) {
+    const saldo = parseFloat(document.getElementById('novoSaldoInicial').value || '0');
+    const data = document.getElementById('novoDataSaldoInicial').value;
+    if (saldo > 0 && !data) {
+        e.preventDefault();
+        alert('Informe a data de referência do saldo inicial.');
+        document.getElementById('novoDataSaldoInicial').focus();
+    }
+});
+</script>
 {% endblock %}
