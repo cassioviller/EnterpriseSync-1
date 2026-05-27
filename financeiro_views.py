@@ -388,7 +388,7 @@ def pagar_conta(conta_id):
                     admin_id=admin_id,
                     tipo_movimento='SAIDA',
                     data_movimento=data_pagamento,
-                    valor=float(valor_pago),
+                    valor=valor_pago,
                     descricao=f'Pagamento: {conta.descricao[:150] if conta.descricao else "Conta a pagar"}',
                     categoria='OUTROS',
                     banco_id=banco_id,

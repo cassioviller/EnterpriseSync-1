@@ -3937,6 +3937,7 @@ def executar_migracoes():
             (184, "Task #58 — Re-seed CategoriaFornecedor com lista completa de construção civil para todos os tenants", _migration_184_reseed_categoria_fornecedor),
             (185, "Task #75 — Insumo: adicionar coluna fracionavel (BOOLEAN NOT NULL DEFAULT TRUE) para controle de arredondamento de compra", _migration_185_insumo_fracionavel),
             (186, "Fix #1 Fase 1 — BancoEmpresa: data_saldo_inicial + índice fluxo_caixa(banco_id, data_movimento)", _migration_186_banco_data_saldo_inicial),
+            (188, "Fix #4 — FluxoCaixa.valor: converter FLOAT8 → NUMERIC(15,2) com arredondamento", _migration_188_fluxo_caixa_valor_numeric),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13266,6 +13267,34 @@ def _migration_185_insumo_fracionavel():
         logger.info("[Migration 185] Coluna fracionavel adicionada à tabela insumo (DEFAULT TRUE).")
     except Exception as e:
         logger.error(f"[Migration 185] Falha: {e}")
+        raise
+
+
+def _migration_188_fluxo_caixa_valor_numeric():
+    """Fix #4 — Converte fluxo_caixa.valor de FLOAT8 para NUMERIC(15,2).
+
+    ROUND(..., 2) absorve imprecisão de ponto flutuante nos dados existentes.
+    Idempotente: verifica o tipo atual antes de executar.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            result = conn.execute(sa_text("""
+                SELECT data_type
+                FROM information_schema.columns
+                WHERE table_name = 'fluxo_caixa' AND column_name = 'valor'
+            """)).fetchone()
+            if result and result[0] in ('double precision', 'real', 'float'):
+                conn.execute(sa_text("""
+                    ALTER TABLE fluxo_caixa
+                      ALTER COLUMN valor TYPE NUMERIC(15,2)
+                      USING ROUND(valor::numeric, 2)
+                """))
+                logger.info("[Migration 188] fluxo_caixa.valor convertido para NUMERIC(15,2).")
+            else:
+                logger.info("[Migration 188] fluxo_caixa.valor já é NUMERIC — skip.")
+    except Exception as e:
+        logger.error(f"[Migration 188] Falha: {e}")
         raise
 
 

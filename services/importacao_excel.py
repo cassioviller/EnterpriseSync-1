@@ -45,6 +45,27 @@ def _parse_float(v, default=0.0):
     except (ValueError, TypeError):
         return default
 
+
+def _parse_decimal(v, default=None):
+    """Converte valor para Decimal com 2 casas, sem perda de precisão de float.
+    Usa string intermediária para evitar imprecisão de ponto flutuante."""
+    from decimal import Decimal as _D, InvalidOperation
+    if default is None:
+        default = _D('0')
+    if isinstance(v, _D):
+        return v.quantize(_D('0.01'))
+    if isinstance(v, (int, float)):
+        return _D(str(round(v, 2)))
+    s = _norm(v).replace('R$', '').replace(' ', '')
+    if not s:
+        return default
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    try:
+        return _D(s).quantize(_D('0.01'))
+    except (ValueError, TypeError, InvalidOperation):
+        return default
+
 def _limpar_cpf(v):
     return re.sub(r'\D', '', _norm(v))[:11]
 
@@ -1920,7 +1941,7 @@ class ImportacaoFluxoCaixa:
             # Erros em qualquer linha propagam para o bloco externo que faz rollback total
             for row in dados.get('saidas', []):
                 cat = row.get('tipo_categoria') or 'OUTROS'
-                valor = float(row.get('valor') or 0)
+                valor = _parse_decimal(row.get('valor') or 0)
                 fornecedor = row.get('fornecedor') or 'Desconhecido'
                 data_str = row.get('data', '')
                 status = row.get('status', 'PENDENTE')
@@ -2075,7 +2096,7 @@ class ImportacaoFluxoCaixa:
 
             # ── Entradas ─────────────────────────────────────────────────────
             for row in dados.get('entradas', []):
-                valor = float(row.get('valor') or 0)
+                valor = _parse_decimal(row.get('valor') or 0)
                 cliente = row.get('cliente') or 'Desconhecido'
                 data_str = row.get('data', '')
                 status = row.get('status', 'PENDENTE')

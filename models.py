@@ -780,7 +780,7 @@ class FluxoCaixa(db.Model):
     data_movimento = db.Column(db.Date, nullable=False)
     tipo_movimento = db.Column(db.String(10), nullable=False)  # 'ENTRADA', 'SAIDA'
     categoria = db.Column(db.String(30), nullable=False)  # 'receita', 'custo_obra', 'custo_veiculo', 'alimentacao', 'salario'
-    valor = db.Column(db.Float, nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False)
     descricao = db.Column(db.String(200), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'))
