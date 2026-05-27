@@ -16,8 +16,11 @@
             <p class="text-muted mb-0">Classifique entradas e saídas financeiras</p>
         </div>
         <div class="col-auto d-flex gap-2 flex-wrap">
-            <a href="{{ url_for('catalogos.categorias_fluxo_caixa_exportar_modelo') }}" class="btn btn-outline-success">
+            <a href="{{ url_for('catalogos.categorias_fluxo_caixa_exportar_modelo') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-file-excel me-1"></i> Exportar Modelo
+            </a>
+            <a href="{{ url_for('catalogos.categorias_fluxo_caixa_exportar_atuais') }}" class="btn btn-outline-success">
+                <i class="fas fa-download me-1"></i> Exportar Categorias Atuais
             </a>
             <button type="button" class="btn btn-outline-primary"
                     data-bs-toggle="collapse" data-bs-target="#importarCollapse" aria-expanded="false">
@@ -40,7 +43,7 @@
                     Faça upload de um arquivo <code>.xlsx</code> com as colunas
                     <strong>Nome</strong>, <strong>Tipo</strong> (ENTRADA ou SAIDA),
                     <strong>Grupo Financeiro</strong> e <strong>Descrição</strong>.
-                    Categorias com mesmo nome e tipo serão ignoradas (sem duplicação).
+                    Categorias com mesmo nome e tipo serão <strong>atualizadas</strong>. Novas serão inseridas. Nenhuma será excluída.
                 </p>
                 <form method="POST" action="{{ url_for('catalogos.categorias_fluxo_caixa_importar') }}"
                       enctype="multipart/form-data" class="d-flex align-items-center gap-3 flex-wrap">

@@ -175,9 +175,7 @@ def categorias_fluxo_caixa_exportar_modelo():
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal='center')
-    ws.append(['Receita de Serviços', 'ENTRADA', 'Receitas Operacionais', 'Faturamento por prestação de serviços'])
-    ws.append(['Custo de Material', 'SAIDA', 'Custos Diretos', 'Materiais consumidos em obras'])
-    note_cell = ws.cell(row=4, column=1, value='NOTA: O campo Tipo deve ser exatamente ENTRADA ou SAIDA (sem acento).')
+    note_cell = ws.cell(row=2, column=1, value='NOTA: O campo Tipo deve ser exatamente ENTRADA ou SAIDA (sem acento).')
     note_cell.font = Font(italic=True, color='888888')
     ws.column_dimensions['A'].width = 30
     ws.column_dimensions['B'].width = 12
@@ -190,6 +188,52 @@ def categorias_fluxo_caixa_exportar_modelo():
         buf,
         as_attachment=True,
         download_name='modelo_categorias_fluxo_caixa.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@catalogos_bp.route('/categorias-fluxo-caixa/exportar-atuais', methods=['GET'])
+@login_required
+def categorias_fluxo_caixa_exportar_atuais():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    categorias = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(
+        CategoriaFluxoCaixa.tipo, CategoriaFluxoCaixa.nome
+    ).all()
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Categorias'
+    headers = ['Nome', 'Tipo', 'Grupo Financeiro', 'Descrição', 'Ativo']
+    header_fill = PatternFill(start_color='1e3a5f', end_color='1e3a5f', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF')
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+    for cat in categorias:
+        ws.append([
+            cat.nome,
+            cat.tipo,
+            cat.grupo_financeiro or '',
+            cat.descricao or '',
+            'TRUE' if cat.ativo else 'FALSE',
+        ])
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 28
+    ws.column_dimensions['D'].width = 45
+    ws.column_dimensions['E'].width = 8
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f'categorias_fluxo_caixa_{admin_id}.xlsx',
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
 
@@ -227,6 +271,7 @@ def categorias_fluxo_caixa_importar():
             flash('Cabeçalho não encontrado. Use o modelo disponível para download.', 'danger')
             return redirect(url_for('catalogos.categorias_fluxo_caixa'))
         criadas = 0
+        atualizadas = 0
         ignoradas = 0
         for rn in range(header_row + 1, ws.max_row + 1):
             nome = str(ws.cell(row=rn, column=col_nome).value or '').strip()
@@ -238,14 +283,7 @@ def categorias_fluxo_caixa_importar():
                 continue
             grupo_nome = str(ws.cell(row=rn, column=col_grupo).value or '').strip() if col_grupo else ''
             desc = str(ws.cell(row=rn, column=col_desc).value or '').strip() if col_desc else ''
-            existe = CategoriaFluxoCaixa.query.filter(
-                CategoriaFluxoCaixa.admin_id == admin_id,
-                db.func.lower(CategoriaFluxoCaixa.nome) == nome.lower(),
-                CategoriaFluxoCaixa.tipo == tipo,
-            ).first()
-            if existe:
-                ignoradas += 1
-                continue
+            # Resolver grupo financeiro (cria se não existir)
             grupo_id = None
             if grupo_nome:
                 gf = GrupoFinanceiro.query.filter(
@@ -258,6 +296,20 @@ def categorias_fluxo_caixa_importar():
                     db.session.add(gf)
                     db.session.flush()
                 grupo_id = gf.id
+            existe = CategoriaFluxoCaixa.query.filter(
+                CategoriaFluxoCaixa.admin_id == admin_id,
+                db.func.lower(CategoriaFluxoCaixa.nome) == nome.lower(),
+                CategoriaFluxoCaixa.tipo == tipo,
+            ).first()
+            if existe:
+                # Upsert: atualiza campos editáveis sem alterar nome, tipo, created_at
+                if grupo_nome:
+                    existe.grupo_financeiro = grupo_nome
+                    existe.grupo_financeiro_id = grupo_id
+                if desc:
+                    existe.descricao = desc
+                atualizadas += 1
+                continue
             cat = CategoriaFluxoCaixa(
                 nome=nome, tipo=tipo,
                 grupo_financeiro=grupo_nome or None,
@@ -270,10 +322,12 @@ def categorias_fluxo_caixa_importar():
         db.session.commit()
         partes = []
         if criadas:
-            partes.append(f'{criadas} categoria(s) criada(s)')
+            partes.append(f'{criadas} nova(s) inserida(s)')
+        if atualizadas:
+            partes.append(f'{atualizadas} atualizada(s)')
         if ignoradas:
-            partes.append(f'{ignoradas} ignorada(s) (duplicada ou tipo inválido)')
-        flash(', '.join(partes) + '.' if partes else 'Nenhuma linha processada.', 'success' if criadas else 'warning')
+            partes.append(f'{ignoradas} ignorada(s) (tipo inválido)')
+        flash(', '.join(partes) + '.' if partes else 'Nenhuma linha processada.', 'success' if (criadas or atualizadas) else 'warning')
     except Exception as e:
         logger.error(f'[IMPORTAR_CATEGORIAS] {e}', exc_info=True)
         flash(f'Erro ao processar arquivo: {e}', 'danger')
