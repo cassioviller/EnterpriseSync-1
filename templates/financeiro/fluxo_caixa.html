@@ -343,20 +343,7 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                      placeholder="Ex: Pagamento fornecedor, Recebimento cliente...">
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-semibold">Categoria (sistema)</label>
-              <select name="categoria" class="form-select">
-                {% for grupo_nome, grupo_itens in categorias_grupos %}
-                <optgroup label="{{ grupo_nome }}">
-                  {% for val, label in grupo_itens %}
-                  <option value="{{ val }}">{{ label }}</option>
-                  {% endfor %}
-                </optgroup>
-                {% endfor %}
-              </select>
-            </div>
-            {% if categorias_fc %}
-            <div class="col-md-4">
-              <label class="form-label fw-semibold">Categoria do catálogo</label>
+              <label class="form-label fw-semibold">Categoria</label>
               <select name="categoria_fluxo_caixa_id" class="form-select">
                 <option value="">— Nenhuma —</option>
                 {% for grupo, cats in categorias_fc | groupby('grupo_financeiro') %}
@@ -374,10 +361,12 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                 {% endfor %}
               </select>
               <div class="form-text">
+                {% if not categorias_fc %}
+                <span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Sem categorias cadastradas.</span>
+                {% endif %}
                 <a href="{{ url_for('catalogos.categorias_fluxo_caixa') }}" target="_blank">Gerenciar catálogos</a>
               </div>
             </div>
-            {% endif %}
             <div class="col-md-4">
               <label class="form-label fw-semibold">Banco (opcional)</label>
               <select name="banco_id" class="form-select">

@@ -692,13 +692,6 @@ def fluxo_caixa():
 
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
 
-    from gestao_custos_views import CATEGORIAS_GRUPOS as _CAT_GRUPOS, CATEGORIA_LABELS as _CAT_LABELS
-    # Converter de (grupo, [KEY, KEY, ...]) para (grupo, [(val, label), ...])
-    categorias_grupos = [
-        (grupo_nome, [(k, _CAT_LABELS.get(k, (k,))[0]) for k in chaves])
-        for grupo_nome, chaves in _CAT_GRUPOS
-    ]
-    
     categorias_fc = CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).order_by(
         CategoriaFluxoCaixa.grupo_financeiro.nullslast(),
         CategoriaFluxoCaixa.nome
@@ -711,7 +704,6 @@ def fluxo_caixa():
         obras=obras,
         centros_custo=centros_custo,
         bancos=bancos,
-        categorias_grupos=categorias_grupos,
         categorias_fc=categorias_fc,
         data_inicio=data_inicio,
         data_fim=data_fim
@@ -724,24 +716,18 @@ def novo_fluxo_caixa():
     """Cria um lançamento direto no FluxoCaixa (sem GCP)"""
     admin_id = get_admin_id()
     try:
-        from gestao_custos_views import CATEGORIA_LABELS as _CAT_LABELS
-        TIPOS_VALIDOS = {'ENTRADA', 'SAIDA'}
-        CATEGORIAS_VALIDAS = set(_CAT_LABELS.keys())
         tipo_movimento = request.form.get('tipo_movimento', 'SAIDA')
-        if tipo_movimento not in TIPOS_VALIDOS:
+        if tipo_movimento not in ('ENTRADA', 'SAIDA'):
             tipo_movimento = 'SAIDA'
         data_str = request.form.get('data_movimento', '').strip()
         data_mov = datetime.strptime(data_str, '%Y-%m-%d').date() if data_str else date.today()
         valor = abs(_parse_valor(request.form.get('valor', '0')))
         descricao = request.form.get('descricao', '').strip()[:200]
-        categoria = request.form.get('categoria', 'OUTROS')
-        if categoria not in CATEGORIAS_VALIDAS:
-            categoria = 'OUTROS'
         banco_id = request.form.get('banco_id', type=int) or None
         obra_id = request.form.get('obra_id', type=int) or None
         categoria_fc_id = request.form.get('categoria_fluxo_caixa_id', type=int) or None
 
-        # Validar que banco e obra pertencem ao tenant
+        # Validar banco e obra pertencem ao tenant
         if banco_id:
             bk = BancoEmpresa.query.filter_by(id=banco_id, admin_id=admin_id).first()
             if not bk:
@@ -750,9 +736,14 @@ def novo_fluxo_caixa():
             ob = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
             if not ob:
                 obra_id = None
+
+        # Derivar categoria do CFC; fallback por tipo_movimento
+        categoria = 'receita' if tipo_movimento == 'ENTRADA' else 'custo_obra'
         if categoria_fc_id:
             cfc = CategoriaFluxoCaixa.query.filter_by(id=categoria_fc_id, admin_id=admin_id).first()
-            if not cfc:
+            if cfc:
+                categoria = 'receita' if cfc.tipo == 'ENTRADA' else 'custo_obra'
+            else:
                 categoria_fc_id = None
 
         fc = FluxoCaixa(
