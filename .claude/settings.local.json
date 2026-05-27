@@ -8,7 +8,21 @@
       "Bash(cp /tmp/impeccable_tmp/PRODUCT.md /tmp/impeccable_tmp/DESIGN.md /tmp/impeccable_tmp/STYLE.md .)",
       "Bash(rm -rf /tmp/impeccable_tmp)",
       "Bash(grep -n \"style=\\\\|color:\\\\|background\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" templates/orcamentos/editar.html)",
-      "Bash(grep -rn \"#[0-9a-fA-F]\\\\{3,6\\\\}\" /home/runner/workspace/templates/orcamentos/ --include=\"*.html\")"
+      "Bash(grep -rn \"#[0-9a-fA-F]\\\\{3,6\\\\}\" /home/runner/workspace/templates/orcamentos/ --include=\"*.html\")",
+      "Bash(mkdir -p .claude/skills/impeccable)",
+      "Bash(mv .claude/skills/SKILL.md .claude/skills/impeccable/SKILL.md)",
+      "Bash(mv .claude/skills/agents .claude/skills/impeccable/agents)",
+      "Bash(mv .claude/skills/reference .claude/skills/impeccable/reference)",
+      "Bash(mv .claude/skills/scripts .claude/skills/impeccable/scripts)",
+      "Bash(rm -rf /tmp/superpowers)",
+      "Bash(xargs du -sh)",
+      "Bash(awk '{sum += $1} END {print sum \" KB total\"}')",
+      "Bash(xargs du -ch)",
+      "Bash(awk '{print $2}')",
+      "Bash(sed 's/\\(.*$//')",
+      "Bash(python3 -)",
+      "Bash(python3 -m py_compile migrations.py)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
