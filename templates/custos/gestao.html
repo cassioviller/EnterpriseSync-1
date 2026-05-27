@@ -950,6 +950,17 @@ function confirmarExclusao(form, entidade, status, valor) {
     }
     return confirm(msg);
 }
+
+// Fase 2 Fix #1: banco obrigatório quando checkbox FC está marcado
+document.getElementById('formAprovar').addEventListener('submit', function(e) {
+    const criarFC = document.getElementById('aprovarCriarFC').checked;
+    const banco = document.getElementById('aprovarBanco').value;
+    if (criarFC && !banco) {
+        e.preventDefault();
+        alert('Selecione o banco para criar o lançamento no Fluxo de Caixa.');
+        document.getElementById('aprovarBanco').focus();
+    }
+});
 </script>
   {% endif %}{# fim modo != 'novo' #}
 </div>{# container-fluid #}

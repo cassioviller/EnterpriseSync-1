@@ -722,6 +722,11 @@ def autorizar(pai_id):
         # Checkbox "Criar lançamento no Fluxo de Caixa" — marcado por padrão
         criar_fc = 'criar_fluxo_caixa' in request.form
 
+        # Fase 2 Fix #1: banco obrigatório quando FC marcado
+        if criar_fc and not banco_id_str:
+            flash('Selecione o banco para criar o lançamento no Fluxo de Caixa.', 'danger')
+            return redirect(url_for('gestao_custos.index'))
+
         fc = None
         if criar_fc:
             fc = FluxoCaixa(
@@ -734,6 +739,7 @@ def autorizar(pai_id):
                 referencia_id=pai.id,
                 referencia_tabela='gestao_custo_pai',
                 observacoes=conta or None,
+                banco_id=int(banco_id_str),
             )
             db.session.add(fc)
             db.session.flush()
@@ -800,7 +806,19 @@ def pagar(pai_id):
         data_pgto_str = request.form.get('data_pagamento', '')
         data_pgto = (datetime.strptime(data_pgto_str, '%Y-%m-%d').date()
                      if data_pgto_str else date.today())
-        conta = request.form.get('conta_bancaria', '').strip()
+
+        banco_id_str_pagar = request.form.get('banco_id', '').strip()
+        conta_bancaria_manual_pagar = request.form.get('conta_bancaria', '').strip()
+        if banco_id_str_pagar:
+            banco_obj = BancoEmpresa.query.filter_by(id=int(banco_id_str_pagar), admin_id=admin_id).first()
+            conta = f'{banco_obj.nome_banco} — Ag {banco_obj.agencia} / C {banco_obj.conta}' if banco_obj else conta_bancaria_manual_pagar
+        else:
+            conta = conta_bancaria_manual_pagar
+
+        # Fase 2 Fix #1: banco obrigatório para registro de pagamento com FC
+        if not banco_id_str_pagar:
+            flash('Selecione o banco para registrar o pagamento no Fluxo de Caixa.', 'danger')
+            return redirect(url_for('gestao_custos.index'))
 
         # Valor autorizado (solicitado ou total)
         valor_autorizado = Decimal(str(pai.valor_solicitado or pai.valor_total))
@@ -854,6 +872,7 @@ def pagar(pai_id):
             referencia_id=pai.id,
             referencia_tabela='gestao_custo_pai',
             observacoes=conta or None,
+            banco_id=int(banco_id_str_pagar),
         )
         db.session.add(fc)
         db.session.flush()
