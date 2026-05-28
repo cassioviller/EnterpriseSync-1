@@ -1476,6 +1476,46 @@ def visualizar_rdo(id):
         flash('Erro ao carregar RDO.', 'error')
         return redirect('/funcionario/rdo/consolidado')
 
+
+@main_bp.route('/rdo/<int:rdo_id>/pdf')
+@login_required
+def exportar_rdo_pdf(rdo_id):
+    """Exporta o RDO em PDF (server-side, sem depender do print do browser)."""
+    try:
+        if current_user.tipo_usuario == TipoUsuario.ADMIN:
+            admin_id_atual = current_user.id
+        else:
+            admin_id_atual = getattr(current_user, 'admin_id', None) or current_user.id
+
+        rdo = RDO.query.options(
+            db.joinedload(RDO.obra),
+            db.joinedload(RDO.criado_por),
+        ).join(Obra).filter(
+            RDO.id == rdo_id,
+            Obra.admin_id == admin_id_atual,
+        ).first()
+
+        if not rdo:
+            flash('RDO não encontrado.', 'error')
+            return redirect('/funcionario/rdo/consolidado')
+
+        from services.rdo_pdf_service import gerar_pdf_rdo
+        pdf_bytes = gerar_pdf_rdo(rdo)
+        if not pdf_bytes:
+            flash('Não foi possível gerar o PDF.', 'error')
+            return redirect(url_for('main.visualizar_rdo', id=rdo_id))
+
+        filename = f"{rdo.numero_rdo or f'rdo-{rdo.id}'}.pdf".replace('/', '-')
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    except Exception as e:
+        logger.error(f"ERRO EXPORTAR RDO PDF: {str(e)}")
+        flash('Erro ao gerar PDF do RDO.', 'error')
+        return redirect(url_for('main.visualizar_rdo', id=rdo_id))
+
+
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
 @admin_required
 def finalizar_rdo(id):
@@ -2164,11 +2204,14 @@ def funcionario_rdo_consolidado():
             page=page, per_page=per_page, error_out=False
         )
         
-        # Enriquecer dados dos RDOs  
+        # Enriquecer dados dos RDOs
         rdos_processados = []
         # Cache de "progresso geral V2" por (obra_id, data_relatorio) — evita
         # recalcular para RDOs do mesmo dia/obra dentro da mesma página.
         _cache_prog_v2: dict = {}
+        # Cache de "progresso geral V1" por (obra_id, data_relatorio): max
+        # percentual_conclusao por subatividade única até a data, depois média.
+        _cache_prog_v1: dict = {}
         # Memoize: a obra usa V2 (tem TarefaCronograma)?
         _cache_obra_v2: dict = {}
         from models import RDOApontamentoCronograma as _RAC
@@ -2225,9 +2268,28 @@ def funcionario_rdo_consolidado():
                     progresso_medio = _cache_prog_v2[cache_key]['progresso_geral_pct']
                     progresso_label = 'Progresso geral'
                 elif total_subatividades > 0:
-                    subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-                    progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades)
-                    progresso_label = 'Progresso do dia'
+                    # V1: progresso GERAL ACUMULADO até a data deste RDO.
+                    # Para cada nome_subatividade único da obra, pega o MAIOR
+                    # percentual_conclusao registrado em qualquer RDO até a
+                    # data atual; depois média desses máximos. Garante que o
+                    # card mostre o avanço acumulado (monotônico no tempo),
+                    # não a média de um único dia.
+                    ck_v1 = (obra.id, rdo.data_relatorio)
+                    if ck_v1 not in _cache_prog_v1:
+                        rows_v1 = db.session.query(
+                            RDOServicoSubatividade.nome_subatividade,
+                            db.func.max(RDOServicoSubatividade.percentual_conclusao),
+                        ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
+                            RDO.obra_id == obra.id,
+                            RDO.admin_id == admin_id_correto,
+                            RDO.data_relatorio <= rdo.data_relatorio,
+                        ).group_by(RDOServicoSubatividade.nome_subatividade).all()
+                        _cache_prog_v1[ck_v1] = (
+                            sum((pct or 0) for _, pct in rows_v1) / len(rows_v1)
+                            if rows_v1 else 0
+                        )
+                    progresso_medio = _cache_prog_v1[ck_v1]
+                    progresso_label = 'Progresso geral'
                 else:
                     progresso_medio = 0
                     progresso_label = 'Progresso'
@@ -2312,6 +2374,8 @@ def funcionario_rdo_consolidado():
             
             # Dados com cálculos reais para fallback
             rdos_fallback = []
+            # Cache V1 acumulado por (obra_id, data_relatorio) — mesma lógica do path principal.
+            _fb_cache_prog_v1: dict = {}
             for rdo in rdos_basicos:
                 # [CONFIG] CALCULAR VALORES REAIS NO FALLBACK
                 try:
@@ -2322,11 +2386,26 @@ def funcionario_rdo_consolidado():
                     # (mesma lógica do path principal, p/ paridade do fallback).
                     mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                     total_funcionarios = len({mo.funcionario_id for mo in mao_obra_lista if mo.funcionario_id})
-                    
-                    # Calcular progresso médio real — V1: subatividades, V2: apontamentos cronograma
+
+                    # Progresso geral acumulado — V1: max % por subatividade
+                    # única até a data; V2 puro: média dos apontamentos do dia.
                     subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
                     if subatividades:
-                        progresso_medio = sum(s.percentual_conclusao for s in subatividades) / len(subatividades)
+                        ck_v1 = (rdo.obra_id, rdo.data_relatorio)
+                        if ck_v1 not in _fb_cache_prog_v1:
+                            rows_v1 = db.session.query(
+                                RDOServicoSubatividade.nome_subatividade,
+                                db.func.max(RDOServicoSubatividade.percentual_conclusao),
+                            ).join(RDO, RDOServicoSubatividade.rdo_id == RDO.id).filter(
+                                RDO.obra_id == rdo.obra_id,
+                                RDO.admin_id == admin_id_correto,
+                                RDO.data_relatorio <= rdo.data_relatorio,
+                            ).group_by(RDOServicoSubatividade.nome_subatividade).all()
+                            _fb_cache_prog_v1[ck_v1] = (
+                                sum((pct or 0) for _, pct in rows_v1) / len(rows_v1)
+                                if rows_v1 else 0
+                            )
+                        progresso_medio = _fb_cache_prog_v1[ck_v1]
                     else:
                         from models import RDOApontamentoCronograma as _RAC
                         aps = _RAC.query.filter_by(rdo_id=rdo.id).all()
@@ -2359,6 +2438,7 @@ def funcionario_rdo_consolidado():
                     'total_funcionarios': total_funcionarios,
                     'total_horas_trabalhadas': round(total_horas_trabalhadas, 1),
                     'progresso_medio': round(progresso_medio, 1),
+                    'progresso_label': 'Progresso geral',
                     'status_cor': {
                         'Finalizado': 'success',
                         'Aprovado': 'info'
