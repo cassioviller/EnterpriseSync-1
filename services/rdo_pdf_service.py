@@ -23,8 +23,8 @@ from reportlab.platypus import (
 from app import db
 from models import (
     RDO, RDOMaoObra, RDOServicoSubatividade, RDOEquipamento, RDOOcorrencia,
-    RDOApontamentoCronograma, ConfiguracaoEmpresa, EngenheiroResponsavel,
-    Funcionario, TarefaCronograma,
+    RDOApontamentoCronograma, RDOFoto, ConfiguracaoEmpresa,
+    EngenheiroResponsavel, Funcionario, TarefaCronograma,
 )
 from utils.rdo_horas import normalizar_horas_funcionario
 
@@ -77,6 +77,52 @@ def _logo_image(config, max_w=110, max_h=42):
     raw = re.sub(r'^data:image/[^;]+;base64,', '', raw)
     try:
         data = base64.b64decode(raw)
+        reader = ImageReader(BytesIO(data))
+        iw, ih = reader.getSize()
+        if not iw or not ih:
+            return None
+        ratio = min(max_w / iw, max_h / ih)
+        return Image(BytesIO(data), width=iw * ratio, height=ih * ratio)
+    except Exception:
+        return None
+
+
+def _foto_image(foto, max_w=255, max_h=160):
+    """Renderiza uma RDOFoto em Image. Prefere a versão otimizada
+    (1200px) → thumbnail (300px) → original → caminho_arquivo no disco.
+    Mantém aspect ratio."""
+    raw = None
+    for attr in ('imagem_otimizada_base64', 'thumbnail_base64', 'imagem_original_base64'):
+        val = (getattr(foto, attr, None) or '').strip()
+        if val:
+            raw = val
+            break
+    data = None
+    if raw:
+        raw = re.sub(r'^data:image/[^;]+;base64,', '', raw)
+        try:
+            data = base64.b64decode(raw)
+        except Exception:
+            data = None
+    if not data and foto.caminho_arquivo:
+        # Fallback: ler do disco (caminho relativo a static/)
+        import os
+        candidates = [
+            foto.caminho_arquivo,
+            os.path.join('static', foto.caminho_arquivo),
+            os.path.join('/home/runner/workspace/static', foto.caminho_arquivo.lstrip('/')),
+        ]
+        for path in candidates:
+            try:
+                if os.path.exists(path):
+                    with open(path, 'rb') as fp:
+                        data = fp.read()
+                    break
+            except Exception:
+                continue
+    if not data:
+        return None
+    try:
         reader = ImageReader(BytesIO(data))
         iw, ih = reader.getSize()
         if not iw or not ih:
@@ -211,9 +257,13 @@ def _build_styles():
 
 
 def _section_rule(label, styles):
-    """Cabeçalho de seção compacto: 1 linha com filete inferior em PRIMARY."""
+    """Cabeçalho de seção compacto: 1 linha com filete inferior em PRIMARY.
+
+    hAlign='LEFT' impede o ReportLab de centralizar (ou encolher) a tabela
+    quando ela está dentro de um KeepTogether ao lado de outro flowable
+    mais estreito (ex.: grid de fotos com hAlign='LEFT')."""
     p = Paragraph(label.upper(), styles['section'])
-    wrap = Table([[p]], colWidths=[565])
+    wrap = Table([[p]], colWidths=[565], hAlign='LEFT')
     wrap.setStyle(TableStyle([
         ('LINEBELOW', (0, 0), (-1, -1), 0.8, PRIMARY),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
@@ -661,6 +711,68 @@ def gerar_pdf_rdo(rdo):
         elements.append(Paragraph(
             rdo.comentario_geral.replace('\n', '<br/>'), styles['body'],
         ))
+
+    # ── Registro Fotográfico ──
+    fotos = (
+        RDOFoto.query.filter_by(rdo_id=rdo.id)
+        .order_by(RDOFoto.ordem.asc().nulls_last(), RDOFoto.id.asc())
+        .limit(12)
+        .all()
+    )
+    if fotos:
+        foto_section_items = [_section_rule('Registro Fotográfico', styles)]
+        cell_w = 268
+        img_max_w = cell_w - 8
+        img_max_h = 150
+        cap_style = ParagraphStyle(
+            'foto_cap', parent=styles['body_muted'],
+            fontSize=7.5, leading=10, alignment=1,
+        )
+        cells = []
+        for idx, foto in enumerate(fotos, start=1):
+            img = _foto_image(foto, max_w=img_max_w, max_h=img_max_h)
+            if not img:
+                continue
+            legenda = (foto.legenda or foto.descricao or '').strip()
+            cap = f"Foto {idx}" + (f" — {legenda}" if legenda else "")
+            cell = Table([[img], [Paragraph(cap, cap_style)]], colWidths=[cell_w])
+            cell.setStyle(TableStyle([
+                ('BOX', (0, 0), (-1, -1), 0.4, BORDER),
+                ('LINEBELOW', (0, 0), (-1, 0), 0.3, BORDER),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            cells.append(cell)
+        # Agrupa em linhas de 2 colunas
+        rows = []
+        for i in range(0, len(cells), 2):
+            row = cells[i:i + 2]
+            while len(row) < 2:
+                row.append('')
+            rows.append(row)
+        if rows:
+            # Renderiza uma linha por vez. A primeira fica junto do título
+            # (KeepTogether) para não deixar o cabeçalho órfão. As demais
+            # linhas fluem normalmente e podem quebrar entre páginas.
+            for ridx, row in enumerate(rows):
+                grid = Table([row], colWidths=[cell_w, cell_w], hAlign='LEFT')
+                grid.setStyle(TableStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (0, -1), 12),
+                    ('RIGHTPADDING', (1, 0), (1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ]))
+                if ridx == 0:
+                    foto_section_items.append(grid)
+                    elements.append(KeepTogether(foto_section_items))
+                else:
+                    elements.append(grid)
 
     # ── Assinaturas ──
     sig_block = _signature_block(rdo, config, styles)

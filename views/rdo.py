@@ -2376,6 +2376,12 @@ def funcionario_rdo_consolidado():
             rdos_fallback = []
             # Cache V1 acumulado por (obra_id, data_relatorio) — mesma lógica do path principal.
             _fb_cache_prog_v1: dict = {}
+            # Cache V2 acumulado por (obra_id, data_relatorio) — espelha o path principal.
+            _fb_cache_prog_v2: dict = {}
+            # Cache de detecção V2 por obra_id.
+            _fb_cache_obra_v2: dict = {}
+            from models import TarefaCronograma as _TC_fb, RDOApontamentoCronograma as _RAC_fb
+            from utils.cronograma_engine import calcular_progresso_geral_obra_v2 as _calc_v2_fb
             for rdo in rdos_basicos:
                 # [CONFIG] CALCULAR VALORES REAIS NO FALLBACK
                 try:
@@ -2387,10 +2393,19 @@ def funcionario_rdo_consolidado():
                     mao_obra_lista = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
                     total_funcionarios = len({mo.funcionario_id for mo in mao_obra_lista if mo.funcionario_id})
 
-                    # Progresso geral acumulado — V1: max % por subatividade
-                    # única até a data; V2 puro: média dos apontamentos do dia.
-                    subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all()
-                    if subatividades:
+                    # Detectar se a obra opera em modo V2 (cache por obra_id).
+                    if rdo.obra_id not in _fb_cache_obra_v2:
+                        _fb_cache_obra_v2[rdo.obra_id] = (
+                            _TC_fb.query
+                            .filter_by(obra_id=rdo.obra_id, admin_id=admin_id_correto)
+                            .first() is not None
+                        )
+                    obra_em_v2_fb = _fb_cache_obra_v2[rdo.obra_id]
+
+                    # Progresso geral acumulado — espelha exatamente o path principal:
+                    # V1: max % por subatividade única até a data, depois média.
+                    # V2 puro: calcular_progresso_geral_obra_v2 (monotônico no tempo).
+                    if total_subatividades > 0:
                         ck_v1 = (rdo.obra_id, rdo.data_relatorio)
                         if ck_v1 not in _fb_cache_prog_v1:
                             rows_v1 = db.session.query(
@@ -2406,10 +2421,18 @@ def funcionario_rdo_consolidado():
                                 if rows_v1 else 0
                             )
                         progresso_medio = _fb_cache_prog_v1[ck_v1]
+                    elif obra_em_v2_fb:
+                        ck_v2 = (rdo.obra_id, rdo.data_relatorio)
+                        if ck_v2 not in _fb_cache_prog_v2:
+                            _fb_cache_prog_v2[ck_v2] = _calc_v2_fb(
+                                rdo.obra_id, rdo.data_relatorio, admin_id_correto
+                            )
+                        progresso_medio = _fb_cache_prog_v2[ck_v2].get('progresso_geral_pct', 0) or 0
+                        # Contar apontamentos de cronograma quando não há subatividades V1
+                        if total_subatividades == 0:
+                            total_subatividades = _RAC_fb.query.filter_by(rdo_id=rdo.id).count()
                     else:
-                        from models import RDOApontamentoCronograma as _RAC
-                        aps = _RAC.query.filter_by(rdo_id=rdo.id).all()
-                        progresso_medio = sum(a.percentual_realizado for a in aps) / len(aps) if aps else 0
+                        progresso_medio = 0
 
                     # Calcular horas trabalhadas reais (normalizadas)
                     from utils.rdo_horas import normalizar_horas_funcionario as _norm_horas
@@ -2430,6 +2453,7 @@ def funcionario_rdo_consolidado():
                     total_funcionarios = 0
                     progresso_medio = 0
                     total_horas_trabalhadas = 0
+                    obra_em_v2_fb = False
                 
                 rdos_fallback.append({
                     'rdo': rdo,
@@ -2438,7 +2462,8 @@ def funcionario_rdo_consolidado():
                     'total_funcionarios': total_funcionarios,
                     'total_horas_trabalhadas': round(total_horas_trabalhadas, 1),
                     'progresso_medio': round(progresso_medio, 1),
-                    'progresso_label': 'Progresso geral',
+                    'progresso_label': 'Progresso geral' if (total_subatividades > 0 or obra_em_v2_fb) else 'Progresso',
+                    'is_v2_progresso': obra_em_v2_fb,
                     'status_cor': {
                         'Finalizado': 'success',
                         'Aprovado': 'info'
