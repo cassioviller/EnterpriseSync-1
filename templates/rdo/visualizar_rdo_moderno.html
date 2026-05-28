@@ -1075,6 +1075,9 @@ console.log('Initializing RDO view with light theme...');
                 </div>
             </div>
             <div class="header-right">
+                <a href="{{ url_for('main.exportar_rdo_pdf', rdo_id=rdo.id) }}" class="btn-voltar" style="margin-right:.5rem;background:#dc3545;border-color:#dc3545;color:#fff;">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                </a>
                 <a href="{{ url_for('main.funcionario_rdo_consolidado') }}" class="btn-voltar">
                     <i class="fas fa-arrow-left"></i> Voltar
                 </a>

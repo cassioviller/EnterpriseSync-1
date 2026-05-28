@@ -22,7 +22,9 @@
       "Bash(sed 's/\\(.*$//')",
       "Bash(python3 -)",
       "Bash(python3 -m py_compile migrations.py)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(python -c \"import services.rdo_pdf_service as s; print\\('service ok:', s.gerar_pdf_rdo.__name__\\)\")",
+      "Bash(python -c ' *)"
     ]
   }
 }
