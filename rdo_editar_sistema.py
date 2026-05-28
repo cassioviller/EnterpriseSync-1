@@ -143,7 +143,6 @@ def editar_rdo_form(rdo_id):
             logger.warning(f"[WARN] Não foi possível carregar apontamentos V2 RDO {rdo_id}: {e_v2}")
 
         from services.dropdown_service import get_opcoes_valores
-        from flask_login import current_user
         from models import TipoUsuario
         _admin_id_rdo = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         return render_template('rdo/editar_rdo.html',
