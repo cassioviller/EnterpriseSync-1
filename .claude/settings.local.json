@@ -39,7 +39,13 @@
       "Bash(rm -f /tmp/rdo_v5-*.png)",
       "Bash(pdftoppm -r 110 -png /tmp/rdo_v5.pdf /tmp/rdo_v5)",
       "Bash(rm -f /tmp/rdo_v6-*.png)",
-      "Bash(pdftoppm -r 110 -png /tmp/rdo_v6.pdf /tmp/rdo_v6)"
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v6.pdf /tmp/rdo_v6)",
+      "Bash(awk '/^class RDO/{flag=1; name=$0} /^class [A-Z]/{if\\(!/^class RDO/\\){flag=0}} flag && /Column|observa|coment|descric/{print NR\": \"$0}' /home/runner/workspace/models.py)",
+      "Bash(awk *)",
+      "Bash(rm -f /tmp/rdo_v8-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v8.pdf /tmp/rdo_v8)",
+      "Bash(rm -f /tmp/rdo_v9-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v9.pdf /tmp/rdo_v9)"
     ]
   }
 }
