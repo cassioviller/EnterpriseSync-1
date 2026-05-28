@@ -24,7 +24,22 @@
       "Bash(python3 -m py_compile migrations.py)",
       "Bash(python3 -c ' *)",
       "Bash(python -c \"import services.rdo_pdf_service as s; print\\('service ok:', s.gerar_pdf_rdo.__name__\\)\")",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(node *)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_preview.pdf /tmp/rdo_preview)",
+      "Bash(rm /tmp/rdo_v2-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v2.pdf /tmp/rdo_v2)",
+      "Bash(rm -f /tmp/rdo_v3-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v3.pdf /tmp/rdo_v3)",
+      "Bash(rm -f /tmp/rdo_v4-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v4.pdf /tmp/rdo_v4)",
+      "Bash(python3 skills/ui-ux-pro-max/scripts/search.py \"construction report technical document professional\" --design-system -p \"SIGE RDO PDF\")",
+      "Bash(python3 /home/runner/workspace/.claude/skills/ui-ux-pro-max/scripts/search.py \"construction engineering report professional document technical\" --domain typography -n 4)",
+      "Bash(python3 /home/runner/workspace/.claude/skills/ui-ux-pro-max/scripts/search.py \"data dense table report layout hierarchy\" --domain ux -n 6)",
+      "Bash(rm -f /tmp/rdo_v5-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v5.pdf /tmp/rdo_v5)",
+      "Bash(rm -f /tmp/rdo_v6-*.png)",
+      "Bash(pdftoppm -r 110 -png /tmp/rdo_v6.pdf /tmp/rdo_v6)"
     ]
   }
 }
