@@ -11,7 +11,7 @@
         data-horas="{{ n.horas_estimadas or 0 }}"
         data-dias="{{ n.duracao_dias or 1 }}"
         data-sub-id="{{ n.subatividade_mestre_id or '' }}">
-        <span class="node-label">
+        <span class="node-label" data-testid="cronograma-node">
             <input type="checkbox" class="form-check-input chk-node"
                    data-pi-id="{{ pi_id }}"
                    {% if n.marcado %}checked{% endif %}>
@@ -327,7 +327,7 @@ ul.cron-tree .node-sub > .node-label {
             </a>
             <div class="d-flex gap-2 ms-auto">
                 <button type="button" id="btnSalvarPreconfig"
-                        class="btn btn-outline-primary">
+                        class="btn btn-outline-primary" data-testid="cronograma-preconfig-salvar">
                     <i class="fas fa-save me-1"></i>
                     Salvar pré-configuração (sem aprovar)
                 </button>

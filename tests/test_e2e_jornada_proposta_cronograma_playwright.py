@@ -274,3 +274,24 @@ class TestJornadaPropostaCronograma:
         st = _db(_state)
         assert st["pode"] is True, "proposta ainda não liberada para envio (revisão pendente)"
         assert st["servico_id"] == CTX.servico_id, "salvar a edição perdeu o vínculo do serviço"
+
+    def test_07_preconfig_cronograma(self, page: Page):
+        # Sem cronograma_default_json salvo, a aprovação cai no gate #200 e o
+        # cronograma NÃO materializa. Aqui pré-configuramos a partir do template
+        # de cronograma herdado do serviço (Alvenaria).
+        page.goto(f"{BASE_URL}/propostas/{CTX.proposta_id}/cronograma-revisar")
+        page.wait_for_load_state("networkidle")
+        nodes = page.locator("[data-testid=cronograma-node]")
+        expect(nodes.first).to_be_visible()
+        corpo = page.locator("body").inner_text()
+        for nome in ["Marcação", "Elevação", "Chapisco"]:
+            assert nome in corpo, f"subatividade do template Alvenaria ausente na árvore: {nome}"
+
+        page.click("[data-testid=cronograma-preconfig-salvar]")
+        page.wait_for_load_state("networkidle")
+
+        def _cdj():
+            from models import Proposta
+            return Proposta.query.get(CTX.proposta_id).cronograma_default_json
+
+        assert _db(_cdj), "cronograma_default_json não foi salvo (gate #200 não destravado)"
