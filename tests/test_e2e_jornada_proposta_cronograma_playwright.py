@@ -585,3 +585,24 @@ class TestJornadaPropostaCronograma:
         st = _db(_estado)
         assert st["status"] in ("rejeitada", "rejeitado"), f"status inesperado: {st['status']}"
         assert st["obra"] is None, "rejeição NÃO deveria gerar obra"
+
+    def test_15_naovazamento_pdf_e_listagem(self, page: Page):
+        # (a) o link do cliente NÃO deve expor custo interno / margem / lucro
+        ctx2 = page.context.browser.new_context()
+        cli = ctx2.new_page()
+        cli.set_default_timeout(TIMEOUT_MS)
+        cli.goto(f"{BASE_URL}/propostas/cliente/{CTX.token}")
+        cli.wait_for_load_state("networkidle")
+        texto = cli.locator("body").inner_text().lower()
+        for termo in ["custo", "margem", "lucro"]:
+            assert termo not in texto, f"portal do cliente vazou termo interno: '{termo}'"
+        ctx2.close()
+
+        # (b) o PDF da proposta responde 200 (geração funciona)
+        resp = page.request.get(f"{BASE_URL}/propostas/{CTX.proposta_id}/pdf")
+        assert resp.status == 200, f"PDF não gerou: HTTP {resp.status}"
+
+        # (c) a proposta aparece na listagem do admin
+        page.goto(f"{BASE_URL}/propostas/")
+        page.wait_for_load_state("networkidle")
+        assert CTX.numero_proposta in page.content(), "proposta não aparece na listagem admin"
