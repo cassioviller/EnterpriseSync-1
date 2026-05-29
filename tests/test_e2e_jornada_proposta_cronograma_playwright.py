@@ -344,3 +344,26 @@ class TestJornadaPropostaCronograma:
 
         # guarda a página do cliente para a etapa de aprovação
         type(self)._cli = cli
+
+    def test_10_cliente_aprova(self, page: Page):
+        cli = type(self)._cli
+        # abre o modal de aprovação e confirma
+        cli.click("[data-testid=portal-aprovar]")
+        confirmar = cli.locator("[data-testid=portal-aprovar-confirmar]")
+        expect(confirmar).to_be_visible()
+        confirmar.click()
+        cli.wait_for_load_state("networkidle")
+
+        def _estado():
+            from models import Proposta, Obra
+            p = Proposta.query.get(CTX.proposta_id)
+            obra = Obra.query.filter_by(proposta_origem_id=CTX.proposta_id).first()
+            return {
+                "status": (p.status or "").lower(),
+                "obra_id": obra.id if obra else None,
+            }
+
+        st = _db(_estado)
+        assert st["status"] in ("aprovada", "aprovado"), f"status inesperado: {st['status']}"
+        assert st["obra_id"], "aprovação não gerou a obra"
+        CTX.obra_id = st["obra_id"]
