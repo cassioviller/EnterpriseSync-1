@@ -105,6 +105,27 @@ def _nova_proposta_via_ui(pg, numero, cliente):
     return _db(_q)
 
 
+def _revisar_e_enviar(pg, pid):
+    """Marca cláusulas/campos como revisados e envia a proposta (status=enviada)."""
+    pg.goto(f"{BASE_URL}/propostas/editar/{pid}")
+    pg.wait_for_load_state("networkidle")
+    checks = pg.locator(".clausula-revisado-check")
+    for i in range(checks.count()):
+        checks.nth(i).check()
+    acks = pg.locator("input[name=campo_revisao_ack]")
+    for i in range(acks.count()):
+        acks.nth(i).check()
+    pg.click("[data-testid=proposta-editar-salvar]")
+    pg.wait_for_load_state("networkidle")
+    # re-navega ao editar (GET) — após salvar a revisão o botão Enviar fica
+    # habilitado; o POST de salvar pode ter redirecionado para outra página.
+    pg.goto(f"{BASE_URL}/propostas/editar/{pid}")
+    pg.wait_for_load_state("networkidle")
+    pg.once("dialog", lambda d: d.accept())
+    pg.click("[data-testid=proposta-enviar]")
+    pg.wait_for_load_state("networkidle")
+
+
 @pytest.fixture(scope="class")
 def page():
     with sync_playwright() as pw:
@@ -533,3 +554,34 @@ class TestJornadaPropostaCronograma:
         assert st["pode"] is False, "pode_enviar deveria ser False sem revisão"
         assert st["pendentes"] > 0, "esperava cláusulas pendentes de revisão"
         assert st["status"] == "rascunho", f"status deveria seguir rascunho: {st['status']}"
+
+    def test_14_cliente_rejeita(self, page: Page):
+        # fluxo negativo: proposta enviada e REJEITADA pelo cliente — não deve
+        # gerar obra nem cronograma.
+        numero = f"{CTX.numero_proposta}-REJ"
+        pid, token = _nova_proposta_via_ui(page, numero, f"Cliente REJ {SUF}")
+        assert pid and token, "proposta de rejeição não criada"
+        _revisar_e_enviar(page, pid)
+
+        # cliente abre o link (anônimo) e rejeita
+        ctx2 = page.context.browser.new_context()
+        cli = ctx2.new_page()
+        cli.set_default_timeout(TIMEOUT_MS)
+        cli.goto(f"{BASE_URL}/propostas/cliente/{token}")
+        cli.wait_for_load_state("networkidle")
+        cli.click("[data-testid=portal-rejeitar]")
+        confirmar = cli.locator("[data-testid=portal-rejeitar-confirmar]")
+        expect(confirmar).to_be_visible()
+        confirmar.click()
+        cli.wait_for_load_state("networkidle")
+        ctx2.close()
+
+        def _estado():
+            from models import Proposta, Obra
+            p = Proposta.query.get(pid)
+            obra = Obra.query.filter_by(proposta_origem_id=pid).first()
+            return {"status": (p.status or "").lower(), "obra": obra.id if obra else None}
+
+        st = _db(_estado)
+        assert st["status"] in ("rejeitada", "rejeitado"), f"status inesperado: {st['status']}"
+        assert st["obra"] is None, "rejeição NÃO deveria gerar obra"
