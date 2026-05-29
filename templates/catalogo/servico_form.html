@@ -12,15 +12,15 @@
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Nome <span class="text-danger">*</span></label>
-            <input name="nome" required class="form-control" placeholder="Ex.: Alvenaria de bloco cerâmico">
+            <input name="nome" required class="form-control" data-testid="servico-nome" placeholder="Ex.: Alvenaria de bloco cerâmico">
           </div>
           <div class="col-md-3">
             <label class="form-label">Categoria</label>
-            <input name="categoria" class="form-control" placeholder="Ex.: Estrutura" value="Geral">
+            <input name="categoria" class="form-control" data-testid="servico-categoria" placeholder="Ex.: Estrutura" value="Geral">
           </div>
           <div class="col-md-3">
             <label class="form-label">Unidade de medida</label>
-            <input name="unidade_medida" class="form-control" placeholder="m2, m3, kg, un, h..." value="un">
+            <input name="unidade_medida" class="form-control" data-testid="servico-unidade" placeholder="m2, m3, kg, un, h..." value="un">
           </div>
           <div class="col-12">
             <label class="form-label">Descrição</label>
@@ -38,7 +38,7 @@
         <div class="alert alert-info small mt-3 mb-0">
           <i class="fas fa-info-circle"></i> Após salvar, você será levado direto à tela de composição para atrelar os insumos do serviço.
         </div>
-        <button class="btn btn-primary mt-3"><i class="fas fa-save"></i> Salvar e ir para composição</button>
+        <button class="btn btn-primary mt-3" data-testid="servico-salvar"><i class="fas fa-save"></i> Salvar e ir para composição</button>
       </form>
     </div>
   </div>

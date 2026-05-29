@@ -12,11 +12,11 @@
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Nome <span class="text-danger">*</span></label>
-            <input name="nome" required class="form-control" value="{{ insumo.nome if insumo else '' }}">
+            <input name="nome" required class="form-control" data-testid="insumo-nome" value="{{ insumo.nome if insumo else '' }}">
           </div>
           <div class="col-md-3">
             <label class="form-label">Tipo</label>
-            <select name="tipo" class="form-select">
+            <select name="tipo" class="form-select" data-testid="insumo-tipo">
               {% set t = insumo.tipo if insumo else 'MATERIAL' %}
               <option value="MATERIAL"    {% if t=='MATERIAL' %}selected{% endif %}>Material</option>
               <option value="MAO_OBRA"    {% if t=='MAO_OBRA' %}selected{% endif %}>Mão de Obra</option>
@@ -25,7 +25,7 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Unidade</label>
-            <input name="unidade" class="form-control" value="{{ insumo.unidade if insumo else 'un' }}">
+            <input name="unidade" class="form-control" data-testid="insumo-unidade" value="{{ insumo.unidade if insumo else 'un' }}">
           </div>
           <div class="col-md-3">
             <label class="form-label">
@@ -102,11 +102,11 @@
           {% if not insumo %}
           <div class="col-md-4">
             <label class="form-label">Preço inicial (R$)</label>
-            <input name="preco" class="form-control" inputmode="decimal" placeholder="Ex.: 1.234,56" value="0,00">
+            <input name="preco" class="form-control" inputmode="decimal" data-testid="insumo-preco" placeholder="Ex.: 1.234,56" value="0,00">
           </div>
           {% endif %}
         </div>
-        <button class="btn btn-primary mt-3"><i class="fas fa-save"></i> Salvar</button>
+        <button class="btn btn-primary mt-3" data-testid="insumo-salvar"><i class="fas fa-save"></i> Salvar</button>
       </form>
     </div>
   </div>

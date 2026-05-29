@@ -211,7 +211,7 @@
         {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <div class="col-md-8">
           <label class="form-label small mb-1">Selecionar template de cronograma</label>
-          <select name="template_padrao_id" class="form-select">
+          <select name="template_padrao_id" class="form-select" data-testid="servico-template-select">
             <option value="">— Nenhum (desvincular) —</option>
             {% for t in templates_disponiveis %}
             <option value="{{ t.id }}" {% if servico.template_padrao_id == t.id %}selected{% endif %}>
@@ -226,7 +226,7 @@
           {% endif %}
         </div>
         <div class="col-md-4 d-flex gap-2">
-          <button class="btn btn-primary flex-grow-1"><i class="fas fa-save me-1"></i>Salvar</button>
+          <button class="btn btn-primary flex-grow-1" data-testid="servico-template-salvar"><i class="fas fa-save me-1"></i>Salvar</button>
           {% if servico.template_padrao %}
           <button class="btn btn-outline-danger" type="submit" name="template_padrao_id" value=""
                   onclick="return confirm('Desvincular o cronograma deste serviço?')"
@@ -252,7 +252,7 @@
               <i class="fas fa-plus-circle me-1"></i>novo insumo
             </button>
           </label>
-          <select name="insumo_id" id="comp-insumo-select" required class="form-select">
+          <select name="insumo_id" id="comp-insumo-select" required class="form-select" data-testid="composicao-insumo">
             <option value="">— selecione —</option>
             {% for i in (insumos or [])[:10] %}
             <option value="{{ i.id }}">{{ i.nome }} ({{ i.tipo }} / {{ i.unidade }})</option>
@@ -261,13 +261,13 @@
         </div>
         <div class="col-md-3">
           <label class="form-label small mb-1">Coeficiente (consumo / unidade do serviço)</label>
-          <input name="coeficiente" id="comp-coef-input" type="number" step="0.0001" required class="form-control">
+          <input name="coeficiente" id="comp-coef-input" type="number" step="0.0001" required class="form-control" data-testid="composicao-coeficiente">
         </div>
         <div class="col-md-3">
           <label class="form-label small mb-1">Observação</label>
           <input name="observacao" class="form-control">
         </div>
-        <div class="col-md-1"><button class="btn btn-success w-100"><i class="fas fa-plus"></i></button></div>
+        <div class="col-md-1"><button class="btn btn-success w-100" data-testid="composicao-add"><i class="fas fa-plus"></i></button></div>
       </form>
     </div>
   </div>
@@ -278,7 +278,7 @@
       <small class="text-muted">Qtd. ref.: <strong>{{ quantidade_ref|float|num(3) }}</strong> {{ servico.unidade_medida }}</small>
     </div>
     <div class="table-responsive">
-      <table class="table mb-0 align-middle" style="font-size:0.92rem;">
+      <table class="table mb-0 align-middle" style="font-size:0.92rem;" data-testid="composicao-tabela">
         <thead class="table-light">
           <tr>
             <th>Insumo</th>
