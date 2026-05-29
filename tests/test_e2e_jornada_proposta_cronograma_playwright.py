@@ -311,3 +311,36 @@ class TestJornadaPropostaCronograma:
             return (Proposta.query.get(CTX.proposta_id).status or "").lower()
 
         assert _db(_status) == "enviada", "proposta não ficou com status 'enviada'"
+
+    def test_09_portal_cliente_layout(self, page: Page):
+        # contexto ANÔNIMO (sem login) — o cliente acessa só pelo token
+        ctx2 = page.context.browser.new_context()
+        cli = ctx2.new_page()
+        cli.set_default_timeout(TIMEOUT_MS)
+        cli.goto(f"{BASE_URL}/propostas/cliente/{CTX.token}")
+        cli.wait_for_load_state("networkidle")
+
+        # (1) Template usado corretamente: a cláusula custom do template aparece
+        clausulas = cli.locator("[data-testid=portal-clausulas]")
+        expect(clausulas).to_contain_text(CTX.clausula_titulo)
+        expect(clausulas).to_contain_text(CTX.clausula_texto)
+
+        # (2) Serviço vinculado aparece como item, com total em formato BR (R$)
+        expect(cli.locator("[data-testid=portal-item]").first).to_contain_text(CTX.servico_nome)
+        expect(cli.locator("[data-testid=portal-total]")).to_contain_text("R$")
+
+        # (3) Sem vazamento de controles internos/admin
+        corpo = cli.locator("body").inner_text().lower()
+        for proibido in ["editar proposta", "/propostas/editar", "cronograma-revisar",
+                          "admin_id", "salvar alterações"]:
+            assert proibido not in corpo, f"vazou controle interno no portal: {proibido}"
+
+        # (4) Botões de decisão presentes
+        expect(cli.locator("[data-testid=portal-aprovar]")).to_be_visible()
+        expect(cli.locator("[data-testid=portal-rejeitar]")).to_be_visible()
+
+        # artefato visual para conferência de layout
+        cli.screenshot(path=f"tests/reports/portal_cliente_{SUF}.png", full_page=True)
+
+        # guarda a página do cliente para a etapa de aprovação
+        type(self)._cli = cli

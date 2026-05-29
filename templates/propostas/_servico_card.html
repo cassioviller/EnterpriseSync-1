@@ -45,7 +45,7 @@ Espera:
 {% set _has_expand = (_grupos|length > 0) or _has_inclusos or _has_exclusos %}
 {% set _collapse_id = prefix ~ '-' ~ idx %}
 
-<div class="card mb-2 servico-card border">
+<div class="card mb-2 servico-card border" data-testid="portal-item">
   <div class="card-header bg-light d-flex flex-wrap gap-2 align-items-center justify-content-between"
        style="cursor: {% if _has_expand %}pointer{% else %}default{% endif %};"
        {% if _has_expand %}data-bs-toggle="collapse" data-bs-target="#{{ _collapse_id }}"

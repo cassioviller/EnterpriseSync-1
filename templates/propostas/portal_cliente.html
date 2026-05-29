@@ -504,7 +504,7 @@
                 </div>
                 <div class="col-md-4 text-center">
                     <p class="text-muted mb-2">Valor Total</p>
-                    <div class="value-display">
+                    <div class="value-display" data-testid="portal-total">
                         {{ (total_geral or 0)|brl }}
                     </div>
                 </div>
@@ -512,7 +512,7 @@
 
             <!-- Descrição do Projeto -->
             <h4 class="section-title">Descrição do Projeto</h4>
-            <div class="p-3 bg-light rounded">
+            <div class="p-3 bg-light rounded" data-testid="portal-descricao">
                 <p style="white-space: pre-line;">{{ proposta.descricao }}</p>
             </div>
         </div>
@@ -635,7 +635,7 @@
            Garantias, Considerações Gerais e cláusulas extras). Renderizadas
            pelo mesmo partial usado nos PDFs — formatação fica idêntica
            nos três. Cláusula com texto vazio é pulada. #}
-        <div class="proposal-card">
+        <div class="proposal-card" data-testid="portal-clausulas">
             {% with clausulas = proposta.clausulas %}
                 {% include 'propostas/_clausulas.html' %}
             {% endwith %}
@@ -645,10 +645,10 @@
         {% if proposta.status == 'ENVIADA' or proposta.status == 'enviada' %}
         <div class="action-buttons text-center py-3">
             <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                <button type="button" class="btn btn-approve" onclick="aprovarProposta()">
+                <button type="button" class="btn btn-approve" onclick="aprovarProposta()" data-testid="portal-aprovar">
                     <i class="fas fa-thumbs-up me-2"></i>Aprovar Proposta
                 </button>
-                <button type="button" class="btn btn-reject" onclick="rejeitarProposta()">
+                <button type="button" class="btn btn-reject" onclick="rejeitarProposta()" data-testid="portal-rejeitar">
                     <i class="fas fa-thumbs-down me-2"></i>Rejeitar Proposta
                 </button>
             </div>
@@ -711,7 +711,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-success">Confirmar Aprovação</button>
+                        <button type="submit" class="btn btn-success" data-testid="portal-aprovar-confirmar">Confirmar Aprovação</button>
                     </div>
                 </form>
             </div>
