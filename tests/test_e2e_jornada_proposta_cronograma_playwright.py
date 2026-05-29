@@ -429,6 +429,48 @@ class TestJornadaPropostaCronograma:
         contrato = page.locator("[data-from-proposta]:not([data-from-proposta=''])")
         assert contrato.count() > 0, "tarefas não marcadas como originadas da proposta"
 
+        # verificação estrutural (banco): hierarquia de 3 níveis, vínculo ao serviço
+        def _estrutura():
+            from models import TarefaCronograma, PropostaItem
+            ts = TarefaCronograma.query.filter_by(obra_id=CTX.obra_id).all()
+            by_id = {t.id: t for t in ts}
+
+            def profundidade(t):
+                d, cur, guard = 1, t, 0
+                while cur.tarefa_pai_id and cur.tarefa_pai_id in by_id and guard < 10:
+                    cur = by_id[cur.tarefa_pai_id]
+                    d += 1
+                    guard += 1
+                return d
+
+            raizes = [t for t in ts if t.tarefa_pai_id is None]
+            prof_max = max((profundidade(t) for t in ts), default=0)
+            # serviços de origem dos itens das tarefas
+            item_ids = {t.gerada_por_proposta_item_id for t in ts if t.gerada_por_proposta_item_id}
+            servico_ids = {
+                PropostaItem.query.get(i).servico_id for i in item_ids
+            } if item_ids else set()
+            nomes = {t.nome_tarefa for t in ts}
+            return {
+                "total": len(ts),
+                "raizes": [t.nome_tarefa for t in raizes],
+                "prof_max": prof_max,
+                "servico_ids": servico_ids,
+                "nomes": nomes,
+            }
+
+        est = _db(_estrutura)
+        assert est["total"] >= 5, f"esperado >=5 tarefas materializadas, veio {est['total']}"
+        assert est["prof_max"] >= 3, f"cronograma não tem 3 níveis (Serviço→Grupo→Sub): prof={est['prof_max']}"
+        assert any(CTX.servico_nome in r for r in est["raizes"]), (
+            f"nó raiz não corresponde ao serviço: {est['raizes']}"
+        )
+        assert CTX.servico_id in est["servico_ids"], (
+            f"tarefas não ligadas ao serviço {CTX.servico_id}: {est['servico_ids']}"
+        )
+        for sub in ["Marcação de paredes", "Elevação de alvenaria", "Chapisco"]:
+            assert sub in est["nomes"], f"subatividade ausente: {sub}"
+
     def test_12_catalogo_listagens(self, page: Page):
         # o insumo e o serviço criados aparecem nas listagens do catálogo (UI)
         page.goto(f"{BASE_URL}/catalogo/insumos")
