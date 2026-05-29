@@ -403,7 +403,7 @@
 
                 <div class="text-end">
                     <button type="button" class="btn btn-secondary me-2" onclick="history.back()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" data-testid="proposta-editar-salvar">
                         <i class="fas fa-save me-2"></i>Salvar Alterações
                     </button>
                 </div>
@@ -423,7 +423,7 @@
                 </div>
                 <form method="POST" action="{{ url_for('propostas.enviar', id=proposta.id) }}"
                       onsubmit="return confirm('Enviar esta proposta ao cliente? Após enviar, novas edições criarão uma nova versão (v{{ (proposta.versao or 1) + 1 }}).');">
-                    <button type="submit" class="btn btn-success btn-lg"
+                    <button type="submit" class="btn btn-success btn-lg" data-testid="proposta-enviar"
                             {% if not _pode_enviar %}disabled title="Existem itens pendentes de revisão"{% endif %}>
                         <i class="fas fa-paper-plane me-2"></i> Enviar ao Cliente
                     </button>

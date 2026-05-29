@@ -146,10 +146,17 @@ class TestJornadaPropostaCronograma:
             """(o) => {
                 const sel = document.getElementById('comp-insumo-select');
                 const ts = sel.tomselect;
-                ts.addOption({value: String(o.id), text: o.nome});
-                ts.addItem(String(o.id));
+                // TomSelect usa valueField:'id' / labelField:'nome'
+                ts.addOption({id: String(o.id), nome: o.nome});
+                ts.refreshOptions(false);
+                ts.addItem(String(o.id), true);
             }""",
             {"id": CTX.insumo_id, "nome": CTX.insumo_nome},
+        )
+        # garante que o select nativo recebeu o value (o que vai no POST)
+        page.wait_for_function(
+            "(id) => document.getElementById('comp-insumo-select').value === String(id)",
+            arg=CTX.insumo_id,
         )
         page.fill("[data-testid=composicao-coeficiente]", "1")
         page.click("[data-testid=composicao-add]")
@@ -243,3 +250,27 @@ class TestJornadaPropostaCronograma:
         CTX.token = info["token"]
         assert info["servico_id"] == CTX.servico_id, "item não vinculou o serviço (servico_id)"
         assert CTX.token, "token do cliente ausente"
+
+    def test_06_revisar_para_envio(self, page: Page):
+        # Cláusulas copiadas do template entram com revisado_em=NULL (pendentes),
+        # bloqueando pode_enviar(). Marcamos como revisadas e salvamos.
+        page.goto(f"{BASE_URL}/propostas/editar/{CTX.proposta_id}")
+        page.wait_for_load_state("networkidle")
+        checks = page.locator(".clausula-revisado-check")
+        for i in range(checks.count()):
+            checks.nth(i).check()
+        acks = page.locator("input[name=campo_revisao_ack]")
+        for i in range(acks.count()):
+            acks.nth(i).check()
+        page.click("[data-testid=proposta-editar-salvar]")
+        page.wait_for_load_state("networkidle")
+
+        def _state():
+            from models import Proposta, PropostaItem
+            p = Proposta.query.get(CTX.proposta_id)
+            it = PropostaItem.query.filter_by(proposta_id=p.id).first()
+            return {"pode": p.pode_enviar(), "servico_id": it.servico_id if it else None}
+
+        st = _db(_state)
+        assert st["pode"] is True, "proposta ainda não liberada para envio (revisão pendente)"
+        assert st["servico_id"] == CTX.servico_id, "salvar a edição perdeu o vínculo do serviço"
