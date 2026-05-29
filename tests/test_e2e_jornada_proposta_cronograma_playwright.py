@@ -295,3 +295,19 @@ class TestJornadaPropostaCronograma:
             return Proposta.query.get(CTX.proposta_id).cronograma_default_json
 
         assert _db(_cdj), "cronograma_default_json não foi salvo (gate #200 não destravado)"
+
+    def test_08_enviar_proposta(self, page: Page):
+        page.goto(f"{BASE_URL}/propostas/editar/{CTX.proposta_id}")
+        page.wait_for_load_state("networkidle")
+        # o botão Enviar dispara um confirm() — aceitar automaticamente
+        page.once("dialog", lambda d: d.accept())
+        enviar = page.locator("[data-testid=proposta-enviar]")
+        expect(enviar).to_be_enabled()
+        enviar.click()
+        page.wait_for_load_state("networkidle")
+
+        def _status():
+            from models import Proposta
+            return (Proposta.query.get(CTX.proposta_id).status or "").lower()
+
+        assert _db(_status) == "enviada", "proposta não ficou com status 'enviada'"
