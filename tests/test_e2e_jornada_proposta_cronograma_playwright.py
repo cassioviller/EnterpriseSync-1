@@ -367,3 +367,25 @@ class TestJornadaPropostaCronograma:
         assert st["status"] in ("aprovada", "aprovado"), f"status inesperado: {st['status']}"
         assert st["obra_id"], "aprovação não gerou a obra"
         CTX.obra_id = st["obra_id"]
+
+    def test_11_verifica_cronograma_obra(self, page: Page):
+        # de volta como admin, conferir o cronograma materializado automaticamente
+        page.goto(f"{BASE_URL}/cronograma/obra/{CTX.obra_id}")
+        page.wait_for_load_state("networkidle")
+
+        tarefas = page.locator("[data-testid=cronograma-tarefa]")
+        assert tarefas.count() > 0, "nenhuma tarefa no cronograma da obra"
+
+        # subatividades do template Alvenaria materializadas (subtarefas podem
+        # estar recolhidas no DOM — checamos o HTML renderizado)
+        html = page.content()
+        for nome in ["Marcação", "Elevação", "Chapisco"]:
+            assert nome in html, f"subatividade não materializada no cronograma: {nome}"
+
+        # vínculo tarefa↔serviço exposto no DOM (data-servico-id)
+        vinc = page.locator(f"[data-servico-id='{CTX.servico_id}']")
+        assert vinc.count() > 0, "nenhuma tarefa do cronograma vinculada ao serviço criado"
+
+        # e ao menos uma tarefa marcada como originada do contrato (proposta)
+        contrato = page.locator("[data-from-proposta]:not([data-from-proposta=''])")
+        assert contrato.count() > 0, "tarefas não marcadas como originadas da proposta"

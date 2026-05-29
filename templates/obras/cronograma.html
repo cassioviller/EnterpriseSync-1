@@ -128,6 +128,9 @@
                   {% if is_pai %}tarefa-pai{% endif %}
                   {% if t.tarefa_pai_id %}tarefa-filho d-none{% endif %}
                   {% if perc >= 100 %}row-done{% elif perc > 0 %}row-wip{% endif %}"
+                data-testid="cronograma-tarefa"
+                data-from-proposta="{{ t.gerada_por_proposta_item_id or '' }}"
+                data-servico-id="{{ t.gerada_por_proposta_item.servico_id if t.gerada_por_proposta_item and t.gerada_por_proposta_item.servico_id else '' }}"
                 data-id="{{ t.id }}"
                 data-pai="{{ t.tarefa_pai_id or '' }}"
                 data-nivel="{{ nivel }}"

@@ -4881,6 +4881,15 @@ class TarefaCronograma(db.Model):
         nullable=True,
         index=True,
     )
+    # Relação somente-leitura para navegar até o item de proposta de origem
+    # (e, por ele, ao serviço de catálogo). Usada na UI do cronograma para
+    # expor o vínculo tarefa↔serviço. viewonly + sem backref = aditivo, sem
+    # conflito de mapeamento.
+    gerada_por_proposta_item = db.relationship(
+        'PropostaItem',
+        foreign_keys=[gerada_por_proposta_item_id],
+        viewonly=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
