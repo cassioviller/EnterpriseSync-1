@@ -202,3 +202,44 @@ class TestJornadaPropostaCronograma:
 
         CTX.template_id = _db(_find)
         assert CTX.template_id, "template de proposta não foi persistido"
+
+    def test_05_criar_proposta(self, page: Page):
+        page.goto(f"{BASE_URL}/propostas/nova")
+        page.wait_for_load_state("networkidle")
+        page.fill("[data-testid=proposta-cliente-nome]", CTX.cliente_nome)
+        page.fill("[data-testid=proposta-cliente-email]", "cliente.e2e@example.com")
+        page.fill("[data-testid=proposta-cliente-telefone]", "(11) 90000-0000")
+        page.fill("[data-testid=proposta-numero]", CTX.numero_proposta)
+        page.fill("[data-testid=proposta-assunto]", f"Obra E2E {SUF}")
+        page.select_option("[data-testid=proposta-template]", value=str(CTX.template_id))
+
+        item = page.locator(".servico-item").first
+        item.locator("[data-testid=proposta-item-descricao]").fill(CTX.servico_nome)
+        item.locator("[data-testid=proposta-item-quantidade]").fill(str(CTX.quantidade))
+        item.locator("[data-testid=proposta-item-preco]").fill("80")
+        # vincula o serviço do catálogo (hidden item_servico_id) — essencial para o
+        # cronograma automático herdar o template de cronograma do serviço
+        item.locator("[data-testid=proposta-item-servico-id]").evaluate(
+            "(el, v) => el.value = v", str(CTX.servico_id)
+        )
+        page.click("[data-testid=proposta-salvar]")
+        page.wait_for_load_state("networkidle")
+
+        def _info():
+            from models import Proposta, PropostaItem
+            p = Proposta.query.filter_by(numero=CTX.numero_proposta).first()
+            if not p:
+                return None
+            it = PropostaItem.query.filter_by(proposta_id=p.id).first()
+            return {
+                "id": p.id,
+                "token": p.token_cliente,
+                "servico_id": it.servico_id if it else None,
+            }
+
+        info = _db(_info)
+        assert info, "proposta não foi persistida"
+        CTX.proposta_id = info["id"]
+        CTX.token = info["token"]
+        assert info["servico_id"] == CTX.servico_id, "item não vinculou o serviço (servico_id)"
+        assert CTX.token, "token do cliente ausente"

@@ -50,7 +50,7 @@
                             </small>
                         </div>
                         <div class="col-md-6">
-                            <select class="form-select" name="template_id" id="template_id">
+                            <select class="form-select" name="template_id" id="template_id" data-testid="proposta-template">
                                 <option value="">— Sem template (usar campos legado abaixo) —</option>
                                 {% for t in templates_proposta %}
                                 <option value="{{ t.id }}">
@@ -75,17 +75,17 @@
                         <h6 class="text-primary mb-3">Dados do Cliente</h6>
                         <div class="mb-3">
                             <label class="form-label">Nome do Cliente *</label>
-                            <input type="text" class="form-control" name="cliente_nome" required>
+                            <input type="text" class="form-control" name="cliente_nome" data-testid="proposta-cliente-nome" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Email</label>
-                            <input type="email" class="form-control" name="cliente_email">
+                            <input type="email" class="form-control" name="cliente_email" data-testid="proposta-cliente-email">
                         </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">Telefone</label>
-                                    <input type="text" class="form-control" name="cliente_telefone">
+                                    <input type="text" class="form-control" name="cliente_telefone" data-testid="proposta-cliente-telefone">
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -102,12 +102,12 @@
                         <h6 class="text-primary mb-3">Dados da Obra</h6>
                         <div class="mb-3">
                             <label class="form-label">Número da Proposta *</label>
-                            <input type="text" class="form-control" name="numero_proposta" placeholder="Ex: 001.25" required>
+                            <input type="text" class="form-control" name="numero_proposta" data-testid="proposta-numero" placeholder="Ex: 001.25" required>
                             <small class="text-muted">Defina um número único para esta proposta</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Assunto da Proposta</label>
-                            <input type="text" class="form-control" name="assunto" placeholder="Ex: Estrutura Metálica Residencial">
+                            <input type="text" class="form-control" name="assunto" data-testid="proposta-assunto" placeholder="Ex: Estrutura Metálica Residencial">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Objeto/Descrição da Obra</label>
@@ -160,9 +160,9 @@
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text bg-info text-white"><i class="fas fa-search me-1"></i> Catálogo</span>
                                     <input type="text" class="form-control servico-catalogo-search"
-                                           list="catalogo_servicos_dl"
+                                           list="catalogo_servicos_dl" data-testid="proposta-item-busca"
                                            placeholder="Digite para buscar serviço do catálogo (preenche descrição/unidade/preço e vincula servico_id)">
-                                    <input type="hidden" name="item_servico_id" class="servico-catalogo-id" value="">
+                                    <input type="hidden" name="item_servico_id" class="servico-catalogo-id" data-testid="proposta-item-servico-id" value="">
                                 </div>
                             </div>
                         </div>
@@ -170,15 +170,15 @@
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">Descrição do Serviço</label>
-                                    <input type="text" class="form-control servico-descricao" 
-                                           name="item_descricao" placeholder="Ex: Estrutura metálica">
+                                    <input type="text" class="form-control servico-descricao"
+                                           name="item_descricao" data-testid="proposta-item-descricao" placeholder="Ex: Estrutura metálica">
                                 </div>
                             </div>
                             <div class="col-md-2">
                                 <div class="mb-3">
                                     <label class="form-label">Quantidade</label>
-                                    <input type="number" class="form-control servico-quantidade" 
-                                           name="item_quantidade" step="0.01" onchange="calcularServico(this)">
+                                    <input type="number" class="form-control servico-quantidade"
+                                           name="item_quantidade" data-testid="proposta-item-quantidade" step="0.01" onchange="calcularServico(this)">
                                 </div>
                             </div>
                             <div class="col-md-2">
@@ -196,8 +196,8 @@
                             <div class="col-md-2">
                                 <div class="mb-3">
                                     <label class="form-label">Valor Unitário</label>
-                                    <input type="number" class="form-control servico-valor-unitario" 
-                                           name="item_preco" step="0.01" onchange="calcularServico(this)">
+                                    <input type="number" class="form-control servico-valor-unitario"
+                                           name="item_preco" data-testid="proposta-item-preco" step="0.01" onchange="calcularServico(this)">
                                 </div>
                             </div>
                             <div class="col-md-2">
@@ -385,7 +385,7 @@
 
                 <div class="d-flex justify-content-end gap-2">
                     <a href="{{ url_for('propostas.index') }}" class="btn btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn btn-success">Criar Proposta</button>
+                    <button type="submit" class="btn btn-success" data-testid="proposta-salvar">Criar Proposta</button>
                 </div>
             </form>
         </div>
