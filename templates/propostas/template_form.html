@@ -80,6 +80,7 @@
                     <div class="col-md-6">
                         <label class="form-label">Nome <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="nome" required maxlength="100"
+                               data-testid="template-nome"
                                value="{{ template.nome if template else '' }}"
                                placeholder="{{ (prefill.placeholder_nome if prefill and prefill.placeholder_nome else 'Ex: Estrutura Metálica Padrão') }}">
                     </div>
@@ -111,7 +112,7 @@
                 <small class="text-muted ms-2">Texto introdutório que aparece no topo da proposta gerada.</small>
             </div>
             <div class="card-body">
-                <textarea class="form-control" name="texto_apresentacao" rows="6"
+                <textarea class="form-control" name="texto_apresentacao" rows="6" data-testid="template-apresentacao"
                           placeholder="Ex: Apresentamos a seguir nossa proposta comercial...">{{ v('texto_apresentacao') }}</textarea>
             </div>
         </div>
@@ -154,12 +155,12 @@
                 <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label">Condições de pagamento</label>
-                        <textarea class="form-control" name="condicoes_pagamento" rows="5"
+                        <textarea class="form-control" name="condicoes_pagamento" rows="5" data-testid="template-pagamento"
                                   placeholder="Ex: 50% na assinatura, 50% na entrega...">{{ v('condicoes_pagamento') }}</textarea>
                     </div>
                     <div class="col-12">
                         <label class="form-label">Garantias</label>
-                        <textarea class="form-control" name="garantias" rows="5"
+                        <textarea class="form-control" name="garantias" rows="5" data-testid="template-garantias"
                                   placeholder="Garantias oferecidas (legal, contratual, prazos)">{{ v('garantias') }}</textarea>
                     </div>
                 </div>
@@ -200,11 +201,13 @@
                     <div class="col-md-4">
                         <label class="form-label">Prazo de entrega (dias)</label>
                         <input type="number" min="0" step="1" class="form-control" name="prazo_entrega_dias"
+                               data-testid="template-prazo"
                                value="{{ v('prazo_entrega_dias') }}" placeholder="Ex: 30">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Validade (dias)</label>
                         <input type="number" min="0" step="1" class="form-control" name="validade_dias"
+                               data-testid="template-validade"
                                value="{{ v('validade_dias') }}" placeholder="Ex: 7">
                     </div>
                     <div class="col-md-4">
@@ -285,7 +288,7 @@
                         {% endfor %}
                     {% endif %}
                 </div>
-                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAdicionarClausula">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnAdicionarClausula" data-testid="template-add-clausula">
                     <i class="fas fa-plus"></i> Nova cláusula
                 </button>
             </div>
@@ -293,7 +296,7 @@
 
         <div class="text-end mb-4">
             <a href="{{ url_for('propostas.listar_templates') }}" class="btn btn-secondary me-2">Cancelar</a>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" data-testid="template-salvar">
                 <i class="fas fa-save me-2"></i>{{ 'Salvar Alterações' if template else 'Criar Template' }}
             </button>
         </div>

@@ -175,3 +175,30 @@ class TestJornadaPropostaCronograma:
             return Servico.query.get(CTX.servico_id).template_padrao_id
 
         assert _db(_svc_tpl) == tpl_id, "vínculo serviço→cronograma não persistiu"
+
+    def test_04_criar_template_proposta(self, page: Page):
+        # /templates/novo pré-preenche do template padrão do tenant; preenchemos
+        # valores ÚNICOS próprios (fill substitui) para verificar depois no portal.
+        page.goto(f"{BASE_URL}/propostas/templates/novo")
+        page.wait_for_load_state("networkidle")
+        page.fill("[data-testid=template-nome]", CTX.template_nome)
+        page.fill("[data-testid=template-apresentacao]", CTX.apresentacao)
+        page.fill("[data-testid=template-pagamento]", CTX.pagamento)
+        page.fill("[data-testid=template-garantias]", CTX.garantia)
+        page.fill("[data-testid=template-prazo]", str(CTX.prazo_dias))
+        page.fill("[data-testid=template-validade]", str(CTX.validade_dias))
+        # adiciona MINHA cláusula (último bloco) com valores únicos
+        page.click("[data-testid=template-add-clausula]")
+        ultima = page.locator("#clausulasContainer .clausula-item").last
+        ultima.locator("input[name=clausula_titulo]").fill(CTX.clausula_titulo)
+        ultima.locator("textarea[name=clausula_texto]").fill(CTX.clausula_texto)
+        page.click("[data-testid=template-salvar]")
+        page.wait_for_load_state("networkidle")
+
+        def _find():
+            from models import PropostaTemplate
+            obj = PropostaTemplate.query.filter_by(nome=CTX.template_nome).first()
+            return obj.id if obj else None
+
+        CTX.template_id = _db(_find)
+        assert CTX.template_id, "template de proposta não foi persistido"
