@@ -14,6 +14,7 @@
 #   bash run_tests.sh --bloco6           # Apenas BLOCO 6 (Financeiro)
 #   bash run_tests.sh --bloco7           # Apenas BLOCO 7 (CRM/Frota/demais)
 #   bash run_tests.sh --integracao       # Apenas testes de integração E2E
+#   bash run_tests.sh --jornada          # Jornada E2E proposta→cronograma (browser real)
 #   bash run_tests.sh --standalone       # Modo standalone (sem pytest)
 #
 # Dependências de sistema (instaladas via nix):
@@ -23,6 +24,7 @@ set -euo pipefail
 
 BLOCO_FILTER=""
 STANDALONE=0
+TARGET_FILE="tests/test_browser_all_modules.py"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -34,6 +36,7 @@ while [[ $# -gt 0 ]]; do
         --bloco6)       BLOCO_FILTER="::TestBloco6Financeiro"; shift ;;
         --bloco7)       BLOCO_FILTER="::TestBloco7Demais"; shift ;;
         --integracao)   BLOCO_FILTER="-k integra"; shift ;;
+        --jornada)      TARGET_FILE="tests/test_e2e_jornada_proposta_cronograma_playwright.py"; BLOCO_FILTER=""; shift ;;
         --standalone)   STANDALONE=1; shift ;;
         *)              echo "Opção desconhecida: $1"; exit 1 ;;
     esac
@@ -94,7 +97,7 @@ else
             2>&1 | tee "tests/reports/pytest_output_${TIMESTAMP}.txt"
     else
         .pythonlibs/bin/pytest \
-            "tests/test_browser_all_modules.py${BLOCO_FILTER}" \
+            "${TARGET_FILE}${BLOCO_FILTER}" \
             --html="${REPORT_HTML}" \
             --self-contained-html \
             --tb=short \
