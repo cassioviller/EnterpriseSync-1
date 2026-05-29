@@ -30,6 +30,7 @@ dependencies = [
     "lxml>=6.0.0",
     "opencv-python>=4.11.0.86",
     "pytest>=8.4.1",
+    "pytest-html>=4.2.0",
     "cryptography>=45.0.6",
     "beautifulsoup4>=4.13.5",
     "flask-cors>=6.0.1",

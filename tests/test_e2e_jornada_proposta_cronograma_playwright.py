@@ -17,10 +17,16 @@ Notas de ambiente confirmadas no spike:
   são visíveis nas consultas _db()).
 """
 import os
+import sys
 import time
 
 import pytest
 from playwright.sync_api import sync_playwright, Page, expect
+
+# Garante que a raiz do workspace está no sys.path para `from app import app`
+# funcionar tanto via `python -m pytest` quanto via o binário `pytest`
+# (run_tests.sh). Mesmo padrão de tests/test_browser_all_modules.py.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE_URL = os.environ.get("PW_BASE_URL", "http://localhost:5000")
 TIMEOUT_MS = int(os.environ.get("SIGE_TIMEOUT_MS", "30000"))

@@ -608,3 +608,15 @@ Duas opções:
 - **Subagente por tarefa:** um agente fresco por tarefa, recebendo este plano + o spec.
 
 Recomendado: inline, porque cada etapa depende do estado da anterior e do servidor vivo.
+
+## Aprendizados da execução (gotchas confirmados ao vivo)
+
+- **Rotas reais:** form de proposta = `GET /propostas/nova` → `POST /propostas/criar`; edição/revisão = `GET/POST /propostas/editar/<id>` (NÃO `/<id>/editar`); cronograma da obra = `GET /cronograma/obra/<id>` (NÃO `?obra_id=`).
+- **Vínculo do serviço no item:** o form de proposta usa o hidden `item_servico_id` (classe `.servico-catalogo-id`); o teste seta esse valor via JS — é o que faz o cronograma automático herdar o template do serviço.
+- **TomSelect (composição):** o `<select>` de insumo carrega só 10 opções no DOM. Selecionar via API: `sel.tomselect.addOption({id, nome}); addItem(id, true)` e esperar o `<select>` nativo sincronizar. `valueField:'id'`, `labelField:'nome'`.
+- **Gate de revisão (#31):** cláusulas vindas do template entram `revisado_em=NULL` → bloqueiam `enviar`. Marcar `.clausula-revisado-check` (+ `campo_revisao_ack`) e salvar o form de editar antes de enviar.
+- **Apresentação no portal:** o portal mostra `proposta.descricao` (campo `objeto`), NÃO o `texto_apresentacao` do template (esse não é copiado). O sinal forte de "template usado" é a **cláusula custom** aparecer no portal via `_clausulas.html`.
+- **Vínculo tarefa↔serviço:** não era exposto no HTML; adicionada relação viewonly `TarefaCronograma.gerada_por_proposta_item` + `data-servico-id`/`data-from-proposta` na linha do cronograma.
+- **Cache de template do gunicorn:** o servidor roda `gunicorn --reload` (observa só `.py`) e o auto-reload de templates do Jinja está OFF. **Após editar um template, tocar num `.py` (ex.: `touch main.py`) para o servidor recarregar** — senão serve markup antigo.
+- **sys.path:** `run_tests.sh` chama o binário `pytest` (não `python -m pytest`), que não põe o CWD no `sys.path`. O teste insere a raiz do workspace no `sys.path` (mesmo padrão de `test_browser_all_modules.py`) para `from app import app` funcionar.
+- **Dependência:** o `run_tests.sh` usa `--html`/`--self-contained-html` → requer `pytest-html` (instalado).
