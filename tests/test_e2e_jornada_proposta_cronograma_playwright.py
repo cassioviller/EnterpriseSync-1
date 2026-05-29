@@ -183,11 +183,18 @@ class TestJornadaPropostaCronograma:
         page.wait_for_load_state("networkidle")
         expect(page.locator(".alert-success[role=alert]")).to_contain_text("vinculado")
 
-        def _svc_tpl():
+        def _svc():
             from models import Servico
-            return Servico.query.get(CTX.servico_id).template_padrao_id
+            s = Servico.query.get(CTX.servico_id)
+            return {
+                "tpl": s.template_padrao_id,
+                "custo": float(s.custo_unitario or 0),
+            }
 
-        assert _db(_svc_tpl) == tpl_id, "vínculo serviço→cronograma não persistiu"
+        sv = _db(_svc)
+        assert sv["tpl"] == tpl_id, "vínculo serviço→cronograma não persistiu"
+        # a composição (insumo 1,50 × coef 1) deve ter recalculado o custo do serviço
+        assert sv["custo"] > 0, f"custo do serviço não recalculado pela composição: {sv['custo']}"
 
     def test_04_criar_template_proposta(self, page: Page):
         # /templates/novo pré-preenche do template padrão do tenant; preenchemos
@@ -250,6 +257,7 @@ class TestJornadaPropostaCronograma:
                 "servico_id": it.servico_id if it else None,
                 "prazo": p.prazo_entrega_dias,
                 "validade": getattr(p, "validade_dias", None),
+                "valor_total": float(p.valor_total or 0),
             }
 
         info = _db(_info)
@@ -265,6 +273,11 @@ class TestJornadaPropostaCronograma:
         )
         assert info["validade"] == CTX.validade_dias, (
             f"validade do template não propagada: {info['validade']} != {CTX.validade_dias}"
+        )
+        # valor_total = quantidade × preço unitário (250 × 80 = 20.000)
+        esperado = CTX.quantidade * 80
+        assert info["valor_total"] == esperado, (
+            f"valor_total incorreto: {info['valor_total']} != {esperado}"
         )
 
     def test_06_revisar_para_envio(self, page: Page):
@@ -415,3 +428,13 @@ class TestJornadaPropostaCronograma:
         # e ao menos uma tarefa marcada como originada do contrato (proposta)
         contrato = page.locator("[data-from-proposta]:not([data-from-proposta=''])")
         assert contrato.count() > 0, "tarefas não marcadas como originadas da proposta"
+
+    def test_12_catalogo_listagens(self, page: Page):
+        # o insumo e o serviço criados aparecem nas listagens do catálogo (UI)
+        page.goto(f"{BASE_URL}/catalogo/insumos")
+        page.wait_for_load_state("networkidle")
+        assert CTX.insumo_nome in page.content(), "insumo criado não aparece na listagem"
+
+        page.goto(f"{BASE_URL}/catalogo/servicos")
+        page.wait_for_load_state("networkidle")
+        assert CTX.servico_nome in page.content(), "serviço criado não aparece na listagem"
