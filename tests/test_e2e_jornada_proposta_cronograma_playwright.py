@@ -78,6 +78,33 @@ def _db(fn):
         return fn()
 
 
+def _nova_proposta_via_ui(pg, numero, cliente):
+    """Cria uma proposta via UI usando o template e o serviço já criados na
+    jornada (CTX.template_id / CTX.servico_id). Retorna (proposta_id, token)."""
+    pg.goto(f"{BASE_URL}/propostas/nova")
+    pg.wait_for_load_state("networkidle")
+    pg.fill("[data-testid=proposta-cliente-nome]", cliente)
+    pg.fill("[data-testid=proposta-numero]", numero)
+    pg.fill("[data-testid=proposta-assunto]", f"Obra {numero}")
+    pg.select_option("[data-testid=proposta-template]", value=str(CTX.template_id))
+    item = pg.locator(".servico-item").first
+    item.locator("[data-testid=proposta-item-descricao]").fill(CTX.servico_nome)
+    item.locator("[data-testid=proposta-item-quantidade]").fill(str(CTX.quantidade))
+    item.locator("[data-testid=proposta-item-preco]").fill("80")
+    item.locator("[data-testid=proposta-item-servico-id]").evaluate(
+        "(el, v) => el.value = v", str(CTX.servico_id)
+    )
+    pg.click("[data-testid=proposta-salvar]")
+    pg.wait_for_load_state("networkidle")
+
+    def _q():
+        from models import Proposta
+        p = Proposta.query.filter_by(numero=numero).first()
+        return (p.id, p.token_cliente) if p else (None, None)
+
+    return _db(_q)
+
+
 @pytest.fixture(scope="class")
 def page():
     with sync_playwright() as pw:
@@ -480,3 +507,29 @@ class TestJornadaPropostaCronograma:
         page.goto(f"{BASE_URL}/catalogo/servicos")
         page.wait_for_load_state("networkidle")
         assert CTX.servico_nome in page.content(), "serviço criado não aparece na listagem"
+
+    def test_13_gate_envio_sem_revisao(self, page: Page):
+        # Gate #31: proposta criada de template tem cláusulas pendentes; sem
+        # revisar, NÃO pode ser enviada e o botão Enviar fica desabilitado.
+        numero = f"{CTX.numero_proposta}-NEG"
+        pid, _tok = _nova_proposta_via_ui(page, numero, f"Cliente NEG {SUF}")
+        assert pid, "proposta negativa não criada"
+
+        page.goto(f"{BASE_URL}/propostas/editar/{pid}")
+        page.wait_for_load_state("networkidle")
+        # botão Enviar presente porém DESABILITADO (sem revisão)
+        expect(page.locator("[data-testid=proposta-enviar]")).to_be_disabled()
+
+        def _estado():
+            from models import Proposta
+            p = Proposta.query.get(pid)
+            return {
+                "pode": p.pode_enviar(),
+                "pendentes": len(p.clausulas_pendentes_revisao()),
+                "status": (p.status or "").lower(),
+            }
+
+        st = _db(_estado)
+        assert st["pode"] is False, "pode_enviar deveria ser False sem revisão"
+        assert st["pendentes"] > 0, "esperava cláusulas pendentes de revisão"
+        assert st["status"] == "rascunho", f"status deveria seguir rascunho: {st['status']}"
