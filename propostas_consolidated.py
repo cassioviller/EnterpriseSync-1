@@ -699,6 +699,13 @@ def criar():
                 proposta.consideracoes_gerais = _template_proposta.consideracoes_gerais
             if getattr(_template_proposta, 'condicoes_entrega', None):
                 proposta.observacoes_entrega = _template_proposta.condicoes_entrega
+            # Prazo de entrega e validade também fazem parte das condições
+            # comerciais do template — propagá-los evita que o portal do
+            # cliente mostre os defaults (90/7) em vez do que o template define.
+            if _template_proposta.prazo_entrega_dias is not None:
+                proposta.prazo_entrega_dias = _template_proposta.prazo_entrega_dias
+            if getattr(_template_proposta, 'validade_dias', None) is not None:
+                proposta.validade_dias = _template_proposta.validade_dias
             _inc = [
                 ln.strip() for ln in str(_template_proposta.itens_inclusos or '').splitlines()
                 if ln and ln.strip()

@@ -248,6 +248,8 @@ class TestJornadaPropostaCronograma:
                 "id": p.id,
                 "token": p.token_cliente,
                 "servico_id": it.servico_id if it else None,
+                "prazo": p.prazo_entrega_dias,
+                "validade": getattr(p, "validade_dias", None),
             }
 
         info = _db(_info)
@@ -256,6 +258,14 @@ class TestJornadaPropostaCronograma:
         CTX.token = info["token"]
         assert info["servico_id"] == CTX.servico_id, "item não vinculou o serviço (servico_id)"
         assert CTX.token, "token do cliente ausente"
+        # condições comerciais do template propagadas (prazo/validade) — sem isso,
+        # o portal do cliente mostraria os defaults (90/7) em vez dos do template
+        assert info["prazo"] == CTX.prazo_dias, (
+            f"prazo do template não propagado: {info['prazo']} != {CTX.prazo_dias}"
+        )
+        assert info["validade"] == CTX.validade_dias, (
+            f"validade do template não propagada: {info['validade']} != {CTX.validade_dias}"
+        )
 
     def test_06_revisar_para_envio(self, page: Page):
         # Cláusulas copiadas do template entram com revisado_em=NULL (pendentes),
@@ -345,7 +355,17 @@ class TestJornadaPropostaCronograma:
         expect(cli.locator("[data-testid=portal-aprovar]")).to_be_visible()
         expect(cli.locator("[data-testid=portal-rejeitar]")).to_be_visible()
 
-        # artefato visual para conferência de layout
+        # artefato visual para conferência de layout — força as proposal-cards
+        # visíveis (o portal usa IntersectionObserver/opacity:0 com reveal no
+        # scroll, que não dispara num screenshot full-page headless)
+        cli.evaluate(
+            """() => document.querySelectorAll('.proposal-card').forEach(c => {
+                c.style.transition = 'none';
+                c.style.opacity = '1';
+                c.style.transform = 'none';
+            })"""
+        )
+        cli.wait_for_timeout(300)
         cli.screenshot(path=f"tests/reports/portal_cliente_{SUF}.png", full_page=True)
 
         # guarda a página do cliente para a etapa de aprovação
