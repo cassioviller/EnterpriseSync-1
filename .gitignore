@@ -5,3 +5,13 @@ static/uploads/relatorios_mapa/
 # Playwright test reports (runtime output, not source)
 tests/reports/*.html
 tests/reports/*.txt
+tests/reports/*.png
+
+# Planilha real do cliente (dado sensível; cópia de trabalho na raiz)
+/1. FLUXO DE CAIXA_Veks Engenharia.xlsx
+
+# Skills locais do Claude Code (ferramental do agente, não código do projeto)
+.claude/skills/
+
+# Logs de erro colados em attached_assets
+attached_assets/Pasted-*.txt
