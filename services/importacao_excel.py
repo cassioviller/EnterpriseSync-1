@@ -1362,6 +1362,24 @@ def _eh_transferencia_interna(desc, valor):
             ('nubank' in d and 'itau' in d))
 
 
+def _match_bancos_transferencia(texto, bancos):
+    """Detecta banco de origem e destino a partir da descrição da transferência.
+
+    bancos: lista de (id, chave_normalizada). A ordem de aparição no texto
+    define origem (1º) e destino (2º). Ex.: "... NUBANK - ITAÚ" → (nubank, itau).
+    Retorna (origem_id, destino_id), cada um podendo ser None.
+    """
+    t = _normalizar(str(texto or ''))
+    achados = []
+    for bid, chave in bancos:
+        if chave and chave in t:
+            achados.append((t.index(chave), bid))
+    achados.sort()
+    origem = achados[0][1] if len(achados) >= 1 else None
+    destino = achados[1][1] if len(achados) >= 2 else None
+    return origem, destino
+
+
 # ---------------------------------------------------------------------------
 # Mapeamento Centro de Custo → obra_id (admin_id=63)
 # ---------------------------------------------------------------------------
@@ -1407,11 +1425,16 @@ def _match_cc_obra(cc, obras_dict):
                 return oid
             # ID não pertence a este tenant: segue para fuzzy
             break
-    # Fuzzy fallback com obras do banco
+    # Fuzzy fallback com obras do banco.
+    # Usa token_set_ratio (não WRatio) com corte alto: evita falso positivo
+    # por palavra isolada — ex.: "Gespi - Engenharia" NÃO deve casar com
+    # "Soares Picon Engenharia" só porque compartilham "Engenharia".
     try:
-        from thefuzz import process as fuzz_process
+        from thefuzz import process as fuzz_process, fuzz
         if obras_dict:
-            match = fuzz_process.extractOne(cc_norm, obras_dict.keys(), score_cutoff=70)
+            match = fuzz_process.extractOne(
+                cc_norm, obras_dict.keys(),
+                scorer=fuzz.token_set_ratio, score_cutoff=88)
             if match:
                 return obras_dict[match[0]]
     except ImportError:
@@ -1477,6 +1500,187 @@ def _fuzzy_match_entidade(nome_excel, funcionarios, fornecedores):
     return 'fornecedor', melhor_s_id, melhor_s_nome, melhor_s_score
 
 
+# ---------------------------------------------------------------------------
+# Match descrição → categoria nomeada (CategoriaFluxoCaixa._DEFAULTS)
+# Retorna o NOME exato de uma das 45 categorias padrão, ou None.
+# Regras ordenadas: a primeira que casar vence (mais específica primeiro).
+# ---------------------------------------------------------------------------
+def _classificar_categoria_nomeada(tipo, plano, descricao, fornecedor, tem_obra=False):
+    d = _normalizar(descricao)
+    pl = _normalizar(plano)
+    fo = _normalizar(fornecedor)
+    blob = f" {d} {pl} {fo} "
+
+    def hb(*kws):   # casa no blob (desc+plano+fornecedor)
+        return any(k in blob for k in kws)
+
+    def hd(*kws):   # casa só na descrição
+        return any(k in d for k in kws)
+
+    if (tipo or '').upper() == 'ENTRADA':
+        if hb('aplicacao financ', 'rendimento', 'receita financeira', 'juros recebido'):
+            return 'Rendimentos Financeiros'
+        if hd('reembolso', 'repasse', 'ressarcimento'):
+            return 'Reembolso de Cliente'
+        if hb('aporte', 'capital social', 'integralizacao'):
+            return 'Aporte de Sócios'
+        if hb('emprestimo', 'financiamento captado'):
+            return 'Empréstimos Recebidos'
+        if hb('venda de ativo', 'alienacao', 'venda de bem', 'venda de equipamento'):
+            return 'Venda de Ativos'
+        if hd('adiantamento', 'sinal', 'antecipa', 'entrada (', 'entrada -'):
+            return 'Adiantamento de Clientes'
+        if hb('obra', 'medicao', 'contrato', 'administracao de obra',
+              'taxa administracao', 'taxa de administracao', 'faturamento', 'receita obra'):
+            return 'Receita de Obras'
+        if hb('servico', 'projeto', 'honorario', ' nf ', 'nf ', 'receita servic'):
+            return 'Receita de Serviços'
+        return 'Outros Recebimentos'
+
+    # ── SAÍDA ──────────────────────────────────────────────────────────────
+    # Pessoal / pró-labore (antes de keywords genéricas)
+    if (hd('diaria') or hb('trabalho noturno', 'hora extra', 'adicional noturno', 'extra trabalho',
+                           'extra noturno', 'extra diurno', 'ajudante', 'servente', 'encarregado',
+                           'ajuda de custo', 'mao-de-obra', 'mao de obra', 'periodo de trabalho',
+                           'vale (', 'plaqueamento')):
+        return 'Mão de Obra Direta'
+    if (hb('salario', 'folha de pagamento', 'rescisao', 'ferias', '13o salario',
+           'decimo terceiro', 'bonus', 'captacao', 'recrutamento', 'selecao de pessoal') and not hd('diaria')):
+        return 'Salários e Encargos'
+    if hb('retirada', 'pro-labore', 'pro labore', 'prolabore',
+          'distribuicao de lucro', 'distribuicao de resultado'):
+        return 'Pró-labore e Retirada de Sócios'
+    # Vale transporte/alimentação: se vinculado a uma obra → CUSTO DIRETO DE OBRA
+    # (Transporte/Alimentação de Obra). Se administrativo (sem obra) → Benefício.
+    if hb('vale transporte', 'vale-transporte', 'vale trans', 'vale-trans', 'vt mes', ' vt '):
+        return 'Transporte de Obra' if tem_obra else 'Benefício Transporte'
+    if hb('vale alimentacao', 'vale-alimentacao', 'vale refeicao', 'vale alim') or ('beneficio' in pl and hd('aliment')):
+        return 'Alimentação de Obra' if tem_obra else 'Benefício Alimentação'
+    if hd('reembolso') and ('funcionario' in blob or 'colaborador' in blob):
+        return 'Reembolsos a Funcionários'
+    # Tributos
+    if hb('simples nacional', 'darf', ' inss', 'inss ', 'fgts', 'imposto', 'tributo',
+          'irpj', 'csll', 'icms', ' das ', 'das ', 'parcelamento das', 'guia de recolhimento',
+          'iptu parcela', 'iptu -', 'prefeitura', 'licenca funcionamento', 'licenca de funcionamento',
+          'ipva'):
+        return 'Impostos e Taxas'
+    # Financeiro / bancário / empréstimos
+    if hb('emprestimo', 'financiamento', 'renegociacao', 'divida', 'parcela do emprestimo'):
+        return 'Empréstimos e Financiamentos'
+    if hb('iof', 'tarifa', 'tar ', 'taxa bancaria', 'anuidade', 'cesta de servic',
+          'manutencao de conta', 'despesa bancaria'):
+        return 'Despesas Bancárias'
+    if hb('juros', 'multa', 'mora', 'encargo financeiro', 'despesa financeira'):
+        return 'Despesa Financeira'
+    # Utilities / administrativo
+    if hb('sabesp', 'conta de agua', 'saneamento') or (hd('agua') and not hd('maquina')):
+        return 'Água'
+    if hb('energia eletrica', 'enel', 'cpfl', 'elektro', 'eletropaulo', 'edp', 'conta de luz', 'energia'):
+        return 'Luz / Energia Elétrica'
+    if hb('internet', 'fibra', 'banda larga', 'vivo fixo', 'vivo empresas - fixo'):
+        return 'Internet'
+    if hb('vivo movel', 'telefone', 'celular', 'plano movel', 'claro ', ' tim ',
+          'vivo empresas - movel', 'vivo empresas', 'telefonica'):
+        return 'Telefone'
+    if hb('workspace', 'google', 'microsoft', 'office 365', 'software', 'assinatura',
+          'sistema', 'saas', 'dropbox', 'licenca de software', 'app ', 'aplicativo', 'plataforma',
+          'diario de obra', 'configuracao servidor'):
+        return 'Sistemas e Assinaturas'
+    if hb('contabil', 'contador', 'advogad', 'juridico', 'assessoria contabil',
+          'tabeliao', 'cartorio', 'protesto', 'advocaticio', 'honorario advocaticio'):
+        return 'Contabilidade e Jurídico'
+    if hb('marketing', 'publicidade', 'anuncio', 'trafego', 'google ads', 'instagram',
+          'facebook', 'comercial externo', 'representante comercial',
+          'comissao de venda', 'comissao venda', 'comissao sobre venda', 'comissao comercial',
+          'comissao (', 'mkt', 'markenting', 'marketing digital', 'brinde', 'presente cliente',
+          'brinde cliente'):
+        return 'Marketing e Vendas'
+    if hb('plotagem', 'copias', 'impressao', 'impressoes', 'papelaria', 'cartucho', 'toner',
+          'material de escritorio', 'post it', 'post-it', 'caneta', 'pasta ', 'calculadora',
+          'grampeador', 'clips', 'notebook', 'monitor lg', 'computador', 'desktop', 'impressora',
+          'mouse', 'teclado', 'suporte cpu'):
+        return 'Material de Escritório'
+    if hb('treinamento', 'capacitacao', 'curso ', 'certificacao', 'workshop',
+          'pos graduacao', 'pos-graduacao', 'graduacao', 'faculdade', 'mba'):
+        return 'Treinamentos e Capacitações'
+    if (hb('aluguel administrat', 'locacao administrat', 'sala comercial', 'aluguel escritorio',
+           'alguel escritorio', 'condominio escritorio', 'condominio escrtitorio',
+           'iptu escritorio', 'aluguel de sala', 'locacao de sala', 'locker', 'arquivamento')
+            or (('imoveis' in fo or 'imobiliaria' in fo)
+                and hb('aluguel', 'alguel', 'iptu', 'condominio', 'locacao'))):
+        return 'Aluguel e Locação Administrativa'
+    if hb('manutencao predial', 'reforma escritorio', 'reparo escritorio'):
+        return 'Manutenção Predial e Escritório'
+    # Custo direto de obra
+    if hb('conserto', 'concerto', 'revisao', 'mecanica', 'oficina', 'pneu', 'funilaria',
+          'manutencao de veiculo', 'manutencao carro', 'lavagem carro', 'lava jato', 'lava-jato',
+          'lava rapido', 'limpeza carro', 'solda escapamento', 'escapamento', 'centro automotivo',
+          'bateria', 'amortecedor', 'parabrisa', 'para-brisa', 'filtro de ar', 'jogo de velas',
+          'porta mala', 'litro de oleo', 'oleo carro', 'auto vitrais', 'troca lanterna',
+          'kit amortecedor', 'filtro de oleo', 'guincho', 'peca gol', 'peca carro',
+          'autopecas', 'auto pecas', 'oleo gol', 'porta - gol'):
+        return 'Manutenção de Frota e Equipamentos'
+    # Locação de veículo (carro/frota) → Frota (antes de combustível e da locação genérica)
+    if hb('aluguel de carro', 'aluguel carro', 'aluguel de carros', 'aluguel de veiculo',
+          'rent car', 'rent a car', 'localiza', 'movida locacao', 'unidas locacao'):
+        return 'Combustível e Frota'
+    if hb('combustivel', 'gasolina', 'diesel', 'etanol', 'posto ', 'abastec', 'pedagio', 'sem parar'):
+        return 'Combustível e Frota'
+    if hb('frete', 'entrega', 'transportadora', 'transportes', 'carreto', 'viagem', 'caminhao'):
+        return 'Fretes e Entregas'
+    if hb('locacao de', 'aluguel de equip', 'martelete', 'esmerilhadeira', 'betoneira',
+          'andaime', 'compressor', 'gerador', 'cacamba', 'locacao '):
+        return 'Locação de Equipamentos'
+    if hb('epi', 'capacete', 'bota ', 'botina', 'luva', 'oculos de protecao', 'cinto de seguranca',
+          'protetor', 'mascara', 'exame admissional', 'exame demissional', 'exame periodico',
+          'exame ocupacional', 'exames admissionais', 'medicina do trabalho', 'aso ', 'admissional',
+          'demissional', 'uniforme', 'fardamento', 'nr 18', 'nr 35', 'nr-18', 'nr-35'):
+        return 'EPIs e Segurança do Trabalho'
+    if hb('ferramenta', 'parafusadeira', 'broca', 'disco', 'furadeira',
+          'serra ', 'serrote', 'consumivel', 'trena', 'alicate', 'martelo', 'chave de fenda',
+          'enxada', 'picareta', ' bit ', 'estilete', 'soquete', 'pilha', 'brocha',
+          'marreta', 'talhadeira', 'makita', 'pa quadrada', 'aspirador', 'lixadeira',
+          'pistola aplicacao', 'pistola pu', 'bits', 'parcela laser'):
+        return 'Ferramentas e Consumíveis'
+    if hb('art ', 'anotacao de responsabilidade', 'licenca', 'alvara', 'taxa de obra', 'crea '):
+        return 'Taxas de Obra / ART / Licenças'
+    if hb('hospedagem', 'hotel', 'pousada'):
+        return 'Hospedagem de Obra'
+    if hb('almoc', 'refeic', 'cafe', 'ifood', 'marmit', 'lanche', 'restaurante',
+          'jantar', 'janta', 'cambuca', 'padaria', 'supermercado', 'cesta basica', 'alimentacao',
+          'gas de cozinha', 'gas cozinha', 'botijao'):
+        return 'Alimentação de Obra'
+    if (hb('vale transporte', 'estacionamento', 'conducao', 'linhas aereas', 'passagem aerea',
+           'blablacar', 'bla bla car')
+            or hd('transporte', 'passagem', 'onibus', 'uber', ' km')
+            or ('km' in d and any(ch.isdigit() for ch in d))):
+        return 'Transporte de Obra'
+    if hb('subempreit', 'empreita', 'subcontrat'):
+        return 'Subempreitada'
+    # Instalação / assentamento = MÃO DE OBRA (serviço) — antes de materiais,
+    # senão "Instalação dos cabos" cairia em Materiais pela palavra "cabo".
+    if hb('instalacao', 'assentamento', 'montagem', 'montador'):
+        return 'Serviços Terceirizados de Obra'
+    if hb('cimento', 'concreto', 'argamassa', 'ferro', ' aco', 'tijolo', 'areia', 'brita',
+          'tinta', 'madeira', 'vidro', 'tubo', 'porcelanato', 'telha', 'material', 'materiai', 'leroy',
+          'cimento&tudo', 'concrelagos', 'dividros', 'bomba', 'eletrico', 'hidraulico',
+          'parabolt', 'selante', 'vergalhao', 'mola aerea', 'parafus',
+          'luminaria', 'ralo', 'cabo', 'abracadeira', 'cantoneira', 'forro',
+          'divisoria', 'aluminio', 'porta de', 'rodape', 'piso ', 'lona', 'deposito',
+          'gesso', 'arame', 'pedido', ' oc ', 'saco de', 'entulho', 'produto de limpeza',
+          'interfone', 'fechadura', 'mezanino', 'fita crepe', 'adaptador', 'osb', 'montante',
+          'bloco', 'impermeabilizante', 'vedacao', 'galvanizado', 'casa do lojista',
+          'tapume', 'cal para', 'baguete', 'painel', 'conduite', 'gaivota', 'fercorte',
+          'la de rocha', 'la de vidro', 'leds', ' led ', 'produto limpeza'):
+        return 'Materiais de Obra'
+    if hb('servico', 'terceiro', 'mao de obra', 'pedreiro', 'eletricista', 'encanador',
+          'pintor', 'pintura', 'gesseiro', 'projeto', 'projetista', 'medicao', 'topografia',
+          'sondagem', 'engenharia', 'fachada', 'reparo do', 'reparo de', 'eletrica', 'eletria',
+          'hidraulica', 'diarista', 'faxina', 'soldador', 'azulejista', 'pagamento semana'):
+        return 'Serviços Terceirizados de Obra'
+    return 'Outras Saídas'
+
+
 class ImportacaoFluxoCaixa:
     """
     Parser + classificador para o arquivo Fluxo de Caixa Veks Engenharia.
@@ -1500,9 +1704,12 @@ class ImportacaoFluxoCaixa:
         wb = openpyxl.load_workbook(arquivo_path_ou_file, data_only=True)
 
         # Carregar entidades em memória (um hit no BD)
-        from models import Funcionario, Fornecedor
+        from models import Funcionario, Fornecedor, BancoEmpresa
         funcionarios = [(f.id, f.nome) for f in
                         Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()]
+        # Bancos: (id, chave) — chave = nome normalizado sem o prefixo "banco "
+        bancos_match = [(b.id, _normalizar(b.nome_banco).replace('banco ', '').strip())
+                        for b in BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).all()]
         # Fornecedores: tupla (id, nome, razao_social, nome_fantasia) para fuzzy com 3 aliases
         fornecedores = []
         for f in Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).all():
@@ -1646,14 +1853,16 @@ class ImportacaoFluxoCaixa:
 
                 # Transferência interna → lista própria (não ignorado)
                 if _eh_transferencia_interna(desc + ' ' + plano, valor):
+                    _orig, _dest = _match_bancos_transferencia(
+                        desc + ' ' + plano + ' ' + fornecedor_nome, bancos_match)
                     transferencias.append({
                         'data': str(data_obj),
                         'fornecedor': fornecedor_nome,
                         'descricao': desc,
                         'valor': valor,
                         'motivo': 'Transferência interna',
-                        'banco_origem_id': None,
-                        'banco_destino_id': None,
+                        'banco_origem_id': _orig,
+                        'banco_destino_id': _dest,
                     })
                     continue
 
@@ -1762,6 +1971,27 @@ class ImportacaoFluxoCaixa:
                 )
             )
 
+        # ── Match descrição → categoria nomeada (CategoriaFluxoCaixa) ────────
+        # Resolve o NOME da categoria e o id correspondente no tenant.
+        from models import CategoriaFluxoCaixa
+        _cats_map = {_normalizar(c.nome): c.id for c in
+                     CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
+        for _r in entradas:
+            _nm = _classificar_categoria_nomeada('ENTRADA', _r.get('plano_contas'),
+                                                 _r.get('descricao'), _r.get('cliente'))
+            _r['categoria_nome'] = _nm
+            _cid = _cats_map.get(_normalizar(_nm)) if _nm else None
+            if _cid and not _r.get('categoria_fluxo_caixa_id'):
+                _r['categoria_fluxo_caixa_id'] = _cid
+        for _r in saidas_auto + saidas_manual:
+            _nm = _classificar_categoria_nomeada('SAIDA', _r.get('plano_contas'),
+                                                 _r.get('descricao'), _r.get('fornecedor'),
+                                                 tem_obra=bool(_r.get('obra_id')))
+            _r['categoria_nome'] = _nm
+            _cid = _cats_map.get(_normalizar(_nm)) if _nm else None
+            if _cid and not _r.get('categoria_fluxo_caixa_id'):
+                _r['categoria_fluxo_caixa_id'] = _cid
+
         # Período descritivo
         datas_sorted = sorted(todas_datas)
         if data_inicio and data_fim:
@@ -1838,11 +2068,19 @@ class ImportacaoFluxoCaixa:
         _obras_nome_map = {o.id: o.nome for o in Obra.query.filter_by(admin_id=admin_id).all()}
 
         def _ja_existe_saida(data_str, valor, fornecedor, aid):
-            """Checa chave de não-duplicidade para saídas."""
+            """Checa chave de não-duplicidade para saídas.
+
+            Ignora linhas do PRÓPRIO lote atual: duas despesas legítimas com
+            mesmo (fornecedor, valor, data) — ex.: duas diárias iguais no mesmo
+            dia — devem AMBAS ser importadas. O dedup serve só para impedir
+            reimportar o mesmo arquivo (lote diferente / dados pré-existentes).
+            """
             existing = GestaoCustoPai.query.filter(
                 GestaoCustoPai.admin_id == aid,
                 GestaoCustoPai.entidade_nome == fornecedor,
                 GestaoCustoPai.valor_total == Decimal(str(valor)),
+                db.or_(GestaoCustoPai.import_batch_id.is_(None),
+                       GestaoCustoPai.import_batch_id != batch_id),
             ).join(
                 GestaoCustoFilho,
                 GestaoCustoFilho.pai_id == GestaoCustoPai.id
@@ -1856,7 +2094,9 @@ class ImportacaoFluxoCaixa:
                 ContaReceber.admin_id == aid,
                 ContaReceber.cliente_nome == cliente,
                 ContaReceber.valor_original == Decimal(str(valor)),
-                ContaReceber.data_emissao == _parse_data(data_str)
+                ContaReceber.data_emissao == _parse_data(data_str),
+                db.or_(ContaReceber.import_batch_id.is_(None),
+                       ContaReceber.import_batch_id != batch_id),
             ).first()
             return existing is not None
 
@@ -2079,7 +2319,7 @@ class ImportacaoFluxoCaixa:
                         n_conta_pagar += 1
 
                 n_saidas += 1
-                totais[cat] = totais.get(cat, {'count': 0, 'valor': 0.0})
+                totais[cat] = totais.get(cat, {'count': 0, 'valor': Decimal('0')})
                 totais[cat]['count'] += 1
                 totais[cat]['valor'] += valor
 

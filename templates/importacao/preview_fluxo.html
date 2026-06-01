@@ -1,7 +1,7 @@
 {% extends "base_completo.html" %}
 {% block title %}Preview Fluxo de Caixa — SIGE{% endblock %}
 
-{% block head_extra %}
+{% block styles %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 <style>
 /* Inputs inline — sem borda em repouso, com borda ao focar */
@@ -16,6 +16,19 @@
 }
 .inline-input:hover { border-color: #dee2e6; background: #fff; }
 .inline-input:focus { border-color: #0d6efd; background: #fff; outline: none; }
+/* Foco forte para navegação por teclado (a11y) */
+.inline-input:focus-visible,
+.destinatario-ts + .ts-wrapper .ts-control:focus-within,
+.form-select:focus-visible,
+.form-check-input:focus-visible {
+  outline: 2px solid #0d6efd;
+  outline-offset: 1px;
+  border-color: #0d6efd;
+}
+/* Dígitos alinhados em colunas numéricas */
+.inline-input.input-valor, .input-data, td.text-end, .table td .input-valor {
+  font-variant-numeric: tabular-nums;
+}
 .inline-input.input-data { min-width: 108px; }
 .inline-input.input-valor { min-width: 80px; text-align: right; }
 .inline-input.input-desc { min-width: 140px; }
@@ -55,6 +68,72 @@
 .cat-ts-wrap.ts-wrapper { font-size: .8rem; min-width: 155px; max-width: 230px; }
 .cat-ts-wrap .ts-control { padding: 2px 6px; min-height: 28px; }
 .cat-ts-wrap .ts-dropdown { font-size: .8rem; min-width: 220px; }
+
+/* ── Dropdowns/autocomplete: flutuam acima da tabela (sem corte/sobreposição) ── */
+.ts-dropdown {
+  z-index: 1080 !important;            /* acima de cards, tooltips e do scroll da tabela */
+  border: 1px solid #cdd5df;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(13, 20, 40, .14);
+  overflow: hidden;
+}
+.ts-dropdown .option { padding: 6px 10px; }
+.ts-dropdown .active { background: #e8f0ff; color: #0d3b8a; }
+.ts-dropdown .optgroup-header {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .04em;
+  color: #6c757d; background: #f6f8fb; padding: 4px 10px;
+}
+.ts-dropdown .no-results { padding: 8px 10px; color: #6c757d; font-style: italic; }
+.ts-wrapper .ts-control { min-height: 30px; border-color: #ced4da; }
+.ts-wrapper.focus .ts-control { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13,110,253,.18); }
+
+/* ── Affordance de edição inline mais clara ── */
+.inline-display-text { border-bottom: 1px dashed #c7ced6; }
+.inline-display-text:hover { background: #e8f0ff; border-bottom-color: #0d6efd; }
+.inline-display-text::after { color: #0d6efd; opacity: .55; }
+
+/* ── Tabela cabe em UMA tela: sem rolagem lateral ── */
+.tbl-fluxo { table-layout: fixed; width: 100%; }
+.tbl-fluxo thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: #f1f4f8;
+  border-bottom: 2px solid #dde3ea;
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .02em;
+  padding-top: .5rem; padding-bottom: .5rem;
+}
+.tbl-fluxo td { vertical-align: middle; }
+/* quebra de texto em vez de empurrar a tabela pro lado */
+.tbl-fluxo th, .tbl-fluxo td { white-space: normal; word-break: break-word; overflow: hidden; }
+/* todo controle encolhe até a largura da coluna (não força overflow) */
+.tbl-fluxo .inline-input,
+.tbl-fluxo .form-select,
+.tbl-fluxo .ts-wrapper,
+.tbl-fluxo .dest-wrap,
+.tbl-fluxo .cat-ts-wrap,
+.tbl-fluxo .banco-select,
+.tbl-fluxo .cat-select {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+/* O <select> nativo escondido pelo Tom Select NÃO pode ocupar espaço
+   (senão estoura a largura da página). Mantém o padrão visually-hidden. */
+.tbl-fluxo select.tomselected,
+.tbl-fluxo select.ts-hidden-accessible {
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 1px !important;
+  max-width: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  border: 0 !important;
+  position: absolute !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+}
+.tbl-fluxo .inline-display-text { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tbl-fluxo .ts-control { flex-wrap: nowrap; overflow: hidden; }
+.tbl-fluxo .ts-control > .item { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 {% endblock %}
 
@@ -64,7 +143,7 @@
   <!-- Cabeçalho -->
   <div class="d-flex align-items-center mb-4">
     <div class="me-3 d-flex align-items-center justify-content-center"
-         style="width:44px;height:44px;background:linear-gradient(135deg,#0d6efd,#6610f2);border-radius:10px;">
+         style="width:44px;height:44px;background:#0d6efd;border-radius:10px;">
       <i data-feather="dollar-sign" style="color:#fff;width:22px;height:22px;"></i>
     </div>
     <div>
@@ -151,7 +230,7 @@
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+        <table class="table table-sm table-hover mb-0 tbl-fluxo" style="font-size:.84rem;">
           <thead class="table-light">
             <tr>
               <th class="px-3">Data</th>
@@ -160,7 +239,6 @@
               <th>CC / Obra</th>
               <th class="text-end">Valor</th>
               <th>Status</th>
-              <th>Fuzzy match</th>
               {% if categorias_entrada %}
               <th>Categoria</th>
               {% endif %}
@@ -201,15 +279,6 @@
                   <span class="badge bg-success">PAGO</span>
                 {% else %}
                   <span class="badge bg-secondary">PENDENTE</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if r.fuzzy_score > 85 %}
-                  <span class="badge bg-success">Auto</span>
-                {% elif r.fuzzy_score > 60 %}
-                  <span class="badge bg-warning text-dark">{{ r.fuzzy_score }}%</span>
-                {% else %}
-                  <span class="badge bg-light text-muted">—</span>
                 {% endif %}
               </td>
               {% if categorias_entrada %}
@@ -266,37 +335,36 @@
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+        <table class="table table-sm table-hover mb-0 tbl-fluxo" style="font-size:.84rem;">
           <thead class="table-light">
             <tr>
-              <th class="px-3" style="min-width:112px;">Data</th>
-              <th style="min-width:140px;">Fornecedor / Entidade</th>
-              <th style="min-width:170px;">Destinatário
+              <th class="px-3" style="width:6%;">Data</th>
+              <th style="width:11%;">Fornecedor</th>
+              <th style="width:14%;">Destinatário
                 <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
                    data-bs-toggle="tooltip"
                    title="Funcionário ou fornecedor vinculado. Clique para substituir o match automático."></i>
               </th>
-              <th style="min-width:150px;">Descrição</th>
-              <th>CC</th>
-              <th class="text-end" style="min-width:90px;">Valor (R$)</th>
-              <th>Status</th>
-              <th>Categoria</th>
-              <th>Score</th>
-              <th class="text-center"
-                  title="Cria somente o lançamento no Fluxo de Caixa, sem registrar custo (GCP/GCF) e sem Conta a Pagar">
-                Apenas pgto.
+              <th style="width:14%;">Descrição</th>
+              <th style="width:10%;">CC</th>
+              <th class="text-end" style="width:8%;">Valor</th>
+              <th style="width:7%;">Status</th>
+              <th style="width:14%;">Categoria</th>
+              <th class="text-center" style="width:5%;"
+                  title="Cria somente o lançamento no Fluxo de Caixa, sem registrar o custo nem a conta a pagar">
+                Pgto.
                 <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
                    data-bs-toggle="tooltip"
-                   title="Cria somente o lançamento no Fluxo de Caixa, sem registrar custo (GCP/GCF) e sem Conta a Pagar."></i>
+                   title="Apenas pagamento: cria somente o lançamento no Fluxo de Caixa, sem registrar o custo nem a conta a pagar."></i>
               </th>
-              <th class="text-center"
+              <th class="text-center" style="width:5%;"
                   title="Marca este lançamento como reembolso a pagar a um funcionário ou colaborador">
-                Reembolso
+                Reemb.
                 <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
                    data-bs-toggle="tooltip"
-                   title="Marca este lançamento como reembolso a pagar."></i>
+                   title="Reembolso: marca este lançamento como reembolso a pagar a um colaborador."></i>
               </th>
-              <th style="min-width:130px;">Banco</th>
+              <th style="width:6%;">Banco</th>
             </tr>
           </thead>
           <tbody>
@@ -406,16 +474,6 @@
                   {% endfor %}
                 </select>
               </td>
-              <!-- Score -->
-              <td>
-                {% if r.fuzzy_score > 85 %}
-                  <span class="badge bg-success">{{ r.fuzzy_score }}%</span>
-                {% elif r.fuzzy_score > 60 %}
-                  <span class="badge bg-warning text-dark">{{ r.fuzzy_score }}%</span>
-                {% else %}
-                  <span class="text-muted small">—</span>
-                {% endif %}
-              </td>
               <!-- Apenas pagamento -->
               <td class="text-center">
                 <input type="checkbox"
@@ -472,24 +530,24 @@
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+        <table class="table table-sm table-hover mb-0 tbl-fluxo" style="font-size:.84rem;">
           <thead class="table-light">
             <tr>
-              <th class="px-3" style="min-width:112px;">Data</th>
-              <th style="min-width:140px;">Fornecedor</th>
-              <th style="min-width:170px;">Destinatário
+              <th class="px-3" style="width:6%;">Data</th>
+              <th style="width:11%;">Fornecedor</th>
+              <th style="width:14%;">Destinatário
                 <i data-feather="help-circle" style="width:12px;height:12px;color:#6c757d;"
                    data-bs-toggle="tooltip"
                    title="Funcionário ou fornecedor vinculado. Clique para substituir o match automático."></i>
               </th>
-              <th style="min-width:150px;">Descrição</th>
-              <th style="min-width:150px;">CC / Obra</th>
-              <th class="text-end" style="min-width:90px;">Valor (R$)</th>
-              <th>Status</th>
-              <th>Categoria <span class="text-danger">*</span></th>
-              <th class="text-center">Apenas pgto.</th>
-              <th class="text-center">Reembolso</th>
-              <th style="min-width:130px;">Banco</th>
+              <th style="width:14%;">Descrição</th>
+              <th style="width:10%;">CC / Obra</th>
+              <th class="text-end" style="width:8%;">Valor</th>
+              <th style="width:7%;">Status</th>
+              <th style="width:14%;">Categoria <span class="text-danger">*</span></th>
+              <th class="text-center" style="width:5%;">Pgto.</th>
+              <th class="text-center" style="width:5%;">Reemb.</th>
+              <th style="width:6%;">Banco</th>
             </tr>
           </thead>
           <tbody>
@@ -677,7 +735,7 @@
                     <select name="transf_origem_{{ loop.index0 }}" class="form-select form-select-sm" style="min-width:130px;font-size:.8rem;">
                       <option value="">— Origem —</option>
                       {% for b in bancos %}
-                      <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                      <option value="{{ b.id }}" {% if r.banco_origem_id == b.id %}selected{% endif %}>{{ b.nome_banco }}</option>
                       {% endfor %}
                     </select>
                     {% else %}<span class="text-muted">—</span>{% endif %}
@@ -687,7 +745,7 @@
                     <select name="transf_destino_{{ loop.index0 }}" class="form-select form-select-sm" style="min-width:130px;font-size:.8rem;">
                       <option value="">— Destino —</option>
                       {% for b in bancos %}
-                      <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                      <option value="{{ b.id }}" {% if r.banco_destino_id == b.id %}selected{% endif %}>{{ b.nome_banco }}</option>
                       {% endfor %}
                     </select>
                     {% else %}<span class="text-muted">—</span>{% endif %}
@@ -778,6 +836,34 @@ document.addEventListener('DOMContentLoaded', function () {
   tooltipEls.forEach(function(el) { new bootstrap.Tooltip(el); });
   feather.replace();
 
+  // ── A11y: nome acessível em cada campo editável (a partir do cabeçalho) ──
+  document.querySelectorAll('table').forEach(function (table) {
+    var heads = Array.prototype.map.call(
+      table.querySelectorAll('thead th'),
+      function (th) { return (th.textContent || '').replace(/\s+/g, ' ').trim(); }
+    );
+    table.querySelectorAll('tbody tr').forEach(function (tr, ri) {
+      tr.querySelectorAll('td').forEach(function (td, ci) {
+        var head = heads[ci] || ('Campo ' + (ci + 1));
+        td.querySelectorAll('input, select').forEach(function (field) {
+          if (!field.getAttribute('aria-label')) {
+            field.setAttribute('aria-label', head + ' — linha ' + (ri + 1));
+          }
+        });
+      });
+    });
+  });
+
+  // ── Loading no submit: previne duplo-envio do import (lento em lote) ─────
+  var formC = document.getElementById('formConfirmar');
+  var btnC = document.getElementById('btnConfirmar');
+  if (formC && btnC) {
+    formC.addEventListener('submit', function () {
+      btnC.disabled = true;
+      btnC.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Importando…';
+    });
+  }
+
   // ── Tom Select: Destinatário ────────────────────────────────────────────
   var BADGE = {
     funcionario: '<span class="badge-tipo-func">Func</span>',
@@ -813,6 +899,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     new TomSelect(el, {
+      dropdownParent: 'body',
       valueField:   'id',
       labelField:   'nome',
       searchField:  ['nome'],
@@ -844,6 +931,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Tom Select: Categorias ──────────────────────────────────────────────
   document.querySelectorAll('.cat-select').forEach(function(el) {
     var ts = new TomSelect(el, {
+      dropdownParent: 'body',
       allowEmptyOption: true,
       maxOptions: 200,
       selectOnTab: true,
@@ -864,6 +952,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Tom Select: CC/Obra ──────────────────────────────────────────────────
   document.querySelectorAll('.obra-ts').forEach(function(el) {
     new TomSelect(el, {
+      dropdownParent: 'body',
       plugins: ['dropdown_input'],
       placeholder: 'Buscar obra…',
       allowEmptyOption: true,

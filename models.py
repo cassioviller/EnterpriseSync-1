@@ -6872,6 +6872,7 @@ class CategoriaFluxoCaixa(db.Model):
         ('ENTRADA', 'Venda de Ativos',                    'Receitas Não Operacionais',   'Receita proveniente da venda de bens e equipamentos'),
         ('ENTRADA', 'Outros Recebimentos',                'Outros',                      'Entradas diversas não categorizadas'),
         # --- SAÍDAS: Custo Direto de Obra ---
+        ('SAIDA',   'Mão de Obra Direta',                 'Custo Direto de Obra',        'Diárias e mão de obra que atua diretamente na execução da obra'),
         ('SAIDA',   'Materiais de Obra',                  'Custo Direto de Obra',        'Aquisição de materiais e insumos para obras'),
         ('SAIDA',   'Subempreitada',                      'Custo Direto de Obra',        'Pagamento a subempreiteiros por serviços de obra'),
         ('SAIDA',   'Serviços Terceirizados de Obra',     'Custo Direto de Obra',        'Prestadores de serviços especializados em obra'),

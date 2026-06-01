@@ -128,10 +128,19 @@ Sempre usar badge semântico + texto (nunca só cor).
 - Use `fw-bold text-warning` para indicar arredondamento forçado (fator > 1 ou não fracionável)
 - Use tooltips `data-bs-toggle="tooltip"` em abreviações técnicas (coef., BDI, fator comercial)
 - Mostre separação clara entre **custo técnico** e **custo real de compra**
+- **Faixa de cor semântica nos cards de seção** (`border-top`/`border-left` 4px) é padrão
+  ACEITO para distinguir blocos por natureza (entrada=verde, saída=azul, atenção=amarelo,
+  transferência=ciano). A cor codifica o tipo do bloco, não decoração.
+- Use `font-variant-numeric: tabular-nums` em colunas numéricas (valor, data) para alinhar dígitos
+- Todo input/select editável precisa de nome acessível: `<label>` (mesmo `.visually-hidden`)
+  ou `aria-label`. `title=` não basta para leitor de tela.
+- Foco visível obrigatório: `:focus-visible` com ring de ≥2px (usuários navegam por Tab)
+- Botão de ação que dispara operação lenta (import, gravação em lote): desabilitar + spinner no submit
 
 ### Don't:
-- Não use `border-left` colorido em cards de status — Bootstrap já tem badge para isso
 - Não use dark mode — o sistema é light-only
 - Não omita o `form-text` explicativo em campos calculados ou com regra especial
 - Não misture R$ com notação americana (1.234.56) — sempre pt-BR
-- Não use gradientes em botões de ação principal
+- Não use gradientes em botões de ação principal **nem em chips de ícone** (manter cor sólida da marca)
+- Não exponha nomes internos de tabela/modelo (ex.: "GCP/GCF") na UI — use linguagem do usuário
+- Não use `outline:none` sem repor o foco com `:focus-visible`

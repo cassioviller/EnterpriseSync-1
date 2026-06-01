@@ -95,6 +95,11 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
+# Recarrega templates do disco a cada request (mesmo sob gunicorn, sem debug).
+# Evita servir HTML/CSS antigo após editar um template sem reiniciar o worker.
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
+
 # Configurações v10.0 Digital Mastery
 app.config['DIGITAL_MASTERY_MODE'] = True
 app.config['OBSERVABILITY_ENABLED'] = True
