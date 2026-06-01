@@ -62,6 +62,7 @@ class Contexto:
     proposta_id = None
     token = None
     obra_id = None
+    obra_token = None
 
 
 CTX = Contexto()
@@ -606,3 +607,74 @@ class TestJornadaPropostaCronograma:
         page.goto(f"{BASE_URL}/propostas/")
         page.wait_for_load_state("networkidle")
         assert CTX.numero_proposta in page.content(), "proposta não aparece na listagem admin"
+
+    # ── Portal da OBRA — acompanhamento do cliente pós-aprovação ─────────────
+    def test_16_gestor_ativa_portal_obra(self, page: Page):
+        # ativa o portal da obra gerada pela aprovação (estado arranjado via DB —
+        # o efeito é o mesmo do botão "Ativar" da tela de detalhes da obra) e
+        # confirma que a UI do gestor passa a expor o link do portal ao cliente.
+        assert CTX.obra_id, "obra_id não definido (test_10 deveria ter criado a obra)"
+
+        def _ativar():
+            import secrets
+            from app import db
+            from models import Obra
+            o = Obra.query.get(CTX.obra_id)
+            o.portal_ativo = True
+            if not o.token_cliente:
+                o.token_cliente = secrets.token_urlsafe(32)
+            db.session.commit()
+            return o.token_cliente
+
+        CTX.obra_token = _db(_ativar)
+        assert CTX.obra_token, "token do cliente não foi gerado ao ativar o portal"
+
+        # a tela do gestor reflete o portal ativo: link do cliente com o token
+        page.goto(f"{BASE_URL}/obras/detalhes/{CTX.obra_id}")
+        page.wait_for_load_state("networkidle")
+        link = page.locator(f"a[href*='/portal/obra/{CTX.obra_token}']")
+        assert link.count() > 0, "tela do gestor não expôs o link do portal do cliente"
+
+    def test_17_cliente_acessa_portal_obra(self, page: Page):
+        # cliente ANÔNIMO (sem login) acompanha a obra só pelo token
+        assert getattr(CTX, "obra_token", None), "obra_token não definido (test_16)"
+        ctx2 = page.context.browser.new_context()
+        cli = ctx2.new_page()
+        cli.set_default_timeout(TIMEOUT_MS)
+        cli.goto(f"{BASE_URL}/portal/obra/{CTX.obra_token}")
+        cli.wait_for_load_state("networkidle")
+
+        corpo = cli.locator("body").inner_text()
+        # (1) é o portal ATIVO, não a página de "portal inativo"
+        assert "Portal temporariamente inativo" not in corpo, "portal veio como inativo"
+        # (2) identifica a obra e renderiza o painel de acompanhamento (hero)
+        assert "Portal do Cliente" in cli.title(), f"título inesperado: {cli.title()}"
+        assert cli.locator(".hero-card").count() > 0, "hero do portal da obra ausente"
+        # (3) não vaza precificação interna ao cliente
+        low = corpo.lower()
+        for termo in ["margem", "lucro"]:
+            assert termo not in low, f"portal da obra vazou termo interno: '{termo}'"
+
+        cli.screenshot(path=f"tests/reports/portal_obra_{SUF}.png", full_page=True)
+        ctx2.close()
+
+    def test_18_portal_obra_inativo_quando_desativado(self, page: Page):
+        # ao DESATIVAR o portal, o mesmo token passa a exibir a página de inativo
+        def _desativar():
+            from app import db
+            from models import Obra
+            o = Obra.query.get(CTX.obra_id)
+            o.portal_ativo = False
+            db.session.commit()
+            return bool(o.portal_ativo)
+        assert _db(_desativar) is False, "portal não foi desativado"
+
+        ctx2 = page.context.browser.new_context()
+        cli = ctx2.new_page()
+        cli.set_default_timeout(TIMEOUT_MS)
+        cli.goto(f"{BASE_URL}/portal/obra/{CTX.obra_token}")
+        cli.wait_for_load_state("networkidle")
+        assert "Portal temporariamente inativo" in cli.locator("body").inner_text(), (
+            "portal desativado não exibiu a página de inativo"
+        )
+        ctx2.close()
