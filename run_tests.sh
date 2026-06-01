@@ -15,6 +15,7 @@
 #   bash run_tests.sh --bloco7           # Apenas BLOCO 7 (CRM/Frota/demais)
 #   bash run_tests.sh --integracao       # Apenas testes de integração E2E
 #   bash run_tests.sh --jornada          # Jornada E2E proposta→cronograma (browser real)
+#   bash run_tests.sh --varredura        # Varredura de todas as páginas do menu (browser real)
 #   bash run_tests.sh --standalone       # Modo standalone (sem pytest)
 #
 # Dependências de sistema (instaladas via nix):
@@ -37,6 +38,7 @@ while [[ $# -gt 0 ]]; do
         --bloco7)       BLOCO_FILTER="::TestBloco7Demais"; shift ;;
         --integracao)   BLOCO_FILTER="-k integra"; shift ;;
         --jornada)      TARGET_FILE="tests/test_e2e_jornada_proposta_cronograma_playwright.py"; BLOCO_FILTER=""; shift ;;
+        --varredura)    TARGET_FILE="tests/test_e2e_varredura_paginas_playwright.py"; BLOCO_FILTER=""; shift ;;
         --standalone)   STANDALONE=1; shift ;;
         *)              echo "Opção desconhecida: $1"; exit 1 ;;
     esac
