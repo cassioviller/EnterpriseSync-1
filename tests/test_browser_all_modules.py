@@ -126,6 +126,123 @@ def _get_admin_id() -> int:
         return u.id
 
 
+def _garantir_dados_e2e(admin_id: int) -> None:
+    """Provisiona, de forma idempotente, os pré-requisitos dos testes de
+    integração (Almox/RDO/Folha) que de outra forma pulariam por falta de
+    dados demo: 1 Fornecedor, 1 AlmoxarifadoItem CONSUMIVEL e 1 Funcionário
+    diarista ativo. Reusa entidades já existentes (marcadas por código/cpf);
+    não duplica entre execuções. Deve ser chamado dentro de um app_context.
+    """
+    import datetime as _dt
+    from app import db
+    from models import (
+        Fornecedor, AlmoxarifadoCategoria, AlmoxarifadoItem, Funcionario,
+        PlanoContas, ParametrosLegais,
+    )
+
+    # -1) Parâmetros legais (tabela INSS/IRRF/FGTS) — sem eles a folha mensal
+    #     não gera FolhaPagamento e o evento folha_processada nunca dispara.
+    #     Cobre o ano corrente e o anterior (competência = mês passado).
+    _ano_atual = _dt.date.today().year
+    for _ano in (_ano_atual, _ano_atual - 1):
+        if ParametrosLegais.query.filter_by(
+                admin_id=admin_id, ano_vigencia=_ano).first() is None:
+            db.session.add(ParametrosLegais(
+                admin_id=admin_id, ano_vigencia=_ano,
+                inss_faixa1_limite=1412.00, inss_faixa1_percentual=7.5,
+                inss_faixa2_limite=2666.68, inss_faixa2_percentual=9.0,
+                inss_faixa3_limite=4000.03, inss_faixa3_percentual=12.0,
+                inss_faixa4_limite=7786.02, inss_faixa4_percentual=14.0,
+                inss_teto=908.85,
+                irrf_isencao=2259.20, irrf_faixa1_limite=2826.65,
+                irrf_faixa1_percentual=7.5, irrf_faixa1_deducao=169.44,
+                irrf_faixa2_limite=3751.05, irrf_faixa2_percentual=15.0,
+                irrf_faixa2_deducao=381.44, irrf_faixa3_limite=4664.68,
+                irrf_faixa3_percentual=22.5, irrf_faixa3_deducao=662.77,
+                irrf_faixa4_percentual=27.5, irrf_faixa4_deducao=896.00,
+                irrf_dependente_valor=189.59,
+                fgts_percentual=8.0, salario_minimo=1412.00,
+                vale_transporte_percentual=6.0, adicional_noturno_percentual=20.0,
+                hora_extra_50_percentual=50.0, hora_extra_100_percentual=100.0,
+                ativo=True,
+            ))
+
+    # 0) Conta de despesa de pessoal (5.1.01.001 Salários) exigida pelo handler
+    #    'folha_processada' → criar_lancamento_folha_pagamento (event_manager.py
+    #    l.1110). codigo é PK global e conta_pai_codigo é FK → codigo, então a
+    #    cadeia de pais (5 → 5.1 → 5.1.01) precisa existir antes; criamos em
+    #    ordem hierárquica, com flush por nível para satisfazer o FK.
+    _cadeia_despesa_pessoal = [
+        ("5", "DESPESAS", 1, None, False),
+        ("5.1", "DESPESAS OPERACIONAIS", 2, "5", False),
+        ("5.1.01", "MÃO DE OBRA", 3, "5.1", False),
+        ("5.1.01.001", "Salários", 4, "5.1.01", True),
+    ]
+    for codigo, nome, nivel, pai, aceita in _cadeia_despesa_pessoal:
+        if PlanoContas.query.get(codigo) is None:
+            db.session.add(PlanoContas(
+                admin_id=admin_id, codigo=codigo, nome=nome,
+                tipo_conta="DESPESA", natureza="DEVEDORA", nivel=nivel,
+                conta_pai_codigo=pai, aceita_lancamento=aceita, ativo=True,
+            ))
+            db.session.flush()
+
+    # 1) Fornecedor (Almox precisa de fornecedor p/ o evento material_entrada)
+    if Fornecedor.query.filter_by(admin_id=admin_id).first() is None:
+        db.session.add(Fornecedor(
+            admin_id=admin_id, nome="__E2E Fornecedor", cnpj="00.000.000/0001-99",
+            tipo_fornecedor="MATERIAL", ativo=True,
+        ))
+
+    # 2) AlmoxarifadoItem CONSUMIVEL (+ categoria, FK obrigatória)
+    if AlmoxarifadoItem.query.filter_by(
+            admin_id=admin_id, tipo_controle="CONSUMIVEL").first() is None:
+        cat = AlmoxarifadoCategoria.query.filter_by(admin_id=admin_id).first()
+        if cat is None:
+            cat = AlmoxarifadoCategoria(
+                admin_id=admin_id, nome="__E2E Categoria",
+                tipo_controle_padrao="CONSUMIVEL",
+            )
+            db.session.add(cat)
+            db.session.flush()
+        db.session.add(AlmoxarifadoItem(
+            admin_id=admin_id, codigo="E2E-CONSUM-01", nome="__E2E Material",
+            categoria_id=cat.id, tipo_controle="CONSUMIVEL", unidade="un",
+        ))
+
+    # 3) Funcionário diarista ativo (RDO gera GestaoCusto SALARIO; Folha precisa
+    #    de funcionário ativo). cpf é único global → usa um determinístico/tenant.
+    diarista = Funcionario.query.filter_by(
+        admin_id=admin_id, ativo=True, tipo_remuneracao="diaria").first()
+    if diarista is None:
+        cpf = f"999.{admin_id % 1000:03d}.000-00"
+        if Funcionario.query.filter_by(cpf=cpf).first() is None:
+            db.session.add(Funcionario(
+                admin_id=admin_id, codigo=f"E2E{admin_id:03d}", nome="__E2E Diarista",
+                cpf=cpf, data_admissao=_dt.date(2024, 1, 1),
+                salario=0.0, valor_diaria=180.0, tipo_remuneracao="diaria",
+                jornada_semanal=44, ativo=True,
+            ))
+
+    # 4) Funcionário ASSALARIADO ativo — a folha mensal só gera FolhaPagamento
+    #    (e dispara o evento folha_processada) para quem tem salário > 0.
+    assalariado = Funcionario.query.filter(
+        Funcionario.admin_id == admin_id, Funcionario.ativo.is_(True),
+        Funcionario.tipo_remuneracao == "salario", Funcionario.salario > 0,
+    ).first()
+    if assalariado is None:
+        cpf2 = f"888.{admin_id % 1000:03d}.000-00"
+        if Funcionario.query.filter_by(cpf=cpf2).first() is None:
+            db.session.add(Funcionario(
+                admin_id=admin_id, codigo=f"E2S{admin_id:03d}", nome="__E2E Assalariado",
+                cpf=cpf2, data_admissao=_dt.date(2024, 1, 1),
+                salario=3000.0, valor_diaria=0.0, tipo_remuneracao="salario",
+                jornada_semanal=44, ativo=True,
+            ))
+
+    db.session.commit()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixture de sessão — login único, compartilhado em todos os testes
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,6 +267,13 @@ def browser_session():
         page.wait_for_load_state("domcontentloaded", timeout=TIMEOUT_MS)
         assert "/login" not in page.url, \
             f"Login falhou — URL atual: {page.url}"
+
+        # Provisiona os pré-requisitos dos testes de integração (fornecedor,
+        # material CONSUMIVEL, funcionário diarista) para que rodem de fato em
+        # vez de pular por dados demo ausentes. Idempotente.
+        from app import app as _flask_app
+        with _flask_app.app_context():
+            _garantir_dados_e2e(_get_admin_id())
 
         yield page
 
@@ -1078,12 +1202,17 @@ class TestIntegracaoRdoGestaoCusto:
             datetime.date.today() - datetime.timedelta(days=days_offset)
         ).isoformat()
 
+        import json as _json
         form_data: dict = {
             "obra_id": str(obra_id),
             "data_relatorio": data_rdo,
             "clima_geral": "Ensolarado",
+            # /rdo/salvar lê a mão de obra do campo JSON 'mao_obra'
+            # (lista de {funcionario_id, horas, funcao}), não de campos soltos.
+            "mao_obra": _json.dumps([
+                {"funcionario_id": func_id, "horas": 8, "funcao": "Pedreiro"}
+            ]),
         }
-        form_data[f"funcionario_{func_id}_horas"] = "8"
 
         resp = browser_session.request.post(
             f"{BASE_URL}/rdo/salvar",
@@ -1155,6 +1284,7 @@ class TestIntegracaoRdoGestaoCusto:
             datetime.date.today() - datetime.timedelta(days=days_offset)
         ).isoformat()
 
+        import json as _json
         form_rdo = {
             "obra_id": str(obra_id),
             "data_relatorio": data_novo_rdo,
@@ -1162,7 +1292,9 @@ class TestIntegracaoRdoGestaoCusto:
             "clima_manha": "Sol",
             "clima_tarde": "Sol",
             "status": "Finalizado",
-            f"funcionario_{func_id}_horas": "8",
+            "mao_obra": _json.dumps([
+                {"funcionario_id": func_id, "horas": 8, "funcao": "Pedreiro"}
+            ]),
         }
         resp_rdo = browser_session.request.post(
             f"{BASE_URL}/rdo/salvar", form=form_rdo,
