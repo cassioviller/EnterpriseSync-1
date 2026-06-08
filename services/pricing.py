@@ -70,6 +70,54 @@ class Precificacao:
     indiretos_componentes: dict = field(default_factory=dict)
 
 
+def _primeiro(*vals) -> Decimal:
+    """Primeiro valor não-nulo da cascata, convertido para Decimal; senão 0."""
+    for v in vals:
+        if v is not None:
+            return v if isinstance(v, Decimal) else Decimal(str(v))
+    return ZERO
+
+
+def resolver_aliquotas(servico, proposta=None, cfg=None) -> Aliquotas:
+    """Resolve as alíquotas pela cascata do Bloco 3.
+
+    - `T, L`  : serviço → empresa → 0   (`imposto_pct`/`margem_lucro_pct` →
+      `imposto_pct_padrao`/`lucro_pct_padrao`).
+    - `AC..DF`: proposta (se não-nula) → empresa → 0.
+    - limiares do guarda-corpo: empresa (`bdi_tl_aviso_pct`/`bdi_tl_bloqueio_pct`),
+      default 60/90.
+
+    `cfg` (ConfiguracaoEmpresa) pode ser injetado; se ausente, é buscado pelo
+    `admin_id` do serviço. Injetá-lo mantém esta função testável sem banco.
+    """
+    if cfg is None and getattr(servico, "admin_id", None) is not None:
+        from models import ConfiguracaoEmpresa
+        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=servico.admin_id).first()
+
+    def emp(attr):
+        return getattr(cfg, attr, None) if cfg is not None else None
+
+    def prop(attr):
+        return getattr(proposta, attr, None) if proposta is not None else None
+
+    t = _primeiro(getattr(servico, "imposto_pct", None), emp("imposto_pct_padrao"))
+    l = _primeiro(getattr(servico, "margem_lucro_pct", None), emp("lucro_pct_padrao"))
+
+    ac = _primeiro(prop("bdi_ac_pct"), emp("bdi_ac_pct"))
+    s = _primeiro(prop("bdi_seguro_pct"), emp("bdi_seguro_pct"))
+    r = _primeiro(prop("bdi_risco_pct"), emp("bdi_risco_pct"))
+    g = _primeiro(prop("bdi_garantia_pct"), emp("bdi_garantia_pct"))
+    df = _primeiro(prop("bdi_desp_financeiras_pct"), emp("bdi_desp_financeiras_pct"))
+
+    tl_aviso = _primeiro(emp("bdi_tl_aviso_pct"), 60)
+    tl_bloqueio = _primeiro(emp("bdi_tl_bloqueio_pct"), 90)
+
+    return Aliquotas(
+        t=t, l=l, ac=ac, s=s, r=r, g=g, df=df,
+        tl_aviso=tl_aviso, tl_bloqueio=tl_bloqueio,
+    )
+
+
 def precificar(custo_total: Decimal, aliquotas: Aliquotas) -> Precificacao:
     """Aplica a fórmula TCU + guarda-corpo. Tudo em Decimal."""
     custo = custo_total if isinstance(custo_total, Decimal) else Decimal(str(custo_total))

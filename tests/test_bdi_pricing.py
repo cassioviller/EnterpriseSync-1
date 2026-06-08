@@ -21,10 +21,11 @@ comportamento atual (não-disrupção).
 Estado esperado AGORA: VERMELHO — `services/pricing.py` ainda não existe.
 """
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
-from services.pricing import Aliquotas, precificar
+from services.pricing import Aliquotas, precificar, resolver_aliquotas
 
 
 def D(x):
@@ -180,3 +181,72 @@ def test_sem_aliquotas_preco_igual_custo():
     assert r.indiretos == D(0)
     assert r.tributos == D(0)
     assert r.lucro == D(0)
+
+
+# --------------------------------------------------------------------------
+# Cascata: resolver_aliquotas (serviço/proposta/empresa → 0).
+# cfg é injetado para testar sem banco.
+# --------------------------------------------------------------------------
+
+def _empresa(**kw):
+    base = dict(
+        imposto_pct_padrao=D(8), lucro_pct_padrao=D(10),
+        bdi_ac_pct=D(5), bdi_seguro_pct=D(1), bdi_risco_pct=D(2),
+        bdi_garantia_pct=D(1), bdi_desp_financeiras_pct=D(3),
+        bdi_tl_aviso_pct=D(60), bdi_tl_bloqueio_pct=D(90),
+    )
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def _servico(imposto_pct=None, margem_lucro_pct=None):
+    return SimpleNamespace(
+        admin_id=1, imposto_pct=imposto_pct, margem_lucro_pct=margem_lucro_pct,
+    )
+
+
+def _proposta(**kw):
+    base = dict(
+        bdi_ac_pct=None, bdi_seguro_pct=None, bdi_risco_pct=None,
+        bdi_garantia_pct=None, bdi_desp_financeiras_pct=None,
+    )
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def test_cascata_tl_servico_vence_empresa():
+    a = resolver_aliquotas(_servico(imposto_pct=D(15), margem_lucro_pct=D(5)),
+                           cfg=_empresa())
+    assert a.t == D(15) and a.l == D(5)
+
+
+def test_cascata_tl_herda_empresa_quando_servico_nulo():
+    a = resolver_aliquotas(_servico(), cfg=_empresa())
+    assert a.t == D(8) and a.l == D(10)
+
+
+def test_cascata_bdi_proposta_vence_empresa():
+    a = resolver_aliquotas(_servico(), proposta=_proposta(bdi_ac_pct=D(20)),
+                           cfg=_empresa())
+    assert a.ac == D(20)        # override da proposta
+    assert a.s == D(1)          # demais herdam a empresa
+    assert a.df == D(3)
+
+
+def test_cascata_bdi_herda_empresa_sem_proposta():
+    a = resolver_aliquotas(_servico(), cfg=_empresa())
+    assert (a.ac, a.s, a.r, a.g, a.df) == (D(5), D(1), D(2), D(1), D(3))
+
+
+def test_cascata_tudo_zero_sem_empresa():
+    # admin_id=None → sem lookup de empresa; tudo cai para 0/defaults.
+    serv = SimpleNamespace(admin_id=None, imposto_pct=None, margem_lucro_pct=None)
+    a = resolver_aliquotas(serv, cfg=None)
+    assert (a.t, a.l, a.ac, a.s, a.r, a.g, a.df) == (D(0),) * 7
+    assert a.tl_aviso == D(60) and a.tl_bloqueio == D(90)  # defaults
+
+
+def test_cascata_limiares_da_empresa():
+    a = resolver_aliquotas(_servico(), cfg=_empresa(bdi_tl_aviso_pct=D(40),
+                                                    bdi_tl_bloqueio_pct=D(70)))
+    assert a.tl_aviso == D(40) and a.tl_bloqueio == D(70)
