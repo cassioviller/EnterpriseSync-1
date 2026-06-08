@@ -26,39 +26,32 @@ def _q2(v: float) -> Decimal:
     return Decimal(str(v)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
-def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
+def calcular_precos_servico(servico, data_ref: Optional[_date] = None,
+                            proposta=None) -> dict:
     """Calcula preço de venda do serviço a partir da composição.
 
-    Returns dict:
+    BDI completo (Bloco 3): a resolução de alíquotas e a fórmula/guarda-corpo
+    são delegadas a `services.pricing`. `proposta` (opcional) permite o override
+    de BDI desta proposta na cascata.
+
+    Returns dict (chaves originais + split BDI):
         {
-          'custo_unitario': Decimal,
+          'custo_unitario': Decimal,        # = custo direto
           'preco_venda':    Decimal,
-          'imposto_pct':    Decimal,
-          'margem_lucro_pct': Decimal,
-          'detalhamento': [
-              {'insumo_id', 'nome', 'unidade', 'coeficiente',
-               'preco_unitario', 'subtotal'}, ...
-          ],
+          'imposto_pct':    Decimal,        # T
+          'margem_lucro_pct': Decimal,      # L
+          'custo_direto', 'indiretos', 'indiretos_componentes',
+          'tributos', 'lucro', 'soma_bdi_pct', 'status', 'mensagem',
+          'detalhamento': [...],
           'erro': Optional[str],
         }
     """
     data_ref = data_ref or _date.today()
 
-    # Defaults da empresa
-    imposto_pct = servico.imposto_pct
-    margem_pct = servico.margem_lucro_pct
-
-    if imposto_pct is None or margem_pct is None:
-        from models import ConfiguracaoEmpresa
-        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=servico.admin_id).first()
-        if cfg:
-            if imposto_pct is None:
-                imposto_pct = cfg.imposto_pct_padrao
-            if margem_pct is None:
-                margem_pct = cfg.lucro_pct_padrao
-
-    imposto_pct = Decimal(str(imposto_pct or 0))
-    margem_pct = Decimal(str(margem_pct or 0))
+    from services.pricing import resolver_aliquotas, precificar
+    aliq = resolver_aliquotas(servico, proposta)
+    imposto_pct = aliq.t
+    margem_pct = aliq.l
 
     custo_total = Decimal('0')
     custo_material = Decimal('0')
@@ -97,13 +90,19 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
     custo_mao_obra_q = _q2(float(custo_mao_obra))
     custo_outros_q = _q2(float(custo_outros))
 
-    divisor = Decimal('1') - (imposto_pct / Decimal('100')) - (margem_pct / Decimal('100'))
+    prec = precificar(custo_total, aliq)
+
+    def _q2d(d):
+        return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
     erro = None
-    if divisor <= Decimal('0'):
+    if prec.status == 'bloqueio':
         preco_venda = Decimal('0.00')
-        erro = 'imposto + margem >= 100% — ajuste os percentuais'
+        erro = prec.mensagem
     else:
-        preco_venda = (custo_total / divisor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        preco_venda = _q2d(prec.preco)
+
+    indiretos_componentes = {k: _q2d(v) for k, v in prec.indiretos_componentes.items()}
 
     return {
         # chaves originais (back-compat)
@@ -120,6 +119,15 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None) -> dict:
         'custo_total': custo_unit_q,
         'preco_venda_unitario': preco_venda,
         'detalhes': detalhamento,
+        # Bloco 3 — split BDI completo (telas internas)
+        'custo_direto': _q2d(prec.custo_direto),
+        'indiretos': _q2d(prec.indiretos),
+        'indiretos_componentes': indiretos_componentes,
+        'tributos': _q2d(prec.tributos),
+        'lucro': _q2d(prec.lucro),
+        'soma_bdi_pct': prec.soma_bdi_pct,
+        'status': prec.status,
+        'mensagem': prec.mensagem,
     }
 
 
@@ -143,6 +151,7 @@ def calcular_precos_servico_por_quantidade(
     servico,
     quantidade,
     data_ref: Optional[_date] = None,
+    proposta=None,
 ) -> dict:
     """Task #47 — Calcula preço de venda considerando quantidade vendida e pacote.
 
@@ -197,19 +206,11 @@ def calcular_precos_servico_por_quantidade(
         qtd = Decimal('1')
         quantidade_fallback = True
 
-    # Obter alíquotas (mesmo cascade de calcular_precos_servico)
-    imposto_pct = servico.imposto_pct
-    margem_pct = servico.margem_lucro_pct
-    if imposto_pct is None or margem_pct is None:
-        from models import ConfiguracaoEmpresa
-        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=servico.admin_id).first()
-        if cfg:
-            if imposto_pct is None:
-                imposto_pct = cfg.imposto_pct_padrao
-            if margem_pct is None:
-                margem_pct = cfg.lucro_pct_padrao
-    imposto_pct = Decimal(str(imposto_pct or 0))
-    margem_pct = Decimal(str(margem_pct or 0))
+    # Alíquotas via cascata do Bloco 3 (serviço/proposta/empresa).
+    from services.pricing import resolver_aliquotas, precificar
+    aliq = resolver_aliquotas(servico, proposta)
+    imposto_pct = aliq.t
+    margem_pct = aliq.l
 
     custo_real_total = Decimal('0')
     custo_tecnico_total = Decimal('0')
@@ -262,23 +263,28 @@ def calcular_precos_servico_por_quantidade(
     ) if qtd > 0 else Decimal('0')
     custo_tecnico_q = _q2(float(custo_tecnico_total))
 
-    divisor = Decimal('1') - (imposto_pct / Decimal('100')) - (margem_pct / Decimal('100'))
+    prec_real = precificar(custo_real_total, aliq)
+    prec_tec = precificar(custo_tecnico_total, aliq)
+
     erro = None
-    if divisor <= Decimal('0'):
+    if prec_real.status == 'bloqueio':
         preco_venda_total = Decimal('0.00')
         preco_tecnico_unit = Decimal('0.00')
-        erro = 'imposto + margem >= 100% — ajuste os percentuais'
+        erro = prec_real.mensagem
     else:
-        preco_venda_total = (custo_real_total / divisor).quantize(
+        preco_venda_total = prec_real.preco.quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
-        preco_tecnico_unit = (custo_tecnico_total / divisor).quantize(
+        preco_tecnico_unit = prec_tec.preco.quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP
         )
 
     preco_venda_medio = (preco_venda_total / qtd).quantize(
         Decimal('0.0001'), rounding=ROUND_HALF_UP
     ) if qtd > 0 else Decimal('0')
+
+    def _q2d(d):
+        return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     return {
         'quantidade': qtd,
@@ -293,11 +299,21 @@ def calcular_precos_servico_por_quantidade(
         'margem_lucro_pct': margem_pct,
         'detalhamento': detalhamento,
         'erro': erro,
+        # Bloco 3 — split BDI completo (sobre o custo real)
+        'custo_direto': _q2d(prec_real.custo_direto),
+        'indiretos': _q2d(prec_real.indiretos),
+        'indiretos_componentes': {k: _q2d(v) for k, v in prec_real.indiretos_componentes.items()},
+        'tributos': _q2d(prec_real.tributos),
+        'lucro': _q2d(prec_real.lucro),
+        'soma_bdi_pct': prec_real.soma_bdi_pct,
+        'status': prec_real.status,
+        'mensagem': prec_real.mensagem,
     }
 
 
 def explodir_servico_para_quantidade(servico, quantidade,
-                                     data_ref: Optional[_date] = None) -> dict:
+                                     data_ref: Optional[_date] = None,
+                                     proposta=None) -> dict:
     """Task #89: explode a composição × quantidade pedida.
 
     Args:
@@ -337,15 +353,16 @@ def explodir_servico_para_quantidade(servico, quantidade,
         subtotal_unitario  = coeficiente × preco do insumo (custo por 1 unid serv.)
         subtotal_total     = quantidade_compra × preco do insumo (custo real de compra)
     """
-    base = calcular_precos_servico(servico, data_ref)
+    base = calcular_precos_servico(servico, data_ref, proposta)
     qtd = Decimal(str(quantidade or 0))
     custo_unit = base.get('custo_unitario') or Decimal('0')
     preco_unit = base.get('preco_venda') or Decimal('0')
-    lucro_unit = (preco_unit - custo_unit) if preco_unit and custo_unit else Decimal('0')
+    # D2 — lucro é L × preço (não preço − custo, que embutia o imposto).
+    lucro_unit = base.get('lucro') or Decimal('0')
 
     subtotal = (qtd * preco_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     custo_total = (qtd * custo_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    lucro_total = (subtotal - custo_total)
+    lucro_total = (qtd * lucro_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     categorias = {
         'MATERIAL': {'custo_unitario': base.get('custo_material', Decimal('0')),
@@ -411,4 +428,11 @@ def explodir_servico_para_quantidade(servico, quantidade,
         'erro': base.get('erro'),
         'categorias': categorias,
         'detalhamento': detalhamento,
+        # Bloco 3 — split BDI completo (por unidade) + status
+        'indiretos_unitario': base.get('indiretos'),
+        'indiretos_componentes': base.get('indiretos_componentes'),
+        'tributos_unitario': base.get('tributos'),
+        'soma_bdi_pct': base.get('soma_bdi_pct'),
+        'status': base.get('status'),
+        'mensagem': base.get('mensagem'),
     }
