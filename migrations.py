@@ -3989,6 +3989,7 @@ def executar_migracoes():
             (185, "Task #75 — Insumo: adicionar coluna fracionavel (BOOLEAN NOT NULL DEFAULT TRUE) para controle de arredondamento de compra", _migration_185_insumo_fracionavel),
             (186, "Fix #1 Fase 1 — BancoEmpresa: data_saldo_inicial + índice fluxo_caixa(banco_id, data_movimento)", _migration_186_banco_data_saldo_inicial),
             (188, "Fix #4 — FluxoCaixa.valor: converter FLOAT8 → NUMERIC(15,2) com arredondamento", _migration_188_fluxo_caixa_valor_numeric),
+            (189, "Bloco 3 — BDI completo (TCU): colunas de BDI em configuracao_empresa (default 0/60/90) e override nullable em propostas_comerciais", _migration_189_bdi_completo),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13318,6 +13319,51 @@ def _migration_185_insumo_fracionavel():
         logger.info("[Migration 185] Coluna fracionavel adicionada à tabela insumo (DEFAULT TRUE).")
     except Exception as e:
         logger.error(f"[Migration 185] Falha: {e}")
+        raise
+
+
+def _migration_189_bdi_completo():
+    """Bloco 3 — BDI completo (padrão TCU).
+
+    Adiciona o perfil de BDI da empresa (5 componentes + 2 limiares de
+    guarda-corpo) e o override opcional por proposta (5 componentes, nullable).
+
+    Idempotente via ADD COLUMN IF NOT EXISTS. Não-disrupção: componentes da
+    empresa entram com DEFAULT 0 e os da proposta como NULL (herdam a empresa),
+    de modo que nenhum preço de catálogo ou snapshot existente é alterado.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            # Empresa: 5 componentes de BDI (default 0) + limiares do guarda-corpo.
+            for col, default in (
+                ("bdi_ac_pct", "0"),
+                ("bdi_seguro_pct", "0"),
+                ("bdi_risco_pct", "0"),
+                ("bdi_garantia_pct", "0"),
+                ("bdi_desp_financeiras_pct", "0"),
+                ("bdi_tl_aviso_pct", "60"),
+                ("bdi_tl_bloqueio_pct", "90"),
+            ):
+                conn.execute(sa_text(
+                    f"ALTER TABLE configuracao_empresa "
+                    f"ADD COLUMN IF NOT EXISTS {col} NUMERIC(5,2) DEFAULT {default}"
+                ))
+            # Proposta: override opcional (nullable = herda a empresa).
+            for col in (
+                "bdi_ac_pct",
+                "bdi_seguro_pct",
+                "bdi_risco_pct",
+                "bdi_garantia_pct",
+                "bdi_desp_financeiras_pct",
+            ):
+                conn.execute(sa_text(
+                    f"ALTER TABLE propostas_comerciais "
+                    f"ADD COLUMN IF NOT EXISTS {col} NUMERIC(5,2)"
+                ))
+        logger.info("[Migration 189] Colunas de BDI adicionadas (empresa default 0/60/90, proposta nullable).")
+    except Exception as e:
+        logger.error(f"[Migration 189] Falha: {e}")
         raise
 
 

@@ -2928,7 +2928,15 @@ class Proposta(db.Model):
     observacoes_entrega = db.Column(db.Text)
     validade_dias = db.Column(db.Integer, default=7)
     percentual_nota_fiscal = db.Column(db.Numeric(5,2), default=13.5)
-    
+
+    # Bloco 3 — override opcional do BDI da empresa nesta proposta.
+    # NULL = herda ConfiguracaoEmpresa (cascata proposta → empresa → 0).
+    bdi_ac_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    bdi_seguro_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    bdi_risco_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    bdi_garantia_pct = db.Column(db.Numeric(5, 2), nullable=True)
+    bdi_desp_financeiras_pct = db.Column(db.Numeric(5, 2), nullable=True)
+
     # Condições de Pagamento
     condicoes_pagamento = db.Column(db.Text, default="""10% de entrada na assinatura do contrato
 10% após projeto aprovado
@@ -3619,7 +3627,18 @@ class ConfiguracaoEmpresa(db.Model):
     # Task #82 — defaults de orçamento
     imposto_pct_padrao = db.Column(db.Numeric(5, 2), default=8.0)
     lucro_pct_padrao = db.Column(db.Numeric(5, 2), default=10.0)
-    
+
+    # Bloco 3 — BDI completo (padrão TCU). Componentes de custo indireto (% por dentro).
+    # Default 0 → preço de catálogo não muda até a empresa preencher (não-disrupção).
+    bdi_ac_pct = db.Column(db.Numeric(5, 2), default=0)               # Administração Central
+    bdi_seguro_pct = db.Column(db.Numeric(5, 2), default=0)           # Seguro
+    bdi_risco_pct = db.Column(db.Numeric(5, 2), default=0)            # Risco
+    bdi_garantia_pct = db.Column(db.Numeric(5, 2), default=0)         # Garantia
+    bdi_desp_financeiras_pct = db.Column(db.Numeric(5, 2), default=0)  # Despesas Financeiras
+    # Guarda-corpo (D3): limiares de T+L para aviso e bloqueio.
+    bdi_tl_aviso_pct = db.Column(db.Numeric(5, 2), default=60)
+    bdi_tl_bloqueio_pct = db.Column(db.Numeric(5, 2), default=90)
+
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
