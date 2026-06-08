@@ -132,10 +132,16 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None,
 
 
 def recalcular_servico_preco(servico, data_ref: Optional[_date] = None,
-                             persistir: bool = True) -> dict:
-    """Recalcula e (opcionalmente) persiste preco_venda_unitario + custo_unitario."""
-    resultado = calcular_precos_servico(servico, data_ref)
-    if persistir and not resultado.get('erro'):
+                             persistir: bool = True, proposta=None) -> dict:
+    """Recalcula e (opcionalmente) persiste preco_venda_unitario + custo_unitario.
+
+    Guarda-corpo (D3): em estado de bloqueio (T+L ≥ limiar) o preço NÃO é
+    persistido — o custo direto pode ser atualizado, mas o preço de venda fica
+    intacto e a mensagem é propagada no dict de retorno.
+    """
+    resultado = calcular_precos_servico(servico, data_ref, proposta)
+    bloqueado = resultado.get('status') == 'bloqueio' or bool(resultado.get('erro'))
+    if persistir and not bloqueado:
         servico.custo_unitario = float(resultado['custo_unitario'])
         servico.preco_venda_unitario = resultado['preco_venda']
         db.session.flush()

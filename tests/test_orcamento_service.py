@@ -595,5 +595,38 @@ def run():
             db.session.rollback()
 
 
+# ---------------------------------------------------------------------------
+# Bloco 3 — P5: guarda-corpo nas camadas de escrita.
+# ---------------------------------------------------------------------------
+
+def test_recalcular_nao_persiste_preco_em_bloqueio(servico_canonico):
+    """T+L ≥ bloqueio (default 90) → status='bloqueio'; o preço de venda
+    persistido NÃO é sobrescrito."""
+    servico_canonico.preco_venda_unitario = Decimal('99.99')
+    db.session.flush()
+    servico_canonico.imposto_pct = 50
+    servico_canonico.margem_lucro_pct = 45   # T+L = 95
+
+    r = recalcular_servico_preco(servico_canonico, persistir=True)
+
+    assert r['status'] == 'bloqueio'
+    assert str(r['preco_venda']) == '0.00'
+    # preço intacto — não gravou 0 nem recalculou
+    assert str(servico_canonico.preco_venda_unitario) == '99.99'
+
+
+def test_recalcular_persiste_preco_em_aviso(servico_canonico):
+    """aviso ≤ T+L < bloqueio → calcula e PERSISTE normalmente, sinalizando."""
+    servico_canonico.imposto_pct = 40
+    servico_canonico.margem_lucro_pct = 25   # T+L = 65 (faixa de aviso)
+
+    r = recalcular_servico_preco(servico_canonico, persistir=True)
+
+    assert r['status'] == 'aviso'
+    assert r['mensagem']
+    assert Decimal(str(r['preco_venda'])) > 0
+    assert servico_canonico.preco_venda_unitario == r['preco_venda']
+
+
 if __name__ == '__main__':
     run()
