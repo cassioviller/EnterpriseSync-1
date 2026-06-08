@@ -24,6 +24,10 @@ from decimal import Decimal
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db, brl_filter, num_filter  # noqa: E402
+# Produção sobe via `main:app` (gunicorn). Importar `main` registra os 17
+# blueprints extras (incl. custos_escritorio) no mesmo `app`, senão url_for()
+# do nav (base_completo.html) quebra com BuildError ao renderizar páginas.
+import main  # noqa: E402,F401
 from werkzeug.security import generate_password_hash  # noqa: E402
 
 from models import (  # noqa: E402
