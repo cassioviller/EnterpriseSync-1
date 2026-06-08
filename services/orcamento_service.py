@@ -26,6 +26,11 @@ def _q2(v: float) -> Decimal:
     return Decimal(str(v)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def _q2d(d: Decimal) -> Decimal:
+    """Quantiza um Decimal para 2 casas (HALF_UP) sem reconverter via str."""
+    return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 def calcular_precos_servico(servico, data_ref: Optional[_date] = None,
                             proposta=None) -> dict:
     """Calcula preço de venda do serviço a partir da composição.
@@ -91,9 +96,6 @@ def calcular_precos_servico(servico, data_ref: Optional[_date] = None,
     custo_outros_q = _q2(float(custo_outros))
 
     prec = precificar(custo_total, aliq)
-
-    def _q2d(d):
-        return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     erro = None
     if prec.status == 'bloqueio':
@@ -288,9 +290,6 @@ def calcular_precos_servico_por_quantidade(
     preco_venda_medio = (preco_venda_total / qtd).quantize(
         Decimal('0.0001'), rounding=ROUND_HALF_UP
     ) if qtd > 0 else Decimal('0')
-
-    def _q2d(d):
-        return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     return {
         'quantidade': qtd,

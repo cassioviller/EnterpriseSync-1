@@ -70,6 +70,29 @@ class Precificacao:
     indiretos_componentes: dict = field(default_factory=dict)
 
 
+def _config_empresa(admin_id):
+    """Busca a ConfiguracaoEmpresa do tenant, com cache por contexto de app.
+
+    Ao precificar muitos serviços no mesmo request (ex.: materializar todos os
+    itens de uma proposta), evita um SELECT por item — consulta uma vez por
+    admin_id e reaproveita. Fora de um contexto de app (ex.: chamada isolada),
+    cai para a consulta direta.
+    """
+    from models import ConfiguracaoEmpresa
+    try:
+        from flask import g
+        cache = getattr(g, "_bdi_cfg_cache", None)
+        if cache is None:
+            cache = g._bdi_cfg_cache = {}
+        if admin_id not in cache:
+            cache[admin_id] = ConfiguracaoEmpresa.query.filter_by(
+                admin_id=admin_id).first()
+        return cache[admin_id]
+    except RuntimeError:
+        # Sem contexto de aplicação ativo — consulta direta.
+        return ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+
+
 def _primeiro(*vals) -> Decimal:
     """Primeiro valor não-nulo da cascata, convertido para Decimal; senão 0."""
     for v in vals:
@@ -91,8 +114,7 @@ def resolver_aliquotas(servico, proposta=None, cfg=None) -> Aliquotas:
     `admin_id` do serviço. Injetá-lo mantém esta função testável sem banco.
     """
     if cfg is None and getattr(servico, "admin_id", None) is not None:
-        from models import ConfiguracaoEmpresa
-        cfg = ConfiguracaoEmpresa.query.filter_by(admin_id=servico.admin_id).first()
+        cfg = _config_empresa(servico.admin_id)
 
     def emp(attr):
         return getattr(cfg, attr, None) if cfg is not None else None
