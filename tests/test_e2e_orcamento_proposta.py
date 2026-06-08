@@ -41,7 +41,14 @@ def main():
             explodir_servico_para_quantidade,
         )
 
-        admin_id = 63
+        # Resolve um admin real do banco (id 63 era hardcode frágil e some
+        # entre ambientes). Prefere o admin demo estável, senão o primeiro ADMIN.
+        _admin = (Usuario.query.filter_by(email='admin@construtoraalfa.com.br').first()
+                  or Usuario.query.filter_by(tipo_usuario='ADMIN').order_by(Usuario.id).first())
+        if _admin is None:
+            print('SKIP — nenhum usuário ADMIN no banco para o e2e')
+            return
+        admin_id = _admin.id
         suffix = f"E2E95-{int(date.today().toordinal())}-{os.getpid()}"
 
         # Encontra um admin diferente para o teste de isolamento multi-tenant
@@ -159,8 +166,10 @@ def main():
               f"PropostaItem.servico_id={re_item.servico_id} == {svc.id}")
         check(str(re_item.custo_unitario) == '90.0000',
               f"snapshot custo_unitario={re_item.custo_unitario} == 90.0000")
-        check(str(re_item.lucro_unitario) == '22.5000',
-              f"snapshot lucro_unitario={re_item.lucro_unitario} == 22.5000")
+        # D2 (Bloco 3): lucro = L × preço = 0,12 × 112,50 = 13,50
+        # (antes era preço − custo = 22,50, que embutia o imposto).
+        check(str(re_item.lucro_unitario) == '13.5000',
+              f"snapshot lucro_unitario={re_item.lucro_unitario} == 13.5000")
         check(str(re_item.subtotal) == '1125.00',
               f"snapshot subtotal={re_item.subtotal} == 1125.00")
         check(re_item.quantidade_medida is not None
