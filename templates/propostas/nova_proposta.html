@@ -374,10 +374,41 @@
                     </small>
                 </div>
 
+                {# Bloco 3 — override opcional de BDI desta proposta (vazio = herda empresa) #}
+                <details class="mb-3">
+                    <summary class="form-label" style="cursor:pointer">BDI desta proposta (opcional)</summary>
+                    <small class="text-muted d-block mb-2">
+                        Deixe em branco para herdar o BDI de
+                        <em>Configurações &raquo; Empresa</em>.
+                    </small>
+                    <div class="row">
+                        <div class="col-md-2 col-6 mb-2">
+                            <label class="form-label small">% Adm. Central</label>
+                            <input type="number" class="form-control" name="bdi_ac_pct" step="0.01" min="0" placeholder="herda">
+                        </div>
+                        <div class="col-md-2 col-6 mb-2">
+                            <label class="form-label small">% Seguro</label>
+                            <input type="number" class="form-control" name="bdi_seguro_pct" step="0.01" min="0" placeholder="herda">
+                        </div>
+                        <div class="col-md-2 col-6 mb-2">
+                            <label class="form-label small">% Risco</label>
+                            <input type="number" class="form-control" name="bdi_risco_pct" step="0.01" min="0" placeholder="herda">
+                        </div>
+                        <div class="col-md-2 col-6 mb-2">
+                            <label class="form-label small">% Garantia</label>
+                            <input type="number" class="form-control" name="bdi_garantia_pct" step="0.01" min="0" placeholder="herda">
+                        </div>
+                        <div class="col-md-2 col-6 mb-2">
+                            <label class="form-label small">% Desp. Financ.</label>
+                            <input type="number" class="form-control" name="bdi_desp_financeiras_pct" step="0.01" min="0" placeholder="herda">
+                        </div>
+                    </div>
+                </details>
+
                 <!-- Valor Manual (alternativo) -->
                 <div class="mb-3">
                     <label class="form-label">Valor Total Manual (opcional)</label>
-                    <input type="number" class="form-control" name="valor_total" 
+                    <input type="number" class="form-control" name="valor_total"
                            step="0.01" placeholder="Use este campo se não detalhar os serviços">
                 </div>
 

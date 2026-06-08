@@ -203,6 +203,30 @@ def _parse_engenheiro_id(raw_value, admin_id):
     return eng.id if eng else None
 
 
+_BDI_OVERRIDE_CAMPOS = (
+    'bdi_ac_pct', 'bdi_seguro_pct', 'bdi_risco_pct',
+    'bdi_garantia_pct', 'bdi_desp_financeiras_pct',
+)
+
+
+def _aplicar_bdi_override(proposta, form):
+    """Bloco 3 — override opcional de BDI da proposta.
+
+    Campo vazio → NULL (herda a empresa). Valor preenchido → percentual ≥ 0.
+    """
+    for campo in _BDI_OVERRIDE_CAMPOS:
+        if campo not in form:
+            continue  # form sem a seção de BDI → preserva o override atual
+        bruto = (form.get(campo) or '').strip()
+        if bruto == '':
+            setattr(proposta, campo, None)
+        else:
+            try:
+                setattr(proposta, campo, max(0.0, float(bruto)))
+            except (TypeError, ValueError):
+                setattr(proposta, campo, None)
+
+
 _TITULOS_CLAUSULA_NUMERICA = {
     'condicoes de entrega',
     'validade da proposta',
@@ -633,6 +657,9 @@ def criar():
         proposta.admin_id = admin_id
         proposta.prazo_entrega_dias = int(request.form.get('prazo_entrega_dias', 90))
         proposta.percentual_nota_fiscal = float(request.form.get('percentual_nota_fiscal', 13.5))
+
+        # Bloco 3 — override opcional de BDI desta proposta (vazio = herda empresa)
+        _aplicar_bdi_override(proposta, request.form)
 
         # Task #173 — engenheiro responsável (override por proposta)
         proposta.engenheiro_id = _parse_engenheiro_id(
@@ -1509,6 +1536,9 @@ def atualizar(id):
             )
         except (TypeError, ValueError):
             pass
+
+        # Bloco 3 — override opcional de BDI desta proposta (vazio = herda empresa)
+        _aplicar_bdi_override(proposta, request.form)
 
         # Task #173 — engenheiro responsável (override por proposta)
         proposta.engenheiro_id = _parse_engenheiro_id(

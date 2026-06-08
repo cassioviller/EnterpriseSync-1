@@ -157,7 +157,20 @@ def salvar_empresa():
         config.prazo_entrega_padrao = int(request.form.get('prazo_entrega_padrao', 90))
         config.validade_padrao = int(request.form.get('validade_padrao', 7))
         config.percentual_nota_fiscal_padrao = float(request.form.get('percentual_nota_fiscal_padrao', 13.5))
-        
+
+        # Bloco 3 — BDI completo (padrão TCU). Validação: percentuais ≥ 0.
+        def _pct_nao_neg(campo, default):
+            valor = float(request.form.get(campo, default) or default)
+            return max(0.0, valor)
+
+        config.bdi_ac_pct = _pct_nao_neg('bdi_ac_pct', 0)
+        config.bdi_seguro_pct = _pct_nao_neg('bdi_seguro_pct', 0)
+        config.bdi_risco_pct = _pct_nao_neg('bdi_risco_pct', 0)
+        config.bdi_garantia_pct = _pct_nao_neg('bdi_garantia_pct', 0)
+        config.bdi_desp_financeiras_pct = _pct_nao_neg('bdi_desp_financeiras_pct', 0)
+        config.bdi_tl_aviso_pct = _pct_nao_neg('bdi_tl_aviso_pct', 60)
+        config.bdi_tl_bloqueio_pct = _pct_nao_neg('bdi_tl_bloqueio_pct', 90)
+
         config.atualizado_em = datetime.utcnow()
         
         logger.debug(f"DEBUG: Salvando config para admin_id {admin_id}")
