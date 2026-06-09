@@ -74,18 +74,21 @@ def test_processar_classifica_via_cadastro_igual_ao_legado(admin_semeado):
     saidas_manual = res["saidas_manual"]
     assert entradas or saidas_auto or saidas_manual, "preview veio vazio"
 
-    # Entradas: motor novo == legado nos mesmos campos
+    # Invariante RESCUE-ONLY: o motor novo bate com o legado, EXCETO quando o legado
+    # caiu no fallback genérico — aí o novo pode resgatar para uma categoria
+    # específica (regras de resgate de baixa precedência). Nunca o contrário.
+    FALLBACK = {"Outras Saídas", "Outros Recebimentos"}
+
     for r in entradas:
         legado = _classificar_categoria_nomeada(
             "ENTRADA", r.get("plano_contas"), r.get("descricao"), r.get("cliente"))
-        assert r["categoria_nome"] == legado
+        assert r["categoria_nome"] == legado or legado in FALLBACK
 
-    # Saídas: idem, com o tem_obra que processar() de fato usou (bool(obra_id))
     for r in saidas_auto + saidas_manual:
         legado = _classificar_categoria_nomeada(
             "SAIDA", r.get("plano_contas"), r.get("descricao"), r.get("fornecedor"),
             tem_obra=bool(r.get("obra_id")))
-        assert r["categoria_nome"] == legado
+        assert r["categoria_nome"] == legado or legado in FALLBACK
 
 
 def test_processar_redefine_auto_vs_manual_pelo_fallback(admin_semeado):

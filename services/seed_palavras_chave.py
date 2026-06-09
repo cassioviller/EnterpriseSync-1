@@ -94,6 +94,17 @@ _SAIDA = [
     ('Serviços Terceirizados de Obra', ['instalacao', 'assentamento', 'montagem', 'montador'], 'qualquer', [], 'indiferente'),
     ('Materiais de Obra', ['cimento', 'concreto', 'argamassa', 'ferro', ' aco', 'tijolo', 'areia', 'brita', 'tinta', 'madeira', 'vidro', 'tubo', 'porcelanato', 'telha', 'material', 'materiai', 'leroy', 'cimento&tudo', 'concrelagos', 'dividros', 'bomba', 'eletrico', 'hidraulico', 'parabolt', 'selante', 'vergalhao', 'mola aerea', 'parafus', 'luminaria', 'ralo', 'cabo', 'abracadeira', 'cantoneira', 'forro', 'divisoria', 'aluminio', 'porta de', 'rodape', 'piso ', 'lona', 'deposito', 'gesso', 'arame', 'pedido', ' oc ', 'saco de', 'entulho', 'produto de limpeza', 'interfone', 'fechadura', 'mezanino', 'fita crepe', 'adaptador', 'osb', 'montante', 'bloco', 'impermeabilizante', 'vedacao', 'galvanizado', 'casa do lojista', 'tapume', 'cal para', 'baguete', 'painel', 'conduite', 'gaivota', 'fercorte', 'la de rocha', 'la de vidro', 'leds', ' led ', 'produto limpeza'], 'qualquer', [], 'indiferente'),
     ('Serviços Terceirizados de Obra', ['servico', 'terceiro', 'mao de obra', 'pedreiro', 'eletricista', 'encanador', 'pintor', 'pintura', 'gesseiro', 'projeto', 'projetista', 'medicao', 'topografia', 'sondagem', 'engenharia', 'fachada', 'reparo do', 'reparo de', 'eletrica', 'eletria', 'hidraulica', 'diarista', 'faxina', 'soldador', 'azulejista', 'pagamento semana'], 'qualquer', [], 'indiferente'),
+    # ── Resgates curados (baixa precedência: ficam por ÚLTIMO, logo só pegam o que
+    # nenhuma regra acima classificou — resgate de 'Outras Saídas'). NÃO alteram
+    # nenhuma classificação específica do legado; só melhoram o que cairia em Outros.
+    # Derivados da análise dos pendentes reais do fluxo (Veks, jan–jun/2026).
+    ('Reembolsos a Funcionários', ['reembolso'], 'descricao', [], 'indiferente'),
+    ('Materiais de Obra', ['drywall', 'glasroc', 'basecoat', 'massa drywall', 'fita telada', 'proform', 'steel home'], 'qualquer', [], 'indiferente'),
+    ('Subempreitada', ['maranhao'], 'qualquer', [], 'indiferente'),  # subempreiteiro recorrente (cliente)
+    # 'extra' com bordas (' extra ') casa a palavra inteira, não 'extrato'.
+    ('Mão de Obra Direta', [' extra ', 'bonificacao', 'adiantamento'], 'qualquer', [], 'indiferente'),
+    ('Hospedagem de Obra', ['airbnb', 'aluguel casa', 'casa vila velha', 'casa para equipe'], 'qualquer', [], 'indiferente'),
+    ('Despesas Bancárias', ['pagamento de fatura', 'pagamento fatura', 'taxa prorrogacao', 'prorrogacao de boleto'], 'qualquer', [], 'indiferente'),
 ]
 
 # Categorias de fallback (quando nada casa) — o classificador devolve eh_pendente.
