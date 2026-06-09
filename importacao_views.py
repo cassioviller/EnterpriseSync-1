@@ -528,6 +528,30 @@ def fluxo_caixa_upload():
     )
 
 
+def _reclassificar_payload(admin_id, payload):
+    """Reclassifica o payload do preview em memória com as Regras + Memória Exata
+    atuais do tenant. Devolve (cls, novo_token) onde cls = {entradas, saidas_auto,
+    saidas_manual, sugestoes} e novo_token é o payload re-assinado (HMAC)."""
+    from models import CategoriaFluxoCaixa
+    from services.classificador_cadastro import _norm as _norm_cat, Contexto
+    from services.seed_palavras_chave import regras_do_tenant, carregar_memoria_exata
+    from services.importacao_excel import classificar_preview
+
+    entradas = payload.get('entradas', [])
+    saidas = payload.get('saidas_auto', []) + payload.get('saidas_manual', [])
+    cat_id_por_nome = {_norm_cat(c.nome): c.id for c in
+                       CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
+    ctx = Contexto(regras=regras_do_tenant(admin_id),
+                   memoria_exata=carregar_memoria_exata(admin_id))
+    cls = classificar_preview(entradas, saidas, ctx, cat_id_por_nome)
+    novo_payload = {
+        'entradas': cls['entradas'], 'saidas_auto': cls['saidas_auto'],
+        'saidas_manual': cls['saidas_manual'],
+        'transferencias': payload.get('transferencias', []),
+    }
+    return cls, _assinar_payload([novo_payload], admin_id, 'fluxo_caixa')
+
+
 @importacao_bp.route('/fluxo-caixa/classificar-termo', methods=['POST'])
 @login_required
 def fluxo_caixa_classificar_termo():
@@ -553,9 +577,7 @@ def fluxo_caixa_classificar_termo():
         return jsonify({'ok': False, 'erro': 'Tipo inválido.'}), 400
 
     from models import CategoriaFluxoCaixa, PalavraChaveCategoria
-    from services.classificador_cadastro import _norm as _norm_cat, Contexto
-    from services.seed_palavras_chave import regras_do_tenant, carregar_memoria_exata
-    from services.importacao_excel import classificar_preview
+    from services.classificador_cadastro import _norm as _norm_cat
 
     # A categoria-alvo precisa ser do próprio tenant (ownership).
     cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
@@ -575,25 +597,170 @@ def fluxo_caixa_classificar_termo():
             tipo=tipo, origem='usuario', ativo=True))
         db.session.commit()
 
-    payload = rows[0]
-    entradas = payload.get('entradas', [])
-    saidas = payload.get('saidas_auto', []) + payload.get('saidas_manual', [])
-
-    cat_id_por_nome = {_norm_cat(c.nome): c.id for c in
-                       CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
-    ctx = Contexto(regras=regras_do_tenant(admin_id),
-                   memoria_exata=carregar_memoria_exata(admin_id))
-    cls = classificar_preview(entradas, saidas, ctx, cat_id_por_nome)
-
-    novo_payload = {
+    cls, novo_token = _reclassificar_payload(admin_id, rows[0])
+    return jsonify({
+        'ok': True,
+        'dados_json': novo_token,
         'entradas': cls['entradas'],
         'saidas_auto': cls['saidas_auto'],
         'saidas_manual': cls['saidas_manual'],
-        'transferencias': payload.get('transferencias', []),
-    }
+        'sugestoes': cls['sugestoes'],
+    })
+
+
+@importacao_bp.route('/fluxo-caixa/corrigir-linha', methods=['POST'])
+@login_required
+def fluxo_caixa_corrigir_linha():
+    """Loop ao vivo (§7.3): Correção de UMA linha. Grava Memória Exata (texto
+    idêntico futuro já vem classificado), reclassifica o payload e — se o contexto
+    contraria a regra do Termo — devolve a proposta de regra refinada (a confirmar)."""
+    admin_id = get_admin_id_robusta()
+    data = request.get_json(silent=True) or request.form
+    token = data.get('dados_json', '')
+    descricao = (data.get('descricao') or '').strip()
+    fornecedor = (data.get('fornecedor') or '').strip()
+    plano = (data.get('plano_contas') or '').strip()
+    tipo = (data.get('tipo') or 'SAIDA').upper()
+    obra_id = data.get('obra_id')
+    try:
+        categoria_id = int(data.get('categoria_id'))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'erro': 'categoria_id inválido'}), 400
+
+    rows = _verificar_payload(token, admin_id, 'fluxo_caixa')
+    if rows is None or not rows:
+        return jsonify({'ok': False, 'erro': 'Preview inválido ou expirado.'}), 400
+    if tipo not in ('ENTRADA', 'SAIDA'):
+        return jsonify({'ok': False, 'erro': 'Tipo inválido.'}), 400
+
+    from models import CategoriaFluxoCaixa
+    from services.classificador_cadastro import (
+        Contexto, Lancamento, regra_vencedora, sugerir_regra_refinada,
+    )
+    from services.seed_palavras_chave import regras_do_tenant, registrar_correcao
+
+    cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+    if not cat:
+        return jsonify({'ok': False, 'erro': 'Categoria não encontrada.'}), 404
+
+    lanc = Lancamento(descricao=descricao, fornecedor=fornecedor, plano=plano,
+                      tem_obra=bool(obra_id), tipo=tipo)
+
+    # Detecta a regra conflitante ANTES de gravar a Correção (sem Memória Exata):
+    # se uma Regra classificaria isto para OUTRA categoria, ofereça refinar.
+    sugestao_refinada = None
+    conflitante = regra_vencedora(
+        lanc, Contexto(regras=regras_do_tenant(admin_id), memoria_exata={}))
+    if conflitante and conflitante.categoria_id != categoria_id:
+        refinada = sugerir_regra_refinada(lanc, categoria_id, cat.nome, conflitante)
+        if refinada.gatilho_extra:   # só oferece com contexto distintivo (senão reclassifica tudo)
+            sugestao_refinada = {
+                'palavras': refinada.palavras, 'gatilho_extra': refinada.gatilho_extra,
+                'campo_alvo': refinada.campo_alvo, 'campo_extra': refinada.campo_extra,
+                'categoria_id': categoria_id, 'categoria_nome': cat.nome,
+                'prioridade': refinada.prioridade, 'tipo': refinada.tipo,
+            }
+
+    # Grava a Correção (Memória Exata: vale para importações futuras e para
+    # Pendentes de texto idêntico) e reclassifica o payload.
+    registrar_correcao(admin_id, lanc, categoria_id)
+    db.session.commit()
+    cls, _ = _reclassificar_payload(admin_id, rows[0])
+
+    # PIN da linha corrigida: a decisão do usuário é autoritária NESTA importação,
+    # mesmo quando uma Regra classificaria diferente (ordem Regra→Memória não
+    # bastaria — a regra venceria). Força a categoria nas linhas de texto idêntico
+    # e garante que saiam da fila (vão para auto). A regra refinada (a confirmar)
+    # é o que faz a correção valer dali em diante.
+    from services.classificador_cadastro import _norm as _norm_cat, derivar_macro
+    alvo = _norm_cat(f"{descricao} {fornecedor}")
+    macro = derivar_macro(cat.nome)
+
+    def _reparticiona(lista, ent_key):
+        auto, manual = [], []
+        for r in lista:
+            chave = _norm_cat(f"{r.get('descricao', '')} {r.get(ent_key, '')}")
+            if chave == alvo:
+                r['categoria_nome'] = cat.nome
+                r['categoria_fluxo_caixa_id'] = categoria_id
+                r['tipo_categoria'] = macro
+                auto.append(r)
+            elif r.get('categoria_nome') in ('Outras Saídas', 'Outros Recebimentos'):
+                manual.append(r)
+            else:
+                auto.append(r)
+        return auto, manual
+
+    entradas_auto, _ent_manual = _reparticiona(cls['entradas'], 'cliente')
+    saidas_auto, saidas_manual = _reparticiona(
+        cls['saidas_auto'] + cls['saidas_manual'], 'fornecedor')
+    entradas = entradas_auto + _ent_manual
+
+    novo_payload = {'entradas': entradas, 'saidas_auto': saidas_auto,
+                    'saidas_manual': saidas_manual,
+                    'transferencias': rows[0].get('transferencias', [])}
     return jsonify({
         'ok': True,
         'dados_json': _assinar_payload([novo_payload], admin_id, 'fluxo_caixa'),
+        'entradas': entradas,
+        'saidas_auto': saidas_auto,
+        'saidas_manual': saidas_manual,
+        'sugestoes': cls['sugestoes'],
+        'sugestao_refinada': sugestao_refinada,
+    })
+
+
+@importacao_bp.route('/fluxo-caixa/confirmar-regra-refinada', methods=['POST'])
+@login_required
+def fluxo_caixa_confirmar_regra_refinada():
+    """Loop ao vivo (§7.3): efetiva a regra refinada proposta (1 clique). Cria a
+    Regra do usuário com a condição extra (AND) e prioridade vencedora, e
+    reclassifica o payload."""
+    admin_id = get_admin_id_robusta()
+    data = request.get_json(silent=True) or request.form
+    token = data.get('dados_json', '')
+    tipo = (data.get('tipo') or 'SAIDA').upper()
+    campo_alvo = data.get('campo_alvo') or 'fornecedor'
+    campo_extra = data.get('campo_extra') or 'descricao'
+    try:
+        categoria_id = int(data.get('categoria_id'))
+        prioridade = int(data.get('prioridade', 39))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'erro': 'categoria_id/prioridade inválidos'}), 400
+
+    def _csv(v):
+        if isinstance(v, (list, tuple)):
+            return ','.join(str(x) for x in v if x)
+        return (v or '').strip()
+
+    palavras = _csv(data.get('palavras'))
+    gatilho_extra = _csv(data.get('gatilho_extra'))
+
+    rows = _verificar_payload(token, admin_id, 'fluxo_caixa')
+    if rows is None or not rows:
+        return jsonify({'ok': False, 'erro': 'Preview inválido ou expirado.'}), 400
+    if not palavras or not gatilho_extra:
+        return jsonify({'ok': False, 'erro': 'Regra refinada incompleta.'}), 400
+    if tipo not in ('ENTRADA', 'SAIDA'):
+        return jsonify({'ok': False, 'erro': 'Tipo inválido.'}), 400
+
+    from models import CategoriaFluxoCaixa, PalavraChaveCategoria
+
+    cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+    if not cat:
+        return jsonify({'ok': False, 'erro': 'Categoria não encontrada.'}), 404
+
+    db.session.add(PalavraChaveCategoria(
+        admin_id=admin_id, categoria_fluxo_caixa_id=categoria_id,
+        palavras=palavras, campo_alvo=campo_alvo,
+        gatilho_extra=gatilho_extra, campo_extra=campo_extra,
+        prioridade=prioridade, tipo=tipo, origem='usuario', ativo=True))
+    db.session.commit()
+
+    cls, novo_token = _reclassificar_payload(admin_id, rows[0])
+    return jsonify({
+        'ok': True,
+        'dados_json': novo_token,
         'entradas': cls['entradas'],
         'saidas_auto': cls['saidas_auto'],
         'saidas_manual': cls['saidas_manual'],

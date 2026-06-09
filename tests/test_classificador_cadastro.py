@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.classificador_cadastro import (
     classificar, texto_norm, derivar_macro, resolver, gerar_sugestoes,
-    sugerir_regra_refinada, Regra, Lancamento, Contexto,
+    sugerir_regra_refinada, regra_vencedora, Regra, Lancamento, Contexto,
 )
 
 
@@ -324,3 +324,16 @@ def test_sugerir_regra_refinada_vence_a_regra_do_termo_pelo_contexto():
     assert "maranhao" in refinada.palavras                # mantém o gatilho do termo
     assert "material" in refinada.gatilho_extra           # contexto distintivo
     assert refinada.origem == "usuario"
+
+
+def test_regra_vencedora_expoe_a_regra_que_classificou():
+    """regra_vencedora devolve a Regra que o classificador escolheria (a de menor
+    desempate) — usada para detectar o conflito numa Correção. None se nenhuma casa."""
+    generica = _regra(["cabo"], 20, "Materiais de Obra", prioridade=90)
+    especifica = _regra(["instalacao"], 30, "Serviços Terceirizados", prioridade=10)
+    ctx = Contexto(regras=[generica, especifica], memoria_exata={})
+
+    venc = regra_vencedora(_lanc(descricao="instalacao dos cabos"), ctx)
+    assert venc is especifica   # menor prioridade vence
+
+    assert regra_vencedora(_lanc(descricao="nada casa aqui"), ctx) is None

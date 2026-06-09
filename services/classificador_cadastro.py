@@ -215,16 +215,24 @@ def _chave_desempate(regra: Regra, campos: dict) -> tuple:
     return (regra.prioridade, origem_rank, campo_rank, -_maior_match(regra, campos))
 
 
+def regra_vencedora(lanc: Lancamento, ctx: Contexto):
+    """A Regra que classificaria o Lançamento (menor desempate), ou None se
+    nenhuma casa. Exposta para detectar a regra conflitante numa Correção."""
+    campos = _campos_busca(lanc)
+    candidatas = [r for r in ctx.regras
+                  if r.tipo == lanc.tipo and _regra_casa(r, campos, lanc.tem_obra)]
+    if not candidatas:
+        return None
+    return min(candidatas, key=lambda r: _chave_desempate(r, campos))
+
+
 def classificar(lanc: Lancamento, ctx: Contexto) -> Veredito:
     """Devolve o Veredito do Lançamento.
 
     Resolução: dentre as Regras que casam, vence a de MENOR prioridade.
     """
-    campos = _campos_busca(lanc)
-    candidatas = [r for r in ctx.regras
-                  if r.tipo == lanc.tipo and _regra_casa(r, campos, lanc.tem_obra)]
-    if candidatas:
-        vencedora = min(candidatas, key=lambda r: _chave_desempate(r, campos))
+    vencedora = regra_vencedora(lanc, ctx)
+    if vencedora:
         return Veredito(
             categoria_id=vencedora.categoria_id,
             categoria_nome=vencedora.categoria_nome,
