@@ -454,6 +454,17 @@ def fluxo_caixa_upload():
     transferencias = resultado.get('transferencias', [])
     primeiro_dia = resultado.get('primeiro_dia')
     periodo_str = resultado.get('periodo_str', '—')
+    sugestoes = resultado.get('sugestoes', [])
+
+    # Persiste a fila por Termo do tenant (substitui as anteriores). Guardado:
+    # uma falha aqui não pode derrubar o preview.
+    try:
+        from services.seed_palavras_chave import persistir_sugestoes
+        persistir_sugestoes(admin_id, sugestoes, commit=True)
+    except Exception as _exc_sug:
+        from models import db as _db
+        _db.session.rollback()
+        logger.warning(f'[FLUXO_CAIXA] Falha ao persistir sugestões: {_exc_sug}')
 
     # Assinar payload com HMAC (envelope contendo os 3 tipos + transferências)
     payload = {

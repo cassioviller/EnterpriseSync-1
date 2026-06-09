@@ -206,6 +206,28 @@ def registrar_correcao(admin_id, lanc, categoria_id, termo_origem=None, commit=F
     return corr
 
 
+def persistir_sugestoes(admin_id, sugestoes, commit=False):
+    """Substitui as Sugestões do tenant pelas recém-geradas (refeitas a cada
+    importação). `sugestoes`: lista de dicts {termo, ocorrencias, soma_valor,
+    exemplo, tipo}. Retorna o nº persistido."""
+    from models import db, PalavraChaveSugestao
+
+    PalavraChaveSugestao.query.filter_by(admin_id=admin_id).delete()
+    for s in sugestoes:
+        db.session.add(PalavraChaveSugestao(
+            admin_id=admin_id,
+            termo=(s.get('termo') or '')[:120],
+            ocorrencias=s.get('ocorrencias') or 0,
+            soma_valor=s.get('soma_valor') or 0,
+            exemplo=(s.get('exemplo') or '')[:300],
+            tipo=s.get('tipo') or 'SAIDA',
+        ))
+    db.session.flush()
+    if commit:
+        db.session.commit()
+    return len(sugestoes)
+
+
 def carregar_memoria_exata(admin_id):
     """Memória Exata do tenant como {texto_norm: (categoria_id, categoria_nome)},
     consumível pelo classificador (Contexto.memoria_exata)."""

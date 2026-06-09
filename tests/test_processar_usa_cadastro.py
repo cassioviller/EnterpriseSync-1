@@ -114,3 +114,50 @@ def test_processar_deriva_macro_da_categoria_nomeada(admin_semeado):
 
     for r in res["saidas_auto"] + res["saidas_manual"] + res["entradas"]:
         assert r["tipo_categoria"] == derivar_macro(r["categoria_nome"])
+
+
+def test_processar_devolve_sugestoes_dos_pendentes(admin_semeado):
+    if not os.path.exists(XLSX):
+        pytest.skip(f"Excel não encontrado: {XLSX}")
+
+    from services.importacao_excel import ImportacaoFluxoCaixa
+
+    res = ImportacaoFluxoCaixa().processar(XLSX, admin_semeado)
+    sugestoes = res["sugestoes"]
+    assert isinstance(sugestoes, list)
+    # havendo pendentes, a fila por Termo não vem vazia
+    if res["saidas_manual"]:
+        assert sugestoes
+    for s in sugestoes:
+        assert {"termo", "ocorrencias", "soma_valor", "exemplo", "tipo"} <= set(s)
+        assert s["ocorrencias"] >= 1
+    # ordenadas por impacto (decrescente)
+    impactos = [s["ocorrencias"] * s["soma_valor"] for s in sugestoes]
+    assert impactos == sorted(impactos, reverse=True)
+
+
+def test_processar_aplica_memoria_exata_de_correcao_previa(admin_semeado):
+    if not os.path.exists(XLSX):
+        pytest.skip(f"Excel não encontrado: {XLSX}")
+
+    from services.importacao_excel import ImportacaoFluxoCaixa
+    from services.seed_palavras_chave import registrar_correcao
+    from services.classificador_cadastro import Lancamento, _norm
+    from models import CategoriaFluxoCaixa
+
+    svc = ImportacaoFluxoCaixa()
+    res1 = svc.processar(XLSX, admin_semeado)
+    if not res1["saidas_manual"]:
+        pytest.skip("sem pendentes para exercitar Memória Exata")
+
+    alvo = res1["saidas_manual"][0]
+    cat = next(c.id for c in CategoriaFluxoCaixa.query.filter_by(admin_id=admin_semeado).all()
+               if _norm(c.nome) == _norm("Materiais de Obra"))
+    registrar_correcao(admin_semeado, Lancamento(
+        descricao=alvo["descricao"], fornecedor=alvo["fornecedor"], tipo="SAIDA"),
+        categoria_id=cat)
+
+    res2 = svc.processar(XLSX, admin_semeado)
+    chave = (alvo["descricao"], alvo["fornecedor"])
+    ainda_pendente = {(r["descricao"], r["fornecedor"]) for r in res2["saidas_manual"]}
+    assert chave not in ainda_pendente   # Memória Exata reclassificou; saiu da fila

@@ -89,3 +89,24 @@ def test_registrar_correcao_e_upsert_nao_duplica(admin_com_categorias):
     linhas = CorrecaoClassificacao.query.filter_by(admin_id=admin_id).all()
     assert len(linhas) == 1                       # upsert, não duplicou
     assert linhas[0].categoria_fluxo_caixa_id == cat_b   # ficou a última
+
+
+def test_persistir_sugestoes_substitui_as_do_tenant(admin_com_categorias):
+    from services.seed_palavras_chave import persistir_sugestoes
+    from models import PalavraChaveSugestao
+    admin_id = admin_com_categorias
+
+    persistir_sugestoes(admin_id, [
+        {'termo': 'maranhao', 'ocorrencias': 3, 'soma_valor': 900.0,
+         'exemplo': 'obra X', 'tipo': 'SAIDA'},
+    ])
+    assert PalavraChaveSugestao.query.filter_by(admin_id=admin_id).count() == 1
+
+    # 2a chamada substitui (refeitas a cada importação)
+    persistir_sugestoes(admin_id, [
+        {'termo': 'beta', 'ocorrencias': 1, 'soma_valor': 50.0,
+         'exemplo': 'y', 'tipo': 'SAIDA'},
+    ])
+    rows = PalavraChaveSugestao.query.filter_by(admin_id=admin_id).all()
+    assert len(rows) == 1
+    assert rows[0].termo == 'beta'
