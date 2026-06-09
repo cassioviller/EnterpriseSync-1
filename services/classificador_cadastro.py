@@ -319,10 +319,13 @@ def _ngramas(texto, n_max=3):
     for n in range(1, n_max + 1):
         for i in range(len(palavras) - n + 1):
             tokens = palavras[i:i + n]
-            if all(t in _STOPWORDS for t in tokens):
-                continue
-            if n == 1 and (tokens[0] in _STOPWORDS or len(tokens[0]) < 3):
-                continue
+            conteudo = [t for t in tokens if t not in _STOPWORDS]
+            if not conteudo:
+                continue   # só stopwords (ex.: 'de', 'da')
+            if all(t in _SOBRENOMES_GENERICOS for t in conteudo):
+                continue   # só sobrenomes genéricos → agruparia pessoas diferentes
+            if n == 1 and len(tokens[0]) < 3:
+                continue   # fragmento curto (ex.: 'sa')
             grams.append(" ".join(tokens))
     return grams
 
@@ -377,6 +380,16 @@ def gerar_sugestoes(pendentes, regras_existentes=()):
 _STOPWORDS = {
     "de", "da", "do", "das", "dos", "e", "a", "o", "as", "os", "para", "com",
     "em", "no", "na", "nos", "nas", "por", "um", "uma", "ao", "aos", "ref",
+}
+
+# Sobrenomes genéricos: como termo ÚNICO, agrupam pessoas diferentes (ex.: vários
+# "... da Silva" sem relação) e dão sugestões ruins. Não viram Termo sozinhos
+# (mas n-gramas maiores, como "ferreira silva", continuam válidos).
+_SOBRENOMES_GENERICOS = {
+    "silva", "souza", "sousa", "santos", "oliveira", "pereira", "lima", "costa",
+    "rodrigues", "almeida", "ferreira", "alves", "ribeiro", "carvalho", "gomes",
+    "martins", "rocha", "dias", "nascimento", "barbosa", "araujo", "fernandes",
+    "vieira", "mendes", "freitas", "barros", "moraes", "moreira", "cardoso",
 }
 
 

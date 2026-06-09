@@ -275,6 +275,23 @@ def test_sugestoes_descartam_stopwords_e_termos_curtos():
     assert sugs[0].termo in {"loja", "tintas", "loja de tintas", "loja de", "de tintas"}
 
 
+def test_sugestoes_nao_agrupam_por_sobrenome_generico():
+    """Sobrenomes comuns (silva, ferreira) agrupariam pessoas DIFERENTES — não viram
+    Termo sozinhos nem em n-grama só-de-sobrenomes ('da silva', 'ferreira silva').
+    Sem termo distintivo compartilhado, cada pessoa fica na sua (não se fundem)."""
+    pend = [
+        _pend(fornecedor="Fabricio Ferreira da Silva", valor=100.0),
+        _pend(fornecedor="Eduardo Fernandes da Silva", valor=200.0),
+    ]
+    sugs = gerar_sugestoes(pend, regras_existentes=[])
+    termos = {s.termo for s in sugs}
+
+    assert "silva" not in termos
+    assert "da silva" not in termos
+    assert "ferreira silva" not in termos
+    assert all(s.ocorrencias == 1 for s in sugs)   # não fundiu pessoas diferentes
+
+
 def test_sugestoes_cobertura_gulosa_agrupa_e_expoe_lancamentos():
     """Cobertura gulosa: 'posto' agrupa fornecedores distintos num único termo;
     cada Pendente pertence a UM termo (partição) e a Sugestão traz seus Lançamentos."""
