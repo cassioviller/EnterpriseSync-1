@@ -1681,6 +1681,74 @@ def _classificar_categoria_nomeada(tipo, plano, descricao, fornecedor, tem_obra=
     return 'Outras Saídas'
 
 
+def classificar_preview(entradas, saidas, ctx, cat_id_por_nome, limite_sugestoes=100):
+    """Classifica os registros do preview de Fluxo de Caixa via cadastro: resolve a
+    categoria nomeada (resolver), deriva o macro tipo_categoria, reparticiona as
+    saídas em auto/manual pelo veredito (fallback → manual) e gera a fila por Termo
+    sobre os Pendentes (gerar_sugestoes, por tipo, cap por impacto).
+
+    NÃO toca o banco — recebe o Contexto (regras + Memória Exata) e o mapa
+    categoria_nome→id já carregados. Muta os dicts in-place. É o núcleo compartilhado
+    pelo processar() (1ª classificação) e pelo loop ao vivo (reclassificação em
+    memória a cada ação do usuário, sem re-upload). Retorna dict:
+    {entradas, saidas_auto, saidas_manual, sugestoes}."""
+    from services.classificador_cadastro import resolver, gerar_sugestoes, Lancamento
+
+    def _lanc_de(_r, tipo, entidade_key):
+        return Lancamento(
+            descricao=_r.get('descricao') or '',
+            fornecedor=_r.get(entidade_key) or '',
+            plano=_r.get('plano_contas') or '',
+            tem_obra=bool(_r.get('obra_id')),
+            valor=float(_r.get('valor') or 0),
+            tipo=tipo,
+        )
+
+    def _aplicar(_r, tipo, entidade_key):
+        res = resolver(_lanc_de(_r, tipo, entidade_key), ctx, cat_id_por_nome)
+        _r['categoria_nome'] = res.categoria_nome
+        _r['tipo_categoria'] = res.tipo_categoria
+        _r['categoria_fluxo_caixa_id'] = res.categoria_id
+        return res
+
+    pendentes_entrada = []
+    for _r in entradas:
+        if _aplicar(_r, 'ENTRADA', 'cliente').eh_manual:
+            pendentes_entrada.append(_r)
+
+    saidas_auto, saidas_manual = [], []
+    for _r in saidas:
+        res = _aplicar(_r, 'SAIDA', 'fornecedor')
+        (saidas_manual if res.eh_manual else saidas_auto).append(_r)
+
+    regras = ctx.regras
+    sugestoes = (
+        gerar_sugestoes([_lanc_de(r, 'SAIDA', 'fornecedor') for r in saidas_manual],
+                        [r for r in regras if r.tipo == 'SAIDA'])
+        + gerar_sugestoes([_lanc_de(r, 'ENTRADA', 'cliente') for r in pendentes_entrada],
+                          [r for r in regras if r.tipo == 'ENTRADA'])
+    )
+    sugestoes.sort(key=lambda s: -(s.ocorrencias * s.soma_valor))
+    if len(sugestoes) > limite_sugestoes:
+        import logging as _log
+        _log.getLogger(__name__).info(
+            f'[FLUXO classificar_preview] {len(sugestoes)} termos sugeridos; '
+            f'devolvendo os {limite_sugestoes} de maior impacto.')
+        sugestoes = sugestoes[:limite_sugestoes]
+
+    sugestoes_dict = [
+        {'termo': s.termo, 'ocorrencias': s.ocorrencias,
+         'soma_valor': float(s.soma_valor), 'exemplo': s.exemplo, 'tipo': s.tipo}
+        for s in sugestoes
+    ]
+    return {
+        'entradas': entradas,
+        'saidas_auto': saidas_auto,
+        'saidas_manual': saidas_manual,
+        'sugestoes': sugestoes_dict,
+    }
+
+
 class ImportacaoFluxoCaixa:
     """
     Parser + classificador para o arquivo Fluxo de Caixa Veks Engenharia.
@@ -1976,72 +2044,24 @@ class ImportacaoFluxoCaixa:
         # macro tipo_categoria é DERIVADO dela; auto vs manual é redefinido pelo
         # resultado — cadastro classificou → auto; caiu no fallback → manual.
         # (§3 do spec 2026-06-09 / ADR-0002; substitui o classificador hardcoded.)
+        # ── Classificação via cadastro (núcleo compartilhado com o loop ao vivo) ─
+        # Motor único: a Regra dirige a categoria nomeada; o macro é DERIVADO dela;
+        # auto vs manual sai do veredito (§3 / ADR-0002). read-only: as sugestões são
+        # DEVOLVIDAS; a persistência fica com a view.
         from models import CategoriaFluxoCaixa
-        from services.classificador_cadastro import (
-            resolver, gerar_sugestoes, Lancamento, Contexto, _norm as _norm_cat,
-        )
+        from services.classificador_cadastro import Contexto, _norm as _norm_cat
         from services.seed_palavras_chave import regras_do_tenant, carregar_memoria_exata
 
         cat_id_por_nome = {_norm_cat(c.nome): c.id for c in
                            CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
-        regras_tenant = regras_do_tenant(admin_id)
-        ctx_cad = Contexto(regras=regras_tenant, memoria_exata=carregar_memoria_exata(admin_id))
-
-        def _lanc_de(_r, tipo, entidade_key):
-            return Lancamento(
-                descricao=_r.get('descricao') or '',
-                fornecedor=_r.get(entidade_key) or '',
-                plano=_r.get('plano_contas') or '',
-                tem_obra=bool(_r.get('obra_id')),
-                valor=float(_r.get('valor') or 0),
-                tipo=tipo,
-            )
-
-        def _aplicar(_r, tipo, entidade_key):
-            res = resolver(_lanc_de(_r, tipo, entidade_key), ctx_cad, cat_id_por_nome)
-            _r['categoria_nome'] = res.categoria_nome
-            _r['tipo_categoria'] = res.tipo_categoria
-            if res.categoria_id and not _r.get('categoria_fluxo_caixa_id'):
-                _r['categoria_fluxo_caixa_id'] = res.categoria_id
-            return res
-
-        pendentes_entrada = []
-        for _r in entradas:
-            if _aplicar(_r, 'ENTRADA', 'cliente').eh_manual:
-                pendentes_entrada.append(_r)
-
-        # Re-particiona as saídas pelo veredito do cadastro (§3): fallback → manual.
-        _todas_saidas = saidas_auto + saidas_manual
-        saidas_auto, saidas_manual = [], []
-        for _r in _todas_saidas:
-            res = _aplicar(_r, 'SAIDA', 'fornecedor')
-            (saidas_manual if res.eh_manual else saidas_auto).append(_r)
-
-        # ── Fila por Termo: sugestões sobre os Pendentes (§7.1) ──────────────
-        # Por tipo (o agregado não mistura ENTRADA/SAÍDA). Cap por impacto evita
-        # inundar a fila com n-gramas raros. processar() é read-only: apenas DEVOLVE
-        # as sugestões; a persistência em PalavraChaveSugestao é responsabilidade da
-        # view (persistir_sugestoes), após o preview.
-        _LIMITE_SUGESTOES = 100
-        sugestoes = (
-            gerar_sugestoes([_lanc_de(r, 'SAIDA', 'fornecedor') for r in saidas_manual],
-                            [r for r in regras_tenant if r.tipo == 'SAIDA'])
-            + gerar_sugestoes([_lanc_de(r, 'ENTRADA', 'cliente') for r in pendentes_entrada],
-                              [r for r in regras_tenant if r.tipo == 'ENTRADA'])
-        )
-        sugestoes.sort(key=lambda s: -(s.ocorrencias * s.soma_valor))
-        if len(sugestoes) > _LIMITE_SUGESTOES:
-            import logging as _log
-            _log.getLogger(__name__).info(
-                f'[FLUXO processar] {len(sugestoes)} termos sugeridos; '
-                f'devolvendo os {_LIMITE_SUGESTOES} de maior impacto.')
-            sugestoes = sugestoes[:_LIMITE_SUGESTOES]
-
-        sugestoes_dict = [
-            {'termo': s.termo, 'ocorrencias': s.ocorrencias,
-             'soma_valor': float(s.soma_valor), 'exemplo': s.exemplo, 'tipo': s.tipo}
-            for s in sugestoes
-        ]
+        ctx_cad = Contexto(regras=regras_do_tenant(admin_id),
+                           memoria_exata=carregar_memoria_exata(admin_id))
+        _cls = classificar_preview(entradas, saidas_auto + saidas_manual,
+                                   ctx_cad, cat_id_por_nome)
+        entradas = _cls['entradas']
+        saidas_auto = _cls['saidas_auto']
+        saidas_manual = _cls['saidas_manual']
+        sugestoes_dict = _cls['sugestoes']
 
         # Período descritivo
         datas_sorted = sorted(todas_datas)

@@ -161,3 +161,30 @@ def test_processar_aplica_memoria_exata_de_correcao_previa(admin_semeado):
     chave = (alvo["descricao"], alvo["fornecedor"])
     ainda_pendente = {(r["descricao"], r["fornecedor"]) for r in res2["saidas_manual"]}
     assert chave not in ainda_pendente   # Memória Exata reclassificou; saiu da fila
+
+
+def test_classificar_preview_reclassifica_em_memoria_sem_db():
+    """Núcleo do loop ao vivo: classificar_preview reparticiona auto/manual e gera
+    a fila por Termo a partir de regras em memória — sem DB, sem Excel. É o que os
+    endpoints chamam ao reclassificar o payload a cada ação."""
+    from services.importacao_excel import classificar_preview
+    from services.classificador_cadastro import Regra, Contexto
+
+    regra = Regra(palavras=["maranhao"], categoria_id=10, categoria_nome="Subempreitada",
+                  campo_alvo="fornecedor", prioridade=40, tipo="SAIDA")
+    ctx = Contexto(regras=[regra], memoria_exata={})
+    saidas = [
+        {"descricao": "empreita bloco", "fornecedor": "Maranhão Ltda", "valor": 1000},
+        {"descricao": "compra avulsa", "fornecedor": "Loja XYZ", "valor": 500},
+        {"descricao": "compra avulsa", "fornecedor": "Loja XYZ", "valor": 700},
+    ]
+
+    out = classificar_preview([], saidas, ctx, cat_id_por_nome={"outras saidas": 99})
+
+    assert [r["categoria_nome"] for r in out["saidas_auto"]] == ["Subempreitada"]
+    assert len(out["saidas_manual"]) == 2
+    assert all(r["categoria_nome"] == "Outras Saídas" for r in out["saidas_manual"])
+    assert all(r["categoria_fluxo_caixa_id"] == 99 for r in out["saidas_manual"])
+    # a fila por Termo surge dos 2 pendentes "Loja XYZ"
+    termos = {s["termo"] for s in out["sugestoes"]}
+    assert termos & {"xyz", "loja", "loja xyz"}
