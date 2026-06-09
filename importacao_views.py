@@ -525,6 +525,7 @@ def fluxo_caixa_upload():
         total_valor_entradas=sum(r.get('valor', 0) for r in entradas),
         primeiro_dia=primeiro_dia,
         periodo_str=periodo_str,
+        sugestoes=sugestoes,
     )
 
 
