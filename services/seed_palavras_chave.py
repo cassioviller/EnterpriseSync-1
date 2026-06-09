@@ -37,8 +37,11 @@ _SAIDA = [
     # Pessoal — Mão de Obra Direta: hd('diaria') OR hb(lista) → duas entradas
     ('Mão de Obra Direta', ['diaria'], 'descricao', [], 'indiferente'),
     ('Mão de Obra Direta', ['trabalho noturno', 'hora extra', 'adicional noturno', 'extra trabalho', 'extra noturno', 'extra diurno', 'ajudante', 'servente', 'encarregado', 'ajuda de custo', 'mao-de-obra', 'mao de obra', 'periodo de trabalho', 'vale (', 'plaqueamento'], 'qualquer', [], 'indiferente'),
-    # Salários (exceto diária)
-    ('Salários e Encargos', ['salario', 'folha de pagamento', 'rescisao', 'ferias', '13o salario', 'decimo terceiro', 'bonus', 'captacao', 'recrutamento', 'selecao de pessoal'], 'qualquer', ['diaria'], 'indiferente'),
+    # Salários — SEM exceção 'diaria': no legado `and not hd('diaria')` é morto
+    # (Mão de Obra acima já captura 'diaria' na descrição antes de Salários ser
+    # avaliada). Pôr a exceção no blob ('qualquer') excluiria 'diaria' em
+    # plano/fornecedor, divergindo do legado, que só olha a descrição.
+    ('Salários e Encargos', ['salario', 'folha de pagamento', 'rescisao', 'ferias', '13o salario', 'decimo terceiro', 'bonus', 'captacao', 'recrutamento', 'selecao de pessoal'], 'qualquer', [], 'indiferente'),
     ('Pró-labore e Retirada de Sócios', ['retirada', 'pro-labore', 'pro labore', 'prolabore', 'distribuicao de lucro', 'distribuicao de resultado'], 'qualquer', [], 'indiferente'),
     # Vale transporte (ternário obra)
     ('Transporte de Obra', ['vale transporte', 'vale-transporte', 'vale trans', 'vale-trans', 'vt mes', ' vt '], 'qualquer', [], 'com_obra'),
