@@ -581,7 +581,7 @@
                 <select name="banco_auto_{{ loop.index0 }}" class="form-select form-select-sm banco-select">
                   <option value="">— Banco —</option>
                   {% for b in bancos %}
-                  <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                  <option value="{{ b.id }}" {% if r.banco_id == b.id %}selected{% endif %}>{{ b.nome_banco }}</option>
                   {% endfor %}
                 </select>
                 {% else %}
@@ -766,7 +766,7 @@
                 <select name="banco_manual_{{ loop.index0 }}" class="form-select form-select-sm banco-select">
                   <option value="">— Banco —</option>
                   {% for b in bancos %}
-                  <option value="{{ b.id }}">{{ b.nome_banco }}</option>
+                  <option value="{{ b.id }}" {% if r.banco_id == b.id %}selected{% endif %}>{{ b.nome_banco }}</option>
                   {% endfor %}
                 </select>
                 {% else %}
