@@ -44,6 +44,7 @@ class Lancamento:
     plano: str = ""
     tem_obra: bool = False
     tipo: str = "SAIDA"
+    valor: float = 0.0   # usado pela fila de sugestões (soma_valor); ignorado no matching
 
 
 @dataclass
@@ -282,3 +283,57 @@ def resolver(lanc: Lancamento, ctx: Contexto, cat_id_por_nome=None) -> Resolucao
         eh_manual=v.categoria_nome in FALLBACK_NOME.values(),
         origem_decisao=v.origem_decisao,
     )
+
+
+# ── Fila por Termo: Sugestões sobre os Pendentes (Fase E) ───────────────────
+
+@dataclass
+class Sugestao:
+    """Termo recorrente entre os Pendentes, agregado por impacto. O usuário pode
+    transformá-lo numa Regra (origem='usuario')."""
+    termo: str
+    ocorrencias: int
+    soma_valor: float
+    exemplo: str = ""
+    tipo: str = "SAIDA"
+
+
+def _ngramas(texto, n_max=3):
+    """N-gramas de 1 a n_max palavras do texto normalizado (preserva ordem)."""
+    palavras = [p for p in _norm(texto).split() if p]
+    grams = []
+    for n in range(1, n_max + 1):
+        for i in range(len(palavras) - n + 1):
+            grams.append(" ".join(palavras[i:i + n]))
+    return grams
+
+
+def gerar_sugestoes(pendentes, regras_existentes=()):
+    """Fila por Termo (função pura, §7.1): tokeniza o fornecedor dos Pendentes em
+    n-gramas (1–3 palavras), agrega por termo (ocorrencias, soma_valor, exemplo) e
+    ordena por impacto (ocorrencias × soma_valor)."""
+    # Gatilhos já cadastrados: um termo candidato que contenha um gatilho existente
+    # já é coberto pelo cadastro e não vira sugestão.
+    cobertos = {_norm(p) for r in regras_existentes for p in r.palavras if _norm(p)}
+
+    def _coberto(termo):
+        return any(kw in termo for kw in cobertos)
+
+    agg = {}
+    for lanc in pendentes:
+        for termo in set(_ngramas(lanc.fornecedor)):
+            if _coberto(termo):
+                continue
+            d = agg.setdefault(termo, {"ocorrencias": 0, "soma_valor": 0.0,
+                                       "exemplo": "", "tipo": lanc.tipo})
+            d["ocorrencias"] += 1
+            d["soma_valor"] += lanc.valor or 0.0
+            if not d["exemplo"]:
+                d["exemplo"] = lanc.descricao or lanc.fornecedor
+
+    sugestoes = [Sugestao(termo=t, ocorrencias=d["ocorrencias"],
+                          soma_valor=d["soma_valor"], exemplo=d["exemplo"],
+                          tipo=d["tipo"])
+                 for t, d in agg.items()]
+    sugestoes.sort(key=lambda s: -(s.ocorrencias * s.soma_valor))
+    return sugestoes

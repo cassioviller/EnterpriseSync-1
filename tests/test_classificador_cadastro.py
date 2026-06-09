@@ -17,7 +17,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.classificador_cadastro import (
-    classificar, texto_norm, derivar_macro, resolver, Regra, Lancamento, Contexto,
+    classificar, texto_norm, derivar_macro, resolver, gerar_sugestoes,
+    Regra, Lancamento, Contexto,
 )
 
 
@@ -236,3 +237,52 @@ def test_resolver_regra_que_aponta_para_fallback_ainda_e_manual():
 
     assert r.categoria_nome == "Outras Saídas"
     assert r.eh_manual is True
+
+
+# ── gerar_sugestoes(): fila por Termo sobre os Pendentes (Fase E) ────────────
+
+def _pend(fornecedor="", descricao="", valor=0.0, tipo="SAIDA"):
+    return Lancamento(descricao=descricao, fornecedor=fornecedor, valor=valor, tipo=tipo)
+
+
+def test_sugestoes_agrega_pendentes_por_termo_do_fornecedor():
+    """Dois Pendentes do mesmo fornecedor geram uma Sugestão para o termo,
+    com ocorrencias=2 e soma_valor somando os dois lançamentos."""
+    pendentes = [
+        _pend(fornecedor="Maranhão Construções", valor=1000.0),
+        _pend(fornecedor="Maranhão Construções", valor=500.0),
+    ]
+    sugestoes = gerar_sugestoes(pendentes, regras_existentes=[])
+
+    por_termo = {s.termo: s for s in sugestoes}
+    assert "maranhao" in por_termo
+    s = por_termo["maranhao"]
+    assert s.ocorrencias == 2
+    assert s.soma_valor == 1500.0
+
+
+def test_sugestoes_descarta_termo_ja_coberto_por_regra():
+    """Um termo que já é gatilho de uma Regra existente não vira Sugestão (não
+    re-sugere o que o cadastro já sabe). Termos vizinhos ainda aparecem."""
+    regra = _regra(["leroy"], 50, "Materiais de Obra", campo_alvo="descricao")
+    pendentes = [_pend(fornecedor="Leroy Merlin", descricao="compra", valor=300.0)]
+
+    sugestoes = gerar_sugestoes(pendentes, regras_existentes=[regra])
+    termos = {s.termo for s in sugestoes}
+
+    assert "leroy" not in termos          # já coberto pela regra
+    assert "merlin" in termos             # termo vizinho continua sugerível
+
+
+def test_sugestoes_ordenadas_por_impacto():
+    """A fila prioriza o que mais pesa: ordena por ocorrencias × soma_valor. Um
+    termo raro mas caro vence muitos termos baratos."""
+    pendentes = (
+        [_pend(fornecedor="Alpha", valor=100.0) for _ in range(3)]    # 3 × 100 = 900
+        + [_pend(fornecedor="Beta", valor=5000.0)]                    # 1 × 5000 = 5000
+    )
+    sugestoes = gerar_sugestoes(pendentes, regras_existentes=[])
+
+    assert sugestoes[0].termo == "beta"   # maior impacto vem primeiro
+    termos_ordem = [s.termo for s in sugestoes]
+    assert termos_ordem.index("beta") < termos_ordem.index("alpha")
