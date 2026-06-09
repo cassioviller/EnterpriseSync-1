@@ -54,7 +54,7 @@
       <select name="tipo" class="form-select"><option value="SAIDA">SAÍDA</option><option value="ENTRADA">ENTRADA</option></select>
     </div>
     <div class="col-auto"><input name="prioridade" type="number" class="form-control" value="50" style="width:90px"></div>
-    <div class="col-auto"><button class="btn btn-primary">Adicionar</button></div>
+    <div class="col-auto"><button type="submit" class="btn btn-primary">Adicionar</button></div>
   </form>
 
   <!-- Regras -->
@@ -107,7 +107,7 @@
       {% endfor %}
       </tbody>
     </table>
-    <button class="btn btn-success">Criar regras das selecionadas</button>
+    <button type="submit" class="btn btn-success">Criar regras das selecionadas</button>
   </form>
   {% endif %}
 </div>
