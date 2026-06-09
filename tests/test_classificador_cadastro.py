@@ -261,6 +261,17 @@ def test_sugestoes_agrega_pendentes_por_termo_do_fornecedor():
     assert s.soma_valor == 1500.0
 
 
+def test_sugestoes_descartam_stopwords_e_termos_curtos():
+    """A fila não deve sugerir ruído: preposições (de, da) e fragmentos de 1–2
+    letras não viram Termo. Palavras de conteúdo do fornecedor, sim."""
+    pendentes = [_pend(fornecedor="Loja de Tintas", valor=100.0) for _ in range(3)]
+    termos = {s.termo for s in gerar_sugestoes(pendentes, regras_existentes=[])}
+
+    assert "de" not in termos            # preposição (stopword)
+    assert "tintas" in termos            # conteúdo
+    assert "loja" in termos
+
+
 def test_sugestoes_descarta_termo_ja_coberto_por_regra():
     """Um termo que já é gatilho de uma Regra existente não vira Sugestão (não
     re-sugere o que o cadastro já sabe). Termos vizinhos ainda aparecem."""

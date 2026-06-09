@@ -307,12 +307,20 @@ class Sugestao:
 
 
 def _ngramas(texto, n_max=3):
-    """N-gramas de 1 a n_max palavras do texto normalizado (preserva ordem)."""
+    """N-gramas de 1 a n_max palavras do texto normalizado (preserva ordem).
+    Descarta ruído: termos de 1 palavra que sejam stopword ou tenham < 3 letras
+    (ex.: 'de', 'a', 'sa') não viram sugestão; n-gramas só de stopwords também
+    são ignorados."""
     palavras = [p for p in _norm(texto).split() if p]
     grams = []
     for n in range(1, n_max + 1):
         for i in range(len(palavras) - n + 1):
-            grams.append(" ".join(palavras[i:i + n]))
+            tokens = palavras[i:i + n]
+            if all(t in _STOPWORDS for t in tokens):
+                continue
+            if n == 1 and (tokens[0] in _STOPWORDS or len(tokens[0]) < 3):
+                continue
+            grams.append(" ".join(tokens))
     return grams
 
 
