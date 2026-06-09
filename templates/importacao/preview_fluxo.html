@@ -226,30 +226,33 @@
         <span class="badge bg-primary ms-2" id="filaCount">{{ sugestoes|length }}</span>
       </h6>
       <small class="text-muted ms-3">
-        Classifique vários lançamentos de uma vez — cria uma regra e reclassifica na hora.
+        Um termo por linha. Clique para ver os lançamentos; escolha a categoria e
+        classifique todos de uma vez (cria a regra e reclassifica na hora).
       </small>
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+        <table class="table table-sm mb-0" style="font-size:.84rem;">
           <thead class="table-light">
             <tr>
-              <th class="px-3" style="width:26%;">Termo (fornecedor)</th>
-              <th style="width:10%;">Lançamentos</th>
-              <th class="text-end" style="width:14%;">Valor</th>
-              <th style="width:34%;">Classificar como…</th>
+              <th class="px-3" style="width:30%;">Termo (no fornecedor)</th>
+              <th class="text-center" style="width:9%;">Lançam.</th>
+              <th class="text-end" style="width:13%;">Valor</th>
+              <th style="width:32%;">Classificar como…</th>
               <th class="text-end px-3" style="width:16%;"></th>
             </tr>
           </thead>
           <tbody id="filaTermosBody">
             {% for s in sugestoes %}
-            <tr data-termo="{{ s.termo }}" data-tipo="{{ s.tipo }}">
-              <td class="px-3"><code class="text-dark">{{ s.termo }}</code></td>
-              <td>
-                <a href="#" class="fila-drill text-decoration-none"
-                   title="Ver os lançamentos deste termo">
-                  <span class="badge bg-light text-dark border">{{ s.ocorrencias }}</span>
-                </a>
+            <tr class="fila-row" data-termo="{{ s.termo }}" data-tipo="{{ s.tipo }}"
+                style="cursor:pointer;">
+              <td class="px-3">
+                <i data-feather="chevron-right" class="fila-chevron"
+                   style="width:14px;height:14px;vertical-align:middle;"></i>
+                <code class="text-dark">{{ s.termo }}</code>
+              </td>
+              <td class="text-center">
+                <span class="badge bg-light text-dark border">{{ s.ocorrencias }}</span>
               </td>
               <td class="text-end">{{ s.soma_valor|brl }}</td>
               <td>
@@ -264,6 +267,30 @@
                 <button type="button" class="btn btn-sm btn-primary fila-btn">
                   <i data-feather="check" style="width:13px;height:13px;"></i> Classificar
                 </button>
+              </td>
+            </tr>
+            <tr class="fila-det" hidden>
+              <td colspan="5" class="p-0" style="background:#f8fafc;">
+                <table class="table table-sm mb-0" style="font-size:.8rem;">
+                  <thead>
+                    <tr class="text-muted">
+                      <th class="ps-5" style="width:14%;">Data</th>
+                      <th style="width:40%;">Descrição</th>
+                      <th style="width:30%;">Fornecedor</th>
+                      <th class="text-end pe-4" style="width:16%;">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for l in s.lancamentos %}
+                    <tr>
+                      <td class="ps-5">{{ l.data }}</td>
+                      <td>{{ l.descricao }}</td>
+                      <td>{{ l.fornecedor }}</td>
+                      <td class="text-end pe-4">{{ l.valor|brl }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
               </td>
             </tr>
             {% endfor %}
@@ -1123,17 +1150,23 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () { el.remove(); }, 2600);
   }
 
-  // Drill-down: destaca as linhas do termo na seção de revisão manual.
+  // Drill-down: clicar na linha do termo expande/colapsa os seus lançamentos.
+  // Ignora cliques nos controles (categoria / botão) — esses têm ação própria.
   card.addEventListener('click', function (e) {
-    var drill = e.target.closest('.fila-drill');
-    if (!drill) return;
-    e.preventDefault();
-    var tr = drill.closest('tr');
-    var alvo = rowsDoTermo(tr.dataset.termo);
-    manualRows().forEach(function (r) { r.classList.remove('table-info'); });
-    alvo.forEach(function (r) { r.classList.add('table-info'); });
-    if (alvo.length) alvo[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (e.target.closest('.fila-cat') || e.target.closest('.fila-btn')) return;
+    var row = e.target.closest('tr.fila-row');
+    if (!row) return;
+    var det = row.nextElementSibling;   // a linha-detalhe vem logo após
+    if (!det || !det.classList.contains('fila-det')) return;
+    det.hidden = !det.hidden;
+    var chev = row.querySelector('.fila-chevron');
+    if (chev) chev.style.transform = det.hidden ? '' : 'rotate(90deg)';
   });
+
+  function atualizaFilaCount() {
+    var fc = document.getElementById('filaCount');
+    if (fc) fc.textContent = document.querySelectorAll('#filaTermosBody tr.fila-row').length;
+  }
 
   // Classificar um termo: cria a Regra + reclassifica ao vivo.
   card.addEventListener('click', function (e) {
@@ -1168,10 +1201,11 @@ document.addEventListener('DOMContentLoaded', function () {
         // Reflete na tela: some as linhas do termo da revisão manual.
         rowsDoTermo(termo).forEach(function (r) { r.style.display = 'none'; });
         atualizaBadgeManual(afetadas);
-        // Tira o termo da fila.
+        // Tira o termo da fila (linha + linha-detalhe).
+        var det = tr.nextElementSibling;
+        if (det && det.classList.contains('fila-det')) det.remove();
         tr.remove();
-        var fc = document.getElementById('filaCount');
-        if (fc) fc.textContent = document.querySelectorAll('#filaTermosBody tr').length;
+        atualizaFilaCount();
         toast(afetadas + ' lançamento(s) classificado(s) como ' +
               sel.options[sel.selectedIndex].text + '.');
         if (window.feather) feather.replace();

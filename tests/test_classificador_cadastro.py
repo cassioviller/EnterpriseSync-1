@@ -262,14 +262,34 @@ def test_sugestoes_agrega_pendentes_por_termo_do_fornecedor():
 
 
 def test_sugestoes_descartam_stopwords_e_termos_curtos():
-    """A fila não deve sugerir ruído: preposições (de, da) e fragmentos de 1–2
-    letras não viram Termo. Palavras de conteúdo do fornecedor, sim."""
+    """A fila não sugere ruído: preposições (de, da) e fragmentos de 1–2 letras não
+    viram Termo. Na cobertura gulosa, 3 fornecedores idênticos colapsam em UM termo
+    de conteúdo (não a preposição)."""
     pendentes = [_pend(fornecedor="Loja de Tintas", valor=100.0) for _ in range(3)]
-    termos = {s.termo for s in gerar_sugestoes(pendentes, regras_existentes=[])}
+    sugs = gerar_sugestoes(pendentes, regras_existentes=[])
+    termos = {s.termo for s in sugs}
 
-    assert "de" not in termos            # preposição (stopword)
-    assert "tintas" in termos            # conteúdo
-    assert "loja" in termos
+    assert "de" not in termos                       # preposição (stopword)
+    assert len(sugs) == 1                           # gulosa: 1 termo cobre os 3
+    assert sugs[0].ocorrencias == 3
+    assert sugs[0].termo in {"loja", "tintas", "loja de tintas", "loja de", "de tintas"}
+
+
+def test_sugestoes_cobertura_gulosa_agrupa_e_expoe_lancamentos():
+    """Cobertura gulosa: 'posto' agrupa fornecedores distintos num único termo;
+    cada Pendente pertence a UM termo (partição) e a Sugestão traz seus Lançamentos."""
+    pend = [
+        _pend(fornecedor="Posto Shell BR", valor=100.0),
+        _pend(fornecedor="Posto Ipiranga", valor=200.0),
+        _pend(fornecedor="Padaria Central", valor=50.0),
+    ]
+    sugs = gerar_sugestoes(pend, regras_existentes=[])
+
+    posto = next(s for s in sugs if s.termo == "posto")
+    assert posto.ocorrencias == 2                   # agrupa os 2 postos diferentes
+    assert len(posto.lancamentos) == 2              # drill-down dos cobertos
+    # partição: a soma das ocorrências cobre todos os 3 Pendentes, sem redundância
+    assert sum(s.ocorrencias for s in sugs) == 3
 
 
 def test_sugestoes_descarta_termo_ja_coberto_por_regra():

@@ -1701,6 +1701,7 @@ def classificar_preview(entradas, saidas, ctx, cat_id_por_nome, limite_sugestoes
             plano=_r.get('plano_contas') or '',
             tem_obra=bool(_r.get('obra_id')),
             valor=float(_r.get('valor') or 0),
+            data=str(_r.get('data') or ''),
             tipo=tipo,
         )
 
@@ -1738,7 +1739,12 @@ def classificar_preview(entradas, saidas, ctx, cat_id_por_nome, limite_sugestoes
 
     sugestoes_dict = [
         {'termo': s.termo, 'ocorrencias': s.ocorrencias,
-         'soma_valor': float(s.soma_valor), 'exemplo': s.exemplo, 'tipo': s.tipo}
+         'soma_valor': float(s.soma_valor), 'exemplo': s.exemplo, 'tipo': s.tipo,
+         'lancamentos': [
+             {'data': l.data, 'descricao': l.descricao, 'fornecedor': l.fornecedor,
+              'valor': float(l.valor or 0)}
+             for l in s.lancamentos
+         ]}
         for s in sugestoes
     ]
     return {

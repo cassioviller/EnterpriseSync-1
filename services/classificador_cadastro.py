@@ -45,6 +45,7 @@ class Lancamento:
     tem_obra: bool = False
     tipo: str = "SAIDA"
     valor: float = 0.0   # usado pela fila de sugestões (soma_valor); ignorado no matching
+    data: str = ""       # exibida no drill-down da fila; ignorada no matching
 
 
 @dataclass
@@ -297,13 +298,15 @@ def resolver(lanc: Lancamento, ctx: Contexto, cat_id_por_nome=None) -> Resolucao
 
 @dataclass
 class Sugestao:
-    """Termo recorrente entre os Pendentes, agregado por impacto. O usuário pode
-    transformá-lo numa Regra (origem='usuario')."""
+    """Termo recorrente entre os Pendentes que o usuário pode transformar numa
+    Regra (origem='usuario'). Na cobertura gulosa, cada Pendente pertence a UM
+    único termo; `lancamentos` traz os Lançamentos cobertos (para o drill-down)."""
     termo: str
     ocorrencias: int
     soma_valor: float
     exemplo: str = ""
     tipo: str = "SAIDA"
+    lancamentos: list = field(default_factory=list)
 
 
 def _ngramas(texto, n_max=3):
@@ -325,32 +328,47 @@ def _ngramas(texto, n_max=3):
 
 
 def gerar_sugestoes(pendentes, regras_existentes=()):
-    """Fila por Termo (função pura, §7.1): tokeniza o fornecedor dos Pendentes em
-    n-gramas (1–3 palavras), agrega por termo (ocorrencias, soma_valor, exemplo) e
-    ordena por impacto (ocorrencias × soma_valor)."""
-    # Gatilhos já cadastrados: um termo candidato que contenha um gatilho existente
-    # já é coberto pelo cadastro e não vira sugestão.
+    """Fila por Termo (função pura, §7.1) por COBERTURA GULOSA: cada Pendente é
+    atribuído a UM único termo — o de maior impacto (ocorrencias × soma_valor) que
+    o cobre — eliminando n-gramas redundantes. Devolve uma lista enxuta de Sugestões
+    distintas, cada uma com os Lançamentos que cobre (drill-down), ordenada por
+    impacto. Um termo candidato que contenha um gatilho já cadastrado é descartado
+    (o cadastro já sabe classificá-lo)."""
     cobertos = {_norm(p) for r in regras_existentes for p in r.palavras if _norm(p)}
 
     def _coberto(termo):
         return any(kw in termo for kw in cobertos)
 
-    agg = {}
-    for lanc in pendentes:
+    # termo candidato -> índices dos Pendentes cujo fornecedor o contém
+    cand = {}
+    for i, lanc in enumerate(pendentes):
         for termo in set(_ngramas(lanc.fornecedor)):
-            if _coberto(termo):
-                continue
-            d = agg.setdefault(termo, {"ocorrencias": 0, "soma_valor": 0.0,
-                                       "exemplo": "", "tipo": lanc.tipo})
-            d["ocorrencias"] += 1
-            d["soma_valor"] += lanc.valor or 0.0
-            if not d["exemplo"]:
-                d["exemplo"] = lanc.descricao or lanc.fornecedor
+            if not _coberto(termo):
+                cand.setdefault(termo, []).append(i)
 
-    sugestoes = [Sugestao(termo=t, ocorrencias=d["ocorrencias"],
-                          soma_valor=d["soma_valor"], exemplo=d["exemplo"],
-                          tipo=d["tipo"])
-                 for t, d in agg.items()]
+    restantes = set(range(len(pendentes)))
+    sugestoes = []
+    while restantes:
+        melhor = None  # (impacto, -len(termo), termo, cobertura)
+        for termo, idxs in cand.items():
+            cob = [i for i in idxs if i in restantes]
+            if not cob:
+                continue
+            soma = sum((pendentes[i].valor or 0.0) for i in cob)
+            chave = (len(cob) * soma, -len(termo))   # impacto, depois termo mais geral
+            if melhor is None or chave > melhor[0]:
+                melhor = (chave, termo, cob)
+        if melhor is None:
+            break  # Pendentes sem termo sugerível (fornecedor vazio/ só stopwords)
+        _, termo, cob = melhor
+        lancs = [pendentes[i] for i in cob]
+        sugestoes.append(Sugestao(
+            termo=termo, ocorrencias=len(lancs),
+            soma_valor=sum((l.valor or 0.0) for l in lancs),
+            exemplo=(lancs[0].descricao or lancs[0].fornecedor),
+            tipo=lancs[0].tipo, lancamentos=lancs))
+        restantes -= set(cob)
+
     sugestoes.sort(key=lambda s: -(s.ocorrencias * s.soma_valor))
     return sugestoes
 
