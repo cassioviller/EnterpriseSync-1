@@ -1971,26 +1971,45 @@ class ImportacaoFluxoCaixa:
                 )
             )
 
-        # ── Match descrição → categoria nomeada (CategoriaFluxoCaixa) ────────
-        # Resolve o NOME da categoria e o id correspondente no tenant.
+        # ── Classificação via cadastro de palavras-chave (Regras do tenant) ──
+        # Motor único: a Regra dirige a categoria nomeada (CategoriaFluxoCaixa); o
+        # macro tipo_categoria é DERIVADO dela; auto vs manual é redefinido pelo
+        # resultado — cadastro classificou → auto; caiu no fallback → manual.
+        # (§3 do spec 2026-06-09 / ADR-0002; substitui o classificador hardcoded.)
         from models import CategoriaFluxoCaixa
-        _cats_map = {_normalizar(c.nome): c.id for c in
-                     CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
+        from services.classificador_cadastro import (
+            resolver, Lancamento, Contexto, _norm as _norm_cat,
+        )
+        from services.seed_palavras_chave import regras_do_tenant
+
+        cat_id_por_nome = {_norm_cat(c.nome): c.id for c in
+                           CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
+        # Memória Exata entra na Fase E (Passo 11); por ora vazia.
+        ctx_cad = Contexto(regras=regras_do_tenant(admin_id), memoria_exata={})
+
+        def _aplicar(_r, tipo, entidade_key):
+            res = resolver(Lancamento(
+                descricao=_r.get('descricao') or '',
+                fornecedor=_r.get(entidade_key) or '',
+                plano=_r.get('plano_contas') or '',
+                tem_obra=bool(_r.get('obra_id')),
+                tipo=tipo,
+            ), ctx_cad, cat_id_por_nome)
+            _r['categoria_nome'] = res.categoria_nome
+            _r['tipo_categoria'] = res.tipo_categoria
+            if res.categoria_id and not _r.get('categoria_fluxo_caixa_id'):
+                _r['categoria_fluxo_caixa_id'] = res.categoria_id
+            return res
+
         for _r in entradas:
-            _nm = _classificar_categoria_nomeada('ENTRADA', _r.get('plano_contas'),
-                                                 _r.get('descricao'), _r.get('cliente'))
-            _r['categoria_nome'] = _nm
-            _cid = _cats_map.get(_normalizar(_nm)) if _nm else None
-            if _cid and not _r.get('categoria_fluxo_caixa_id'):
-                _r['categoria_fluxo_caixa_id'] = _cid
-        for _r in saidas_auto + saidas_manual:
-            _nm = _classificar_categoria_nomeada('SAIDA', _r.get('plano_contas'),
-                                                 _r.get('descricao'), _r.get('fornecedor'),
-                                                 tem_obra=bool(_r.get('obra_id')))
-            _r['categoria_nome'] = _nm
-            _cid = _cats_map.get(_normalizar(_nm)) if _nm else None
-            if _cid and not _r.get('categoria_fluxo_caixa_id'):
-                _r['categoria_fluxo_caixa_id'] = _cid
+            _aplicar(_r, 'ENTRADA', 'cliente')
+
+        # Re-particiona as saídas pelo veredito do cadastro (§3): fallback → manual.
+        _todas_saidas = saidas_auto + saidas_manual
+        saidas_auto, saidas_manual = [], []
+        for _r in _todas_saidas:
+            res = _aplicar(_r, 'SAIDA', 'fornecedor')
+            (saidas_manual if res.eh_manual else saidas_auto).append(_r)
 
         # Período descritivo
         datas_sorted = sorted(todas_datas)

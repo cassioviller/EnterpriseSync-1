@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.classificador_cadastro import (
-    classificar, texto_norm, derivar_macro, Regra, Lancamento, Contexto,
+    classificar, texto_norm, derivar_macro, resolver, Regra, Lancamento, Contexto,
 )
 
 
@@ -175,3 +175,64 @@ def test_derivar_macro_da_categoria_nomeada():
     assert derivar_macro("Impostos e Taxas") == "TRIBUTOS"
     assert derivar_macro("Pró-labore e Retirada de Sócios") == "PRO_LABORE"
     assert derivar_macro("Categoria Inexistente") == "OUTROS"
+
+
+# ── resolver(): classificação + macro + auto/manual num só passo (Fase D) ────
+
+def test_resolver_regra_que_casa_produz_categoria_especifica_e_auto():
+    """resolver() classifica o Lançamento e devolve a Resolução pronta para o
+    preview: categoria nomeada específica, id da regra, macro derivado e
+    eh_manual=False (o cadastro decidiu — vai para a fila automática)."""
+    regra = _regra(["maranhao"], 10, "Subempreitada", campo_alvo="fornecedor",
+                   prioridade=40)
+    lanc = _lanc(descricao="empreita bloco B", fornecedor="Maranhão Construções",
+                 tem_obra=True)
+    ctx = Contexto(regras=[regra], memoria_exata={})
+
+    r = resolver(lanc, ctx, cat_id_por_nome={})
+
+    assert r.categoria_id == 10
+    assert r.categoria_nome == "Subempreitada"
+    assert r.tipo_categoria == "MAO_OBRA_DIRETA"   # derivado da categoria nomeada
+    assert r.eh_manual is False
+
+
+def test_resolver_pendente_cai_no_fallback_generico_e_e_manual():
+    """Quando nenhuma Regra casa, a SAÍDA cai no fallback genérico 'Outras
+    Saídas' (id resolvido do mapa do tenant), macro OUTROS e eh_manual=True —
+    vai para a fila de revisão manual (§3 do spec)."""
+    ctx = Contexto(regras=[], memoria_exata={})
+    lanc = _lanc(descricao="algo que nenhuma regra reconhece", tipo="SAIDA")
+
+    r = resolver(lanc, ctx, cat_id_por_nome={"outras saidas": 99})
+
+    assert r.categoria_nome == "Outras Saídas"
+    assert r.categoria_id == 99
+    assert r.tipo_categoria == "OUTROS"
+    assert r.eh_manual is True
+
+
+def test_resolver_entrada_pendente_usa_fallback_de_entrada():
+    """O fallback genérico respeita o tipo: uma ENTRADA sem Regra cai em
+    'Outros Recebimentos', não em 'Outras Saídas'."""
+    ctx = Contexto(regras=[], memoria_exata={})
+    lanc = _lanc(descricao="deposito nao identificado", tipo="ENTRADA")
+
+    r = resolver(lanc, ctx, cat_id_por_nome={})
+
+    assert r.categoria_nome == "Outros Recebimentos"
+    assert r.eh_manual is True
+
+
+def test_resolver_regra_que_aponta_para_fallback_ainda_e_manual():
+    """§3 define manual pelo RESULTADO: se a categoria resolvida é o fallback
+    genérico, é revisão manual — mesmo que uma Regra (não a pendência) a tenha
+    produzido. O usuário precisa olhar."""
+    regra = _regra(["pix"], 99, "Outras Saídas", prioridade=50)
+    lanc = _lanc(descricao="pix avulso")
+    ctx = Contexto(regras=[regra], memoria_exata={})
+
+    r = resolver(lanc, ctx, cat_id_por_nome={})
+
+    assert r.categoria_nome == "Outras Saídas"
+    assert r.eh_manual is True

@@ -241,3 +241,44 @@ def classificar(lanc: Lancamento, ctx: Contexto) -> Veredito:
     # Sem Regra e sem Memória → Pendente de Classificação
     return Veredito(categoria_id=None, categoria_nome=None,
                     origem_decisao="fallback", eh_pendente=True)
+
+
+# ── Resolução para o preview de importação (Fase D) ─────────────────────────
+
+# Categoria genérica quando nenhuma Regra casa (Pendente). É o sinal de revisão
+# manual do §3: o cadastro não soube classificar.
+FALLBACK_NOME = {"ENTRADA": "Outros Recebimentos", "SAIDA": "Outras Saídas"}
+
+
+@dataclass
+class Resolucao:
+    """Veredito já enriquecido para o preview: categoria nomeada + id do tenant,
+    macro derivado e a decisão auto (cadastro classificou) vs manual (fallback)."""
+    categoria_id: Optional[int]
+    categoria_nome: Optional[str]
+    tipo_categoria: str          # macro derivado da categoria nomeada
+    eh_manual: bool
+    origem_decisao: str
+
+
+def resolver(lanc: Lancamento, ctx: Contexto, cat_id_por_nome=None) -> Resolucao:
+    """Classifica o Lançamento e resolve tudo que o preview precisa num passo:
+    categoria nomeada, id da categoria no tenant, macro e auto/manual."""
+    v = classificar(lanc, ctx)
+    if v.eh_pendente:
+        nome = FALLBACK_NOME.get(lanc.tipo, "Outras Saídas")
+        cat_id_por_nome = cat_id_por_nome or {}
+        return Resolucao(
+            categoria_id=cat_id_por_nome.get(_norm(nome)),
+            categoria_nome=nome,
+            tipo_categoria=derivar_macro(nome),
+            eh_manual=True,
+            origem_decisao=v.origem_decisao,
+        )
+    return Resolucao(
+        categoria_id=v.categoria_id,
+        categoria_nome=v.categoria_nome,
+        tipo_categoria=derivar_macro(v.categoria_nome),
+        eh_manual=v.categoria_nome in FALLBACK_NOME.values(),
+        origem_decisao=v.origem_decisao,
+    )
