@@ -1,0 +1,114 @@
+{% extends "base_completo.html" %}
+
+{% block title %}Palavras-Chave — Regras de Classificação{% endblock %}
+
+{% block content %}
+{# PLACEHOLDER funcional (Passo 17). A UI definitiva (light-only, filtros,
+   drill-down, paginação) é o Passo 18. #}
+<div class="container-fluid py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-1">
+      <li class="breadcrumb-item"><a href="{{ url_for('catalogos.hub') }}">Catálogos</a></li>
+      <li class="breadcrumb-item active">Palavras-Chave</li>
+    </ol>
+  </nav>
+  <h1 class="h3 mb-3"><i class="fas fa-tags text-primary me-2"></i>Regras de Classificação</h1>
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in msgs %}
+      <div class="alert alert-{{ 'danger' if cat == 'danger' else cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Filtros -->
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+      <input type="text" name="q" class="form-control" placeholder="Buscar palavra…"
+             value="{{ filtros.q }}">
+    </div>
+    <div class="col-auto">
+      <select name="origem" class="form-select">
+        <option value="">Todas as origens</option>
+        <option value="sistema" {{ 'selected' if filtros.origem == 'sistema' }}>Sistema</option>
+        <option value="usuario" {{ 'selected' if filtros.origem == 'usuario' }}>Usuário</option>
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-outline-secondary">Filtrar</button></div>
+  </form>
+
+  <!-- Nova regra -->
+  <form method="post" action="{{ url_for('catalogos.palavras_chave_criar') }}" class="row g-2 mb-4">
+    <div class="col"><input name="palavras" class="form-control" placeholder="gatilho(s), separados por vírgula" required></div>
+    <div class="col">
+      <select name="categoria_id" class="form-select" required>
+        {% for c in categorias %}<option value="{{ c.id }}">{{ c.nome }} ({{ c.tipo }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="campo_alvo" class="form-select">
+        <option value="qualquer">qualquer</option><option value="fornecedor">fornecedor</option>
+        <option value="descricao">descrição</option><option value="plano">plano</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="tipo" class="form-select"><option value="SAIDA">SAÍDA</option><option value="ENTRADA">ENTRADA</option></select>
+    </div>
+    <div class="col-auto"><input name="prioridade" type="number" class="form-control" value="50" style="width:90px"></div>
+    <div class="col-auto"><button class="btn btn-primary">Adicionar</button></div>
+  </form>
+
+  <!-- Regras -->
+  <table class="table table-sm align-middle">
+    <thead><tr><th>Gatilho</th><th>Categoria</th><th>Campo</th><th>Prio.</th><th>Tipo</th><th>Origem</th><th>Ativo</th><th></th></tr></thead>
+    <tbody>
+    {% for r in regras %}
+      <tr class="{{ '' if r.ativo else 'text-muted' }}">
+        <td><code>{{ r.palavras }}</code></td>
+        <td>{{ cat_nome.get(r.categoria_fluxo_caixa_id, '—') }}</td>
+        <td>{{ r.campo_alvo }}</td>
+        <td>{{ r.prioridade }}</td>
+        <td>{{ r.tipo }}</td>
+        <td>{{ r.origem }}</td>
+        <td>{{ 'sim' if r.ativo else 'não' }}</td>
+        <td class="text-end">
+          <form method="post" action="{{ url_for('catalogos.palavras_chave_toggle', id=r.id) }}" class="d-inline">
+            <button class="btn btn-sm btn-outline-secondary">{{ 'Desativar' if r.ativo else 'Ativar' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('catalogos.palavras_chave_excluir', id=r.id) }}" class="d-inline"
+                onsubmit="return confirm('Excluir esta regra?')">
+            <button class="btn btn-sm btn-outline-danger">Excluir</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="text-center text-muted">Nenhuma regra.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Sugestões -->
+  {% if sugestoes %}
+  <h2 class="h5 mt-4">Sugestões (da última importação)</h2>
+  <form method="post" action="{{ url_for('catalogos.palavras_chave_sugestoes_cadastrar') }}">
+    <table class="table table-sm align-middle">
+      <thead><tr><th>Termo</th><th>Ocorr.</th><th>Soma</th><th>Categoria → criar regra</th></tr></thead>
+      <tbody>
+      {% for s in sugestoes %}
+        <tr>
+          <td><code>{{ s.termo }}</code></td><td>{{ s.ocorrencias }}</td>
+          <td>{{ '%.2f'|format(s.soma_valor) }}</td>
+          <td>
+            <select name="cat_{{ s.id }}" class="form-select form-select-sm">
+              <option value="">— ignorar —</option>
+              {% for c in categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+            </select>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button class="btn btn-success">Criar regras das selecionadas</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -9,7 +9,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import (
     GrupoFinanceiro, CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso,
-    FluxoCaixa, Fornecedor, TipoUsuario
+    FluxoCaixa, Fornecedor, TipoUsuario, PalavraChaveCategoria, PalavraChaveSugestao
 )
 
 logger = logging.getLogger(__name__)
@@ -660,3 +660,234 @@ def grupos_financeiros_deletar(id):
     db.session.commit()
     flash(f'Grupo financeiro "{grupo.nome}" excluído.', 'success')
     return redirect(url_for('catalogos.grupos_financeiros'))
+
+
+# ============================================================
+# PalavraChaveCategoria — Regras de Classificação (Fluxo de Caixa)
+# ============================================================
+
+_CAMPOS_ALVO = ('qualquer', 'descricao', 'fornecedor', 'plano')
+
+
+def _norm_kw_csv(texto):
+    """Normaliza uma lista de gatilhos separados por vírgula (lower + sem acento),
+    preservando ordem e descartando vazios. Devolve string CSV ou None."""
+    from services.classificador_cadastro import _norm
+    itens = [_norm(p) for p in (texto or '').split(',')]
+    itens = [p for p in itens if p]
+    return ','.join(itens) if itens else None
+
+
+def _conflito_regra(admin_id, palavras, prioridade, campo_alvo, tipo,
+                    categoria_id, excluir_id=None):
+    """Detecta conflito: regra ATIVA do tenant com mesma palavra + mesma
+    prioridade + mesma especificidade (campo_alvo) + mesmo tipo, apontando para
+    categoria DIFERENTE. Devolve a regra conflitante ou None (§8)."""
+    q = PalavraChaveCategoria.query.filter_by(
+        admin_id=admin_id, ativo=True, palavras=palavras,
+        prioridade=prioridade, campo_alvo=campo_alvo, tipo=tipo)
+    if excluir_id:
+        q = q.filter(PalavraChaveCategoria.id != excluir_id)
+    for r in q.all():
+        if r.categoria_fluxo_caixa_id != categoria_id:
+            return r
+    return None
+
+
+@catalogos_bp.route('/palavras-chave')
+@login_required
+def palavras_chave():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    # Filtros: busca (palavra), categoria, origem
+    busca = (request.args.get('q') or '').strip().lower()
+    f_cat = (request.args.get('categoria') or '').strip()
+    f_origem = (request.args.get('origem') or '').strip()
+
+    q = PalavraChaveCategoria.query.filter_by(admin_id=admin_id)
+    if f_cat.isdigit():
+        q = q.filter_by(categoria_fluxo_caixa_id=int(f_cat))
+    if f_origem in ('sistema', 'usuario'):
+        q = q.filter_by(origem=f_origem)
+    regras = q.order_by(PalavraChaveCategoria.tipo,
+                        PalavraChaveCategoria.prioridade).all()
+    if busca:
+        regras = [r for r in regras if busca in (r.palavras or '').lower()]
+
+    cat_nome = {c.id: c.nome for c in
+                CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id).all()}
+    categorias = CategoriaFluxoCaixa.query.filter_by(
+        admin_id=admin_id, ativo=True).order_by(CategoriaFluxoCaixa.tipo,
+                                                 CategoriaFluxoCaixa.nome).all()
+    sugestoes = PalavraChaveSugestao.query.filter_by(
+        admin_id=admin_id, dismissed=False).order_by(
+        PalavraChaveSugestao.ocorrencias.desc()).all()
+    return render_template('catalogos/palavras_chave.html',
+                           regras=regras, cat_nome=cat_nome,
+                           categorias=categorias, sugestoes=sugestoes,
+                           filtros={'q': busca, 'categoria': f_cat, 'origem': f_origem})
+
+
+@catalogos_bp.route('/palavras-chave/criar', methods=['POST'])
+@login_required
+def palavras_chave_criar():
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    palavras = _norm_kw_csv(request.form.get('palavras'))
+    if not palavras:
+        flash('Informe ao menos um gatilho (palavra).', 'danger')
+        return redirect(url_for('catalogos.palavras_chave'))
+    try:
+        categoria_id = int(request.form.get('categoria_id'))
+        prioridade = int(request.form.get('prioridade', 50))
+    except (TypeError, ValueError):
+        flash('Categoria e prioridade são obrigatórias.', 'danger')
+        return redirect(url_for('catalogos.palavras_chave'))
+
+    campo_alvo = request.form.get('campo_alvo', 'qualquer')
+    if campo_alvo not in _CAMPOS_ALVO:
+        campo_alvo = 'qualquer'
+    tipo = request.form.get('tipo', 'SAIDA').upper()
+    if tipo not in ('ENTRADA', 'SAIDA'):
+        tipo = 'SAIDA'
+
+    cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+    if not cat:
+        flash('Categoria não encontrada.', 'danger')
+        return redirect(url_for('catalogos.palavras_chave'))
+
+    conflito = _conflito_regra(admin_id, palavras, prioridade, campo_alvo, tipo, categoria_id)
+    if conflito:
+        flash(f'Conflito: já existe uma regra "{palavras}" (prioridade {prioridade}, '
+              f'{campo_alvo}) apontando para outra categoria. Ajuste a prioridade ou '
+              f'a palavra antes de salvar.', 'warning')
+        return redirect(url_for('catalogos.palavras_chave'))
+
+    excecoes = _norm_kw_csv(request.form.get('excecoes'))
+    gatilho_extra = _norm_kw_csv(request.form.get('gatilho_extra'))
+    campo_extra = request.form.get('campo_extra', 'qualquer')
+    if campo_extra not in _CAMPOS_ALVO:
+        campo_extra = 'qualquer'
+    condicao_obra = request.form.get('condicao_obra', 'indiferente')
+    if condicao_obra not in ('indiferente', 'com_obra', 'sem_obra'):
+        condicao_obra = 'indiferente'
+
+    db.session.add(PalavraChaveCategoria(
+        admin_id=admin_id, categoria_fluxo_caixa_id=categoria_id, palavras=palavras,
+        campo_alvo=campo_alvo, excecoes=excecoes, gatilho_extra=gatilho_extra,
+        campo_extra=campo_extra, condicao_obra=condicao_obra, prioridade=prioridade,
+        tipo=tipo, origem='usuario', ativo=True))
+    db.session.commit()
+    flash(f'Regra "{palavras}" → {cat.nome} criada.', 'success')
+    return redirect(url_for('catalogos.palavras_chave'))
+
+
+@catalogos_bp.route('/palavras-chave/<int:id>/editar', methods=['POST'])
+@login_required
+def palavras_chave_editar(id):
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    regra = PalavraChaveCategoria.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    palavras = _norm_kw_csv(request.form.get('palavras')) or regra.palavras
+    try:
+        categoria_id = int(request.form.get('categoria_id', regra.categoria_fluxo_caixa_id))
+        prioridade = int(request.form.get('prioridade', regra.prioridade))
+    except (TypeError, ValueError):
+        flash('Categoria e prioridade inválidas.', 'danger')
+        return redirect(url_for('catalogos.palavras_chave'))
+    campo_alvo = request.form.get('campo_alvo', regra.campo_alvo)
+    if campo_alvo not in _CAMPOS_ALVO:
+        campo_alvo = regra.campo_alvo
+    tipo = request.form.get('tipo', regra.tipo).upper()
+    if tipo not in ('ENTRADA', 'SAIDA'):
+        tipo = regra.tipo
+
+    cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+    if not cat:
+        flash('Categoria não encontrada.', 'danger')
+        return redirect(url_for('catalogos.palavras_chave'))
+
+    conflito = _conflito_regra(admin_id, palavras, prioridade, campo_alvo, tipo,
+                               categoria_id, excluir_id=regra.id)
+    if conflito:
+        flash(f'Conflito: já existe uma regra "{palavras}" (prioridade {prioridade}) '
+              f'para outra categoria. Ajuste antes de salvar.', 'warning')
+        return redirect(url_for('catalogos.palavras_chave'))
+
+    regra.palavras = palavras
+    regra.categoria_fluxo_caixa_id = categoria_id
+    regra.campo_alvo = campo_alvo
+    regra.prioridade = prioridade
+    regra.tipo = tipo
+    regra.excecoes = _norm_kw_csv(request.form.get('excecoes'))
+    db.session.commit()
+    flash('Regra atualizada.', 'success')
+    return redirect(url_for('catalogos.palavras_chave'))
+
+
+@catalogos_bp.route('/palavras-chave/<int:id>/toggle', methods=['POST'])
+@login_required
+def palavras_chave_toggle(id):
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    regra = PalavraChaveCategoria.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    regra.ativo = not regra.ativo
+    db.session.commit()
+    flash(f'Regra {"ativada" if regra.ativo else "desativada"}.', 'success')
+    return redirect(url_for('catalogos.palavras_chave'))
+
+
+@catalogos_bp.route('/palavras-chave/<int:id>/excluir', methods=['POST'])
+@login_required
+def palavras_chave_excluir(id):
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    regra = PalavraChaveCategoria.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    db.session.delete(regra)
+    db.session.commit()
+    flash('Regra excluída.', 'success')
+    return redirect(url_for('catalogos.palavras_chave'))
+
+
+@catalogos_bp.route('/palavras-chave/sugestoes/cadastrar', methods=['POST'])
+@login_required
+def palavras_chave_sugestoes_cadastrar():
+    """Promove Sugestões selecionadas a Regras (lote). Cada termo vira uma Regra
+    do usuário (campo_alvo='fornecedor', prioridade 40) para a categoria escolhida."""
+    admin_id, err = _require_admin()
+    if err:
+        return err
+    # Form: para cada sugestão marcada, cat_<sugestao_id> = categoria_id escolhida.
+    criadas = 0
+    for sug in PalavraChaveSugestao.query.filter_by(admin_id=admin_id).all():
+        cat_raw = (request.form.get(f'cat_{sug.id}') or '').strip()
+        if not cat_raw.isdigit():
+            continue
+        categoria_id = int(cat_raw)
+        cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+        if not cat:
+            continue
+        palavras = _norm_kw_csv(sug.termo)
+        if not palavras:
+            continue
+        if _conflito_regra(admin_id, palavras, 40, 'fornecedor', sug.tipo, categoria_id):
+            continue
+        ja = PalavraChaveCategoria.query.filter_by(
+            admin_id=admin_id, palavras=palavras, campo_alvo='fornecedor',
+            tipo=sug.tipo, origem='usuario').first()
+        if ja:
+            continue
+        db.session.add(PalavraChaveCategoria(
+            admin_id=admin_id, categoria_fluxo_caixa_id=categoria_id, palavras=palavras,
+            campo_alvo='fornecedor', prioridade=40, tipo=sug.tipo,
+            origem='usuario', ativo=True))
+        sug.dismissed = True
+        criadas += 1
+    db.session.commit()
+    flash(f'{criadas} regra(s) criada(s) a partir das sugestões.', 'success')
+    return redirect(url_for('catalogos.palavras_chave'))
