@@ -181,6 +181,47 @@ def seed_para_admin(admin_id, commit=False):
     return criadas
 
 
+def registrar_correcao(admin_id, lanc, categoria_id, termo_origem=None, commit=False):
+    """Grava (upsert por admin_id+texto_norm) a Correção que o usuário fez num
+    Lançamento individual. Vira Memória Exata: texto idêntico futuro já vem
+    classificado. NÃO cria Regra (§7.3). Retorna a CorrecaoClassificacao."""
+    from models import db, CorrecaoClassificacao
+    from services.classificador_cadastro import texto_norm
+
+    chave = texto_norm(lanc)
+    corr = CorrecaoClassificacao.query.filter_by(
+        admin_id=admin_id, texto_norm=chave).first()
+    if corr:
+        corr.categoria_fluxo_caixa_id = categoria_id
+        corr.termo_origem = termo_origem
+        corr.tipo = lanc.tipo
+    else:
+        corr = CorrecaoClassificacao(
+            admin_id=admin_id, texto_norm=chave, categoria_fluxo_caixa_id=categoria_id,
+            termo_origem=termo_origem, tipo=lanc.tipo)
+        db.session.add(corr)
+    db.session.flush()
+    if commit:
+        db.session.commit()
+    return corr
+
+
+def carregar_memoria_exata(admin_id):
+    """Memória Exata do tenant como {texto_norm: (categoria_id, categoria_nome)},
+    consumível pelo classificador (Contexto.memoria_exata)."""
+    from models import CategoriaFluxoCaixa, CorrecaoClassificacao
+
+    nome_por_id = {
+        c.id: c.nome
+        for c in CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id).all()
+    }
+    return {
+        c.texto_norm: (c.categoria_fluxo_caixa_id,
+                       nome_por_id.get(c.categoria_fluxo_caixa_id, ''))
+        for c in CorrecaoClassificacao.query.filter_by(admin_id=admin_id).all()
+    }
+
+
 def regras_do_tenant(admin_id):
     """Carrega as Regras de Classificação ativas do tenant como objetos Regra
     (consumível pelo classificador)."""

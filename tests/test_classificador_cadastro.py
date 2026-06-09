@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.classificador_cadastro import (
     classificar, texto_norm, derivar_macro, resolver, gerar_sugestoes,
-    Regra, Lancamento, Contexto,
+    sugerir_regra_refinada, Regra, Lancamento, Contexto,
 )
 
 
@@ -286,3 +286,41 @@ def test_sugestoes_ordenadas_por_impacto():
     assert sugestoes[0].termo == "beta"   # maior impacto vem primeiro
     termos_ordem = [s.termo for s in sugestoes]
     assert termos_ordem.index("beta") < termos_ordem.index("alpha")
+
+
+# ── Memória Exata + regra refinada: aprendizado (Fase E, Passo 11) ───────────
+
+def test_memoria_exata_reaplica_categoria_em_texto_identico():
+    """Texto idêntico (descrição+fornecedor) já corrigido antes reaparece já
+    classificado pela Memória Exata, sem Regra e sem ação do usuário (§7.3)."""
+    lanc = _lanc(descricao="servico avulso xyz", fornecedor="ACME")
+    ctx = Contexto(regras=[], memoria_exata={texto_norm(lanc): (77, "Materiais de Obra")})
+
+    v = classificar(lanc, ctx)
+
+    assert v.categoria_id == 77
+    assert v.categoria_nome == "Materiais de Obra"
+    assert v.origem_decisao == "memoria_exata"
+    assert v.eh_pendente is False
+
+
+def test_sugerir_regra_refinada_vence_a_regra_do_termo_pelo_contexto():
+    """Quando o usuário corrige uma linha cujo contexto contraria a regra do
+    Termo (ex.: 'maranhão' em geral é Subempreitada, mas ESTA é compra de
+    material), o sistema propõe uma Regra refinada 'maranhão + material →
+    Materiais' com prioridade MENOR (vence o conflito). Não persiste nada (§7.3)."""
+    conflitante = _regra(["maranhao"], 10, "Subempreitada",
+                         campo_alvo="fornecedor", prioridade=40)
+    lanc = _lanc(descricao="compra de material hidraulico",
+                 fornecedor="Maranhão Construções")
+
+    refinada = sugerir_regra_refinada(
+        lanc, categoria_id=20, categoria_nome="Materiais de Obra",
+        regra_conflitante=conflitante)
+
+    assert refinada.categoria_id == 20
+    assert refinada.categoria_nome == "Materiais de Obra"
+    assert refinada.prioridade < conflitante.prioridade   # vence a regra do termo
+    assert "maranhao" in refinada.palavras                # mantém o gatilho do termo
+    assert "material" in refinada.gatilho_extra           # contexto distintivo
+    assert refinada.origem == "usuario"

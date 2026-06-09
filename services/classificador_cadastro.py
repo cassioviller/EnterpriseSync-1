@@ -337,3 +337,36 @@ def gerar_sugestoes(pendentes, regras_existentes=()):
                  for t, d in agg.items()]
     sugestoes.sort(key=lambda s: -(s.ocorrencias * s.soma_valor))
     return sugestoes
+
+
+# Stopwords PT-BR para isolar o contexto distintivo de uma Correção.
+_STOPWORDS = {
+    "de", "da", "do", "das", "dos", "e", "a", "o", "as", "os", "para", "com",
+    "em", "no", "na", "nos", "nas", "por", "um", "uma", "ao", "aos", "ref",
+}
+
+
+def sugerir_regra_refinada(lanc: Lancamento, categoria_id, categoria_nome,
+                           regra_conflitante: Regra) -> Regra:
+    """Monta (sem persistir) uma Regra refinada que resolve o conflito detectado
+    por uma Correção (§7.3): mantém o gatilho do Termo e adiciona como condição
+    extra (AND) o contexto distintivo da descrição — as palavras de conteúdo que
+    não fazem parte do Termo. A prioridade é MENOR que a regra do Termo, para
+    vencer o conflito. O usuário ainda confirma antes de virar regra."""
+    termo_tokens = {_norm(p) for p in regra_conflitante.palavras}
+    distintivos = [
+        t for t in _norm(lanc.descricao).split()
+        if t and t not in _STOPWORDS and t not in termo_tokens
+    ]
+    return Regra(
+        palavras=list(regra_conflitante.palavras),
+        categoria_id=categoria_id,
+        categoria_nome=categoria_nome,
+        campo_alvo=regra_conflitante.campo_alvo,
+        gatilho_extra=distintivos,
+        campo_extra="descricao",
+        condicao_obra="indiferente",
+        prioridade=regra_conflitante.prioridade - 1,
+        origem="usuario",
+        tipo=regra_conflitante.tipo,
+    )
