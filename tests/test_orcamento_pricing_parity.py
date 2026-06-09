@@ -89,10 +89,14 @@ def main():
                             'orcamentos', 'editar.html')
     with open(tpl_path, 'r', encoding='utf-8') as f:
         content = f.read()
-    if re.search(r'custoUnit\s*/\s*divisor', content) and \
+    # Task #74 — o pricing do editor passou a usar o custo REAL de compra
+    # (custoCompra = Σ pacotes × preço) como base, alinhado a recalcular_item()
+    # do backend: venda = custoCompra / divisor; preço_unit = (custoCompra/qtd)
+    # / divisor. O divisor segue idêntico (1 − imp/100 − mar/100).
+    if re.search(r'custoCompra\s*/\s*divisor', content) and \
        re.search(r'1\s*-\s*\(imp\|\|0\)\s*/\s*100\s*-\s*\(mar\|\|0\)\s*/\s*100',
-                 content) and 'Math.round((custoUnit / divisor) * 10000)' in content:
-        print('PASS  template usa fórmula canônica do backend')
+                 content) and 'Math.round((custoCompra / divisor) * 100)' in content:
+        print('PASS  template usa fórmula canônica do backend (Task #74)')
     else:
         fails += 1
         print('FAIL  template editar.html não usa fórmula canônica')

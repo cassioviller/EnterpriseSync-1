@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture Review — Classificação de Fluxo de Caixa</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+  .badge{font-size:.7rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .box{border:1px solid #e2e8f0;border-radius:.5rem}
+  .shallow{background:#fef2f2;border:1px solid #fecaca}
+  .deep{background:#f0fdf4;border:1px solid #bbf7d0}
+  .resp{font-size:.72rem;background:#fff;border:1px solid #e2e8f0;border-radius:.3rem;padding:2px 7px;margin:2px;display:inline-block}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:.85em}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<div class="max-w-5xl mx-auto px-6 py-10">
+
+  <header class="mb-10">
+    <p class="badge text-indigo-600 mb-1">Architecture Review · deepening opportunities</p>
+    <h1 class="text-3xl font-bold text-slate-900">Classificação de Fluxo de Caixa</h1>
+    <p class="text-slate-500 mt-2">Avaliação da arquitetura <b>planejada</b> antes de implementar. Linguagem de domínio do
+      <code>CONTEXT.md</code>; respeita o <code>ADR-0002</code>. Foco: fronteiras de módulo do novo classificador,
+      testabilidade isolada do Flask, e o risco de inchar <code>processar()</code>.</p>
+    <div class="mt-3 text-sm text-slate-400">Fatos: <code>processar()</code> 325 linhas / ~8 queries ·
+      <code>importar()</code> 413 linhas · preview = HMAC round-trip sem estado server-side · decisão auto/Pendente em
+      variável local.</div>
+  </header>
+
+  <!-- ============ CANDIDATE 1 ============ -->
+  <section class="box bg-white p-6 mb-8 shadow-sm">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold text-slate-900">1 · Separar <span class="text-rose-600">Parse</span> de
+        <span class="text-emerald-600">Classify</span></h2>
+      <span class="badge bg-emerald-100 text-emerald-700 px-2 py-1 rounded">Strong</span>
+    </div>
+    <p class="text-sm text-slate-500 mb-2"><b>Módulos:</b> <code>services/importacao_excel.py › ImportacaoFluxoCaixa.processar</code></p>
+
+    <p class="text-sm mb-2"><b class="text-slate-700">Problema.</b> <code>processar()</code> é um módulo <b>shallow</b>:
+      interface minúscula (arquivo, período) escondendo 7 responsabilidades — abrir workbook, carregar 7 entidades do DB,
+      parsear colunas por índice mágico (<code>row[10..13]</code> caçando o valor), filtrar período, classificar em 3 níveis,
+      pré-computar "apenas pagamento", resolver categoria nomeada. O plano adiciona <i>carregar regras/correções, gerar a fila,
+      manter linhas vivas</i> — empurrando pra ~380 linhas. Toda a complexidade num lugar sem costura interna.</p>
+
+    <p class="text-sm mb-4"><b class="text-slate-700">Solução.</b> Dois módulos profundos atrás de interfaces pequenas:
+      um <b>Leitor de Planilha</b> (<code>workbook + período → list[Lançamento]</code>, sem DB, sem classificação) e um
+      <b>Classificador</b> (candidato 2). <code>processar()</code> vira cola fina: carrega contexto, chama os dois.</p>
+
+    <!-- before/after -->
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div class="shallow rounded-lg p-4">
+        <p class="badge text-rose-600 mb-2">Antes — god-method</p>
+        <div class="box bg-white p-3">
+          <p class="text-xs font-bold text-slate-600 mb-1">processar() · 325→380 linhas</p>
+          <span class="resp">abrir workbook</span><span class="resp">7 queries de entidade</span>
+          <span class="resp">parse colunas (índice mágico)</span><span class="resp">filtro período</span>
+          <span class="resp">classificar 3 níveis</span><span class="resp">decisão auto/Pendente</span>
+          <span class="resp">apenas-pagamento</span><span class="resp">categoria nomeada</span>
+          <span class="resp">+ regras/correções</span><span class="resp">+ gerar fila</span>
+        </div>
+        <p class="text-xs text-rose-500 mt-2">Teste = subir Excel real + app context. Sem teste unitário do parse nem da decisão.</p>
+      </div>
+      <div class="deep rounded-lg p-4">
+        <p class="badge text-emerald-600 mb-2">Depois — 3 módulos profundos</p>
+        <div class="box bg-white p-2 mb-2"><b class="text-xs">Leitor de Planilha</b>
+          <div class="text-xs text-slate-500"><code>ler(wb, periodo) → [Lançamento]</code> · só openpyxl</div></div>
+        <div class="box bg-white p-2 mb-2"><b class="text-xs">Classificador</b>
+          <div class="text-xs text-slate-500"><code>classificar_lote(lançamentos, ctx) → Resultado</code></div></div>
+        <div class="box bg-white p-2"><b class="text-xs">processar()</b> · ~40 linhas
+          <div class="text-xs text-slate-500">cola: carrega contexto, chama Leitor + Classificador</div></div>
+        <p class="text-xs text-emerald-600 mt-2">Parse testável com um <code>.xlsx</code> minúsculo, sem DB. Decisão testável sem openpyxl.</p>
+      </div>
+    </div>
+
+    <p class="text-sm bg-slate-50 rounded p-3"><b>Deletion test.</b> Apague o Leitor: o índice mágico das colunas
+      (<code>row[10..13]</code>, offset do cabeçalho da aba Saída) re-aparece espalhado em quem parseia. <b>Concentra
+      complexidade → ganha o sustento.</b> Leverage: o parse vira o lugar único onde "o formato Veks" é conhecido.</p>
+  </section>
+
+  <!-- ============ CANDIDATE 2 ============ -->
+  <section class="box bg-white p-6 mb-8 shadow-sm">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold text-slate-900">2 · Um <span class="text-emerald-600">Classificador</span> que decide
+        o <i>veredito</i>, não só devolve categoria</h2>
+      <span class="badge bg-emerald-100 text-emerald-700 px-2 py-1 rounded">Strong · top pick</span>
+    </div>
+    <p class="text-sm text-slate-500 mb-2"><b>Módulos:</b> planejado <code>services/classificador_cadastro.py</code> ·
+      hoje espalhado em <code>processar()</code> + 8 funções de nível de módulo</p>
+
+    <p class="text-sm mb-2"><b class="text-slate-700">Problema.</b> Hoje a <b>ordem</b> (plano → reembolso → keywords) e a
+      <b>decisão "auto vs Pendente"</b> vivem numa variável local <code>precisa_revisao</code> dentro de
+      <code>processar()</code> — não há <b>locality</b>. As funções puras (<code>_classificar_keywords</code> etc.) são
+      testáveis isoladas, mas <i>o bug mora em como são orquestradas</i>. O plano cria <code>classificar_por_cadastro(...) →
+      categoria | None</code> — uma função <b>shallow</b>: devolve categoria-ou-None e deixa <code>processar()</code>
+      <i>re-interpretar</i> o None como Pendente e aplicar a ordem Regra→Memória Exata. A dispersão se repete.</p>
+
+    <p class="text-sm mb-4"><b class="text-slate-700">Solução.</b> Tornar o Classificador <b>deep</b>: a interface devolve um
+      <b>Veredito</b> completo, e a ordem de resolução (Regra de Classificação → Memória Exata → Pendente) e o desempate por
+      prioridade vivem <i>dentro</i> dele. <code>processar()</code> não decide nada de classificação — só consome o veredito.</p>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div class="shallow rounded-lg p-4">
+        <p class="badge text-rose-600 mb-2">Antes — função rasa + orquestração externa</p>
+        <pre class="text-xs bg-white p-3 rounded box overflow-x-auto">cat = classificar_por_cadastro(...)   # → str | None
+# processar() ainda precisa:
+if cat is None:
+    cat = memoria_exata.get(texto)     # ordem aqui
+if cat in (None,'Outras Saídas'):
+    pendentes.append(...)              # veredito aqui
+else:
+    auto.append(...)</pre>
+        <p class="text-xs text-rose-500 mt-2">Test surface = funções de keyword. A decisão real (Pendente?) não tem teste próprio.</p>
+      </div>
+      <div class="deep rounded-lg p-4">
+        <p class="badge text-emerald-600 mb-2">Depois — veredito é a interface</p>
+        <pre class="text-xs bg-white p-3 rounded box overflow-x-auto">v = classificador.classificar(lanc, ctx)
+# v.categoria_id, v.categoria_nome
+# v.origem_decisao  (regra|memoria|fallback)
+# v.eh_pendente     ← o veredito
+(auto if not v.eh_pendente else pendentes).append(...)</pre>
+        <p class="text-xs text-emerald-600 mt-2">Test surface = o veredito. <code>assert classificar(x).eh_pendente is True</code>.
+          A ordem Regra→Memória→Pendente tem locality.</p>
+      </div>
+    </div>
+
+    <div class="mb-2"><p class="text-xs font-bold text-slate-500 mb-1">Ordem de resolução (dentro do módulo, com locality):</p>
+      <pre class="mermaid bg-white box p-3 text-center">
+flowchart LR
+  L[Lançamento] --> R{Regra de Classificação?\nmenor prioridade}
+  R -->|casa| C1[Veredito: categoria]
+  R -->|nenhuma| M{Memória Exata?\ntexto idêntico}
+  M -->|sim| C2[Veredito: categoria]
+  M -->|não| P[Veredito: eh_pendente]
+      </pre>
+    </div>
+
+    <p class="text-sm bg-slate-50 rounded p-3"><b>Deletion test.</b> Apague o Classificador: a ordem de resolução e a regra
+      auto/Pendente re-aparecem em <code>processar()</code> <i>e</i> em todo endpoint do loop ao vivo
+      (<code>classificar-termo</code>, <code>corrigir-linha</code>) que precisa reclassificar. <b>Concentra complexidade em
+      3+ chamadores → ganha o sustento, com folga.</b> É o módulo de maior leverage do projeto.</p>
+  </section>
+
+  <!-- ============ CANDIDATE 3 ============ -->
+  <section class="box bg-white p-6 mb-8 shadow-sm">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold text-slate-900">3 · Onde mora o estado da <span class="text-amber-600">Sessão de Preview</span>?</h2>
+      <span class="badge bg-amber-100 text-amber-700 px-2 py-1 rounded">Worth exploring</span>
+    </div>
+    <p class="text-sm text-slate-500 mb-2"><b>Módulos:</b> <code>importacao_views.py</code> (<code>_assinar_payload</code>/
+      <code>_verificar_payload</code> L36-69) · plano Passo 13</p>
+
+    <p class="text-sm mb-2"><b class="text-slate-700">Problema.</b> Hoje o preview é <b>stateless</b>: o payload vai assinado
+      (HMAC) e <i>round-trip pelo navegador</i> — não há estado server-side. Mas o <b>loop ao vivo</b> (drill-down +
+      reclassificar a cada Termo classificado, sem re-upload) precisa dos Lançamentos individuais vivos <i>entre requests</i>.
+      O plano só acena: "token assinado + cache server-side". Essa é a costura mais subespecificada — se não for decidida,
+      vira estado <i>ad-hoc</i> (session global, dict de módulo) vazando em <code>importacao_views</code>.</p>
+
+    <p class="text-sm mb-3"><b class="text-slate-700">Duas adaptadores possíveis (= seam real só com 2):</b></p>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div class="box p-4 bg-slate-50">
+        <p class="text-sm font-bold text-slate-700 mb-1">A · Payload-como-estado</p>
+        <p class="text-xs text-slate-500">Cada ação re-POSTa o payload assinado; servidor reclassifica em memória e devolve o
+          delta. <b>Zero infra nova</b>, idêntico ao que <code>confirmar</code> já faz.</p>
+        <p class="text-xs text-rose-500 mt-2">Custo: ~3700 Lançamentos num campo oculto re-enviado a cada clique.</p>
+      </div>
+      <div class="box p-4 bg-slate-50">
+        <p class="text-sm font-bold text-slate-700 mb-1">B · Módulo Sessão de Preview</p>
+        <p class="text-xs text-slate-500">Store server-side <code>token → [Lançamento] + estado da fila</code>, interface
+          <code>carregar/reclassificar/confirmar</code>. Requests pequenos.</p>
+        <p class="text-xs text-rose-500 mt-2">Custo: estado mutável + ciclo de vida/expiração pra gerir.</p>
+      </div>
+    </div>
+    <p class="text-sm bg-amber-50 border border-amber-200 rounded p-3"><b>Decisão pendente.</b> O plano precisa <i>escolher
+      explicitamente</i> A ou B antes da Fase F. Recomendo grelhar: o volume (3700 linhas) e a frequência de cliques decidem.
+      Não contradiz nenhum ADR — é um seam novo que o ADR-0002 não cobre.</p>
+  </section>
+
+  <!-- ============ CANDIDATE 4 ============ -->
+  <section class="box bg-white p-6 mb-8 shadow-sm opacity-90">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold text-slate-900">4 · <span class="text-slate-500">A fan-out de</span> <code>importar()</code></h2>
+      <span class="badge bg-slate-200 text-slate-600 px-2 py-1 rounded">Speculative</span>
+    </div>
+    <p class="text-sm mb-2"><b class="text-slate-700">Problema.</b> <code>importar()</code> tem 413 linhas: dedup,
+      auto-criação de fornecedor, fan-out GestaoCustoPai/Filho + FluxoCaixa + ContaPagar, entradas, relatório. É god-method —
+      mas <b>pré-existente</b> e <b>fora do escopo</b> desta feature.</p>
+    <p class="text-sm bg-slate-50 rounded p-3"><b>Recomendação.</b> Não mexer agora (o skill evita refactor não relacionado).
+      A feature só toca <code>importar()</code> pra passar <code>categoria_fluxo_caixa_id</code> — mudança cirúrgica. Fica
+      registrado como dívida adjacente para um ciclo futuro.</p>
+  </section>
+
+  <!-- TOP RECOMMENDATION -->
+  <section class="box bg-indigo-50 border-indigo-200 p-6 mb-6">
+    <h2 class="text-lg font-bold text-indigo-900 mb-2">★ Por onde eu começaria</h2>
+    <p class="text-sm text-indigo-900"><b>Candidato 2 primeiro</b> (o Classificador que devolve <i>Veredito</i>). É o módulo
+      que a feature cria de qualquer jeito — acertar a <b>interface</b> (devolve veredito + dona da ordem de resolução) é a
+      decisão de maior leverage e ataca direto os dois objetivos: <b>testabilidade</b> (test surface = o veredito) e
+      <b>não inchar <code>processar()</code></b> (a decisão sai de lá). O <b>Candidato 1</b> (separar Parse) cai naturalmente
+      depois. O <b>Candidato 3</b> (Sessão de Preview) é uma <i>decisão</i> a grelhar antes da Fase F, não um refactor agora.</p>
+  </section>
+
+  <p class="text-xs text-slate-400 text-center">Relatório de avaliação — não altera código. Linguagem: CONTEXT.md (domínio) + LANGUAGE.md (arquitetura).</p>
+</div>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral'});</script>
+</body>
+</html>

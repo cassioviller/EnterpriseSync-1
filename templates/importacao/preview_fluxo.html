@@ -215,9 +215,68 @@
     </div>
   </div>
 
+  {# ── Fila por Termo (loop ao vivo) — classifica vários de uma vez ── #}
+  {% if sugestoes %}
+  <div class="card border-0 shadow-sm mb-4" id="filaTermosCard"
+       style="border-radius:14px;border-left:4px solid #0d6efd !important;">
+    <div class="card-header bg-transparent border-bottom d-flex align-items-center py-3 px-4">
+      <h6 class="mb-0 fw-bold text-primary">
+        <i data-feather="zap" style="width:16px;height:16px;"></i>
+        Fila por Termo
+        <span class="badge bg-primary ms-2" id="filaCount">{{ sugestoes|length }}</span>
+      </h6>
+      <small class="text-muted ms-3">
+        Classifique vários lançamentos de uma vez — cria uma regra e reclassifica na hora.
+      </small>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" style="font-size:.84rem;">
+          <thead class="table-light">
+            <tr>
+              <th class="px-3" style="width:26%;">Termo (fornecedor)</th>
+              <th style="width:10%;">Lançamentos</th>
+              <th class="text-end" style="width:14%;">Valor</th>
+              <th style="width:34%;">Classificar como…</th>
+              <th class="text-end px-3" style="width:16%;"></th>
+            </tr>
+          </thead>
+          <tbody id="filaTermosBody">
+            {% for s in sugestoes %}
+            <tr data-termo="{{ s.termo }}" data-tipo="{{ s.tipo }}">
+              <td class="px-3"><code class="text-dark">{{ s.termo }}</code></td>
+              <td>
+                <a href="#" class="fila-drill text-decoration-none"
+                   title="Ver os lançamentos deste termo">
+                  <span class="badge bg-light text-dark border">{{ s.ocorrencias }}</span>
+                </a>
+              </td>
+              <td class="text-end">{{ s.soma_valor|brl }}</td>
+              <td>
+                <select class="form-select form-select-sm fila-cat">
+                  <option value="">— escolher categoria —</option>
+                  {% for c in (categorias_saida if s.tipo == 'SAIDA' else categorias_entrada) %}
+                  <option value="{{ c.id }}">{{ c.nome }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="text-end px-3">
+                <button type="button" class="btn btn-sm btn-primary fila-btn">
+                  <i data-feather="check" style="width:13px;height:13px;"></i> Classificar
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <form id="formConfirmar" action="{{ url_for('importacao.fluxo_caixa_confirmar') }}" method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="dados_json" value="{{ dados_json | e }}">
+    <input type="hidden" id="dadosJson" name="dados_json" value="{{ dados_json | e }}">
 
   <!-- 1. ENTRADAS -->
   {% if entradas %}
@@ -552,7 +611,8 @@
           </thead>
           <tbody>
             {% for r in saidas_manual %}
-            <tr data-entidade="{{ r.entidade_tipo or '' }}">
+            <tr data-entidade="{{ r.entidade_tipo or '' }}"
+                data-fornecedor="{{ r.fornecedor|e }}" class="manual-row">
               <!-- Data editável -->
               <td class="px-3">
                 <input type="text"
@@ -1018,6 +1078,110 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 });
+</script>
+
+<script>
+// ── Loop ao vivo: Fila por Termo ──────────────────────────────────────────
+(function () {
+  var card = document.getElementById('filaTermosCard');
+  if (!card) return;
+
+  var tokenInput = document.getElementById('dadosJson');
+  var csrfInput = document.querySelector('input[name="csrf_token"]');
+  var csrf = csrfInput ? csrfInput.value : '';
+
+  function norm(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function manualRows() {
+    return Array.prototype.slice.call(document.querySelectorAll('tr.manual-row'));
+  }
+
+  // Linhas manuais cujo fornecedor contém o termo (mesma lógica do gatilho).
+  function rowsDoTermo(termo) {
+    var t = norm(termo);
+    return manualRows().filter(function (tr) {
+      return tr.style.display !== 'none' && norm(tr.dataset.fornecedor).indexOf(t) !== -1;
+    });
+  }
+
+  function atualizaBadgeManual(delta) {
+    var badge = document.querySelector('.text-warning .badge.bg-warning')
+             || document.querySelector('.badge.bg-warning.text-dark');
+    if (!badge) return;
+    var n = parseInt(badge.textContent, 10) || 0;
+    badge.textContent = Math.max(0, n - delta);
+  }
+
+  function toast(msg) {
+    var el = document.createElement('div');
+    el.className = 'alert alert-success shadow-sm';
+    el.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:1080;min-width:240px;';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, 2600);
+  }
+
+  // Drill-down: destaca as linhas do termo na seção de revisão manual.
+  card.addEventListener('click', function (e) {
+    var drill = e.target.closest('.fila-drill');
+    if (!drill) return;
+    e.preventDefault();
+    var tr = drill.closest('tr');
+    var alvo = rowsDoTermo(tr.dataset.termo);
+    manualRows().forEach(function (r) { r.classList.remove('table-info'); });
+    alvo.forEach(function (r) { r.classList.add('table-info'); });
+    if (alvo.length) alvo[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  // Classificar um termo: cria a Regra + reclassifica ao vivo.
+  card.addEventListener('click', function (e) {
+    var btn = e.target.closest('.fila-btn');
+    if (!btn) return;
+    var tr = btn.closest('tr');
+    var sel = tr.querySelector('.fila-cat');
+    var catId = sel.value;
+    if (!catId) { sel.classList.add('is-invalid'); sel.focus(); return; }
+    sel.classList.remove('is-invalid');
+
+    var termo = tr.dataset.termo, tipo = tr.dataset.tipo;
+    var afetadas = rowsDoTermo(termo).length;
+    btn.disabled = true;
+    btn.innerHTML = '…';
+
+    fetch('/importacao/fluxo-caixa/classificar-termo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify({ dados_json: tokenInput.value, termo: termo,
+                             categoria_id: catId, tipo: tipo })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          alert((data && data.erro) || 'Não foi possível classificar.');
+          btn.disabled = false; btn.innerHTML = 'Classificar';
+          return;
+        }
+        // Atualiza o estado (token) para que Confirmar persista o reclassificado.
+        tokenInput.value = data.dados_json;
+        // Reflete na tela: some as linhas do termo da revisão manual.
+        rowsDoTermo(termo).forEach(function (r) { r.style.display = 'none'; });
+        atualizaBadgeManual(afetadas);
+        // Tira o termo da fila.
+        tr.remove();
+        var fc = document.getElementById('filaCount');
+        if (fc) fc.textContent = document.querySelectorAll('#filaTermosBody tr').length;
+        toast(afetadas + ' lançamento(s) classificado(s) como ' +
+              sel.options[sel.selectedIndex].text + '.');
+        if (window.feather) feather.replace();
+      })
+      .catch(function () {
+        btn.disabled = false; btn.innerHTML = 'Classificar';
+        alert('Erro de rede ao classificar o termo.');
+      });
+  });
+})();
 </script>
 
 {% endblock %}

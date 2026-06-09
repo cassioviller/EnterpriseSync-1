@@ -58,34 +58,30 @@ _cache_parametros_legais = {}
 def _obter_parametros_legais(admin_id: int, ano: int):
     """
     Busca ParametrosLegais por admin_id e ano_vigencia.
-    Cacheia o resultado para evitar queries repetidas no mesmo cálculo.
-    
+
+    NÃO cacheia a instância ORM entre requests: um cache de módulo guardando o
+    objeto SQLAlchemy o deixa *detached* após o teardown da sessão, e no request
+    seguinte o acesso aos atributos falha (DetachedInstanceError) — a folha
+    deixava de ser processada até reiniciar o worker. Além disso o cache nunca
+    era invalidado ao editar os parâmetros. A consulta é uma linha indexada por
+    (admin_id, ano_vigencia); o custo por funcionário é desprezível.
+
     Args:
         admin_id: ID do administrador
         ano: Ano de vigência dos parâmetros
-        
+
     Returns:
         ParametrosLegais ou None se não encontrar
     """
-    cache_key = (admin_id, ano)
-    
-    if cache_key in _cache_parametros_legais:
-        return _cache_parametros_legais[cache_key]
-    
     try:
         params = ParametrosLegais.query.filter_by(
             admin_id=admin_id,
             ano_vigencia=ano,
             ativo=True
         ).first()
-        
-        _cache_parametros_legais[cache_key] = params
-        
-        if params:
-            logger.debug(f"[_obter_parametros_legais] Encontrado ParametrosLegais para admin={admin_id}, ano={ano}")
-        else:
-            logger.debug(f"[_obter_parametros_legais] Não encontrado ParametrosLegais para admin={admin_id}, ano={ano}, usando fallback")
-        
+        if not params:
+            logger.debug(
+                f"[_obter_parametros_legais] Não encontrado para admin={admin_id}, ano={ano}")
         return params
     except Exception as e:
         logger.error(f"[_obter_parametros_legais] Erro ao buscar parâmetros: {e}")

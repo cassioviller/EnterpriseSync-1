@@ -32,6 +32,25 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _registrar_blueprints_opcionais():
+    """Registra os blueprints carregados via try/except no main.py (importacao,
+    catalogos) ANTES de qualquer request — após o 1º request o Flask trava o
+    registro de blueprints. Idempotente; sessão inteira. Sem isto, o teste HTTP
+    que registra primeiro tranca o app e os demais erram ao registrar."""
+    try:
+        from app import app
+        if "importacao" not in app.blueprints:
+            from importacao_views import importacao_bp
+            app.register_blueprint(importacao_bp)
+        if "catalogos" not in app.blueprints:
+            from views.catalogos_views import catalogos_bp
+            app.register_blueprint(catalogos_bp)
+    except Exception:
+        pass
+    yield
+
+
 # ---------------------------------------------------------------------------
 # Fixtures de configuração consumidas pelo test_browser_all_modules.py
 # ---------------------------------------------------------------------------

@@ -816,16 +816,18 @@ def criar():
                     _svc = _Svc.query.get(servico_id_int)
                     _r = _explodir(_svc, qtd_medida)
                     custo_unit_snap = _r['custo_unitario']
-                    # Guarda-corpo (D3): em bloqueio não materializa preço do snapshot.
+                    # Guarda-corpo (D3): em bloqueio não materializa preço nem
+                    # snapshots de lucro/subtotal (ficam None — sem preço válido).
                     if _r.get('status') == 'bloqueio':
                         logger.warning(
                             f"BDI bloqueio no item {idx+1}: {_r.get('mensagem')} "
                             "— preço do catálogo não aplicado"
                         )
-                    elif not preco_unit_final or float(preco_unit_final) <= 0:
-                        preco_unit_final = _r['preco_unitario']
-                    lucro_unit_snap = _r['lucro_unitario']
-                    subtotal_snap = _r['subtotal']
+                    else:
+                        if not preco_unit_final or float(preco_unit_final) <= 0:
+                            preco_unit_final = _r['preco_unitario']
+                        lucro_unit_snap = _r['lucro_unitario']
+                        subtotal_snap = _r['subtotal']
                 except Exception as _e:
                     logger.warning(f"Task #89: explosão falhou no item {idx+1}: {_e}")
 
@@ -1743,16 +1745,18 @@ def atualizar(id):
                     _svc = _Svc.query.get(servico_id_int)
                     _r = _explodir(_svc, quantidade)
                     custo_unit_snap = _r['custo_unitario']
-                    # Guarda-corpo (D3): em bloqueio não materializa preço do snapshot.
+                    # Guarda-corpo (D3): em bloqueio não materializa preço nem
+                    # snapshots de lucro/subtotal (ficam None — sem preço válido).
                     if _r.get('status') == 'bloqueio':
                         logger.warning(
                             f"BDI bloqueio no item {i+1}: {_r.get('mensagem')} "
                             "— preço do catálogo não aplicado"
                         )
-                    elif not preco_unitario or float(preco_unitario) <= 0:
-                        preco_unitario = float(_r['preco_unitario'])
-                    lucro_unit_snap = _r['lucro_unitario']
-                    subtotal_snap = _r['subtotal']
+                    else:
+                        if not preco_unitario or float(preco_unitario) <= 0:
+                            preco_unitario = float(_r['preco_unitario'])
+                        lucro_unit_snap = _r['lucro_unitario']
+                        subtotal_snap = _r['subtotal']
                 except Exception as _e:
                     logger.warning(f"Task #89: explosão falhou no item {i+1}: {_e}")
 
