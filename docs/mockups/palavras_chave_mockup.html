@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mockup · Palavras-Chave de Classificação</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body { background:#0d1117; font-size:.9rem; }
+    .container-app { max-width:1180px; }
+    .card { border:1px solid #30363d; background:#161b22; }
+    .table { --bs-table-bg:transparent; }
+    .table td, .table th { vertical-align:middle; }
+    .kw-chip { font-family:ui-monospace,monospace; font-size:.78rem; background:#21262d; border:1px solid #30363d;
+               border-radius:5px; padding:1px 7px; margin:1px 2px 1px 0; display:inline-block; color:#c9d1d9; }
+    .meta-badge { font-size:.7rem; font-weight:500; }
+    .sug-card { border:1px solid #1f6feb55; background:#0d2a4d22; }
+    .sug-row:hover, .kw-row:hover { background:#1c2128; }
+    .origin-voce { color:#3fb950; }
+    .origin-sistema { color:#8b949e; }
+    .row-except { font-size:.74rem; color:#d29922; }
+    .table-sm > :not(caption) > * > * { padding:.45rem .5rem; }
+    .form-select-sm, .form-control-sm { font-size:.82rem; }
+    .section-title { font-size:1.05rem; font-weight:600; }
+    .muted { color:#8b949e; }
+    .adv-box { background:#0d1117; border:1px solid #30363d; border-radius:8px; }
+    .pill-count { background:#1f6feb; color:#fff; border-radius:20px; padding:1px 9px; font-size:.72rem; font-weight:600; }
+  </style>
+</head>
+<body>
+<div class="container container-app py-4">
+
+  <!-- Cabeçalho -->
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h4 class="section-title mb-1"><i class="fa-solid fa-tags me-2 text-primary"></i>Palavras-Chave de Classificação</h4>
+      <div class="muted">Ensine o sistema a categorizar lançamentos da importação automaticamente.</div>
+    </div>
+    <button class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1"></i>Nova palavra-chave</button>
+  </div>
+
+  <!-- PAINEL DE SUGESTÕES -->
+  <div class="card sug-card mb-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0"><i class="fa-solid fa-lightbulb text-warning me-2"></i>Sugestões da última importação</h6>
+        <span class="muted small">663 lançamentos em revisão manual · 41 termos recorrentes</span>
+      </div>
+      <p class="muted small mb-3">Estes termos se repetem nos não-classificados. Escolha a categoria e cadastre de uma vez —
+        ao salvar, o preview da importação é re-classificado na hora.</p>
+
+      <table class="table table-sm align-middle mb-2">
+        <thead class="muted small text-uppercase">
+          <tr>
+            <th style="width:30px"><input class="form-check-input" type="checkbox"></th>
+            <th>Termo</th>
+            <th class="text-center">Aparece</th>
+            <th class="text-end">Σ Valor</th>
+            <th>Exemplo</th>
+            <th style="width:210px">Categoria</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sug-row">
+            <td><input class="form-check-input" type="checkbox" checked></td>
+            <td><span class="kw-chip">maranhão</span></td>
+            <td class="text-center"><span class="pill-count">18</span></td>
+            <td class="text-end fw-semibold">R$ 47.300</td>
+            <td class="muted small">"Maranhão - empreita alvenaria bloco B"</td>
+            <td>
+              <select class="form-select form-select-sm">
+                <option>Subempreitada</option>
+                <option>Serviços Terceirizados de Obra</option>
+                <option>Mão de Obra Direta</option>
+              </select>
+            </td>
+          </tr>
+          <tr class="sug-row">
+            <td><input class="form-check-input" type="checkbox" checked></td>
+            <td><span class="kw-chip">concrelagos</span></td>
+            <td class="text-center"><span class="pill-count">9</span></td>
+            <td class="text-end fw-semibold">R$ 22.150</td>
+            <td class="muted small">"Concrelagos concreto usinado 12m³"</td>
+            <td>
+              <select class="form-select form-select-sm">
+                <option>Materiais de Obra</option>
+                <option>Locação de Equipamentos</option>
+              </select>
+            </td>
+          </tr>
+          <tr class="sug-row">
+            <td><input class="form-check-input" type="checkbox"></td>
+            <td><span class="kw-chip">josé carlos</span></td>
+            <td class="text-center"><span class="pill-count">12</span></td>
+            <td class="text-end fw-semibold">R$ 9.800</td>
+            <td class="muted small">"José Carlos diária 8 dias"</td>
+            <td>
+              <select class="form-select form-select-sm">
+                <option class="muted">Selecione…</option>
+                <option>Mão de Obra Direta</option>
+                <option>Subempreitada</option>
+              </select>
+            </td>
+          </tr>
+          <tr class="sug-row">
+            <td><input class="form-check-input" type="checkbox"></td>
+            <td><span class="kw-chip">vidraçaria sjc</span></td>
+            <td class="text-center"><span class="pill-count">7</span></td>
+            <td class="text-end fw-semibold">R$ 5.400</td>
+            <td class="muted small">"Vidraçaria SJC fachada cortina"</td>
+            <td>
+              <select class="form-select form-select-sm">
+                <option class="muted">Selecione…</option>
+                <option>Serviços Terceirizados de Obra</option>
+                <option>Materiais de Obra</option>
+              </select>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="d-flex justify-content-between align-items-center">
+        <a href="#" class="small">ver todos os 41 termos →</a>
+        <button class="btn btn-success btn-sm"><i class="fa-solid fa-check me-1"></i>Cadastrar 2 selecionadas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
+    <div class="input-group input-group-sm" style="width:240px">
+      <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+      <input type="text" class="form-control" placeholder="Buscar palavra…">
+    </div>
+    <select class="form-select form-select-sm" style="width:200px"><option>Categoria: Todas</option></select>
+    <select class="form-select form-select-sm" style="width:150px"><option>Origem: Todas</option><option>Você</option><option>Sistema</option></select>
+    <span class="muted small ms-auto">42 regras ativas</span>
+  </div>
+
+  <!-- TABELA DE REGRAS -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="muted small text-uppercase">
+          <tr>
+            <th>Palavras</th>
+            <th style="width:210px">Categoria</th>
+            <th class="text-center" style="width:90px">Onde</th>
+            <th class="text-center" style="width:90px">Obra</th>
+            <th class="text-center" style="width:70px">Prio.</th>
+            <th class="text-center" style="width:80px">Origem</th>
+            <th class="text-end" style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="kw-row">
+            <td><span class="kw-chip">maranhão</span></td>
+            <td><span class="badge text-bg-secondary meta-badge">Subempreitada</span></td>
+            <td class="text-center muted small">fornecedor</td>
+            <td class="text-center muted">—</td>
+            <td class="text-center muted">50</td>
+            <td class="text-center"><span class="origin-voce small"><i class="fa-solid fa-user me-1"></i>Você</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+          <tr class="kw-row">
+            <td>
+              <span class="kw-chip">cimento</span><span class="kw-chip">ferro</span><span class="kw-chip">areia</span>
+              <span class="kw-chip">tijolo</span><span class="muted small">+18</span>
+            </td>
+            <td><span class="badge text-bg-secondary meta-badge">Materiais de Obra</span></td>
+            <td class="text-center muted small">qualquer</td>
+            <td class="text-center muted">—</td>
+            <td class="text-center muted">90</td>
+            <td class="text-center"><span class="origin-sistema small"><i class="fa-solid fa-gear me-1"></i>Sistema</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+          <tr class="kw-row">
+            <td>
+              <span class="kw-chip">salario</span><span class="kw-chip">folha</span><span class="kw-chip">rescisão</span><span class="kw-chip">férias</span>
+              <div class="row-except mt-1"><i class="fa-solid fa-ban me-1"></i>exceto: <span class="kw-chip">diaria</span></div>
+            </td>
+            <td><span class="badge text-bg-secondary meta-badge">Salários e Encargos</span></td>
+            <td class="text-center muted small">qualquer</td>
+            <td class="text-center muted">—</td>
+            <td class="text-center muted">30</td>
+            <td class="text-center"><span class="origin-sistema small"><i class="fa-solid fa-gear me-1"></i>Sistema</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+          <tr class="kw-row">
+            <td><span class="kw-chip">vale transporte</span></td>
+            <td><span class="badge text-bg-secondary meta-badge">Transporte de Obra</span></td>
+            <td class="text-center muted small">qualquer</td>
+            <td class="text-center"><span class="badge text-bg-info meta-badge">só c/ obra</span></td>
+            <td class="text-center muted">20</td>
+            <td class="text-center"><span class="origin-sistema small"><i class="fa-solid fa-gear me-1"></i>Sistema</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+          <tr class="kw-row">
+            <td><span class="kw-chip">vale transporte</span></td>
+            <td><span class="badge text-bg-secondary meta-badge">Benefício Transporte</span></td>
+            <td class="text-center muted small">qualquer</td>
+            <td class="text-center"><span class="badge text-bg-warning text-dark meta-badge">só s/ obra</span></td>
+            <td class="text-center muted">20</td>
+            <td class="text-center"><span class="origin-sistema small"><i class="fa-solid fa-gear me-1"></i>Sistema</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+          <tr class="kw-row">
+            <td><span class="kw-chip">ifood</span><span class="kw-chip">marmita</span><span class="kw-chip">restaurante</span><span class="kw-chip">almoço</span><span class="muted small">+6</span></td>
+            <td><span class="badge text-bg-secondary meta-badge">Alimentação de Obra</span></td>
+            <td class="text-center muted small">qualquer</td>
+            <td class="text-center muted">—</td>
+            <td class="text-center muted">90</td>
+            <td class="text-center"><span class="origin-sistema small"><i class="fa-solid fa-gear me-1"></i>Sistema</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+          <tr class="kw-row">
+            <td><span class="kw-chip">instalação</span><span class="kw-chip">assentamento</span><span class="kw-chip">montagem</span></td>
+            <td><span class="badge text-bg-secondary meta-badge">Serviços Terceirizados</span></td>
+            <td class="text-center muted small">qualquer</td>
+            <td class="text-center muted">—</td>
+            <td class="text-center"><span class="badge text-bg-dark meta-badge">10 ⚡</span></td>
+            <td class="text-center"><span class="origin-sistema small"><i class="fa-solid fa-gear me-1"></i>Sistema</span></td>
+            <td class="text-end"><i class="fa-solid fa-pen muted me-2" role="button"></i><i class="fa-solid fa-trash muted" role="button"></i></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center small muted">
+      <span>Mostrando 7 de 42</span>
+      <nav><ul class="pagination pagination-sm mb-0">
+        <li class="page-item disabled"><a class="page-link">‹</a></li>
+        <li class="page-item active"><a class="page-link">1</a></li>
+        <li class="page-item"><a class="page-link">2</a></li>
+        <li class="page-item"><a class="page-link">3</a></li>
+        <li class="page-item"><a class="page-link">›</a></li>
+      </ul></nav>
+    </div>
+  </div>
+
+  <!-- FORM (inline, simulando o modal/painel) -->
+  <div class="card mt-4">
+    <div class="card-header"><i class="fa-solid fa-plus me-2"></i>Nova palavra-chave <span class="muted small">(prévia do formulário)</span></div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Palavras <span class="text-danger">*</span></label>
+          <input class="form-control form-control-sm" value="maranhão">
+          <div class="form-text">Uma ou várias, separadas por vírgula. Casa se <b>qualquer</b> aparecer.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Categoria <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm"><option>Subempreitada</option></select>
+        </div>
+      </div>
+
+      <a class="d-inline-block mt-3 small" data-bs-toggle="collapse" href="#adv"><i class="fa-solid fa-sliders me-1"></i>Opções avançadas</a>
+      <div class="collapse" id="adv">
+        <div class="adv-box p-3 mt-2">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label small">Onde buscar</label>
+              <select class="form-select form-select-sm"><option>Fornecedor</option><option>Descrição</option><option>Plano</option><option>Qualquer</option></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Exceções <span class="muted">(e não…)</span></label>
+              <input class="form-control form-control-sm" placeholder="ex.: diaria">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Condição de obra</label>
+              <select class="form-select form-select-sm"><option>Indiferente</option><option>Só com obra</option><option>Só sem obra</option></select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small">Prioridade</label>
+              <input class="form-control form-control-sm" value="50">
+              <div class="form-text">menor decide antes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-end mt-3">
+        <button class="btn btn-outline-secondary btn-sm me-2">Cancelar</button>
+        <button class="btn btn-primary btn-sm">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="muted small text-center mt-4 mb-0">Mockup estático — apenas visualização. Nenhuma função real conectada.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
