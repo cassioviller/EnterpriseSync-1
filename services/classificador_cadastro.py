@@ -30,6 +30,10 @@ class Regra:
     prioridade: int = 50
     origem: str = "usuario"             # sistema | usuario
     tipo: str = "SAIDA"
+    # Condição extra (AND): se preenchida, alguma palavra de gatilho_extra também
+    # precisa aparecer em campo_extra. Expressa regras "A num campo E B em outro".
+    gatilho_extra: list = field(default_factory=list)
+    campo_extra: str = "qualquer"
 
 
 @dataclass
@@ -65,6 +69,16 @@ def _norm(texto) -> str:
     s = _ud.normalize("NFD", s)
     s = "".join(c for c in s if _ud.category(c) != "Mn")
     return s.strip()
+
+
+def _norm_kw(palavra) -> str:
+    """Normaliza um gatilho/exceção PRESERVANDO espaços de fronteira — gatilhos
+    como ' inss', 'art ', ' vt ' dependem do espaço para não casar dentro de
+    palavras (ex.: 'art ' não pode casar em 'martins'). Paridade com o legado,
+    que compara o keyword literal contra o blob normalizado."""
+    s = str(palavra or "").lower()
+    s = _ud.normalize("NFD", s)
+    return "".join(c for c in s if _ud.category(c) != "Mn")
 
 
 # ── Núcleo ──────────────────────────────────────────────────────────────────
@@ -155,27 +169,40 @@ def _condicao_obra_ok(regra: Regra, tem_obra: bool) -> bool:
     return True  # indiferente
 
 
+def _alvo(campo: str, campos: dict) -> str:
+    if campo == "qualquer":
+        # Blob com espaços nas bordas e entre campos (gatilhos como ' inss', ' vt '
+        # dependem do espaço de fronteira — paridade com o classificador legado).
+        return f" {campos['descricao']} {campos['plano']} {campos['fornecedor']} "
+    return campos.get(campo, "")
+
+
+def _alvo_da_regra(regra: Regra, campos: dict) -> str:
+    return _alvo(regra.campo_alvo, campos)
+
+
 def _regra_casa(regra: Regra, campos: dict, tem_obra: bool) -> bool:
     """A regra casa se: a condição de obra é satisfeita E alguma palavra do
     gatilho aparece no(s) campo(s) alvo E nenhuma exceção está presente."""
     if not _condicao_obra_ok(regra, tem_obra):
         return False
-    if regra.campo_alvo == "qualquer":
-        alvo = " ".join(campos.values())
-    else:
-        alvo = campos.get(regra.campo_alvo, "")
-    if any(_norm(e) in alvo for e in regra.excecoes):
+    alvo = _alvo_da_regra(regra, campos)
+    if any(_norm_kw(e) in alvo for e in regra.excecoes):
         return False
-    return any(_norm(p) in alvo for p in regra.palavras)
+    if not any(_norm_kw(p) in alvo for p in regra.palavras):
+        return False
+    # Condição extra (AND) em outro campo
+    if regra.gatilho_extra:
+        alvo_extra = _alvo(regra.campo_extra, campos)
+        if not any(_norm_kw(p) in alvo_extra for p in regra.gatilho_extra):
+            return False
+    return True
 
 
 def _maior_match(regra: Regra, campos: dict) -> int:
     """Tamanho da palavra do gatilho mais longa que casou (especificidade)."""
-    if regra.campo_alvo == "qualquer":
-        alvo = " ".join(campos.values())
-    else:
-        alvo = campos.get(regra.campo_alvo, "")
-    return max((len(_norm(p)) for p in regra.palavras if _norm(p) in alvo), default=0)
+    alvo = _alvo_da_regra(regra, campos)
+    return max((len(_norm_kw(p)) for p in regra.palavras if _norm_kw(p) in alvo), default=0)
 
 
 def _chave_desempate(regra: Regra, campos: dict) -> tuple:
@@ -193,7 +220,8 @@ def classificar(lanc: Lancamento, ctx: Contexto) -> Veredito:
     Resolução: dentre as Regras que casam, vence a de MENOR prioridade.
     """
     campos = _campos_busca(lanc)
-    candidatas = [r for r in ctx.regras if _regra_casa(r, campos, lanc.tem_obra)]
+    candidatas = [r for r in ctx.regras
+                  if r.tipo == lanc.tipo and _regra_casa(r, campos, lanc.tem_obra)]
     if candidatas:
         vencedora = min(candidatas, key=lambda r: _chave_desempate(r, campos))
         return Veredito(

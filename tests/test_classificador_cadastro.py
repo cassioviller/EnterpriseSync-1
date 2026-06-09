@@ -135,6 +135,37 @@ def test_empate_de_prioridade_regra_do_usuario_vence_a_do_sistema():
     assert v.categoria_nome == "Subempreitada"
 
 
+def test_gatilho_extra_exige_segundo_campo_and():
+    """Uma Regra com gatilho_extra só casa se o gatilho principal aparece no
+    campo-alvo E o gatilho extra aparece no campo extra (ex.: 'aliment' na
+    descrição E 'beneficio' no plano)."""
+    regra = Regra(
+        palavras=["aliment"], categoria_id=5, categoria_nome="Benefício Alimentação",
+        campo_alvo="descricao", gatilho_extra=["beneficio"], campo_extra="plano",
+        tipo="SAIDA",
+    )
+    ctx = Contexto(regras=[regra], memoria_exata={})
+
+    # principal + extra presentes → casa
+    com = _lanc(descricao="alimentação da equipe", plano="Benefícios")
+    assert classificar(com, ctx).categoria_nome == "Benefício Alimentação"
+
+    # principal presente, extra ausente → não casa (Pendente)
+    sem = _lanc(descricao="alimentação da equipe", plano="Despesa Operacional")
+    assert classificar(sem, ctx).eh_pendente is True
+
+
+def test_regra_so_casa_lancamento_do_mesmo_tipo():
+    """Uma Regra de ENTRADA não classifica um Lançamento de SAÍDA e vice-versa."""
+    regra_entrada = _regra(["medicao"], 1, "Receita de Obras", tipo="ENTRADA")
+    lanc_saida = _lanc(descricao="medicao da obra", tipo="SAIDA")
+    ctx = Contexto(regras=[regra_entrada], memoria_exata={})
+
+    v = classificar(lanc_saida, ctx)
+
+    assert v.eh_pendente is True  # a regra de ENTRADA não vale para a SAÍDA
+
+
 def test_derivar_macro_da_categoria_nomeada():
     """O macro tipo_categoria é derivado da categoria nomeada (não há cadastro
     de macro separado). Categorias não mapeadas caem em OUTROS."""
