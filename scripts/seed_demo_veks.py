@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # registra app + modelos
 from main import app
-from models import db, Usuario, Funcionario, Fornecedor, Obra
-from services.importacao_excel import _obter_ou_criar_cliente_placeholder
+from models import db, Usuario, Funcionario, Fornecedor, Obra, BancoEmpresa
+from services.importacao_excel import _obter_ou_criar_cliente_placeholder, _normalizar
 
 XLSX = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "1. FLUXO DE CAIXA_Veks Engenharia.xlsx")
@@ -43,6 +43,7 @@ def _coletar():
     wb = openpyxl.load_workbook(XLSX, data_only=True)
     forn = {}        # nome -> tem_diaria
     obras = set()
+    bancos = {}      # nome_normalizado -> nome representativo
     for row in wb["Saída"].iter_rows(min_row=6, values_only=True):
         dv = row[1]
         if not dv or not isinstance(dv, (dt, date)):
@@ -50,30 +51,36 @@ def _coletar():
         fo = str(row[3] or "").strip()
         de = str(row[4] or "").lower()
         cc = str(row[5] or "").strip() if len(row) > 5 else ""
+        bk = str(row[6] or "").strip() if len(row) > 6 else ""
         if fo:
             forn.setdefault(fo, False)
             if "diari" in de or "diári" in de:
                 forn[fo] = True
         if cc and cc != "???" and len(cc) > 2:
             obras.add(cc[:100])
+        if bk and bk != "???":
+            bancos.setdefault(_normalizar(bk).replace("banco ", "").strip(), bk[:100])
     for row in wb["Entrada"].iter_rows(min_row=6, values_only=True):
         dv = row[0]
         if not dv or not isinstance(dv, (dt, date)):
             continue
         cc = str(row[4] or "").strip() if len(row) > 4 else ""
+        bk = str(row[5] or "").strip() if len(row) > 5 else ""
         if cc and cc != "???" and len(cc) > 2:
             obras.add(cc[:100])
+        if bk and bk != "???":
+            bancos.setdefault(_normalizar(bk).replace("banco ", "").strip(), bk[:100])
 
     funcionarios, fornecedores = [], []
     for nome, tem_diaria in forn.items():
         eh_empresa = bool(_EMP.search(nome))
         eh_func = tem_diaria or (bool(_NOMES.search(nome)) and not eh_empresa)
         (funcionarios if eh_func else fornecedores).append(nome)
-    return sorted(obras), sorted(funcionarios), sorted(fornecedores)
+    return sorted(obras), sorted(funcionarios), sorted(fornecedores), bancos
 
 
 def seed(admin_id):
-    obras, funcionarios, fornecedores = _coletar()
+    obras, funcionarios, fornecedores, bancos = _coletar()
     cli_id = _obter_ou_criar_cliente_placeholder(admin_id)
 
     # índices do que já existe (idempotência por nome, case-insensitive)
@@ -83,9 +90,17 @@ def seed(admin_id):
                Funcionario.query.filter_by(admin_id=admin_id).all()}
     obra_ex = {o.nome.strip().lower() for o in
                Obra.query.filter_by(admin_id=admin_id).all()}
+    banco_ex = {_normalizar(b.nome_banco).replace("banco ", "").strip() for b in
+                BancoEmpresa.query.filter_by(admin_id=admin_id).all()}
     seq = Funcionario.query.filter_by(admin_id=admin_id).count() + 1
 
-    n_obra = n_func = n_forn = 0
+    n_obra = n_func = n_forn = n_banco = 0
+    for i, (chave, nome) in enumerate(bancos.items()):
+        if chave in banco_ex:
+            continue
+        db.session.add(BancoEmpresa(admin_id=admin_id, nome_banco=nome,
+                                    agencia="0001", conta=f"{i + 1:06d}", ativo=True))
+        banco_ex.add(chave); n_banco += 1
     for nome in obras:
         if nome.strip().lower() in obra_ex:
             continue
@@ -114,8 +129,9 @@ def seed(admin_id):
 
     db.session.commit()
     return dict(obras=len(obras), funcionarios=len(funcionarios),
-                fornecedores=len(fornecedores),
-                criadas_obras=n_obra, criados_func=n_func, criados_forn=n_forn)
+                fornecedores=len(fornecedores), bancos=len(bancos),
+                criadas_obras=n_obra, criados_func=n_func, criados_forn=n_forn,
+                criados_banco=n_banco)
 
 
 def _resolver_admin(arg):
@@ -135,6 +151,7 @@ if __name__ == "__main__":
             print("admin não encontrado:", sys.argv[1]); sys.exit(1)
         r = seed(admin_id)
         print(f"[seed_demo_veks] admin_id={admin_id}")
+        print(f"  Bancos:       {r['criados_banco']} criados / {r['bancos']} no arquivo")
         print(f"  Obras:        {r['criadas_obras']} criadas / {r['obras']} no arquivo")
         print(f"  Funcionários: {r['criados_func']} criados / {r['funcionarios']} no arquivo")
         print(f"  Fornecedores: {r['criados_forn']} criados / {r['fornecedores']} no arquivo")

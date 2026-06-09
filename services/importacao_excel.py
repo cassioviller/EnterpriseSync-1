@@ -1380,6 +1380,19 @@ def _match_bancos_transferencia(texto, bancos):
     return origem, destino
 
 
+def _match_banco_coluna(valor_banco, bancos):
+    """Casa o texto da coluna BANCO/CONTA de uma linha com um banco cadastrado
+    (substring normalizado, nos dois sentidos). bancos: lista de (id, chave_norm).
+    Devolve o banco_id ou None."""
+    v = _normalizar(str(valor_banco or '')).replace('banco ', '').strip()
+    if not v:
+        return None
+    for bid, chave in bancos:
+        if chave and (chave in v or v in chave):
+            return bid
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Mapeamento Centro de Custo → obra_id (admin_id=63)
 # ---------------------------------------------------------------------------
@@ -1876,6 +1889,7 @@ class ImportacaoFluxoCaixa:
                     'obra_id': obra_id,
                     'valor': valor,
                     'status': status,
+                    'banco_id': _match_banco_coluna(row[5] if len(row) > 5 else '', bancos_match),
                     'tipo_categoria': cat_ent,
                     'categoria_fluxo_caixa_id': None,  # será resolvido pela view
                     'entidade_tipo': ent_tipo if _confirmed_ent else None,
@@ -1974,6 +1988,8 @@ class ImportacaoFluxoCaixa:
                     if cat is None:
                         precisa_revisao = True
 
+                banco_id_row = _match_banco_coluna(
+                    row[6] if len(row) > 6 else '', bancos_match)
                 registro = {
                     'tipo': 'saida',
                     'data': str(data_obj),
@@ -1984,6 +2000,7 @@ class ImportacaoFluxoCaixa:
                     'obra_id': obra_id,
                     'valor': valor,
                     'status': status,
+                    'banco_id': banco_id_row,
                     'tipo_categoria': cat,
                     'eh_reembolso': eh_reembolso,
                     'entidade_tipo': ent_tipo if _confirmed_ent else None,
