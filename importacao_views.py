@@ -528,6 +528,79 @@ def fluxo_caixa_upload():
     )
 
 
+@importacao_bp.route('/fluxo-caixa/classificar-termo', methods=['POST'])
+@login_required
+def fluxo_caixa_classificar_termo():
+    """Loop ao vivo (§7.4): cria uma Regra (origem='usuario') para o Termo e
+    RECLASSIFICA o payload em memória, devolvendo as seções + a fila atualizadas —
+    sem re-upload. Payload-como-estado: recebe e devolve o payload assinado (HMAC)."""
+    admin_id = get_admin_id_robusta()
+    data = request.get_json(silent=True) or request.form
+    token = data.get('dados_json', '')
+    termo = (data.get('termo') or '').strip()
+    tipo = (data.get('tipo') or 'SAIDA').upper()
+    try:
+        categoria_id = int(data.get('categoria_id'))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'erro': 'categoria_id inválido'}), 400
+
+    rows = _verificar_payload(token, admin_id, 'fluxo_caixa')
+    if rows is None or not rows:
+        return jsonify({'ok': False, 'erro': 'Preview inválido ou expirado.'}), 400
+    if not termo:
+        return jsonify({'ok': False, 'erro': 'Termo vazio.'}), 400
+    if tipo not in ('ENTRADA', 'SAIDA'):
+        return jsonify({'ok': False, 'erro': 'Tipo inválido.'}), 400
+
+    from models import CategoriaFluxoCaixa, PalavraChaveCategoria
+    from services.classificador_cadastro import _norm as _norm_cat, Contexto
+    from services.seed_palavras_chave import regras_do_tenant, carregar_memoria_exata
+    from services.importacao_excel import classificar_preview
+
+    # A categoria-alvo precisa ser do próprio tenant (ownership).
+    cat = CategoriaFluxoCaixa.query.filter_by(id=categoria_id, admin_id=admin_id).first()
+    if not cat:
+        return jsonify({'ok': False, 'erro': 'Categoria não encontrada.'}), 404
+
+    termo_norm = _norm_cat(termo)
+    # Cria a Regra do usuário (campo_alvo='fornecedor', prioridade=40). Idempotente:
+    # não duplica se a mesma regra já existir.
+    ja_existe = PalavraChaveCategoria.query.filter_by(
+        admin_id=admin_id, palavras=termo_norm, campo_alvo='fornecedor',
+        tipo=tipo, origem='usuario').first()
+    if not ja_existe:
+        db.session.add(PalavraChaveCategoria(
+            admin_id=admin_id, categoria_fluxo_caixa_id=categoria_id,
+            palavras=termo_norm, campo_alvo='fornecedor', prioridade=40,
+            tipo=tipo, origem='usuario', ativo=True))
+        db.session.commit()
+
+    payload = rows[0]
+    entradas = payload.get('entradas', [])
+    saidas = payload.get('saidas_auto', []) + payload.get('saidas_manual', [])
+
+    cat_id_por_nome = {_norm_cat(c.nome): c.id for c in
+                       CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()}
+    ctx = Contexto(regras=regras_do_tenant(admin_id),
+                   memoria_exata=carregar_memoria_exata(admin_id))
+    cls = classificar_preview(entradas, saidas, ctx, cat_id_por_nome)
+
+    novo_payload = {
+        'entradas': cls['entradas'],
+        'saidas_auto': cls['saidas_auto'],
+        'saidas_manual': cls['saidas_manual'],
+        'transferencias': payload.get('transferencias', []),
+    }
+    return jsonify({
+        'ok': True,
+        'dados_json': _assinar_payload([novo_payload], admin_id, 'fluxo_caixa'),
+        'entradas': cls['entradas'],
+        'saidas_auto': cls['saidas_auto'],
+        'saidas_manual': cls['saidas_manual'],
+        'sugestoes': cls['sugestoes'],
+    })
+
+
 @importacao_bp.route('/fluxo-caixa/confirmar', methods=['POST'])
 @login_required
 def fluxo_caixa_confirmar():
