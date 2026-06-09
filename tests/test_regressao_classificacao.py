@@ -88,26 +88,39 @@ def _classificar_novo(ctx, tipo, plano, descricao, entidade, tem_obra):
 def test_motor_novo_reproduz_o_antigo_no_excel_real(lancamentos):
     ctx = Contexto(regras=regras_sistema(), memoria_exata={})
 
-    divergencias = Counter()      # (antigo, novo) → contagem
+    # Invariante RESCUE-ONLY: o motor novo pode MELHORAR (resgatar um lançamento
+    # que o legado jogou no fallback genérico para uma categoria específica), mas
+    # NUNCA pode mudar uma classificação específica do legado. Regras de resgate são
+    # de baixa precedência (ficam por último no seed), então só pegam o que cairia
+    # em 'Outras Saídas'/'Outros Recebimentos'. Ver seed _SAIDA (resgates curados).
+    FALLBACK = {FALLBACK_ENTRADA, FALLBACK_SAIDA}
+
+    resgates = Counter()      # (fallback antigo, novo específico) → contagem — PERMITIDO
+    regressoes = Counter()    # (antigo específico, novo) → contagem — PROIBIDO
     exemplos = {}
     total = 0
-    iguais = 0
 
     for tipo, plano, descricao, entidade, tem_obra in lancamentos:
         total += 1
         antigo = _classificar_categoria_nomeada(tipo, plano, descricao, entidade, tem_obra)
         novo = _classificar_novo(ctx, tipo, plano, descricao, entidade, tem_obra)
         if antigo == novo:
-            iguais += 1
+            continue
+        if antigo in FALLBACK:
+            resgates[(antigo, novo)] += 1          # legado desistiu; novo classificou → OK
         else:
-            divergencias[(antigo, novo)] += 1
-            exemplos.setdefault((antigo, novo), (descricao[:60], entidade[:30], plano[:30]))
+            regressoes[(antigo, novo)] += 1        # legado tinha categoria específica → NÃO pode mudar
+        exemplos.setdefault((antigo, novo), (descricao[:60], entidade[:30], plano[:30]))
 
-    n_div = total - iguais
-    if n_div:
-        print(f"\n=== REGRESSÃO: {iguais}/{total} iguais — {n_div} divergências ===")
-        for (antigo, novo), n in divergencias.most_common(30):
-            ex = exemplos[(antigo, novo)]
-            print(f"  {n:4d}  [{antigo}] → [{novo}]  ex: {ex}")
+    if resgates:
+        print(f"\n=== RESGATES (melhorias, permitidos): {sum(resgates.values())} ===")
+        for (antigo, novo), n in resgates.most_common(20):
+            print(f"  {n:4d}  [{antigo}] → [{novo}]  ex: {exemplos[(antigo, novo)]}")
+    if regressoes:
+        print(f"\n=== REGRESSÕES (proibidas): {sum(regressoes.values())} ===")
+        for (antigo, novo), n in regressoes.most_common(30):
+            print(f"  {n:4d}  [{antigo}] → [{novo}]  ex: {exemplos[(antigo, novo)]}")
 
-    assert n_div == 0, f"{n_div}/{total} lançamentos classificados diferente do motor antigo"
+    n_reg = sum(regressoes.values())
+    assert n_reg == 0, (f"{n_reg}/{total} classificações ESPECÍFICAS do legado foram "
+                        f"alteradas (regressão). Resgates de fallback são permitidos.")
