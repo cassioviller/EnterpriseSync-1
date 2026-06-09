@@ -3990,6 +3990,7 @@ def executar_migracoes():
             (186, "Fix #1 Fase 1 — BancoEmpresa: data_saldo_inicial + índice fluxo_caixa(banco_id, data_movimento)", _migration_186_banco_data_saldo_inicial),
             (188, "Fix #4 — FluxoCaixa.valor: converter FLOAT8 → NUMERIC(15,2) com arredondamento", _migration_188_fluxo_caixa_valor_numeric),
             (189, "Bloco 3 — BDI completo (TCU): colunas de BDI em configuracao_empresa (default 0/60/90) e override nullable em propostas_comerciais", _migration_189_bdi_completo),
+            (190, "Cadastro de Regras de Classificação de Fluxo de Caixa: palavra_chave_categoria + palavra_chave_sugestao + correcao_classificacao (ADR-0002)", migration_190_palavra_chave_classificacao),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -12196,6 +12197,85 @@ def migration_166_catalogos_auxiliares():
     db.session.commit()
     logger.info("=" * 80)
     logger.info("✅ MIGRAÇÃO 166 CONCLUÍDA: Catálogos Auxiliares implantados!")
+    logger.info("=" * 80)
+
+
+def migration_190_palavra_chave_classificacao():
+    """
+    Migration 190 — Cadastro de Regras de Classificação de Fluxo de Caixa.
+    Cria (idempotente):
+      - palavra_chave_categoria  (Regra de Classificação)
+      - palavra_chave_sugestao   (Sugestão da fila por Termo)
+      - correcao_classificacao   (Correção + Memória Exata, única por admin+texto)
+    Ver ADR-0002 e spec 2026-06-09 §4. Tabelas também nascem do db.create_all();
+    esta migration garante paridade em ambientes que não o rodam.
+    """
+    logger.info("=" * 80)
+    logger.info("🏷️  MIGRAÇÃO 190: Regras de Classificação de Fluxo de Caixa")
+    logger.info("=" * 80)
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS palavra_chave_categoria (
+            id SERIAL PRIMARY KEY,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            categoria_fluxo_caixa_id INTEGER NOT NULL REFERENCES categoria_fluxo_caixa(id),
+            palavras TEXT NOT NULL,
+            campo_alvo VARCHAR(40) NOT NULL DEFAULT 'qualquer',
+            excecoes TEXT,
+            condicao_obra VARCHAR(20) NOT NULL DEFAULT 'indiferente',
+            prioridade INTEGER NOT NULL DEFAULT 50,
+            tipo VARCHAR(10) NOT NULL DEFAULT 'SAIDA',
+            origem VARCHAR(10) NOT NULL DEFAULT 'usuario',
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_pck_admin_ativo_tipo_prio
+        ON palavra_chave_categoria(admin_id, ativo, tipo, prioridade)
+    """))
+    logger.info("✅ Tabela palavra_chave_categoria criada/verificada")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS palavra_chave_sugestao (
+            id SERIAL PRIMARY KEY,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            termo VARCHAR(120) NOT NULL,
+            ocorrencias INTEGER NOT NULL DEFAULT 0,
+            soma_valor NUMERIC(15,2) NOT NULL DEFAULT 0,
+            exemplo VARCHAR(300),
+            tipo VARCHAR(10) NOT NULL DEFAULT 'SAIDA',
+            dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_pcs_admin_tipo
+        ON palavra_chave_sugestao(admin_id, tipo)
+    """))
+    logger.info("✅ Tabela palavra_chave_sugestao criada/verificada")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS correcao_classificacao (
+            id SERIAL PRIMARY KEY,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            texto_norm VARCHAR(500) NOT NULL,
+            categoria_fluxo_caixa_id INTEGER NOT NULL REFERENCES categoria_fluxo_caixa(id),
+            termo_origem VARCHAR(120),
+            tipo VARCHAR(10) NOT NULL DEFAULT 'SAIDA',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    db.session.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_correcao_admin_texto
+        ON correcao_classificacao(admin_id, texto_norm)
+    """))
+    logger.info("✅ Tabela correcao_classificacao criada/verificada")
+
+    db.session.commit()
+    logger.info("=" * 80)
+    logger.info("✅ MIGRAÇÃO 190 CONCLUÍDA: Regras de Classificação implantadas!")
     logger.info("=" * 80)
 
 

@@ -6954,6 +6954,81 @@ class CategoriaFluxoCaixa(db.Model):
         db.session.flush()
 
 
+class PalavraChaveCategoria(db.Model):
+    """Regra de Classificação: associação por tenant entre um Gatilho (palavras) e
+    uma Categoria de destino, com Prioridade e condições. Ensina o sistema a
+    categorizar Lançamentos da importação de Fluxo de Caixa automaticamente.
+    Ver CONTEXT.md (seção Importação / Classificação) e ADR-0002."""
+    __tablename__ = 'palavra_chave_categoria'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    categoria_fluxo_caixa_id = db.Column(
+        db.Integer, db.ForeignKey('categoria_fluxo_caixa.id'), nullable=False)
+    # Gatilho: uma ou mais palavras separadas por vírgula (semântica "qualquer uma")
+    palavras = db.Column(db.Text, nullable=False)
+    # Onde buscar: qualquer | descricao | fornecedor | plano (aceita múltiplos por vírgula)
+    campo_alvo = db.Column(db.String(40), nullable=False, default='qualquer')
+    # Exceções: palavras que, se presentes, anulam a regra (OU)
+    excecoes = db.Column(db.Text, nullable=True)
+    # Condição de obra: indiferente | com_obra | sem_obra
+    condicao_obra = db.Column(db.String(20), nullable=False, default='indiferente')
+    # Prioridade: menor decide primeiro (mais específica)
+    prioridade = db.Column(db.Integer, nullable=False, default=50)
+    tipo = db.Column(db.String(10), nullable=False, default='SAIDA')  # ENTRADA | SAIDA
+    origem = db.Column(db.String(10), nullable=False, default='usuario')  # sistema | usuario
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('idx_pck_admin_ativo_tipo_prio', 'admin_id', 'ativo', 'tipo', 'prioridade'),
+    )
+
+
+class PalavraChaveSugestao(db.Model):
+    """Sugestão: termo recorrente entre os Pendentes de Classificação de uma
+    importação, agregado por impacto, que o usuário pode transformar em Regra.
+    Refeita a cada importação para o tenant. Ver CONTEXT.md."""
+    __tablename__ = 'palavra_chave_sugestao'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    termo = db.Column(db.String(120), nullable=False)
+    ocorrencias = db.Column(db.Integer, nullable=False, default=0)
+    soma_valor = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    exemplo = db.Column(db.String(300))
+    tipo = db.Column(db.String(10), nullable=False, default='SAIDA')  # ENTRADA | SAIDA
+    dismissed = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('idx_pcs_admin_tipo', 'admin_id', 'tipo'),
+    )
+
+
+class CorrecaoClassificacao(db.Model):
+    """Correção + Memória Exata: decisão de categoria que o usuário fez em um
+    Lançamento individual (no drill-down de um Termo). Reaplicada automaticamente
+    quando um Lançamento de texto idêntico reaparece. Chaveada por
+    (admin_id, texto_norm). Ver CONTEXT.md (Correção, Memória Exata) e spec §4."""
+    __tablename__ = 'correcao_classificacao'
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    # descrição+fornecedor normalizados — chave da Memória Exata
+    texto_norm = db.Column(db.String(500), nullable=False)
+    categoria_fluxo_caixa_id = db.Column(
+        db.Integer, db.ForeignKey('categoria_fluxo_caixa.id'), nullable=False)
+    termo_origem = db.Column(db.String(120), nullable=True)
+    tipo = db.Column(db.String(10), nullable=False, default='SAIDA')  # ENTRADA | SAIDA
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('uq_correcao_admin_texto', 'admin_id', 'texto_norm', unique=True),
+    )
+
+
 class CategoriaFornecedor(db.Model):
     """Categorias de fornecedor (M2M com Fornecedor)."""
     __tablename__ = 'categoria_fornecedor'
