@@ -12,7 +12,7 @@ altera classificações.
 
 ## FASE A — Fundação (modelos + tabelas)
 
-### Passo 1 — Modelos `PalavraChaveCategoria` e `PalavraChaveSugestao`
+### Passo 1 — Modelos `PalavraChaveCategoria`, `PalavraChaveSugestao`, `CorrecaoClassificacao`
 **Arquivo:** `models.py` (logo após `class CategoriaFluxoCaixa`, ~L6863)
 
 - `PalavraChaveCategoria` com campos da §4 do spec: `id`, `admin_id` (FK usuario),
@@ -23,13 +23,18 @@ altera classificações.
   `updated_at`.
 - `PalavraChaveSugestao`: `id`, `admin_id`, `termo`, `ocorrencias`, `soma_valor`
   (Numeric), `exemplo`, `tipo`, `dismissed` (Boolean default False), `created_at`.
-- `__tablename__` = `palavra_chave_categoria` / `palavra_chave_sugestao`.
+- `CorrecaoClassificacao` (Correção + Memória Exata): `id`, `admin_id`, `texto_norm`
+  (String), `categoria_fluxo_caixa_id` (FK), `termo_origem` (String, null), `tipo`
+  (String), `created_at`. Índice **único** `(admin_id, texto_norm)`.
+- `__tablename__` = `palavra_chave_categoria` / `palavra_chave_sugestao` /
+  `correcao_classificacao`.
 
-### Passo 2 — Migration das duas tabelas
+### Passo 2 — Migration das três tabelas
 **Arquivo:** `migrations.py`
 
-- Dois blocos `CREATE TABLE IF NOT EXISTS` (padrão do arquivo), com índice
-  `(admin_id, ativo, tipo, prioridade)` em `palavra_chave_categoria`.
+- Três blocos `CREATE TABLE IF NOT EXISTS` (padrão do arquivo): índice
+  `(admin_id, ativo, tipo, prioridade)` em `palavra_chave_categoria`; índice único
+  `(admin_id, texto_norm)` em `correcao_classificacao`.
 - Registrar na sequência de execução de migrations como os demais.
 
 ---
@@ -39,10 +44,11 @@ altera classificações.
 ### Passo 3 — Função de classificação por cadastro
 **Arquivo novo:** `services/classificador_cadastro.py`
 
-- `classificar_por_cadastro(tipo, plano, descricao, fornecedor, tem_obra, regras)`
-  retornando `(categoria_id, categoria_nome)` ou `None`. Lógica da §5 do spec:
+- `classificar_por_cadastro(tipo, plano, descricao, fornecedor, tem_obra, regras,
+  correcoes)` retornando `(categoria_id, categoria_nome)` ou `None`. Lógica da §5:
   filtro de candidatos + seleção por menor prioridade + desempates
-  (especificidade → origem usuário → campo específico).
+  (especificidade → origem usuário → campo específico). **Ordem de resolução:**
+  Regra → **Memória Exata** (`correcoes` por `texto_norm`) → `None`.
 - Reaproveitar `_normalizar` de `importacao_excel.py` (mover para `utils` comum ou
   importar).
 - `MACRO_POR_CATEGORIA: dict[str,str]` — mapa categoria nomeada → `tipo_categoria`
@@ -105,72 +111,94 @@ altera classificações.
 
 ---
 
-## FASE E — Motor de sugestões
+## FASE E — Fila por Termo, sugestões e aprendizado
 
-### Passo 9 — Função de sugestões
+### Passo 9 — Função de sugestões (fila por Termo)
 **Arquivo:** `services/classificador_cadastro.py`
 
-- `gerar_sugestoes(lancamentos_nao_classificados, regras_existentes)`: tokeniza
-  fornecedor + descrição (n-gramas 1–3), descarta termos já cobertos, agrega por
-  termo (`ocorrencias`, `soma_valor`, `exemplo`), ordena por `ocorrencias × soma_valor`.
+- `gerar_sugestoes(pendentes, regras_existentes)`: tokeniza fornecedor + descrição
+  (n-gramas 1–3), descarta termos já cobertos, agrega por termo (`ocorrencias`,
+  `soma_valor`, `exemplo`), ordena por `ocorrencias × soma_valor`.
 
 ### Passo 10 — Persistência das sugestões no preview
 **Arquivo:** `services/importacao_excel.py` (fim de `processar`) + retorno do dict
 
-- Após classificar, rodar `gerar_sugestoes` sobre os não classificados e gravar em
-  `PalavraChaveSugestao` (substituindo as do tenant). Incluir `sugestoes` no dict de
-  retorno.
+- Após classificar, rodar `gerar_sugestoes` sobre os Pendentes e gravar em
+  `PalavraChaveSugestao` (substituindo as do tenant). Incluir `sugestoes` e os
+  **lançamentos individuais por termo** no dict de retorno (para o drill-down §7.2).
 
-### Passo 11 — Testes das sugestões
+### Passo 11 — Correção, Memória Exata e regra refinada
+**Arquivos:** `services/classificador_cadastro.py`
+
+- `registrar_correcao(admin_id, lancamento, categoria_id)`: grava
+  `CorrecaoClassificacao` (`texto_norm`, `termo_origem`), upsert por
+  `(admin_id, texto_norm)`.
+- `sugerir_regra_refinada(correcao, regra_conflitante)`: deriva o token distintivo e
+  monta a Sugestão `gatilho_refinado → categoria` com `prioridade` menor que a regra do
+  termo (vence o conflito). **Não grava regra** — só devolve a proposta.
+
+### Passo 12 — Testes de sugestões + aprendizado
 **Arquivo:** `tests/test_classificador_cadastro.py`
 
-- Agregação correta; exclusão de termos já cobertos; ordenação por frequência×valor.
+- Agregação/ordenação/exclusão de termos cobertos; Memória Exata reaplica em texto
+  idêntico; Correção não cria regra; regra refinada só efetiva com confirmação.
 
 ---
 
-## FASE F — UI (CRUD + sugestões)
+## FASE F — Loop ao vivo no preview (a experiência que o usuário pediu)
 
-### Passo 12 — Rotas CRUD
+### Passo 13 — Lançamentos vivos no servidor durante a sessão
+**Arquivos:** `importacao_views.py`, `services/importacao_excel.py`
+
+- Manter os lançamentos individuais do preview acessíveis no servidor durante a sessão
+  (token assinado já existente + cache server-side), para drill-down e reclassificação
+  ao vivo **sem re-upload** (§7.2/§7.4).
+
+### Passo 14 — Endpoint: classificar Termo (cria Regra + reclassifica ao vivo)
+**Arquivo:** `importacao_views.py`
+
+- `POST /importacao/fluxo-caixa/classificar-termo`: cria
+  `PalavraChaveCategoria(origem='usuario', campo_alvo='fornecedor', prioridade=40)`,
+  reclassifica o payload em memória e devolve a fila + seções atualizadas.
+
+### Passo 15 — Endpoint: corrigir linha (Correção + oferta de regra refinada)
+**Arquivo:** `importacao_views.py`
+
+- `POST /importacao/fluxo-caixa/corrigir-linha`: chama `registrar_correcao`, aplica à
+  linha, devolve a Sugestão de regra refinada (`sugerir_regra_refinada`).
+- `POST /importacao/fluxo-caixa/confirmar-regra-refinada`: efetiva a regra (1 clique).
+
+### Passo 16 — UI do preview: fila por Termo + drill-down + correções
+**Arquivo:** `templates/importacao/preview_fluxo.html`
+
+- Fila agrupada por Termo (ordenada por impacto); clique expande os lançamentos;
+  dropdown de categoria por termo e por linha; reclassificação ao vivo (JS).
+- **Light-only** conforme `DESIGN.md`; faixa de cor semântica por bloco
+  (entrada=verde, saída=azul, transferência=ciano).
+
+## FASE F2 — Página de cadastro (CRUD das Regras)
+
+### Passo 17 — Rotas CRUD
 **Arquivo:** `views/catalogos_views.py`
 
-- `GET /catalogos/palavras-chave` (lista + filtros + sugestões),
-  `POST .../criar`, `POST .../<id>/editar`, `POST .../<id>/toggle`,
-  `POST .../<id>/excluir`, `POST .../sugestoes/cadastrar` (lote).
-- Validação de tenant em todas (padrão do arquivo).
+- `GET /catalogos/palavras-chave` (lista + filtros + sugestões), `POST .../criar`,
+  `POST .../<id>/editar`, `POST .../<id>/toggle`, `POST .../<id>/excluir`,
+  `POST .../sugestoes/cadastrar` (lote). Validação de tenant em todas.
+- **Detecção de conflito** no salvar (mesma palavra + mesma prioridade +
+  especificidade, categoria diferente → avisa, não grava silenciosamente).
 
-### Passo 13 — Template da página
-**Arquivos:** `templates/catalogos/palavras_chave.html` (+ parcial de form/modal)
+### Passo 18 — Template da página + menu
+**Arquivos:** `templates/catalogos/palavras_chave.html` (+ parcial), menu de catálogos
 
-- Portar o mockup `static/mockups/palavras_chave_mockup.html` para Jinja, ligado a
-  dados reais. Filtros por busca/categoria/origem; paginação.
-
-### Passo 14 — Detecção de conflito no salvar
-**Arquivo:** `views/catalogos_views.py` (criar/editar)
-
-- Antes de gravar: se existir regra com mesma palavra + mesma prioridade + mesma
-  especificidade e categoria diferente → `flash` de aviso e não grava (ou pede
-  confirmação).
-
-### Passo 15 — Cadastrar sugestões em lote + re-classificar preview
-**Arquivos:** `views/catalogos_views.py` + `importacao_views.py`
-
-- `sugestoes/cadastrar` cria `PalavraChaveCategoria(origem='usuario',
-  campo_alvo='fornecedor', prioridade=40)` para os termos marcados; marca as
-  `PalavraChaveSugestao` como `dismissed`.
-- No preview de importação: botão que re-roda a classificação do payload em memória
-  e atualiza as seções auto/manual.
-
-### Passo 16 — Painel de sugestões no preview + entrada no menu
-**Arquivos:** `templates/importacao/preview_fluxo.html`, menu de catálogos
-
-- Incluir o painel de sugestões no preview (dados já disponíveis).
+- Portar o mockup para Jinja, **light-only** (corrigir o dark do mockup), dados reais,
+  filtros (busca/categoria/origem), paginação. Não expor nomes de tabela/modelo na UI.
 - Link "Palavras-Chave" na landing `/catalogos/` e no menu lateral.
 
 ---
 
 ## FASE G — Limpeza
 
-### Passo 17 — Aposentar o hardcode
+### Passo 19 — Aposentar o hardcode
 **Arquivo:** `services/importacao_excel.py`
 
 - Após regressão verde em produção: remover `_classificar_categoria_nomeada`,
@@ -178,7 +206,7 @@ altera classificações.
   `_categoria_por_plano`, `_classificar_keywords` (manter só o que o motor novo usar).
 - Manter cópia do oráculo apenas no teste de regressão (ou removê-lo também).
 
-### Passo 18 — Remover o mockup temporário
+### Passo 20 — Remover o mockup temporário
 **Arquivos:** `templates/importacao/index.html`, `static/mockups/`, `docs/mockups/`
 
 - Remover o botão "Prévia: Palavras-Chave" e os arquivos de mockup (a página real os
@@ -191,5 +219,6 @@ altera classificações.
 1. Fases A–C entregam o motor + seed + **regressão verde** (nada muda na prática
    ainda — segurança máxima).
 2. Fase D liga no import; rodar uma importação real e conferir contagens.
-3. Fases E–F entregam a experiência (sugestões + tela).
+3. Fase E entrega o cérebro (sugestões + aprendizado); Fases F/F2 entregam a
+   experiência (loop ao vivo no preview + página de cadastro).
 4. Fase G limpa.
