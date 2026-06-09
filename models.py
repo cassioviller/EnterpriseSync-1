@@ -6971,6 +6971,9 @@ class PalavraChaveCategoria(db.Model):
     campo_alvo = db.Column(db.String(40), nullable=False, default='qualquer')
     # Exceções: palavras que, se presentes, anulam a regra (OU)
     excecoes = db.Column(db.Text, nullable=True)
+    # Condição extra (AND): gatilho que também precisa aparecer em campo_extra
+    gatilho_extra = db.Column(db.Text, nullable=True)
+    campo_extra = db.Column(db.String(40), nullable=False, default='qualquer')
     # Condição de obra: indiferente | com_obra | sem_obra
     condicao_obra = db.Column(db.String(20), nullable=False, default='indiferente')
     # Prioridade: menor decide primeiro (mais específica)

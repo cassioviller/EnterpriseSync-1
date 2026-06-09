@@ -16,7 +16,7 @@ RESIDUOS_NAO_MIGRAVEIS e são medidas pelo teste de regressão.
 
 Ver ADR-0002 e spec 2026-06-09 §6.
 """
-from services.classificador_cadastro import Regra
+from services.classificador_cadastro import Regra, _norm
 
 
 # Cada item: (categoria_nome, palavras, campo_alvo, excecoes, condicao_obra)
@@ -123,3 +123,79 @@ def regras_sistema():
     """Lista de Regra (objetos do classificador) reproduzindo o hardcode.
     categoria_id=0 (placeholder); o seed por tenant resolve o id real."""
     return _build(_ENTRADA, 'ENTRADA') + _build(_SAIDA, 'SAIDA')
+
+
+# ── Persistência por tenant ──────────────────────────────────────────────────
+
+def _join(lista):
+    return ','.join(lista) if lista else None
+
+
+def _split(texto):
+    return texto.split(',') if texto else []
+
+
+def seed_para_admin(admin_id, commit=False):
+    """Persiste REGRAS_SISTEMA como PalavraChaveCategoria (origem='sistema') para
+    o tenant, resolvendo categoria_nome → categoria_fluxo_caixa_id. Idempotente:
+    re-rodar não duplica (chave: prioridade+tipo+palavras+campo_alvo). Regras cuja
+    categoria não existe no tenant são ignoradas. Retorna o nº de regras criadas."""
+    from models import db, CategoriaFluxoCaixa, PalavraChaveCategoria
+
+    cat_id_por_nome = {
+        _norm(c.nome): c.id
+        for c in CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id, ativo=True).all()
+    }
+    existentes = {
+        (r.prioridade, r.tipo, r.palavras, r.campo_alvo)
+        for r in PalavraChaveCategoria.query.filter_by(
+            admin_id=admin_id, origem='sistema').all()
+    }
+
+    criadas = 0
+    for regra in regras_sistema():
+        cid = cat_id_por_nome.get(_norm(regra.categoria_nome))
+        if not cid:
+            continue
+        palavras_str = ','.join(regra.palavras)
+        chave = (regra.prioridade, regra.tipo, palavras_str, regra.campo_alvo)
+        if chave in existentes:
+            continue
+        db.session.add(PalavraChaveCategoria(
+            admin_id=admin_id, categoria_fluxo_caixa_id=cid,
+            palavras=palavras_str, campo_alvo=regra.campo_alvo,
+            excecoes=_join(regra.excecoes),
+            gatilho_extra=_join(regra.gatilho_extra), campo_extra=regra.campo_extra,
+            condicao_obra=regra.condicao_obra, prioridade=regra.prioridade,
+            tipo=regra.tipo, origem='sistema', ativo=True,
+        ))
+        existentes.add(chave)
+        criadas += 1
+
+    db.session.flush()
+    if commit:
+        db.session.commit()
+    return criadas
+
+
+def regras_do_tenant(admin_id):
+    """Carrega as Regras de Classificação ativas do tenant como objetos Regra
+    (consumível pelo classificador)."""
+    from models import CategoriaFluxoCaixa, PalavraChaveCategoria
+
+    nome_por_id = {
+        c.id: c.nome
+        for c in CategoriaFluxoCaixa.query.filter_by(admin_id=admin_id).all()
+    }
+    regras = []
+    for r in PalavraChaveCategoria.query.filter_by(admin_id=admin_id, ativo=True).all():
+        regras.append(Regra(
+            palavras=_split(r.palavras),
+            categoria_id=r.categoria_fluxo_caixa_id,
+            categoria_nome=nome_por_id.get(r.categoria_fluxo_caixa_id, ''),
+            campo_alvo=r.campo_alvo, excecoes=_split(r.excecoes),
+            condicao_obra=r.condicao_obra, prioridade=r.prioridade,
+            origem=r.origem, tipo=r.tipo,
+            gatilho_extra=_split(r.gatilho_extra), campo_extra=r.campo_extra,
+        ))
+    return regras

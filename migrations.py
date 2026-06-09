@@ -12222,6 +12222,8 @@ def migration_190_palavra_chave_classificacao():
             palavras TEXT NOT NULL,
             campo_alvo VARCHAR(40) NOT NULL DEFAULT 'qualquer',
             excecoes TEXT,
+            gatilho_extra TEXT,
+            campo_extra VARCHAR(40) NOT NULL DEFAULT 'qualquer',
             condicao_obra VARCHAR(20) NOT NULL DEFAULT 'indiferente',
             prioridade INTEGER NOT NULL DEFAULT 50,
             tipo VARCHAR(10) NOT NULL DEFAULT 'SAIDA',
