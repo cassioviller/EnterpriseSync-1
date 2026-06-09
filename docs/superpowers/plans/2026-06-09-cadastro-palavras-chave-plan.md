@@ -41,18 +41,28 @@ altera classificações.
 
 ## FASE B — Motor de matching (puro, testável, ainda não ligado)
 
-### Passo 3 — Função de classificação por cadastro
+### Passo 3 — Classificador profundo (devolve Veredito)
 **Arquivo novo:** `services/classificador_cadastro.py`
 
-- `classificar_por_cadastro(tipo, plano, descricao, fornecedor, tem_obra, regras,
-  correcoes)` retornando `(categoria_id, categoria_nome)` ou `None`. Lógica da §5:
-  filtro de candidatos + seleção por menor prioridade + desempates
-  (especificidade → origem usuário → campo específico). **Ordem de resolução:**
-  Regra → **Memória Exata** (`correcoes` por `texto_norm`) → `None`.
+- Interface `classificar(lancamento, contexto) -> Veredito`, onde `Veredito` tem
+  `categoria_id`, `categoria_nome`, `origem_decisao` (`regra|memoria_exata|fallback`),
+  `eh_pendente`. **A ordem de resolução (Regra → Memória Exata → Pendente), o desempate
+  por prioridade e a decisão auto/Pendente vivem DENTRO do módulo** — `processar()` só
+  consome o veredito (decisão da review técnica, §5 do spec).
+- Filtro de candidatos + menor prioridade + desempates (especificidade → origem usuário
+  → campo específico).
 - Reaproveitar `_normalizar` de `importacao_excel.py` (mover para `utils` comum ou
   importar).
 - `MACRO_POR_CATEGORIA: dict[str,str]` — mapa categoria nomeada → `tipo_categoria`
-  macro (substitui o cadastro de macro). Função `derivar_macro(categoria_nome)`.
+  macro. Função `derivar_macro(categoria_nome)`.
+
+### Passo 3b — Leitor de Planilha (separar Parse de Classify)
+**Arquivos:** `services/importacao_excel.py` (extrair) ou novo `services/leitor_fluxo.py`
+
+- Extrair a leitura do Excel para `ler(workbook, periodo) -> list[Lançamento]` — só
+  openpyxl, **sem DB e sem classificação**. `processar()` passa a ser cola: carrega
+  contexto + chama Leitor + Classificador (§5 do spec). Parse testável com um `.xlsx`
+  minúsculo, sem app context.
 
 ### Passo 4 — Testes unitários do motor
 **Arquivo novo:** `tests/test_classificador_cadastro.py`
@@ -147,12 +157,14 @@ altera classificações.
 
 ## FASE F — Loop ao vivo no preview (a experiência que o usuário pediu)
 
-### Passo 13 — Lançamentos vivos no servidor durante a sessão
-**Arquivos:** `importacao_views.py`, `services/importacao_excel.py`
+### Passo 13 — Estado do preview: payload-como-estado
+**Arquivos:** `importacao_views.py`
 
-- Manter os lançamentos individuais do preview acessíveis no servidor durante a sessão
-  (token assinado já existente + cache server-side), para drill-down e reclassificação
-  ao vivo **sem re-upload** (§7.2/§7.4).
+- **Decisão da review técnica:** usar **payload-como-estado** — cada ação do loop ao
+  vivo re-envia o payload assinado (HMAC, mecanismo já existente), o servidor
+  reclassifica em memória e devolve o delta. **Sem store/cache server-side novo.**
+  O payload passa a incluir os lançamentos individuais (para drill-down).
+- Se o volume virar gargalo, migrar depois para `token → Lançamentos` server-side.
 
 ### Passo 14 — Endpoint: classificar Termo (cria Regra + reclassifica ao vivo)
 **Arquivo:** `importacao_views.py`

@@ -113,8 +113,21 @@ Sugestões de regra refinada.
 
 ## 5. Motor de matching (substitui `_classificar_categoria_nomeada`)
 
-Função pura `classificar_por_cadastro(tipo, plano, descricao, fornecedor, tem_obra,
-regras) -> (categoria_id, categoria_nome) | None`:
+> **Arquitetura (rev. da review técnica):** o classificador é um **módulo profundo** que
+> devolve um **Veredito** — não uma "categoria ou None" que o chamador precise
+> re-interpretar. O Veredito carrega `categoria_id`, `categoria_nome`,
+> `origem_decisao` (`regra` | `memoria_exata` | `fallback`) e `eh_pendente`. A **ordem
+> de resolução** (Regra → Memória Exata → Pendente) e a decisão **auto vs Pendente**
+> vivem **dentro** do módulo, não em `processar()`. Assim a superfície de teste é o
+> veredito (`assert classificar(x).eh_pendente`), e `processar()` só consome.
+>
+> **Separação Parse/Classify:** a leitura do Excel vira um **Leitor de Planilha** puro
+> (`workbook + período → list[Lançamento]`, sem DB, sem classificação). `processar()`
+> fica como cola fina: carrega o contexto (regras, correções, entidades) e chama
+> Leitor + Classificador. Reduz `processar()` de ~380 para ~40 linhas e torna parse e
+> decisão testáveis isoladamente.
+
+Interface: `classificar(lancamento, contexto) -> Veredito`. Lógica interna:
 
 1. Monta campos de busca: `descricao`, `fornecedor`, `plano`, e `blob` (concatenado).
 2. **Filtra candidatos**: `ativo` + `tipo` compatível + `condicao_obra` satisfeita +
@@ -229,9 +242,13 @@ tabela/modelo na UI (regra do `DESIGN.md`): falar "regra"/"palavra-chave", nunca
 `PalavraChaveCategoria`.
 
 **Loop ao vivo no preview** (§7.4): a fila por Termo e o drill-down ficam em
-`templates/importacao/preview_fluxo.html`, com os lançamentos vivos no servidor durante
-a sessão. A página `/catalogos/palavras-chave` é o CRUD completo das regras + visão das
-sugestões.
+`templates/importacao/preview_fluxo.html`. **Estado do preview (decisão da review
+técnica):** usar **payload-como-estado** — cada ação (classificar termo, corrigir
+linha) re-envia o payload assinado (HMAC), o servidor reclassifica em memória e devolve
+o delta. **Sem infra nova** e idêntico ao que `confirmar` já faz. Se o volume (~3700
+lançamentos por requisição) virar gargalo, migrar depois para um store server-side
+`token → Lançamentos` (não feito agora). A página `/catalogos/palavras-chave` é o CRUD
+completo das regras + visão das sugestões.
 
 **Detecção de conflito** no salvar: duas regras com mesma palavra + mesma prioridade
 + mesma especificidade apontando para categorias diferentes → a tela **avisa** em vez
