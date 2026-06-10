@@ -1417,8 +1417,16 @@ _CC_OBRA_MAP = {
     'rafael - urbanova': 256,
     'urbanova': 256,
 }
-_CC_ADMIN = ['escritorio', 'guilherme e ariane', 'guilherme', 'ariane',
-             'administrativo', 'geral', 'head', 'holding']
+_CC_ADMIN = ['escritorio', 'administrativo', 'geral', 'head', 'holding']
+
+# Aliases de Centro de Custo → NOME da obra (resolvido por nome dentro do tenant
+# atual, NÃO por id fixo). Assim funciona em qualquer ambiente/deploy — usa a obra
+# que já existe no perfil, sem duplicar. Casa se qualquer um dos termos aparecer no
+# CC ("Guilherme e Ariane", "Guilherme/Ariane", etc.) → obra "Vereda".
+_CC_OBRA_ALIAS = {
+    'guilherme': 'vereda',
+    'ariane': 'vereda',
+}
 
 
 def _match_cc_obra(cc, obras_dict):
@@ -1429,6 +1437,15 @@ def _match_cc_obra(cc, obras_dict):
     # Checa se é administrativo
     if any(x in cc_norm for x in _CC_ADMIN):
         return None
+    # Aliases por NOME de obra do tenant (ex.: Guilherme/Ariane → Vereda).
+    # Resolve contra as obras reais da conta — sem id fixo, sem duplicar.
+    for termo, obra_nome in _CC_OBRA_ALIAS.items():
+        if termo in cc_norm:
+            oid = obras_dict.get(_normalizar(obra_nome)) if obras_dict else None
+            if oid:
+                return oid
+            # Obra-alvo não cadastrada neste tenant: segue o fluxo normal.
+            break
     # Lookup direto
     valid_obra_ids = set(obras_dict.values()) if obras_dict else set()
     for chave, oid in _CC_OBRA_MAP.items():
