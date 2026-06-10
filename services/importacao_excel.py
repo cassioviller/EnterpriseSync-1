@@ -1672,8 +1672,9 @@ def _classificar_categoria_nomeada(tipo, plano, descricao, fornecedor, tem_obra=
         return 'Subempreitada'
     # Instalação / assentamento = MÃO DE OBRA (serviço) — antes de materiais,
     # senão "Instalação dos cabos" cairia em Materiais pela palavra "cabo".
+    # Serviços de terceiros fundidos em Subempreitada (decisão 2026-06-10).
     if hb('instalacao', 'assentamento', 'montagem', 'montador'):
-        return 'Serviços Terceirizados de Obra'
+        return 'Subempreitada'
     if hb('cimento', 'concreto', 'argamassa', 'ferro', ' aco', 'tijolo', 'areia', 'brita',
           'tinta', 'madeira', 'vidro', 'tubo', 'porcelanato', 'telha', 'material', 'materiai', 'leroy',
           'cimento&tudo', 'concrelagos', 'dividros', 'bomba', 'eletrico', 'hidraulico',
@@ -1690,7 +1691,7 @@ def _classificar_categoria_nomeada(tipo, plano, descricao, fornecedor, tem_obra=
           'pintor', 'pintura', 'gesseiro', 'projeto', 'projetista', 'medicao', 'topografia',
           'sondagem', 'engenharia', 'fachada', 'reparo do', 'reparo de', 'eletrica', 'eletria',
           'hidraulica', 'diarista', 'faxina', 'soldador', 'azulejista', 'pagamento semana'):
-        return 'Serviços Terceirizados de Obra'
+        return 'Subempreitada'
     return 'Outras Saídas'
 
 

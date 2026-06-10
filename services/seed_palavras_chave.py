@@ -91,9 +91,13 @@ _SAIDA = [
     # km + dígito na descrição (ex.: '1083km'): 'km' na desc E algum dígito na desc
     ('Transporte de Obra', ['km'], 'descricao', [], 'indiferente', list('0123456789'), 'descricao'),
     ('Subempreitada', ['subempreit', 'empreita', 'subcontrat'], 'qualquer', [], 'indiferente'),
-    ('Serviços Terceirizados de Obra', ['instalacao', 'assentamento', 'montagem', 'montador'], 'qualquer', [], 'indiferente'),
+    # Serviços de terceiros fundidos em Subempreitada (decisão 2026-06-10): não há
+    # mais classificação para 'Serviços Terceirizados de Obra'. Mantidas a ordem/
+    # prioridade originais — só o destino mudou.
+    ('Subempreitada', ['instalacao', 'assentamento', 'montagem', 'montador'], 'qualquer', [], 'indiferente'),
     ('Materiais de Obra', ['cimento', 'concreto', 'argamassa', 'ferro', ' aco', 'tijolo', 'areia', 'brita', 'tinta', 'madeira', 'vidro', 'tubo', 'porcelanato', 'telha', 'material', 'materiai', 'leroy', 'cimento&tudo', 'concrelagos', 'dividros', 'bomba', 'eletrico', 'hidraulico', 'parabolt', 'selante', 'vergalhao', 'mola aerea', 'parafus', 'luminaria', 'ralo', 'cabo', 'abracadeira', 'cantoneira', 'forro', 'divisoria', 'aluminio', 'porta de', 'rodape', 'piso ', 'lona', 'deposito', 'gesso', 'arame', 'pedido', ' oc ', 'saco de', 'entulho', 'produto de limpeza', 'interfone', 'fechadura', 'mezanino', 'fita crepe', 'adaptador', 'osb', 'montante', 'bloco', 'impermeabilizante', 'vedacao', 'galvanizado', 'casa do lojista', 'tapume', 'cal para', 'baguete', 'painel', 'conduite', 'gaivota', 'fercorte', 'la de rocha', 'la de vidro', 'leds', ' led ', 'produto limpeza'], 'qualquer', [], 'indiferente'),
-    ('Serviços Terceirizados de Obra', ['servico', 'terceiro', 'mao de obra', 'pedreiro', 'eletricista', 'encanador', 'pintor', 'pintura', 'gesseiro', 'projeto', 'projetista', 'medicao', 'topografia', 'sondagem', 'engenharia', 'fachada', 'reparo do', 'reparo de', 'eletrica', 'eletria', 'hidraulica', 'diarista', 'faxina', 'soldador', 'azulejista', 'pagamento semana'], 'qualquer', [], 'indiferente'),
+    # Fundido em Subempreitada (decisão 2026-06-10): ver nota acima.
+    ('Subempreitada', ['servico', 'terceiro', 'mao de obra', 'pedreiro', 'eletricista', 'encanador', 'pintor', 'pintura', 'gesseiro', 'projeto', 'projetista', 'medicao', 'topografia', 'sondagem', 'engenharia', 'fachada', 'reparo do', 'reparo de', 'eletrica', 'eletria', 'hidraulica', 'diarista', 'faxina', 'soldador', 'azulejista', 'pagamento semana'], 'qualquer', [], 'indiferente'),
     # ── Resgates curados (baixa precedência: ficam por ÚLTIMO, logo só pegam o que
     # nenhuma regra acima classificou — resgate de 'Outras Saídas'). NÃO alteram
     # nenhuma classificação específica do legado; só melhoram o que cairia em Outros.

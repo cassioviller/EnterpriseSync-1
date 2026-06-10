@@ -3992,6 +3992,7 @@ def executar_migracoes():
             (189, "Bloco 3 — BDI completo (TCU): colunas de BDI em configuracao_empresa (default 0/60/90) e override nullable em propostas_comerciais", _migration_189_bdi_completo),
             (190, "Cadastro de Regras de Classificação de Fluxo de Caixa: palavra_chave_categoria + palavra_chave_sugestao + correcao_classificacao (ADR-0002)", migration_190_palavra_chave_classificacao),
             (191, "Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria origem='sistema') para todos os tenants existentes", migration_191_seed_regras_classificacao_sistema),
+            (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -12323,6 +12324,72 @@ def migration_191_seed_regras_classificacao_sistema():
     except Exception as e:
         db.session.rollback()
         logger.error(f"[Migration 191] Falha geral: {e}")
+        raise
+
+
+def migration_192_fundir_terceirizados_em_subempreitada():
+    """Decisão 2026-06-10 — Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada'.
+
+    Os tenants existentes já receberam (migration 191) as regras de classificação
+    origem='sistema' apontando para a categoria 'Serviços Terceirizados de Obra'.
+    Como o seed é idempotente por (prioridade,tipo,palavras,campo_alvo), re-rodá-lo
+    NÃO reaponta essas regras. Esta migração faz o repontamento direto: toda regra
+    origem='sistema' que aponta para 'Serviços Terceirizados de Obra' passa a apontar
+    para 'Subempreitada', em todos os perfis.
+
+    Escopo: SÓ as regras (origem='sistema'). Não move lançamentos já classificados e
+    não desativa a categoria — ela apenas deixa de ser destino de classificação.
+    Idempotente: ao re-rodar, nenhuma regra sistema aponta mais para a categoria antiga.
+    """
+    try:
+        rows = db.session.execute(text("""
+            SELECT id FROM usuario
+            WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+        """)).fetchall()
+        admin_ids = [r[0] for r in rows]
+        logger.info(f"[Migration 192] Fundindo terceirizados→subempreitada em {len(admin_ids)} tenant(s)")
+
+        ok_count = 0
+        total_repontadas = 0
+        for aid in admin_ids:
+            try:
+                sub_id = db.session.execute(text("""
+                    SELECT id FROM categoria_fluxo_caixa
+                    WHERE admin_id = :aid AND tipo = 'SAIDA'
+                      AND lower(nome) = lower('Subempreitada')
+                    LIMIT 1
+                """), {'aid': aid}).scalar()
+                terc_id = db.session.execute(text("""
+                    SELECT id FROM categoria_fluxo_caixa
+                    WHERE admin_id = :aid AND tipo = 'SAIDA'
+                      AND lower(nome) = lower('Serviços Terceirizados de Obra')
+                    LIMIT 1
+                """), {'aid': aid}).scalar()
+
+                if not sub_id or not terc_id:
+                    logger.info(f"[Migration 192] admin_id={aid}: sem categoria Subempreitada/Terceirizados — skip")
+                    continue
+
+                res = db.session.execute(text("""
+                    UPDATE palavra_chave_categoria
+                    SET categoria_fluxo_caixa_id = :sub_id
+                    WHERE admin_id = :aid
+                      AND origem = 'sistema'
+                      AND categoria_fluxo_caixa_id = :terc_id
+                """), {'sub_id': sub_id, 'aid': aid, 'terc_id': terc_id})
+                db.session.commit()
+                n = res.rowcount or 0
+                ok_count += 1
+                total_repontadas += n
+                logger.info(f"[Migration 192] admin_id={aid}: {n} regra(s) repontada(s)")
+            except Exception as _e:
+                logger.warning(f"[Migration 192] Falhou para admin_id={aid}: {_e}")
+                db.session.rollback()
+
+        logger.info(f"[Migration 192] Concluída — {ok_count}/{len(admin_ids)} tenant(s), {total_repontadas} regra(s) repontada(s).")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 192] Falha geral: {e}")
         raise
 
 
