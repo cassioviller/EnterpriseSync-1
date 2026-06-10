@@ -3991,6 +3991,7 @@ def executar_migracoes():
             (188, "Fix #4 — FluxoCaixa.valor: converter FLOAT8 → NUMERIC(15,2) com arredondamento", _migration_188_fluxo_caixa_valor_numeric),
             (189, "Bloco 3 — BDI completo (TCU): colunas de BDI em configuracao_empresa (default 0/60/90) e override nullable em propostas_comerciais", _migration_189_bdi_completo),
             (190, "Cadastro de Regras de Classificação de Fluxo de Caixa: palavra_chave_categoria + palavra_chave_sugestao + correcao_classificacao (ADR-0002)", migration_190_palavra_chave_classificacao),
+            (191, "Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria origem='sistema') para todos os tenants existentes", migration_191_seed_regras_classificacao_sistema),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -12279,6 +12280,50 @@ def migration_190_palavra_chave_classificacao():
     logger.info("=" * 80)
     logger.info("✅ MIGRAÇÃO 190 CONCLUÍDA: Regras de Classificação implantadas!")
     logger.info("=" * 80)
+
+
+def migration_191_seed_regras_classificacao_sistema():
+    """Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria,
+    origem='sistema') para todos os tenants (ADMIN + SUPER_ADMIN) existentes.
+
+    As regras curadas vivem em services/seed_palavras_chave.py e até então só eram
+    plantadas manualmente via scripts/seed_palavras_chave_cli.py. Sem elas, o
+    classificador-por-cadastro fica sem regras do tenant e cai no fallback
+    'Pendente'. Esta migração garante que todo perfil já existente em produção
+    receba as regras no próximo deploy.
+
+    Depende das categorias já existirem (migrations 169/182 garantem isso, e
+    seed_para_admin ignora regras cuja categoria não exista no tenant).
+    Idempotente: seed_para_admin não duplica (chave: prioridade+tipo+palavras+campo_alvo).
+    """
+    try:
+        from services.seed_palavras_chave import seed_para_admin
+
+        rows = db.session.execute(text("""
+            SELECT id FROM usuario
+            WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+        """)).fetchall()
+        admin_ids = [r[0] for r in rows]
+        logger.info(f"[Migration 191] Seeding regras de classificação para {len(admin_ids)} tenant(s)")
+
+        ok_count = 0
+        total_regras = 0
+        for aid in admin_ids:
+            try:
+                n = seed_para_admin(aid, commit=False)
+                db.session.commit()
+                ok_count += 1
+                total_regras += n
+                logger.info(f"[Migration 191] admin_id={aid}: {n} regra(s) criada(s)")
+            except Exception as _e:
+                logger.warning(f"[Migration 191] Seed falhou para admin_id={aid}: {_e}")
+                db.session.rollback()
+
+        logger.info(f"[Migration 191] Concluída — {ok_count}/{len(admin_ids)} tenant(s), {total_regras} regra(s) no total.")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 191] Falha geral: {e}")
+        raise
 
 
 def migration_165_custos_escritorio():
