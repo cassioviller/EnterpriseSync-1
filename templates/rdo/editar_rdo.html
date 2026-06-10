@@ -353,12 +353,19 @@
                     </button>
                 </div>
                 <div class="rdo-card-body">
+                    <div class="row g-2 mb-1 d-none d-md-flex repet-head">
+                        <div class="col-md-4"><small class="text-muted fw-bold">Equipamento / Ferramenta</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Quantidade</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Horas de uso</small></div>
+                        <div class="col-md-3"><small class="text-muted fw-bold">Estado de conservação</small></div>
+                        <div class="col-md-1"></div>
+                    </div>
                     <div id="equip-rows-edit">
                         {% for eq in (rdo.equipamentos or []) %}
                         <div class="row g-2 mb-2 align-items-end repet-row">
-                            <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="equip_nome[]" value="{{ eq.nome_equipamento or '' }}"></div>
-                            <div class="col-md-2"><input type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" value="{{ eq.quantidade or 1 }}"></div>
-                            <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" value="{{ eq.horas_uso or 0 }}"></div>
+                            <div class="col-md-4"><input type="text" class="form-control form-control-sm" name="equip_nome[]" placeholder="Nome do equipamento" value="{{ eq.nome_equipamento or '' }}"></div>
+                            <div class="col-md-2"><input type="number" min="1" step="1" class="form-control form-control-sm" name="equip_quantidade[]" placeholder="Qtd" value="{{ eq.quantidade or 1 }}"></div>
+                            <div class="col-md-2"><input type="number" min="0" step="0.5" class="form-control form-control-sm" name="equip_horas_uso[]" placeholder="Horas" value="{{ eq.horas_uso or 0 }}"></div>
                             <div class="col-md-3">
                                 <select class="form-control form-control-sm" name="equip_estado[]">
                                     {% for o in opcoes_rdo_status_equipamento %}
