@@ -93,7 +93,13 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "echo": False  # Desabilitar logs SQL em produção
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
+
+# A confirmação do fluxo de caixa pode enviar o ano inteiro de uma vez: cada linha
+# do preview gera ~9 campos de formulário (data/obra/valor/categoria/banco/...).
+# O default do Werkzeug é 1000 partes, o que estoura num import anual e fazia o
+# RequestEntityTooLarge cair no redirect-para-referrer → 405. Elevamos o teto.
+app.request_class.max_form_parts = 100_000
 
 # Recarrega templates do disco a cada request (mesmo sob gunicorn, sem debug).
 # Evita servir HTML/CSS antigo após editar um template sem reiniciar o worker.
@@ -145,13 +151,20 @@ def handle_csrf_error(e):
 from werkzeug.exceptions import RequestEntityTooLarge
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):
-    from flask import request, redirect, flash, jsonify
+    from flask import request, redirect, flash, jsonify, url_for
     limit_mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
+    msg = (f'Envio muito grande para processar de uma vez (limite {limit_mb} MB). '
+           f'Tente importar um período menor — por exemplo, por trimestre ou por mês.')
     if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({"error": f"Arquivo muito grande. O limite máximo é {limit_mb} MB."}), 413
-    flash(f'Arquivo muito grande. O limite máximo é {limit_mb} MB.', 'danger')
+        return jsonify({"error": msg}), 413
+    flash(msg, 'danger')
+    # Não redirecionar para request.referrer: numa confirmação de preview o referrer
+    # é a própria rota POST-only (/fluxo-caixa/upload), e um redirect GET para ela
+    # devolve 405. Mandamos para uma página GET segura.
+    if request.path.startswith('/importacao'):
+        return redirect(url_for('importacao.index'))
     referrer = request.referrer
-    if referrer:
+    if referrer and request.method == 'GET':
         return redirect(referrer)
     return redirect('/')
 
