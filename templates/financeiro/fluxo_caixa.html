@@ -310,11 +310,14 @@ tr.mes-toggle[aria-expanded="true"] .mes-chevron { transform: rotate(180deg); }
                                 </tr>
                             </thead>
                             <tbody>
+                                {# Mês único (caso padrão: período = mês corrente) já vem aberto,
+                                   senão a tela parece vazia. Vários meses ficam fechados. #}
+                                {% set abrir_todos = meses|length == 1 %}
                                 {% for mes in meses %}
                                 {% set mid = 'mes-' ~ mes.mes %}
                                 <tr class="mes-toggle {{ 'table-success' if mes.saldo_mes_real >= 0 else 'table-danger' }}"
                                     data-bs-toggle="collapse" data-bs-target="#{{ mid }}"
-                                    aria-expanded="false" aria-controls="{{ mid }}">
+                                    aria-expanded="{{ 'true' if abrir_todos else 'false' }}" aria-controls="{{ mid }}">
                                     <td class="fw-semibold">{{ mes.label }}</td>
                                     <td class="text-end text-success">{{ mes.entradas_real|brl }}</td>
                                     <td class="text-end text-danger">{{ mes.saidas_real|brl }}</td>
@@ -326,7 +329,7 @@ tr.mes-toggle[aria-expanded="true"] .mes-chevron { transform: rotate(180deg); }
                                 </tr>
                                 <tr>
                                     <td colspan="8" class="p-0 border-0">
-                                        <div class="collapse" id="{{ mid }}">
+                                        <div class="collapse{{ ' show' if abrir_todos else '' }}" id="{{ mid }}">
                                             <table class="table table-hover mb-0" style="font-size:.88rem;">
                                                 <thead class="table-light">
                                                     <tr>
