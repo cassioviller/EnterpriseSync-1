@@ -633,6 +633,32 @@ class FinanceiroService:
                     'editavel': True,
                 })
 
+            # Entradas realizadas vindas de contas a receber baixadas — simétrico a
+            # pagamentos_realizados (sem isso, recebimentos ficam invisíveis no fluxo).
+            rr_query = FluxoCaixa.query.filter(
+                and_(
+                    FluxoCaixa.admin_id == admin_id,
+                    FluxoCaixa.tipo_movimento == 'ENTRADA',
+                    FluxoCaixa.referencia_tabela == 'conta_receber',
+                    FluxoCaixa.data_movimento >= data_inicio,
+                    FluxoCaixa.data_movimento <= data_fim,
+                )
+            )
+            if obra_id:
+                rr_query = rr_query.filter(FluxoCaixa.obra_id == obra_id)
+            for fc in rr_query.all():
+                detalhes.append({
+                    'id': fc.id,
+                    'data': fc.data_movimento,
+                    'tipo': 'ENTRADA',
+                    'descricao': fc.descricao or 'Recebimento',
+                    'valor': float(fc.valor),
+                    'origem': 'Conta a Receber',
+                    'status': 'RECEBIDO',
+                    'realizado': True,
+                    'editavel': True,
+                })
+
             # Ordenar por data
             detalhes.sort(key=lambda x: x['data'])
             
