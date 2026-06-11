@@ -1,174 +1,159 @@
 # Plano de Implementação — Redesenho do Dashboard de Fluxo de Caixa
 
 **Spec:** `docs/superpowers/specs/2026-06-11-redesign-fluxo-caixa-design.md`
-**Data:** 2026-06-11
-**Estratégia:** passos pequenos, cada um verificável e commitável de forma independente.
-A função pura entra primeiro (com teste), depois a fiação da view, depois os 4 blocos
-do template um a um. A tela continua funcionando após cada passo.
+**ADR:** `docs/adr/0003-fluxo-caixa-variacao-relativa-nao-saldo-absoluto.md`
+**Data:** 2026-06-11 (revisado após grilling Q1–Q8)
+**Estratégia:** passos pequenos, cada um verificável e commitável. Backend puro e
+filtro primeiro (com testes), depois fiação da view, depois os blocos do template. A
+tela continua funcionando após cada passo.
 
-## Pré-condições / contexto confirmado
-- `FinanceiroService.calcular_fluxo_caixa(admin_id, data_inicio, data_fim)` devolve
-  `{saldo_inicial, entradas_previstas, saidas_previstas, saldo_final_projetado,
-  detalhes, alerta}`. Cada item de `detalhes`: `data`(date|None), `tipo`('ENTRADA'|
-  'SAIDA'), `descricao`, `valor`(float), `origem`, `status`, `realizado`(bool),
-  `editavel`(bool, opcional), `id`(opcional). — `financeiro_service.py:430-625`
-- View `financeiro_views.fluxo_caixa` — `financeiro_views.py:679-742`. Monta `filtros`,
-  `obras`, `centros_custo`, `bancos`, `categorias_fc` e renderiza
-  `templates/financeiro/fluxo_caixa.html`.
-- **Gap pré-existente (fora de escopo):** os filtros `obra_id`/`centro_custo_id`/
-  `tipo_movimento` são exibidos e repassados ao template, mas **não filtram** o
-  resultado de `calcular_fluxo_caixa`. Não corrigir neste trabalho; apenas não
-  introduzir regressão.
-- Chart.js já carregado: `static/js/vendor/chart.js` via `base_completo.html`.
-- Filtro Jinja `brl` existe (`app.py:221`).
+## Contexto confirmado (do código)
+- `calcular_fluxo_caixa(admin_id, data_inicio, data_fim)` — `financeiro_service.py:430`.
+  Itens de `detalhes`: `data`(date|None), `tipo`('ENTRADA'|'SAIDA'), `descricao`,
+  `valor`(float), `origem`, `status`, `realizado`(bool), `editavel?`, `id?`.
+- View `fluxo_caixa` — `financeiro_views.py:679`. Hoje passa selects de obra/centro/tipo
+  mas **nenhum filtra** o resultado.
+- Cobertura obra/centro: `ContaReceber.obra_id` ✓ (sem centro); `FluxoCaixa.obra_id` +
+  `centro_custo_id` ✓; `GestaoCustoPai` **sem** obra/centro → só via `GestaoCustoFilho`
+  (`obra_id`, `centro_custo_id`); relação `GestaoCustoPai.itens`.
+- Chart.js local (`static/js/vendor/chart.js`); filtro Jinja `brl` (`app.py:221`).
 
 ---
 
-## Passo 1 — Função pura `agregar_fluxo_mensal` + teste unitário (TDD)
+## Passo 1 — Filtro de Obra em `calcular_fluxo_caixa` + teste (Q5/Q6/Q8)
 
-**Arquivo:** `financeiro_service.py` (nova staticmethod em `FinanceiroService`),
-`tests/test_agregar_fluxo_mensal.py` (novo).
+**Arquivo:** `financeiro_service.py` (`calcular_fluxo_caixa`), `tests/test_fluxo_obra.py`.
 
-1.1 Escrever o teste primeiro (`tests/test_agregar_fluxo_mensal.py`), sem servidor —
-importa só a função pura. Casos:
-   - **Lista vazia** → `meses == []`, `kpis` todos 0, `serie_chart` com listas vazias.
-   - **Um mês, 1 entrada + 1 saída** → `entradas`, `saidas`, `saldo_mes` corretos;
-     `saldo_acumulado == saldo_inicial + saldo_mes`.
-   - **Dois meses** → `saldo_acumulado` do 2º mês = `saldo_inicial + saldo_mes[0] +
-     saldo_mes[1]`; `meses` ordenados por chave `mes`.
-   - **Realizado × previsto** → item `realizado=True` soma em `realizado_*`,
-     `realizado=False` em `previsto_*`; `kpis.realizado_liquido` /
-     `kpis.previsto_liquido` corretos.
-   - **Bucket sem data** → item com `data=None` cai num mês `{'mes':'sem-data',
-     'label':'Sem data'}` ao fim; não entra em `serie_chart`; entra nos KPIs.
+1.1 Adicionar param `obra_id: int = None`. Quando setado, filtrar:
+   - `contas_receber`: `+ .filter(ContaReceber.obra_id == obra_id)`.
+   - `pagamentos_realizados` e `fluxos_diretos` (FluxoCaixa): `+ FluxoCaixa.obra_id == obra_id`.
+   - `custos_v2_previstos` e `custos_v2_pagos` (GestaoCustoPai): `+ GestaoCustoPai.itens.any(
+     GestaoCustoFilho.obra_id == obra_id)` — conta o **pai inteiro** (aproximação Q8;
+     comentar a nota). `None`/0 = sem filtro.
+1.2 Teste (`tests/test_fluxo_obra.py`, com `app_context`): criar 2 obras, lançamentos em
+   cada; `calcular_fluxo_caixa(..., obra_id=A)` retorna só os da obra A em entradas e
+   realizado; um GestaoCustoPai com filho na obra A entra, sem filho na A não entra.
 
-1.2 Implementar `agregar_fluxo_mensal(detalhes, saldo_inicial)` conforme §3.1 da spec.
-   Pura: sem query, sem `Decimal` (recebe floats), sem efeitos. Rótulo pt-BR do mês via
-   mapa fixo de 3 letras (`Jan`..`Dez`) — não usar `locale` (não confiável no ambiente).
-   `saldo_acumulado` calculado só sobre meses com data, na ordem cronológica.
-
-1.3 `kpis` = `{saldo_banco: saldo_inicial, realizado_liquido, previsto_liquido}`
-   (sem `saldo_projetado` — o card usa `fluxo.saldo_final_projetado`, ver spec §3.1).
-
-**Verificação:** `pytest tests/test_agregar_fluxo_mensal.py -q` passa (5 casos verdes).
-**Commit:** `feat(fluxo): agregação mensal pura + teste unitário`
+**Verificação:** `pytest tests/test_fluxo_obra.py -q` verde; sem filtro, resultado igual
+ao de hoje (não-regressão).
+**Commit:** `feat(fluxo): filtro de obra em calcular_fluxo_caixa (+teste)`
 
 ---
 
-## Passo 2 — Fiar a view
+## Passo 2 — Função pura `agregar_fluxo_mensal` + teste unitário (TDD)
 
-**Arquivo:** `financeiro_views.py:723-742`.
+**Arquivo:** `financeiro_service.py` (staticmethod), `tests/test_agregar_fluxo_mensal.py`.
 
-2.1 Após `fluxo = FinanceiroService.calcular_fluxo_caixa(...)`, chamar
-   `agg = FinanceiroService.agregar_fluxo_mensal(fluxo['detalhes'], fluxo['saldo_inicial'])`.
+2.1 Teste primeiro (sem servidor). Casos:
+   - **Lista vazia** → `meses == []`, KPIs 0, `serie_chart` com listas vazias.
+   - **Um mês** (1 entrada + 1 saída realizadas) → `entradas_real`/`saidas_real`/
+     `saldo_mes_real` corretos; `variacao_acumulada == saldo_mes_real` (começa em 0).
+   - **Dois meses** → `variacao_acumulada` do 2º = soma dos `saldo_mes_real`; meses
+     ordenados por `mes`.
+   - **Realizado × previsto** → item `realizado=False` entra em `previsto_liquido` (não
+     em `*_real`); `var_acum_proj = var_acum_real + Σ previsto_liquido`.
+   - **Bucket "sem data"** → item `data=None` vira mês `'sem-data'` ao fim;
+     `variacao_acumulada None`; fora de `serie_chart`; dentro dos KPIs.
+2.2 Implementar conforme spec §3.2: variação acumulada **de 0** (só realizado); rótulo
+   pt-BR via mapa fixo `Jan..Dez` (sem `locale`); `serie_chart` com `entradas_real`,
+   `saidas_real`, `var_acum_real`, `var_acum_proj`.
 
-2.2 Adicionar ao `render_template`: `meses=agg['meses']`, `kpis=agg['kpis']`,
-   `serie_chart=agg['serie_chart']`. Manter tudo que já é passado (não remover `fluxo`,
-   `filtros` etc. — o template ainda os usa até o Passo 5).
-
-**Verificação:** abrir `/financeiro/fluxo-caixa` no período jan–jun/2026; a tela
-renderiza igual a hoje (ainda não consumimos as novas variáveis). Sem erro 500.
-**Commit:** `feat(fluxo): view passa série mensal e KPIs ao template`
-
----
-
-## Passo 3 — Bloco KPIs (4 cards)
-
-**Arquivo:** `templates/financeiro/fluxo_caixa.html` (bloco "Resumo", ~linhas 128-162).
-
-3.1 Substituir os 4 cards atuais por:
-   - **Saldo em banco** = `kpis.saldo_banco|brl`.
-   - **Realizado no período** = `kpis.realizado_liquido|brl` (classe verde se ≥0,
-     vermelha se <0).
-   - **A realizar (previsto)** = `kpis.previsto_liquido|brl`.
-   - **Saldo projetado** = `fluxo.saldo_final_projetado|brl`; card vermelho + ícone
-     alerta quando `fluxo.alerta` (ou `< 0`).
-   - Seguir cores/badges do `DESIGN.md`; reusar a estrutura `card`/`card-body` atual.
-
-**Verificação:** os 4 cards mostram valores coerentes com a reconciliação (realizado
-líquido ≈ 1.166.042,55 − 1.504.202,39 no período total do batch).
-**Commit:** `feat(fluxo): KPIs separando realizado de previsto`
+**Verificação:** `pytest tests/test_agregar_fluxo_mensal.py -q` verde.
+**Commit:** `feat(fluxo): agregação mensal pura (variação acumulada) + teste`
 
 ---
 
-## Passo 4 — Bloco do gráfico (Chart.js)
+## Passo 3 — Fiar a view (Q6/Q7)
 
-**Arquivo:** `templates/financeiro/fluxo_caixa.html` (novo bloco entre KPIs e tabela);
-JS no `{% block scripts %}`.
+**Arquivo:** `financeiro_views.py:679-742`.
 
-4.1 Adicionar `<canvas id="graficoFluxo">` dentro de um `card`.
+3.1 Passar `obra_id or None` a `calcular_fluxo_caixa`.
+3.2 `agg = FinanceiroService.agregar_fluxo_mensal(fluxo['detalhes'], fluxo['saldo_inicial'])`;
+   adicionar `meses=agg['meses']`, `kpis=agg['kpis']`, `serie_chart=agg['serie_chart']`.
+3.3 **Remover** do contexto os dados de Centro de Custo e Tipo (e parar de buscar
+   `centros_custo`). Manter `obras`, `bancos`, `categorias_fc`, `filtros` (sem
+   centro/tipo), `fluxo`.
 
-4.2 No script, ler `serie_chart` via `{{ serie_chart|tojson }}` e montar Chart.js misto:
-   - dataset barra **Entradas** (verde `#198754`), dataset barra **Saídas**
-     (vermelho `#dc3545`), ambos no eixo Y principal;
-   - dataset linha **Saldo acumulado** (azul `#0d6efd`) no eixo Y secundário (`y1`);
-   - tooltips formatando `pt-BR` (R$); legenda no topo.
-   - Guardar contra `serie_chart.labels.length === 0` (não instanciar o chart; esconder
-     o card ou mostrar "sem dados no período").
-
-**Verificação:** gráfico aparece com 6 grupos (jan–jun), linha de saldo acumulado
-crescente/decrescente coerente; um período de 1 mês degrada para 1 grupo sem quebrar.
-**Commit:** `feat(fluxo): gráfico de entradas/saídas + saldo acumulado`
+**Verificação:** `/financeiro/fluxo-caixa` renderiza sem erro; filtrar por obra muda os
+números; novas variáveis disponíveis (ainda não consumidas pelo template).
+**Commit:** `feat(fluxo): view filtra por obra e fornece série mensal/KPIs`
 
 ---
 
-## Passo 5 — Tabela agrupada por mês + drill-down
+## Passo 4 — Template: filtros + KPIs (Q1/Q6/Q7)
 
-**Arquivo:** `templates/financeiro/fluxo_caixa.html` (bloco "Tabela", ~linhas 164-302) e
-o `{% block scripts %}` (init DataTables, ~linhas 547-555).
+**Arquivo:** `templates/financeiro/fluxo_caixa.html` (blocos Filtros ~72-126 e Resumo ~128-162).
 
-5.1 Trocar a tabela única por **uma tabela-resumo de meses**: colunas Mês ▾ · Entradas ·
-   Saídas · Saldo mês · Saldo acumulado · nº · botão expandir. Iterar `meses`. Linha do
-   mês com classe de cor pelo sinal de `saldo_mes`.
+4.1 Filtros: manter Período + Obra; **remover** selects de Centro de Custo e Tipo.
+4.2 KPIs (4 cards): Saldo em banco (`kpis.saldo_banco`, com dica se 0) · Realizado no
+   período (`kpis.realizado_liquido`, verde/vermelho) · A realizar
+   (`kpis.previsto_liquido`) · Saldo projetado (`fluxo.saldo_final_projetado`, vermelho +
+   alerta se `fluxo.alerta`).
 
-5.2 Cada linha-mês tem um `data-bs-toggle="collapse"` apontando para uma linha-detalhe
-   (`<tr class="collapse">` com um `<td colspan>` contendo a sub-tabela dos
-   `mes.movimentos`). Todos **fechados** por padrão.
+**Verificação:** filtros enxutos; KPIs coerentes com a reconciliação.
+**Commit:** `feat(fluxo): filtros enxutos + KPIs realizado/previsto`
 
-5.3 A sub-tabela de movimentos reusa **exatamente** o render de célula atual (Data,
-   Tipo, Status, Origem, Descrição, Valor) incluindo `cell-editable`, `data-field`,
-   `data-edit-url`, `data-id` e os ícones de lápis — para a edição inline continuar
-   funcionando sem mudar o JS de `saveEdit`/`enterEdit`.
+---
 
-5.4 **Remover o init do DataTable** (`#movimentosTable`) — o agrupamento server-side o
-   substitui. Manter todo o JS de edição inline (`enterEdit`/`saveEdit`/`cancelEdit` e
-   os bindings de `dblclick`/botões/teclas), que opera por `td.cell-editable` e
-   independe do DataTable. Confirmar que os bindings em `DOMContentLoaded` pegam as
-   células dentro dos `collapse` (estão no DOM desde o load, só escondidas → ok).
+## Passo 5 — Template: gráfico (Q3/Q4)
 
-5.5 Manter o empty state atual quando `meses` vazio.
+**Arquivo:** `fluxo_caixa.html` (novo bloco + `{% block scripts %}`).
 
-**Verificação:** meses listados com subtotais corretos; expandir um mês mostra os
-lançamentos; **editar inline** data/valor/descrição de um lançamento dentro de um mês
-salva e atualiza a célula (testar o fluxo `saveEdit` → 200 JSON). Modal "Nova
+5.1 `<canvas id="graficoFluxo">` num card.
+5.2 Chart.js misto a partir de `{{ serie_chart|tojson }}`: barras `entradas_real`
+   (verde) + `saidas_real` (vermelho) no eixo `y`; linha `var_acum_real` (azul sólida) +
+   `var_acum_proj` (azul tracejada) no eixo `y1`. Tooltips R$ pt-BR. Guarda para
+   `labels` vazio (não instanciar / mensagem).
+
+**Verificação:** 6 grupos (jan–jun); duas linhas coincidem onde não há previsto; período
+de 1 mês degrada sem quebrar.
+**Commit:** `feat(fluxo): gráfico de variação acumulada (realizada + projetada)`
+
+---
+
+## Passo 6 — Template: tabela mensal + drill-down (Q2)
+
+**Arquivo:** `fluxo_caixa.html` (bloco Tabela ~164-302) e init DataTables (~547-555).
+
+6.1 Tabela-resumo de meses: **Mês ▾ · Entradas · Saídas · Saldo mês · Variação acumulada
+   · Previsto líquido · nº · [expandir]** (4 primeiras = realizado). Linha colorida pelo
+   sinal de `saldo_mes_real`.
+6.2 Cada mês → `collapse` com sub-tabela de `mes.movimentos`, reusando o render de célula
+   atual (`cell-editable`, `data-field`, `data-edit-url`, `data-id`, ícone lápis). Badge
+   de status distingue Realizado/Previsto. Fechados por padrão. Bucket "Sem data" ao fim.
+6.3 **Remover** o init do DataTable único; **manter** todo o JS de edição inline
+   (`enterEdit`/`saveEdit`/`cancelEdit` + bindings em `DOMContentLoaded`, que pegam
+   células dentro dos `collapse` por já estarem no DOM).
+6.4 Manter empty state quando `meses` vazio.
+
+**Verificação:** meses com subtotais corretos; expandir mostra lançamentos; **editar
+inline** dentro de um mês salva (200 JSON) e atualiza a célula; modal "Nova
 Movimentação" intacto.
-**Commit:** `feat(fluxo): tabela agrupada por mês com drill-down e edição inline`
+**Commit:** `feat(fluxo): tabela mensal com drill-down e edição inline`
 
 ---
 
-## Passo 6 — Verificação end-to-end e fechamento
+## Passo 7 — Verificação end-to-end e fechamento
+7.1 `pytest tests/test_fluxo_obra.py tests/test_agregar_fluxo_mensal.py -q` verde.
+7.2 Render real (jan–jun/2026, batch `veks2026_162255`): somatórios mensais batem com
+   entradas R$ 1.166.042,55 / saídas R$ 1.504.202,39; variação acumulada consistente
+   (de 0); filtro de Obra reduz os números corretamente; KPIs/gráfico/drill-down OK;
+   edição inline e modal OK.
+7.3 Revisão do diff; nenhuma regressão.
 
-6.1 Rodar a suíte de testes relevante (`pytest tests/test_agregar_fluxo_mensal.py -q`).
-6.2 Render real (período jan–jun/2026, batch `veks2026_162255`): conferir
-   - soma das Entradas mensais ≈ R$ 1.166.042,55, Saídas ≈ R$ 1.504.202,39;
-   - `saldo_acumulado` internamente consistente (`saldo_inicial + Σ saldo_mes`);
-   - KPIs, gráfico e drill-down coerentes; edição inline e modal OK.
-6.3 Conferir período default (mês corrente) e período de 1 mês (gráfico degrada ok).
-6.4 Revisão final do diff; nenhuma regressão nos filtros exibidos.
-
-**Commit final (se necessário):** `fix(fluxo): ajustes pós-verificação do dashboard`
+**Commit final (se necessário):** `fix(fluxo): ajustes pós-verificação`
 
 ---
 
-## Riscos / pontos de atenção
-- **Edição inline dentro de `collapse`:** as células existem no DOM no load (só
-  escondidas), então os listeners de `DOMContentLoaded` as alcançam. Validar no Passo 5.
-- **Performance:** ~1.600 `<tr>` escondidos em `collapse`. Aceitável; se travar, paginar
-  por mês fica para v2 (não fazer agora).
-- **`serie_chart` vazio / 1 mês:** tratado no Passo 4.
-- **Não tocar** em `calcular_fluxo_caixa`, esquema de dados, nem nos filtros não
-  aplicados (gap pré-existente).
+## Riscos / atenção
+- **Edição inline dentro de `collapse`:** células no DOM no load (só escondidas) → os
+  listeners as alcançam. Validar no Passo 6.
+- **Filtro de Obra aproximado em saídas previstas** (pai multi-obra superestima) — raro;
+  comentar no código.
+- **Performance:** ~1.600 `<tr>` escondidos — aceitável; paginar por mês = v2.
+- **`serie_chart` vazio / 1 mês:** tratado no Passo 5.
 
-## Fora de escopo (reafirmado da spec)
-Sub-grupo por categoria, toggle de granularidade, barras empilhadas realizado/previsto,
-exportação, correção da quirk do `saldo_final_projetado`.
+## Fora de escopo (reafirmado)
+Centro de Custo/Tipo na tela; obra exato em saídas previstas; sub-grupo por categoria;
+toggle de granularidade; barras empilhadas; exportação; saldo bancário absoluto;
+correção da quirk do `saldo_final_projetado`.

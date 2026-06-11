@@ -25,6 +25,24 @@ _Avoid_: imposto isolado, encargo
 Campo da proposta (`percentual_nota_fiscal`, default 13,5%) que hoje é **apenas informativo** no PDF ("considerar X% para nota fiscal"). NÃO entra em nenhum cálculo e é distinto de _Tributos_.
 _Avoid_: imposto, tributo
 
+## Fluxo de Caixa (Visualização)
+
+**Realizado**:
+Movimentação que efetivamente entrou ou saiu do caixa/banco (existe como registro de `FluxoCaixa`). É o que de fato aconteceu, não uma promessa.
+_Avoid_: pago (pago é um status da obrigação; realizado é o efeito no caixa), efetivado
+
+**Previsto**:
+Obrigação em aberto ainda não liquidada (a receber ou a pagar) que projeta uma movimentação futura de caixa. Vive enquanto não vira Realizado.
+_Avoid_: pendente, agendado, a vencer
+
+**Variação acumulada de caixa**:
+Quanto o caixa variou ao longo do período, partindo de **zero** e somando apenas os movimentos **Realizados**. Não é um saldo absoluto — o sistema não mantém saldo bancário (ver ADR 0003). A versão que soma também os **Previstos** é a *variação projetada*.
+_Avoid_: saldo acumulado, saldo corrente, running balance (sugerem saldo absoluto, que não temos)
+
+**Saldo em banco**:
+Soma dos saldos atuais das contas bancárias cadastradas (`BancoEmpresa`). Métrica à parte da Variação acumulada; hoje fica em R$ 0 porque os saldos não são mantidos.
+_Avoid_: saldo inicial, caixa
+
 ## Importação / Classificação de Fluxo de Caixa
 
 **Lançamento**:
