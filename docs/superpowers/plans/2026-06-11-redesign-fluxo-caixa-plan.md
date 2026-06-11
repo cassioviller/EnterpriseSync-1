@@ -3,6 +3,10 @@
 **Spec:** `docs/superpowers/specs/2026-06-11-redesign-fluxo-caixa-design.md`
 **ADR:** `docs/adr/0003-fluxo-caixa-variacao-relativa-nao-saldo-absoluto.md`
 **Data:** 2026-06-11 (revisado após grilling Q1–Q8)
+**Status:** ✅ **CONCLUÍDO em 2026-06-11** — Passos 1–7 executados e verificados.
+Commits: `5e2475e` (P1) · `72e45cc` (P2) · `91ead22` (P2.5) · `8d147ee` (P3) ·
+`e615701` (P4) · `7ea66e9` (P5) · `1a3b87e` (P6). Passo 7 verificado end-to-end no
+browser (Playwright, dados reais jan–jun/2026): 19/19 checagens — ver fechamento ao fim.
 **Estratégia:** passos pequenos, cada um verificável e commitável. Backend puro e
 filtro primeiro (com testes), depois fiação da view, depois os blocos do template. A
 tela continua funcionando após cada passo.
@@ -141,15 +145,24 @@ Movimentação" intacto.
 
 ---
 
-## Passo 7 — Verificação end-to-end e fechamento
-7.1 `pytest tests/test_fluxo_obra.py tests/test_agregar_fluxo_mensal.py -q` verde.
-7.2 Render real (jan–jun/2026, batch `veks2026_162255`): somatórios mensais batem com
-   entradas R$ 1.166.042,55 / saídas R$ 1.504.202,39; variação acumulada consistente
-   (de 0); filtro de Obra reduz os números corretamente; KPIs/gráfico/drill-down OK;
-   edição inline e modal OK.
-7.3 Revisão do diff; nenhuma regressão.
+## Passo 7 — Verificação end-to-end e fechamento ✅ FEITO
+7.1 `pytest tests/test_fluxo_obra.py tests/test_agregar_fluxo_mensal.py -q` → **10 passed**
+   (inclui o teste novo de `movimentos` por mês, do Passo 6).
+7.2 Verificado no **browser real** (gunicorn + Playwright/Chromium, logado como
+   `admin_alfa`, jan–jun/2026): somatórios mensais batem exatos (entradas
+   R$ 1.166.042,55 / saídas R$ 1.504.202,39); variação acumulada encadeia de 0
+   (Jan +2.441,38 → Jun −338.159,84); 6 meses fechados por padrão, drill-down expande
+   312 linhas em Jan; **edição inline dentro do collapse salva (200 JSON) e atualiza a
+   célula sem reload** (risco do plano confirmado resolvido); Escape cancela; filtro de
+   Obra muda o Realizado (todas: −338.159,84 → Vereda dos Campos: −3.236,87) e o select
+   mantém a seleção; modal Nova Movimentação abre; período de 1 mês degrada sem quebrar;
+   período vazio mostra empty state; zero erros JS no console. 19/19 checagens.
+7.3 Diff revisado; nenhuma regressão. **Nenhum commit de fix necessário.**
 
-**Commit final (se necessário):** `fix(fluxo): ajustes pós-verificação`
+**Achado registrado (fora de escopo, candidato a v2):** com o período todo realizado,
+o card *Saldo Projetado* fica idêntico ao *A Realizar* (o `saldo_final_projetado` do
+service só considera o previsto) — é a quirk já listada em "Fora de escopo", mas na
+tela ao vivo os dois cards iguais lado a lado chamam atenção.
 
 ---
 
