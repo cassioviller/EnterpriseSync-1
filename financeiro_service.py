@@ -692,7 +692,9 @@ class FinanceiroService:
             b = buckets.setdefault(chave, {
                 'entradas_real': 0.0, 'saidas_real': 0.0,
                 'entradas_prev': 0.0, 'saidas_prev': 0.0,
+                'movimentos': [],
             })
+            b['movimentos'].append(d)
             valor = float(d.get('valor') or 0)
             entrada = d.get('tipo') == 'ENTRADA'
             if d.get('realizado'):
@@ -726,6 +728,7 @@ class FinanceiroService:
                     'saldo_mes_real': saldo_mes,
                     'variacao_acumulada': None,
                     'previsto_liquido': previsto_liquido,
+                    'movimentos': b['movimentos'],
                 })
                 continue
 
@@ -741,6 +744,7 @@ class FinanceiroService:
                 'saldo_mes_real': saldo_mes,
                 'variacao_acumulada': var_acum,
                 'previsto_liquido': previsto_liquido,
+                'movimentos': b['movimentos'],
             })
             serie['labels'].append(label)
             serie['entradas_real'].append(b['entradas_real'])
