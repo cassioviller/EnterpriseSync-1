@@ -648,7 +648,90 @@ class FinanceiroService:
         except Exception as e:
             logger.error(f"❌ Erro ao calcular fluxo de caixa: {str(e)}")
             raise
-    
+
+    _MESES_PT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+    @staticmethod
+    def agregar_fluxo_mensal(detalhes: list, saldo_inicial: float = 0.0) -> Dict:
+        """Agrega a lista plana de `detalhes` em série mensal (ver spec 2026-06-11 §3.2).
+
+        Pura: sem query, sem efeitos. Variação acumulada parte de ZERO e soma só o
+        Realizado (ADR 0003).
+        """
+        buckets = {}  # 'YYYY-MM' -> acumuladores
+        for d in detalhes:
+            data = d.get('data')
+            chave = 'sem-data' if data is None else '%04d-%02d' % (data.year, data.month)
+            b = buckets.setdefault(chave, {
+                'entradas_real': 0.0, 'saidas_real': 0.0,
+                'entradas_prev': 0.0, 'saidas_prev': 0.0,
+            })
+            valor = float(d.get('valor') or 0)
+            entrada = d.get('tipo') == 'ENTRADA'
+            if d.get('realizado'):
+                b['entradas_real' if entrada else 'saidas_real'] += valor
+            else:
+                b['entradas_prev' if entrada else 'saidas_prev'] += valor
+
+        meses = []
+        serie = {'labels': [], 'entradas_real': [], 'saidas_real': [],
+                 'var_acum_real': [], 'var_acum_proj': []}
+        var_acum = 0.0
+        prev_acum = 0.0
+        realizado_liquido = 0.0
+        previsto_liquido_total = 0.0
+        # 'sem-data' ordena depois de '2026-XX' (ASCII: dígitos antes de letras) → fica ao fim
+        for chave in sorted(buckets):
+            b = buckets[chave]
+            saldo_mes = b['entradas_real'] - b['saidas_real']
+            previsto_liquido = b['entradas_prev'] - b['saidas_prev']
+            # KPIs contam todos os buckets, inclusive 'sem-data'
+            realizado_liquido += saldo_mes
+            previsto_liquido_total += previsto_liquido
+
+            if chave == 'sem-data':
+                # Fora da variação acumulada e do gráfico (sem eixo temporal)
+                meses.append({
+                    'mes': 'sem-data',
+                    'label': 'Sem data',
+                    'entradas_real': b['entradas_real'],
+                    'saidas_real': b['saidas_real'],
+                    'saldo_mes_real': saldo_mes,
+                    'variacao_acumulada': None,
+                    'previsto_liquido': previsto_liquido,
+                })
+                continue
+
+            var_acum += saldo_mes
+            prev_acum += previsto_liquido
+            ano, mes = chave.split('-')
+            label = '%s/%s' % (FinanceiroService._MESES_PT[int(mes)], ano[2:])
+            meses.append({
+                'mes': chave,
+                'label': label,
+                'entradas_real': b['entradas_real'],
+                'saidas_real': b['saidas_real'],
+                'saldo_mes_real': saldo_mes,
+                'variacao_acumulada': var_acum,
+                'previsto_liquido': previsto_liquido,
+            })
+            serie['labels'].append(label)
+            serie['entradas_real'].append(b['entradas_real'])
+            serie['saidas_real'].append(b['saidas_real'])
+            serie['var_acum_real'].append(var_acum)
+            serie['var_acum_proj'].append(var_acum + prev_acum)
+
+        return {
+            'meses': meses,
+            'kpis': {
+                'saldo_banco': float(saldo_inicial),
+                'realizado_liquido': realizado_liquido,
+                'previsto_liquido': previsto_liquido_total,
+            },
+            'serie_chart': serie,
+        }
+
     # ==================== DASHBOARD ====================
     
     @staticmethod
