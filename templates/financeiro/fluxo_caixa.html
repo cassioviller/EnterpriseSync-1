@@ -95,29 +95,13 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Centro de Custo</label>
-                            <select name="centro_custo_id" class="form-select">
-                                <option value="0">Todos</option>
-                                {% for centro in centros_custo %}
-                                <option value="{{ centro.id }}" {{ 'selected' if filtros.centro_custo_id == centro.id }}>
-                                    {{ centro.nome }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">Tipo</label>
-                            <select name="tipo_movimento" class="form-select">
-                                <option value="">Todos</option>
-                                <option value="ENTRADA" {{ 'selected' if filtros.tipo_movimento == 'ENTRADA' }}>Entrada</option>
-                                <option value="SAIDA"   {{ 'selected' if filtros.tipo_movimento == 'SAIDA' }}>Saída</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-filter"></i> Filtrar
+                        <div class="col-md-3 d-flex align-items-end gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-1"></i>Filtrar
                             </button>
+                            <a href="{{ url_for('financeiro.fluxo_caixa') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Limpar
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -127,35 +111,46 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
 
     <!-- Resumo -->
     <div class="row mb-4">
+        {# Saldo em banco — valor real dos bancos (honesto; ver ADR 0003) #}
         <div class="col-md-3">
-            <div class="card bg-info text-white">
+            <div class="card bg-info text-white h-100">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-wallet me-2"></i>Saldo Inicial</h5>
-                    <h3>{{ fluxo.saldo_inicial|default(0)|brl }}</h3>
+                    <h6 class="mb-1"><i class="fas fa-university me-2"></i>Saldo em Banco</h6>
+                    <h3 class="mb-0">{{ kpis.saldo_banco|default(0)|brl }}</h3>
+                    {% if not kpis.saldo_banco %}
+                    <small class="d-block mt-1" style="opacity:.85;">Configure os saldos bancários</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
+        {# Realizado no período — o que de fato entrou menos o que saiu #}
         <div class="col-md-3">
-            <div class="card bg-success text-white">
+            <div class="card bg-{% if kpis.realizado_liquido|default(0) >= 0 %}success{% else %}danger{% endif %} text-white h-100">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-arrow-up me-2"></i>Entradas Previstas</h5>
-                    <h3>{{ fluxo.entradas_previstas|default(0)|brl }}</h3>
+                    <h6 class="mb-1"><i class="fas fa-check-circle me-2"></i>Realizado no Período</h6>
+                    <h3 class="mb-0">{{ kpis.realizado_liquido|default(0)|brl }}</h3>
+                    <small class="d-block mt-1" style="opacity:.85;">entradas − saídas efetivadas</small>
                 </div>
             </div>
         </div>
+        {# A realizar — previsto líquido (a receber − a pagar em aberto) #}
         <div class="col-md-3">
-            <div class="card bg-danger text-white">
+            <div class="card bg-secondary text-white h-100">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-arrow-down me-2"></i>Saídas Previstas</h5>
-                    <h3>{{ fluxo.saidas_previstas|default(0)|brl }}</h3>
+                    <h6 class="mb-1"><i class="fas fa-hourglass-half me-2"></i>A Realizar (previsto)</h6>
+                    <h3 class="mb-0">{{ kpis.previsto_liquido|default(0)|brl }}</h3>
+                    <small class="d-block mt-1" style="opacity:.85;">a receber − a pagar em aberto</small>
                 </div>
             </div>
         </div>
+        {# Saldo projetado — vem do service (só previsto); vermelho se negativo #}
         <div class="col-md-3">
-            <div class="card bg-{% if fluxo.saldo_final_projetado|default(0) >= 0 %}primary{% else %}warning{% endif %} {% if fluxo.saldo_final_projetado|default(0) >= 0 %}text-white{% else %}text-dark{% endif %}">
+            <div class="card bg-{% if fluxo.alerta or fluxo.saldo_final_projetado|default(0) < 0 %}danger{% else %}primary{% endif %} text-white h-100">
                 <div class="card-body text-center">
-                    <h5><i class="fas fa-balance-scale me-2"></i>Saldo Projetado</h5>
-                    <h3>{{ fluxo.saldo_final_projetado|default(0)|brl }}</h3>
+                    <h6 class="mb-1">
+                        {% if fluxo.alerta or fluxo.saldo_final_projetado|default(0) < 0 %}<i class="fas fa-exclamation-triangle me-2"></i>{% else %}<i class="fas fa-balance-scale me-2"></i>{% endif %}Saldo Projetado
+                    </h6>
+                    <h3 class="mb-0">{{ fluxo.saldo_final_projetado|default(0)|brl }}</h3>
                 </div>
             </div>
         </div>
@@ -311,8 +306,6 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
         <input type="hidden" name="_filtro_inicio"          value="{{ filtros.data_inicio }}">
         <input type="hidden" name="_filtro_fim"             value="{{ filtros.data_fim }}">
         <input type="hidden" name="_filtro_obra_id"         value="{{ filtros.obra_id|default('') }}">
-        <input type="hidden" name="_filtro_centro_custo_id" value="{{ filtros.centro_custo_id|default('') }}">
-        <input type="hidden" name="_filtro_tipo"            value="{{ filtros.tipo_movimento|default('') }}">
         <div class="modal-header">
           <h5 class="modal-title">
             <i class="fas fa-plus-circle text-success me-2"></i>Nova Movimentação
