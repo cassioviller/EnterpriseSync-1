@@ -720,7 +720,12 @@ def fluxo_caixa():
     except Exception:
         pass
     
-    fluxo = FinanceiroService.calcular_fluxo_caixa(admin_id, data_inicio, data_fim)
+    fluxo = FinanceiroService.calcular_fluxo_caixa(
+        admin_id, data_inicio, data_fim, obra_id=obra_id or None
+    )
+
+    # Agregação mensal (série + KPIs) para o dashboard híbrido
+    agg = FinanceiroService.agregar_fluxo_mensal(fluxo['detalhes'], fluxo['saldo_inicial'])
 
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
 
@@ -732,6 +737,9 @@ def fluxo_caixa():
     return render_template(
         'financeiro/fluxo_caixa.html',
         fluxo=fluxo,
+        meses=agg['meses'],
+        kpis=agg['kpis'],
+        serie_chart=agg['serie_chart'],
         filtros=filtros,
         obras=obras,
         centros_custo=centros_custo,
