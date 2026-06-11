@@ -950,10 +950,31 @@ def fluxo_caixa_confirmar():
         flash(f'Erro ao importar: {e}', 'danger')
         return redirect(url_for('importacao.index'))
 
+    # Intervalo de datas do batch para o botão "Ver no Fluxo de Caixa" —
+    # garante que a tela abra cobrindo exatamente o que foi importado.
+    fc_data_min = fc_data_max = None
+    try:
+        from models import FluxoCaixa
+        from sqlalchemy import func as sa_func
+        rng = db.session.query(
+            sa_func.min(FluxoCaixa.data_movimento),
+            sa_func.max(FluxoCaixa.data_movimento),
+        ).filter(
+            FluxoCaixa.admin_id == admin_id,
+            FluxoCaixa.import_batch_id == batch_id,
+        ).one()
+        if rng[0] and rng[1]:
+            fc_data_min = rng[0].strftime('%Y-%m-%d')
+            fc_data_max = rng[1].strftime('%Y-%m-%d')
+    except Exception as e:
+        logger.warning(f'[FLUXO_CAIXA] Não foi possível calcular intervalo do batch: {e}')
+
     return render_template(
         'importacao/resultado_fluxo.html',
         resultado=resultado,
         batch_id=batch_id,
+        fc_data_min=fc_data_min,
+        fc_data_max=fc_data_max,
     )
 
 

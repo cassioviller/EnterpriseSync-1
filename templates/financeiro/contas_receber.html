@@ -41,9 +41,22 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">Vencimento de</label>
+                    <input type="date" name="data_inicio" class="form-control"
+                           value="{{ data_inicio_filtro }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">até</label>
+                    <input type="date" name="data_fim" class="form-control"
+                           value="{{ data_fim_filtro }}">
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>Filtrar
+                    </button>
                     <a href="{{ url_for('financeiro.listar_contas_receber') }}" class="btn btn-secondary">
-                        <i class="fas fa-times me-2"></i>Limpar Filtros
+                        <i class="fas fa-times me-1"></i>Limpar
                     </a>
                 </div>
             </form>

@@ -205,16 +205,18 @@ class FinanceiroService:
             raise
     
     @staticmethod
-    def listar_contas_pagar(admin_id: int, status: str = None, 
+    def listar_contas_pagar(admin_id: int, status: str = None,
                            obra_id: int = None, vencidas: bool = False,
                            responsavel_id: int = None,
-                           categoria: str = None) -> List[ContaPagar]:
+                           categoria: str = None,
+                           data_inicio: date = None,
+                           data_fim: date = None) -> List[ContaPagar]:
         """Lista contas a pagar com filtros"""
         query = ContaPagar.query.filter_by(admin_id=admin_id)
-        
+
         if status:
             query = query.filter_by(status=status)
-        
+
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
 
@@ -223,7 +225,13 @@ class FinanceiroService:
 
         if categoria:
             query = query.filter(ContaPagar.origem_tipo == categoria)
-        
+
+        # Filtro de período por data de vencimento
+        if data_inicio:
+            query = query.filter(ContaPagar.data_vencimento >= data_inicio)
+        if data_fim:
+            query = query.filter(ContaPagar.data_vencimento <= data_fim)
+
         if vencidas:
             hoje = date.today()
             query = query.filter(
@@ -387,16 +395,24 @@ class FinanceiroService:
     
     @staticmethod
     def listar_contas_receber(admin_id: int, status: str = None,
-                             obra_id: int = None, vencidas: bool = False) -> List[ContaReceber]:
+                             obra_id: int = None, vencidas: bool = False,
+                             data_inicio: date = None,
+                             data_fim: date = None) -> List[ContaReceber]:
         """Lista contas a receber com filtros"""
         query = ContaReceber.query.filter_by(admin_id=admin_id)
-        
+
         if status:
             query = query.filter_by(status=status)
-        
+
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
-        
+
+        # Filtro de período por data de vencimento
+        if data_inicio:
+            query = query.filter(ContaReceber.data_vencimento >= data_inicio)
+        if data_fim:
+            query = query.filter(ContaReceber.data_vencimento <= data_fim)
+
         if vencidas:
             hoje = date.today()
             query = query.filter(
@@ -411,7 +427,7 @@ class FinanceiroService:
     # ==================== FLUXO DE CAIXA ====================
     
     @staticmethod
-    def calcular_fluxo_caixa(admin_id: int, data_inicio: date, 
+    def calcular_fluxo_caixa(admin_id: int, data_inicio: date,
                             data_fim: date) -> Dict:
         """
         Calcula fluxo de caixa projetado
@@ -430,8 +446,9 @@ class FinanceiroService:
                 admin_id=admin_id,
                 ativo=True
             ).all()
-            saldo_inicial = sum((b.saldo_atual or 0) for b in bancos)
-            
+            # float() evita TypeError 'Decimal - float' ao projetar saldo_final
+            saldo_inicial = float(sum((b.saldo_atual or 0) for b in bancos))
+
             # Contas a receber (entradas)
             contas_receber = ContaReceber.query.filter(
                 and_(
@@ -442,10 +459,10 @@ class FinanceiroService:
                 )
             ).all()
             
-            entradas_previstas = sum(
+            entradas_previstas = float(sum(
                 (c.saldo if c.saldo is not None else (c.valor_original or 0))
                 for c in contas_receber
-            )
+            ))
             
             # Saídas previstas — GestaoCustoPai em aberto (PENDENTE, SOLICITADO, AUTORIZADO, PARCIAL)
             dt_inicio = datetime.combine(data_inicio, datetime.min.time())
