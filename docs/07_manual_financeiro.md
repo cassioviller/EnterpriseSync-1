@@ -260,9 +260,9 @@ A tela de Contas a Receber mostra uma lista com:
 
 ---
 
-## 7.5. Fluxo de Caixa — O Extrato da Sua Empresa
+## 7.5. Fluxo de Caixa — Mês a Mês
 
-O **Fluxo de Caixa** funciona como o extrato bancário da sua empresa. Ele mostra todas as movimentações de dinheiro — tudo o que entrou e tudo o que saiu — em ordem cronológica.
+O **Fluxo de Caixa** mostra como o dinheiro da empresa se movimentou, separando o que **de fato aconteceu** (Realizado) do que **ainda está por vir** (Previsto), agrupado mês a mês.
 
 ### Como acessar o Fluxo de Caixa
 
@@ -270,47 +270,58 @@ Clique em **Financeiro → Fluxo de Caixa** no menu.
 
 ![Tela de Fluxo de Caixa](placeholder_fluxo_caixa.png)
 
-### O que você vê no Fluxo de Caixa
+### Os 4 indicadores do topo
 
-Cada linha do extrato mostra uma movimentação com as seguintes informações:
+| Card | O que mostra |
+|------|--------------|
+| **Saldo em Banco** | Soma dos saldos das contas bancárias cadastradas (mostra uma dica para configurá-los se estiver em R$ 0) |
+| **Realizado no Período** | Entradas menos saídas que **de fato aconteceram** — verde quando positivo, vermelho quando negativo |
+| **A Realizar (previsto)** | O que está por vir: a receber menos a pagar em aberto |
+| **Saldo Projetado** | Projeção do período considerando o previsto — fica vermelho com alerta quando negativo |
 
-| Informação | O que significa |
-|------------|----------------|
-| **Data** | Quando a movimentação aconteceu |
-| **Tipo** | Se é uma **Entrada** (dinheiro que entrou) ou **Saída** (dinheiro que saiu) |
-| **Categoria** | De onde veio ou para onde foi (receita de obra, custo de veículo, alimentação, salário, etc.) |
-| **Descrição** | Detalhes sobre a movimentação |
-| **Valor** | Quanto foi movimentado |
-| **Obra** | A qual obra essa movimentação está vinculada (quando aplicável) |
+### Gráfico de evolução
 
-### Resumo do período
+O gráfico mostra, mês a mês:
 
-No final do extrato, o sistema mostra um resumo:
+- **Barras verdes** — entradas realizadas
+- **Barras vermelhas** — saídas realizadas
+- **Linha azul sólida** — variação acumulada de caixa (parte de zero e soma só o Realizado)
+- **Linha azul tracejada** — variação projetada (a mesma linha, incluindo o que ainda está previsto)
 
-- **Total de Entradas** — Tudo o que entrou no período
-- **Total de Saídas** — Tudo o que saiu no período
-- **Saldo do Período** — A diferença (entradas menos saídas)
+Quando as duas linhas coincidem, não há nada previsto em aberto naquele trecho.
 
-Se o saldo for positivo, sua empresa recebeu mais do que gastou. Se for negativo, os gastos superaram as receitas naquele período.
+### Tabela mensal
+
+Cada linha é um mês, com **Entradas**, **Saídas**, **Saldo do mês**, **Variação acumulada**, **Previsto líquido** e o **número de lançamentos**. A linha fica verde quando o mês fechou positivo e vermelha quando fechou negativo.
+
+**Clique num mês para expandir** e ver os lançamentos um a um (data, tipo, status, origem, descrição e valor). Movimentações sem data ficam num grupo **"Sem data"** ao final.
+
+### Edição direto na tabela
+
+Dentro de um mês expandido, as células com o ícone de lápis ✏ (data, descrição e valor de lançamentos manuais) podem ser editadas:
+
+1. Dê **duplo clique** na célula
+2. Altere o valor
+3. **Enter** (ou ✓) salva; **Esc** (ou ✕) cancela
 
 ### Como filtrar o Fluxo de Caixa
 
-Você pode refinar a visualização com os filtros:
-
 1. **Período** — Escolha data inicial e final (ex: mês de janeiro, último trimestre)
-2. **Tipo** — Veja apenas Entradas, apenas Saídas, ou Todos
-3. **Categoria** — Filtre por um tipo específico (ex: só custos com veículos)
-4. **Obra** — Veja apenas as movimentações de uma obra
+2. **Obra** — Veja apenas as movimentações de uma obra
 
-**Exemplo prático:** Para saber quanto a Obra Residencial Solar gastou com veículos no mês de janeiro:
+**Exemplo prático:** Para saber como ficou o caixa da Obra Residencial Solar no primeiro semestre:
 
-1. Selecione o período: 01/01/2026 a 31/01/2026
-2. Selecione o tipo: Saídas
-3. Selecione a categoria: Transporte/Veículos
-4. Selecione a obra: Residencial Solar
-5. Clique em Filtrar
+1. Selecione o período: 01/01/2026 a 30/06/2026
+2. Selecione a obra: Residencial Solar
+3. Clique em Filtrar
 
-> **Dica:** Use o fluxo de caixa semanalmente para conferir se não há nenhuma movimentação estranha ou lançamento esquecido.
+Os indicadores, o gráfico e a tabela mensal passam a considerar só os movimentos daquela obra.
+
+### Nova Movimentação
+
+O botão verde **Nova Movimentação** abre um formulário para lançar uma entrada ou saída direta no caixa, com categoria, banco e obra opcionais.
+
+> **Dica:** Use o fluxo de caixa semanalmente para conferir se não há nenhuma movimentação estranha ou lançamento esquecido — a linha de variação acumulada mostra rapidamente se o caixa está melhorando ou piorando.
 
 ---
 

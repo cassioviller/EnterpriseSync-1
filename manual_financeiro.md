@@ -289,11 +289,11 @@ A lista mostra todos os custos agrupados por entidade (funcionário, restaurante
 
 **O que acontece automaticamente ao Aprovar:**
 - Status muda para **PAGO**
-- Custo **sai da tabela de Movimentos Previstos** do Fluxo de Caixa
-- Um registro de **FluxoCaixa** histórico é criado (tipo SAIDA)
+- Custo **deixa de ser Saída Prevista** no Fluxo de Caixa
+- Um registro de **FluxoCaixa** histórico é criado (tipo SAIDA) — passa a contar como **Realizado** (badge "Pago" no drill-down do mês)
 - Se a obra tiver contabilidade configurada → **lançamento contábil criado** automaticamente
 
-> **Confirmado em teste:** após APROVAR, a linha some imediatamente de "Movimentos Previstos" no Fluxo de Caixa.
+> **Confirmado em teste:** após APROVAR, a linha troca imediatamente de Saída Prevista para Pago no Fluxo de Caixa.
 
 ---
 
@@ -301,25 +301,40 @@ A lista mostra todos os custos agrupados por entidade (funcionário, restaurante
 
 **Caminho:** Financeiro → **Fluxo de Caixa**
 
-Use os filtros de **Data Início** e **Data Fim** para o período que deseja analisar.
+Use os filtros de **Data Início**, **Data Fim** e **Obra** para o recorte que deseja
+analisar. A tela separa **Realizado** (o que de fato entrou/saiu do caixa) de
+**Previsto** (obrigações em aberto) — ver glossário em `CONTEXT.md` e ADR 0003.
 
 ### O que cada card mostra
 
 | Card | Cor | O que inclui |
 |---|---|---|
-| Saldo Inicial | Azul | Soma do saldo atual de todos os bancos cadastrados |
-| Entradas Previstas | Verde | Contas a Receber com status PENDENTE ou PARCIAL no período |
-| Saídas Previstas | Vermelho | Gestão de Custos SOLICITADO no período |
-| Saldo Final Projetado | Azul/Amarelo | Saldo Inicial + Entradas − Saídas |
+| Saldo em Banco | Azul | Soma do saldo atual de todos os bancos cadastrados (dica de configuração se R$ 0) |
+| Realizado no Período | Verde/Vermelho | Entradas − saídas **efetivadas** (registros de FluxoCaixa, incl. recebimentos de conta_receber e custos PAGOS) |
+| A Realizar (previsto) | Cinza | A receber (Contas a Receber PENDENTE/PARCIAL) − a pagar (Gestão de Custos SOLICITADO) no período |
+| Saldo Projetado | Azul/Vermelho | Projeção do service (só previsto); vermelho + alerta se negativo |
 
-### Tabela de Movimentos Previstos
+### Gráfico de evolução
 
-Cada linha da tabela representa um lançamento individual:
+Misto Chart.js por mês: barras verdes (entradas realizadas), barras vermelhas (saídas
+realizadas), linha azul sólida (variação acumulada **realizada**, partindo de zero) e
+linha azul tracejada (variação **projetada** = realizada + previsto acumulado).
 
-| Cor da linha | Tipo | Origem |
+### Tabela mensal com drill-down
+
+Uma linha por mês — Entradas, Saídas, Saldo do mês, Variação acumulada, Previsto
+líquido e nº de lançamentos — colorida pelo sinal do saldo mensal. Clicar no mês
+expande a sub-tabela com os lançamentos individuais:
+
+| Cor da linha | Badge | Origem |
 |---|---|---|
-| Verde | ENTRADA | Conta a Receber pendente |
-| Vermelho | SAÍDA | Gestão de Custos (qualquer categoria) SOLICITADO |
+| Verde | Recebida / Entrada Prevista | FluxoCaixa ENTRADA realizado / Conta a Receber pendente |
+| Cinza (opaca) | Pago | FluxoCaixa SAIDA realizado (Gestão de Custos PAGO etc.) |
+| Vermelho | Saída Prevista | Gestão de Custos (qualquer categoria) SOLICITADO |
+
+Lançamentos manuais (FluxoCaixa direto) têm células editáveis inline (duplo clique:
+data, descrição, valor). Movimentos sem data caem num grupo **"Sem data"** ao fim,
+fora da variação acumulada e do gráfico, mas dentro dos KPIs.
 
 > **Gestão de Custos com Data de Vencimento:** quando o lançamento tem data de vencimento preenchida (ex: Aluguel, Energia), ele aparece no período que inclui essa data — não a data de criação. Isso garante que a projeção de caixa esteja no mês correto.
 
