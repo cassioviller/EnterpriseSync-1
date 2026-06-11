@@ -10,7 +10,7 @@ from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, PlanoContas,
     LancamentoContabil, PartidaContabil, Fornecedor, Obra,
-    FluxoCaixaContabil, GestaoCustoPai, FluxoCaixa
+    FluxoCaixaContabil, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
 )
 import logging
 
@@ -428,7 +428,7 @@ class FinanceiroService:
     
     @staticmethod
     def calcular_fluxo_caixa(admin_id: int, data_inicio: date,
-                            data_fim: date) -> Dict:
+                            data_fim: date, obra_id: int = None) -> Dict:
         """
         Calcula fluxo de caixa projetado
         
@@ -450,14 +450,17 @@ class FinanceiroService:
             saldo_inicial = float(sum((b.saldo_atual or 0) for b in bancos))
 
             # Contas a receber (entradas)
-            contas_receber = ContaReceber.query.filter(
+            cr_query = ContaReceber.query.filter(
                 and_(
                     ContaReceber.admin_id == admin_id,
                     ContaReceber.data_vencimento >= data_inicio,
                     ContaReceber.data_vencimento <= data_fim,
                     ContaReceber.status.in_(['PENDENTE', 'PARCIAL'])
                 )
-            ).all()
+            )
+            if obra_id:
+                cr_query = cr_query.filter(ContaReceber.obra_id == obra_id)
+            contas_receber = cr_query.all()
             
             entradas_previstas = float(sum(
                 (c.saldo if c.saldo is not None else (c.valor_original or 0))
@@ -494,10 +497,16 @@ class FinanceiroService:
                         ),
                     )
                 )
-            ).all()
+            )
+            if obra_id:
+                # GestaoCustoPai não tem obra; filtra via filhos (conta o pai inteiro — Q8)
+                custos_v2_previstos = custos_v2_previstos.filter(
+                    GestaoCustoPai.itens.any(GestaoCustoFilho.obra_id == obra_id)
+                )
+            custos_v2_previstos = custos_v2_previstos.all()
 
             # Movimentos realizados: consultar tabela FluxoCaixa diretamente (captura PAGO e PARCIAL)
-            pagamentos_realizados = FluxoCaixa.query.filter(
+            pr_query = FluxoCaixa.query.filter(
                 and_(
                     FluxoCaixa.admin_id == admin_id,
                     FluxoCaixa.tipo_movimento == 'SAIDA',
@@ -505,17 +514,26 @@ class FinanceiroService:
                     FluxoCaixa.data_movimento >= data_inicio,
                     FluxoCaixa.data_movimento <= data_fim,
                 )
-            ).all()
+            )
+            if obra_id:
+                pr_query = pr_query.filter(FluxoCaixa.obra_id == obra_id)
+            pagamentos_realizados = pr_query.all()
 
             # Manter compatibilidade: PAGO via GestaoCustoPai.data_pagamento (fallback)
-            custos_v2_pagos = GestaoCustoPai.query.filter(
+            cp_query = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status == 'PAGO',
                     GestaoCustoPai.data_pagamento >= data_inicio,
                     GestaoCustoPai.data_pagamento <= data_fim,
                 )
-            ).all()
+            )
+            if obra_id:
+                # GestaoCustoPai não tem obra; filtra via filhos (conta o pai inteiro — Q8)
+                cp_query = cp_query.filter(
+                    GestaoCustoPai.itens.any(GestaoCustoFilho.obra_id == obra_id)
+                )
+            custos_v2_pagos = cp_query.all()
             ids_pago_via_gc = {c.id for c in custos_v2_pagos}
 
             # Saídas previstas: usar saldo (valor restante) para PARCIAL, total para demais
@@ -591,14 +609,17 @@ class FinanceiroService:
             
             # Entradas e saídas diretas no FluxoCaixa (importação ou lançamento manual)
             # Restringe a referencia_tabela IS NULL para alinhar com /editar (mesmo critério)
-            fluxos_diretos = FluxoCaixa.query.filter(
+            fd_query = FluxoCaixa.query.filter(
                 and_(
                     FluxoCaixa.admin_id == admin_id,
                     FluxoCaixa.data_movimento >= data_inicio,
                     FluxoCaixa.data_movimento <= data_fim,
                     FluxoCaixa.referencia_tabela == None,  # noqa: E711
                 )
-            ).all()
+            )
+            if obra_id:
+                fd_query = fd_query.filter(FluxoCaixa.obra_id == obra_id)
+            fluxos_diretos = fd_query.all()
             for fc in fluxos_diretos:
                 detalhes.append({
                     'id': fc.id,
