@@ -89,6 +89,18 @@ def test_serie_chart_barras_e_duas_linhas():
     assert s["var_acum_proj"] == [60.0, 110.0]      # +previsto acum (-10): 60 ; 110
 
 
+def test_movimentos_agrupados_por_mes_na_ordem_de_entrada():
+    """Cada mês carrega seus movimentos (para o drill-down do Passo 6), na ordem
+    em que chegaram — `calcular_fluxo_caixa` já entrega ordenado por data."""
+    a = _mov(date(2026, 1, 10), "ENTRADA", 100.0, True)
+    b = _mov(date(2026, 1, 20), "SAIDA", 30.0, True)
+    c = _mov(date(2026, 2, 5), "ENTRADA", 50.0, False)
+    out = agregar([a, b, c], saldo_inicial=0.0)
+
+    assert out["meses"][0]["movimentos"] == [a, b]
+    assert out["meses"][1]["movimentos"] == [c]
+
+
 def test_lista_vazia():
     out = agregar([], saldo_inicial=0.0)
     assert out["meses"] == []

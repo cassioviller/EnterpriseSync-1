@@ -46,6 +46,11 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
   margin-left:3px;
   vertical-align: middle;
 }
+
+/* Tabela mensal com drill-down */
+tr.mes-toggle { cursor: pointer; }
+tr.mes-toggle .mes-chevron { transition: transform .2s; }
+tr.mes-toggle[aria-expanded="true"] .mes-chevron { transform: rotate(180deg); }
 </style>
 {% endblock %}
 
@@ -174,125 +179,172 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
         </div>
     </div>
 
-    <!-- Tabela -->
+    {# Linha de um movimento — markup da antiga tabela plana, reusado no drill-down
+       de cada mês (Passo 6). `rid` dá id único às linhas não-editáveis. #}
+    {% macro linha_movimento(movimento, rid) %}
+    {% set realizado = movimento.realizado|default(false) %}
+    {% set editavel  = movimento.editavel|default(false) %}
+    {% set mov_id    = movimento.id|default(0) %}
+    {% set edit_url  = url_for('financeiro.editar_fluxo_caixa', fc_id=mov_id) if editavel else '' %}
+    <tr {% if editavel %}id="row-{{ mov_id }}"{% else %}id="nrow-{{ rid }}"{% endif %}
+        class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}"
+        data-editavel="{{ 'true' if editavel else 'false' }}"
+        data-edit-url="{{ edit_url }}"
+        data-id="{{ mov_id }}">
+
+        <!-- Data -->
+        <td class="{{ 'cell-editable' if editavel else '' }}" data-field="data_movimento">
+            <span class="cell-text">
+                {{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}
+                {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
+            </span>
+            {% if editavel %}
+            <div class="cell-edit">
+                <input type="date" class="cell-input"
+                       value="{{ movimento.data.strftime('%Y-%m-%d') if movimento.data else '' }}"
+                       style="min-width:130px;">
+                <button class="cell-save-btn" type="button">✓</button>
+                <button class="cell-cancel-btn" type="button">✕</button>
+            </div>
+            {% endif %}
+        </td>
+
+        <!-- Tipo (badge distingue Realizado × Previsto; entradas realizadas mantêm
+             .badge.bg-success — o JS de edição inline usa essa classe p/ o sinal) -->
+        <td>
+            {% if movimento.tipo == 'ENTRADA' %}
+                {% if realizado %}
+                <span class="badge bg-success"><i class="fas fa-arrow-up me-1"></i>Recebida</span>
+                {% else %}
+                <span class="badge bg-light text-success border"><i class="fas fa-arrow-up me-1"></i>Entrada Prevista</span>
+                {% endif %}
+            {% elif realizado %}
+                <span class="badge bg-secondary"><i class="fas fa-check me-1"></i>Pago</span>
+            {% else %}
+                <span class="badge bg-danger"><i class="fas fa-arrow-down me-1"></i>Saída Prevista</span>
+            {% endif %}
+        </td>
+
+        <!-- Status -->
+        <td>
+            {% set st = movimento.status|default('') %}
+            {% if st in ('PAGO', 'RECEBIDO') %}
+                <span class="badge bg-primary">{{ st|title }}</span>
+            {% elif st == 'AUTORIZADO' %}
+                <span class="badge bg-success">Autorizado</span>
+            {% elif st == 'SOLICITADO' %}
+                <span class="badge bg-warning text-dark">Solicitado</span>
+            {% elif st == 'PENDENTE' %}
+                <span class="badge bg-light text-dark border">Pendente</span>
+            {% else %}
+                <span class="badge bg-light text-dark border">—</span>
+            {% endif %}
+        </td>
+
+        <!-- Origem -->
+        <td><span class="badge bg-secondary">{{ movimento.origem|default('') }}</span></td>
+
+        <!-- Descrição -->
+        <td class="{{ 'cell-editable' if editavel else '' }}" data-field="descricao">
+            <span class="cell-text">
+                {{ movimento.descricao|default('-') }}
+                {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
+            </span>
+            {% if editavel %}
+            <div class="cell-edit">
+                <input type="text" class="cell-input"
+                       value="{{ movimento.descricao|default('') }}"
+                       style="min-width:200px;">
+                <button class="cell-save-btn" type="button">✓</button>
+                <button class="cell-cancel-btn" type="button">✕</button>
+            </div>
+            {% endif %}
+        </td>
+
+        <!-- Valor -->
+        <td class="text-end {{ 'cell-editable' if editavel else '' }}" data-field="valor">
+            <span class="cell-text {% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %} fw-semibold">
+                {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
+                {{ movimento.valor|default(0)|brl }}
+                {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
+            </span>
+            {% if editavel %}
+            <div class="cell-edit">
+                <input type="text" class="cell-input text-end"
+                       value="{{ "%.2f"|format(movimento.valor|default(0)) }}"
+                       style="min-width:80px;">
+                <button class="cell-save-btn" type="button">✓</button>
+                <button class="cell-cancel-btn" type="button">✕</button>
+            </div>
+            {% endif %}
+        </td>
+    </tr>
+    {% endmacro %}
+
+    <!-- Tabela mensal com drill-down -->
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Movimentos do Período ({{ fluxo.detalhes|default([])|length }} registros)</h5>
+                    <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Movimentação Mensal ({{ fluxo.detalhes|default([])|length }} registros)</h5>
                     <small class="text-muted">
+                        Clique num mês para ver os lançamentos ·
                         <i class="fas fa-pencil-alt me-1 text-primary"></i>
-                        Duplo clique em células com <i class="fas fa-pencil-alt" style="font-size:.65rem;color:#adb5bd;"></i> para editar data, valor ou descrição inline
+                        duplo clique em células com <i class="fas fa-pencil-alt" style="font-size:.65rem;color:#adb5bd;"></i> edita data, valor ou descrição
                     </small>
                 </div>
                 <div class="card-body p-0">
-                    {% if fluxo.detalhes %}
+                    {% if meses %}
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0" id="movimentosTable" style="font-size:.9rem;">
+                        <table class="table mb-0 align-middle" style="font-size:.92rem;">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="min-width:110px;">Data</th>
-                                    <th>Tipo</th>
-                                    <th>Status</th>
-                                    <th>Origem</th>
-                                    <th>Descrição</th>
-                                    <th class="text-end" style="min-width:110px;">Valor</th>
+                                    <th style="min-width:90px;">Mês</th>
+                                    <th class="text-end">Entradas</th>
+                                    <th class="text-end">Saídas</th>
+                                    <th class="text-end">Saldo do mês</th>
+                                    <th class="text-end">Variação acumulada</th>
+                                    <th class="text-end">Previsto líquido</th>
+                                    <th class="text-center">nº</th>
+                                    <th style="width:40px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for movimento in fluxo.detalhes %}
-                                {% set realizado = movimento.realizado|default(false) %}
-                                {% set editavel  = movimento.editavel|default(false) %}
-                                {% set mov_id    = movimento.id|default(0) %}
-                                {% set edit_url  = url_for('financeiro.editar_fluxo_caixa', fc_id=mov_id) if editavel else '' %}
-                                <tr {% if editavel %}id="row-{{ mov_id }}"{% else %}id="nrow-{{ loop.index }}"{% endif %}
-                                    class="{% if movimento.tipo == 'ENTRADA' %}table-success{% elif realizado %}table-secondary{% else %}table-danger{% endif %} {% if realizado %}opacity-75{% endif %}"
-                                    data-editavel="{{ 'true' if editavel else 'false' }}"
-                                    data-edit-url="{{ edit_url }}"
-                                    data-id="{{ mov_id }}">
-
-                                    <!-- Data -->
-                                    <td class="{{ 'cell-editable' if editavel else '' }}" data-field="data_movimento">
-                                        <span class="cell-text">
-                                            {{ movimento.data.strftime('%d/%m/%Y') if movimento.data else '-' }}
-                                            {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
-                                        </span>
-                                        {% if editavel %}
-                                        <div class="cell-edit">
-                                            <input type="date" class="cell-input"
-                                                   value="{{ movimento.data.strftime('%Y-%m-%d') if movimento.data else '' }}"
-                                                   style="min-width:130px;">
-                                            <button class="cell-save-btn" type="button">✓</button>
-                                            <button class="cell-cancel-btn" type="button">✕</button>
+                                {% for mes in meses %}
+                                {% set mid = 'mes-' ~ mes.mes %}
+                                <tr class="mes-toggle {{ 'table-success' if mes.saldo_mes_real >= 0 else 'table-danger' }}"
+                                    data-bs-toggle="collapse" data-bs-target="#{{ mid }}"
+                                    aria-expanded="false" aria-controls="{{ mid }}">
+                                    <td class="fw-semibold">{{ mes.label }}</td>
+                                    <td class="text-end text-success">{{ mes.entradas_real|brl }}</td>
+                                    <td class="text-end text-danger">{{ mes.saidas_real|brl }}</td>
+                                    <td class="text-end fw-semibold {{ 'text-success' if mes.saldo_mes_real >= 0 else 'text-danger' }}">{{ mes.saldo_mes_real|brl }}</td>
+                                    <td class="text-end">{% if mes.variacao_acumulada is not none %}{{ mes.variacao_acumulada|brl }}{% else %}—{% endif %}</td>
+                                    <td class="text-end">{{ mes.previsto_liquido|brl }}</td>
+                                    <td class="text-center"><span class="badge bg-secondary">{{ mes.movimentos|length }}</span></td>
+                                    <td class="text-center"><i class="fas fa-chevron-down mes-chevron text-muted"></i></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="8" class="p-0 border-0">
+                                        <div class="collapse" id="{{ mid }}">
+                                            <table class="table table-hover mb-0" style="font-size:.88rem;">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="min-width:110px;">Data</th>
+                                                        <th>Tipo</th>
+                                                        <th>Status</th>
+                                                        <th>Origem</th>
+                                                        <th>Descrição</th>
+                                                        <th class="text-end" style="min-width:110px;">Valor</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for movimento in mes.movimentos %}
+                                                    {{ linha_movimento(movimento, mes.mes ~ '-' ~ loop.index) }}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        {% endif %}
-                                    </td>
-
-                                    <!-- Tipo -->
-                                    <td>
-                                        <span class="badge bg-{% if movimento.tipo == 'ENTRADA' %}success{% elif realizado %}secondary{% else %}danger{% endif %}">
-                                            {% if movimento.tipo == 'ENTRADA' %}
-                                                <i class="fas fa-arrow-up me-1"></i>Entrada
-                                            {% elif realizado %}
-                                                <i class="fas fa-check me-1"></i>Pago
-                                            {% else %}
-                                                <i class="fas fa-arrow-down me-1"></i>Saída Prevista
-                                            {% endif %}
-                                        </span>
-                                    </td>
-
-                                    <!-- Status -->
-                                    <td>
-                                        {% set st = movimento.status|default('') %}
-                                        {% if st in ('PAGO', 'RECEBIDO') %}
-                                            <span class="badge bg-primary">{{ st|title }}</span>
-                                        {% elif st == 'AUTORIZADO' %}
-                                            <span class="badge bg-success">Autorizado</span>
-                                        {% elif st == 'SOLICITADO' %}
-                                            <span class="badge bg-warning text-dark">Solicitado</span>
-                                        {% elif st == 'PENDENTE' %}
-                                            <span class="badge bg-light text-dark border">Pendente</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark border">—</span>
-                                        {% endif %}
-                                    </td>
-
-                                    <!-- Origem -->
-                                    <td><span class="badge bg-secondary">{{ movimento.origem|default('') }}</span></td>
-
-                                    <!-- Descrição -->
-                                    <td class="{{ 'cell-editable' if editavel else '' }}" data-field="descricao">
-                                        <span class="cell-text">
-                                            {{ movimento.descricao|default('-') }}
-                                            {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
-                                        </span>
-                                        {% if editavel %}
-                                        <div class="cell-edit">
-                                            <input type="text" class="cell-input"
-                                                   value="{{ movimento.descricao|default('') }}"
-                                                   style="min-width:200px;">
-                                            <button class="cell-save-btn" type="button">✓</button>
-                                            <button class="cell-cancel-btn" type="button">✕</button>
-                                        </div>
-                                        {% endif %}
-                                    </td>
-
-                                    <!-- Valor -->
-                                    <td class="text-end {{ 'cell-editable' if editavel else '' }}" data-field="valor">
-                                        <span class="cell-text {% if movimento.tipo == 'ENTRADA' %}text-success{% elif realizado %}text-secondary{% else %}text-danger{% endif %} fw-semibold">
-                                            {% if movimento.tipo == 'ENTRADA' %}+{% else %}-{% endif %}
-                                            {{ movimento.valor|default(0)|brl }}
-                                            {% if editavel %}<i class="fas fa-pencil-alt pencil-hint"></i>{% endif %}
-                                        </span>
-                                        {% if editavel %}
-                                        <div class="cell-edit">
-                                            <input type="text" class="cell-input text-end"
-                                                   value="{{ "%.2f"|format(movimento.valor|default(0)) }}"
-                                                   style="min-width:80px;">
-                                            <button class="cell-save-btn" type="button">✓</button>
-                                            <button class="cell-cancel-btn" type="button">✕</button>
-                                        </div>
-                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -554,16 +606,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.key === 'Escape') { e.preventDefault(); cancelEdit(td); }
         });
     });
-
-    // DataTable init
-    if (typeof $.fn !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
-        $('#movimentosTable').DataTable({
-            language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
-            order: [[0, 'desc']],
-            pageLength: 25,
-            columnDefs: [{ targets: [5], className: 'text-end' }]
-        });
-    }
 
     // Gráfico de evolução (Chart.js): barras realizadas + 2 linhas de variação acumulada
     var elGrafico = document.getElementById('graficoFluxo');
