@@ -156,6 +156,24 @@ td.cell-editing .cell-edit  { display: flex !important; align-items: center; gap
         </div>
     </div>
 
+    <!-- Gráfico de evolução -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Evolução no período</h5>
+                </div>
+                <div class="card-body">
+                    {% if serie_chart and serie_chart.labels %}
+                    <canvas id="graficoFluxo" style="max-height:340px;"></canvas>
+                    {% else %}
+                    <p class="text-muted text-center mb-0 py-4">Sem dados no período selecionado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tabela -->
     <div class="row">
         <div class="col-12">
@@ -544,6 +562,47 @@ document.addEventListener('DOMContentLoaded', function() {
             order: [[0, 'desc']],
             pageLength: 25,
             columnDefs: [{ targets: [5], className: 'text-end' }]
+        });
+    }
+
+    // Gráfico de evolução (Chart.js): barras realizadas + 2 linhas de variação acumulada
+    var elGrafico = document.getElementById('graficoFluxo');
+    if (elGrafico && typeof Chart !== 'undefined') {
+        var serie = {{ serie_chart|tojson }};
+        var fmtBRL = function(v) {
+            return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        };
+        new Chart(elGrafico, {
+            data: {
+                labels: serie.labels,
+                datasets: [
+                    { type: 'bar', label: 'Entradas', data: serie.entradas_real,
+                      backgroundColor: 'rgba(25,135,84,.75)', order: 3, yAxisID: 'y' },
+                    { type: 'bar', label: 'Saídas', data: serie.saidas_real,
+                      backgroundColor: 'rgba(220,53,69,.75)', order: 3, yAxisID: 'y' },
+                    { type: 'line', label: 'Variação acumulada (realizada)', data: serie.var_acum_real,
+                      borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,.1)',
+                      borderWidth: 2, tension: .2, order: 1, yAxisID: 'y1' },
+                    { type: 'line', label: 'Variação acumulada (projetada)', data: serie.var_acum_proj,
+                      borderColor: '#0d6efd', borderDash: [6, 4], borderWidth: 2,
+                      pointRadius: 0, tension: .2, order: 2, yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: { callbacks: { label: function(c) { return c.dataset.label + ': ' + fmtBRL(c.parsed.y); } } }
+                },
+                scales: {
+                    y:  { position: 'left',  title: { display: true, text: 'Entradas / Saídas' },
+                          ticks: { callback: function(v) { return fmtBRL(v); } } },
+                    y1: { position: 'right', title: { display: true, text: 'Variação acumulada' },
+                          grid: { drawOnChartArea: false },
+                          ticks: { callback: function(v) { return fmtBRL(v); } } }
+                }
+            }
         });
     }
 });
