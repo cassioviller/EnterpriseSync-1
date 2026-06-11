@@ -316,7 +316,7 @@ tr.mes-toggle[aria-expanded="true"] .mes-chevron { transform: rotate(180deg); }
                                 {% for mes in meses %}
                                 {% set mid = 'mes-' ~ mes.mes %}
                                 <tr class="mes-toggle {{ 'table-success' if mes.saldo_mes_real >= 0 else 'table-danger' }}"
-                                    data-bs-toggle="collapse" data-bs-target="#{{ mid }}"
+                                    role="button" data-target="{{ mid }}"
                                     aria-expanded="{{ 'true' if abrir_todos else 'false' }}" aria-controls="{{ mid }}">
                                     <td class="fw-semibold">{{ mes.label }}</td>
                                     <td class="text-end text-success">{{ mes.entradas_real|brl }}</td>
@@ -327,27 +327,27 @@ tr.mes-toggle[aria-expanded="true"] .mes-chevron { transform: rotate(180deg); }
                                     <td class="text-center"><span class="badge bg-secondary">{{ mes.movimentos|length }}</span></td>
                                     <td class="text-center"><i class="fas fa-chevron-down mes-chevron text-muted"></i></td>
                                 </tr>
-                                <tr>
+                                {# Linha de detalhe: escondida via display (sem collapse animado do
+                                   Bootstrap, que travava em altura 0 dentro de tabela). #}
+                                <tr class="mes-detalhe{{ '' if abrir_todos else ' d-none' }}" id="{{ mid }}">
                                     <td colspan="8" class="p-0 border-0">
-                                        <div class="collapse{{ ' show' if abrir_todos else '' }}" id="{{ mid }}">
-                                            <table class="table table-hover mb-0" style="font-size:.88rem;">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th style="min-width:110px;">Data</th>
-                                                        <th>Tipo</th>
-                                                        <th>Status</th>
-                                                        <th>Origem</th>
-                                                        <th>Descrição</th>
-                                                        <th class="text-end" style="min-width:110px;">Valor</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for movimento in mes.movimentos %}
-                                                    {{ linha_movimento(movimento, mes.mes ~ '-' ~ loop.index) }}
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <table class="table table-hover mb-0" style="font-size:.88rem;">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="min-width:110px;">Data</th>
+                                                    <th>Tipo</th>
+                                                    <th>Status</th>
+                                                    <th>Origem</th>
+                                                    <th>Descrição</th>
+                                                    <th class="text-end" style="min-width:110px;">Valor</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for movimento in mes.movimentos %}
+                                                {{ linha_movimento(movimento, mes.mes ~ '-' ~ loop.index) }}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -564,8 +564,25 @@ function saveEdit(td) {
     });
 }
 
+// Expandir/recolher um mês — toggle próprio por display (sem depender do
+// collapse animado do Bootstrap, que ficava preso em altura 0 dentro da tabela).
+function toggleMes(tr) {
+    var alvo = document.getElementById(tr.getAttribute('data-target'));
+    if (!alvo) return;
+    var aberto = alvo.classList.toggle('d-none') === false; // true se ficou visível
+    tr.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+}
+
 // Bind dblclick/key handlers to editable cells
 document.addEventListener('DOMContentLoaded', function() {
+    // Toggle de mês: clique na linha-resumo abre/fecha a sub-tabela.
+    document.querySelectorAll('tr.mes-toggle').forEach(function(tr) {
+        tr.addEventListener('click', function(e) {
+            if (e.target.closest('.cell-edit')) return; // nunca no meio de uma edição
+            toggleMes(tr);
+        });
+    });
+
     document.querySelectorAll('td.cell-editable').forEach(function(td) {
         // Add tooltip hint on the display text span
         var textSpan = td.querySelector('.cell-text');
