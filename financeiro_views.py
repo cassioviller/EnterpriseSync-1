@@ -697,29 +697,17 @@ def fluxo_caixa():
         data_fim = _df
     
     obra_id = request.args.get('obra_id', type=int) or 0
-    centro_custo_id = request.args.get('centro_custo_id', type=int) or 0
-    tipo_movimento = request.args.get('tipo_movimento', '')
-    
-    # Criar objeto filtros para o template
+
+    # Criar objeto filtros para o template (período + obra; centro/tipo removidos — spec Q6/Q7)
     filtros = {
         'data_inicio': data_inicio.strftime('%Y-%m-%d') if data_inicio else '',
         'data_fim': data_fim.strftime('%Y-%m-%d') if data_fim else '',
         'obra_id': obra_id,
-        'centro_custo_id': centro_custo_id,
-        'tipo_movimento': tipo_movimento
     }
-    
-    # Buscar obras e centros de custo para os dropdowns
+
+    # Buscar obras para o dropdown
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
-    
-    # Tentar buscar centros de custo se existir a tabela
-    centros_custo = []
-    try:
-        from models import CentroCusto
-        centros_custo = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).all()
-    except Exception:
-        pass
-    
+
     fluxo = FinanceiroService.calcular_fluxo_caixa(
         admin_id, data_inicio, data_fim, obra_id=obra_id or None
     )
@@ -742,7 +730,6 @@ def fluxo_caixa():
         serie_chart=agg['serie_chart'],
         filtros=filtros,
         obras=obras,
-        centros_custo=centros_custo,
         bancos=bancos,
         categorias_fc=categorias_fc,
         data_inicio=data_inicio,
@@ -808,9 +795,7 @@ def novo_fluxo_caixa():
     return redirect(url_for('financeiro.fluxo_caixa',
                             data_inicio=request.form.get('_filtro_inicio', ''),
                             data_fim=request.form.get('_filtro_fim', ''),
-                            obra_id=request.form.get('_filtro_obra_id', ''),
-                            centro_custo_id=request.form.get('_filtro_centro_custo_id', ''),
-                            tipo_movimento=request.form.get('_filtro_tipo', '')))
+                            obra_id=request.form.get('_filtro_obra_id', '')))
 
 
 @financeiro_bp.route('/fluxo-caixa/<int:fc_id>/editar', methods=['POST'])
