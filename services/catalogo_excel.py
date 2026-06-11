@@ -175,6 +175,11 @@ INSUMO_HEADERS = [
     'fator_comercial', 'unidade_comercial', 'tipo_medicao',
 ]
 
+COMPOSICAO_HEADERS = [
+    'servico_nome', 'servico_unidade', 'categoria',
+    'insumo_nome', 'coeficiente', 'unidade_insumo', 'observacao',
+]
+
 TIPOS_MEDICAO_VALIDOS = {
     'UNITARIO', 'AREA', 'PERIMETRO', 'PERIMETRO_PE_DIREITO', 'AREA_PE_DIREITO', 'LINEAR',
 }
@@ -547,8 +552,68 @@ def _aplicar_nova_vigencia_preco(
 
 
 # ──────────────────────────────────────────────────────────────────────
-# COMPOSIÇÕES — importação
+# COMPOSIÇÕES — modelo + importação
 # ──────────────────────────────────────────────────────────────────────
+def gerar_modelo_composicoes_xlsx(admin_id: int) -> bytes:
+    """Gera o `.xlsx` de Composições com os dados reais do tenant.
+
+    Exporta cada linha de composição (serviço × insumo × coeficiente) dos
+    serviços ativos de ``admin_id``. Sem dados, exporta só o cabeçalho.
+    Round-trip: o arquivo baixado pode ser editado e reimportado.
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Composicoes'
+    ws.append(COMPOSICAO_HEADERS)
+    _style_header(ws, len(COMPOSICAO_HEADERS))
+
+    servicos = (
+        Servico.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(Servico.nome)
+        .all()
+    )
+    for svc in servicos:
+        for c in sorted(svc.composicoes, key=lambda c: (c.insumo.nome if c.insumo else '')):
+            ins = c.insumo
+            coef_val = str(c.coeficiente or '0').replace('.', ',')
+            ws.append([
+                svc.nome or '',
+                svc.unidade_medida or '',
+                svc.categoria or '',
+                ins.nome if ins else '',
+                coef_val,
+                c.unidade or (ins.unidade if ins else ''),
+                c.observacao or '',
+            ])
+
+    _autosize(ws, [32, 14, 18, 32, 14, 14, 36])
+
+    inst = wb.create_sheet('Instruções')
+    inst.append(['Como preencher a planilha de Composições'])
+    inst.append([])
+    inst.append(['Coluna', 'O que é'])
+    for col, txt in [
+        ('servico_nome', 'Nome do serviço. Linhas com o mesmo nome formam um serviço só.'),
+        ('servico_unidade', 'Unidade do serviço (kg, m2, m3, un, m, vb). Obrigatória ao criar serviço novo.'),
+        ('categoria', 'Categoria do serviço (opcional).'),
+        ('insumo_nome', 'Nome do insumo — precisa já estar cadastrado. Importe os Insumos primeiro.'),
+        ('coeficiente', 'Quanto do insumo entra em 1 unidade do serviço (ex.: 0,014 h por kg).'),
+        ('unidade_insumo', 'Unidade do insumo (opcional; usa a do cadastro se vazio).'),
+        ('observacao', 'Texto livre (ex.: "perda 5%", "h/kg").'),
+    ]:
+        inst.append([col, txt])
+    inst.append([])
+    inst.append(['Importação', 'Serviço com nome igual a um já cadastrado é atualizado, '
+                 'não duplicado. A composição é casada por (serviço, insumo).'])
+    inst.append(['', 'Linha cujo insumo não existe é rejeitada e reportada no resumo; '
+                 'as demais continuam.'])
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    return bio.getvalue()
+
+
 def importar_composicoes_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
     """Lê um `.xlsx` e faz upsert de Serviços e suas Composições.
 
