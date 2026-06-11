@@ -63,6 +63,14 @@ ao de hoje (não-regressão).
 
 ---
 
+## Passo 2.5 — Entradas recebidas no fluxo (achado da verificação) ✅ FEITO
+
+Descoberto ao verificar o Passo 2 com dados reais: `calcular_fluxo_caixa` incluía as
+saídas realizadas (`gestao_custo_pai`) mas **não** as entradas realizadas
+(`FluxoCaixa` ENTRADA com `referencia_tabela='conta_receber'`) — R$ 1,17M recebidos
+ficavam invisíveis, quebrando o propósito do redesenho. Adicionada a query simétrica
+(respeita `obra_id`) + 1 teste de integração. Commit `91ead22`.
+
 ## Passo 3 — Fiar a view (Q6/Q7)
 
 **Arquivo:** `financeiro_views.py:679-742`.
