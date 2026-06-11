@@ -114,7 +114,7 @@ O mapeamento concreto **serviço → código SINAPI** dos 17 itens fica no plano
 
 1. Importador de Composições funciona: planilha serviço×insumo×coeficiente popula `Servico` + `ComposicaoServico`, com upsert e histórico, e rejeita linhas inválidas com motivo.
 2. Os 17 itens da obra existem no sistema como serviços com composição SINAPI e quantidades.
-3. **Validação (Passo 5)**: para cada item, o custo recalculado pelo sistema é comparável ao da proposta REV10; divergências ficam explícitas e justificadas (erro da planilha, escolha de coeficiente, ou ajuste de quantidade).
+3. **Validação (Passo 5)**: para cada item, o sistema é comparado à REV10 nos **dois** números — custo recalculado × custo REV10, **e** preço de venda (pós-BDI) × preço de venda REV10 (colunas K–AE). Divergências ficam explícitas e justificadas (erro corrigido da planilha, escolha de coeficiente, ou ajuste de quantidade).
 4. Cada coeficiente é editável e rastreável (`ComposicaoServicoHistorico`).
 
 ## 7. Fora de escopo
@@ -124,7 +124,7 @@ O mapeamento concreto **serviço → código SINAPI** dos 17 itens fica no plano
 - `GERENCIAMENTO FINANCEIRO/Planilha de Custos.xlsx` e `MEDIÇÃO/Medição.xlsx` **não são fonte** — estão vazias / com dados aleatórios, conforme o usuário.
 - Importação automática de Orçamento/Proposta via Excel (o Orçamento é montado a partir dos serviços + quantidades; Proposta é gerada do Orçamento pelo fluxo que já existe).
 
-## 8. Decisões em aberto (resolver no Passo 0)
+## 8. Decisões do Passo 0 (resolvidas)
 
-- **Custo × venda**: qual número da REV10 é a referência de validação — o custo (R$ 1.145.717,42, soma das colunas de custo) ou o preço de venda (colunas K–AE, não somadas na planilha)?
-- Tratamento dos **erros já achados na planilha** (material "verba global" multiplicado por quantidade no preço de venda; item 1.16 com material contado uma vez para 24 baias): corrigir na importação ou replicar e sinalizar?
+- **Custo × venda**: a validação usa **os dois**. Compara custo recalculado × custo REV10 **e** preço de venda (pós-BDI) × preço de venda REV10 (colunas K–AE). Os dois precisam ser reconciliados.
+- **Erros da planilha**: **corrigir na importação** — modelar o valor correto (não replicar o erro), documentando cada correção. Casos conhecidos: material "verba global" multiplicado por quantidade no preço de venda; item 1.16 com material contado uma vez para 24 baias.
