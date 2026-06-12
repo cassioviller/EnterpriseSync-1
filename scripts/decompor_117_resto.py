@@ -5,10 +5,10 @@ aço/painelização, fechamentos e pintura stain JÁ são precificados nos itens
 os escopos genuinamente NOVOS do 1.17 são:
 
   - Fundação ................. já feita (decompor_117_fundacao.py)
-  - Infra Elétrica ........... aba 'Instalações' (ref. Vereda)   ⚠️
-  - Infra Hidráulica ......... aba 'Instalações' (ref. Vereda)   ⚠️
-  - Isolamento (lã de rocha) . área do Memorial; preço estimado  🧩
-  - Forro PVC preto .......... área Memorial FORRO; preço estim. 🧩
+  - Infra Elétrica ........... contagem dos PROJETOS + SINAPI-SP 104473/104480
+  - Infra Hidráulica ......... contagem dos PROJETOS + SINAPI-SP 104678
+  - Isolamento (lã de rocha) . área do Memorial; preço de mercado 🧩
+  - Forro PVC preto .......... área Memorial FORRO; SINAPI 96111  🧩
 
 Cria os insumos + um serviço decomposto por escopo (idempotente) e imprime a
 reconciliação com a verba 1.17 (mat R$52.322 + M.O. R$40.242 = R$92.564).
@@ -22,13 +22,21 @@ CATEGORIA = 'Obra Baia REV10'
 
 # serviço -> (unidade_servico, [ (insumo, tipo, un, preco, coef, obs) ])
 SERVICOS = {
+    # Firmado pela ANÁLISE DOS PROJETOS (DETALHE_ESTUDO_BAIAS, BLOCO 1 E 2, IMPLANTACAO):
+    # 24 baias, cada uma com 1 ponto de luz no teto + 1 ponto água fria + 1 ponto esgoto
+    # (bebedouro). NÃO há bloco de banheiros nas baias -> louças/metais do Memorial são
+    # "NÃO INCLUSOS" / da cabana existente. Substitui a verba Vereda por contagem SINAPI-SP.
     'Infra Elétrica (1.17)': ('vb', [
-        ('M.O. infra elétrica',       'MAO_OBRA', 'vb', '10000.00', '1', 'Instalações!D28 (Vereda) ⚠️ SINAPI 104473=R$203,40/ponto'),
-        ('Material infra elétrica',   'MATERIAL', 'vb', '18000.00', '1', 'Instalações!D29 (Vereda) ⚠️ depende da contagem de pontos'),
+        # 24 luz baias + ~20 luz pilares (infra, SINAPI 104473 R$203,40/pt) + 8 tomadas
+        # (104480 ~R$155) + 8 refletores LED ext + 2 quadros/alimentador. ~mat 63% / M.O. 37%.
+        ('Material infra elétrica',   'MATERIAL', 'vb', '11000.00', '1', '44 pts ilum+tomadas+refletor+quadro; SINAPI 104473/104480-SP (projetos)'),
+        ('M.O. infra elétrica',       'MAO_OBRA', 'vb', '6400.00',  '1', 'instalação dos 44 pts+quadro; SINAPI-SP parcela M.O.'),
     ]),
     'Infra Hidráulica (1.17)': ('vb', [
-        ('M.O. infra hidráulica',     'MAO_OBRA', 'vb', '15000.00', '1', 'Instalações!G7 (Vereda) ⚠️ SINAPI 104660=R$1.308/conj. água fria'),
-        ('Material infra hidráulica', 'MATERIAL', 'vb', '13000.00', '1', 'Instalações!G8 (Vereda) ⚠️ SINAPI 104678=R$134,89/conj. esgoto'),
+        # 24 drenos/esgoto baias (104678 ~R$135/pt) + rede água fria aos 24 bebedouros
+        # (~130m tubo + ramais + registros). Os 24 TERMINAIS de água fria estão no item 1.16.
+        ('Material infra hidráulica', 'MATERIAL', 'vb', '6300.00', '1', '24 esgoto/dreno + rede AF ~130m; SINAPI 104678-SP (AF terminal=1.16)'),
+        ('M.O. infra hidráulica',     'MAO_OBRA', 'vb', '4200.00', '1', 'instalação rede esgoto+água fria; SINAPI-SP parcela M.O.'),
     ]),
     'Isolamento lã de rocha (1.17)': ('m2', [
         # Painel lã de rocha 32kg/m³ 1200x600x50mm (0,72 m²/pç). Área = FORRO 196,14 m² (Memorial!E26).
