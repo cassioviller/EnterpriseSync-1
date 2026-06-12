@@ -15,6 +15,10 @@ INSUMO_HEADERS = ['nome', 'tipo', 'unidade', 'descricao', 'coeficiente_padrao',
 COMP_HEADERS = ['servico_nome', 'servico_unidade', 'categoria',
                 'insumo_nome', 'coeficiente', 'unidade_insumo', 'observacao']
 CATEGORIA = 'Obra Baia REV10'
+# Venda total do orçamento ORIGINAL = soma da coluna O (TOTAL venda) da aba
+# 'Proposta Comercial' da REV10. A venda é calibrada por markup UNIFORME para o
+# total bater exatamente com este número (os custos/insumos/coef. são os nossos).
+VENDA_ORIGINAL = Decimal('1720796.75')
 
 
 def D(s):
@@ -155,29 +159,25 @@ SERVICOS = [
 
 
 def calc():
-    rows = []
-    tot_custo = tot_venda = Decimal('0')
-    for cod, nome, un, qty_s, comps, bdi in SERVICOS:
+    """Custos da decomposição + venda por MARKUP UNIFORME (venda total = original).
+
+    rows = [(cod, nome, un, qty, custo_unit, custo_total, venda_total)].
+    """
+    tmp = []
+    tot_custo = Decimal('0')
+    for cod, nome, un, qty_s, comps, _bdi in SERVICOS:
         qty = D(qty_s)
-        Lmat = Decimal(bdi.get('Lmat', '0.20'))
-        Tmo = Decimal('0.13')
-        Lmo = Decimal(bdi.get('Lmo', '0.28'))
-        mat = mo = Decimal('0')
+        cu = Decimal('0')  # custo por unidade de serviço
         for ins, coef_s, _ in comps:
-            tipo, _u, preco = INSUMOS[ins]
-            v = D(coef_s) * D(preco)
-            if tipo in ('MATERIAL', 'EQUIPAMENTO'):
-                mat += v
-            else:
-                mo += v
-        mat_total = mat * qty
-        mo_total = mo * qty
-        custo_total = mat_total + mo_total
-        venda = mat_total / (1 - Lmat) + mo_total / (1 - (Tmo + Lmo))
+            _tipo, _u, preco = INSUMOS[ins]
+            cu += D(coef_s) * D(preco)
+        custo_total = cu * qty
         tot_custo += custo_total
-        tot_venda += venda
-        rows.append((cod, nome, un, qty, (mat + mo), custo_total, venda))
-    return rows, tot_custo, tot_venda
+        tmp.append((cod, nome, un, qty, cu, custo_total))
+    # markup uniforme p/ a venda total igualar a do orçamento original
+    fator = VENDA_ORIGINAL / tot_custo
+    rows = [(cod, nome, un, qty, cu, ct, ct * fator) for cod, nome, un, qty, cu, ct in tmp]
+    return rows, tot_custo, VENDA_ORIGINAL
 
 
 def money(x):
