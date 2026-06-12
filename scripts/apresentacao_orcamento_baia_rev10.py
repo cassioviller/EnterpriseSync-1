@@ -35,11 +35,8 @@ _spec = importlib.util.spec_from_file_location(
 _gi = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_gi)
 INSUMOS, SERVICOS, D = _gi.INSUMOS, _gi.SERVICOS, _gi.D
-
-# venda total do orçamento ORIGINAL = soma da coluna O (TOTAL venda) da aba
-# 'Proposta Comercial' da planilha REV10. A venda da apresentação é calibrada
-# para bater exatamente com este número.
-VENDA_ORIGINAL = Decimal('1720796.75')
+# mesma fonte do gerador (evita divergência): venda total do orçamento original
+VENDA_ORIGINAL = _gi.VENDA_ORIGINAL
 
 AZUL = '2F5496'
 AZUL_CLARO = 'D9E1F2'
