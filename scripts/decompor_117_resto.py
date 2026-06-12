@@ -22,10 +22,11 @@ CATEGORIA = 'Obra Baia REV10'
 
 # serviço -> (unidade_servico, [ (insumo, tipo, un, preco, coef, obs) ])
 SERVICOS = {
-    # Firmado pela ANÁLISE DOS PROJETOS (DETALHE_ESTUDO_BAIAS, BLOCO 1 E 2, IMPLANTACAO):
-    # 24 baias, cada uma com 1 ponto de luz no teto + 1 ponto água fria + 1 ponto esgoto
-    # (bebedouro). NÃO há bloco de banheiros nas baias -> louças/metais do Memorial são
-    # "NÃO INCLUSOS" / da cabana existente. Substitui a verba Vereda por contagem SINAPI-SP.
+    # Firmado pela ANÁLISE DOS PROJETOS (DETALHE_ESTUDO_BAIAS, BLOCO 1 E 2, IMPLANTACAO)
+    # + Memorial. 24 baias, cada uma com 1 ponto de luz no teto + 1 ponto água fria + 1
+    # ponto esgoto (bebedouro). O BANHEIRO/APOIO (8 bacias, 6 cubas, 2 mictórios, etc. do
+    # Memorial) É do projeto da baia -> a infra hidráulica e a M.O. de instalação entram.
+    # Só o MATERIAL das louças/metais é "NÃO INCLUSO" (cliente fornece) — R$40.939,92.
     'Infra Elétrica (1.17)': ('vb', [
         # 24 luz baias + ~20 luz pilares (infra, SINAPI 104473 R$203,40/pt) + 8 tomadas
         # (104480 ~R$155) + 8 refletores LED ext + 2 quadros/alimentador. ~mat 63% / M.O. 37%.
@@ -33,10 +34,11 @@ SERVICOS = {
         ('M.O. infra elétrica',       'MAO_OBRA', 'vb', '6400.00',  '1', 'instalação dos 44 pts+quadro; SINAPI-SP parcela M.O.'),
     ]),
     'Infra Hidráulica (1.17)': ('vb', [
-        # 24 drenos/esgoto baias (104678 ~R$135/pt) + rede água fria aos 24 bebedouros
-        # (~130m tubo + ramais + registros). Os 24 TERMINAIS de água fria estão no item 1.16.
-        ('Material infra hidráulica', 'MATERIAL', 'vb', '6300.00', '1', '24 esgoto/dreno + rede AF ~130m; SINAPI 104678-SP (AF terminal=1.16)'),
-        ('M.O. infra hidráulica',     'MAO_OBRA', 'vb', '4200.00', '1', 'instalação rede esgoto+água fria; SINAPI-SP parcela M.O.'),
+        # 24 esgoto/dreno baias (104678 ~R$135) + rede AF ~130m aos bebedouros + BANHEIRO
+        # ~17 pts AF e ~21 pts esgoto (Memorial) + M.O. instalação louças R$3.436 + caixas/
+        # registros. Terminais AF das baias = item 1.16. Material das louças = NÃO INCLUSO.
+        ('Material infra hidráulica', 'MATERIAL', 'vb', '9400.00', '1', '24 esgoto baias+rede AF+banheiro(17AF/21esg)+caixas/reg; SINAPI 104678-SP'),
+        ('M.O. infra hidráulica',     'MAO_OBRA', 'vb', '9600.00', '1', 'instalação rede+banheiro+M.O. louças R$3.436 (Memorial); SINAPI-SP'),
     ]),
     'Isolamento lã de rocha (1.17)': ('m2', [
         # Painel lã de rocha 32kg/m³ 1200x600x50mm (0,72 m²/pç). Área = FORRO 196,14 m² (Memorial!E26).
