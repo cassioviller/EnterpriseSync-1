@@ -23,21 +23,23 @@ CATEGORIA = 'Obra Baia REV10'
 # serviço -> (unidade_servico, [ (insumo, tipo, un, preco, coef, obs) ])
 SERVICOS = {
     'Infra Elétrica (1.17)': ('vb', [
-        ('M.O. infra elétrica',       'MAO_OBRA', 'vb', '10000.00', '1', 'Instalações!D28 (ref. Vereda) ⚠️'),
-        ('Material infra elétrica',   'MATERIAL', 'vb', '18000.00', '1', 'Instalações!D29 (ref. Vereda) ⚠️'),
+        ('M.O. infra elétrica',       'MAO_OBRA', 'vb', '10000.00', '1', 'Instalações!D28 (Vereda) ⚠️ SINAPI 104473=R$203,40/ponto'),
+        ('Material infra elétrica',   'MATERIAL', 'vb', '18000.00', '1', 'Instalações!D29 (Vereda) ⚠️ depende da contagem de pontos'),
     ]),
     'Infra Hidráulica (1.17)': ('vb', [
-        ('M.O. infra hidráulica',     'MAO_OBRA', 'vb', '15000.00', '1', 'Instalações!G7 (ref. Vereda) ⚠️'),
-        ('Material infra hidráulica', 'MATERIAL', 'vb', '13000.00', '1', 'Instalações!G8 (ref. Vereda) ⚠️'),
+        ('M.O. infra hidráulica',     'MAO_OBRA', 'vb', '15000.00', '1', 'Instalações!G7 (Vereda) ⚠️ SINAPI 104660=R$1.308/conj. água fria'),
+        ('Material infra hidráulica', 'MATERIAL', 'vb', '13000.00', '1', 'Instalações!G8 (Vereda) ⚠️ SINAPI 104678=R$134,89/conj. esgoto'),
     ]),
     'Isolamento lã de rocha (1.17)': ('m2', [
         # Painel lã de rocha 32kg/m³ 1200x600x50mm (0,72 m²/pç). Área = FORRO 196,14 m² (Memorial!E26).
-        ('Painel lã de rocha 32kg/m³ 50mm', 'MATERIAL', 'm2', '48.00', '196.142', 'spec 1.17; preço estimado 🧩'),
-        ('M.O. instalação isolamento',      'MAO_OBRA', 'm2', '12.00', '196.142', 'estimado 🧩'),
+        # Preço corrigido p/ mercado: pct 4,32 m² ~R$104 -> ~R$25/m² (antes R$48, 2x alto).
+        ('Painel lã de rocha 32kg/m³ 50mm', 'MATERIAL', 'm2', '25.00', '196.142', 'mercado ~R$25/m² (pct 4,32m² @ ~R$104) 🧩'),
+        ('M.O. instalação isolamento',      'MAO_OBRA', 'm2', '10.00', '196.142', 'estimado 🧩'),
     ]),
     'Forro PVC preto (1.17)': ('m2', [
-        ('Forro PVC preto (material)', 'MATERIAL', 'm2', '38.00', '196.142', 'área Memorial!E26; preço estimado 🧩'),
-        ('M.O. instalação forro PVC',  'MAO_OBRA', 'm2', '22.00', '196.142', 'estimado 🧩'),
+        # Alinhado ao SINAPI 96111 (forro PVC) = R$66,39/m² all-in, ref 03/2026 não desonerado.
+        ('Forro PVC preto (material)', 'MATERIAL', 'm2', '42.00', '196.142', 'SINAPI 96111 R$66,39/m² all-in 🧩'),
+        ('M.O. instalação forro PVC',  'MAO_OBRA', 'm2', '24.00', '196.142', 'SINAPI 96111 (parcela M.O.) 🧩'),
     ]),
 }
 
@@ -60,9 +62,12 @@ def main():
                 if not ins:
                     ins = Insumo(admin_id=aid, nome=nome, tipo=tipo, unidade=un)
                     db.session.add(ins); db.session.flush()
-                if not PrecoBaseInsumo.query.filter_by(insumo_id=ins.id, vigencia_fim=None).first():
+                pb = PrecoBaseInsumo.query.filter_by(insumo_id=ins.id, vigencia_fim=None).first()
+                if not pb:
                     db.session.add(PrecoBaseInsumo(admin_id=aid, insumo_id=ins.id,
                                    valor=Decimal(preco), vigencia_inicio=date(2026, 1, 1)))
+                else:
+                    pb.valor = Decimal(preco)  # atualiza p/ valor revisado (SINAPI/mercado)
                 ins_by_nome[nome] = ins
             db.session.flush()
 
