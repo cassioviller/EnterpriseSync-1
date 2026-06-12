@@ -34,7 +34,22 @@ INSUMOS = {
     'Adicional elétrico': ('MATERIAL', 'vb', '1500,00'),
     'Quadro/diversos elétrico': ('MATERIAL', 'vb', '610,00'),
     'Material ponto hidráulico': ('MATERIAL', 'un', '867,10'),
-    'Material pacote complementar': ('MATERIAL', 'vb', '52322,00'),
+    # --- 1.17 decomposto (substitui a verba 'pacote complementar') ---
+    'Concreto armado fundação': ('MATERIAL', 'm3', '480,00'),
+    'Bomba de concreto': ('EQUIPAMENTO', 'un', '1800,00'),
+    'Aço CA-50 fundação': ('MATERIAL', 'kg', '5,50'),
+    'Madeira de forma': ('MATERIAL', 'vb', '9000,00'),
+    'Miscelâneas fundação': ('MATERIAL', 'vb', '5500,00'),
+    'Equipe fundação (dia)': ('MAO_OBRA', 'dia', '1170,00'),
+    'Visita técnica (Guilherme)': ('MAO_OBRA', 'vb', '2914,00'),
+    'Material infra elétrica': ('MATERIAL', 'vb', '11000,00'),
+    'M.O. infra elétrica': ('MAO_OBRA', 'vb', '6400,00'),
+    'Material infra hidráulica': ('MATERIAL', 'vb', '9400,00'),
+    'M.O. infra hidráulica': ('MAO_OBRA', 'vb', '9600,00'),
+    'Painel lã de rocha 32kg/m³ 50mm': ('MATERIAL', 'm2', '25,00'),
+    'M.O. instalação isolamento': ('MAO_OBRA', 'm2', '10,00'),
+    'Forro PVC preto (material)': ('MATERIAL', 'm2', '42,00'),
+    'M.O. instalação forro PVC': ('MAO_OBRA', 'm2', '24,00'),
     'Encarregado': ('MAO_OBRA', 'h', '36,36'),
     'Montador líder': ('MAO_OBRA', 'h', '31,82'),
     'Montador': ('MAO_OBRA', 'h', '26,14'),
@@ -110,9 +125,31 @@ SERVICOS = [
     ('1.16', 'Ponto hidráulico por baia', 'un', '24', [
         ('Material ponto hidráulico', '1', 'corrigido: material x24 (planilha conta 1x)'),
         ('M.O. ponto hidráulico', '1', 'taxa 100/un')], {}),
-    ('1.17', 'Pacote complementar REV10', 'vb', '1', [
-        ('Material pacote complementar', '1', 'verba — decompor depois'),
-        ('M.O. pacote complementar', '1', 'verba; BDI lucro 15%')],
+    # 1.17 DECOMPOSTO (era verba R$92.564). BDI do pacote: Lmat 0.22 / Lmo 0.15.
+    ('1.17a', 'Fundação - sapatas, radier e aço', 'vb', '1', [
+        ('Concreto armado fundação', '58,23', '58,23 m3 x R$480 (aba Fundação)'),
+        ('Bomba de concreto', '3', '3 x R$1800'),
+        ('Aço CA-50 fundação', '2743', '2.743 kg x R$5,50'),
+        ('Madeira de forma', '1', 'verba R$9000'),
+        ('Miscelâneas fundação', '1,5', '1,5 x R$5500'),
+        ('Equipe fundação (dia)', '20', '20 dias x R$1170/dia (enxugado de 40)'),
+        ('Visita técnica (Guilherme)', '1', 'verba R$2914')],
+        {'Lmat': '0.22', 'Lmo': '0.15'}),
+    ('1.17b', 'Infra Elétrica', 'vb', '1', [
+        ('Material infra elétrica', '1', '44 pts ilum+tomadas+quadro; SINAPI 104473/104480 (projetos)'),
+        ('M.O. infra elétrica', '1', 'instalação; SINAPI-SP')],
+        {'Lmat': '0.22', 'Lmo': '0.15'}),
+    ('1.17c', 'Infra Hidráulica', 'vb', '1', [
+        ('Material infra hidráulica', '1', '24 esgoto baias+banheiro+rede AF; SINAPI 104678'),
+        ('M.O. infra hidráulica', '1', 'instalação + M.O. louças R$3436 (Memorial)')],
+        {'Lmat': '0.22', 'Lmo': '0.15'}),
+    ('1.17d', 'Isolamento lã de rocha', 'm2', '196,142', [
+        ('Painel lã de rocha 32kg/m³ 50mm', '1', 'mercado ~R$25/m2 (pct 4,32m2)'),
+        ('M.O. instalação isolamento', '1', 'estimado R$10/m2')],
+        {'Lmat': '0.22', 'Lmo': '0.15'}),
+    ('1.17e', 'Forro PVC preto', 'm2', '196,142', [
+        ('Forro PVC preto (material)', '1', 'SINAPI 96111 R$66/m2 all-in'),
+        ('M.O. instalação forro PVC', '1', 'parcela M.O.')],
         {'Lmat': '0.22', 'Lmo': '0.15'}),
 ]
 
@@ -129,7 +166,7 @@ def calc():
         for ins, coef_s, _ in comps:
             tipo, _u, preco = INSUMOS[ins]
             v = D(coef_s) * D(preco)
-            if tipo == 'MATERIAL':
+            if tipo in ('MATERIAL', 'EQUIPAMENTO'):
                 mat += v
             else:
                 mo += v
@@ -185,7 +222,8 @@ def build_xlsx(rows, tot_custo, tot_venda):
 
     ws4 = wb.create_sheet('LEIA-ME')
     for line in [
-        ['Importação da obra Baia REV10 — 17 itens (composição = CUSTO; BDI/lucro por item)'],
+        ['Importação da obra Baia REV10 — 21 serviços (1.17 decomposto em 1.17a-e). '
+         'Composição = CUSTO; BDI/lucro por item.'],
         [''],
         ['Como importar:'],
         ['  1) Catálogo de Insumos  -> Importar Excel  (aba "Insumos")'],
@@ -196,9 +234,16 @@ def build_xlsx(rows, tot_custo, tot_venda):
         ['  1.16 material x24 (planilha contava 1x) · 1.7 unidade vb->m2'],
         ['  1.3/1.8/1.15 Stain modelado como verba global (custo)'],
         [''],
+        ['1.17 DECOMPOSTO (era verba R$92.564) em 5 serviços = R$148.211 (custo):'],
+        ['  1.17a Fundação R$92.001 (enxugada: equipe 20 dias, sem escavação dupla)'],
+        ['  1.17b Infra Elétrica R$17.400 · 1.17c Infra Hidráulica R$19.000 (projetos+SINAPI)'],
+        ['  1.17d Isolamento lã de rocha R$6.865 · 1.17e Forro PVC R$12.945 (mercado/SINAPI)'],
+        ['  NÃO recadastrados (já em outros itens): aço->1.1, fechamento->1.5/1.6, stain->1.8/1.15'],
+        ['  NÃO incluso (cliente): material das louças/metais R$40.940'],
+        [''],
         ['Pendentes de calibração sua:'],
         ['  1.9 base 44 vs qtd 32 · 1.12 12 pontos vs descrição (baias+pilares)'],
-        ['  1.17 verba — decompor em fundação/aço/painelização/instalações'],
+        ['  1.3 erro da planilha: R$128k fantasma (Stain global em H vs x161 em J)'],
         [''],
         ['ATENÇÃO ao importar Insumos: nomes genéricos (Montador, Ajudante, '
          'Concreto usinado...) podem já existir no seu catálogo e o preço será '
