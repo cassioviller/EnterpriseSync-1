@@ -55,7 +55,7 @@ SERVICOS = {
 
 VERBA_MAT = Decimal('52322')
 VERBA_MO = Decimal('40242')
-FUNDACAO_REAL = Decimal('121000')  # do decompor_117_fundacao.py (mat+M.O. ~R$121k)
+FUNDACAO_REAL = Decimal('92000')  # do decompor_117_fundacao.py (enxugado: 20 dias, sem escavação dupla)
 
 
 def main():

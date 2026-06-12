@@ -10,16 +10,22 @@ from datetime import date
 
 SVC = 'Fundação - sapatas, radier e aço (1.17)'
 # nome -> (tipo, unidade, preco, coef_no_servico, obs)
+# NOTA: enxugado vs aba. A aba bilava 40 dias de equipe (R$46.800) e a escavação
+# de estaca à parte (R$5.600). O Memorial diz RADIER=15 dias e a equipe já executa
+# a escavação -> 40 dias era ~2x e a escavação era dupla contagem. Ajustado para
+# 20 dias e escavação removida -> fundação de R$121k cai para ~R$92k (cruzamento
+# Memorial + SINAPI ~R$2.078/m³, dentro da faixa de concreto armado de fundação).
 LINHAS = [
-    ('Escavação de estaca',        'MAO_OBRA',   'm',  '20.00',  '280',   'aba Fundação L62'),
     ('Concreto armado fundação',   'MATERIAL',   'm3', '480.00', '58.23', 'aba Fundação L63'),
     ('Bomba de concreto',          'EQUIPAMENTO','un', '1800.00','3',     'aba Fundação L64'),
     ('Aço CA-50 fundação',         'MATERIAL',   'kg', '5.50',   '2743',  'aba Fundação L65'),
     ('Madeira de forma',           'MATERIAL',   'vb', '9000.00','1',     'aba Fundação L66'),
     ('Miscelâneas fundação',       'MATERIAL',   'vb', '5500.00','1.5',   'aba Fundação L67'),
-    ('Equipe fundação (dia)',      'MAO_OBRA',   'dia','1170.00','40',    'Enc+2Ped+MeioOf+Aj, 40 dias'),
+    ('Equipe fundação (dia)',      'MAO_OBRA',   'dia','1170.00','20',    'Enc+2Ped+MeioOf+Aj, 20 dias (enxugado de 40)'),
     ('Visita técnica (Guilherme)', 'MAO_OBRA',   'vb', '2914.00','1',     'aba Fundação L39'),
 ]
+# insumos removidos do serviço nesta revisão (limpa composições antigas no banco)
+REMOVIDOS = ['Escavação de estaca']
 VERBA_MAT = Decimal('52322'); VERBA_MO = Decimal('40242')
 
 
@@ -53,6 +59,13 @@ def main():
                 comp = ComposicaoServico(admin_id=aid, servico_id=svc.id, insumo_id=ins.id)
                 db.session.add(comp)
             comp.coeficiente = Decimal(coef); comp.unidade = un; comp.observacao = obs
+        # remove composições de insumos descartados nesta revisão
+        for nome in REMOVIDOS:
+            ins = Insumo.query.filter_by(admin_id=aid, nome=nome).first()
+            if ins:
+                comp = ComposicaoServico.query.filter_by(servico_id=svc.id, insumo_id=ins.id).first()
+                if comp:
+                    db.session.delete(comp)
         db.session.commit()
 
         # comparação
