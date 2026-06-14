@@ -62,9 +62,15 @@ fechamento. O alvo é mostrar, **por Atividade e por dia**:
 
 - **D1 — Custo incorrido de MO por atividade é COMPUTADO no read-model**, não gravado: ratear o
   `RDOCustoDiario.custo_total_dia` do funcionário pelas **horas que ele lançou em cada atividade**
-  naquele dia (`RDOMaoObra.horas_trabalhadas` por `tarefa_cronograma_id`). Não exige mexer
-  (destrutivamente) no pipeline de geração de custo, e usa o custo **onerado real**, não uma tarifa
-  nominal. → Fatia 1 sem migration.
+  naquele dia (`RDOMaoObra.horas_trabalhadas` por `tarefa_cronograma_id`; as horas já vêm
+  normalizadas por `utils/rdo_horas.py` e o `custo_total_dia` já é proporcional às horas lançadas em
+  `services/custo_funcionario_dia.py:81`, então o rateio fecha sem perder nem inflar). Usa o custo
+  **onerado real**, não tarifa nominal. → Fatia 1 sem migration.
+  - **Ociosidade NÃO é medida.** Tempo pago e ocioso (chuva, espera) fica **embutido** no custo da
+    atividade via as horas apontadas — é parte real do custo de fazê-la. O **índice de
+    produtividade** (D5) é o sinal de ineficiência, sem exigir que alguém cronometre o ócio. O
+    mensalista pago e não apontado a nenhuma atividade no dia cai automaticamente em `ocioso_mensal`
+    (nível obra), sem entrada manual.
 - **D2 — Custo direto não-MO é etiquetado na origem** com `tarefa_cronograma_id` (nova FK opcional
   em `GestaoCustoFilho`); **custo compartilhado é rateado** por hora-homem/atividade/dia dentro do
   read-model. → Fatia 2.
@@ -72,8 +78,12 @@ fechamento. O alvo é mostrar, **por Atividade e por dia**:
   (verba+lucro), reusando seu `tarefa_cronograma_id`. → Fatia 2 (telhado viga I).
 - **D4 — Resultado = competência** (Custo incorrido), separado da lente de **caixa** (Realizado/
   Previsto, ADR 0003). Duas lentes, nunca fundidas.
-- **D5 — Alarme = índice de produtividade** (horas ganhas ÷ horas reais), o indicador que antecipa
-  o prejuízo enquanto ainda dá para reagir.
+- **D5 — Alarme primário em R$ (universal):** `custo MO real incorrido` vs `custo MO orçado para o
+  avanço` (= `%concluído × custo MO orçado da atividade`, vindo das linhas `MAO_OBRA` do snapshot da
+  composição × quantidade × peso). Alarme quando `real > orçado-para-o-avanço`. Funciona para
+  qualquer modelo de precificação (R$/m², hora, verba). **Refino em horas** (horas ganhas ÷ horas
+  reais) só onde a MO foi precificada **em hora** (coeficiente em `h`, ex.: item 1.1 LSF) — na Baia
+  a maioria dos itens precifica MO em R$/m², sem hora-homem orçada.
 
 ## 5. As fatias
 
@@ -102,19 +112,32 @@ considerando **só MO** (o maior custo variável), com o alarme.
   `RDOCustoDiario.custo_total_dia × (horas do func. na atividade / horas totais do func. no dia)`,
   usando `RDOMaoObra.tarefa_cronograma_id` + `RDOMaoObra.horas_trabalhadas`.
 - `resultado_realizado_atividade(tarefa)` = valor agregado − custo MO (Fatia 1: só MO).
-- `indice_produtividade(tarefa)`:
-  - `horas_ganhas` = `(quantidade_acumulada / quantidade_total) × horas_previstas_atividade`,
-    onde `horas_previstas` = `SubatividadeMestre.duracao_estimada_horas` (as mesmas horas do peso).
-  - `horas_reais` = Σ `RDOMaoObra.horas_trabalhadas` da atividade.
-  - `indice = horas_ganhas / horas_reais` (<1 = no vermelho); **alarme** quando `< 0,9`.
+- `custo_mo_orcado_atividade(tarefa)` = Σ subtotais `MAO_OBRA` do `composicao_snapshot` do
+  `OrcamentoItem` × quantidade × peso da atividade (em R$, disponível para qualquer precificação).
+- `alarme_mo(tarefa)` **(primário, R$)**:
+  - `orcado_para_avanço` = `(percentual_concluido/100) × custo_mo_orcado_atividade`.
+  - `real` = `custo_mo_atividade` (acumulado).
+  - **estouro** quando `real > orcado_para_avanço`; índice R$ = `orcado_para_avanço / real`
+    (<1 = no vermelho).
+- `indice_horas(tarefa)` **(refino, só se MO precificada em hora)**:
+  - `horas_ganhas` = `(quantidade_acumulada / quantidade_total) × horas_orçadas`, onde
+    `horas_orçadas` = Σ coeficientes dos insumos `MAO_OBRA` com `unidade='h'` × quantidade × peso.
+  - `horas_reais` = Σ `RDOMaoObra.horas_trabalhadas` da atividade. `indice = ganhas / reais`.
+  - Indisponível quando a MO do item não tem insumo horário (mostra só o alarme em R$).
+- **D6 — O peso Serviço→Atividade é o da medição (REUSO).** Tanto a venda quanto o custo orçado da
+  atividade são divididos pelo `ItemMedicaoCronogramaTarefa.peso` que **já existe** para a medição —
+  uma única fonte de verdade. Editor manual já pronto: `medicao_views.py:344` (`vincular_tarefa`),
+  tela `templates/medicao/gestao_itens.html`, validação soma=100% (`medicao_service.py:68`). **Sem
+  campo nem regra nova.**
 
 **UI:** tela/aba "Resultado por Atividade" da obra (nova view `resultado_views.py` ou aba na obra),
 listando por atividade: qtd prevista×produzida, Valor agregado, Custo incorrido (MO), Resultado
 realizado, índice de produtividade com selo de alarme. Rollup por Serviço e Obra.
 
 **Critérios de aceite:** com RDOs lançados por atividade, o Resultado e o índice batem com cálculo
-manual; editar um RDO não quebra o vínculo; soma dos Resultados das atividades = Resultado do
-serviço.
+manual; editar um RDO não quebra o vínculo; a soma do Custo incorrido das atividades = custo de MO
+**apontado** da obra (o pago não apontado a nenhuma atividade fica em `ocioso_mensal`, nível obra,
+automático — sem medição manual).
 
 **Fora de escopo (Fatia 1):** material/alimentação/transporte, subempreitada, previsão, caixa.
 
@@ -160,9 +183,10 @@ Lente distinta do Resultado (competência).
 - **Bug edição RDO** (`rdo_editar_sistema.py:374`) — corrigido na Fatia 1.
 - **Materialização não-automática** — para a Baia, materializamos explicitamente; rever se vira
   automático é decisão à parte (possível ADR).
-- **Peso/horas frágil**: se `SubatividadeMestre.duracao_estimada_horas` está vazio, o peso e as
-  "horas ganhas" caem em divisão igual (`cronograma_proposta.py:677`) e distorcem o resultado.
-  Popular horas previstas faz parte da montagem do cronograma da Baia.
+- **Peso semeado por divisão igual**: quando `SubatividadeMestre.duracao_estimada_horas` está vazio,
+  a materialização semeia o peso por divisão igual (`cronograma_proposta.py:677`). Mitigação: ajustar
+  na **tela de medição que já existe** (D6) — não é campo novo. Para o refino em horas (1.1), as
+  horas vêm da composição (D5), não do catálogo.
 - **Gate v2**: todo o módulo exige `versao_sistema='v2'`; a obra Baia precisa estar em v2.
 
 ## 7. Fora de escopo (YAGNI agora)
