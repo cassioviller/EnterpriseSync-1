@@ -14,6 +14,7 @@ junta + basecoat) — insumo para definir as Atividades/Subatividades do cronogr
 ## Artefatos (todos no repo)
 - **`docs/superpowers/specs/2026-06-14-espinha-financeira-obra-design.md`** — o spec (5 fatias, decisões D1–D6). MESTRE.
 - **`docs/superpowers/specs/2026-06-14-mapa-codigo-cronograma-custo-medicao.md`** — mapa do código real (file:line). REFERÊNCIA.
+- **`docs/superpowers/specs/2026-06-14-quebra-atividades-baia-rev10.md`** — os 21 serviços quebrados em Atividades (passos), com unidade/dependência/peso. INSUMO DO CRONOGRAMA.
 - **`CONTEXT.md`** — glossário (termos fixados nesta sessão, abaixo).
 - `ESTUDO_cronograma_baia_rev10.md` — mecânica cronograma↔orçamento↔medição + mapa atividade→serviço (MPP §3).
 - `CONTEXTO_orcamento_baia_rev10.md` · `HANDOFF_baia_rev10.md` — contexto do orçamento Baia.
@@ -51,8 +52,14 @@ Resultado sobe Atividade → Serviço → Obra. "Realizado" sozinho é banido (e
 - `subatividade_mestre` vazio (0); peso semeia por divisão igual — ajusta-se na tela de medição (D6).
 - Gate v2: a obra Baia precisa estar em `versao_sistema='v2'`.
 
-## Próximo passo (em andamento)
-**Estudar a quebra de cada atividade em passos executáveis** (placa cimentícia → instalar / tratamento
-de junta / basecoat; LSF → painelização / verticalização; etc.). Saída esperada: lista de
-Atividades/Subatividades por Serviço da Baia, com a sequência que faz sentido — base para montar o
-cronograma (habilitação da Fatia 1) e para o catálogo `SubatividadeMestre`.
+## Feito nesta sessão (além do spec)
+**Quebra dos 21 serviços em Atividades** concluída (pesquisa do método executivo + projetos da obra) →
+`docs/superpowers/specs/2026-06-14-quebra-atividades-baia-rev10.md`. Cada serviço tem seus passos em
+ordem, com unidade de apontamento, dependências e peso. É o insumo para montar o cronograma da Baia
+(habilitação da Fatia 1) e semear o catálogo `SubatividadeMestre`.
+
+## Próximo passo
+1. **Decisões em aberto** (fim do doc de quebra): 1.16×1.17c (água fria 2×), 1.17d×1.17e (lã de rocha
+   = plano do forro), 1.12 (12 vs 24 pontos), telhado viga I (verba+lucro), granularidade de alguns 1:N.
+2. **Montar o cronograma da Baia** a partir da quebra (criar Atividades/templates) — habilitação da Fatia 1.
+3. **Plano de implementação da Fatia 1** (writing-plans) quando o spec for aprovado.
