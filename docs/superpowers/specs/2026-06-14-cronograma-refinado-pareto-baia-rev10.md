@@ -1,121 +1,101 @@
-# Cronograma refinado (Pareto + Linha de Balanço) — Obra Baia REV10
+# Cronograma refinado (Pareto POR SERVIÇO + Linha de Balanço) — Obra Baia REV10
 
-> Decisão de engenharia: **o que realmente vale metrificar** no cronograma da Baia. Parte da quebra
-> completa (`2026-06-14-quebra-atividades-baia-rev10.md`, ~80 passos = referência) e a **enxuga ao
-> que tem valor de gestão**, para não poluir o RDO nem matar a aderência do preenchimento.
-> Fundamentado no Pareto de custo real do orçamento + metodologia (LOB/LBMS, EVM, aderência de RDO).
-> Data: 2026-06-14. Este é o **cronograma-de-controle de referência**; a quebra de ~80 passos fica
-> como dicionário de método executivo.
+> Decisão de engenharia: **o que vale metrificar** no cronograma da Baia. Parte da quebra completa
+> (`2026-06-14-quebra-atividades-baia-rev10.md`, ~80 passos = dicionário de método) e a enxuga.
+> **Base do Pareto (corrigida): a importância de cada PASSO dentro do SEU serviço** — não o custo do
+> serviço. Em cada serviço, os poucos passos vitais viram atividade; o resto funde. Serviço barato com
+> 2 frentes vitais distintas → 2 atividades; serviço caro que é 1 frente só → 1 atividade.
+> Data: 2026-06-14. Este é o cronograma-de-controle de referência.
 
-## Princípio (por que enxugar)
-1. **Pareto manda onde detalhar.** ~20% dos itens = ~80% do custo. Detalhe se paga nos itens **A**;
-   nos **C** (2% cada) é só trabalho sem resultado. (Cost-significant work packages; ABC analysis.)
-2. **Obra repetitiva = Linha de Balanço.** 24 baias quase idênticas ⇒ a atividade é uma **frente que
-   repete a mesma operação em 24 locais**; mede-se por **baia concluída** e acompanha-se o **ritmo
-   (baias/dia)**, não um checkbox de micro-passo. O ganho de **curva de aprendizado** (baia 8 sai mais
-   rápida que a baia 1) vira o termômetro precoce. (LOB / LBMS Kenley-Seppänen / Takt.)
-3. **Passo passivo não é atividade.** Cura do concreto, secagem de stain/tinta = **folga (lag)** entre
-   atividades, nunca linha de RDO. (EIA-748 Level of Effort: "minimizar; não distorce desempenho".)
-4. **Pacote curto = medição objetiva.** Atividade que cabe num período de relatório mede-se por
-   **0/100 ou unidade concluída**, sem disputa de "% feito". Pacote fino demais → **agrupar** e tratar
-   o antigo como marco. (Guia EVM federal CMS/HHS; regra 8/80; nada acima de ~1 mês.)
-5. **Aderência > detalhe.** Encarregado abandona RDO trabalhoso; campo a mais derruba a qualidade do
-   dado (lançamento "de memória"). Unidade natural + binário + foto, no mesmo dia. (Last Planner/PPC.)
+## Princípio (por que e como enxugar)
+1. **Pareto é POR SERVIÇO.** Dentro de cada serviço, mantém-se o passo que é **frente vital** do
+   avanço daquele serviço; o passo de baixa importância **funde** na frente vizinha. O tamanho em R$
+   do serviço **não** decide o detalhe — a importância do passo no serviço decide.
+2. **Regra de seleção do passo:** vira atividade só se **(peso ≥ ~20% do serviço)** **E** **(frente
+   distinta** — equipe, janela de tempo, ou gate diferente). Passo <20% **ou** da mesma frente contínua
+   → funde. Passo **passivo** (cura, secagem) → **folga (lag)**, nunca linha de RDO. **Gate** de
+   qualidade/caminho crítico → entra mesmo com peso baixo.
+3. **Obra repetitiva = Linha de Balanço.** 24 baias idênticas: mede-se por **baia concluída** e pelo
+   **ritmo (baias/dia)**; a curva de aprendizado (baia 8 mais rápida que a 1) é o alarme precoce.
+4. **Aderência > detalhe.** Unidade natural + binário + foto, no mesmo dia. Campo a mais derruba a
+   qualidade do dado. (EVM federal: pacote fino demais deve ser **agrupado**.)
+5. **O peso do passo no serviço = o peso da medição** (`ItemMedicaoCronogramaTarefa.peso`, D6). A
+   coluna "peso" abaixo já é o que reparte a venda do serviço entre suas atividades — soma 100%/serviço.
 
-## Critérios objetivos aplicados (entra no cronograma só se…)
-Para cada serviço/passo: **(a)** carrega fatia relevante de custo/esforço? · **(b)** é frente com
-ritmo próprio (equipe/local/janela distintos)? · **(c)** é discreto (tem produto medível) e não
-passivo? · **(d)** apontável em unidade natural sem instrumentação extra? · **(e)** é gate de
-qualidade/caminho crítico? · **(f)** o número muda alguma decisão? — Se um passo só passa em (a)
-fraco e em mais nada, **funde**; se é passivo, vira **lag**; se é gate, **entra mesmo barato**.
-
-## Pareto de custo (orçamento 98, custo R$ 1.017.875)
-| Classe | Itens | % custo | Tratamento |
-|---|---|---|---|
-| **A** (80%) | 1.1 LSF (40%), 1.13 shingle, 1.17a fundação, 1.10 corredores, 1.2 pint. aço, 1.7 pint. interna, 1.5 placa, 1.6 régua | top 8 = 81% | **2–3 atividades** nas 3 maiores; 1–2 nas demais |
-| **B** (15%) | 1.16, 1.4, 1.8, 1.17c, 1.9, 1.17b, 1.12 | ~12% | **1 atividade** cada (2 só onde a janela obriga) |
-| **C** (5%) | 1.14, 1.17e, 1.15, 1.11, 1.17d, 1.3 | ~5% | **1 atividade** cada, unidade natural |
-
----
-
-## Cronograma refinado — ~30 atividades (de ~80)
-
-> Unidade de apontamento escolhida pela **aderência** (baia concluída onde o trabalho é por-baia;
-> m²/kg em superfície contínua). 🚩 = marco/gate (custo ~0, entra por criticidade). ⏳ = folga passiva.
+## Cronograma refinado — 30 atividades + 3 gates
+> Unidade escolhida pela aderência (baia onde é por-baia; m²/kg/un em superfície/contagem).
+> 🚩 = gate (peso 0). Peso = importância da atividade **no seu serviço** (soma 100% por serviço).
 
 ### Fase 1 — Fundação e infra embutida
-| # | Atividade | Serviço | Unidade | Funde / nota |
-|---|---|---|---|---|
-| 1 | **Preparo do terreno + lastro** | 1.17a | m² | funde locação+escavação+regularização+lastro (1 frente de terra) |
-| 2 | **Infra embutida na fundação (elétrica)** | 1.17b | baias (24) | eletrodutos/caixas antes do concreto |
-| 3 | **Infra embutida na fundação (hidráulica/dreno)** | 1.17c | baias (24) | esgoto+dreno brita/areia+AF; funde os 3 passos |
-| 4 | 🚩 **Liberação pré-concretagem** | 1.17a | gate | checklist: nível + infra tampada. Trava a concretagem |
-| 5 | **Armação e formas** | 1.17a | m² | funde ferragem + caixaria |
-| 6 | **Concretagem do radier + baldrames** | 1.17a | m² | ⏳ cura 7 dias vira lag até a estrutura |
-| 7 | **Corredores em concreto** | 1.10 | m² | funde base+forma+armação+concretagem (1 frente de concreto) |
+| # | Atividade | Serviço | Unid. | Peso no serviço | Funde |
+|---|---|---|---|---|---|
+| 1 | Preparo do terreno + lastro | 1.17a | m² | 33% | locação+escavação+regularização+lastro (1 frente de terra) |
+| 2 | Infra elétrica embutida | 1.17b | baias | 100% | eletrodutos/caixas antes do concreto |
+| 3 | Infra hidráulica/dreno embutida | 1.17c | baias | 100% | esgoto+dreno+AF |
+| 4 | 🚩 Liberação pré-concretagem | 1.17a | gate | — | checklist nível+infra tampada (trava concretagem) |
+| 5 | Armação e formas | 1.17a | m² | 38% | ferragem+caixaria |
+| 6 | Concretagem do radier | 1.17a | m² | 29% | ⏳ cura 7d = lag |
+| 7 | Corredores — preparo e formas | 1.10 | m² | 47% | base+forma+tela |
+| 8 | Corredores — concretagem | 1.10 | m² | 53% | ⏳ cura = lag |
 
 ### Fase 2 — Estrutura e cobertura
-| # | Atividade | Serviço | Unidade | Funde / nota |
-|---|---|---|---|---|
-| 8 | **Painelização LSF (bancada)** | 1.1 | m² painel | a maior frente de MO da obra (~40% do custo total) |
-| 9 | **Montagem LSF (verticalização + fixação)** | 1.1 | baias (24) | funde levantar+aprumar+chumbar |
-| 10 | **Contraventamento + prumo** 🚩 | 1.1 | baias (24) | trava a estrutura; conclusão = libera fechamento/cobertura |
-| 11 | **Verticalização dos pilares roliços** | 1.9 | un (32) | funde recebimento+base+levantar+fixar |
-| 12 | **Telhado viga I — fabricação (oficina)** | *subempreit.* | % | terceiros; verba+lucro; roda em paralelo |
-| 13 | **Telhado viga I — montagem (campo)** | *subempreit.* | % | terceiros; depende dos apoios prontos |
-| 14 | **Base OSB do telhado** | 1.13 | m² | |
-| 15 | **Telhamento shingle (manta+telhas+cumeeira)** 🚩 | 1.13 | m² | funde manta/starter/fileiras/cumeeira; fim = telhado estanque |
-| 16 | **Pintura do aço estrutural** | 1.2 | m² | funde preparo+primer+demãos |
+| # | Atividade | Serviço | Unid. | Peso | Funde |
+|---|---|---|---|---|---|
+| 9 | Painelização LSF (bancada) | 1.1 | m² painel | 50% | recebimento/marcação fundidos |
+| 10 | Montagem LSF (verticalização+fixação+contravent.) | 1.1 | baias | 50% | 1 frente de montagem in loco |
+| 11 | 🚩 Estrutura aprumada | 1.1 | gate | — | libera fechamento e cobertura |
+| 12 | Verticalização dos pilares roliços | 1.9 | un (32) | 100% | recebimento+base+levantar+fixar |
+| 13 | Telhado viga I — fabricação (oficina) | *subempr.* | % | 50% | terceiros; paralelo |
+| 14 | Telhado viga I — montagem (campo) | *subempr.* | % | 50% | terceiros; depende dos apoios |
+| 15 | Base OSB do telhado | 1.13 | m² | 25% | |
+| 16 | Telhamento shingle (manta+telhas+cumeeira) | 1.13 | m² | 75% | starter/fileiras/cumeeira |
+| 17 | 🚩 Telhado estanque | 1.13 | gate | — | fim da cumeeira |
+| 18 | Pintura do aço estrutural | 1.2 | m² | 100% | preparo+primer+demãos (1 frente) |
 
 ### Fase 3 — Fechamentos e acabamento
-| # | Atividade | Serviço | Unidade | Funde / nota |
-|---|---|---|---|---|
-| 17 | **Lã de rocha (isolamento)** | 1.17d | m² | no plano do forro; sequência antes do PVC |
-| 18 | **Forro de PVC** | 1.17e | m² | funde perímetro+estrutura+réguas |
-| 19 | **Fixação da placa cimentícia** | 1.5 | baias (24) | a instalação (o "instalar" do dono) |
-| 20 | **Tratamento de junta + basecoat** | 1.5 | baias (24) | funde junta+basecoat (1ª/2ª demão); o acabamento da placa |
-| 21 | **Fechamento em régua de pinus** | 1.6 | m² | funde barreira+ripado+régua |
-| 22 | **Pintura interna dos fechamentos** | 1.7 | m² | funde selador+demãos; ⏳ depende do basecoat curado |
-| 23 | **Stain das paredes externas** | 1.8 | m² | funde demãos; ⏳ secagem 12h = lag interno |
-| 24 | **Revestimento pedra moledo** | 1.11 | m² | funde chapisco+assentar+rejunte+limpeza |
+| # | Atividade | Serviço | Unid. | Peso | Funde |
+|---|---|---|---|---|---|
+| 19 | Lã de rocha (isolamento) | 1.17d | m² | 100% | |
+| 20 | Forro de PVC | 1.17e | m² | 100% | perímetro+estrutura+réguas (1 frente) |
+| 21 | Fixação da placa cimentícia | 1.5 | baias | 55% | o "instalar" do dono |
+| 22 | Tratamento de junta + basecoat | 1.5 | baias | 45% | junta+basecoat (frente de acabamento) |
+| 23 | Fechamento em régua de pinus | 1.6 | m² | 100% | barreira+ripado+régua (1 frente) |
+| 24 | Pintura interna dos fechamentos | 1.7 | m² | 100% | selador+demãos; ⏳ basecoat curado |
+| 25 | Stain das paredes externas | 1.8 | m² | 100% | demãos; ⏳ secagem 12h = lag |
+| 26 | Revestimento pedra moledo | 1.11 | m² | 100% | chapisco+assentar+rejunte (1 frente) |
 
 ### Fase 4 — Esquadrias, cercado e elétrica final
-| # | Atividade | Serviço | Unidade | Funde / nota |
-|---|---|---|---|---|
-| 25 | **Portões das baias (fabricar + instalar)** | 1.4 | un (48) | funde oficina+campo; pode pré-fabricar em paralelo |
-| 26 | **Stain dos portões** | 1.3 | m² | funde demãos (na bancada) |
-| 27 | **Cercado das baias** | 1.14 | baias (24) | funde corte+montagem+travamento |
-| 28 | **Stain do cercado** | 1.15 | baias (24) | in loco; funde demãos |
-| 29 | **Ponto hidráulico terminal por baia** | 1.16 | baias (24) | o ponto do bebedouro (1.17c já fez a rede) |
-| 30 | **Elétrica final (fiação + pontos + luminárias)** | 1.12 | baias (24) | funde enfiação+quadro+pontos+energização |
+| # | Atividade | Serviço | Unid. | Peso | Funde |
+|---|---|---|---|---|---|
+| 27 | Portões — fabricação (oficina) | 1.4 | un (48) | 60% | corte+quadro+contravent.+lixa+roldana |
+| 28 | Portões — instalação (campo) | 1.4 | un (48) | 40% | trilho+pendurar+regulagem |
+| 29 | Stain dos portões | 1.3 | m² | 100% | demãos (bancada) |
+| 30 | Cercado das baias | 1.14 | baias | 100% | corte+montagem+travamento (1 frente) |
+| 31 | Stain do cercado | 1.15 | baias | 100% | demãos (in loco) |
+| 32 | Ponto hidráulico terminal por baia | 1.16 | baias | 100% | bebedouro (rede já no #3) |
+| 33 | Elétrica final (fiação+pontos+luminárias) | 1.12 | baias | 100% | enfiação+quadro+pontos+energização |
 
-🚩 **Marcos de controle (custo 0):** Liberação pré-concretagem (#4) · Estrutura aprumada (#10) ·
-Telhado estanque (#15). ⏳ **Folgas passivas (não são RDO):** cura do radier (~7 d), secagem de
-stain/tinta (~12 h entre demãos).
+⏳ **Folgas passivas (não são RDO):** cura do radier (~7d), cura dos corredores, secagem de stain/tinta (~12h entre demãos).
 
-## O que foi cortado (e por quê)
-- **Passos administrativos/recebimento/marcação/conferência** dos itens A → fundidos na frente
-  (não são produção medível; conferência vira gate só nos 3 marcos).
-- **Demãos e sub-camadas** (basecoat 1ª/2ª, stain 1ª/2ª/3ª, primer) → 1 atividade por frente de
-  pintura; demão é ritmo interno, não linha de RDO.
-- **Cura e secagem** → folga (lag), nunca atividade.
-- **Sub-passos de verba** (elétrica/hidráulica em 3–8 micro-passos) → 1–2 atividades por janela.
+## O que mudou ao corrigir a base (custo → importância no serviço)
+- **Corredores (1.10):** 1 → **2** atividades — preparo e concretagem são **2 frentes vitais distintas**
+  do serviço (antes eu dava 1 só porque o serviço era "só 7% do custo" — base errada).
+- **Portões (1.4):** 1 → **2** — fabricação (oficina) e instalação (campo) são frentes distintas e
+  vitais (60%/40%), podem correr em paralelo.
+- **LSF (1.1):** 3 → **2** — verticalização+fixação+contraventamento são **uma frente contínua** de
+  montagem; não eram 3 frentes só porque o serviço é caro.
+- **Pintura do aço, forro, pedra, régua:** 1 atividade — são **uma frente contínua** cada, mesmo tendo
+  vários passos (os passos têm peso, mas não são frentes distintas).
 
-## Resolução das 5 decisões em aberto (decididas como gestor)
-1. **1.16 × 1.17c:** 1.17c = **rede/dreno embutido** (atividade #3, por baia); 1.16 = **ponto terminal
-   do bebedouro** (atividade #29, por baia). Não há dupla contagem — escopos distintos.
-2. **1.17d × 1.17e:** mantidos como **2 atividades em sequência** (#17 lã, #18 forro), cada uma medindo
-   o próprio escopo/venda. Sequência evita medir o mesmo avanço 2×.
-3. **1.12 pontos de luz:** atividade #30 medida por **baia (24)** — unidade natural, independe da
-   contagem fina de pontos. 🔴 A quantidade de pontos para **custo** (12 da planilha vs 1/baia+1/pilar)
-   continua a validar com o cliente, mas **não trava o cronograma**.
-4. **Telhado viga I:** 2 atividades de subempreitada (#12 fabricação, #13 montagem), medidas por %.
-   🔴 Falta o **valor da verba+lucro** e se entrega fab+montagem (se só uma, fundir #12/#13).
-5. **Granularidade:** resolvida — ~30 atividades, detalhe concentrado em 1.1/1.17a/1.13 (os itens A).
+## Decisões em aberto — resolvidas como gestor
+1. **1.16 × 1.17c:** 1.17c = rede/dreno embutido (#3); 1.16 = ponto terminal do bebedouro (#32). Sem dupla contagem.
+2. **1.17d × 1.17e:** 2 atividades em sequência (#19 lã, #20 forro), cada uma seu escopo/venda.
+3. **1.12:** medido por baia (#33); a contagem fina de pontos é questão de **custo** (validar com cliente), não trava o cronograma.
+4. **Telhado viga I:** #13/#14 por %; 🔴 falta valor da verba+lucro e se entrega fab+montagem (se só uma, fundir).
+5. **Granularidade:** resolvida pela regra peso≥20% + frente distinta.
 
-## Como ler este cronograma (visão de gestor — Linha de Balanço)
-Cada atividade por-baia tem um **ritmo-alvo (baias/dia)**. O valor não é só "% concluído" — é a
-**inclinação** (velocidade) e se ela **acelera** com a curva de aprendizado. Uma frente que estagna
-(linha horizontal) é equipe ociosa esperando a anterior; uma frente mais lenta que o ritmo-alvo é o
-alarme precoce de estouro de MO (liga direto no Resultado por Atividade da Fatia 1). Definir os
-ritmos-alvo por frente é o próximo passo ao montar as datas (precisa das durações do MPP/XML).
+## Como ler (Linha de Balanço)
+Cada atividade por-baia tem um **ritmo-alvo (baias/dia)**; o sinal de gestão é a **inclinação** (velocidade)
+e se ela **acelera**. Frente estagnada = equipe ociosa esperando a anterior; frente mais lenta que o alvo
+= alarme precoce de estouro de MO (liga no Resultado por Atividade da Fatia 1). Definir os ritmos-alvo
+precisa das durações (exportar `Projeto1.mpp` → XML).
