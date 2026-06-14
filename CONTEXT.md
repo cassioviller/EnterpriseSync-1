@@ -25,6 +25,38 @@ _Avoid_: imposto isolado, encargo
 Campo da proposta (`percentual_nota_fiscal`, default 13,5%) que hoje é **apenas informativo** no PDF ("considerar X% para nota fiscal"). NÃO entra em nenhum cálculo e é distinto de _Tributos_.
 _Avoid_: imposto, tributo
 
+## Estrutura do Trabalho (Orçamento ↔ Cronograma)
+
+**Serviço**:
+A linha do orçamento — unidade de **precificação**. Tem composição (custo direto) e valor de venda (via BDI). É onde o **preço mora**. Desdobra-se em uma ou mais Atividades.
+_Avoid_: item, tarefa, etapa
+
+**Atividade**:
+A `TarefaCronograma` — unidade **executável e mensurável** do cronograma, onde a produção diária é apontada (RDO). Aponta para um Serviço (`servico_id`). Ex.: o Serviço "Estrutura LSF" → Atividades "painelização" e "verticalização". O preço **não** mora na Atividade; vem rateado do Serviço por hora-homem. O Resultado sobe Atividade → Serviço → Obra.
+_Avoid_: tarefa (no domínio, use Atividade), subatividade, fase
+
+## Acompanhamento Financeiro da Obra (Execução)
+
+**Avanço realizado**:
+Quanto de uma Atividade foi **fisicamente executado** (quantidade/percentual), apontado no RDO, em oposição ao _planejado_. É **avanço físico, não dinheiro** — e é a **âncora** de onde derivam tanto o _Valor agregado_ quanto o _Custo incorrido_. Termo do RDO; "Realizado" sozinho é banido de relatório (existe também o _Realizado_ de caixa, ver Fluxo de Caixa) — sempre usar com substantivo.
+_Avoid_: realizado (pelado), produção, executado isolado
+
+**Valor agregado** (a receber):
+_Avanço realizado_ × valor de venda da Atividade. Mede o quanto a produção "ganhou" até a data — um avanço reconhecido, **antes** de virar obrigação ou fatura. Distinto de _Medição_ (o ato formal e periódico de medir para faturar).
+_Avoid_: faturado, medido, receita, valor produzido
+
+**Custo incorrido**:
+Custo reconhecido **no dia em que o fato acontece** (competência): mão de obra pela hora trabalhada no dia, material quando consumido/requisitado, etc. É o que alimenta o _Resultado_ — distinto do _Realizado_ de caixa (quando o dinheiro de fato sai), que ocorre em outra data.
+_Avoid_: custo realizado, custo pago, desembolso
+
+**Resultado realizado**:
+Valor agregado reconhecido − custo real incorrido, até a data. O que a obra/atividade deu de resultado **de verdade** até agora. Conceito _ex-post_, distinto de **Lucro** (que é planejamento do BDI, % da venda fixado antes da obra).
+_Avoid_: lucro, lucro da obra, margem, markup, margem de contribuição
+
+**Resultado projetado**:
+Projeção do _Resultado realizado_ no encerramento da atividade/obra, dada a produtividade observada. É a saída do motor de previsão (EVM).
+_Avoid_: lucro projetado, margem projetada, estimativa de lucro
+
 ## Fluxo de Caixa (Visualização)
 
 **Realizado**:
