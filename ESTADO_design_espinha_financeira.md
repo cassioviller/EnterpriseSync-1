@@ -14,7 +14,8 @@ junta + basecoat) — insumo para definir as Atividades/Subatividades do cronogr
 ## Artefatos (todos no repo)
 - **`docs/superpowers/specs/2026-06-14-espinha-financeira-obra-design.md`** — o spec (5 fatias, decisões D1–D6). MESTRE.
 - **`docs/superpowers/specs/2026-06-14-mapa-codigo-cronograma-custo-medicao.md`** — mapa do código real (file:line). REFERÊNCIA.
-- **`docs/superpowers/specs/2026-06-14-quebra-atividades-baia-rev10.md`** — os 21 serviços quebrados em Atividades (passos), com unidade/dependência/peso. INSUMO DO CRONOGRAMA.
+- **`docs/superpowers/specs/2026-06-14-cronograma-refinado-pareto-baia-rev10.md`** — o cronograma ENXUTO (~30 atividades, Pareto+LOB). CRONOGRAMA-DE-CONTROLE DE REFERÊNCIA.
+- **`docs/superpowers/specs/2026-06-14-quebra-atividades-baia-rev10.md`** — os 21 serviços em ~80 passos (dicionário de método executivo; referência, não o cronograma).
 - **`CONTEXT.md`** — glossário (termos fixados nesta sessão, abaixo).
 - `ESTUDO_cronograma_baia_rev10.md` — mecânica cronograma↔orçamento↔medição + mapa atividade→serviço (MPP §3).
 - `CONTEXTO_orcamento_baia_rev10.md` · `HANDOFF_baia_rev10.md` — contexto do orçamento Baia.
@@ -58,8 +59,14 @@ Resultado sobe Atividade → Serviço → Obra. "Realizado" sozinho é banido (e
 ordem, com unidade de apontamento, dependências e peso. É o insumo para montar o cronograma da Baia
 (habilitação da Fatia 1) e semear o catálogo `SubatividadeMestre`.
 
+## Cronograma refinado — FEITO (sem supervisão, foco Pareto)
+Os ~80 passos foram enxugados para **~30 atividades** (`...cronograma-refinado-pareto...`), aplicando
+Pareto de custo (1.1 LSF = 40%; top 8 = 80%) + Linha de Balanço (obra repetitiva, medir por baia) +
+regras de aderência (cortar passo passivo/admin; cura/secagem = folga). As 5 decisões em aberto foram
+**resolvidas como gestor** (ver doc). Restam só 2 dados externos: **valor da verba+lucro do telhado
+viga I** e a **contagem de pontos do 1.12** (para custo, não trava cronograma).
+
 ## Próximo passo
-1. **Decisões em aberto** (fim do doc de quebra): 1.16×1.17c (água fria 2×), 1.17d×1.17e (lã de rocha
-   = plano do forro), 1.12 (12 vs 24 pontos), telhado viga I (verba+lucro), granularidade de alguns 1:N.
-2. **Montar o cronograma da Baia** a partir da quebra (criar Atividades/templates) — habilitação da Fatia 1.
-3. **Plano de implementação da Fatia 1** (writing-plans) quando o spec for aprovado.
+1. **Datas/durações + ritmos-alvo (baias/dia)** por frente — precisa exportar o `Projeto1.mpp` p/ XML.
+2. **Materializar o cronograma da Baia** no sistema a partir das ~30 atividades (habilitação da Fatia 1).
+3. **Plano de implementação da Fatia 1** (writing-plans).
