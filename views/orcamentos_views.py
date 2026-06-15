@@ -884,3 +884,35 @@ def api_composicao_servico(servico_id):
         'margem_pct': float(svc.margem_lucro_pct) if svc.margem_lucro_pct is not None else None,
         'composicao': snapshot_from_servico(svc),
     })
+
+
+@orcamentos_bp.route('/<int:id>/importar-obra', methods=['POST'])
+@login_required
+@admin_required
+def importar_obra(id):
+    """Materializa a obra completa a partir deste orçamento (auto-wiring):
+    Proposta -> Obra -> ItemMedicaoComercial -> Cronograma, tudo vinculado,
+    sem configuração manual. Idempotente. Redireciona para a obra criada."""
+    admin_id = _admin_id()
+    orc = Orcamento.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    try:
+        from services.importar_obra_completa import importar_obra_completa
+        res = importar_obra_completa(orc.id, admin_id)
+        if res['criado']:
+            flash(
+                f"Obra criada do orçamento {orc.numero}: "
+                f"{res['n_tarefas']} atividades vinculadas (sem configuração manual).",
+                'success',
+            )
+        else:
+            flash(
+                f"O orçamento {orc.numero} já tinha obra "
+                f"({res['n_tarefas']} atividades).",
+                'info',
+            )
+        return redirect(url_for('main.detalhes_obra', id=res['obra_id']))
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Falha ao importar obra do orçamento {id}")
+        flash(f"Falha ao importar a obra: {e}", 'error')
+        return redirect(url_for('orcamentos.editar', id=id))

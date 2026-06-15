@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
+import main  # noqa: F401 — registra blueprints (rota /orcamentos/<id>/importar-obra)
 from models import (
     Usuario, TipoUsuario, Funcionario, Obra, Cliente,
     Orcamento, OrcamentoItem, Proposta, PropostaItem,
@@ -190,3 +191,19 @@ def test_resultado_por_atividade_funciona_apos_import():
         assert ro['valor_agregado'] >= Decimal('2500.00')
         nomes = {x['nome'] for x in ro['atividades']}
         assert any(n.startswith('Alvenaria') for n in nomes)
+
+
+def test_rota_importar_obra_cria_e_redireciona():
+    """Smoke da UI: POST /orcamentos/<id>/importar-obra cria a obra e redireciona."""
+    with app.app_context():
+        orc = _orcamento_baia_like()
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['_user_id'] = str(_fx.admin.id)
+                sess['_fresh'] = True
+            resp = c.post(f'/orcamentos/{orc.id}/importar-obra', follow_redirects=False)
+        assert resp.status_code in (302, 303), resp.status_code
+        assert '/obras/' in resp.headers.get('Location', '')
+        prop = Proposta.query.filter_by(orcamento_id=orc.id).first()
+        assert prop is not None and prop.obra_id is not None
+        assert TarefaCronograma.query.filter_by(obra_id=prop.obra_id).count() == 2

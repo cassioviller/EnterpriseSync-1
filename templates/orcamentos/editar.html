@@ -34,6 +34,14 @@
               data-bs-toggle="modal" data-bs-target="#modalGerarProposta">
         <i class="fas fa-file-export me-1"></i> Gerar Proposta a partir do Orçamento
       </button>
+      {# Espinha financeira — auto-wiring: cria obra+cronograma vinculados, sem config #}
+      <form method="POST" action="{{ url_for('orcamentos.importar_obra', id=o.id) }}"
+            class="d-inline"
+            onsubmit="return confirm('Criar a obra a partir deste orçamento? Serão criados proposta, obra, itens de medição e cronograma já vinculados (sem configuração manual).');">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-industry me-1"></i> Importar como Obra
+        </button>
+      </form>
     </div>
   </div>
 
