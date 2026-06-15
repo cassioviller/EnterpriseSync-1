@@ -36,9 +36,14 @@ def resultado_por_atividade(obra_id):
         return guard
 
     from models import Obra
-    from services.resultado_atividade_service import resultado_obra
+    from services.resultado_atividade_service import resultado_obra, evm_obra
 
     admin_id = _admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
     dados = resultado_obra(obra_id)
-    return render_template('resultado/por_atividade.html', obra=obra, dados=dados)
+    evm = evm_obra(obra_id, admin_id)
+    evm_por_tarefa = {it['tarefa_id']: it for it in evm['itens']}
+    return render_template(
+        'resultado/por_atividade.html',
+        obra=obra, dados=dados, evm=evm, evm_por_tarefa=evm_por_tarefa,
+    )

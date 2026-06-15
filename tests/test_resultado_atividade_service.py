@@ -345,3 +345,62 @@ def test_rota_resultado_responde():
             resp = c.get(f'/obras/{_fx.obra.id}/resultado')
         assert resp.status_code == 200, resp.status_code
         assert b'Resultado por Atividade' in resp.data
+
+
+# ── Fatia 3: EVM ──────────────────────────────────────────────────────────────
+
+def test_venda_total_atividade():
+    from services.resultado_atividade_service import venda_total_atividade
+    with app.app_context():
+        t = _tarefa('Venda', percentual=30.0)
+        _item_medicao(valor_comercial=1000, tarefa=t, peso=100)
+        db.session.commit()
+        assert venda_total_atividade(t) == Decimal('1000.00')   # independe do avanço
+
+
+def test_evm_atividade_cpi_eac():
+    from services.resultado_atividade_service import evm_atividade
+    with app.app_context():
+        snap = [{'tipo': 'MAO_OBRA', 'unidade': 'm2', 'coeficiente': 1.0, 'subtotal_unitario': 10.0}]
+        pi = _proposta_item(composicao_snapshot=snap, quantidade=100)   # BAC custo = 1000
+        t = _tarefa('EVM', percentual=50.0)
+        _item_medicao(valor_comercial=2000, tarefa=t, peso=100, quantidade=100, proposta_item=pi)
+        f = _func(); r = _rdo(date(2026, 5, 1)); _mo(r, f, t, 8.0); _custo_diario(r, f, 800)
+        db.session.commit()
+        e = evm_atividade(t, _fx.admin.id)
+        assert e['bac_custo'] == Decimal('1000.00')
+        assert e['ev'] == Decimal('500.00')          # 50% × 1000
+        assert e['ac'] == Decimal('800.00')
+        assert e['cpi'] == Decimal('0.625')          # 500/800
+        assert e['eac'] == Decimal('1600.00')        # 1000/0.625
+        assert e['venda_total'] == Decimal('2000.00')
+        assert e['resultado_projetado'] == Decimal('400.00')   # 2000 − 1600
+        assert e['spi'] is None                       # sem data_inicio → sem baseline de prazo
+
+
+def test_evm_obra_rollup():
+    from services.resultado_atividade_service import evm_obra
+    with app.app_context():
+        s = _sfx()
+        cli = Cliente(nome=f'CLI-EV-{s}', admin_id=_fx.admin.id); db.session.add(cli); db.session.flush()
+        obra2 = Obra(nome=f'Obra EV {s}', codigo=f'OEV{s[:6]}', data_inicio=date(2026, 1, 1),
+                     admin_id=_fx.admin.id, cliente_id=cli.id, valor_contrato=1)
+        db.session.add(obra2); db.session.flush()
+        _orig = _fx.obra
+        _fx.obra = obra2
+        try:
+            snap = [{'tipo': 'MAO_OBRA', 'unidade': 'm2', 'coeficiente': 1.0, 'subtotal_unitario': 10.0}]
+            pi = _proposta_item(composicao_snapshot=snap, quantidade=100)   # BAC 1000
+            t = _tarefa('EVM-Obra', percentual=50.0)
+            _item_medicao(valor_comercial=2000, tarefa=t, peso=100, quantidade=100, proposta_item=pi)
+            f = _func(); r = _rdo(date(2026, 5, 2)); _mo(r, f, t, 8.0); _custo_diario(r, f, 800)
+            db.session.commit()
+            e = evm_obra(obra2.id, _fx.admin.id)
+            assert e['bac_custo'] == Decimal('1000.00')
+            assert e['ev'] == Decimal('500.00')
+            assert e['ac'] == Decimal('800.00')
+            assert e['cpi'] == Decimal('0.625')
+            assert e['eac'] == Decimal('1600.00')
+            assert e['resultado_projetado'] == Decimal('400.00')
+        finally:
+            _fx.obra = _orig

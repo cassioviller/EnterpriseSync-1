@@ -418,3 +418,85 @@ def resultado_obra(obra_id):
         'custo_incorrido': _q(tot_incorrido),
         'resultado': _q(tot_agregado - tot_incorrido),
     }
+
+
+# ── Fatia 3 — EVM (previsão): CPI / SPI / EAC / resultado projetado ───────────
+# Reúso (DC7): CPI = alarme_custo (EV/AC); SPI = cronograma_engine; BAC custo =
+# orçado baseline; venda = venda_total_atividade. Puro cálculo, sem migration.
+
+def venda_total_atividade(tarefa):
+    """Venda (valor_comercial) alocada à atividade pelo Peso da medição,
+    independente do avanço — o BAC de receita da atividade."""
+    total = Decimal('0')
+    for link in _links_da_tarefa(tarefa):
+        item = db.session.get(ItemMedicaoComercial, link.item_medicao_id)
+        if not item:
+            continue
+        soma_peso = _soma_peso_item(item.id)
+        if soma_peso <= 0:
+            continue
+        total += (_D(link.peso) / soma_peso) * _D(item.valor_comercial)
+    return _q(total)
+
+
+def evm_atividade(tarefa, admin_id, data_ref=None):
+    """Earned Value por atividade.
+      CPI = EV/AC (reusa alarme_custo); SPI = realizado/planejado (cronograma_engine);
+      EAC = BAC_custo / CPI; resultado projetado = venda − EAC.
+    SPI fica None quando a atividade não tem baseline de prazo (sem data_inicio —
+    vem do export do Projeto1.mpp)."""
+    from datetime import date as _date
+    from utils.cronograma_engine import calcular_progresso_rdo
+    data_ref = data_ref or _date.today()
+
+    a = alarme_custo(tarefa)
+    bac = a['orcado_total']          # BAC de custo (baseline congelado)
+    ev = a['orcado_para_avanco']     # Earned Value
+    ac = a['real']                   # Actual Cost (incorrido)
+    cpi = a['indice_rs']             # EV/AC (None se AC=0)
+
+    prog = calcular_progresso_rdo(tarefa.id, data_ref, admin_id)
+    plan_raw = prog.get('percentual_planejado')
+    plan = _D(plan_raw)
+    real = _D(prog.get('percentual_realizado'))
+    spi = (real / plan).quantize(MILESIMO, rounding=ROUND_HALF_UP) if plan > 0 else None
+
+    eac = (bac / cpi).quantize(CENTAVO, rounding=ROUND_HALF_UP) if (cpi and cpi > 0) else None
+    venda = venda_total_atividade(tarefa)
+    resultado_proj = _q(venda - eac) if eac is not None else None
+
+    return {
+        'bac_custo': bac, 'ev': ev, 'ac': ac, 'cpi': cpi, 'spi': spi, 'eac': eac,
+        'venda_total': venda, 'resultado_projetado': resultado_proj,
+        'percentual_planejado': plan_raw,
+        'percentual_realizado': float(real),
+    }
+
+
+def evm_obra(obra_id, admin_id, data_ref=None):
+    """Rollup EVM da obra: soma BAC/EV/AC/venda das folhas; CPI da obra = ΣEV/ΣAC;
+    SPI da obra do cronograma_engine; EAC e resultado projetado da obra."""
+    from datetime import date as _date
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    data_ref = data_ref or _date.today()
+
+    bac = ev = ac = venda = Decimal('0')
+    itens = []
+    for t in _folhas_da_obra(obra_id):
+        e = evm_atividade(t, admin_id, data_ref)
+        bac += e['bac_custo']; ev += e['ev']; ac += e['ac']; venda += e['venda_total']
+        itens.append({'tarefa_id': t.id, 'nome': t.nome_tarefa, **e})
+
+    cpi = (ev / ac).quantize(MILESIMO, rounding=ROUND_HALF_UP) if ac > 0 else None
+    agg = calcular_progresso_geral_obra_v2(obra_id, data_ref, admin_id)
+    plan = _D(agg.get('progresso_planejado_pct'))
+    realz = _D(agg.get('progresso_geral_pct'))
+    spi = (realz / plan).quantize(MILESIMO, rounding=ROUND_HALF_UP) if plan > 0 else None
+    eac = (bac / cpi).quantize(CENTAVO, rounding=ROUND_HALF_UP) if (cpi and cpi > 0) else None
+
+    return {
+        'obra_id': obra_id, 'itens': itens,
+        'bac_custo': _q(bac), 'ev': _q(ev), 'ac': _q(ac), 'venda_total': _q(venda),
+        'cpi': cpi, 'spi': spi, 'eac': eac,
+        'resultado_projetado': _q(venda - eac) if eac is not None else None,
+    }

@@ -31,6 +31,38 @@
     </div>
   </div>
 
+  <h5 class="text-muted mb-2">Previsão (EVM)</h5>
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">CPI (custo)</div>
+        <div class="h5 mb-0 {{ 'text-danger' if (evm.cpi and evm.cpi < 1) else 'text-success' }}">
+          {% if evm.cpi is not none %}{{ '%.3f'|format(evm.cpi) }}{% else %}—{% endif %}
+        </div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">SPI (prazo)</div>
+        <div class="h5 mb-0">{% if evm.spi is not none %}{{ '%.3f'|format(evm.spi) }}{% else %}—{% endif %}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Custo projetado (EAC)</div>
+        <div class="h5 mb-0">{% if evm.eac is not none %}R$ {{ '%.2f'|format(evm.eac) }}{% else %}—{% endif %}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm"><div class="card-body">
+        <div class="text-muted small">Resultado projetado</div>
+        <div class="h5 mb-0 {{ 'text-danger' if (evm.resultado_projetado is not none and evm.resultado_projetado < 0) else 'text-success' }}">
+          {% if evm.resultado_projetado is not none %}R$ {{ '%.2f'|format(evm.resultado_projetado) }}{% else %}—{% endif %}
+        </div>
+      </div></div>
+    </div>
+  </div>
+
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle">
       <thead class="table-light">
@@ -39,39 +71,46 @@
           <th class="text-end">% concl.</th>
           <th class="text-end">Valor agregado</th>
           <th class="text-end">Custo MO</th>
+          <th class="text-end">Custo não-MO</th>
           <th class="text-end">Resultado</th>
           <th class="text-center">Alarme (R$)</th>
-          <th class="text-end">Índice horas</th>
+          <th class="text-end">EAC</th>
+          <th class="text-end">Result. proj.</th>
         </tr>
       </thead>
       <tbody>
         {% for a in dados.atividades %}
+        {% set e = evm_por_tarefa.get(a.tarefa_id) %}
         <tr>
           <td>{{ a.nome }}</td>
           <td class="text-end">{{ '%.1f'|format(a.percentual_concluido) }}%</td>
           <td class="text-end">R$ {{ '%.2f'|format(a.valor_agregado) }}</td>
           <td class="text-end">R$ {{ '%.2f'|format(a.custo_mo) }}</td>
+          <td class="text-end">R$ {{ '%.2f'|format(a.custo_nao_mo) }}</td>
           <td class="text-end {{ 'text-danger' if a.resultado < 0 else '' }}">
             R$ {{ '%.2f'|format(a.resultado) }}
           </td>
           <td class="text-center">
-            {% if a.alarme.estouro %}
+            {% if a.alarme_custo.estouro %}
               <span class="badge bg-danger"
-                    title="real R$ {{ '%.2f'|format(a.alarme.real) }} > orçado p/ avanço R$ {{ '%.2f'|format(a.alarme.orcado_para_avanco) }}">
-                ⚠ {{ '%.0f'|format((a.alarme.indice_rs or 0) * 100) }}%
+                    title="real R$ {{ '%.2f'|format(a.alarme_custo.real) }} > orçado p/ avanço R$ {{ '%.2f'|format(a.alarme_custo.orcado_para_avanco) }}">
+                ⚠ {{ '%.0f'|format((a.alarme_custo.indice_rs or 0) * 100) }}%
               </span>
-            {% elif a.alarme.real > 0 %}
+            {% elif a.alarme_custo.real > 0 %}
               <span class="badge bg-success">ok</span>
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td class="text-end">
-            {% if a.indice_horas %}{{ '%.3f'|format(a.indice_horas.indice or 0) }}{% else %}—{% endif %}
+            {% if e and e.eac is not none %}R$ {{ '%.2f'|format(e.eac) }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end {{ 'text-danger' if (e and e.resultado_projetado is not none and e.resultado_projetado < 0) else '' }}">
+            {% if e and e.resultado_projetado is not none %}R$ {{ '%.2f'|format(e.resultado_projetado) }}{% else %}—{% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">
+        <tr><td colspan="9" class="text-center text-muted py-4">
           Nenhuma atividade com apontamento ainda.
         </td></tr>
         {% endfor %}
