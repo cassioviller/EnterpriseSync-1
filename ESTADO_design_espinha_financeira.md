@@ -66,7 +66,17 @@ regras de aderência (cortar passo passivo/admin; cura/secagem = folga). As 5 de
 **resolvidas como gestor** (ver doc). Restam só 2 dados externos: **valor da verba+lucro do telhado
 viga I** e a **contagem de pontos do 1.12** (para custo, não trava cronograma).
 
+## Planos de implementação — FEITO (writing-plans, todas as fatias, 2026-06-15)
+Escritos juntos para travar consistência, achar problemas cross-cutting cedo e reusar ao máximo:
+- **`docs/superpowers/plans/2026-06-15-espinha-financeira-plano-mestre.md`** — contrato compartilhado
+  (DC1–DC10), migration única, regra anti-dupla-contagem de MO (DC3), mapa de reúso, riscos cross-fatia.
+- `...-fatia-1-resultado-por-atividade-plan.md` — MO + alarme + tela + bug RDO + habilitação Baia (sem migration).
+- `...-fatia-2-custos-nao-mo-por-atividade-plan.md` — **migration ÚNICA 193**; não-MO direto+rateio; subempreitada/telhado.
+- `...-fatia-3-evm-previsao-plan.md` — CPI/SPI/EAC (reúso de alarme_custo + cronograma_engine).
+- `...-fatia-4-lente-caixa-plan.md` — Realizado/Previsto por obra (reúso integral do FinanceiroService, ADR 0003).
+- `...-fatia-5-inteligencia-portfolio-plan.md` — learning loop (catálogo) + roll-up de portfólio.
+
 ## Próximo passo
-1. **Datas/durações + ritmos-alvo (baias/dia)** por frente — precisa exportar o `Projeto1.mpp` p/ XML.
-2. **Materializar o cronograma da Baia** no sistema a partir das ~30 atividades (habilitação da Fatia 1).
-3. **Plano de implementação da Fatia 1** (writing-plans).
+1. **Executar a Fatia 1** (Fase A: bug do RDO → Fase B: read-model → C: tela → D: habilitação Baia).
+2. **Datas/durações + ritmos-alvo (baias/dia)** — exportar `Projeto1.mpp` p/ XML (alimenta materialização).
+3. Confirmar com o usuário os **dados externos do telhado** (verba+lucro+opção A/B/C) antes da Fatia 2 §D.
