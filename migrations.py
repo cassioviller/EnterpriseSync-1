@@ -3993,6 +3993,7 @@ def executar_migracoes():
             (190, "Cadastro de Regras de Classificação de Fluxo de Caixa: palavra_chave_categoria + palavra_chave_sugestao + correcao_classificacao (ADR-0002)", migration_190_palavra_chave_classificacao),
             (191, "Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria origem='sistema') para todos os tenants existentes", migration_191_seed_regras_classificacao_sistema),
             (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
+            (193, "Espinha financeira — cronograma_template_item.peso_medicao (peso explícito da Atividade no Serviço; ADR 0004)", _migration_193_template_peso_medicao),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13513,6 +13514,27 @@ def _migration_185_insumo_fracionavel():
         logger.info("[Migration 185] Coluna fracionavel adicionada à tabela insumo (DEFAULT TRUE).")
     except Exception as e:
         logger.error(f"[Migration 185] Falha: {e}")
+        raise
+
+
+def _migration_193_template_peso_medicao():
+    """Espinha financeira (ADR 0004/DC8) — peso explícito da Atividade no Serviço.
+
+    Adiciona cronograma_template_item.peso_medicao (NUMERIC 5,2, nullable). Quando
+    preenchido, a importação grava esse valor direto no Peso da medição
+    (ItemMedicaoCronogramaTarefa.peso), em vez de derivar de horas. NULL = mantém
+    o comportamento anterior. Idempotente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE cronograma_template_item
+                ADD COLUMN IF NOT EXISTS peso_medicao NUMERIC(5,2);
+            """))
+        logger.info("[Migration 193] Coluna peso_medicao adicionada a cronograma_template_item.")
+    except Exception as e:
+        logger.error(f"[Migration 193] Falha: {e}")
         raise
 
 

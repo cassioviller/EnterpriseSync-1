@@ -185,32 +185,79 @@ def _sintetizar_atividade(it, imc, obra, admin_id, ordem):
     return tarefa
 
 
-def _materializar_ou_sintetizar(proposta, obra, admin_id, imc_por_item):
-    """Materializa via template onde houver; sintetiza atividade 1:1 onde não houver."""
-    # 1) Caminho do sistema (itens cujo serviço tem CronogramaTemplate)
-    try:
-        from services.cronograma_proposta import montar_arvore_preview, materializar_cronograma
-        arvore = montar_arvore_preview(proposta, admin_id)
-        proposta.cronograma_default_json = arvore
-        materializar_cronograma(proposta, admin_id, obra.id, arvore)
-    except Exception as e:
-        logger.warning(f"[import] materializar_cronograma via template falhou/sem template: {e}")
+def _template_itens_do_servico(servico_id, admin_id):
+    """Itens (com peso_medicao) do CronogramaTemplate vinculado ao serviço.
+    Retorna lista ordenada, ou [] se o serviço não tem template padrão."""
+    if not servico_id:
+        return []
+    from models import Servico, CronogramaTemplateItem
+    serv = db.session.get(Servico, servico_id)
+    tmpl_id = getattr(serv, 'template_padrao_id', None) if serv else None
+    if not tmpl_id:
+        return []
+    return (
+        CronogramaTemplateItem.query
+        .filter_by(template_id=tmpl_id)
+        .order_by(CronogramaTemplateItem.ordem)
+        .all()
+    )
 
-    # 2) Fallback: itens sem nenhuma TarefaCronograma → sintetizar atividade 1:1
+
+def _materializar_do_template(it, imc, obra, admin_id, tmpl_itens):
+    """Cria 1 TarefaCronograma por item do template (multi-atividade), gravando o
+    Peso da medição DIRETO do `peso_medicao` explícito (DC8/ADR 0004) — soma
+    100%/serviço. Itens sem peso (gates) são ignorados no aspecto financeiro.
+    Quantidades/ritmos por atividade vêm depois (export do Projeto1.mpp)."""
+    n = 0
+    for ti in tmpl_itens:
+        if ti.peso_medicao is None:
+            continue
+        tarefa = TarefaCronograma(
+            obra_id=obra.id,
+            nome_tarefa=(ti.nome_tarefa or 'Atividade')[:200],
+            ordem=ti.ordem or 0,
+            duracao_dias=ti.duracao_dias or 1,
+            quantidade_total=None,            # refinado depois (MPP)
+            servico_id=it.servico_id,
+            percentual_concluido=0.0,
+            admin_id=admin_id,
+            gerada_por_proposta_item_id=it.id,
+        )
+        db.session.add(tarefa)
+        db.session.flush()
+        db.session.add(ItemMedicaoCronogramaTarefa(
+            item_medicao_id=imc.id,
+            cronograma_tarefa_id=tarefa.id,
+            peso=Decimal(str(ti.peso_medicao)),
+            admin_id=admin_id,
+        ))
+        n += 1
+    db.session.flush()
+    return n
+
+
+def _materializar_ou_sintetizar(proposta, obra, admin_id, imc_por_item):
+    """Para cada item: se o serviço tem template (com peso_medicao), cria as N
+    atividades com os pesos explícitos; senão, sintetiza Serviço = Atividade
+    (1:1, peso 100% — fallback, ADR 0004). Idempotente."""
     itens = PropostaItem.query.filter_by(proposta_id=proposta.id).order_by(PropostaItem.ordem).all()
     n_tarefas = 0
     for idx, it in enumerate(itens, start=1):
-        ja_tem = TarefaCronograma.query.filter_by(
+        ja = TarefaCronograma.query.filter_by(
             gerada_por_proposta_item_id=it.id, obra_id=obra.id
-        ).first()
-        if ja_tem:
-            n_tarefas += 1
+        ).count()
+        if ja:
+            n_tarefas += ja
             continue
         imc = imc_por_item.get(it.id)
         if imc is None:
             continue
-        _sintetizar_atividade(it, imc, obra, admin_id, idx)
-        n_tarefas += 1
+        tmpl_itens = _template_itens_do_servico(it.servico_id, admin_id)
+        if any(ti.peso_medicao is not None for ti in tmpl_itens):
+            n_tarefas += _materializar_do_template(it, imc, obra, admin_id, tmpl_itens)
+        else:
+            _sintetizar_atividade(it, imc, obra, admin_id, idx)   # 1:1 fallback
+            n_tarefas += 1
     return n_tarefas
 
 

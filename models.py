@@ -5166,6 +5166,10 @@ class CronogramaTemplateItem(db.Model):
     duracao_dias = db.Column(db.Integer, default=1, nullable=False)
     quantidade_prevista = db.Column(db.Float)          # unidade vem da SubatividadeMestre
     responsavel = db.Column(db.String(20), default='empresa')  # empresa | terceiros
+    # Espinha financeira (ADR 0004/DC8): peso explícito da Atividade no Serviço
+    # (do cronograma refinado). Quando preenchido, vira direto o Peso da medição
+    # (ItemMedicaoCronogramaTarefa.peso), sem derivar de horas. Soma 100%/serviço.
+    peso_medicao = db.Column(db.Numeric(5, 2), nullable=True)
 
     admin_id = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
