@@ -143,6 +143,10 @@ def _migration_193_espinha_atividade_fks(cursor):
         "ALTER TABLE rdo_subempreitada_apontamento "
         "ADD COLUMN IF NOT EXISTS gestao_custo_pai_id INTEGER "
         "REFERENCES gestao_custo_pai(id) ON DELETE SET NULL",
+
+        # Grill 2026-06-15 / ADR 0005 — distingue Proposta de importacao da comercial
+        "ALTER TABLE propostas_comerciais "
+        "ADD COLUMN IF NOT EXISTS origem VARCHAR(30)",
     ]
     for s in stmts:
         cursor.execute(s)

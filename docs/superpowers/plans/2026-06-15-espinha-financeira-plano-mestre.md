@@ -64,6 +64,8 @@ atividade que a espinha vai precisar — assim Fatias 3, 4 e 5 ficam **sem migra
 | `rdo_subempreitada_apontamento` | `verba_unica` | Numeric(15,2) nullable | subempreitada vira custo (Fatia 2 / telhado) |
 | `rdo_subempreitada_apontamento` | `lucro_pct` | Numeric(5,2) nullable | idem |
 | `rdo_subempreitada_apontamento` | `gestao_custo_pai_id` | FK→gestao_custo_pai, nullable | idempotência do custo de subempreitada |
+| `propostas_comerciais` | `origem` | String(30) nullable, default NULL | distinguir _Proposta de importação_ (`'importacao_obra'`) da proposta comercial de venda; filtra funil/KPIs (ver ADR 0005) |
+| `cronograma_template_item` | `peso_medicao` | Numeric(5,2) nullable | peso explícito da Atividade no Serviço (do cronograma refinado); a materialização grava direto no _Peso da medição_ em vez de derivar de horas (ver DC8, ADR 0004) |
 
 Fatia 5 (learning loop) escreve em colunas **já existentes** de `SubatividadeMestre`
 (`meta_produtividade`, `duracao_estimada_horas`) — sem migration.
@@ -94,11 +96,16 @@ entraria duas vezes. Esta regra fica num único ponto e é coberta por teste de 
 
 ### DC5 — Custo orçado por atividade é uma família de funções sobre o snapshot
 A Fatia 1 cria `custo_mo_orcado_unitario(snapshot)` (filtra `tipo=='MAO_OBRA'`). Generaliza-se para
-`custo_orcado_unitario(snapshot, tipos)` e a Fatia 2 chama com os demais tipos. **Fonte única e
-cadeia única** (confirmada no código):
+`custo_orcado_unitario(snapshot, tipos)` e a Fatia 2 chama com os demais tipos. Chaves do snapshot:
+`tipo` (MAIÚSC: `MAO_OBRA`/`MATERIAL`/…), `unidade` (minúsc: `h`/`m2`/…), `coeficiente`,
+`subtotal_unitario` (custo por unidade de serviço).
+**Fonte do snapshot (grill 2026-06-15, ADR 0005):** o orçado é o **baseline congelado** da
+**Proposta** — `PropostaItem.composicao_snapshot` × quantidade × _Peso da medição_. Cadeia:
 `TarefaCronograma → ItemMedicaoCronogramaTarefa → ItemMedicaoComercial.proposta_item_id →
-PropostaItem.composicao_snapshot`. Chaves do snapshot: `tipo` (MAIÚSC: `MAO_OBRA`/`MATERIAL`/…),
-`unidade` (minúsc: `h`/`m2`/…), `coeficiente`, `subtotal_unitario` (custo por unidade de serviço).
+PropostaItem.composicao_snapshot`. **Não acompanha revisões** (senão o alarme poderia ser mascarado;
+ver _Orçado (baseline)_ no CONTEXT). A Fatia 1 **já lê assim** — está correta, sem refactor. O
+Orçamento operacional é ferramenta de re-planejamento à parte (pode virar "estimativa atual" do EVM
+no futuro, não o baseline).
 
 ### DC6 — Rateio por hora-homem é um helper único, escrito na Fatia 1
 A Fatia 1 já rateia o custo onerado por horas/atividade/RDO (`custo_mo_atividade`). Extrair desse
@@ -119,6 +126,11 @@ hora-homem/atividade/dia. Nada de dois rateios divergentes.
 `ItemMedicaoCronogramaTarefa.peso` (editor pronto: `medicao_views.py:344`, validação soma=100% em
 `medicao_service.py:68`). Vale para **venda, custo orçado e rateio de orçado**. Nunca criar peso
 paralelo.
+**Semente do peso (grill 2026-06-15):** quando a Atividade vem de um `CronogramaTemplate`, o peso
+**explícito** do detalhamento (cronograma refinado: 33/38/29…) é gravado direto no _Peso da medição_
+(campo `cronograma_template_item.peso_medicao`, migration 193), em vez de derivar de
+`duracao_estimada_horas`. O peso da medição continua sendo a fonte única — só muda de onde vem a
+semente. Quando o peso explícito não existe, mantém-se a derivação por horas / divisão igual.
 
 ### DC9 — Telhado viga I: subempreitada verba+lucro com venda total travada (Fatia 2)
 Reusa o *margin lock* de `services/orcamento_view_service.py:recalcular_item` (venda = custo /
@@ -132,6 +144,18 @@ Reusa o *margin lock* de `services/orcamento_view_service.py:recalcular_item` (v
 **nunca voltam** ao catálogo. A Fatia 5 lê os índices de RDOs finalizados e **atualiza**
 `SubatividadeMestre.meta_produtividade`/`duracao_estimada_horas` (colunas existentes), melhorando o
 próximo orçamento e os pesos da próxima materialização (`cronograma_proposta.py:675`).
+
+---
+
+### DC11 — Habilitação da obra = importar o Orçamento como Obra (grill 2026-06-15, ADR 0005)
+A habilitação canônica de uma obra para a espinha é **importar o Orçamento como Obra**
+(`services/importar_obra_completa.py` + botão na UI), não um script por obra. O importador cria a
+cadeia vinculada sem config: **Proposta de importação** (`origem='importacao_obra'`, elo
+Obra→Orçamento, fora do funil comercial — ADR 0005) → Obra → IMC 1:1 → Cronograma. Onde o Serviço
+tem `CronogramaTemplate`, materializa as Atividades finas; onde não tem, **sintetiza Serviço =
+Atividade (1:1), peso 100%** (ADR 0004), e a granularidade congela ao iniciar o apontamento. O
+**orçado (baseline)** vem do snapshot congelado da Proposta (DC5) — o importador **não** depende do
+Orçamento operacional para isso.
 
 ---
 

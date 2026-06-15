@@ -14,6 +14,31 @@
 
 ---
 
+## Atualização pós-grill (2026-06-15) — status e deltas
+
+**Implementado e commitado:** Fase A (bug RDO), Fase B (read-model), Fase C (tela). A **Fase D**
+(habilitação) foi substituída pelo **importador auto-wiring** `services/importar_obra_completa.py`
++ botão "Importar como Obra" na UI (ver plano-mestre DC11, ADR 0004, ADR 0005). A Baia foi
+materializada (obra 655).
+
+**Confirmado correto no grill (sem refactor):** o orçado (baseline) é lido do
+`PropostaItem.composicao_snapshot` — **congelado**, não acompanha revisões (ADR 0005, _Orçado
+(baseline)_ no CONTEXT). É o que a Fatia 1 já faz. O Orçamento operacional **não** é a fonte do
+baseline; logo o importador **não** precisa chamar `garantir_operacional` para a espinha.
+
+**Deltas pendentes decididos no grill (alinhar código às decisões):**
+1. **Multi-atividade real (corrige o 1:1 — ADR 0004)** — o principal. O 1:1 da Baia foi fallback por
+   falta de detalhamento. Construir `CronogramaTemplate` por serviço a partir do
+   `2026-06-14-cronograma-refinado-pareto-baia-rev10.md` (30 atividades) com `peso_medicao`
+   explícito (migration 193); o importador materializa as N atividades e grava o _Peso da medição_
+   do template. **Re-materializar a obra 655** para multi-atividade — possível porque ela ainda
+   **não tem RDO apontado** (granularidade não congelou). Onde faltar template, o 1:1 segue fallback.
+2. **Proposta de importação marcada** (ADR 0005): coluna `propostas_comerciais.origem` (migration
+   193); o importador seta `origem='importacao_obra'`; listagem/KPIs comerciais filtram.
+3. **Reconciliar obra 655** (pré-decisão): passo idempotente — setar `proposta.origem`; não apagar.
+
+---
+
 ## 0. Objetivo e contexto (leia antes de começar)
 
 O SIGE é um app **Flask + SQLAlchemy** (Postgres). A obra é executada por um **cronograma** de

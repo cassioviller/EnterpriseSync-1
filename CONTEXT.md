@@ -25,6 +25,14 @@ _Avoid_: imposto isolado, encargo
 Campo da proposta (`percentual_nota_fiscal`, default 13,5%) que hoje é **apenas informativo** no PDF ("considerar X% para nota fiscal"). NÃO entra em nenhum cálculo e é distinto de _Tributos_.
 _Avoid_: imposto, tributo
 
+**Orçado (baseline)**:
+O custo orçado da Atividade que serve de **referência fixa** para o alarme e o EVM, vindo do snapshot da **Proposta** (`PropostaItem.composicao_snapshot` × quantidade × _Peso da medição_). É **congelado** no início da obra: não se move com revisões. É o "o que foi prometido", contra o qual o _Custo incorrido_ real é comparado — se o orçado acompanhasse revisões, o alarme deixaria de acusar estouro.
+_Avoid_: custo previsto, orçado da obra (ambíguo), custo planejado revisado
+
+**Orçamento operacional**:
+Cópia **por obra e versionada** do orçamento (`ObraOrcamentoOperacional`, clonada por `garantir_operacional`), que o gestor pode **revisar durante a execução** (re-planejamento). É uma ferramenta separada — **não** é o _Orçado (baseline)_ do alarme/EVM (esse é congelado da Proposta, justamente para o alarme não poder ser mascarado por revisões). Pode alimentar a "estimativa atual" da previsão no futuro (EVM completo), mas não o baseline.
+_Avoid_: orçado (esse é o baseline congelado), orçamento (sozinho — o comercial/empresa)
+
 ## Estrutura do Trabalho (Orçamento ↔ Cronograma)
 
 **Serviço**:
@@ -32,8 +40,16 @@ A linha do orçamento — unidade de **precificação**. Tem composição (custo
 _Avoid_: item, tarefa, etapa
 
 **Atividade**:
-A `TarefaCronograma` — unidade **executável e mensurável** do cronograma, onde a produção diária é apontada (RDO). Aponta para um Serviço (`servico_id`). Ex.: o Serviço "Estrutura LSF" → Atividades "painelização" e "verticalização". O preço **não** mora na Atividade; vem rateado do Serviço por hora-homem. O Resultado sobe Atividade → Serviço → Obra.
+A `TarefaCronograma` — unidade **executável e mensurável** do cronograma, onde a produção diária é apontada (RDO). Aponta para um Serviço (`servico_id`). Ex.: o Serviço "Estrutura LSF" → Atividades "painelização" e "verticalização". O preço **não** mora na Atividade; ele desce do Serviço por **dois rateios distintos**: a parte de **venda e de custo orçado** desce pelo _Peso da medição_; o **Custo incorrido de MO** real desce por **hora-homem apontada**. O Resultado sobe Atividade → Serviço → Obra.
 _Avoid_: tarefa (no domínio, use Atividade), subatividade, fase
+
+**Peso da medição**:
+Quanto cada Atividade representa do seu Serviço para fins de **medição, venda e custo orçado** (`ItemMedicaoCronogramaTarefa.peso`). Os pesos das Atividades de um mesmo Serviço somam 100%. É a **fonte única** de como venda e custo orçado descem do Serviço para a Atividade — distinto do rateio do _Custo incorrido_ de MO, que é por hora-homem real. Editável na tela de medição; quando o Serviço tem uma única Atividade, o peso é 100%.
+_Avoid_: peso da atividade, rateio por hora-homem (esse é do custo real), proporção
+
+**Proposta de importação** (proposta-ponte):
+Proposta gerada **automaticamente** quando um Orçamento é importado como Obra. No domínio, a Obra sempre nasce de uma Proposta (`obra.proposta_origem_id`), que é o elo até o Orçamento de origem (e a base do _Orçamento operacional_). A Proposta de importação cumpre **só** esse papel estrutural — **não é uma proposta comercial de venda** e fica **fora do funil e dos KPIs comerciais** (marcada por `origem`). Distinta da Proposta comercial, que é enviada a um cliente e passa por aprovação.
+_Avoid_: proposta sintética, proposta fake, proposta comercial (essa é a de venda)
 
 ## Acompanhamento Financeiro da Obra (Execução)
 
