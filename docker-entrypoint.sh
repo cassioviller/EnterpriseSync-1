@@ -52,7 +52,17 @@ try:
         print('📋 Verificando/criando tabelas básicas...')
         db.create_all()
         print('✅ Tabelas verificadas')
-        
+
+        # Migrações de schema (idempotentes) — necessárias para bancos EXISTENTES,
+        # onde db.create_all() não adiciona colunas novas. Não-fatal.
+        print('🔧 Aplicando migrações de schema...')
+        try:
+            from migrations import executar_migracoes
+            executar_migracoes()
+            print('✅ Migrações aplicadas')
+        except Exception as e_mig:
+            print(f'⚠️ Migrações (não crítico): {e_mig}')
+
         # Verificação básica de dados (apenas diagnóstico)
         try:
             from sqlalchemy import text
