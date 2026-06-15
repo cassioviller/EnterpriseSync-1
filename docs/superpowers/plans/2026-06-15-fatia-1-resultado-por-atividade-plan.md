@@ -27,15 +27,14 @@ materializada (obra 655).
 baseline; logo o importador **não** precisa chamar `garantir_operacional` para a espinha.
 
 **Deltas pendentes decididos no grill (alinhar código às decisões):**
-1. **Multi-atividade real (corrige o 1:1 — ADR 0004)** — o principal. O 1:1 da Baia foi fallback por
-   falta de detalhamento. Construir `CronogramaTemplate` por serviço a partir do
-   `2026-06-14-cronograma-refinado-pareto-baia-rev10.md` (30 atividades) com `peso_medicao`
-   explícito (migration 193); o importador materializa as N atividades e grava o _Peso da medição_
-   do template. **Re-materializar a obra 655** para multi-atividade — possível porque ela ainda
-   **não tem RDO apontado** (granularidade não congelou). Onde faltar template, o 1:1 segue fallback.
-2. **Proposta de importação marcada** (ADR 0005): coluna `propostas_comerciais.origem` (migration
-   193); o importador seta `origem='importacao_obra'`; listagem/KPIs comerciais filtram.
-3. **Reconciliar obra 655** (pré-decisão): passo idempotente — setar `proposta.origem`; não apagar.
+1. ✅ **FEITO (commit 5389265) — Multi-atividade real (ADR 0004).** migration 193 adicionou
+   `cronograma_template_item.peso_medicao`; o importador consome `CronogramaTemplate` e cria N
+   atividades com o peso explícito (1:1 vira só fallback). Seed dos 21 templates da Baia (do
+   cronograma refinado) e **obra 655 re-materializada: 21 → 28 atividades**, pesos batendo o doc
+   (1.17a 33/38/29; 1.1 50/50; 1.4 60/40). 19 testes verdes.
+2. ⬜ **Proposta de importação marcada** (ADR 0005): coluna `propostas_comerciais.origem`; o
+   importador seta `origem='importacao_obra'`; listagem/KPIs comerciais filtram.
+3. ⬜ **Reconciliar obra 655** (pré-decisão): passo idempotente — setar `proposta.origem`; não apagar.
 
 ---
 
