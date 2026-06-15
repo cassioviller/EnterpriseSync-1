@@ -1,0 +1,308 @@
+"""Read-model do Resultado por Atividade (Fatia 1 — só Mão de Obra).
+
+Calcula, a partir das fontes que já existem (sem migration):
+  - valor_agregado_atividade   : a receber pela produção feita
+  - custo_mo_atividade         : custo onerado real de MO rateado por horas (D1)
+  - resultado_realizado_atividade = agregado − custo MO
+  - custo_orcado_unitario      : custo orçado por unidade de serviço (genérico por tipo, DC5)
+  - custo_mo_orcado_atividade  : MO orçada (composicao_snapshot × quantidade × peso)
+  - alarme_mo                  : real vs orçado-para-o-avanço, em R$ (D5 primário)
+  - indice_horas               : refino, só onde a MO foi orçada em hora
+  - resultado_obra             : rollup por atividade / serviço / obra
+
+O peso Serviço→Atividade é o da medição (ItemMedicaoCronogramaTarefa.peso) — D6,
+fonte única de verdade. Nada é gravado: tudo é computado sob demanda (DC1).
+
+Cadeia atividade→orçamento (confirmada no código):
+  TarefaCronograma → ItemMedicaoCronogramaTarefa (cronograma_tarefa_id)
+  → ItemMedicaoComercial (item_medicao_id; valor_comercial, quantidade, proposta_item_id)
+  → Proposta? NÃO: → PropostaItem (proposta_item_id) → composicao_snapshot.
+"""
+from collections import defaultdict
+from decimal import Decimal, ROUND_HALF_UP
+
+from app import db
+from models import (
+    TarefaCronograma, ItemMedicaoComercial, ItemMedicaoCronogramaTarefa,
+    PropostaItem, RDOMaoObra, RDOCustoDiario,
+)
+
+CEM = Decimal('100')
+CENTAVO = Decimal('0.01')
+MILESIMO = Decimal('0.001')
+
+
+def _D(x):
+    """Converte qualquer numérico/None para Decimal de forma segura."""
+    return Decimal(str(x)) if x is not None else Decimal('0')
+
+
+def _q(d):
+    return d.quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+# ── helpers reutilizáveis (DC6/DC8 — usados também pelas fatias seguintes) ─────
+
+def _soma_peso_item(item_id):
+    """Soma dos pesos de todas as tarefas vinculadas ao item de medição (D6).
+    É o denominador da normalização do peso."""
+    total = (
+        db.session.query(
+            db.func.coalesce(db.func.sum(ItemMedicaoCronogramaTarefa.peso), 0)
+        )
+        .filter(ItemMedicaoCronogramaTarefa.item_medicao_id == item_id)
+        .scalar()
+    )
+    return _D(total)
+
+
+def _links_da_tarefa(tarefa):
+    """Vínculos (item_medicao, peso) desta atividade."""
+    return (
+        ItemMedicaoCronogramaTarefa.query
+        .filter_by(cronograma_tarefa_id=tarefa.id)
+        .all()
+    )
+
+
+def _horas_func_no_rdo(rdo_id, func_id):
+    """Total de horas que um funcionário lançou num RDO (todas as atividades).
+    Denominador do rateio do custo onerado (DC6 — a Fatia 2 reusa este helper)."""
+    return _D(
+        db.session.query(
+            db.func.coalesce(db.func.sum(RDOMaoObra.horas_trabalhadas), 0)
+        )
+        .filter(RDOMaoObra.rdo_id == rdo_id, RDOMaoObra.funcionario_id == func_id)
+        .scalar()
+    )
+
+
+# ── venda / valor agregado ────────────────────────────────────────────────────
+
+def valor_agregado_atividade(tarefa):
+    """Valor a receber pela produção já feita nesta atividade.
+    = (percentual_concluido/100) × peso_norm × valor_comercial, somado sobre os
+    itens de medição a que a atividade está vinculada (D6)."""
+    perc = _D(tarefa.percentual_concluido) / CEM
+    total = Decimal('0')
+    for link in _links_da_tarefa(tarefa):
+        item = db.session.get(ItemMedicaoComercial, link.item_medicao_id)
+        if not item:
+            continue
+        soma_peso = _soma_peso_item(item.id)
+        if soma_peso <= 0:
+            continue
+        peso_norm = _D(link.peso) / soma_peso
+        total += perc * peso_norm * _D(item.valor_comercial)
+    return _q(total)
+
+
+# ── custo de MO incorrido (D1) ────────────────────────────────────────────────
+
+def custo_mo_atividade(tarefa):
+    """Custo de MO incorrido nesta atividade (D1): para cada (RDO, funcionário)
+    que apontou horas na atividade, rateia o custo onerado real daquele RDO
+    (RDOCustoDiario.custo_total_dia) pela fração de horas do funcionário gastas
+    na atividade naquele RDO. Soma sobre todos os RDOs."""
+    horas_ativ = defaultdict(Decimal)        # (rdo_id, func_id) -> horas na atividade
+    for mo in RDOMaoObra.query.filter_by(tarefa_cronograma_id=tarefa.id).all():
+        horas_ativ[(mo.rdo_id, mo.funcionario_id)] += _D(mo.horas_trabalhadas)
+
+    total = Decimal('0')
+    for (rdo_id, func_id), h_ativ in horas_ativ.items():
+        h_total = _horas_func_no_rdo(rdo_id, func_id)
+        if h_total <= 0:
+            continue
+        custo = (
+            RDOCustoDiario.query
+            .filter_by(rdo_id=rdo_id, funcionario_id=func_id)
+            .first()
+        )
+        if not custo:
+            continue
+        total += _D(custo.custo_total_dia) * (h_ativ / h_total)
+    return _q(total)
+
+
+def resultado_realizado_atividade(tarefa):
+    """Resultado (competência) da atividade na Fatia 1 = Valor agregado − Custo MO.
+    Fatias 2+ somarão material/transporte/subempreitada ao custo (via
+    custo_incorrido_atividade, sem mudar esta assinatura)."""
+    return _q(valor_agregado_atividade(tarefa) - custo_mo_atividade(tarefa))
+
+
+# ── custo orçado a partir do snapshot da composição (DC5) ─────────────────────
+
+def custo_orcado_unitario(composicao_snapshot, tipos=None):
+    """Custo orçado por UMA unidade de serviço, somando subtotal_unitario das
+    linhas cujo tipo está em `tipos` (None = todos). Função pura."""
+    total = Decimal('0')
+    for linha in (composicao_snapshot or []):
+        tp = (linha.get('tipo') or '').upper()
+        if tipos is None or tp in tipos:
+            total += _D(linha.get('subtotal_unitario'))
+    return total
+
+
+def custo_mo_orcado_unitario(composicao_snapshot):
+    """Caso particular de custo_orcado_unitario para MAO_OBRA."""
+    return custo_orcado_unitario(composicao_snapshot, {'MAO_OBRA'})
+
+
+def custo_mo_orcado_atividade(tarefa):
+    """MO orçada alocada à atividade = Σ_itens (MO/un × quantidade × peso_norm).
+    quantidade vem do ItemMedicaoComercial (fallback PropostaItem)."""
+    total = Decimal('0')
+    for link in _links_da_tarefa(tarefa):
+        item = db.session.get(ItemMedicaoComercial, link.item_medicao_id)
+        if not item or not item.proposta_item_id:
+            continue
+        pi = db.session.get(PropostaItem, item.proposta_item_id)
+        if not pi:
+            continue
+        soma_peso = _soma_peso_item(item.id)
+        if soma_peso <= 0:
+            continue
+        mo_unit = custo_mo_orcado_unitario(pi.composicao_snapshot)
+        qtd = _D(item.quantidade) if item.quantidade is not None else _D(pi.quantidade)
+        peso_norm = _D(link.peso) / soma_peso
+        total += mo_unit * qtd * peso_norm
+    return _q(total)
+
+
+# ── alarme primário em R$ (D5) ────────────────────────────────────────────────
+
+def alarme_mo(tarefa):
+    """Alarme primário em R$ (D5): compara o custo MO real incorrido com o custo
+    MO orçado para o avanço atual. Vale para qualquer modelo de precificação."""
+    perc = _D(tarefa.percentual_concluido) / CEM
+    orcado_total = custo_mo_orcado_atividade(tarefa)
+    orcado_para_avanco = _q(orcado_total * perc)
+    real = custo_mo_atividade(tarefa)
+    indice = None
+    if real > 0:
+        indice = (orcado_para_avanco / real).quantize(MILESIMO, rounding=ROUND_HALF_UP)
+    return {
+        'orcado_total': orcado_total,
+        'orcado_para_avanco': orcado_para_avanco,
+        'real': real,
+        'estouro': real > orcado_para_avanco,
+        'indice_rs': indice,   # <1 = no vermelho; None se sem custo real ainda
+    }
+
+
+# ── refino em horas (só onde a MO foi orçada em hora) ─────────────────────────
+
+def horas_orcadas_unitarias(composicao_snapshot):
+    """Horas orçadas por UMA unidade de serviço = Σ coeficiente das linhas
+    MAO_OBRA com unidade 'h'. Retorna None se nenhuma linha de MO é horária."""
+    total = Decimal('0')
+    achou = False
+    for linha in (composicao_snapshot or []):
+        if (linha.get('tipo') or '').upper() == 'MAO_OBRA' and \
+           (linha.get('unidade') or '').lower() == 'h':
+            total += _D(linha.get('coeficiente'))
+            achou = True
+    return total if achou else None
+
+
+def indice_horas(tarefa):
+    """Refino do alarme (D5), só onde a MO foi orçada em hora. Índice =
+    horas ganhas (avanço × horas orçadas) / horas reais apontadas.
+    Retorna None quando a MO do item não tem insumo horário."""
+    horas_orcadas = Decimal('0')
+    tem_hora = False
+    for link in _links_da_tarefa(tarefa):
+        item = db.session.get(ItemMedicaoComercial, link.item_medicao_id)
+        if not item or not item.proposta_item_id:
+            continue
+        pi = db.session.get(PropostaItem, item.proposta_item_id)
+        if not pi:
+            continue
+        unit = horas_orcadas_unitarias(pi.composicao_snapshot)
+        if unit is None:
+            continue
+        tem_hora = True
+        soma_peso = _soma_peso_item(item.id)
+        if soma_peso <= 0:
+            continue
+        qtd = _D(item.quantidade) if item.quantidade is not None else _D(pi.quantidade)
+        peso_norm = _D(link.peso) / soma_peso
+        horas_orcadas += unit * qtd * peso_norm
+
+    if not tem_hora:
+        return None
+
+    perc = _D(tarefa.percentual_concluido) / CEM
+    horas_ganhas = horas_orcadas * perc
+    horas_reais = _D(
+        db.session.query(
+            db.func.coalesce(db.func.sum(RDOMaoObra.horas_trabalhadas), 0)
+        )
+        .filter(RDOMaoObra.tarefa_cronograma_id == tarefa.id)
+        .scalar()
+    )
+    indice = None
+    if horas_reais > 0:
+        indice = (horas_ganhas / horas_reais).quantize(MILESIMO, rounding=ROUND_HALF_UP)
+    return {
+        'horas_orcadas': _q(horas_orcadas),
+        'horas_ganhas': _q(horas_ganhas),
+        'horas_reais': _q(horas_reais),
+        'indice': indice,
+    }
+
+
+# ── rollup atividade → serviço → obra ─────────────────────────────────────────
+
+def _folhas_da_obra(obra_id):
+    """Atividades-folha (sem filhas) da obra — os centros de custo reais.
+    Grupos (que têm filhas) são agregação, não recebem apontamento direto."""
+    tarefas = TarefaCronograma.query.filter_by(obra_id=obra_id).all()
+    pais = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id is not None}
+    return [t for t in tarefas if t.id not in pais]
+
+
+def resultado_obra(obra_id):
+    """Rollup do Resultado da obra a partir das atividades-folha. Retorna o
+    detalhe por atividade + totais por serviço + totais da obra."""
+    atividades = []
+    por_servico = defaultdict(lambda: {
+        'valor_agregado': Decimal('0'), 'custo_mo': Decimal('0'),
+        'resultado': Decimal('0'),
+    })
+    tot_agregado = Decimal('0')
+    tot_custo = Decimal('0')
+
+    for t in _folhas_da_obra(obra_id):
+        agregado = valor_agregado_atividade(t)
+        custo = custo_mo_atividade(t)
+        resultado = _q(agregado - custo)
+        atividades.append({
+            'tarefa_id': t.id,
+            'nome': t.nome_tarefa,
+            'servico_id': t.servico_id,
+            'percentual_concluido': float(t.percentual_concluido or 0),
+            'quantidade_total': float(t.quantidade_total or 0),
+            'valor_agregado': agregado,
+            'custo_mo': custo,
+            'resultado': resultado,
+            'alarme': alarme_mo(t),
+            'indice_horas': indice_horas(t),
+        })
+        chave = t.servico_id or 0
+        por_servico[chave]['valor_agregado'] += agregado
+        por_servico[chave]['custo_mo'] += custo
+        por_servico[chave]['resultado'] += resultado
+        tot_agregado += agregado
+        tot_custo += custo
+
+    return {
+        'obra_id': obra_id,
+        'atividades': atividades,
+        'por_servico': {k: {kk: _q(vv) for kk, vv in v.items()}
+                        for k, v in por_servico.items()},
+        'valor_agregado': _q(tot_agregado),
+        'custo_mo': _q(tot_custo),
+        'resultado': _q(tot_agregado - tot_custo),
+    }
