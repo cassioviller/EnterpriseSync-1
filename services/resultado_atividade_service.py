@@ -500,3 +500,38 @@ def evm_obra(obra_id, admin_id, data_ref=None):
         'cpi': cpi, 'spi': spi, 'eac': eac,
         'resultado_projetado': _q(venda - eac) if eac is not None else None,
     }
+
+
+# ── Fatia 5 — roll-up de portfólio (consolida todas as obras do tenant) ───────
+
+def resultado_portfolio(admin_id, data_ref=None):
+    """Consolida Resultado (competência) + EVM de todas as obras ativas do tenant.
+    Reúsa resultado_obra e evm_obra; visão da empresa."""
+    from models import Obra
+    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
+    linhas = []
+    tot_agreg = Decimal('0')
+    tot_incorrido = Decimal('0')
+    tot_venda = Decimal('0')
+    for o in obras:
+        r = resultado_obra(o.id)
+        e = evm_obra(o.id, admin_id, data_ref)
+        linhas.append({
+            'obra_id': o.id, 'nome': o.nome,
+            'valor_agregado': r['valor_agregado'],
+            'custo_incorrido': r['custo_incorrido'],
+            'resultado': r['resultado'],
+            'venda_total': e['venda_total'],
+            'cpi': e['cpi'], 'spi': e['spi'], 'eac': e['eac'],
+            'resultado_projetado': e['resultado_projetado'],
+        })
+        tot_agreg += r['valor_agregado']
+        tot_incorrido += r['custo_incorrido']
+        tot_venda += e['venda_total']
+    return {
+        'obras': linhas,
+        'valor_agregado': _q(tot_agreg),
+        'custo_incorrido': _q(tot_incorrido),
+        'resultado': _q(tot_agreg - tot_incorrido),
+        'venda_total': _q(tot_venda),
+    }

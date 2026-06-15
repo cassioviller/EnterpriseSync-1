@@ -51,6 +51,35 @@ def resultado_por_atividade(obra_id):
     )
 
 
+@resultado_bp.route('/resultado/portfolio/')
+@resultado_bp.route('/resultado/portfolio')
+@login_required
+def portfolio():
+    """Roll-up de portfólio — Resultado/EVM consolidados de todas as obras (Fatia 5)."""
+    guard = _check_v2()
+    if guard:
+        return guard
+    from services.resultado_atividade_service import resultado_portfolio
+    admin_id = _admin_id()
+    dados = resultado_portfolio(admin_id)
+    return render_template('resultado/portfolio.html', dados=dados)
+
+
+@resultado_bp.route('/resultado/aprender-produtividade', methods=['POST'])
+@login_required
+def aprender_produtividade():
+    """Aciona o loop de aprendizado: realimenta o catálogo (SubatividadeMestre)
+    com a produtividade observada (Fatia 5 / DC10)."""
+    guard = _check_v2()
+    if guard:
+        return guard
+    from services.aprendizado_produtividade import atualizar_catalogo_produtividade
+    admin_id = _admin_id()
+    n = atualizar_catalogo_produtividade(admin_id)
+    flash(f'Catálogo de produtividade atualizado: {n} subatividade(s) recalibrada(s).', 'success')
+    return redirect(url_for('resultado.portfolio'))
+
+
 def _parse_data_arg(arg):
     v = (request.args.get(arg) or '').strip()
     if not v:
