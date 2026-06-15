@@ -3995,6 +3995,7 @@ def executar_migracoes():
             (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
             (193, "Espinha financeira — cronograma_template_item.peso_medicao (peso explícito da Atividade no Serviço; ADR 0004)", _migration_193_template_peso_medicao),
             (194, "Espinha financeira — propostas_comerciais.origem (Proposta de importação fora do funil comercial; ADR 0005)", _migration_194_proposta_origem),
+            (195, "Espinha financeira Fatia 2 — FKs tarefa_cronograma em gestao_custo_filho/movimentacao_estoque/custo_veiculo + verba/lucro/pai em subempreitada", _migration_195_custo_nao_mo_por_atividade),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13560,6 +13561,40 @@ def _migration_194_proposta_origem():
         logger.info("[Migration 194] Coluna origem adicionada a propostas_comerciais.")
     except Exception as e:
         logger.error(f"[Migration 194] Falha: {e}")
+        raise
+
+
+def _migration_195_custo_nao_mo_por_atividade():
+    """Espinha financeira (Fatia 2 / DC2) — etiquetar custo não-MO na atividade.
+
+    FK tarefa_cronograma_id em gestao_custo_filho, movimentacao_estoque e
+    custo_veiculo (custo direto por atividade). Campos verba_unica/lucro_pct/
+    gestao_custo_pai_id em rdo_subempreitada_apontamento (subempreitada vira
+    custo). Tudo nullable/idempotente; ON DELETE SET NULL.
+    """
+    from sqlalchemy import text as sa_text
+    stmts = [
+        "ALTER TABLE gestao_custo_filho ADD COLUMN IF NOT EXISTS tarefa_cronograma_id INTEGER "
+        "REFERENCES tarefa_cronograma(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_gcf_tarefa_cronograma ON gestao_custo_filho(tarefa_cronograma_id)",
+        "ALTER TABLE movimentacao_estoque ADD COLUMN IF NOT EXISTS tarefa_cronograma_id INTEGER "
+        "REFERENCES tarefa_cronograma(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_movest_tarefa_cronograma ON movimentacao_estoque(tarefa_cronograma_id)",
+        "ALTER TABLE custo_veiculo ADD COLUMN IF NOT EXISTS tarefa_cronograma_id INTEGER "
+        "REFERENCES tarefa_cronograma(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_custoveic_tarefa_cronograma ON custo_veiculo(tarefa_cronograma_id)",
+        "ALTER TABLE rdo_subempreitada_apontamento ADD COLUMN IF NOT EXISTS verba_unica NUMERIC(15,2)",
+        "ALTER TABLE rdo_subempreitada_apontamento ADD COLUMN IF NOT EXISTS lucro_pct NUMERIC(5,2)",
+        "ALTER TABLE rdo_subempreitada_apontamento ADD COLUMN IF NOT EXISTS gestao_custo_pai_id INTEGER "
+        "REFERENCES gestao_custo_pai(id) ON DELETE SET NULL",
+    ]
+    try:
+        with db.engine.begin() as conn:
+            for s in stmts:
+                conn.execute(sa_text(s))
+        logger.info("[Migration 195] FKs de atividade (custo não-MO) + campos de subempreitada adicionados.")
+    except Exception as e:
+        logger.error(f"[Migration 195] Falha: {e}")
         raise
 
 

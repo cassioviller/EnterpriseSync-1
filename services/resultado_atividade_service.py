@@ -24,8 +24,13 @@ from decimal import Decimal, ROUND_HALF_UP
 from app import db
 from models import (
     TarefaCronograma, ItemMedicaoComercial, ItemMedicaoCronogramaTarefa,
-    PropostaItem, RDOMaoObra, RDOCustoDiario,
+    PropostaItem, RDOMaoObra, RDOCustoDiario, RDO,
+    GestaoCustoFilho, GestaoCustoPai,
 )
+
+# Categorias do ledger que JÁ são MO (lidas do RDOCustoDiario, D1) — o read-model
+# NÃO as soma de novo a partir do GestaoCustoFilho, senão a folha contaria 2x (DC3).
+_CATEGORIAS_MO = {'SALARIO', 'MAO_OBRA_DIRETA', 'VALE_ALIMENTACAO', 'VALE_TRANSPORTE'}
 
 CEM = Decimal('100')
 CENTAVO = Decimal('0.01')
@@ -124,11 +129,64 @@ def custo_mo_atividade(tarefa):
     return _q(total)
 
 
+# ── custo NÃO-MO incorrido (Fatia 2: material/alimentação/transporte/subempreitada) ──
+
+def _horas_obra_no_dia(obra_id, data):
+    """Hora-homem total apontada na obra num dia (denominador do rateio, DC6)."""
+    return _D(
+        db.session.query(db.func.coalesce(db.func.sum(RDOMaoObra.horas_trabalhadas), 0))
+        .join(RDO, RDO.id == RDOMaoObra.rdo_id)
+        .filter(RDO.obra_id == obra_id, RDO.data_relatorio == data)
+        .scalar()
+    )
+
+
+def _horas_atividade_no_dia(tarefa_id, data):
+    """Hora-homem apontada nesta atividade num dia (numerador do rateio)."""
+    return _D(
+        db.session.query(db.func.coalesce(db.func.sum(RDOMaoObra.horas_trabalhadas), 0))
+        .join(RDO, RDO.id == RDOMaoObra.rdo_id)
+        .filter(RDOMaoObra.tarefa_cronograma_id == tarefa_id, RDO.data_relatorio == data)
+        .scalar()
+    )
+
+
+def custo_nao_mo_atividade(tarefa):
+    """Custo não-MO da atividade (Fatia 2):
+      (a) DIRETO: lançamentos do ledger com `tarefa_cronograma_id == tarefa.id`;
+      (b) COMPARTILHADO: lançamentos do dia sem atividade, rateados pela fração de
+          hora-homem da atividade naquele dia (DC6).
+    Exclui as categorias de MO (DC3) — elas já vêm do RDOCustoDiario (custo_mo)."""
+    total = Decimal('0')
+    rows = (
+        db.session.query(GestaoCustoFilho, GestaoCustoPai.tipo_categoria)
+        .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+        .filter(GestaoCustoFilho.obra_id == tarefa.obra_id)
+        .filter(~GestaoCustoPai.tipo_categoria.in_(_CATEGORIAS_MO))
+        .all()
+    )
+    for filho, _cat in rows:
+        if filho.tarefa_cronograma_id == tarefa.id:
+            total += _D(filho.valor)                         # (a) direto
+        elif filho.tarefa_cronograma_id is None:
+            dia = filho.data_referencia
+            h_obra = _horas_obra_no_dia(tarefa.obra_id, dia)
+            if h_obra > 0:
+                frac = _horas_atividade_no_dia(tarefa.id, dia) / h_obra
+                total += _D(filho.valor) * frac              # (b) rateio
+        # lançamento de OUTRA atividade → ignora
+    return _q(total)
+
+
+def custo_incorrido_atividade(tarefa):
+    """Custo incorrido total da atividade = MO (D1) + não-MO (Fatia 2)."""
+    return _q(custo_mo_atividade(tarefa) + custo_nao_mo_atividade(tarefa))
+
+
 def resultado_realizado_atividade(tarefa):
-    """Resultado (competência) da atividade na Fatia 1 = Valor agregado − Custo MO.
-    Fatias 2+ somarão material/transporte/subempreitada ao custo (via
-    custo_incorrido_atividade, sem mudar esta assinatura)."""
-    return _q(valor_agregado_atividade(tarefa) - custo_mo_atividade(tarefa))
+    """Resultado (competência) da atividade = Valor agregado − Custo incorrido total
+    (MO + material/alimentação/transporte/subempreitada). Assinatura estável."""
+    return _q(valor_agregado_atividade(tarefa) - custo_incorrido_atividade(tarefa))
 
 
 # ── custo orçado a partir do snapshot da composição (DC5) ─────────────────────
@@ -188,6 +246,47 @@ def alarme_mo(tarefa):
         'real': real,
         'estouro': real > orcado_para_avanco,
         'indice_rs': indice,   # <1 = no vermelho; None se sem custo real ainda
+    }
+
+
+def custo_orcado_atividade_por_tipos(tarefa, tipos=None):
+    """Orçado (baseline) da atividade somando os tipos do snapshot pedidos
+    (None = todos), via composicao_snapshot × quantidade × Peso da medição.
+    Fonte = PropostaItem congelado (DC5/ADR 0005). `custo_mo_orcado_atividade`
+    é o caso particular tipos={'MAO_OBRA'}."""
+    total = Decimal('0')
+    for link in _links_da_tarefa(tarefa):
+        item = db.session.get(ItemMedicaoComercial, link.item_medicao_id)
+        if not item or not item.proposta_item_id:
+            continue
+        pi = db.session.get(PropostaItem, item.proposta_item_id)
+        if not pi:
+            continue
+        soma_peso = _soma_peso_item(item.id)
+        if soma_peso <= 0:
+            continue
+        unit = custo_orcado_unitario(pi.composicao_snapshot, tipos)
+        qtd = _D(item.quantidade) if item.quantidade is not None else _D(pi.quantidade)
+        total += unit * qtd * (_D(link.peso) / soma_peso)
+    return _q(total)
+
+
+def alarme_custo(tarefa):
+    """Alarme em R$ sobre o custo TOTAL (CPI da Fatia 3): orçado-para-o-avanço
+    (baseline congelado, todos os tipos) vs custo incorrido total."""
+    perc = _D(tarefa.percentual_concluido) / CEM
+    orcado_total = custo_orcado_atividade_por_tipos(tarefa, None)
+    orcado_para_avanco = _q(orcado_total * perc)
+    real = custo_incorrido_atividade(tarefa)
+    indice = None
+    if real > 0:
+        indice = (orcado_para_avanco / real).quantize(MILESIMO, rounding=ROUND_HALF_UP)
+    return {
+        'orcado_total': orcado_total,
+        'orcado_para_avanco': orcado_para_avanco,
+        'real': real,
+        'estouro': real > orcado_para_avanco,
+        'indice_rs': indice,
     }
 
 
@@ -269,15 +368,19 @@ def resultado_obra(obra_id):
     atividades = []
     por_servico = defaultdict(lambda: {
         'valor_agregado': Decimal('0'), 'custo_mo': Decimal('0'),
+        'custo_nao_mo': Decimal('0'), 'custo_incorrido': Decimal('0'),
         'resultado': Decimal('0'),
     })
     tot_agregado = Decimal('0')
-    tot_custo = Decimal('0')
+    tot_mo = Decimal('0')
+    tot_nao_mo = Decimal('0')
 
     for t in _folhas_da_obra(obra_id):
         agregado = valor_agregado_atividade(t)
-        custo = custo_mo_atividade(t)
-        resultado = _q(agregado - custo)
+        custo_mo = custo_mo_atividade(t)
+        custo_nao_mo = custo_nao_mo_atividade(t)
+        incorrido = _q(custo_mo + custo_nao_mo)
+        resultado = _q(agregado - incorrido)
         atividades.append({
             'tarefa_id': t.id,
             'nome': t.nome_tarefa,
@@ -285,24 +388,33 @@ def resultado_obra(obra_id):
             'percentual_concluido': float(t.percentual_concluido or 0),
             'quantidade_total': float(t.quantidade_total or 0),
             'valor_agregado': agregado,
-            'custo_mo': custo,
+            'custo_mo': custo_mo,
+            'custo_nao_mo': custo_nao_mo,
+            'custo_incorrido': incorrido,
             'resultado': resultado,
             'alarme': alarme_mo(t),
+            'alarme_custo': alarme_custo(t),
             'indice_horas': indice_horas(t),
         })
         chave = t.servico_id or 0
         por_servico[chave]['valor_agregado'] += agregado
-        por_servico[chave]['custo_mo'] += custo
+        por_servico[chave]['custo_mo'] += custo_mo
+        por_servico[chave]['custo_nao_mo'] += custo_nao_mo
+        por_servico[chave]['custo_incorrido'] += incorrido
         por_servico[chave]['resultado'] += resultado
         tot_agregado += agregado
-        tot_custo += custo
+        tot_mo += custo_mo
+        tot_nao_mo += custo_nao_mo
 
+    tot_incorrido = tot_mo + tot_nao_mo
     return {
         'obra_id': obra_id,
         'atividades': atividades,
         'por_servico': {k: {kk: _q(vv) for kk, vv in v.items()}
                         for k, v in por_servico.items()},
         'valor_agregado': _q(tot_agregado),
-        'custo_mo': _q(tot_custo),
-        'resultado': _q(tot_agregado - tot_custo),
+        'custo_mo': _q(tot_mo),
+        'custo_nao_mo': _q(tot_nao_mo),
+        'custo_incorrido': _q(tot_incorrido),
+        'resultado': _q(tot_agregado - tot_incorrido),
     }
