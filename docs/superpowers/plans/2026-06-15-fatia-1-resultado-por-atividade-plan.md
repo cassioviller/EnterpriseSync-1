@@ -32,9 +32,13 @@ baseline; logo o importador **não** precisa chamar `garantir_operacional` para 
    atividades com o peso explícito (1:1 vira só fallback). Seed dos 21 templates da Baia (do
    cronograma refinado) e **obra 655 re-materializada: 21 → 28 atividades**, pesos batendo o doc
    (1.17a 33/38/29; 1.1 50/50; 1.4 60/40). 19 testes verdes.
-2. ⬜ **Proposta de importação marcada** (ADR 0005): coluna `propostas_comerciais.origem`; o
-   importador seta `origem='importacao_obra'`; listagem/KPIs comerciais filtram.
-3. ⬜ **Reconciliar obra 655** (pré-decisão): passo idempotente — setar `proposta.origem`; não apagar.
+2. ✅ **FEITO (commit 138b357) — Proposta de importação marcada** (ADR 0005): migration 194 adicionou
+   `propostas_comerciais.origem`; o importador seta `origem='importacao_obra'`; a listagem e os KPIs
+   comerciais (propostas index) filtram a proposta-ponte.
+3. ✅ **FEITO (commit 138b357) — Reconciliada a obra 655**: proposta 413 marcada com
+   `origem='importacao_obra'` na base (idempotente, sem apagar).
+
+**Todos os deltas do grill estão concluídos.** A Fatia 1 + importador refletem as decisões.
 
 ---
 
