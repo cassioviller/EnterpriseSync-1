@@ -5,6 +5,21 @@
 > Depende da Fatia 1 (read-model + tela). Spec §Fatia 2.
 > **Esta fatia carrega a ÚNICA migration da espinha (DC2).** Fatias 3–5 ficam sem migration.
 
+## Status de execução (2026-06-15)
+
+- ✅ **F2-A — schema** (commit 5c85906): **migration 195** (não 193, que já fora usada no delta 1)
+  — FK `tarefa_cronograma_id` em `gestao_custo_filho`/`movimentacao_estoque`/`custo_veiculo` +
+  `verba_unica`/`lucro_pct`/`gestao_custo_pai_id` em `rdo_subempreitada_apontamento`.
+- ✅ **F2-B — read-model** (commit 5c85906): `custo_nao_mo_atividade` (direto + rateio hora-homem),
+  `custo_incorrido_atividade`, `alarme_custo` (CPI total), `resultado_obra` enriquecido. **DC3**
+  (MO não conta 2×) com teste de regressão. 5 testes.
+- ✅ **F2-C subempreitada → custo** (commit 33bfed3): `_registrar_custo_subempreitada` (verba+lucro
+  → custo ligado à atividade, idempotente), wired em `apontar_subempreitada`. Teste.
+- ⬜ **F2-C material direto na UI**: botão/modal "material direto na atividade" (espelha equipe).
+  *Custo de material que cai no nível obra já flui por rateio (F2-B); isto é precisão extra.*
+- ⬜ **F2-D telhado viga I**: 🔴 **bloqueado por dado externo** — precisa de verba+lucro+opção A/B/C
+  (ver `ESPACO_telhado_viga_i_baia_rev10.md`). O mecanismo de custo (subempreitada) já existe.
+
 ## Objetivo
 
 Completar o custo incorrido por atividade: além da MO (Fatia 1), somar **material, alimentação,
