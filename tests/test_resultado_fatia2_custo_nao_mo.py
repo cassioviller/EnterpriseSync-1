@@ -178,6 +178,36 @@ def test_dc3_mo_nao_conta_duas_vezes():
         assert custo_incorrido_atividade(t) == Decimal('620.00')
 
 
+def test_subempreitada_gera_custo_e_idempotente():
+    """F2-C/DC9: apontar subempreitada com verba+lucro gera custo na atividade
+    (GestaoCustoFilho SUBEMPREITADA ligado à tarefa); reeditar não duplica."""
+    from cronograma_views import _registrar_custo_subempreitada
+    from services.resultado_atividade_service import custo_nao_mo_atividade
+    from models import Subempreiteiro, RDOSubempreitadaApontamento
+    with app.app_context():
+        t = _tarefa('Telhado viga I')
+        sub = Subempreiteiro(nome=f'Sub {_sfx()}', admin_id=_fx.admin.id, ativo=True)
+        db.session.add(sub); db.session.flush()
+        r = _rdo(date(2026, 4, 6))
+        apt = RDOSubempreitadaApontamento(
+            rdo_id=r.id, admin_id=_fx.admin.id, tarefa_cronograma_id=t.id,
+            subempreiteiro_id=sub.id, qtd_pessoas=2, horas_trabalhadas=8.0,
+            quantidade_produzida=1.0,
+        )
+        db.session.add(apt); db.session.flush()
+
+        # verba 10000 + lucro 20% → custo 12000, ligado à atividade
+        _registrar_custo_subempreitada(apt, r, t, sub, {'verba_unica': 10000, 'lucro_pct': 20}, _fx.admin.id)
+        db.session.commit()
+        assert custo_nao_mo_atividade(t) == Decimal('12000.00')
+        assert apt.gestao_custo_pai_id is not None
+
+        # reeditar (verba 5000, lucro 0) → 5000, sem somar (idempotente)
+        _registrar_custo_subempreitada(apt, r, t, sub, {'verba_unica': 5000, 'lucro_pct': 0}, _fx.admin.id)
+        db.session.commit()
+        assert custo_nao_mo_atividade(t) == Decimal('5000.00')
+
+
 def test_alarme_custo_total():
     from services.resultado_atividade_service import alarme_custo
     with app.app_context():
