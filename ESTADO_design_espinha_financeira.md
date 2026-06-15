@@ -76,7 +76,18 @@ Escritos juntos para travar consistência, achar problemas cross-cutting cedo e 
 - `...-fatia-4-lente-caixa-plan.md` — Realizado/Previsto por obra (reúso integral do FinanceiroService, ADR 0003).
 - `...-fatia-5-inteligencia-portfolio-plan.md` — learning loop (catálogo) + roll-up de portfólio.
 
-## Próximo passo
-1. **Executar a Fatia 1** (Fase A: bug do RDO → Fase B: read-model → C: tela → D: habilitação Baia).
-2. **Datas/durações + ritmos-alvo (baias/dia)** — exportar `Projeto1.mpp` p/ XML (alimenta materialização).
-3. Confirmar com o usuário os **dados externos do telhado** (verba+lucro+opção A/B/C) antes da Fatia 2 §D.
+## Execução — FEITO (2026-06-15, branch design/espinha-financeira-obra)
+As 5 fatias foram implementadas e testadas (**36 testes verdes**); grill-with-docs aplicado
+(ADR 0004/0005; orçado = baseline congelado da proposta; serviço→N atividades por peso).
+- **Fatia 1** ✅ bug RDO + read-model + tela + **importador auto-wiring** (Baia obra 655, 28 atividades multi).
+- **Fatia 2** ✅ núcleo: custo não-MO (direto+rateio, DC3 anti-dupla-contagem) + custo incorrido +
+  alarme total + subempreitada→custo. Pendente: material-UI (precisão) e telhado (dado externo).
+- **Fatia 3** ✅ EVM (CPI/SPI/EAC/resultado projetado). SPI espera datas do MPP.
+- **Fatia 4** ✅ lente de caixa por obra (reúso do FinanceiroService, ADR 0003).
+- **Fatia 5** ✅ learning loop (catálogo) + roll-up de portfólio.
+
+## Próximo passo (pendentes pontuais)
+1. **Datas/durações** por atividade — exportar `Projeto1.mpp` p/ XML → liga o **SPI** e a Linha de Balanço.
+2. **Telhado viga I** (Fatia 2 §D) — falta verba+lucro+opção A/B/C (mecanismo de custo já existe).
+3. **Material direto na UI** (Fatia 2) — botão espelhando equipe (custo já flui por rateio).
+4. **Pushar a branch / abrir PR.**

@@ -3,6 +3,16 @@
 > Data: 2026-06-15. Obedece ao plano-mestre (DC1, DC10). Depende das Fatias 1–3. **Sem migration.**
 > Spec §Fatia 5.
 
+## Status de execução (2026-06-15) — commit fedb11e  ✅ COMPLETA
+
+- ✅ **F5-1/F5-2** `services/aprendizado_produtividade`: `produtividade_observada` (média ponderada
+  por horas dos RDOs finalizados) + `atualizar_catalogo_produtividade` (EMA conservadora, guarda de
+  `min_amostras`; realimenta `SubatividadeMestre.meta_produtividade`/`duracao_estimada_horas` — DC10).
+- ✅ **F5-3** `resultado_portfolio` (consolida Resultado + EVM de todas as obras; reúsa
+  `resultado_obra`/`evm_obra`).
+- ✅ **F5-4** rota `/resultado/portfolio` + template + ação "Aprender produtividade".
+- 4 testes. **Sem migration** (colunas já existiam).
+
 ## Objetivo
 Duas entregas independentes:
 1. **Loop de aprendizado de produtividade** — a produtividade real observada realimenta o catálogo
