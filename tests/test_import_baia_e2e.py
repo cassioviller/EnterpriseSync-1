@@ -12,6 +12,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
+import main  # noqa: F401 — registra blueprints (rota /resultado/importar-obra)
 from models import (
     Usuario, TipoUsuario, Funcionario, OrcamentoItem, Proposta, Obra,
     TarefaCronograma, ItemMedicaoComercial, ItemMedicaoCronogramaTarefa,
@@ -116,3 +117,37 @@ def test_baia_importada_resultado_apos_apontamento():
         assert valor_agregado_atividade(t) > 0          # avanço × peso × venda
         assert custo_mo_atividade(t) == Decimal('400.00')
         assert custo_mo_orcado_atividade(t) > 0         # MO orçada do snapshot real
+
+
+@pytest.mark.skipif(not os.path.exists(XLSX), reason='arquivo de importação ausente')
+def test_upload_planilha_pela_tela_cria_obra_no_perfil():
+    """Upload do .xlsx pela TELA (rota /resultado/importar-obra) cria a obra no
+    perfil logado, sem terminal."""
+    import re
+    app.config['WTF_CSRF_ENABLED'] = False  # em produção o JS do base injeta o token
+    with app.app_context():
+        s = _sfx()
+        admin = Usuario(username=f'up_{s}', email=f'up_{s}@sige.test', nome='Upload',
+                        tipo_usuario=TipoUsuario.ADMIN,
+                        password_hash=generate_password_hash('Test@1234'),
+                        versao_sistema='v2', ativo=True)
+        db.session.add(admin); db.session.commit()
+        admin_id = admin.id
+
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['_user_id'] = str(admin_id)
+                sess['_fresh'] = True
+            with open(XLSX, 'rb') as fh:
+                resp = c.post(
+                    '/resultado/importar-obra',
+                    data={'arquivo': (fh, 'IMPORTACAO_Baia_REV10_completa.xlsx')},
+                    content_type='multipart/form-data',
+                    follow_redirects=False,
+                )
+        assert resp.status_code in (302, 303), resp.status_code
+        loc = resp.headers.get('Location', '')
+        m = re.search(r'/obras/(\d+)/resultado', loc)
+        assert m, loc
+        obra_id = int(m.group(1))
+        assert TarefaCronograma.query.filter_by(obra_id=obra_id, admin_id=admin_id).count() == 28

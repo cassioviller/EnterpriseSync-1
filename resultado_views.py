@@ -80,6 +80,61 @@ def aprender_produtividade():
     return redirect(url_for('resultado.portfolio'))
 
 
+@resultado_bp.route('/resultado/importar-obra', methods=['GET', 'POST'])
+@login_required
+def importar_obra_planilha():
+    """Importa a Obra Baia a partir de uma planilha (.xlsx) enviada pela tela,
+    criando tudo (catálogo → orçamento → cronograma multi-atividade → obra) no
+    **perfil atual** (tenant logado). Sem terminal."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    from models import Usuario
+    admin_id = _admin_id()
+    perfil = Usuario.query.get(admin_id)
+    perfil_nome = (getattr(perfil, 'nome', None) or getattr(perfil, 'username', None)
+                   or f'admin {admin_id}')
+
+    if request.method == 'POST':
+        arquivo = request.files.get('arquivo')
+        if not arquivo or not arquivo.filename:
+            flash('Selecione um arquivo .xlsx.', 'warning')
+            return redirect(url_for('resultado.importar_obra_planilha'))
+        if not arquivo.filename.lower().endswith('.xlsx'):
+            flash('O arquivo precisa ser .xlsx.', 'warning')
+            return redirect(url_for('resultado.importar_obra_planilha'))
+
+        import os as _os
+        import tempfile
+        from scripts.importar_baia_easypanel import importar_baia_completa
+
+        fd, tmp = tempfile.mkstemp(suffix='.xlsx')
+        _os.close(fd)
+        try:
+            arquivo.save(tmp)
+            res = importar_baia_completa(admin_id, xlsx_path=tmp)
+        except Exception as e:
+            logger.exception('Falha ao importar obra da planilha')
+            flash(f'Falha ao importar a obra: {e}', 'error')
+            return redirect(url_for('resultado.importar_obra_planilha'))
+        finally:
+            try:
+                _os.unlink(tmp)
+            except OSError:
+                pass
+
+        status = 'criada' if res.get('criado', True) else 'já existia (reaproveitada)'
+        flash(
+            f"Obra {status} no perfil «{perfil_nome}»: "
+            f"{res.get('n_tarefas', '?')} atividades vinculadas. Abrindo a obra.",
+            'success',
+        )
+        return redirect(url_for('resultado.resultado_por_atividade', obra_id=res['obra_id']))
+
+    return render_template('resultado/importar_obra.html', perfil_nome=perfil_nome)
+
+
 def _parse_data_arg(arg):
     v = (request.args.get(arg) or '').strip()
     if not v:

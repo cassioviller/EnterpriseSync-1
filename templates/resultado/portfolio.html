@@ -5,12 +5,17 @@
 <div class="container-fluid py-3">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h3 class="mb-0">Portfólio — Resultado consolidado</h3>
-    <form method="post" action="{{ url_for('resultado.aprender_produtividade') }}"
-          onsubmit="return confirm('Recalibrar o catálogo de produtividade com o que foi observado nos RDOs?');">
-      <button class="btn btn-sm btn-outline-primary">
-        <i class="fas fa-brain me-1"></i> Aprender produtividade
-      </button>
-    </form>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('resultado.importar_obra_planilha') }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-file-import me-1"></i> Importar obra (planilha)
+      </a>
+      <form method="post" action="{{ url_for('resultado.aprender_produtividade') }}"
+            onsubmit="return confirm('Recalibrar o catálogo de produtividade com o que foi observado nos RDOs?');">
+        <button class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-brain me-1"></i> Aprender produtividade
+        </button>
+      </form>
+    </div>
   </div>
 
   <div class="row g-3 mb-4">
