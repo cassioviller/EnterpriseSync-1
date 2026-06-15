@@ -398,6 +398,34 @@ def salvar_edicao_rdo(rdo_id):
                     (func_id, ('sub', sub_mestre_id), horas_trabalhadas)
                 )
 
+        # Equipe por atividade do cronograma (V2). O template emite
+        # cron_tarefa_<tarefa_id>_func_<func_id>_horas (espelho de
+        # views/rdo.py:salvar_rdo_flexivel). Sem isto, a edição perdia o
+        # vínculo atividade↔funcionário (bug rdo_editar_sistema.py:374).
+        _cron_tarefa_pattern = _re.compile(r'^cron_tarefa_(\d+)_func_(\d+)_horas$')
+        _seen_cron_keys = set()
+        for campo, valor in request.form.items():
+            if not valor:
+                continue
+            m_cron = _cron_tarefa_pattern.match(campo)
+            if not m_cron:
+                continue
+            try:
+                tarefa_id_cron = int(m_cron.group(1))
+                func_id_cron = int(m_cron.group(2))
+                horas_cron = float(valor)
+            except (ValueError, TypeError):
+                continue
+            if horas_cron <= 0:
+                continue
+            cron_key = (func_id_cron, tarefa_id_cron)
+            if cron_key in _seen_cron_keys:
+                continue
+            _seen_cron_keys.add(cron_key)
+            entradas_brutas.append(
+                (func_id_cron, ('cron', tarefa_id_cron), horas_cron)
+            )
+
         # Task #38 — coleta de pesos enviados pelo painel
         pesos: dict = {}
         for campo, valor in request.form.items():
@@ -421,11 +449,33 @@ def salvar_edicao_rdo(rdo_id):
         funcionarios_salvos = 0
         for entrada in entradas_normalizadas:
             func_id, atividade_key, horas_trabalhadas = entrada[0], entrada[1], entrada[2]
-            _, sub_mestre_id = atividade_key
             funcionario = Funcionario.query.filter_by(id=func_id, admin_id=admin_id).first()
-            if funcionario:
+            if not funcionario:
+                continue
+            funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
+
+            if atividade_key[0] == 'cron':
+                # Atividade do cronograma: grava o vínculo direto (tarefa_cronograma_id)
+                tarefa_cron_id = atividade_key[1]
+                rdo_funcionario = RDOMaoObra(
+                    rdo_id=rdo_id,
+                    funcionario_id=func_id,
+                    funcao_exercida=funcao_exercida,
+                    horas_trabalhadas=horas_trabalhadas,
+                    admin_id=admin_id,
+                    subatividade_id=None,
+                    tarefa_cronograma_id=tarefa_cron_id,
+                )
+                db.session.add(rdo_funcionario)
+                func_ids_vinculados.add(func_id)
+                funcionarios_salvos += 1
+                logger.info(
+                    f"✅ Funcionário por atividade (cronograma): {funcionario.nome} → "
+                    f"tarefa={tarefa_cron_id} {horas_trabalhadas:.2f}h"
+                )
+            else:  # ('sub', sub_mestre_id)
+                sub_mestre_id = atividade_key[1]
                 sub_db_id = sub_mestre_to_db_id.get(sub_mestre_id)
-                funcao_exercida = request.form.get(f'funcao_{func_id}', 'Operacional')
                 peso_linha = pesos.get((func_id, atividade_key))
                 rdo_funcionario = RDOMaoObra(
                     rdo_id=rdo_id,

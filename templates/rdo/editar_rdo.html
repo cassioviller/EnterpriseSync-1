@@ -2446,12 +2446,14 @@ function _atualizarBotaoEquipeV2Edit(tarefaId) {
 function _syncHiddenInputsEquipeV2Edit() {
     const form = document.getElementById('formEditarRDO');
     if (!form) return;
-    form.querySelectorAll('input[name^="sub_func_"][data-v2edit="1"]').forEach(el => el.remove());
+    form.querySelectorAll('input[name^="cron_tarefa_"][data-v2edit="1"]').forEach(el => el.remove());
     Object.entries(_cronTaskEquipeEdit).forEach(([tarefaId, lista]) => {
         lista.forEach(f => {
             const h = document.createElement('input');
             h.type = 'hidden';
-            h.name = `sub_func_${tarefaId}_${f.id}_horas`;
+            // tarefaId é um TarefaCronograma.id — emitir no padrão que o backend
+            // (rdo_editar_sistema.py / salvar_rdo_flexivel) sabe parsear como cronograma.
+            h.name = `cron_tarefa_${tarefaId}_func_${f.id}_horas`;
             h.value = f.horas;
             h.dataset.v2edit = '1';
             form.appendChild(h);

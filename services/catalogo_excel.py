@@ -34,6 +34,8 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from models import (
+    ComposicaoServico,
+    ComposicaoServicoHistorico,
     CronogramaTemplate,
     CronogramaTemplateItem,
     Insumo,
@@ -171,6 +173,11 @@ def _autosize(ws, widths: list[int]):
 INSUMO_HEADERS = [
     'nome', 'tipo', 'unidade', 'descricao', 'coeficiente_padrao', 'preco_base',
     'fator_comercial', 'unidade_comercial', 'tipo_medicao',
+]
+
+COMPOSICAO_HEADERS = [
+    'servico_nome', 'servico_unidade', 'categoria',
+    'insumo_nome', 'coeficiente', 'unidade_insumo', 'observacao',
 ]
 
 TIPOS_MEDICAO_VALIDOS = {
@@ -542,6 +549,273 @@ def _aplicar_nova_vigencia_preco(
         vigencia_inicio=vigencia,
         observacao='Importação Excel',
     ))
+
+
+# ──────────────────────────────────────────────────────────────────────
+# COMPOSIÇÕES — modelo + importação
+# ──────────────────────────────────────────────────────────────────────
+def gerar_modelo_composicoes_xlsx(admin_id: int) -> bytes:
+    """Gera o `.xlsx` de Composições com os dados reais do tenant.
+
+    Exporta cada linha de composição (serviço × insumo × coeficiente) dos
+    serviços ativos de ``admin_id``. Sem dados, exporta só o cabeçalho.
+    Round-trip: o arquivo baixado pode ser editado e reimportado.
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Composicoes'
+    ws.append(COMPOSICAO_HEADERS)
+    _style_header(ws, len(COMPOSICAO_HEADERS))
+
+    servicos = (
+        Servico.query
+        .filter_by(admin_id=admin_id, ativo=True)
+        .order_by(Servico.nome)
+        .all()
+    )
+    for svc in servicos:
+        for c in sorted(svc.composicoes, key=lambda c: (c.insumo.nome if c.insumo else '')):
+            ins = c.insumo
+            coef_val = str(c.coeficiente or '0').replace('.', ',')
+            ws.append([
+                svc.nome or '',
+                svc.unidade_medida or '',
+                svc.categoria or '',
+                ins.nome if ins else '',
+                coef_val,
+                c.unidade or (ins.unidade if ins else ''),
+                c.observacao or '',
+            ])
+
+    _autosize(ws, [32, 14, 18, 32, 14, 14, 36])
+
+    inst = wb.create_sheet('Instruções')
+    inst.append(['Como preencher a planilha de Composições'])
+    inst.append([])
+    inst.append(['Coluna', 'O que é'])
+    for col, txt in [
+        ('servico_nome', 'Nome do serviço. Linhas com o mesmo nome formam um serviço só.'),
+        ('servico_unidade', 'Unidade do serviço (kg, m2, m3, un, m, vb). Obrigatória ao criar serviço novo.'),
+        ('categoria', 'Categoria do serviço (opcional).'),
+        ('insumo_nome', 'Nome do insumo — precisa já estar cadastrado. Importe os Insumos primeiro.'),
+        ('coeficiente', 'Quanto do insumo entra em 1 unidade do serviço (ex.: 0,014 h por kg).'),
+        ('unidade_insumo', 'Unidade do insumo (opcional; usa a do cadastro se vazio).'),
+        ('observacao', 'Texto livre (ex.: "perda 5%", "h/kg").'),
+    ]:
+        inst.append([col, txt])
+    inst.append([])
+    inst.append(['Importação', 'Serviço com nome igual a um já cadastrado é atualizado, '
+                 'não duplicado. A composição é casada por (serviço, insumo).'])
+    inst.append(['', 'Linha cujo insumo não existe é rejeitada e reportada no resumo; '
+                 'as demais continuam.'])
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    return bio.getvalue()
+
+
+def importar_composicoes_xlsx(arquivo, admin_id: int) -> dict[str, Any]:
+    """Lê um `.xlsx` e faz upsert de Serviços e suas Composições.
+
+    Cada linha liga um serviço a um insumo com um coeficiente (consumo de
+    insumo por unidade do serviço). Formato esperado (aba "Composicoes" ou a
+    primeira), cabeçalho na linha 1:
+
+    ``servico_nome`` (obrig.), ``servico_unidade`` (obrig. ao criar serviço
+    novo), ``categoria``, ``insumo_nome`` (obrig. — precisa já existir),
+    ``coeficiente`` (obrig.), ``unidade_insumo``, ``observacao``.
+
+    Regras:
+      - Upsert do ``Servico`` por ``(admin_id, lower(servico_nome))``. Cria com
+        ``unidade_medida``/``categoria``; não apaga dados de serviço existente.
+      - Resolve ``Insumo`` por ``(admin_id, lower(insumo_nome))``; se não
+        existir, **rejeita a linha** (este importador NÃO cria insumos —
+        importe os insumos primeiro).
+      - Upsert da ``ComposicaoServico`` pela UNIQUE ``(servico_id, insumo_id)``.
+        Ao alterar o coeficiente de uma composição existente, grava
+        ``ComposicaoServicoHistorico``.
+      - Recalcula o preço dos serviços afetados ao final.
+
+    Retorna ``{'servicos_created', 'servicos_updated', 'composicoes_created',
+    'composicoes_updated', 'rejected': [{linha, motivo}]}``.
+
+    Em erro grave (arquivo corrompido, aba ausente, arquivo grande demais)
+    levanta ``ValueError`` sem tocar no banco. Validações linha-a-linha não
+    derrubam o import: a linha é rejeitada com motivo e as demais continuam.
+    """
+    wb = _ler_workbook_seguro(arquivo)
+
+    ws = wb['Composicoes'] if 'Composicoes' in wb.sheetnames else wb.worksheets[0]
+    _checar_max_linhas(max(0, (ws.max_row or 1) - 1), 'Composicoes')
+
+    header = [(_str_or_none(c.value) or '').lower() for c in ws[1]]
+    if not header or header[0] != 'servico_nome':
+        raise ValueError(
+            'Cabeçalho inválido. A primeira coluna deve ser "servico_nome". '
+            'Baixe novamente o modelo Excel para verificar o formato.'
+        )
+
+    def _col(row, name):
+        try:
+            idx = header.index(name)
+        except ValueError:
+            return None
+        return row[idx] if idx < len(row) else None
+
+    servicos_created = 0
+    composicoes_created = 0
+    composicoes_updated = 0
+    rejected: list[dict[str, Any]] = []
+    servicos_afetados: set[int] = set()
+
+    # Caches do tenant para upsert por nome (case-insensitive)
+    servicos_idx = {
+        (s.nome or '').strip().lower(): s
+        for s in Servico.query.filter_by(admin_id=admin_id).all()
+    }
+    insumos_idx = {
+        (i.nome or '').strip().lower(): i
+        for i in Insumo.query.filter_by(admin_id=admin_id).all()
+    }
+    # Snapshot dos serviços que já existiam antes deste import
+    servicos_existentes_ids = {s.id for s in servicos_idx.values()}
+
+    try:
+        for row_idx, row in enumerate(
+            ws.iter_rows(min_row=2, values_only=True), start=2
+        ):
+            # Pula linhas totalmente vazias
+            if not any(c not in (None, '') for c in row):
+                continue
+
+            servico_nome = _str_or_none(_col(row, 'servico_nome'))
+            servico_unidade = _str_or_none(_col(row, 'servico_unidade'))
+            insumo_nome = _str_or_none(_col(row, 'insumo_nome'))
+
+            if not servico_nome:
+                rejected.append({'linha': row_idx, 'motivo': 'servico_nome é obrigatório.'})
+                continue
+            if not insumo_nome:
+                rejected.append({'linha': row_idx, 'motivo': 'insumo_nome é obrigatório.'})
+                continue
+
+            coef_dec, coef_invalido = _parse_decimal(_col(row, 'coeficiente'))
+            if coef_invalido:
+                rejected.append({
+                    'linha': row_idx,
+                    'motivo': (f'coeficiente inválido: '
+                               f'"{_col(row, "coeficiente")}" não é numérico.'),
+                })
+                continue
+            if coef_dec is None:
+                rejected.append({'linha': row_idx, 'motivo': 'coeficiente é obrigatório.'})
+                continue
+            if coef_dec < 0:
+                rejected.append({'linha': row_idx, 'motivo': 'coeficiente não pode ser negativo.'})
+                continue
+
+            # Insumo precisa já existir — não criamos insumo aqui
+            ins = insumos_idx.get(insumo_nome.strip().lower())
+            if ins is None:
+                rejected.append({
+                    'linha': row_idx,
+                    'motivo': (f'insumo não encontrado: "{insumo_nome}". '
+                               'Importe os insumos primeiro.'),
+                })
+                continue
+
+            categoria = _str_or_none(_col(row, 'categoria'))
+            unidade_insumo = _str_or_none(_col(row, 'unidade_insumo')) or ins.unidade
+            observacao = _str_or_none(_col(row, 'observacao'))
+
+            # Upsert do serviço
+            chave_svc = servico_nome.strip().lower()
+            svc = servicos_idx.get(chave_svc)
+            if svc is None:
+                if not servico_unidade:
+                    rejected.append({
+                        'linha': row_idx,
+                        'motivo': 'servico_unidade é obrigatória ao criar um serviço novo.',
+                    })
+                    continue
+                svc = Servico(
+                    admin_id=admin_id,
+                    nome=servico_nome.strip(),
+                    categoria=categoria or 'Geral',
+                    unidade_medida=servico_unidade.strip()[:10],
+                )
+                db.session.add(svc)
+                db.session.flush()
+                servicos_idx[chave_svc] = svc
+                servicos_created += 1
+            else:
+                # Serviço já existe: só atualiza unidade/categoria se vierem
+                if servico_unidade:
+                    svc.unidade_medida = servico_unidade.strip()[:10]
+                if categoria:
+                    svc.categoria = categoria
+
+            # Upsert da composição (UNIQUE servico_id, insumo_id)
+            comp = ComposicaoServico.query.filter_by(
+                servico_id=svc.id, insumo_id=ins.id
+            ).first()
+            if comp is None:
+                db.session.add(ComposicaoServico(
+                    admin_id=admin_id,
+                    servico_id=svc.id,
+                    insumo_id=ins.id,
+                    coeficiente=coef_dec,
+                    unidade=unidade_insumo,
+                    observacao=observacao,
+                ))
+                composicoes_created += 1
+                servicos_afetados.add(svc.id)
+            else:
+                coef_anterior = Decimal(str(comp.coeficiente or 0))
+                if coef_anterior != coef_dec:
+                    db.session.add(ComposicaoServicoHistorico(
+                        admin_id=admin_id,
+                        composicao_servico_id=comp.id,
+                        servico_id=svc.id,
+                        insumo_id=ins.id,
+                        coeficiente_anterior=coef_anterior,
+                        coeficiente_novo=coef_dec,
+                        motivo='Importação Excel',
+                    ))
+                    comp.coeficiente = coef_dec
+                    composicoes_updated += 1
+                    servicos_afetados.add(svc.id)
+                # Snapshots opcionais: só sobrescreve se vierem preenchidos
+                if unidade_insumo is not None:
+                    comp.unidade = unidade_insumo
+                if observacao is not None:
+                    comp.observacao = observacao
+
+        db.session.flush()
+
+        # Serviços pré-existentes que foram afetados por novas/alteradas composições
+        servicos_updated = len(servicos_afetados & servicos_existentes_ids)
+
+        # Recalcular preço dos serviços afetados
+        if servicos_afetados:
+            from services.orcamento_service import recalcular_servico_preco
+            for sid in servicos_afetados:
+                s = Servico.query.get(sid)
+                if s:
+                    recalcular_servico_preco(s)
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    return {
+        'servicos_created': servicos_created,
+        'servicos_updated': servicos_updated,
+        'composicoes_created': composicoes_created,
+        'composicoes_updated': composicoes_updated,
+        'rejected': rejected,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────

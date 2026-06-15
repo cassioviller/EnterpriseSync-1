@@ -914,6 +914,50 @@ def tarefas_rdo(obra_id: int):
 # SUBEMPREITADA — Apontamentos diários (pessoas × horas × quantidade)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _registrar_custo_subempreitada(apt, rdo, tarefa, sub, data, admin_id):
+    """Fatia 2 (DC9) — transforma o apontamento de subempreitada em custo na
+    atividade: verba única + lucro % → GestaoCustoFilho 'SUBEMPREITADA' ligado
+    a `tarefa_cronograma_id`. Idempotente: remove o custo anterior do mesmo
+    apontamento antes de recriar. Sem verba → limpa e não gera custo."""
+    from decimal import Decimal as _Dec
+    from models import GestaoCustoFilho
+
+    # idempotência: apaga o custo anterior deste apontamento
+    antigos = GestaoCustoFilho.query.filter_by(
+        origem_tabela='rdo_subempreitada_apontamento', origem_id=apt.id, admin_id=admin_id,
+    ).all()
+    for f in antigos:
+        db.session.delete(f)
+    db.session.flush()
+
+    verba_raw = data.get('verba_unica')
+    if verba_raw is None or float(verba_raw or 0) <= 0:
+        apt.verba_unica = None
+        apt.lucro_pct = None
+        apt.gestao_custo_pai_id = None
+        return None
+
+    verba = _Dec(str(verba_raw))
+    lucro = _Dec(str(data.get('lucro_pct') or 0))
+    apt.verba_unica = verba
+    apt.lucro_pct = lucro
+    custo_total = (verba * (_Dec('1') + lucro / _Dec('100'))).quantize(_Dec('0.01'))
+
+    from utils.financeiro_integration import registrar_custo_automatico
+    filho = registrar_custo_automatico(
+        admin_id=admin_id, tipo_categoria='SUBEMPREITADA',
+        entidade_nome=sub.nome, entidade_id=sub.id, data=rdo.data_relatorio,
+        descricao=f'Subempreitada {sub.nome} — {tarefa.nome_tarefa}'[:300],
+        valor=custo_total, obra_id=tarefa.obra_id,
+        origem_tabela='rdo_subempreitada_apontamento', origem_id=apt.id,
+        force_v2=True,
+    )
+    if filho:
+        filho.tarefa_cronograma_id = tarefa.id      # custo direto na atividade (Fatia 2)
+        apt.gestao_custo_pai_id = filho.pai_id
+    return filho
+
+
 @cronograma_bp.route('/rdo/<int:rdo_id>/apontar-subempreitada', methods=['POST'])
 @login_required
 def apontar_subempreitada(rdo_id: int):
@@ -985,6 +1029,10 @@ def apontar_subempreitada(rdo_id: int):
     apt.quantidade_produzida = qtd_prod
     apt.observacoes = obs
     apt.calcular_homem_hora()
+    db.session.flush()  # garante apt.id para o vínculo do custo
+
+    # Fatia 2 (DC9) — subempreitada vira custo na atividade (verba + lucro)
+    _registrar_custo_subempreitada(apt, rdo, tarefa, sub, data, admin_id)
 
     db.session.commit()
 

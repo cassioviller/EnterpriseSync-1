@@ -44,6 +44,20 @@ def _parse_valor(raw: str) -> float:
     return float(raw)
 
 
+def _parse_data_arg(nome: str):
+    """Lê um arg de data (YYYY-MM-DD) da query string; devolve date ou None.
+
+    Tolerante a valor vazio/inválido (devolve None em vez de estourar).
+    """
+    raw = (request.args.get(nome) or '').strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
 # ==================== DASHBOARD ====================
 
 @financeiro_bp.route('/')
@@ -120,13 +134,17 @@ def listar_contas_pagar():
     responsavel_id = request.args.get('responsavel_id', type=int)
     highlight_id = request.args.get('highlight_id', type=int)
     categoria = request.args.get('categoria', '')
-    
+    data_inicio = _parse_data_arg('data_inicio')
+    data_fim = _parse_data_arg('data_fim')
+
     contas = FinanceiroService.listar_contas_pagar(
-        admin_id, 
-        status=status, 
+        admin_id,
+        status=status,
         obra_id=obra_id,
         responsavel_id=responsavel_id,
         categoria=categoria or None,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
     )
 
     # Se highlight_id especificado, garantir que a conta aparece primeiro na lista
@@ -246,6 +264,8 @@ def listar_contas_pagar():
         obra_selecionada=obra_id,
         responsavel_selecionado=responsavel_id,
         categoria_selecionada=categoria,
+        data_inicio_filtro=data_inicio.strftime('%Y-%m-%d') if data_inicio else '',
+        data_fim_filtro=data_fim.strftime('%Y-%m-%d') if data_fim else '',
         usuarios=usuarios,
         highlight_id=highlight_id,
         datetime=datetime,
@@ -432,11 +452,15 @@ def listar_contas_receber():
     # Filtros
     status = request.args.get('status')
     obra_id = request.args.get('obra_id', type=int)
-    
+    data_inicio = _parse_data_arg('data_inicio')
+    data_fim = _parse_data_arg('data_fim')
+
     contas = FinanceiroService.listar_contas_receber(
         admin_id,
         status=status,
-        obra_id=obra_id
+        obra_id=obra_id,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
     )
     
     # Obras para filtro
@@ -486,6 +510,8 @@ def listar_contas_receber():
         resumo=resumo,
         status_selecionado=status,
         obra_selecionada=obra_id,
+        data_inicio_filtro=data_inicio.strftime('%Y-%m-%d') if data_inicio else '',
+        data_fim_filtro=data_fim.strftime('%Y-%m-%d') if data_fim else '',
         datetime=datetime
     )
 
@@ -654,41 +680,40 @@ def fluxo_caixa():
     """Projeção de fluxo de caixa"""
     admin_id = get_admin_id()
     
-    # Período padrão: próximos 30 dias
-    data_inicio = date.today()
-    data_fim = data_inicio + timedelta(days=30)
-    
-    # Permitir customização via query params
-    if request.args.get('data_inicio'):
-        data_inicio = datetime.strptime(request.args.get('data_inicio'), '%Y-%m-%d').date()
-    if request.args.get('data_fim'):
-        data_fim = datetime.strptime(request.args.get('data_fim'), '%Y-%m-%d').date()
+    # Período padrão: mês corrente inteiro (1º dia → último dia do mês atual).
+    # Garante que lançamentos realizados/importados do mês apareçam sem mexer no filtro.
+    import calendar as _calendar
+    hoje_fc = date.today()
+    data_inicio = date(hoje_fc.year, hoje_fc.month, 1)
+    data_fim = date(hoje_fc.year, hoje_fc.month,
+                    _calendar.monthrange(hoje_fc.year, hoje_fc.month)[1])
+
+    # Permitir customização via query params (tolerante a valor inválido)
+    _di = _parse_data_arg('data_inicio')
+    _df = _parse_data_arg('data_fim')
+    if _di:
+        data_inicio = _di
+    if _df:
+        data_fim = _df
     
     obra_id = request.args.get('obra_id', type=int) or 0
-    centro_custo_id = request.args.get('centro_custo_id', type=int) or 0
-    tipo_movimento = request.args.get('tipo_movimento', '')
-    
-    # Criar objeto filtros para o template
+
+    # Criar objeto filtros para o template (período + obra; centro/tipo removidos — spec Q6/Q7)
     filtros = {
         'data_inicio': data_inicio.strftime('%Y-%m-%d') if data_inicio else '',
         'data_fim': data_fim.strftime('%Y-%m-%d') if data_fim else '',
         'obra_id': obra_id,
-        'centro_custo_id': centro_custo_id,
-        'tipo_movimento': tipo_movimento
     }
-    
-    # Buscar obras e centros de custo para os dropdowns
+
+    # Buscar obras para o dropdown
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).all()
-    
-    # Tentar buscar centros de custo se existir a tabela
-    centros_custo = []
-    try:
-        from models import CentroCusto
-        centros_custo = CentroCusto.query.filter_by(admin_id=admin_id, ativo=True).all()
-    except Exception:
-        pass
-    
-    fluxo = FinanceiroService.calcular_fluxo_caixa(admin_id, data_inicio, data_fim)
+
+    fluxo = FinanceiroService.calcular_fluxo_caixa(
+        admin_id, data_inicio, data_fim, obra_id=obra_id or None
+    )
+
+    # Agregação mensal (série + KPIs) para o dashboard híbrido
+    agg = FinanceiroService.agregar_fluxo_mensal(fluxo['detalhes'], fluxo['saldo_inicial'])
 
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
 
@@ -700,9 +725,11 @@ def fluxo_caixa():
     return render_template(
         'financeiro/fluxo_caixa.html',
         fluxo=fluxo,
+        meses=agg['meses'],
+        kpis=agg['kpis'],
+        serie_chart=agg['serie_chart'],
         filtros=filtros,
         obras=obras,
-        centros_custo=centros_custo,
         bancos=bancos,
         categorias_fc=categorias_fc,
         data_inicio=data_inicio,
@@ -768,9 +795,7 @@ def novo_fluxo_caixa():
     return redirect(url_for('financeiro.fluxo_caixa',
                             data_inicio=request.form.get('_filtro_inicio', ''),
                             data_fim=request.form.get('_filtro_fim', ''),
-                            obra_id=request.form.get('_filtro_obra_id', ''),
-                            centro_custo_id=request.form.get('_filtro_centro_custo_id', ''),
-                            tipo_movimento=request.form.get('_filtro_tipo', '')))
+                            obra_id=request.form.get('_filtro_obra_id', '')))
 
 
 @financeiro_bp.route('/fluxo-caixa/<int:fc_id>/editar', methods=['POST'])

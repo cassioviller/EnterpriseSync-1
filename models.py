@@ -2017,7 +2017,12 @@ class MovimentacaoEstoque(db.Model):
     rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id'))
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
-    
+    # Espinha financeira (Fatia 2 / DC2): material consumido por atividade
+    tarefa_cronograma_id = db.Column(
+        db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+
     # Controle e auditoria
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     observacoes = db.Column(db.Text)
@@ -2989,6 +2994,10 @@ class Proposta(db.Model):
     # Integração com Obras
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     convertida_em_obra = db.Column(db.Boolean, default=False)
+    # Espinha financeira (ADR 0005) — origem da proposta. 'importacao_obra' marca a
+    # Proposta de importação (elo Obra->Orçamento), que NÃO é proposta comercial de
+    # venda: fica fora do funil/KPIs comerciais. NULL = proposta comercial normal.
+    origem = db.Column(db.String(30), nullable=True, index=True)
 
     # Task #115 — origem (Orçamento interno que gerou esta proposta), 1→N
     orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id', ondelete='SET NULL'),
@@ -4295,7 +4304,12 @@ class CustoVeiculo(db.Model):
     # Relacionamento principal
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculo.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
-    
+    # Espinha financeira (Fatia 2 / DC2): equipamento dedicado a uma atividade
+    tarefa_cronograma_id = db.Column(
+        db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True, index=True,
+    )
+
     # Dados do custo
     data_custo = db.Column(db.Date, nullable=False)
     tipo_custo = db.Column(db.String(30), nullable=False)  # manutencao, seguro, ipva, dpvat, multa, outros
@@ -5061,11 +5075,19 @@ class GestaoCustoFilho(db.Model):
     )
     origem_tabela = db.Column(db.String(80), nullable=True)
     origem_id = db.Column(db.Integer, nullable=True)
+    # Espinha financeira (Fatia 2 / DC2): etiqueta o custo não-MO na atividade
+    tarefa_cronograma_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     obra = db.relationship('Obra', foreign_keys=[obra_id])
     obra_servico_custo = db.relationship('ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
+    tarefa_cronograma = db.relationship('TarefaCronograma', foreign_keys=[tarefa_cronograma_id])
 
     def __repr__(self):
         return f'<GestaoCustoFilho pai={self.pai_id} R${self.valor} {self.descricao[:30]}>'
@@ -5166,6 +5188,10 @@ class CronogramaTemplateItem(db.Model):
     duracao_dias = db.Column(db.Integer, default=1, nullable=False)
     quantidade_prevista = db.Column(db.Float)          # unidade vem da SubatividadeMestre
     responsavel = db.Column(db.String(20), default='empresa')  # empresa | terceiros
+    # Espinha financeira (ADR 0004/DC8): peso explícito da Atividade no Serviço
+    # (do cronograma refinado). Quando preenchido, vira direto o Peso da medição
+    # (ItemMedicaoCronogramaTarefa.peso), sem derivar de horas. Soma 100%/serviço.
+    peso_medicao = db.Column(db.Numeric(5, 2), nullable=True)
 
     admin_id = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -5517,6 +5543,14 @@ class RDOSubempreitadaApontamento(db.Model):
     quantidade_produzida = db.Column(db.Float, nullable=False, default=0.0)
     homem_hora = db.Column(db.Float, nullable=True)  # qtd / (pessoas * horas)
     observacoes = db.Column(db.Text, nullable=True)
+    # Espinha financeira (Fatia 2 / DC9): subempreitada vira custo (verba + lucro)
+    verba_unica = db.Column(db.Numeric(15, 2), nullable=True)   # custo da verba
+    lucro_pct = db.Column(db.Numeric(5, 2), nullable=True)      # lucro % sobre a verba
+    gestao_custo_pai_id = db.Column(
+        db.Integer,
+        db.ForeignKey('gestao_custo_pai.id', use_alter=True, name='fk_rdosub_gcp'),
+        nullable=True,
+    )
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

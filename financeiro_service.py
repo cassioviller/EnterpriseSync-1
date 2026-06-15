@@ -10,7 +10,7 @@ from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, PlanoContas,
     LancamentoContabil, PartidaContabil, Fornecedor, Obra,
-    FluxoCaixaContabil, GestaoCustoPai, FluxoCaixa
+    FluxoCaixaContabil, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
 )
 import logging
 
@@ -205,16 +205,18 @@ class FinanceiroService:
             raise
     
     @staticmethod
-    def listar_contas_pagar(admin_id: int, status: str = None, 
+    def listar_contas_pagar(admin_id: int, status: str = None,
                            obra_id: int = None, vencidas: bool = False,
                            responsavel_id: int = None,
-                           categoria: str = None) -> List[ContaPagar]:
+                           categoria: str = None,
+                           data_inicio: date = None,
+                           data_fim: date = None) -> List[ContaPagar]:
         """Lista contas a pagar com filtros"""
         query = ContaPagar.query.filter_by(admin_id=admin_id)
-        
+
         if status:
             query = query.filter_by(status=status)
-        
+
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
 
@@ -223,7 +225,13 @@ class FinanceiroService:
 
         if categoria:
             query = query.filter(ContaPagar.origem_tipo == categoria)
-        
+
+        # Filtro de período por data de vencimento
+        if data_inicio:
+            query = query.filter(ContaPagar.data_vencimento >= data_inicio)
+        if data_fim:
+            query = query.filter(ContaPagar.data_vencimento <= data_fim)
+
         if vencidas:
             hoje = date.today()
             query = query.filter(
@@ -387,16 +395,24 @@ class FinanceiroService:
     
     @staticmethod
     def listar_contas_receber(admin_id: int, status: str = None,
-                             obra_id: int = None, vencidas: bool = False) -> List[ContaReceber]:
+                             obra_id: int = None, vencidas: bool = False,
+                             data_inicio: date = None,
+                             data_fim: date = None) -> List[ContaReceber]:
         """Lista contas a receber com filtros"""
         query = ContaReceber.query.filter_by(admin_id=admin_id)
-        
+
         if status:
             query = query.filter_by(status=status)
-        
+
         if obra_id:
             query = query.filter_by(obra_id=obra_id)
-        
+
+        # Filtro de período por data de vencimento
+        if data_inicio:
+            query = query.filter(ContaReceber.data_vencimento >= data_inicio)
+        if data_fim:
+            query = query.filter(ContaReceber.data_vencimento <= data_fim)
+
         if vencidas:
             hoje = date.today()
             query = query.filter(
@@ -411,8 +427,8 @@ class FinanceiroService:
     # ==================== FLUXO DE CAIXA ====================
     
     @staticmethod
-    def calcular_fluxo_caixa(admin_id: int, data_inicio: date, 
-                            data_fim: date) -> Dict:
+    def calcular_fluxo_caixa(admin_id: int, data_inicio: date,
+                            data_fim: date, obra_id: int = None) -> Dict:
         """
         Calcula fluxo de caixa projetado
         
@@ -430,22 +446,26 @@ class FinanceiroService:
                 admin_id=admin_id,
                 ativo=True
             ).all()
-            saldo_inicial = sum((b.saldo_atual or 0) for b in bancos)
-            
+            # float() evita TypeError 'Decimal - float' ao projetar saldo_final
+            saldo_inicial = float(sum((b.saldo_atual or 0) for b in bancos))
+
             # Contas a receber (entradas)
-            contas_receber = ContaReceber.query.filter(
+            cr_query = ContaReceber.query.filter(
                 and_(
                     ContaReceber.admin_id == admin_id,
                     ContaReceber.data_vencimento >= data_inicio,
                     ContaReceber.data_vencimento <= data_fim,
                     ContaReceber.status.in_(['PENDENTE', 'PARCIAL'])
                 )
-            ).all()
+            )
+            if obra_id:
+                cr_query = cr_query.filter(ContaReceber.obra_id == obra_id)
+            contas_receber = cr_query.all()
             
-            entradas_previstas = sum(
+            entradas_previstas = float(sum(
                 (c.saldo if c.saldo is not None else (c.valor_original or 0))
                 for c in contas_receber
-            )
+            ))
             
             # Saídas previstas — GestaoCustoPai em aberto (PENDENTE, SOLICITADO, AUTORIZADO, PARCIAL)
             dt_inicio = datetime.combine(data_inicio, datetime.min.time())
@@ -477,10 +497,16 @@ class FinanceiroService:
                         ),
                     )
                 )
-            ).all()
+            )
+            if obra_id:
+                # GestaoCustoPai não tem obra; filtra via filhos (conta o pai inteiro — Q8)
+                custos_v2_previstos = custos_v2_previstos.filter(
+                    GestaoCustoPai.itens.any(GestaoCustoFilho.obra_id == obra_id)
+                )
+            custos_v2_previstos = custos_v2_previstos.all()
 
             # Movimentos realizados: consultar tabela FluxoCaixa diretamente (captura PAGO e PARCIAL)
-            pagamentos_realizados = FluxoCaixa.query.filter(
+            pr_query = FluxoCaixa.query.filter(
                 and_(
                     FluxoCaixa.admin_id == admin_id,
                     FluxoCaixa.tipo_movimento == 'SAIDA',
@@ -488,17 +514,26 @@ class FinanceiroService:
                     FluxoCaixa.data_movimento >= data_inicio,
                     FluxoCaixa.data_movimento <= data_fim,
                 )
-            ).all()
+            )
+            if obra_id:
+                pr_query = pr_query.filter(FluxoCaixa.obra_id == obra_id)
+            pagamentos_realizados = pr_query.all()
 
             # Manter compatibilidade: PAGO via GestaoCustoPai.data_pagamento (fallback)
-            custos_v2_pagos = GestaoCustoPai.query.filter(
+            cp_query = GestaoCustoPai.query.filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status == 'PAGO',
                     GestaoCustoPai.data_pagamento >= data_inicio,
                     GestaoCustoPai.data_pagamento <= data_fim,
                 )
-            ).all()
+            )
+            if obra_id:
+                # GestaoCustoPai não tem obra; filtra via filhos (conta o pai inteiro — Q8)
+                cp_query = cp_query.filter(
+                    GestaoCustoPai.itens.any(GestaoCustoFilho.obra_id == obra_id)
+                )
+            custos_v2_pagos = cp_query.all()
             ids_pago_via_gc = {c.id for c in custos_v2_pagos}
 
             # Saídas previstas: usar saldo (valor restante) para PARCIAL, total para demais
@@ -574,14 +609,17 @@ class FinanceiroService:
             
             # Entradas e saídas diretas no FluxoCaixa (importação ou lançamento manual)
             # Restringe a referencia_tabela IS NULL para alinhar com /editar (mesmo critério)
-            fluxos_diretos = FluxoCaixa.query.filter(
+            fd_query = FluxoCaixa.query.filter(
                 and_(
                     FluxoCaixa.admin_id == admin_id,
                     FluxoCaixa.data_movimento >= data_inicio,
                     FluxoCaixa.data_movimento <= data_fim,
                     FluxoCaixa.referencia_tabela == None,  # noqa: E711
                 )
-            ).all()
+            )
+            if obra_id:
+                fd_query = fd_query.filter(FluxoCaixa.obra_id == obra_id)
+            fluxos_diretos = fd_query.all()
             for fc in fluxos_diretos:
                 detalhes.append({
                     'id': fc.id,
@@ -591,6 +629,32 @@ class FinanceiroService:
                     'valor': float(fc.valor),
                     'origem': 'Lançamento Direto',
                     'status': 'PAGO' if fc.tipo_movimento == 'SAIDA' else 'RECEBIDO',
+                    'realizado': True,
+                    'editavel': True,
+                })
+
+            # Entradas realizadas vindas de contas a receber baixadas — simétrico a
+            # pagamentos_realizados (sem isso, recebimentos ficam invisíveis no fluxo).
+            rr_query = FluxoCaixa.query.filter(
+                and_(
+                    FluxoCaixa.admin_id == admin_id,
+                    FluxoCaixa.tipo_movimento == 'ENTRADA',
+                    FluxoCaixa.referencia_tabela == 'conta_receber',
+                    FluxoCaixa.data_movimento >= data_inicio,
+                    FluxoCaixa.data_movimento <= data_fim,
+                )
+            )
+            if obra_id:
+                rr_query = rr_query.filter(FluxoCaixa.obra_id == obra_id)
+            for fc in rr_query.all():
+                detalhes.append({
+                    'id': fc.id,
+                    'data': fc.data_movimento,
+                    'tipo': 'ENTRADA',
+                    'descricao': fc.descricao or 'Recebimento',
+                    'valor': float(fc.valor),
+                    'origem': 'Conta a Receber',
+                    'status': 'RECEBIDO',
                     'realizado': True,
                     'editavel': True,
                 })
@@ -610,7 +674,94 @@ class FinanceiroService:
         except Exception as e:
             logger.error(f"❌ Erro ao calcular fluxo de caixa: {str(e)}")
             raise
-    
+
+    _MESES_PT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+    @staticmethod
+    def agregar_fluxo_mensal(detalhes: list, saldo_inicial: float = 0.0) -> Dict:
+        """Agrega a lista plana de `detalhes` em série mensal (ver spec 2026-06-11 §3.2).
+
+        Pura: sem query, sem efeitos. Variação acumulada parte de ZERO e soma só o
+        Realizado (ADR 0003).
+        """
+        buckets = {}  # 'YYYY-MM' -> acumuladores
+        for d in detalhes:
+            data = d.get('data')
+            chave = 'sem-data' if data is None else '%04d-%02d' % (data.year, data.month)
+            b = buckets.setdefault(chave, {
+                'entradas_real': 0.0, 'saidas_real': 0.0,
+                'entradas_prev': 0.0, 'saidas_prev': 0.0,
+                'movimentos': [],
+            })
+            b['movimentos'].append(d)
+            valor = float(d.get('valor') or 0)
+            entrada = d.get('tipo') == 'ENTRADA'
+            if d.get('realizado'):
+                b['entradas_real' if entrada else 'saidas_real'] += valor
+            else:
+                b['entradas_prev' if entrada else 'saidas_prev'] += valor
+
+        meses = []
+        serie = {'labels': [], 'entradas_real': [], 'saidas_real': [],
+                 'var_acum_real': [], 'var_acum_proj': []}
+        var_acum = 0.0
+        prev_acum = 0.0
+        realizado_liquido = 0.0
+        previsto_liquido_total = 0.0
+        # 'sem-data' ordena depois de '2026-XX' (ASCII: dígitos antes de letras) → fica ao fim
+        for chave in sorted(buckets):
+            b = buckets[chave]
+            saldo_mes = b['entradas_real'] - b['saidas_real']
+            previsto_liquido = b['entradas_prev'] - b['saidas_prev']
+            # KPIs contam todos os buckets, inclusive 'sem-data'
+            realizado_liquido += saldo_mes
+            previsto_liquido_total += previsto_liquido
+
+            if chave == 'sem-data':
+                # Fora da variação acumulada e do gráfico (sem eixo temporal)
+                meses.append({
+                    'mes': 'sem-data',
+                    'label': 'Sem data',
+                    'entradas_real': b['entradas_real'],
+                    'saidas_real': b['saidas_real'],
+                    'saldo_mes_real': saldo_mes,
+                    'variacao_acumulada': None,
+                    'previsto_liquido': previsto_liquido,
+                    'movimentos': b['movimentos'],
+                })
+                continue
+
+            var_acum += saldo_mes
+            prev_acum += previsto_liquido
+            ano, mes = chave.split('-')
+            label = '%s/%s' % (FinanceiroService._MESES_PT[int(mes)], ano[2:])
+            meses.append({
+                'mes': chave,
+                'label': label,
+                'entradas_real': b['entradas_real'],
+                'saidas_real': b['saidas_real'],
+                'saldo_mes_real': saldo_mes,
+                'variacao_acumulada': var_acum,
+                'previsto_liquido': previsto_liquido,
+                'movimentos': b['movimentos'],
+            })
+            serie['labels'].append(label)
+            serie['entradas_real'].append(b['entradas_real'])
+            serie['saidas_real'].append(b['saidas_real'])
+            serie['var_acum_real'].append(var_acum)
+            serie['var_acum_proj'].append(var_acum + prev_acum)
+
+        return {
+            'meses': meses,
+            'kpis': {
+                'saldo_banco': float(saldo_inicial),
+                'realizado_liquido': realizado_liquido,
+                'previsto_liquido': previsto_liquido_total,
+            },
+            'serie_chart': serie,
+        }
+
     # ==================== DASHBOARD ====================
     
     @staticmethod

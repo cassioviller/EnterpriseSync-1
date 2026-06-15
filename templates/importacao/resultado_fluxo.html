@@ -230,7 +230,11 @@
   {% endif %}
 
   <!-- Links de navegação -->
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('financeiro.fluxo_caixa', data_inicio=fc_data_min, data_fim=fc_data_max) }}"
+       class="btn btn-success btn-sm">
+      <i data-feather="trending-up" style="width:14px;height:14px;"></i> Ver no Fluxo de Caixa
+    </a>
     <a href="{{ url_for('gestao_custos.index') }}"
        class="btn btn-outline-primary btn-sm">
       <i data-feather="briefcase" style="width:14px;height:14px;"></i> Ver Gestão de Custos

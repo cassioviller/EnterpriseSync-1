@@ -176,6 +176,13 @@ try:
 except Exception as e:
     logger.error(f"[ERROR] Erro ao registrar Medicao: {e}")
 
+try:
+    from resultado_views import resultado_bp
+    app.register_blueprint(resultado_bp)
+    logger.info("[OK] Blueprint RESULTADO POR ATIVIDADE registrado")
+except Exception as e:
+    logger.error(f"[ERROR] Erro ao registrar Resultado: {e}")
+
 logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
 
 try:

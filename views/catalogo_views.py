@@ -332,6 +332,65 @@ def BytesIO_wrap(data: bytes):
 # ──────────────────────────────────────────────────────────────────────
 # SERVIÇOS — Composição + Preço
 # ──────────────────────────────────────────────────────────────────────
+@catalogo_bp.route('/servicos/composicoes/modelo-excel')
+@login_required
+def composicoes_modelo_excel():
+    """Baixa o `.xlsx` com os serviços e composições do tenant."""
+    aid = _admin_id()
+    from services.catalogo_excel import gerar_modelo_composicoes_xlsx
+    bio = gerar_modelo_composicoes_xlsx(admin_id=aid)
+    return send_file(
+        BytesIO_wrap(bio),
+        as_attachment=True,
+        download_name='modelo_composicoes.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@catalogo_bp.route('/servicos/composicoes/importar-excel', methods=['POST'])
+@login_required
+def composicoes_importar_excel():
+    """Recebe um `.xlsx` e faz upsert de serviços e suas composições."""
+    aid = _admin_id()
+    arquivo = request.files.get('arquivo')
+    if not arquivo or not arquivo.filename:
+        flash('Selecione um arquivo Excel para importar.', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+    if not arquivo.filename.lower().endswith(('.xlsx', '.xlsm')):
+        flash('Envie um arquivo .xlsx (Excel).', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+
+    from services.catalogo_excel import importar_composicoes_xlsx
+    try:
+        resultado = importar_composicoes_xlsx(arquivo.stream, aid)
+    except ValueError as e:
+        flash(f'Erro ao importar: {e}', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+    except Exception as e:
+        logger.exception('Erro inesperado importando composições via Excel')
+        flash(f'Erro inesperado: {e}', 'error')
+        return redirect(url_for('catalogo.servicos_list'))
+
+    flash(
+        f'Importação concluída: {resultado["servicos_created"]} serviço(s) criado(s), '
+        f'{resultado["servicos_updated"]} serviço(s) atualizado(s), '
+        f'{resultado["composicoes_created"]} composição(ões) criada(s), '
+        f'{resultado["composicoes_updated"]} composição(ões) atualizada(s).',
+        'success',
+    )
+    if resultado['rejected']:
+        detalhes = '; '.join(
+            f'linha {r["linha"]}: {r["motivo"]}'
+            for r in resultado['rejected'][:15]
+        )
+        suffix = '' if len(resultado['rejected']) <= 15 else f' (+{len(resultado["rejected"]) - 15} outras)'
+        flash(
+            f'{len(resultado["rejected"])} linha(s) rejeitada(s): {detalhes}{suffix}',
+            'warning',
+        )
+    return redirect(url_for('catalogo.servicos_list'))
+
+
 @catalogo_bp.route('/servicos')
 @login_required
 def servicos_list():
