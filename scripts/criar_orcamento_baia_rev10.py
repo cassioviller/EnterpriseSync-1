@@ -17,53 +17,60 @@ NUMERO = 'ORC-BAIA-REV10'
 AREA_COBERTA = Decimal('1173')   # m² (telha shingle, item 1.13/1.2)
 
 
-def main():
+def criar_orcamento_baia(admin_id, xlsx_path=PATH):
+    """Importa o catálogo (insumos+composições) do xlsx e (re)cria o Orçamento da
+    Baia para `admin_id`. Deve rodar dentro de app_context. Retorna o orcamento_id.
+    Recria o orçamento se já existir (re-import limpo)."""
+    aid = admin_id
     pyrows = {r[0]: r for r in calc()[0]}  # cod -> (cod,nome,un,qty,cu,custo,venda)
+
+    # 1) catálogo (idempotente via upsert dos importadores)
+    with open(xlsx_path, 'rb') as fh:
+        importar_insumos_xlsx(fh, aid)
+    with open(xlsx_path, 'rb') as fh:
+        importar_composicoes_xlsx(fh, aid)
+
+    # 2) orçamento — recria se já existe
+    old = Orcamento.query.filter_by(admin_id=aid, numero=NUMERO).first()
+    if old:
+        OrcamentoItem.query.filter_by(orcamento_id=old.id).delete(synchronize_session=False)
+        db.session.delete(old)
+        db.session.commit()
+    orc = Orcamento(admin_id=aid, numero=NUMERO, titulo='Obra Baia REV10 — 24 baias',
+                    cliente_nome='Grupo Mônica', status='rascunho', criado_por=aid)
+    db.session.add(orc)
+    db.session.flush()
+
+    svc_by_nome = {s.nome: s for s in Servico.query.filter_by(admin_id=aid).all()}
+    for i, sdef in enumerate(SERVICOS, 1):
+        cod, nome, un, qty_s = sdef[0], sdef[1], sdef[2], sdef[3]
+        svc = svc_by_nome[nome]
+        row = pyrows[cod]
+        custo, venda = row[5], row[6]
+        margem = (Decimal('1') - custo / venda) * 100 if venda > 0 else Decimal('0')
+        item = OrcamentoItem(
+            admin_id=aid, orcamento_id=orc.id, ordem=i, servico_id=svc.id,
+            descricao=f'{cod} {nome}', unidade=un,
+            quantidade=Decimal(qty_s.replace(',', '.')),
+            composicao_snapshot=snapshot_from_servico(svc),
+            imposto_pct=Decimal('0'),
+            margem_pct=margem.quantize(Decimal('0.01')),
+        )
+        db.session.add(item)
+        db.session.flush()
+        recalcular_item(item, orc)
+    recalcular_orcamento(orc)
+    db.session.commit()
+    return orc.id
+
+
+def main():
     with app.app_context():
         u = Usuario.query.filter_by(tipo_usuario='ADMIN').first() or Usuario.query.first()
-        aid = u.id
-
-        # 1) catálogo (idempotente via upsert dos importadores)
-        r1 = importar_insumos_xlsx(open(PATH, 'rb'), aid)
-        r2 = importar_composicoes_xlsx(open(PATH, 'rb'), aid)
-        print(f'Catálogo: {r1["created"]} insumos, {r2["servicos_created"]} serviços, '
-              f'{r2["composicoes_created"]} composições | rejeições: '
-              f'{len(r1["rejected"])}/{len(r2["rejected"])}')
-
-        # 2) orçamento — recria se já existe
-        old = Orcamento.query.filter_by(admin_id=aid, numero=NUMERO).first()
-        if old:
-            OrcamentoItem.query.filter_by(orcamento_id=old.id).delete(synchronize_session=False)
-            db.session.delete(old)
-            db.session.commit()
-        orc = Orcamento(admin_id=aid, numero=NUMERO, titulo='Obra Baia REV10 — 24 baias',
-                        cliente_nome='Grupo Mônica', status='rascunho', criado_por=aid)
-        db.session.add(orc)
-        db.session.flush()
-
-        svc_by_nome = {s.nome: s for s in Servico.query.filter_by(admin_id=aid).all()}
-        for i, sdef in enumerate(SERVICOS, 1):
-            cod, nome, un, qty_s = sdef[0], sdef[1], sdef[2], sdef[3]
-            svc = svc_by_nome[nome]
-            row = pyrows[cod]
-            custo, venda = row[5], row[6]
-            margem = (Decimal('1') - custo / venda) * 100 if venda > 0 else Decimal('0')
-            item = OrcamentoItem(
-                admin_id=aid, orcamento_id=orc.id, ordem=i, servico_id=svc.id,
-                descricao=f'{cod} {nome}', unidade=un,
-                quantidade=Decimal(qty_s.replace(',', '.')),
-                composicao_snapshot=snapshot_from_servico(svc),
-                imposto_pct=Decimal('0'),
-                margem_pct=margem.quantize(Decimal('0.01')),
-            )
-            db.session.add(item)
-            db.session.flush()
-            recalcular_item(item, orc)
-        recalcular_orcamento(orc)
-        db.session.commit()
+        orc_id = criar_orcamento_baia(u.id)
 
         # 3) leitura + R$/m²
-        orc = Orcamento.query.get(orc.id)
+        orc = Orcamento.query.get(orc_id)
         ct, vt = Decimal(str(orc.custo_total)), Decimal(str(orc.venda_total))
         print(f'\nOrçamento {orc.numero} (id {orc.id}) — {len(orc.itens)} itens')
         print(f'  Custo total:  R$ {ct:,.2f}')
