@@ -2989,6 +2989,10 @@ class Proposta(db.Model):
     # Integração com Obras
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))
     convertida_em_obra = db.Column(db.Boolean, default=False)
+    # Espinha financeira (ADR 0005) — origem da proposta. 'importacao_obra' marca a
+    # Proposta de importação (elo Obra->Orçamento), que NÃO é proposta comercial de
+    # venda: fica fora do funil/KPIs comerciais. NULL = proposta comercial normal.
+    origem = db.Column(db.String(30), nullable=True, index=True)
 
     # Task #115 — origem (Orçamento interno que gerou esta proposta), 1→N
     orcamento_id = db.Column(db.Integer, db.ForeignKey('orcamento.id', ondelete='SET NULL'),

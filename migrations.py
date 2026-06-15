@@ -3994,6 +3994,7 @@ def executar_migracoes():
             (191, "Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria origem='sistema') para todos os tenants existentes", migration_191_seed_regras_classificacao_sistema),
             (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
             (193, "Espinha financeira — cronograma_template_item.peso_medicao (peso explícito da Atividade no Serviço; ADR 0004)", _migration_193_template_peso_medicao),
+            (194, "Espinha financeira — propostas_comerciais.origem (Proposta de importação fora do funil comercial; ADR 0005)", _migration_194_proposta_origem),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13535,6 +13536,30 @@ def _migration_193_template_peso_medicao():
         logger.info("[Migration 193] Coluna peso_medicao adicionada a cronograma_template_item.")
     except Exception as e:
         logger.error(f"[Migration 193] Falha: {e}")
+        raise
+
+
+def _migration_194_proposta_origem():
+    """Espinha financeira (ADR 0005) — propostas_comerciais.origem.
+
+    Distingue a Proposta de importação ('importacao_obra', elo Obra->Orçamento)
+    da proposta comercial de venda. NULL = comercial normal. O funil/KPIs
+    comerciais filtram origem='importacao_obra'. Idempotente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE propostas_comerciais
+                ADD COLUMN IF NOT EXISTS origem VARCHAR(30);
+            """))
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS idx_propostas_comerciais_origem
+                ON propostas_comerciais(origem);
+            """))
+        logger.info("[Migration 194] Coluna origem adicionada a propostas_comerciais.")
+    except Exception as e:
+        logger.error(f"[Migration 194] Falha: {e}")
         raise
 
 

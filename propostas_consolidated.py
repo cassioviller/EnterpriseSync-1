@@ -462,26 +462,30 @@ def index():
         
         logger.debug(f"DEBUG PROPOSTAS: admin_id={admin_id}, filters=status:{status_filter}, cliente:{cliente_filter}")
         
+        # Espinha financeira (ADR 0005): a Proposta de importação (origem='importacao_obra')
+        # é só o elo Obra->Orçamento — fica FORA do funil/KPIs comerciais.
+        _so_comercial = or_(Proposta.origem.is_(None), Proposta.origem != 'importacao_obra')
+
         # Query base com filtro por admin
-        query = Proposta.query.filter_by(admin_id=admin_id)
-        
+        query = Proposta.query.filter_by(admin_id=admin_id).filter(_so_comercial)
+
         # Aplicar filtros
         if status_filter:
             query = query.filter(Proposta.status == status_filter)
         if cliente_filter:
             query = query.filter(Proposta.cliente_nome.ilike(f'%{cliente_filter}%'))
-        
+
         # Paginação
         propostas = query.order_by(Proposta.criado_em.desc()).paginate(
             page=page, per_page=20, error_out=False
         )
-        
-        # Estatísticas para dashboard
+
+        # Estatísticas para dashboard (também só comerciais)
         stats = safe_db_operation(lambda: {
-            'total': Proposta.query.filter_by(admin_id=admin_id).count(),
-            'pendentes': Proposta.query.filter_by(admin_id=admin_id, status='pendente').count(),
-            'aprovadas': Proposta.query.filter_by(admin_id=admin_id, status='aprovada').count(),
-            'valor_total': db.session.query(func.sum(Proposta.valor_total)).filter_by(admin_id=admin_id).scalar() or 0
+            'total': Proposta.query.filter_by(admin_id=admin_id).filter(_so_comercial).count(),
+            'pendentes': Proposta.query.filter_by(admin_id=admin_id, status='pendente').filter(_so_comercial).count(),
+            'aprovadas': Proposta.query.filter_by(admin_id=admin_id, status='aprovada').filter(_so_comercial).count(),
+            'valor_total': db.session.query(func.sum(Proposta.valor_total)).filter_by(admin_id=admin_id).filter(_so_comercial).scalar() or 0
         }, {})
         
         logger.debug(f"DEBUG PROPOSTAS: {stats.get('total', 0)} propostas encontradas")

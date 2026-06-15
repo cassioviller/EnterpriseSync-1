@@ -65,6 +65,7 @@ def _criar_proposta(orc, admin_id):
         orcamento_id=orc.id,
         criado_por=admin_id,
         versao=1,
+        origem='importacao_obra',   # Proposta de importação (ADR 0005) — fora do funil comercial
     )
     db.session.add(proposta)
     db.session.flush()

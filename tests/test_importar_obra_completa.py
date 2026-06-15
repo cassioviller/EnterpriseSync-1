@@ -254,6 +254,35 @@ def test_import_multi_atividade_via_template():
         assert sum(pesos.values()) == Decimal('100')
 
 
+def test_import_marca_origem_e_sai_do_funil_comercial():
+    """Delta 2 (ADR 0005): a Proposta de importação recebe origem='importacao_obra'
+    e NÃO aparece na listagem comercial; uma proposta comercial normal aparece."""
+    from datetime import date
+    from services.importar_obra_completa import importar_obra_completa
+    with app.app_context():
+        orc = _orcamento_baia_like()
+        res = importar_obra_completa(orc.id, _fx.admin.id)
+        ponte = Proposta.query.filter_by(orcamento_id=orc.id).first()
+        assert ponte.origem == 'importacao_obra'
+
+        # proposta comercial normal (deve aparecer no funil)
+        normal = Proposta(
+            admin_id=_fx.admin.id, numero=f'PROP-NORMAL-{_sfx()}',
+            cliente_nome='Cliente Normal', data_proposta=date(2026, 1, 1),
+            status='pendente', origem=None,
+        )
+        db.session.add(normal); db.session.commit()
+
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['_user_id'] = str(_fx.admin.id)
+                sess['_fresh'] = True
+            resp = c.get('/propostas/')
+        assert resp.status_code == 200, resp.status_code
+        assert normal.numero.encode() in resp.data         # comercial aparece
+        assert ponte.numero.encode() not in resp.data       # ponte não aparece
+
+
 def test_rota_importar_obra_cria_e_redireciona():
     """Smoke da UI: POST /orcamentos/<id>/importar-obra cria a obra e redireciona."""
     with app.app_context():
