@@ -4,6 +4,16 @@
 > Fatia 2 (custos completos viram ContaPagar; medição vira ContaReceber). **Sem migration.**
 > Spec §Fatia 4.
 
+## Status de execução (2026-06-15) — commit f2b9298  ✅ COMPLETA
+
+- ✅ **F4-1** `services/caixa_obra_service.fluxo_caixa_obra` — reúso integral do
+  `FinanceiroService` (calcular_fluxo_caixa + agregar_fluxo_mensal), filtrado por obra,
+  `saldo_inicial=0.0` (ADR 0003).
+- ✅ **F4-2** rota `/obras/<id>/caixa` + template (filtro de período default mês corrente;
+  KPIs Realizado/Previsto **separados**; série mensal com variação acumulada a partir de 0).
+- ✅ **F4-3** aba "Caixa" no detalhe da obra, rotulada como lente distinta da competência (DC4).
+- 3 testes (escopo por obra, estrutura/variação-de-zero, rota). Sem migration.
+
 ## Objetivo
 Mostrar, **por obra**, quando ela fica no vermelho de **caixa** (não de competência): curva de
 **Realizado/Previsto** no tempo — Valor agregado → medição → `ContaReceber` vs Custo → `ContaPagar`.
