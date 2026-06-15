@@ -3,6 +3,18 @@
 > Data: 2026-06-15. Obedece ao plano-mestre (DC1, DC7). Depende da Fatia 2 (custo incorrido completo).
 > **Sem migration.** Spec §Fatia 3.
 
+## Status de execução (2026-06-15) — commit b308054
+
+- ✅ **F3-1** `venda_total_atividade` (BAC de receita).
+- ✅ **F3-2** `evm_atividade` (CPI=EV/AC via `alarme_custo`; SPI via `cronograma_engine`; EAC=BAC/CPI;
+  resultado projetado = venda − EAC). SPI fica **None** até a obra ter baseline de prazo
+  (`data_inicio`/`duracao` por atividade — vêm do export do `Projeto1.mpp`).
+- ✅ **F3-3** `evm_obra` (rollup; SPI da obra via `calcular_progresso_geral_obra_v2`).
+- ✅ **F3-4 (UI)** tela: cards de Previsão (CPI/SPI/EAC/resultado projetado) + colunas por atividade.
+- ⬜ **F3-4 (alavanca)** "quanto falta" (un/HH ou R$ p/ fechar a meta) — não implementado; refino.
+- 🔎 **Nota:** CPI/EAC/resultado projetado já funcionam na Baia (vêm do custo). **SPI** só aparece
+  depois de carregar datas/durações (passo do MPP).
+
 ## Objetivo
 Resultado **projetado** no fechamento, por atividade e obra: CPI, SPI, EAC e margem projetada, com a
 alavanca ("faltam +N un/HH ou realocar equipe"). É **puro cálculo sobre o read-model** das Fatias 1–2
