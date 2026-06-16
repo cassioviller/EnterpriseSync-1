@@ -389,6 +389,13 @@
                     </button>
                 </div>
                 <div class="rdo-card-body">
+                    <div class="row g-2 mb-1 d-none d-md-flex repet-head">
+                        <div class="col-md-3"><small class="text-muted fw-bold">Tipo</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Severidade</small></div>
+                        <div class="col-md-4"><small class="text-muted fw-bold">Descrição</small></div>
+                        <div class="col-md-2"><small class="text-muted fw-bold">Status</small></div>
+                        <div class="col-md-1"></div>
+                    </div>
                     <div id="ocorr-rows-edit">
                         {% for oc in (rdo.ocorrencias_rdo or []) %}
                         <div class="row g-2 mb-2 align-items-end repet-row">
