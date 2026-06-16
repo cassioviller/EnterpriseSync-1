@@ -1,0 +1,443 @@
+"""
+services/orcamento_service.py — Task #82
+
+Cálculo paramétrico de preço de venda de Serviços a partir de sua Composição
+(Insumos × coeficientes), aplicando imposto e margem de lucro.
+
+Fórmula:
+    custo_unitario = Σ (coeficiente_i × preco_vigente_i)
+    preco_venda    = custo_unitario / (1 − imposto_pct/100 − margem_lucro_pct/100)
+
+Quando o serviço não tem composição, o resultado é 0 (não tenta inferir).
+Quando a soma de imposto+margem ≥ 100, o cálculo retorna 0 e sinaliza erro
+no dict de resposta para evitar divisão por zero/negativos.
+"""
+from __future__ import annotations
+
+from datetime import date as _date
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
+
+from app import db
+
+
+def _q2(v: float) -> Decimal:
+    """Arredonda para 2 casas decimais (HALF_UP)."""
+    return Decimal(str(v)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _q2d(d: Decimal) -> Decimal:
+    """Quantiza um Decimal para 2 casas (HALF_UP) sem reconverter via str."""
+    return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def calcular_precos_servico(servico, data_ref: Optional[_date] = None,
+                            proposta=None) -> dict:
+    """Calcula preço de venda do serviço a partir da composição.
+
+    BDI completo (Bloco 3): a resolução de alíquotas e a fórmula/guarda-corpo
+    são delegadas a `services.pricing`. `proposta` (opcional) permite o override
+    de BDI desta proposta na cascata.
+
+    Returns dict (chaves originais + split BDI):
+        {
+          'custo_unitario': Decimal,        # = custo direto
+          'preco_venda':    Decimal,
+          'imposto_pct':    Decimal,        # T
+          'margem_lucro_pct': Decimal,      # L
+          'custo_direto', 'indiretos', 'indiretos_componentes',
+          'tributos', 'lucro', 'soma_bdi_pct', 'status', 'mensagem',
+          'detalhamento': [...],
+          'erro': Optional[str],
+        }
+    """
+    data_ref = data_ref or _date.today()
+
+    from services.pricing import resolver_aliquotas, precificar
+    aliq = resolver_aliquotas(servico, proposta)
+    imposto_pct = aliq.t
+    margem_pct = aliq.l
+
+    custo_total = Decimal('0')
+    custo_material = Decimal('0')
+    custo_mao_obra = Decimal('0')
+    custo_outros = Decimal('0')
+    detalhamento = []
+    for comp in servico.composicoes:
+        preco_vig = Decimal(str(comp.insumo.preco_vigente(data_ref)))
+        coef = Decimal(str(comp.coeficiente or 0))
+        fator_com = Decimal(str(comp.insumo.fator_comercial or 1)) or Decimal('1')
+        preco_unit = preco_vig / fator_com
+        sub = (coef * preco_unit).quantize(Decimal('0.0001'))
+        custo_total += sub
+        tipo = (comp.insumo.tipo or '').upper()
+        if tipo == 'MATERIAL':
+            custo_material += sub
+        elif tipo == 'MAO_OBRA':
+            custo_mao_obra += sub
+        else:
+            custo_outros += sub
+        detalhamento.append({
+            'insumo_id': comp.insumo_id,
+            'nome': comp.insumo.nome,
+            'unidade': comp.unidade or comp.insumo.unidade,
+            'tipo': comp.insumo.tipo,
+            'coeficiente': float(coef),
+            'preco_unitario': float(preco_unit),
+            'preco_embalagem': float(preco_vig),
+            'subtotal': float(sub),
+            'fator_comercial': float(fator_com),
+            'unidade_comercial': comp.insumo.unidade_comercial or None,
+        })
+
+    custo_unit_q = _q2(float(custo_total))
+    custo_material_q = _q2(float(custo_material))
+    custo_mao_obra_q = _q2(float(custo_mao_obra))
+    custo_outros_q = _q2(float(custo_outros))
+
+    prec = precificar(custo_total, aliq)
+
+    erro = None
+    if prec.status == 'bloqueio':
+        preco_venda = Decimal('0.00')
+        erro = prec.mensagem
+    else:
+        preco_venda = _q2d(prec.preco)
+
+    indiretos_componentes = {k: _q2d(v) for k, v in prec.indiretos_componentes.items()}
+
+    return {
+        # chaves originais (back-compat)
+        'custo_unitario': custo_unit_q,
+        'preco_venda': preco_venda,
+        'imposto_pct': imposto_pct,
+        'margem_lucro_pct': margem_pct,
+        'detalhamento': detalhamento,
+        'erro': erro,
+        # contrato Task #82 (split de categorias + alias)
+        'custo_material': custo_material_q,
+        'custo_mao_obra': custo_mao_obra_q,
+        'custo_outros': custo_outros_q,
+        'custo_total': custo_unit_q,
+        'preco_venda_unitario': preco_venda,
+        'detalhes': detalhamento,
+        # Bloco 3 — split BDI completo (telas internas)
+        'custo_direto': _q2d(prec.custo_direto),
+        'indiretos': _q2d(prec.indiretos),
+        'indiretos_componentes': indiretos_componentes,
+        'tributos': _q2d(prec.tributos),
+        'lucro': _q2d(prec.lucro),
+        'soma_bdi_pct': prec.soma_bdi_pct,
+        'status': prec.status,
+        'mensagem': prec.mensagem,
+    }
+
+
+def recalcular_servico_preco(servico, data_ref: Optional[_date] = None,
+                             persistir: bool = True, proposta=None) -> dict:
+    """Recalcula e (opcionalmente) persiste preco_venda_unitario + custo_unitario.
+
+    Guarda-corpo (D3): em estado de bloqueio (T+L ≥ limiar) o preço NÃO é
+    persistido — o custo direto pode ser atualizado, mas o preço de venda fica
+    intacto e a mensagem é propagada no dict de retorno.
+    """
+    resultado = calcular_precos_servico(servico, data_ref, proposta)
+    bloqueado = resultado.get('status') == 'bloqueio' or bool(resultado.get('erro'))
+    if persistir and not bloqueado:
+        servico.custo_unitario = float(resultado['custo_unitario'])
+        servico.preco_venda_unitario = resultado['preco_venda']
+        db.session.flush()
+    return resultado
+
+
+# Compatibility alias (Task #82 review #9): preserva contrato original
+# do spec, que usava `recalcular_servico` como nome canônico.
+recalcular_servico = recalcular_servico_preco
+
+
+def calcular_precos_servico_por_quantidade(
+    servico,
+    quantidade,
+    data_ref: Optional[_date] = None,
+    proposta=None,
+) -> dict:
+    """Task #47 — Calcula preço de venda considerando quantidade vendida e pacote.
+
+    Para cada insumo da composição:
+        quantidade_tecnica = coeficiente × quantidade_vendida
+        pacotes            = ceil(quantidade_tecnica / fator_comercial)
+        quantidade_compra  = pacotes × fator_comercial
+        custo_real_linha   = pacotes × preco_embalagem
+
+    custo_real_total          = Σ custo_real_linha
+    custo_medio_real_unitario = custo_real_total / quantidade_vendida
+    preco_venda_total         = custo_real_total / (1 − imp/100 − mar/100)
+    preco_venda_medio         = preco_venda_total / quantidade_vendida
+
+    Quando fator_comercial <= 1 cada unidade técnica é sua própria embalagem
+    (custo_real_linha = quantidade_tecnica × preco_por_unidade), igual ao
+    cálculo técnico proporcional.
+
+    Se quantidade <= 0, usa 1 como fallback e sinaliza via 'quantidade_fallback'.
+
+    Returns dict:
+        {
+          'quantidade': Decimal,
+          'quantidade_fallback': bool,
+          'custo_real_total':          Decimal,
+          'custo_medio_real_unitario': Decimal,
+          'preco_venda_total':         Decimal,
+          'preco_venda_medio':         Decimal,
+          'custo_tecnico_unitario':    Decimal,  # referência (cálculo proporcional)
+          'preco_tecnico_unitario':    Decimal,  # referência
+          'imposto_pct':               Decimal,
+          'margem_lucro_pct':          Decimal,
+          'detalhamento': [
+              {
+                'insumo_id', 'nome', 'tipo', 'unidade',
+                'preco_embalagem', 'fator_comercial', 'unidade_comercial',
+                'coeficiente',
+                'quantidade_tecnica', 'pacotes', 'quantidade_compra',
+                'custo_tecnico', 'custo_real',
+              }, ...
+          ],
+          'erro': Optional[str],
+        }
+    """
+    from decimal import ROUND_CEILING
+
+    data_ref = data_ref or _date.today()
+
+    qtd = Decimal(str(quantidade or 0))
+    quantidade_fallback = False
+    if qtd <= Decimal('0'):
+        qtd = Decimal('1')
+        quantidade_fallback = True
+
+    # Alíquotas via cascata do Bloco 3 (serviço/proposta/empresa).
+    from services.pricing import resolver_aliquotas, precificar
+    aliq = resolver_aliquotas(servico, proposta)
+    imposto_pct = aliq.t
+    margem_pct = aliq.l
+
+    custo_real_total = Decimal('0')
+    custo_tecnico_total = Decimal('0')
+    detalhamento = []
+
+    for comp in servico.composicoes:
+        preco_embalagem = Decimal(str(comp.insumo.preco_vigente(data_ref)))
+        coef = Decimal(str(comp.coeficiente or 0))
+        fator = Decimal(str(comp.insumo.fator_comercial or 1)) or Decimal('1')
+
+        qtd_tecnica = (coef * qtd).quantize(Decimal('0.0001'))
+
+        if fator > Decimal('1') and qtd_tecnica > Decimal('0'):
+            pacotes = (qtd_tecnica / fator).to_integral_value(rounding=ROUND_CEILING)
+            qtd_compra = (pacotes * fator).quantize(Decimal('0.0001'))
+            custo_real_linha = (pacotes * preco_embalagem).quantize(
+                Decimal('0.0001')
+            )
+        else:
+            pacotes = qtd_tecnica
+            qtd_compra = qtd_tecnica
+            preco_unit = preco_embalagem / fator if fator > 0 else Decimal('0')
+            custo_real_linha = (qtd_tecnica * preco_unit).quantize(Decimal('0.0001'))
+
+        preco_unit_tec = preco_embalagem / fator if fator > 0 else Decimal('0')
+        custo_tecnico_linha = (coef * preco_unit_tec).quantize(Decimal('0.0001'))
+
+        custo_real_total += custo_real_linha
+        custo_tecnico_total += custo_tecnico_linha
+
+        detalhamento.append({
+            'insumo_id': comp.insumo_id,
+            'nome': comp.insumo.nome,
+            'tipo': comp.insumo.tipo,
+            'unidade': comp.unidade or comp.insumo.unidade,
+            'preco_embalagem': float(preco_embalagem),
+            'fator_comercial': float(fator),
+            'unidade_comercial': comp.insumo.unidade_comercial or None,
+            'coeficiente': float(coef),
+            'quantidade_tecnica': float(qtd_tecnica),
+            'pacotes': float(pacotes),
+            'quantidade_compra': float(qtd_compra),
+            'custo_tecnico': float(custo_tecnico_linha),
+            'custo_real': float(custo_real_linha),
+        })
+
+    custo_real_total_q = _q2(float(custo_real_total))
+    custo_medio = (custo_real_total / qtd).quantize(
+        Decimal('0.0001'), rounding=ROUND_HALF_UP
+    ) if qtd > 0 else Decimal('0')
+    custo_tecnico_q = _q2(float(custo_tecnico_total))
+
+    prec_real = precificar(custo_real_total, aliq)
+    prec_tec = precificar(custo_tecnico_total, aliq)
+
+    erro = None
+    if prec_real.status == 'bloqueio':
+        preco_venda_total = Decimal('0.00')
+        preco_tecnico_unit = Decimal('0.00')
+        erro = prec_real.mensagem
+    else:
+        preco_venda_total = prec_real.preco.quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        preco_tecnico_unit = prec_tec.preco.quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+
+    preco_venda_medio = (preco_venda_total / qtd).quantize(
+        Decimal('0.0001'), rounding=ROUND_HALF_UP
+    ) if qtd > 0 else Decimal('0')
+
+    return {
+        'quantidade': qtd,
+        'quantidade_fallback': quantidade_fallback,
+        'custo_real_total': custo_real_total_q,
+        'custo_medio_real_unitario': custo_medio,
+        'preco_venda_total': preco_venda_total,
+        'preco_venda_medio': preco_venda_medio,
+        'custo_tecnico_unitario': custo_tecnico_q,
+        'preco_tecnico_unitario': preco_tecnico_unit,
+        'imposto_pct': imposto_pct,
+        'margem_lucro_pct': margem_pct,
+        'detalhamento': detalhamento,
+        'erro': erro,
+        # Bloco 3 — split BDI completo (sobre o custo real)
+        'custo_direto': _q2d(prec_real.custo_direto),
+        'indiretos': _q2d(prec_real.indiretos),
+        'indiretos_componentes': {k: _q2d(v) for k, v in prec_real.indiretos_componentes.items()},
+        'tributos': _q2d(prec_real.tributos),
+        'lucro': _q2d(prec_real.lucro),
+        'soma_bdi_pct': prec_real.soma_bdi_pct,
+        'status': prec_real.status,
+        'mensagem': prec_real.mensagem,
+    }
+
+
+def explodir_servico_para_quantidade(servico, quantidade,
+                                     data_ref: Optional[_date] = None,
+                                     proposta=None) -> dict:
+    """Task #89: explode a composição × quantidade pedida.
+
+    Args:
+        servico: instância de Servico (com composições carregadas).
+        quantidade: quantidade-medida do item (m², m³, peça, h…) — Decimal/float.
+
+    Returns dict:
+        {
+          'quantidade': Decimal,
+          'custo_unitario': Decimal,        # custo por 1 unidade do serviço
+          'preco_unitario': Decimal,
+          'lucro_unitario': Decimal,
+          'subtotal': Decimal,              # quantidade × preço unitário
+          'custo_total': Decimal,           # quantidade × custo unitário
+          'lucro_total': Decimal,
+          'imposto_pct': Decimal,
+          'margem_lucro_pct': Decimal,
+          'erro': Optional[str],
+          'categorias': {
+              'MATERIAL':  { 'custo_unitario': Decimal, 'custo_total': Decimal, 'itens': [...] },
+              'MAO_OBRA':  { ... },
+              'OUTROS':    { ... },
+          },
+          'detalhamento': [
+              { 'insumo_id', 'nome', 'tipo', 'unidade',
+                'coeficiente', 'preco_unitario',
+                'quantidade_tecnica', 'quantidade_compra',
+                'fator_comercial', 'unidade_comercial',
+                'subtotal_unitario', 'subtotal_total' },
+              ...
+          ],
+        }
+
+    Cada linha do detalhamento expressa (Task #19):
+        quantidade_tecnica = coeficiente × quantidade do serviço (consumo exato)
+        quantidade_compra  = múltiplo do fator_comercial ≥ quantidade_tecnica (o que se compra)
+        subtotal_unitario  = coeficiente × preco do insumo (custo por 1 unid serv.)
+        subtotal_total     = quantidade_compra × preco do insumo (custo real de compra)
+    """
+    base = calcular_precos_servico(servico, data_ref, proposta)
+    qtd = Decimal(str(quantidade or 0))
+    custo_unit = base.get('custo_unitario') or Decimal('0')
+    preco_unit = base.get('preco_venda') or Decimal('0')
+    # D2 — lucro é L × preço (não preço − custo, que embutia o imposto).
+    lucro_unit = base.get('lucro') or Decimal('0')
+
+    subtotal = (qtd * preco_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    custo_total = (qtd * custo_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    lucro_total = (qtd * lucro_unit).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    categorias = {
+        'MATERIAL': {'custo_unitario': base.get('custo_material', Decimal('0')),
+                     'custo_total': Decimal('0'), 'itens': []},
+        'MAO_OBRA': {'custo_unitario': base.get('custo_mao_obra', Decimal('0')),
+                     'custo_total': Decimal('0'), 'itens': []},
+        'OUTROS':   {'custo_unitario': base.get('custo_outros', Decimal('0')),
+                     'custo_total': Decimal('0'), 'itens': []},
+    }
+    for c in ('MATERIAL', 'MAO_OBRA', 'OUTROS'):
+        categorias[c]['custo_total'] = (
+            qtd * Decimal(str(categorias[c]['custo_unitario']))
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    import math as _math
+    detalhamento = []
+    for d in base.get('detalhamento', []):
+        coef = Decimal(str(d['coeficiente']))
+        preco = Decimal(str(d['preco_unitario']))
+        fator = Decimal(str(d.get('fator_comercial') or 1)) or Decimal('1')
+        qtd_tecnica = (coef * qtd).quantize(Decimal('0.0001'))
+        sub_unit = (coef * preco).quantize(Decimal('0.0001'))
+        # Task #19 — qtd_compra: arredonda para cima ao próximo múltiplo do fator
+        # Usa puro Decimal para evitar imprecisão de float ao ceil
+        if fator > Decimal('1') and qtd_tecnica > Decimal('0'):
+            from decimal import ROUND_CEILING
+            multiplos = (qtd_tecnica / fator).to_integral_value(rounding=ROUND_CEILING)
+            qtd_compra = (multiplos * fator).quantize(Decimal('0.0001'))
+        else:
+            qtd_compra = qtd_tecnica
+        # subtotal_total usa quantidade de compra (custo real, não técnico)
+        sub_tot = (qtd_compra * preco).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        linha = {
+            'insumo_id': d['insumo_id'],
+            'nome': d['nome'],
+            'tipo': d['tipo'],
+            'unidade': d['unidade'],
+            'coeficiente': float(coef),
+            'preco_unitario': float(preco),
+            'quantidade_tecnica': float(qtd_tecnica),
+            'quantidade_compra': float(qtd_compra),
+            'fator_comercial': float(fator),
+            'unidade_comercial': d.get('unidade_comercial') or None,
+            'subtotal_unitario': float(sub_unit),
+            'subtotal_total': float(sub_tot),
+        }
+        detalhamento.append(linha)
+        tipo = (d.get('tipo') or '').upper()
+        bucket = 'MATERIAL' if tipo == 'MATERIAL' else (
+            'MAO_OBRA' if tipo == 'MAO_OBRA' else 'OUTROS')
+        categorias[bucket]['itens'].append(linha)
+
+    return {
+        'quantidade': qtd,
+        'custo_unitario': custo_unit,
+        'preco_unitario': preco_unit,
+        'lucro_unitario': lucro_unit,
+        'subtotal': subtotal,
+        'custo_total': custo_total,
+        'lucro_total': lucro_total,
+        'imposto_pct': base.get('imposto_pct'),
+        'margem_lucro_pct': base.get('margem_lucro_pct'),
+        'erro': base.get('erro'),
+        'categorias': categorias,
+        'detalhamento': detalhamento,
+        # Bloco 3 — split BDI completo (por unidade) + status
+        'indiretos_unitario': base.get('indiretos'),
+        'indiretos_componentes': base.get('indiretos_componentes'),
+        'tributos_unitario': base.get('tributos'),
+        'soma_bdi_pct': base.get('soma_bdi_pct'),
+        'status': base.get('status'),
+        'mensagem': base.get('mensagem'),
+    }
