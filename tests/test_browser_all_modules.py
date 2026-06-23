@@ -1796,6 +1796,14 @@ class TestConsoleSweep:
         ("/almoxarifado/relatorios", "Almox Relatórios"),
         ("/metricas/servico", "Métricas Serviço"),
         ("/orcamentos", "Orçamentos"),
+        # Migradas de test_e2e_modules.py (legado, removido) — rotas antes só
+        # cobertas lá: relatórios/centros de custo contábeis e sub-telas de
+        # alimentação. As demais rotas daquele arquivo já constam acima ou
+        # apontavam para destinos de redirect inexistentes como rota direta.
+        ("/contabilidade/relatorios", "Contabilidade Relatórios"),
+        ("/contabilidade/centros-custo", "Centros de Custo"),
+        ("/alimentacao/itens", "Alimentação Itens"),
+        ("/alimentacao/restaurantes", "Alimentação Restaurantes"),
     ]
 
     @pytest.mark.parametrize("path,nome", ROTAS)
