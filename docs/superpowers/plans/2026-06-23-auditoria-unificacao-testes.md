@@ -89,6 +89,13 @@ Demais conversões:
     - `test_task_172_obra_cliente_fk` — usa kwarg removido `cliente_nome` e checa `cliente_nome_efetivo`; semântica da feature evoluiu.
     - `test_compras_nova_dropdown` (#202) — 2 asserts de template desatualizados (link de fornecedor `almoxarifado.fornecedores_criar`; `<select>` vs alerta em lista vazia).
     - `test_clausulas_configuraveis` (#174) — REV4: remoção de cláusula via sentinela deixa `clausulas=1` (esperava 0).
-- **Fase 4 — Fix frágil (D)** e varredura final: `pytest tests/` 100% verde + atualizar `run_tests.sh` para rodar a suíte toda.
+- **Fase 3 (cont.):** `d8fb2ba` insumo_coeficiente (#166) + orcamento_formato_br (#165) — saíram do collect_ignore_glob; helpers `teste_*` renomeados p/ `_teste_*`. `28fd5fa` 6 playwright @browser (bdi_completo, fator_comercial #74, formato_br_e2e orçamentos, fracionavel #75, block_scripts_213 #213, rdo_unificado #152) — 6 passed contra servidor.
+  - **Total Fase 3: 21 conversões** (15 não-playwright + 6 playwright). Gate rápido: ~300 coletados.
+  - **DEFERIDOS (8, reconciliação profunda — não rushar):**
+    - Schema/feature drift: `task_172` (kwarg removido `cliente_nome`), `compras_nova_dropdown` (#202, template), `clausulas_configuraveis` (#174, REV4).
+    - Híbrido fixtures: `task_45_catalogo_eventos` (#45, `def test_*(admin, proposta)` posicionais).
+    - DOM drift playwright: `composicao_formato_br`, `formato_br_e2e_extra` (TypeError), `rdo_progresso_monotonico` (#143), `rdo_subgrupo_aninhado_playwright` (#154) — Timeout/seletor.
+
+- **Fase 4 — Fix frágil (D)** e varredura final: reconciliar os 8 deferidos caso a caso; `ciclo_proposta_obra_medido_cr` (admin_id=63 hardcoded → fixture); dedup varredura↔ConsoleSweep; atualizar `run_tests.sh` para rodar `pytest tests/` (gate rápido + browser) em vez de só `test_browser_all_modules`.
 
 Cada fase = commits pequenos e reversíveis; a suíte deve ficar verde ao fim de cada uma.
