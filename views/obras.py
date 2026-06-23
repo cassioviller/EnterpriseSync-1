@@ -131,8 +131,16 @@ def obras():
             total_dias = 0
             total_funcionarios = set()
             
+            # Otimização N+1: carrega todos os funcionários do período numa só query
+            # (antes: uma query por registro de ponto, dentro do loop por obra).
+            _func_ids = {r.funcionario_id for r in registros_obra if r.funcionario_id}
+            _funcionarios_map = {
+                f.id: f
+                for f in Funcionario.query.filter(Funcionario.id.in_(_func_ids)).all()
+            } if _func_ids else {}
+
             for registro in registros_obra:
-                funcionario = Funcionario.query.get(registro.funcionario_id)
+                funcionario = _funcionarios_map.get(registro.funcionario_id)
                 if funcionario and funcionario.salario:
                     valor_hora = calcular_valor_hora_periodo(funcionario, periodo_inicio, periodo_fim)
                     horas_trabalhadas = (registro.horas_trabalhadas or 0)

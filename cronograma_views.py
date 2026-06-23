@@ -123,15 +123,24 @@ def index():
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
 
     from sqlalchemy import func as sqlfunc
+    # Otimização N+1: uma agregação por obra_id (count + avg) em vez de duas queries
+    # por obra dentro do loop.
+    _agg_rows = (
+        db.session.query(
+            TarefaCronograma.obra_id,
+            sqlfunc.count(TarefaCronograma.id),
+            sqlfunc.avg(TarefaCronograma.percentual_concluido),
+        )
+        .filter(TarefaCronograma.admin_id == admin_id)
+        .group_by(TarefaCronograma.obra_id)
+        .all()
+    )
+    _agg_por_obra = {r[0]: (r[1], r[2]) for r in _agg_rows}
     # Monta sumário por obra
     resumos = []
     for obra in obras:
-        total = TarefaCronograma.query.filter_by(obra_id=obra.id, admin_id=admin_id).count()
-        perc_medio = (
-            db.session.query(sqlfunc.avg(TarefaCronograma.percentual_concluido))
-            .filter_by(obra_id=obra.id, admin_id=admin_id)
-            .scalar()
-        ) or 0.0
+        total, perc_medio = _agg_por_obra.get(obra.id, (0, 0.0))
+        perc_medio = perc_medio or 0.0
         resumos.append({
             'obra': obra,
             'total_tarefas': total,
