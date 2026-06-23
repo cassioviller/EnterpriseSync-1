@@ -455,5 +455,21 @@ class CronogramaAprovacaoRunner:
         return 0 if not self.failed else 1
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_cronograma_automatico_aprovacao_task102():
+    """Entrypoint pytest: roda os 8 cenários sequenciais (estado compartilhado)
+    do Runner e falha se qualquer asserção interna falhar. Conversão fiel do
+    antigo script standalone — a lógica/conhecimento dos cenários é preservada
+    integralmente no Runner; aqui só expomos ao pytest com assert real."""
+    runner = CronogramaAprovacaoRunner()
+    runner.run()
+    assert not runner.failed, (
+        "Cenários falharam (Task #102):\n  - " + "\n  - ".join(runner.failed)
+    )
+
+
 if __name__ == '__main__':
     sys.exit(CronogramaAprovacaoRunner().run())
