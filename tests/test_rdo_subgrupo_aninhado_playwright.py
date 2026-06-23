@@ -61,7 +61,7 @@ def seed_dados():
         obra = Obra(
             nome=f'Obra PW {suf}', codigo=f'PW-{suf[:6]}',
             admin_id=admin_id, status='Em andamento',
-            data_inicio=date.today(), cliente_nome=cli.nome,
+            data_inicio=date.today(), cliente_id=cli.id,  # Task #172: FK NOT NULL
         )
         db.session.add(obra); db.session.flush()
         raiz = TarefaCronograma(
@@ -264,6 +264,20 @@ def main():
         log.error(f' ✗ {f}')
     log.info('=' * 70)
     sys.exit(0 if not failed else 1)
+
+
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_rdo_subgrupo_aninhado_e2e():
+    """Entrypoint pytest (browser): subgrupo aninhado UI/DOM (Task #154). Requer
+    servidor. Cobertura preservada (lado visual; a HTTP cobre JSON/cálculo)."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E subgrupo aninhado falhou (exit code={e.code})"
 
 
 if __name__ == '__main__':
