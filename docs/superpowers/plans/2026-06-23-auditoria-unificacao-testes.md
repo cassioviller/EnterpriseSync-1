@@ -96,6 +96,13 @@ Demais conversões:
     - Híbrido fixtures: `task_45_catalogo_eventos` (#45, `def test_*(admin, proposta)` posicionais).
     - DOM drift playwright: `composicao_formato_br`, `formato_br_e2e_extra` (TypeError), `rdo_progresso_monotonico` (#143), `rdo_subgrupo_aninhado_playwright` (#154) — Timeout/seletor.
 
-- **Fase 4 — Fix frágil (D)** e varredura final: reconciliar os 8 deferidos caso a caso; `ciclo_proposta_obra_medido_cr` (admin_id=63 hardcoded → fixture); dedup varredura↔ConsoleSweep; atualizar `run_tests.sh` para rodar `pytest tests/` (gate rápido + browser) em vez de só `test_browser_all_modules`.
+- **Fase 4 — 🔄 itens de infra/frágil concluídos:**
+  - `7ba6fb0` `ciclo_proposta_obra_medido_cr` (#94): admin_id=63 hardcoded → admin dinâmico + convertido a pytest.
+  - `d39bf9a` `run_tests.sh` ganha `--gate` (`pytest tests/ -m "not browser"`) e `--suite` (suíte inteira).
+  - `<sys.path>` conftest força a raiz no `sys.path` — o console script `pytest` (usado pelo run_tests.sh) não adicionava o CWD, quebrando a coleção de `test_agregar_fluxo_mensal` (`from financeiro_service import …`). **Achado via a validação do `--gate`.**
+  - `d9f64c5` `rdo_subgrupo_aninhado_playwright` (#154): mesmo schema drift Task #172 → convertido @browser (verde).
+  - `119c84f` `formato_br_e2e_extra`: seed corrigido (cliente_id); conversão ainda pendente por DOM drift.
+  - **Gate `bash run_tests.sh --gate`: 297 passed, 4 skipped, 0 failed.**
+  - **RESTAM (reconciliação profunda, focada):** task_172, clausulas_configuraveis, compras_nova_dropdown, task_45 (híbrido fixtures); composicao_formato_br, formato_br_e2e_extra, rdo_progresso_monotonico (DOM drift). Dedup varredura↔ConsoleSweep: resolvido como "manter ambos" (varredura é superior).
 
 Cada fase = commits pequenos e reversíveis; a suíte deve ficar verde ao fim de cada uma.
