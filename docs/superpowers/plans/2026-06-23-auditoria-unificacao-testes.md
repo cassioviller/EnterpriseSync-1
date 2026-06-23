@@ -80,8 +80,15 @@ Demais conversões:
   - `1f47f9e` 6 Runners: compras_tipo, cronograma_duplicado_rdo (#144), e2e_metricas_funcionario (#98), orcamento_override_e2e (#120), rdo_unificado_responsaveis (#149), rdo_subgrupo_aninhado (#154). **Reconciliação:** Task #172 tornou `obra.cliente_id` FK NOT NULL e removeu `cliente_nome` → testes passam a criar Cliente; rdo_subgrupo também encurta numero_rdo (estourava varchar(20)).
   - `4af6d68` 5 main(): e2e_orcamento_proposta_modelo (#31), engenheiro_responsavel_pdf (#173), legacy_propostas_drop (#201), orcamento_pricing_parity (#74, puro), proposta_no_leak (#115, puro).
   - **Gate:** 292 passed, 4 skipped (era 284 na Fase 0; +11 cobertura real agora executável).
-  - **Restante Fase 3:** `def run()` (clausulas_configuraveis 1022L, compras_nova_dropdown); merge-pair rdo_kpis_task140↔rdo_listagem_kpis; 3 em `collect_ignore_glob` (insumo_coeficiente, orcamento_formato_br, task_45); 10 playwright (precisam de servidor+marcador browser).
-  - **Deferido p/ Fase 4 (reconciliação profunda):** `test_task_172_obra_cliente_fk` — o próprio teste usa kwarg removido `cliente_nome` e checa `cliente_nome_efetivo`; semântica da feature evoluiu, exige estudo cuidadoso para não asseram comportamento antigo.
+  - `ce4aab1` par RDO KPIs: rdo_kpis_task140 (#140, +cliente_id Task #172) e rdo_listagem_kpis (#61). Dedup fina do overlap do motor fica como refinamento.
+  - **Total convertido na Fase 3: 13** (6 Runners + 5 main() + 2 RDO KPIs). Gate: **303 collected**.
+  - **Restante Fase 3 (grupos distintos):**
+    - 3 em `collect_ignore_glob` (insumo_coeficiente #166, orcamento_formato_br, task_45 #45) — precisam sair do ignore + converter.
+    - 10 playwright — precisam de servidor gunicorn + marcador `browser` (rodam via run_tests.sh, mecânica diferente do gate rápido).
+  - **DEFERIDOS (reconciliação profunda — não rushar):**
+    - `test_task_172_obra_cliente_fk` — usa kwarg removido `cliente_nome` e checa `cliente_nome_efetivo`; semântica da feature evoluiu.
+    - `test_compras_nova_dropdown` (#202) — 2 asserts de template desatualizados (link de fornecedor `almoxarifado.fornecedores_criar`; `<select>` vs alerta em lista vazia).
+    - `test_clausulas_configuraveis` (#174) — REV4: remoção de cláusula via sentinela deixa `clausulas=1` (esperava 0).
 - **Fase 4 — Fix frágil (D)** e varredura final: `pytest tests/` 100% verde + atualizar `run_tests.sh` para rodar a suíte toda.
 
 Cada fase = commits pequenos e reversíveis; a suíte deve ficar verde ao fim de cada uma.
