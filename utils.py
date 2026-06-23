@@ -951,7 +951,6 @@ def calcular_kpis_funcionarios_geral(data_inicio=None, data_fim=None, admin_id=N
     # Funcionários ativos são sempre incluídos
     # Funcionários inativos são incluídos apenas se tiverem registros no período filtrado
     
-    from sqlalchemy import or_
     
     if admin_id:
         # Buscar funcionários ativos

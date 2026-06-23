@@ -22,7 +22,6 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
-from app import db
 
 logger = logging.getLogger(__name__)
 

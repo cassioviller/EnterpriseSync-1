@@ -2,12 +2,11 @@
 Reembolsos V2 — CRUD completo de reembolsos para funcionários
 Blueprint: /reembolsos
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
-from flask_login import login_required, current_user
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask_login import login_required
 from datetime import datetime, date
 from decimal import Decimal
 import os, uuid
-from werkzeug.utils import secure_filename
 from app import db
 from models import ReembolsoFuncionario, Funcionario, Obra, GestaoCustoPai
 from multitenant_helper import get_admin_id

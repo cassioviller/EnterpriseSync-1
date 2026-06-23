@@ -40,8 +40,7 @@ def main():
         from models import (
             Usuario, TipoUsuario, Servico, Insumo, PrecoBaseInsumo,
             ComposicaoServico, Orcamento, OrcamentoItem, Proposta,
-            PropostaItem, PropostaTemplate, PropostaTemplateClausula,
-            PropostaClausula,
+            PropostaItem, PropostaTemplate, PropostaClausula,
         )
         from services.orcamento_view_service import snapshot_from_servico
 

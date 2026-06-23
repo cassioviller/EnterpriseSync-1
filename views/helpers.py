@@ -1,12 +1,6 @@
 from flask_login import current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, Obra, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto
-from utils.tenant import get_tenant_admin_id
-from utils import calcular_valor_hora_periodo
-from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.orm import joinedload
-import os
-import json
+from models import db, TipoUsuario
+from sqlalchemy import text
 import logging
 import sys
 import importlib.util

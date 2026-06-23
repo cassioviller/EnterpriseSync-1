@@ -597,7 +597,6 @@ def processar_saida():
             db.session.commit()
 
             try:
-                from decimal import Decimal as _Dec
                 EventManager.emit('material_saida', {
                     'movimento_id': movimento.id if movimento else 0,
                     'item_id': item_id,

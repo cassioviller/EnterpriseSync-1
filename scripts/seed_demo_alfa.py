@@ -3810,7 +3810,6 @@ def _seed_custos_mes_atual(admin_id):
     try:
         from app import db
         from models import GestaoCustoPai, GestaoCustoFilho, Obra
-        from sqlalchemy import text
         from datetime import date
 
         hoje = date.today()

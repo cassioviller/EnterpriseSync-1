@@ -9,7 +9,7 @@ from flask_login import login_required, current_user
 from app import db
 from models import (
     GrupoFinanceiro, CategoriaFluxoCaixa, CategoriaFornecedor, CategoriaReembolso,
-    FluxoCaixa, Fornecedor, TipoUsuario, PalavraChaveCategoria, PalavraChaveSugestao
+    FluxoCaixa, TipoUsuario, PalavraChaveCategoria, PalavraChaveSugestao
 )
 
 logger = logging.getLogger(__name__)

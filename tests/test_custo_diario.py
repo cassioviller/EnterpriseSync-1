@@ -17,7 +17,6 @@ import os
 import sys
 import logging
 from datetime import date, datetime
-from decimal import Decimal
 
 import pytest
 
@@ -368,7 +367,7 @@ def test_8_edicao_rdo_atualiza_custos_financeiros():
       4. Gravar novo custo diário + gerar custos financeiros
       5. Verificar: 1 GestaoCustoFilho (não 2), com valor atualizado
     """
-    from models import GestaoCustoFilho, GestaoCustoPai
+    from models import GestaoCustoFilho
 
     with app.app_context():
         func = _func(tipo='salario', salario=3000.0, valor_va=0.0, valor_vt=0.0)

@@ -32,14 +32,12 @@ Decisões:
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
-from typing import Any
 
 from app import db
 from models import (
     CronogramaTemplate,
-    CronogramaTemplateItem,
     ItemMedicaoComercial,
     ItemMedicaoCronogramaTarefa,
     PropostaItem,

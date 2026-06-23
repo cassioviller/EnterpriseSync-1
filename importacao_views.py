@@ -13,7 +13,7 @@ from datetime import datetime
 
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
                    render_template, request, send_file, url_for)
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from models import db
 from views.helpers import get_admin_id_robusta
@@ -421,7 +421,6 @@ def fluxo_caixa_upload():
     admin_id = get_admin_id_robusta()
 
     # Ler período selecionado pelo usuário
-    from datetime import date as _date
     data_inicio = None
     data_fim = None
     try:

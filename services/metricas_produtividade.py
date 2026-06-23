@@ -29,7 +29,6 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -98,7 +97,6 @@ def _get_operacional_cache(cache: dict, obra_id: int, servico_id: int, data_ref:
     try:
         from models import ObraOrcamentoOperacional, ObraOrcamentoOperacionalItem
         from services.orcamento_operacional import obter_operacional_vigente
-        from app import db
 
         item = (
             ObraOrcamentoOperacionalItem.query
@@ -1380,7 +1378,6 @@ def aplicar_como_referencia(admin_id: int, servico_id: int, usuario_id: int,
         RDO, RDOMaoObra, RDOServicoSubatividade,
     )
     from app import db
-    from collections import defaultdict
 
     # ── 1. Carregar registros do período apenas para o serviço solicitado ──────
     q = (

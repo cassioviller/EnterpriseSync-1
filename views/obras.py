@@ -1,16 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
+from flask import render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, Cliente, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
+from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico, verificar_dados_producao
-from datetime import datetime, date, timedelta
+from views.helpers import get_admin_id_robusta, verificar_dados_producao
+from datetime import datetime, date
 import calendar
-from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import desc, text
 import os
 import json
 import logging
@@ -93,7 +91,6 @@ def obras():
             logger.error(f"DEBUG: Erro na data_fim: {e}")
     
     # Importar desc localmente para evitar conflitos
-    from sqlalchemy import desc
     obras = query.order_by(desc(Obra.data_inicio)).all()
     
     logger.debug(f"DEBUG FILTROS OBRAS: {filtros}")

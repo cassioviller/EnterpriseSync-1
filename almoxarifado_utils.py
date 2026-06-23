@@ -2,13 +2,11 @@ from models import db
 # ===== MÓDULO 4: ALMOXARIFADO INTELIGENTE - BASEADO NA REUNIÃO TÉCNICA =====
 
 import hashlib
-from models import (Produto, CategoriaProduto, Fornecedor, NotaFiscal, MovimentacaoEstoque, RDO, Funcionario, Obra, Usuario)
+from models import (Produto, Fornecedor, NotaFiscal, MovimentacaoEstoque, RDO)
 import xml.etree.ElementTree as ET
 from decimal import Decimal
 import re
-import base64
-import io
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from collections import defaultdict
 import logging
 
@@ -791,7 +789,6 @@ def rollback_movimento_manual(movimento):
         dict: {'sucesso': bool, 'mensagem': str}
     """
     from models import AlmoxarifadoItem, AlmoxarifadoEstoque
-    from sqlalchemy import func
     
     try:
         if not movimento.impacta_estoque:

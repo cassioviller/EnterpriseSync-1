@@ -26,13 +26,11 @@ Uso direto:
 import os
 import sys
 import logging
-import subprocess
-import re
 from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import sync_playwright
 
 from app import app, db
 from werkzeug.security import generate_password_hash

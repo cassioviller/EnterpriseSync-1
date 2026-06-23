@@ -14,7 +14,6 @@ Exemplos:
 
 import pytest
 from decimal import Decimal
-from datetime import date, timedelta
 
 TOLERANCIA_MINUTOS = 10
 TOLERANCIA_HORAS = Decimal(str(TOLERANCIA_MINUTOS)) / Decimal('60')

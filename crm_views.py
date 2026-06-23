@@ -41,7 +41,7 @@ from models import (
     Lead, LeadHistorico, LeadStatus,
     CrmResponsavel, CrmOrigem, CrmCadencia, CrmSituacao,
     CrmTipoMaterial, CrmTipoObra, CrmMotivoPerda,
-    Cliente, ClienteObservacao, Proposta, Obra, Usuario, TipoUsuario,
+    Cliente, ClienteObservacao, TipoUsuario,
 )
 
 logger = logging.getLogger(__name__)

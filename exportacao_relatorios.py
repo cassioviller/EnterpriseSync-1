@@ -13,11 +13,9 @@ Funcionalidades:
 
 from flask import Blueprint, render_template, request, jsonify, send_file, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
-from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, and_, or_, text, extract, case
-import json
+from datetime import datetime, timedelta
+from sqlalchemy import func
 import logging
-from decimal import Decimal
 from io import BytesIO
 import pandas as pd
 import matplotlib
@@ -25,14 +23,9 @@ matplotlib.use('Agg')  # Backend não-GUI
 import matplotlib.pyplot as plt
 import seaborn as sns
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-import base64
-import os
-import tempfile
-from threading import Thread
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -41,7 +34,7 @@ from email import encoders
 
 # Importar modelos
 from models import (
-    db, Veiculo, CustoVeiculo, UsoVeiculo, Obra, Funcionario, Usuario
+    db, Veiculo, CustoVeiculo, UsoVeiculo
 )
 from auth import admin_required
 

@@ -1,23 +1,17 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
+from flask import render_template, request, redirect, url_for, flash, jsonify, make_response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
-from auth import admin_required, funcionario_required
+from models import db, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RegistroPonto
+from auth import funcionario_required
 from utils.tenant import get_tenant_admin_id
-from utils import calcular_valor_hora_periodo
 from services.funcionario_metrics import (
     calcular_metricas_funcionario,
     calcular_metricas_lista,
     agregar_kpis_geral,
 )
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
-import calendar
-from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 import os
-import json
 import logging
 
 from views import main_bp
@@ -38,10 +32,9 @@ except ImportError:
 def funcionarios():
     # Temporariamente remover decorator para testar
     # @admin_required
-    from models import Departamento, Funcao, HorarioTrabalho, RegistroPonto, Funcionario
+    from models import Departamento, Funcao, HorarioTrabalho, Funcionario
     from sqlalchemy import text
     from werkzeug.utils import secure_filename
-    import os
     
     # ===== PROCESSAR POST PARA CRIAR NOVO FUNCIONÁRIO =====
     if request.method == 'POST':
@@ -287,8 +280,6 @@ def funcionarios():
 # Rota para perfil de funcionário com KPIs calculados
 @main_bp.route('/funcionario_perfil/<int:id>')
 def funcionario_perfil(id):
-    from models import RegistroPonto
-    from pdf_generator import gerar_pdf_funcionario
     
     funcionario = Funcionario.query.get_or_404(id)
     
@@ -318,7 +309,6 @@ def funcionario_perfil(id):
     registros = query.order_by(RegistroPonto.data.desc()).all()  # Ordenar por data decrescente
     
     # Calcular dias úteis CORRETAMENTE (calendário real, não aproximação)
-    from datetime import timedelta
     
     dias_uteis_esperados = 0
     domingos_feriados = 0
@@ -375,7 +365,6 @@ def funcionario_perfil(id):
     
     # Buscar itens do almoxarifado em posse do funcionário (MULTI-TENANT)
     from models import AlmoxarifadoEstoque, AlmoxarifadoItem, AlmoxarifadoMovimento
-    from sqlalchemy import func
     from decimal import Decimal
     
     # IMPORTANTE: Para almoxarifado, usar o admin_id do funcionário (não do usuário logado)
@@ -609,7 +598,6 @@ def funcionario_horario_padrao(funcionario_id):
     fallback=pdf_generation_fallback
 )
 def funcionario_perfil_pdf(id):
-    from models import RegistroPonto
     
     funcionario = Funcionario.query.get_or_404(id)
     

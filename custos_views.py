@@ -1,9 +1,8 @@
 from flask import Blueprint, render_template, jsonify, request, flash, redirect, url_for
 from flask_login import login_required, current_user
-from models import CustoObra, Obra, Funcionario, Vehicle, db
-from sqlalchemy import func, desc, extract, text
+from models import CustoObra, Obra, db
+from sqlalchemy import func, desc
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
-from utils.database import db_transaction  # ✅ OTIMIZAÇÃO MÉDIO PRAZO 3: Transações atômicas
 from datetime import datetime, date, timedelta
 import logging
 

@@ -22,7 +22,7 @@ def editar_rdo_form(rdo_id):
     Exibir formulário de edição para RDO específico
     """
     try:
-        from models import RDO, Obra, RDOServicoSubatividade, SubatividadeMestre, Funcionario, TipoUsuario
+        from models import RDO, Obra, RDOServicoSubatividade, Funcionario, TipoUsuario
         try:
             from utils.auth_utils import get_admin_id_from_user
         except ImportError:
@@ -32,7 +32,6 @@ def editar_rdo_form(rdo_id):
                 elif hasattr(current_user, 'admin_id') and current_user.admin_id:
                     return current_user.admin_id
                 return None
-        from app import db
         
         # Obter admin_id do usuário atual
         admin_id = get_admin_id_from_user()
@@ -98,7 +97,6 @@ def editar_rdo_form(rdo_id):
                 funcionarios_vinculados_por_sub[key][str(func_rdo.funcionario_id)] = func_rdo.horas_trabalhadas
         
         # Buscar lista de todos os funcionários ativos do admin (para seleção por subatividade)
-        from models import Funcionario
         funcionarios_todos_list = [
             {'id': f.id, 'nome': f.nome, 'cargo': f.funcao_ref.nome if f.funcao_ref else 'Operacional'}
             for f in Funcionario.query.filter_by(admin_id=admin_id, ativo=True).order_by(Funcionario.nome).all()
@@ -116,7 +114,6 @@ def editar_rdo_form(rdo_id):
             from utils.tenant import is_v2_active
             if is_v2_active():
                 from models import RDOApontamentoCronograma, TarefaCronograma
-                from app import db as _db
                 # Task #19 — apontamentos seguem a ordem do cronograma.
                 aps = (
                     RDOApontamentoCronograma.query
@@ -143,7 +140,6 @@ def editar_rdo_form(rdo_id):
             logger.warning(f"[WARN] Não foi possível carregar apontamentos V2 RDO {rdo_id}: {e_v2}")
 
         from services.dropdown_service import get_opcoes_valores
-        from models import TipoUsuario
         _admin_id_rdo = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         return render_template('rdo/editar_rdo.html',
                              rdo=rdo,

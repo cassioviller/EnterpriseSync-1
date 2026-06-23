@@ -28,7 +28,7 @@ Os dicionários retornados preservam as chaves usadas pelos templates atuais
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 

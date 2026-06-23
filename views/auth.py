@@ -2,7 +2,7 @@ from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user, login_user, logout_user
 from werkzeug.security import check_password_hash
 from app import limiter
-from models import db, Usuario, TipoUsuario
+from models import Usuario, TipoUsuario
 from sqlalchemy import or_
 import logging
 

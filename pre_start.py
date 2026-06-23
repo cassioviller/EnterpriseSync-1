@@ -3,7 +3,6 @@ SIGE v10.0 - Pre-Start: Execução de migrações antes do Gunicorn
 Chamado por docker-entrypoint-easypanel-auto.sh antes de iniciar a aplicação.
 """
 import sys
-import os
 import logging
 
 logging.basicConfig(

@@ -59,7 +59,7 @@ def gerar_cache(admin_id=None, incluir_inativas=False):
     Returns:
         dict: Estatísticas da geração do cache
     """
-    from app import app, db
+    from app import app
     from models import Funcionario, FotoFacialFuncionario
     from ponto_views import gerar_embedding_otimizado, preload_deepface_model
     
@@ -345,7 +345,7 @@ def atualizar_embedding_funcionario(funcionario_id):
     Returns:
         bool: True se atualizado com sucesso
     """
-    from app import app, db
+    from app import app
     from models import Funcionario, FotoFacialFuncionario
     from ponto_views import gerar_embedding_otimizado, preload_deepface_model
     

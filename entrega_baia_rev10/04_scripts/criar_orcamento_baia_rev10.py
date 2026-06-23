@@ -5,7 +5,7 @@ tenant (catálogo + orçamento). Imprime totais e R$/m².
 """
 from decimal import Decimal
 from app import app, db
-from models import (Usuario, Servico, Insumo, ComposicaoServico, Orcamento,
+from models import (Usuario, Servico, Orcamento,
                     OrcamentoItem)
 from services.catalogo_excel import importar_insumos_xlsx, importar_composicoes_xlsx
 from services.orcamento_view_service import (snapshot_from_servico, recalcular_item,

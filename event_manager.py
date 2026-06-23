@@ -99,8 +99,7 @@ def lancar_custo_material_obra(data: dict, admin_id: int):
     para não conflatar consumo genérico com transferência intencional.
     """
     try:
-        from models import db, AlmoxarifadoMovimento, AlmoxarifadoItem
-        from datetime import datetime
+        from models import AlmoxarifadoMovimento, AlmoxarifadoItem
 
         movimento_id = data.get('movimento_id')
         if not movimento_id:
@@ -294,7 +293,6 @@ def calcular_horas_folha(data: dict, admin_id: int):
     """Handler: Calcular horas para folha quando ponto é registrado (suporta diaristas V2)"""
     try:
         from models import db, RegistroPonto, CustoObra, Funcionario
-        from datetime import datetime
         from decimal import Decimal
         
         registro_id = data.get('registro_id')
@@ -888,7 +886,6 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
     (Obra + IMC + lançamento contábil + cronograma — tudo ou nada).
     """
     from models import db, Proposta, Obra
-    from datetime import datetime
     from sqlalchemy import func
     import secrets
 
@@ -1052,7 +1049,6 @@ def criar_lancamento_folha_pagamento(data: dict, admin_id: int):
     try:
         from models import (db, FolhaPagamento, LancamentoContabil, PartidaContabil, 
                            PlanoContas, Funcionario)
-        from datetime import datetime
         
         logger.info(f"🔔 HANDLER FOLHA_PROCESSADA CHAMADO! admin_id={admin_id}, data={data}")
         
@@ -1237,7 +1233,7 @@ def criar_conta_pagar_alimentacao(data: dict, admin_id: int):
     """Handler: Criar conta a pagar quando lançamento de alimentação for criado"""
     try:
         from models import db, AlimentacaoLancamento, Restaurante, Fornecedor, ContaPagar
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         from decimal import Decimal
         
         lancamento_id = data.get('lancamento_id')

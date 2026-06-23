@@ -5,13 +5,12 @@ Versão limpa e funcional
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, make_response, send_file
 from models import (db, FolhaPagamento, ParametrosLegais, Funcionario, BeneficioFuncionario, 
-                    Adiantamento, CalculoHorasMensal, GestaoCustoPai, GestaoCustoFilho)
-from flask_login import login_required, current_user
-from datetime import datetime, date, timedelta
+                    Adiantamento, GestaoCustoPai, GestaoCustoFilho)
+from flask_login import current_user
+from datetime import datetime, date
 from dateutil.relativedelta import relativedelta  # [OK] OTIMIZAÇÃO: Movido do inline (linha 41)
 from functools import wraps  # [OK] OTIMIZAÇÃO: Movido do inline (linha 20)
 from io import BytesIO
-import calendar
 import logging
 logger = logging.getLogger(__name__)
 from sqlalchemy.orm import joinedload  # [OK] OTIMIZAÇÃO: Eager loading para evitar N+1

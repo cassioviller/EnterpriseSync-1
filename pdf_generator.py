@@ -3,13 +3,12 @@ Gerador de PDF para relatórios do SIGE
 Funcionalidade: Exportar perfil de funcionário com KPIs e controle de ponto
 """
 
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.platypus.flowables import PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.enums import TA_CENTER
 from io import BytesIO
 from datetime import datetime
 import locale

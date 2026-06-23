@@ -1,18 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
+from flask import request, redirect, url_for, flash, jsonify, send_file, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
-from auth import admin_required
+from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Obra, Servico, ServicoObraReal, RDOServicoSubatividade, RegistroPonto
 from utils.tenant import get_tenant_admin_id
-from utils import calcular_valor_hora_periodo
-from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico
-from datetime import datetime, date, timedelta
+from views.helpers import get_admin_id_robusta, get_admin_id_dinamico
+from datetime import datetime, date
 import calendar
-from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import IntegrityError
-import os
-import json
+from sqlalchemy import text
 import logging
 
 from views import main_bp

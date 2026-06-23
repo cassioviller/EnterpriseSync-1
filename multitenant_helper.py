@@ -4,7 +4,6 @@ Usa current_user do Flask-Login diretamente (sem bypass).
 """
 from flask_login import current_user
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 

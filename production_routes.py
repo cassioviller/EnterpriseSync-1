@@ -1,8 +1,8 @@
 """
 Rotas específicas para produção com tratamento robusto de erro
 """
-from flask import Blueprint, render_template, request, jsonify
-from models import db, Funcionario, Obra, Usuario, TipoUsuario
+from flask import Blueprint, render_template, jsonify
+from models import db, Funcionario, Obra
 from sqlalchemy import text
 import logging
 
@@ -327,7 +327,7 @@ def safe_alimentacao():
         
         # Buscar registros de alimentação
         try:
-            from models import RegistroAlimentacao, Funcionario, Obra, Restaurante
+            from models import RegistroAlimentacao, Funcionario, Obra
             registros = RegistroAlimentacao.query.filter_by(admin_id=admin_id).limit(50).all()
             funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
             obras = Obra.query.filter_by(admin_id=admin_id).all()

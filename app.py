@@ -141,7 +141,7 @@ csrf = CSRFProtect(app)
 from flask_wtf.csrf import CSRFError
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
-    from flask import request, redirect, url_for, flash, jsonify
+    from flask import request, redirect, flash, jsonify
     logging.warning(f"[WARN] CSRF error on {request.method} {request.path}: {e.description}")
     if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({"error": "CSRF token missing or invalid. Please refresh the page."}), 400
@@ -151,7 +151,7 @@ def handle_csrf_error(e):
 from werkzeug.exceptions import RequestEntityTooLarge
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):
-    from flask import request, redirect, flash, jsonify, url_for
+    from flask import request, redirect, flash, jsonify
     limit_mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
     msg = (f'Envio muito grande para processar de uma vez (limite {limit_mb} MB). '
            f'Tente importar um período menor — por exemplo, por trimestre ou por mês.')
@@ -337,26 +337,26 @@ logging.info("[OK] Todos os modelos importados do arquivo consolidado")
 
 # Import Event Manager to register integration handlers
 try:
-    import event_manager
+    import event_manager  # noqa: F401  (import com efeito colateral: registra eventos)
     logging.info(f"[OK] Event Manager inicializado - {len(event_manager.EventManager.list_events())} eventos registrados")
 except Exception as e:
     logging.warning(f"[WARN] Event Manager não carregado: {e}")
 
 # Import event handlers to auto-register
 try:
-    import handlers.folha_handlers
+    import handlers.folha_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
     logging.info("[OK] Handler de folha de pagamento registrado")
 except Exception as e:
     logging.warning(f"[WARN] Handler de folha não carregado: {e}")
 
 try:
-    import handlers.propostas_handlers
+    import handlers.propostas_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
     logging.info("[OK] Handler de propostas comerciais registrado")
 except Exception as e:
     logging.warning(f"[WARN] Handler de propostas não carregado: {e}")
 
 try:
-    import handlers.financeiro_handlers
+    import handlers.financeiro_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
     logging.info("[OK] Handler de financeiro registrado")
 except Exception as e:
     logging.warning(f"[WARN] Handler de financeiro não carregado: {e}")
@@ -484,7 +484,6 @@ def load_user(user_id):
 @app.template_global()
 def obter_foto_funcionario(funcionario):
     """Obter foto do funcionário (base64 ou padrão)"""
-    from flask import url_for  # Import necessário para template_global
     if funcionario.foto_base64:
         return funcionario.foto_base64
     elif funcionario.foto:

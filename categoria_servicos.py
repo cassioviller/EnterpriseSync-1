@@ -3,7 +3,7 @@ SISTEMA DE GESTÃO DE CATEGORIAS DE SERVIÇOS - SIGE v8.0
 Módulo para gerenciamento completo de categorias de serviços
 """
 
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask import Blueprint, request, jsonify, redirect, url_for
 from flask_login import current_user
 from models import db, CategoriaServico
 from datetime import datetime

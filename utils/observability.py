@@ -3,11 +3,10 @@ Sistema de Observabilidade Digital Mastery
 Baseado nos princípios de Joris Kuypers: maestria, controle e excelência técnica
 """
 import time
-import json
 import logging
 import traceback
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from functools import wraps
 from collections import defaultdict, deque
 import threading

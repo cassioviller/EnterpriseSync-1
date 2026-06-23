@@ -1,18 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
+from flask import render_template, request, redirect, url_for, flash, jsonify, Response
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
+from models import db, TipoUsuario, Funcionario, Obra
 from auth import admin_required
 from utils.tenant import get_tenant_admin_id
-from utils import calcular_valor_hora_periodo
-from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico
 from datetime import datetime, date, timedelta
-import calendar
-from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-import os
-import json
 import logging
 
 from views import main_bp
@@ -237,8 +230,7 @@ def processar_passageiro_veiculo(passageiro_id, funcionario_id, uso_veiculo_id, 
 @main_bp.route('/veiculos/uso', methods=['POST'])
 @login_required  # [LOCK] MUDANÇA: Funcionários podem registrar uso de veículos
 def novo_uso_veiculo_lista():
-    from forms import UsoVeiculoForm
-    from models import Veiculo, UsoVeiculo, Funcionario, Obra
+    from models import Veiculo, UsoVeiculo
     
     # Obter veiculo_id do form (hidden field)
     veiculo_id = request.form.get('veiculo_id')
@@ -466,7 +458,7 @@ def organizar_passageiros_por_posicao(passageiros):
 @login_required
 def detalhes_uso_veiculo(uso_id):
     """Fornecer dados detalhados de um uso específico via AJAX"""
-    from models import UsoVeiculo, Funcionario, Obra, Veiculo, PassageiroVeiculo
+    from models import UsoVeiculo, PassageiroVeiculo
     
     try:
         # [LOCK] SEGURANÇA MULTITENANT
@@ -594,7 +586,7 @@ def detalhes_uso_veiculo(uso_id):
 def editar_uso_veiculo(uso_id):
     """Editar uso de veículo existente"""
     from forms import UsoVeiculoForm
-    from models import UsoVeiculo, Veiculo, Funcionario, Obra
+    from models import UsoVeiculo, Veiculo, Funcionario
     
     try:
         # [LOCK] SEGURANÇA MULTITENANT
@@ -774,7 +766,6 @@ def deletar_custo_veiculo(custo_id):
 @main_bp.route('/veiculos/custo', methods=['POST'])
 @login_required  # [LOCK] MUDANÇA: Funcionários podem registrar custos de veículos
 def novo_custo_veiculo_lista():
-    from forms import CustoVeiculoForm
     from models import Veiculo, CustoVeiculo
     
     # Obter veiculo_id do form (hidden field)
@@ -963,7 +954,6 @@ def dashboard_veiculo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
-        from sqlalchemy import text
         from sqlalchemy import func, extract
         
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
@@ -1070,7 +1060,7 @@ def historico_veiculo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
-        from sqlalchemy import text, Funcionario, Obra
+        from sqlalchemy import Funcionario, Obra
         
         veiculo = Veiculo.query.filter_by(id=id, admin_id=admin_id).first_or_404()
         
@@ -1228,7 +1218,6 @@ def exportar_dados_veiculo(id):
     try:
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
-        from sqlalchemy import text
         import io
         import csv
         from flask import Response
@@ -1313,7 +1302,7 @@ def lancamentos_veiculos():
             return redirect(url_for('auth.login'))
             
         from models import Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
-        from sqlalchemy import func, desc, or_, and_
+        from sqlalchemy import desc
         
         # Parâmetros de filtro
         filtros = {
@@ -1495,7 +1484,6 @@ def relatorios_veiculos():
             return redirect(url_for('auth.login'))
             
         from models import Veiculo, UsoVeiculo, CustoVeiculo
-        from sqlalchemy import func, extract
         
         # Período do relatório (últimos 3 meses por padrão)
         data_inicio = request.args.get('data_inicio')
@@ -1598,10 +1586,9 @@ def exportar_relatorio_veiculos():
         admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
         from models import Veiculo, UsoVeiculo, CustoVeiculo
         from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.lib.pagesizes import A4
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch
         import io
         
         # Parâmetros
@@ -1923,7 +1910,7 @@ def novo_custo_veiculo_form(veiculo_id):
             return redirect(url_for('auth.login'))
         
         # Buscar veículo
-        from models import Veiculo, Funcionario, Obra, UsoVeiculo
+        from models import Veiculo, Obra, UsoVeiculo
         veiculo = Veiculo.query.filter_by(id=veiculo_id, admin_id=tenant_admin_id).first()
         if not veiculo:
             flash('Veículo não encontrado.', 'error')

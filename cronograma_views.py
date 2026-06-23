@@ -5,13 +5,13 @@ Rotas JSON para CRUD de tarefas + recálculo automático de datas.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_file, url_for, flash
-from flask_login import current_user, login_required
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file, url_for, flash
+from flask_login import login_required
 
 from models import (
-    db, Obra, TarefaCronograma, CalendarioEmpresa, RDOApontamentoCronograma,
+    db, Obra, TarefaCronograma, RDOApontamentoCronograma,
     CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
     RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario,
     ComposicaoServico, SubatividadeMaoObra,
@@ -2265,7 +2265,7 @@ def api_produtividade():
     data_inicio_str = request.args.get('data_inicio', '')
     data_fim_str = request.args.get('data_fim', '')
 
-    from datetime import date as _date, datetime as _dt
+    from datetime import datetime as _dt
 
     try:
         data_inicio = _dt.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else None

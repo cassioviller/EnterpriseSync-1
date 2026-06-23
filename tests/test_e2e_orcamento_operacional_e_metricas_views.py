@@ -17,7 +17,6 @@ Testes E2E HTTP cobrindo as 3 features auditadas via Flask test_client:
 import os
 import sys
 from datetime import date, datetime
-from decimal import Decimal
 
 import pytest
 

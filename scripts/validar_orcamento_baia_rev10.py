@@ -11,8 +11,8 @@ Fonte dos valores: leitura direta da planilha (data_only) — ver scripts de
 extração. Não altera a planilha.
 """
 from decimal import Decimal
-from app import app, db
-from models import Servico, Insumo, ComposicaoServico, PrecoBaseInsumo, Usuario
+from app import app
+from models import Servico, ComposicaoServico, PrecoBaseInsumo, Usuario
 
 # cod, unidade, qtd, H(mat_tot planilha), I(mo_tot planilha), J(total planilha), obs/flag
 ITENS = [

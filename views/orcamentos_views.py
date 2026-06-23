@@ -7,7 +7,7 @@ Apenas usuários administradores podem ver/editar orçamentos.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -20,7 +20,7 @@ from auth import admin_required
 from models import (
     Orcamento, OrcamentoItem, Servico, Cliente, Proposta, PropostaItem,
     PropostaHistorico, ConfiguracaoEmpresa, CronogramaTemplate,
-    PropostaTemplate, PropostaClausula, TarefaCronograma,
+    PropostaTemplate, TarefaCronograma,
 )
 from services.orcamento_view_service import (
     snapshot_from_servico, recalcular_item, recalcular_orcamento,

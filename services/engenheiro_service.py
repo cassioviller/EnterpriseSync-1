@@ -17,7 +17,7 @@ Mantém os templates PDF agnósticos: todos consomem `engenheiro_dados`,
 um dict simples com nome/crea/email/telefone/endereco/website e a
 imagem opcional `assinatura_base64`.
 """
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 
 def _vazio(d: Dict[str, Any]) -> bool:

@@ -11,7 +11,6 @@ e totais a partir do snapshot persistido.
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
 
 
 def _d(v) -> Decimal:

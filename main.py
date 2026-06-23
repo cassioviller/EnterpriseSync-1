@@ -26,7 +26,7 @@ try:
 except ImportError as e:
     logger.warning(f"[WARN] Sistema CRUD RDO não encontrado: {e}")
 
-from flask import flash, redirect, url_for, render_template_string
+from flask import redirect, url_for, render_template_string
 import traceback
 
 # Configurar logging detalhado

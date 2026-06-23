@@ -4,11 +4,10 @@
 # Services modernos com formulários unificados e design consistente
 # Design visual idêntico aos módulos RDO/Obras
 
-from datetime import datetime, date, time, timedelta
-from sqlalchemy import func, and_, or_, desc
+from datetime import datetime
+from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
-from flask import flash
-from models import db, Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra, Usuario
+from models import db, Veiculo, UsoVeiculo, CustoVeiculo, Funcionario, Obra
 from utils.circuit_breaker import circuit_breaker
 from decimal import Decimal
 import logging

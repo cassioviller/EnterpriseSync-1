@@ -14,8 +14,7 @@ Cenários cobertos:
 import os
 import sys
 import logging
-from datetime import date, datetime, timedelta
-from decimal import Decimal
+from datetime import date, datetime
 
 import pytest
 
@@ -25,8 +24,7 @@ from app import app, db
 from models import (
     Usuario, TipoUsuario, Funcionario, Obra, Cliente,
     RDO, RDOMaoObra, RDOCustoDiario, RDOServicoSubatividade,
-    Servico, ComposicaoServico, Insumo, Funcao,
-    ObraOrcamentoOperacional, ObraOrcamentoOperacionalItem,
+    Servico, ComposicaoServico, Insumo, ObraOrcamentoOperacional, ObraOrcamentoOperacionalItem,
     ObraOrcamentoOperacionalItemVersao,
 )
 from werkzeug.security import generate_password_hash

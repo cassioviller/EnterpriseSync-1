@@ -12,19 +12,16 @@ import secrets
 from datetime import date, datetime
 
 from flask import (
-    Blueprint, abort, current_app, flash, jsonify, redirect,
+    Blueprint, abort, current_app, flash, redirect,
     render_template, request, url_for,
 )
-from flask_login import current_user, login_required
+from flask_login import login_required
 from werkzeug.utils import secure_filename
 
 from models import (
-    db, Obra, TarefaCronograma, PedidoCompra, PedidoCompraItem,
-    MedicaoObra, Fornecedor, ConfiguracaoEmpresa, RDO,
+    db, Obra, TarefaCronograma, PedidoCompra, MedicaoObra, ConfiguracaoEmpresa, RDO,
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
-    MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente,
-    MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao,
-    RelatorioCompraMapa,
+    MapaConcorrencia, OpcaoConcorrencia, MapaConcorrenciaV2, RelatorioCompraMapa,
 )
 
 logger = logging.getLogger(__name__)

@@ -1,18 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
-from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
-from auth import admin_required
+from flask import render_template, request, redirect, url_for
+from flask_login import current_user
+from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO
 from utils.tenant import get_tenant_admin_id
-from utils import calcular_valor_hora_periodo
-from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, _calcular_funcionarios_departamento, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, _calcular_serie_temporal_custos, get_admin_id_robusta, get_admin_id_dinamico
-from datetime import datetime, date, timedelta
+from views.helpers import safe_db_operation, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, _calcular_serie_temporal_custos
+from datetime import datetime, date
 import calendar
-from sqlalchemy import func, desc, or_, and_, text, inspect
-from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import IntegrityError
-import os
-import json
+from sqlalchemy import text
 import logging
 
 from views import main_bp
@@ -297,7 +290,7 @@ def dashboard():
             total_veiculos = 0
         
         # ========== MÉTRICAS DE PROPOSTAS DINÂMICAS ==========
-        from models import Proposta, PropostaTemplate, PropostaHistorico
+        from models import Proposta, PropostaTemplate
         # datetime já importado no topo do arquivo
         
         try:

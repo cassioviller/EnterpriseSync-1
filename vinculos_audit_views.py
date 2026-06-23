@@ -26,7 +26,6 @@ from models import (
     Funcionario,
     RDO,
     Obra,
-    Servico,
 )
 
 logger = logging.getLogger(__name__)

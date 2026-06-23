@@ -5,7 +5,7 @@
 
 from datetime import date, datetime, time, timedelta
 from app import db
-from models import RegistroPonto, Funcionario, Obra, ConfiguracaoHorario, FuncionarioObrasPonto
+from models import RegistroPonto, Funcionario, ConfiguracaoHorario, FuncionarioObrasPonto
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 import logging
 

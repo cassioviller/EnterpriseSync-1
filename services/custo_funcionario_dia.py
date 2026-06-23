@@ -212,7 +212,7 @@ def gravar_custo_funcionario_rdo(rdo, admin_id: int) -> int:
     """
     try:
         from app import db
-        from models import RDOMaoObra, Funcionario, RDOCustoDiario, RDO
+        from models import RDOMaoObra, Funcionario, RDO
 
         linhas_rdo = RDOMaoObra.query.filter_by(rdo_id=rdo.id).all()
         if not linhas_rdo:

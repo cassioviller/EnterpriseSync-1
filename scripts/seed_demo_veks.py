@@ -17,7 +17,6 @@ from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import main  # registra app + modelos
 from main import app
 from models import db, Usuario, Funcionario, Fornecedor, Obra, BancoEmpresa
 from services.importacao_excel import _obter_ou_criar_cliente_placeholder, _normalizar

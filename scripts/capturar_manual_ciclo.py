@@ -1,5 +1,5 @@
 """Captura screenshots de cada tela do ciclo SIGE para o manual visual."""
-import os, time
+import time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 

@@ -10,9 +10,8 @@ import logging
 logger = logging.getLogger(__name__)
 from models import (
     db, PlanoContas, CentroCustoContabil, LancamentoContabil, PartidaContabil, 
-    BalanceteMensal, DREMensal, BalancoPatrimonial, FluxoCaixaContabil, 
-    ProvisaoMensal, SpedContabil, AuditoriaContabil, Proposta, 
-    NotaFiscal, MovimentacaoEstoque, FolhaPagamento
+    BalanceteMensal, AuditoriaContabil, Proposta, 
+    NotaFiscal, FolhaPagamento
 )
 
 # ===============================================================
@@ -711,7 +710,6 @@ def obter_dados_balancete(admin_id, mes, ano):
     Returns:
         dict: Dicionário com contas e totais
     """
-    from sqlalchemy import func
     
     # Definir período
     primeiro_dia = date(ano, mes, 1)
@@ -821,7 +819,7 @@ def gerar_balancete_pdf(admin_id, mes, ano):
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER
     from io import BytesIO
     from datetime import datetime
     
@@ -1081,7 +1079,7 @@ def gerar_dre_pdf(admin_id, mes, ano):
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    from reportlab.lib.enums import TA_CENTER
     from io import BytesIO
     from datetime import datetime
     
@@ -1263,7 +1261,7 @@ def gerar_dre_excel(admin_id, mes, ano):
         BytesIO: Buffer com o arquivo Excel
     """
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from openpyxl.styles import Font, Alignment, PatternFill
     from io import BytesIO
     from datetime import datetime
     

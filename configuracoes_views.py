@@ -9,7 +9,7 @@ from models import (
     Funcionario, EngenheiroResponsavel,
 )
 from decorators import admin_required
-from datetime import datetime, time
+from datetime import datetime
 import logging
 logger = logging.getLogger(__name__)
 

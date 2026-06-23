@@ -1,7 +1,7 @@
 """
 Error handlers para o SIGE - Sistema robusto de tratamento de erros em produção
 """
-from flask import render_template, jsonify, request
+from flask import render_template, request
 import logging
 import traceback
 from datetime import datetime

@@ -4,7 +4,7 @@ Engine de alertas para Entregas / Terceiros.
 Avalia tarefas de cronograma com responsavel='terceiros' (entregas, subempreitadas)
 e produz mensagens contextuais por urgencia para o Painel Estrategico da Obra.
 """
-from datetime import date, timedelta
+from datetime import date
 import logging
 
 from app import db

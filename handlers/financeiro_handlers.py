@@ -4,7 +4,7 @@ Integração automática: Financeiro → Contabilidade (Pagamento de Notas Fisca
 """
 
 from event_manager import event_handler
-from models import db, LancamentoContabil, PartidaContabil, NotaFiscal, Fornecedor
+from models import db, LancamentoContabil, PartidaContabil
 from decimal import Decimal
 from datetime import date, datetime
 import logging

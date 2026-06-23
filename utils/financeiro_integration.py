@@ -5,7 +5,7 @@ Chamada automaticamente pelos módulos operacionais (Alimentação, Transporte, 
 """
 
 import logging
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)

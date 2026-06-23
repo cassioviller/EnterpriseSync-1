@@ -37,8 +37,7 @@ import os
 import sys
 import json
 import secrets
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -48,8 +47,7 @@ from app import app, db
 from models import (
     Usuario, TipoUsuario,
     Cliente,
-    Insumo, ComposicaoServico,
-    Servico,
+    Insumo, Servico,
     CronogramaTemplate, CronogramaTemplateItem,
     SubatividadeMestre,
     Proposta, PropostaItem,

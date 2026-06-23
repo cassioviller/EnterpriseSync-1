@@ -49,8 +49,7 @@ from werkzeug.security import generate_password_hash
 from app import app, db
 from models import (
     Usuario, TipoUsuario,
-    Fornecedor, Cliente, Obra, PedidoCompra, PedidoCompraItem,
-    AlmoxarifadoMovimento, AlmoxarifadoEstoque,
+    Fornecedor, Cliente, Obra, PedidoCompra, AlmoxarifadoMovimento, AlmoxarifadoEstoque,
     GestaoCustoPai, GestaoCustoFilho,
     LancamentoContabil, PartidaContabil, PlanoContas,
 )

@@ -8,7 +8,7 @@ import time
 import json
 from enum import Enum
 from typing import List, Dict, Any, Callable, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from app import db
 from sqlalchemy import text
 import logging

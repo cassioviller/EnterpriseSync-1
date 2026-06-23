@@ -1,9 +1,12 @@
 """
-Task #152 — Playwright e2e: fluxo COMPLETO do "RDO unificado" (`/rdo/novo`)
-no DOM real do browser, cobrindo os 3 tipos de responsável e a persistência
-após salvar + reabrir para edição.
+Playwright e2e: fluxo COMPLETO do "RDO unificado" no DOM real do browser —
+CRIAÇÃO (`/rdo/novo`) + EDIÇÃO e re-salvamento (`/rdo/<id>/editar`).
 
-Cobre o "Done looks like" da Task #152:
+Cobre os 3 tipos de responsável (Empresa / Subempreitada / Terceiros) e,
+além da criação, a edição que re-grava o RDO via
+`rdo_editar_sistema.salvar_edicao_rdo` (`POST /rdo/editar/<id>`).
+
+── FASE CRIAÇÃO (Task #152) ──────────────────────────────────────────────
   P1. /rdo/novo?obra_id=<obra> renderiza os 3 cartões data-tarefa-id
       esperados (Empresa / Subempreitada / Terceiros).
   P2. Cada cartão exibe o badge correto do responsável
@@ -19,8 +22,20 @@ Cobre o "Done looks like" da Task #152:
       data_entrega_real + percentual_realizado=100 na TarefaCronograma.
   P8. Empresa: digitar quantidade no input + submeter cria 1
       RDOApontamentoCronograma com a quantidade correta.
-  P9. Reabrir `/rdo/<rdo_id>/editar` retorna 200 (persistência ao
-      reabrir a edição do RDO recém-criado não quebra).
+  P9. Reabrir `/rdo/<rdo_id>/editar` retorna 200 e renderiza no DOM os
+      dados salvos (qty empresa, checkbox terceiros, badge subempreitada).
+
+── FASE EDIÇÃO (re-salvamento via /rdo/editar/<id>) ──────────────────────
+  P10. Editar observação (#observacoes_gerais) e clima (#clima_geral) e
+       re-salvar persiste em RDO.comentario_geral / RDO.clima_geral.
+  P11. MÃO DE OBRA — regressão do bug b98e61b: alocar funcionário à tarefa
+       Empresa do cronograma (campo cron_tarefa_<tid>_func_<fid>_horas)
+       persiste RDOMaoObra com `tarefa_cronograma_id` PRESERVADO
+       (subatividade_id=None). Sem o fix a edição descartava o vínculo.
+  P12. EQUIPAMENTO (equip_*[]) é gravado em RDOEquipamento na edição.
+  P13. OCORRÊNCIA (ocorr_*[]) é gravada em RDOOcorrencia na edição.
+  P14. A edição NÃO apaga os apontamentos de cronograma (empresa) já
+       gravados na criação (RDOApontamentoCronograma preservado).
 
 Pré-requisito: o servidor Flask precisa estar rodando em
 http://localhost:5000 (workflow "Start application").
@@ -30,7 +45,6 @@ Uso direto:
 """
 import os
 import sys
-import re
 import logging
 from datetime import date, datetime
 
@@ -43,7 +57,9 @@ from werkzeug.security import generate_password_hash
 from models import (
     Usuario, TipoUsuario, Obra, Cliente, TarefaCronograma,
     RDO, RDOApontamentoCronograma, RDOSubempreitadaApontamento,
-    Subempreiteiro,
+    Subempreiteiro, Funcionario, RDOMaoObra, RDOEquipamento,
+    RDOOcorrencia, RDOCustoDiario, RDOServicoSubatividade, CustoObra,
+    GestaoCustoFilho,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -113,29 +129,68 @@ def seed_dados():
             responsavel='terceiros', is_cliente=False,
         )
         db.session.add_all([t_emp, t_sub, t_terc])
+        db.session.flush()
+
+        # Funcionário para testar a alocação de MÃO DE OBRA na edição
+        # (regressão do bug b98e61b — tarefa_cronograma_id preservado).
+        func = Funcionario(
+            admin_id=admin_id,
+            codigo=f'F{suf[:6]}',
+            nome=f'Pedreiro T152 {suf}',
+            cpf=suf[:11],
+            data_admissao=date.today(),
+            tipo_remuneracao='salario',
+            salario=2000.0,
+            ativo=True,
+        )
+        db.session.add(func)
         db.session.commit()
 
         return dict(
             email=email, admin_id=admin_id,
             sub_id=sub.id, cli_id=cli.id, obra_id=obra.id,
             t_emp_id=t_emp.id, t_sub_id=t_sub.id, t_terc_id=t_terc.id,
+            func_id=func.id,
         )
 
 
 def cleanup(ctx):
     with app.app_context():
-        # apaga apontamentos / RDOs criados pelo fluxo
+        # apaga apontamentos / RDOs criados pelo fluxo. Cada delete em seu
+        # próprio try p/ que uma FK remanescente não aborte a limpeza inteira.
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=ctx['obra_id']).all()]
         for rid in rdo_ids:
-            RDOApontamentoCronograma.query.filter_by(rdo_id=rid).delete()
-            RDOSubempreitadaApontamento.query.filter_by(rdo_id=rid).delete()
-        RDO.query.filter_by(obra_id=ctx['obra_id']).delete()
-        TarefaCronograma.query.filter_by(obra_id=ctx['obra_id']).delete()
-        Obra.query.filter_by(id=ctx['obra_id']).delete()
-        Cliente.query.filter_by(id=ctx['cli_id']).delete()
-        Subempreiteiro.query.filter_by(id=ctx['sub_id']).delete()
-        Usuario.query.filter_by(id=ctx['admin_id']).delete()
-        db.session.commit()
+            for model in (RDOApontamentoCronograma, RDOSubempreitadaApontamento,
+                          RDOMaoObra, RDOEquipamento, RDOOcorrencia,
+                          RDOCustoDiario, RDOServicoSubatividade, CustoObra):
+                try:
+                    model.query.filter_by(rdo_id=rid).delete()
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        # Custos gerados pela edição (GestaoCustoFilho) referenciam a obra —
+        # precisam sair antes do RDO/Obra.
+        try:
+            GestaoCustoFilho.query.filter_by(obra_id=ctx['obra_id']).delete()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        for model, filt in (
+            (RDO, {'obra_id': ctx['obra_id']}),
+            (TarefaCronograma, {'obra_id': ctx['obra_id']}),
+            (Funcionario, {'id': ctx.get('func_id')}),
+            (Obra, {'id': ctx['obra_id']}),
+            (Cliente, {'id': ctx['cli_id']}),
+            (Subempreiteiro, {'id': ctx['sub_id']}),
+            (Usuario, {'id': ctx['admin_id']}),
+        ):
+            if None in filt.values():
+                continue
+            try:
+                model.query.filter_by(**filt).delete()
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -532,6 +587,164 @@ def main():
                     False,
                     f'P9b Subempreitada NÃO persistida na edição: {e}',
                 )
+
+            # ════════════════════════════════════════════════════════════
+            # FASE EDIÇÃO (P10–P14): editar o RDO recém-criado e RE-SALVAR.
+            # O form #formEditarRDO posta em /rdo/editar/<id>
+            # (rdo_editar_sistema.salvar_edicao_rdo). Exercita observação,
+            # clima, MÃO DE OBRA (regressão b98e61b), equipamento e
+            # ocorrência num único re-salvamento (o handler faz
+            # delete-then-reinsert dessas seções a cada submit).
+            # ════════════════════════════════════════════════════════════
+            NEW_OBS = 'RDO EDITADO via Playwright (obs unificada #152-edit)'
+            HORAS_FUNC = 8.0
+            EQUIP_NOME = 'Betoneira CB-400'
+            OCORR_DESC = 'Chuva forte interrompeu concretagem (edit pw)'
+
+            # Recarrega a página de edição p/ estado fresco do form.
+            page.goto(edit_url, wait_until='networkidle')
+            page.wait_for_selector('#formEditarRDO', timeout=10000)
+
+            # (a) Observação — campo real do form
+            page.fill('textarea[name="observacoes_gerais"]', NEW_OBS)
+
+            # (b) Clima — seleciona a 1ª opção real do select (valores vêm
+            #     dinâmicos de get_opcoes_valores). Captura o valor esperado.
+            clima_expected = page.evaluate(
+                """() => {
+                    const sel = document.querySelector(
+                        'select[name="clima_geral"], #clima_geral');
+                    if (!sel) return null;
+                    const opt = Array.from(sel.options)
+                        .find(o => o.value && o.value.trim());
+                    if (!opt) return '';
+                    sel.value = opt.value;
+                    sel.dispatchEvent(new Event('change', {bubbles:true}));
+                    return opt.value;
+                }"""
+            )
+            log.info(f'clima escolhido na edição: {clima_expected!r}')
+
+            # (c) MÃO DE OBRA (regressão b98e61b): injeta o hidden de equipe
+            #     do cronograma cron_tarefa_<emp>_func_<func>_horas (espelha
+            #     o que o modal de equipe V2 gravaria). O handler precisa
+            #     persistir RDOMaoObra com tarefa_cronograma_id setado.
+            page.evaluate(
+                """({tid, fid, horas}) => {
+                    const f = document.getElementById('formEditarRDO');
+                    const add = (name, val) => {
+                        const h = document.createElement('input');
+                        h.type='hidden'; h.name=name; h.value=val;
+                        f.appendChild(h);
+                    };
+                    add(`cron_tarefa_${tid}_func_${fid}_horas`, horas);
+                    add(`funcao_${fid}`, 'Pedreiro');
+                }""",
+                {'tid': ctx['t_emp_id'], 'fid': ctx['func_id'],
+                 'horas': HORAS_FUNC},
+            )
+
+            # (d) EQUIPAMENTO — campos repetíveis equip_*[]
+            page.evaluate(
+                """({nome}) => {
+                    const f = document.getElementById('formEditarRDO');
+                    const add = (name, val) => {
+                        const h=document.createElement('input');
+                        h.type='hidden'; h.name=name; h.value=val;
+                        f.appendChild(h);
+                    };
+                    add('equip_nome[]', nome);
+                    add('equip_quantidade[]', '2');
+                    add('equip_horas_uso[]', '6');
+                    add('equip_estado[]', 'Bom');
+                }""",
+                {'nome': EQUIP_NOME},
+            )
+
+            # (e) OCORRÊNCIA — campos repetíveis ocorr_*[]
+            page.evaluate(
+                """({desc}) => {
+                    const f = document.getElementById('formEditarRDO');
+                    const add = (name, val) => {
+                        const h=document.createElement('input');
+                        h.type='hidden'; h.name=name; h.value=val;
+                        f.appendChild(h);
+                    };
+                    add('ocorr_tipo[]', 'Clima');
+                    add('ocorr_severidade[]', 'Media');
+                    add('ocorr_descricao[]', desc);
+                    add('ocorr_status[]', 'Pendente');
+                }""",
+                {'desc': OCORR_DESC},
+            )
+
+            # Submeter via form.submit() — bypassa o listener que faz AJAX de
+            # qty (não estamos editando quantidade do cronograma aqui).
+            with page.expect_navigation(wait_until='networkidle',
+                                        timeout=20000):
+                page.evaluate(
+                    "document.getElementById('formEditarRDO').submit()"
+                )
+            _ok(f'/editar/{rdo_id}' not in page.url
+                and f'/rdo/{rdo_id}/editar' not in page.url,
+                f'P10 POST edição redirecionou sem erro (url={page.url})')
+
+            # ── Verificações no DB (edição) ─────────────────────────────
+            with app.app_context():
+                db.session.expire_all()
+                rdo_e = RDO.query.get(rdo_id)
+
+                _ok(rdo_e is not None
+                    and (rdo_e.comentario_geral or '') == NEW_OBS,
+                    f'P10 observação editada persistida '
+                    f'(comentario_geral={getattr(rdo_e, "comentario_geral", None)!r})')
+
+                if clima_expected:
+                    _ok((rdo_e.clima_geral or '') == clima_expected,
+                        f'P10b clima editado persistido '
+                        f'(clima_geral={rdo_e.clima_geral!r}, '
+                        f'esperado={clima_expected!r})')
+
+                # P11 — MÃO DE OBRA: regressão b98e61b
+                mo = RDOMaoObra.query.filter_by(
+                    rdo_id=rdo_id, funcionario_id=ctx['func_id']).all()
+                mo_cron = [m for m in mo
+                           if m.tarefa_cronograma_id == ctx['t_emp_id']]
+                _ok(len(mo_cron) == 1,
+                    f'P11 RDOMaoObra c/ tarefa_cronograma_id={ctx["t_emp_id"]} '
+                    f'preservado (n_total={len(mo)}, n_cron={len(mo_cron)}) '
+                    f'— regressão b98e61b')
+                if mo_cron:
+                    r = mo_cron[0]
+                    _ok(r.subatividade_id is None
+                        and abs(float(r.horas_trabalhadas or 0)
+                                - HORAS_FUNC) < 1e-3,
+                        f'P11b RDOMaoObra correto '
+                        f'(subatividade_id={r.subatividade_id}, '
+                        f'horas={r.horas_trabalhadas}, esperado={HORAS_FUNC})')
+
+                # P12 — equipamento
+                eqs = RDOEquipamento.query.filter_by(rdo_id=rdo_id).all()
+                _ok(any((e.nome_equipamento or '') == EQUIP_NOME
+                        and int(e.quantidade or 0) == 2 for e in eqs),
+                    f'P12 RDOEquipamento persistido na edição '
+                    f'(n={len(eqs)}, nomes={[e.nome_equipamento for e in eqs]})')
+
+                # P13 — ocorrência
+                ocs = RDOOcorrencia.query.filter_by(rdo_id=rdo_id).all()
+                _ok(any(OCORR_DESC in (o.descricao_ocorrencia or '')
+                        for o in ocs),
+                    f'P13 RDOOcorrencia persistida na edição (n={len(ocs)})')
+
+                # P14 — apontamentos de cronograma (empresa) preservados
+                aps_emp2 = RDOApontamentoCronograma.query.filter_by(
+                    rdo_id=rdo_id,
+                    tarefa_cronograma_id=ctx['t_emp_id']).all()
+                qtd2 = sum(float(a.quantidade_executada_dia or 0)
+                           for a in aps_emp2)
+                _ok(len(aps_emp2) >= 1 and abs(qtd2 - QTD_EMP) < 1e-3,
+                    f'P14 apontamento cronograma preservado após edição '
+                    f'(n={len(aps_emp2)}, qtd={qtd2}, esperado={QTD_EMP})')
 
             browser.close()
     finally:

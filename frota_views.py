@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required, current_user
+from flask_login import login_required
 from models import Veiculo as FrotaVeiculo, UsoVeiculo as FrotaUtilizacao, CustoVeiculo as FrotaDespesa, Funcionario, Obra
 from app import db
 from utils.tenant import get_tenant_admin_id, is_v2_active

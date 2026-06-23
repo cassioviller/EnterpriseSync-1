@@ -1,13 +1,13 @@
 import logging
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for, make_response
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app import db
 from models import (
-    Obra, MedicaoObra, MedicaoObraItem, ItemMedicaoComercial,
+    Obra, MedicaoObra, ItemMedicaoComercial,
     ItemMedicaoCronogramaTarefa, TarefaCronograma, ConfiguracaoEmpresa,
     ContaReceber,
 )

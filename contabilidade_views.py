@@ -5,20 +5,18 @@ Views para o Módulo 7 - Sistema Contábil Completo
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file
 from models import (SpedContabil, DREMensal, BalancoPatrimonial, LancamentoContabil, PlanoContas, 
-                    BalanceteMensal, AuditoriaContabil, TipoUsuario, PartidaContabil, CentroCustoContabil, 
-                    Obra, db)  # ✅ OTIMIZAÇÃO: Movido Obra do inline (linhas 1078, 1170)
-from flask_login import login_required, current_user
+                    AuditoriaContabil, TipoUsuario, PartidaContabil, CentroCustoContabil, 
+                    Obra)  # ✅ OTIMIZAÇÃO: Movido Obra do inline (linhas 1078, 1170)
+from flask_login import current_user
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from functools import wraps  # ✅ OTIMIZAÇÃO: Movido do inline (linha 33)
-from sqlalchemy import func  # ✅ OTIMIZAÇÃO: Movido do inline (linha 514)
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 import calendar
 # Imports de contabilidade_utils consolidados (antes espalhados em várias linhas)
 from contabilidade_utils import (
-    calcular_saldo_conta, criar_plano_contas_padrao, get_next_lancamento_numero,
-    gerar_razao_conta, calcular_dre_mensal, gerar_balancete_pdf, gerar_balancete_excel,
+    calcular_saldo_conta, criar_plano_contas_padrao, gerar_razao_conta, calcular_dre_mensal, gerar_balancete_pdf, gerar_balancete_excel,
     gerar_dre_pdf, gerar_dre_excel, gerar_balanco_patrimonial, executar_auditoria_automatica
 )
 
@@ -55,7 +53,6 @@ def admin_required(f):
 @admin_required
 def dashboard_contabil():
     """Dashboard principal da contabilidade"""
-    from contabilidade_utils import calcular_saldo_conta
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -97,7 +94,6 @@ def dashboard_contabil():
 @admin_required
 def plano_de_contas():
     """Exibir plano de contas"""
-    from contabilidade_utils import criar_plano_contas_padrao
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -520,7 +516,6 @@ def estornar_lancamento(id):
 @admin_required
 def balancete():
     """Gerar balancete de verificação mensal com drill-down"""
-    from sqlalchemy import func
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -661,7 +656,6 @@ def balancete():
 @admin_required
 def razao(conta_codigo):
     """Razão Analítico - Detailed ledger for a specific account"""
-    from contabilidade_utils import gerar_razao_conta
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -697,7 +691,6 @@ def razao(conta_codigo):
 @admin_required
 def dre():
     """Demonstração do Resultado do Exercício - Estrutura Completa Brasileira"""
-    from contabilidade_utils import calcular_dre_mensal
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -844,8 +837,6 @@ def dre():
 @admin_required
 def balancete_pdf():
     """Exportar Balancete em PDF"""
-    from flask import send_file
-    from contabilidade_utils import gerar_balancete_pdf
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -881,8 +872,6 @@ def balancete_pdf():
 @admin_required
 def balancete_excel():
     """Exportar Balancete em Excel"""
-    from flask import send_file
-    from contabilidade_utils import gerar_balancete_excel
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -918,8 +907,6 @@ def balancete_excel():
 @admin_required
 def dre_pdf():
     """Exportar DRE em PDF"""
-    from flask import send_file
-    from contabilidade_utils import gerar_dre_pdf
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -955,8 +942,6 @@ def dre_pdf():
 @admin_required
 def dre_excel():
     """Exportar DRE em Excel"""
-    from flask import send_file
-    from contabilidade_utils import gerar_dre_excel
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -992,7 +977,6 @@ def dre_excel():
 @admin_required
 def balanco_patrimonial():
     """Balanço Patrimonial com cálculo dinâmico baseado em lançamentos"""
-    from contabilidade_utils import gerar_balanco_patrimonial
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -1012,7 +996,6 @@ def balanco_patrimonial():
 @admin_required
 def auditoria_contabil():
     """Sistema de auditoria contábil"""
-    from contabilidade_utils import executar_auditoria_automatica
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -1084,7 +1067,6 @@ def centros_custo():
 @admin_required
 def criar_centro_custo():
     """Criar novo Centro de Custo"""
-    from models import Obra
     
     admin_id = get_admin_id()
     if not admin_id:
@@ -1176,7 +1158,6 @@ def criar_centro_custo():
 @admin_required
 def editar_centro_custo(id):
     """Editar Centro de Custo existente"""
-    from models import Obra
     
     admin_id = get_admin_id()
     if not admin_id:

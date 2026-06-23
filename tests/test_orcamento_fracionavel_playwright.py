@@ -187,7 +187,6 @@ def cleanup(ctx: dict | None) -> None:
 
 def _fmtBR(n: float, decimals: int = 2) -> str:
     """Formata número em pt-BR para comparação (ex: 11,35)."""
-    import locale
     s = f'{n:.{decimals}f}'.replace('.', ',')
     return s
 

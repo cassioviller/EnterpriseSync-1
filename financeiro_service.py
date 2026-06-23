@@ -4,13 +4,11 @@ Lógica de negócio centralizada para operações financeiras
 """
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
-from sqlalchemy import and_, or_, func
+from typing import List, Dict
+from sqlalchemy import and_, func
 from app import db
 from models import (
-    ContaPagar, ContaReceber, BancoEmpresa, PlanoContas,
-    LancamentoContabil, PartidaContabil, Fornecedor, Obra,
-    FluxoCaixaContabil, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
+    ContaPagar, ContaReceber, BancoEmpresa, LancamentoContabil, PartidaContabil, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
 )
 import logging
 

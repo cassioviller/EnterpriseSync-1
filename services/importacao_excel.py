@@ -654,7 +654,7 @@ class ImportacaoDiarias:
     def importar(self, rows, admin_id):
         from models import db, Funcionario, Obra
         from utils.financeiro_integration import registrar_custo_automatico
-        import random, string
+        import random
         criados, erros = 0, []
 
         # Cache de obras e funcionários criados nesta importação para reusar IDs
@@ -881,7 +881,7 @@ class ImportacaoAlimentacao:
         return validos, erros
 
     def importar(self, rows, admin_id):
-        from models import db, AlimentacaoLancamento, Funcionario
+        from models import db, AlimentacaoLancamento
         from sqlalchemy import text
         criados, erros = 0, []
 

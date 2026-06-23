@@ -14,12 +14,7 @@ Funcionalidades:
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, and_, or_, text, extract, case
-from sqlalchemy.orm import joinedload
-import json
 import logging
-from decimal import Decimal
-from collections import defaultdict
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor, IsolationForest
@@ -32,9 +27,6 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Importar modelos
-from models import (
-    db, Veiculo, CustoVeiculo, UsoVeiculo, Obra, Funcionario, Usuario
-)
 from auth import admin_required
 
 # Configurar logging

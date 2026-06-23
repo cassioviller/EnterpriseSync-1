@@ -1,20 +1,13 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, session, Response
+from flask import render_template, request, redirect, url_for, flash, jsonify, make_response, session
 from flask_login import login_required, current_user
-from models import db, Usuario, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, AlocacaoEquipe, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, RegistroPonto, NotificacaoCliente
+from models import db, TipoUsuario, Funcionario, Obra, RDO, RDOMaoObra, RDOEquipamento, RDOOcorrencia, RDOFoto, Servico, ServicoObra, ServicoObraReal, RDOServicoSubatividade, SubatividadeMestre, NotificacaoCliente
 from auth import admin_required, funcionario_required
-from utils.tenant import get_tenant_admin_id
-from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
-from views.helpers import safe_db_operation, get_admin_id_robusta, get_admin_id_dinamico, verificar_dados_producao
-from datetime import datetime, date, timedelta
-import calendar
-from sqlalchemy import func, desc, or_, and_, text
-from sqlalchemy.orm import joinedload
-from sqlalchemy.exc import IntegrityError
-import os
+from views.helpers import get_admin_id_robusta, get_admin_id_dinamico
+from datetime import datetime, date
+from sqlalchemy import text
 import json
 import logging
-import traceback
 
 from views import main_bp
 
@@ -64,7 +57,6 @@ def rdos():
         logger.info("[DOC] TEMPLATE: rdo_lista_unificada.html (MODERNO)")
         logger.info(f"[USER] USUÁRIO: {current_user.email if hasattr(current_user, 'email') else 'N/A'}")
         # Criar sessão isolada para evitar problemas
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         engine = db.get_engine()
         Session = sessionmaker(bind=engine)

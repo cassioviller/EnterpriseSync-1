@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import session, redirect, url_for, flash, abort
+from flask import redirect, url_for, flash
 from flask_login import current_user
 from models import TipoUsuario
 

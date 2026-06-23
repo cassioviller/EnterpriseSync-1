@@ -382,7 +382,6 @@ def explodir_servico_para_quantidade(servico, quantidade,
             qtd * Decimal(str(categorias[c]['custo_unitario']))
         ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-    import math as _math
     detalhamento = []
     for d in base.get('detalhamento', []):
         coef = Decimal(str(d['coeficiente']))

@@ -4,7 +4,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia, SubatividadeMestre, NotificacaoCliente, RDOFoto, RDOApontamentoCronograma, CustoObra, AlocacaoEquipe, MovimentacaoEstoque
-from datetime import datetime, date
+from datetime import datetime
 import json
 import logging
 logger = logging.getLogger(__name__)

@@ -3,13 +3,12 @@
 
 from flask_login import UserMixin
 from datetime import datetime, date, time
-from sqlalchemy import func, JSON, Column, Integer, String, Text, Float, Boolean, DateTime, Date, Time, Numeric, ForeignKey, Enum as SQLEnum
+from sqlalchemy import func, JSON, Column, Integer, String, Text, DateTime, Numeric, ForeignKey
 from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase, relationship, backref
+from sqlalchemy.orm import DeclarativeBase, relationship
 from functools import lru_cache
 import logging
-import uuid
 import secrets
 
 logger = logging.getLogger(__name__)
@@ -3844,7 +3843,7 @@ class AllocationEmployee(db.Model):
     def sincronizar_com_ponto(self):
         """Cria registro de ponto baseado na alocação"""
         from app import db
-        from datetime import datetime, date
+        from datetime import datetime
         
         # Verificar se já existe registro
         registro_existente = RegistroPonto.query.filter_by(

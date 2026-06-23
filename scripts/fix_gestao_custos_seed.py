@@ -9,7 +9,6 @@ os.environ.setdefault('FLASK_APP', 'main')
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
-from datetime import date
 
 ADMIN_ID = 63
 
@@ -18,10 +17,9 @@ def section(msg): print(f"\n{'='*55}\n{msg}\n{'='*55}")
 
 with app.app_context():
     from models import (
-        GestaoCustoPai, GestaoCustoFilho, FluxoCaixa,
-        RDOApontamentoCronograma, RDO, TarefaCronograma
+        GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
     )
-    from sqlalchemy import text, func
+    from sqlalchemy import text
 
     # ─────────────────────────────────────────────────────
     # 1. CONSOLIDAR GESTÃO DE CUSTOS

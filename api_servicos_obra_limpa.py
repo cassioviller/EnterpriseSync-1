@@ -4,7 +4,7 @@ Sistema completamente funcional usando tabela servico_obra_real
 """
 
 from flask import Blueprint, request, jsonify, session
-from models import db, ServicoObraReal, Servico, Obra, Usuario
+from models import db, ServicoObraReal, Servico, Usuario
 from datetime import date, datetime
 import logging
 

@@ -3,8 +3,8 @@ Blueprint Custos do Escritório — Task #6
 Controle de despesas internas do escritório (aluguel, água, luz, etc.)
 Lança automaticamente em ContaPagar; pagamento é feito de lá.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required, current_user
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required
 from datetime import date, datetime
 from decimal import Decimal
 from calendar import monthrange

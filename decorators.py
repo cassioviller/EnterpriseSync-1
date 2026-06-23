@@ -2,8 +2,6 @@
 Decoradores de autenticação e autorização
 """
 from functools import wraps
-from flask import abort, redirect, url_for, flash
-from flask_login import current_user
 
 def admin_required(f):
     """Requer que o usuário seja administrador"""

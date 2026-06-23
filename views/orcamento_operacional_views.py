@@ -7,7 +7,6 @@ orçamento de contrato, com versionamento por item.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from decimal import Decimal
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
@@ -17,10 +16,10 @@ from app import db
 from auth import admin_required
 from models import (
     Obra, ObraOrcamentoOperacional, ObraOrcamentoOperacionalItem,
-    ObraOrcamentoOperacionalItemVersao, OrcamentoItem,
+    ObraOrcamentoOperacionalItemVersao,
 )
 from services.orcamento_operacional import (
-    garantir_operacional, listar_versoes, editar_item, diff_com_original,
+    garantir_operacional, editar_item, diff_com_original,
     atualizar_do_original,
 )
 

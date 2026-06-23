@@ -17,7 +17,6 @@ Regras Testadas:
 
 import pytest
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, timedelta
 
 
 SALARIO_BASE = Decimal('3500.00')

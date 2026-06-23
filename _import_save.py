@@ -3,7 +3,6 @@ WS = "/home/runner/workspace"
 sys.path.insert(0, WS)
 os.chdir(WS)
 from datetime import date, datetime
-import main
 from main import app
 from services.importacao_excel import ImportacaoFluxoCaixa
 
@@ -30,7 +29,7 @@ with app.app_context():
     print(f"    erros: {len(erros)}", flush=True)
     for e in erros[:5]:
         print("      -", str(e)[:140], flush=True)
-    from models import FluxoCaixa, CategoriaFluxoCaixa, ContaPagar
+    from models import FluxoCaixa, CategoriaFluxoCaixa
     from collections import Counter
     fc_batch = FluxoCaixa.query.filter_by(admin_id=1, import_batch_id=batch).all()
     catmap = {c.id: c.nome for c in CategoriaFluxoCaixa.query.filter_by(admin_id=1).all()}

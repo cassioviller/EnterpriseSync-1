@@ -1086,8 +1086,7 @@ class TestIntegracaoAlmoxGestaoCusto:
 
         from app import app as flask_app
         from models import (
-            AlmoxarifadoMovimento, AlmoxarifadoEstoque,
-            GestaoCustoPai, GestaoCustoFilho,
+            AlmoxarifadoMovimento, GestaoCustoPai,
         )
 
         # Registrar contagem antes da entrada
@@ -1399,8 +1398,6 @@ class TestIntegracaoFolhaLancamento:
     def _competencia(self) -> tuple[int, int]:
         """Retorna (ano, mes) de uma competência passada sem folha, ou a corrente."""
         from app import app as flask_app
-        from models import FolhaPagamento
-        import calendar as _cal
         with flask_app.app_context():
             admin_id = _get_admin_id()
             hoje = datetime.date.today()
@@ -1476,9 +1473,8 @@ class TestIntegracaoFolhaLancamento:
         """
         from app import app as flask_app
         from models import (
-            Funcionario, FolhaPagamento, LancamentoContabil, PartidaContabil
+            Funcionario, LancamentoContabil, PartidaContabil
         )
-        import datetime as _dt
 
         with flask_app.app_context():
             admin_id = _get_admin_id()
@@ -1811,7 +1807,6 @@ class TestConsoleSweep:
 
 def run_all(headless: bool = True):
     """Executa todos os blocos em modo standalone (sem pytest)."""
-    import importlib.util
 
     log.info(f"=== Suíte Playwright standalone — {BASE_URL} ===")
     log.info(f"Conta demo: {DEMO_USERNAME}")

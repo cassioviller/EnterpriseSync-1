@@ -6,7 +6,7 @@ Centraliza todos os cálculos de folha, INSS, IR, FGTS e horas extras
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Dict, Optional
-from sqlalchemy import extract, func
+from sqlalchemy import extract
 from models import db, Funcionario, RegistroPonto, ParametrosLegais, ConfiguracaoSalarial, BeneficioFuncionario, CalendarioUtil, HorarioDia, HorarioTrabalho
 from utils import calcular_valor_hora_periodo
 import logging
@@ -311,7 +311,6 @@ def calcular_horas_mes(funcionario_id: int, ano: int, mes: int) -> Dict:
     """
     try:
         import calendar
-        from datetime import timedelta
         
         funcionario = Funcionario.query.get(funcionario_id)
         if not funcionario:
@@ -1212,7 +1211,7 @@ def obter_dados_folha_obra(obra_id: int, data_inicio: date, data_fim: date, admi
             - evolucao_mensal: dados para gráfico de evolução
     """
     try:
-        from models import FolhaProcessada, Funcionario, RegistroPonto
+        from models import FolhaProcessada, Funcionario
         
         ano_inicio = data_inicio.year
         mes_inicio = data_inicio.month

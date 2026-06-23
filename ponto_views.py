@@ -4,8 +4,8 @@
 # ================================
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-from flask_login import login_required, current_user
-from datetime import date, datetime, timedelta
+from flask_login import login_required
+from datetime import date, datetime
 import pytz
 from app import db
 
@@ -23,7 +23,7 @@ def get_date_brasil():
 def get_time_brasil():
     """Retorna a hora atual no fuso horário de Brasília"""
     return datetime.now(TIMEZONE_BRASIL).time()
-from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, DispositivoObra, FuncionarioObrasPonto, FotoFacialFuncionario
+from models import Obra, Funcionario, RegistroPonto, ConfiguracaoHorario, FuncionarioObrasPonto, FotoFacialFuncionario
 from ponto_service import PontoService
 from multitenant_helper import get_admin_id as get_tenant_admin_id
 from decorators import admin_required
@@ -32,9 +32,7 @@ from utils_facial import (
     validar_qualidade_foto,
     validar_qualidade_foto_avancada,
     reconhecer_com_multiplas_fotos,
-    identificar_funcionario_multiplas_fotos,
-    THRESHOLD_CONFIANCA,
-    MIN_CONFIANCA_PERCENTUAL
+    THRESHOLD_CONFIANCA
 )
 from utils_geofencing import validar_localizacao_na_obra
 import logging
@@ -1374,7 +1372,6 @@ def download_modelo():
     """Gera e faz download da planilha modelo Excel com competência selecionada"""
     from services.ponto_importacao import PontoExcelService
     from flask import make_response
-    from datetime import datetime
     
     try:
         admin_id = get_tenant_admin_id()
@@ -1454,7 +1451,6 @@ def download_modelo():
 def processar_importacao():
     """Processa upload e importação da planilha Excel"""
     from services.ponto_importacao import PontoExcelService
-    from werkzeug.utils import secure_filename
     from io import BytesIO
     
     try:

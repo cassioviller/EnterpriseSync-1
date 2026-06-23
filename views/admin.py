@@ -1,11 +1,10 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from models import db, Usuario, TipoUsuario, Funcionario, Obra, RegistroPonto
+from models import db, Usuario, TipoUsuario, Funcionario, RegistroPonto
 from auth import super_admin_required, admin_required
 from utils.tenant import get_tenant_admin_id
 from datetime import datetime
-from sqlalchemy import text
 import logging
 import traceback
 

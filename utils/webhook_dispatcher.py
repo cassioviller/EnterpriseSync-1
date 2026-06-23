@@ -377,7 +377,7 @@ def reentregar_pendentes(now: datetime | None = None, limit: int = 50) -> int:
     if not is_enabled():
         return 0
     try:
-        from models import db, WebhookEntrega
+        from models import WebhookEntrega
         now = now or datetime.utcnow()
         pendentes = (
             WebhookEntrega.query

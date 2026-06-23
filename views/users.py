@@ -1,5 +1,5 @@
 from flask import render_template, request, redirect, url_for, flash
-from flask_login import login_required, current_user
+from flask_login import login_required
 from werkzeug.security import generate_password_hash
 from models import db, Usuario, TipoUsuario
 from auth import admin_required

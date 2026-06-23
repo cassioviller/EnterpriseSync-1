@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from flask import current_app, request
+from flask import request
 import psycopg2
 from sqlalchemy.exc import SQLAlchemyError
 

@@ -9,8 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault('FLASK_APP', 'main')
 
 from app import app, db
-from datetime import date, timedelta
-from decimal import Decimal
+from datetime import date
 import random
 
 ADMIN_ID = 63
@@ -29,11 +28,10 @@ with app.app_context():
         CalendarioEmpresa, RDO, RDOMaoObra, RDOApontamentoCronograma,
         GestaoCustoPai, GestaoCustoFilho, FluxoCaixa,
         LancamentoTransporte, CategoriaTransporte,
-        AlimentacaoLancamento, AlimentacaoItem, Restaurante,
+        AlimentacaoLancamento, Restaurante,
         AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento,
         CustoObra, Fornecedor
     )
-    from sqlalchemy import text
 
     # ─────────────────────────────────────────────────────
     # 1. FUNCAO E DEPARTAMENTO BASE

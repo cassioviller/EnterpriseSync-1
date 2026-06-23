@@ -8,10 +8,10 @@ Sistema unificado de propostas comerciais consolidando:
 Implementa padrões de resiliência: Idempotência, Circuit Breaker, Saga
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_login import login_required, current_user
-from auth import admin_required, funcionario_required
-from datetime import datetime, date, timedelta
+from auth import admin_required
+from datetime import datetime, date
 from decimal import Decimal
 from io import BytesIO
 import os
@@ -22,7 +22,7 @@ import logging
 logger = logging.getLogger(__name__)
 import base64
 from werkzeug.utils import secure_filename
-from sqlalchemy import func, desc, or_, and_, text
+from sqlalchemy import func, or_
 from PIL import Image
 
 # Importar utilitários de resiliência
@@ -57,7 +57,7 @@ except ImportError as e:
 from app import db
 from models import (
     Proposta, PropostaItem, PropostaHistorico, PropostaArquivo,
-    ConfiguracaoEmpresa, Usuario, TipoUsuario, Obra, Servico, Cliente,
+    ConfiguracaoEmpresa, TipoUsuario, Cliente,
     PropostaTemplate, PropostaClausula, PropostaTemplateClausula,
 )
 

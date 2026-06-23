@@ -5,8 +5,8 @@ API para busca de funcionários com autocomplete
 Sistema SIGE v8.0 - Módulo de RDO
 """
 
-from flask import Blueprint, request, jsonify, session
-from models import Funcionario, Usuario
+from flask import Blueprint, request, jsonify
+from models import Funcionario
 import logging
 
 # Configurar logging específico para este módulo

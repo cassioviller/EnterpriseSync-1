@@ -9,7 +9,6 @@ from flask_login import login_required, current_user
 from models import db, ServicoObraReal, Obra, Servico, Funcionario
 from datetime import datetime, date
 from multitenant_helper import get_admin_id
-from sqlalchemy import and_, or_
 import logging
 
 # Configurar logging

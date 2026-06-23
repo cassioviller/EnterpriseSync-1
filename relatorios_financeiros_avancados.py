@@ -12,22 +12,17 @@ Funcionalidades:
 - Comparativo de custos entre veículos
 """
 
-from flask import Blueprint, render_template, request, jsonify, send_file, flash, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from sqlalchemy import func, desc, and_, or_, text, extract, case
-from sqlalchemy.orm import joinedload
-import json
+from sqlalchemy import func, desc, and_, extract, case
 import logging
-from decimal import Decimal
 from collections import defaultdict
-import pandas as pd
 import numpy as np
-from io import BytesIO
 
 # Importar modelos
 from models import (
-    db, Veiculo, CustoVeiculo, UsoVeiculo, Obra, Funcionario, Usuario
+    db, Veiculo, CustoVeiculo, UsoVeiculo, Obra
 )
 from auth import admin_required
 

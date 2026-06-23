@@ -321,7 +321,7 @@ def get_grupos_por_modulo(admin_id: int) -> dict[str, list[dict]]:
 def criar_opcao(slug: str, admin_id: int, valor: str,
                 cor: str | None = None, ordem: int | None = None):
     """Cria nova opção no motor e, para slugs CRM, sincroniza no modelo legado."""
-    from models import DropdownGrupo, DropdownOpcao
+    from models import DropdownOpcao
     grupo = ensure_grupo(slug, admin_id)
 
     existing = DropdownOpcao.query.filter_by(

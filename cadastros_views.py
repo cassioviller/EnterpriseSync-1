@@ -121,7 +121,6 @@ def dropdown_toggle_ativo(slug, opcao_id):
 def dropdown_verificar_uso(slug, opcao_id):
     """Retorna JSON com { em_uso, total, opcoes_disponiveis } para popular o modal de exclusão."""
     from services.dropdown_service import contar_uso_opcao, get_dropdown_options
-    from models import DropdownOpcao
     admin_id = _get_admin_id()
     try:
         total = contar_uso_opcao(slug, opcao_id, admin_id)
@@ -145,7 +144,7 @@ def dropdown_verificar_uso(slug, opcao_id):
 @login_required
 def dropdown_excluir_opcao(slug, opcao_id):
     """Exclui fisicamente a opção, migrando registros se necessário."""
-    from services.dropdown_service import contar_uso_opcao, migrar_e_excluir_opcao, desativar_opcao
+    from services.dropdown_service import contar_uso_opcao, migrar_e_excluir_opcao
     admin_id = _get_admin_id()
     opcao_destino_id = request.form.get('opcao_destino_id', type=int)
     try:

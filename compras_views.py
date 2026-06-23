@@ -8,8 +8,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from models import (AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento,
-                    CentroCusto, ContaPagar, CustoObra,
-                    Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem,
+                    ContaPagar, Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem,
                     GestaoCustoPai, GestaoCustoFilho, Usuario)
 from utils.tenant import get_tenant_admin_id, is_v2_active
 
@@ -171,7 +170,6 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
 
     NÃO commita — o chamador cuida do commit.
     """
-    from decimal import Decimal
     fornecedor = Fornecedor.query.get(pedido.fornecedor_id)
     obra = Obra.query.get(pedido.obra_id) if pedido.obra_id else None
     vencimentos = _vencimentos(
@@ -289,8 +287,6 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
     NÃO commita — o chamador cuida do commit/rollback.
     Levanta exceção em caso de erro (chamador faz rollback).
     """
-    from decimal import Decimal
-    from datetime import datetime as _dt
 
     if pedido.processada_apos_aprovacao:
         logger.info(f"[compra aprovada cliente] pedido={pedido.id} já processado, noop")

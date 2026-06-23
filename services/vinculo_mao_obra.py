@@ -35,7 +35,6 @@ from models import (
     Funcionario,
     RDOMaoObra,
     RDOServicoSubatividade,
-    SubatividadeMestre,
     SubatividadeMaoObra,
     ComposicaoServico,
     TarefaCronograma,

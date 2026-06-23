@@ -9,7 +9,6 @@ from flask import (
 )
 from flask_login import login_required, current_user
 from sqlalchemy import or_
-from datetime import datetime
 import logging
 
 from app import db
