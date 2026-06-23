@@ -102,12 +102,19 @@ class MetricasTestRunner:
 
     def _criar_obra(self, admin):
         sfx = _suffix()
+        # Task #172: obra.cliente_id virou FK NOT NULL — cria um Cliente.
+        from models import Cliente
+        cli = Cliente(admin_id=admin.id, nome=f'Cli Met {sfx[-6:]}',
+                      email=f'cli_met_{sfx}@test.local')
+        db.session.add(cli)
+        db.session.flush()
         o = Obra(
             nome=f'Obra Met {sfx[-6:]}',
             codigo=f'OM{admin.id}{sfx[-4:]}',
             data_inicio=date.today(),
             admin_id=admin.id,
             ativo=True,
+            cliente_id=cli.id,
         )
         db.session.add(o)
         db.session.flush()
@@ -406,6 +413,20 @@ class MetricasTestRunner:
             print(f'  ✖ {bad}')
         print('=' * 72)
         return 0 if not self.failed else 1
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_e2e_metricas_funcionario_task98():
+    """Entrypoint pytest do Runner legado (Task #98). Cobertura preservada."""
+    runner = MetricasTestRunner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam (Task #98):\n  - " + "\n  - ".join(map(str, runner.failed))
 
 
 if __name__ == '__main__':

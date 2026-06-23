@@ -558,5 +558,19 @@ class OverrideE2ERunner:
         return 0 if not self.failed else 1
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_orcamento_override_e2e_task120():
+    """Entrypoint pytest do Runner legado (Task #120). Cobertura preservada."""
+    runner = OverrideE2ERunner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam (Task #120):\n  - " + "\n  - ".join(map(str, runner.failed))
+
+
 if __name__ == '__main__':
     sys.exit(OverrideE2ERunner().run())

@@ -78,12 +78,20 @@ class ComprasTipoTestRunner:
         db.session.add(admin)
         db.session.flush()
 
+        # Task #172: obra.cliente_id virou FK NOT NULL — cria um Cliente.
+        from models import Cliente
+        cli = Cliente(admin_id=admin.id, nome=f'Cli Compras {sfx}',
+                      email=f'cli_compras_{sfx}@test.local')
+        db.session.add(cli)
+        db.session.flush()
+
         obra = Obra(
             nome=f'Obra Compras {sfx}',
             codigo=f'OCO{admin.id}',
             data_inicio=date.today(),
             admin_id=admin.id,
             ativo=True,
+            cliente_id=cli.id,
         )
         forn = Fornecedor(
             nome=f'Fornecedor Compras {sfx}',
@@ -321,6 +329,22 @@ class ComprasTipoTestRunner:
                 print(f"  - {f}")
             sys.exit(1)
         print("✅ TODOS OS TESTES PASSARAM")
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_compras_tipo_processamento():
+    """Entrypoint pytest do Runner legado (cenários sequenciais de estado
+    compartilhado). Roda o fluxo e falha se runner.failed não estiver vazio.
+    Cobertura preservada integralmente."""
+    runner = ComprasTipoTestRunner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam:\n  - " + "\n  - ".join(map(str, runner.failed))
 
 
 if __name__ == '__main__':

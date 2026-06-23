@@ -731,5 +731,19 @@ class CronogramaDuplicadoRDORunner:
         return 0 if not self.failed else 1
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_cronograma_duplicado_rdo_task144():
+    """Entrypoint pytest do Runner legado (Task #144). Cobertura preservada."""
+    runner = CronogramaDuplicadoRDORunner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam (Task #144):\n  - " + "\n  - ".join(map(str, runner.failed))
+
+
 if __name__ == '__main__':
     sys.exit(CronogramaDuplicadoRDORunner().run())

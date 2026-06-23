@@ -83,7 +83,7 @@ class Runner:
         obra = Obra(
             nome=f'Obra #154 {suf}', codigo=f'O154-{suf[:6]}',
             admin_id=admin_id, status='Em andamento',
-            data_inicio=date.today(), cliente_nome=cli.nome,
+            data_inicio=date.today(), cliente_id=cli.id,  # Task #172: FK NOT NULL
         )
         db.session.add(obra); db.session.flush()
         self.obra = obra
@@ -129,7 +129,7 @@ class Runner:
         # Apontamento: 50/100 em fa (50%) e 100/200 em fb (50%).
         # (Vamos criar via INSERT direto para não depender de auth)
         rdo = RDO(
-            numero_rdo=f'RDO-T154-{suf}',
+            numero_rdo=f'R154-{suf[-10:]}',  # numero_rdo é varchar(20)
             obra_id=obra.id, criado_por_id=admin_id, admin_id=admin_id,
             data_relatorio=date.today(), local='Campo',
             clima_geral='Ensolarado',
@@ -218,6 +218,20 @@ def main():
         logger.error(f' ✗ {f}')
     logger.info('=' * 70)
     sys.exit(0 if not runner.failed else 1)
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_rdo_subgrupo_aninhado_task154():
+    """Entrypoint pytest do script legado (Task #154): main() roda os cenários e
+    sys.exit(0/1) conforme runner.failed. Asseramos exit code 0. Cobertura
+    preservada (a versão _playwright cobre o lado visual; esta, o HTTP/JSON)."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"Cenários falharam (Task #154): exit code={e.code}"
 
 
 if __name__ == '__main__':
