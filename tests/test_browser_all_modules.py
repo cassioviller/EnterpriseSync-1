@@ -126,6 +126,19 @@ def _get_admin_id() -> int:
         return u.id
 
 
+def _obra_com_cronograma(admin_id: int):
+    """Retorna o id da 1ª obra do admin que tenha cronograma materializado
+    (ao menos uma TarefaCronograma), ou None se não houver."""
+    from app import app as flask_app
+    from models import TarefaCronograma
+    with flask_app.app_context():
+        t = (TarefaCronograma.query
+             .filter_by(admin_id=admin_id)
+             .order_by(TarefaCronograma.obra_id)
+             .first())
+        return t.obra_id if t else None
+
+
 def _garantir_dados_e2e(admin_id: int) -> None:
     """Provisiona, de forma idempotente, os pré-requisitos dos testes de
     integração (Almox/RDO/Folha) que de outra forma pulariam por falta de
@@ -404,6 +417,18 @@ class TestBloco3ObrasRdo:
             assert not erros, f"Erros JS críticos em obras: {erros[:3]}"
         finally:
             _js_erros_stop(browser_session, erros)
+
+    def test_cronograma_fisico_financeiro(self, browser_session):
+        """Página físico-financeira do cronograma — abre sem 500/404 e exibe o
+        título. Pula se nenhuma obra tiver cronograma materializado."""
+        obra_id = _obra_com_cronograma(_get_admin_id())
+        if obra_id is None:
+            pytest.skip("Nenhuma obra com cronograma materializado no banco demo")
+        path = f"/cronograma/obra/{obra_id}/fisico-financeiro"
+        _check_page(browser_session, path)
+        html = browser_session.content().lower()
+        assert "físico-financeiro" in html or "fisico-financeiro" in html, \
+            "Página FF não exibe o título esperado"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
