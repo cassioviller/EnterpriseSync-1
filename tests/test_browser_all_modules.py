@@ -49,6 +49,10 @@ from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+# Toda a suíte deste arquivo requer Playwright + servidor gunicorn de pé.
+# Marcador de módulo para o gate rápido poder excluí-la com `-m "not browser"`.
+pytestmark = pytest.mark.browser
+
 BASE_URL = os.environ.get("PW_BASE_URL", "http://localhost:5000")
 DEMO_USERNAME = "admin@construtoraalfa.com.br"
 DEMO_SENHA = "Alfa@2026"

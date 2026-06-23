@@ -12,6 +12,25 @@ import os
 import pytest
 
 # ---------------------------------------------------------------------------
+# App canônico (== `main:app`) montado no MOMENTO DA COLEÇÃO.
+# ---------------------------------------------------------------------------
+# Este `import main` roda quando o pytest importa o conftest — ANTES de coletar
+# qualquer módulo de teste e ANTES de qualquer request. `app.py` registra ~37
+# blueprints; `main.py` adiciona os outros ~17 (custos_escritorio, financeiro,
+# etc.). Templates como `base_completo.html` referenciam endpoints que só
+# existem após `main.py` (ex.: `custos_escritorio.painel_mensal`,
+# `financeiro.dashboard`). Como o Flask TRAVA o registro de blueprints após a
+# 1ª request, se um módulo de teste disparar uma request no import-time da
+# coleção o registro tranca incompleto e renders falham com BuildError de forma
+# não-determinística. Importar `main` aqui (nível de módulo do conftest)
+# garante os 54 blueprints registrados antes de tudo. Sem efeitos colaterais:
+# o servidor só sobe sob `if __name__ == '__main__'`.
+try:
+    import main  # noqa: F401
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
 # Arquivos standalone (não-pytest) que devem ser ignorados pelo coletor
 # ---------------------------------------------------------------------------
 collect_ignore_glob = [
@@ -34,20 +53,29 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def _registrar_blueprints_opcionais():
-    """Registra os blueprints carregados via try/except no main.py (importacao,
-    catalogos) ANTES de qualquer request — após o 1º request o Flask trava o
-    registro de blueprints. Idempotente; sessão inteira. Sem isto, o teste HTTP
-    que registra primeiro tranca o app e os demais erram ao registrar."""
+    """Monta o app CANÔNICO (o mesmo que o gunicorn serve via `main:app`) ANTES
+    de qualquer request — após o 1º request o Flask trava o registro de
+    blueprints. `app.py` registra ~37 blueprints; `main.py` adiciona os outros
+    ~17 (importacao, catalogos, custos_escritorio, etc.). Templates como
+    `base_completo.html` referenciam endpoints que só existem após `main.py`
+    (ex.: `custos_escritorio.painel_mensal`), então qualquer teste que renderiza
+    uma página herdando dessa base FALHA com BuildError se rodar com o app de 37.
+    Importar `main` é idempotente e não tem efeitos colaterais (só registra
+    blueprints; o servidor só sobe sob `if __name__ == '__main__'`)."""
     try:
-        from app import app
-        if "importacao" not in app.blueprints:
-            from importacao_views import importacao_bp
-            app.register_blueprint(importacao_bp)
-        if "catalogos" not in app.blueprints:
-            from views.catalogos_views import catalogos_bp
-            app.register_blueprint(catalogos_bp)
+        import main  # noqa: F401 — registra todos os blueprints no app compartilhado
     except Exception:
-        pass
+        # Fallback mínimo: ao menos os dois que os testes HTTP mais exercitam.
+        try:
+            from app import app
+            if "importacao" not in app.blueprints:
+                from importacao_views import importacao_bp
+                app.register_blueprint(importacao_bp)
+            if "catalogos" not in app.blueprints:
+                from views.catalogos_views import catalogos_bp
+                app.register_blueprint(catalogos_bp)
+        except Exception:
+            pass
     yield
 
 
