@@ -2522,3 +2522,44 @@ def api_produtividade():
             'total_registros': len(rows),
         },
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FÍSICO-FINANCEIRO (derivado)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro')
+@login_required
+def fisico_financeiro(obra_id: int):
+    guard = _check_v2()
+    if guard:
+        return guard
+    from services.cronograma_fisico_financeiro import montar_fisico_financeiro
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    dados = montar_fisico_financeiro(obra_id, admin_id)
+    return render_template('cronograma/fisico_financeiro.html', obra=obra, dados=dados)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro/export.xlsx')
+@login_required
+def fisico_financeiro_xlsx(obra_id: int):
+    guard = _check_v2()
+    if guard:
+        return guard
+    import io
+    from services.cronograma_fisico_financeiro import (
+        montar_fisico_financeiro, exportar_fisico_financeiro_xlsx,
+    )
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    dados = montar_fisico_financeiro(obra_id, admin_id)
+    wb = exportar_fisico_financeiro_xlsx(dados)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf, as_attachment=True,
+        download_name=f'cronograma_ff_obra_{obra_id}.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )

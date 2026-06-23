@@ -1,0 +1,83 @@
+{% extends "base_completo.html" %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Cronograma Físico-Financeiro — {{ obra.nome }}</h4>
+    <a class="btn btn-success btn-sm"
+       href="{{ url_for('cronograma.fisico_financeiro_xlsx', obra_id=obra.id) }}">
+      Baixar Excel
+    </a>
+  </div>
+
+  {% if dados.avisos %}
+    <div class="alert alert-warning">
+      <ul class="mb-0">{% for a in dados.avisos %}<li>{{ a }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+
+  {% if not dados.etapas %}
+    <div class="alert alert-info">
+      Nenhum custo faseável encontrado. Verifique se o cronograma foi materializado
+      (proposta aprovada) e se as tarefas têm datas e custo (ObraServicoCusto).
+    </div>
+  {% else %}
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Etapa</th><th class="text-end">Veks (R$)</th>
+          <th class="text-end">Fat Direto (R$)</th><th class="text-end">Total (R$)</th>
+          <th class="text-end">%</th>
+          {% for mes in dados.meses_ordenados %}<th class="text-end">{{ mes }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for et in dados.etapas %}
+        <tr>
+          <td>{{ et.nome }}</td>
+          <td class="text-end">{{ '%.2f'|format(et.veks) }}</td>
+          <td class="text-end">{{ '%.2f'|format(et.fat_direto) }}</td>
+          <td class="text-end">{{ '%.2f'|format(et.previsto.total) }}</td>
+          <td class="text-end">
+            {% if dados.totais.total %}{{ '%.1f'|format(100 * et.previsto.total / dados.totais.total) }}%{% else %}—{% endif %}
+          </td>
+          {% for mes in dados.meses_ordenados %}
+          <td class="text-end">{{ '%.2f'|format(et.meses.get(mes, 0)) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>TOTAL GERAL</td>
+          <td class="text-end">{{ '%.2f'|format(dados.totais.veks) }}</td>
+          <td class="text-end">{{ '%.2f'|format(dados.totais.fat_direto) }}</td>
+          <td class="text-end">{{ '%.2f'|format(dados.totais.total) }}</td>
+          <td class="text-end">100%</td>
+          {% for mes in dados.meses_ordenados %}<td></td>{% endfor %}
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <h5 class="mt-4">Curva S financeira (custo acumulado)</h5>
+  <table class="table table-sm table-bordered w-auto">
+    <thead class="table-light"><tr><th>Mês</th><th class="text-end">Custo do mês</th><th class="text-end">Acumulado</th><th class="text-end">% acumulado</th></tr></thead>
+    <tbody>
+      {% for p in dados.curva_s %}
+      <tr>
+        <td>{{ p.mes }}</td>
+        <td class="text-end">{{ '%.2f'|format(p.custo_mes) }}</td>
+        <td class="text-end">{{ '%.2f'|format(p.acumulado) }}</td>
+        <td class="text-end">{{ '%.1f'|format(100 * p.pct_acumulado) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if dados.nao_faseado and dados.nao_faseado > 0 %}
+    <p class="text-muted">Custo não faseado (tarefas sem datas): R$ {{ '%.2f'|format(dados.nao_faseado) }}</p>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
