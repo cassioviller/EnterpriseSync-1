@@ -57,3 +57,27 @@ def fasear_por_dias_uteis(valor: Decimal, data_inicio, data_fim,
         else:
             out[mes] = (valor - acumulado).quantize(CENTAVO, ROUND_HALF_UP)
     return out
+
+
+def alocar_por_peso(valor: Decimal, pesos: list) -> dict:
+    """Distribui `valor` entre chaves proporcional ao peso. `pesos` é lista de
+    (chave, peso). Se Σpeso == 0, distribui igualmente. Conserva o total
+    (última chave absorve o resto)."""
+    if not pesos:
+        return {}
+    valor = Decimal(valor)
+    soma = sum((Decimal(p) for _, p in pesos), Decimal("0"))
+    n = len(pesos)
+    out: dict = {}
+    acumulado = Decimal("0")
+    for i, (chave, peso) in enumerate(pesos):
+        if i < n - 1:
+            if soma > 0:
+                parcela = (valor * Decimal(peso) / soma).quantize(CENTAVO, ROUND_HALF_UP)
+            else:
+                parcela = (valor / n).quantize(CENTAVO, ROUND_HALF_UP)
+            out[chave] = parcela
+            acumulado += parcela
+        else:
+            out[chave] = (valor - acumulado).quantize(CENTAVO, ROUND_HALF_UP)
+    return out

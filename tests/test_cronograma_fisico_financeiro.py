@@ -28,3 +28,22 @@ def test_tarefa_cruza_dois_meses_divide_por_dias_uteis():
 
 def test_valor_zero_retorna_vazio():
     assert fasear_por_dias_uteis(D("0"), date(2026, 6, 1), date(2026, 6, 5), False, False) == {}
+
+
+from services.cronograma_fisico_financeiro import alocar_por_peso
+
+
+def test_aloca_proporcional_ao_peso_e_conserva_total():
+    out = alocar_por_peso(D("1000"), [("a", D("30")), ("b", D("70"))])
+    assert out == {"a": D("300.00"), "b": D("700.00")}
+    assert sum(out.values()) == D("1000")
+
+
+def test_peso_zero_distribui_igualmente():
+    out = alocar_por_peso(D("900"), [("a", D("0")), ("b", D("0")), ("c", D("0"))])
+    assert sum(out.values()) == D("900")
+    assert out["a"] == D("300.00") and out["c"] == D("300.00")
+
+
+def test_sem_tarefas_retorna_vazio():
+    assert alocar_por_peso(D("100"), []) == {}
