@@ -9,7 +9,20 @@ Configurações aplicadas em tempo de execução:
 """
 
 import os
+import sys
+
 import pytest
+
+# ---------------------------------------------------------------------------
+# Raiz do projeto no sys.path — robustez de invocação.
+# ---------------------------------------------------------------------------
+# Vários módulos (financeiro_service, app, main, models…) ficam na raiz. Com
+# `python -m pytest` o CWD entra no sys.path automaticamente, mas o console
+# script `.pythonlibs/bin/pytest` (usado pelo run_tests.sh) NÃO o adiciona —
+# aí a coleção de testes que importam módulos-raiz (ex.: test_agregar_fluxo_
+# mensal → `from financeiro_service import …`) falha conforme a ordem. Inserir
+# a raiz aqui (conftest carrega antes de tudo) garante import estável.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------------------------------------------------------------------------
 # App canônico (== `main:app`) montado no MOMENTO DA COLEÇÃO.
