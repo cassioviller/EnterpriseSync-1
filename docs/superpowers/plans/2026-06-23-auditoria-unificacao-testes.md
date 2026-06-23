@@ -68,7 +68,13 @@ Demais conversões:
   - **Causa-raiz das 8 falhas do baseline (descoberta):** não eram regressões nem testes desatualizados — eram **registro incompleto de blueprints**. `app.py` registra ~37 blueprints; `main.py` (o que o gunicorn serve) adiciona ~17. Templates como `base_completo.html` referenciam endpoints que só existem após `main.py` (`custos_escritorio.painel_mensal`, `financeiro.dashboard`). Como o Flask trava o registro após a 1ª request, rodar a suíte com o app de 37 quebrava renders de forma **não-determinística** (endpoint faltante variava por ordem de execução).
   - **Fix:** `import main` no nível de módulo do `tests/conftest.py` (roda na coleção, antes de qualquer módulo de teste/request) monta o app canônico de 54 blueprints. + `pytestmark = pytest.mark.browser` no `test_browser_all_modules.py` para o gate poder excluí-lo.
   - **Os 4 skips** são legítimos: `test_fluxo_obra` / `test_fluxo_entradas_realizadas` são read-only contra o banco demo (ADMIN/OBRA/janela hardcoded) e pulam quando a precondição não existe — candidatos a self-seeding em fase futura.
-- **Fase 1 — Limpeza barata (baixo risco):** deletes (A) + merges (B) confirmados. Cada um: mover/absorver casos, rodar, commit atômico.
+- **Fase 1 — Limpeza barata (baixo risco): ✅ itens seguros concluídos.**
+  - `27c1f1f` delete `test_e2e_modules.py` + 4 rotas órfãs migradas ao smoke (3 eram redirects inexistentes).
+  - `2192e96` `_test_fluxo_classificacao.py` → `scripts/` (diagnóstico).
+  - `dbd91b3` merge `test_calculo_tolerancia` → `test_regras_salario_completo` (preservada a tolerância-sobre-extras, única).
+  - **Re-sequenciado (decisão de auditoria):**
+    - Merges `composicao_formato_br`, `rdo_kpis_task140`, `block_scripts_213` (HTTP) envolvem **scripts legados 0-coletados** → movidos para a Fase 3 (fundir = converter + consolidar num passo só; fundir sem converter é churn sem valor).
+    - `varredura_paginas` **NÃO será deletada**: ela é SUPERIOR ao `ConsoleSweep` (resolve rotas via `url_for`, valida conteúdo E checa erros JS), e cobre ~15 rotas únicas. O `(avaliar)` do plano resolveu-se como "manter varredura". Dedup fino varredura↔ConsoleSweep fica para a Fase 4.
 - **Fase 2 — Conversões críticas (C alta prioridade):** 4 E2E críticos viram pytest com fixtures compartilhadas (admin/proposta/obra) no `conftest.py`.
 - **Fase 3 — Conversões restantes (C):** lote por cluster, reusando fixtures da Fase 2.
 - **Fase 4 — Fix frágil (D)** e varredura final: `pytest tests/` 100% verde + atualizar `run_tests.sh` para rodar a suíte toda.
