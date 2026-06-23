@@ -14,9 +14,13 @@
 
 - **GATE de boot** (após mudanças que tocam app/models/views):
   ```bash
-  python -c "import app; print('BLUEPRINTS', len(app.app.blueprints))"
+  python -c "import main; print('BLUEPRINTS', len(main.app.blueprints))"
   ```
-  Esperado: termina com `BLUEPRINTS 37`, exit 0.
+  Esperado: termina com `BLUEPRINTS 54`, exit 0.
+  > Use `main` (não `app`): o app servido pelo gunicorn é `main:app`, que registra
+  > os blueprints extras de `main.py` além dos 37 de `app.py`. Validar via `import app`
+  > deixa de fora rotas reais e pode falhar ao renderizar templates que referenciam
+  > esses endpoints (ex.: `custos_escritorio.painel_mensal` em `base_completo.html`).
 - **Testes puros** (sem servidor):
   ```bash
   .pythonlibs/bin/python -m pytest tests/test_cronograma_fisico_financeiro.py -q
@@ -100,9 +104,9 @@ final da lista):
 
 Run:
 ```bash
-python -c "import app; print('BLUEPRINTS', len(app.app.blueprints))"
+python -c "import main; print('BLUEPRINTS', len(main.app.blueprints))"
 ```
-Expected: `BLUEPRINTS 37`. Nos logs deve aparecer `[Migration 193]` (aplicada ou skip).
+Expected: `BLUEPRINTS 54`. Nos logs deve aparecer `[Migration 193]` (aplicada ou skip).
 
 - [ ] **Step 5: Verificar a coluna no banco**
 
@@ -904,9 +908,9 @@ Se não houver uma barra óbvia, adicionar logo após o `<h*>` de título da pá
 
 Run:
 ```bash
-python -c "import app; print('BLUEPRINTS', len(app.app.blueprints)); print('FF_ROUTE', any('fisico-financeiro' in str(r) for r in app.app.url_map.iter_rules()))"
+python -c "import main; print('BLUEPRINTS', len(main.app.blueprints)); print('FF_ROUTE', any('fisico-financeiro' in str(r) for r in main.app.url_map.iter_rules()))"
 ```
-Expected: `BLUEPRINTS 37` e `FF_ROUTE True`.
+Expected: `BLUEPRINTS 54` e `FF_ROUTE True`.
 
 - [ ] **Step 5: Commit**
 
