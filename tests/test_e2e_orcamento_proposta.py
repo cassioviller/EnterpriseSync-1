@@ -331,5 +331,21 @@ def main():
         sys.exit(1)
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_e2e_orcamento_proposta_ciclo_task95():
+    """Entrypoint pytest: roda o ciclo orçamento→proposta→obra (snapshot
+    imutável, isolamento multi-tenant) e falha se qualquer check interno falhar.
+    Conversão fiel do script standalone (main() usa check()→PASS/FAIL globais e
+    sys.exit; capturado aqui; asseramos FAIL vazio). Cobertura preservada."""
+    try:
+        main()
+    except SystemExit:
+        pass
+    assert not FAIL, "Checks falharam (Task #95):\n  - " + "\n  - ".join(FAIL)
+
+
 if __name__ == "__main__":
     main()
