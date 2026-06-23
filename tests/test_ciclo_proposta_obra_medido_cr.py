@@ -37,7 +37,20 @@ def main():
         from event_manager import EventManager
         from services.medicao_service import recalcular_medicao_obra
 
-        admin_id = 63
+        # Fase 4: admin_id era hardcoded (=63), quebrava se o admin não
+        # existisse no banco. Cria um admin próprio (isolado por sufixo).
+        from werkzeug.security import generate_password_hash
+        from models import Usuario, TipoUsuario
+        _suf = f"{date.today().toordinal()}_{os.getpid()}"
+        _admin = Usuario(
+            username=f"ciclo94_{_suf}", email=f"ciclo94_{_suf}@test.local",
+            nome="Ciclo 94 Admin",
+            password_hash=generate_password_hash("Senha@2026"),
+            tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+        )
+        db.session.add(_admin)
+        db.session.flush()
+        admin_id = _admin.id
         numero = f"E2E-CICLO-{int(date.today().toordinal())}-{os.getpid()}"
         print(f"\n[setup] criando proposta {numero} (admin {admin_id})")
 
@@ -221,6 +234,21 @@ def main():
         print(f"  ✘ {m}")
     if FAIL:
         sys.exit(1)
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_ciclo_proposta_obra_medido_cr_task94():
+    """Entrypoint pytest do script legado (Task #94): ciclo proposta→obra→medido
+    →ContaReceber (UPSERT CR única). main() usa check()→PASS/FAIL e sys.exit.
+    Cobertura preservada; admin_id agora dinâmico (era hardcoded =63)."""
+    try:
+        main()
+    except SystemExit:
+        pass
+    assert not FAIL, "Cenários falharam (Task #94):\n  - " + "\n  - ".join(map(str, FAIL))
 
 
 if __name__ == "__main__":
