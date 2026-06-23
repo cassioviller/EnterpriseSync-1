@@ -135,5 +135,15 @@ def main() -> int:
     return 0
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_legacy_propostas_drop_task201():
+    """Entrypoint pytest do smoke legado (Task #201): main() retorna 0 se a
+    migração 141 dropou as tabelas legadas. Cobertura preservada."""
+    assert main() == 0, "Smoke da migração 141 (drop de tabelas legadas) falhou"
+
+
 if __name__ == '__main__':
     raise SystemExit(main())

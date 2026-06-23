@@ -387,5 +387,18 @@ def main():
     return 0 if not FAIL else 1
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_engenheiro_responsavel_pdf_task173():
+    """Entrypoint pytest do script legado (Task #173/#178). Cobertura preservada."""
+    try:
+        main()
+    except SystemExit:
+        pass
+    assert not FAIL, "Checks falharam (Task #173):\n  - " + "\n  - ".join(map(str, FAIL))
+
+
 if __name__ == '__main__':
     sys.exit(main())
