@@ -149,10 +149,11 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
     from models import (
         ObraServicoCusto, TarefaCronograma, ItemMedicaoCronogramaTarefa,
     )
-    from utils.cronograma_engine import get_calendario
+    from models import CalendarioEmpresa
 
-    cal = get_calendario(admin_id)
-    sab, dom = cal.considerar_sabado, cal.considerar_domingo
+    cal = CalendarioEmpresa.query.filter_by(admin_id=admin_id).first()
+    sab = cal.considerar_sabado if cal else False
+    dom = cal.considerar_domingo if cal else False
 
     tarefas = TarefaCronograma.query.filter_by(obra_id=obra_id, admin_id=admin_id).all()
     por_id = {t.id: t for t in tarefas}
@@ -199,31 +200,46 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
             nao_faseado += previsto_total
             raiz_sintetica = type("R", (), {"id": f"osc-{osc.id}", "nome_tarefa": osc.nome,
                                             "servico": None, "tarefa_pai_id": None})
-            etapa_resumo = _etapa(raiz_sintetica)
+            resumo_por_raiz = [(_etapa(raiz_sintetica), Decimal("1"))]
         else:
-            aloc = alocar_por_peso(previsto_total, pesos)
-            for tarefa_id, valor_tarefa in aloc.items():
+            # peso total por raiz (etapa) das folhas vinculadas a este OSC
+            peso_por_raiz = {}   # raiz_id -> [etapa_dict, peso_acumulado]
+            for tarefa_id, peso in pesos:
                 folha = por_id[tarefa_id]
                 raiz = _raiz_da_tarefa(folha, por_id)
                 et = _etapa(raiz)
-                fases = fasear_por_dias_uteis(
-                    valor_tarefa, folha.data_inicio, folha.data_fim, sab, dom)
+                slot = peso_por_raiz.setdefault(raiz.id, [et, Decimal("0")])
+                slot[1] += Decimal(peso)
+            # faseia o previsto alocado a cada folha (inalterado)
+            aloc = alocar_por_peso(previsto_total, pesos)
+            for tarefa_id, valor_tarefa in aloc.items():
+                folha = por_id[tarefa_id]
+                et = _etapa(_raiz_da_tarefa(folha, por_id))
+                fases = fasear_por_dias_uteis(valor_tarefa, folha.data_inicio, folha.data_fim, sab, dom)
                 for mes, parcela in fases.items():
                     if mes == NAO_FASEADO:
                         nao_faseado += parcela
                         continue
                     et["meses"][mes] = et["meses"].get(mes, Decimal("0")) + parcela
                     meses_globais[mes] = meses_globais.get(mes, Decimal("0")) + parcela
-            etapa_resumo = _etapa(_raiz_da_tarefa(por_id[pesos[0][0]], por_id))
+            # fração de resumo por raiz = peso da raiz / Σpeso (fallback igual)
+            soma_peso = sum((p for _, p in peso_por_raiz.values()), Decimal("0"))
+            n_raizes = len(peso_por_raiz)
+            resumo_por_raiz = []
+            for et, peso_raiz in peso_por_raiz.values():
+                frac = (peso_raiz / soma_peso) if soma_peso > 0 else (Decimal("1") / n_raizes)
+                resumo_por_raiz.append((et, frac))
 
-        etapa_resumo["previsto"]["material"] += material
-        etapa_resumo["previsto"]["mao_obra"] += mao_obra
-        etapa_resumo["previsto"]["outros"] += outros
-        etapa_resumo["previsto"]["total"] += previsto_total
-        etapa_resumo["veks"] += veks
-        etapa_resumo["fat_direto"] += fat
-        etapa_resumo["orcado"] += Decimal(osc.valor_orcado or 0)
-        etapa_resumo["realizado"] += Decimal(osc.realizado_total or 0)
+        # distribui os agregados de resumo entre as raízes pela fração
+        for et, frac in resumo_por_raiz:
+            et["previsto"]["material"] += material * frac
+            et["previsto"]["mao_obra"] += mao_obra * frac
+            et["previsto"]["outros"] += outros * frac
+            et["previsto"]["total"] += previsto_total * frac
+            et["veks"] += veks * frac
+            et["fat_direto"] += fat * frac
+            et["orcado"] += Decimal(osc.valor_orcado or 0) * frac
+            et["realizado"] += Decimal(osc.realizado_total or 0) * frac
 
     for et in etapas.values():
         et["desvio"] = et["realizado"] - et["previsto"]["total"]
