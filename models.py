@@ -5615,6 +5615,12 @@ class ObraServicoCusto(db.Model):
     mao_obra_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
     outros_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
 
+    # Físico-financeiro: quem paga cada categoria — 'veks' (empresa) ou 'fat_direto'
+    # (cliente paga o fornecedor direto). Default 'veks'.
+    fonte_material = db.Column(db.String(20), default='veks', nullable=False)
+    fonte_mao_obra = db.Column(db.String(20), default='veks', nullable=False)
+    fonte_outros = db.Column(db.String(20), default='veks', nullable=False)
+
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
