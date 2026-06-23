@@ -65,7 +65,7 @@ def api_funcionarios_consolidada():
                 if admin_id_param:
                     try:
                         admin_id = int(admin_id_param)
-                    except:
+                    except Exception:
                         # Se não conseguir converter, buscar todos
                         admin_id = None
                 else:
@@ -112,12 +112,12 @@ def api_funcionarios_consolidada():
                     
                     try:
                         funcao_nome = f.funcao_ref.nome if hasattr(f, 'funcao_ref') and f.funcao_ref else 'N/A'
-                    except:
+                    except Exception:
                         funcao_nome = 'N/A'
                     
                     try:
                         departamento_nome = f.departamento_ref.nome if hasattr(f, 'departamento_ref') and f.departamento_ref else 'N/A'
-                    except:
+                    except Exception:
                         departamento_nome = 'N/A'
                     
                     funcionarios_json.append({
@@ -133,12 +133,12 @@ def api_funcionarios_consolidada():
                     
                     try:
                         cargo_nome = f.funcao_ref.nome if hasattr(f, 'funcao_ref') and f.funcao_ref else 'Sem cargo'
-                    except:
+                    except Exception:
                         cargo_nome = 'Sem cargo'
                         
                     try:
                         departamento_nome = f.departamento_ref.nome if hasattr(f, 'departamento_ref') and f.departamento_ref else 'Sem departamento'
-                    except:
+                    except Exception:
                         departamento_nome = 'Sem departamento'
                     
                     funcionarios_json.append({
@@ -1068,7 +1068,7 @@ def get_admin_id_dinamico():
         try:
             primeiro_admin = db.session.execute(text("SELECT MIN(admin_id) FROM funcionario")).fetchone()
             return primeiro_admin[0] if primeiro_admin and primeiro_admin[0] else 1
-        except:
+        except Exception:
             return 1
 
 @main_bp.route('/api/servicos')

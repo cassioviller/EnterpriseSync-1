@@ -744,7 +744,7 @@ def obter_servicos_da_obra(obra_id, admin_id=None):
         try:
             db.session.rollback()
             logger.info("[SYNC] ROLLBACK executado")
-        except:
+        except Exception:
             logger.error("[WARN] Rollback falhou")
             
         # Fallback simpler - buscar apenas serviços que têm RDO
@@ -973,7 +973,7 @@ def editar_obra(id):
         try:
             db.session.rollback()
             logger.info("[SYNC] ROLLBACK preventivo na edição executado")
-        except:
+        except Exception:
             pass
         
         # Usar sistema robusto de detecção de admin_id
@@ -995,7 +995,7 @@ def editar_obra(id):
             try:
                 db.session.rollback()
                 logger.error("[SYNC] ROLLBACK após erro de serviços executado")
-            except:
+            except Exception:
                 pass
             servicos_obra_lista = []
             servicos_obra = []
@@ -1008,7 +1008,7 @@ def editar_obra(id):
         try:
             db.session.rollback()
             logger.info("[SYNC] ROLLBACK geral na edição executado")
-        except:
+        except Exception:
             pass
         funcionarios = []
         servicos_disponiveis = []
@@ -1595,7 +1595,7 @@ def detalhes_obra(id):
                 try:
                     from models import Restaurante
                     restaurante = Restaurante.query.get(registro.restaurante_id)
-                except:
+                except Exception:
                     restaurante = None
             
             custos_alimentacao_detalhados.append({
@@ -1714,7 +1714,7 @@ def detalhes_obra(id):
         try:
             from models import RDO
             rdos_obra = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).limit(10).all()
-        except:
+        except Exception:
             rdos_obra = []
         
         # ===== SISTEMA REFATORADO DE SERVIÇOS DA OBRA =====
@@ -1725,7 +1725,7 @@ def detalhes_obra(id):
             try:
                 db.session.rollback()
                 logger.info("[SYNC] ROLLBACK preventivo executado")
-            except:
+            except Exception:
                 pass
             
             admin_id_para_servicos = get_admin_id_robusta(obra)
@@ -1738,7 +1738,7 @@ def detalhes_obra(id):
             try:
                 db.session.rollback()
                 logger.error("[SYNC] ROLLBACK após erro executado")
-            except:
+            except Exception:
                 pass
             servicos_obra = []
         
