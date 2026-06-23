@@ -65,3 +65,35 @@ Consolida os achados de `2026-06-23-inventario-arquivos.md`,
   versionada explícita (Alembic já está no projeto).
 - `archive/` e `backups/legacy_*` (137 arquivos) — resíduo histórico isolado; remoção é
   decisão à parte.
+
+---
+
+## Status de execução (2026-06-23)
+
+| Seção | Item | Status |
+|---|---|---|
+| A | Binários (5) + xlsx/pdf (29) + png (9) destrastrear | ✅ Task 6 (`git rm --cached` + .gitignore) |
+| A | 6 one-offs + diagnósticos + bypass_auth.disabled | ✅ Task 7 (removidos; universal mantido) |
+| B | Módulos de view mortos | ✅ NO-OP (nenhum morto comprovado) |
+| C | 595 imports não usados | ✅ Task 8 (573 removidos via ruff; `__init__.py` e side-effects protegidos) |
+| D1/D2 | Boot/registro silencioso | ✅ Task 9 (77 logs com `exc_info=True`) |
+| D3/D4 | bare except em api/obras | ✅ Task 11 (14 narrowed p/ `except Exception:`) |
+| D5/D6 | demais bare except / bypass_auth | D6 ✅ (removido); D5 parcial (api/obras feitos; restantes registrados) |
+| E1/E2 | N+1 obras/cronograma | ✅ Task 12 (prefetch dict / group_by) |
+| F | Riscos de manutenção | registrados (não executados — fora de escopo) |
+
+### Verificação
+- **Gate rápido (boot):** 37 blueprints, 556 rotas — verde após cada commit.
+- **Lint:** baseline 1093 → **492** erros ruff (E722 51→0; F401 593→32; F811 42→8).
+  Restante dominado por F821/F405 (ruído de `from models import *`, seção F).
+- **Gate pesado (Playwright, servidor gunicorn `--reload` vivo):**
+  - BLOCO 1 (Auth): **4 passed**
+  - BLOCO 3 (Obras/RDO, cobre o N+1 de views/obras.py): **8 passed**
+  - Suíte completa (73 testes) deve ser rodada no fluxo normal do usuário antes do merge;
+    blocos representativos das áreas alteradas passaram.
+
+### Itens remanescentes (registrados, fora desta passada)
+- F541 (92 f-strings sem placeholder), F841 (50 vars não usadas), B007/B023/B904 — higiene
+  cosmética, baixa prioridade.
+- F821/F405 (243) — exigem resolver `from models import *` (projeto à parte).
+- Arquivos gigantes e dívida flat vs `views/` (seção F) — projetos à parte.
