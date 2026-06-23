@@ -10,9 +10,9 @@ try:
     app.register_blueprint(rdo_editar_bp)
     logger.info("[OK] Sistema de edição RDO registrado")
 except ImportError as e:
-    logger.error(f"[WARN] Erro ao importar sistema de edição RDO: {e}")
+    logger.error(f"[WARN] Erro ao importar sistema de edição RDO: {e}", exc_info=True)
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar sistema de edição RDO: {e}")
+    logger.error(f"[ERROR] Erro ao registrar sistema de edição RDO: {e}", exc_info=True)
 
 
 
@@ -24,7 +24,7 @@ try:
     app.register_blueprint(rdo_crud_bp)
     logger.info("[OK] Sistema CRUD RDO completo registrado")
 except ImportError as e:
-    logger.warning(f"[WARN] Sistema CRUD RDO não encontrado: {e}")
+    logger.warning(f"[WARN] Sistema CRUD RDO não encontrado: {e}", exc_info=True)
 
 from flask import redirect, url_for, render_template_string
 import traceback
@@ -87,7 +87,7 @@ try:
     app.register_blueprint(health_bp)
     logger.info("[OK] Health check registrado")
 except ImportError as e:
-    logger.warning(f"[WARN] Health check não encontrado: {e}")
+    logger.warning(f"[WARN] Health check não encontrado: {e}", exc_info=True)
 
 # Registrar API de Funcionários
 try:
@@ -100,7 +100,7 @@ try:
     app.register_blueprint(api_buscar_funcionarios_bp)
     logger.info("[OK] API de Busca de Funcionários registrada")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar API Funcionários: {e}")
+    logger.error(f"[ERROR] Erro ao registrar API Funcionários: {e}", exc_info=True)
 
 # CRUD antigo de Serviços removido (Task #128) — uso exclusivo do Catálogo de Serviços.
 # Mantemos um redirect das rotas /servicos* para o Catálogo para não quebrar
@@ -116,7 +116,7 @@ try:
     app.register_blueprint(cadastrar_servico_bp)
     logger.info("[OK] Sistema de cadastro serviço-obra registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar cadastro serviço-obra: {e}")
+    logger.error(f"[ERROR] Erro ao registrar cadastro serviço-obra: {e}", exc_info=True)
 
 # Sistema de veículos-obras removido (código obsoleto limpo)
 
@@ -128,7 +128,7 @@ try:
     app.register_blueprint(analytics_bp)
     logger.info("[OK] Analytics Preditivos registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Analytics Preditivos: {e}")
+    logger.error(f"[ERROR] Erro ao registrar Analytics Preditivos: {e}", exc_info=True)
 
 # Sistema de alertas avançados removido (código obsoleto limpo)
 
@@ -140,7 +140,7 @@ try:
     app.register_blueprint(dashboards_bp)
     logger.info("[OK] Dashboards Específicos registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Dashboards Específicos: {e}")
+    logger.error(f"[ERROR] Erro ao registrar Dashboards Específicos: {e}", exc_info=True)
 
 # Registrar Exportação de Relatórios
 try:
@@ -148,7 +148,7 @@ try:
     app.register_blueprint(exportacao_bp)
     logger.info("[OK] Exportação de Relatórios registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Exportação de Relatórios: {e}")
+    logger.error(f"[ERROR] Erro ao registrar Exportação de Relatórios: {e}", exc_info=True)
 
 # Registrar Relatórios Financeiros Avançados
 try:
@@ -156,7 +156,7 @@ try:
     app.register_blueprint(financeiros_bp)
     logger.info("[OK] Relatórios Financeiros Avançados registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Relatórios Financeiros: {e}")
+    logger.error(f"[ERROR] Erro ao registrar Relatórios Financeiros: {e}", exc_info=True)
 
 # Relatórios de uso detalhado removido (código obsoleto limpo)
 
@@ -167,14 +167,14 @@ try:
     app.register_blueprint(portal_obras_bp)
     logger.info("[OK] Portal do Cliente por Obra registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Portal Obras: {e}")
+    logger.error(f"[ERROR] Erro ao registrar Portal Obras: {e}", exc_info=True)
 
 try:
     from medicao_views import medicao_bp
     app.register_blueprint(medicao_bp)
     logger.info("[OK] Blueprint MEDICAO QUINZENAL registrado")
 except Exception as e:
-    logger.error(f"[ERROR] Erro ao registrar Medicao: {e}")
+    logger.error(f"[ERROR] Erro ao registrar Medicao: {e}", exc_info=True)
 
 logger.info("[READY] SISTEMA INICIADO - Todos os blueprints críticos foram carregados")
 
@@ -219,14 +219,14 @@ try:
     csrf.exempt(selecionar_mapa_v2)
     logger.info("[OK] CSRF exempt: portal_obras (public routes only)")
 except Exception as e:
-    logger.error(f"[WARN] CSRF exempt portal_obras routes: {e}")
+    logger.error(f"[WARN] CSRF exempt portal_obras routes: {e}", exc_info=True)
 
 try:
     from medicao_views import portal_pdf_extrato
     csrf.exempt(portal_pdf_extrato)
     logger.info("[OK] CSRF exempt: medicao portal_pdf_extrato (public)")
 except Exception as e:
-    logger.error(f"[WARN] CSRF exempt medicao portal: {e}")
+    logger.error(f"[WARN] CSRF exempt medicao portal: {e}", exc_info=True)
 
 
 try:
@@ -234,36 +234,36 @@ try:
     app.register_blueprint(custos_escritorio_bp)
     logger.info("[OK] Blueprint custos_escritorio registrado")
 except ImportError as e:
-    logger.warning(f"[WARN] custos_escritorio não encontrado: {e}")
+    logger.warning(f"[WARN] custos_escritorio não encontrado: {e}", exc_info=True)
 except Exception as e:
-    logger.error(f"[ERROR] Falha ao registrar custos_escritorio: {e}")
+    logger.error(f"[ERROR] Falha ao registrar custos_escritorio: {e}", exc_info=True)
 
 try:
     from views.catalogos_views import catalogos_bp
     app.register_blueprint(catalogos_bp)
     logger.info("[OK] Blueprint catalogos registrado")
 except ImportError as e:
-    logger.warning(f"[WARN] catalogos não encontrado: {e}")
+    logger.warning(f"[WARN] catalogos não encontrado: {e}", exc_info=True)
 except Exception as e:
-    logger.error(f"[ERROR] Falha ao registrar catalogos: {e}")
+    logger.error(f"[ERROR] Falha ao registrar catalogos: {e}", exc_info=True)
 
 try:
     from views.quick_create_views import quick_create_bp
     app.register_blueprint(quick_create_bp)
     logger.info("[OK] Blueprint quick_create registrado")
 except ImportError as e:
-    logger.warning(f"[WARN] quick_create não encontrado: {e}")
+    logger.warning(f"[WARN] quick_create não encontrado: {e}", exc_info=True)
 except Exception as e:
-    logger.error(f"[ERROR] Falha ao registrar quick_create: {e}")
+    logger.error(f"[ERROR] Falha ao registrar quick_create: {e}", exc_info=True)
 
 try:
     from cadastros_views import cadastros_hub_bp
     app.register_blueprint(cadastros_hub_bp)
     logger.info("[OK] Blueprint cadastros_hub registrado")
 except ImportError as e:
-    logger.warning(f"[WARN] cadastros_hub não encontrado: {e}")
+    logger.warning(f"[WARN] cadastros_hub não encontrado: {e}", exc_info=True)
 except Exception as e:
-    logger.error(f"[ERROR] Falha ao registrar cadastros_hub: {e}")
+    logger.error(f"[ERROR] Falha ao registrar cadastros_hub: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

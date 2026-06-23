@@ -340,26 +340,26 @@ try:
     import event_manager  # noqa: F401  (import com efeito colateral: registra eventos)
     logging.info(f"[OK] Event Manager inicializado - {len(event_manager.EventManager.list_events())} eventos registrados")
 except Exception as e:
-    logging.warning(f"[WARN] Event Manager não carregado: {e}")
+    logging.warning(f"[WARN] Event Manager não carregado: {e}", exc_info=True)
 
 # Import event handlers to auto-register
 try:
     import handlers.folha_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
     logging.info("[OK] Handler de folha de pagamento registrado")
 except Exception as e:
-    logging.warning(f"[WARN] Handler de folha não carregado: {e}")
+    logging.warning(f"[WARN] Handler de folha não carregado: {e}", exc_info=True)
 
 try:
     import handlers.propostas_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
     logging.info("[OK] Handler de propostas comerciais registrado")
 except Exception as e:
-    logging.warning(f"[WARN] Handler de propostas não carregado: {e}")
+    logging.warning(f"[WARN] Handler de propostas não carregado: {e}", exc_info=True)
 
 try:
     import handlers.financeiro_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
     logging.info("[OK] Handler de financeiro registrado")
 except Exception as e:
-    logging.warning(f"[WARN] Handler de financeiro não carregado: {e}")
+    logging.warning(f"[WARN] Handler de financeiro não carregado: {e}", exc_info=True)
 
 # Task #43 — Webhook para n8n (notificações externas).
 # Bootstrap: registra listener universal para a allowlist + thread de retry.
@@ -369,7 +369,7 @@ try:
     _init_webhook(app)
     logging.info("[OK] Despachante de webhook (n8n) inicializado")
 except Exception as e:
-    logging.warning(f"[WARN] Despachante de webhook não carregado: {e}")
+    logging.warning(f"[WARN] Despachante de webhook não carregado: {e}", exc_info=True)
 
 # Import views
 from views import main_bp
@@ -393,7 +393,7 @@ try:
     app.register_blueprint(clientes_bp)
     logging.info("[OK] Blueprint clientes (cadastros) registrado")
 except Exception as e:
-    logging.error(f"[ERROR] Erro ao registrar blueprint clientes: {e}")
+    logging.error(f"[ERROR] Erro ao registrar blueprint clientes: {e}", exc_info=True)
 
 # Task #42 — CRM de Leads
 try:
@@ -401,7 +401,7 @@ try:
     app.register_blueprint(crm_bp)
     logging.info("[OK] Blueprint CRM de Leads registrado")
 except Exception as e:
-    logging.error(f"[ERROR] Erro ao registrar blueprint CRM: {e}")
+    logging.error(f"[ERROR] Erro ao registrar blueprint CRM: {e}", exc_info=True)
 
 # Task #16 — Manual do Usuário
 try:
@@ -409,7 +409,7 @@ try:
     app.register_blueprint(manual_bp)
     logging.info("[OK] Blueprint Manual do Usuário registrado")
 except Exception as e:
-    logging.error(f"[ERROR] Erro ao registrar blueprint Manual: {e}")
+    logging.error(f"[ERROR] Erro ao registrar blueprint Manual: {e}", exc_info=True)
 
 # Task #19 — Ferramentas de desenvolvimento (mobile preview)
 try:
@@ -417,7 +417,7 @@ try:
     app.register_blueprint(dev_bp)
     logging.info("[OK] Blueprint dev_tools (mobile preview) registrado")
 except Exception as e:
-    logging.error(f"[ERROR] Erro ao registrar blueprint dev_tools: {e}")
+    logging.error(f"[ERROR] Erro ao registrar blueprint dev_tools: {e}", exc_info=True)
 
 ponto_import_error = None
 try:
@@ -469,7 +469,7 @@ try:
     app.register_blueprint(servico_obra_real_bp)
     logging.info("[OK] Blueprint ServicoObraReal registrado")
 except ImportError as e:
-    logging.warning(f"ServicosObraReal não disponível: {e}")
+    logging.warning(f"ServicosObraReal não disponível: {e}", exc_info=True)
 
 # Test routes removed for production cleanliness
 
@@ -594,7 +594,7 @@ with app.app_context():
         executar_migracoes()
         logger.info("[OK] Migrações executadas com sucesso!")
     except Exception as e:
-        logger.error(f"[ERROR] Erro ao executar migrações: {e}")
+        logger.error(f"[ERROR] Erro ao executar migrações: {e}", exc_info=True)
         logger.warning("[WARN] Aplicação continuará mesmo com erro nas migrações")
     
     # [CONFIG] AUTO-FIX UNIVERSAL - Correção automática de admin_id em TODAS as tabelas
@@ -603,7 +603,7 @@ with app.app_context():
         from fix_all_admin_id_universal import auto_fix_all_admin_id
         auto_fix_all_admin_id()
     except Exception as e:
-        logger.error(f"[ERROR] Erro no auto-fix universal: {e}")
+        logger.error(f"[ERROR] Erro no auto-fix universal: {e}", exc_info=True)
     
     # [DEL] SISTEMA DE LIMPEZA DE VEÍCULOS - CRITICAL INTEGRATION
     # Executa limpeza de tabelas obsoletas de veículos quando RUN_CLEANUP_VEICULOS=1
@@ -617,7 +617,7 @@ with app.app_context():
     except ImportError:
         logger.warning("[WARN] Migration de limpeza de veículos não disponível")
     except Exception as e:
-        logger.error(f"[ERROR] Erro na migration de limpeza de veículos: {e}")
+        logger.error(f"[ERROR] Erro na migration de limpeza de veículos: {e}", exc_info=True)
         # Não interromper o app, apenas logar erro
         logger.info("[INFO] Para executar migrações: RUN_MIGRATIONS=1 gunicorn --bind 0.0.0.0:5000 main:app")
     
@@ -627,14 +627,14 @@ with app.app_context():
         app.register_blueprint(folha_bp, url_prefix='/folha')
         logging.info("[OK] Blueprint folha de pagamento registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint folha de pagamento: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint folha de pagamento: {e}", exc_info=True)
     
     try:
         from contabilidade_views import contabilidade_bp
         app.register_blueprint(contabilidade_bp, url_prefix='/contabilidade')
         logging.info("[OK] Blueprint contabilidade registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint contabilidade: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint contabilidade: {e}", exc_info=True)
     
     # Blueprint financeiro v9.0
     try:
@@ -642,7 +642,7 @@ with app.app_context():
         app.register_blueprint(financeiro_bp)
         logging.info("[OK] Blueprint financeiro v9.0 registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint financeiro: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint financeiro: {e}", exc_info=True)
     
     # Blueprint custos v9.0
     try:
@@ -650,7 +650,7 @@ with app.app_context():
         app.register_blueprint(custos_bp)
         logging.info("[OK] Blueprint custos v9.0 registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint custos: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint custos: {e}", exc_info=True)
 
     # Blueprint Gestão de Custos V2 (Migration 77)
     try:
@@ -658,7 +658,7 @@ with app.app_context():
         app.register_blueprint(gestao_custos_bp)
         logging.info("[OK] Blueprint gestao_custos V2 registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint gestao_custos: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint gestao_custos: {e}", exc_info=True)
     
     # Blueprint Orçamentos (Task #115 — substitui módulo legado de Templates)
     try:
@@ -670,7 +670,7 @@ with app.app_context():
         app.register_blueprint(orcamento_operacional_bp)
         logging.info("[OK] Blueprint orcamentos registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint orcamentos: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint orcamentos: {e}", exc_info=True)
     
     # Blueprint de serviços será registrado em main.py para evitar conflitos
     
@@ -680,9 +680,9 @@ with app.app_context():
         app.register_blueprint(alimentacao_bp)
         logging.info("[OK] Blueprint alimentação registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint alimentação não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint alimentação não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint alimentação: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint alimentação: {e}", exc_info=True)
     
     # Modelos de propostas já estão consolidados em models.py
         logging.info("[OK] Modelos de propostas importados do arquivo consolidado")
@@ -693,9 +693,9 @@ with app.app_context():
         app.register_blueprint(propostas_bp, url_prefix='/propostas')
         logging.info("[OK] Blueprint propostas consolidado registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint propostas consolidado não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint propostas consolidado não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint propostas: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint propostas: {e}", exc_info=True)
     
     # Task #82 — Catálogo de Insumos + Composição/Orçamento de Serviços
     try:
@@ -705,7 +705,7 @@ with app.app_context():
         app.register_blueprint(catalogo_legacy_bp)  # aliases /propostas/* e /medicao/obra/*
         logging.info("[OK] Blueprint CATALOGO (insumos+composicao+orcamento) registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint catalogo: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint catalogo: {e}", exc_info=True)
 
     # Registrar API de organização
     try:
@@ -713,7 +713,7 @@ with app.app_context():
         app.register_blueprint(api_organizer)
         logging.info("[OK] Blueprint API organizer registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint API organizer não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint API organizer não encontrado: {e}", exc_info=True)
     
     # Registrar blueprint de categorias de serviços
     try:
@@ -721,11 +721,11 @@ with app.app_context():
         app.register_blueprint(categorias_bp)
         logging.info("[OK] Blueprint categorias de serviços registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint categorias de serviços não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint categorias de serviços não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint categorias de serviços: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint categorias de serviços: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint API organizer: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint API organizer: {e}", exc_info=True)
     
     # Registrar blueprint de configurações
     try:
@@ -733,9 +733,9 @@ with app.app_context():
         app.register_blueprint(configuracoes_bp)
         logging.info("[OK] Blueprint configurações registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint configurações não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint configurações não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint configurações: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint configurações: {e}", exc_info=True)
     
     # Registrar API limpa de serviços da obra
     try:
@@ -743,9 +743,9 @@ with app.app_context():
         app.register_blueprint(api_servicos_obra_bp)
         logging.info("[OK] Blueprint API serviços obra LIMPA registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint API serviços obra limpa não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint API serviços obra limpa não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint API serviços obra limpa: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint API serviços obra limpa: {e}", exc_info=True)
     
     # Registrar blueprint EQUIPE - Sistema de Gestão Lean
     try:
@@ -753,9 +753,9 @@ with app.app_context():
         app.register_blueprint(equipe_bp)
         logging.info("[OK] Blueprint EQUIPE (gestão lean) registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint EQUIPE não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint EQUIPE não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint EQUIPE: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint EQUIPE: {e}", exc_info=True)
     
     # Registrar blueprint FROTA - Novo sistema de gestão de veículos
     try:
@@ -763,9 +763,9 @@ with app.app_context():
         app.register_blueprint(frota_bp)
         logging.info("[OK] Blueprint FROTA registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint FROTA não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint FROTA não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint FROTA: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint FROTA: {e}", exc_info=True)
     
     # Registrar blueprint COMPRAS V2
     try:
@@ -773,9 +773,9 @@ with app.app_context():
         app.register_blueprint(compras_bp)
         logging.info("[OK] Blueprint COMPRAS registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint COMPRAS não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint COMPRAS não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint COMPRAS: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint COMPRAS: {e}", exc_info=True)
 
     # Registrar blueprint TRANSPORTE V2
     try:
@@ -783,9 +783,9 @@ with app.app_context():
         app.register_blueprint(transporte_bp)
         logging.info("[OK] Blueprint TRANSPORTE registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint TRANSPORTE não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint TRANSPORTE não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint TRANSPORTE: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint TRANSPORTE: {e}", exc_info=True)
 
     # Registrar blueprint CRONOGRAMA V2
     try:
@@ -793,9 +793,9 @@ with app.app_context():
         app.register_blueprint(cronograma_bp)
         logging.info("[OK] Blueprint CRONOGRAMA registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint CRONOGRAMA não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint CRONOGRAMA não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint CRONOGRAMA: {e}", exc_info=True)
 
     # Task #62 — Auditoria de vínculos Cronograma↔Subatividade↔Serviço↔MO
     try:
@@ -803,9 +803,9 @@ with app.app_context():
         app.register_blueprint(vinculos_audit_bp)
         logging.info("[OK] Blueprint VINCULOS_AUDIT (Task #62) registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint VINCULOS_AUDIT não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint VINCULOS_AUDIT não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint VINCULOS_AUDIT: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint VINCULOS_AUDIT: {e}", exc_info=True)
 
     # Task #62 — listener SQLAlchemy: auto-vínculo Funcao→ComposicaoServico
     try:
@@ -813,7 +813,7 @@ with app.app_context():
         install_auto_link_listener()
         logging.info("[OK] Auto-link listener (Task #62) instalado")
     except Exception as e:
-        logging.error(f"[ERROR] Falha instalando auto-link listener Task#62: {e}")
+        logging.error(f"[ERROR] Falha instalando auto-link listener Task#62: {e}", exc_info=True)
 
     # Registrar blueprint SUBEMPREITEIROS (Task 57)
     try:
@@ -821,9 +821,9 @@ with app.app_context():
         app.register_blueprint(subempreiteiros_bp)
         logging.info("[OK] Blueprint SUBEMPREITEIROS registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint SUBEMPREITEIROS não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint SUBEMPREITEIROS não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint SUBEMPREITEIROS: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint SUBEMPREITEIROS: {e}", exc_info=True)
 
     # Registrar blueprint REEMBOLSOS V2
     try:
@@ -831,9 +831,9 @@ with app.app_context():
         app.register_blueprint(reembolso_bp)
         logging.info("[OK] Blueprint REEMBOLSOS V2 registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint REEMBOLSOS não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint REEMBOLSOS não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint REEMBOLSOS: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint REEMBOLSOS: {e}", exc_info=True)
 
     # Registrar blueprint landing page
     try:
@@ -841,7 +841,7 @@ with app.app_context():
         app.register_blueprint(landing_bp)
         logging.info("[OK] Blueprint landing page registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint landing: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint landing: {e}", exc_info=True)
 
     # Task #70 — Planejamento de Custos
     try:
@@ -849,7 +849,7 @@ with app.app_context():
         app.register_blueprint(planejamento_custos_bp)
         logging.info("[OK] Blueprint planejamento_custos registrado")
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint planejamento_custos: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint planejamento_custos: {e}", exc_info=True)
 
     # Task #3 — Métricas de Produtividade e Lucratividade
     try:
@@ -857,9 +857,9 @@ with app.app_context():
         app.register_blueprint(metricas_bp)
         logging.info("[OK] Blueprint METRICAS (Task #3) registrado")
     except ImportError as e:
-        logging.warning(f"[WARN] Blueprint METRICAS não encontrado: {e}")
+        logging.warning(f"[WARN] Blueprint METRICAS não encontrado: {e}", exc_info=True)
     except Exception as e:
-        logging.error(f"[ERROR] Erro ao registrar blueprint METRICAS: {e}")
+        logging.error(f"[ERROR] Erro ao registrar blueprint METRICAS: {e}", exc_info=True)
     
     # Sistema avançado de veículos removido (código obsoleto limpo)
     
@@ -872,7 +872,7 @@ with app.app_context():
     #         bypass_auth removido
     #         logging.info("[UNLOCK] Sistema de bypass de autenticação carregado")
     #     except Exception as e:
-    #         logging.error(f"Erro ao carregar bypass: {e}")
+    #         logging.error(f"Erro ao carregar bypass: {e}", exc_info=True)
     
     logging.info("[LOCK] Sistema de bypass PERMANENTEMENTE desabilitado - admin_id consistente")
 
@@ -892,7 +892,7 @@ try:
     app.cli.add_command(cobertura_ociosa_cmd)
     logging.info("[OK] Comando CLI cobertura-ociosa registrado")
 except ImportError as e:
-    logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}")
+    logging.warning(f"[WARN] Comando CLI de diagnóstico não disponível: {e}", exc_info=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SCHEDULER: job mensal — cobertura ociosa de mensalistas (dia 1 de cada mês)
