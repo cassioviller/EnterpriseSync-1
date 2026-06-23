@@ -313,5 +313,19 @@ def main() -> None:
     sys.exit(0 if not failed else 1)
 
 
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_orcamento_fracionavel_e2e():
+    """Entrypoint pytest (browser): fracionavel=False força ceil (Task #75) no
+    DOM. Requer servidor. Cobertura preservada."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E fracionável falhou (exit code={e.code})"
+
+
 if __name__ == '__main__':
     main()

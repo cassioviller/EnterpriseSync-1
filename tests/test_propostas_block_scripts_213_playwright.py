@@ -343,5 +343,20 @@ def run():
     sys.exit(0)
 
 
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_propostas_block_scripts_213_e2e():
+    """Entrypoint pytest (browser): gate de cronograma-revisar→aprovar com
+    cliques reais (Task #213). Requer servidor. Cobertura preservada (versão
+    canônica; a HTTP é redundante)."""
+    try:
+        run()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E block scripts #213 falhou (exit code={e.code})"
+
+
 if __name__ == "__main__":
     run()
