@@ -86,11 +86,12 @@ Consolida os achados de `2026-06-23-inventario-arquivos.md`,
 - **Gate rápido (boot):** 37 blueprints, 556 rotas — verde após cada commit.
 - **Lint:** baseline 1093 → **492** erros ruff (E722 51→0; F401 593→32; F811 42→8).
   Restante dominado por F821/F405 (ruído de `from models import *`, seção F).
-- **Gate pesado (Playwright, servidor gunicorn `--reload` vivo):**
-  - BLOCO 1 (Auth): **4 passed**
-  - BLOCO 3 (Obras/RDO, cobre o N+1 de views/obras.py): **8 passed**
-  - Suíte completa (73 testes) deve ser rodada no fluxo normal do usuário antes do merge;
-    blocos representativos das áreas alteradas passaram.
+- **Gate pesado (Playwright, browser real, servidor gunicorn `--reload` vivo):**
+  - Chromium atualizado (`playwright install chromium`, v1.58.0).
+  - **Suíte completa: `115 passed` em 45.9s, 0 falhas.** Inclui ConsoleSweep de todas as
+    páginas (sem erros de JS), cobrindo `/obras` (E1) e `/cronograma/` (E2).
+  - 5 warnings são pré-existentes (`Query.get` legado, SAWarning de relationship overlap),
+    não introduzidos por esta passada.
 
 ### Itens remanescentes (registrados, fora desta passada)
 - F541 (92 f-strings sem placeholder), F841 (50 vars não usadas), B007/B023/B904 — higiene
