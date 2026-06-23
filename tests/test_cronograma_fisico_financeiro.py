@@ -47,3 +47,19 @@ def test_peso_zero_distribui_igualmente():
 
 def test_sem_tarefas_retorna_vazio():
     assert alocar_por_peso(D("100"), []) == {}
+
+
+from services.cronograma_fisico_financeiro import montar_curva_s
+
+
+def test_curva_s_acumula_e_fecha_em_um():
+    curva = montar_curva_s({"2026-07": D("600"), "2026-06": D("400")})
+    assert [c["mes"] for c in curva] == ["2026-06", "2026-07"]  # ordenado
+    assert curva[0]["acumulado"] == D("400")
+    assert curva[1]["acumulado"] == D("1000")
+    assert curva[1]["pct_acumulado"] == D("1")
+    assert curva[0]["pct_acumulado"] == D("0.4")
+
+
+def test_curva_s_vazia():
+    assert montar_curva_s({}) == []

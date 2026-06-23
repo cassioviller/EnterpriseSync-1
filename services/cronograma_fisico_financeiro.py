@@ -81,3 +81,25 @@ def alocar_por_peso(valor: Decimal, pesos: list) -> dict:
         else:
             out[chave] = (valor - acumulado).quantize(CENTAVO, ROUND_HALF_UP)
     return out
+
+
+def montar_curva_s(meses_valores: dict) -> list:
+    """Recebe {'YYYY-MM': Decimal}; retorna lista ordenada por mês com
+    custo do mês, acumulado e pct_acumulado (sobre o total). Ignora o bucket
+    NAO_FASEADO."""
+    meses = {k: Decimal(v) for k, v in meses_valores.items() if k != NAO_FASEADO}
+    if not meses:
+        return []
+    total = sum(meses.values(), Decimal("0"))
+    curva = []
+    acumulado = Decimal("0")
+    for mes in sorted(meses):
+        acumulado += meses[mes]
+        pct = (acumulado / total) if total > 0 else Decimal("0")
+        curva.append({
+            "mes": mes,
+            "custo_mes": meses[mes],
+            "acumulado": acumulado,
+            "pct_acumulado": pct,
+        })
+    return curva
