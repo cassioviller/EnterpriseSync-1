@@ -34,8 +34,10 @@ except Exception:
 # Arquivos standalone (não-pytest) que devem ser ignorados pelo coletor
 # ---------------------------------------------------------------------------
 collect_ignore_glob = [
-    "test_insumo_coeficiente_padrao.py",
-    "test_orcamento_formato_br.py",
+    # Híbrido: define várias funções `def test_*(admin, proposta, ...)` feitas
+    # para chamada manual via main() (args posicionais, não fixtures pytest).
+    # Coletá-las quebra com "fixture not found". Conversão requer refatoração
+    # maior (fixtures reais) — deferida.
     "test_task_45_catalogo_eventos.py",
 ]
 

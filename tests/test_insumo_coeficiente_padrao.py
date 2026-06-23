@@ -51,7 +51,7 @@ def _check(cond: bool, label: str, falhas: list[str]):
         falhas.append(label)
 
 
-def teste_coeficiente_padrao_fluxo_completo(falhas: list[str]):
+def _teste_coeficiente_padrao_fluxo_completo(falhas: list[str]):
     suf = _suffix()
     with app.app_context():
         admin = Usuario(
@@ -222,7 +222,7 @@ def teste_coeficiente_padrao_fluxo_completo(falhas: list[str]):
 
 def main() -> int:
     falhas: list[str] = []
-    teste_coeficiente_padrao_fluxo_completo(falhas)
+    _teste_coeficiente_padrao_fluxo_completo(falhas)
 
     if falhas:
         logger.error('=' * 60)
@@ -233,6 +233,16 @@ def main() -> int:
     logger.info('=' * 60)
     logger.info('✅ Task #166: todos os checks passaram')
     return 0
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_insumo_coeficiente_padrao_task166():
+    """Entrypoint pytest do script legado (Task #166): main() retorna 0 se o
+    fluxo de coeficiente_padrao do insumo passa. Cobertura preservada."""
+    assert main() == 0, "Fluxo de coeficiente_padrao do insumo falhou (ver stdout)"
 
 
 if __name__ == '__main__':
