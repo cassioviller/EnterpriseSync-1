@@ -262,3 +262,49 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
         "nao_faseado": nao_faseado,
         "avisos": avisos,
     }
+
+
+def exportar_fisico_financeiro_xlsx(dados: dict):
+    """Gera um openpyxl.Workbook no layout da planilha de referência:
+    aba 'Cronograma FF (por etapa)' + aba 'Curva S'."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Cronograma FF (por etapa)"
+
+    meses = dados.get("meses_ordenados", [])
+    header = ["Etapa", "Veks (R$)", "Fat Direto (R$)", "Total (R$)", "%"] + list(meses)
+    ws.append(header)
+
+    total_geral = dados["totais"]["total"] or Decimal("1")
+    for et in dados["etapas"]:
+        total_et = et["previsto"]["total"]
+        pct = (total_et / total_geral) if total_geral else Decimal("0")
+        linha = [
+            et["nome"],
+            float(et["veks"]), float(et["fat_direto"]), float(total_et), float(pct),
+        ]
+        for mes in meses:
+            linha.append(float(et["meses"].get(mes, 0)))
+        ws.append(linha)
+
+    t = dados["totais"]
+    rodape = ["TOTAL GERAL", float(t["veks"]), float(t["fat_direto"]), float(t["total"]), 1.0]
+    # soma por mês
+    soma_mes = {m: Decimal("0") for m in meses}
+    for et in dados["etapas"]:
+        for m in meses:
+            soma_mes[m] += et["meses"].get(m, Decimal("0"))
+    rodape += [float(soma_mes[m]) for m in meses]
+    ws.append(rodape)
+
+    # aba Curva S
+    ws2 = wb.create_sheet("Curva S")
+    ws2.append(["Mês", "Custo do mês", "Custo acumulado", "% acumulado"])
+    for ponto in dados.get("curva_s", []):
+        ws2.append([
+            ponto["mes"], float(ponto["custo_mes"]),
+            float(ponto["acumulado"]), float(ponto["pct_acumulado"]),
+        ])
+    return wb

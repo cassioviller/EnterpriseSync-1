@@ -84,3 +84,36 @@ def test_tudo_veks_por_default():
         fonte_material="veks", fonte_mao_obra="veks", fonte_outros="veks",
     )
     assert veks == D("160") and fat == D("0")
+
+
+from services.cronograma_fisico_financeiro import exportar_fisico_financeiro_xlsx
+
+
+def test_xlsx_tem_abas_e_cabecalho():
+    dados = {
+        "etapas": [{
+            "etapa_id": 1, "nome": "Fundação", "categoria": "Fundação",
+            "previsto": {"material": D("20000"), "mao_obra": D("49000"),
+                         "outros": D("9300"), "total": D("78300")},
+            "veks": D("58300"), "fat_direto": D("20000"),
+            "orcado": D("78300"), "realizado": D("0"), "desvio": D("-78300"),
+            "meses": {"2026-06": D("70000"), "2026-07": D("8300")},
+        }],
+        "meses_ordenados": ["2026-06", "2026-07"],
+        "totais": {"veks": D("58300"), "fat_direto": D("20000"), "total": D("78300"),
+                   "previsto": D("78300"), "orcado": D("78300"), "realizado": D("0")},
+        "curva_s": [
+            {"mes": "2026-06", "custo_mes": D("70000"), "acumulado": D("70000"), "pct_acumulado": D("0.894")},
+            {"mes": "2026-07", "custo_mes": D("8300"), "acumulado": D("78300"), "pct_acumulado": D("1")},
+        ],
+        "nao_faseado": D("0"), "avisos": [],
+    }
+    wb = exportar_fisico_financeiro_xlsx(dados)
+    assert {ws.title for ws in wb.worksheets} == {"Cronograma FF (por etapa)", "Curva S"}
+    ws = wb["Cronograma FF (por etapa)"]
+    # cabeçalho: Etapa | Veks | Fat Direto | Total | % | 2026-06 | 2026-07
+    header = [c.value for c in ws[1]]
+    assert header[:5] == ["Etapa", "Veks (R$)", "Fat Direto (R$)", "Total (R$)", "%"]
+    assert "2026-06" in header and "2026-07" in header
+    # primeira etapa
+    assert ws.cell(row=2, column=1).value == "Fundação"
