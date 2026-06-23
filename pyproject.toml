@@ -47,4 +47,20 @@ dependencies = [
     "python-levenshtein>=0.27.3",
     "playwright>=1.58.0",
     "markdown>=3.10",
+    "ruff>=0.6",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# Auditoria de higiene; não reformatar o mundo. Regras seguras e de detecção.
+extend-exclude = [
+    ".pythonlibs", "__pycache__", "archive", "backups", "attached_assets",
+    "migrations.py", "uv.lock",
+]
+
+[tool.ruff.lint]
+# F = pyflakes (imports/vars não usados, redefinição), E9 = erros de sintaxe,
+# B = bugbear (bare except, etc.). Conservador de propósito.
+select = ["F", "E9", "B"]
+ignore = []
