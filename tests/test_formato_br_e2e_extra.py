@@ -125,12 +125,18 @@ def seed_dados():
 
         # Obra + Item de medição + Custo realizado vinculado ao serviço
         # → alimenta a tela /historico-obras com linhas reais.
+        # Task #172: obra.cliente_id virou FK NOT NULL (removido cliente_nome).
+        from models import Cliente
+        cli = Cliente(admin_id=admin_id, nome='Cliente Teste 189',
+                      email=f'cli189_{suf}@test.local')
+        db.session.add(cli)
+        db.session.flush()
         obra = Obra(
             admin_id=admin_id,
             nome=f'__t189_obra_{suf}',
             codigo=f'T189-{suf[-6:]}',
             data_inicio=date(2026, 1, 1),
-            cliente_nome='Cliente Teste 189',
+            cliente_id=cli.id,
             status='Em andamento',
             ativo=True,
         )
