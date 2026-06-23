@@ -63,3 +63,24 @@ def test_curva_s_acumula_e_fecha_em_um():
 
 def test_curva_s_vazia():
     assert montar_curva_s({}) == []
+
+
+from services.cronograma_fisico_financeiro import classificar_veks_fat
+
+
+def test_material_fat_mao_obra_veks():
+    veks, fat = classificar_veks_fat(
+        material=D("100"), mao_obra=D("50"), outros=D("10"),
+        fonte_material="fat_direto", fonte_mao_obra="veks", fonte_outros="veks",
+    )
+    assert fat == D("100")
+    assert veks == D("60")
+    assert veks + fat == D("160")
+
+
+def test_tudo_veks_por_default():
+    veks, fat = classificar_veks_fat(
+        material=D("100"), mao_obra=D("50"), outros=D("10"),
+        fonte_material="veks", fonte_mao_obra="veks", fonte_outros="veks",
+    )
+    assert veks == D("160") and fat == D("0")

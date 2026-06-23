@@ -103,3 +103,22 @@ def montar_curva_s(meses_valores: dict) -> list:
             "pct_acumulado": pct,
         })
     return curva
+
+
+def classificar_veks_fat(material, mao_obra, outros,
+                         fonte_material, fonte_mao_obra, fonte_outros):
+    """Soma as categorias em (veks, fat_direto) conforme cada fonte. Qualquer
+    valor de fonte != 'fat_direto' é tratado como 'veks'."""
+    veks = Decimal("0")
+    fat = Decimal("0")
+    for valor, fonte in (
+        (material, fonte_material),
+        (mao_obra, fonte_mao_obra),
+        (outros, fonte_outros),
+    ):
+        v = Decimal(valor or 0)
+        if fonte == "fat_direto":
+            fat += v
+        else:
+            veks += v
+    return veks, fat
