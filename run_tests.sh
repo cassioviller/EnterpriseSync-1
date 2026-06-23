@@ -5,7 +5,9 @@
 # Requer: servidor rodando em http://localhost:5000 (Start application workflow).
 #
 # Uso:
-#   bash run_tests.sh                    # Todos os blocos (pytest)
+#   bash run_tests.sh                    # Smoke browser canônico (test_browser_all_modules)
+#   bash run_tests.sh --gate             # Gate rápido: pytest tests/ -m "not browser" (lógica/DB/HTTP)
+#   bash run_tests.sh --suite            # Suíte INTEIRA: pytest tests/ (gate + browser)
 #   bash run_tests.sh --bloco1           # Apenas BLOCO 1 (Auth)
 #   bash run_tests.sh --bloco2           # Apenas BLOCO 2 (Propostas)
 #   bash run_tests.sh --bloco3           # Apenas BLOCO 3 (Obras/RDO)
@@ -24,11 +26,14 @@
 set -euo pipefail
 
 BLOCO_FILTER=""
+MARKER_ARGS=()
 STANDALONE=0
 TARGET_FILE="tests/test_browser_all_modules.py"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --gate)         TARGET_FILE="tests/"; MARKER_ARGS=(-m "not browser"); shift ;;
+        --suite)        TARGET_FILE="tests/"; shift ;;
         --bloco1)       BLOCO_FILTER="::TestBloco1Auth"; shift ;;
         --bloco2)       BLOCO_FILTER="::TestBloco2Propostas"; shift ;;
         --bloco3)       BLOCO_FILTER="::TestBloco3ObrasRdo"; shift ;;
@@ -100,6 +105,7 @@ else
     else
         .pythonlibs/bin/pytest \
             "${TARGET_FILE}${BLOCO_FILTER}" \
+            "${MARKER_ARGS[@]}" \
             --html="${REPORT_HTML}" \
             --self-contained-html \
             --tb=short \
