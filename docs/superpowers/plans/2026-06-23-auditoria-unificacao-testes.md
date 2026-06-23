@@ -75,8 +75,13 @@ Demais conversões:
   - **Re-sequenciado (decisão de auditoria):**
     - Merges `composicao_formato_br`, `rdo_kpis_task140`, `block_scripts_213` (HTTP) envolvem **scripts legados 0-coletados** → movidos para a Fase 3 (fundir = converter + consolidar num passo só; fundir sem converter é churn sem valor).
     - `varredura_paginas` **NÃO será deletada**: ela é SUPERIOR ao `ConsoleSweep` (resolve rotas via `url_for`, valida conteúdo E checa erros JS), e cobre ~15 rotas únicas. O `(avaliar)` do plano resolveu-se como "manter varredura". Dedup fino varredura↔ConsoleSweep fica para a Fase 4.
-- **Fase 2 — Conversões críticas (C alta prioridade):** 4 E2E críticos viram pytest com fixtures compartilhadas (admin/proposta/obra) no `conftest.py`.
-- **Fase 3 — Conversões restantes (C):** lote por cluster, reusando fixtures da Fase 2.
+- **Fase 2 — Conversões críticas: ✅ CONCLUÍDA** (`6b2fa77`, `5d2da41`). 4 E2E críticos viram pytest @integration. **Reconciliação real:** #200 e #132 assumiam envio direto de proposta (pré-Task #31); hoje a rota /status exige revisão concluída (400 caso contrário) → ajustados para simular a confirmação de revisão.
+- **Fase 3 — Conversões restantes: 🔄 EM ANDAMENTO (11 de ~16 não-playwright feitas).**
+  - `1f47f9e` 6 Runners: compras_tipo, cronograma_duplicado_rdo (#144), e2e_metricas_funcionario (#98), orcamento_override_e2e (#120), rdo_unificado_responsaveis (#149), rdo_subgrupo_aninhado (#154). **Reconciliação:** Task #172 tornou `obra.cliente_id` FK NOT NULL e removeu `cliente_nome` → testes passam a criar Cliente; rdo_subgrupo também encurta numero_rdo (estourava varchar(20)).
+  - `4af6d68` 5 main(): e2e_orcamento_proposta_modelo (#31), engenheiro_responsavel_pdf (#173), legacy_propostas_drop (#201), orcamento_pricing_parity (#74, puro), proposta_no_leak (#115, puro).
+  - **Gate:** 292 passed, 4 skipped (era 284 na Fase 0; +11 cobertura real agora executável).
+  - **Restante Fase 3:** `def run()` (clausulas_configuraveis 1022L, compras_nova_dropdown); merge-pair rdo_kpis_task140↔rdo_listagem_kpis; 3 em `collect_ignore_glob` (insumo_coeficiente, orcamento_formato_br, task_45); 10 playwright (precisam de servidor+marcador browser).
+  - **Deferido p/ Fase 4 (reconciliação profunda):** `test_task_172_obra_cliente_fk` — o próprio teste usa kwarg removido `cliente_nome` e checa `cliente_nome_efetivo`; semântica da feature evoluiu, exige estudo cuidadoso para não asseram comportamento antigo.
 - **Fase 4 — Fix frágil (D)** e varredura final: `pytest tests/` 100% verde + atualizar `run_tests.sh` para rodar a suíte toda.
 
 Cada fase = commits pequenos e reversíveis; a suíte deve ficar verde ao fim de cada uma.
