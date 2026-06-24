@@ -333,7 +333,10 @@ def calcular_resumo_obra(obra_id: int, admin_id=None) -> dict:
     administracao = total_proposta_orcada * (percentual_adm / 100.0)
 
     custo_real_da_obra = total_realizado + total_a_realizar + administracao + faturamento_direto
-    verba_disponivel = total_proposta_orcada - custo_real_da_obra
+    # Verba disponível = visão de CAIXA: o que já entrou menos o que já foi gasto.
+    verba_disponivel = valor_recebido - total_realizado
+    # Saldo orçamentário = visão de MARGEM (preservada): contrato menos custo projetado.
+    saldo_orcamentario = total_proposta_orcada - custo_real_da_obra
     lucro_liquido = valor_medido - (total_realizado + administracao + faturamento_direto)
 
     indicadores = {
@@ -343,6 +346,7 @@ def calcular_resumo_obra(obra_id: int, admin_id=None) -> dict:
         'total_a_realizar': round(total_a_realizar, 2),
         'custo_real_da_obra': round(custo_real_da_obra, 2),
         'verba_disponivel': round(verba_disponivel, 2),
+        'saldo_orcamentario': round(saldo_orcamentario, 2),
         'faturamento_direto': round(faturamento_direto, 2),
         'valor_medido': round(valor_medido, 2),
         'valor_recebido': round(valor_recebido, 2),
@@ -404,6 +408,7 @@ def _resumo_vazio():
     empty = {k: 0.0 for k in [
         'total_proposta_orcada', 'valor_custo_orcado', 'total_realizado',
         'total_a_realizar', 'custo_real_da_obra', 'verba_disponivel',
+        'saldo_orcamentario',
         'faturamento_direto', 'valor_medido', 'valor_recebido',
         'valor_a_receber', 'lucro_liquido', 'administracao',
         'percentual_administracao',

@@ -69,6 +69,7 @@ class TestResumoCustosObra(ResumoCustosObraBaseTest):
         r = calcular_resumo_obra(obra.id, admin_id=admin.id)
         chaves = {'total_proposta_orcada', 'valor_custo_orcado', 'total_realizado',
                   'total_a_realizar', 'custo_real_da_obra', 'verba_disponivel',
+                  'saldo_orcamentario',
                   'faturamento_direto', 'valor_medido', 'valor_recebido',
                   'valor_a_receber', 'lucro_liquido', 'administracao'}
         self.assertTrue(chaves.issubset(set(r['indicadores'].keys())))

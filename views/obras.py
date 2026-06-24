@@ -17,6 +17,21 @@ from views import main_bp
 
 logger = logging.getLogger(__name__)
 
+
+def _jsonable(obj):
+    from decimal import Decimal as _D
+    from datetime import date as _date, datetime as _dt
+    if isinstance(obj, _D):
+        return float(obj)
+    if isinstance(obj, (_date, _dt)):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonable(v) for v in obj]
+    return obj
+
+
 try:
     from utils.circuit_breaker import circuit_breaker, pdf_generation_fallback, database_query_fallback
 except ImportError:
@@ -2082,6 +2097,47 @@ def detalhes_obra(id):
         # Exibir traceback completo em modo desenvolvimento
         flash(f'Erro ao carregar detalhes da obra: {str(e)}\n\nTraceback:\n{error_traceback}', 'error')
         return redirect(url_for('main.obras'))
+
+
+@main_bp.route('/obras/<int:id>/financeiro/dados')
+@login_required
+@capture_db_errors
+def financeiro_dados(id):
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    return jsonify(_jsonable(painel_financeiro(obra)))
+
+
+@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>', methods=['POST'])
+@login_required
+@capture_db_errors
+def financeiro_editar_etapa(id, osc_id):
+    from decimal import Decimal, InvalidOperation
+    from models import ObraServicoCusto
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    osc = ObraServicoCusto.query.filter_by(id=osc_id, obra_id=obra.id, admin_id=admin_id).first_or_404()
+
+    def _dec(v):
+        try:
+            return Decimal(str(v).replace(',', '.')) if v not in (None, '') else Decimal('0')
+        except (InvalidOperation, ValueError):
+            return None
+    veks = _dec(request.form.get('veks'))
+    fat = _dec(request.form.get('fat'))
+    orc = _dec(request.form.get('valor_orcado'))
+    if veks is None or fat is None or orc is None:
+        return jsonify({'erro': 'valores inválidos'}), 400
+
+    osc.mao_obra_a_realizar = veks
+    osc.fonte_mao_obra = 'veks'
+    osc.material_a_realizar = fat
+    osc.fonte_material = 'fat_direto'
+    osc.valor_orcado = orc
+    db.session.commit()
+    return jsonify(_jsonable(painel_financeiro(obra)))
 
 
 # ────────────────────────────────────────────────────────────────────
