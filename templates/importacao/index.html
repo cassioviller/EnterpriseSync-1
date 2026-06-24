@@ -26,6 +26,26 @@
   {% endif %}
   {% endwith %}
 
+  <!-- Importação especial: Cronograma Físico-Financeiro (JSON) -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body d-flex align-items-center p-4">
+      <div class="me-3 d-flex align-items-center justify-content-center flex-shrink-0"
+           style="width:44px;height:44px;background:#e8f0f8;border-radius:10px;">
+        <i data-feather="bar-chart-2" style="width:22px;height:22px;color:#1e3a5f;"></i>
+      </div>
+      <div class="flex-grow-1">
+        <h6 class="fw-bold mb-0 text-dark">Cronograma Físico-Financeiro (JSON)</h6>
+        <small class="text-muted">Importa cronograma, custos, vínculos, medições de contrato e fluxo
+          de caixa de uma vez — a obra abre pronta no painel físico-financeiro.</small>
+      </div>
+      <a href="{{ url_for('importacao.importar_fisico_financeiro_view') }}"
+         class="btn btn-primary btn-sm ms-3 flex-shrink-0">
+        <i data-feather="upload" style="width:13px;height:13px;"></i>
+        Importar JSON
+      </a>
+    </div>
+  </div>
+
   <!-- Cards dos módulos -->
   {% set modulos_lista = [
     ('funcionarios', modulos.funcionarios),
