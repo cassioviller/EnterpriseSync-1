@@ -9,22 +9,28 @@
     return m ? m.getAttribute('content') : '';
   }
 
+  function kpiRow(label, valor, cls) {
+    return '<div class="d-flex justify-content-between align-items-baseline py-1 border-bottom">' +
+      '<span class="small text-muted">' + label + '</span>' +
+      '<span class="fw-bold ' + (cls || '') + '" style="font-variant-numeric:tabular-nums">' +
+      BRL(valor) + '</span></div>';
+  }
   function renderKPIs(k) {
-    var cards = [
-      ['Venda (contrato)', k.venda, ''], ['Custo total', k.custo_total, ''],
-      ['Lucro projetado', k.lucro_projetado, 'text-success'],
-      ['Desembolso Veks', k.desembolso_veks, ''],
-      ['Faturamento direto', k.fat_direto, 'text-success'],
-      ['Recebido até hoje', k.recebido_ate_hoje, ''],
-      ['Verba disponível (caixa)', k.verba_disponivel, (k.verba_disponivel >= 0 ? 'text-success' : 'text-danger')],
-      ['Custo realizado', k.custo_realizado, '']
-    ];
-    el('fin-kpis').innerHTML = cards.map(function (c) {
-      return '<div class="col-6 col-md-3"><div class="card h-100"><div class="card-body p-2">' +
-        '<div class="small text-muted">' + c[0] + '</div>' +
-        '<div class="fw-bold ' + c[2] + '" style="font-variant-numeric:tabular-nums">' + BRL(c[1]) + '</div>' +
-        '</div></div></div>';
-    }).join('');
+    var pos = function (v) { return (v || 0) >= 0 ? 'text-success' : 'text-danger'; };
+    var pct = (k.lucro_pct != null)
+      ? ' <small class="text-muted">(' + (k.lucro_pct * 100).toFixed(1) + '%)</small>' : '';
+    el('fin-kpi-resultado').innerHTML =
+      kpiRow('Venda (contrato)', k.venda, '') +
+      kpiRow('Custo total', k.custo_total, '') +
+      kpiRow('Imposto', k.imposto, '') +
+      kpiRow('Lucro projetado' + pct, k.lucro_projetado, pos(k.lucro_projetado)).replace('border-bottom', '');
+    el('fin-kpi-caixa').innerHTML =
+      kpiRow('Recebido até hoje', k.recebido_ate_hoje, '') +
+      kpiRow('Verba disponível', k.verba_disponivel, pos(k.verba_disponivel)).replace('border-bottom', '');
+    el('fin-kpi-custo').innerHTML =
+      kpiRow('Desembolso Veks', k.desembolso_veks, '') +
+      kpiRow('Faturamento direto', k.fat_direto, '') +
+      kpiRow('Custo realizado', k.custo_realizado, '').replace('border-bottom', '');
   }
   function renderMedicoes(meds) {
     el('fin-medicoes').innerHTML = (meds || []).map(function (m) {
