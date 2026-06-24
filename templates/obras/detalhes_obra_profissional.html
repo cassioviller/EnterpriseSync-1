@@ -1523,34 +1523,63 @@
      data-obra-id="{{ obra.id }}" data-endpoint="{{ url_for('main.financeiro_dados', id=obra.id) }}">
   <div id="fin-loading" class="text-muted py-4">Carregando painel financeiro…</div>
   <div id="fin-painel" style="display:none">
-    <div class="row g-3 mb-4" id="fin-kpis"></div>
+
+    <!-- Resumo: 3 grupos de KPI -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <div class="text-uppercase small text-muted fw-bold mb-2">
+          <i class="fas fa-chart-line me-1"></i>Resultado</div>
+        <div id="fin-kpi-resultado"></div>
+      </div></div></div>
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <div class="text-uppercase small text-muted fw-bold mb-2">
+          <i class="fas fa-wallet me-1"></i>Caixa</div>
+        <div id="fin-kpi-caixa"></div>
+      </div></div></div>
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <div class="text-uppercase small text-muted fw-bold mb-2">
+          <i class="fas fa-coins me-1"></i>Custo</div>
+        <div id="fin-kpi-custo"></div>
+      </div></div></div>
+    </div>
+
+    <!-- Custo por etapa -->
     <div class="card mb-4"><div class="card-body">
       <h6 class="fw-bold mb-3">Custo por etapa <small class="text-muted">(clique para editar)</small></h6>
-      <canvas id="finEtapas" height="320"></canvas>
+      <div class="fin-chart" style="position:relative;height:360px"><canvas id="finEtapas"></canvas></div>
       <div id="fin-etapa-det" class="mt-3"></div>
     </div></div>
+
+    <!-- Curva S + Doughnut -->
     <div class="row g-3 mb-4">
       <div class="col-lg-8"><div class="card h-100"><div class="card-body">
         <h6 class="fw-bold mb-3">Curva S — recebido, gasto, lucro e realizado</h6>
-        <canvas id="finCurva" height="240"></canvas>
+        <div class="fin-chart" style="position:relative;height:300px"><canvas id="finCurva"></canvas></div>
       </div></div></div>
       <div class="col-lg-4"><div class="card h-100"><div class="card-body">
         <h6 class="fw-bold mb-3">Veks × Faturamento direto</h6>
-        <canvas id="finSplit" height="240"></canvas>
+        <div class="fin-chart" style="position:relative;height:300px"><canvas id="finSplit"></canvas></div>
       </div></div></div>
     </div>
+
+    <!-- Caixa + Medições -->
     <div class="row g-3 mb-4">
       <div class="col-lg-6"><div class="card h-100"><div class="card-body">
         <h6 class="fw-bold mb-3">Caixa final por mês</h6>
-        <canvas id="finCaixa" height="220"></canvas>
+        <div class="fin-chart" style="position:relative;height:280px"><canvas id="finCaixa"></canvas></div>
       </div></div></div>
       <div class="col-lg-6"><div class="card h-100"><div class="card-body">
         <h6 class="fw-bold mb-3">Medições de contrato</h6>
-        <table class="table table-sm"><thead><tr><th>Parcela</th><th>Data</th><th>%</th>
-          <th class="text-end">Valor</th></tr></thead><tbody id="fin-medicoes"></tbody></table>
+        <div style="max-height:280px;overflow:auto">
+          <table class="table table-sm mb-0"><thead><tr><th>Parcela</th><th>Data</th><th>%</th>
+            <th class="text-end">Valor</th></tr></thead><tbody id="fin-medicoes"></tbody></table>
+        </div>
       </div></div></div>
     </div>
+
     <div id="fin-alerta"></div>
+
+    <!-- CTA Mapa de Orçamentos -->
     <div class="card"><div class="card-body d-flex align-items-center justify-content-between">
       <div><h6 class="fw-bold mb-0">Mapa de Orçamentos</h6>
         <small class="text-muted">Cotações por frente de trabalho.</small></div>
