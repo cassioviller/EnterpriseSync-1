@@ -103,6 +103,20 @@ Demais conversões:
   - `d9f64c5` `rdo_subgrupo_aninhado_playwright` (#154): mesmo schema drift Task #172 → convertido @browser (verde).
   - `119c84f` `formato_br_e2e_extra`: seed corrigido (cliente_id); conversão ainda pendente por DOM drift.
   - **Gate `bash run_tests.sh --gate`: 297 passed, 4 skipped, 0 failed.**
-  - **RESTAM (reconciliação profunda, focada):** task_172, clausulas_configuraveis, compras_nova_dropdown, task_45 (híbrido fixtures); composicao_formato_br, formato_br_e2e_extra, rdo_progresso_monotonico (DOM drift). Dedup varredura↔ConsoleSweep: resolvido como "manter ambos" (varredura é superior).
+
+- **Fase 4 (cont.) — ✅ 7 deferidos reconciliados e convertidos:**
+  - **Não-browser (+15 testes no gate):**
+    - `task_172_obra_cliente_fk`: t3 usa `cliente_busca` (#176 resolve nome via `services.cliente_resolver`); t5 (fallback obra legada) **removido** — #176 tornou `obra.cliente_id` FK NOT NULL e eliminou as colunas-texto `cliente_*`. → pytest @integration.
+    - `task_45_catalogo_eventos`: fixtures pytest reais (admin/cliente/proposta/obra) c/ sufixos únicos; `step()` passa a assertar. **Sai do `collect_ignore_glob`** (agora vazio). 12 testes.
+    - `clausulas_configuraveis` (#174): reconciliação Task #31 — `/propostas/editar` só edita in-place **rascunhos**; uma 'enviada' é redirecionada p/ "nova versão" (por isso a remoção via sentinela deixava clausulas=1). `prop_remove` passa a nascer 'rascunho'. → pytest @integration.
+    - `compras_nova_dropdown` (#202): UX REV — empty-state trocou link p/ página por criação **inline** (`qcAbrirFornecedor()`); `<select>` agora é sempre renderizado (sem options quando vazio). Asserts atualizados. → pytest @integration.
+  - **Browser (DOM/value drift) — 3 convertidos @browser:**
+    - `composicao_formato_br` (#189): cards CUSTO/PREÇO 2x`<h3>`→4x`<h4>` (Task #47): custo=nth(0), preço=nth(3); assertion tolera colunas inteiras (`pacotes`). **Fix de template**: quebra de preço renderizava `{{ imposto_pct }}%`/`{{ margem }}%` crus (US `13.00%`) → `|num(2)` (`13,00%`).
+    - `formato_br_e2e_extra` (#189): preço de venda **re-derivado** pela fórmula margem-sobre-preço (`custo/(1-(imp+margem)/100)` = R$ 7.923,89) — seed/asserts atualizados.
+    - `rdo_progresso_monotonico` (#143): data do card `.rdo-date span` → `.rdo-card-header small`.
+  - **Gate final: 312 passed, 4 skipped, 0 failed** (era 297; +15). Suíte coleta **513 testes** sem erros; os 3 @browser verdes contra servidor.
+  - Dedup varredura↔ConsoleSweep: resolvido como "manter ambos" (varredura é superior).
+
+**STATUS: plano CONCLUÍDO.** Todas as fases (0–4) verdes; nenhum deferido restante.
 
 Cada fase = commits pequenos e reversíveis; a suíte deve ficar verde ao fim de cada uma.
