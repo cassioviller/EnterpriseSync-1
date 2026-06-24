@@ -23,10 +23,7 @@
       kpiRow('Venda (contrato)', k.venda, '') +
       kpiRow('Custo total', k.custo_total, '') +
       kpiRow('Imposto', k.imposto, '') +
-      '<div class="d-flex justify-content-between align-items-baseline py-1">' +
-        '<span class="small text-muted">Lucro projetado' + pct + '</span>' +
-        '<span class="fw-bold ' + pos(k.lucro_projetado) + '" style="font-variant-numeric:tabular-nums">' +
-        BRL(k.lucro_projetado) + '</span></div>';
+      kpiRow('Lucro projetado' + pct, k.lucro_projetado, pos(k.lucro_projetado)).replace('border-bottom', '');
     el('fin-kpi-caixa').innerHTML =
       kpiRow('Recebido até hoje', k.recebido_ate_hoje, '') +
       kpiRow('Verba disponível', k.verba_disponivel, pos(k.verba_disponivel)).replace('border-bottom', '');
