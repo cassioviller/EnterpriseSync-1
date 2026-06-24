@@ -167,3 +167,10 @@ def test_wrappers_de_servico():
         k = kpis(obra)
         assert abs(float(k['venda']) - 1505613.76) < 1.0
         assert k['desembolso_veks'] > 0 and k['fat_direto'] > 0
+
+
+@pytest.mark.integration
+def test_rota_import_json_get_existe():
+    with app.test_client() as c:
+        resp = c.get('/importacao/fisico-financeiro')
+        assert resp.status_code in (200, 302)

@@ -1020,6 +1020,35 @@ def fluxo_caixa_rollback(batch_id):
     return redirect(url_for('importacao.historico'))
 
 
+@importacao_bp.route('/fisico-financeiro', methods=['GET', 'POST'])
+@login_required
+def importar_fisico_financeiro_view():
+    """Importa cronograma físico-financeiro completo a partir de um arquivo JSON
+    (cronograma, custos, vínculos, medições de contrato e fluxo de caixa). Ao
+    concluir, redireciona para o painel físico-financeiro da obra criada."""
+    import json as _json
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+
+    admin_id = get_admin_id_robusta()
+
+    if request.method == 'POST':
+        arquivo = request.files.get('arquivo')
+        if not arquivo or arquivo.filename == '':
+            flash('Selecione um arquivo JSON.', 'warning')
+            return redirect(url_for('importacao.importar_fisico_financeiro_view'))
+        try:
+            payload = _json.load(arquivo.stream)
+            res = importar_fisico_financeiro(payload, admin_id)
+        except Exception as e:
+            logger.error(f'[FF_IMPORT] Erro ao importar JSON: {e}', exc_info=True)
+            flash(f'Falha ao importar: {e}', 'danger')
+            return redirect(url_for('importacao.importar_fisico_financeiro_view'))
+        flash('Obra importada — painel físico-financeiro pronto.', 'success')
+        return redirect(url_for('cronograma.fisico_financeiro', obra_id=res['obra_id']))
+
+    return render_template('importacao/fisico_financeiro_upload.html')
+
+
 @importacao_bp.route('/historico', methods=['GET'])
 @login_required
 def historico():

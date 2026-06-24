@@ -1,0 +1,22 @@
+{% extends "base_completo.html" %}
+{% block title %}Importar Físico-Financeiro (JSON){% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h3>Importar Cronograma Físico-Financeiro (JSON)</h3>
+  <p class="text-muted">Importa cronograma, custos, vínculos, medições de contrato
+     e o fluxo de caixa de uma vez. A obra abre pronta no painel.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+  {% endwith %}
+
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="arquivo" accept="application/json,.json" class="form-control mb-3" required>
+    <button class="btn btn-primary" type="submit">Importar</button>
+  </form>
+</div>
+{% endblock %}
