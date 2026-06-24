@@ -292,6 +292,13 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
 
         # distribui os agregados de resumo entre as raízes pela fração
         for et, frac in resumo_por_raiz:
+            # Rastreia o OSC de origem da etapa: se uma única OSC alimenta a
+            # etapa, guarda seu id (para casar com realizado_por_etapa); se
+            # múltiplas OSCs convergem na mesma etapa, marca como None.
+            if "osc_id" not in et:
+                et["osc_id"] = osc.id
+            elif et["osc_id"] != osc.id:
+                et["osc_id"] = None
             et["previsto"]["material"] += material * frac
             et["previsto"]["mao_obra"] += mao_obra * frac
             et["previsto"]["outros"] += outros * frac
@@ -437,6 +444,59 @@ def kpis(obra, dados=None):
         "desembolso_veks": dados["totais"]["veks"],
         "fat_direto": dados["totais"]["fat_direto"],
         "recebido_ate_hoje": recebido,
+    }
+
+
+def painel_financeiro(obra) -> dict:
+    """Dicionário consolidado do Painel Financeiro (pronto para JSON):
+    KPIs, etapas (previsto+realizado), Curva S de 4 séries (recebido líquido,
+    gasto Veks previsto, lucro, custo realizado), caixa, medições, doughnut, divergência."""
+    from services.resumo_custos_obra import calcular_resumo_obra
+
+    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    k = kpis(obra, dados)
+    caixa = fluxo_caixa(obra, dados)
+    meds = medicoes_contrato(obra)
+    div = fluxo_caixa_divergencia(obra, dados)
+    resumo = calcular_resumo_obra(obra.id, obra.admin_id).get('indicadores', {})
+
+    realizado_mes = curva_realizado(obra)
+    realizado_etapa = realizado_por_etapa(obra)
+
+    meses = sorted(set([l["mes"] for l in caixa["linhas"]]) | set(realizado_mes))
+    caixa_por_mes = {l["mes"]: l for l in caixa["linhas"]}
+    receb_ac, gasto_ac, real_ac = [], [], []
+    r = g = re_ = Decimal("0")
+    for m in meses:
+        linha = caixa_por_mes.get(m)
+        r += (linha["entrada"] if linha else Decimal("0"))
+        g += (linha["gasto_veks"] if linha else Decimal("0"))
+        re_ += realizado_mes.get(m, Decimal("0"))
+        receb_ac.append(r); gasto_ac.append(g); real_ac.append(re_)
+    lucro_ac = [receb_ac[i] - gasto_ac[i] for i in range(len(meses))]
+
+    etapas = []
+    for e in dados["etapas"]:
+        osc_id = e.get("osc_id") or e.get("etapa_id")
+        etapas.append({
+            "nome": e["nome"],
+            "veks": e["veks"],
+            "fat": e["fat_direto"],
+            "previsto": e["previsto"]["total"],
+            "realizado": realizado_etapa.get(osc_id, Decimal("0")),
+            "osc_id": osc_id,
+        })
+
+    return {
+        "kpis": {**k, "verba_disponivel": resumo.get("verba_disponivel", 0),
+                 "custo_realizado": resumo.get("total_realizado", 0)},
+        "etapas": etapas,
+        "curva_s": {"meses": meses, "recebido_liquido": receb_ac,
+                    "gasto_veks": gasto_ac, "lucro": lucro_ac, "realizado": real_ac},
+        "caixa": caixa,
+        "medicoes": meds,
+        "doughnut": {"veks": dados["totais"]["veks"], "fat": dados["totais"]["fat_direto"]},
+        "divergencia": div,
     }
 
 
