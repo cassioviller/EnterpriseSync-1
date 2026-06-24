@@ -141,3 +141,29 @@ def test_isolamento_multitenant():
         o2 = importar_fisico_financeiro(_carregar_json(), a2)['obra_id']
         assert o1 != o2
         assert TarefaCronograma.query.filter_by(obra_id=o1, admin_id=a2).count() == 0
+
+
+@pytest.mark.integration
+def test_wrappers_de_servico():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import (
+        medicoes_contrato, fluxo_caixa, fluxo_caixa_divergencia, kpis)
+    from models import Obra
+    with app.app_context():
+        admin_id = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+        obra = Obra.query.get(oid)
+
+        meds = medicoes_contrato(obra)
+        assert len(meds) == 6
+        assert abs(sum(float(m['valor']) for m in meds) - 1505613.76) < 1.0
+
+        fc = fluxo_caixa(obra)
+        assert fc['linhas'] and 'lucro_em_caixa' in fc
+
+        div = fluxo_caixa_divergencia(obra)
+        assert abs(float(div['resumo']['delta_veks']) - 90000) < 2000
+
+        k = kpis(obra)
+        assert abs(float(k['venda']) - 1505613.76) < 1.0
+        assert k['desembolso_veks'] > 0 and k['fat_direto'] > 0

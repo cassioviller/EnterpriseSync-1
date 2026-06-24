@@ -326,6 +326,114 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
     }
 
 
+def medicoes_contrato(obra) -> list:
+    from models import MedicaoContrato
+    meds = (MedicaoContrato.query
+            .filter_by(obra_id=obra.id, admin_id=obra.admin_id)
+            .order_by(MedicaoContrato.ordem).all())
+    venda = Decimal(str(obra.valor_contrato or 0))
+    out = []
+    for m in meds:
+        pct = Decimal(str(m.pct or 0))
+        out.append({
+            "nome": m.nome, "data": m.data, "pct": pct,
+            "valor": (venda * pct).quantize(CENTAVO, ROUND_HALF_UP),
+            "mes": m.recebido_no_mes, "obs": m.obs,
+        })
+    return out
+
+
+def _medicao_por_mes(obra):
+    """Soma valor das medições por mês 'YYYY-MM' (pela data)."""
+    out = {}
+    for m in medicoes_contrato(obra):
+        if m["data"]:
+            chave = f"{m['data'].year:04d}-{m['data'].month:02d}"
+            out[chave] = out.get(chave, Decimal("0")) + m["valor"]
+    return out
+
+
+def fluxo_caixa(obra):
+    """Fluxo de caixa recalculado: medições (por mês) + Veks/Fat faseados pelo
+    cronograma. imposto_pct vem do snapshot/contrato (default 0.135)."""
+    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    medicao = _medicao_por_mes(obra)
+    veks = {k: Decimal(v) for k, v in dados["meses_veks"].items()}
+    fat = {k: Decimal(v) for k, v in dados["meses_fat"].items()}
+    meses = sorted(set(medicao) | set(veks) | set(fat))
+    snap = obra.fluxo_caixa_planilha or {}
+    imposto_pct = Decimal(str((snap.get("imposto_pct") if isinstance(snap, dict) else None) or "0.135"))
+    res = calcular_fluxo_caixa(meses, medicao, fat, veks, imposto_pct)
+    res["meses"] = meses
+    return res
+
+
+_MESES_PT = {"jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+             "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12}
+
+
+def _veks_verbatim_por_mes(rotulos, valores, obra):
+    """Converte rótulos 'jun','jul'... + lista de valores em {'YYYY-MM': Decimal},
+    inferindo o ano pela data_inicio da obra (rola para o ano seguinte se o mês
+    for menor que o mês inicial)."""
+    ano_base = obra.data_inicio.year if obra.data_inicio else date.today().year
+    mes_ini = obra.data_inicio.month if obra.data_inicio else 1
+    out = {}
+    for rotulo, val in zip(rotulos, valores):
+        m = _MESES_PT.get(str(rotulo).strip().lower()[:3])
+        if not m:
+            continue
+        ano = ano_base if m >= mes_ini else ano_base + 1
+        chave = f"{ano:04d}-{m:02d}"
+        out[chave] = out.get(chave, Decimal("0")) + Decimal(str(val or 0))
+    return out
+
+
+def fluxo_caixa_divergencia(obra):
+    """Compara Veks faseado (recalc) × GASTO VEKS do snapshot verbatim, mês a mês,
+    e resume a inconsistência dos Indiretos (Δ Veks e os dois lucros)."""
+    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    recalc = {k: Decimal(v) for k, v in dados["meses_veks"].items()}
+    snap = obra.fluxo_caixa_planilha or {}
+    verbatim = {}
+    if isinstance(snap, dict) and snap.get("meses") and snap.get("gasto_veks"):
+        verbatim = _veks_verbatim_por_mes(snap["meses"], snap["gasto_veks"], obra)
+    cmp = comparar_fluxo_caixa(recalc, verbatim)
+    veks_etapas = dados["totais"]["veks"]
+    veks_verbatim = cmp["total_verbatim"]
+    lucro_caixa = Decimal(str((snap.get("lucro_caixa_final") if isinstance(snap, dict) else 0) or 0))
+    cmp["resumo"] = {
+        "veks_etapas": veks_etapas,
+        "veks_verbatim": veks_verbatim,
+        "delta_veks": (veks_verbatim - veks_etapas) if veks_verbatim else Decimal("0"),
+        "lucro_em_caixa": lucro_caixa,
+        "lucro_por_etapas": Decimal(str(obra.valor_contrato or 0)) - dados["totais"]["total"],
+    }
+    return cmp
+
+
+def kpis(obra):
+    venda = Decimal(str(obra.valor_contrato or 0))
+    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    custo = dados["totais"]["total"]
+    snap = obra.fluxo_caixa_planilha or {}
+    imposto_pct = Decimal(str((snap.get("imposto_pct") if isinstance(snap, dict) else None) or "0.135"))
+    imposto = (venda * imposto_pct).quantize(CENTAVO, ROUND_HALF_UP)
+    lucro = venda - custo - imposto
+    recebido = Decimal("0")
+    for m in medicoes_contrato(obra):
+        if m["data"] and m["data"] <= date.today():
+            recebido += m["valor"]
+    return {
+        "venda": venda, "custo_total": custo,
+        "imposto": imposto, "lucro_projetado": lucro,
+        "lucro_pct": (lucro / venda) if venda else Decimal("0"),
+        "desembolso_veks": dados["totais"]["veks"],
+        "fat_direto": dados["totais"]["fat_direto"],
+        "recebido_ate_hoje": recebido,
+    }
+
+
 def exportar_fisico_financeiro_xlsx(dados: dict):
     """Gera um openpyxl.Workbook no layout da planilha de referência:
     aba 'Cronograma FF (por etapa)' + aba 'Curva S'."""
