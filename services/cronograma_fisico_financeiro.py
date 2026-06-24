@@ -213,6 +213,8 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
 
     etapas: dict = {}
     meses_globais: dict = {}
+    meses_veks: dict = {}
+    meses_fat: dict = {}
     nao_faseado = Decimal("0")
     avisos: list = []
 
@@ -262,6 +264,8 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
                 slot = peso_por_raiz.setdefault(raiz.id, [et, Decimal("0")])
                 slot[1] += Decimal(peso)
             # faseia o previsto alocado a cada folha (inalterado)
+            razao_veks = (veks / previsto_total) if previsto_total else Decimal("0")
+            razao_fat = (fat / previsto_total) if previsto_total else Decimal("0")
             aloc = alocar_por_peso(previsto_total, pesos)
             for tarefa_id, valor_tarefa in aloc.items():
                 folha = por_id[tarefa_id]
@@ -273,6 +277,8 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
                         continue
                     et["meses"][mes] = et["meses"].get(mes, Decimal("0")) + parcela
                     meses_globais[mes] = meses_globais.get(mes, Decimal("0")) + parcela
+                    meses_veks[mes] = meses_veks.get(mes, Decimal("0")) + (parcela * razao_veks)
+                    meses_fat[mes] = meses_fat.get(mes, Decimal("0")) + (parcela * razao_fat)
             # fração de resumo por raiz = peso da raiz / Σpeso (fallback igual)
             soma_peso = sum((p for _, p in peso_por_raiz.values()), Decimal("0"))
             n_raizes = len(peso_por_raiz)
@@ -312,6 +318,8 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
         "curva_s": montar_curva_s(meses_globais),
         "nao_faseado": nao_faseado,
         "avisos": avisos,
+        "meses_veks": meses_veks,
+        "meses_fat": meses_fat,
     }
 
 

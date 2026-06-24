@@ -169,3 +169,15 @@ def test_divergencia_por_mes_e_resumo_veks():
     assert res["total_recalc"] == D("200000")
     assert res["total_verbatim"] == D("230000")
     assert res["delta_total"] == D("30000")
+
+
+@pytest.mark.integration
+def test_montar_inclui_meses_veks_e_fat():
+    import os, sys
+    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
+    from app import app
+    from services.cronograma_fisico_financeiro import montar_fisico_financeiro
+    with app.app_context():
+        dados = montar_fisico_financeiro(obra_id=-1, admin_id=-1)
+    assert "meses_veks" in dados and "meses_fat" in dados
+    assert dados["meses_veks"] == {} and dados["meses_fat"] == {}
