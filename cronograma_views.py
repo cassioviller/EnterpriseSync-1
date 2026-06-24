@@ -2531,21 +2531,9 @@ def api_produtividade():
 @cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro')
 @login_required
 def fisico_financeiro(obra_id: int):
-    guard = _check_v2()
-    if guard:
-        return guard
-    from services.cronograma_fisico_financeiro import (
-        montar_fisico_financeiro, medicoes_contrato, fluxo_caixa,
-        fluxo_caixa_divergencia, kpis,
-    )
-    admin_id = _admin_id()
-    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
-    dados = montar_fisico_financeiro(obra_id, admin_id)
-    return render_template(
-        'cronograma/fisico_financeiro.html', obra=obra, dados=dados,
-        kpis=kpis(obra, dados), medicoes=medicoes_contrato(obra),
-        caixa=fluxo_caixa(obra, dados), divergencia=fluxo_caixa_divergencia(obra, dados),
-    )
+    # O painel agora vive na aba Financeiro da página da obra.
+    from flask import redirect, url_for
+    return redirect(url_for('main.detalhes_obra', id=obra_id) + '#tab-financeiro')
 
 
 @cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro/export.xlsx')

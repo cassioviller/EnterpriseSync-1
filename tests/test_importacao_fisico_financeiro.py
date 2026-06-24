@@ -273,12 +273,11 @@ def test_painel_renderiza_apos_import():
             with c.session_transaction() as sess:
                 sess['_user_id'] = str(admin_id)
                 sess['_fresh'] = True
+            # A rota standalone agora redireciona para a aba Financeiro da
+            # página da obra (main.detalhes_obra → /obras/detalhes/<id>).
             resp = c.get(f'/cronograma/obra/{oid}/fisico-financeiro')
-            assert resp.status_code == 200
-            html = resp.get_data(as_text=True)
-            assert 'Medições de contrato' in html
-            assert 'Fluxo de caixa mensal' in html
-            # KPIs and the Indiretos alert should render with the Baias data
-            assert 'Inconsistência dos Indiretos' in html
+            assert resp.status_code in (301, 302)
+            loc = resp.headers.get('Location', '')
+            assert f'/obras/detalhes/{oid}' in loc and 'tab-financeiro' in loc
     finally:
         app.config['WTF_CSRF_ENABLED'] = prev

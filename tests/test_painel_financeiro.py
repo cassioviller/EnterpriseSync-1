@@ -234,3 +234,26 @@ def test_editar_etapa_multitenant():
         r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}',
                    data={'veks': '1', 'fat': '1', 'valor_orcado': '2'})
         assert r.status_code == 404
+
+
+@pytest.mark.integration
+def test_rota_ff_antiga_redireciona():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        # Rota real é /cronograma/obra/<id>/fisico-financeiro (singular "obra").
+        r = c.get(f'/cronograma/obra/{oid}/fisico-financeiro')
+        assert r.status_code in (301, 302)
+        loc = r.headers.get('Location', '')
+        # main.detalhes_obra → /obras/detalhes/<id>
+        assert f'/obras/detalhes/{oid}' in loc and 'tab-financeiro' in loc
