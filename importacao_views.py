@@ -1042,6 +1042,14 @@ def importar_fisico_financeiro_view():
             logger.error(f'[FF_IMPORT] Erro ao importar JSON: {e}', exc_info=True)
             flash(f'Falha ao importar: {e}', 'danger')
             return redirect(url_for('importacao.importar_fisico_financeiro_view'))
+        # O painel físico-financeiro é v2-gated; garante v2 para o tenant não
+        # ser redirecionado ao dashboard logo após importar.
+        from models import db, Usuario
+        admin = Usuario.query.get(admin_id)
+        if admin is not None and admin.versao_sistema != 'v2':
+            admin.versao_sistema = 'v2'
+            db.session.add(admin)
+            db.session.commit()
         flash('Obra importada — painel físico-financeiro pronto.', 'success')
         return redirect(url_for('cronograma.fisico_financeiro', obra_id=res['obra_id']))
 
