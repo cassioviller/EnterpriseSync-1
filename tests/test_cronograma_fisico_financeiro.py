@@ -1,6 +1,8 @@
 from datetime import date
 from decimal import Decimal
 
+import pytest
+
 from services.cronograma_fisico_financeiro import fasear_por_dias_uteis
 
 D = Decimal
@@ -117,3 +119,39 @@ def test_xlsx_tem_abas_e_cabecalho():
     assert "2026-06" in header and "2026-07" in header
     # primeira etapa
     assert ws.cell(row=2, column=1).value == "Fundação"
+
+
+from services.cronograma_fisico_financeiro import calcular_fluxo_caixa
+
+
+def test_caixa_rolante_2_meses_sem_fat():
+    meses = ["2026-06", "2026-07"]
+    res = calcular_fluxo_caixa(
+        meses,
+        medicao={"2026-06": D("100000"), "2026-07": D("50000")},
+        fat_direto={"2026-06": D("0"), "2026-07": D("0")},
+        gasto_veks={"2026-06": D("30000"), "2026-07": D("20000")},
+        imposto_pct=D("0.135"),
+    )
+    jun, jul = res["linhas"]
+    assert jun["imposto"] == D("13500.00")
+    assert jun["entrada"] == D("86500.00")
+    assert jun["caixa_final"] == D("56500.00")
+    assert jul["caixa_inicial"] == D("99750.00")
+    assert jul["caixa_final"] == D("79750.00")
+    assert res["lucro_em_caixa"] == D("79750.00")
+
+
+def test_caixa_fat_do_periodo_anterior():
+    meses = ["2026-06", "2026-07"]
+    res = calcular_fluxo_caixa(
+        meses,
+        medicao={"2026-06": D("100000"), "2026-07": D("100000")},
+        fat_direto={"2026-06": D("40000"), "2026-07": D("0")},
+        gasto_veks={"2026-06": D("0"), "2026-07": D("0")},
+        imposto_pct=D("0.135"),
+    )
+    jun, jul = res["linhas"]
+    assert jun["entrada"] == D("86500.00")
+    assert jul["imposto"] == D("8100.00")
+    assert jul["entrada"] == D("51900.00")

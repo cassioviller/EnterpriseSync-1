@@ -124,6 +124,57 @@ def classificar_veks_fat(material, mao_obra, outros,
     return veks, fat
 
 
+def calcular_fluxo_caixa(meses, medicao, fat_direto, gasto_veks, imposto_pct):
+    """Modelo de caixa derivado. Dicts mes->Decimal. fat_direto e imposto são do
+    PERÍODO ANTERIOR (regra da Planilha1). Retorna {linhas:[...], lucro_em_caixa}."""
+    imposto_pct = Decimal(imposto_pct)
+    fat_anterior = Decimal("0")
+    caixa_final_anterior = None
+    linhas = []
+    for m in meses:
+        med = Decimal(medicao.get(m, 0) or 0)
+        imp = ((med - fat_anterior) * imposto_pct).quantize(CENTAVO, ROUND_HALF_UP)
+        entrada = (med - fat_anterior - imp).quantize(CENTAVO, ROUND_HALF_UP)
+        if caixa_final_anterior is None:
+            caixa_ini = entrada
+        else:
+            caixa_ini = caixa_final_anterior + entrada
+        veks = Decimal(gasto_veks.get(m, 0) or 0)
+        caixa_fim = (caixa_ini - veks).quantize(CENTAVO, ROUND_HALF_UP)
+        linhas.append({
+            "mes": m, "medicao": med, "fat_anterior": fat_anterior,
+            "imposto": imp, "entrada": entrada,
+            "caixa_inicial": caixa_ini, "gasto_veks": veks, "caixa_final": caixa_fim,
+        })
+        fat_anterior = Decimal(fat_direto.get(m, 0) or 0)
+        caixa_final_anterior = caixa_fim
+    return {
+        "linhas": linhas,
+        "lucro_em_caixa": linhas[-1]["caixa_final"] if linhas else Decimal("0"),
+    }
+
+
+def comparar_fluxo_caixa(recalc, verbatim):
+    """Compara dois dicts mes->Decimal (ex.: gasto_veks recalculado × verbatim).
+    delta = verbatim - recalc por mês e no total."""
+    meses = sorted(set(recalc) | set(verbatim))
+    por_mes = {}
+    total_r = Decimal("0")
+    total_v = Decimal("0")
+    for m in meses:
+        r = Decimal(recalc.get(m, 0) or 0)
+        v = Decimal(verbatim.get(m, 0) or 0)
+        por_mes[m] = {"recalc": r, "verbatim": v, "delta": v - r}
+        total_r += r
+        total_v += v
+    return {
+        "por_mes": por_mes,
+        "total_recalc": total_r,
+        "total_verbatim": total_v,
+        "delta_total": total_v - total_r,
+    }
+
+
 def _previsto_por_categoria(osc):
     """Previsto = realizado + a_realizar, por categoria (Decimal)."""
     material = Decimal(osc.realizado_material or 0) + Decimal(osc.material_a_realizar or 0)
