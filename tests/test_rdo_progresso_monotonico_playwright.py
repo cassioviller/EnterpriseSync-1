@@ -207,7 +207,9 @@ def main():
             colhidos = []
             for i in range(n_cards):
                 c = cards.nth(i)
-                data_txt = c.locator('.rdo-date span').first.inner_text().strip()
+                # DOM REV: a data migrou de '.rdo-date span' para o <small> do
+                # cabeçalho do card ('#<id> · dd/mm/aaaa' em .rdo-card-header).
+                data_txt = c.locator('.rdo-card-header small').first.inner_text().strip()
                 prog_block = c.locator('.rdo-progress')
                 # P2 — bloco de progresso presente
                 _ok(prog_block.count() == 1,
@@ -270,6 +272,20 @@ def main():
         log.error(f' ✗ {f}')
     log.info('=' * 70)
     sys.exit(0 if not failed else 1)
+
+
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_rdo_progresso_monotonico_e2e():
+    """Entrypoint pytest (browser): progresso geral monotônico nos cards de RDO
+    consolidado (Task #143). Requer servidor."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E progresso monotônico falhou (exit code={e.code})"
 
 
 if __name__ == '__main__':

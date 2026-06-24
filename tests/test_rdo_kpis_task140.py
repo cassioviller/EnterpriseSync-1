@@ -74,6 +74,7 @@ class Runner:
             nome=f'Obra 140 {s}', codigo=f'O140-{s[-6:]}',
             admin_id=admin.id, status='Em andamento',
             data_inicio=date(2026, 3, 2),
+            cliente_id=cli.id,  # Task #172: FK NOT NULL
         )
         db.session.add(obra); db.session.flush()
 
@@ -228,6 +229,21 @@ class Runner:
         log.info(f"PASSED: {len(self.passed)} | FAILED: {len(self.failed)}")
         log.info("=" * 60)
         return 0 if not self.failed else 1
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_rdo_kpis_task140():
+    """Entrypoint pytest do Runner legado (Task #140): bugs #1-3 do motor
+    calcular_progresso_geral_obra_v2. Cobertura preservada."""
+    runner = Runner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam (Task #140):\n  - " + "\n  - ".join(map(str, runner.failed))
 
 
 if __name__ == '__main__':

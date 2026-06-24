@@ -57,7 +57,7 @@ def _check(cond: bool, label: str, falhas: list[str]):
         falhas.append(label)
 
 
-def teste_filtros_brl_num(falhas: list[str]):
+def _teste_filtros_brl_num(falhas: list[str]):
     """Filtros aceitam Decimal/float/int/None sem TypeError."""
     _check(brl_filter(Decimal('1540.00')) == 'R$ 1.540,00',
            'brl(Decimal 1540) → R$ 1.540,00', falhas)
@@ -84,7 +84,7 @@ def teste_filtros_brl_num(falhas: list[str]):
         _check(False, f'multiplicação float*Decimal não pode levantar TypeError ({e})', falhas)
 
 
-def teste_parse_br_input(falhas: list[str]):
+def _teste_parse_br_input(falhas: list[str]):
     """Backend aceita valores em pt-BR ('1.234,56') e en-US ('1234.56')."""
     _check(_parse_br_number('1.234,56') == 1234.56,
            "_parse_br_number('1.234,56') → 1234.56", falhas)
@@ -102,7 +102,7 @@ def teste_parse_br_input(falhas: list[str]):
            "_parse_br_decimal('25') → Decimal 25", falhas)
 
 
-def teste_editar_orcamento_http_200(falhas: list[str]):
+def _teste_editar_orcamento_http_200(falhas: list[str]):
     """GET /orcamentos/<id>/editar retorna 200 com composição mista
     Decimal/float e contém pelo menos um valor formatado em pt-BR.
     """
@@ -262,9 +262,9 @@ def teste_editar_orcamento_http_200(falhas: list[str]):
 
 def main():
     falhas: list[str] = []
-    teste_filtros_brl_num(falhas)
-    teste_parse_br_input(falhas)
-    teste_editar_orcamento_http_200(falhas)
+    _teste_filtros_brl_num(falhas)
+    _teste_parse_br_input(falhas)
+    _teste_editar_orcamento_http_200(falhas)
     print('\n' + '=' * 70)
     if falhas:
         print(f'❌ {len(falhas)} falha(s):')
@@ -272,6 +272,16 @@ def main():
             print(f'  - {f}')
         sys.exit(1)
     print('✅ Todos os testes passaram (Task #165)')
+
+
+def test_orcamento_formato_br():
+    """Entrypoint pytest do script legado de formato BR (filtros brl/num +
+    parse pt-BR + render /orcamentos/editar). main() sys.exit(1) se houver
+    falha. Cobertura preservada (teste canônico de formato BR backend)."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"Testes de formato BR falharam (exit code={e.code})"
 
 
 if __name__ == '__main__':

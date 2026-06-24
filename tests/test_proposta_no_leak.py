@@ -81,5 +81,15 @@ def main():
     sys.exit(0 if total_leaks == 0 else 1)
 
 
+def test_proposta_no_leak_task115():
+    """Entrypoint pytest do guard estático (Task #115): nenhuma superfície
+    cliente expõe custo/imposto/margem/composição. main() sys.exit(0) se 0
+    vazamentos. Cobertura preservada."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"Vazamento de dados sensíveis detectado (exit code={e.code})"
+
+
 if __name__ == '__main__':
     main()

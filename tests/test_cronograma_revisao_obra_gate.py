@@ -219,7 +219,19 @@ def run():
         prop_a_id, token_a = fresh_proposta(
             client, admin, cliente, servico_id, servico_nome, suffix="A",
         )
-        # Envia ao cliente
+        # Envia ao cliente.
+        # Reconciliação (Task #31, posterior a este teste): a rota /status só
+        # permite ENVIADA quando a revisão está concluída (sem campos/cláusulas
+        # pendentes). Simula a confirmação de revisão que o admin faz na UI
+        # antes de enviar — caso contrário a rota responde 400 (gate de envio).
+        from datetime import datetime as _dt
+        _pa = db.session.get(Proposta, prop_a_id)
+        _pa.status = 'rascunho'
+        _pa.campos_pendentes_revisao = []
+        for _c in (_pa.clausulas or []):
+            if _c.revisado_em is None:
+                _c.revisado_em = _dt.utcnow()
+        db.session.commit()
         r = client.post(f"/propostas/{prop_a_id}/status", json={"status": "ENVIADA"})
         step("A.1 status ENVIADA", r.status_code == 200, f"http={r.status_code}")
 
@@ -529,6 +541,22 @@ def run():
         sys.exit(1)
     print("OK — gate de revisão de cronograma da obra validado.")
     sys.exit(0)
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_revisao_obra_gate_task200():
+    """Entrypoint pytest: roda o fluxo HTTP do gate de revisão de cronograma e
+    falha se qualquer cenário interno falhar. Conversão fiel do script
+    standalone (run() popula as listas globais PASS/FAIL e faz sys.exit no fim —
+    capturamos o SystemExit e asseramos FAIL vazio). Cobertura preservada."""
+    try:
+        run()
+    except SystemExit:
+        pass
+    assert not FAIL, "Cenários falharam (Task #200):\n  - " + "\n  - ".join(FAIL)
 
 
 if __name__ == "__main__":

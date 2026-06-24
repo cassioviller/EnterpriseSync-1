@@ -252,6 +252,7 @@ class Obra(db.Model):
     data_previsao_fim = db.Column(db.Date)
     orcamento = db.Column(db.Float, default=0.0)
     valor_contrato = db.Column(db.Float, default=0.0)  # Valor do contrato para cálculo de margem
+    fluxo_caixa_planilha = db.Column(db.JSON)  # snapshot verbatim da Planilha1 (fluxo_caixa_mensal)
     area_total_m2 = db.Column(db.Float, default=0.0)  # Área total da obra
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
@@ -5316,6 +5317,37 @@ class MedicaoObraItem(db.Model):
         return f'<MedicaoObraItem medicao={self.medicao_obra_id} item={self.item_medicao_comercial_id}>'
 
 
+class MedicaoContrato(db.Model):
+    """Medição de contrato (cronograma de faturamento FIXO pelo contrato).
+    Distinta de MedicaoObra (medição por execução). valor = pct × valor_contrato."""
+    __tablename__ = 'medicao_contrato'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    data = db.Column(db.Date)
+    pct = db.Column(db.Numeric(7, 5), nullable=False, default=0)
+    recebido_no_mes = db.Column(db.String(8))
+    obs = db.Column(db.Text)
+    ordem = db.Column(db.Integer, default=0)
+
+    obra = db.relationship('Obra', backref='medicoes_contrato')
+
+    @property
+    def valor(self):
+        from decimal import Decimal as _D
+        return (_D(str(self.obra.valor_contrato or 0)) * _D(str(self.pct or 0)))
+
+    __table_args__ = (
+        db.Index('ix_medicao_contrato_obra', 'obra_id'),
+        db.Index('ix_medicao_contrato_admin', 'admin_id'),
+    )
+
+    def __repr__(self):
+        return f'<MedicaoContrato {self.nome} obra={self.obra_id}>'
+
+
 class MapaConcorrenciaV2(db.Model):
     """Mapa de Concorrência V2 — tabela multi-fornecedor comparativa (N itens × N fornecedores)"""
     __tablename__ = 'mapa_concorrencia_v2'
@@ -5614,6 +5646,12 @@ class ObraServicoCusto(db.Model):
     )
     mao_obra_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
     outros_a_realizar = db.Column(db.Numeric(15, 2), default=0, nullable=False)
+
+    # Físico-financeiro: quem paga cada categoria — 'veks' (empresa) ou 'fat_direto'
+    # (cliente paga o fornecedor direto). Default 'veks'.
+    fonte_material = db.Column(db.String(20), default='veks', nullable=False)
+    fonte_mao_obra = db.Column(db.String(20), default='veks', nullable=False)
+    fonte_outros = db.Column(db.String(20), default='veks', nullable=False)
 
     observacoes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

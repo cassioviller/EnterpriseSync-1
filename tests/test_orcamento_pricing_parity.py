@@ -107,5 +107,14 @@ def main():
     sys.exit(0 if fails == 0 else 1)
 
 
+def test_orcamento_pricing_parity_task74():
+    """Entrypoint pytest do teste puro de paridade frontend↔backend (Task #74).
+    main() faz sys.exit(0) se a fórmula bate. Cobertura preservada."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"Paridade de precificação falhou (exit code={e.code})"
+
+
 if __name__ == '__main__':
     main()

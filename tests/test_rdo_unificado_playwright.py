@@ -758,5 +758,19 @@ def main():
     sys.exit(0 if not failed else 1)
 
 
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_rdo_unificado_e2e():
+    """Entrypoint pytest (browser): RDO unificado 3 responsáveis, fluxo completo
+    (Task #152). Requer servidor. Cobertura preservada."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E RDO unificado falhou (exit code={e.code})"
+
+
 if __name__ == '__main__':
     main()

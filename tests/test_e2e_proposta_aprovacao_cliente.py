@@ -390,6 +390,17 @@ def run():
                   evidence=f"snapshot_size={len(json.dumps(prop.cronograma_default_json or []))}")
 
         # Step 9 — Admin envia ao cliente (status RASCUNHO→ENVIADA)
+        # Reconciliação (Task #31, posterior a este teste): enviar exige revisão
+        # concluída (sem cláusulas/campos pendentes). Simula a confirmação de
+        # revisão que o admin faz na UI antes de enviar — senão a rota dá 400.
+        from datetime import datetime as _dt
+        prop = db.session.get(Proposta, proposta_id)
+        prop.status = 'rascunho'
+        prop.campos_pendentes_revisao = []
+        for _c in (prop.clausulas or []):
+            if _c.revisado_em is None:
+                _c.revisado_em = _dt.utcnow()
+        db.session.commit()
         r = client.post(f"/propostas/{proposta_id}/status",
                         json={"status": "ENVIADA"})
         http_check("Admin POST status ENVIADA", r, [200])
@@ -477,6 +488,22 @@ def run():
         sys.exit(1)
     print("OK — fluxo HTTP completo aprovado.")
     sys.exit(0)
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_proposta_aprovacao_cliente_task132():
+    """Entrypoint pytest: roda o ciclo HTTP completo proposta→portal→aprovação
+    cliente→obra e falha se qualquer cenário interno falhar. Conversão fiel do
+    script standalone (run() popula PASS/FAIL globais e faz sys.exit — capturado
+    aqui; asseramos FAIL vazio). Cobertura preservada."""
+    try:
+        run()
+    except SystemExit:
+        pass
+    assert not FAIL, "Cenários falharam (Task #132):\n  - " + "\n  - ".join(FAIL)
 
 
 if __name__ == "__main__":

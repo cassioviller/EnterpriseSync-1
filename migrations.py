@@ -3993,6 +3993,9 @@ def executar_migracoes():
             (190, "Cadastro de Regras de Classificação de Fluxo de Caixa: palavra_chave_categoria + palavra_chave_sugestao + correcao_classificacao (ADR-0002)", migration_190_palavra_chave_classificacao),
             (191, "Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria origem='sistema') para todos os tenants existentes", migration_191_seed_regras_classificacao_sistema),
             (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
+            (196, "fonte pagamento Veks/Fat em obra_servico_custo", _migration_196_obra_servico_custo_fonte_pagamento),
+            (197, "Físico-financeiro — tabela medicao_contrato", _migration_197_medicao_contrato),
+            (198, "Físico-financeiro — obra.fluxo_caixa_planilha (snapshot verbatim)", _migration_198_obra_fluxo_caixa_planilha),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13558,6 +13561,71 @@ def _migration_189_bdi_completo():
         logger.info("[Migration 189] Colunas de BDI adicionadas (empresa default 0/60/90, proposta nullable).")
     except Exception as e:
         logger.error(f"[Migration 189] Falha: {e}")
+        raise
+
+
+def _migration_196_obra_servico_custo_fonte_pagamento():
+    """Físico-financeiro — adiciona fonte_material/fonte_mao_obra/fonte_outros
+    em obra_servico_custo (Veks x Faturamento Direto). Idempotente.
+
+    NOTA: os números 193/194/195 já constam em migration_history (aplicados em
+    2026-06-15 por uma sessão anterior, sem código correspondente neste arquivo);
+    por isso esta migração usa 196 para não colidir com o cache.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            for col in ('fonte_material', 'fonte_mao_obra', 'fonte_outros'):
+                conn.execute(sa_text(f"""
+                    ALTER TABLE obra_servico_custo
+                      ADD COLUMN IF NOT EXISTS {col} VARCHAR(20) NOT NULL DEFAULT 'veks'
+                """))
+        logger.info("[Migration 196] fonte_material/mao_obra/outros adicionadas em obra_servico_custo.")
+    except Exception as e:
+        logger.error(f"[Migration 196] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_197_medicao_contrato():
+    """Físico-financeiro — cria tabela medicao_contrato (cronograma de
+    faturamento fixo pelo contrato). Idempotente."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS medicao_contrato (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(120) NOT NULL,
+                    data DATE,
+                    pct NUMERIC(7,5) NOT NULL DEFAULT 0,
+                    recebido_no_mes VARCHAR(8),
+                    obs TEXT,
+                    ordem INTEGER DEFAULT 0
+                )
+            """))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_medicao_contrato_obra ON medicao_contrato(obra_id)"))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_medicao_contrato_admin ON medicao_contrato(admin_id)"))
+        logger.info("[Migration 197] medicao_contrato criada.")
+    except Exception as e:
+        logger.error(f"[Migration 197] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_198_obra_fluxo_caixa_planilha():
+    """Físico-financeiro — coluna JSON para o snapshot verbatim do fluxo de
+    caixa da Planilha1. Idempotente."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE obra
+                  ADD COLUMN IF NOT EXISTS fluxo_caixa_planilha JSONB
+            """))
+        logger.info("[Migration 198] obra.fluxo_caixa_planilha adicionada.")
+    except Exception as e:
+        logger.error(f"[Migration 198] Falha: {e}", exc_info=True)
         raise
 
 

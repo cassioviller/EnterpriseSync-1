@@ -42,6 +42,16 @@ def calcular_tolerancia(diferenca_minutos: int, tolerancia: int = TOLERANCIA_MIN
     return minutos_para_horas(abs(diferenca_minutos))
 
 
+def calcular_extra_com_tolerancia(extra_minutos: int, tolerancia: int = TOLERANCIA_MINUTOS) -> Decimal:
+    """Tolerancia aplicada a horas EXTRAS: se o excedente <= tolerancia, nao
+    credita nada; se > tolerancia, credita TODAS as horas extras (nao so o
+    excedente). Simetrica a calcular_tolerancia, mas para credito de extras.
+    (Conhecimento preservado do antigo test_calculo_tolerancia.py.)"""
+    if extra_minutos <= tolerancia:
+        return Decimal('0')
+    return minutos_para_horas(extra_minutos)
+
+
 def calcular_he_50(horas: Decimal) -> Decimal:
     """Calcula valor de horas extras 50%"""
     return (VALOR_HORA * Decimal('1.5') * horas).quantize(Decimal('0.01'))
@@ -113,11 +123,40 @@ class TestToleranciaAtraso:
         desconto = calcular_tolerancia(-9)
         assert desconto == Decimal('0')
     
+    def test_saida_11_minutos_antes_desconta_tudo(self):
+        """Saida 11 minutos antes (ultrapassou) = desconta 11 minutos.
+        (Caso de fronteira preservado do antigo test_calculo_tolerancia.py.)"""
+        desconto = calcular_tolerancia(-11)
+        assert desconto == minutos_para_horas(11)
+
     def test_saida_60_minutos_antes_desconta_tudo(self):
         """Saida 60 minutos antes = desconta 60 minutos (1h)"""
         desconto = calcular_tolerancia(-60)
         esperado = Decimal('1')
         assert desconto == esperado
+
+
+class TestToleranciaHorasExtras:
+    """Tolerancia aplicada a horas EXTRAS (credito): excedente <= tolerancia nao
+    credita; > tolerancia credita tudo. Conhecimento preservado do antigo
+    test_calculo_tolerancia.py (regras_salario nao cobria a tolerancia sobre
+    extras, so o calculo de HE 50/100)."""
+
+    def test_extra_9_minutos_nao_credita(self):
+        """9 minutos a mais (dentro da tolerancia) = sem hora extra"""
+        assert calcular_extra_com_tolerancia(9) == Decimal('0')
+
+    def test_extra_10_minutos_nao_credita(self):
+        """10 minutos a mais (exatamente na tolerancia) = sem hora extra"""
+        assert calcular_extra_com_tolerancia(10) == Decimal('0')
+
+    def test_extra_11_minutos_credita_tudo(self):
+        """11 minutos a mais (ultrapassou) = credita 11 minutos"""
+        assert calcular_extra_com_tolerancia(11) == minutos_para_horas(11)
+
+    def test_extra_2_horas_credita_tudo(self):
+        """2 horas a mais = credita 2 horas (cenario da simulacao: dia 03)"""
+        assert calcular_extra_com_tolerancia(120) == Decimal('2')
 
 
 class TestFaltaInjustificada:

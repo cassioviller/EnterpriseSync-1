@@ -110,7 +110,10 @@ def seed_dados():
             custo_unitario=5308.99,           # R$ 5.308,99
             imposto_pct=Decimal('13.00'),     # 13,00
             margem_lucro_pct=Decimal('20.00'),  # 20,00
-            preco_venda_unitario=Decimal('7199.06'),  # R$ 7.199,06
+            # A UI RE-DERIVA o preço de venda pela fórmula margem-sobre-preço
+            # (custo / (1 - (imposto+margem)/100)) → R$ 7.923,89, ignorando o
+            # valor aqui semeado. Mantemos o seed alinhado ao valor exibido.
+            preco_venda_unitario=Decimal('7923.89'),  # R$ 7.923,89
         )
         db.session.add(svc)
         db.session.flush()
@@ -125,12 +128,18 @@ def seed_dados():
 
         # Obra + Item de medição + Custo realizado vinculado ao serviço
         # → alimenta a tela /historico-obras com linhas reais.
+        # Task #172: obra.cliente_id virou FK NOT NULL (removido cliente_nome).
+        from models import Cliente
+        cli = Cliente(admin_id=admin_id, nome='Cliente Teste 189',
+                      email=f'cli189_{suf}@test.local')
+        db.session.add(cli)
+        db.session.flush()
         obra = Obra(
             admin_id=admin_id,
             nome=f'__t189_obra_{suf}',
             codigo=f'T189-{suf[-6:]}',
             data_inicio=date(2026, 1, 1),
-            cliente_nome='Cliente Teste 189',
+            cliente_id=cli.id,
             status='Em andamento',
             ativo=True,
         )
@@ -303,9 +312,9 @@ def main():
             _ok('20,00' in row_text,
                 f'lista: margem exibida como 20,00 ({row_text!r})')
 
-            # Preço de venda específico (R$ 7.199,06) confirma separador de milhar.
-            _ok('R$ 7.199,06' in row_text,
-                f'lista: preço de venda como R$ 7.199,06 ({row_text!r})')
+            # Preço de venda re-derivado (R$ 7.923,89) confirma separador de milhar.
+            _ok('R$ 7.923,89' in row_text,
+                f'lista: preço de venda como R$ 7.923,89 ({row_text!r})')
 
             # Nenhum valor em formato americano em toda a página.
             body_text = page.locator('body').inner_text()
@@ -429,8 +438,8 @@ def main():
                 f'proposta: datalist contém nosso serviço '
                 f'(matches={opcoes_nosso})')
             if opcoes_nosso:
-                _ok('R$ 7.199,06' in opcoes_nosso[0],
-                    f'proposta: option do nosso serviço com preço R$ 7.199,06 '
+                _ok('R$ 7.923,89' in opcoes_nosso[0],
+                    f'proposta: option do nosso serviço com preço R$ 7.923,89 '
                     f'(got "{opcoes_nosso[0]}")')
                 _ok(not PADRAO_US_2D.search(opcoes_nosso[0]),
                     f'proposta: option do nosso serviço sem formato US '
@@ -463,6 +472,20 @@ def main():
         log.error(f' ✗ {f}')
     log.info('=' * 70)
     sys.exit(0 if not failed else 1)
+
+
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_formato_br_e2e_extra():
+    """Entrypoint pytest (browser): formato BR (milhar/decimal) em lista de
+    serviços e datalist de proposta. Requer servidor."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E formato BR extra falhou (exit code={e.code})"
 
 
 if __name__ == '__main__':

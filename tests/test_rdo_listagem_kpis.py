@@ -285,5 +285,20 @@ class Runner:
         return 0 if not self.failed else 1
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_rdo_listagem_kpis_task61():
+    """Entrypoint pytest do Runner legado (Task #61): paridade list-vs-detail dos
+    KPIs V2 + parsers + persistência. Cobertura preservada."""
+    runner = Runner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam (Task #61):\n  - " + "\n  - ".join(map(str, runner.failed))
+
+
 if __name__ == '__main__':
     sys.exit(Runner().run())

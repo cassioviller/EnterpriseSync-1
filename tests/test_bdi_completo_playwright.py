@@ -226,5 +226,19 @@ def main():
     sys.exit(0 if not failed else 1)
 
 
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_bdi_completo_e2e():
+    """Entrypoint pytest (browser): roda o e2e do BDI completo. Requer servidor
+    gunicorn de pé. main() faz sys.exit != 0 em falha. Cobertura preservada."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E do BDI completo falhou (exit code={e.code})"
+
+
 if __name__ == '__main__':
     main()

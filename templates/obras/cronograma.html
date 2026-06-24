@@ -37,6 +37,9 @@
           <span class="badge bg-info ms-1">+dias</span>
         {% endif %}
       </a>
+      <a href="{{ url_for('cronograma.fisico_financeiro', obra_id=obra.id) }}" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-coins me-1"></i> Físico-Financeiro
+      </a>
     </div>
   </div>
 

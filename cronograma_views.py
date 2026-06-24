@@ -2522,3 +2522,40 @@ def api_produtividade():
             'total_registros': len(rows),
         },
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FÍSICO-FINANCEIRO (derivado)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro')
+@login_required
+def fisico_financeiro(obra_id: int):
+    # O painel agora vive na aba Financeiro da página da obra.
+    from flask import redirect, url_for
+    # '#financeiro' = data-hash da aba (o JS de hash→tab mapeia por data-hash, não pelo id da pane)
+    return redirect(url_for('main.detalhes_obra', id=obra_id) + '#financeiro')
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro/export.xlsx')
+@login_required
+def fisico_financeiro_xlsx(obra_id: int):
+    guard = _check_v2()
+    if guard:
+        return guard
+    import io
+    from services.cronograma_fisico_financeiro import (
+        montar_fisico_financeiro, exportar_fisico_financeiro_xlsx,
+    )
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    dados = montar_fisico_financeiro(obra_id, admin_id)
+    wb = exportar_fisico_financeiro_xlsx(dados)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf, as_attachment=True,
+        download_name=f'cronograma_ff_obra_{obra_id}.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )

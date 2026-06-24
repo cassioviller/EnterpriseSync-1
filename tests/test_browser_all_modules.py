@@ -49,6 +49,10 @@ from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+# Toda a suíte deste arquivo requer Playwright + servidor gunicorn de pé.
+# Marcador de módulo para o gate rápido poder excluí-la com `-m "not browser"`.
+pytestmark = pytest.mark.browser
+
 BASE_URL = os.environ.get("PW_BASE_URL", "http://localhost:5000")
 DEMO_USERNAME = "admin@construtoraalfa.com.br"
 DEMO_SENHA = "Alfa@2026"
@@ -124,6 +128,19 @@ def _get_admin_id() -> int:
         u = Usuario.query.filter_by(email=DEMO_USERNAME).first()
         assert u, f"Conta demo {DEMO_USERNAME} não encontrada no banco"
         return u.id
+
+
+def _obra_com_cronograma(admin_id: int):
+    """Retorna o id da 1ª obra do admin que tenha cronograma materializado
+    (ao menos uma TarefaCronograma), ou None se não houver."""
+    from app import app as flask_app
+    from models import TarefaCronograma
+    with flask_app.app_context():
+        t = (TarefaCronograma.query
+             .filter_by(admin_id=admin_id)
+             .order_by(TarefaCronograma.obra_id)
+             .first())
+        return t.obra_id if t else None
 
 
 def _garantir_dados_e2e(admin_id: int) -> None:
@@ -404,6 +421,18 @@ class TestBloco3ObrasRdo:
             assert not erros, f"Erros JS críticos em obras: {erros[:3]}"
         finally:
             _js_erros_stop(browser_session, erros)
+
+    def test_cronograma_fisico_financeiro(self, browser_session):
+        """Página físico-financeira do cronograma — abre sem 500/404 e exibe o
+        título. Pula se nenhuma obra tiver cronograma materializado."""
+        obra_id = _obra_com_cronograma(_get_admin_id())
+        if obra_id is None:
+            pytest.skip("Nenhuma obra com cronograma materializado no banco demo")
+        path = f"/cronograma/obra/{obra_id}/fisico-financeiro"
+        _check_page(browser_session, path)
+        html = browser_session.content().lower()
+        assert "físico-financeiro" in html or "fisico-financeiro" in html, \
+            "Página FF não exibe o título esperado"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1767,6 +1796,14 @@ class TestConsoleSweep:
         ("/almoxarifado/relatorios", "Almox Relatórios"),
         ("/metricas/servico", "Métricas Serviço"),
         ("/orcamentos", "Orçamentos"),
+        # Migradas de test_e2e_modules.py (legado, removido) — rotas antes só
+        # cobertas lá: relatórios/centros de custo contábeis e sub-telas de
+        # alimentação. As demais rotas daquele arquivo já constam acima ou
+        # apontavam para destinos de redirect inexistentes como rota direta.
+        ("/contabilidade/relatorios", "Contabilidade Relatórios"),
+        ("/contabilidade/centros-custo", "Centros de Custo"),
+        ("/alimentacao/itens", "Alimentação Itens"),
+        ("/alimentacao/restaurantes", "Alimentação Restaurantes"),
     ]
 
     @pytest.mark.parametrize("path,nome", ROTAS)

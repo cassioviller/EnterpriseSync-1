@@ -170,7 +170,9 @@ def t3_nova_obra_via_post():
         resp = c.post('/obras/nova', data={
             'nome': f'Obra T172 {tag}',
             'codigo': codigo,
-            'cliente_nome': nome_cliente,
+            # Task #176: o form de nova obra lê `cliente_busca` (texto livre)
+            # para resolver/criar o Cliente via services.cliente_resolver.
+            'cliente_busca': nome_cliente,
             'cliente_email': email_cliente,
             'cliente_telefone': '11988887777',
             'data_inicio': datetime.utcnow().date().isoformat(),
@@ -280,37 +282,44 @@ def t4_propagacao_proposta_aprovada():
                    evidence=f"obras={len(obras)} clientes={len(clientes)}")
 
 
-def t5_fallback_obra_legada():
-    """Obra sem cliente_id (legada) deve usar texto via property efetivo."""
-    admin = make_admin()
-    aid = admin.id
-    tag = datetime.utcnow().strftime('%H%M%S%f')
+# NOTA (Task #176): o antigo t5_fallback_obra_legada foi REMOVIDO.
+# A #176 tornou `obra.cliente_id` FK NOT NULL e eliminou as colunas-texto
+# `cliente_nome/email/telefone` de Obra. Não existe mais "obra legada sem
+# cliente_id" nem fallback de texto — `cliente_*_efetivo` lê só do Cliente
+# vinculado. O cenário que t5 testava deixou de existir no schema.
 
-    obra = Obra(
-        nome=f'Obra Legada {tag}',
-        codigo=f'LEG-{tag[-6:]}',
-        cliente_nome=f'Texto Legado {tag}',
-        cliente_email=f'legado_{tag}@x.test',
-        cliente_telefone='11900000000',
-        admin_id=aid,
-        status='Em andamento',
-        data_inicio=datetime.utcnow().date(),
-    )
-    db.session.add(obra)
-    db.session.flush()
 
-    record('T5a — Obra legada não tem cliente_id',
-           obra.cliente_id is None,
-           evidence=f"cliente_id={obra.cliente_id}")
-    record('T5b — fallback cliente_nome_efetivo == cliente_nome',
-           obra.cliente_nome_efetivo == f'Texto Legado {tag}',
-           evidence=f"efetivo={obra.cliente_nome_efetivo!r}")
-    record('T5c — fallback cliente_email_efetivo == cliente_email',
-           obra.cliente_email_efetivo == f'legado_{tag}@x.test',
-           evidence=f"efetivo={obra.cliente_email_efetivo!r}")
-    record('T5d — fallback cliente_telefone_efetivo == cliente_telefone',
-           obra.cliente_telefone_efetivo == '11900000000',
-           evidence=f"efetivo={obra.cliente_telefone_efetivo!r}")
+def _run_all():
+    """Executa t1–t4 dentro de um app_context, com rollback ao final.
+
+    Reutilizado tanto pelo entrypoint pytest quanto pelo main() standalone.
+    """
+    with app.app_context():
+        try:
+            t1_schema_coluna_existe()
+            t2_resolver_helper()
+            t3_nova_obra_via_post()
+            t4_propagacao_proposta_aprovada()
+            db.session.rollback()
+        except Exception as e:
+            db.session.rollback()
+            FAIL.append(('EXCEPTION', str(e)))
+            import traceback
+            traceback.print_exc()
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_task_172_obra_cliente_fk():
+    """Entrypoint pytest (Task #172/#176). Cobre schema FK, resolver de
+    Cliente, POST /obras/nova e propagação de proposta aprovada."""
+    PASS.clear()
+    FAIL.clear()
+    _run_all()
+    assert not FAIL, "Cenários falharam (Task #172):\n  - " + "\n  - ".join(
+        f"{lbl} — {ev}" for lbl, ev in FAIL)
 
 
 def main():
@@ -318,19 +327,7 @@ def main():
     print('TASK #172 — Obra.cliente_id FK + helpers + propagação')
     print('=' * 80)
 
-    with app.app_context():
-        try:
-            t1_schema_coluna_existe()
-            t2_resolver_helper()
-            t3_nova_obra_via_post()
-            t4_propagacao_proposta_aprovada()
-            t5_fallback_obra_legada()
-            db.session.rollback()
-        except Exception as e:
-            db.session.rollback()
-            FAIL.append(('EXCEPTION', str(e)))
-            import traceback
-            traceback.print_exc()
+    _run_all()
 
     print('=' * 80)
     print(f'PASS: {len(PASS)}  FAIL: {len(FAIL)}')

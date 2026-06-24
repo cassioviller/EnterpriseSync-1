@@ -183,9 +183,9 @@
             </td>
           </tr>
           {% endif %}
-          <tr><td>Tributos <span class="text-muted small">({{ _b.imposto_pct }}%)</span></td>
+          <tr><td>Tributos <span class="text-muted small">({{ _b.imposto_pct|num(2) }}%)</span></td>
               <td class="text-end">{{ _b.tributos|brl }}</td></tr>
-          <tr><td>Lucro <span class="text-muted small">({{ _b.margem_lucro_pct }}%)</span></td>
+          <tr><td>Lucro <span class="text-muted small">({{ _b.margem_lucro_pct|num(2) }}%)</span></td>
               <td class="text-end">{{ _b.lucro|brl }}</td></tr>
           <tr class="fw-bold border-top">
             <td>Preço</td><td class="text-end text-success">{{ _preco|brl }}</td>

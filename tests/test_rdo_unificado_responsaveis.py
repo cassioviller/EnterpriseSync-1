@@ -438,5 +438,19 @@ class RDOUnificadoRunner:
         return 0 if not self.failed else 1
 
 
+import pytest
+
+
+@pytest.mark.integration
+def test_rdo_unificado_responsaveis_task149():
+    """Entrypoint pytest do Runner legado (Task #149). Cobertura preservada."""
+    runner = RDOUnificadoRunner()
+    try:
+        runner.run()
+    except SystemExit:
+        pass
+    assert not runner.failed, "Cenários falharam (Task #149):\n  - " + "\n  - ".join(map(str, runner.failed))
+
+
 if __name__ == '__main__':
     sys.exit(RDOUnificadoRunner().run())

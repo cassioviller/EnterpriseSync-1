@@ -47,8 +47,43 @@ from utils.webhook_dispatcher import WEBHOOK_EVENT_ALLOWLIST
 import notificacoes_cli
 
 
+import pytest
+
 RUN_TAG = f"E2E45-{secrets.token_hex(3).upper()}"
 PASS, FAIL = [], []
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Fixtures pytest — substituem os args posicionais que antes só eram
+# preenchidos via main() (motivo do collect_ignore_glob original).
+# ────────────────────────────────────────────────────────────────────────
+@pytest.fixture
+def _appctx():
+    with app.app_context():
+        yield
+        db.session.rollback()
+
+
+@pytest.fixture
+def admin(_appctx):
+    return make_admin()
+
+
+@pytest.fixture
+def cliente(admin):
+    return make_cliente(admin)
+
+
+@pytest.fixture
+def proposta(admin):
+    # Sufixo único por teste: a constraint (numero_proposta, admin_id) é única
+    # e o admin é compartilhado entre os testes (mesmo RUN_TAG).
+    return make_proposta(admin, numero_suffix=f'HLP-{secrets.token_hex(3).upper()}')
+
+
+@pytest.fixture
+def obra(admin, cliente):
+    return make_obra(admin, cliente, suffix=secrets.token_hex(2).upper())
 
 EVENTOS_TASK_45 = {
     'proposta.aprovada',
@@ -66,6 +101,7 @@ def step(label, ok, detail=""):
     (PASS if ok else FAIL).append(label)
     extra = f" — {detail}" if detail else ""
     print(f"  {tag} {label}{extra}")
+    assert ok, f"{label}{extra}"
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -90,11 +126,12 @@ def make_admin():
     return u
 
 
-def make_cliente(admin):
+def make_cliente(admin, suffix=""):
+    sfx = suffix or secrets.token_hex(2)
     c = Cliente(
         admin_id=admin.id,
-        nome=f"Cliente E2E {RUN_TAG}",
-        email=f"cli{RUN_TAG.lower()}@e2e.com.br",
+        nome=f"Cliente E2E {RUN_TAG}-{sfx}",
+        email=f"cli{RUN_TAG.lower()}{sfx}@e2e.com.br",
         telefone="5511999998888",
     )
     db.session.add(c)
@@ -391,18 +428,27 @@ def main():
         proposta = make_proposta(admin, numero_suffix='HLP')
         obra = make_obra(admin, cliente)
 
-        test_allowlist_contem_catalogo()
-        test_emit_proposta_aprovada(admin, proposta)
-        test_emit_proposta_rejeitada(admin, proposta)
-        test_emit_proposta_expirando(admin, proposta)
-        test_emit_obra_rdo_publicado(admin, obra)
-        test_emit_obra_medicao_publicada(admin, obra)
-        test_emit_obra_cronograma_atualizado(admin, obra)
-        test_emit_obra_concluida(admin, obra)
-        test_safe_emit_engole_excecao(admin, proposta)
-        test_cli_expirando_idempotencia(admin)
-        test_cli_expirando_fora_janela(admin)
-        test_emit_obra_concluida_helper_so_quando_chamado(admin, cliente)
+        # step() agora levanta AssertionError em falha (modo pytest); no runner
+        # standalone capturamos para preservar o sumário PASS/FAIL.
+        casos = [
+            lambda: test_allowlist_contem_catalogo(),
+            lambda: test_emit_proposta_aprovada(admin, proposta),
+            lambda: test_emit_proposta_rejeitada(admin, proposta),
+            lambda: test_emit_proposta_expirando(admin, proposta),
+            lambda: test_emit_obra_rdo_publicado(admin, obra),
+            lambda: test_emit_obra_medicao_publicada(admin, obra),
+            lambda: test_emit_obra_cronograma_atualizado(admin, obra),
+            lambda: test_emit_obra_concluida(admin, obra),
+            lambda: test_safe_emit_engole_excecao(admin, proposta),
+            lambda: test_cli_expirando_idempotencia(admin),
+            lambda: test_cli_expirando_fora_janela(admin),
+            lambda: test_emit_obra_concluida_helper_so_quando_chamado(admin, cliente),
+        ]
+        for caso in casos:
+            try:
+                caso()
+            except AssertionError:
+                pass
 
     print()
     print(f"==> RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL")
