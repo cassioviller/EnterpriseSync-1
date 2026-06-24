@@ -2534,11 +2534,18 @@ def fisico_financeiro(obra_id: int):
     guard = _check_v2()
     if guard:
         return guard
-    from services.cronograma_fisico_financeiro import montar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import (
+        montar_fisico_financeiro, medicoes_contrato, fluxo_caixa,
+        fluxo_caixa_divergencia, kpis,
+    )
     admin_id = _admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
     dados = montar_fisico_financeiro(obra_id, admin_id)
-    return render_template('cronograma/fisico_financeiro.html', obra=obra, dados=dados)
+    return render_template(
+        'cronograma/fisico_financeiro.html', obra=obra, dados=dados,
+        kpis=kpis(obra), medicoes=medicoes_contrato(obra),
+        caixa=fluxo_caixa(obra), divergencia=fluxo_caixa_divergencia(obra),
+    )
 
 
 @cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro/export.xlsx')
