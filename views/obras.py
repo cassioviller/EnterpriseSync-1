@@ -1367,6 +1367,48 @@ def financeiro_dados(id):
     return jsonify(_jsonable(painel_financeiro(obra)))
 
 
+@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>', methods=['POST'])
+@login_required
+def financeiro_editar_etapa(id, osc_id):
+    from decimal import Decimal, InvalidOperation
+    from models import Obra, ObraServicoCusto
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from services.resumo_custos_obra import recalcular_servico
+    from utils.tenant import get_tenant_admin_id
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    osc = ObraServicoCusto.query.filter_by(id=osc_id, obra_id=obra.id, admin_id=admin_id).first_or_404()
+
+    def _dec(v):
+        try:
+            return Decimal(str(v).replace(',', '.')) if v not in (None, '') else Decimal('0')
+        except (InvalidOperation, ValueError):
+            return None
+    veks = _dec(request.form.get('veks'))
+    fat = _dec(request.form.get('fat'))
+    orc = _dec(request.form.get('valor_orcado'))
+    if veks is None or fat is None or orc is None:
+        return jsonify({'erro': 'valores inválidos'}), 400
+
+    osc.mao_obra_a_realizar = veks
+    osc.fonte_mao_obra = 'veks'
+    osc.material_a_realizar = fat
+    osc.fonte_material = 'fat_direto'
+    osc.valor_orcado = orc
+    db.session.commit()
+    # recalcular_servico recompõe estado derivado (cotações etc.). Os valores
+    # editados manualmente (Veks / Fat direto) são a fonte de verdade, então
+    # reaplicamos após o recálculo para que não sejam sobrescritos.
+    recalcular_servico(osc.id)
+    osc.mao_obra_a_realizar = veks
+    osc.fonte_mao_obra = 'veks'
+    osc.material_a_realizar = fat
+    osc.fonte_material = 'fat_direto'
+    osc.valor_orcado = orc
+    db.session.commit()
+    return jsonify(_jsonable(painel_financeiro(obra)))
+
+
 @main_bp.route('/obras/detalhes/<int:id>')
 @capture_db_errors
 def detalhes_obra(id):
