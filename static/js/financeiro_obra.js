@@ -4,6 +4,10 @@
   var BRLk = function (v) { return 'R$ ' + Math.round((v || 0) / 1000).toLocaleString('pt-BR') + 'k'; };
   var C = {}, loaded = false, ENDPOINT = null, OBRA_ID = null;
   function el(id) { return document.getElementById(id); }
+  function csrfToken() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+  }
 
   function renderKPIs(k) {
     var cards = [
@@ -61,7 +65,7 @@
       fd.append('veks', el('ed-veks').value || '0');
       fd.append('fat', el('ed-fat').value || '0');
       fd.append('valor_orcado', el('ed-orc').value || '0');
-      fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id, { method: 'POST', body: fd })
+      fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id, { method: 'POST', body: fd, headers: { 'X-CSRFToken': csrfToken() } })
         .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(function (p) { render(p); box.innerHTML = '<div class="text-success small">Salvo e recalculado.</div>'; })
         .catch(function () { box.innerHTML = '<div class="text-danger small">Falha ao salvar.</div>'; });
