@@ -5316,6 +5316,37 @@ class MedicaoObraItem(db.Model):
         return f'<MedicaoObraItem medicao={self.medicao_obra_id} item={self.item_medicao_comercial_id}>'
 
 
+class MedicaoContrato(db.Model):
+    """Medição de contrato (cronograma de faturamento FIXO pelo contrato).
+    Distinta de MedicaoObra (medição por execução). valor = pct × valor_contrato."""
+    __tablename__ = 'medicao_contrato'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    nome = db.Column(db.String(120), nullable=False)
+    data = db.Column(db.Date)
+    pct = db.Column(db.Numeric(7, 5), nullable=False, default=0)
+    recebido_no_mes = db.Column(db.String(8))
+    obs = db.Column(db.Text)
+    ordem = db.Column(db.Integer, default=0)
+
+    obra = db.relationship('Obra', backref='medicoes_contrato')
+
+    @property
+    def valor(self):
+        from decimal import Decimal as _D
+        return (_D(str(self.obra.valor_contrato or 0)) * _D(str(self.pct or 0)))
+
+    __table_args__ = (
+        db.Index('ix_medicao_contrato_obra', 'obra_id'),
+        db.Index('ix_medicao_contrato_admin', 'admin_id'),
+    )
+
+    def __repr__(self):
+        return f'<MedicaoContrato {self.nome} obra={self.obra_id}>'
+
+
 class MapaConcorrenciaV2(db.Model):
     """Mapa de Concorrência V2 — tabela multi-fornecedor comparativa (N itens × N fornecedores)"""
     __tablename__ = 'mapa_concorrencia_v2'

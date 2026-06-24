@@ -3994,6 +3994,7 @@ def executar_migracoes():
             (191, "Seed das Regras de Classificação de Fluxo de Caixa (PalavraChaveCategoria origem='sistema') para todos os tenants existentes", migration_191_seed_regras_classificacao_sistema),
             (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
             (196, "fonte pagamento Veks/Fat em obra_servico_custo", _migration_196_obra_servico_custo_fonte_pagamento),
+            (197, "Físico-financeiro — tabela medicao_contrato", _migration_197_medicao_contrato),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13581,6 +13582,33 @@ def _migration_196_obra_servico_custo_fonte_pagamento():
         logger.info("[Migration 196] fonte_material/mao_obra/outros adicionadas em obra_servico_custo.")
     except Exception as e:
         logger.error(f"[Migration 196] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_197_medicao_contrato():
+    """Físico-financeiro — cria tabela medicao_contrato (cronograma de
+    faturamento fixo pelo contrato). Idempotente."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS medicao_contrato (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(120) NOT NULL,
+                    data DATE,
+                    pct NUMERIC(7,5) NOT NULL DEFAULT 0,
+                    recebido_no_mes VARCHAR(8),
+                    obs TEXT,
+                    ordem INTEGER DEFAULT 0
+                )
+            """))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_medicao_contrato_obra ON medicao_contrato(obra_id)"))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_medicao_contrato_admin ON medicao_contrato(admin_id)"))
+        logger.info("[Migration 197] medicao_contrato criada.")
+    except Exception as e:
+        logger.error(f"[Migration 197] Falha: {e}", exc_info=True)
         raise
 
 
