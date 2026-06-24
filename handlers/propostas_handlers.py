@@ -93,6 +93,9 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
     cliente_nome = data.get('cliente_nome')
     valor_total = Decimal(str(data.get('valor_total', 0)))
     data_aprovacao = data.get('data_aprovacao')
+    # A importação físico-financeira reusa este caminho canônico (Obra + IMC + OSC),
+    # mas NÃO é uma venda contábil: quando skip_contabil=True, pula lançamento/partidas.
+    skip_contabil = bool(data.get('skip_contabil'))
 
     logger.info(f"🔔 Processando evento proposta_aprovada - Proposta: {proposta_id}, Cliente: {cliente_nome}")
 
@@ -149,11 +152,12 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
             )
 
     # Task #94: lançamento contábil só faz sentido para valor > 0.
-    # Para valor zerado, propaga itens comerciais e cronograma sem lançamento.
-    if valor_total <= 0:
+    # Para valor zerado (ou importação com skip_contabil), propaga itens
+    # comerciais e cronograma sem lançamento.
+    if valor_total <= 0 or skip_contabil:
         logger.info(
-            f"⏭️ Proposta {proposta_id}: valor zerado — pulando lançamento contábil; "
-            f"propagação proposta→obra continua."
+            f"⏭️ Proposta {proposta_id}: {'importação (skip_contabil)' if skip_contabil else 'valor zerado'} "
+            f"— pulando lançamento contábil; propagação proposta→obra continua."
         )
         _propagar_proposta_para_obra(proposta_id, admin_id)
         _materializar_cronograma_se_houver()

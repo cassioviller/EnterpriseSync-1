@@ -281,3 +281,73 @@ def test_painel_renderiza_apos_import():
             assert f'/obras/detalhes/{oid}' in loc and loc.endswith('#financeiro')
     finally:
         app.config['WTF_CSRF_ENABLED'] = prev
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Fluxo comercial completo (Orçamento → Proposta → IMC/OSC), sem contábil
+# ──────────────────────────────────────────────────────────────────────
+@pytest.mark.integration
+def test_importa_cria_orcamento_e_proposta():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Orcamento, OrcamentoItem, Proposta, PropostaItem
+    with app.app_context():
+        admin_id = _novo_admin()
+        res = importar_fisico_financeiro(_carregar_json(), admin_id)
+        assert res['orcamento_id'] and res['proposta_id']
+
+        orcs = Orcamento.query.filter_by(admin_id=admin_id).all()
+        assert len(orcs) == 1
+        assert OrcamentoItem.query.filter_by(orcamento_id=orcs[0].id).count() == 12
+
+        prop = Proposta.query.filter_by(id=res['proposta_id'], admin_id=admin_id).first()
+        assert prop is not None and prop.obra_id == res['obra_id']
+        assert prop.orcamento_id == orcs[0].id
+        assert PropostaItem.query.filter_by(proposta_id=prop.id).count() == 12
+        # venda da proposta ≈ contrato (Σ peso_pct ≈ 1; pesos têm 4 casas no JSON)
+        assert abs(float(orcs[0].venda_total) - 1505613.76) < 2000
+
+
+@pytest.mark.integration
+def test_importa_casa_insumos_no_catalogo():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Insumo, ComposicaoServico, OrcamentoItem
+    with app.app_context():
+        admin_id = _novo_admin()
+        res = importar_fisico_financeiro(_carregar_json(), admin_id)
+        # itens de custo do JSON viraram Insumos do catálogo + composição
+        assert Insumo.query.filter_by(admin_id=admin_id).count() > 0
+        assert ComposicaoServico.query.filter_by(admin_id=admin_id).count() > 0
+        # cada OrcamentoItem carrega um composicao_snapshot não vazio
+        itens = OrcamentoItem.query.filter_by(admin_id=admin_id).all()
+        assert all(isinstance(i.composicao_snapshot, list) for i in itens)
+        assert any((i.composicao_snapshot or []) for i in itens)
+
+
+@pytest.mark.integration
+def test_importa_nao_gera_lancamento_contabil():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import LancamentoContabil
+    with app.app_context():
+        admin_id = _novo_admin()
+        res = importar_fisico_financeiro(_carregar_json(), admin_id)
+        # skip_contabil=True → nenhum lançamento contábil desta proposta
+        lcs = LancamentoContabil.query.filter_by(
+            admin_id=admin_id, origem='PROPOSTAS',
+            origem_id=res['proposta_id']).count()
+        assert lcs == 0
+
+
+@pytest.mark.integration
+def test_reimport_nao_duplica_orcamento_proposta():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Orcamento, Proposta, OrcamentoItem, PropostaItem
+    with app.app_context():
+        admin_id = _novo_admin()
+        importar_fisico_financeiro(_carregar_json(), admin_id)
+        res2 = importar_fisico_financeiro(_carregar_json(), admin_id)
+        assert Orcamento.query.filter_by(admin_id=admin_id).count() == 1
+        assert Proposta.query.filter_by(admin_id=admin_id).count() == 1
+        assert OrcamentoItem.query.filter_by(
+            orcamento_id=res2['orcamento_id']).count() == 12
+        assert PropostaItem.query.filter_by(
+            proposta_id=res2['proposta_id']).count() == 12
