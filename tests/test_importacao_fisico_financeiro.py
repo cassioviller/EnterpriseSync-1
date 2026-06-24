@@ -211,3 +211,34 @@ def test_rota_import_json_post_importa_e_redireciona():
     with app.app_context():
         depois = Obra.query.filter_by(admin_id=admin_id).count()
         assert depois == antes + 1
+
+
+@pytest.mark.integration
+def test_painel_renderiza_apos_import():
+    import io  # noqa
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario
+    with app.app_context():
+        admin_id = _novo_admin()
+        # O painel é guardado por _check_v2() → is_v2_active(), que exige
+        # versao_sistema == 'v2' no admin do tenant. Sem isso a rota redireciona.
+        admin = Usuario.query.get(admin_id)
+        admin.versao_sistema = 'v2'
+        db.session.commit()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+    prev = app.config.get('WTF_CSRF_ENABLED', True)
+    app.config['WTF_CSRF_ENABLED'] = False
+    try:
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['_user_id'] = str(admin_id)
+                sess['_fresh'] = True
+            resp = c.get(f'/cronograma/obra/{oid}/fisico-financeiro')
+            assert resp.status_code == 200
+            html = resp.get_data(as_text=True)
+            assert 'Medições de contrato' in html
+            assert 'Fluxo de caixa mensal' in html
+            # KPIs and the Indiretos alert should render with the Baias data
+            assert 'Inconsistência dos Indiretos' in html
+    finally:
+        app.config['WTF_CSRF_ENABLED'] = prev
