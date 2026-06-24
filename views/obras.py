@@ -17,6 +17,21 @@ from views import main_bp
 
 logger = logging.getLogger(__name__)
 
+
+def _jsonable(obj):
+    from decimal import Decimal as _D
+    from datetime import date as _date, datetime as _dt
+    if isinstance(obj, _D):
+        return float(obj)
+    if isinstance(obj, (_date, _dt)):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonable(v) for v in obj]
+    return obj
+
+
 try:
     from utils.circuit_breaker import circuit_breaker, pdf_generation_fallback, database_query_fallback
 except ImportError:
@@ -1341,6 +1356,17 @@ def trocar_cliente_obra(id):
 
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
+@main_bp.route('/obras/<int:id>/financeiro/dados')
+@login_required
+def financeiro_dados(id):
+    from models import Obra
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from utils.tenant import get_tenant_admin_id
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    return jsonify(_jsonable(painel_financeiro(obra)))
+
+
 @main_bp.route('/obras/detalhes/<int:id>')
 @capture_db_errors
 def detalhes_obra(id):

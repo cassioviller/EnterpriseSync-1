@@ -149,3 +149,41 @@ def test_painel_etapas_osc_id_e_none_ou_osc_real():
         p = painel_financeiro(obra)
         for e in p['etapas']:
             assert e['osc_id'] is None or e['osc_id'] in osc_ids
+
+
+@pytest.mark.integration
+def test_endpoint_financeiro_dados():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.get(f'/obras/{oid}/financeiro/dados')
+        assert r.status_code == 200
+        data = r.get_json()
+        for k in ('kpis', 'etapas', 'curva_s', 'caixa', 'medicoes', 'doughnut'):
+            assert k in data
+        assert len(data['curva_s']['meses']) == len(data['curva_s']['realizado'])
+
+
+@pytest.mark.integration
+def test_endpoint_financeiro_dados_multitenant():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    import json
+    with app.app_context():
+        a1 = _novo_admin(); a2 = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), a1)['obra_id']
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(a2); s['_fresh'] = True
+        r = c.get(f'/obras/{oid}/financeiro/dados')
+        assert r.status_code == 404
