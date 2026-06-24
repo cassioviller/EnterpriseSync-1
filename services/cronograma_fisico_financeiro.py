@@ -466,18 +466,18 @@ def painel_financeiro(obra) -> dict:
     meses = sorted(set([l["mes"] for l in caixa["linhas"]]) | set(realizado_mes))
     caixa_por_mes = {l["mes"]: l for l in caixa["linhas"]}
     receb_ac, gasto_ac, real_ac = [], [], []
-    r = g = re_ = Decimal("0")
+    r = g = real_ = Decimal("0")
     for m in meses:
         linha = caixa_por_mes.get(m)
         r += (linha["entrada"] if linha else Decimal("0"))
         g += (linha["gasto_veks"] if linha else Decimal("0"))
-        re_ += realizado_mes.get(m, Decimal("0"))
-        receb_ac.append(r); gasto_ac.append(g); real_ac.append(re_)
+        real_ += realizado_mes.get(m, Decimal("0"))
+        receb_ac.append(r); gasto_ac.append(g); real_ac.append(real_)
     lucro_ac = [receb_ac[i] - gasto_ac[i] for i in range(len(meses))]
 
     etapas = []
     for e in dados["etapas"]:
-        osc_id = e.get("osc_id") or e.get("etapa_id")
+        osc_id = e.get("osc_id")  # id verdadeiro do ObraServicoCusto, ou None (etapa multi-OSC)
         etapas.append({
             "nome": e["nome"],
             "veks": e["veks"],

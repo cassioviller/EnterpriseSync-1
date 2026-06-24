@@ -131,3 +131,21 @@ def test_painel_financeiro_estrutura():
         assert p['etapas'] and all('realizado' in e and 'previsto' in e for e in p['etapas'])
         assert set(['veks', 'fat']) <= set(p['doughnut'])
         assert 'verba_disponivel' in p['kpis']
+
+
+@pytest.mark.integration
+def test_painel_etapas_osc_id_e_none_ou_osc_real():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra, ObraServicoCusto
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        osc_ids = {o.id for o in ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).all()}
+        p = painel_financeiro(obra)
+        for e in p['etapas']:
+            assert e['osc_id'] is None or e['osc_id'] in osc_ids
