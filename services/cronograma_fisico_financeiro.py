@@ -440,6 +440,43 @@ def kpis(obra, dados=None):
     }
 
 
+def curva_realizado(obra) -> dict:
+    """Custo realizado por mês 'YYYY-MM' a partir de GestaoCustoFilho.data_referencia,
+    tenant-scoped, excluindo FATURAMENTO_DIRETO. Fonte: RDO/diárias, empreitadas,
+    compras, aluguel — cresce ao longo do tempo."""
+    from models import db, GestaoCustoFilho, GestaoCustoPai
+    rows = (db.session.query(GestaoCustoFilho.data_referencia, GestaoCustoFilho.valor)
+            .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+            .filter(GestaoCustoFilho.obra_id == obra.id)
+            .filter(GestaoCustoPai.admin_id == obra.admin_id)
+            .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')
+            .all())
+    out: dict = {}
+    for dt, valor in rows:
+        if not dt:
+            continue
+        chave = f"{dt.year:04d}-{dt.month:02d}"
+        out[chave] = out.get(chave, Decimal("0")) + Decimal(valor or 0)
+    return out
+
+
+def realizado_por_etapa(obra) -> dict:
+    """Realizado por etapa: {obra_servico_custo_id: Decimal} (exclui FATURAMENTO_DIRETO)."""
+    from models import db, GestaoCustoFilho, GestaoCustoPai
+    rows = (db.session.query(GestaoCustoFilho.obra_servico_custo_id, GestaoCustoFilho.valor)
+            .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+            .filter(GestaoCustoFilho.obra_id == obra.id)
+            .filter(GestaoCustoPai.admin_id == obra.admin_id)
+            .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')
+            .all())
+    out: dict = {}
+    for osc_id, valor in rows:
+        if osc_id is None:
+            continue
+        out[osc_id] = out.get(osc_id, Decimal("0")) + Decimal(valor or 0)
+    return out
+
+
 def exportar_fisico_financeiro_xlsx(dados: dict):
     """Gera um openpyxl.Workbook no layout da planilha de referência:
     aba 'Cronograma FF (por etapa)' + aba 'Curva S'."""
