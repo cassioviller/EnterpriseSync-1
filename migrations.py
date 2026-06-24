@@ -3995,6 +3995,7 @@ def executar_migracoes():
             (192, "Fundir 'Serviços Terceirizados de Obra' em 'Subempreitada' — reaponta regras origem='sistema' em todos os tenants (decisão 2026-06-10)", migration_192_fundir_terceirizados_em_subempreitada),
             (196, "fonte pagamento Veks/Fat em obra_servico_custo", _migration_196_obra_servico_custo_fonte_pagamento),
             (197, "Físico-financeiro — tabela medicao_contrato", _migration_197_medicao_contrato),
+            (198, "Físico-financeiro — obra.fluxo_caixa_planilha (snapshot verbatim)", _migration_198_obra_fluxo_caixa_planilha),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13609,6 +13610,22 @@ def _migration_197_medicao_contrato():
         logger.info("[Migration 197] medicao_contrato criada.")
     except Exception as e:
         logger.error(f"[Migration 197] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_198_obra_fluxo_caixa_planilha():
+    """Físico-financeiro — coluna JSON para o snapshot verbatim do fluxo de
+    caixa da Planilha1. Idempotente."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                ALTER TABLE obra
+                  ADD COLUMN IF NOT EXISTS fluxo_caixa_planilha JSONB
+            """))
+        logger.info("[Migration 198] obra.fluxo_caixa_planilha adicionada.")
+    except Exception as e:
+        logger.error(f"[Migration 198] Falha: {e}", exc_info=True)
         raise
 
 

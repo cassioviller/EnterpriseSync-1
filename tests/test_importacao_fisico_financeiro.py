@@ -14,3 +14,9 @@ def test_medicao_contrato_schema_existe():
         cols = {c.name for c in MedicaoContrato.__table__.columns}
         assert {'obra_id', 'admin_id', 'nome', 'data', 'pct',
                 'recebido_no_mes', 'obs', 'ordem'} <= cols
+
+
+@pytest.mark.integration
+def test_obra_tem_coluna_fluxo_caixa_planilha():
+    from models import Obra
+    assert 'fluxo_caixa_planilha' in {c.name for c in Obra.__table__.columns}
