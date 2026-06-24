@@ -643,6 +643,11 @@ def run():
         # 14) REV4 — Removendo uma cláusula via UI, ela some dos 3 renderers
         #     (pdf padrão, pdf paginado e portal cliente). Esta é a
         #     verificação explícita pedida pelo code review.
+        # Task #31: o gate de versionamento (rota /propostas/editar) só edita
+        # in-place propostas em 'rascunho' — uma 'enviada' é redirecionada para
+        # "criar nova versão" e a edição NÃO ocorre. A remoção de cláusula via
+        # UI portanto exige rascunho; o portal do cliente renderiza por token
+        # independentemente do status, então os 3 renderers continuam cobertos.
         prop_remove = Proposta(
             admin_id=admin.id,
             numero=f"PROP-RM-{RUN_TAG}",
@@ -650,7 +655,7 @@ def run():
             cliente_nome=cli_legacy.nome,
             cliente_email=cli_legacy.email,
             cliente_id=cli_legacy.id,
-            status="enviada",
+            status="rascunho",
             valor_total=Decimal("100.00"),
             token_cliente=f"tok-rm-{RUN_TAG.lower()}",
         )
@@ -1015,6 +1020,20 @@ def run():
     print(f"   Failed: {summary['failed']}")
     print(f"   Relatório: {REPORT_PATH}")
     return 0 if summary["failed"] == 0 else 1
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_clausulas_configuraveis():
+    """Entrypoint pytest (Task #174). Roda o fluxo HTTP completo de cláusulas
+    configuráveis no app canônico (conftest importa `main` → 54 blueprints)."""
+    _steps.clear()
+    run()
+    falhas = [s for s in _steps if not s["ok"]]
+    assert not falhas, "Steps falharam (Task #174):\n  - " + "\n  - ".join(
+        f"{s['step']} — {s['error'] or s['evidence']}" for s in falhas)
 
 
 if __name__ == "__main__":
