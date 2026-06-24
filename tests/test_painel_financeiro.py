@@ -280,3 +280,28 @@ def test_obras_id_serve_pagina_nao_json():
         ct = r.headers.get('Content-Type', '')
         assert 'text/html' in ct
         assert 'tab-financeiro' in r.get_data(as_text=True)
+
+
+@pytest.mark.integration
+def test_pagina_obra_tem_aba_financeiro_e_endpoint():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        page = c.get(f'/obras/{oid}', follow_redirects=True)
+        assert page.status_code == 200
+        html = page.get_data(as_text=True)
+        assert 'tab-financeiro' in html
+        assert 'financeiro_obra.js' in html
+        data = c.get(f'/obras/{oid}/financeiro/dados').get_json()
+        assert len(data['curva_s']['meses']) == len(data['curva_s']['realizado'])
+        assert len(data['etapas']) == 12
