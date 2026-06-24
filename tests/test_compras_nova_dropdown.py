@@ -4,8 +4,9 @@ Task #202 — Teste E2E HTTP do dropdown de fornecedores em /compras/nova.
 Cobre, na rota real `compras_views.nova` / `nova_post`:
 
   1. GET /compras/nova com tenant SEM fornecedores
-     → renderiza alerta de empty-state com link para
-       /almoxarifado/fornecedores/criar (não exibe `<select>`).
+     → renderiza alerta de empty-state com botão de criação INLINE
+       ("+ novo" → qcAbrirFornecedor()); o `<select>` é sempre exibido
+       mas sem options de fornecedor (só a option vazia placeholder).
 
   2. GET /compras/nova com tenant COM fornecedores ativos
      → renderiza `<select name="fornecedor_id" class="... select2-ajax">`
@@ -264,14 +265,25 @@ def run():
             check("Empty-state alerta presente",
                   "Nenhum fornecedor cadastrado" in html_empty,
                   "alert-warning visível")
-            check("Link para cadastrar fornecedor presente",
-                  "/almoxarifado/fornecedores/criar" in html_empty,
-                  "url_for(almoxarifado.fornecedores_criar)")
-            # No empty state, NÃO renderiza o select
-            check("Select de fornecedor ausente quando lista vazia",
-                  '<select name="fornecedor_id"' not in html_empty
-                  and '<select name=fornecedor_id' not in html_empty,
-                  "select substituído por alerta")
+            # UX REV: o empty-state agora oferece criação INLINE (botão "+ novo"
+            # → qcAbrirFornecedor()) em vez de um link para a página separada
+            # /almoxarifado/fornecedores/criar. O fornecedor criado popula o
+            # próprio select sem sair da tela de compra.
+            check("Affordance de criar fornecedor inline presente (+ novo)",
+                  "qcAbrirFornecedor(" in html_empty,
+                  "botão inline qcAbrirFornecedor()")
+            # UX REV: o <select> é SEMPRE renderizado (para receber o fornecedor
+            # criado inline) — mas, com a lista vazia, não traz NENHUMA option
+            # de fornecedor (só a option vazia placeholder).
+            sel_empty = re.search(
+                r'<select[^>]*name="fornecedor_id"[^>]*>(.*?)</select>',
+                html_empty, re.DOTALL,
+            )
+            opts_empty = re.findall(
+                r'<option[^>]*value="(\d+)"', sel_empty.group(1) if sel_empty else "")
+            check("Select sem options de fornecedor quando lista vazia",
+                  sel_empty is not None and not opts_empty,
+                  "select presente, zero options numéricas")
 
             # ── Seed fornecedores no admin A (e ruído no admin B) ─
             print("\n[2] Seed: 2 ativos + 1 inativo no admin A; 1 fornecedor no admin B (ruído)")
@@ -470,6 +482,21 @@ def run():
             cleanup(admin_ids)
 
     return 0 if FAIL == 0 else 1
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_compras_nova_dropdown():
+    """Entrypoint pytest (Task #202). Roda o fluxo HTTP do dropdown de
+    fornecedores em /compras/nova no app canônico (conftest importa main)."""
+    global PASS, FAIL, ERRORS
+    PASS = 0
+    FAIL = 0
+    ERRORS = []
+    run()
+    assert not ERRORS, "Asserts falharam (Task #202):\n  - " + "\n  - ".join(ERRORS)
 
 
 if __name__ == "__main__":
