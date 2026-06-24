@@ -353,16 +353,22 @@ def _medicao_por_mes(obra):
     return out
 
 
-def fluxo_caixa(obra):
+def _imposto_pct(obra):
+    """Alíquota de imposto: do snapshot da planilha, senão 0.135 (ISS 4% + DAS 9,5%)."""
+    snap = obra.fluxo_caixa_planilha or {}
+    val = snap.get("imposto_pct") if isinstance(snap, dict) else None
+    return Decimal(str(val or "0.135"))
+
+
+def fluxo_caixa(obra, dados=None):
     """Fluxo de caixa recalculado: medições (por mês) + Veks/Fat faseados pelo
     cronograma. imposto_pct vem do snapshot/contrato (default 0.135)."""
-    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    dados = dados if dados is not None else montar_fisico_financeiro(obra.id, obra.admin_id)
     medicao = _medicao_por_mes(obra)
     veks = {k: Decimal(v) for k, v in dados["meses_veks"].items()}
     fat = {k: Decimal(v) for k, v in dados["meses_fat"].items()}
     meses = sorted(set(medicao) | set(veks) | set(fat))
-    snap = obra.fluxo_caixa_planilha or {}
-    imposto_pct = Decimal(str((snap.get("imposto_pct") if isinstance(snap, dict) else None) or "0.135"))
+    imposto_pct = _imposto_pct(obra)
     res = calcular_fluxo_caixa(meses, medicao, fat, veks, imposto_pct)
     res["meses"] = meses
     return res
@@ -389,10 +395,10 @@ def _veks_verbatim_por_mes(rotulos, valores, obra):
     return out
 
 
-def fluxo_caixa_divergencia(obra):
+def fluxo_caixa_divergencia(obra, dados=None):
     """Compara Veks faseado (recalc) × GASTO VEKS do snapshot verbatim, mês a mês,
     e resume a inconsistência dos Indiretos (Δ Veks e os dois lucros)."""
-    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    dados = dados if dados is not None else montar_fisico_financeiro(obra.id, obra.admin_id)
     recalc = {k: Decimal(v) for k, v in dados["meses_veks"].items()}
     snap = obra.fluxo_caixa_planilha or {}
     verbatim = {}
@@ -402,23 +408,23 @@ def fluxo_caixa_divergencia(obra):
     veks_etapas = dados["totais"]["veks"]
     veks_verbatim = cmp["total_verbatim"]
     lucro_caixa = Decimal(str((snap.get("lucro_caixa_final") if isinstance(snap, dict) else 0) or 0))
+    venda = Decimal(str(obra.valor_contrato or 0))
+    imposto = (venda * _imposto_pct(obra)).quantize(CENTAVO, ROUND_HALF_UP)
     cmp["resumo"] = {
         "veks_etapas": veks_etapas,
         "veks_verbatim": veks_verbatim,
         "delta_veks": (veks_verbatim - veks_etapas) if veks_verbatim else Decimal("0"),
         "lucro_em_caixa": lucro_caixa,
-        "lucro_por_etapas": Decimal(str(obra.valor_contrato or 0)) - dados["totais"]["total"],
+        "lucro_por_etapas": venda - dados["totais"]["total"] - imposto,
     }
     return cmp
 
 
-def kpis(obra):
+def kpis(obra, dados=None):
     venda = Decimal(str(obra.valor_contrato or 0))
-    dados = montar_fisico_financeiro(obra.id, obra.admin_id)
+    dados = dados if dados is not None else montar_fisico_financeiro(obra.id, obra.admin_id)
     custo = dados["totais"]["total"]
-    snap = obra.fluxo_caixa_planilha or {}
-    imposto_pct = Decimal(str((snap.get("imposto_pct") if isinstance(snap, dict) else None) or "0.135"))
-    imposto = (venda * imposto_pct).quantize(CENTAVO, ROUND_HALF_UP)
+    imposto = (venda * _imposto_pct(obra)).quantize(CENTAVO, ROUND_HALF_UP)
     lucro = venda - custo - imposto
     recebido = Decimal("0")
     for m in medicoes_contrato(obra):

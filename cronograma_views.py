@@ -2543,8 +2543,8 @@ def fisico_financeiro(obra_id: int):
     dados = montar_fisico_financeiro(obra_id, admin_id)
     return render_template(
         'cronograma/fisico_financeiro.html', obra=obra, dados=dados,
-        kpis=kpis(obra), medicoes=medicoes_contrato(obra),
-        caixa=fluxo_caixa(obra), divergencia=fluxo_caixa_divergencia(obra),
+        kpis=kpis(obra, dados), medicoes=medicoes_contrato(obra),
+        caixa=fluxo_caixa(obra, dados), divergencia=fluxo_caixa_divergencia(obra, dados),
     )
 
 
