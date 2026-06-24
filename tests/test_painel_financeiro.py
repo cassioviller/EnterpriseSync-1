@@ -326,3 +326,30 @@ def test_pagina_obra_tem_aba_financeiro_e_endpoint():
         data = c.get(f'/obras/{oid}/financeiro/dados').get_json()
         assert len(data['curva_s']['meses']) == len(data['curva_s']['realizado'])
         assert len(data['etapas']) == 12
+
+
+@pytest.mark.integration
+def test_painel_tem_grupos_kpi_e_wrappers_chart():
+    # Redesign: 3 grupos de KPI (Resultado/Caixa/Custo) com corpo preenchido por
+    # JS (ids fin-kpi-*) + cada canvas dentro de um wrapper .fin-chart de altura fixa.
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        body = c.get(f'/obras/{oid}').get_data(as_text=True)
+    for rotulo in ('Resultado', 'Caixa', 'Custo'):
+        assert rotulo in body, rotulo
+    for gid in ('fin-kpi-resultado', 'fin-kpi-caixa', 'fin-kpi-custo'):
+        assert gid in body, gid
+    assert body.count('class="fin-chart"') >= 4
+    for cid in ('finEtapas', 'finCurva', 'finSplit', 'finCaixa'):
+        assert f'<canvas id="{cid}"></canvas>' in body, cid
