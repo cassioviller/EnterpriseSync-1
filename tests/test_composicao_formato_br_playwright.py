@@ -175,10 +175,15 @@ def main():
             _ok(page.locator('table').count() >= 1,
                 'página de composição renderizada')
 
-            # 3. Cards "CUSTO UNITÁRIO" e "PREÇO DE VENDA" devem
-            #    estar em formato BR (R$ N.NNN,NN).
-            custo_card_text = page.locator('h3').nth(0).inner_text().strip()
-            preco_card_text = page.locator('h3').nth(1).inner_text().strip()
+            # 3. Cards de custo e preço devem estar em formato BR (R$ N.NNN,NN).
+            #    Task #47: a página passou de 2 cards <h3> (CUSTO UNITÁRIO /
+            #    PREÇO DE VENDA) para 4 cards <h4>:
+            #      nth(0)=CUSTO TÉCNICO/un., nth(1)=CUSTO REAL TOTAL,
+            #      nth(2)=CUSTO MÉDIO REAL/un., nth(3)=PREÇO VENDA TOTAL.
+            #    Os cards 1/2 mostram "—" sem medição real; validamos os
+            #    cards com valor garantido: custo técnico (0) e preço venda (3).
+            custo_card_text = page.locator('h4').nth(0).inner_text().strip()
+            preco_card_text = page.locator('h4').nth(3).inner_text().strip()
             _ok(bool(PADRAO_BRL.search(custo_card_text)),
                 f'card CUSTO UNITÁRIO em formato BR (got "{custo_card_text}")')
             _ok(bool(PADRAO_BRL.search(preco_card_text)),
@@ -215,10 +220,13 @@ def main():
             for txt in celulas:
                 _ok(not PADRAO_US_2D.search(txt),
                     f'célula sem formato US ".NN" (got "{txt}")')
-                # Toda célula numérica deve ter vírgula como separador decimal
-                # (BR). Pode ser "35,0000", "170,0000", "5.250,00", "59,02", etc.
-                _ok(',' in txt,
-                    f'célula contém vírgula decimal (got "{txt}")')
+                # Células com parte decimal devem usar vírgula (BR): "35,0000",
+                # "5.250,00", "59,02", etc. Colunas inteiras (ex.: "pacotes"
+                # via |num(0) → "150"/"0") não têm decimal e são válidas sem
+                # vírgula — só exigimos vírgula quando NÃO é inteiro puro.
+                if not re.fullmatch(r'\d+', txt):
+                    _ok(',' in txt,
+                        f'célula contém vírgula decimal (got "{txt}")')
 
             # 6. Smoke check: também verifica o texto inteiro do <body> não
             #    contém o padrão americano "número.NN " (espaço/limite),
@@ -243,6 +251,20 @@ def main():
         log.error(f' ✗ {f}')
     log.info('=' * 70)
     sys.exit(0 if not failed else 1)
+
+
+import pytest
+
+pytestmark = pytest.mark.browser
+
+
+def test_composicao_formato_br_e2e():
+    """Entrypoint pytest (browser): formato BR na tela de composição/preço.
+    Requer servidor. A cobertura HTTP/cálculo é coberta pelos testes não-browser."""
+    try:
+        main()
+    except SystemExit as e:
+        assert e.code in (0, None), f"E2E composição formato BR falhou (exit code={e.code})"
 
 
 if __name__ == '__main__':
