@@ -79,5 +79,73 @@
     <p class="text-muted">Custo não faseado (tarefas sem datas): R$ {{ '%.2f'|format(dados.nao_faseado) }}</p>
   {% endif %}
   {% endif %}
+
+  {# --- KPIs --- #}
+  <div class="row g-3 mb-4">
+    {% set k = kpis %}
+    {% for rotulo, valor in [
+        ('Venda', k.venda), ('Custo total', k.custo_total),
+        ('Lucro projetado', k.lucro_projetado), ('Desembolso Veks', k.desembolso_veks),
+        ('Faturamento direto', k.fat_direto), ('Recebido até hoje', k.recebido_ate_hoje)] %}
+    <div class="col-6 col-md-2">
+      <div class="card h-100"><div class="card-body p-2">
+        <div class="small text-muted">{{ rotulo }}</div>
+        <div class="fw-bold" style="font-variant-numeric:tabular-nums">
+          R$ {{ '%.2f'|format(valor|float) }}</div>
+      </div></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# --- Alerta da inconsistência dos Indiretos --- #}
+  {% if divergencia and divergencia.resumo.delta_veks and divergencia.resumo.delta_veks|float|abs > 1 %}
+  <div class="alert alert-warning">
+    <strong>Inconsistência dos Indiretos:</strong>
+    Veks pelas etapas = R$ {{ '%.0f'|format(divergencia.resumo.veks_etapas|float) }};
+    GASTO VEKS da planilha = R$ {{ '%.0f'|format(divergencia.resumo.veks_verbatim|float) }}
+    (Δ R$ {{ '%.0f'|format(divergencia.resumo.delta_veks|float) }}).
+    Lucro em caixa (planilha) = R$ {{ '%.0f'|format(divergencia.resumo.lucro_em_caixa|float) }}.
+    Decida se os Indiretos rodam ~3,5 ou ~5 meses — o app não escolhe sozinho.
+  </div>
+  {% endif %}
+
+  {# --- Medições de contrato --- #}
+  <h5 class="mt-4">Medições de contrato</h5>
+  <table class="table table-sm">
+    <thead><tr><th>Medição</th><th>Data</th><th>%</th><th class="text-end">Valor (R$)</th><th>Mês</th></tr></thead>
+    <tbody>
+    {% for m in medicoes %}
+      <tr><td>{{ m.nome }}</td><td>{{ m.data and m.data.strftime('%d/%m/%Y') or '—' }}</td>
+          <td>{{ '%.1f'|format((m.pct|float)*100) }}%</td>
+          <td class="text-end">{{ '%.2f'|format(m.valor|float) }}</td>
+          <td>{{ m.mes or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {# --- Fluxo de caixa (recalculado) com divergência de Veks --- #}
+  <h5 class="mt-4">Fluxo de caixa mensal (recalculado)</h5>
+  <table class="table table-sm">
+    <thead><tr><th>Mês</th><th class="text-end">Medição</th><th class="text-end">Imposto</th>
+      <th class="text-end">Entrada líq.</th><th class="text-end">Caixa inicial</th>
+      <th class="text-end">Gasto Veks</th><th class="text-end">Caixa final</th>
+      <th class="text-end">Δ Veks vs planilha</th></tr></thead>
+    <tbody>
+    {% for l in caixa.linhas %}
+      <tr><td>{{ l.mes }}</td>
+          <td class="text-end">{{ '%.0f'|format(l.medicao|float) }}</td>
+          <td class="text-end">{{ '%.0f'|format(l.imposto|float) }}</td>
+          <td class="text-end">{{ '%.0f'|format(l.entrada|float) }}</td>
+          <td class="text-end">{{ '%.0f'|format(l.caixa_inicial|float) }}</td>
+          <td class="text-end">{{ '%.0f'|format(l.gasto_veks|float) }}</td>
+          <td class="text-end">{{ '%.0f'|format(l.caixa_final|float) }}</td>
+          <td class="text-end">
+            {% set d = divergencia.por_mes.get(l.mes) %}
+            {{ d and '%.0f'|format(d.delta|float) or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th colspan="6" class="text-end">Lucro em caixa (recalc):</th>
+      <th class="text-end">{{ '%.0f'|format(caixa.lucro_em_caixa|float) }}</th><th></th></tr></tfoot>
+  </table>
 </div>
 {% endblock %}
