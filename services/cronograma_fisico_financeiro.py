@@ -487,9 +487,17 @@ def painel_financeiro(obra) -> dict:
             "osc_id": osc_id,
         })
 
+    # Verba disponível (caixa) = o que já entrou (recebido até hoje, pelas
+    # medições de contrato) menos o que já foi gasto (custo realizado). Usa os
+    # próprios números do painel para ficar internamente consistente — o
+    # `verba_disponivel` do resumo usa outra fonte de "recebido" (MedicaoObra),
+    # que fica zerada em obras importadas/sem medição de execução.
+    custo_realizado = Decimal(str(resumo.get("total_realizado", 0) or 0))
+    verba_disponivel = k["recebido_ate_hoje"] - custo_realizado
+
     return {
-        "kpis": {**k, "verba_disponivel": resumo.get("verba_disponivel", 0),
-                 "custo_realizado": resumo.get("total_realizado", 0)},
+        "kpis": {**k, "verba_disponivel": verba_disponivel,
+                 "custo_realizado": custo_realizado},
         "etapas": etapas,
         "curva_s": {"meses": meses, "recebido_liquido": receb_ac,
                     "gasto_veks": gasto_ac, "lucro": lucro_ac, "realizado": real_ac},

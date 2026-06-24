@@ -134,6 +134,27 @@ def test_painel_financeiro_estrutura():
 
 
 @pytest.mark.integration
+def test_painel_verba_disponivel_eh_recebido_menos_realizado():
+    # No painel, Verba disponível (caixa) = recebido até hoje − custo realizado,
+    # usando os próprios KPIs do painel (consistente, não a fonte do resumo).
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra
+    from decimal import Decimal
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        k = painel_financeiro(Obra.query.get(oid))['kpis']
+        esperado = Decimal(str(k['recebido_ate_hoje'])) - Decimal(str(k['custo_realizado']))
+        assert Decimal(str(k['verba_disponivel'])) == esperado
+        # sem custo realizado lançado, a verba é exatamente o recebido até hoje
+        assert Decimal(str(k['verba_disponivel'])) == Decimal(str(k['recebido_ate_hoje']))
+
+
+@pytest.mark.integration
 def test_painel_etapas_osc_id_e_none_ou_osc_real():
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from services.cronograma_fisico_financeiro import painel_financeiro
