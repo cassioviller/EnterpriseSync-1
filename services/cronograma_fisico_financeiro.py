@@ -125,8 +125,10 @@ def classificar_veks_fat(material, mao_obra, outros,
 
 
 def calcular_fluxo_caixa(meses, medicao, fat_direto, gasto_veks, imposto_pct):
-    """Modelo de caixa derivado. Dicts mes->Decimal. fat_direto e imposto são do
-    PERÍODO ANTERIOR (regra da Planilha1). Retorna {linhas:[...], lucro_em_caixa}."""
+    """Modelo de caixa derivado. Dicts mes->Decimal. O fat_direto abate no
+    PERÍODO SEGUINTE (regra da Planilha1): cada mês usa o fat_direto do mês
+    anterior, e o imposto incide sobre (medição − fat anterior).
+    Retorna {linhas:[...], lucro_em_caixa}."""
     imposto_pct = Decimal(imposto_pct)
     fat_anterior = Decimal("0")
     caixa_final_anterior = None
@@ -277,6 +279,7 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
                         continue
                     et["meses"][mes] = et["meses"].get(mes, Decimal("0")) + parcela
                     meses_globais[mes] = meses_globais.get(mes, Decimal("0")) + parcela
+                    # precisão cheia de propósito; quantizado só ao entrar em calcular_fluxo_caixa
                     meses_veks[mes] = meses_veks.get(mes, Decimal("0")) + (parcela * razao_veks)
                     meses_fat[mes] = meses_fat.get(mes, Decimal("0")) + (parcela * razao_fat)
             # fração de resumo por raiz = peso da raiz / Σpeso (fallback igual)
