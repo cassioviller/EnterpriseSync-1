@@ -23,7 +23,12 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     contrato = payload.get('contrato', {})
 
     cliente = obter_ou_criar_cliente(nome=obra_j.get('cliente'), admin_id=admin_id)
-    codigo = obra_j.get('codigo_obra') or obra_j.get('nome')
+    if cliente is None:
+        raise ValueError(
+            "O arquivo precisa de 'obra.cliente' (nome do cliente) — "
+            "obrigatório para criar a obra."
+        )
+    codigo = obra_j.get('codigo_obra') or (obra_j.get('nome') or '')[:20]
 
     obra = Obra.query.filter_by(codigo=codigo, admin_id=admin_id).first()
     if obra is None:
@@ -34,8 +39,7 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     obra.valor_contrato = float(contrato.get('valor_venda') or 0)
     obra.data_inicio = _parse_date(contrato.get('data_inicio')) or obra.data_inicio
     obra.data_previsao_fim = _parse_date(contrato.get('data_fim_cronograma'))
-    if cliente is not None:
-        obra.cliente_id = cliente.id
+    obra.cliente_id = cliente.id
     db.session.flush()
 
     avisos: list[str] = []
@@ -86,6 +90,9 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
         else:
             dias = (df - di).days + 1 if (di and df) else 1
             folhas.append((etapa['nome'], di, df, max(1, dias)))
+            avisos.append(
+                f"Etapa '{etapa['nome']}' sem tarefas do cronograma — "
+                "faseada pela data da etapa.")
 
         peso_pct = Decimal(str(custo.get('peso_pct') or 0))
         imc = ItemMedicaoComercial(

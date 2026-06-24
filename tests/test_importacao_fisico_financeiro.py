@@ -214,6 +214,46 @@ def test_rota_import_json_post_importa_e_redireciona():
 
 
 @pytest.mark.integration
+def test_importa_sem_cliente_falha_claramente():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    with app.app_context():
+        admin_id = _novo_admin()
+        payload = _carregar_json()
+        payload['obra'] = dict(payload['obra'])
+        payload['obra'].pop('cliente', None)
+        with pytest.raises(ValueError):
+            importar_fisico_financeiro(payload, admin_id)
+
+
+@pytest.mark.integration
+def test_importa_retorna_avisos_como_lista():
+    # No fixture Baias, TODAS as etapas (inclusive Indiretos/transversal) têm
+    # tarefas_mpp não vazias, então nenhum aviso 'sem tarefas' é gerado.
+    # Garantimos apenas que 'avisos' é uma lista no retorno.
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    with app.app_context():
+        admin_id = _novo_admin()
+        res = importar_fisico_financeiro(_carregar_json(), admin_id)
+        assert isinstance(res['avisos'], list)
+
+
+@pytest.mark.integration
+def test_importa_gera_aviso_para_etapa_sem_tarefas():
+    # Quando uma etapa não tem tarefas_mpp, o importador cria uma folha de
+    # fallback e registra um aviso 'sem tarefas'.
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    with app.app_context():
+        admin_id = _novo_admin()
+        payload = _carregar_json()
+        payload['eap'] = [dict(e) for e in payload['eap']]
+        alvo = payload['eap'][-1]
+        alvo['cronograma'] = dict(alvo.get('cronograma', {}))
+        alvo['cronograma']['tarefas_mpp'] = []
+        res = importar_fisico_financeiro(payload, admin_id)
+        assert any('sem tarefas' in a.lower() for a in res['avisos'])
+
+
+@pytest.mark.integration
 def test_painel_renderiza_apos_import():
     import io  # noqa
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
