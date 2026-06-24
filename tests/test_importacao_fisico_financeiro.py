@@ -174,3 +174,40 @@ def test_rota_import_json_get_existe():
     with app.test_client() as c:
         resp = c.get('/importacao/fisico-financeiro')
         assert resp.status_code in (200, 302)
+
+
+@pytest.mark.integration
+def test_rota_import_json_post_importa_e_redireciona():
+    import io
+    from models import Obra
+    app.config['TESTING'] = True
+    app.config['WTF_CSRF_ENABLED'] = False
+    if not app.secret_key:
+        app.secret_key = 'test-secret-ff-post'
+
+    with app.app_context():
+        admin_id = _novo_admin()
+        antes = Obra.query.filter_by(admin_id=admin_id).count()
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    with open(caminho, 'rb') as f:
+        json_bytes = f.read()
+
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(admin_id)
+        sess['_fresh'] = True
+
+    resp = c.post(
+        '/importacao/fisico-financeiro',
+        data={'arquivo': (io.BytesIO(json_bytes), 'baias.json')},
+        content_type='multipart/form-data',
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert '/fisico-financeiro' in resp.headers['Location']
+
+    with app.app_context():
+        depois = Obra.query.filter_by(admin_id=admin_id).count()
+        assert depois == antes + 1

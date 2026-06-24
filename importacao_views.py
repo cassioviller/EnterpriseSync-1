@@ -1026,7 +1026,6 @@ def importar_fisico_financeiro_view():
     """Importa cronograma físico-financeiro completo a partir de um arquivo JSON
     (cronograma, custos, vínculos, medições de contrato e fluxo de caixa). Ao
     concluir, redireciona para o painel físico-financeiro da obra criada."""
-    import json as _json
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
 
     admin_id = get_admin_id_robusta()
@@ -1037,7 +1036,7 @@ def importar_fisico_financeiro_view():
             flash('Selecione um arquivo JSON.', 'warning')
             return redirect(url_for('importacao.importar_fisico_financeiro_view'))
         try:
-            payload = _json.load(arquivo.stream)
+            payload = json.load(arquivo.stream)
             res = importar_fisico_financeiro(payload, admin_id)
         except Exception as e:
             logger.error(f'[FF_IMPORT] Erro ao importar JSON: {e}', exc_info=True)
