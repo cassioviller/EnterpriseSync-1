@@ -2533,7 +2533,8 @@ def api_produtividade():
 def fisico_financeiro(obra_id: int):
     # O painel agora vive na aba Financeiro da página da obra.
     from flask import redirect, url_for
-    return redirect(url_for('main.detalhes_obra', id=obra_id) + '#tab-financeiro')
+    # '#financeiro' = data-hash da aba (o JS de hash→tab mapeia por data-hash, não pelo id da pane)
+    return redirect(url_for('main.detalhes_obra', id=obra_id) + '#financeiro')
 
 
 @cronograma_bp.route('/obra/<int:obra_id>/fisico-financeiro/export.xlsx')

@@ -278,6 +278,6 @@ def test_painel_renderiza_apos_import():
             resp = c.get(f'/cronograma/obra/{oid}/fisico-financeiro')
             assert resp.status_code in (301, 302)
             loc = resp.headers.get('Location', '')
-            assert f'/obras/detalhes/{oid}' in loc and 'tab-financeiro' in loc
+            assert f'/obras/detalhes/{oid}' in loc and loc.endswith('#financeiro')
     finally:
         app.config['WTF_CSRF_ENABLED'] = prev

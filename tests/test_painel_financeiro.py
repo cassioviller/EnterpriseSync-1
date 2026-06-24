@@ -255,8 +255,8 @@ def test_rota_ff_antiga_redireciona():
         r = c.get(f'/cronograma/obra/{oid}/fisico-financeiro')
         assert r.status_code in (301, 302)
         loc = r.headers.get('Location', '')
-        # main.detalhes_obra → /obras/detalhes/<id>
-        assert f'/obras/detalhes/{oid}' in loc and 'tab-financeiro' in loc
+        # main.detalhes_obra → /obras/detalhes/<id>#financeiro (data-hash da aba)
+        assert f'/obras/detalhes/{oid}' in loc and loc.endswith('#financeiro')
 
 
 @pytest.mark.integration
