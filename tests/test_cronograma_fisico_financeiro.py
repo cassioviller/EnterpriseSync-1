@@ -155,3 +155,17 @@ def test_caixa_fat_do_periodo_anterior():
     assert jun["entrada"] == D("86500.00")
     assert jul["imposto"] == D("8100.00")
     assert jul["entrada"] == D("51900.00")
+
+
+from services.cronograma_fisico_financeiro import comparar_fluxo_caixa
+
+
+def test_divergencia_por_mes_e_resumo_veks():
+    recalc = {"2026-06": D("100000"), "2026-07": D("100000")}
+    verbatim = {"2026-06": D("130000"), "2026-07": D("100000")}
+    res = comparar_fluxo_caixa(recalc, verbatim)
+    assert res["por_mes"]["2026-06"]["delta"] == D("30000")
+    assert res["por_mes"]["2026-07"]["delta"] == D("0")
+    assert res["total_recalc"] == D("200000")
+    assert res["total_verbatim"] == D("230000")
+    assert res["delta_total"] == D("30000")
