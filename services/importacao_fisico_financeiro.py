@@ -16,16 +16,46 @@ Idempotente e tenant-scoped.
 """
 from __future__ import annotations
 
+import calendar
 from datetime import date
 from decimal import Decimal
 
 CENTAVO = Decimal("0.01")
+
+_MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+                'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
 
 def _parse_date(s):
     if not s:
         return None
     return date.fromisoformat(s[:10])
+
+
+def _mes_bounds(chave):
+    """'YYYY-MM' → (primeiro_dia, último_dia, 'abrev/yy'). Erro se inválida."""
+    y, m = int(chave[:4]), int(chave[5:7])
+    di = date(y, m, 1)
+    df = date(y, m, calendar.monthrange(y, m)[1])
+    return di, df, f"{_MESES_ABREV[m - 1]}/{str(y)[2:]}"
+
+
+def _add_linhas_de_meses(Model, osc, admin_id, nome, meses, fonte, ordem):
+    """Cria uma linha por mês a partir do mapa ``{'YYYY-MM': valor}`` (divisão
+    mensal verbatim da Planilha1), nomeada 'nome (abrev/yy)' e datada no mês.
+    Devolve o próximo ``ordem``."""
+    from app import db
+    for chave in sorted(meses):
+        valor = Decimal(str(meses[chave] or 0))
+        if valor == 0:
+            continue
+        di, df, rotulo = _mes_bounds(chave)
+        db.session.add(Model(
+            obra_servico_custo_id=osc.id, admin_id=admin_id,
+            descricao=f"{nome} ({rotulo})"[:200], valor=valor, fonte=fonte,
+            ordem=ordem, data_inicio=di, data_fim=df))
+        ordem += 1
+    return ordem
 
 
 # ----------------------------------------------------------------------
@@ -316,6 +346,19 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
             ordem = 0
             for it in (info['etapa'].get('itens') or []):
                 nome_it = (it.get('item') or 'Item')[:200]
+                meses_v = it.get('meses_veks') or {}
+                meses_f = it.get('meses_fat') or {}
+                if meses_v or meses_f:
+                    # Item com divisão mensal explícita (Planilha1, custo de
+                    # período): uma linha por mês ('Estadia (jun/26)'...), datada
+                    # no mês, com o valor verbatim da planilha.
+                    ordem = _add_linhas_de_meses(
+                        ObraServicoCustoItem, osc, admin_id, nome_it[:180],
+                        meses_v, 'veks', ordem)
+                    ordem = _add_linhas_de_meses(
+                        ObraServicoCustoItem, osc, admin_id, nome_it[:180],
+                        meses_f, 'fat_direto', ordem)
+                    continue
                 v = Decimal(str(it.get('veks') or 0))
                 f = Decimal(str(it.get('fat') or 0))
                 if v > 0:

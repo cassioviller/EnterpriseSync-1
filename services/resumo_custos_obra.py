@@ -248,7 +248,23 @@ def calcular_resumo_obra(obra_id: int, admin_id=None) -> dict:
     if admin_id is not None:
         q_svcs = q_svcs.filter_by(admin_id=admin_id)
     svcs = q_svcs.all()
+    # Custo orçado: na cadeia comercial canônica, ObraServicoCusto.valor_orcado
+    # herda o valor_comercial (VENDA) do ItemMedicaoComercial — não o custo. Por
+    # isso, quando há linhas de custo cadastradas (fonte da verdade do custo),
+    # o custo orçado vem da soma delas; só cai para valor_orcado no fluxo
+    # manual/legado sem linhas.
     valor_custo_orcado = sum(_f(s.valor_orcado) for s in svcs)
+    if svcs:
+        from models import ObraServicoCustoItem
+        soma_linhas = _f(
+            db.session.query(
+                sqlfunc.coalesce(sqlfunc.sum(ObraServicoCustoItem.valor), 0)
+            )
+            .filter(ObraServicoCustoItem.obra_servico_custo_id.in_([s.id for s in svcs]))
+            .scalar() or 0
+        )
+        if soma_linhas > 0:
+            valor_custo_orcado = soma_linhas
     total_realizado_svc = sum(s.realizado_total for s in svcs)
     total_a_realizar = sum(s.a_realizar_total for s in svcs)
 

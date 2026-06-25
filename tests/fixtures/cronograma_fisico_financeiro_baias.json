@@ -1,1209 +1,1269 @@
 {
-  "_meta": {
-    "gerado_em": "2026-06-23",
-    "fontes": [
-      "CRONOGRAMA_16_06.mpp (MS Project — cronograma físico)",
-      "Planilha de Custos REV01 / aba Planilha1 (plano de custos por etapa)"
-    ],
-    "descricao": "Cronograma físico-financeiro da obra Baias Kabod. A INTERLIGAÇÃO: cada nó da EAP carrega o CRONOGRAMA (datas, %físico, dependências — do MS Project) E o CUSTO (Veks + faturamento direto — da Planilha1). Assim o físico (datas) governa o faseamento do financeiro, em vez de uma distribuição manual por mês.",
-    "como_usar": "Importar como fonte do módulo físico-financeiro. O app distribui o custo de cada etapa ao longo das datas da etapa (linear ou por marcos), gera a Curva S física (avanço ponderado por custo) e financeira, o fluxo de caixa (medições - desembolso - abatimento do fat direto) e os indicadores de avanço físico × financeiro (PV/EV/AC, SPI/CPI)."
-  },
-  "obra": {
-    "nome": "Baias Kabod",
-    "codigo_obra": "10",
-    "cliente": "Grupo Mônica / Kabod Cabana",
-    "local": "Fazenda Santa Mônica, Itu/SP",
-    "sistema": "Estrutura metálica + LSF, telha shingle",
-    "num_baias_contrato": 22,
-    "num_baias_projeto": 24
-  },
-  "contrato": {
-    "valor_venda": 1505613.76,
-    "data_inicio": "2026-06-04",
-    "data_fim_contratual": "2026-10-05",
-    "data_fim_cronograma": "2026-09-11",
-    "prazo_dias": 123,
-    "multa_moratoria": {
-      "pct_dia": 0.03,
-      "teto_pct": 0.3
-    }
-  },
-  "parametros": {
-    "imposto_pct": 0.135,
-    "detalhe_imposto": "ISS 4% + DAS 9,5%",
-    "regra_fat_direto": "Faturamento direto NÃO é desembolso da Veks; abate da medição seguinte. Entrada de caixa = medição − fat_direto_do_período − imposto."
-  },
-  "medicoes": [
-    {
-      "nome": "Entrada",
-      "data": "2026-06-12",
-      "pct": 0.2,
-      "recebido_no_mes": "jun",
-      "obs": "5% (12/06) + 15% (16/06) — já recebida"
-    },
-    {
-      "nome": "Medição 1",
-      "data": "2026-07-10",
-      "pct": 0.3,
-      "recebido_no_mes": "jul"
-    },
-    {
-      "nome": "Medição 2",
-      "data": "2026-08-10",
-      "pct": 0.2,
-      "recebido_no_mes": "ago"
-    },
-    {
-      "nome": "Medição 3",
-      "data": "2026-09-10",
-      "pct": 0.2,
-      "recebido_no_mes": "set"
-    },
-    {
-      "nome": "Medição 4",
-      "data": "2026-10-05",
-      "pct": 0.05,
-      "recebido_no_mes": "out",
-      "obs": "entrega"
-    },
-    {
-      "nome": "Medição 5",
-      "data": "2026-11-20",
-      "pct": 0.05,
-      "recebido_no_mes": "nov",
-      "obs": "retenção"
-    }
+ "_meta": {
+  "gerado_em": "2026-06-23",
+  "fontes": [
+   "CRONOGRAMA_16_06.mpp (MS Project — cronograma físico)",
+   "Planilha de Custos REV01 / aba Planilha1 (plano de custos por etapa)"
   ],
-  "eap": [
-    {
-      "codigo": "PRELIM",
-      "nome": "Preliminares e projetos",
-      "grupo": "Mobilização",
-      "cronograma": {
-        "inicio": "2026-06-08",
-        "fim": "2026-06-25",
-        "pct_fisico": 2.2,
-        "tarefas_mpp": [
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 51160,
-        "fat_direto": 0,
-        "total": 51160,
-        "peso_pct": 0.0442
-      },
-      "itens": [
-        {
-          "item": "Custos Externos",
-          "veks": 34220,
-          "fat": 0
-        },
-        {
-          "item": "Projetos",
-          "veks": 9500,
-          "fat": 0
-        },
-        {
-          "item": "Topografo",
-          "veks": 3000,
-          "fat": 0
-        },
-        {
-          "item": "Aso Func.",
-          "veks": 3000,
-          "fat": 0
-        },
-        {
-          "item": "Pgr | Pcmso",
-          "veks": 1440,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "FUND",
-      "nome": "Fundação",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-06-22",
-        "fim": "2026-07-21",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 68100,
-        "fat_direto": 85000,
-        "total": 153100,
-        "peso_pct": 0.1322
-      },
-      "itens": [
-        {
-          "item": "M.O. Fundação",
-          "veks": 58800,
-          "fat": 0
-        },
-        {
-          "item": "Material Fundação",
-          "veks": 0,
-          "fat": 85000
-        },
-        {
-          "item": "Retroescavadeira",
-          "veks": 3800,
-          "fat": 0
-        },
-        {
-          "item": "Munck",
-          "veks": 3000,
-          "fat": 0
-        },
-        {
-          "item": "Perfuratriz",
-          "veks": 2500,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "ESTMET",
-      "nome": "Estrutura metálica (cobertura)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-06-19",
-        "fim": "2026-08-13",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          26,
-          27
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 0,
-        "fat_direto": 208700,
-        "total": 208700,
-        "peso_pct": 0.1802
-      },
-      "itens": [
-        {
-          "item": "Estrutura Metalica Cob.",
-          "veks": 0,
-          "fat": 208700
-        }
-      ]
-    },
-    {
-      "codigo": "ESTLSF",
-      "nome": "Estrutura LSF (baias)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-07-01",
-        "fim": "2026-07-21",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          28,
-          29,
-          30,
-          25
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 15000,
-        "fat_direto": 55000,
-        "total": 70000,
-        "peso_pct": 0.0604
-      },
-      "itens": [
-        {
-          "item": "Aço LSF",
-          "veks": 0,
-          "fat": 55000
-        },
-        {
-          "item": "M.O. Aço LSF",
-          "veks": 15000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "COBERT",
-      "nome": "Cobertura (Shingle)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-07-27",
-        "fim": "2026-09-04",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          42
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 75400,
-        "fat_direto": 0,
-        "total": 75400,
-        "peso_pct": 0.0651
-      },
-      "itens": [
-        {
-          "item": "M.O. Shingle",
-          "veks": 75400,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "FECHA",
-      "nome": "Fechamentos (plaqueamento)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-06-08",
-        "fim": "2026-08-25",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          31,
-          32,
-          33,
-          34
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 51000,
-        "fat_direto": 75000,
-        "total": 126000,
-        "peso_pct": 0.1088
-      },
-      "itens": [
-        {
-          "item": "Materiais De Placa Cimenticia",
-          "veks": 0,
-          "fat": 75000
-        },
-        {
-          "item": "M.O. Plaqueamento",
-          "veks": 30000,
-          "fat": 0
-        },
-        {
-          "item": "Basecoat",
-          "veks": 21000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "PINT",
-      "nome": "Pintura / Stain",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-08-12",
-        "fim": "2026-09-11",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          35,
-          43
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 51700,
-        "fat_direto": 0,
-        "total": 51700,
-        "peso_pct": 0.0446
-      },
-      "itens": [
-        {
-          "item": "Pintura Estrutura",
-          "veks": 35200,
-          "fat": 0
-        },
-        {
-          "item": "M.O. Aplicação De Stain",
-          "veks": 15500,
-          "fat": 0
-        },
-        {
-          "item": "Material Stain",
-          "veks": 1000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "MOLEDO",
-      "nome": "Pedra moledo",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-07-20",
-        "fim": "2026-08-21",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          36,
-          37
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 10000,
-        "fat_direto": 0,
-        "total": 10000,
-        "peso_pct": 0.0086
-      },
-      "itens": [
-        {
-          "item": "Estrutura Na Tora Para Pedra Moledo",
-          "veks": 10000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "PORTAO",
-      "nome": "Portões",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-06-22",
-        "fim": "2026-08-14",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          41
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 10000,
-        "fat_direto": 0,
-        "total": 10000,
-        "peso_pct": 0.0086
-      },
-      "itens": [
-        {
-          "item": "Carpintaria",
-          "veks": 10000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "ELET",
-      "nome": "Elétrica",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-08-14",
-        "fim": "2026-08-27",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          38,
-          39,
-          40
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 7200,
-        "fat_direto": 0,
-        "total": 7200,
-        "peso_pct": 0.0062
-      },
-      "itens": [
-        {
-          "item": "M.O. Elétrica",
-          "veks": 4800,
-          "fat": 0
-        },
-        {
-          "item": "Material Elétrico",
-          "veks": 2400,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "HIDRO",
-      "nome": "Hidráulica",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-08-14",
-        "fim": "2026-08-27",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          38
-        ],
-        "transversal": false,
-        "obs": "sem tarefa própria no MS Project; alocada junto à elétrica"
-      },
-      "custo": {
-        "veks": 4400,
-        "fat_direto": 0,
-        "total": 4400,
-        "peso_pct": 0.0038
-      },
-      "itens": [
-        {
-          "item": "M.O. Hidraulica",
-          "veks": 2400,
-          "fat": 0
-        },
-        {
-          "item": "Material Hidraulico",
-          "veks": 2000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "INDIRETOS",
-      "nome": "Indiretos / gestão (período)",
-      "grupo": "Transversal",
-      "cronograma": {
-        "inicio": "2026-06-08",
-        "fim": "2026-09-11",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          2,
-          12,
-          13
-        ],
-        "transversal": true,
-        "obs": "custo de período — distribuir ao longo de toda a obra"
-      },
-      "custo": {
-        "veks": 390500,
-        "fat_direto": 0,
-        "total": 390500,
-        "peso_pct": 0.3372
-      },
-      "itens": [
-        {
-          "item": "Escritório",
-          "veks": 154000,
-          "fat": 0
-        },
-        {
-          "item": "Emprestimo",
-          "veks": 56000,
-          "fat": 0
-        },
-        {
-          "item": "Miscelanea",
-          "veks": 47000,
-          "fat": 0
-        },
-        {
-          "item": "Estadia",
-          "veks": 32500,
-          "fat": 0
-        },
-        {
-          "item": "Refeição",
-          "veks": 32500,
-          "fat": 0
-        },
-        {
-          "item": "Refeição Equipe Plaq.",
-          "veks": 5500,
-          "fat": 0
-        },
-        {
-          "item": "Refeição LSF",
-          "veks": 10500,
-          "fat": 0
-        },
-        {
-          "item": "Encarregado",
-          "veks": 20000,
-          "fat": 0
-        },
-        {
-          "item": "Carro Alugado",
-          "veks": 12500,
-          "fat": 0
-        },
-        {
-          "item": "Refeição Encarregado",
-          "veks": 20000,
-          "fat": 0
-        }
-      ]
-    }
-  ],
-  "cronograma_tarefas": [
-    {
-      "id": 1,
-      "nivel": 1,
-      "nome": "OBRA ITU - BAIAS FAZENDA SANTA MÔNICA",
-      "inicio": "2026-06-08",
-      "fim": "2026-09-11",
-      "dias": 70.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 2,
-      "nivel": 2,
-      "nome": "MOBILIZAÇÃO",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-25",
-      "dias": 14.0,
-      "pct_fisico": 2.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 3,
-      "nivel": 3,
-      "nome": "PROPOSTA ENCARREGADO",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 4,
-      "nivel": 3,
-      "nome": "ESTUDO DE SOLO SPT",
-      "inicio": "2026-06-11",
-      "fim": "2026-06-11",
-      "dias": 1.0,
-      "pct_fisico": 100.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 5,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-18",
-      "dias": 9.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 6,
-      "nivel": 3,
-      "nome": "CHECK LIST DE FERRAMENTAS PARA MOBILIZAÇÃO",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 7,
-      "nivel": 3,
-      "nome": "CHECK LIST DE ATIVIDADES PARA MOBILIZAÇÃO",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 8,
-      "nivel": 3,
-      "nome": "CONTRATAÇÃO DE EQUIPE CIVIL",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 9,
-      "nivel": 3,
-      "nome": "CONTRATAÇÃO DE EQUIPE DE SERRALHERIA",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 10,
-      "nivel": 3,
-      "nome": "VALIDAÇÃO DO ORÇAMENTO FUNDAÇÃO",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-12",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 11,
-      "nivel": 3,
-      "nome": "VALIDAÇÃO DO ORÇAMENTO GERAL",
-      "inicio": "2026-06-19",
-      "fim": "2026-06-25",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        5
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 12,
-      "nivel": 3,
-      "nome": "ALUGUEL DE CASA / HOTEL",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-16",
-      "dias": 7.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 13,
-      "nivel": 3,
-      "nome": "MOBILIZAÇÃO EQUIPE",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-09",
-      "dias": 2.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 14,
-      "nivel": 2,
-      "nome": "BAIAS",
-      "inicio": "2026-06-08",
-      "fim": "2026-09-11",
-      "dias": 70.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 15,
-      "nivel": 3,
-      "nome": "MARCAÇÃO DE OBRA",
-      "inicio": "2026-06-22",
-      "fim": "2026-06-22",
-      "dias": 0.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": true,
-      "resumo": true
-    },
-    {
-      "id": 16,
-      "nivel": 4,
-      "nome": "Contratar topografo ?",
-      "inicio": "2026-06-22",
-      "fim": "2026-06-22",
-      "dias": 0.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": true,
-      "resumo": false
-    },
-    {
-      "id": 17,
-      "nivel": 3,
-      "nome": "FUNDAÇÃO",
-      "inicio": "2026-06-22",
-      "fim": "2026-07-21",
-      "dias": 22.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 18,
-      "nivel": 4,
-      "nome": "ESCAVAÇÃO DE SAPATAS PARA PILARES",
-      "inicio": "2026-06-22",
-      "fim": "2026-06-30",
-      "dias": 7.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        15
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 19,
-      "nivel": 4,
-      "nome": "ESCAVAÇÃO DE FUNDAÇÃO  PARA BALDRAMES",
-      "inicio": "2026-06-22",
-      "fim": "2026-06-30",
-      "dias": 7.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        15
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 20,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE CAIXARIA PARA PISO DE CONCRETO E VIGAS BALDRAME",
-      "inicio": "2026-07-01",
-      "fim": "2026-07-14",
-      "dias": 10.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        19
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 21,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO",
-      "inicio": "2026-07-01",
-      "fim": "2026-07-07",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        18
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 22,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE CAIXARIA",
-      "inicio": "2026-07-01",
-      "fim": "2026-07-07",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        19
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 23,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE CONCRETAGEM DAS FUNDAÇÕES",
-      "inicio": "2026-07-08",
-      "fim": "2026-07-14",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        22
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 24,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE CONCRETAGEM DAS CALÇADAS",
-      "inicio": "2026-07-15",
-      "fim": "2026-07-21",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        23
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 25,
-      "nivel": 3,
-      "nome": "IÇAMENTO DOS PILARES DE MADEIRA",
-      "inicio": "2026-07-15",
-      "fim": "2026-07-17",
-      "dias": 3.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        23
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 26,
-      "nivel": 3,
-      "nome": "FABRICAÇÃO DE AÇO PARA TELHADO",
-      "inicio": "2026-06-19",
-      "fim": "2026-07-16",
-      "dias": 20.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        5
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 27,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE ESTRUTURA METÁLICA PARA TELHADO",
-      "inicio": "2026-07-17",
-      "fim": "2026-08-13",
-      "dias": 20.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        26
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 28,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE ESTRUTURA EM LSF PARA BAIAS",
-      "inicio": "2026-07-01",
-      "fim": "2026-07-21",
-      "dias": 15.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 29,
-      "nivel": 4,
-      "nome": "PAINELIZAÇÃO DE LSF",
-      "inicio": "2026-07-01",
-      "fim": "2026-07-09",
-      "dias": 7.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 30,
-      "nivel": 4,
-      "nome": "VERTICALIZAÇÃO DE LSF",
-      "inicio": "2026-07-10",
-      "fim": "2026-07-21",
-      "dias": 8.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        29
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 31,
-      "nivel": 3,
-      "nome": "PLAQUEMENTO",
-      "inicio": "2026-06-08",
-      "fim": "2026-08-25",
-      "dias": 57.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 32,
-      "nivel": 4,
-      "nome": "CHAPEAMENTO EXTERNO DAS BAIAS",
-      "inicio": "2026-07-22",
-      "fim": "2026-08-11",
-      "dias": 15.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        30
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 33,
-      "nivel": 4,
-      "nome": "CHAPEAMENTO INTERNO DA BAIAS",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-26",
-      "dias": 15.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 34,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE BASECOAT",
-      "inicio": "2026-06-29",
-      "fim": "2026-07-17",
-      "dias": 15.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        33
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 35,
-      "nivel": 4,
-      "nome": "PINTURA COM STAIN DAS MADEIRAS PINUS",
-      "inicio": "2026-08-12",
-      "fim": "2026-08-25",
-      "dias": 10.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        32
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 36,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE PEDRA MOLEDO",
-      "inicio": "2026-07-20",
-      "fim": "2026-08-14",
-      "dias": 20.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        25
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 37,
-      "nivel": 4,
-      "nome": "APLICAÇÃO DE RESINA SOBRE PEDRA MODELO",
-      "inicio": "2026-08-17",
-      "fim": "2026-08-21",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        36
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 38,
-      "nivel": 3,
-      "nome": "ELÉTRICA",
-      "inicio": "2026-08-14",
-      "fim": "2026-08-27",
-      "dias": 10.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 39,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE 1 PONTO DE ILUMINAÇÃO POR BAIA",
-      "inicio": "2026-08-14",
-      "fim": "2026-08-20",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        27
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 40,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE 1 PONTO DE ELÉTRICA EM CADA PILAR",
-      "inicio": "2026-08-21",
-      "fim": "2026-08-27",
-      "dias": 5.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        39
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 41,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE PORTÃO DAS BAIAS",
-      "inicio": "2026-06-22",
-      "fim": "2026-08-14",
-      "dias": 40.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [
-        15
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 42,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE TELHADO SINGLE",
-      "inicio": "2026-07-27",
-      "fim": "2026-09-04",
-      "dias": 30.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 43,
-      "nivel": 3,
-      "nome": "PINTURA DE ESTRUTURA DO TELHADO",
-      "inicio": "2026-08-24",
-      "fim": "2026-09-11",
-      "dias": 15.0,
-      "pct_fisico": 0.0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    }
-  ],
-  "resumo": {
-    "custo_total": 1158160,
-    "desembolso_veks": 734460,
-    "faturamento_direto": 423700,
-    "imposto_estimado": 146058,
-    "lucro_projetado_estimado": 201396,
-    "lucro_pct_estimado": 0.1338,
-    "obs": "Lucro é estimativa (venda − custo − imposto). O app recalcula com o modelo de caixa mês a mês a partir do faseamento pelo cronograma."
-  },
-  "fluxo_caixa_mensal": {
-    "_obs": "Forecast mensal da própria Planilha1 (bloco caixa/medição/imposto), preservado verbatim. lucro em caixa = caixa_final de nov.",
-    "meses": [
-      "jun",
-      "jul",
-      "ago",
-      "set",
-      "out",
-      "nov"
-    ],
-    "medicao": [
-      301123,
-      451684,
-      301123,
-      301123,
-      75281,
-      75281
-    ],
-    "entrada_liquida": [
-      301123,
-      99173,
-      222988,
-      222988,
-      65118,
-      65118
-    ],
-    "caixa_inicial": [
-      301123,
-      231696,
-      258094,
-      300222,
-      201799,
-      152047
-    ],
-    "caixa_final": [
-      132523,
-      35106,
-      77234,
-      136682,
-      86929,
-      152047
-    ],
-    "gasto_veks": [
-      168600,
-      196590,
-      180860,
-      163540,
-      114870,
-      0
-    ],
-    "fat_direto": [
-      337033,
-      43333,
-      43333,
-      0,
-      0,
-      0
-    ],
-    "imposto": [
-      0,
-      15478,
-      34802,
-      34802,
-      10163,
-      10163
-    ],
-    "custo_veks_por_mes": {
-      "direto": [
-        78100,
-        87090,
-        87360,
-        70040,
-        21370,
-        0
-      ],
-      "indireto": [
-        90500,
-        109500,
-        93500,
-        93500,
-        93500,
-        0
-      ]
-    },
-    "lucro_caixa_final": 152047,
-    "inconsistencia": "GASTO VEKS mensal soma 824,460, mas o total Veks das etapas e 734.460 (Indiretos contam ~5 meses no mensal vs ~3,5 no total -> diferenca de 90,000). Por isso o lucro em caixa (152,047) difere do lucro pelos totais de etapa (~242k). Decidir se Indiretos rodam 3,5 ou 5 meses."
+  "descricao": "Cronograma físico-financeiro da obra Baias Kabod. A INTERLIGAÇÃO: cada nó da EAP carrega o CRONOGRAMA (datas, %físico, dependências — do MS Project) E o CUSTO (Veks + faturamento direto — da Planilha1). Assim o físico (datas) governa o faseamento do financeiro, em vez de uma distribuição manual por mês.",
+  "como_usar": "Importar como fonte do módulo físico-financeiro. O app distribui o custo de cada etapa ao longo das datas da etapa (linear ou por marcos), gera a Curva S física (avanço ponderado por custo) e financeira, o fluxo de caixa (medições - desembolso - abatimento do fat direto) e os indicadores de avanço físico × financeiro (PV/EV/AC, SPI/CPI)."
+ },
+ "obra": {
+  "nome": "Baias Kabod",
+  "codigo_obra": "10",
+  "cliente": "Grupo Mônica / Kabod Cabana",
+  "local": "Fazenda Santa Mônica, Itu/SP",
+  "sistema": "Estrutura metálica + LSF, telha shingle",
+  "num_baias_contrato": 22,
+  "num_baias_projeto": 24
+ },
+ "contrato": {
+  "valor_venda": 1505613.76,
+  "data_inicio": "2026-06-04",
+  "data_fim_contratual": "2026-10-05",
+  "data_fim_cronograma": "2026-09-11",
+  "prazo_dias": 123,
+  "multa_moratoria": {
+   "pct_dia": 0.03,
+   "teto_pct": 0.3
   }
+ },
+ "parametros": {
+  "imposto_pct": 0.135,
+  "detalhe_imposto": "ISS 4% + DAS 9,5%",
+  "regra_fat_direto": "Faturamento direto NÃO é desembolso da Veks; abate da medição seguinte. Entrada de caixa = medição − fat_direto_do_período − imposto."
+ },
+ "medicoes": [
+  {
+   "nome": "Entrada",
+   "data": "2026-06-12",
+   "pct": 0.2,
+   "recebido_no_mes": "jun",
+   "obs": "5% (12/06) + 15% (16/06) — já recebida"
+  },
+  {
+   "nome": "Medição 1",
+   "data": "2026-07-10",
+   "pct": 0.3,
+   "recebido_no_mes": "jul"
+  },
+  {
+   "nome": "Medição 2",
+   "data": "2026-08-10",
+   "pct": 0.2,
+   "recebido_no_mes": "ago"
+  },
+  {
+   "nome": "Medição 3",
+   "data": "2026-09-10",
+   "pct": 0.2,
+   "recebido_no_mes": "set"
+  },
+  {
+   "nome": "Medição 4",
+   "data": "2026-10-05",
+   "pct": 0.05,
+   "recebido_no_mes": "out",
+   "obs": "entrega"
+  },
+  {
+   "nome": "Medição 5",
+   "data": "2026-11-20",
+   "pct": 0.05,
+   "recebido_no_mes": "nov",
+   "obs": "retenção"
+  }
+ ],
+ "eap": [
+  {
+   "codigo": "PRELIM",
+   "nome": "Preliminares e projetos",
+   "grupo": "Mobilização",
+   "cronograma": {
+    "inicio": "2026-06-08",
+    "fim": "2026-06-25",
+    "pct_fisico": 2.2,
+    "tarefas_mpp": [
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 51160,
+    "fat_direto": 0,
+    "total": 51160,
+    "peso_pct": 0.0442
+   },
+   "itens": [
+    {
+     "item": "Custos Externos",
+     "veks": 34220,
+     "fat": 0
+    },
+    {
+     "item": "Projetos",
+     "veks": 9500,
+     "fat": 0
+    },
+    {
+     "item": "Topografo",
+     "veks": 3000,
+     "fat": 0
+    },
+    {
+     "item": "Aso Func.",
+     "veks": 3000,
+     "fat": 0
+    },
+    {
+     "item": "Pgr | Pcmso",
+     "veks": 1440,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "FUND",
+   "nome": "Fundação",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-22",
+    "fim": "2026-07-21",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 68100,
+    "fat_direto": 85000,
+    "total": 153100,
+    "peso_pct": 0.1322
+   },
+   "itens": [
+    {
+     "item": "M.O. Fundação",
+     "veks": 58800,
+     "fat": 0
+    },
+    {
+     "item": "Material Fundação",
+     "veks": 0,
+     "fat": 85000
+    },
+    {
+     "item": "Retroescavadeira",
+     "veks": 3800,
+     "fat": 0
+    },
+    {
+     "item": "Munck",
+     "veks": 3000,
+     "fat": 0
+    },
+    {
+     "item": "Perfuratriz",
+     "veks": 2500,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "ESTMET",
+   "nome": "Estrutura metálica (cobertura)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-19",
+    "fim": "2026-08-13",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     26,
+     27
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 0,
+    "fat_direto": 208700,
+    "total": 208700,
+    "peso_pct": 0.1802
+   },
+   "itens": [
+    {
+     "item": "Estrutura Metalica Cob.",
+     "veks": 0,
+     "fat": 208700
+    }
+   ]
+  },
+  {
+   "codigo": "ESTLSF",
+   "nome": "Estrutura LSF (baias)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-07-01",
+    "fim": "2026-07-21",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     28,
+     29,
+     30,
+     25
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 15000,
+    "fat_direto": 55000,
+    "total": 70000,
+    "peso_pct": 0.0604
+   },
+   "itens": [
+    {
+     "item": "Aço LSF",
+     "veks": 0,
+     "fat": 55000
+    },
+    {
+     "item": "M.O. Aço LSF",
+     "veks": 15000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "COBERT",
+   "nome": "Cobertura (Shingle)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-07-27",
+    "fim": "2026-09-04",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     42
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 75400,
+    "fat_direto": 0,
+    "total": 75400,
+    "peso_pct": 0.0651
+   },
+   "itens": [
+    {
+     "item": "M.O. Shingle",
+     "veks": 75400,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "FECHA",
+   "nome": "Fechamentos (plaqueamento)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-08",
+    "fim": "2026-08-25",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     31,
+     32,
+     33,
+     34
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 51000,
+    "fat_direto": 75000,
+    "total": 126000,
+    "peso_pct": 0.1088
+   },
+   "itens": [
+    {
+     "item": "Materiais De Placa Cimenticia",
+     "veks": 0,
+     "fat": 75000
+    },
+    {
+     "item": "M.O. Plaqueamento",
+     "veks": 30000,
+     "fat": 0
+    },
+    {
+     "item": "Basecoat",
+     "veks": 21000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "PINT",
+   "nome": "Pintura / Stain",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-12",
+    "fim": "2026-09-11",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     35,
+     43
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 51700,
+    "fat_direto": 0,
+    "total": 51700,
+    "peso_pct": 0.0446
+   },
+   "itens": [
+    {
+     "item": "Pintura Estrutura",
+     "veks": 35200,
+     "fat": 0
+    },
+    {
+     "item": "M.O. Aplicação De Stain",
+     "veks": 15500,
+     "fat": 0
+    },
+    {
+     "item": "Material Stain",
+     "veks": 1000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "MOLEDO",
+   "nome": "Pedra moledo",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-07-20",
+    "fim": "2026-08-21",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     36,
+     37
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 10000,
+    "fat_direto": 0,
+    "total": 10000,
+    "peso_pct": 0.0086
+   },
+   "itens": [
+    {
+     "item": "Estrutura Na Tora Para Pedra Moledo",
+     "veks": 10000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "PORTAO",
+   "nome": "Portões",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-22",
+    "fim": "2026-08-14",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     41
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 10000,
+    "fat_direto": 0,
+    "total": 10000,
+    "peso_pct": 0.0086
+   },
+   "itens": [
+    {
+     "item": "Carpintaria",
+     "veks": 10000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "ELET",
+   "nome": "Elétrica",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-14",
+    "fim": "2026-08-27",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     38,
+     39,
+     40
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 7200,
+    "fat_direto": 0,
+    "total": 7200,
+    "peso_pct": 0.0062
+   },
+   "itens": [
+    {
+     "item": "M.O. Elétrica",
+     "veks": 4800,
+     "fat": 0
+    },
+    {
+     "item": "Material Elétrico",
+     "veks": 2400,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "HIDRO",
+   "nome": "Hidráulica",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-14",
+    "fim": "2026-08-27",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     38
+    ],
+    "transversal": false,
+    "obs": "sem tarefa própria no MS Project; alocada junto à elétrica"
+   },
+   "custo": {
+    "veks": 4400,
+    "fat_direto": 0,
+    "total": 4400,
+    "peso_pct": 0.0038
+   },
+   "itens": [
+    {
+     "item": "M.O. Hidraulica",
+     "veks": 2400,
+     "fat": 0
+    },
+    {
+     "item": "Material Hidraulico",
+     "veks": 2000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "INDIRETOS",
+   "nome": "Indiretos / gestão (período)",
+   "grupo": "Transversal",
+   "cronograma": {
+    "inicio": "2026-06-08",
+    "fim": "2026-09-11",
+    "pct_fisico": 0.0,
+    "tarefas_mpp": [
+     2,
+     12,
+     13
+    ],
+    "transversal": true,
+    "obs": "custo de período — distribuir ao longo de toda a obra"
+   },
+   "custo": {
+    "veks": 480500,
+    "fat_direto": 0,
+    "total": 480500,
+    "peso_pct": 0.3372
+   },
+   "itens": [
+    {
+     "item": "Escritório",
+     "veks": 220000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 44000,
+      "2026-07": 44000,
+      "2026-08": 44000,
+      "2026-09": 44000,
+      "2026-10": 44000
+     }
+    },
+    {
+     "item": "Emprestimo",
+     "veks": 80000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 16000,
+      "2026-07": 16000,
+      "2026-08": 16000,
+      "2026-09": 16000,
+      "2026-10": 16000
+     }
+    },
+    {
+     "item": "Miscelanea",
+     "veks": 47000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 7000,
+      "2026-07": 10000,
+      "2026-08": 10000,
+      "2026-09": 10000,
+      "2026-10": 10000
+     }
+    },
+    {
+     "item": "Estadia",
+     "veks": 32500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 10500,
+      "2026-07": 5500,
+      "2026-08": 5500,
+      "2026-09": 5500,
+      "2026-10": 5500
+     }
+    },
+    {
+     "item": "Refeição",
+     "veks": 32500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 10500,
+      "2026-07": 5500,
+      "2026-08": 5500,
+      "2026-09": 5500,
+      "2026-10": 5500
+     }
+    },
+    {
+     "item": "Refeição Equipe Plaq.",
+     "veks": 5500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 5500
+     }
+    },
+    {
+     "item": "Refeição LSF",
+     "veks": 10500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 10500
+     }
+    },
+    {
+     "item": "Encarregado",
+     "veks": 20000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 5000,
+      "2026-08": 5000,
+      "2026-09": 5000,
+      "2026-10": 5000
+     }
+    },
+    {
+     "item": "Carro Alugado",
+     "veks": 12500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 2500,
+      "2026-07": 2500,
+      "2026-08": 2500,
+      "2026-09": 2500,
+      "2026-10": 2500
+     }
+    },
+    {
+     "item": "Refeição Encarregado",
+     "veks": 20000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 5000,
+      "2026-08": 5000,
+      "2026-09": 5000,
+      "2026-10": 5000
+     }
+    }
+   ]
+  }
+ ],
+ "cronograma_tarefas": [
+  {
+   "id": 1,
+   "nivel": 1,
+   "nome": "OBRA ITU - BAIAS FAZENDA SANTA MÔNICA",
+   "inicio": "2026-06-08",
+   "fim": "2026-09-11",
+   "dias": 70.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 2,
+   "nivel": 2,
+   "nome": "MOBILIZAÇÃO",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-25",
+   "dias": 14.0,
+   "pct_fisico": 2.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 3,
+   "nivel": 3,
+   "nome": "PROPOSTA ENCARREGADO",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-12",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 4,
+   "nivel": 3,
+   "nome": "ESTUDO DE SOLO SPT",
+   "inicio": "2026-06-11",
+   "fim": "2026-06-11",
+   "dias": 1.0,
+   "pct_fisico": 100.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 5,
+   "nivel": 3,
+   "nome": "EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-18",
+   "dias": 9.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 6,
+   "nivel": 3,
+   "nome": "CHECK LIST DE FERRAMENTAS PARA MOBILIZAÇÃO",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-12",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 7,
+   "nivel": 3,
+   "nome": "CHECK LIST DE ATIVIDADES PARA MOBILIZAÇÃO",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-12",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 8,
+   "nivel": 3,
+   "nome": "CONTRATAÇÃO DE EQUIPE CIVIL",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-12",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 9,
+   "nivel": 3,
+   "nome": "CONTRATAÇÃO DE EQUIPE DE SERRALHERIA",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-12",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 10,
+   "nivel": 3,
+   "nome": "VALIDAÇÃO DO ORÇAMENTO FUNDAÇÃO",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-12",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 11,
+   "nivel": 3,
+   "nome": "VALIDAÇÃO DO ORÇAMENTO GERAL",
+   "inicio": "2026-06-19",
+   "fim": "2026-06-25",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    5
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 12,
+   "nivel": 3,
+   "nome": "ALUGUEL DE CASA / HOTEL",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-16",
+   "dias": 7.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 13,
+   "nivel": 3,
+   "nome": "MOBILIZAÇÃO EQUIPE",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-09",
+   "dias": 2.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 14,
+   "nivel": 2,
+   "nome": "BAIAS",
+   "inicio": "2026-06-08",
+   "fim": "2026-09-11",
+   "dias": 70.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 15,
+   "nivel": 3,
+   "nome": "MARCAÇÃO DE OBRA",
+   "inicio": "2026-06-22",
+   "fim": "2026-06-22",
+   "dias": 0.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": true,
+   "resumo": true
+  },
+  {
+   "id": 16,
+   "nivel": 4,
+   "nome": "Contratar topografo ?",
+   "inicio": "2026-06-22",
+   "fim": "2026-06-22",
+   "dias": 0.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": true,
+   "resumo": false
+  },
+  {
+   "id": 17,
+   "nivel": 3,
+   "nome": "FUNDAÇÃO",
+   "inicio": "2026-06-22",
+   "fim": "2026-07-21",
+   "dias": 22.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 18,
+   "nivel": 4,
+   "nome": "ESCAVAÇÃO DE SAPATAS PARA PILARES",
+   "inicio": "2026-06-22",
+   "fim": "2026-06-30",
+   "dias": 7.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    15
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 19,
+   "nivel": 4,
+   "nome": "ESCAVAÇÃO DE FUNDAÇÃO  PARA BALDRAMES",
+   "inicio": "2026-06-22",
+   "fim": "2026-06-30",
+   "dias": 7.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    15
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 20,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE CAIXARIA PARA PISO DE CONCRETO E VIGAS BALDRAME",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-14",
+   "dias": 10.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    19
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 21,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-07",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    18
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 22,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE CAIXARIA",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-07",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    19
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 23,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE CONCRETAGEM DAS FUNDAÇÕES",
+   "inicio": "2026-07-08",
+   "fim": "2026-07-14",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    22
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 24,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE CONCRETAGEM DAS CALÇADAS",
+   "inicio": "2026-07-15",
+   "fim": "2026-07-21",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    23
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 25,
+   "nivel": 3,
+   "nome": "IÇAMENTO DOS PILARES DE MADEIRA",
+   "inicio": "2026-07-15",
+   "fim": "2026-07-17",
+   "dias": 3.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    23
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 26,
+   "nivel": 3,
+   "nome": "FABRICAÇÃO DE AÇO PARA TELHADO",
+   "inicio": "2026-06-19",
+   "fim": "2026-07-16",
+   "dias": 20.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    5
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 27,
+   "nivel": 3,
+   "nome": "EXECUÇÃO DE ESTRUTURA METÁLICA PARA TELHADO",
+   "inicio": "2026-07-17",
+   "fim": "2026-08-13",
+   "dias": 20.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    26
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 28,
+   "nivel": 3,
+   "nome": "EXECUÇÃO DE ESTRUTURA EM LSF PARA BAIAS",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-21",
+   "dias": 15.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 29,
+   "nivel": 4,
+   "nome": "PAINELIZAÇÃO DE LSF",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-09",
+   "dias": 7.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 30,
+   "nivel": 4,
+   "nome": "VERTICALIZAÇÃO DE LSF",
+   "inicio": "2026-07-10",
+   "fim": "2026-07-21",
+   "dias": 8.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    29
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 31,
+   "nivel": 3,
+   "nome": "PLAQUEMENTO",
+   "inicio": "2026-06-08",
+   "fim": "2026-08-25",
+   "dias": 57.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 32,
+   "nivel": 4,
+   "nome": "CHAPEAMENTO EXTERNO DAS BAIAS",
+   "inicio": "2026-07-22",
+   "fim": "2026-08-11",
+   "dias": 15.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    30
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 33,
+   "nivel": 4,
+   "nome": "CHAPEAMENTO INTERNO DA BAIAS",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-26",
+   "dias": 15.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 34,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE BASECOAT",
+   "inicio": "2026-06-29",
+   "fim": "2026-07-17",
+   "dias": 15.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    33
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 35,
+   "nivel": 4,
+   "nome": "PINTURA COM STAIN DAS MADEIRAS PINUS",
+   "inicio": "2026-08-12",
+   "fim": "2026-08-25",
+   "dias": 10.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    32
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 36,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE PEDRA MOLEDO",
+   "inicio": "2026-07-20",
+   "fim": "2026-08-14",
+   "dias": 20.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    25
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 37,
+   "nivel": 4,
+   "nome": "APLICAÇÃO DE RESINA SOBRE PEDRA MODELO",
+   "inicio": "2026-08-17",
+   "fim": "2026-08-21",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    36
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 38,
+   "nivel": 3,
+   "nome": "ELÉTRICA",
+   "inicio": "2026-08-14",
+   "fim": "2026-08-27",
+   "dias": 10.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": true
+  },
+  {
+   "id": 39,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE 1 PONTO DE ILUMINAÇÃO POR BAIA",
+   "inicio": "2026-08-14",
+   "fim": "2026-08-20",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    27
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 40,
+   "nivel": 4,
+   "nome": "EXECUÇÃO DE 1 PONTO DE ELÉTRICA EM CADA PILAR",
+   "inicio": "2026-08-21",
+   "fim": "2026-08-27",
+   "dias": 5.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    39
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 41,
+   "nivel": 3,
+   "nome": "EXECUÇÃO DE PORTÃO DAS BAIAS",
+   "inicio": "2026-06-22",
+   "fim": "2026-08-14",
+   "dias": 40.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [
+    15
+   ],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 42,
+   "nivel": 3,
+   "nome": "EXECUÇÃO DE TELHADO SINGLE",
+   "inicio": "2026-07-27",
+   "fim": "2026-09-04",
+   "dias": 30.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  },
+  {
+   "id": 43,
+   "nivel": 3,
+   "nome": "PINTURA DE ESTRUTURA DO TELHADO",
+   "inicio": "2026-08-24",
+   "fim": "2026-09-11",
+   "dias": 15.0,
+   "pct_fisico": 0.0,
+   "predecessoras": [],
+   "marco": false,
+   "resumo": false
+  }
+ ],
+ "resumo": {
+  "custo_total": 1248160,
+  "desembolso_veks": 824460,
+  "faturamento_direto": 423700,
+  "imposto_estimado": 146058,
+  "lucro_projetado_estimado": 111396,
+  "lucro_pct_estimado": 0.074,
+  "obs": "Lucro é estimativa (venda − custo − imposto). O app recalcula com o modelo de caixa mês a mês a partir do faseamento pelo cronograma. Indiretos rodam 5 meses (jun-out) conforme Planilha1 REV01."
+ },
+ "fluxo_caixa_mensal": {
+  "_obs": "Forecast mensal da própria Planilha1 (bloco caixa/medição/imposto), preservado verbatim. lucro em caixa = caixa_final de nov.",
+  "meses": [
+   "jun",
+   "jul",
+   "ago",
+   "set",
+   "out",
+   "nov"
+  ],
+  "medicao": [
+   301123,
+   451684,
+   301123,
+   301123,
+   75281,
+   75281
+  ],
+  "entrada_liquida": [
+   301123,
+   99173,
+   222988,
+   222988,
+   65118,
+   65118
+  ],
+  "caixa_inicial": [
+   301123,
+   231696,
+   258094,
+   300222,
+   201799,
+   152047
+  ],
+  "caixa_final": [
+   132523,
+   35106,
+   77234,
+   136682,
+   86929,
+   152047
+  ],
+  "gasto_veks": [
+   168600,
+   196590,
+   180860,
+   163540,
+   114870,
+   0
+  ],
+  "fat_direto": [
+   337033,
+   43333,
+   43333,
+   0,
+   0,
+   0
+  ],
+  "imposto": [
+   0,
+   15478,
+   34802,
+   34802,
+   10163,
+   10163
+  ],
+  "custo_veks_por_mes": {
+   "direto": [
+    78100,
+    87090,
+    87360,
+    70040,
+    21370,
+    0
+   ],
+   "indireto": [
+    90500,
+    109500,
+    93500,
+    93500,
+    93500,
+    0
+   ]
+  },
+  "lucro_caixa_final": 152047,
+  "inconsistencia": "GASTO VEKS mensal soma 824,460, mas o total Veks das etapas e 734.460 (Indiretos contam ~5 meses no mensal vs ~3,5 no total -> diferenca de 90,000). Por isso o lucro em caixa (152,047) difere do lucro pelos totais de etapa (~242k). Decidir se Indiretos rodam 3,5 ou 5 meses."
+ }
 }

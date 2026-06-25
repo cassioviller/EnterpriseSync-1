@@ -82,7 +82,9 @@ def test_importa_cria_etapas_tarefas_e_custos():
         oscs = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=admin_id).all()
         soma_veks = sum(float(o.mao_obra_a_realizar or 0) for o in oscs)
         soma_fat = sum(float(o.material_a_realizar or 0) for o in oscs)
-        assert abs(soma_veks - 734460) < 50
+        # Veks = 734.460 (etapas) + 90.000 (indiretos rodam 5 meses na
+        # Planilha1 REV01, não 3,5) = 824.460. Fat inalterado.
+        assert abs(soma_veks - 824460) < 50
         assert abs(soma_fat - 423700) < 50
 
 
@@ -368,7 +370,9 @@ def test_importa_popula_linhas_de_custo():
         assert len(linhas) >= 12  # ao menos uma linha por etapa
         soma_veks = sum(float(l.valor) for l in linhas if l.fonte == 'veks')
         soma_fat = sum(float(l.valor) for l in linhas if l.fonte == 'fat_direto')
-        assert abs(soma_veks - 734460) < 50
+        # Veks = 734.460 (etapas) + 90.000 (indiretos rodam 5 meses na
+        # Planilha1 REV01, não 3,5) = 824.460. Fat inalterado.
+        assert abs(soma_veks - 824460) < 50
         assert abs(soma_fat - 423700) < 50
         # agregado da OSC == soma das linhas (derivação)
         for o in oscs:
@@ -395,3 +399,51 @@ def test_reimport_nao_duplica_linhas_de_custo():
             ~ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids),
             ObraServicoCustoItem.admin_id == admin_id).count()
         assert orfas == 0
+
+
+@pytest.mark.integration
+def test_indiretos_transversais_viram_linhas_mensais():
+    """Etapa transversal (custo de período) é explodida em linhas mensais
+    nomeadas ('Estadia (jun/26)'...) ponderadas pelo perfil da planilha, com o
+    total conservado; etapas normais mantêm a janela única da etapa."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    with app.app_context():
+        admin_id = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+
+        # OSC da etapa transversal "Indiretos / gestão (período)"
+        ind = ObraServicoCusto.query.filter(
+            ObraServicoCusto.obra_id == oid,
+            ObraServicoCusto.admin_id == admin_id,
+            ObraServicoCusto.nome.like('Indiretos%')).first()
+        assert ind is not None
+        linhas = ObraServicoCustoItem.query.filter_by(
+            obra_servico_custo_id=ind.id).all()
+
+        # 10 itens × 5 meses (jun–out), todos nomeados com o mês
+        assert len(linhas) == 50
+        assert all('/' in (l.descricao or '') for l in linhas)
+        assert any('(jun/26)' in l.descricao for l in linhas)
+        assert any('(out/26)' in l.descricao for l in linhas)
+        # cada linha mensal cai dentro do seu mês (data_inicio.month == data_fim.month)
+        assert all(l.data_inicio and l.data_fim
+                   and l.data_inicio.month == l.data_fim.month for l in linhas)
+        # total conservado (390.500) e perfil mensal (jul mais pesado, cauda out)
+        por_mes = {}
+        for l in linhas:
+            k = f"{l.data_inicio.year:04d}-{l.data_inicio.month:02d}"
+            por_mes[k] = por_mes.get(k, 0.0) + float(l.valor)
+        assert abs(sum(por_mes.values()) - 390500) < 1
+        assert sorted(por_mes) == ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
+        assert por_mes['2026-07'] > por_mes['2026-06']   # jul é o pico do perfil
+
+        # etapa normal (Fundação) NÃO é explodida por mês — janela única
+        fund = ObraServicoCusto.query.filter(
+            ObraServicoCusto.obra_id == oid,
+            ObraServicoCusto.admin_id == admin_id,
+            ObraServicoCusto.nome.like('Fundação%')).first()
+        assert fund is not None
+        linhas_f = ObraServicoCustoItem.query.filter_by(
+            obra_servico_custo_id=fund.id).all()
+        assert all('/' not in (l.descricao or '') for l in linhas_f)
