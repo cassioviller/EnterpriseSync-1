@@ -6,12 +6,13 @@
         <h2 class="section-title">Relatórios diários (RDOs)</h2>
         <span class="section-counter">{{ rdos|length }}</span>
     </div>
+    <p class="rdo-intro">O dia a dia da sua obra, registrado em fotos e relatos da equipe. Toque em um relatório para ver os detalhes.</p>
     <div class="card-portal">
         <div class="row-list">
             {% for r in rdos %}
             <a href="{{ url_for('portal_obras.portal_rdo_detalhe', token=obra.token_cliente, rdo_id=r.id) }}"
                class="rdo-row"
-               aria-label="Abrir RDO de {{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else 'data indisponível' }}">
+               aria-label="Abrir relatório de {{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else 'data indisponível' }}">
                 <div class="rdo-thumb">
                     {% if r.fotos and r.fotos|length > 0 %}
                     {% set foto = r.fotos[0] %}
@@ -28,13 +29,18 @@
                     <i class="far fa-image"></i>
                     {% endif %}
                 </div>
-                <span class="pill pill-success" style="min-width:90px;justify-content:center;">Finalizado</span>
-                <div class="rdo-data">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</div>
-                <div class="rdo-coment">{{ r.comentario_geral or '' }}</div>
-                {% if r.fotos and r.fotos|length > 0 %}
-                <span class="rdo-fotos"><i class="fas fa-camera"></i> {{ r.fotos|length }} foto{{ 's' if r.fotos|length > 1 }}</span>
-                {% endif %}
-                <i class="fas fa-chevron-right chev"></i>
+                <div class="rdo-main">
+                    <div class="rdo-data">{{ r.data_relatorio.strftime('%d/%m/%Y') if r.data_relatorio else '—' }}</div>
+                    {% if r.comentario_geral %}
+                    <div class="rdo-coment">{{ r.comentario_geral }}</div>
+                    {% endif %}
+                </div>
+                <div class="rdo-meta">
+                    {% if r.fotos and r.fotos|length > 0 %}
+                    <span class="rdo-fotos"><i class="fas fa-camera"></i> {{ r.fotos|length }} foto{{ 's' if r.fotos|length > 1 }}</span>
+                    {% endif %}
+                    <i class="fas fa-chevron-right chev"></i>
+                </div>
             </a>
             {% endfor %}
         </div>

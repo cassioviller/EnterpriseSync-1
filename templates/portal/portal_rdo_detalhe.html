@@ -48,27 +48,27 @@
         }
         .foto-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 12px;
-            padding: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+            padding: 18px;
         }
         .foto-item img {
             width: 100%;
-            height: 180px;
+            height: 220px;
             object-fit: cover;
-            border-radius: var(--radius-sm);
+            border-radius: var(--radius);
             cursor: zoom-in;
-            transition: transform .15s, box-shadow .15s;
+            transition: transform .2s cubic-bezier(.22, 1, .36, 1), box-shadow .2s ease;
             border: 1px solid var(--border);
         }
         .foto-item img:hover {
-            transform: scale(1.02);
+            transform: translateY(-2px);
             box-shadow: var(--shadow-md);
         }
         .foto-caption {
-            font-size: .78rem;
+            font-size: .8rem;
             color: var(--text-muted);
-            margin-top: 6px;
+            margin-top: 8px;
             text-align: center;
         }
         .modal-foto {

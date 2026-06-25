@@ -1,40 +1,54 @@
-<!-- Hero / progresso geral ───────────────────────────────────── -->
-<section class="section">
+<!-- Hero / acompanhamento da obra ────────────────────────────── -->
+<section class="section hero-section">
     <div class="hero-card">
-        <div class="progress-ring-wrap">
-            <svg class="progress-ring" viewBox="0 0 120 120" aria-label="Progresso geral da obra">
-                <circle class="ring-bg" cx="60" cy="60" r="50"/>
-                <circle class="ring-fg" cx="60" cy="60" r="50"
-                        stroke-dasharray="314.16"
-                        stroke-dashoffset="{{ 314.16 - (314.16 * perc_geral / 100) }}"/>
+        <div class="hero-ring">
+            <svg class="progress-ring" viewBox="0 0 120 120" role="img"
+                 aria-label="Progresso geral da obra: {{ perc_geral }} por cento concluído">
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle class="ring-fg" cx="60" cy="60" r="52"
+                        stroke-dasharray="326.73"
+                        stroke-dashoffset="{{ 326.73 - (326.73 * perc_geral / 100) }}"/>
+                <text class="ring-pct" x="60" y="58">{{ perc_geral }}%</text>
+                <text class="ring-sub" x="60" y="76">concluído</text>
             </svg>
-            <div class="progress-pct">{{ perc_geral }}%</div>
-            <div class="progress-lbl">Progresso geral</div>
         </div>
-        <div class="hero-stats">
-            <div class="kpi-grid">
-                <div class="kpi">
-                    <div class="kpi-val">{{ cronograma_cliente|length }}</div>
-                    <div class="kpi-lbl">Tarefas</div>
-                </div>
-                <div class="kpi">
-                    <div class="kpi-val">{{ compras_pendentes|length }}</div>
-                    <div class="kpi-lbl">Compras<br>pendentes</div>
-                </div>
-                <div class="kpi">
-                    <div class="kpi-val">{{ medicoes|length }}</div>
-                    <div class="kpi-lbl">Medições</div>
-                </div>
-                <div class="kpi">
-                    <div class="kpi-val">{% if obra.data_inicio %}{{ (hoje - obra.data_inicio).days }}{% else %}—{% endif %}</div>
-                    <div class="kpi-lbl">Dias de obra</div>
-                </div>
+        <div class="hero-body">
+            <div class="hero-eyebrow">Acompanhamento da obra</div>
+            <div class="hero-status-row">
+                <span class="pill {% if obra.status == 'Concluída' %}pill-success{% elif obra.status == 'Pausada' %}pill-warning{% else %}pill-info{% endif %}">
+                    <i class="fas fa-circle"></i> {{ obra.status }}
+                </span>
+                {% if obra.data_inicio %}
+                <span class="hero-update">Obra iniciada em {{ obra.data_inicio.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
             </div>
-            <div class="obra-info">
-                <div><strong>Início:</strong> {{ obra.data_inicio.strftime('%d/%m/%Y') if obra.data_inicio else '—' }}</div>
-                <div><strong>Previsão fim:</strong> {{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '—' }}</div>
-                <div><strong>Status:</strong> {{ obra.status }}</div>
-                <div><strong>Endereço:</strong> {{ obra.endereco or '—' }}</div>
+            <dl class="hero-facts">
+                <div>
+                    <dt>Previsão de entrega</dt>
+                    <dd>{{ obra.data_previsao_fim.strftime('%d/%m/%Y') if obra.data_previsao_fim else '—' }}</dd>
+                </div>
+                <div>
+                    <dt>Endereço</dt>
+                    <dd>{{ obra.endereco or '—' }}</dd>
+                </div>
+            </dl>
+            <div class="hero-metrics">
+                <div class="hm">
+                    <span class="hm-val">{{ cronograma_cliente|length }}</span>
+                    <span class="hm-lbl">Etapas</span>
+                </div>
+                <div class="hm">
+                    <span class="hm-val">{{ rdos|length if rdos else 0 }}</span>
+                    <span class="hm-lbl">Relatórios</span>
+                </div>
+                <div class="hm">
+                    <span class="hm-val">{{ medicoes|length }}</span>
+                    <span class="hm-lbl">Medições</span>
+                </div>
+                <div class="hm">
+                    <span class="hm-val">{% if obra.data_inicio %}{{ (hoje - obra.data_inicio).days }}{% else %}—{% endif %}</span>
+                    <span class="hm-lbl">Dias de obra</span>
+                </div>
             </div>
         </div>
     </div>
