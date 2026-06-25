@@ -419,3 +419,10 @@ def test_endpoint_etapa_itens_multitenant():
         r = c.post(f'/obras/{o1}/financeiro/etapa/{osc1}/itens',
                    json={'itens': []})
         assert r.status_code == 404
+
+
+@pytest.mark.integration
+def test_osc_item_tem_datas():
+    from models import ObraServicoCustoItem
+    cols = {c.name for c in ObraServicoCustoItem.__table__.columns}
+    assert {'data_inicio', 'data_fim'} <= cols

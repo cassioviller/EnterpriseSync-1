@@ -5705,6 +5705,9 @@ class ObraServicoCustoItem(db.Model):
     valor = db.Column(db.Numeric(15, 2), nullable=False, default=0)
     fonte = db.Column(db.String(20), nullable=False, default='veks')  # 'veks' | 'fat_direto'
     ordem = db.Column(db.Integer, default=0)
+    # Janela de desembolso previsto (caixa): o valor é faseado entre estas datas.
+    data_inicio = db.Column(db.Date, nullable=True)
+    data_fim = db.Column(db.Date, nullable=True)
 
     osc = db.relationship('ObraServicoCusto', backref=db.backref(
         'itens_custo', cascade='all, delete-orphan'))
