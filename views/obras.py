@@ -2131,14 +2131,30 @@ def financeiro_etapa_itens(id, osc_id):
         except (InvalidOperation, ValueError, AttributeError, TypeError):
             return None
 
+    def _data(v):
+        """Retorna (date|None, ok). Vazio é válido (None); formato ruim é inválido."""
+        if v in (None, ''):
+            return None, True
+        from datetime import date as _date
+        try:
+            return _date.fromisoformat(str(v)[:10]), True
+        except (ValueError, TypeError):
+            return None, False
+
     novos = []
     for i, it in enumerate(itens):
         valor = _dec(it.get('valor'))
         if valor is None or valor < 0:
             return jsonify({'erro': 'valor inválido'}), 400
+        di, ok1 = _data(it.get('data_inicio'))
+        df, ok2 = _data(it.get('data_fim'))
+        if not (ok1 and ok2):
+            return jsonify({'erro': 'data inválida'}), 400
+        if di and df and df < di:
+            return jsonify({'erro': 'data_fim antes de data_inicio'}), 400
         fonte = 'fat_direto' if it.get('fonte') == 'fat_direto' else 'veks'
         desc = (str(it.get('descricao') or '').strip() or 'Item')[:200]
-        novos.append((desc, valor, fonte, i))
+        novos.append((desc, valor, fonte, i, di, df))
 
     orc_raw = payload.get('valor_orcado')
     if orc_raw not in (None, ''):
@@ -2149,10 +2165,11 @@ def financeiro_etapa_itens(id, osc_id):
 
     ObraServicoCustoItem.query.filter_by(
         obra_servico_custo_id=osc.id).delete(synchronize_session=False)
-    for desc, valor, fonte, ordem in novos:
+    for desc, valor, fonte, ordem, di, df in novos:
         db.session.add(ObraServicoCustoItem(
             obra_servico_custo_id=osc.id, admin_id=admin_id,
-            descricao=desc, valor=valor, fonte=fonte, ordem=ordem))
+            descricao=desc, valor=valor, fonte=fonte, ordem=ordem,
+            data_inicio=di, data_fim=df))
     db.session.flush()
     recalcular_osc_dos_itens(osc)
     db.session.commit()

@@ -309,6 +309,10 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
             # OSC são derivados delas.
             ObraServicoCustoItem.query.filter_by(
                 obra_servico_custo_id=osc.id).delete(synchronize_session=False)
+            # Janela de desembolso default da linha = cronograma da etapa.
+            cron_etapa = info['etapa'].get('cronograma', {}) or {}
+            di_etapa = _parse_date(cron_etapa.get('inicio'))
+            df_etapa = _parse_date(cron_etapa.get('fim'))
             ordem = 0
             for it in (info['etapa'].get('itens') or []):
                 nome_it = (it.get('item') or 'Item')[:200]
@@ -317,23 +321,27 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
                 if v > 0:
                     db.session.add(ObraServicoCustoItem(
                         obra_servico_custo_id=osc.id, admin_id=admin_id,
-                        descricao=nome_it, valor=v, fonte='veks', ordem=ordem)); ordem += 1
+                        descricao=nome_it, valor=v, fonte='veks', ordem=ordem,
+                        data_inicio=di_etapa, data_fim=df_etapa)); ordem += 1
                 if f > 0:
                     db.session.add(ObraServicoCustoItem(
                         obra_servico_custo_id=osc.id, admin_id=admin_id,
-                        descricao=nome_it, valor=f, fonte='fat_direto', ordem=ordem)); ordem += 1
+                        descricao=nome_it, valor=f, fonte='fat_direto', ordem=ordem,
+                        data_inicio=di_etapa, data_fim=df_etapa)); ordem += 1
             if ordem == 0:
                 # Etapa sem itens detalhados no JSON → linhas do agregado.
                 if info['veks'] > 0:
                     db.session.add(ObraServicoCustoItem(
                         obra_servico_custo_id=osc.id, admin_id=admin_id,
                         descricao=info['etapa']['nome'][:200], valor=info['veks'],
-                        fonte='veks', ordem=ordem)); ordem += 1
+                        fonte='veks', ordem=ordem,
+                        data_inicio=di_etapa, data_fim=df_etapa)); ordem += 1
                 if info['fat'] > 0:
                     db.session.add(ObraServicoCustoItem(
                         obra_servico_custo_id=osc.id, admin_id=admin_id,
                         descricao=info['etapa']['nome'][:200], valor=info['fat'],
-                        fonte='fat_direto', ordem=ordem)); ordem += 1
+                        fonte='fat_direto', ordem=ordem,
+                        data_inicio=di_etapa, data_fim=df_etapa)); ordem += 1
             db.session.flush()
             osc.fonte_outros = 'veks'
             osc.realizado_material = 0

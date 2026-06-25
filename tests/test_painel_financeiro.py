@@ -426,3 +426,56 @@ def test_osc_item_tem_datas():
     from models import ObraServicoCustoItem
     cols = {c.name for c in ObraServicoCustoItem.__table__.columns}
     assert {'data_inicio', 'data_fim'} <= cols
+
+
+@pytest.mark.integration
+def test_painel_itens_incluem_datas():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        p = painel_financeiro(Obra.query.get(oid))
+        # toda linha expõe as chaves de data
+        for e in p['etapas']:
+            for it in e['itens']:
+                assert 'data_inicio' in it and 'data_fim' in it
+        # ao menos uma linha veio com datas preenchidas da etapa (cronograma)
+        assert any(it['data_inicio'] for e in p['etapas'] for it in e['itens'])
+
+
+@pytest.mark.integration
+def test_endpoint_etapa_itens_persiste_datas():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, ObraServicoCustoItem
+    import json
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/itens',
+                   json={'itens': [
+                       {'descricao': 'X', 'valor': '1000', 'fonte': 'veks',
+                        'data_inicio': '2026-07-01', 'data_fim': '2026-07-31'}]})
+        assert r.status_code == 200
+        # data inválida → 400
+        r2 = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/itens',
+                    json={'itens': [{'descricao': 'Y', 'valor': '1', 'fonte': 'veks',
+                                     'data_inicio': 'xx/yy'}]})
+        assert r2.status_code == 400
+    with app.app_context():
+        from datetime import date
+        it = ObraServicoCustoItem.query.filter_by(obra_servico_custo_id=osc_id).one()
+        assert it.data_inicio == date(2026, 7, 1)
+        assert it.data_fim == date(2026, 7, 31)

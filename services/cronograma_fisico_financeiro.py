@@ -486,7 +486,8 @@ def painel_financeiro(obra) -> dict:
                             ObraServicoCustoItem.ordem).all())
         for it in linhas:
             itens_por_osc.setdefault(it.obra_servico_custo_id, []).append(
-                {"id": it.id, "descricao": it.descricao, "valor": it.valor, "fonte": it.fonte})
+                {"id": it.id, "descricao": it.descricao, "valor": it.valor, "fonte": it.fonte,
+                 "data_inicio": it.data_inicio, "data_fim": it.data_fim})
 
     etapas = []
     for e in dados["etapas"]:
