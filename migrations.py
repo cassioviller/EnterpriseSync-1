@@ -3996,6 +3996,7 @@ def executar_migracoes():
             (196, "fonte pagamento Veks/Fat em obra_servico_custo", _migration_196_obra_servico_custo_fonte_pagamento),
             (197, "Físico-financeiro — tabela medicao_contrato", _migration_197_medicao_contrato),
             (198, "Físico-financeiro — obra.fluxo_caixa_planilha (snapshot verbatim)", _migration_198_obra_fluxo_caixa_planilha),
+            (199, "Físico-financeiro — tabela obra_servico_custo_item (linhas de custo por etapa)", _migration_199_obra_servico_custo_item),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13626,6 +13627,32 @@ def _migration_198_obra_fluxo_caixa_planilha():
         logger.info("[Migration 198] obra.fluxo_caixa_planilha adicionada.")
     except Exception as e:
         logger.error(f"[Migration 198] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_199_obra_servico_custo_item():
+    """Físico-financeiro — cria obra_servico_custo_item (linhas de custo por etapa,
+    classificadas Veks/Fat). Idempotente."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS obra_servico_custo_item (
+                    id SERIAL PRIMARY KEY,
+                    obra_servico_custo_id INTEGER NOT NULL
+                        REFERENCES obra_servico_custo(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    descricao VARCHAR(200) NOT NULL,
+                    valor NUMERIC(15,2) NOT NULL DEFAULT 0,
+                    fonte VARCHAR(20) NOT NULL DEFAULT 'veks',
+                    ordem INTEGER DEFAULT 0
+                )
+            """))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_osc_item_osc ON obra_servico_custo_item(obra_servico_custo_id)"))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_osc_item_admin ON obra_servico_custo_item(admin_id)"))
+        logger.info("[Migration 199] obra_servico_custo_item criada.")
+    except Exception as e:
+        logger.error(f"[Migration 199] Falha: {e}", exc_info=True)
         raise
 
 

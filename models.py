@@ -5690,6 +5690,29 @@ class ObraServicoCusto(db.Model):
         return f'<ObraServicoCusto #{self.id} obra={self.obra_id} {self.nome}>'
 
 
+class ObraServicoCustoItem(db.Model):
+    """Linha de custo (insumo) de uma etapa, por obra. Fonte da verdade do custo
+    previsto: ObraServicoCusto.mao_obra_a_realizar/material_a_realizar = soma destas
+    linhas por `fonte` (veks/fat_direto). Ver design 2026-06-24."""
+    __tablename__ = 'obra_servico_custo_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_servico_custo_id = db.Column(
+        db.Integer, db.ForeignKey('obra_servico_custo.id', ondelete='CASCADE'),
+        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    valor = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+    fonte = db.Column(db.String(20), nullable=False, default='veks')  # 'veks' | 'fat_direto'
+    ordem = db.Column(db.Integer, default=0)
+
+    osc = db.relationship('ObraServicoCusto', backref=db.backref(
+        'itens_custo', cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<ObraServicoCustoItem osc={self.obra_servico_custo_id} {self.descricao!r}>'
+
+
 class ObraServicoEquipePlanejada(db.Model):
     """Linha de equipe planejada por serviço: funcionário + quantidade dias +
     custos diários snapshot (diária, alimentação, transporte)."""

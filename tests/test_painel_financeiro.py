@@ -353,3 +353,11 @@ def test_painel_tem_grupos_kpi_e_wrappers_chart():
     assert body.count('class="fin-chart"') >= 4
     for cid in ('finEtapas', 'finCurva', 'finSplit', 'finCaixa'):
         assert f'<canvas id="{cid}"></canvas>' in body, cid
+
+
+@pytest.mark.integration
+def test_obra_servico_custo_item_schema():
+    from models import ObraServicoCustoItem
+    cols = {c.name for c in ObraServicoCustoItem.__table__.columns}
+    assert {'id', 'obra_servico_custo_id', 'admin_id', 'descricao',
+            'valor', 'fonte', 'ordem'} <= cols
