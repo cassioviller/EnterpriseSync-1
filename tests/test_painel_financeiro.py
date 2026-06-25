@@ -211,53 +211,6 @@ def test_endpoint_financeiro_dados_multitenant():
 
 
 @pytest.mark.integration
-def test_endpoint_editar_etapa():
-    from services.importacao_fisico_financeiro import importar_fisico_financeiro
-    from models import ObraServicoCusto
-    import json
-    with app.app_context():
-        aid = _novo_admin()
-        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
-                               'cronograma_fisico_financeiro_baias.json')
-        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
-        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
-    app.config['WTF_CSRF_ENABLED'] = False
-    with app.test_client() as c:
-        with c.session_transaction() as s:
-            s['_user_id'] = str(aid); s['_fresh'] = True
-        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}',
-                   data={'veks': '12345', 'fat': '6789', 'valor_orcado': '19134'})
-        assert r.status_code == 200
-        data = r.get_json()
-        assert 'etapas' in data
-    with app.app_context():
-        osc = ObraServicoCusto.query.get(osc_id)
-        assert float(osc.mao_obra_a_realizar) == 12345.0
-        assert float(osc.material_a_realizar) == 6789.0
-        assert float(osc.valor_orcado) == 19134.0
-
-
-@pytest.mark.integration
-def test_editar_etapa_multitenant():
-    from services.importacao_fisico_financeiro import importar_fisico_financeiro
-    from models import ObraServicoCusto
-    import json
-    with app.app_context():
-        a1 = _novo_admin(); a2 = _novo_admin()
-        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
-                               'cronograma_fisico_financeiro_baias.json')
-        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), a1)['obra_id']
-        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=a1).first().id
-    app.config['WTF_CSRF_ENABLED'] = False
-    with app.test_client() as c:
-        with c.session_transaction() as s:
-            s['_user_id'] = str(a2); s['_fresh'] = True
-        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}',
-                   data={'veks': '1', 'fat': '1', 'valor_orcado': '2'})
-        assert r.status_code == 404
-
-
-@pytest.mark.integration
 def test_rota_ff_antiga_redireciona():
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import Usuario
@@ -407,3 +360,62 @@ def test_painel_etapas_incluem_itens():
         for e in p['etapas']:
             for it in e['itens']:
                 assert set(it) >= {'id', 'descricao', 'valor', 'fonte'}
+
+
+@pytest.mark.integration
+def test_endpoint_etapa_itens_substitui_e_recalcula():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, ObraServicoCustoItem
+    import json
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        osc_id = osc.id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        # substitui por 2 linhas (1 veks 1000, 1 fat 500)
+        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/itens',
+                   json={'itens': [
+                       {'descricao': 'X', 'valor': '1000', 'fonte': 'veks'},
+                       {'descricao': 'Y', 'valor': '500', 'fonte': 'fat_direto'}],
+                       'valor_orcado': '2000'})
+        assert r.status_code == 200
+        p = r.get_json()
+        assert 'kpis' in p and 'etapas' in p
+        # payload inválido → 400
+        r2 = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/itens',
+                    json={'itens': [{'descricao': 'Z', 'valor': 'abc', 'fonte': 'veks'}]})
+        assert r2.status_code == 400
+    with app.app_context():
+        linhas = ObraServicoCustoItem.query.filter_by(obra_servico_custo_id=osc_id).all()
+        assert len(linhas) == 2
+        osc = ObraServicoCusto.query.get(osc_id)
+        assert abs(float(osc.mao_obra_a_realizar) - 1000) < 0.01
+        assert abs(float(osc.material_a_realizar) - 500) < 0.01
+
+
+@pytest.mark.integration
+def test_endpoint_etapa_itens_multitenant():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto
+    import json
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        a1 = _novo_admin(); a2 = _novo_admin()
+        u = Usuario.query.get(a2); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        o1 = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), a1)['obra_id']
+        osc1 = ObraServicoCusto.query.filter_by(obra_id=o1, admin_id=a1).first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(a2); s['_fresh'] = True
+        r = c.post(f'/obras/{o1}/financeiro/etapa/{osc1}/itens',
+                   json={'itens': []})
+        assert r.status_code == 404

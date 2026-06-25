@@ -2109,33 +2109,52 @@ def financeiro_dados(id):
     return jsonify(_jsonable(painel_financeiro(obra)))
 
 
-@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>', methods=['POST'])
+@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>/itens', methods=['POST'])
 @login_required
 @capture_db_errors
-def financeiro_editar_etapa(id, osc_id):
+def financeiro_etapa_itens(id, osc_id):
     from decimal import Decimal, InvalidOperation
-    from models import ObraServicoCusto
-    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    from services.cronograma_fisico_financeiro import painel_financeiro, recalcular_osc_dos_itens
     admin_id = get_tenant_admin_id()
     obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     osc = ObraServicoCusto.query.filter_by(id=osc_id, obra_id=obra.id, admin_id=admin_id).first_or_404()
 
+    payload = request.get_json(silent=True) or {}
+    itens = payload.get('itens')
+    if not isinstance(itens, list):
+        return jsonify({'erro': 'itens inválido'}), 400
+
     def _dec(v):
         try:
-            return Decimal(str(v).replace(',', '.')) if v not in (None, '') else Decimal('0')
-        except (InvalidOperation, ValueError):
+            return Decimal(str(v).replace(',', '.'))
+        except (InvalidOperation, ValueError, AttributeError, TypeError):
             return None
-    veks = _dec(request.form.get('veks'))
-    fat = _dec(request.form.get('fat'))
-    orc = _dec(request.form.get('valor_orcado'))
-    if veks is None or fat is None or orc is None:
-        return jsonify({'erro': 'valores inválidos'}), 400
 
-    osc.mao_obra_a_realizar = veks
-    osc.fonte_mao_obra = 'veks'
-    osc.material_a_realizar = fat
-    osc.fonte_material = 'fat_direto'
-    osc.valor_orcado = orc
+    novos = []
+    for i, it in enumerate(itens):
+        valor = _dec(it.get('valor'))
+        if valor is None or valor < 0:
+            return jsonify({'erro': 'valor inválido'}), 400
+        fonte = 'fat_direto' if it.get('fonte') == 'fat_direto' else 'veks'
+        desc = (str(it.get('descricao') or '').strip() or 'Item')[:200]
+        novos.append((desc, valor, fonte, i))
+
+    orc_raw = payload.get('valor_orcado')
+    if orc_raw not in (None, ''):
+        orc = _dec(orc_raw)
+        if orc is None:
+            return jsonify({'erro': 'valor_orcado inválido'}), 400
+        osc.valor_orcado = orc
+
+    ObraServicoCustoItem.query.filter_by(
+        obra_servico_custo_id=osc.id).delete(synchronize_session=False)
+    for desc, valor, fonte, ordem in novos:
+        db.session.add(ObraServicoCustoItem(
+            obra_servico_custo_id=osc.id, admin_id=admin_id,
+            descricao=desc, valor=valor, fonte=fonte, ordem=ordem))
+    db.session.flush()
+    recalcular_osc_dos_itens(osc)
     db.session.commit()
     return jsonify(_jsonable(painel_financeiro(obra)))
 
