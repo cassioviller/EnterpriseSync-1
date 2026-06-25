@@ -545,6 +545,22 @@ def realizado_por_etapa(obra) -> dict:
     return out
 
 
+def recalcular_osc_dos_itens(osc):
+    """Deriva os agregados da OSC da soma das linhas de custo (fonte da verdade):
+    Veks (mao_obra_a_realizar) = Σ valor (fonte != 'fat_direto');
+    Fat (material_a_realizar)  = Σ valor (fonte == 'fat_direto'). Retorna (veks, fat)."""
+    from models import ObraServicoCustoItem
+    itens = ObraServicoCustoItem.query.filter_by(obra_servico_custo_id=osc.id).all()
+    veks = sum((Decimal(str(i.valor or 0)) for i in itens if i.fonte != 'fat_direto'), Decimal("0"))
+    fat = sum((Decimal(str(i.valor or 0)) for i in itens if i.fonte == 'fat_direto'), Decimal("0"))
+    osc.mao_obra_a_realizar = veks
+    osc.material_a_realizar = fat
+    osc.outros_a_realizar = Decimal("0")
+    osc.fonte_mao_obra = 'veks'
+    osc.fonte_material = 'fat_direto'
+    return veks, fat
+
+
 def exportar_fisico_financeiro_xlsx(dados: dict):
     """Gera um openpyxl.Workbook no layout da planilha de referência:
     aba 'Cronograma FF (por etapa)' + aba 'Curva S'."""

@@ -361,3 +361,29 @@ def test_obra_servico_custo_item_schema():
     cols = {c.name for c in ObraServicoCustoItem.__table__.columns}
     assert {'id', 'obra_servico_custo_id', 'admin_id', 'descricao',
             'valor', 'fonte', 'ordem'} <= cols
+
+
+@pytest.mark.integration
+def test_recalcular_osc_dos_itens():
+    from services.cronograma_fisico_financeiro import recalcular_osc_dos_itens
+    from models import Obra, ObraServicoCusto, ObraServicoCustoItem
+    with app.app_context():
+        aid = _novo_admin()
+        obra = Obra(nome='OI', codigo=f'OI{aid}', admin_id=aid, cliente_id=_novo_cliente(aid),
+                    data_inicio=date(2026, 6, 1), valor_contrato=0)
+        db.session.add(obra); db.session.flush()
+        osc = ObraServicoCusto(obra_id=obra.id, admin_id=aid, nome='E1', valor_orcado=D('0'))
+        db.session.add(osc); db.session.flush()
+        db.session.add_all([
+            ObraServicoCustoItem(obra_servico_custo_id=osc.id, admin_id=aid,
+                                 descricao='a', valor=D('100'), fonte='veks', ordem=0),
+            ObraServicoCustoItem(obra_servico_custo_id=osc.id, admin_id=aid,
+                                 descricao='b', valor=D('50'), fonte='veks', ordem=1),
+            ObraServicoCustoItem(obra_servico_custo_id=osc.id, admin_id=aid,
+                                 descricao='c', valor=D('200'), fonte='fat_direto', ordem=2),
+        ])
+        db.session.flush()
+        veks, fat = recalcular_osc_dos_itens(osc)
+        assert veks == D('150') and fat == D('200')
+        assert D(str(osc.mao_obra_a_realizar)) == D('150')
+        assert D(str(osc.material_a_realizar)) == D('200')
