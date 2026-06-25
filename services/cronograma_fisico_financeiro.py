@@ -234,6 +234,15 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
             }
         return etapas[raiz.id]
 
+    # Desembolso (caixa) faseado pelas DATAS DAS LINHAS de custo (fonte da verdade).
+    # `meses_veks/meses_fat` arrancam com as parcelas já faseadas por datas; o loop
+    # abaixo soma, POR CRONOGRAMA, apenas o que cada OSC ainda não faseou por linha
+    # (fallback complementar para linhas sem datas).
+    linhas_veks, linhas_fat, faseado_por_osc = fasear_custo_por_linhas(
+        obra_id, admin_id, sab, dom)
+    meses_veks.update(linhas_veks)
+    meses_fat.update(linhas_fat)
+
     for osc in custos:
         material, mao_obra, outros = _previsto_por_categoria(osc)
         previsto_total = material + mao_obra + outros
@@ -241,6 +250,11 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
             material, mao_obra, outros,
             osc.fonte_material, osc.fonte_mao_obra, osc.fonte_outros,
         )
+        # remanescente a fasear pelo cronograma = total do OSC menos o já faseado
+        # por datas de linha. Clamp em 0 (linhas nunca excedem o agregado).
+        _ja = faseado_por_osc.get(osc.id, {})
+        veks_cron = max(veks - _ja.get('veks', Decimal("0")), Decimal("0"))
+        fat_cron = max(fat - _ja.get('fat', Decimal("0")), Decimal("0"))
 
         vinculos = []
         if osc.item_medicao_comercial_id:
@@ -265,9 +279,10 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
                 et = _etapa(raiz)
                 slot = peso_por_raiz.setdefault(raiz.id, [et, Decimal("0")])
                 slot[1] += Decimal(peso)
-            # faseia o previsto alocado a cada folha (inalterado)
-            razao_veks = (veks / previsto_total) if previsto_total else Decimal("0")
-            razao_fat = (fat / previsto_total) if previsto_total else Decimal("0")
+            # faseia o previsto alocado a cada folha (físico = inalterado); o
+            # financeiro usa só o remanescente não faseado por datas de linha.
+            razao_veks = (veks_cron / previsto_total) if previsto_total else Decimal("0")
+            razao_fat = (fat_cron / previsto_total) if previsto_total else Decimal("0")
             aloc = alocar_por_peso(previsto_total, pesos)
             for tarefa_id, valor_tarefa in aloc.items():
                 folha = por_id[tarefa_id]
@@ -310,14 +325,6 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
 
     for et in etapas.values():
         et["desvio"] = et["realizado"] - et["previsto"]["total"]
-
-    # Desembolso (caixa) faseado pelas DATAS DAS LINHAS DE CUSTO — substitui o
-    # faseamento por cronograma quando há linhas com datas. As linhas são a fonte
-    # da verdade do custo previsto; suas janelas definem quando o caixa sai.
-    lv, lf, _sem_data = fasear_custo_por_linhas(obra_id, admin_id, sab, dom)
-    if lv or lf:
-        meses_veks = lv
-        meses_fat = lf
 
     meses_ordenados = sorted(meses_globais)
     totais = {
@@ -569,31 +576,36 @@ def realizado_por_etapa(obra) -> dict:
 
 
 def fasear_custo_por_linhas(obra_id, admin_id, sab, dom):
-    """Distribui o valor de cada linha de custo no seu período [data_inicio, data_fim]
-    por dias úteis, agregando por mês 'YYYY-MM' e por fonte. Linhas sem datas vão para
-    `sem_data`. Retorna (meses_veks, meses_fat, sem_data)."""
+    """Faseia por dias úteis o valor de cada linha de custo QUE TEM datas válidas,
+    agregando por mês 'YYYY-MM' e por fonte. Retorna (meses_veks, meses_fat,
+    faseado_por_osc), onde faseado_por_osc[osc_id] = {'veks': Σ, 'fat': Σ} é a
+    parcela já faseada por datas (linhas sem datas NÃO entram — o caller faseia o
+    restante pelo cronograma, fallback complementar)."""
     from models import ObraServicoCusto, ObraServicoCustoItem
     osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(
         obra_id=obra_id, admin_id=admin_id).all()]
     meses_veks: dict = {}
     meses_fat: dict = {}
-    sem_data = Decimal("0")
+    faseado_por_osc: dict = {}
     if not osc_ids:
-        return meses_veks, meses_fat, sem_data
+        return meses_veks, meses_fat, faseado_por_osc
     linhas = ObraServicoCustoItem.query.filter(
         ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).all()
     for l in linhas:
         valor = Decimal(str(l.valor or 0))
         if valor == 0:
             continue
-        alvo = meses_fat if l.fonte == 'fat_direto' else meses_veks
         fases = fasear_por_dias_uteis(valor, l.data_inicio, l.data_fim, sab, dom)
+        # linha sem datas (ou intervalo inválido) → NAO_FASEADO → não faseia aqui
+        if NAO_FASEADO in fases:
+            continue
+        alvo = meses_fat if l.fonte == 'fat_direto' else meses_veks
         for mes, parcela in fases.items():
-            if mes == NAO_FASEADO:
-                sem_data += parcela
-                continue
             alvo[mes] = alvo.get(mes, Decimal("0")) + parcela
-    return meses_veks, meses_fat, sem_data
+        slot = faseado_por_osc.setdefault(
+            l.obra_servico_custo_id, {'veks': Decimal('0'), 'fat': Decimal('0')})
+        slot['fat' if l.fonte == 'fat_direto' else 'veks'] += valor
+    return meses_veks, meses_fat, faseado_por_osc
 
 
 def recalcular_osc_dos_itens(osc):

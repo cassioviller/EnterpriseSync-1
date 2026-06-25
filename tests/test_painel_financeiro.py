@@ -486,7 +486,7 @@ def test_caixa_faseado_pelas_datas_das_linhas():
     """O desembolso Veks/Fat por mês deve seguir as datas das linhas de custo,
     não o cronograma. Mover uma linha para um mês isolado move o caixa."""
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
-    from services.cronograma_fisico_financeiro import fluxo_caixa
+    from services.cronograma_fisico_financeiro import fluxo_caixa, recalcular_osc_dos_itens
     from models import Obra, ObraServicoCusto, ObraServicoCustoItem
     from datetime import date
     import json
@@ -496,7 +496,8 @@ def test_caixa_faseado_pelas_datas_das_linhas():
                                'cronograma_fisico_financeiro_baias.json')
         obra = Obra.query.get(importar_fisico_financeiro(
             json.load(open(caminho, encoding='utf-8')), aid)['obra_id'])
-        # zera as linhas de todas as etapas e cria UMA linha veks isolada em 2027-03
+        # zera as linhas de todas as etapas (agregados → 0) e cria UMA linha veks
+        # isolada em 2027-03 na primeira etapa
         oscs = ObraServicoCusto.query.filter_by(obra_id=obra.id, admin_id=aid).all()
         osc_ids = [o.id for o in oscs]
         ObraServicoCustoItem.query.filter(
@@ -506,6 +507,9 @@ def test_caixa_faseado_pelas_datas_das_linhas():
             valor=D('30000'), fonte='veks', ordem=0,
             data_inicio=date(2027, 3, 2), data_fim=date(2027, 3, 31)))
         db.session.flush()
+        for o in oscs:  # agregados derivam das linhas (todos zeram, exceto oscs[0])
+            recalcular_osc_dos_itens(o)
+        db.session.flush()
         caixa = fluxo_caixa(obra)
         por_mes = {l['mes']: l for l in caixa['linhas']}
         assert '2027-03' in por_mes
@@ -513,3 +517,44 @@ def test_caixa_faseado_pelas_datas_das_linhas():
         total_veks = sum(float(l['gasto_veks']) for l in caixa['linhas'])
         assert abs(total_veks - 30000) < 1
         assert abs(float(por_mes['2027-03']['gasto_veks']) - 30000) < 1
+
+
+@pytest.mark.integration
+def test_caixa_fallback_complementar_linha_sem_data():
+    """Fallback complementar: linha COM datas é faseada por elas; linha SEM datas
+    cai no faseamento por cronograma — nada se perde."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import fluxo_caixa, recalcular_osc_dos_itens
+    from models import Obra, ObraServicoCusto, ObraServicoCustoItem
+    from datetime import date
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        obra = Obra.query.get(importar_fisico_financeiro(
+            json.load(open(caminho, encoding='utf-8')), aid)['obra_id'])
+        oscs = ObraServicoCusto.query.filter_by(obra_id=obra.id, admin_id=aid).all()
+        baseline = fluxo_caixa(obra)
+        total_base = sum(float(l['gasto_veks']) for l in baseline['linhas'])
+        veks0_orig = float(oscs[0].mao_obra_a_realizar or 0)
+        # substitui as linhas da etapa 0 por: uma DATADA (2027-03) + uma SEM data
+        ObraServicoCustoItem.query.filter_by(
+            obra_servico_custo_id=oscs[0].id).delete(synchronize_session=False)
+        db.session.add_all([
+            ObraServicoCustoItem(obra_servico_custo_id=oscs[0].id, admin_id=aid,
+                                 descricao='Datada', valor=D('10000'), fonte='veks', ordem=0,
+                                 data_inicio=date(2027, 3, 2), data_fim=date(2027, 3, 31)),
+            ObraServicoCustoItem(obra_servico_custo_id=oscs[0].id, admin_id=aid,
+                                 descricao='SemData', valor=D('7000'), fonte='veks', ordem=1),
+        ])
+        db.session.flush()
+        recalcular_osc_dos_itens(oscs[0])  # agregado etapa0 = 17000
+        db.session.flush()
+        caixa = fluxo_caixa(obra)
+        por_mes = {l['mes']: l for l in caixa['linhas']}
+        # a linha datada cai exatamente em 2027-03 (e SÓ ela: 10000, não 17000)
+        assert abs(float(por_mes['2027-03']['gasto_veks']) - 10000) < 1
+        # nada se perde: total = baseline - etapa0 original + 17000 (10k datada + 7k cronograma)
+        total = sum(float(l['gasto_veks']) for l in caixa['linhas'])
+        assert abs(total - (total_base - veks0_orig + 17000)) < 2
