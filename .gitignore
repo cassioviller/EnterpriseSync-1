@@ -27,3 +27,7 @@ docs/manual_ciclo/*.pdf
 # Planilhas/PDFs colados em attached_assets
 attached_assets/*.xlsx
 attached_assets/*.pdf
+
+# Config do Replit — gerada por cada ambiente; fora do repo para não propagar
+.replit
+replit.nix
