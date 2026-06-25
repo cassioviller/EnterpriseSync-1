@@ -387,3 +387,23 @@ def test_recalcular_osc_dos_itens():
         assert veks == D('150') and fat == D('200')
         assert D(str(osc.mao_obra_a_realizar)) == D('150')
         assert D(str(osc.material_a_realizar)) == D('200')
+
+
+@pytest.mark.integration
+def test_painel_etapas_incluem_itens():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        p = painel_financeiro(Obra.query.get(oid))
+        assert all('itens' in e for e in p['etapas'])
+        # ao menos uma etapa com itens preenchidos
+        assert any(e['itens'] for e in p['etapas'])
+        for e in p['etapas']:
+            for it in e['itens']:
+                assert set(it) >= {'id', 'descricao', 'valor', 'fonte'}

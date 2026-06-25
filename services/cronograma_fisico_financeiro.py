@@ -475,6 +475,19 @@ def painel_financeiro(obra) -> dict:
         receb_ac.append(r); gasto_ac.append(g); real_ac.append(real_)
     lucro_ac = [receb_ac[i] - gasto_ac[i] for i in range(len(meses))]
 
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(
+        obra_id=obra.id, admin_id=obra.admin_id).all()]
+    itens_por_osc = {}
+    if osc_ids:
+        linhas = (ObraServicoCustoItem.query
+                  .filter(ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids))
+                  .order_by(ObraServicoCustoItem.obra_servico_custo_id,
+                            ObraServicoCustoItem.ordem).all())
+        for it in linhas:
+            itens_por_osc.setdefault(it.obra_servico_custo_id, []).append(
+                {"id": it.id, "descricao": it.descricao, "valor": it.valor, "fonte": it.fonte})
+
     etapas = []
     for e in dados["etapas"]:
         osc_id = e.get("osc_id")  # id verdadeiro do ObraServicoCusto, ou None (etapa multi-OSC)
@@ -485,6 +498,7 @@ def painel_financeiro(obra) -> dict:
             "previsto": e["previsto"]["total"],
             "realizado": realizado_etapa.get(osc_id, Decimal("0")),
             "osc_id": osc_id,
+            "itens": itens_por_osc.get(osc_id, []),
         })
 
     # Verba disponível (caixa) = o que já entrou (recebido até hoje, pelas
