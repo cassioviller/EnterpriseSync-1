@@ -479,3 +479,37 @@ def test_endpoint_etapa_itens_persiste_datas():
         it = ObraServicoCustoItem.query.filter_by(obra_servico_custo_id=osc_id).one()
         assert it.data_inicio == date(2026, 7, 1)
         assert it.data_fim == date(2026, 7, 31)
+
+
+@pytest.mark.integration
+def test_caixa_faseado_pelas_datas_das_linhas():
+    """O desembolso Veks/Fat por mês deve seguir as datas das linhas de custo,
+    não o cronograma. Mover uma linha para um mês isolado move o caixa."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import fluxo_caixa
+    from models import Obra, ObraServicoCusto, ObraServicoCustoItem
+    from datetime import date
+    import json
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        obra = Obra.query.get(importar_fisico_financeiro(
+            json.load(open(caminho, encoding='utf-8')), aid)['obra_id'])
+        # zera as linhas de todas as etapas e cria UMA linha veks isolada em 2027-03
+        oscs = ObraServicoCusto.query.filter_by(obra_id=obra.id, admin_id=aid).all()
+        osc_ids = [o.id for o in oscs]
+        ObraServicoCustoItem.query.filter(
+            ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).delete(synchronize_session=False)
+        db.session.add(ObraServicoCustoItem(
+            obra_servico_custo_id=oscs[0].id, admin_id=aid, descricao='Solo',
+            valor=D('30000'), fonte='veks', ordem=0,
+            data_inicio=date(2027, 3, 2), data_fim=date(2027, 3, 31)))
+        db.session.flush()
+        caixa = fluxo_caixa(obra)
+        por_mes = {l['mes']: l for l in caixa['linhas']}
+        assert '2027-03' in por_mes
+        # todo o gasto_veks cai em 2027-03 (a única linha dada)
+        total_veks = sum(float(l['gasto_veks']) for l in caixa['linhas'])
+        assert abs(total_veks - 30000) < 1
+        assert abs(float(por_mes['2027-03']['gasto_veks']) - 30000) < 1

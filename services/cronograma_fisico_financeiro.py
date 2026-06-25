@@ -311,6 +311,14 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
     for et in etapas.values():
         et["desvio"] = et["realizado"] - et["previsto"]["total"]
 
+    # Desembolso (caixa) faseado pelas DATAS DAS LINHAS DE CUSTO — substitui o
+    # faseamento por cronograma quando há linhas com datas. As linhas são a fonte
+    # da verdade do custo previsto; suas janelas definem quando o caixa sai.
+    lv, lf, _sem_data = fasear_custo_por_linhas(obra_id, admin_id, sab, dom)
+    if lv or lf:
+        meses_veks = lv
+        meses_fat = lf
+
     meses_ordenados = sorted(meses_globais)
     totais = {
         "veks": sum((e["veks"] for e in etapas.values()), Decimal("0")),
@@ -558,6 +566,34 @@ def realizado_por_etapa(obra) -> dict:
             continue
         out[osc_id] = out.get(osc_id, Decimal("0")) + Decimal(valor or 0)
     return out
+
+
+def fasear_custo_por_linhas(obra_id, admin_id, sab, dom):
+    """Distribui o valor de cada linha de custo no seu período [data_inicio, data_fim]
+    por dias úteis, agregando por mês 'YYYY-MM' e por fonte. Linhas sem datas vão para
+    `sem_data`. Retorna (meses_veks, meses_fat, sem_data)."""
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id).all()]
+    meses_veks: dict = {}
+    meses_fat: dict = {}
+    sem_data = Decimal("0")
+    if not osc_ids:
+        return meses_veks, meses_fat, sem_data
+    linhas = ObraServicoCustoItem.query.filter(
+        ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).all()
+    for l in linhas:
+        valor = Decimal(str(l.valor or 0))
+        if valor == 0:
+            continue
+        alvo = meses_fat if l.fonte == 'fat_direto' else meses_veks
+        fases = fasear_por_dias_uteis(valor, l.data_inicio, l.data_fim, sab, dom)
+        for mes, parcela in fases.items():
+            if mes == NAO_FASEADO:
+                sem_data += parcela
+                continue
+            alvo[mes] = alvo.get(mes, Decimal("0")) + parcela
+    return meses_veks, meses_fat, sem_data
 
 
 def recalcular_osc_dos_itens(osc):
