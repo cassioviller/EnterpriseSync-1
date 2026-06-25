@@ -351,3 +351,47 @@ def test_reimport_nao_duplica_orcamento_proposta():
             orcamento_id=res2['orcamento_id']).count() == 12
         assert PropostaItem.query.filter_by(
             proposta_id=res2['proposta_id']).count() == 12
+
+
+@pytest.mark.integration
+def test_importa_popula_linhas_de_custo():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    from decimal import Decimal
+    with app.app_context():
+        admin_id = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+        oscs = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=admin_id).all()
+        osc_ids = [o.id for o in oscs]
+        linhas = ObraServicoCustoItem.query.filter(
+            ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).all()
+        assert len(linhas) >= 12  # ao menos uma linha por etapa
+        soma_veks = sum(float(l.valor) for l in linhas if l.fonte == 'veks')
+        soma_fat = sum(float(l.valor) for l in linhas if l.fonte == 'fat_direto')
+        assert abs(soma_veks - 734460) < 50
+        assert abs(soma_fat - 423700) < 50
+        # agregado da OSC == soma das linhas (derivação)
+        for o in oscs:
+            v = sum(float(l.valor) for l in linhas
+                    if l.obra_servico_custo_id == o.id and l.fonte == 'veks')
+            assert abs(float(o.mao_obra_a_realizar or 0) - v) < 0.01
+
+
+@pytest.mark.integration
+def test_reimport_nao_duplica_linhas_de_custo():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    with app.app_context():
+        admin_id = _novo_admin()
+        importar_fisico_financeiro(_carregar_json(), admin_id)
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+        osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(
+            obra_id=oid, admin_id=admin_id).all()]
+        linhas = ObraServicoCustoItem.query.filter(
+            ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).count()
+        # mesma quantia das linhas de eap.itens (sem acumular do 1º import)
+        assert linhas >= 12
+        orfas = ObraServicoCustoItem.query.filter(
+            ~ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids),
+            ObraServicoCustoItem.admin_id == admin_id).count()
+        assert orfas == 0

@@ -103,7 +103,8 @@ def _limpar_derivados(obra, admin_id: int):
     from app import db
     from models import (Orcamento, OrcamentoItem, Proposta, PropostaItem,
                         ItemMedicaoComercial, ItemMedicaoCronogramaTarefa,
-                        ObraServicoCusto, TarefaCronograma, MedicaoContrato)
+                        ObraServicoCusto, ObraServicoCustoItem, TarefaCronograma,
+                        MedicaoContrato)
 
     props = Proposta.query.filter_by(obra_id=obra.id, admin_id=admin_id).all()
     prop_ids = [p.id for p in props]
@@ -124,6 +125,11 @@ def _limpar_derivados(obra, admin_id: int):
     if ids_imc:
         ItemMedicaoCronogramaTarefa.query.filter(
             ItemMedicaoCronogramaTarefa.item_medicao_id.in_(ids_imc)).delete(synchronize_session=False)
+    osc_ids_obra = [r[0] for r in db.session.query(ObraServicoCusto.id)
+                    .filter_by(obra_id=obra.id, admin_id=admin_id).all()]
+    if osc_ids_obra:
+        ObraServicoCustoItem.query.filter(
+            ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids_obra)).delete(synchronize_session=False)
     ObraServicoCusto.query.filter_by(obra_id=obra.id, admin_id=admin_id).delete(synchronize_session=False)
     ItemMedicaoComercial.query.filter_by(obra_id=obra.id).delete(synchronize_session=False)
     TarefaCronograma.query.filter_by(obra_id=obra.id, admin_id=admin_id).delete(synchronize_session=False)
@@ -296,17 +302,44 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
         osc = ObraServicoCusto.query.filter_by(
             item_medicao_comercial_id=imc.id, admin_id=admin_id).first()
         if osc is not None:
-            # valor_orcado fica como valor_comercial (venda); o CUSTO previsto
-            # vai nos *_a_realizar, classificado Veks/Fat Direto.
-            osc.mao_obra_a_realizar = info['veks']
-            osc.fonte_mao_obra = 'veks'
-            osc.material_a_realizar = info['fat']
-            osc.fonte_material = 'fat_direto'
-            osc.outros_a_realizar = Decimal('0')
+            from models import ObraServicoCustoItem
+            from services.cronograma_fisico_financeiro import recalcular_osc_dos_itens
+            # Linhas de custo (insumos) da etapa = eap.itens (cada item vira linha
+            # Veks e/ou Fat). Estas linhas são a fonte da verdade; os agregados da
+            # OSC são derivados delas.
+            ObraServicoCustoItem.query.filter_by(
+                obra_servico_custo_id=osc.id).delete(synchronize_session=False)
+            ordem = 0
+            for it in (info['etapa'].get('itens') or []):
+                nome_it = (it.get('item') or 'Item')[:200]
+                v = Decimal(str(it.get('veks') or 0))
+                f = Decimal(str(it.get('fat') or 0))
+                if v > 0:
+                    db.session.add(ObraServicoCustoItem(
+                        obra_servico_custo_id=osc.id, admin_id=admin_id,
+                        descricao=nome_it, valor=v, fonte='veks', ordem=ordem)); ordem += 1
+                if f > 0:
+                    db.session.add(ObraServicoCustoItem(
+                        obra_servico_custo_id=osc.id, admin_id=admin_id,
+                        descricao=nome_it, valor=f, fonte='fat_direto', ordem=ordem)); ordem += 1
+            if ordem == 0:
+                # Etapa sem itens detalhados no JSON → linhas do agregado.
+                if info['veks'] > 0:
+                    db.session.add(ObraServicoCustoItem(
+                        obra_servico_custo_id=osc.id, admin_id=admin_id,
+                        descricao=info['etapa']['nome'][:200], valor=info['veks'],
+                        fonte='veks', ordem=ordem)); ordem += 1
+                if info['fat'] > 0:
+                    db.session.add(ObraServicoCustoItem(
+                        obra_servico_custo_id=osc.id, admin_id=admin_id,
+                        descricao=info['etapa']['nome'][:200], valor=info['fat'],
+                        fonte='fat_direto', ordem=ordem)); ordem += 1
+            db.session.flush()
             osc.fonte_outros = 'veks'
             osc.realizado_material = 0
             osc.realizado_mao_obra = 0
             osc.realizado_outros = 0
+            recalcular_osc_dos_itens(osc)
         _materializar_cronograma_fisico(
             obra, admin_id, imc, info['etapa'], mpp, data_inicio, avisos)
 
