@@ -47,31 +47,76 @@
       ' × planilha ' + BRL(r.veks_verbatim) + ' (Δ ' + BRL(r.delta_veks) + '). ' +
       'Lucro em caixa (planilha) ' + BRL(r.lucro_em_caixa) + '. Decida 3,5 vs 5 meses dos Indiretos.</div>';
   }
+  function etapaLinhaHTML(it) {
+    var sel = function (v) { return it && it.fonte === v ? ' selected' : ''; };
+    return '<tr>' +
+      '<td><input class="form-control form-control-sm fin-it-desc" value="' +
+        ((it && it.descricao) ? String(it.descricao).replace(/"/g, '&quot;') : '') + '"></td>' +
+      '<td><input type="number" step="0.01" class="form-control form-control-sm fin-it-valor text-end" value="' +
+        (it ? Number(it.valor || 0) : 0) + '"></td>' +
+      '<td><select class="form-select form-select-sm fin-it-fonte">' +
+        '<option value="veks"' + sel('veks') + '>Veks</option>' +
+        '<option value="fat_direto"' + sel('fat_direto') + '>Fat direto</option>' +
+      '</select></td>' +
+      '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger fin-it-del p-0">&times;</button></td>' +
+    '</tr>';
+  }
   function showEtapa(et) {
     var box = el('fin-etapa-det');
-    box.innerHTML =
-      '<div class="border rounded p-3 bg-light"><div class="d-flex justify-content-between mb-2">' +
-      '<strong>' + et.nome + '</strong><span>Realizado: ' + BRL(et.realizado) + ' / Previsto: ' + BRL(et.previsto) + '</span></div>' +
-      '<div class="row g-2 align-items-end">' +
-      '<div class="col-auto"><label class="small text-muted">Veks (R$)</label>' +
-      '<input id="ed-veks" type="number" class="form-control form-control-sm" value="' + Math.round(et.veks) + '"></div>' +
-      '<div class="col-auto"><label class="small text-muted">Fat direto (R$)</label>' +
-      '<input id="ed-fat" type="number" class="form-control form-control-sm" value="' + Math.round(et.fat) + '"></div>' +
-      '<div class="col-auto"><label class="small text-muted">Orçado (R$)</label>' +
-      '<input id="ed-orc" type="number" class="form-control form-control-sm" value="' + Math.round(et.previsto) + '"></div>' +
-      '<div class="col-auto"><button id="ed-save" class="btn btn-primary btn-sm">Salvar</button></div>' +
-      '</div></div>';
     if (et.osc_id == null) {
-      box.querySelector('#ed-save').disabled = true;
-      box.insertAdjacentHTML('beforeend', '<div class="small text-muted mt-1">Etapa sem custo único vinculável — edição indisponível.</div>');
+      box.innerHTML = '<div class="border rounded p-3 bg-light"><strong>' + et.nome + '</strong>' +
+        '<div class="small text-muted mt-1">Etapa sem custo único vinculável — edição indisponível.</div></div>';
       return;
     }
-    el('ed-save').addEventListener('click', function () {
-      var fd = new FormData();
-      fd.append('veks', el('ed-veks').value || '0');
-      fd.append('fat', el('ed-fat').value || '0');
-      fd.append('valor_orcado', el('ed-orc').value || '0');
-      fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id, { method: 'POST', body: fd, headers: { 'X-CSRFToken': csrfToken() } })
+    var linhas = (et.itens || []).map(etapaLinhaHTML).join('');
+    box.innerHTML =
+      '<div class="border rounded p-3 bg-light">' +
+      '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome + '</strong>' +
+        '<span>Realizado: ' + BRL(et.realizado) + ' / Previsto: <span id="fin-it-prev">' + BRL(et.previsto) + '</span></span></div>' +
+      '<table class="table table-sm align-middle mb-2"><thead><tr>' +
+        '<th>Descrição</th><th class="text-end" style="width:140px">Valor (R$)</th>' +
+        '<th style="width:120px">Tipo</th><th style="width:32px"></th></tr></thead>' +
+      '<tbody id="fin-it-body">' + linhas + '</tbody></table>' +
+      '<div class="d-flex justify-content-between align-items-end flex-wrap gap-2">' +
+        '<button type="button" id="fin-it-add" class="btn btn-outline-secondary btn-sm">+ Adicionar linha</button>' +
+        '<div class="d-flex align-items-end gap-2">' +
+          '<div><label class="small text-muted">Orçado/venda (R$)</label>' +
+            '<input id="fin-it-orc" type="number" step="0.01" class="form-control form-control-sm" value="' + Number(et.previsto || 0) + '"></div>' +
+          '<button type="button" id="fin-it-save" class="btn btn-primary btn-sm">Salvar etapa</button>' +
+        '</div>' +
+      '</div></div>';
+
+    function recalcPrev() {
+      var total = 0;
+      box.querySelectorAll('.fin-it-valor').forEach(function (i) { total += Number(i.value || 0); });
+      el('fin-it-prev').textContent = BRL(total);
+    }
+    function bindRow(tr) {
+      tr.querySelector('.fin-it-del').addEventListener('click', function () { tr.remove(); recalcPrev(); });
+      tr.querySelector('.fin-it-valor').addEventListener('input', recalcPrev);
+    }
+    box.querySelectorAll('#fin-it-body tr').forEach(bindRow);
+    el('fin-it-add').addEventListener('click', function () {
+      var tmp = document.createElement('tbody');
+      tmp.innerHTML = etapaLinhaHTML(null);
+      var tr = tmp.firstChild;
+      el('fin-it-body').appendChild(tr);
+      bindRow(tr);
+    });
+    el('fin-it-save').addEventListener('click', function () {
+      var itens = [];
+      box.querySelectorAll('#fin-it-body tr').forEach(function (tr) {
+        itens.push({
+          descricao: tr.querySelector('.fin-it-desc').value,
+          valor: tr.querySelector('.fin-it-valor').value || '0',
+          fonte: tr.querySelector('.fin-it-fonte').value
+        });
+      });
+      fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/itens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body: JSON.stringify({ itens: itens, valor_orcado: el('fin-it-orc').value || '0' })
+      })
         .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(function (p) { render(p); box.innerHTML = '<div class="text-success small">Salvo e recalculado.</div>'; })
         .catch(function () { box.innerHTML = '<div class="text-danger small">Falha ao salvar.</div>'; });
