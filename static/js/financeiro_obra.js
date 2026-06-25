@@ -58,6 +58,10 @@
         '<option value="veks"' + sel('veks') + '>Veks</option>' +
         '<option value="fat_direto"' + sel('fat_direto') + '>Fat direto</option>' +
       '</select></td>' +
+      '<td><input type="date" class="form-control form-control-sm fin-it-ini" value="' +
+        ((it && it.data_inicio) ? String(it.data_inicio).slice(0, 10) : '') + '"></td>' +
+      '<td><input type="date" class="form-control form-control-sm fin-it-fim" value="' +
+        ((it && it.data_fim) ? String(it.data_fim).slice(0, 10) : '') + '"></td>' +
       '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger fin-it-del p-0">&times;</button></td>' +
     '</tr>';
   }
@@ -74,8 +78,9 @@
       '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome + '</strong>' +
         '<span>Realizado: ' + BRL(et.realizado) + ' / Previsto: <span id="fin-it-prev">' + BRL(et.previsto) + '</span></span></div>' +
       '<table class="table table-sm align-middle mb-2"><thead><tr>' +
-        '<th>Descrição</th><th class="text-end" style="width:140px">Valor (R$)</th>' +
-        '<th style="width:120px">Tipo</th><th style="width:32px"></th></tr></thead>' +
+        '<th>Descrição</th><th class="text-end" style="width:130px">Valor (R$)</th>' +
+        '<th style="width:110px">Tipo</th><th style="width:150px">Desembolso de</th>' +
+        '<th style="width:150px">até</th><th style="width:32px"></th></tr></thead>' +
       '<tbody id="fin-it-body">' + linhas + '</tbody></table>' +
       '<div class="d-flex justify-content-between align-items-end flex-wrap gap-2">' +
         '<button type="button" id="fin-it-add" class="btn btn-outline-secondary btn-sm">+ Adicionar linha</button>' +
@@ -109,7 +114,9 @@
         itens.push({
           descricao: tr.querySelector('.fin-it-desc').value,
           valor: tr.querySelector('.fin-it-valor').value || '0',
-          fonte: tr.querySelector('.fin-it-fonte').value
+          fonte: tr.querySelector('.fin-it-fonte').value,
+          data_inicio: tr.querySelector('.fin-it-ini').value || '',
+          data_fim: tr.querySelector('.fin-it-fim').value || ''
         });
       });
       fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/itens', {
