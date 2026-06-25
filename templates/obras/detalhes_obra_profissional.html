@@ -4,34 +4,67 @@
 
 {% block head %}
 <style>
-/* Detalhes da Obra - Estilo Profissional Moderno */
+/* ════════════════════════════════════════════════════════════════════
+   Detalhes da Obra — sistema de design (impeccable, register: product)
+   Light-only, institucional, brand azul. Neutros tingidos em OKLCH.
+   Sem gradientes decorativos, sem hover-lift, sem brilho. Preciso, robusto.
+   ════════════════════════════════════════════════════════════════════ */
 .obra-container {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    /* neutros tingidos para o azul da marca */
+    --ink:        oklch(0.28 0.025 255);   /* texto principal  */
+    --ink-2:      oklch(0.45 0.02 255);    /* texto secundário */
+    --ink-3:      oklch(0.60 0.015 255);   /* muted / labels   */
+    --line:       oklch(0.91 0.012 255);   /* borda hairline   */
+    --line-2:     oklch(0.95 0.008 255);   /* divisória leve   */
+    --surface:    oklch(0.995 0.002 255);  /* card             */
+    --surface-2:  oklch(0.975 0.005 255);  /* cabeçalho/painel */
+    --page:       oklch(0.965 0.006 255);  /* fundo da página  */
+
+    --brand:      oklch(0.58 0.20 256);    /* azul institucional ~#0d6efd */
+    --brand-700:  oklch(0.50 0.19 256);    /* hover/active     */
+    --brand-050:  oklch(0.96 0.025 256);   /* superfície tênue */
+    --brand-ink:  oklch(0.30 0.10 256);    /* texto sobre tênue */
+
+    /* acentos semânticos de seção (a cor codifica o tipo do bloco) */
+    --c-success:  oklch(0.60 0.14 150);
+    --c-info:     oklch(0.62 0.13 235);
+    --c-warning:  oklch(0.70 0.15 75);
+    --c-danger:   oklch(0.58 0.18 25);
+    --c-teal:     oklch(0.58 0.10 195);
+    --c-violet:   oklch(0.56 0.16 290);
+
+    --radius:     10px;
+    --shadow:     0 1px 2px oklch(0.45 0.03 255 / 0.06), 0 1px 3px oklch(0.45 0.03 255 / 0.05);
+    --shadow-md:  0 2px 8px oklch(0.45 0.03 255 / 0.07);
+
+    background: var(--page);
     min-height: 100vh;
-    padding: 2rem 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 1.75rem 0;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
 .obra-card {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    border: none;
-    margin-bottom: 2rem;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--line);
+    margin-bottom: 1.5rem;
     overflow: hidden;
-    transition: all 0.3s ease;
 }
 
-.obra-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-}
+/* superfícies de trabalho não saltam ao passar o mouse */
+.obra-card:hover { box-shadow: var(--shadow-md); }
 
 .obra-card-header {
-    background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
-    color: white;
-    padding: 1.5rem 2rem;
+    /* acento semântico via --accent (default = marca); cabeçalho claro, texto escuro */
+    --accent: var(--brand);
+    background: var(--surface-2);
+    color: var(--ink);
+    padding: 1rem 1.5rem;
     border: none;
+    border-top: 3px solid var(--accent);
+    border-bottom: 1px solid var(--line);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -39,31 +72,21 @@
 
 .obra-card-header h3 {
     margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.6rem;
 }
+.obra-card-header h3 i { color: var(--accent); }
 
 .obra-header-main {
-    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-    color: white;
-    padding: 3rem 2rem 2.5rem 2rem;
-    margin: -15px -15px 2rem -15px;
+    background: var(--brand-700);
+    color: #fff;
+    padding: 2.25rem 2rem 2rem 2rem;
+    margin: -15px -15px 1.5rem -15px;
     position: relative;
-    overflow: hidden;
-}
-
-.obra-header-main::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 100%;
-    height: 100%;
-    background: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="80" cy="20" r="20" fill="rgba(255,255,255,0.1)"/><circle cx="90" cy="70" r="15" fill="rgba(255,255,255,0.05)"/></svg>');
-    z-index: 1;
 }
 
 .obra-header-content {
@@ -72,15 +95,15 @@
 }
 
 .obra-title {
-    font-size: 2.2rem;
+    font-size: 2rem;
     font-weight: 700;
+    letter-spacing: -0.02em;
     margin: 0 0 0.5rem 0;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .obra-subtitle {
-    font-size: 1.1rem;
-    opacity: 0.9;
+    font-size: 1rem;
+    color: oklch(1 0 0 / 0.88);
     margin: 0;
     display: flex;
     align-items: center;
@@ -89,37 +112,40 @@
 }
 
 .status-badge {
-    padding: 0.5rem 1rem;
-    border-radius: 25px;
+    padding: 0.35rem 0.85rem;
+    border-radius: 50rem;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    gap: 0.45rem;
+    letter-spacing: 0.02em;
+    background: oklch(1 0 0 / 0.14);
+    color: #fff;
+    border: 1px solid oklch(1 0 0 / 0.35);
 }
+.status-badge i { font-size: 0.6rem; }
 
-.status-em-andamento { background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 2px solid #22c55e; }
-.status-concluida { background: rgba(59, 130, 246, 0.2); color: #3b82f6; border: 2px solid #3b82f6; }
-.status-pausada { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 2px solid #fbbf24; }
-.status-planejamento { background: rgba(156, 163, 175, 0.2); color: #9ca3af; border: 2px solid #9ca3af; }
+.status-em-andamento i { color: oklch(0.88 0.16 150); }
+.status-concluida i    { color: oklch(0.85 0.10 235); }
+.status-pausada i      { color: oklch(0.88 0.15 90); }
+.status-planejamento i { color: oklch(0.90 0.01 255); }
 
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .kpi-card {
-    background: white;
-    border-radius: 16px;
-    padding: 1.5rem;
+    --kpi-color: var(--brand);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.35rem;
     text-align: center;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    border: 1px solid rgba(0,0,0,0.05);
-    transition: all 0.3s ease;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--line);
     position: relative;
     overflow: hidden;
 }
@@ -130,34 +156,30 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--kpi-color, #198754), var(--kpi-color-light, #20c997));
-}
-
-.kpi-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    height: 3px;
+    background: var(--kpi-color);
 }
 
 .kpi-icon {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--kpi-color, #198754);
+    font-size: 1.9rem;
+    margin-bottom: 0.6rem;
+    color: var(--kpi-color);
 }
 
 .kpi-value {
-    font-size: 2rem;
+    font-size: 1.7rem;
     font-weight: 700;
-    color: #1a202c;
-    margin: 0.5rem 0;
+    color: var(--ink);
+    margin: 0.35rem 0;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
 }
 
 .kpi-label {
-    font-size: 0.9rem;
-    color: #64748b;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 0.78rem;
+    color: var(--ink-3);
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .info-grid {
@@ -168,8 +190,8 @@
 }
 
 .info-item {
-    padding: 1rem 0;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--line-2);
 }
 
 .info-item:last-child {
@@ -178,135 +200,114 @@
 
 .info-label {
     font-weight: 600;
-    color: #374151;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.5rem;
+    color: var(--ink-2);
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
+    margin-bottom: 0.4rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
+.info-label i { color: var(--ink-3); }
 
 .info-value {
-    font-size: 1.1rem;
-    color: #1a202c;
+    font-size: 1.05rem;
+    color: var(--ink);
     font-weight: 500;
 }
 
 .progress-container {
-    background: #f8fafc;
-    border-radius: 12px;
-    padding: 1.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
     margin: 1.5rem 0;
 }
 
 .progress-header {
     display: flex;
-    justify-content: between;
+    justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
 }
 
 .progress-bar {
-    height: 12px;
-    background: #e2e8f0;
-    border-radius: 6px;
+    height: 10px;
+    background: var(--line);
+    border-radius: 50rem;
     overflow: hidden;
     position: relative;
 }
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #22c55e, #16a34a);
-    border-radius: 6px;
-    transition: width 0.5s ease;
-    position: relative;
-}
-
-.progress-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    background: var(--c-success);
+    border-radius: 50rem;
+    transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .action-buttons {
     display: flex;
-    gap: 1rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
     margin-top: 1.5rem;
 }
 
 .btn-modern {
-    padding: 0.75rem 1.5rem;
-    border-radius: 12px;
+    padding: 0.55rem 1.1rem;
+    border-radius: 8px;
     font-weight: 600;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    transition: all 0.3s ease;
-    border: none;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    border: 1px solid transparent;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+}
+.btn-modern:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
 }
 
+/* ação primária sólida sobre a faixa azul do cabeçalho = branco translúcido */
 .btn-primary-modern {
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-    color: white;
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    background: #fff;
+    color: var(--brand-700);
 }
-
 .btn-primary-modern:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-    color: white;
+    background: var(--brand-050);
+    color: var(--brand-700);
 }
 
 .btn-success-modern {
-    background: linear-gradient(135deg, #22c55e, #16a34a);
-    color: white;
-    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+    background: var(--c-success);
+    color: #fff;
 }
-
 .btn-success-modern:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
-    color: white;
+    background: oklch(0.54 0.14 150);
+    color: #fff;
 }
 
 .btn-warning-modern {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    color: white;
-    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+    background: oklch(1 0 0 / 0.16);
+    color: #fff;
+    border-color: oklch(1 0 0 / 0.4);
 }
-
 .btn-warning-modern:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
-    color: white;
+    background: oklch(1 0 0 / 0.26);
+    color: #fff;
 }
 
 .btn-outline-modern {
-    background: white;
-    color: #6b7280;
-    border: 2px solid #e5e7eb;
+    background: oklch(1 0 0 / 0.1);
+    color: #fff;
+    border: 1px solid oklch(1 0 0 / 0.4);
 }
-
 .btn-outline-modern:hover {
-    background: #f9fafb;
-    border-color: #d1d5db;
-    transform: translateY(-1px);
+    background: oklch(1 0 0 / 0.2);
+    color: #fff;
 }
 
 .timeline-container {
@@ -334,12 +335,12 @@
     position: absolute;
     left: -1.5rem;
     top: 1.5rem;
-    width: 12px;
-    height: 12px;
-    background: #22c55e;
+    width: 11px;
+    height: 11px;
+    background: var(--c-success);
     border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 0 0 3px #22c55e;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 2px var(--c-success);
 }
 
 .funcionarios-grid {
@@ -350,18 +351,18 @@
 }
 
 .funcionario-card {
-    background: white;
-    border-radius: 12px;
+    background: var(--surface);
+    border-radius: var(--radius);
     padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--line);
     text-align: center;
-    transition: all 0.3s ease;
+    transition: box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .funcionario-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-md);
+    border-color: var(--brand);
 }
 
 .header-actions {
@@ -375,61 +376,64 @@
 }
 
 .funcionario-avatar {
-    width: 60px;
-    height: 60px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    background: var(--brand-050);
+    color: var(--brand-700);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 1rem;
-    color: white;
-    font-size: 1.5rem;
-    font-weight: bold;
+    margin: 0 auto 0.85rem;
+    font-size: 1.4rem;
+    font-weight: 700;
 }
 
 .table-modern {
-    background: white;
-    border-radius: 12px;
+    background: var(--surface);
+    border-radius: var(--radius);
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
 }
 
 .table-modern thead {
-    background: linear-gradient(135deg, #1f2937, #374151);
-    color: white;
+    background: var(--surface-2);
+    color: var(--ink-2);
 }
 
 .table-modern th {
-    padding: 1rem;
+    padding: 0.7rem 1rem;
     font-weight: 600;
     border: none;
-    font-size: 0.9rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .table-modern td {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     border: none;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--line-2);
     vertical-align: middle;
 }
+.table-modern tbody tr:last-child td { border-bottom: none; }
 
 .table-modern tbody tr:hover {
-    background: #f9fafb;
+    background: var(--surface-2);
 }
 
 .empty-state {
     text-align: center;
     padding: 3rem 2rem;
-    color: #6b7280;
+    color: var(--ink-3);
 }
 
 .empty-state i {
-    font-size: 4rem;
+    font-size: 3rem;
     margin-bottom: 1rem;
-    opacity: 0.5;
+    opacity: 0.55;
 }
 
 @media (max-width: 768px) {
@@ -462,47 +466,46 @@
 
 /* ============== ABAS DE DETALHES DA OBRA ============== */
 .obra-tabs-wrapper {
-    background: #ffffff;
+    background: var(--surface);
     margin-top: 1rem;
-    border-radius: 10px 10px 0 0;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    border-radius: var(--radius) var(--radius) 0 0;
+    box-shadow: var(--shadow);
     position: relative;
     z-index: 2;
 }
 .obra-nav-tabs {
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 1px solid var(--line);
     flex-wrap: wrap;
-    gap: 0.25rem;
-    background: #ffffff;
-    border-radius: 10px 10px 0 0;
+    gap: 0.15rem;
+    background: transparent;
 }
 .obra-nav-tabs .nav-link {
-    color: #475569;
+    color: var(--ink-2);
     font-weight: 600;
-    border: 1px solid transparent;
-    border-bottom: 3px solid transparent;
-    border-radius: 8px 8px 0 0;
-    padding: 0.75rem 1.25rem;
-    background: #f8fafc;
-    transition: all 0.25s ease;
-    font-size: 0.95rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 0.7rem 1.15rem;
+    background: transparent;
+    transition: color 0.18s ease, border-color 0.18s ease;
+    font-size: 0.92rem;
 }
 .obra-nav-tabs .nav-link:hover {
-    color: #0066cc;
-    background: #eef4ff;
-    border-color: #e2e8f0;
-    border-bottom-color: transparent;
+    color: var(--brand);
+    border-bottom-color: var(--line);
 }
 .obra-nav-tabs .nav-link.active {
-    color: #0066cc;
-    background: #ffffff;
-    border-color: #e2e8f0;
-    border-bottom: 3px solid #0066cc;
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+    color: var(--brand);
+    background: transparent;
+    border-bottom: 2px solid var(--brand);
+}
+.obra-nav-tabs .nav-link:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+    border-radius: 4px;
 }
 .obra-tab-content {
-    background: #ffffff;
-    border-radius: 0 0 10px 10px;
+    background: transparent;
     padding-top: 1.25rem;
     position: relative;
     z-index: 1;
@@ -546,10 +549,10 @@
     align-items: stretch;
 }
 .bloco-info-combinado > .info-coluna {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border: 1px solid #e2e8f0;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--line);
     padding: 1.1rem 1.25rem;
     display: flex;
     flex-direction: column;
@@ -557,15 +560,15 @@
 .bloco-info-combinado .info-coluna h4 {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #1e293b;
+    color: var(--ink);
     margin: 0 0 0.75rem 0;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid #f1f5f9;
+    border-bottom: 1px solid var(--line);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
-.bloco-info-combinado .info-coluna h4 i { color: #0066cc; }
+.bloco-info-combinado .info-coluna h4 i { color: var(--brand); }
 .bloco-info-combinado .info-coluna .info-item {
     grid-template-columns: minmax(140px, 170px) 1fr;
     padding: 0.5rem 0;
@@ -747,10 +750,10 @@
 .obra-tab-content .empty-state-compact {
     text-align: center;
     padding: 1.75rem 1rem;
-    color: #94a3b8;
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    border-radius: 12px;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius);
 }
 .obra-tab-content .empty-state-compact i {
     font-size: 2rem;
@@ -933,7 +936,7 @@
         {% set i = resumo.indicadores %}
         <div class="obra-card" style="padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 0.75rem;">
-                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.6rem;">
+                <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 0.6rem;">
                     <i class="fas fa-calculator" style="color: #8b5cf6;"></i>
                     Resumo de Custos da Obra
                 </h3>
@@ -959,11 +962,11 @@
                 ] %}
                 {% for label, val, cor, icon in cards %}
                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                    <div style="background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid {{ cor }}; border-radius: 8px; padding: 0.65rem 0.85rem; height: 100%;">
-                        <div style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">
+                    <div style="background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.9rem; height: 100%;">
+                        <div style="color: var(--ink-3); font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;">
                             <i class="fas {{ icon }} me-1" style="color: {{ cor }};"></i>{{ label }}
                         </div>
-                        <div style="color: {{ cor }}; font-size: 1.05rem; font-weight: 700; margin-top: 0.2rem;">
+                        <div style="color: {{ cor }}; font-size: 1.05rem; font-weight: 700; margin-top: 0.2rem; font-variant-numeric: tabular-nums;">
                             R$ {{ '{:,.2f}'.format(val|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
                         </div>
                     </div>
@@ -981,7 +984,7 @@
 
         <div class="painel-estrategico obra-card" style="padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;">
             <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap" style="gap: 0.75rem;">
-                <h3 style="margin: 0; font-size: 1.35rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 0.6rem;">
+                <h3 style="margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 0.6rem;">
                     <i class="fas fa-chart-line" style="color: #0066cc;"></i>
                     Painel Estratégico
                 </h3>
@@ -1123,7 +1126,7 @@
                     {% if entregas_detalhe and entregas_detalhe|length > 0 %}
                     <div id="card-entregas-terceiros" style="margin-top: 1.5rem; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem;">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <h4 style="font-size: 1rem; font-weight: 700; color: var(--ink); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                                 <i class="fas fa-truck-loading" style="color: #6366f1;"></i> Entregas / Terceiros — Alertas por urgência
                             </h4>
                             <span class="text-muted small">Ordenado por urgência</span>
@@ -1136,7 +1139,7 @@
                                 <i class="fas {{ sn.icon }}" style="color: {{ sn.border }}; font-size: 1.4rem; margin-top: 2px; flex-shrink: 0;"></i>
                                 <div style="flex: 1; min-width: 0;">
                                     <div class="d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
-                                        <span style="font-weight: 700; color: #1e293b;">{{ ent.nome }}</span>
+                                        <span style="font-weight: 700; color: var(--ink);">{{ ent.nome }}</span>
                                         <span style="background: {{ sn.bg }}; color: {{ sn.text }}; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">{{ ent.nivel }}</span>
                                     </div>
                                     <div style="color: {{ sn.text }}; font-weight: 600; font-size: 0.9rem; margin-top: 4px;">
@@ -1161,8 +1164,8 @@
         <!-- /painel-estrategico -->
 
         <style>
-            .semaforo-card:hover { transform: translateX(4px); }
-            .painel-estrategico { background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+            .semaforo-card { transition: border-color 0.18s ease; }
+            .painel-estrategico { background: var(--surface, #fff); border-radius: var(--radius, 10px); box-shadow: var(--shadow, 0 1px 3px rgba(0,0,0,0.06)); border: 1px solid var(--line, #e9ecef); }
         </style>
 
         <script>
@@ -1670,7 +1673,7 @@
 
         <!-- Dashboard de Custos de Mão de Obra -->
         <div class="obra-card">
-            <div class="obra-card-header" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">
+            <div class="obra-card-header" style="--accent: var(--c-success);">
                 <h3>
                     <i class="fas fa-users-cog"></i> Dashboard de Custos de Mão de Obra
                     {% if dados_folha and dados_folha.totais.total_funcionarios > 0 %}
@@ -1683,10 +1686,10 @@
                 <!-- KPIs de Mão de Obra -->
                 <div class="row mb-4">
                     <div class="col-md-3 mb-3">
-                        <div class="kpi-card" style="border-left: 4px solid #059669;">
+                        <div class="kpi-card" style="--kpi-color: var(--c-success); text-align: left;">
                             <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #059669 0%, #047857 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-dollar-sign" style="color: white; font-size: 1.5rem;"></i>
+                                <div style="width: 48px; height: 48px; background: oklch(0.95 0.05 150); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-dollar-sign" style="color: var(--c-success); font-size: 1.35rem;"></i>
                                 </div>
                                 <div style="text-align: left;">
                                     <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Custo Total Mão de Obra</h6>
@@ -1700,10 +1703,10 @@
                     </div>
                     
                     <div class="col-md-3 mb-3">
-                        <div class="kpi-card" style="border-left: 4px solid #3b82f6;">
+                        <div class="kpi-card" style="--kpi-color: var(--brand); text-align: left;">
                             <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-clock" style="color: white; font-size: 1.5rem;"></i>
+                                <div style="width: 48px; height: 48px; background: var(--brand-050); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-clock" style="color: var(--brand); font-size: 1.35rem;"></i>
                                 </div>
                                 <div style="text-align: left;">
                                     <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Total de Horas</h6>
@@ -1717,10 +1720,10 @@
                     </div>
                     
                     <div class="col-md-3 mb-3">
-                        <div class="kpi-card" style="border-left: 4px solid #8b5cf6;">
+                        <div class="kpi-card" style="--kpi-color: var(--c-violet); text-align: left;">
                             <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-chart-line" style="color: white; font-size: 1.5rem;"></i>
+                                <div style="width: 48px; height: 48px; background: oklch(0.95 0.05 290); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-chart-line" style="color: var(--c-violet); font-size: 1.35rem;"></i>
                                 </div>
                                 <div style="text-align: left;">
                                     <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">Custo Médio/Hora</h6>
@@ -1734,10 +1737,10 @@
                     </div>
                     
                     <div class="col-md-3 mb-3">
-                        <div class="kpi-card" style="border-left: 4px solid #f59e0b;">
+                        <div class="kpi-card" style="--kpi-color: var(--c-warning); text-align: left;">
                             <div style="display: flex; align-items: center; gap: 1rem;">
-                                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-percentage" style="color: white; font-size: 1.5rem;"></i>
+                                <div style="width: 48px; height: 48px; background: oklch(0.96 0.05 75); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-percentage" style="color: var(--c-warning); font-size: 1.35rem;"></i>
                                 </div>
                                 <div style="text-align: left;">
                                     <h6 style="margin: 0; color: #6b7280; font-size: 0.85rem;">% Horas Extras</h6>
@@ -1806,7 +1809,7 @@
                                 <tr>
                                     <td>
                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.8rem;">
+                                            <div style="width: 32px; height: 32px; background: var(--brand-050); color: var(--brand-700); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem;">
                                                 {{ func.nome[0]|upper }}
                                             </div>
                                             {{ func.nome }}
@@ -1983,7 +1986,7 @@
 
         <!-- Compras para Aprovação do Cliente -->
         <div class="obra-card" id="card-compras" style="scroll-margin-top: 80px;">
-            <div class="obra-card-header" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+            <div class="obra-card-header" style="--accent: var(--c-info);">
                 <h3><i class="fas fa-shopping-cart"></i> Compras para Aprovação</h3>
                 <div class="header-actions">
                     <span class="badge bg-light text-dark ms-2">{{ pedidos_compra_obra|length if pedidos_compra_obra else 0 }}</span>
@@ -2076,7 +2079,7 @@
         <div class="tab-pane fade" id="tab-cronograma" role="tabpanel">
 
         <div class="obra-card" id="card-cronograma" style="scroll-margin-top: 80px;">
-            <div class="obra-card-header" style="background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
+            <div class="obra-card-header" style="--accent: var(--c-teal);">
                 <h3><i class="fas fa-calendar-alt"></i> Cronograma do Cliente</h3>
                 <div class="ms-auto d-flex align-items-center gap-2">
                     <span class="badge bg-light text-dark">{{ cronograma_cliente_items|length if cronograma_cliente_items else 0 }} tarefa(s)</span>
@@ -2194,7 +2197,7 @@
         <div class="tab-pane fade" id="tab-mapa" role="tabpanel">
 
         <div class="obra-card">
-            <div class="obra-card-header" style="background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);">
+            <div class="obra-card-header" style="--accent: var(--c-violet);">
                 <h3><i class="fas fa-table"></i> Mapa de Concorrência</h3>
                 <div class="ms-auto d-flex align-items-center gap-2">
                     <span class="badge bg-light text-dark">{{ mapas_v2|length if mapas_v2 else 0 }}</span>
@@ -2253,7 +2256,7 @@
 <div class="modal fade" id="modalNovaCompraObra" tabindex="-1" aria-labelledby="modalNovaCompraObraLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+            <div class="modal-header text-white" style="background: var(--brand-700, #0a58ca);">
                 <h5 class="modal-title" id="modalNovaCompraObraLabel">
                     <i class="fas fa-shopping-cart me-2"></i>
                     Nova Compra para Aprovação — {{ obra.nome }}
@@ -2751,9 +2754,9 @@ function compraObraRemoverItem(btn) {
     box-shadow: 0 1px 3px rgba(0,0,0,.18); display: flex; align-items: center;
     color: #fff; font-size: .7rem; font-weight: 600;
 }
-.ccg-bar-leaf { background: linear-gradient(90deg,#0ea5e9,#38bdf8); }
-.ccg-bar-done { background: linear-gradient(90deg,#16a34a,#22c55e); }
-.ccg-bar-low  { background: linear-gradient(90deg,#94a3b8,#cbd5e1); color: #1f2937; }
+.ccg-bar-leaf { background: var(--c-info, #0d6efd); }
+.ccg-bar-done { background: var(--c-success, #198754); }
+.ccg-bar-low  { background: oklch(0.78 0.02 255); color: #1f2937; }
 .ccg-progress { height: 100%; background: rgba(255,255,255,.3); }
 .ccg-bar-label { position: relative; z-index: 2; padding-left: 6px; text-shadow: 0 1px 1px rgba(0,0,0,.25); }
 .ccg-today { position: absolute; top: 0; bottom: 0; width: 2px; background: #e53935; z-index: 5; pointer-events: none; }
@@ -2781,7 +2784,7 @@ function compraObraRemoverItem(btn) {
 <div class="modal fade" id="modalNovoMapaV2" tabindex="-1" aria-labelledby="modalNovoMapaV2Label" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;">
+            <div class="modal-header" style="background: var(--brand-700, #0a58ca); color:#fff;">
                 <h5 class="modal-title" id="modalNovoMapaV2Label">
                     <i class="fas fa-table me-2"></i>Novo Mapa de Concorrência
                 </h5>
