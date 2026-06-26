@@ -3,7 +3,7 @@
 {% macro render_cron_node(node, level=0) -%}
 {%- set pc = node.percentual_apresentacao or 0 -%}
 {%- if node.filhos -%}
-<details class="cron-node" data-level="{{ level }}" {% if level < 2 %}open{% endif %}>
+<details class="cron-node" data-level="{{ level }}">
     <summary>
         <span class="cron-caret"><i class="fas fa-chevron-right"></i></span>
         <div class="timeline-name">
