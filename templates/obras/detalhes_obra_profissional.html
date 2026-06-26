@@ -1523,7 +1523,8 @@
              ABA: FINANCEIRO
              ═══════════════════════════════════════════════════════════════ -->
 <div class="tab-pane fade" id="tab-financeiro" role="tabpanel"
-     data-obra-id="{{ obra.id }}" data-endpoint="{{ url_for('main.financeiro_dados', id=obra.id) }}">
+     data-obra-id="{{ obra.id }}" data-endpoint="{{ url_for('main.financeiro_dados', id=obra.id) }}"
+     data-config-endpoint="{{ url_for('main.financeiro_config', id=obra.id) }}">
   <div id="fin-loading" class="text-muted py-4">Carregando painel financeiro…</div>
   <div id="fin-painel" style="display:none">
 
@@ -1545,6 +1546,25 @@
         <div id="fin-kpi-custo"></div>
       </div></div></div>
     </div>
+
+    <!-- Configuração: competência do faturamento direto -->
+    <div class="card mb-4"><div class="card-body py-2">
+      <div class="row align-items-center g-2">
+        <div class="col-md-7">
+          <label for="fin-fat-competencia" class="fw-bold mb-0">
+            <i class="fas fa-calendar-alt me-1"></i>Abatimento do faturamento direto</label>
+          <div class="small text-muted">
+            Em qual medição o faturamento direto desconta a base de imposto/entrada.</div>
+        </div>
+        <div class="col-md-5">
+          <select id="fin-fat-competencia" class="form-select form-select-sm">
+            <option value="seguinte">Próxima competência (abate na medição seguinte)</option>
+            <option value="mesma">Mesma competência (abate na própria medição)</option>
+          </select>
+          <div id="fin-fat-competencia-msg" class="small text-muted mt-1" style="display:none"></div>
+        </div>
+      </div>
+    </div></div>
 
     <!-- Custo por etapa -->
     <div class="card mb-4"><div class="card-body">

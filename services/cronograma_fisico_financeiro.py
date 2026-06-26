@@ -124,19 +124,28 @@ def classificar_veks_fat(material, mao_obra, outros,
     return veks, fat
 
 
-def calcular_fluxo_caixa(meses, medicao, fat_direto, gasto_veks, imposto_pct):
-    """Modelo de caixa derivado. Dicts mes->Decimal. O fat_direto abate no
-    PERÍODO SEGUINTE (regra da Planilha1): cada mês usa o fat_direto do mês
-    anterior, e o imposto incide sobre (medição − fat anterior).
+def calcular_fluxo_caixa(meses, medicao, fat_direto, gasto_veks, imposto_pct,
+                         fat_competencia="seguinte"):
+    """Modelo de caixa derivado. Dicts mes->Decimal. `fat_competencia` controla
+    em qual período o faturamento direto abate a base de imposto/entrada:
+      - "seguinte" (padrão, regra da Planilha1): cada mês usa o fat_direto do mês
+        ANTERIOR — o desconto escorrega para o período seguinte.
+      - "mesma": o fat_direto abate na PRÓPRIA medição (mesma competência),
+        reduzindo o imposto no período a que pertence (inclusive o último).
+    Em ambos os casos o imposto incide sobre (medição − fat abatido).
     Retorna {linhas:[...], lucro_em_caixa}."""
     imposto_pct = Decimal(imposto_pct)
+    mesma = (fat_competencia == "mesma")
     fat_anterior = Decimal("0")
     caixa_final_anterior = None
     linhas = []
     for m in meses:
         med = Decimal(medicao.get(m, 0) or 0)
-        imp = ((med - fat_anterior) * imposto_pct).quantize(CENTAVO, ROUND_HALF_UP)
-        entrada = (med - fat_anterior - imp).quantize(CENTAVO, ROUND_HALF_UP)
+        fat_mes = Decimal(fat_direto.get(m, 0) or 0)
+        # valor de fat_direto que abate NESTE período
+        fat_abatido = fat_mes if mesma else fat_anterior
+        imp = ((med - fat_abatido) * imposto_pct).quantize(CENTAVO, ROUND_HALF_UP)
+        entrada = (med - fat_abatido - imp).quantize(CENTAVO, ROUND_HALF_UP)
         if caixa_final_anterior is None:
             caixa_ini = entrada
         else:
@@ -144,11 +153,11 @@ def calcular_fluxo_caixa(meses, medicao, fat_direto, gasto_veks, imposto_pct):
         veks = Decimal(gasto_veks.get(m, 0) or 0)
         caixa_fim = (caixa_ini - veks).quantize(CENTAVO, ROUND_HALF_UP)
         linhas.append({
-            "mes": m, "medicao": med, "fat_anterior": fat_anterior,
+            "mes": m, "medicao": med, "fat_anterior": fat_abatido,
             "imposto": imp, "entrada": entrada,
             "caixa_inicial": caixa_ini, "gasto_veks": veks, "caixa_final": caixa_fim,
         })
-        fat_anterior = Decimal(fat_direto.get(m, 0) or 0)
+        fat_anterior = fat_mes
         caixa_final_anterior = caixa_fim
     return {
         "linhas": linhas,
@@ -382,6 +391,14 @@ def _imposto_pct(obra):
     return Decimal(str(val or "0.135"))
 
 
+def _fat_competencia(obra):
+    """Competência do abatimento do faturamento direto: 'seguinte' (padrão, abate
+    no período seguinte) ou 'mesma' (abate na própria medição)."""
+    snap = obra.fluxo_caixa_planilha or {}
+    val = snap.get("fat_competencia") if isinstance(snap, dict) else None
+    return "mesma" if val == "mesma" else "seguinte"
+
+
 def fluxo_caixa(obra, dados=None):
     """Fluxo de caixa recalculado: medições (por mês) + Veks/Fat faseados pelo
     cronograma. imposto_pct vem do snapshot/contrato (default 0.135)."""
@@ -391,7 +408,8 @@ def fluxo_caixa(obra, dados=None):
     fat = {k: Decimal(v) for k, v in dados["meses_fat"].items()}
     meses = sorted(set(medicao) | set(veks) | set(fat))
     imposto_pct = _imposto_pct(obra)
-    res = calcular_fluxo_caixa(meses, medicao, fat, veks, imposto_pct)
+    res = calcular_fluxo_caixa(meses, medicao, fat, veks, imposto_pct,
+                               fat_competencia=_fat_competencia(obra))
     res["meses"] = meses
     return res
 
@@ -535,6 +553,7 @@ def painel_financeiro(obra) -> dict:
         "medicoes": meds,
         "doughnut": {"veks": dados["totais"]["veks"], "fat": dados["totais"]["fat_direto"]},
         "divergencia": div,
+        "config": {"fat_competencia": _fat_competencia(obra)},
     }
 
 

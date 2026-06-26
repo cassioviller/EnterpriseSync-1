@@ -2109,6 +2109,30 @@ def financeiro_dados(id):
     return jsonify(_jsonable(painel_financeiro(obra)))
 
 
+@main_bp.route('/obras/<int:id>/financeiro/config', methods=['POST'])
+@login_required
+@capture_db_errors
+def financeiro_config(id):
+    """Salva configurações por obra do painel físico-financeiro. Por enquanto:
+    `fat_competencia` ('seguinte'|'mesma') — em qual período o faturamento direto
+    abate a base de imposto/entrada. Guardado no snapshot fluxo_caixa_planilha."""
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+
+    payload = request.get_json(silent=True) or {}
+    comp = payload.get('fat_competencia')
+    if comp not in ('seguinte', 'mesma'):
+        return jsonify({'erro': 'fat_competencia inválido'}), 400
+
+    # JSON column: copia o dict para o SQLAlchemy detectar a mudança.
+    snap = dict(obra.fluxo_caixa_planilha or {})
+    snap['fat_competencia'] = comp
+    obra.fluxo_caixa_planilha = snap
+    db.session.commit()
+    return jsonify(_jsonable(painel_financeiro(obra)))
+
+
 @main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>/itens', methods=['POST'])
 @login_required
 @capture_db_errors

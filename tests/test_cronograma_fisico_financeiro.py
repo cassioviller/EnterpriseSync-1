@@ -157,6 +157,32 @@ def test_caixa_fat_do_periodo_anterior():
     assert jul["entrada"] == D("51900.00")
 
 
+def test_caixa_fat_mesma_competencia_abate_no_proprio_periodo():
+    """Modo 'mesma': o fat_direto abate na própria medição (mesma competência),
+    inclusive no último período — pagando menos imposto que o modo 'seguinte'."""
+    meses = ["2026-07", "2026-08"]
+    med = {"2026-07": D("100000"), "2026-08": D("100000")}
+    fat = {"2026-07": D("40000"), "2026-08": D("30000")}  # fat também no último mês
+    veks = {"2026-07": D("0"), "2026-08": D("0")}
+
+    seguinte = calcular_fluxo_caixa(meses, med, fat, veks, D("0.135"),
+                                    fat_competencia="seguinte")
+    mesma = calcular_fluxo_caixa(meses, med, fat, veks, D("0.135"),
+                                 fat_competencia="mesma")
+
+    # 'mesma' abate cada fat na sua medição: jul sobre (100k-40k), ago sobre (100k-30k)
+    jul, ago = mesma["linhas"]
+    assert jul["fat_anterior"] == D("40000")
+    assert jul["imposto"] == D("8100.00")
+    assert ago["fat_anterior"] == D("30000")
+    assert ago["imposto"] == D("9450.00")
+
+    # o fat do último período (30k) só é abatido no modo 'mesma' → 13,5% × 30k a menos
+    imp_seguinte = sum(l["imposto"] for l in seguinte["linhas"])
+    imp_mesma = sum(l["imposto"] for l in mesma["linhas"])
+    assert imp_seguinte - imp_mesma == D("4050.00")
+
+
 from services.cronograma_fisico_financeiro import comparar_fluxo_caixa
 
 

@@ -2,7 +2,7 @@
 (function () {
   var BRL = function (v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); };
   var BRLk = function (v) { return 'R$ ' + Math.round((v || 0) / 1000).toLocaleString('pt-BR') + 'k'; };
-  var C = {}, loaded = false, ENDPOINT = null, OBRA_ID = null;
+  var C = {}, loaded = false, ENDPOINT = null, CONFIG_ENDPOINT = null, OBRA_ID = null, cfgBound = false;
   function el(id) { return document.getElementById(id); }
   function csrfToken() {
     var m = document.querySelector('meta[name="csrf-token"]');
@@ -164,8 +164,41 @@
       options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return BRL(c.parsed.y); } } } }, scales: { y: { grid: grid, ticks: { callback: BRLk } }, x: { grid: { display: false } } } }
     });
   }
+  function setCfgMsg(texto, cls) {
+    var m = el('fin-fat-competencia-msg');
+    if (!m) return;
+    if (!texto) { m.style.display = 'none'; m.textContent = ''; return; }
+    m.style.display = 'block';
+    m.textContent = texto;
+    m.className = 'small mt-1 ' + (cls || 'text-muted');
+  }
+  function saveConfig(valor) {
+    var sel = el('fin-fat-competencia');
+    if (sel) sel.disabled = true;
+    setCfgMsg('Salvando…', 'text-muted');
+    fetch(CONFIG_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken(),
+                 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ fat_competencia: valor })
+    })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (p) { render(p); setCfgMsg('Salvo.', 'text-success'); })
+      .catch(function () { setCfgMsg('Não foi possível salvar.', 'text-danger'); })
+      .finally(function () { if (sel) sel.disabled = false; });
+  }
+  function renderConfig(cfg) {
+    var sel = el('fin-fat-competencia');
+    if (!sel) return;
+    sel.value = (cfg && cfg.fat_competencia === 'mesma') ? 'mesma' : 'seguinte';
+    if (!cfgBound) {
+      cfgBound = true;
+      sel.addEventListener('change', function () { saveConfig(sel.value); });
+    }
+  }
   function render(p) {
     renderKPIs(p.kpis); renderMedicoes(p.medicoes); renderAlerta(p.divergencia);
+    renderConfig(p.config);
     Object.keys(C).forEach(function (key) { if (C[key]) C[key].destroy(); });
     C = {};
     buildCharts(p);
@@ -181,6 +214,7 @@
     var pane = el('tab-financeiro');
     if (!pane) return;
     ENDPOINT = pane.getAttribute('data-endpoint');
+    CONFIG_ENDPOINT = pane.getAttribute('data-config-endpoint');
     OBRA_ID = pane.getAttribute('data-obra-id');
     var btn = document.querySelector('[data-bs-target="#tab-financeiro"]');
     if (btn) btn.addEventListener('shown.bs.tab', load);
