@@ -91,15 +91,43 @@ Com o modelo corrigido, os dois lucros que antes divergiam passam a **bater**:
 - `lucro_projetado` (KPI: venda − custo − imposto) = **24.976,15**
 - imposto único = **128.903,28** nos três lugares (engine, KPI, divergência).
 
+## Alerta de caixa negativo (requisito do usuário)
+
+Quando **qualquer mês** tiver `caixa_final < 0`, o painel deve alertar. Requisito-chave:
+o alerta é **derivado ao vivo** do fluxo recalculado, **nunca persistido** — assim ele se
+autocorrige: se o usuário mudar um valor em produção e o mês deixar de ser negativo, o alerta
+**some sozinho**; se outro mês virar negativo, **aparece sozinho** no próximo load. Sem
+migração, sem campo no banco.
+
+- **Backend** `calcular_fluxo_caixa` / `fluxo_caixa`: derivar do `linhas` já existente um bloco
+  `meses_negativos = [{mes, caixa_final} for l in linhas if l.caixa_final < 0]` e
+  `pior = min(...)`. Anexar ao dict de caixa (`caixa["meses_negativos"]`, `caixa["pior_caixa"]`).
+  Computado a cada chamada → sempre coerente com os números atuais.
+- **Frontend JS** `static/js/financeiro_obra.js`: nova função `renderAlertaCaixa(caixa)` que
+  renderiza um `alert-danger` listando os meses negativos (ex.: "Caixa negativo em **out**:
+  −R$ 40.142"); innerHTML vazio quando não há nenhum. Novo elemento `#fin-alerta-caixa` no
+  template da aba Financeiro (separado do `#fin-alerta` dos Indiretos).
+- **Frontend Jinja** `templates/cronograma/fisico_financeiro.html`: marcar em vermelho a célula
+  `caixa final` quando `l.caixa_final < 0` (`class="text-danger fw-bold"`) + um `alert-danger`
+  resumo acima da tabela quando houver meses negativos.
+- **Gráfico de caixa** (`finCaixa`): pintar a barra de **vermelho** quando `caixa_final < 0`
+  (hoje só fica âmbar abaixo de 110k).
+
+Para a Baia no modelo corrigido, o alerta nasce ativo: **out = −40.142**.
+
 ## Plano de implementação
 
-1. **Código** `services/cronograma_fisico_financeiro.py`: em `kpis` (l.467) e
-   `fluxo_caixa_divergencia` (l.452), trocar `venda × imposto_pct` por
-   `(venda − fat_direto_total) × imposto_pct`. `fat_direto_total = dados["totais"]["fat_direto"]`.
+1. **Código** `services/cronograma_fisico_financeiro.py`:
+   - em `kpis` (l.467) e `fluxo_caixa_divergencia` (l.452), trocar `venda × imposto_pct` por
+     `(venda − fat_direto_total) × imposto_pct` (`fat_direto_total = dados["totais"]["fat_direto"]`).
+   - em `calcular_fluxo_caixa`/`fluxo_caixa`, derivar `meses_negativos` + `pior_caixa`.
 2. **JSON** `tests/fixtures/cronograma_fisico_financeiro_baias.json`: atualizar `eap[].custo`
    (4 campos) + recalcular todos os `peso_pct`; regravar `fluxo_caixa_mensal`.
-3. **Testes:** `test_cronograma_fisico_financeiro`, `test_painel_financeiro`,
-   `test_importacao_fisico_financeiro` — ajustar asserts que dependam do imposto antigo.
+3. **UI:** `financeiro_obra.js` (+ elemento no template da aba) e `fisico_financeiro.html`
+   (célula vermelha + resumo) + cor da barra do gráfico.
+4. **Testes:** `test_cronograma_fisico_financeiro`, `test_painel_financeiro`,
+   `test_importacao_fisico_financeiro` — ajustar asserts do imposto antigo + cobrir
+   `meses_negativos` (caso com e sem negativo).
 
 ## Fora de escopo
 
