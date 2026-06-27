@@ -240,19 +240,25 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
     nao_faseado = Decimal("0")
     avisos: list = []
 
-    def _etapa(raiz):
-        if raiz.id not in etapas:
-            etapas[raiz.id] = {
-                "etapa_id": raiz.id,
-                "nome": raiz.nome_tarefa,
-                "categoria": getattr(getattr(raiz, "servico", None), "categoria", None),
+    def _etapa(osc):
+        """Bucket de etapa por CUSTO (OSC), não pela raiz da árvore do cronograma.
+        A árvore do cronograma vira o outline do .mpp (raiz única OBRA), então
+        agrupar por raiz colapsaria tudo numa etapa só. Cada OSC é uma etapa."""
+        if osc.id not in etapas:
+            etapas[osc.id] = {
+                "etapa_id": osc.id,
+                "osc_id": osc.id,
+                "nome": osc.nome,
+                "categoria": getattr(getattr(osc, "servico", None), "categoria", None),
+                "tipo": "entregavel",   # vira 'periodo' se não houver tarefa vinculada
+                "pct_fisico": None,     # período não tem avanço físico
                 "previsto": {"material": Decimal("0"), "mao_obra": Decimal("0"),
                              "outros": Decimal("0"), "total": Decimal("0")},
                 "veks": Decimal("0"), "fat_direto": Decimal("0"),
                 "orcado": Decimal("0"), "realizado": Decimal("0"),
                 "meses": {},
             }
-        return etapas[raiz.id]
+        return etapas[osc.id]
 
     # Desembolso (caixa) faseado pelas DATAS DAS LINHAS de custo (fonte da verdade).
     # `meses_veks/meses_fat` arrancam com as parcelas já faseadas por datas; o loop
@@ -270,6 +276,16 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
             material, mao_obra, outros,
             osc.fonte_material, osc.fonte_mao_obra, osc.fonte_outros,
         )
+        et = _etapa(osc)
+        et["previsto"]["material"] += material
+        et["previsto"]["mao_obra"] += mao_obra
+        et["previsto"]["outros"] += outros
+        et["previsto"]["total"] += previsto_total
+        et["veks"] += veks
+        et["fat_direto"] += fat
+        et["orcado"] += Decimal(osc.valor_orcado or 0)
+        et["realizado"] += Decimal(osc.realizado_total or 0)
+
         # remanescente a fasear pelo cronograma = total do OSC menos o já faseado
         # por datas de linha. Clamp em 0 (linhas nunca excedem o agregado).
         _ja = faseado_por_osc.get(osc.id, {})
@@ -285,63 +301,30 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
                  for v in vinculos if v.cronograma_tarefa_id in por_id]
 
         if not pesos:
-            avisos.append(f"Serviço '{osc.nome}' sem tarefas vinculadas — custo não faseado.")
-            nao_faseado += previsto_total
-            raiz_sintetica = type("R", (), {"id": f"osc-{osc.id}", "nome_tarefa": osc.nome,
-                                            "servico": None, "tarefa_pai_id": None})
-            resumo_por_raiz = [(_etapa(raiz_sintetica), Decimal("1"))]
-        else:
-            # peso total por raiz (etapa) das folhas vinculadas a este OSC
-            peso_por_raiz = {}   # raiz_id -> [etapa_dict, peso_acumulado]
-            for tarefa_id, peso in pesos:
-                folha = por_id[tarefa_id]
-                raiz = _raiz_da_tarefa(folha, por_id)
-                et = _etapa(raiz)
-                slot = peso_por_raiz.setdefault(raiz.id, [et, Decimal("0")])
-                slot[1] += Decimal(peso)
-            # faseia o previsto alocado a cada folha (físico = inalterado); o
-            # financeiro usa só o remanescente não faseado por datas de linha.
-            razao_veks = (veks_cron / previsto_total) if previsto_total else Decimal("0")
-            razao_fat = (fat_cron / previsto_total) if previsto_total else Decimal("0")
-            aloc = alocar_por_peso(previsto_total, pesos)
-            for tarefa_id, valor_tarefa in aloc.items():
-                folha = por_id[tarefa_id]
-                et = _etapa(_raiz_da_tarefa(folha, por_id))
-                fases = fasear_por_dias_uteis(valor_tarefa, folha.data_inicio, folha.data_fim, sab, dom)
-                for mes, parcela in fases.items():
-                    if mes == NAO_FASEADO:
-                        nao_faseado += parcela
-                        continue
-                    et["meses"][mes] = et["meses"].get(mes, Decimal("0")) + parcela
-                    meses_globais[mes] = meses_globais.get(mes, Decimal("0")) + parcela
-                    # precisão cheia de propósito; quantizado só ao entrar em calcular_fluxo_caixa
-                    meses_veks[mes] = meses_veks.get(mes, Decimal("0")) + (parcela * razao_veks)
-                    meses_fat[mes] = meses_fat.get(mes, Decimal("0")) + (parcela * razao_fat)
-            # fração de resumo por raiz = peso da raiz / Σpeso (fallback igual)
-            soma_peso = sum((p for _, p in peso_por_raiz.values()), Decimal("0"))
-            n_raizes = len(peso_por_raiz)
-            resumo_por_raiz = []
-            for et, peso_raiz in peso_por_raiz.values():
-                frac = (peso_raiz / soma_peso) if soma_peso > 0 else (Decimal("1") / n_raizes)
-                resumo_por_raiz.append((et, frac))
+            # Custo de PERÍODO / avulso (indiretos, escritório, estadia…): não passa
+            # por medição física — não tem tarefa no .mpp. O caixa já foi faseado
+            # pelas datas das linhas (fasear_custo_por_linhas, acima); não há curva
+            # de previsto físico. NÃO é erro: não entra em `nao_faseado`.
+            et["tipo"] = "periodo"
+            continue
 
-        # distribui os agregados de resumo entre as raízes pela fração
-        for et, frac in resumo_por_raiz:
-            # Rastreia o OSC de origem da etapa: se uma única OSC alimenta a
-            # etapa, guarda seu id (para casar com realizado_por_etapa); se
-            # múltiplas OSCs convergem na mesma etapa, marca como None.
-            if "osc_id" not in et:
-                et["osc_id"] = osc.id
-            elif et["osc_id"] != osc.id:
-                et["osc_id"] = None
-            et["previsto"]["material"] += material * frac
-            et["previsto"]["mao_obra"] += mao_obra * frac
-            et["previsto"]["outros"] += outros * frac
-            et["previsto"]["total"] += previsto_total * frac
-            et["veks"] += veks * frac
-            et["fat_direto"] += fat * frac
-            et["orcado"] += Decimal(osc.valor_orcado or 0) * frac
-            et["realizado"] += Decimal(osc.realizado_total or 0) * frac
+        # Etapa entregável: faseia o previsto físico pelas datas das tarefas
+        # vinculadas; o financeiro usa só o remanescente não faseado por linha.
+        razao_veks = (veks_cron / previsto_total) if previsto_total else Decimal("0")
+        razao_fat = (fat_cron / previsto_total) if previsto_total else Decimal("0")
+        aloc = alocar_por_peso(previsto_total, pesos)
+        for tarefa_id, valor_tarefa in aloc.items():
+            folha = por_id[tarefa_id]
+            fases = fasear_por_dias_uteis(valor_tarefa, folha.data_inicio, folha.data_fim, sab, dom)
+            for mes, parcela in fases.items():
+                if mes == NAO_FASEADO:
+                    nao_faseado += parcela
+                    continue
+                et["meses"][mes] = et["meses"].get(mes, Decimal("0")) + parcela
+                meses_globais[mes] = meses_globais.get(mes, Decimal("0")) + parcela
+                # precisão cheia de propósito; quantizado só ao entrar em calcular_fluxo_caixa
+                meses_veks[mes] = meses_veks.get(mes, Decimal("0")) + (parcela * razao_veks)
+                meses_fat[mes] = meses_fat.get(mes, Decimal("0")) + (parcela * razao_fat)
 
     for et in etapas.values():
         et["desvio"] = et["realizado"] - et["previsto"]["total"]
