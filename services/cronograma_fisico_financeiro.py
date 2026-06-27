@@ -159,9 +159,20 @@ def calcular_fluxo_caixa(meses, medicao, fat_direto, gasto_veks, imposto_pct,
         })
         fat_anterior = fat_mes
         caixa_final_anterior = caixa_fim
+    # Alerta de caixa negativo: derivado ao vivo dos próprios `linhas`, nunca
+    # persistido — recalcula a cada chamada, então se autocorrige quando os
+    # valores mudam (mês que deixa de ser negativo some; outro que vira aparece).
+    meses_negativos = [
+        {"mes": l["mes"], "caixa_final": l["caixa_final"]}
+        for l in linhas if l["caixa_final"] < 0
+    ]
+    pior_caixa = min(meses_negativos, key=lambda x: x["caixa_final"]) \
+        if meses_negativos else None
     return {
         "linhas": linhas,
         "lucro_em_caixa": linhas[-1]["caixa_final"] if linhas else Decimal("0"),
+        "meses_negativos": meses_negativos,
+        "pior_caixa": pior_caixa,
     }
 
 
@@ -449,7 +460,10 @@ def fluxo_caixa_divergencia(obra, dados=None):
     veks_verbatim = cmp["total_verbatim"]
     lucro_caixa = Decimal(str((snap.get("lucro_caixa_final") if isinstance(snap, dict) else 0) or 0))
     venda = Decimal(str(obra.valor_contrato or 0))
-    imposto = (venda * _imposto_pct(obra)).quantize(CENTAVO, ROUND_HALF_UP)
+    # Imposto incide só sobre o que a Veks fatura/recebe = venda − fat_direto
+    # (o fat direto é pago pelo cliente direto ao fornecedor → fora da base).
+    base_imposto = venda - dados["totais"]["fat_direto"]
+    imposto = (base_imposto * _imposto_pct(obra)).quantize(CENTAVO, ROUND_HALF_UP)
     cmp["resumo"] = {
         "veks_etapas": veks_etapas,
         "veks_verbatim": veks_verbatim,
@@ -464,7 +478,9 @@ def kpis(obra, dados=None):
     venda = Decimal(str(obra.valor_contrato or 0))
     dados = dados if dados is not None else montar_fisico_financeiro(obra.id, obra.admin_id)
     custo = dados["totais"]["total"]
-    imposto = (venda * _imposto_pct(obra)).quantize(CENTAVO, ROUND_HALF_UP)
+    # Imposto sobre a base recebida pela Veks = venda − fat_direto (ver fluxo_caixa).
+    base_imposto = venda - dados["totais"]["fat_direto"]
+    imposto = (base_imposto * _imposto_pct(obra)).quantize(CENTAVO, ROUND_HALF_UP)
     lucro = venda - custo - imposto
     recebido = Decimal("0")
     for m in medicoes_contrato(obra):

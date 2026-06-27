@@ -47,6 +47,21 @@
       ' × planilha ' + BRL(r.veks_verbatim) + ' (Δ ' + BRL(r.delta_veks) + '). ' +
       'Lucro em caixa (planilha) ' + BRL(r.lucro_em_caixa) + '. Decida 3,5 vs 5 meses dos Indiretos.</div>';
   }
+  // Alerta de caixa negativo — derivado ao vivo do fluxo recalculado (caixa.meses_negativos).
+  // Some/aparece sozinho conforme os valores mudam; nada é persistido.
+  function renderAlertaCaixa(caixa) {
+    var negs = (caixa && caixa.meses_negativos) || [];
+    if (!negs.length) { el('fin-alerta-caixa').innerHTML = ''; return; }
+    var lista = negs.map(function (n) {
+      return '<strong>' + n.mes + '</strong> (' + BRL(n.caixa_final) + ')';
+    }).join(', ');
+    var plural = negs.length > 1;
+    el('fin-alerta-caixa').innerHTML = '<div class="alert alert-danger mb-0">' +
+      '<i class="fas fa-triangle-exclamation me-1"></i>' +
+      '<strong>Caixa negativo</strong> ' + (plural ? 'nos meses' : 'no mês') + ': ' + lista +
+      '. A Veks desembolsa mais do que recebeu nesse(s) período(s) — avalie adiantar medição ou ' +
+      'reescalonar desembolso.</div>';
+  }
   function etapaLinhaHTML(it) {
     var sel = function (v) { return it && it.fonte === v ? ' selected' : ''; };
     return '<tr>' +
@@ -160,7 +175,7 @@
     var caixaLin = (p.caixa && p.caixa.linhas) || [];
     C.caixa = new Chart(el('finCaixa'), {
       type: 'bar',
-      data: { labels: caixaLin.map(function (l) { return l.mes; }), datasets: [{ label: 'Caixa final', data: caixaLin.map(function (l) { return l.caixa_final; }), backgroundColor: caixaLin.map(function (l) { return l.caixa_final < 110000 ? amber : blue; }) }] },
+      data: { labels: caixaLin.map(function (l) { return l.mes; }), datasets: [{ label: 'Caixa final', data: caixaLin.map(function (l) { return l.caixa_final; }), backgroundColor: caixaLin.map(function (l) { return l.caixa_final < 0 ? red : (l.caixa_final < 110000 ? amber : blue); }) }] },
       options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return BRL(c.parsed.y); } } } }, scales: { y: { grid: grid, ticks: { callback: BRLk } }, x: { grid: { display: false } } } }
     });
   }
@@ -198,6 +213,7 @@
   }
   function render(p) {
     renderKPIs(p.kpis); renderMedicoes(p.medicoes); renderAlerta(p.divergencia);
+    renderAlertaCaixa(p.caixa);
     renderConfig(p.config);
     Object.keys(C).forEach(function (key) { if (C[key]) C[key].destroy(); });
     C = {};

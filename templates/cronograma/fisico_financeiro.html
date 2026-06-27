@@ -125,6 +125,15 @@
 
   {# --- Fluxo de caixa (recalculado) com divergência de Veks --- #}
   <h5 class="mt-4">Fluxo de caixa mensal (recalculado)</h5>
+  {% if caixa.meses_negativos %}
+  <div class="alert alert-danger py-2">
+    <strong>Caixa negativo</strong>
+    {{ 'nos meses' if caixa.meses_negativos|length > 1 else 'no mês' }}:
+    {% for n in caixa.meses_negativos %}<strong>{{ n.mes }}</strong>
+      (R$ {{ '%.0f'|format(n.caixa_final|float) }}){{ ', ' if not loop.last }}{% endfor %}.
+    A Veks desembolsa mais do que recebeu nesse(s) período(s).
+  </div>
+  {% endif %}
   <table class="table table-sm">
     <thead><tr><th>Mês</th><th class="text-end">Medição</th><th class="text-end">Imposto</th>
       <th class="text-end">Entrada líq.</th><th class="text-end">Caixa inicial</th>
@@ -138,7 +147,7 @@
           <td class="text-end">{{ '%.0f'|format(l.entrada|float) }}</td>
           <td class="text-end">{{ '%.0f'|format(l.caixa_inicial|float) }}</td>
           <td class="text-end">{{ '%.0f'|format(l.gasto_veks|float) }}</td>
-          <td class="text-end">{{ '%.0f'|format(l.caixa_final|float) }}</td>
+          <td class="text-end {{ 'text-danger fw-bold' if l.caixa_final < 0 }}">{{ '%.0f'|format(l.caixa_final|float) }}</td>
           <td class="text-end">
             {% set d = divergencia.por_mes.get(l.mes) %}
             {{ d and '%.0f'|format(d.delta|float) or '—' }}</td></tr>

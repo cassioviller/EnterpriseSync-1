@@ -1,8 +1,74 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-06-26**.
-> Resume o que foi feito nesta rodada e o que ainda falta — principalmente a
-> **reconciliação dos custos pela aba `Planilha1`** do Excel novo.
+> Documento de handoff. Última atualização: **2026-06-27**.
+> Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## ⚠️ POR QUE o ambiente cai no meio da sessão (5ª vez) — e como não repetir
+
+**Sintoma:** no meio da sessão, `python3`/`git` somem com erro
+`Transport endpoint is not connected`; `which python3` não acha nada.
+
+**Causa-raiz (é de infraestrutura do sandbox, NÃO do nosso código):**
+Este ambiente (Replit/Nix) serve o **`/nix/store` por um mount FUSE**. *Todos* os binários
+da toolchain (python, git, node) vivem dentro de `/nix`, e arquivos de sistema como
+`/etc/gitconfig` são **symlinks para dentro do `/nix`**. Quando o processo FUSE que serve
+esse mount morre, o kernel passa a responder *"Transport endpoint is not connected"* para
+qualquer acesso sob o mount → a toolchain inteira "desaparece" no meio da sessão.
+
+O que mata o processo FUSE, mais provável aqui: **pressão de memória / OOM** no container.
+Este repo carrega **TensorFlow + DeepFace** no import do `app` (reconhecimento facial), que
+é pesado; ao rodar testes/scripts que importam `app`, o pico de RAM pode derrubar o daemon
+do nix-store. Também pode ser reciclagem/idle-timeout do servidor de store do Replit.
+
+**Como mitigar (o que está sob nosso controle):**
+1. **Commit & push cedo e frequente.** Como a recuperação é *reiniciar o container* (que
+   reconstrói o mount) e a sessão só volta puxando do git, qualquer trabalho não-pushado
+   se perde. Esta é a lição principal — já é a 5ª vez.
+2. **Git continua usável mesmo após a queda** com `GIT_CONFIG_NOSYSTEM=1` (ignora o
+   `/etc/gitconfig` que aponta pro mount morto). Foi assim que este commit saiu.
+3. **Não importar o stack de ML** (TensorFlow/DeepFace) quando o trabalho é só
+   financeiro/cronograma — reduz a pressão de memória que provavelmente dispara o OOM.
+   (Os testes daqui importam `app`, que puxa o ML; rodar só os 3 arquivos já ajuda.)
+4. **Recuperação:** reiniciar o container → `git pull` da branch → seguir.
+
+---
+
+## Rodada 2026-06-27 — Reconciliação Planilha1 + correção do imposto (FEITA, falta rodar testes)
+
+Spec: `docs/superpowers/specs/2026-06-27-reconciliacao-custos-imposto-baia-design.md`.
+Branch: `fix/reconciliacao-custos-imposto-baia` (só o spec commitado; implementação **não
+commitada** — ambiente caiu antes).
+
+**Descobertas (investigação das fórmulas da `Planilha1`):**
+- Motor: `imposto = (medição − fat_direto) × 13,5%` (ISS 4% + DAS 9,5%).
+- 3 erros na planilha: Indiretos contados 3,5 E 5 meses (Δ 74.000); junho sem imposto +
+  `+20.000` chumbado na mão; e 1 **bug no código**: `kpis`/`divergencia` tributavam a
+  venda cheia (`venda × pct`), supertributando o fat direto.
+- Decisões do usuário: **Indiretos 5 meses (versão cara)**; **tudo que a Veks recebe é
+  tributado, inclusive junho/mobilização**; base = medição − fat direto.
+
+**Mudanças aplicadas (working tree, NÃO commitadas):**
+1. `services/cronograma_fisico_financeiro.py`: `kpis` (l.467) e `fluxo_caixa_divergencia`
+   (l.452) → `imposto = (venda − dados["totais"]["fat_direto"]) × pct`. Em
+   `calcular_fluxo_caixa` → deriva `meses_negativos` + `pior_caixa` (alerta ao vivo).
+2. `tests/fixtures/cronograma_fisico_financeiro_baias.json`: `eap[].custo` + **`eap[].itens`**
+   (o import lê dos ITENS, não do custo!) reconciliados; `peso_pct` recalculado; snapshot
+   `fluxo_caixa_mensal` regravado (junho tributado). Convergência: veks total 800.960,
+   imposto 128.903, **lucro projetado = lucro em caixa = 24.976**.
+3. Alerta de caixa negativo (out = −40.142): `static/js/financeiro_obra.js`
+   (`renderAlertaCaixa` + barra vermelha), `templates/obras/detalhes_obra_profissional.html`
+   (`#fin-alerta-caixa`), `templates/cronograma/fisico_financeiro.html` (célula vermelha +
+   resumo). Derivado ao vivo → some/aparece sozinho quando os valores mudam.
+4. Asserts atualizados em `tests/test_importacao_fisico_financeiro.py` (data_fim 08/10;
+   lucro_caixa_final 24976; delta_veks ~0; indiretos 39 linhas / total 457.000).
+
+**PENDENTE (bloqueado por ambiente):** rodar
+`python -m pytest tests/test_cronograma_fisico_financeiro.py tests/test_painel_financeiro.py
+tests/test_importacao_fisico_financeiro.py -q` e **commitar**. O mount FUSE do `/nix/store`
+caiu no meio da sessão (Python e git indisponíveis: "Transport endpoint is not connected") —
+**só volta com reinício do container** (mesmo problema da rodada anterior).
 
 ---
 
