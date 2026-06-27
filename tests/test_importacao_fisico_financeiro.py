@@ -81,16 +81,19 @@ def test_importa_cria_etapas_tarefas_e_custos():
         admin_id = _novo_admin()
         res = importar_fisico_financeiro(_carregar_json(), admin_id)
         oid = res['obra_id']
-        raizes = TarefaCronograma.query.filter_by(obra_id=oid, admin_id=admin_id,
-                                                  tarefa_pai_id=None).count()
-        assert raizes == 12
-        folhas = TarefaCronograma.query.filter(
-            TarefaCronograma.obra_id == oid,
-            TarefaCronograma.admin_id == admin_id,
-            TarefaCronograma.tarefa_pai_id.isnot(None)).count()
-        assert folhas >= 12
+        # Cronograma físico = espelho fiel das 56 tarefas do .mpp, no outline.
+        tarefas = TarefaCronograma.query.filter_by(obra_id=oid, admin_id=admin_id).all()
+        assert len(tarefas) == 56
+        raizes = [t for t in tarefas if t.tarefa_pai_id is None]
+        assert len(raizes) == 1 and 'OBRA' in (raizes[0].nome_tarefa or '').upper()
+        nomes = {(t.nome_tarefa or '').upper() for t in tarefas}
+        # tarefa físico-pura (sem custo) presente, fiel ao .mpp
+        assert any('FAZENDA' in n for n in nomes)
+        # INDIRETOS é custo de período — NÃO vira tarefa do cronograma
+        assert not any('INDIRETO' in n for n in nomes)
         assert ItemMedicaoComercial.query.filter_by(obra_id=oid).count() == 12
-        assert ItemMedicaoCronogramaTarefa.query.filter_by(admin_id=admin_id).count() == folhas
+        # vínculo opcional custo↔tarefa: ao menos uma tarefa por etapa entregável
+        assert ItemMedicaoCronogramaTarefa.query.filter_by(admin_id=admin_id).count() >= 11
         oscs = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=admin_id).all()
         soma_veks = sum(float(o.mao_obra_a_realizar or 0) for o in oscs)
         soma_fat = sum(float(o.material_a_realizar or 0) for o in oscs)
@@ -141,7 +144,9 @@ def test_reimport_nao_duplica():
         oid2 = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
         assert oid1 == oid2
         assert Obra.query.filter_by(admin_id=admin_id).count() == 1
-        assert TarefaCronograma.query.filter_by(obra_id=oid1, tarefa_pai_id=None).count() == 12
+        # cronograma não duplica: continua com as 56 tarefas do .mpp, 1 raiz (OBRA)
+        assert TarefaCronograma.query.filter_by(obra_id=oid1).count() == 56
+        assert TarefaCronograma.query.filter_by(obra_id=oid1, tarefa_pai_id=None).count() == 1
         assert MedicaoContrato.query.filter_by(obra_id=oid1).count() == 6
 
 
@@ -255,10 +260,11 @@ def test_importa_retorna_avisos_como_lista():
 
 
 @pytest.mark.integration
-def test_importa_gera_aviso_para_etapa_sem_tarefas():
-    # Quando uma etapa não tem tarefas_mpp, o importador cria uma folha de
-    # fallback e registra um aviso 'sem tarefas'.
+def test_etapa_sem_tarefas_vira_periodo():
+    # Etapa sem tarefas_mpp = custo de PERÍODO: não vira tarefa no cronograma,
+    # não gera aviso 'sem tarefas', e aparece no painel com tipo='periodo'.
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import montar_fisico_financeiro
     with app.app_context():
         admin_id = _novo_admin()
         payload = _carregar_json()
@@ -267,7 +273,11 @@ def test_importa_gera_aviso_para_etapa_sem_tarefas():
         alvo['cronograma'] = dict(alvo.get('cronograma', {}))
         alvo['cronograma']['tarefas_mpp'] = []
         res = importar_fisico_financeiro(payload, admin_id)
-        assert any('sem tarefas' in a.lower() for a in res['avisos'])
+        assert not any('sem tarefas' in a.lower() for a in res['avisos'])
+        dados = montar_fisico_financeiro(res['obra_id'], admin_id)
+        periodo = [e for e in dados['etapas'] if e.get('tipo') == 'periodo']
+        assert periodo, "etapa sem tarefas_mpp deveria virar tipo='periodo'"
+        assert all(e.get('pct_fisico') is None for e in periodo)
 
 
 @pytest.mark.integration

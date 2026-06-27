@@ -170,45 +170,61 @@ def _limpar_derivados(obra, admin_id: int):
 # ----------------------------------------------------------------------
 # Cronograma físico-financeiro (raiz + folhas COM datas do .mpp) + vínculos
 # ----------------------------------------------------------------------
-def _materializar_cronograma_fisico(obra, admin_id, imc, etapa, mpp, data_default, avisos):
+def _materializar_cronograma_mpp(obra, admin_id, tarefas_mpp):
+    """Materializa o cronograma físico FIEL ao .mpp: uma TarefaCronograma por tarefa,
+    na hierarquia do outline (pai = tarefa anterior de nível imediatamente menor).
+    Independente de custo — TODA tarefa do .mpp aparece, inclusive físico-puras
+    (FAZENDA/limpeza/desmobilização, sem custo) e resumos (que viram nós-pai). O
+    modelo não tem coluna de 'resumo'/'marco'; a hierarquia via tarefa_pai_id já
+    distingue pais (resumos) de folhas. Retorna {mpp_id: tarefa_cronograma_id}."""
     from app import db
-    from models import TarefaCronograma, ItemMedicaoCronogramaTarefa
+    from models import TarefaCronograma
 
-    cron = etapa.get("cronograma", {})
-    di = _parse_date(cron.get("inicio")) or data_default
-    df = _parse_date(cron.get("fim"))
-
-    raiz = TarefaCronograma(obra_id=obra.id, admin_id=admin_id,
-                            nome_tarefa=etapa["nome"], tarefa_pai_id=None,
-                            data_inicio=di, data_fim=df, percentual_concluido=0)
-    db.session.add(raiz)
-    db.session.flush()
-
-    folhas_ids = cron.get("tarefas_mpp") or []
-    folhas = []
-    if folhas_ids:
-        for tid in folhas_ids:
-            t = mpp.get(tid, {})
-            fdi = _parse_date(t.get("inicio")) or di
-            fdf = _parse_date(t.get("fim")) or df
-            folhas.append((t.get("nome") or etapa["nome"], fdi, fdf, int(t.get("dias") or 1)))
-    else:
-        dias = (df - di).days + 1 if (di and df) else 1
-        folhas.append((etapa["nome"], di, df, max(1, dias)))
-        avisos.append(
-            f"Etapa '{etapa['nome']}' sem tarefas do cronograma — "
-            "faseada pela data da etapa.")
-
-    for nome_f, fdi, fdf, dias in folhas:
-        folha = TarefaCronograma(obra_id=obra.id, admin_id=admin_id,
-                                 nome_tarefa=nome_f, tarefa_pai_id=raiz.id,
-                                 data_inicio=fdi, data_fim=fdf,
-                                 duracao_dias=dias, percentual_concluido=0)
-        db.session.add(folha)
+    tid_to_db: dict = {}
+    ancestral_por_nivel: dict = {}   # nivel -> id da última tarefa vista nesse nível
+    for ordem, t in enumerate(tarefas_mpp):
+        nivel = int(t.get("nivel") or 1)
+        pai_id = None
+        for n in range(nivel - 1, 0, -1):
+            if n in ancestral_por_nivel:
+                pai_id = ancestral_por_nivel[n]
+                break
+        tarefa = TarefaCronograma(
+            obra_id=obra.id, admin_id=admin_id,
+            nome_tarefa=(t.get("nome") or "Tarefa")[:200],
+            tarefa_pai_id=pai_id,
+            data_inicio=_parse_date(t.get("inicio")),
+            data_fim=_parse_date(t.get("fim")),
+            duracao_dias=max(1, int(t.get("dias") or 1)),
+            ordem=ordem, percentual_concluido=0)
+        db.session.add(tarefa)
         db.session.flush()
+        tid_to_db[t["id"]] = tarefa.id
+        ancestral_por_nivel[nivel] = tarefa.id
+        # níveis mais profundos deixam de ser ancestrais válidos
+        for n in [x for x in ancestral_por_nivel if x > nivel]:
+            del ancestral_por_nivel[n]
+    return tid_to_db
+
+
+def _vincular_etapa_tarefas(admin_id, imc, etapa, mpp, tid_to_db, avisos):
+    """Vínculo OPCIONAL custo↔tarefa: liga o IMC da etapa às folhas do .mpp que
+    carregam seu avanço físico (peso = dias). Etapa de PERÍODO (sem `tarefas_mpp`)
+    não vincula — é custo, não medição física, e não vira tarefa no cronograma.
+    Ver spec 2026-06-27-custo-cronograma-fieis-regime-medicao."""
+    from app import db
+    from models import ItemMedicaoCronogramaTarefa
+
+    cron = etapa.get("cronograma", {}) or {}
+    for tid in (cron.get("tarefas_mpp") or []):
+        db_id = tid_to_db.get(tid)
+        if db_id is None:
+            avisos.append(f"Etapa '{etapa['nome']}': tarefa {tid} do .mpp não encontrada.")
+            continue
+        dias = max(1, int((mpp.get(tid) or {}).get("dias") or 1))
         db.session.add(ItemMedicaoCronogramaTarefa(
-            item_medicao_id=imc.id, cronograma_tarefa_id=folha.id,
-            admin_id=admin_id, peso=max(1, dias)))
+            item_medicao_id=imc.id, cronograma_tarefa_id=db_id,
+            admin_id=admin_id, peso=dias))
     db.session.flush()
 
 
@@ -322,6 +338,10 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
 
     # 4) recupera IMC/OSC por PropostaItem e preenche custo + cronograma físico -
     mpp = {t['id']: t for t in payload.get('cronograma_tarefas', [])}
+    # Cronograma físico = espelho do .mpp (todas as tarefas, no outline), criado UMA
+    # vez e independente de custo. As etapas de custo só REFERENCIAM essas tarefas.
+    tid_to_db = _materializar_cronograma_mpp(
+        obra, admin_id, payload.get('cronograma_tarefas', []))
     imcs = ItemMedicaoComercial.query.filter_by(obra_id=obra.id, admin_id=admin_id).all()
     imc_por_pi = {i.proposta_item_id: i for i in imcs if i.proposta_item_id}
     for pi_id, info in etapa_por_pi.items():
@@ -391,8 +411,7 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
             osc.realizado_mao_obra = 0
             osc.realizado_outros = 0
             recalcular_osc_dos_itens(osc)
-        _materializar_cronograma_fisico(
-            obra, admin_id, imc, info['etapa'], mpp, data_inicio, avisos)
+        _vincular_etapa_tarefas(admin_id, imc, info['etapa'], mpp, tid_to_db, avisos)
 
     # 5) medições de contrato + snapshot do fluxo de caixa da planilha --------
     from models import MedicaoContrato
