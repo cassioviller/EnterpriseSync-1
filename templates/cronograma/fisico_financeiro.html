@@ -34,10 +34,7 @@
       <tbody>
         {% for et in dados.etapas %}
         <tr>
-          <td>
-            {{ et.nome }}
-            {% if et.tipo == 'periodo' %}<span class="badge bg-secondary ms-1" title="Custo de período — sem avanço físico, fora do RDO/cronograma">período</span>{% endif %}
-          </td>
+          <td>{{ et.nome }}</td>
           <td class="text-end">{{ '%.2f'|format(et.veks) }}</td>
           <td class="text-end">{{ '%.2f'|format(et.fat_direto) }}</td>
           <td class="text-end">{{ '%.2f'|format(et.previsto.total) }}</td>
@@ -45,8 +42,7 @@
             {% if dados.totais.total %}{{ '%.1f'|format(100 * et.previsto.total / dados.totais.total) }}%{% else %}—{% endif %}
           </td>
           {% for mes in dados.meses_ordenados %}
-          {# período não tem curva de previsto físico — seu custo corre no caixa (abaixo) #}
-          <td class="text-end">{% if et.tipo == 'periodo' %}<span class="text-muted">—</span>{% else %}{{ '%.2f'|format(et.meses.get(mes, 0)) }}{% endif %}</td>
+          <td class="text-end">{{ '%.2f'|format(et.meses.get(mes, 0)) }}</td>
           {% endfor %}
         </tr>
         {% endfor %}

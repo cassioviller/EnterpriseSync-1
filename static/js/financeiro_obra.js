@@ -90,7 +90,9 @@
     var linhas = (et.itens || []).map(etapaLinhaHTML).join('');
     box.innerHTML =
       '<div class="border rounded p-3 bg-light">' +
-      '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome + '</strong>' +
+      '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome +
+        (et.tipo === 'periodo' ? ' <span class="badge bg-secondary" title="Custo de período — sem avanço físico, fora do RDO/cronograma">período</span>' : '') +
+        '</strong>' +
         '<span>Realizado: ' + BRL(et.realizado) + ' / Previsto: <span id="fin-it-prev">' + BRL(et.previsto) + '</span></span></div>' +
       '<table class="table table-sm align-middle mb-2"><thead><tr>' +
         '<th>Descrição</th><th class="text-end" style="width:130px">Valor (R$)</th>' +
