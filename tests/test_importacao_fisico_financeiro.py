@@ -104,6 +104,28 @@ def test_importa_cria_etapas_tarefas_e_custos():
 
 
 @pytest.mark.integration
+def test_indiretos_e_periodo_na_baia():
+    """F5 — na Baia, INDIRETOS é custo de período: aparece no painel como
+    tipo='periodo' (sem % físico), veks 457.000, e NÃO vira tarefa do cronograma."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import montar_fisico_financeiro
+    from models import TarefaCronograma
+    with app.app_context():
+        admin_id = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+        dados = montar_fisico_financeiro(oid, admin_id)
+        ind = [e for e in dados['etapas'] if 'INDIRET' in (e['nome'] or '').upper()]
+        assert len(ind) == 1
+        assert ind[0]['tipo'] == 'periodo'
+        assert ind[0]['pct_fisico'] is None
+        assert abs(float(ind[0]['veks']) - 457000) < 50
+        # não materializou tarefa de indiretos no cronograma
+        nomes = {(t.nome_tarefa or '').upper()
+                 for t in TarefaCronograma.query.filter_by(obra_id=oid).all()}
+        assert not any('INDIRETO' in n for n in nomes)
+
+
+@pytest.mark.integration
 def test_painel_deriva_apos_import():
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from services.cronograma_fisico_financeiro import montar_fisico_financeiro

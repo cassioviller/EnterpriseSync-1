@@ -495,18 +495,11 @@
       "cronograma": {
         "inicio": "2026-06-08",
         "fim": "2026-10-08",
-        "pct_fisico": 31.9,
-        "tarefas_mpp": [
-          2,
-          6,
-          19,
-          34,
-          36,
-          55,
-          56
-        ],
+        "pct_fisico": null,
+        "tarefas_mpp": [],
         "transversal": true,
-        "obs": "custo de período — distribuir ao longo de toda a obra"
+        "tipo": "periodo",
+        "obs": "custo de período — sem tarefa no .mpp; faseado pelos meses da Planilha1 (jun-out). Não vira tarefa no cronograma/RDO/portal."
       },
       "custo": {
         "veks": 457000,
