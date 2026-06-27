@@ -82,10 +82,10 @@ def test_importa_cria_etapas_tarefas_e_custos():
         oscs = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=admin_id).all()
         soma_veks = sum(float(o.mao_obra_a_realizar or 0) for o in oscs)
         soma_fat = sum(float(o.material_a_realizar or 0) for o in oscs)
-        # Veks = 734.460 (etapas) + 90.000 (indiretos rodam 5 meses na
-        # Planilha1 REV01, não 3,5) = 824.460. Fat inalterado.
-        assert abs(soma_veks - 824460) < 50
-        assert abs(soma_fat - 423700) < 50
+        # Veks total reconciliado pela Planilha1 (REV01 nova), indiretos 5 meses
+        # = 800.960; fat_direto reconciliado = 550.775 (ESTMET 332.892 + FUND 87.882,64 + demais).
+        assert abs(soma_veks - 800960) < 50
+        assert abs(soma_fat - 550775) < 50
 
 
 @pytest.mark.integration
@@ -373,10 +373,10 @@ def test_importa_popula_linhas_de_custo():
         assert len(linhas) >= 12  # ao menos uma linha por etapa
         soma_veks = sum(float(l.valor) for l in linhas if l.fonte == 'veks')
         soma_fat = sum(float(l.valor) for l in linhas if l.fonte == 'fat_direto')
-        # Veks = 734.460 (etapas) + 90.000 (indiretos rodam 5 meses na
-        # Planilha1 REV01, não 3,5) = 824.460. Fat inalterado.
-        assert abs(soma_veks - 824460) < 50
-        assert abs(soma_fat - 423700) < 50
+        # Veks total reconciliado pela Planilha1 (REV01 nova), indiretos 5 meses
+        # = 800.960; fat_direto reconciliado = 550.775 (ESTMET 332.892 + FUND 87.882,64 + demais).
+        assert abs(soma_veks - 800960) < 50
+        assert abs(soma_fat - 550775) < 50
         # agregado da OSC == soma das linhas (derivação)
         for o in oscs:
             v = sum(float(l.valor) for l in linhas
