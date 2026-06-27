@@ -279,6 +279,11 @@ def test_pagina_obra_tem_aba_financeiro_e_endpoint():
         data = c.get(f'/obras/{oid}/financeiro/dados').get_json()
         assert len(data['curva_s']['meses']) == len(data['curva_s']['realizado'])
         assert len(data['etapas']) == 12
+        # INDIRETOS aparece junto das etapas, marcado como custo de período.
+        periodo = [e for e in data['etapas'] if e.get('tipo') == 'periodo']
+        assert len(periodo) == 1
+        assert 'INDIRET' in (periodo[0]['nome'] or '').upper()
+        assert all(e.get('tipo') in ('entregavel', 'periodo') for e in data['etapas'])
 
 
 @pytest.mark.integration

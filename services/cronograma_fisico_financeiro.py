@@ -532,6 +532,10 @@ def painel_financeiro(obra) -> dict:
             "realizado": realizado_etapa.get(osc_id, Decimal("0")),
             "osc_id": osc_id,
             "itens": itens_por_osc.get(osc_id, []),
+            # 'entregavel' (medida por execução/RDO) | 'periodo' (custo de período,
+            # sem avanço físico). Período aparece junto, sem % físico.
+            "tipo": e.get("tipo", "entregavel"),
+            "pct_fisico": e.get("pct_fisico"),
         })
 
     # Verba disponível (caixa) = o que já entrou (recebido até hoje, pelas
