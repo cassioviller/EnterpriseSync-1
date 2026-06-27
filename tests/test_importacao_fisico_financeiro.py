@@ -22,6 +22,18 @@ def test_obra_tem_coluna_fluxo_caixa_planilha():
     assert 'fluxo_caixa_planilha' in {c.name for c in Obra.__table__.columns}
 
 
+@pytest.mark.integration
+def test_obra_tem_regime_medicao_default_fixa():
+    """F1 — regime de medição por obra: 'fixa' (marcos) | 'percentual' (% via RDO).
+    Default 'fixa' para não alterar obras existentes."""
+    from models import Obra
+    cols = {c.name for c in Obra.__table__.columns}
+    assert 'regime_medicao' in cols
+    col = Obra.__table__.columns['regime_medicao']
+    assert col.default.arg == 'fixa'
+    assert col.nullable is False
+
+
 import json
 from datetime import date, datetime
 from werkzeug.security import generate_password_hash

@@ -284,6 +284,13 @@ class Obra(db.Model):
     # Task #70 — Percentual de administração para cálculo de custo fixo da obra
     percentual_administracao = db.Column(db.Numeric(5, 2), default=0, nullable=False)
 
+    # Regime de medição/faturamento da obra:
+    #   'fixa'       → fatura por marcos contratuais (MedicaoContrato, datas/% fixos).
+    #   'percentual' → fatura pelo % físico das etapas apurado via RDO (MedicaoObra).
+    # Governa se o vínculo custo↔tarefa é obrigatório (percentual) ou opcional (fixa).
+    # Ver spec 2026-06-27-custo-cronograma-fieis-regime-medicao.
+    regime_medicao = db.Column(db.String(20), default='fixa', nullable=False)
+
     # Task #200 — Revisão de cronograma na primeira entrada da obra.
     # NULL = obra ainda não passou pelo gate de revisão inicial; uma vez
     # preenchido, a obra abre direto nos detalhes (sem redirect para a

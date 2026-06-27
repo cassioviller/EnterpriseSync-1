@@ -3998,6 +3998,7 @@ def executar_migracoes():
             (198, "Físico-financeiro — obra.fluxo_caixa_planilha (snapshot verbatim)", _migration_198_obra_fluxo_caixa_planilha),
             (199, "Físico-financeiro — tabela obra_servico_custo_item (linhas de custo por etapa)", _migration_199_obra_servico_custo_item),
             (200, "Físico-financeiro — datas de desembolso por linha de custo", _migration_200_osc_item_datas),
+            (201, "Obra.regime_medicao (fixa|percentual) + backfill percentual p/ obras com medição física", _migration_201_obra_regime_medicao),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13668,6 +13669,29 @@ def _migration_200_osc_item_datas():
         logger.info("[Migration 200] obra_servico_custo_item.data_inicio/data_fim adicionadas.")
     except Exception as e:
         logger.error(f"[Migration 200] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_201_obra_regime_medicao():
+    """Regime de medição/faturamento por obra: 'fixa' (marcos contratuais) ou
+    'percentual' (% físico via RDO). Default 'fixa' para não alterar obras
+    existentes; obras que já possuem medição física (medicao_obra) são marcadas
+    'percentual'. Idempotente. Ver spec 2026-06-27-custo-cronograma-fieis-regime-medicao."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE obra ADD COLUMN IF NOT EXISTS regime_medicao "
+                "VARCHAR(20) NOT NULL DEFAULT 'fixa'"))
+            # Backfill: obras com medição física real → 'percentual'.
+            conn.execute(sa_text("""
+                UPDATE obra SET regime_medicao = 'percentual'
+                WHERE id IN (SELECT DISTINCT obra_id FROM medicao_obra)
+                  AND regime_medicao = 'fixa'
+            """))
+        logger.info("[Migration 201] obra.regime_medicao adicionada + backfill percentual.")
+    except Exception as e:
+        logger.error(f"[Migration 201] Falha: {e}", exc_info=True)
         raise
 
 
