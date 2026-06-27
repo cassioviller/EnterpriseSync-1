@@ -126,6 +126,26 @@ def test_indiretos_e_periodo_na_baia():
 
 
 @pytest.mark.integration
+def test_periodo_fora_do_cronograma_rdo_portal():
+    """F7 — custo de período não vira TarefaCronograma. Como cronograma, RDO e portal
+    do cliente listam SOMENTE TarefaCronograma, a ausência aqui garante a ausência nos
+    três (invariante estrutural, não filtro)."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import montar_fisico_financeiro
+    from models import TarefaCronograma
+    with app.app_context():
+        admin_id = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+        dados = montar_fisico_financeiro(oid, admin_id)
+        nomes_periodo = {(e['nome'] or '').upper()
+                         for e in dados['etapas'] if e.get('tipo') == 'periodo'}
+        assert nomes_periodo, "deveria haver ao menos um custo de período"
+        nomes_tarefas = {(t.nome_tarefa or '').upper()
+                         for t in TarefaCronograma.query.filter_by(obra_id=oid).all()}
+        assert nomes_periodo.isdisjoint(nomes_tarefas)
+
+
+@pytest.mark.integration
 def test_painel_deriva_apos_import():
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from services.cronograma_fisico_financeiro import montar_fisico_financeiro
