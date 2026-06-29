@@ -16,12 +16,11 @@
       var desc = (it.descricao || '').trim();
       var chave = desc + '||' + fonte;
       if (!mapa[chave]) {
-        mapa[chave] = { descricao: desc, fonte: fonte, periodos: [], previsto: 0, realizado: 0 };
+        mapa[chave] = { descricao: desc, fonte: fonte, periodos: [], previsto: 0 };
         ordem.push(chave);
       }
       mapa[chave].periodos.push(it);
       mapa[chave].previsto += Number(it.valor || 0);
-      mapa[chave].realizado += Number(it.valor_realizado || 0);
     });
     return ordem.map(function (k) { return mapa[k]; }).sort(function (a, b) {
       return a.descricao.localeCompare(b.descricao) || a.fonte.localeCompare(b.fonte);
@@ -94,7 +93,6 @@
       '<td>' + fonteLabel(g.fonte) + '</td>' +
       '<td class="text-center">' + g.periodos.length + '</td>' +
       '<td class="text-end" data-grp-previsto>' + BRL(g.previsto) + '</td>' +
-      '<td class="text-end" data-grp-realizado>' + BRL(g.realizado) + '</td>' +
       '<td class="text-center"><button type="button" class="btn btn-sm btn-link fin-grp-open p-0" ' +
         'data-grupo="' + idx + '" title="Abrir períodos">&#9656;</button></td>' +
     '</tr>';
@@ -109,7 +107,7 @@
     box._etapa = et;
     box._grupos = agruparPeriodos(et.itens);
     var linhas = box._grupos.map(grupoLinhaHTML).join('') ||
-      '<tr><td colspan="6" class="text-muted small">Sem custos lançados.</td></tr>';
+      '<tr><td colspan="5" class="text-muted small">Sem custos lançados.</td></tr>';
     box.innerHTML =
       '<div class="border rounded p-3 bg-light">' +
       '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome +
@@ -121,7 +119,6 @@
         '<th>Custo</th><th style="width:90px">Fonte</th>' +
         '<th class="text-center" style="width:80px">Períodos</th>' +
         '<th class="text-end" style="width:130px">Previsto</th>' +
-        '<th class="text-end" style="width:130px">Realizado</th>' +
         '<th style="width:36px"></th></tr></thead>' +
       '<tbody id="fin-grp-body">' + linhas + '</tbody></table>' +
       '<div class="d-flex justify-content-end">' +
@@ -139,17 +136,13 @@
   function recalcGrupo(box, idx) {
     var g = box._grupos[idx];
     g.previsto = g.periodos.reduce(function (s, p) { return s + Number(p.valor || 0); }, 0);
-    g.realizado = g.periodos.reduce(function (s, p) { return s + Number(p.valor_realizado || 0); }, 0);
     var tr = box.querySelector('#fin-grp-body tr[data-grupo="' + idx + '"]');
     if (tr) {
       tr.querySelector('[data-grp-previsto]').textContent = BRL(g.previsto);
-      tr.querySelector('[data-grp-realizado]').textContent = BRL(g.realizado);
       tr.querySelector('td:nth-child(3)').textContent = g.periodos.length;
     }
     var prev = box._grupos.reduce(function (s, gg) { return s + gg.previsto; }, 0);
-    var real = box._grupos.reduce(function (s, gg) { return s + gg.realizado; }, 0);
     el('fin-it-prev').textContent = BRL(prev);
-    el('fin-et-real').textContent = BRL(real);
   }
 
   function coletarItensDaEtapa(box) {
@@ -160,7 +153,6 @@
           descricao: g.descricao,
           fonte: g.fonte,
           valor: String(p.valor || 0),
-          valor_realizado: String(p.valor_realizado || 0),
           data_inicio: p.data_inicio ? String(p.data_inicio).slice(0, 10) : '',
           data_fim: p.data_fim ? String(p.data_fim).slice(0, 10) : ''
         });
@@ -195,13 +187,6 @@
       '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger fin-pm-del p-0">&times;</button></td>' +
     '</tr>';
   }
-  function periodoRowRealHTML(p, i) {
-    return '<tr data-p="' + i + '">' +
-      '<td>' + rotuloMes(p.data_inicio) + '</td>' +
-      '<td><input type="number" step="0.01" class="form-control form-control-sm text-end fin-pm-realval" value="' +
-        Number(p.valor_realizado || 0) + '"></td>' +
-    '</tr>';
-  }
   function abrirModuloPeriodos(box, idx) {
     var g = box._grupos[idx];
     el('fin-pm-titulo').innerHTML = (g.descricao || 'Períodos') +
@@ -209,16 +194,12 @@
 
     function renderAbas() {
       el('fin-pm-prev-body').innerHTML = g.periodos.map(periodoRowPrevHTML).join('');
-      el('fin-pm-real-body').innerHTML = g.periodos.map(periodoRowRealHTML).join('');
       totais();
       el('fin-pm-prev-body').querySelectorAll('tr').forEach(bindPrevRow);
-      el('fin-pm-real-body').querySelectorAll('tr').forEach(bindRealRow);
     }
     function totais() {
       var tp = g.periodos.reduce(function (s, p) { return s + Number(p.valor || 0); }, 0);
-      var tr = g.periodos.reduce(function (s, p) { return s + Number(p.valor_realizado || 0); }, 0);
       el('fin-pm-prev-total').textContent = BRL(tp);
-      el('fin-pm-real-total').textContent = BRL(tr);
     }
     function bindPrevRow(trEl) {
       var i = parseInt(trEl.getAttribute('data-p'), 10);
@@ -236,14 +217,8 @@
         g.periodos.splice(i, 1); renderAbas();
       });
     }
-    function bindRealRow(trEl) {
-      var i = parseInt(trEl.getAttribute('data-p'), 10);
-      trEl.querySelector('.fin-pm-realval').addEventListener('input', function () {
-        g.periodos[i].valor_realizado = Number(this.value || 0); totais();
-      });
-    }
     el('fin-pm-add').onclick = function () {
-      g.periodos.push({ valor: 0, valor_realizado: 0, data_inicio: null, data_fim: null, fonte: g.fonte });
+      g.periodos.push({ valor: 0, data_inicio: null, data_fim: null, fonte: g.fonte });
       renderAbas();
     };
     el('fin-pm-aplicar').onclick = function () { recalcGrupo(box, idx); };

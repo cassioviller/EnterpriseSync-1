@@ -1626,30 +1626,14 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
         <div class="modal-body">
-          <ul class="nav nav-tabs mb-3" role="tablist">
-            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
-                data-bs-target="#fin-pm-prev" type="button">Previsão</button></li>
-            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
-                data-bs-target="#fin-pm-real" type="button">Realizado</button></li>
-          </ul>
-          <div class="tab-content">
-            <div class="tab-pane fade show active" id="fin-pm-prev">
-              <table class="table table-sm align-middle"><thead><tr>
-                <th>Mês</th><th style="width:140px">Início</th><th style="width:140px">Fim</th>
-                <th class="text-end" style="width:150px">Previsto (R$)</th><th style="width:32px"></th>
-              </tr></thead><tbody id="fin-pm-prev-body"></tbody></table>
-              <div class="d-flex justify-content-between">
-                <button type="button" id="fin-pm-add" class="btn btn-outline-secondary btn-sm">+ Adicionar período</button>
-                <span class="small text-muted">Total previsto: <strong id="fin-pm-prev-total">R$ 0</strong></span>
-              </div>
-            </div>
-            <div class="tab-pane fade" id="fin-pm-real">
-              <table class="table table-sm align-middle"><thead><tr>
-                <th>Mês</th><th class="text-end" style="width:150px">Realizado (R$)</th>
-              </tr></thead><tbody id="fin-pm-real-body"></tbody></table>
-              <div class="d-flex justify-content-end">
-                <span class="small text-muted">Total realizado: <strong id="fin-pm-real-total">R$ 0</strong></span>
-              </div>
+          <div id="fin-pm-prev">
+            <table class="table table-sm align-middle"><thead><tr>
+              <th>Mês</th><th style="width:140px">Início</th><th style="width:140px">Fim</th>
+              <th class="text-end" style="width:150px">Previsto (R$)</th><th style="width:32px"></th>
+            </tr></thead><tbody id="fin-pm-prev-body"></tbody></table>
+            <div class="d-flex justify-content-between">
+              <button type="button" id="fin-pm-add" class="btn btn-outline-secondary btn-sm">+ Adicionar período</button>
+              <span class="small text-muted">Total previsto: <strong id="fin-pm-prev-total">R$ 0</strong></span>
             </div>
           </div>
         </div>
