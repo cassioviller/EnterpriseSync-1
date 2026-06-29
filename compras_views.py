@@ -594,6 +594,21 @@ def nova_post():
                       'Selecione uma obra da lista.', 'danger')
                 return redirect(url_for('compras.nova'))
 
+        # Etapa (ObraServicoCusto) opcional — só vale com obra; valida obra+tenant.
+        osc_id = request.form.get('obra_servico_custo_id') or None
+        if osc_id and obra_id:
+            try:
+                osc_id = int(osc_id)
+            except (TypeError, ValueError):
+                osc_id = None
+            if osc_id:
+                from models import ObraServicoCusto as _OSC
+                if not _OSC.query.filter_by(
+                        id=osc_id, obra_id=obra_id, admin_id=admin_id).first():
+                    osc_id = None
+        else:
+            osc_id = None
+
         # Tipo de compra: 'normal' (default) ou 'aprovacao_cliente'
         tipo_compra = request.form.get('tipo_compra', 'normal').strip()
         if tipo_compra not in ('normal', 'aprovacao_cliente'):
@@ -659,6 +674,7 @@ def nova_post():
             fornecedor_id=fornecedor_id,
             data_compra=data_compra,
             obra_id=obra_id,
+            obra_servico_custo_id=osc_id,
             condicao_pagamento=condicao,
             parcelas=parcelas,
             valor_total=valor_total,

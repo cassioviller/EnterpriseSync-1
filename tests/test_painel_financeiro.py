@@ -1137,3 +1137,50 @@ def test_endpoint_etapas_custo():
         with c.session_transaction() as s:
             s['_user_id'] = str(outro); s['_fresh'] = True
         assert c.get(f'/obras/{oid}/etapas-custo').status_code == 404
+
+
+@pytest.mark.integration
+def test_post_nova_compra_grava_etapa():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, Fornecedor, PedidoCompra, GestaoCustoFilho
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+        forn = Fornecedor(nome='Forn POST', cnpj=f'CT{aid:012d}'[:18], admin_id=aid, ativo=True)
+        db.session.add(forn); db.session.commit()
+        forn_id = forn.id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        data = {
+            'fornecedor_id': str(forn_id), 'data_compra': '2026-06-10',
+            'condicao_pagamento': 'a_vista', 'parcelas': '1',
+            'obra_id': str(oid), 'obra_servico_custo_id': str(osc_id),
+            'tipo_compra': 'normal',
+            'item_descricao[]': 'Cimento', 'item_quantidade[]': '1',
+            'item_preco[]': '100', 'item_almoxarifado_id[]': '',
+        }
+        r = c.post('/compras/nova', data=data)
+        assert r.status_code in (200, 302)
+        # etapa inválida (não pertence à obra) → gravada como None
+        data2 = dict(data); data2['obra_servico_custo_id'] = '999999'
+        data2['item_descricao[]'] = 'Areia'
+        r2 = c.post('/compras/nova', data=data2)
+        assert r2.status_code in (200, 302)
+    with app.app_context():
+        ped = PedidoCompra.query.filter_by(admin_id=aid, numero=None,
+                                           obra_id=oid).order_by(PedidoCompra.id).all()
+        # primeiro pedido: etapa válida; segundo: None
+        p_ok = next(p for p in ped if p.obra_servico_custo_id == osc_id)
+        assert p_ok is not None
+        f = GestaoCustoFilho.query.filter_by(
+            origem_tabela='pedido_compra', origem_id=p_ok.id).first()
+        assert f.obra_servico_custo_id == osc_id
+        p_invalida = next(p for p in ped if p.id != p_ok.id)
+        assert p_invalida.obra_servico_custo_id is None
