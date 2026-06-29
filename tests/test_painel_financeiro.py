@@ -665,3 +665,37 @@ def test_get_lancamentos_endpoint():
         body = r.get_json()
         assert len(body['lancamentos']) == 1
         assert body['lancamentos'][0]['descricao'] == 'Conta luz'
+
+
+@pytest.mark.integration
+def test_post_lancamento_manual_cria_conta_pagar():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, GestaoCustoFilho
+    from decimal import Decimal
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos',
+                   json={'data': '2026-06-10', 'descricao': 'Aluguel sala', 'valor': '900'})
+        assert r.status_code == 200
+        body = r.get_json()
+        assert 'painel' in body and body.get('lancamento_id')
+        # valor negativo → 400
+        r2 = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos',
+                    json={'data': '2026-06-10', 'descricao': 'x', 'valor': '-5'})
+        assert r2.status_code == 400
+    with app.app_context():
+        f = GestaoCustoFilho.query.filter_by(
+            obra_id=oid, obra_servico_custo_id=osc_id,
+            origem_tabela='lancamento_periodo_manual').one()
+        assert Decimal(str(f.valor)) == Decimal('900')
+        assert f.descricao == 'Aluguel sala'

@@ -2212,6 +2212,46 @@ def financeiro_etapa_lancamentos(id, osc_id):
     return jsonify(_jsonable({'lancamentos': lancamentos_da_etapa(obra, osc_id)}))
 
 
+@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>/lancamentos', methods=['POST'])
+@login_required
+@capture_db_errors
+def financeiro_etapa_lancamento_criar(id, osc_id):
+    from decimal import Decimal, InvalidOperation
+    from datetime import date as _date
+    from models import ObraServicoCusto
+    from utils.financeiro_integration import registrar_custo_automatico
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    ObraServicoCusto.query.filter_by(id=osc_id, obra_id=obra.id, admin_id=admin_id).first_or_404()
+
+    p = request.get_json(silent=True) or {}
+    try:
+        valor = Decimal(str(p.get('valor')).replace(',', '.'))
+    except (InvalidOperation, ValueError, AttributeError, TypeError):
+        return jsonify({'erro': 'valor inválido'}), 400
+    if valor < 0:
+        return jsonify({'erro': 'valor inválido'}), 400
+    try:
+        data = _date.fromisoformat(str(p.get('data'))[:10])
+    except (ValueError, TypeError):
+        return jsonify({'erro': 'data inválida'}), 400
+    descricao = (str(p.get('descricao') or '').strip() or 'Lançamento')[:200]
+    fornecedor = (str(p.get('fornecedor') or '').strip() or 'Lançamento manual')[:120]
+
+    filho = registrar_custo_automatico(
+        admin_id=admin_id, tipo_categoria='OUTROS',
+        entidade_nome=fornecedor, entidade_id=None,
+        data=data, descricao=descricao, valor=valor,
+        obra_id=obra.id, obra_servico_custo_id=osc_id,
+        origem_tabela='lancamento_periodo_manual', origem_id=None,
+        force_v2=False)
+    if filho is None:
+        return jsonify({'erro': 'não foi possível registrar (tenant não-v2?)'}), 400
+    db.session.commit()
+    return jsonify(_jsonable({'lancamento_id': filho.id, 'painel': painel_financeiro(obra)}))
+
+
 # ────────────────────────────────────────────────────────────────────
 # Task #200 — Revisão inicial de cronograma da obra
 # ────────────────────────────────────────────────────────────────────
