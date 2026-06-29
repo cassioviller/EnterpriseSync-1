@@ -1078,3 +1078,33 @@ def test_processar_compra_normal_amarra_etapa():
         assert all(f.obra_servico_custo_id == osc.id for f in filhos)
         # realizado da etapa soma a compra inteira
         assert float(realizado_por_etapa(obra).get(osc.id, 0)) >= 1000 - 1
+
+
+@pytest.mark.integration
+def test_lancamentos_da_etapa_rotula_compra():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import lancamentos_da_etapa
+    from models import Obra, ObraServicoCusto, GestaoCustoPai, GestaoCustoFilho
+    from decimal import Decimal
+    from datetime import date
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        pai = GestaoCustoPai(admin_id=aid, tipo_categoria='MATERIAL',
+                             entidade_nome='Fornecedor X', valor_total=Decimal('300'),
+                             status='PENDENTE')
+        db.session.add(pai); db.session.flush()
+        db.session.add(GestaoCustoFilho(
+            pai_id=pai.id, admin_id=aid, obra_id=oid, obra_servico_custo_id=osc.id,
+            data_referencia=date(2026, 6, 10), descricao='Compra cimento',
+            valor=Decimal('300'), origem_tabela='pedido_compra', origem_id=1))
+        db.session.commit()
+        out = lancamentos_da_etapa(obra, osc.id)
+        l = next(x for x in out if x['descricao'] == 'Compra cimento')
+        assert l['origem_label'] == 'Compra'
+        assert l['editavel'] is False

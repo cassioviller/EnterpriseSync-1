@@ -597,6 +597,9 @@ def realizado_por_etapa(obra) -> dict:
     return out
 
 
+_ORIGEM_LABELS = {'lancamento_periodo_manual': 'Manual', 'pedido_compra': 'Compra'}
+
+
 def lancamentos_da_etapa(obra, osc_id) -> list:
     """Lança­mentos de custo realizado (GestaoCustoFilho) ligados a uma etapa (OSC),
     ordenados por data. `editavel` = lançamento manual criado no painel."""
@@ -619,7 +622,7 @@ def lancamentos_da_etapa(obra, osc_id) -> list:
         out.append({
             "id": f.id, "data": f.data_referencia, "descricao": f.descricao,
             "valor": f.valor, "origem": origem,
-            "origem_label": ("Manual" if editavel else (origem or "Sistema")),
+            "origem_label": _ORIGEM_LABELS.get(origem, (origem or "Sistema")),
             "categoria_id": cat_id, "categoria_label": cat_label,
             "editavel": editavel,
         })
