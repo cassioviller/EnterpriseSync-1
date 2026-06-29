@@ -113,6 +113,16 @@
                 <div class="form-text"><i class="fas fa-info-circle me-1"></i>A obra define o centro de custo do material na Gestão de Custos.</div>
               </div>
 
+              <div class="col-md-12">
+                <label class="form-label fw-semibold">
+                  Etapa <small class="text-muted ms-1">(opcional)</small>
+                </label>
+                <select name="obra_servico_custo_id" id="oscSelect" class="form-select" disabled>
+                  <option value="">— Sem etapa —</option>
+                </select>
+                <div class="form-text"><i class="fas fa-info-circle me-1"></i>Amarra o custo desta compra a uma etapa da obra (entra no Realizado dela). Selecione a Obra primeiro.</div>
+              </div>
+
               <div class="col-md-6">
                 <label class="form-label fw-semibold">Condição de Pagamento</label>
                 <select name="condicao_pagamento" id="selectCondicao" class="form-select" onchange="toggleParcelas(this.value)">
@@ -401,6 +411,35 @@ function atualizarTipoCompra() {
   }
 }
 atualizarTipoCompra();
+
+// ── ETAPA (cascata com a Obra) ────────────────────────────────
+(function () {
+  var oscSel = document.getElementById('oscSelect');
+  var obraSel = document.getElementById('obraSelect');
+  if (!oscSel || !obraSel) return;
+  function carregarEtapas(obraId) {
+    oscSel.innerHTML = '<option value="">— Sem etapa —</option>';
+    if (!obraId) { oscSel.disabled = true; return; }
+    fetch('/obras/' + obraId + '/etapas-custo', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        (d.etapas || []).forEach(function (e) {
+          var o = document.createElement('option');
+          o.value = e.id; o.textContent = e.nome;
+          oscSel.appendChild(o);
+        });
+        oscSel.disabled = false;
+      })
+      .catch(function () { oscSel.disabled = true; });
+  }
+  // select2 dispara o evento via jQuery; ouvir os dois p/ robustez
+  obraSel.addEventListener('change', function () { carregarEtapas(obraSel.value); });
+  if (window.jQuery) {
+    window.jQuery(obraSel).on('change', function () { carregarEtapas(obraSel.value); });
+  }
+  // estado inicial (caso a obra já venha selecionada)
+  carregarEtapas(obraSel.value);
+})();
 
 // ── REEMBOLSO ────────────────────────────────────────────────
 (function () {
