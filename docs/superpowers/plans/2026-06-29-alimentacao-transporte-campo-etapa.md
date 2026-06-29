@@ -312,7 +312,7 @@ def test_post_alimentacao_grava_etapa():
     with app.app_context():
         al = AlimentacaoLancamento.query.filter_by(obra_id=oid).first()
         assert al is not None and al.obra_servico_custo_id == osc_id
-        f = GestaoCustoFilho.query.filter_by(origem_tabela='alimentacao_lancamento').first()
+        f = GestaoCustoFilho.query.filter_by(origem_tabela='alimentacao_lancamento', obra_id=oid).first()
         assert f is not None and f.obra_servico_custo_id == osc_id
         assert float(realizado_por_etapa(Obra.query.get(oid)).get(osc_id, 0)) >= 120 - 1
 ```
