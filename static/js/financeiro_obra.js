@@ -250,6 +250,10 @@
 
     renderAbas();
     var modalEl = el('fin-periodos-modal');
+    // O modal mora dentro do pane #tab-financeiro, cujo ancestral cria um stacking
+    // context — o .modal-backdrop (anexado ao <body>) ficaria ACIMA do modal e
+    // interceptaria os cliques. Reparentar para o <body> escapa esse contexto.
+    if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
     var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
     modal.show();
   }
