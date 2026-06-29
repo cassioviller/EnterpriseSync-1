@@ -110,7 +110,18 @@ def sige_timeout_ms() -> int:
 @pytest.fixture(scope="session")
 def browser_launch_options() -> dict:
     """Opções de lançamento do browser Chromium."""
-    return {
+    import shutil
+    opts: dict = {
         "headless": True,
         "args": ["--no-sandbox", "--disable-dev-shm-usage"],
     }
+    # Usar Chromium do sistema quando o binário do Playwright não está disponível
+    system_chromium = (
+        os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH")
+        or shutil.which("chromium")
+        or shutil.which("chromium-browser")
+        or shutil.which("google-chrome")
+    )
+    if system_chromium:
+        opts["executable_path"] = system_chromium
+    return opts
