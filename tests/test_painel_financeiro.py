@@ -690,3 +690,30 @@ def test_endpoint_etapa_itens_persiste_valor_realizado():
     with app.app_context():
         it = ObraServicoCustoItem.query.filter_by(obra_servico_custo_id=osc_id).one()
         assert Decimal(str(it.valor_realizado)) == Decimal('250')
+
+
+@pytest.mark.integration
+def test_painel_itens_tem_campos_para_agrupar():
+    """Cada item do painel expõe (descricao, fonte, valor, valor_realizado) — base do
+    agrupamento (descricao, fonte) feito na UI. Itens de período repetem descricao+fonte."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra
+    from collections import Counter
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        p = painel_financeiro(Obra.query.get(oid))
+        for e in p['etapas']:
+            for it in e['itens']:
+                assert {'descricao', 'fonte', 'valor', 'valor_realizado'} <= set(it.keys())
+        # ao menos uma etapa de período tem grupo com >1 item (mesma descricao+fonte)
+        algum_grupo_multi = False
+        for e in p['etapas']:
+            chaves = Counter((it['descricao'], it['fonte']) for it in e['itens'])
+            if any(c > 1 for c in chaves.values()):
+                algum_grupo_multi = True
+        assert algum_grupo_multi
