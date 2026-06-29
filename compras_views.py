@@ -219,6 +219,7 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
             descricao=desc_cp[:300],
             valor=v,
             obra_id=pedido.obra_id,
+            obra_servico_custo_id=pedido.obra_servico_custo_id,
             origem_tabela='pedido_compra',
             origem_id=pedido.id,
         )
@@ -339,6 +340,7 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
         descricao=desc_cp[:300],
         valor=pedido.valor_total,
         obra_id=pedido.obra_id,
+        obra_servico_custo_id=pedido.obra_servico_custo_id,
         origem_tabela='pedido_compra',
         origem_id=pedido.id,
     )

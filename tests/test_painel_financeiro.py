@@ -1037,3 +1037,44 @@ def test_pedido_compra_tem_obra_servico_custo_id():
     from models import PedidoCompra
     cols = {c.name for c in PedidoCompra.__table__.columns}
     assert 'obra_servico_custo_id' in cols
+
+
+@pytest.mark.integration
+def test_processar_compra_normal_amarra_etapa():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import realizado_por_etapa
+    from compras_views import processar_compra_normal
+    from models import (Obra, ObraServicoCusto, Fornecedor, PedidoCompra,
+                        PedidoCompraItem, GestaoCustoFilho)
+    from decimal import Decimal
+    from datetime import date
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        forn = Fornecedor(nome='Forn Teste', cnpj=f'CT{aid:012d}'[:18], admin_id=aid, ativo=True)
+        db.session.add(forn); db.session.flush()
+        ped = PedidoCompra(
+            numero='PC-TST', fornecedor_id=forn.id, data_compra=date(2026, 6, 10),
+            obra_id=oid, obra_servico_custo_id=osc.id, condicao_pagamento='parcelado',
+            parcelas=2, valor_total=Decimal('1000.00'), tipo_compra='normal',
+            processada_apos_aprovacao=False, admin_id=aid)
+        db.session.add(ped); db.session.flush()
+        item = PedidoCompraItem(
+            pedido_id=ped.id, almoxarifado_item_id=None, descricao='Cimento',
+            quantidade=Decimal('1'), preco_unitario=Decimal('1000'),
+            subtotal=Decimal('1000'), admin_id=aid)
+        db.session.add(item); db.session.flush()
+        itens = [('Cimento', 1.0, 1000.0, None, 1000.0)]
+        processar_compra_normal(ped, itens, aid, aid)
+        db.session.commit()
+        filhos = GestaoCustoFilho.query.filter_by(
+            origem_tabela='pedido_compra', origem_id=ped.id).all()
+        assert len(filhos) == 2  # parcelado → 2 parcelas
+        assert all(f.obra_servico_custo_id == osc.id for f in filhos)
+        # realizado da etapa soma a compra inteira
+        assert float(realizado_por_etapa(obra).get(osc.id, 0)) >= 1000 - 1
