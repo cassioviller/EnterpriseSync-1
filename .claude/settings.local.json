@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(git push origin main)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git push origin main)",
       "Bash(npx skills *)",
       "Bash(mkdir -p .claude/skills)",
       "Bash(git clone *)",
