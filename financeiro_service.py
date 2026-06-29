@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, date
 from decimal import Decimal
 from typing import List, Dict
 from sqlalchemy import and_, func
+from sqlalchemy.orm import joinedload
 from app import db
 from models import (
     ContaPagar, ContaReceber, BancoEmpresa, LancamentoContabil, PartidaContabil, GestaoCustoPai, GestaoCustoFilho, FluxoCaixa
@@ -478,7 +479,11 @@ class FinanceiroService:
             dt_fim = datetime.combine(data_fim, datetime.max.time())
             from sqlalchemy import or_ as sql_or
             STATUSES_ABERTOS = ['PENDENTE', 'SOLICITADO', 'AUTORIZADO', 'PARCIAL']
-            custos_v2_previstos = GestaoCustoPai.query.filter(
+            # joinedload da categoria: o rótulo do fluxo lê custo.categoria_fluxo_caixa;
+            # eager-load resolve a categoria no MESMO SELECT do Pai (snapshot já visível),
+            # evitando o lazy-load por linha que ficava stale na 1ª leitura após a escrita.
+            custos_v2_previstos = GestaoCustoPai.query.options(
+                joinedload(GestaoCustoPai.categoria_fluxo_caixa)).filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(STATUSES_ABERTOS),
@@ -526,7 +531,8 @@ class FinanceiroService:
             pagamentos_realizados = pr_query.all()
 
             # Manter compatibilidade: PAGO via GestaoCustoPai.data_pagamento (fallback)
-            cp_query = GestaoCustoPai.query.filter(
+            cp_query = GestaoCustoPai.query.options(
+                joinedload(GestaoCustoPai.categoria_fluxo_caixa)).filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status == 'PAGO',
