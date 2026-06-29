@@ -161,7 +161,7 @@ def test_processar_compra_normal_amarra_etapa():
         oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
         obra = Obra.query.get(oid)
         osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
-        forn = Fornecedor(nome='Forn Teste', admin_id=aid, ativo=True)
+        forn = Fornecedor(nome='Forn Teste', cnpj=f'CT{aid:012d}'[:18], admin_id=aid, ativo=True)
         db.session.add(forn); db.session.flush()
         ped = PedidoCompra(
             numero='PC-TST', fornecedor_id=forn.id, data_compra=date(2026, 6, 10),
@@ -416,7 +416,7 @@ def test_post_nova_compra_grava_etapa():
                                'cronograma_fisico_financeiro_baias.json')
         oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
         osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
-        forn = Fornecedor(nome='Forn POST', admin_id=aid, ativo=True)
+        forn = Fornecedor(nome='Forn POST', cnpj=f'CT{aid:012d}'[:18], admin_id=aid, ativo=True)
         db.session.add(forn); db.session.commit()
         forn_id = forn.id
     with app.test_client() as c:
@@ -624,7 +624,7 @@ def test_compra_com_etapa_entra_no_painel_realizado():
                                'cronograma_fisico_financeiro_baias.json')
         oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
         osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
-        forn = Fornecedor(nome='Forn E2E', admin_id=aid, ativo=True)
+        forn = Fornecedor(nome='Forn E2E', cnpj=f'CT{aid:012d}'[:18], admin_id=aid, ativo=True)
         db.session.add(forn); db.session.commit()
         forn_id = forn.id
     with app.test_client() as c:
