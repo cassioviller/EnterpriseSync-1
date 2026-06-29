@@ -30,7 +30,7 @@
 | `models.py` (`AlimentacaoLancamento` ~l.1140; `LancamentoTransporte` ~l.4803) | ORM | **Modificar** — `obra_servico_custo_id` + relationship em ambos |
 | `migrations.py` (registry ~l.4005; defs ~l.13760) | Schema | **Modificar** — `_migration_206_*` (duas colunas) |
 | `transporte_views.py` (`novo_post` l.151) | Criação do transporte | **Modificar** — ler/validar/gravar osc + passar ao helper |
-| `alimentacao_views.py` (POST em `/lancamentos/novo` ~l.324) | Criação da alimentação | **Modificar** — idem |
+| `alimentacao_views.py` (POST em `/lancamentos/novo-v2` (`lancamento_novo_v2`) ~l.324) | Criação da alimentação | **Modificar** — idem |
 | `services/cronograma_fisico_financeiro.py` (`_ORIGEM_LABELS` ~l.600) | Rótulos da aba Realizado | **Modificar** — novas origens |
 | `templates/transporte/novo_lancamento.html` (obra select l.78) | UI | **Modificar** — id no obra select + select Etapa + cascata |
 | `templates/alimentacao/lancamento_novo_v2.html` (obra select l.526) | UI | **Modificar** — select Etapa + cascata |
@@ -279,7 +279,7 @@ git commit -m "feat(baia): transporte grava obra_servico_custo_id e amarra ao re
 
 **Interfaces:**
 - Consumes: `AlimentacaoLancamento.obra_servico_custo_id` (Task 1); `registrar_custo_automatico(..., obra_servico_custo_id=)`.
-- Produces: `POST /alimentacao/lancamentos/novo` com `obra_servico_custo_id` → grava no `AlimentacaoLancamento` (se pertencer à obra+tenant; senão `None`) e o `GestaoCustoFilho` (`origem_tabela='alimentacao_lancamento'`) herda a etapa.
+- Produces: `POST /alimentacao/lancamentos/novo-v2` (função `lancamento_novo_v2`) com `obra_servico_custo_id` → grava no `AlimentacaoLancamento` (se pertencer à obra+tenant; senão `None`) e o `GestaoCustoFilho` (`origem_tabela='alimentacao_lancamento'`) herda a etapa.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -302,7 +302,7 @@ def test_post_alimentacao_grava_etapa():
     with app.test_client() as c:
         with c.session_transaction() as s:
             s['_user_id'] = str(aid); s['_fresh'] = True
-        r = c.post('/alimentacao/lancamentos/novo', data={
+        r = c.post('/alimentacao/lancamentos/novo-v2', data={
             'obra_id': str(oid), 'data': '2026-06-10', 'descricao': 'Refeições',
             'obra_servico_custo_id': str(osc_id),
             'itens[0][preco]': '120', 'itens[0][quantidade]': '1',
