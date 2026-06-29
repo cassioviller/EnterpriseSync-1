@@ -597,7 +597,15 @@ def realizado_por_etapa(obra) -> dict:
     return out
 
 
-_ORIGEM_LABELS = {'lancamento_periodo_manual': 'Manual', 'pedido_compra': 'Compra'}
+_ORIGEM_LABELS = {
+    'lancamento_periodo_manual': 'Manual',
+    'pedido_compra': 'Compra',
+    'alimentacao_lancamento': 'Alimentação',
+    'lancamento_transporte': 'Transporte',
+    'registro_ponto': 'Mão de obra',
+    'registro_ponto_va': 'Vale alimentação',
+    'registro_ponto_vt': 'Vale transporte',
+}
 
 
 def lancamentos_da_etapa(obra, osc_id) -> list:
