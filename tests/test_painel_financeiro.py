@@ -588,3 +588,72 @@ def test_osc_item_valor_realizado_default_zero():
             descricao='Escritório', valor=Decimal('100'), fonte='veks', ordem=0)
         db.session.add(it); db.session.commit()
         assert Decimal(str(it.valor_realizado or 0)) == Decimal('0')
+
+
+@pytest.mark.integration
+def test_painel_itens_expoem_valor_realizado():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        p = painel_financeiro(Obra.query.get(oid))
+        for e in p['etapas']:
+            for it in e['itens']:
+                assert 'valor_realizado' in it
+
+
+@pytest.mark.integration
+def test_realizado_manual_entra_no_realizado_da_etapa_e_kpi():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Obra, ObraServicoCusto, ObraServicoCustoItem
+    from decimal import Decimal
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        kpi_antes = painel_financeiro(obra)['kpis']['custo_realizado']
+        # lança 7.000 de realizado manual num período qualquer
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        it = (ObraServicoCustoItem.query
+              .filter_by(obra_servico_custo_id=osc.id).order_by(ObraServicoCustoItem.ordem).first())
+        it.valor_realizado = Decimal('7000')
+        db.session.commit()
+        p = painel_financeiro(Obra.query.get(oid))
+        # KPI custo realizado cresceu 7.000
+        assert abs(float(p['kpis']['custo_realizado']) - (float(kpi_antes) + 7000)) < 1
+        # realizado da etapa dona do item reflete os 7.000 (era ~0 para estas etapas)
+        et = next(e for e in p['etapas'] if e['osc_id'] == osc.id)
+        assert float(et['realizado']) >= 7000 - 1
+
+
+@pytest.mark.integration
+def test_curva_realizado_inclui_valor_realizado_manual():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import curva_realizado
+    from models import Obra, ObraServicoCusto, ObraServicoCustoItem
+    from decimal import Decimal
+    from datetime import date
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        it = (ObraServicoCustoItem.query
+              .filter_by(obra_servico_custo_id=osc.id).order_by(ObraServicoCustoItem.ordem).first())
+        it.data_inicio = date(2026, 7, 15)
+        it.valor_realizado = Decimal('3000')
+        db.session.commit()
+        out = curva_realizado(Obra.query.get(oid))
+        assert out.get('2026-07', Decimal('0')) >= Decimal('3000')

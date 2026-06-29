@@ -518,7 +518,8 @@ def painel_financeiro(obra) -> dict:
                             ObraServicoCustoItem.ordem).all())
         for it in linhas:
             itens_por_osc.setdefault(it.obra_servico_custo_id, []).append(
-                {"id": it.id, "descricao": it.descricao, "valor": it.valor, "fonte": it.fonte,
+                {"id": it.id, "descricao": it.descricao, "valor": it.valor,
+                 "valor_realizado": it.valor_realizado, "fonte": it.fonte,
                  "data_inicio": it.data_inicio, "data_fim": it.data_fim})
 
     etapas = []
@@ -544,6 +545,7 @@ def painel_financeiro(obra) -> dict:
     # `verba_disponivel` do resumo usa outra fonte de "recebido" (MedicaoObra),
     # que fica zerada em obras importadas/sem medição de execução.
     custo_realizado = Decimal(str(resumo.get("total_realizado", 0) or 0))
+    custo_realizado += sum(realizado_manual_por_osc(obra).values(), Decimal("0"))
     verba_disponivel = k["recebido_ate_hoje"] - custo_realizado
 
     return {
@@ -577,6 +579,35 @@ def curva_realizado(obra) -> dict:
             continue
         chave = f"{dt.year:04d}-{dt.month:02d}"
         out[chave] = out.get(chave, Decimal("0")) + Decimal(valor or 0)
+    # realizado manual por período (spec 2026-06-29): faseado pelo mês de data_inicio
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(
+        obra_id=obra.id, admin_id=obra.admin_id).all()]
+    if osc_ids:
+        for l in (ObraServicoCustoItem.query
+                  .filter(ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).all()):
+            vr = Decimal(str(l.valor_realizado or 0))
+            if vr and l.data_inicio:
+                chave = f"{l.data_inicio.year:04d}-{l.data_inicio.month:02d}"
+                out[chave] = out.get(chave, Decimal("0")) + vr
+    return out
+
+
+def realizado_manual_por_osc(obra) -> dict:
+    """Σ valor_realizado (lançamento manual por período) por obra_servico_custo_id.
+    Realizado manual da spec 2026-06-29 — aditivo ao realizado de GestaoCustoFilho."""
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(
+        obra_id=obra.id, admin_id=obra.admin_id).all()]
+    out: dict = {}
+    if not osc_ids:
+        return out
+    linhas = ObraServicoCustoItem.query.filter(
+        ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).all()
+    for l in linhas:
+        vr = Decimal(str(l.valor_realizado or 0))
+        if vr:
+            out[l.obra_servico_custo_id] = out.get(l.obra_servico_custo_id, Decimal("0")) + vr
     return out
 
 
@@ -594,6 +625,8 @@ def realizado_por_etapa(obra) -> dict:
         if osc_id is None:
             continue
         out[osc_id] = out.get(osc_id, Decimal("0")) + Decimal(valor or 0)
+    for osc_id, vr in realizado_manual_por_osc(obra).items():
+        out[osc_id] = out.get(osc_id, Decimal("0")) + vr
     return out
 
 
