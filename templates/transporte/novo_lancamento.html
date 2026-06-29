@@ -75,12 +75,19 @@
               <label class="form-label fw-semibold">
                 Obra <span class="text-danger">*</span>
               </label>
-              <select name="obra_id" class="form-select" required>
+              <select name="obra_id" id="obraSelect" class="form-select" required>
                 <option value="">Selecione a obra...</option>
                 {% for o in obras %}
                   <option value="{{ o.id }}">{{ o.nome }}</option>
                 {% endfor %}
               </select>
+              <div class="mt-2">
+                <label class="form-label">Etapa <small class="text-muted">(opcional)</small></label>
+                <select name="obra_servico_custo_id" id="oscSelect" class="form-select" disabled>
+                  <option value="">— Sem etapa —</option>
+                </select>
+                <small class="text-muted">Amarra o custo a uma etapa da obra (entra no Realizado dela).</small>
+              </div>
             </div>
 
             <!-- Descrição -->
@@ -235,6 +242,29 @@
     const row = document.getElementById(`reimb_row_${idx}`);
     if (row) row.remove();
   };
+})();
+</script>
+<script>
+(function () {
+  var obraSel = document.getElementById('obraSelect');
+  var oscSel = document.getElementById('oscSelect');
+  if (!obraSel || !oscSel) return;
+  function carregarEtapas(obraId) {
+    oscSel.innerHTML = '<option value="">— Sem etapa —</option>';
+    if (!obraId) { oscSel.disabled = true; return; }
+    fetch('/obras/' + obraId + '/etapas-custo', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        (d.etapas || []).forEach(function (e) {
+          var o = document.createElement('option');
+          o.value = e.id; o.textContent = e.nome; oscSel.appendChild(o);
+        });
+        oscSel.disabled = false;
+      })
+      .catch(function () { oscSel.disabled = true; });
+  }
+  obraSel.addEventListener('change', function () { carregarEtapas(obraSel.value); });
+  carregarEtapas(obraSel.value);
 })();
 </script>
 {% endblock %}
