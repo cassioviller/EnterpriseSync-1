@@ -177,6 +177,20 @@ def novo_post():
         if obra_id:
             obra_id = int(obra_id)
 
+        osc_id = request.form.get('obra_servico_custo_id') or None
+        if osc_id and obra_id:
+            try:
+                osc_id = int(osc_id)
+            except (TypeError, ValueError):
+                osc_id = None
+            if osc_id:
+                from models import ObraServicoCusto as _OSC
+                if not _OSC.query.filter_by(
+                        id=osc_id, obra_id=obra_id, admin_id=admin_id).first():
+                    osc_id = None
+        else:
+            osc_id = None
+
         # Upload do comprovante
         comprovante_url = None
         arquivo = request.files.get('comprovante')
@@ -193,6 +207,7 @@ def novo_post():
             veiculo_id=veiculo_id,
             centro_custo_id=centro_custo_id,
             obra_id=obra_id,
+            obra_servico_custo_id=osc_id,
             data_lancamento=data_lancamento,
             valor=valor,
             descricao=descricao,
@@ -283,6 +298,7 @@ def novo_post():
                     descricao=descricao or f'Lançamento de transporte — {_entidade_nome}',
                     valor=_valor_liquido,
                     obra_id=obra_id,
+                    obra_servico_custo_id=osc_id,
                     centro_custo_id=centro_custo_id,
                     origem_tabela='lancamento_transporte',
                     origem_id=lancamento.id,

@@ -1225,3 +1225,38 @@ def test_alimentacao_transporte_tem_obra_servico_custo_id():
     from models import AlimentacaoLancamento, LancamentoTransporte
     assert 'obra_servico_custo_id' in {c.name for c in AlimentacaoLancamento.__table__.columns}
     assert 'obra_servico_custo_id' in {c.name for c in LancamentoTransporte.__table__.columns}
+
+
+@pytest.mark.integration
+def test_post_transporte_grava_etapa():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import realizado_por_etapa
+    from models import (Usuario, Obra, ObraServicoCusto, GestaoCustoFilho,
+                        CategoriaTransporte, CentroCusto)
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+        cat = CategoriaTransporte(nome='VT', admin_id=aid)
+        cc = CentroCusto(admin_id=aid, codigo=f'CC{aid}', nome='CC', tipo='obra', obra_id=oid)
+        db.session.add_all([cat, cc]); db.session.commit()
+        cat_id, cc_id = cat.id, cc.id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.post('/transporte/novo', data={
+            'categoria_id': str(cat_id), 'centro_custo_id': str(cc_id),
+            'data_lancamento': '2026-06-10', 'valor': '300', 'descricao': 'Van obra',
+            'obra_id': str(oid), 'obra_servico_custo_id': str(osc_id),
+        })
+        assert r.status_code in (200, 302)
+    with app.app_context():
+        f = GestaoCustoFilho.query.filter_by(
+            origem_tabela='lancamento_transporte', obra_id=oid).first()
+        assert f is not None and f.obra_servico_custo_id == osc_id
+        assert float(realizado_por_etapa(Obra.query.get(oid)).get(osc_id, 0)) >= 300 - 1
