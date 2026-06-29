@@ -2,6 +2,31 @@
 (function () {
   var BRL = function (v) { return 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'); };
   var BRLk = function (v) { return 'R$ ' + Math.round((v || 0) / 1000).toLocaleString('pt-BR') + 'k'; };
+  var MESES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  function rotuloMes(iso) {
+    if (!iso) return '—';
+    var s = String(iso).slice(0, 10), m = parseInt(s.slice(5, 7), 10);
+    if (!m || m < 1 || m > 12) return '—';
+    return MESES_ABREV[m - 1] + '/' + s.slice(2, 4);
+  }
+  function agruparPeriodos(itens) {
+    var mapa = {}, ordem = [];
+    (itens || []).forEach(function (it) {
+      var fonte = it.fonte === 'fat_direto' ? 'fat_direto' : 'veks';
+      var desc = (it.descricao || '').trim();
+      var chave = desc + '||' + fonte;
+      if (!mapa[chave]) {
+        mapa[chave] = { descricao: desc, fonte: fonte, periodos: [], previsto: 0, realizado: 0 };
+        ordem.push(chave);
+      }
+      mapa[chave].periodos.push(it);
+      mapa[chave].previsto += Number(it.valor || 0);
+      mapa[chave].realizado += Number(it.valor_realizado || 0);
+    });
+    return ordem.map(function (k) { return mapa[k]; }).sort(function (a, b) {
+      return a.descricao.localeCompare(b.descricao) || a.fonte.localeCompare(b.fonte);
+    });
+  }
   var C = {}, loaded = false, ENDPOINT = null, CONFIG_ENDPOINT = null, OBRA_ID = null, cfgBound = false;
   function el(id) { return document.getElementById(id); }
   function csrfToken() {
@@ -62,22 +87,16 @@
       '. A Veks desembolsa mais do que recebeu nesse(s) período(s) — avalie adiantar medição ou ' +
       'reescalonar desembolso.</div>';
   }
-  function etapaLinhaHTML(it) {
-    var sel = function (v) { return it && it.fonte === v ? ' selected' : ''; };
-    return '<tr>' +
-      '<td><input class="form-control form-control-sm fin-it-desc" value="' +
-        ((it && it.descricao) ? String(it.descricao).replace(/"/g, '&quot;') : '') + '"></td>' +
-      '<td><input type="number" step="0.01" class="form-control form-control-sm fin-it-valor text-end" value="' +
-        (it ? Number(it.valor || 0) : 0) + '"></td>' +
-      '<td><select class="form-select form-select-sm fin-it-fonte">' +
-        '<option value="veks"' + sel('veks') + '>Veks</option>' +
-        '<option value="fat_direto"' + sel('fat_direto') + '>Fat direto</option>' +
-      '</select></td>' +
-      '<td><input type="date" class="form-control form-control-sm fin-it-ini" value="' +
-        ((it && it.data_inicio) ? String(it.data_inicio).slice(0, 10) : '') + '"></td>' +
-      '<td><input type="date" class="form-control form-control-sm fin-it-fim" value="' +
-        ((it && it.data_fim) ? String(it.data_fim).slice(0, 10) : '') + '"></td>' +
-      '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger fin-it-del p-0">&times;</button></td>' +
+  function fonteLabel(f) { return f === 'fat_direto' ? 'Fat direto' : 'Veks'; }
+  function grupoLinhaHTML(g, idx) {
+    return '<tr data-grupo="' + idx + '">' +
+      '<td>' + String(g.descricao || '').replace(/</g, '&lt;') + '</td>' +
+      '<td>' + fonteLabel(g.fonte) + '</td>' +
+      '<td class="text-center">' + g.periodos.length + '</td>' +
+      '<td class="text-end" data-grp-previsto>' + BRL(g.previsto) + '</td>' +
+      '<td class="text-end" data-grp-realizado>' + BRL(g.realizado) + '</td>' +
+      '<td class="text-center"><button type="button" class="btn btn-sm btn-link fin-grp-open p-0" ' +
+        'data-grupo="' + idx + '" title="Abrir períodos">&#9656;</button></td>' +
     '</tr>';
   }
   function showEtapa(et) {
@@ -87,64 +106,80 @@
         '<div class="small text-muted mt-1">Etapa sem custo único vinculável — edição indisponível.</div></div>';
       return;
     }
-    var linhas = (et.itens || []).map(etapaLinhaHTML).join('');
+    box._etapa = et;
+    box._grupos = agruparPeriodos(et.itens);
+    var linhas = box._grupos.map(grupoLinhaHTML).join('') ||
+      '<tr><td colspan="6" class="text-muted small">Sem custos lançados.</td></tr>';
     box.innerHTML =
       '<div class="border rounded p-3 bg-light">' +
       '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome +
         (et.tipo === 'periodo' ? ' <span class="badge bg-secondary" title="Custo de período — sem avanço físico, fora do RDO/cronograma">período</span>' : '') +
         '</strong>' +
-        '<span>Realizado: ' + BRL(et.realizado) + ' / Previsto: <span id="fin-it-prev">' + BRL(et.previsto) + '</span></span></div>' +
+        '<span>Realizado: <span id="fin-et-real">' + BRL(et.realizado) + '</span>' +
+        ' / Previsto: <span id="fin-it-prev">' + BRL(et.previsto) + '</span></span></div>' +
       '<table class="table table-sm align-middle mb-2"><thead><tr>' +
-        '<th>Descrição</th><th class="text-end" style="width:130px">Valor (R$)</th>' +
-        '<th style="width:110px">Tipo</th><th style="width:150px">Desembolso de</th>' +
-        '<th style="width:150px">até</th><th style="width:32px"></th></tr></thead>' +
-      '<tbody id="fin-it-body">' + linhas + '</tbody></table>' +
-      '<div class="d-flex justify-content-between align-items-end flex-wrap gap-2">' +
-        '<button type="button" id="fin-it-add" class="btn btn-outline-secondary btn-sm">+ Adicionar linha</button>' +
-        '<div class="d-flex align-items-end gap-2">' +
-          '<div><label class="small text-muted">Orçado/venda (R$)</label>' +
-            '<input id="fin-it-orc" type="number" step="0.01" class="form-control form-control-sm" value="' + Number(et.previsto || 0) + '"></div>' +
-          '<button type="button" id="fin-it-save" class="btn btn-primary btn-sm">Salvar etapa</button>' +
-        '</div>' +
+        '<th>Custo</th><th style="width:90px">Fonte</th>' +
+        '<th class="text-center" style="width:80px">Períodos</th>' +
+        '<th class="text-end" style="width:130px">Previsto</th>' +
+        '<th class="text-end" style="width:130px">Realizado</th>' +
+        '<th style="width:36px"></th></tr></thead>' +
+      '<tbody id="fin-grp-body">' + linhas + '</tbody></table>' +
+      '<div class="d-flex justify-content-end">' +
+        '<button type="button" id="fin-it-save" class="btn btn-primary btn-sm">Salvar etapa</button>' +
       '</div></div>';
 
-    function recalcPrev() {
-      var total = 0;
-      box.querySelectorAll('.fin-it-valor').forEach(function (i) { total += Number(i.value || 0); });
-      el('fin-it-prev').textContent = BRL(total);
-    }
-    function bindRow(tr) {
-      tr.querySelector('.fin-it-del').addEventListener('click', function () { tr.remove(); recalcPrev(); });
-      tr.querySelector('.fin-it-valor').addEventListener('input', recalcPrev);
-    }
-    box.querySelectorAll('#fin-it-body tr').forEach(bindRow);
-    el('fin-it-add').addEventListener('click', function () {
-      var tmp = document.createElement('tbody');
-      tmp.innerHTML = etapaLinhaHTML(null);
-      var tr = tmp.firstChild;
-      el('fin-it-body').appendChild(tr);
-      bindRow(tr);
+    box.querySelectorAll('.fin-grp-open').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        abrirModuloPeriodos(box, parseInt(btn.getAttribute('data-grupo'), 10));
+      });
     });
-    el('fin-it-save').addEventListener('click', function () {
-      var itens = [];
-      box.querySelectorAll('#fin-it-body tr').forEach(function (tr) {
+    el('fin-it-save').addEventListener('click', function () { salvarEtapa(box); });
+  }
+
+  function recalcGrupo(box, idx) {
+    var g = box._grupos[idx];
+    g.previsto = g.periodos.reduce(function (s, p) { return s + Number(p.valor || 0); }, 0);
+    g.realizado = g.periodos.reduce(function (s, p) { return s + Number(p.valor_realizado || 0); }, 0);
+    var tr = box.querySelector('#fin-grp-body tr[data-grupo="' + idx + '"]');
+    if (tr) {
+      tr.querySelector('[data-grp-previsto]').textContent = BRL(g.previsto);
+      tr.querySelector('[data-grp-realizado]').textContent = BRL(g.realizado);
+      tr.querySelector('td:nth-child(3)').textContent = g.periodos.length;
+    }
+    var prev = box._grupos.reduce(function (s, gg) { return s + gg.previsto; }, 0);
+    var real = box._grupos.reduce(function (s, gg) { return s + gg.realizado; }, 0);
+    el('fin-it-prev').textContent = BRL(prev);
+    el('fin-et-real').textContent = BRL(real);
+  }
+
+  function coletarItensDaEtapa(box) {
+    var itens = [];
+    box._grupos.forEach(function (g) {
+      g.periodos.forEach(function (p) {
         itens.push({
-          descricao: tr.querySelector('.fin-it-desc').value,
-          valor: tr.querySelector('.fin-it-valor').value || '0',
-          fonte: tr.querySelector('.fin-it-fonte').value,
-          data_inicio: tr.querySelector('.fin-it-ini').value || '',
-          data_fim: tr.querySelector('.fin-it-fim').value || ''
+          descricao: g.descricao,
+          fonte: g.fonte,
+          valor: String(p.valor || 0),
+          valor_realizado: String(p.valor_realizado || 0),
+          data_inicio: p.data_inicio ? String(p.data_inicio).slice(0, 10) : '',
+          data_fim: p.data_fim ? String(p.data_fim).slice(0, 10) : ''
         });
       });
-      fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/itens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
-        body: JSON.stringify({ itens: itens, valor_orcado: el('fin-it-orc').value || '0' })
-      })
-        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-        .then(function (p) { render(p); box.innerHTML = '<div class="text-success small">Salvo e recalculado.</div>'; })
-        .catch(function () { box.innerHTML = '<div class="text-danger small">Falha ao salvar.</div>'; });
     });
+    return itens;
+  }
+
+  function salvarEtapa(box) {
+    var et = box._etapa;
+    var prevTotal = box._grupos.reduce(function (s, g) { return s + g.previsto; }, 0);
+    fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/itens', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+      body: JSON.stringify({ itens: coletarItensDaEtapa(box), valor_orcado: String(prevTotal) })
+    })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (p) { render(p); box.innerHTML = '<div class="text-success small">Salvo e recalculado.</div>'; })
+      .catch(function () { box.innerHTML = '<div class="text-danger small">Falha ao salvar.</div>'; });
   }
   function buildCharts(p) {
     var blue = '#2E6BB0', green = '#198754', amber = '#C8870E', red = '#C0392B', grid = { color: '#E5EBF2' };
