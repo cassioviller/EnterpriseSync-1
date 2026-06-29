@@ -597,6 +597,31 @@ def realizado_por_etapa(obra) -> dict:
     return out
 
 
+def lancamentos_da_etapa(obra, osc_id) -> list:
+    """Lança­mentos de custo realizado (GestaoCustoFilho) ligados a uma etapa (OSC),
+    ordenados por data. `editavel` = lançamento manual criado no painel."""
+    from models import db, GestaoCustoFilho, GestaoCustoPai
+    rows = (db.session.query(GestaoCustoFilho)
+            .join(GestaoCustoPai, GestaoCustoFilho.pai_id == GestaoCustoPai.id)
+            .filter(GestaoCustoFilho.obra_id == obra.id)
+            .filter(GestaoCustoFilho.obra_servico_custo_id == osc_id)
+            .filter(GestaoCustoPai.admin_id == obra.admin_id)
+            .filter(GestaoCustoPai.tipo_categoria != 'FATURAMENTO_DIRETO')
+            .all())
+    out = []
+    for f in rows:
+        origem = f.origem_tabela or ''
+        editavel = origem == 'lancamento_periodo_manual'
+        out.append({
+            "id": f.id, "data": f.data_referencia, "descricao": f.descricao,
+            "valor": f.valor, "origem": origem,
+            "origem_label": ("Manual" if editavel else (origem or "Sistema")),
+            "editavel": editavel,
+        })
+    out.sort(key=lambda x: (x["data"] is None, x["data"] or 0))
+    return out
+
+
 def fasear_custo_por_linhas(obra_id, admin_id, sab, dom):
     """Faseia por dias úteis o valor de cada linha de custo QUE TEM datas válidas,
     agregando por mês 'YYYY-MM' e por fonte. Retorna (meses_veks, meses_fat,

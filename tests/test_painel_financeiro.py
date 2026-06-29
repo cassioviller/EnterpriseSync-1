@@ -597,3 +597,37 @@ def test_painel_itens_tem_campos_para_agrupar():
             if any(c > 1 for c in chaves.values()):
                 algum_grupo_multi = True
         assert algum_grupo_multi
+
+
+@pytest.mark.integration
+def test_lancamentos_da_etapa_lista_gestao_custo_filho():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import lancamentos_da_etapa
+    from models import Obra, ObraServicoCusto, GestaoCustoPai, GestaoCustoFilho
+    from decimal import Decimal
+    from datetime import date
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        pai = GestaoCustoPai(admin_id=aid, tipo_categoria='OUTROS',
+                             entidade_nome='Fornecedor X', valor_total=Decimal('300'),
+                             status='PENDENTE')
+        db.session.add(pai); db.session.flush()
+        db.session.add(GestaoCustoFilho(
+            pai_id=pai.id, admin_id=aid, obra_id=oid, obra_servico_custo_id=osc.id,
+            data_referencia=date(2026, 6, 10), descricao='Aluguel sala',
+            valor=Decimal('300'), origem_tabela='lancamento_periodo_manual'))
+        db.session.commit()
+        out = lancamentos_da_etapa(obra, osc.id)
+        assert len(out) == 1
+        l = out[0]
+        assert l['descricao'] == 'Aluguel sala'
+        assert Decimal(str(l['valor'])) == Decimal('300')
+        assert l['data'] == date(2026, 6, 10)
+        assert l['editavel'] is True
+        assert l['origem'] == 'lancamento_periodo_manual'
