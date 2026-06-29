@@ -2252,6 +2252,58 @@ def financeiro_etapa_lancamento_criar(id, osc_id):
     return jsonify(_jsonable({'lancamento_id': filho.id, 'painel': painel_financeiro(obra)}))
 
 
+@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>/lancamentos/<int:filho_id>',
+               methods=['PATCH', 'DELETE'])
+@login_required
+@capture_db_errors
+def financeiro_etapa_lancamento_editar(id, osc_id, filho_id):
+    from decimal import Decimal, InvalidOperation
+    from datetime import date as _date
+    from models import GestaoCustoFilho
+    from gestao_custos_views import _recalcular_total_pai
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    filho = GestaoCustoFilho.query.filter_by(
+        id=filho_id, admin_id=admin_id, obra_id=obra.id,
+        obra_servico_custo_id=osc_id).first_or_404()
+    if (filho.origem_tabela or '') != 'lancamento_periodo_manual':
+        return jsonify({'erro': 'lançamento não editável aqui (origem do sistema)'}), 403
+    pai = filho.pai
+
+    if request.method == 'DELETE':
+        db.session.delete(filho)
+        db.session.flush()
+        from models import GestaoCustoFilho as _F
+        if _F.query.filter_by(pai_id=pai.id).count() == 0:
+            db.session.delete(pai)
+        else:
+            _recalcular_total_pai(pai)
+        db.session.commit()
+        return jsonify(_jsonable({'painel': painel_financeiro(obra)}))
+
+    p = request.get_json(silent=True) or {}
+    if 'valor' in p:
+        try:
+            v = Decimal(str(p.get('valor')).replace(',', '.'))
+        except (InvalidOperation, ValueError, AttributeError, TypeError):
+            return jsonify({'erro': 'valor inválido'}), 400
+        if v < 0:
+            return jsonify({'erro': 'valor inválido'}), 400
+        filho.valor = v
+    if 'data' in p:
+        try:
+            filho.data_referencia = _date.fromisoformat(str(p.get('data'))[:10])
+        except (ValueError, TypeError):
+            return jsonify({'erro': 'data inválida'}), 400
+    if 'descricao' in p:
+        filho.descricao = (str(p.get('descricao') or '').strip() or 'Lançamento')[:200]
+    db.session.flush()
+    _recalcular_total_pai(pai)
+    db.session.commit()
+    return jsonify(_jsonable({'painel': painel_financeiro(obra)}))
+
+
 # ────────────────────────────────────────────────────────────────────
 # Task #200 — Revisão inicial de cronograma da obra
 # ────────────────────────────────────────────────────────────────────
