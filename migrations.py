@@ -4002,6 +4002,7 @@ def executar_migracoes():
             (202, "Custos unificados — valor_realizado por período + strip sufixo (mês/aa) das descrições", _migration_202_osc_item_valor_realizado),
             (203, "Realizado por lançamentos — remove obra_servico_custo_item.valor_realizado", _migration_203_drop_valor_realizado),
             (204, "Lançamento por categoria — gestao_custo_pai.categoria_fluxo_caixa_id", _migration_204_gestao_custo_pai_categoria_fc),
+            (205, "Compras por etapa — pedido_compra.obra_servico_custo_id", _migration_205_pedido_compra_obra_servico_custo),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13753,6 +13754,22 @@ def _migration_204_gestao_custo_pai_categoria_fc():
         logger.info("[Migration 204] gestao_custo_pai.categoria_fluxo_caixa_id adicionada.")
     except Exception as e:
         logger.error(f"[Migration 204] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_205_pedido_compra_obra_servico_custo():
+    """Compras por etapa — adiciona pedido_compra.obra_servico_custo_id (FK p/
+    obra_servico_custo). Idempotente. Ver spec 2026-06-29-compras-campo-etapa-design."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE pedido_compra "
+                "ADD COLUMN IF NOT EXISTS obra_servico_custo_id INTEGER "
+                "REFERENCES obra_servico_custo(id)"))
+        logger.info("[Migration 205] pedido_compra.obra_servico_custo_id adicionada.")
+    except Exception as e:
+        logger.error(f"[Migration 205] Falha: {e}", exc_info=True)
         raise
 
 

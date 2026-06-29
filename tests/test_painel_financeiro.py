@@ -1030,3 +1030,10 @@ def test_fluxo_caixa_lancamento_manual_usa_data_digitada():
         # cada lançamento vira sua própria linha, na data digitada
         assert len(c1) == 1 and c1[0]['data'] == date(2026, 6, 20)
         assert len(c2) == 1 and c2[0]['data'] == date(2026, 7, 15)
+
+
+@pytest.mark.integration
+def test_pedido_compra_tem_obra_servico_custo_id():
+    from models import PedidoCompra
+    cols = {c.name for c in PedidoCompra.__table__.columns}
+    assert 'obra_servico_custo_id' in cols

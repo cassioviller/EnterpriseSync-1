@@ -4725,6 +4725,11 @@ class PedidoCompra(db.Model):
     data_compra = db.Column(db.Date, nullable=False)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    # Etapa (centro de custo) à qual a compra se amarra — opcional. Quando definida,
+    # os GestaoCustoFilho gerados entram no Realizado dessa etapa
+    # (spec 2026-06-29-compras-campo-etapa-design).
+    obra_servico_custo_id = db.Column(
+        db.Integer, db.ForeignKey('obra_servico_custo.id'), nullable=True)
     condicao_pagamento = db.Column(db.String(50), default='a_vista')  # a_vista, 30d, 60d, 90d, parcelado
     parcelas = db.Column(db.Integer, default=1)
     valor_total = db.Column(db.Numeric(12, 2), nullable=False)
@@ -4755,6 +4760,8 @@ class PedidoCompra(db.Model):
     fornecedor = db.relationship('Fornecedor', backref='pedidos_compra', foreign_keys=[fornecedor_id])
     centro_custo = db.relationship('CentroCusto', backref='pedidos_compra', foreign_keys=[centro_custo_id])
     obra = db.relationship('Obra', backref='pedidos_compra', foreign_keys=[obra_id])
+    obra_servico_custo = db.relationship(
+        'ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
     itens = db.relationship('PedidoCompraItem', backref='pedido', lazy='dynamic', cascade='all, delete-orphan')
     responsavel = db.relationship('Usuario', foreign_keys=[responsavel_id], backref='pedidos_compra_responsavel')
 
