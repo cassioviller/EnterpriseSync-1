@@ -4000,6 +4000,7 @@ def executar_migracoes():
             (200, "Físico-financeiro — datas de desembolso por linha de custo", _migration_200_osc_item_datas),
             (201, "Obra.regime_medicao (fixa|percentual) + backfill percentual p/ obras com medição física", _migration_201_obra_regime_medicao),
             (202, "Custos unificados — valor_realizado por período + strip sufixo (mês/aa) das descrições", _migration_202_osc_item_valor_realizado),
+            (203, "Realizado por lançamentos — remove obra_servico_custo_item.valor_realizado", _migration_203_drop_valor_realizado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13719,6 +13720,21 @@ def _migration_202_osc_item_valor_realizado():
         logger.info("[Migration 202] obra_servico_custo_item.valor_realizado + strip sufixo (mês/aa).")
     except Exception as e:
         logger.error(f"[Migration 202] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_203_drop_valor_realizado():
+    """Realizado por lançamentos — remove obra_servico_custo_item.valor_realizado
+    (o realizado passa a vir de GestaoCustoFilho ligado à etapa). Idempotente.
+    Ver spec 2026-06-29-realizado-por-lancamentos-design."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE obra_servico_custo_item DROP COLUMN IF EXISTS valor_realizado"))
+        logger.info("[Migration 203] obra_servico_custo_item.valor_realizado removida.")
+    except Exception as e:
+        logger.error(f"[Migration 203] Falha: {e}", exc_info=True)
         raise
 
 

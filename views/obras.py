@@ -2178,11 +2178,7 @@ def financeiro_etapa_itens(id, osc_id):
             return jsonify({'erro': 'data_fim antes de data_inicio'}), 400
         fonte = 'fat_direto' if it.get('fonte') == 'fat_direto' else 'veks'
         desc = (str(it.get('descricao') or '').strip() or 'Item')[:200]
-        vr_raw = it.get('valor_realizado')
-        vr = Decimal('0') if vr_raw in (None, '') else _dec(vr_raw)
-        if vr is None or vr < 0:
-            return jsonify({'erro': 'valor_realizado inválido'}), 400
-        novos.append((desc, valor, fonte, i, di, df, vr))
+        novos.append((desc, valor, fonte, i, di, df))
 
     orc_raw = payload.get('valor_orcado')
     if orc_raw not in (None, ''):
@@ -2193,11 +2189,11 @@ def financeiro_etapa_itens(id, osc_id):
 
     ObraServicoCustoItem.query.filter_by(
         obra_servico_custo_id=osc.id).delete(synchronize_session=False)
-    for desc, valor, fonte, ordem, di, df, vr in novos:
+    for desc, valor, fonte, ordem, di, df in novos:
         db.session.add(ObraServicoCustoItem(
             obra_servico_custo_id=osc.id, admin_id=admin_id,
             descricao=desc, valor=valor, fonte=fonte, ordem=ordem,
-            data_inicio=di, data_fim=df, valor_realizado=vr))
+            data_inicio=di, data_fim=df))
     db.session.flush()
     recalcular_osc_dos_itens(osc)
     db.session.commit()

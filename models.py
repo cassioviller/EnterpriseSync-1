@@ -5710,7 +5710,6 @@ class ObraServicoCustoItem(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(15, 2), nullable=False, default=0)  # previsto por período
-    valor_realizado = db.Column(db.Numeric(15, 2), nullable=False, default=0)  # realizado manual por período (spec 2026-06-29)
     fonte = db.Column(db.String(20), nullable=False, default='veks')  # 'veks' | 'fat_direto'
     ordem = db.Column(db.Integer, default=0)
     # Janela de desembolso previsto (caixa): o valor é faseado entre estas datas.
