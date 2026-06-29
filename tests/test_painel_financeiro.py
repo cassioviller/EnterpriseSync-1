@@ -1184,3 +1184,37 @@ def test_post_nova_compra_grava_etapa():
         assert f.obra_servico_custo_id == osc_id
         p_invalida = next(p for p in ped if p.id != p_ok.id)
         assert p_invalida.obra_servico_custo_id is None
+
+
+@pytest.mark.integration
+def test_compra_com_etapa_entra_no_painel_realizado():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Usuario, Obra, ObraServicoCusto, Fornecedor
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+        forn = Fornecedor(nome='Forn E2E', cnpj=f'CT{aid:012d}'[:18], admin_id=aid, ativo=True)
+        db.session.add(forn); db.session.commit()
+        forn_id = forn.id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        c.post('/compras/nova', data={
+            'fornecedor_id': str(forn_id), 'data_compra': '2026-06-10',
+            'condicao_pagamento': 'a_vista', 'parcelas': '1',
+            'obra_id': str(oid), 'obra_servico_custo_id': str(osc_id),
+            'tipo_compra': 'normal',
+            'item_descricao[]': 'Cimento', 'item_quantidade[]': '1',
+            'item_preco[]': '750', 'item_almoxarifado_id[]': '',
+        })
+    with app.app_context():
+        p = painel_financeiro(Obra.query.get(oid))
+        et = next(e for e in p['etapas'] if e['osc_id'] == osc_id)
+        assert float(et['realizado']) >= 750 - 1
