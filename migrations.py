@@ -4003,6 +4003,7 @@ def executar_migracoes():
             (203, "Realizado por lançamentos — remove obra_servico_custo_item.valor_realizado", _migration_203_drop_valor_realizado),
             (204, "Lançamento por categoria — gestao_custo_pai.categoria_fluxo_caixa_id", _migration_204_gestao_custo_pai_categoria_fc),
             (205, "Compras por etapa — pedido_compra.obra_servico_custo_id", _migration_205_pedido_compra_obra_servico_custo),
+            (206, "Alimentação/Transporte por etapa — obra_servico_custo_id", _migration_206_alimentacao_transporte_obra_servico_custo),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13770,6 +13771,24 @@ def _migration_205_pedido_compra_obra_servico_custo():
         logger.info("[Migration 205] pedido_compra.obra_servico_custo_id adicionada.")
     except Exception as e:
         logger.error(f"[Migration 205] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_206_alimentacao_transporte_obra_servico_custo():
+    """Alimentação/Transporte por etapa — adiciona obra_servico_custo_id em
+    alimentacao_lancamento e lancamento_transporte (FK p/ obra_servico_custo).
+    Idempotente. Ver spec 2026-06-29-alimentacao-transporte-campo-etapa-design."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            for tabela in ('alimentacao_lancamento', 'lancamento_transporte'):
+                conn.execute(sa_text(
+                    f"ALTER TABLE {tabela} "
+                    "ADD COLUMN IF NOT EXISTS obra_servico_custo_id INTEGER "
+                    "REFERENCES obra_servico_custo(id)"))
+        logger.info("[Migration 206] obra_servico_custo_id adicionada em alimentacao_lancamento e lancamento_transporte.")
+    except Exception as e:
+        logger.error(f"[Migration 206] Falha: {e}", exc_info=True)
         raise
 
 

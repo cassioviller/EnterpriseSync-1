@@ -1149,11 +1149,15 @@ class AlimentacaoLancamento(db.Model):
     # Chaves Estrangeiras - padrão multi-tenant com admin_id NOT NULL
     restaurante_id = db.Column(db.Integer, db.ForeignKey('restaurante.id'), nullable=True)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=False)
+    obra_servico_custo_id = db.Column(
+        db.Integer, db.ForeignKey('obra_servico_custo.id'), nullable=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    
+
     # Relacionamentos
     restaurante = db.relationship('Restaurante', back_populates='lancamentos')
     obra = db.relationship('Obra', backref='lancamentos_alimentacao')
+    obra_servico_custo = db.relationship(
+        'ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
     
     # Many-to-Many com Funcionários
     funcionarios = db.relationship('Funcionario',
@@ -4810,6 +4814,8 @@ class LancamentoTransporte(db.Model):
     veiculo_id = db.Column(db.Integer, db.ForeignKey('frota_veiculo.id'), nullable=True)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo.id'), nullable=False)
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'), nullable=True)
+    obra_servico_custo_id = db.Column(
+        db.Integer, db.ForeignKey('obra_servico_custo.id'), nullable=True)
 
     data_lancamento = db.Column(db.Date, nullable=False)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
@@ -4824,6 +4830,8 @@ class LancamentoTransporte(db.Model):
     veiculo = db.relationship('Vehicle', backref='lancamentos_transporte', foreign_keys=[veiculo_id])
     centro_custo = db.relationship('CentroCusto', backref='lancamentos_transporte', foreign_keys=[centro_custo_id])
     obra = db.relationship('Obra', backref='lancamentos_transporte', foreign_keys=[obra_id])
+    obra_servico_custo = db.relationship(
+        'ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

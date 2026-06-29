@@ -1218,3 +1218,10 @@ def test_compra_com_etapa_entra_no_painel_realizado():
         p = painel_financeiro(Obra.query.get(oid))
         et = next(e for e in p['etapas'] if e['osc_id'] == osc_id)
         assert float(et['realizado']) >= 750 - 1
+
+
+@pytest.mark.integration
+def test_alimentacao_transporte_tem_obra_servico_custo_id():
+    from models import AlimentacaoLancamento, LancamentoTransporte
+    assert 'obra_servico_custo_id' in {c.name for c in AlimentacaoLancamento.__table__.columns}
+    assert 'obra_servico_custo_id' in {c.name for c in LancamentoTransporte.__table__.columns}
