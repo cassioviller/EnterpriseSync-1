@@ -932,3 +932,30 @@ def test_post_lancamento_grava_categoria_fc_e_fallback():
             obra_id=oid, obra_servico_custo_id=osc_id, descricao='Sem categoria').one()
         assert fmat.pai.categoria_fluxo_caixa_id == mat_id
         assert ffall.pai.categoria_fluxo_caixa_id == outras_id
+
+
+@pytest.mark.integration
+def test_fluxo_caixa_usa_nome_categoria_fc():
+    from financeiro_service import FinanceiroService
+    from utils.financeiro_integration import registrar_custo_automatico
+    from models import CategoriaFluxoCaixa
+    from decimal import Decimal
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        CategoriaFluxoCaixa.seed_defaults(aid)
+        db.session.commit()
+        mat = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first()
+        registrar_custo_automatico(
+            admin_id=aid, tipo_categoria='OUTROS', entidade_nome='Fornecedor X',
+            entidade_id=None, data=date(2026, 6, 10), descricao='Cimento',
+            valor=Decimal('100'), obra_id=None,
+            origem_tabela='lancamento_periodo_manual', origem_id=None,
+            categoria_fluxo_caixa_id=mat.id, force_v2=True)
+        db.session.commit()
+        out = FinanceiroService.calcular_fluxo_caixa(
+            aid, date(2026, 1, 1), date(2030, 1, 1))
+        saidas = [d for d in out['detalhes'] if d.get('tipo') == 'SAIDA']
+        assert any('Materiais de Obra' in (d.get('descricao') or '') for d in saidas)
+        assert not any('[OUTROS]' in (d.get('descricao') or '') for d in saidas)

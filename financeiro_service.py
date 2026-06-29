@@ -423,7 +423,15 @@ class FinanceiroService:
         return query.order_by(ContaReceber.data_vencimento).all()
     
     # ==================== FLUXO DE CAIXA ====================
-    
+
+    @staticmethod
+    def _rotulo_categoria(custo):
+        """Rótulo de categoria do custo para o fluxo de caixa: nome da
+        CategoriaFluxoCaixa quando vinculada, senão o tipo_categoria (enum)."""
+        if getattr(custo, 'categoria_fluxo_caixa_id', None) and custo.categoria_fluxo_caixa:
+            return custo.categoria_fluxo_caixa.nome
+        return custo.tipo_categoria
+
     @staticmethod
     def calcular_fluxo_caixa(admin_id: int, data_inicio: date,
                             data_fim: date, obra_id: int = None) -> Dict:
@@ -569,7 +577,7 @@ class FinanceiroService:
                 detalhes.append({
                     'data': custo_data,
                     'tipo': 'SAIDA',
-                    'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
+                    'descricao': f'{custo.entidade_nome} [{FinanceiroService._rotulo_categoria(custo)}]',
                     'valor': float(custo.saldo if getattr(custo, 'saldo', None) is not None else (custo.valor_solicitado or custo.valor_total)),
                     'origem': 'Gestão de Custos V2',
                     'status': badge_status,
@@ -598,7 +606,7 @@ class FinanceiroService:
                     detalhes.append({
                         'data': custo.data_pagamento or data_fim,
                         'tipo': 'SAIDA',
-                        'descricao': f'{custo.entidade_nome} [{custo.tipo_categoria}]',
+                        'descricao': f'{custo.entidade_nome} [{FinanceiroService._rotulo_categoria(custo)}]',
                         'valor': float(custo.valor_pago or custo.valor_total),
                         'origem': 'Gestão de Custos V2',
                         'status': 'PAGO',
