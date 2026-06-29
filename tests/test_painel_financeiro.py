@@ -1108,3 +1108,32 @@ def test_lancamentos_da_etapa_rotula_compra():
         l = next(x for x in out if x['descricao'] == 'Compra cimento')
         assert l['origem_label'] == 'Compra'
         assert l['editavel'] is False
+
+
+@pytest.mark.integration
+def test_endpoint_etapas_custo():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        n = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).count()
+        outro = _novo_admin()
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.get(f'/obras/{oid}/etapas-custo')
+        assert r.status_code == 200
+        body = r.get_json()
+        assert len(body['etapas']) == n and n > 0
+        assert {'id', 'nome'} <= set(body['etapas'][0].keys())
+    # obra de outro admin → 404
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(outro); s['_fresh'] = True
+        assert c.get(f'/obras/{oid}/etapas-custo').status_code == 404

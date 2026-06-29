@@ -2315,6 +2315,19 @@ def financeiro_etapa_lancamento_editar(id, osc_id, filho_id):
     return jsonify(_jsonable({'painel': painel_financeiro(obra)}))
 
 
+@main_bp.route('/obras/<int:id>/etapas-custo', methods=['GET'])
+@login_required
+@capture_db_errors
+def obra_etapas_custo(id):
+    from models import ObraServicoCusto
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    rows = (ObraServicoCusto.query
+            .filter_by(obra_id=obra.id, admin_id=admin_id)
+            .order_by(ObraServicoCusto.id).all())
+    return jsonify({'etapas': [{'id': o.id, 'nome': o.nome} for o in rows]})
+
+
 # ────────────────────────────────────────────────────────────────────
 # Task #200 — Revisão inicial de cronograma da obra
 # ────────────────────────────────────────────────────────────────────
