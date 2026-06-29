@@ -2224,7 +2224,7 @@ def financeiro_etapa_lancamento_criar(id, osc_id):
     from datetime import date as _date
     from models import ObraServicoCusto
     from utils.financeiro_integration import registrar_custo_automatico
-    from services.cronograma_fisico_financeiro import painel_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro, resolver_categoria_fluxo_caixa
     admin_id = get_tenant_admin_id()
     obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
     ObraServicoCusto.query.filter_by(id=osc_id, obra_id=obra.id, admin_id=admin_id).first_or_404()
@@ -2242,6 +2242,12 @@ def financeiro_etapa_lancamento_criar(id, osc_id):
         return jsonify({'erro': 'data inválida'}), 400
     descricao = (str(p.get('descricao') or '').strip() or 'Lançamento')[:200]
     fornecedor = (str(p.get('fornecedor') or '').strip() or 'Lançamento manual')[:120]
+    cat_raw = p.get('categoria_fluxo_caixa_id')
+    try:
+        cat_in = int(cat_raw) if cat_raw not in (None, '', 'null') else None
+    except (ValueError, TypeError):
+        cat_in = None
+    categoria_fc_id = resolver_categoria_fluxo_caixa(admin_id, cat_in)
 
     filho = registrar_custo_automatico(
         admin_id=admin_id, tipo_categoria='OUTROS',
@@ -2249,6 +2255,7 @@ def financeiro_etapa_lancamento_criar(id, osc_id):
         data=data, descricao=descricao, valor=valor,
         obra_id=obra.id, obra_servico_custo_id=osc_id,
         origem_tabela='lancamento_periodo_manual', origem_id=None,
+        categoria_fluxo_caixa_id=categoria_fc_id,
         force_v2=False)
     if filho is None:
         return jsonify({'erro': 'não foi possível registrar (tenant não-v2?)'}), 400

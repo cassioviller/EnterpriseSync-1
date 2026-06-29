@@ -893,3 +893,42 @@ def test_get_lancamentos_inclui_categorias():
         assert 'categorias' in body and isinstance(body['categorias'], list)
         nomes = {o['nome'] for g in body['categorias'] for o in g['opcoes']}
         assert 'Materiais de Obra' in nomes
+
+
+@pytest.mark.integration
+def test_post_lancamento_grava_categoria_fc_e_fallback():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, GestaoCustoFilho, CategoriaFluxoCaixa
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        CategoriaFluxoCaixa.seed_defaults(aid); db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+        mat_id = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first().id
+        outras_id = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Outras Saídas', tipo='SAIDA').first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        # com categoria válida
+        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos',
+                   json={'data': '2026-06-10', 'descricao': 'Cimento', 'valor': '900',
+                         'categoria_fluxo_caixa_id': mat_id})
+        assert r.status_code == 200
+        # sem categoria → fallback Outras Saídas
+        r2 = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos',
+                    json={'data': '2026-06-11', 'descricao': 'Sem categoria', 'valor': '50'})
+        assert r2.status_code == 200
+    with app.app_context():
+        fmat = GestaoCustoFilho.query.filter_by(
+            obra_id=oid, obra_servico_custo_id=osc_id, descricao='Cimento').one()
+        ffall = GestaoCustoFilho.query.filter_by(
+            obra_id=oid, obra_servico_custo_id=osc_id, descricao='Sem categoria').one()
+        assert fmat.pai.categoria_fluxo_caixa_id == mat_id
+        assert ffall.pai.categoria_fluxo_caixa_id == outras_id
