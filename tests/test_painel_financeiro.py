@@ -657,3 +657,36 @@ def test_curva_realizado_inclui_valor_realizado_manual():
         db.session.commit()
         out = curva_realizado(Obra.query.get(oid))
         assert out.get('2026-07', Decimal('0')) >= Decimal('3000')
+
+
+@pytest.mark.integration
+def test_endpoint_etapa_itens_persiste_valor_realizado():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, ObraServicoCustoItem
+    from decimal import Decimal
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/itens',
+                   json={'itens': [
+                       {'descricao': 'Escritório', 'valor': '1000', 'fonte': 'veks',
+                        'data_inicio': '2026-07-01', 'data_fim': '2026-07-31',
+                        'valor_realizado': '250'}]})
+        assert r.status_code == 200
+        # valor_realizado negativo → 400
+        r2 = c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/itens',
+                    json={'itens': [{'descricao': 'X', 'valor': '1', 'fonte': 'veks',
+                                     'valor_realizado': '-5'}]})
+        assert r2.status_code == 400
+    with app.app_context():
+        it = ObraServicoCustoItem.query.filter_by(obra_servico_custo_id=osc_id).one()
+        assert Decimal(str(it.valor_realizado)) == Decimal('250')
