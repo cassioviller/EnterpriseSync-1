@@ -730,3 +730,29 @@ def test_patch_e_delete_lancamento_manual():
         assert rd.status_code == 200
     with app.app_context():
         assert GestaoCustoFilho.query.get(fid) is None
+
+
+@pytest.mark.integration
+def test_custo_nao_previsto_conta_no_realizado_da_etapa():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import painel_financeiro
+    from models import Usuario, Obra, ObraServicoCusto
+    from decimal import Decimal
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos',
+               json={'data': '2026-06-10', 'descricao': 'Multa imprevista', 'valor': '1000'})
+    with app.app_context():
+        p = painel_financeiro(Obra.query.get(oid))
+        et = next(e for e in p['etapas'] if e['osc_id'] == osc_id)
+        assert float(et['realizado']) >= 1000 - 1   # conta mesmo sem previsão correspondente
