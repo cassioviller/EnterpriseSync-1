@@ -336,6 +336,18 @@ def lancamento_novo_v2():
                 flash('Obra inválida', 'error')
                 return redirect(url_for('alimentacao.lancamento_novo_v2'))
 
+            osc_raw = request.form.get('obra_servico_custo_id') or None
+            osc_id = None
+            if osc_raw:
+                try:
+                    _oid = int(osc_raw)
+                except (TypeError, ValueError):
+                    _oid = None
+                if _oid:
+                    from models import ObraServicoCusto as _OSC
+                    if _OSC.query.filter_by(id=_oid, obra_id=obra.id, admin_id=admin_id).first():
+                        osc_id = _oid
+
             restaurante_id = request.form.get('restaurante_id')
             restaurante = None
             if restaurante_id:
@@ -439,6 +451,7 @@ def lancamento_novo_v2():
                 descricao=request.form.get('descricao', ''),
                 restaurante_id=restaurante.id if restaurante else None,
                 obra_id=obra.id,
+                obra_servico_custo_id=osc_id,
                 admin_id=admin_id
             )
             db.session.add(lancamento)
@@ -526,6 +539,7 @@ def lancamento_novo_v2():
                     descricao=lancamento.descricao or f'Refeições — {_rest_nome}',
                     valor=float(valor_total),
                     obra_id=obra.id if obra else None,
+                    obra_servico_custo_id=osc_id,
                     origem_tabela='alimentacao_lancamento',
                     origem_id=lancamento.id,
                 )

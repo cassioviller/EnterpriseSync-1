@@ -1260,3 +1260,36 @@ def test_post_transporte_grava_etapa():
             origem_tabela='lancamento_transporte', obra_id=oid).first()
         assert f is not None and f.obra_servico_custo_id == osc_id
         assert float(realizado_por_etapa(Obra.query.get(oid)).get(osc_id, 0)) >= 300 - 1
+
+
+@pytest.mark.integration
+def test_post_alimentacao_grava_etapa():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import realizado_por_etapa
+    from models import Usuario, Obra, ObraServicoCusto, AlimentacaoLancamento, GestaoCustoFilho
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+        db.session.commit()
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.post('/alimentacao/lancamentos/novo-v2', data={
+            'obra_id': str(oid), 'data': '2026-06-10', 'descricao': 'Refeições',
+            'obra_servico_custo_id': str(osc_id),
+            'itens[0][preco]': '120', 'itens[0][quantidade]': '1',
+            'itens[0][nome]': 'Marmita',
+        })
+        assert r.status_code in (200, 302)
+    with app.app_context():
+        al = AlimentacaoLancamento.query.filter_by(obra_id=oid).first()
+        assert al is not None and al.obra_servico_custo_id == osc_id
+        f = GestaoCustoFilho.query.filter_by(origem_tabela='alimentacao_lancamento', obra_id=oid).first()
+        assert f is not None and f.obra_servico_custo_id == osc_id
+        assert float(realizado_por_etapa(Obra.query.get(oid)).get(osc_id, 0)) >= 120 - 1
