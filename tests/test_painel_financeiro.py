@@ -763,3 +763,37 @@ def test_gestao_custo_pai_tem_categoria_fluxo_caixa():
     from models import GestaoCustoPai
     cols = {c.name for c in GestaoCustoPai.__table__.columns}
     assert 'categoria_fluxo_caixa_id' in cols
+
+
+@pytest.mark.integration
+def test_registrar_custo_separa_pai_por_categoria_fc():
+    from utils.financeiro_integration import registrar_custo_automatico
+    from models import CategoriaFluxoCaixa, GestaoCustoFilho
+    from decimal import Decimal
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        CategoriaFluxoCaixa.seed_defaults(aid)
+        db.session.commit()
+        mat = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first()
+        mo = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Mão de Obra Direta', tipo='SAIDA').first()
+        f1 = registrar_custo_automatico(
+            admin_id=aid, tipo_categoria='OUTROS', entidade_nome='Lançamento manual',
+            entidade_id=None, data=date(2026, 6, 10), descricao='Cimento',
+            valor=Decimal('100'), obra_id=None,
+            origem_tabela='lancamento_periodo_manual', origem_id=None,
+            categoria_fluxo_caixa_id=mat.id, force_v2=True)
+        f2 = registrar_custo_automatico(
+            admin_id=aid, tipo_categoria='OUTROS', entidade_nome='Lançamento manual',
+            entidade_id=None, data=date(2026, 6, 11), descricao='Diária',
+            valor=Decimal('200'), obra_id=None,
+            origem_tabela='lancamento_periodo_manual', origem_id=None,
+            categoria_fluxo_caixa_id=mo.id, force_v2=True)
+        db.session.commit()
+        assert f1 is not None and f2 is not None
+        # categorias diferentes → pais diferentes
+        assert f1.pai_id != f2.pai_id
+        assert f1.pai.categoria_fluxo_caixa_id == mat.id
+        assert f2.pai.categoria_fluxo_caixa_id == mo.id

@@ -69,6 +69,7 @@ def registrar_custo_automatico(
     origem_tabela: str = None,
     origem_id: int = None,
     obra_servico_custo_id=None,
+    categoria_fluxo_caixa_id=None,
     force_v2: bool = False,
 ):
     """
@@ -131,6 +132,11 @@ def registrar_custo_automatico(
             filtros.append(GestaoCustoPai.entidade_id.is_(None))
             filtros.append(GestaoCustoPai.entidade_nome == entidade_nome)
 
+        if categoria_fluxo_caixa_id is not None:
+            filtros.append(GestaoCustoPai.categoria_fluxo_caixa_id == categoria_fluxo_caixa_id)
+        else:
+            filtros.append(GestaoCustoPai.categoria_fluxo_caixa_id.is_(None))
+
         pai = (
             GestaoCustoPai.query
             .filter(*filtros)
@@ -144,6 +150,7 @@ def registrar_custo_automatico(
                 tipo_categoria=categoria_normalizada,
                 entidade_nome=entidade_nome,
                 entidade_id=entidade_id,
+                categoria_fluxo_caixa_id=categoria_fluxo_caixa_id,
                 valor_total=Decimal('0.00'),
                 status='PENDENTE',
             )
