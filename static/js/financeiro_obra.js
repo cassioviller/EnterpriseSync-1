@@ -157,7 +157,7 @@
     fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/lancamentos',
           { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (d) { renderRealizado(box, et, d.lancamentos || []); })
+      .then(function (d) { box._categorias = d.categorias || []; renderRealizado(box, et, d.lancamentos || []); })
       .catch(function () { pane.innerHTML = '<div class="text-danger small">Falha ao carregar lançamentos.</div>'; });
   }
   function renderRealizado(box, et, lancs) {
@@ -180,7 +180,8 @@
             '<button type="button" class="btn btn-sm btn-link text-danger p-0 fin-lc-del" data-id="' + l.id + '">×</button>'
           : '<span class="badge bg-light text-dark border">' + (l.origem_label || 'Sistema') + '</span>';
         html += '<tr><td style="width:90px">' + (l.data ? String(l.data).slice(8, 10) + '/' + String(l.data).slice(5, 7) : '—') + '</td>' +
-          '<td>' + String(l.descricao || '').replace(/</g, '&lt;') + '</td>' +
+          '<td>' + String(l.descricao || '').replace(/</g, '&lt;') +
+            (l.categoria_label ? ' <span class="badge bg-light text-dark border">' + String(l.categoria_label).replace(/</g, '&lt;') + '</span>' : '') + '</td>' +
           '<td class="text-end" style="width:120px">' + BRL(l.valor) + '</td>' +
           '<td class="text-end" style="width:90px">' + acoes + '</td></tr>';
       });
@@ -204,21 +205,38 @@
       b.addEventListener('click', function () { excluirLancamento(box, et, b.getAttribute('data-id')); });
     });
   }
+  function categoriaSelectHTML(cats, sel) {
+    var h = '<select id="fin-lc-cat" class="form-select form-select-sm"><option value="">— Categoria —</option>';
+    (cats || []).forEach(function (g) {
+      h += '<optgroup label="' + String(g.grupo || '').replace(/</g, '&lt;') + '">';
+      (g.opcoes || []).forEach(function (o) {
+        h += '<option value="' + o.id + '"' + (String(o.id) === String(sel) ? ' selected' : '') +
+             '>' + String(o.nome || '').replace(/</g, '&lt;') + '</option>';
+      });
+      h += '</optgroup>';
+    });
+    return h + '</select>';
+  }
   function lancamentoForm(box, et, l) {
     var hoje = (l && l.data) ? String(l.data).slice(0, 10) : '';
+    var catRow = l ? '' :
+      '<div class="col-12 mb-1">' + categoriaSelectHTML(box._categorias, '') + '</div>';
     el('fin-lc-form').innerHTML =
       '<div class="border rounded p-2 mt-2"><div class="row g-2">' +
+        catRow +
         '<div class="col-3"><input type="date" id="fin-lc-data" class="form-control form-control-sm" value="' + hoje + '"></div>' +
         '<div class="col-5"><input type="text" id="fin-lc-desc" class="form-control form-control-sm" placeholder="Descrição" value="' + (l ? String(l.descricao || '').replace(/"/g, '&quot;') : '') + '"></div>' +
         '<div class="col-2"><input type="number" step="0.01" id="fin-lc-valor" class="form-control form-control-sm text-end" placeholder="Valor" value="' + (l ? Number(l.valor || 0) : '') + '"></div>' +
         '<div class="col-2"><button type="button" id="fin-lc-salvar" class="btn btn-primary btn-sm w-100">Salvar</button></div>' +
       '</div></div>';
     el('fin-lc-salvar').addEventListener('click', function () {
+      var catEl = el('fin-lc-cat');
       var payload = {
         data: el('fin-lc-data').value || '',
         descricao: el('fin-lc-desc').value || '',
         valor: el('fin-lc-valor').value || '0'
       };
+      if (catEl) payload.categoria_fluxo_caixa_id = catEl.value || '';
       var url = '/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/lancamentos' + (l ? '/' + l.id : '');
       fetch(url, {
         method: l ? 'PATCH' : 'POST',
