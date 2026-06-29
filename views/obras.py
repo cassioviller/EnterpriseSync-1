@@ -2200,6 +2200,18 @@ def financeiro_etapa_itens(id, osc_id):
     return jsonify(_jsonable(painel_financeiro(obra)))
 
 
+@main_bp.route('/obras/<int:id>/financeiro/etapa/<int:osc_id>/lancamentos', methods=['GET'])
+@login_required
+@capture_db_errors
+def financeiro_etapa_lancamentos(id, osc_id):
+    from models import ObraServicoCusto
+    from services.cronograma_fisico_financeiro import lancamentos_da_etapa
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first_or_404()
+    ObraServicoCusto.query.filter_by(id=osc_id, obra_id=obra.id, admin_id=admin_id).first_or_404()
+    return jsonify(_jsonable({'lancamentos': lancamentos_da_etapa(obra, osc_id)}))
+
+
 # ────────────────────────────────────────────────────────────────────
 # Task #200 — Revisão inicial de cronograma da obra
 # ────────────────────────────────────────────────────────────────────

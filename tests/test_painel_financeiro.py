@@ -631,3 +631,37 @@ def test_lancamentos_da_etapa_lista_gestao_custo_filho():
         assert l['data'] == date(2026, 6, 10)
         assert l['editavel'] is True
         assert l['origem'] == 'lancamento_periodo_manual'
+
+
+@pytest.mark.integration
+def test_get_lancamentos_endpoint():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, GestaoCustoPai, GestaoCustoFilho
+    from decimal import Decimal
+    from datetime import date
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        pai = GestaoCustoPai(admin_id=aid, tipo_categoria='OUTROS', entidade_nome='F',
+                             valor_total=Decimal('150'), status='PENDENTE')
+        db.session.add(pai); db.session.flush()
+        db.session.add(GestaoCustoFilho(
+            pai_id=pai.id, admin_id=aid, obra_id=oid, obra_servico_custo_id=osc.id,
+            data_referencia=date(2026, 7, 5), descricao='Conta luz', valor=Decimal('150'),
+            origem_tabela='lancamento_periodo_manual'))
+        db.session.commit()
+        osc_id = osc.id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.get(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos')
+        assert r.status_code == 200
+        body = r.get_json()
+        assert len(body['lancamentos']) == 1
+        assert body['lancamentos'][0]['descricao'] == 'Conta luz'
