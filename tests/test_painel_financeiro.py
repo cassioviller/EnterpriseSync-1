@@ -868,3 +868,28 @@ def test_lancamentos_da_etapa_expoe_categoria():
         assert len(out) == 1
         assert out[0]['categoria_id'] == mat.id
         assert out[0]['categoria_label'] == 'Materiais de Obra'
+
+
+@pytest.mark.integration
+def test_get_lancamentos_inclui_categorias():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Usuario, ObraServicoCusto, CategoriaFluxoCaixa
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        CategoriaFluxoCaixa.seed_defaults(aid); db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.get(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos')
+        assert r.status_code == 200
+        body = r.get_json()
+        assert 'categorias' in body and isinstance(body['categorias'], list)
+        nomes = {o['nome'] for g in body['categorias'] for o in g['opcoes']}
+        assert 'Materiais de Obra' in nomes
