@@ -42,17 +42,17 @@ def _mes_bounds(chave):
 
 def _add_linhas_de_meses(Model, osc, admin_id, nome, meses, fonte, ordem):
     """Cria uma linha por mês a partir do mapa ``{'YYYY-MM': valor}`` (divisão
-    mensal verbatim da Planilha1), nomeada 'nome (abrev/yy)' e datada no mês.
-    Devolve o próximo ``ordem``."""
+    mensal verbatim da Planilha1), nomeada com o nome-base e datada no mês (o
+    rótulo 'mês/aa' é derivado das datas na UI). Devolve o próximo ``ordem``."""
     from app import db
     for chave in sorted(meses):
         valor = Decimal(str(meses[chave] or 0))
         if valor == 0:
             continue
-        di, df, rotulo = _mes_bounds(chave)
+        di, df, _rotulo = _mes_bounds(chave)  # rótulo é derivado das datas na UI
         db.session.add(Model(
             obra_servico_custo_id=osc.id, admin_id=admin_id,
-            descricao=f"{nome} ({rotulo})"[:200], valor=valor, fonte=fonte,
+            descricao=nome[:200], valor=valor, fonte=fonte,
             ordem=ordem, data_inicio=di, data_fim=df))
         ordem += 1
     return ordem
@@ -370,8 +370,9 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
                 meses_f = it.get('meses_fat') or {}
                 if meses_v or meses_f:
                     # Item com divisão mensal explícita (Planilha1, custo de
-                    # período): uma linha por mês ('Estadia (jun/26)'...), datada
-                    # no mês, com o valor verbatim da planilha.
+                    # período): uma linha por mês (nome-base, datada no mês; o
+                    # rótulo 'mês/aa' é derivado das datas na UI), com o valor
+                    # verbatim da planilha.
                     ordem = _add_linhas_de_meses(
                         ObraServicoCustoItem, osc, admin_id, nome_it[:180],
                         meses_v, 'veks', ordem)

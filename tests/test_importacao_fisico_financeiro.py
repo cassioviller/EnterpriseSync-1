@@ -471,8 +471,9 @@ def test_reimport_nao_duplica_linhas_de_custo():
 @pytest.mark.integration
 def test_indiretos_transversais_viram_linhas_mensais():
     """Etapa transversal (custo de período) é explodida em linhas mensais
-    nomeadas ('Estadia (jun/26)'...) ponderadas pelo perfil da planilha, com o
-    total conservado; etapas normais mantêm a janela única da etapa."""
+    (nome-base, datadas no mês; o rótulo 'mês/aa' é derivado das datas na UI)
+    ponderadas pelo perfil da planilha, com o total conservado; etapas normais
+    mantêm a janela única da etapa."""
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import ObraServicoCusto, ObraServicoCustoItem
     with app.app_context():
@@ -494,9 +495,15 @@ def test_indiretos_transversais_viram_linhas_mensais():
         # Estadia 5 + Refeição 5 + Equipe Plaq. 1 + LSF 1 + Encarregado 4 +
         # Carro 5 + Ref. Encarregado 4 = 39.
         assert len(linhas) == 39
-        assert all('/' in (l.descricao or '') for l in linhas)
-        assert any('(jun/26)' in l.descricao for l in linhas)
-        assert any('(out/26)' in l.descricao for l in linhas)
+        # descrição é o nome-base (sem sufixo '(mês/aa)'); o mês vem das datas
+        import re as _re
+        _suf = _re.compile(
+            r' \((jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/\d{2}\)$', _re.I)
+        assert not any(_suf.search(l.descricao or '') for l in linhas)
+        # vários períodos do mesmo nome-base+fonte (ex.: Escritório em 5 meses)
+        from collections import Counter as _Counter
+        _grp = _Counter((l.descricao, l.fonte) for l in linhas)
+        assert any(c > 1 for c in _grp.values())
         # cada linha mensal cai dentro do seu mês (data_inicio.month == data_fim.month)
         assert all(l.data_inicio and l.data_fim
                    and l.data_inicio.month == l.data_fim.month for l in linhas)
@@ -518,3 +525,28 @@ def test_indiretos_transversais_viram_linhas_mensais():
         linhas_f = ObraServicoCustoItem.query.filter_by(
             obra_servico_custo_id=fund.id).all()
         assert all('/' not in (l.descricao or '') for l in linhas_f)
+
+
+@pytest.mark.integration
+def test_importacao_descricao_periodo_sem_sufixo_mes():
+    """Linhas de custo de período (INDIRETOS) gravam a descrição-base, sem '(mês/aa)'."""
+    import re, json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import ObraServicoCusto, ObraServicoCustoItem
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_ids = [o.id for o in ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).all()]
+        itens = ObraServicoCustoItem.query.filter(
+            ObraServicoCustoItem.obra_servico_custo_id.in_(osc_ids)).all()
+        sufixo = re.compile(r' \((jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/\d{2}\)$', re.I)
+        assert itens, "esperado ao menos um item importado"
+        assert not any(sufixo.search(it.descricao) for it in itens), \
+            "nenhuma descrição deve terminar com '(mês/aa)'"
+        # ainda existem múltiplos períodos do mesmo grupo (mesma descricao+fonte)
+        from collections import Counter
+        chaves = Counter((it.descricao, it.fonte) for it in itens)
+        assert any(c > 1 for c in chaves.values()), \
+            "esperado ao menos um grupo com vários períodos (ex.: Escritório veks)"
