@@ -959,3 +959,36 @@ def test_fluxo_caixa_usa_nome_categoria_fc():
         saidas = [d for d in out['detalhes'] if d.get('tipo') == 'SAIDA']
         assert any('Materiais de Obra' in (d.get('descricao') or '') for d in saidas)
         assert not any('[OUTROS]' in (d.get('descricao') or '') for d in saidas)
+
+
+@pytest.mark.integration
+def test_lancamento_categoria_ponta_a_ponta():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import lancamentos_da_etapa, painel_financeiro
+    from models import Usuario, Obra, ObraServicoCusto, CategoriaFluxoCaixa
+    import json, os
+    app.config['WTF_CSRF_ENABLED'] = False
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'
+        CategoriaFluxoCaixa.seed_defaults(aid); db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        osc_id = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first().id
+        mat_id = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first().id
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        c.post(f'/obras/{oid}/financeiro/etapa/{osc_id}/lancamentos',
+               json={'data': '2026-06-10', 'descricao': 'Cimento', 'valor': '1000',
+                     'categoria_fluxo_caixa_id': mat_id})
+    with app.app_context():
+        obra = Obra.query.get(oid)
+        out = lancamentos_da_etapa(obra, osc_id)
+        assert any(l['categoria_label'] == 'Materiais de Obra' for l in out)
+        # conta no realizado da etapa
+        p = painel_financeiro(obra)
+        et = next(e for e in p['etapas'] if e['osc_id'] == osc_id)
+        assert float(et['realizado']) >= 1000 - 1
