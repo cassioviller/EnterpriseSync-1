@@ -97,6 +97,19 @@
         'data-grupo="' + idx + '" title="Abrir períodos">&#9656;</button></td>' +
     '</tr>';
   }
+  function previsaoTabelaHTML(box) {
+    var linhas = box._grupos.map(grupoLinhaHTML).join('') ||
+      '<tr><td colspan="5" class="text-muted small">Sem custos lançados.</td></tr>';
+    return '<table class="table table-sm align-middle mb-2"><thead><tr>' +
+        '<th>Custo</th><th style="width:90px">Fonte</th>' +
+        '<th class="text-center" style="width:80px">Períodos</th>' +
+        '<th class="text-end" style="width:130px">Previsto</th>' +
+        '<th style="width:36px"></th></tr></thead>' +
+      '<tbody id="fin-grp-body">' + linhas + '</tbody></table>' +
+      '<div class="d-flex justify-content-end">' +
+        '<button type="button" id="fin-it-save" class="btn btn-primary btn-sm">Salvar etapa</button>' +
+      '</div>';
+  }
   function showEtapa(et) {
     var box = el('fin-etapa-det');
     if (et.osc_id == null) {
@@ -106,8 +119,6 @@
     }
     box._etapa = et;
     box._grupos = agruparPeriodos(et.itens);
-    var linhas = box._grupos.map(grupoLinhaHTML).join('') ||
-      '<tr><td colspan="5" class="text-muted small">Sem custos lançados.</td></tr>';
     box.innerHTML =
       '<div class="border rounded p-3 bg-light">' +
       '<div class="d-flex justify-content-between mb-2"><strong>' + et.nome +
@@ -115,15 +126,12 @@
         '</strong>' +
         '<span>Realizado: <span id="fin-et-real">' + BRL(et.realizado) + '</span>' +
         ' / Previsto: <span id="fin-it-prev">' + BRL(et.previsto) + '</span></span></div>' +
-      '<table class="table table-sm align-middle mb-2"><thead><tr>' +
-        '<th>Custo</th><th style="width:90px">Fonte</th>' +
-        '<th class="text-center" style="width:80px">Períodos</th>' +
-        '<th class="text-end" style="width:130px">Previsto</th>' +
-        '<th style="width:36px"></th></tr></thead>' +
-      '<tbody id="fin-grp-body">' + linhas + '</tbody></table>' +
-      '<div class="d-flex justify-content-end">' +
-        '<button type="button" id="fin-it-save" class="btn btn-primary btn-sm">Salvar etapa</button>' +
-      '</div></div>';
+      '<ul class="nav nav-tabs mb-2"><li class="nav-item">' +
+        '<button class="nav-link active" id="fin-et-tab-prev" type="button">Previsão (por grupo)</button></li>' +
+        '<li class="nav-item"><button class="nav-link" id="fin-et-tab-real" type="button">Realizado — lançamentos</button></li></ul>' +
+      '<div id="fin-et-pane-prev">' + previsaoTabelaHTML(box) + '</div>' +
+      '<div id="fin-et-pane-real" style="display:none"></div>' +
+      '</div>';
 
     box.querySelectorAll('.fin-grp-open').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -131,6 +139,113 @@
       });
     });
     el('fin-it-save').addEventListener('click', function () { salvarEtapa(box); });
+
+    function showPane(which) {
+      el('fin-et-pane-prev').style.display = which === 'prev' ? '' : 'none';
+      el('fin-et-pane-real').style.display = which === 'real' ? '' : 'none';
+      el('fin-et-tab-prev').classList.toggle('active', which === 'prev');
+      el('fin-et-tab-real').classList.toggle('active', which === 'real');
+      if (which === 'real') carregarRealizado(box, et);
+    }
+    el('fin-et-tab-prev').addEventListener('click', function () { showPane('prev'); });
+    el('fin-et-tab-real').addEventListener('click', function () { showPane('real'); });
+  }
+
+  function carregarRealizado(box, et) {
+    var pane = el('fin-et-pane-real');
+    pane.innerHTML = '<div class="text-muted small">Carregando…</div>';
+    fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/lancamentos',
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) { renderRealizado(box, et, d.lancamentos || []); })
+      .catch(function () { pane.innerHTML = '<div class="text-danger small">Falha ao carregar lançamentos.</div>'; });
+  }
+  function renderRealizado(box, et, lancs) {
+    var porMes = {}, ordem = [];
+    lancs.forEach(function (l) {
+      var chave = l.data ? String(l.data).slice(0, 7) : 'sem-data';
+      if (!porMes[chave]) { porMes[chave] = []; ordem.push(chave); }
+      porMes[chave].push(l);
+    });
+    ordem.sort();
+    var total = 0, html = '';
+    ordem.forEach(function (chave) {
+      var linhas = porMes[chave], sub = 0;
+      var rotulo = chave === 'sem-data' ? 'sem data' : rotuloMes(chave + '-01');
+      html += '<div class="fw-bold mt-2">' + rotulo + '</div><table class="table table-sm mb-1"><tbody>';
+      linhas.forEach(function (l) {
+        sub += Number(l.valor || 0); total += Number(l.valor || 0);
+        var acoes = l.editavel
+          ? '<button type="button" class="btn btn-sm btn-link p-0 fin-lc-edit" data-id="' + l.id + '">✎</button> ' +
+            '<button type="button" class="btn btn-sm btn-link text-danger p-0 fin-lc-del" data-id="' + l.id + '">×</button>'
+          : '<span class="badge bg-light text-dark border">' + (l.origem_label || 'Sistema') + '</span>';
+        html += '<tr><td style="width:90px">' + (l.data ? String(l.data).slice(8, 10) + '/' + String(l.data).slice(5, 7) : '—') + '</td>' +
+          '<td>' + String(l.descricao || '').replace(/</g, '&lt;') + '</td>' +
+          '<td class="text-end" style="width:120px">' + BRL(l.valor) + '</td>' +
+          '<td class="text-end" style="width:90px">' + acoes + '</td></tr>';
+      });
+      html += '</tbody></table><div class="small text-muted">Subtotal ' + rotulo + ': ' + BRL(sub) + '</div>';
+    });
+    if (!ordem.length) html = '<div class="text-muted small">Sem lançamentos. Use "+ Novo lançamento".</div>';
+    el('fin-et-pane-real').innerHTML =
+      html +
+      '<div class="d-flex justify-content-between align-items-center mt-2">' +
+        '<button type="button" id="fin-lc-novo" class="btn btn-outline-primary btn-sm">+ Novo lançamento</button>' +
+        '<span class="small">Total realizado: <strong>' + BRL(total) + '</strong></span></div>' +
+      '<div id="fin-lc-form"></div>';
+    el('fin-lc-novo').addEventListener('click', function () { lancamentoForm(box, et, null); });
+    el('fin-et-pane-real').querySelectorAll('.fin-lc-edit').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var l = lancs.filter(function (x) { return String(x.id) === b.getAttribute('data-id'); })[0];
+        lancamentoForm(box, et, l);
+      });
+    });
+    el('fin-et-pane-real').querySelectorAll('.fin-lc-del').forEach(function (b) {
+      b.addEventListener('click', function () { excluirLancamento(box, et, b.getAttribute('data-id')); });
+    });
+  }
+  function lancamentoForm(box, et, l) {
+    var hoje = (l && l.data) ? String(l.data).slice(0, 10) : '';
+    el('fin-lc-form').innerHTML =
+      '<div class="border rounded p-2 mt-2"><div class="row g-2">' +
+        '<div class="col-3"><input type="date" id="fin-lc-data" class="form-control form-control-sm" value="' + hoje + '"></div>' +
+        '<div class="col-5"><input type="text" id="fin-lc-desc" class="form-control form-control-sm" placeholder="Descrição" value="' + (l ? String(l.descricao || '').replace(/"/g, '&quot;') : '') + '"></div>' +
+        '<div class="col-2"><input type="number" step="0.01" id="fin-lc-valor" class="form-control form-control-sm text-end" placeholder="Valor" value="' + (l ? Number(l.valor || 0) : '') + '"></div>' +
+        '<div class="col-2"><button type="button" id="fin-lc-salvar" class="btn btn-primary btn-sm w-100">Salvar</button></div>' +
+      '</div></div>';
+    el('fin-lc-salvar').addEventListener('click', function () {
+      var payload = {
+        data: el('fin-lc-data').value || '',
+        descricao: el('fin-lc-desc').value || '',
+        valor: el('fin-lc-valor').value || '0'
+      };
+      var url = '/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/lancamentos' + (l ? '/' + l.id : '');
+      fetch(url, {
+        method: l ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (d) { if (d.painel) { render(d.painel); atualizarCabecalhoEtapa(et, d.painel); } carregarRealizado(box, et); })
+        .catch(function () { el('fin-lc-form').innerHTML = '<div class="text-danger small">Falha ao salvar.</div>'; });
+    });
+  }
+  function atualizarCabecalhoEtapa(et, painel) {
+    if (!painel || !painel.etapas) return;
+    var fresh = painel.etapas.filter(function (e) { return e.osc_id === et.osc_id; })[0];
+    if (!fresh) return;
+    et.realizado = fresh.realizado; et.previsto = fresh.previsto;
+    var r = el('fin-et-real'), pv = el('fin-it-prev');
+    if (r) r.textContent = BRL(et.realizado);
+    if (pv) pv.textContent = BRL(et.previsto);
+  }
+  function excluirLancamento(box, et, id) {
+    fetch('/obras/' + OBRA_ID + '/financeiro/etapa/' + et.osc_id + '/lancamentos/' + id, {
+      method: 'DELETE', headers: { 'X-CSRFToken': csrfToken() }
+    })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) { if (d.painel) { render(d.painel); atualizarCabecalhoEtapa(et, d.painel); } carregarRealizado(box, et); })
+      .catch(function () {});
   }
 
   function recalcGrupo(box, idx) {
