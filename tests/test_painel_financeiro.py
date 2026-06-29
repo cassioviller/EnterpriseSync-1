@@ -797,3 +797,74 @@ def test_registrar_custo_separa_pai_por_categoria_fc():
         assert f1.pai_id != f2.pai_id
         assert f1.pai.categoria_fluxo_caixa_id == mat.id
         assert f2.pai.categoria_fluxo_caixa_id == mo.id
+
+
+@pytest.mark.integration
+def test_categorias_fluxo_caixa_saida_agrupa():
+    from services.cronograma_fisico_financeiro import categorias_fluxo_caixa_saida
+    from models import CategoriaFluxoCaixa
+    with app.app_context():
+        aid = _novo_admin()
+        CategoriaFluxoCaixa.seed_defaults(aid)
+        db.session.commit()
+        grupos = categorias_fluxo_caixa_saida(aid)
+        # estrutura agrupada
+        assert all(set(g.keys()) == {'grupo', 'opcoes'} for g in grupos)
+        nomes = {o['nome'] for g in grupos for o in g['opcoes']}
+        assert 'Materiais de Obra' in nomes
+        # só SAÍDA — nenhuma categoria de ENTRADA aparece
+        assert 'Receita de Obras' not in nomes
+
+
+@pytest.mark.integration
+def test_resolver_categoria_fluxo_caixa_fallback():
+    from services.cronograma_fisico_financeiro import resolver_categoria_fluxo_caixa
+    from models import CategoriaFluxoCaixa
+    with app.app_context():
+        aid = _novo_admin()
+        CategoriaFluxoCaixa.seed_defaults(aid)
+        db.session.commit()
+        outras = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Outras Saídas', tipo='SAIDA').first()
+        receita = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, tipo='ENTRADA').first()
+        mat = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first()
+        # válida → ela mesma
+        assert resolver_categoria_fluxo_caixa(aid, mat.id) == mat.id
+        # None → Outras Saídas
+        assert resolver_categoria_fluxo_caixa(aid, None) == outras.id
+        # ENTRADA (não SAÍDA) → fallback Outras Saídas
+        assert resolver_categoria_fluxo_caixa(aid, receita.id) == outras.id
+
+
+@pytest.mark.integration
+def test_lancamentos_da_etapa_expoe_categoria():
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.cronograma_fisico_financeiro import lancamentos_da_etapa
+    from utils.financeiro_integration import registrar_custo_automatico
+    from models import Obra, ObraServicoCusto, CategoriaFluxoCaixa
+    from decimal import Decimal
+    from datetime import date
+    import json, os
+    with app.app_context():
+        aid = _novo_admin()
+        CategoriaFluxoCaixa.seed_defaults(aid)
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        obra = Obra.query.get(oid)
+        osc = ObraServicoCusto.query.filter_by(obra_id=oid, admin_id=aid).first()
+        mat = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first()
+        registrar_custo_automatico(
+            admin_id=aid, tipo_categoria='OUTROS', entidade_nome='Lançamento manual',
+            entidade_id=None, data=date(2026, 6, 10), descricao='Cimento',
+            valor=Decimal('100'), obra_id=oid, obra_servico_custo_id=osc.id,
+            origem_tabela='lancamento_periodo_manual', origem_id=None,
+            categoria_fluxo_caixa_id=mat.id, force_v2=True)
+        db.session.commit()
+        out = lancamentos_da_etapa(obra, osc.id)
+        assert len(out) == 1
+        assert out[0]['categoria_id'] == mat.id
+        assert out[0]['categoria_label'] == 'Materiais de Obra'

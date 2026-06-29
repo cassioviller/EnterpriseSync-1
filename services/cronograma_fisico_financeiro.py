@@ -612,14 +612,57 @@ def lancamentos_da_etapa(obra, osc_id) -> list:
     for f in rows:
         origem = f.origem_tabela or ''
         editavel = origem == 'lancamento_periodo_manual'
+        pai = f.pai
+        cat_id = getattr(pai, 'categoria_fluxo_caixa_id', None)
+        cat_label = (pai.categoria_fluxo_caixa.nome
+                     if cat_id and pai.categoria_fluxo_caixa else None)
         out.append({
             "id": f.id, "data": f.data_referencia, "descricao": f.descricao,
             "valor": f.valor, "origem": origem,
             "origem_label": ("Manual" if editavel else (origem or "Sistema")),
+            "categoria_id": cat_id, "categoria_label": cat_label,
             "editavel": editavel,
         })
     out.sort(key=lambda x: (x["data"] is None, x["data"] or 0))
     return out
+
+
+def categorias_fluxo_caixa_saida(admin_id) -> list:
+    """Categorias de SAÍDA ativas do tenant, agrupadas por grupo_financeiro, para o
+    dropdown do lançamento: [{"grupo": str, "opcoes": [{"id", "nome"}]}]."""
+    from models import db, CategoriaFluxoCaixa
+    rows = (db.session.query(CategoriaFluxoCaixa)
+            .filter(CategoriaFluxoCaixa.admin_id == admin_id)
+            .filter(CategoriaFluxoCaixa.tipo == 'SAIDA')
+            .filter(CategoriaFluxoCaixa.ativo.is_(True))
+            .order_by(CategoriaFluxoCaixa.grupo_financeiro, CategoriaFluxoCaixa.nome)
+            .all())
+    grupos: list = []
+    idx: dict = {}
+    for c in rows:
+        g = c.grupo_financeiro or 'Outros'
+        if g not in idx:
+            idx[g] = len(grupos)
+            grupos.append({"grupo": g, "opcoes": []})
+        grupos[idx[g]]["opcoes"].append({"id": c.id, "nome": c.nome})
+    return grupos
+
+
+def resolver_categoria_fluxo_caixa(admin_id, categoria_id):
+    """Resolve a categoria do lançamento: devolve `categoria_id` se for uma
+    CategoriaFluxoCaixa de SAÍDA ativa do tenant; senão a 'Outras Saídas' do tenant;
+    senão None. Nunca levanta — categoria não derruba o POST."""
+    from models import CategoriaFluxoCaixa
+    if categoria_id is not None:
+        c = (CategoriaFluxoCaixa.query
+             .filter_by(id=categoria_id, admin_id=admin_id, tipo='SAIDA', ativo=True)
+             .first())
+        if c:
+            return c.id
+    fallback = (CategoriaFluxoCaixa.query
+                .filter_by(admin_id=admin_id, nome='Outras Saídas', tipo='SAIDA')
+                .first())
+    return fallback.id if fallback else None
 
 
 def fasear_custo_por_linhas(obra_id, admin_id, sab, dom):
