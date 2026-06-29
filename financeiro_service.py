@@ -483,7 +483,8 @@ class FinanceiroService:
             # eager-load resolve a categoria no MESMO SELECT do Pai (snapshot já visível),
             # evitando o lazy-load por linha que ficava stale na 1ª leitura após a escrita.
             custos_v2_previstos = GestaoCustoPai.query.options(
-                joinedload(GestaoCustoPai.categoria_fluxo_caixa)).filter(
+                joinedload(GestaoCustoPai.categoria_fluxo_caixa),
+                joinedload(GestaoCustoPai.itens)).filter(
                 and_(
                     GestaoCustoPai.admin_id == admin_id,
                     GestaoCustoPai.status.in_(STATUSES_ABERTOS),
@@ -580,11 +581,46 @@ class FinanceiroService:
                 else:
                     custo_data = data_fim
                 badge_status = custo.status  # PENDENTE / SOLICITADO / AUTORIZADO
+                cat_label = FinanceiroService._rotulo_categoria(custo)
+                valor_pai = float(custo.saldo if getattr(custo, 'saldo', None) is not None
+                                  else (custo.valor_solicitado or custo.valor_total) or 0)
+                # Lançamentos manuais: explodir o Pai em uma linha por filho, na data
+                # digitada (data_referencia), em vez de uma linha agregada na data de
+                # criação do Pai. O agrupamento em Gestão de Custos não muda.
+                manuais = [f for f in custo.itens
+                           if (f.origem_tabela or '') == 'lancamento_periodo_manual']
+                if manuais:
+                    soma_manual = 0.0
+                    for f in manuais:
+                        v = float(f.valor or 0)
+                        soma_manual += v
+                        detalhes.append({
+                            'data': f.data_referencia or custo_data,
+                            'tipo': 'SAIDA',
+                            'descricao': f'{custo.entidade_nome} [{cat_label}] — {f.descricao}',
+                            'valor': v,
+                            'origem': 'Gestão de Custos V2',
+                            'status': badge_status,
+                            'realizado': False,
+                        })
+                    # Resto não-manual do mesmo Pai (se houver) vai como linha agregada.
+                    resto = valor_pai - soma_manual
+                    if resto > 0.005:
+                        detalhes.append({
+                            'data': custo_data,
+                            'tipo': 'SAIDA',
+                            'descricao': f'{custo.entidade_nome} [{cat_label}]',
+                            'valor': resto,
+                            'origem': 'Gestão de Custos V2',
+                            'status': badge_status,
+                            'realizado': False,
+                        })
+                    continue
                 detalhes.append({
                     'data': custo_data,
                     'tipo': 'SAIDA',
-                    'descricao': f'{custo.entidade_nome} [{FinanceiroService._rotulo_categoria(custo)}]',
-                    'valor': float(custo.saldo if getattr(custo, 'saldo', None) is not None else (custo.valor_solicitado or custo.valor_total)),
+                    'descricao': f'{custo.entidade_nome} [{cat_label}]',
+                    'valor': valor_pai,
                     'origem': 'Gestão de Custos V2',
                     'status': badge_status,
                     'realizado': False,

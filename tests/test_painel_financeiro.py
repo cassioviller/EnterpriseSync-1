@@ -992,3 +992,41 @@ def test_lancamento_categoria_ponta_a_ponta():
         p = painel_financeiro(obra)
         et = next(e for e in p['etapas'] if e['osc_id'] == osc_id)
         assert float(et['realizado']) >= 1000 - 1
+
+
+@pytest.mark.integration
+def test_fluxo_caixa_lancamento_manual_usa_data_digitada():
+    """Lançamento manual aparece no fluxo de caixa na data digitada (data_referencia
+    do filho), não na data de criação do Pai — o Pai é explodido em linha por filho."""
+    from financeiro_service import FinanceiroService
+    from utils.financeiro_integration import registrar_custo_automatico
+    from models import CategoriaFluxoCaixa
+    from decimal import Decimal
+    from datetime import date
+    with app.app_context():
+        aid = _novo_admin()
+        CategoriaFluxoCaixa.seed_defaults(aid); db.session.commit()
+        mat = CategoriaFluxoCaixa.query.filter_by(
+            admin_id=aid, nome='Materiais de Obra', tipo='SAIDA').first()
+        # dois lançamentos manuais, mesma categoria → mesmo Pai, datas distintas
+        registrar_custo_automatico(
+            admin_id=aid, tipo_categoria='OUTROS', entidade_nome='Lançamento manual',
+            entidade_id=None, data=date(2026, 6, 20), descricao='Cimento',
+            valor=Decimal('4242.42'), obra_id=None,
+            origem_tabela='lancamento_periodo_manual', origem_id=None,
+            categoria_fluxo_caixa_id=mat.id, force_v2=True)
+        registrar_custo_automatico(
+            admin_id=aid, tipo_categoria='OUTROS', entidade_nome='Lançamento manual',
+            entidade_id=None, data=date(2026, 7, 15), descricao='Areia',
+            valor=Decimal('555.00'), obra_id=None,
+            origem_tabela='lancamento_periodo_manual', origem_id=None,
+            categoria_fluxo_caixa_id=mat.id, force_v2=True)
+        db.session.commit()
+        out = FinanceiroService.calcular_fluxo_caixa(aid, date(2026, 1, 1), date(2030, 1, 1))
+        c1 = [d for d in out['detalhes']
+              if d.get('tipo') == 'SAIDA' and abs(float(d.get('valor', 0)) - 4242.42) < 0.01]
+        c2 = [d for d in out['detalhes']
+              if d.get('tipo') == 'SAIDA' and abs(float(d.get('valor', 0)) - 555.00) < 0.01]
+        # cada lançamento vira sua própria linha, na data digitada
+        assert len(c1) == 1 and c1[0]['data'] == date(2026, 6, 20)
+        assert len(c2) == 1 and c2[0]['data'] == date(2026, 7, 15)
