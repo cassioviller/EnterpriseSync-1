@@ -563,3 +563,28 @@ def test_caixa_fallback_complementar_linha_sem_data():
         # nada se perde: total = baseline - etapa0 original + 17000 (10k datada + 7k cronograma)
         total = sum(float(l['gasto_veks']) for l in caixa['linhas'])
         assert abs(total - (total_base - veks0_orig + 17000)) < 2
+
+
+@pytest.mark.integration
+def test_osc_item_tem_valor_realizado():
+    from models import ObraServicoCustoItem
+    cols = {c.name for c in ObraServicoCustoItem.__table__.columns}
+    assert 'valor_realizado' in cols
+
+
+@pytest.mark.integration
+def test_osc_item_valor_realizado_default_zero():
+    from models import ObraServicoCusto, ObraServicoCustoItem, Obra, Usuario
+    from decimal import Decimal
+    with app.app_context():
+        aid = _novo_admin()
+        obra = Obra(nome='T-vr', admin_id=aid, data_inicio=date(2026, 6, 1),
+                    cliente_id=_novo_cliente(aid))
+        db.session.add(obra); db.session.flush()
+        osc = ObraServicoCusto(obra_id=obra.id, admin_id=aid, nome='E1')
+        db.session.add(osc); db.session.flush()
+        it = ObraServicoCustoItem(
+            obra_servico_custo_id=osc.id, admin_id=aid,
+            descricao='Escritório', valor=Decimal('100'), fonte='veks', ordem=0)
+        db.session.add(it); db.session.commit()
+        assert Decimal(str(it.valor_realizado or 0)) == Decimal('0')

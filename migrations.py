@@ -3999,6 +3999,7 @@ def executar_migracoes():
             (199, "Físico-financeiro — tabela obra_servico_custo_item (linhas de custo por etapa)", _migration_199_obra_servico_custo_item),
             (200, "Físico-financeiro — datas de desembolso por linha de custo", _migration_200_osc_item_datas),
             (201, "Obra.regime_medicao (fixa|percentual) + backfill percentual p/ obras com medição física", _migration_201_obra_regime_medicao),
+            (202, "Custos unificados — valor_realizado por período + strip sufixo (mês/aa) das descrições", _migration_202_osc_item_valor_realizado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13692,6 +13693,32 @@ def _migration_201_obra_regime_medicao():
         logger.info("[Migration 201] obra.regime_medicao adicionada + backfill percentual.")
     except Exception as e:
         logger.error(f"[Migration 201] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_202_osc_item_valor_realizado():
+    """Custos unificados — realizado manual por período: coluna valor_realizado em
+    obra_servico_custo_item. Data-migration: remove o sufixo '(mês/aa)' das descrições
+    para que os períodos existentes agrupem por (descricao, fonte). Idempotente.
+    Ver spec 2026-06-29-custos-unificados-modulo-periodos-design."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE obra_servico_custo_item ADD COLUMN IF NOT EXISTS "
+                "valor_realizado NUMERIC(15,2) NOT NULL DEFAULT 0"))
+            # Data-migration: tira ' (jan/26)'... do fim da descrição (case-insensitive).
+            conn.execute(sa_text(r"""
+                UPDATE obra_servico_custo_item
+                SET descricao = regexp_replace(
+                    descricao,
+                    ' \((jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/[0-9]{2}\)$',
+                    '', 'i')
+                WHERE descricao ~* ' \((jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/[0-9]{2}\)$'
+            """))
+        logger.info("[Migration 202] obra_servico_custo_item.valor_realizado + strip sufixo (mês/aa).")
+    except Exception as e:
+        logger.error(f"[Migration 202] Falha: {e}", exc_info=True)
         raise
 
 
