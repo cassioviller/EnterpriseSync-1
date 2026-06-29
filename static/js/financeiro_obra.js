@@ -181,6 +181,79 @@
       .then(function (p) { render(p); box.innerHTML = '<div class="text-success small">Salvo e recalculado.</div>'; })
       .catch(function () { box.innerHTML = '<div class="text-danger small">Falha ao salvar.</div>'; });
   }
+
+  function ultimoDiaMes(ano, mes) { return new Date(ano, mes, 0).getDate(); }
+  function periodoRowPrevHTML(p, i) {
+    return '<tr data-p="' + i + '">' +
+      '<td>' + rotuloMes(p.data_inicio) + '</td>' +
+      '<td><input type="date" class="form-control form-control-sm fin-pm-ini" value="' +
+        (p.data_inicio ? String(p.data_inicio).slice(0, 10) : '') + '"></td>' +
+      '<td><input type="date" class="form-control form-control-sm fin-pm-fim" value="' +
+        (p.data_fim ? String(p.data_fim).slice(0, 10) : '') + '"></td>' +
+      '<td><input type="number" step="0.01" class="form-control form-control-sm text-end fin-pm-valor" value="' +
+        Number(p.valor || 0) + '"></td>' +
+      '<td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger fin-pm-del p-0">&times;</button></td>' +
+    '</tr>';
+  }
+  function periodoRowRealHTML(p, i) {
+    return '<tr data-p="' + i + '">' +
+      '<td>' + rotuloMes(p.data_inicio) + '</td>' +
+      '<td><input type="number" step="0.01" class="form-control form-control-sm text-end fin-pm-realval" value="' +
+        Number(p.valor_realizado || 0) + '"></td>' +
+    '</tr>';
+  }
+  function abrirModuloPeriodos(box, idx) {
+    var g = box._grupos[idx];
+    el('fin-pm-titulo').innerHTML = (g.descricao || 'Períodos') +
+      ' <span class="badge bg-light text-dark border">' + fonteLabel(g.fonte) + '</span>';
+
+    function renderAbas() {
+      el('fin-pm-prev-body').innerHTML = g.periodos.map(periodoRowPrevHTML).join('');
+      el('fin-pm-real-body').innerHTML = g.periodos.map(periodoRowRealHTML).join('');
+      totais();
+      el('fin-pm-prev-body').querySelectorAll('tr').forEach(bindPrevRow);
+      el('fin-pm-real-body').querySelectorAll('tr').forEach(bindRealRow);
+    }
+    function totais() {
+      var tp = g.periodos.reduce(function (s, p) { return s + Number(p.valor || 0); }, 0);
+      var tr = g.periodos.reduce(function (s, p) { return s + Number(p.valor_realizado || 0); }, 0);
+      el('fin-pm-prev-total').textContent = BRL(tp);
+      el('fin-pm-real-total').textContent = BRL(tr);
+    }
+    function bindPrevRow(trEl) {
+      var i = parseInt(trEl.getAttribute('data-p'), 10);
+      trEl.querySelector('.fin-pm-valor').addEventListener('input', function () {
+        g.periodos[i].valor = Number(this.value || 0); totais();
+      });
+      trEl.querySelector('.fin-pm-ini').addEventListener('change', function () {
+        g.periodos[i].data_inicio = this.value || null;
+        trEl.querySelector('td:first-child').textContent = rotuloMes(this.value);
+      });
+      trEl.querySelector('.fin-pm-fim').addEventListener('change', function () {
+        g.periodos[i].data_fim = this.value || null;
+      });
+      trEl.querySelector('.fin-pm-del').addEventListener('click', function () {
+        g.periodos.splice(i, 1); renderAbas();
+      });
+    }
+    function bindRealRow(trEl) {
+      var i = parseInt(trEl.getAttribute('data-p'), 10);
+      trEl.querySelector('.fin-pm-realval').addEventListener('input', function () {
+        g.periodos[i].valor_realizado = Number(this.value || 0); totais();
+      });
+    }
+    el('fin-pm-add').onclick = function () {
+      g.periodos.push({ valor: 0, valor_realizado: 0, data_inicio: null, data_fim: null, fonte: g.fonte });
+      renderAbas();
+    };
+    el('fin-pm-aplicar').onclick = function () { recalcGrupo(box, idx); };
+
+    renderAbas();
+    var modalEl = el('fin-periodos-modal');
+    var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.show();
+  }
+
   function buildCharts(p) {
     var blue = '#2E6BB0', green = '#198754', amber = '#C8870E', red = '#C0392B', grid = { color: '#E5EBF2' };
     var st = p.etapas.slice().sort(function (a, b) { return b.previsto - a.previsto; });
