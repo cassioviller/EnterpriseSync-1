@@ -5002,6 +5002,10 @@ class GestaoCustoPai(db.Model):
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     fluxo_caixa_id = db.Column(db.Integer, db.ForeignKey('fluxo_caixa.id'), nullable=True)
+    # Categoria de fluxo de caixa (catálogo curável) — categoriza o custo no relatório
+    # de Fluxo de Caixa e no lançamento por etapa (spec 2026-06-29-lancamento-categoria-fluxo-caixa).
+    categoria_fluxo_caixa_id = db.Column(
+        db.Integer, db.ForeignKey('categoria_fluxo_caixa.id'), nullable=True)
 
     # Novos campos para absorver ContaPagar
     fornecedor_id = db.Column(db.Integer, db.ForeignKey('fornecedor.id'), nullable=True)
@@ -5026,6 +5030,8 @@ class GestaoCustoPai(db.Model):
     itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
                             cascade='all, delete-orphan')
     fornecedor = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
+    categoria_fluxo_caixa = db.relationship(
+        'CategoriaFluxoCaixa', foreign_keys=[categoria_fluxo_caixa_id])
     subempreiteiro = db.relationship('Subempreiteiro', foreign_keys=[subempreiteiro_id], backref='custos_lancados')
     responsavel = db.relationship('Usuario', foreign_keys=[responsavel_id], backref='gestao_custo_responsavel')
     # conta_contabil: sem relationship ORM pois não há FK DB-level (veja nota acima).

@@ -4001,6 +4001,7 @@ def executar_migracoes():
             (201, "Obra.regime_medicao (fixa|percentual) + backfill percentual p/ obras com medição física", _migration_201_obra_regime_medicao),
             (202, "Custos unificados — valor_realizado por período + strip sufixo (mês/aa) das descrições", _migration_202_osc_item_valor_realizado),
             (203, "Realizado por lançamentos — remove obra_servico_custo_item.valor_realizado", _migration_203_drop_valor_realizado),
+            (204, "Lançamento por categoria — gestao_custo_pai.categoria_fluxo_caixa_id", _migration_204_gestao_custo_pai_categoria_fc),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13735,6 +13736,23 @@ def _migration_203_drop_valor_realizado():
         logger.info("[Migration 203] obra_servico_custo_item.valor_realizado removida.")
     except Exception as e:
         logger.error(f"[Migration 203] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_204_gestao_custo_pai_categoria_fc():
+    """Lançamento por categoria de fluxo de caixa — adiciona
+    gestao_custo_pai.categoria_fluxo_caixa_id (FK p/ categoria_fluxo_caixa). Idempotente.
+    Ver spec 2026-06-29-lancamento-categoria-fluxo-caixa-design."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE gestao_custo_pai "
+                "ADD COLUMN IF NOT EXISTS categoria_fluxo_caixa_id INTEGER "
+                "REFERENCES categoria_fluxo_caixa(id)"))
+        logger.info("[Migration 204] gestao_custo_pai.categoria_fluxo_caixa_id adicionada.")
+    except Exception as e:
+        logger.error(f"[Migration 204] Falha: {e}", exc_info=True)
         raise
 
 

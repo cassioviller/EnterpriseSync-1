@@ -756,3 +756,10 @@ def test_custo_nao_previsto_conta_no_realizado_da_etapa():
         p = painel_financeiro(Obra.query.get(oid))
         et = next(e for e in p['etapas'] if e['osc_id'] == osc_id)
         assert float(et['realizado']) >= 1000 - 1   # conta mesmo sem previsão correspondente
+
+
+@pytest.mark.integration
+def test_gestao_custo_pai_tem_categoria_fluxo_caixa():
+    from models import GestaoCustoPai
+    cols = {c.name for c in GestaoCustoPai.__table__.columns}
+    assert 'categoria_fluxo_caixa_id' in cols
