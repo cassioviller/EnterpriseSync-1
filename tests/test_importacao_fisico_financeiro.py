@@ -829,3 +829,32 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         assert oid2 == oid
         assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 6
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
+
+
+def test_import_sem_rdos_lanca_pct_fisico_sem_mao_de_obra():
+    """Arquivo SEM seção `rdos` (físico vem do `pct_fisico` do cronograma) gera o
+    progresso da obra direto do cronograma — sem adicionar pessoas. Reproduz o
+    Baia_fisico_financeiro_IMPORTAR.json (real). Ver 2026-06-30-pct-fisico-no-import-baia."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, RDOMaoObra
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    payload = _carregar_json()
+    # Simula o arquivo real: sem `rdos`, físico só no `pct_fisico` das folhas.
+    payload.pop('rdos', None)
+    folhas = [t for t in payload['cronograma_tarefas'] if not t.get('resumo')]
+    folhas[0]['pct_fisico'] = 100.0
+    folhas[1]['pct_fisico'] = 50.0
+    com_fisico = sum(1 for t in folhas if float(t.get('pct_fisico') or 0) > 0)
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
+        # 1 RDO sintético de físico, SEM mão de obra
+        assert len(rdo_ids) == 1
+        assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
+        # progresso da obra > 0 (lançado a partir do pct_fisico)
+        prog = calcular_progresso_geral_obra_v2(oid, date.today(), aid)
+        assert prog['progresso_geral_pct'] > 0
+        assert prog['n_tarefas_apontadas'] == com_fisico

@@ -228,6 +228,44 @@ def _vincular_etapa_tarefas(admin_id, imc, etapa, mpp, tid_to_db, avisos):
     db.session.flush()
 
 
+def _rdos_sinteticos_do_pct_fisico(payload):
+    """Quando o arquivo NÃO traz a seção `rdos` (físico real do documento), deriva
+    UM "RDO de físico inicial" a partir do `pct_fisico` das tarefas FOLHA do
+    cronograma (coluna %físico do MS Project). É isso que permite LANÇAR a
+    porcentagem da obra direto do cronograma — SEM adicionar pessoas
+    (`mao_de_obra=0`; o usuário adiciona mão de obra ao editar o RDO).
+
+    Tarefas-resumo não entram (são rollup dos filhos → evitam dupla contagem).
+    Retorna [] quando não há físico a lançar (cai no comportamento padrão).
+    Ver spec 2026-06-30-pct-fisico-no-import-baia."""
+    tarefas = payload.get('cronograma_tarefas', []) or []
+    apont = [
+        {'tarefa_mpp': t['id'], 'pct': float(t.get('pct_fisico') or 0)}
+        for t in tarefas
+        if not t.get('resumo') and float(t.get('pct_fisico') or 0) > 0
+    ]
+    if not apont:
+        return []
+    # Data do snapshot: geração do arquivo (precisa ser ≤ hoje p/ aparecer no card
+    # de hoje, que chama calcular_progresso_geral_obra_v2 com date.today());
+    # fallback p/ início do contrato; nunca no futuro.
+    hoje = date.today()
+    meta = payload.get('_meta') or {}
+    contrato = payload.get('contrato') or {}
+    data_snap = (_parse_date(meta.get('gerado_em'))
+                 or _parse_date(contrato.get('data_inicio'))
+                 or hoje)
+    if data_snap > hoje:
+        data_snap = hoje
+    return [{
+        'data': data_snap.isoformat(),
+        'mao_de_obra': 0,
+        'clima': 'Não informado',
+        'comentario': 'Físico inicial importado do cronograma (%físico do MS Project).',
+        'apontamentos': apont,
+    }]
+
+
 def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     """Cria os RDOs da obra a partir do payload (seção `rdos`), referenciando as
     tarefas pelo id do .mpp (traduzido por `tid_to_db`). Idempotente: apaga os RDOs
@@ -503,7 +541,10 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
 
     # RDOs (físico real) a partir do payload; depois sincroniza o % das tarefas
     # pelo último apontamento. `tid_to_db` foi montado em _materializar_cronograma_mpp.
-    _materializar_rdos(obra, admin_id, payload.get('rdos', []), tid_to_db)
+    # Sem seção `rdos`, deriva o físico do `pct_fisico` do cronograma (lança a
+    # porcentagem da obra sem adicionar pessoas) — ver _rdos_sinteticos_do_pct_fisico.
+    rdos = payload.get('rdos') or _rdos_sinteticos_do_pct_fisico(payload)
+    _materializar_rdos(obra, admin_id, rdos, tid_to_db)
     db.session.flush()
     from utils.cronograma_engine import sincronizar_percentuais_obra
     sincronizar_percentuais_obra(obra.id, admin_id)
