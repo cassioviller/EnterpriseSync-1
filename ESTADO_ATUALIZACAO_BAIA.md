@@ -24,6 +24,21 @@ deixou de orfanar/zerar o físico — antes o reimport apagava as `TarefaCronogr
 - Suíte focada verde (96 passed). Commits locais: `d6531d52` (helper+integração),
   `b0936359` (fixture+teste). **Pendente:** `git push` (ambiente sem credencial nesta máquina).
 
+### Card de RDO passa a exibir o progresso da OBRA (não 0%)
+
+Spec `docs/superpowers/specs/2026-06-30-progresso-obra-no-card-rdo-design.md`;
+plano `docs/superpowers/plans/2026-06-30-progresso-obra-no-card-rdo.md`.
+
+`utils/cronograma_engine.py::calcular_progresso_rdo` ganhou um **fallback**: tarefa sem
+`quantidade_total` agora deriva o `percentual_realizado` do último apontamento até a data (mesma
+fonte que `sincronizar_percentuais_obra`). Antes devolvia sempre 0, fazendo os cards de RDO
+mostrarem "Progresso Geral 0,0%". Agora os cards exibem o avanço **acumulado da obra até a data do
+RDO**, crescente (Baia: 1,7% em 22/06 → 2,3% em 27/06, verificado no browser). Correção de leitura;
+rota/template/agregador inalterados; também beneficia obras do `seed_rdos_baias.py`.
+
+Confirmado: das **56 tarefas** da Baia, só 5 têm %>0 (3 folhas citadas + 2 pais por rollup); as
+outras **51 estão em 0%**. Suíte focada verde (98 passed). Commit local `4892d1cd`.
+
 ---
 
 ## ⚠️ POR QUE o ambiente cai no meio da sessão (5ª vez) — e como não repetir
