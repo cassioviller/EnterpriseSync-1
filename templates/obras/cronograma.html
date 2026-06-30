@@ -81,7 +81,7 @@
       <div class="stat-card stat-card-purple">
         <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
         <div class="stat-body">
-          <div class="stat-val" id="statPercGeral">{{ "%.0f"|format(perc_total) }}%</div>
+          <div class="stat-val" id="statPercGeral">{{ "%.0f"|format(progresso_geral_header if progresso_geral_header is not none else perc_total) }}%</div>
           <div class="stat-lbl">Progresso Geral</div>
         </div>
       </div>
