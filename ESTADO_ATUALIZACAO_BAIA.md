@@ -1,7 +1,28 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-06-27**.
+> Documento de handoff. Última atualização: **2026-06-30**.
 > Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## Rodada 2026-06-30 — RDOs no payload de import (físico real pelo relatório semanal)
+
+Spec `docs/superpowers/specs/2026-06-30-rdos-no-import-baia-design.md`;
+plano `docs/superpowers/plans/2026-06-30-rdos-no-import-baia.md`.
+
+O import (`importar_fisico_financeiro`) agora cria os **RDOs da Baia a partir de uma seção
+`"rdos"` no JSON** (helper `_materializar_rdos` + `sincronizar_percentuais_obra`). Reimportar
+deixou de orfanar/zerar o físico — antes o reimport apagava as `TarefaCronograma` e os RDOs
+(que vinham de `scripts/seed_rdos_baias.py`) ficavam órfãos.
+
+- **`scripts/seed_rdos_baias.py` não é mais necessário para a Baia** (o import é a fonte única).
+  Mantido no repo para outras obras; sem mudança nele.
+- Fixture `tests/fixtures/cronograma_fisico_financeiro_baias.json` ganhou 6 RDOs fiéis ao
+  relatório 22–27/06. Físico resultante (cronograma, por tarefa): ESTUDO DE SOLO SPT **100%**,
+  EXECUÇÃO DE PROJETOS **65%**, FAZENDA: NIVELAMENTO DO PLATÔ **20%**, demais **0%**.
+- Mão de obra no RDO é só realismo (não gera custo). Invariantes financeiros preservados.
+- Suíte focada verde (96 passed). Commits locais: `d6531d52` (helper+integração),
+  `b0936359` (fixture+teste). **Pendente:** `git push` (ambiente sem credencial nesta máquina).
 
 ---
 
