@@ -81,7 +81,7 @@
       <div class="stat-card stat-card-purple">
         <div class="stat-icon"><i class="fas fa-chart-pie"></i></div>
         <div class="stat-body">
-          <div class="stat-val" id="statPercGeral">{{ "%.0f"|format(progresso_geral_header if progresso_geral_header is not none else perc_total) }}%</div>
+          <div class="stat-val" id="statPercGeral">{{ "%.1f"|format(progresso_geral_header if progresso_geral_header is not none else perc_total) }}%</div>
           <div class="stat-lbl">Progresso Geral</div>
         </div>
       </div>
@@ -294,7 +294,7 @@
                       {% else %}fill-low{% endif %}"
                       style="width:{{ perc }}%"></div>
                   </div>
-                  <span class="perc-text {% if perc >= plan %}text-success{% elif perc > 0 %}text-warning{% else %}text-danger{% endif %}">{{ perc }}%</span>
+                  <span class="perc-text {% if perc >= plan %}text-success{% elif perc > 0 %}text-warning{% else %}text-danger{% endif %}">{% if progresso_geral_header is not none and not t.tarefa_pai_id %}{{ "%.1f"|format(progresso_geral_header) }}{% else %}{{ perc }}{% endif %}%</span>
                 </div>
                 {% endif %}
               </td>

@@ -686,7 +686,8 @@ def test_cronograma_header_usa_progresso_v2():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
-        esperado = round(calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct'])
+        # header exibido com 1 casa decimal (idêntico ao portal)
+        esperado = "%.1f" % calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct']
     with app.test_client() as c:
         with c.session_transaction() as s:
             s['_user_id'] = str(aid); s['_fresh'] = True
