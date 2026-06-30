@@ -425,6 +425,27 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
     perc_realizado = 0.0
     if tarefa.quantidade_total and tarefa.quantidade_total > 0:
         perc_realizado = min(100.0, round(acumulado / tarefa.quantidade_total * 100, 2))
+    else:
+        # Tarefa sem quantidade física: o avanço é o percentual_realizado do
+        # ÚLTIMO apontamento até data_rdo (mesma fonte que
+        # sincronizar_percentuais_obra). Antes esse caso devolvia sempre 0.
+        ultimo = (
+            db.session.query(RDOApontamentoCronograma.percentual_realizado)
+            .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+            .filter(
+                RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+                RDOApontamentoCronograma.admin_id == admin_id,
+                RDO.data_relatorio <= data_rdo,
+            )
+            .order_by(RDO.data_relatorio.desc())
+            .first()
+        )
+        if ultimo is not None and ultimo[0] is not None:
+            perc_realizado = min(100.0, float(ultimo[0]))
+            if acumulado <= 0:
+                # sinaliza apontamento p/ n_tarefas_apontadas em
+                # calcular_progresso_geral_obra_v2 (testa quantidade_acumulada > 0)
+                acumulado = perc_realizado
 
     return {
         'percentual_planejado': perc_planejado,

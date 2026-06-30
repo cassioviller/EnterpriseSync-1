@@ -627,3 +627,46 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 20.0
         assert por_nome['MOBILIZAÇÃO EQUIPE'] == 0.0
         assert por_nome['MARCAÇÃO DE OBRA'] == 0.0
+
+
+def test_calcular_progresso_rdo_fallback_sem_quantidade_total():
+    """Tarefa sem quantidade_total: realizado = percentual_realizado do último
+    apontamento até a data (antes era sempre 0)."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from utils.cronograma_engine import calcular_progresso_rdo
+    from models import TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        projetos = (TarefaCronograma.query
+                    .filter_by(obra_id=oid, admin_id=aid)
+                    .filter(TarefaCronograma.nome_tarefa.like('EXECUÇÃO DE PROJETOS%'))
+                    .first())
+        assert projetos is not None and not projetos.quantidade_total
+        # antes do 1º apontamento (22/06) → 0
+        r21 = calcular_progresso_rdo(projetos.id, date(2026, 6, 21), aid)
+        assert r21['percentual_realizado'] == 0.0
+        # 22/06 → 50 (primeiro apontamento); 27/06 → 65 (acumulado)
+        assert calcular_progresso_rdo(projetos.id, date(2026, 6, 22), aid)['percentual_realizado'] == 50.0
+        assert calcular_progresso_rdo(projetos.id, date(2026, 6, 27), aid)['percentual_realizado'] == 65.0
+
+
+def test_progresso_geral_obra_cresce_por_data():
+    """O progresso acumulado da obra (usado nos cards de RDO) é > 0 e cresce de
+    22/06 para 27/06."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        p22 = calcular_progresso_geral_obra_v2(oid, date(2026, 6, 22), aid)['progresso_geral_pct']
+        p27 = calcular_progresso_geral_obra_v2(oid, date(2026, 6, 27), aid)['progresso_geral_pct']
+        assert 0 < p22 < p27 < 100
