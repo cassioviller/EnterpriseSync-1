@@ -550,3 +550,57 @@ def test_importacao_descricao_periodo_sem_sufixo_mes():
         chaves = Counter((it.descricao, it.fonte) for it in itens)
         assert any(c > 1 for c in chaves.values()), \
             "esperado ao menos um grupo com vários períodos (ex.: Escritório veks)"
+
+
+def test_import_cria_rdos_da_secao_rdos():
+    """Import com seção `rdos` cria 1 RDO por item e sincroniza o % das tarefas."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        payload = json.load(open(caminho, encoding='utf-8'))
+        # injeta uma seção rdos mínima (independente do conteúdo final da fixture)
+        payload['rdos'] = [
+            {"data": "2026-06-22", "clima": "Nublado", "precipitacao": "Sem chuva",
+             "comentario": "Topografia.", "mao_de_obra": 0,
+             "apontamentos": [{"tarefa_mpp": 3, "pct": 100}, {"tarefa_mpp": 4, "pct": 50}]},
+            {"data": "2026-06-27", "clima": "Ensolarado", "precipitacao": "Sem chuva",
+             "comentario": "Nivelamento galpão B.", "mao_de_obra": 0,
+             "apontamentos": [{"tarefa_mpp": 3, "pct": 100}, {"tarefa_mpp": 4, "pct": 65},
+                              {"tarefa_mpp": 6, "pct": 20}]},
+        ]
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 2
+        por_nome = {t.nome_tarefa: t for t in
+                    TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
+        assert float(por_nome['ESTUDO DE SOLO SPT'].percentual_concluido) == 100.0
+        assert float(por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA'].percentual_concluido) == 65.0
+        assert float(por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'].percentual_concluido) == 20.0
+        assert float(por_nome['MOBILIZAÇÃO EQUIPE'].percentual_concluido) == 0.0
+
+
+def test_import_rdos_idempotente_e_opcional():
+    """Reimportar não duplica RDOs; payload sem `rdos` não cria nada e não quebra."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        payload = json.load(open(caminho, encoding='utf-8'))
+        payload['rdos'] = [
+            {"data": "2026-06-22", "apontamentos": [{"tarefa_mpp": 3, "pct": 100}]},
+        ]
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        importar_fisico_financeiro(payload, aid)  # reimport
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 1
+
+        sem = json.load(open(caminho, encoding='utf-8'))
+        sem.pop('rdos', None)
+        aid2 = _novo_admin()
+        oid2 = importar_fisico_financeiro(sem, aid2)['obra_id']
+        assert RDO.query.filter_by(obra_id=oid2, admin_id=aid2).count() == 0

@@ -228,6 +228,63 @@ def _vincular_etapa_tarefas(admin_id, imc, etapa, mpp, tid_to_db, avisos):
     db.session.flush()
 
 
+def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
+    """Cria os RDOs da obra a partir do payload (seção `rdos`), referenciando as
+    tarefas pelo id do .mpp (traduzido por `tid_to_db`). Idempotente: apaga os RDOs
+    da obra antes de recriar. Mão de obra é só realismo do documento (não gera
+    custo). Retorna o nº de RDOs criados. Ver spec 2026-06-30-rdos-no-import-baia."""
+    from app import db
+    from models import RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario
+
+    if not rdos:
+        return 0
+
+    # Idempotência: remove RDOs anteriores desta obra (cascata limpa mão de obra
+    # e apontamentos).
+    for r in RDO.query.filter_by(obra_id=obra.id, admin_id=admin_id).all():
+        db.session.delete(r)
+    db.session.flush()
+
+    funcs = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).limit(10).all()
+    criados = 0
+    for item in rdos:
+        dia = _parse_date(item.get('data'))
+        if dia is None:
+            continue
+        rdo = RDO(
+            numero_rdo=f"RDO-{obra.id}-{dia.strftime('%Y%m%d')}",
+            obra_id=obra.id, admin_id=admin_id, criado_por_id=admin_id,
+            data_relatorio=dia, local='Campo', status='Finalizado',
+            clima_geral=(item.get('clima') or 'Não informado')[:50],
+            precipitacao=(item.get('precipitacao') or '')[:20],
+            comentario_geral=item.get('comentario') or '',
+        )
+        db.session.add(rdo)
+        db.session.flush()
+
+        qtd_mo = int(item.get('mao_de_obra') or 0)
+        for f in funcs[:qtd_mo]:
+            funcao_nome = getattr(getattr(f, 'funcao_ref', None), 'nome', None) \
+                or getattr(f, 'funcao', None) or 'Operário'
+            db.session.add(RDOMaoObra(
+                rdo_id=rdo.id, admin_id=admin_id, funcionario_id=f.id,
+                funcao_exercida=str(funcao_nome)[:100], horas_trabalhadas=8.0))
+
+        for ap in (item.get('apontamentos') or []):
+            db_id = tid_to_db.get(ap.get('tarefa_mpp'))
+            if db_id is None:
+                continue
+            pct = float(ap.get('pct') or 0)
+            db.session.add(RDOApontamentoCronograma(
+                rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
+                quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+                percentual_realizado=pct, percentual_planejado=None))
+        criados += 1
+
+    db.session.flush()
+    return criados
+
+
 # ----------------------------------------------------------------------
 # Orquestrador
 # ----------------------------------------------------------------------
@@ -425,6 +482,13 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
             obs=med.get('obs'), ordem=i))
 
     obra.fluxo_caixa_planilha = payload.get('fluxo_caixa_mensal')
+
+    # RDOs (físico real) a partir do payload; depois sincroniza o % das tarefas
+    # pelo último apontamento. `tid_to_db` foi montado em _materializar_cronograma_mpp.
+    _materializar_rdos(obra, admin_id, payload.get('rdos', []), tid_to_db)
+    db.session.flush()
+    from utils.cronograma_engine import sincronizar_percentuais_obra
+    sincronizar_percentuais_obra(obra.id, admin_id)
 
     db.session.commit()
     return {'obra_id': obra.id, 'orcamento_id': orc.id,
