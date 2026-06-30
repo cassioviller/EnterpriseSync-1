@@ -69,6 +69,30 @@ Notas:
 - Suíte focada verde (**102 passed**). Verificado no browser (cronograma interno + portal, anel e
   árvore). Tudo no `origin/main` (último commit `c557cb7e`).
 
+### RDOs sem mão de obra no import + reimport idempotente (FK do `custo_obra`)
+
+Commit `ae28dcff`.
+
+- **Sem mão de obra no import.** A fixture pedia `mao_de_obra: 2/2/2/1/1/3`, e o import anexava os
+  N primeiros funcionários ativos do tenant (aleatórios) em cada RDO. Zerado para `0` nos 6 RDOs —
+  os RDOs nascem sem mão de obra e o usuário lança a equipe real **ao editar** cada RDO.
+- **Bug de reimport descoberto (quebrava em produção).** A mão de obra dos RDOs virava `custo_obra`
+  (tipo `mao_obra`, "1 diária"), que referencia o RDO **sem cascade** (`custo_obra_rdo_id_fkey`,
+  delete rule NO ACTION). Reimportar sobre a Baia existente disparava
+  `ForeignKeyViolation` ao apagar os RDOs antigos. Em dev (obra nova) não aparecia porque não havia
+  `custo_obra` ainda.
+- **Correção da idempotência** em `_materializar_rdos`: antes de apagar os RDOs antigos, agora
+  **apaga** os `custo_obra` derivados deles e **desvincula** (`SET NULL` manual) as outras tabelas
+  NO ACTION — `notificacao_cliente`, `movimentacao_estoque`, `alocacao_equipe`. (`rdo_custo_diario`
+  já é SET NULL no banco.) Os filhos com ON DELETE CASCADE somem sozinhos.
+- 2 testes novos (RDOs sem mão de obra; reimport com `custo_obra` referenciando o RDO não quebra e
+  remove o custo). Suíte focada **104 passed**. Reimport real na obra 591 OK (6 RDOs, 0 mão de obra,
+  0 `custo_obra`). Tudo no `origin/main` (último commit `ae28dcff`).
+
+> **Produção:** após o deploy do código atual, a reimportação da Baia volta a funcionar (antes dava
+> erro de FK) e remove os custos-fantasma de mão de obra; depois é só editar cada RDO para lançar a
+> equipe real.
+
 ---
 
 ## ⚠️ POR QUE o ambiente cai no meio da sessão (5ª vez) — e como não repetir
