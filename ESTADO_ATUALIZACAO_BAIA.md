@@ -39,6 +39,30 @@ rota/template/agregador inalterados; também beneficia obras do `seed_rdos_baias
 Confirmado: das **56 tarefas** da Baia, só 5 têm %>0 (3 folhas citadas + 2 pais por rollup); as
 outras **51 estão em 0%**. Suíte focada verde (98 passed). Commit local `4892d1cd`.
 
+### Unificação do "progresso da obra" em toda a UI
+
+Antes existiam **quatro** números diferentes de progresso da obra. Foram todos alinhados à mesma
+métrica — `calcular_progresso_geral_obra_v2` (média das FOLHAS ponderada por duração, acumulada
+até a data; ignora os pais, que dupla-contavam) — e à mesma formatação (**1 casa decimal**):
+
+| Onde | Antes | Agora | Commit |
+|---|---|---|---|
+| Card de RDO | 0,0% (bug) | 2,3% (cresce por data) | `4892d1cd` |
+| Header "Progresso Geral" do cronograma | 4% (média simples de todas as tarefas) | 2,3% | `4dbf3cb3` |
+| Linha raiz "OBRA" do cronograma | 10,41% (rollup hierárquico) | 2,3% | `2a6bb930` |
+| Portal do cliente (anel) | 4,4% (média simples) | 2,3% | `ccaaa754` |
+| Formatação 1 casa decimal (header + raiz) | inteiro | 1 casa | `5f9c82e9` |
+
+Notas:
+- **Só exibição.** O rollup hierárquico persistido na raiz (10,41%) continua gravado no banco —
+  apenas não é mais exibido. O fix da raiz/header é override no route/template
+  (`cronograma_views.py`, `templates/obras/cronograma.html`); o portal trocou a fórmula em
+  `portal_obras_views.py:100`.
+- `calcular_progresso_rdo` ganhou fallback p/ `percentual_realizado` quando a tarefa não tem
+  `quantidade_total` — origem do conserto do card e base das demais correções.
+- Suíte focada verde (**101 passed**). Verificado no browser (cronograma + portal). Tudo no
+  `origin/main` (último commit `5f9c82e9`).
+
 ---
 
 ## ⚠️ POR QUE o ambiente cai no meio da sessão (5ª vez) — e como não repetir
