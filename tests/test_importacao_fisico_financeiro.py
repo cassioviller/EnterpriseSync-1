@@ -786,3 +786,46 @@ def test_portal_cronograma_raiz_alinha_progresso_v2():
         # a raiz mostra perc_geral; o rollup antigo (99) não aparece
         assert f'{esperado}%' in html
         assert '99.0%' not in html
+
+
+def test_fixture_rdos_sem_mao_de_obra():
+    """Os RDOs da Baia não trazem mão de obra no import (o usuário adiciona ao editar)."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, RDOMaoObra
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    d = json.load(open(caminho, encoding='utf-8'))
+    assert all((r.get('mao_de_obra') or 0) == 0 for r in d['rdos'])
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(d, aid)['obra_id']
+        rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
+        assert len(rdo_ids) == 6
+        assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
+
+
+def test_reimport_limpa_custo_obra_referenciando_rdo():
+    """Reimport não viola FK quando há custo_obra (ex.: mão de obra) referenciando
+    os RDOs antigos; o custo derivado some junto e os 6 RDOs são recriados."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, CustoObra
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    payload = json.load(open(caminho, encoding='utf-8'))
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        rdo = RDO.query.filter_by(obra_id=oid, admin_id=aid).first()
+        db.session.add(CustoObra(obra_id=oid, admin_id=aid, rdo_id=rdo.id,
+                                 tipo='mao_obra', descricao='RDO mão de obra',
+                                 valor=180.0, data=date(2026, 6, 22)))
+        db.session.commit()
+        assert CustoObra.query.filter_by(obra_id=oid, rdo_id=rdo.id).count() == 1
+        # reimporta — não deve levantar IntegrityError de FK
+        oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
+        assert oid2 == oid
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 6
+        assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0

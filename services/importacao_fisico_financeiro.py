@@ -234,14 +234,32 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     da obra antes de recriar. Mão de obra é só realismo do documento (não gera
     custo). Retorna o nº de RDOs criados. Ver spec 2026-06-30-rdos-no-import-baia."""
     from app import db
-    from models import RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario
+    from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
+                        CustoObra, NotificacaoCliente, MovimentacaoEstoque,
+                        AlocacaoEquipe)
 
     if not rdos:
         return 0
 
-    # Idempotência: remove RDOs anteriores desta obra (cascata limpa mão de obra
-    # e apontamentos).
-    for r in RDO.query.filter_by(obra_id=obra.id, admin_id=admin_id).all():
+    # Idempotência: remove RDOs anteriores desta obra. As filhas com ON DELETE
+    # CASCADE (mão de obra, apontamentos, fotos…) somem junto; as que referenciam
+    # o RDO SEM cascade precisam ser tratadas antes, senão o DELETE viola FK:
+    #   - custo_obra: custo derivado do RDO (ex.: mão de obra) → removido junto;
+    #   - notificacao_cliente / movimentacao_estoque / alocacao_equipe → desvincula
+    #     (preserva o histórico, só solta o ponteiro para o RDO que vai sumir).
+    antigos = RDO.query.filter_by(obra_id=obra.id, admin_id=admin_id).all()
+    old_ids = [r.id for r in antigos]
+    if old_ids:
+        CustoObra.query.filter(CustoObra.rdo_id.in_(old_ids)).delete(
+            synchronize_session=False)
+        NotificacaoCliente.query.filter(NotificacaoCliente.rdo_id.in_(old_ids)).update(
+            {NotificacaoCliente.rdo_id: None}, synchronize_session=False)
+        MovimentacaoEstoque.query.filter(MovimentacaoEstoque.rdo_id.in_(old_ids)).update(
+            {MovimentacaoEstoque.rdo_id: None}, synchronize_session=False)
+        AlocacaoEquipe.query.filter(AlocacaoEquipe.rdo_gerado_id.in_(old_ids)).update(
+            {AlocacaoEquipe.rdo_gerado_id: None}, synchronize_session=False)
+        db.session.flush()
+    for r in antigos:
         db.session.delete(r)
     db.session.flush()
 
