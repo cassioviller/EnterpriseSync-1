@@ -96,10 +96,13 @@ def portal_obra(token: str):
     )
 
     total_tarefas = len(tarefas)
-    if total_tarefas > 0:
-        perc_geral = sum(t.percentual_concluido or 0 for t in tarefas) / total_tarefas
-    else:
-        perc_geral = 0.0
+    # Progresso geral: mesma métrica do cronograma/card de RDO —
+    # calcular_progresso_geral_obra_v2 (média das FOLHAS ponderada por duração,
+    # acumulada até hoje), em vez da média simples de todas as tarefas (que
+    # dupla-conta os pais). Ver specs de 2026-06-30 (progresso-obra-no-card-rdo).
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    perc_geral = calcular_progresso_geral_obra_v2(
+        obra.id, date.today(), admin_id)['progresso_geral_pct']
 
     # Cronograma do cliente: agora vive em TarefaCronograma com is_cliente=True
     # (migration #117). Constrói a árvore hierárquica (serviço → grupo →

@@ -724,3 +724,29 @@ def test_cronograma_linha_raiz_alinha_progresso_v2():
         # a <tr> da raiz tem data-pai="" e data-perc = métrica v2
         m = re.search(r'data-id="%d"[^>]*data-perc="(\d+)"' % raiz.id, html)
         assert m is not None and int(m.group(1)) == esperado
+
+
+def test_portal_cliente_usa_progresso_v2():
+    """O anel de progresso do portal do cliente usa calcular_progresso_geral_obra_v2
+    (mesma métrica do cronograma/RDO), não a média simples de todas as tarefas."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    from models import Obra
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        o = Obra.query.get(oid)
+        o.token_cliente = f'tok-test-{oid}'
+        o.portal_ativo = True
+        db.session.commit()
+        token = o.token_cliente
+        esperado = round(calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct'], 1)
+    with app.test_client() as c:
+        r = c.get(f'/portal/obra/{token}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        assert f'>{esperado}%<' in html
