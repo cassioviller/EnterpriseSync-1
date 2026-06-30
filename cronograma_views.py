@@ -228,14 +228,20 @@ def cronograma_obra(obra_id: int):
     config_empresa = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
     nome_empresa = config_empresa.nome_empresa if config_empresa else 'Empresa'
 
-    # Progresso Geral do header: mesma métrica do card de RDO — média das FOLHAS
-    # ponderada por duração, acumulada até hoje (calcular_progresso_geral_obra_v2),
-    # em vez da média simples de todas as tarefas (que dupla-conta os pais). Só no
-    # cronograma da empresa; o modo cliente mantém a média do template.
+    # Progresso Geral (header + linha raiz "OBRA"): mesma métrica do card de RDO —
+    # média das FOLHAS ponderada por duração, acumulada até hoje
+    # (calcular_progresso_geral_obra_v2), em vez da média simples de todas as
+    # tarefas (que dupla-conta os pais) ou do rollup hierárquico (que superestima).
+    # Só no cronograma da empresa; o modo cliente mantém a média do template.
     progresso_geral_header = None
     if not cliente_mode:
         progresso_geral_header = calcular_progresso_geral_obra_v2(
             obra_id, hoje, admin_id)['progresso_geral_pct']
+        # Alinha a linha raiz (OBRA, sem tarefa_pai_id) ao mesmo número no array
+        # do front (JS/gantt). Só exibição — não persiste no banco.
+        for d in tarefas_dict:
+            if not d.get('tarefa_pai_id'):
+                d['percentual_concluido'] = progresso_geral_header
 
     return render_template(
         'obras/cronograma.html',

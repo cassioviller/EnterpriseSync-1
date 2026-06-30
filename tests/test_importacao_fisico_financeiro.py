@@ -694,3 +694,33 @@ def test_cronograma_header_usa_progresso_v2():
         assert r.status_code == 200
         html = r.get_data(as_text=True)
         assert f'id="statPercGeral">{esperado}%' in html
+
+
+def test_cronograma_linha_raiz_alinha_progresso_v2():
+    """A linha raiz (OBRA) do cronograma exibe o mesmo progresso do header/card
+    (calcular_progresso_geral_obra_v2), não o rollup hierárquico persistido."""
+    import json, os, re
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    from models import Usuario, TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        u = Usuario.query.get(aid); u.versao_sistema = 'v2'; db.session.commit()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        esperado = round(calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct'])
+        raiz = (TarefaCronograma.query
+                .filter_by(obra_id=oid, admin_id=aid, tarefa_pai_id=None).first())
+        # o rollup persistido da raiz é diferente da métrica v2 (senão o teste é vácuo)
+        assert round(float(raiz.percentual_concluido or 0)) != esperado
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['_user_id'] = str(aid); s['_fresh'] = True
+        r = c.get(f'/cronograma/obra/{oid}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        # a <tr> da raiz tem data-pai="" e data-perc = métrica v2
+        m = re.search(r'data-id="%d"[^>]*data-perc="(\d+)"' % raiz.id, html)
+        assert m is not None and int(m.group(1)) == esperado

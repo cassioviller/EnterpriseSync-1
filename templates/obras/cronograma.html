@@ -124,7 +124,7 @@
           <tbody id="tarefasBody">
             {% for t in tarefas %}
             {% set is_pai = t.id in pai_ids %}
-            {% set perc = (t.percentual_concluido or 0)|int %}
+            {% set perc = (progresso_geral_header if (progresso_geral_header is not none and not t.tarefa_pai_id) else (t.percentual_concluido or 0))|int %}
             {% set plan = (planejados_map.get(t.id, 0))|int %}
             {% set nivel = nivel_map.get(t.id, 0) %}
             <tr class="tarefa-row
