@@ -136,6 +136,13 @@ def portal_obra(token: str):
             _nodes_by_id[t.tarefa_pai_id].filhos.append(node)
         else:
             cronograma_cliente_tree.append(node)
+    # Linha raiz do cronograma do portal mostra o MESMO número do anel
+    # (perc_geral = calcular_progresso_geral_obra_v2), não o rollup hierárquico
+    # persistido na raiz — consistente com o cronograma interno. Só quando há uma
+    # única raiz (o nó "OBRA"); com múltiplos topos cada um mantém o seu.
+    if len(cronograma_cliente_tree) == 1:
+        cronograma_cliente_tree[0].percentual_apresentacao = perc_geral
+
     # Total de tarefas (folhas + nós) para o counter da seção; mantém compat.
     cronograma_cliente = list(_tarefas_cliente)
 

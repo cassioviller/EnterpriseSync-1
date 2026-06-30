@@ -751,3 +751,38 @@ def test_portal_cliente_usa_progresso_v2():
         assert r.status_code == 200
         html = r.get_data(as_text=True)
         assert f'>{esperado}%<' in html
+
+
+def test_portal_cronograma_raiz_alinha_progresso_v2():
+    """A linha raiz do cronograma do portal mostra o mesmo número do anel
+    (calcular_progresso_geral_obra_v2), não o rollup hierárquico persistido."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from utils.cronograma_engine import calcular_progresso_geral_obra_v2
+    from models import Obra, TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        o = Obra.query.get(oid)
+        o.token_cliente = f'tok-cli-{oid}'
+        o.portal_ativo = True
+        # cronograma do cliente: raiz com rollup alto (99) + 1 filho (50)
+        raiz = TarefaCronograma(obra_id=oid, admin_id=aid, nome_tarefa='OBRA (cliente)',
+                                is_cliente=True, percentual_concluido=99.0, ordem=0)
+        db.session.add(raiz); db.session.flush()
+        db.session.add(TarefaCronograma(obra_id=oid, admin_id=aid, nome_tarefa='Etapa cliente',
+                                        is_cliente=True, tarefa_pai_id=raiz.id,
+                                        percentual_concluido=50.0, ordem=1))
+        db.session.commit()
+        token = o.token_cliente
+        esperado = round(calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct'], 1)
+    with app.test_client() as c:
+        r = c.get(f'/portal/obra/{token}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        # a raiz mostra perc_geral; o rollup antigo (99) não aparece
+        assert f'{esperado}%' in html
+        assert '99.0%' not in html
