@@ -1455,5 +1455,74 @@
     },
     "lucro_caixa_final": 24976,
     "inconsistencia": "RESOLVIDA: Indiretos adotados em 5 meses (versão cara). Imposto de junho corrigido (a planilha original deixava jun=0 e somava +20.000 na mão; o correto é tributar a mobilização → imposto total 128.903, lucro líquido = lucro em caixa = 24.976)."
-  }
+  },
+  "rdos": [
+    {
+      "data": "2026-06-22",
+      "clima": "Nublado",
+      "precipitacao": "Sem chuva",
+      "comentario": "Responsabilidades repassadas à equipe da Fazenda para liberação das frentes. Apresentada à Kabod a necessidade de instalações provisórias (container com banheiro). Topógrafo realizou o levantamento dos níveis do terreno; dados enviados para análise da engenharia.",
+      "mao_de_obra": 2,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 50}
+      ]
+    },
+    {
+      "data": "2026-06-23",
+      "clima": "Chuvoso",
+      "precipitacao": "Chuva forte",
+      "comentario": "Análise topográfica identificou desnível de ~35 cm entre o terreno das baias e a calçada da Cabana; a marcação prevista para 24/06 foi suspensa até o nivelamento dos platôs pela Fazenda. Visita técnica do Eng. Alan. Relatório de sondagem enviado à Kabod. Fortes chuvas impediram a terraplenagem; executadas apenas a retirada da caixa d'água e a remoção parcial do morro.",
+      "mao_de_obra": 2,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 55}
+      ]
+    },
+    {
+      "data": "2026-06-24",
+      "clima": "Chuvoso",
+      "precipitacao": "Chuva forte",
+      "comentario": "Chuvas pela manhã impediram novamente a terraplenagem. Reunião com o Sr. André (AJR): cerca de 2 dias de estiagem necessários para a entrada dos equipamentos. Reunião com a Sra. Ana (Fazenda) sobre a adequação do platô. Solicitados projetos hidráulico/elétrico e detalhes das calçadas. Enviados os projetos de cobertura e pilares metálicos e o cronograma com entrega em 08/10/26. Reforçada a infraestrutura provisória (energia/água por galpão, containers, caçamba, remoção de entulho).",
+      "mao_de_obra": 2,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65}
+      ]
+    },
+    {
+      "data": "2026-06-25",
+      "clima": "Parcialmente nublado",
+      "precipitacao": "Garoa",
+      "comentario": "Redução das chuvas pela manhã. A empresa de terraplenagem confirmou a autorização da Fazenda para o nivelamento dos platôs, tomando como referência a cota da calçada da Cabana existente.",
+      "mao_de_obra": 1,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65}
+      ]
+    },
+    {
+      "data": "2026-06-26",
+      "clima": "Nublado",
+      "precipitacao": "Sem chuva",
+      "comentario": "Terreno ainda saturado pelas chuvas acumuladas; possível início do nivelamento em 27/06, conforme as condições climáticas. A equipe de fundação permanece mobilizada, com início previsto em 29/06 (montagem dos gabaritos e recebimento dos materiais de fundação).",
+      "mao_de_obra": 1,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65}
+      ]
+    },
+    {
+      "data": "2026-06-27",
+      "clima": "Ensolarado",
+      "precipitacao": "Sem chuva",
+      "comentario": "A equipe de terraplenagem da AJR (contratada pela Fazenda) iniciou o nivelamento do platô do galpão B. Mantidos os piquetes das 4 extremidades do platô. A equipe trabalhará no domingo (28/06) para tentar concluir o galpão B; segunda-feira depende do jogo do Brasil.",
+      "mao_de_obra": 3,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65},
+        {"tarefa_mpp": 6, "pct": 20}
+      ]
+    }
+  ]
 }

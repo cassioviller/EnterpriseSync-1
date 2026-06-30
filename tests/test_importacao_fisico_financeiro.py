@@ -604,3 +604,26 @@ def test_import_rdos_idempotente_e_opcional():
         aid2 = _novo_admin()
         oid2 = importar_fisico_financeiro(sem, aid2)['obra_id']
         assert RDO.query.filter_by(obra_id=oid2, admin_id=aid2).count() == 0
+
+
+def test_fixture_baia_traz_rdos_do_relatorio():
+    """A fixture canônica da Baia já contém os 6 RDOs do relatório 22–27/06 e o
+    import reproduz o físico: solo 100%, projetos 65%, nivelamento 20%."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        payload = json.load(open(caminho, encoding='utf-8'))
+        assert len(payload.get('rdos', [])) == 6
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 6
+        por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
+                    TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
+        assert por_nome['ESTUDO DE SOLO SPT'] == 100.0
+        assert por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA'] == 65.0
+        assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 20.0
+        assert por_nome['MOBILIZAÇÃO EQUIPE'] == 0.0
+        assert por_nome['MARCAÇÃO DE OBRA'] == 0.0
