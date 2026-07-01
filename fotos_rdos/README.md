@@ -46,4 +46,14 @@ anexa ao RDO — igual ao upload manual da tela, mas automático.
 > não quebra). Se quiser fixar o nome do arquivo em vez da ordem, use a forma
 > longa: `{"arquivo": "2.jpg", "legenda": "..."}`.
 
+## Pode apagar os arquivos depois de importar
+
+As fotos ficam em base64 no banco (persistentes). Depois de importar, você **pode
+esvaziar** `fotos_rdos/<data>/` para não pesar o repositório:
+
+- **Pasta com arquivos** no reimport → ela manda (reconstrói/substitui as fotos do dia).
+- **Pasta vazia/ausente** no reimport → **preserva** as fotos já importadas do RDO.
+
+Para trocar as fotos, coloque os arquivos novos e reimporte. Detalhes em `RDO.md`.
+
 Fluxo completo e schema do RDO: veja **`RDO.md`** na raiz do projeto.

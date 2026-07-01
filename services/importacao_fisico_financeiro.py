@@ -356,6 +356,38 @@ def _materializar_fotos_rdo(rdo, admin_id, dia, fotos):
     return criadas
 
 
+# Colunas de RDOFoto copiadas ao preservar/restaurar (tudo menos id e rdo_id).
+_FOTO_COLS = ('nome_arquivo', 'caminho_arquivo', 'legenda', 'descricao',
+              'arquivo_original', 'arquivo_otimizado', 'thumbnail', 'nome_original',
+              'tamanho_bytes', 'ordem', 'imagem_original_base64',
+              'imagem_otimizada_base64', 'thumbnail_base64')
+
+
+def _snapshot_fotos_por_data(rdos_antigos):
+    """Copia as fotos dos RDOs antigos (indexadas por data) ANTES do reimport
+    apagá-los. As fotos ficam em base64 no banco — persistentes —, então se o
+    usuário apagar os arquivos da pasta `fotos_rdos/<data>/` para aliviar espaço,
+    o reimport não deve perdê-las. Retorna {data_iso: [dict de colunas RDOFoto]}."""
+    snap = {}
+    for r in rdos_antigos:
+        fotos = list(getattr(r, 'fotos', None) or [])
+        if not fotos or not r.data_relatorio:
+            continue
+        snap.setdefault(r.data_relatorio.isoformat(), []).extend(
+            {c: getattr(f, c) for c in _FOTO_COLS} for f in fotos)
+    return snap
+
+
+def _restaurar_fotos_preservadas(rdo, admin_id, snapshots):
+    """Recria as RDOFoto preservadas (do snapshot) no RDO novo, com o mesmo
+    conteúdo/base64. Usado quando a pasta do dia está vazia no reimport."""
+    from app import db
+    from models import RDOFoto
+    for dados in snapshots:
+        db.session.add(RDOFoto(admin_id=admin_id, rdo_id=rdo.id, **dados))
+    return len(snapshots)
+
+
 def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     """Cria os RDOs da obra a partir do payload (seção `rdos`), referenciando as
     tarefas pelo id do .mpp (traduzido por `tid_to_db`). Idempotente: apaga os RDOs
@@ -376,6 +408,9 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     #   - notificacao_cliente / movimentacao_estoque / alocacao_equipe → desvincula
     #     (preserva o histórico, só solta o ponteiro para o RDO que vai sumir).
     antigos = RDO.query.filter_by(obra_id=obra.id, admin_id=admin_id).all()
+    # Preserva as fotos já importadas (base64) por data, para não perdê-las quando
+    # a pasta `fotos_rdos/<data>/` estiver vazia neste reimport (ver loop abaixo).
+    fotos_snap = _snapshot_fotos_por_data(antigos)
     old_ids = [r.id for r in antigos]
     if old_ids:
         CustoObra.query.filter(CustoObra.rdo_id.in_(old_ids)).delete(
@@ -426,7 +461,15 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
                 quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
                 percentual_realizado=pct, percentual_planejado=None))
 
-        _materializar_fotos_rdo(rdo, admin_id, dia, item.get('fotos'))
+        # Regra de foto no reimport: se a pasta do dia tiver arquivos, ELA manda
+        # (reconstrói). Se vier vazia (0 fotos criadas), preserva as que já
+        # estavam no RDO — assim o usuário pode apagar os arquivos da raiz para
+        # aliviar espaço sem perder as fotos já importadas (ficam em base64).
+        criadas = _materializar_fotos_rdo(rdo, admin_id, dia, item.get('fotos'))
+        if criadas == 0:
+            preservadas = fotos_snap.get(dia.isoformat())
+            if preservadas:
+                _restaurar_fotos_preservadas(rdo, admin_id, preservadas)
         criados += 1
 
     db.session.flush()

@@ -100,6 +100,25 @@ fotos_rdos/
 
 Detalhes também em `fotos_rdos/README.md`.
 
+### Apagar as fotos da raiz depois de importar (para aliviar espaço)
+
+As fotos, uma vez importadas, ficam **em base64 no banco** (persistentes). Então
+você **pode apagar os arquivos** de `fotos_rdos/<data>/` depois de importar, sem
+perder nada. A regra do reimport é:
+
+| Estado da pasta `fotos_rdos/<data>/` no reimport | O que acontece com as fotos do RDO |
+|---|---|
+| **Tem arquivos** | A pasta manda: reconstrói as fotos daquele dia a partir dela (substitui). |
+| **Vazia / não existe** | **Preserva** as fotos que já estavam no RDO (não apaga). |
+
+Ou seja: importar com fotos → apagar os arquivos da raiz → reimportar **mantém**
+as fotos. Para **trocar** as fotos de um dia, é só colocar os arquivos novos na
+pasta e reimportar. Para **zerar** as fotos de um dia sem colocar outras, apague-as
+pela tela do RDO (o reimport sozinho, com a pasta vazia, nunca remove).
+
+> Cuidado: se a pasta tiver **qualquer** arquivo, ela substitui o conjunto inteiro
+> daquele dia. Não deixe 1 arquivo solto achando que os outros serão preservados.
+
 ---
 
 ## 4. O fluxo (o que você faz × o que eu faço)

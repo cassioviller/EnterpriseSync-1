@@ -849,6 +849,63 @@ def test_import_anexa_fotos_do_rdo(tmp_path):
         assert all(f.nome_arquivo and f.caminho_arquivo for f in fotos)  # legados NOT NULL
 
 
+def test_reimport_sem_arquivos_preserva_fotos_do_rdo(tmp_path):
+    """Importar com fotos, apagar os arquivos da pasta e reimportar NÃO perde as
+    fotos já anexadas (ficam em base64 no banco); reimportar com arquivos novos
+    substitui."""
+    import json, os
+    from PIL import Image
+    from services import importacao_fisico_financeiro as ff
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, RDOFoto
+
+    dia_dir = tmp_path / '2026-06-22'
+    dia_dir.mkdir()
+    for n in (1, 2):
+        Image.new('RGB', (8, 8), (10 * n, 20, 30)).save(dia_dir / f'{n}.png')
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    payload = json.load(open(caminho, encoding='utf-8'))
+    payload['rdos'] = [{
+        "data": "2026-06-22", "clima": "Nublado", "mao_de_obra": 0,
+        "comentario": "Topografia.",
+        "apontamentos": [{"tarefa_mpp": 3, "pct": 100}],
+        "fotos": ["Nível do platô", "Gabarito da Baia 01"],
+    }]
+
+    def _fotos(oid, aid):
+        rdo = RDO.query.filter_by(obra_id=oid, admin_id=aid).first()
+        return RDOFoto.query.filter_by(rdo_id=rdo.id).order_by(RDOFoto.ordem).all()
+
+    with app.app_context():
+        aid = _novo_admin()
+        old_base = ff.FOTOS_RDO_BASE
+        ff.FOTOS_RDO_BASE = str(tmp_path)
+        try:
+            # 1) 1º import: 2 fotos vêm da pasta
+            oid = importar_fisico_financeiro(payload, aid)['obra_id']
+            assert [f.legenda for f in _fotos(oid, aid)] == ["Nível do platô", "Gabarito da Baia 01"]
+            b64_antes = [f.imagem_otimizada_base64 for f in _fotos(oid, aid)]
+
+            # 2) usuário apaga os arquivos da raiz p/ aliviar espaço; reimporta
+            for n in (1, 2):
+                os.remove(dia_dir / f'{n}.png')
+            importar_fisico_financeiro(payload, aid)
+            fotos = _fotos(oid, aid)
+            assert [f.legenda for f in fotos] == ["Nível do platô", "Gabarito da Baia 01"]
+            assert [f.imagem_otimizada_base64 for f in fotos] == b64_antes  # mesmo conteúdo
+
+            # 3) coloca um arquivo novo na pasta -> a pasta volta a mandar (substitui)
+            Image.new('RGB', (8, 8), (200, 10, 10)).save(dia_dir / '1.png')
+            payload['rdos'][0]['fotos'] = ["Só a nova"]
+            importar_fisico_financeiro(payload, aid)
+            fotos = _fotos(oid, aid)
+            assert [f.legenda for f in fotos] == ["Só a nova"]
+        finally:
+            ff.FOTOS_RDO_BASE = old_base
+
+
 def test_reimport_limpa_custo_obra_referenciando_rdo():
     """Reimport não viola FK quando há custo_obra (ex.: mão de obra) referenciando
     os RDOs antigos; o custo derivado some junto e os 6 RDOs são recriados."""
