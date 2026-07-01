@@ -17,10 +17,19 @@ Idempotente e tenant-scoped.
 from __future__ import annotations
 
 import calendar
+import logging
+import os
 from datetime import date
 from decimal import Decimal
 
+logger = logging.getLogger(__name__)
+
 CENTAVO = Decimal("0.01")
+
+# Base das fotos dos RDOs: uma subpasta por dia (fotos_rdos/AAAA-MM-DD/) com as
+# imagens numeradas 1.jpg, 2.jpg… A legenda de cada foto vem no JSON (ver
+# _materializar_fotos_rdo e o documento RDO.md). Sobrescrevível por ambiente/teste.
+FOTOS_RDO_BASE = os.environ.get('FOTOS_RDO_BASE', 'fotos_rdos')
 
 _MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun',
                 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -266,6 +275,87 @@ def _rdos_sinteticos_do_pct_fisico(payload):
     }]
 
 
+def _resolver_arquivo_foto(pasta, indice, nome):
+    """Localiza o arquivo de uma foto dentro de `pasta` (fotos_rdos/<data>/).
+
+    - Se `nome` foi informado no JSON, usa-o direto.
+    - Senão, aplica a convenção posicional: a i-ésima foto da lista é o arquivo
+      `(indice+1).<ext>` (1.jpg, 2.png…), na ordem em que o usuário numerou.
+    Retorna o caminho absoluto/relativo do arquivo, ou None se não existir.
+    """
+    import glob
+    if nome:
+        cam = os.path.join(pasta, nome)
+        return cam if os.path.isfile(cam) else None
+    achados = sorted(glob.glob(os.path.join(pasta, f"{indice + 1}.*")))
+    return achados[0] if achados else None
+
+
+def _materializar_fotos_rdo(rdo, admin_id, dia, fotos):
+    """Anexa as fotos de um RDO a partir da lista `fotos` do JSON.
+
+    Cada item pode ser:
+      - uma STRING → só a legenda; o arquivo é inferido pela ordem na pasta
+        `fotos_rdos/<data>/` (1.<ext>, 2.<ext>…);
+      - um OBJETO `{"arquivo": "1.jpg", "legenda": "..."}` → nome explícito.
+
+    Reusa `salvar_foto_rdo` (mesma otimização WebP + base64 do upload da tela), de
+    modo que a foto fica persistida no banco (sobrevive a deploy/restart). Fotos
+    ausentes na pasta viram warning — NÃO quebram o import. Retorna nº de fotos
+    criadas. Idempotência: o RDO é recriado no reimport e a FK ON DELETE CASCADE
+    remove as RDOFoto antigas junto, então não duplica."""
+    if not fotos:
+        return 0
+    from app import db
+    from models import RDOFoto
+    from services.rdo_foto_service import salvar_foto_rdo
+    from werkzeug.datastructures import FileStorage
+
+    pasta = os.path.join(FOTOS_RDO_BASE, dia.isoformat())
+    criadas = 0
+    for i, f in enumerate(fotos):
+        if isinstance(f, str):
+            nome, legenda = None, f
+        elif isinstance(f, dict):
+            nome, legenda = f.get('arquivo'), (f.get('legenda') or '')
+        else:
+            continue
+        caminho = _resolver_arquivo_foto(pasta, i, nome)
+        if caminho is None:
+            logger.warning(
+                "[FF_IMPORT] RDO %s: foto %s não encontrada em %s (pulada)",
+                dia.isoformat(), nome or (i + 1), pasta)
+            continue
+        try:
+            with open(caminho, 'rb') as fh:
+                fs = FileStorage(stream=fh, filename=os.path.basename(caminho))
+                res = salvar_foto_rdo(fs, admin_id, rdo.id)
+        except Exception as e:  # foto inválida/corrompida não derruba o import
+            logger.warning("[FF_IMPORT] RDO %s: falha ao processar %s: %s",
+                           dia.isoformat(), caminho, e)
+            continue
+        db.session.add(RDOFoto(
+            admin_id=admin_id, rdo_id=rdo.id,
+            # campos legados NOT NULL
+            nome_arquivo=res['nome_original'],
+            caminho_arquivo=res['arquivo_otimizado'],
+            legenda=legenda, descricao=legenda,
+            # v9.0 (arquivos físicos, backup)
+            arquivo_original=res['arquivo_original'],
+            arquivo_otimizado=res['arquivo_otimizado'],
+            thumbnail=res['thumbnail'],
+            nome_original=res['nome_original'],
+            tamanho_bytes=res['tamanho_bytes'],
+            ordem=i,
+            # v9.0.4 (base64 — persistência no banco)
+            imagem_original_base64=res['imagem_original_base64'],
+            imagem_otimizada_base64=res['imagem_otimizada_base64'],
+            thumbnail_base64=res['thumbnail_base64'],
+        ))
+        criadas += 1
+    return criadas
+
+
 def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     """Cria os RDOs da obra a partir do payload (seção `rdos`), referenciando as
     tarefas pelo id do .mpp (traduzido por `tid_to_db`). Idempotente: apaga os RDOs
@@ -335,6 +425,8 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
                 rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
                 quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
                 percentual_realizado=pct, percentual_planejado=None))
+
+        _materializar_fotos_rdo(rdo, admin_id, dia, item.get('fotos'))
         criados += 1
 
     db.session.flush()

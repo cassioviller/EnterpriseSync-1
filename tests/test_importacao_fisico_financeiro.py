@@ -805,6 +805,50 @@ def test_fixture_rdos_sem_mao_de_obra():
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
+def test_import_anexa_fotos_do_rdo(tmp_path):
+    """Um RDO com `fotos` (legendas em ordem) anexa RDOFoto lendo os arquivos
+    numerados de fotos_rdos/<data>/; a legenda e o base64 são persistidos, e uma
+    foto ausente é pulada sem quebrar o import."""
+    import json, os
+    from PIL import Image
+    from services import importacao_fisico_financeiro as ff
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, RDOFoto
+
+    # pasta de fotos do dia 2026-06-22 com 1.png e 2.png (a 3ª legenda fica órfã)
+    dia_dir = tmp_path / '2026-06-22'
+    dia_dir.mkdir()
+    for n in (1, 2):
+        Image.new('RGB', (8, 8), (10 * n, 20, 30)).save(dia_dir / f'{n}.png')
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    payload = json.load(open(caminho, encoding='utf-8'))
+    payload['rdos'] = [{
+        "data": "2026-06-22", "clima": "Nublado", "mao_de_obra": 0,
+        "comentario": "Topografia.",
+        "apontamentos": [{"tarefa_mpp": 3, "pct": 100}],
+        "fotos": ["Nível do platô", "Gabarito da Baia 01", "Foto que falta"],
+    }]
+
+    with app.app_context():
+        aid = _novo_admin()
+        old_base = ff.FOTOS_RDO_BASE
+        ff.FOTOS_RDO_BASE = str(tmp_path)
+        try:
+            oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        finally:
+            ff.FOTOS_RDO_BASE = old_base
+
+        rdo = RDO.query.filter_by(obra_id=oid, admin_id=aid).first()
+        fotos = RDOFoto.query.filter_by(rdo_id=rdo.id).order_by(RDOFoto.ordem).all()
+        # 2 fotos anexadas (a 3ª foi pulada por não ter arquivo)
+        assert len(fotos) == 2
+        assert [f.legenda for f in fotos] == ["Nível do platô", "Gabarito da Baia 01"]
+        assert all(f.imagem_otimizada_base64 and f.thumbnail_base64 for f in fotos)
+        assert all(f.nome_arquivo and f.caminho_arquivo for f in fotos)  # legados NOT NULL
+
+
 def test_reimport_limpa_custo_obra_referenciando_rdo():
     """Reimport não viola FK quando há custo_obra (ex.: mão de obra) referenciando
     os RDOs antigos; o custo derivado some junto e os 6 RDOs são recriados."""
