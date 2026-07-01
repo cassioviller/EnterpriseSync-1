@@ -370,9 +370,9 @@
             {% for f in fotos %}
             <div class="foto-item">
                 {% if f.imagem_otimizada_base64 %}
-                <img src="data:image/webp;base64,{{ f.imagem_otimizada_base64 }}" alt="{{ f.legenda or 'Foto RDO' }}" onclick="abrirFoto(this.src)">
+                <img src="{{ f.imagem_otimizada_base64 if f.imagem_otimizada_base64.startswith('data:') else 'data:image/webp;base64,' ~ f.imagem_otimizada_base64 }}" alt="{{ f.legenda or 'Foto RDO' }}" onclick="abrirFoto(this.src)">
                 {% elif f.thumbnail_base64 %}
-                <img src="data:image/webp;base64,{{ f.thumbnail_base64 }}" alt="{{ f.legenda or 'Foto RDO' }}" onclick="abrirFoto(this.src)">
+                <img src="{{ f.thumbnail_base64 if f.thumbnail_base64.startswith('data:') else 'data:image/webp;base64,' ~ f.thumbnail_base64 }}" alt="{{ f.legenda or 'Foto RDO' }}" onclick="abrirFoto(this.src)">
                 {% elif f.arquivo_otimizado %}
                 <img src="/{{ f.arquivo_otimizado }}" alt="{{ f.legenda or 'Foto RDO' }}" onclick="abrirFoto(this.src)">
                 {% elif f.caminho_arquivo %}

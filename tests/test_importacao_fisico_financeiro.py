@@ -944,6 +944,50 @@ def test_import_auto_anexa_fotos_da_pasta_sem_legenda(tmp_path):
         assert all(f.imagem_otimizada_base64 for f in fotos)
 
 
+def test_portal_rdo_foto_sem_prefixo_base64_duplicado(tmp_path):
+    """A foto importada (base64 já é um data URI completo) aparece no portal do
+    cliente com UM único prefixo `data:image/...;base64,` — regressão do bug que
+    duplicava o prefixo no template e quebrava a imagem."""
+    import json, os
+    from PIL import Image
+    from services import importacao_fisico_financeiro as ff
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Obra, RDO
+
+    dia_dir = tmp_path / '2026-06-30'
+    dia_dir.mkdir()
+    Image.new('RGB', (8, 8), (10, 20, 30)).save(dia_dir / '1.png')
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    payload = json.load(open(caminho, encoding='utf-8'))
+    payload['rdos'] = [{"data": "2026-06-30", "comentario": "x",
+                        "apontamentos": [{"tarefa_mpp": 6, "pct": 60}],
+                        "fotos": ["Foto teste"]}]
+
+    with app.app_context():
+        aid = _novo_admin()
+        old = ff.FOTOS_RDO_BASE
+        ff.FOTOS_RDO_BASE = str(tmp_path)
+        try:
+            oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        finally:
+            ff.FOTOS_RDO_BASE = old
+        token = f'tok-foto-rdo-{aid}'  # único por run (o DB Postgres não faz rollback)
+        obra = Obra.query.get(oid)
+        obra.token_cliente = token
+        obra.portal_ativo = True
+        db.session.commit()
+        rdo_id = RDO.query.filter_by(obra_id=oid, admin_id=aid).first().id
+
+    with app.test_client() as c:
+        r = c.get(f'/portal/obra/{token}/rdo/{rdo_id}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        assert 'data:image/webp;base64,' in html            # a foto renderiza
+        assert 'data:image/webp;base64,data:' not in html   # sem prefixo duplicado
+
+
 def test_reimport_sem_arquivos_preserva_fotos_do_rdo(tmp_path):
     """Importar com fotos, apagar os arquivos da pasta e reimportar NÃO perde as
     fotos já anexadas (ficam em base64 no banco); reimportar com arquivos novos

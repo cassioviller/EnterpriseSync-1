@@ -17,7 +17,7 @@
                     {% if r.fotos and r.fotos|length > 0 %}
                     {% set foto = r.fotos[0] %}
                     {% if foto.thumbnail_base64 %}
-                    <img src="data:image/webp;base64,{{ foto.thumbnail_base64 }}" alt="">
+                    <img src="{{ foto.thumbnail_base64 if foto.thumbnail_base64.startswith('data:') else 'data:image/webp;base64,' ~ foto.thumbnail_base64 }}" alt="">
                     {% elif foto.thumbnail %}
                     <img src="{{ foto.thumbnail }}" alt="">
                     {% elif foto.caminho_arquivo %}
