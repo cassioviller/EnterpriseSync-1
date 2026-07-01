@@ -462,6 +462,7 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     funcs = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).limit(10).all()
     criados = 0
     acum_qtd: dict = {}     # tarefa_mpp → quantidade acumulada (modo quantitativo)
+    acum_pct: dict = {}     # tarefa_mpp → último % acumulado (modo percentual direto)
     qtot_cache: dict = {}   # db_id → quantidade_total da tarefa (0 se não tem)
     # Processa em ORDEM DE DATA para o acúmulo quantitativo ficar correto
     # independentemente da ordem dos RDOs no JSON.
@@ -518,11 +519,16 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
                     quantidade_executada_dia=q, quantidade_acumulada=acum,
                     percentual_realizado=pct, percentual_planejado=plan))
             else:
-                # Modo percentual direto (comportamento antigo)
+                # Modo percentual direto: o JSON traz o % ACUMULADO da tarefa no dia.
+                # O incremento diário é a diferença para o último acumulado da mesma
+                # tarefa (itens processados em ordem de data) — sem isto, a coluna
+                # "Incremento" do RDO/portal ficava sempre +0.0%.
                 pct = float(ap.get('pct') or 0)
+                inc = max(0.0, round(pct - acum_pct.get(tmpp, 0.0), 2))
+                acum_pct[tmpp] = pct
                 db.session.add(RDOApontamentoCronograma(
                     rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
-                    quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+                    quantidade_executada_dia=inc, quantidade_acumulada=0.0,
                     percentual_realizado=pct, percentual_planejado=plan))
 
         # Regra de foto no reimport: se a pasta do dia tiver arquivos, ELA manda

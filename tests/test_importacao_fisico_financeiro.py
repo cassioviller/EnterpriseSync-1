@@ -631,6 +631,35 @@ def test_apontamento_quantitativo_deriva_percentual_e_acumula():
         assert [a.quantidade_acumulada for a in aps] == [10.0, 25.0]
 
 
+def test_apontamento_percentual_grava_incremento_diario():
+    """Modo percentual direto (JSON traz o % acumulado): o incremento diário é a
+    diferença para o acumulado anterior da mesma tarefa — não fica sempre 0."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import TarefaCronograma, RDOApontamentoCronograma, RDO
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        payload = json.load(open(caminho, encoding='utf-8'))
+        payload['rdos'] = [
+            {"data": "2026-06-22", "apontamentos": [{"tarefa_mpp": 4, "pct": 50}]},
+            {"data": "2026-06-23", "apontamentos": [{"tarefa_mpp": 4, "pct": 55}]},
+            {"data": "2026-06-24", "apontamentos": [{"tarefa_mpp": 4, "pct": 65}]},
+        ]
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        t4 = (TarefaCronograma.query
+              .filter_by(obra_id=oid, admin_id=aid)
+              .filter(TarefaCronograma.nome_tarefa.like('EXECUÇÃO DE PROJETOS%')).first())
+        aps = (RDOApontamentoCronograma.query
+               .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+               .filter(RDOApontamentoCronograma.tarefa_cronograma_id == t4.id)
+               .order_by(RDO.data_relatorio).all())
+        # primeiro dia = 50 (partindo de 0); depois +5 e +10
+        assert [a.quantidade_executada_dia for a in aps] == [50.0, 5.0, 10.0]
+        assert [a.percentual_realizado for a in aps] == [50.0, 55.0, 65.0]
+
+
 def test_import_rdos_idempotente_e_opcional():
     """Reimportar não duplica RDOs; payload sem `rdos` não cria nada e não quebra."""
     import json, os
