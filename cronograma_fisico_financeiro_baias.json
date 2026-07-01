@@ -798,6 +798,8 @@
       "inicio": "2026-06-29",
       "fim": "2026-07-21",
       "dias": 17.0,
+      "quantidade_total": 48,
+      "unidade": "un",
       "pct_fisico": 0,
       "predecessoras": [],
       "marco": false,
@@ -1559,7 +1561,7 @@
         {"tarefa_mpp": 4, "pct": 65},
         {"tarefa_mpp": 6, "pct": 100},
         {"tarefa_mpp": 9, "pct": 50},
-        {"tarefa_mpp": 15, "pct": 10}
+        {"tarefa_mpp": 15, "quantidade": 10}
       ],
       "fotos": [
         "Descarregamento do aço da fundação",

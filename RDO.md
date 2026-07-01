@@ -65,13 +65,31 @@ Cada item da lista `rdos` é um dia:
 | `precipitacao` | Ex.: "Sem chuva", "Chuva fraca". | não |
 | `comentario` | Texto livre (relato do dia). | não |
 | `mao_de_obra` | Quantas pessoas anexar (0 = nenhuma; você lança a equipe real editando o RDO, se quiser). Mão de obra do RDO **não gera custo**. | não (default 0) |
-| `apontamentos` | Lista `{tarefa_mpp, pct}` = "esta tarefa está em `pct`%". `tarefa_mpp` é o **id da tarefa no cronograma** (coluna do MS Project). | não |
+| `apontamentos` | Avanço das tarefas no dia. Dois modos por item (ver abaixo). `tarefa_mpp` é o **id da tarefa no cronograma** (coluna do MS Project). | não |
 | `fotos` | Lista de **legendas em ordem** (foto 1, 2, 3…) OU objetos `{arquivo, legenda}`. Ver seção 3. | não |
 
 **Sobre `apontamentos`:** você **não precisa** saber os ids. É só me descrever no
 chat ("estudo de solo 100%, projetos em 65%, nivelamento do platô 20%") que eu
 traduzo para os `tarefa_mpp` certos. A tabela de ids está em `cronograma_tarefas`
 dentro do próprio JSON (cada tarefa tem `id` + `nome`).
+
+**Dois modos de apontamento** (por item):
+
+1. **Percentual direto** — `{"tarefa_mpp": 6, "pct": 65}`: você diz o % da tarefa.
+2. **Quantitativo (automático)** — `{"tarefa_mpp": 15, "quantidade": 10}`: você diz
+   **quanto fez** e o sistema calcula o % sozinho, pela `quantidade_total` da tarefa
+   no cronograma. Ex.: brocas com `quantidade_total: 48` → "fez 10" = **20,83%**; no
+   RDO seguinte "fez mais 15" → acumula 25 → **52,08%** (soma sozinho entre RDOs).
+
+Para o modo quantitativo, a **tarefa no cronograma** precisa ter o total:
+```json
+{ "id": 15, "nome": "EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO",
+  "quantidade_total": 48, "unidade": "un", ... }
+```
+> O `quantidade_total` governa **só o % daquela tarefa**. No progresso geral da obra
+> (o anel), o peso da tarefa continua pela **duração** — a menos que **todas** as
+> tarefas tenham quantitativo (aí o peso passa a ser o quantitativo). Isso evita
+> misturar unidades ("48 brocas" × "dias" das outras tarefas).
 
 ---
 

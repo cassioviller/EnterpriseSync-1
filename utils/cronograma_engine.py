@@ -461,10 +461,13 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
     Itera todas as `TarefaCronograma` FOLHA da obra (subtarefas — tarefas-pai
     não entram para evitar dupla contagem) e combina via **média ponderada**.
 
-    Peso por tarefa (em ordem de preferência, documentada inline):
-       1. `quantidade_total` (peso pela "massa" física da tarefa, mais fiel);
-       2. `duracao_dias`     (sem qty: usa a fatia temporal planejada);
-       3. `1`                 (último recurso: média simples).
+    Peso por tarefa:
+       • `quantidade_total` SÓ quando TODAS as folhas o têm (unidade consistente);
+       • senão `duracao_dias` (fatia temporal — unidade comparável entre todas);
+       • senão `1` (último recurso: média simples).
+    Se só algumas folhas têm `quantidade_total`, usá-la como peso misturaria
+    unidades incomparáveis entre tarefas — por isso, nesse caso, ela governa apenas
+    o % da própria tarefa, não o peso do agregado.
 
     Tarefas sem qualquer apontamento até `data_ref` contam como **0%**
     (puxam a média para baixo) — é por isso que o número não pode decrescer
@@ -511,14 +514,23 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
     soma_pesos = 0.0
     n_apontadas = 0
 
+    # Peso: usa `quantidade_total` SÓ quando TODAS as folhas o têm (unidade
+    # consistente entre tarefas). Se apenas algumas têm (ex.: 48 brocas numa obra
+    # cujas demais tarefas não têm quantitativo), usar qty como peso misturaria
+    # unidades incomparáveis ("brocas" × "dias") e distorceria a média — então
+    # cai para a duração em todas. Nesse caso o `quantidade_total` governa apenas o
+    # % da própria tarefa (calcular_progresso_rdo / sincronizar_percentuais_obra).
+    usar_qtd = all(t.quantidade_total and float(t.quantidade_total) > 0
+                   for t in folhas_efetivas)
+
     for t in folhas_efetivas:
         prog = calcular_progresso_rdo(t.id, data_ref, admin_id)
         perc_real = float(prog.get('percentual_realizado') or 0.0)
         # Sem plano calculável conta como 0 no agregado planejado.
         perc_plan = float(prog.get('percentual_planejado') or 0.0)
 
-        # Escolha do peso (ver docstring acima)
-        if t.quantidade_total and float(t.quantidade_total) > 0:
+        # Escolha do peso (ver comentário acima)
+        if usar_qtd:
             peso = float(t.quantidade_total)
         elif t.duracao_dias and int(t.duracao_dias) > 0:
             peso = float(t.duracao_dias)

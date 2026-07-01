@@ -582,6 +582,39 @@ def test_import_cria_rdos_da_secao_rdos():
         assert float(por_nome['MOBILIZAÇÃO EQUIPE'].percentual_concluido) == 0.0
 
 
+def test_apontamento_quantitativo_deriva_percentual_e_acumula():
+    """Tarefa com `quantidade_total` + apontamentos por `quantidade` derivam o % da
+    tarefa (acumulada/total) e acumulam entre RDOs; a quantidade fica gravada no
+    apontamento (executada_dia por dia, acumulada corrente)."""
+    import json, os
+    from datetime import date
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import TarefaCronograma, RDOApontamentoCronograma, RDO
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        payload = json.load(open(caminho, encoding='utf-8'))
+        # t15 já tem quantidade_total=48 na fixture; aponta 10 e depois +15
+        payload['rdos'] = [
+            {"data": "2026-06-30", "apontamentos": [{"tarefa_mpp": 15, "quantidade": 10}]},
+            {"data": "2026-07-01", "apontamentos": [{"tarefa_mpp": 15, "quantidade": 15}]},
+        ]
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        t15 = (TarefaCronograma.query
+               .filter_by(obra_id=oid, admin_id=aid,
+                          nome_tarefa='EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO').first())
+        assert float(t15.quantidade_total) == 48.0
+        # acumulado 25/48 = 52,08%
+        assert float(t15.percentual_concluido) == 52.08
+        aps = (RDOApontamentoCronograma.query
+               .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+               .filter(RDOApontamentoCronograma.tarefa_cronograma_id == t15.id)
+               .order_by(RDO.data_relatorio).all())
+        assert [a.quantidade_executada_dia for a in aps] == [10.0, 15.0]
+        assert [a.quantidade_acumulada for a in aps] == [10.0, 25.0]
+
+
 def test_import_rdos_idempotente_e_opcional():
     """Reimportar não duplica RDOs; payload sem `rdos` não cria nada e não quebra."""
     import json, os
@@ -609,7 +642,8 @@ def test_import_rdos_idempotente_e_opcional():
 def test_fixture_baia_traz_rdos_do_relatorio():
     """A fixture canônica da Baia contém os RDOs diários do relatório (22–30/06) e o
     import reproduz o físico acumulado até 30/06: solo 100%, projetos 65%,
-    nivelamento do platô 100% (Galpões A e B concluídos), gabarito 50%, ferragens 10%."""
+    nivelamento do platô 100% (Galpões A e B concluídos), gabarito 50%, ferragens
+    20,83% (10 de 48 brocas — modo quantitativo)."""
     import json, os
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import RDO, TarefaCronograma
@@ -627,7 +661,7 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         assert por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA'] == 65.0
         assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 100.0
         assert por_nome['EXECUÇÃO DE GABARITO'] == 50.0
-        assert por_nome['EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO'] == 10.0
+        assert por_nome['EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO'] == 20.83  # 10/48
         assert por_nome['MOBILIZAÇÃO EQUIPE'] == 0.0
 
 

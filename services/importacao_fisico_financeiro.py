@@ -198,6 +198,7 @@ def _materializar_cronograma_mpp(obra, admin_id, tarefas_mpp):
             if n in ancestral_por_nivel:
                 pai_id = ancestral_por_nivel[n]
                 break
+        qtot = t.get("quantidade_total")
         tarefa = TarefaCronograma(
             obra_id=obra.id, admin_id=admin_id,
             nome_tarefa=(t.get("nome") or "Tarefa")[:200],
@@ -205,6 +206,11 @@ def _materializar_cronograma_mpp(obra, admin_id, tarefas_mpp):
             data_inicio=_parse_date(t.get("inicio")),
             data_fim=_parse_date(t.get("fim")),
             duracao_dias=max(1, int(t.get("dias") or 1)),
+            # Quantitativo opcional: governa o % da tarefa (quantidade_acumulada /
+            # quantidade_total). NÃO vira peso no progresso geral — ver
+            # calcular_progresso_geral_obra_v2 (peso sempre pela duração).
+            quantidade_total=(float(qtot) if qtot not in (None, "") else None),
+            unidade_medida=((t.get("unidade_medida") or t.get("unidade") or None)),
             ordem=ordem, percentual_concluido=0)
         db.session.add(tarefa)
         db.session.flush()
@@ -396,7 +402,7 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     from app import db
     from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
                         CustoObra, NotificacaoCliente, MovimentacaoEstoque,
-                        AlocacaoEquipe)
+                        AlocacaoEquipe, TarefaCronograma)
 
     if not rdos:
         return 0
@@ -428,7 +434,14 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
 
     funcs = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).limit(10).all()
     criados = 0
-    for item in rdos:
+    acum_qtd: dict = {}     # tarefa_mpp → quantidade acumulada (modo quantitativo)
+    qtot_cache: dict = {}   # db_id → quantidade_total da tarefa (0 se não tem)
+    # Processa em ORDEM DE DATA para o acúmulo quantitativo ficar correto
+    # independentemente da ordem dos RDOs no JSON.
+    itens_ordenados = sorted(
+        (it for it in rdos if _parse_date(it.get('data'))),
+        key=lambda it: _parse_date(it.get('data')))
+    for item in itens_ordenados:
         dia = _parse_date(item.get('data'))
         if dia is None:
             continue
@@ -452,14 +465,34 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
                 funcao_exercida=str(funcao_nome)[:100], horas_trabalhadas=8.0))
 
         for ap in (item.get('apontamentos') or []):
-            db_id = tid_to_db.get(ap.get('tarefa_mpp'))
+            tmpp = ap.get('tarefa_mpp')
+            db_id = tid_to_db.get(tmpp)
             if db_id is None:
                 continue
-            pct = float(ap.get('pct') or 0)
-            db.session.add(RDOApontamentoCronograma(
-                rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
-                quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
-                percentual_realizado=pct, percentual_planejado=None))
+            if ap.get('quantidade') is not None:
+                # Modo quantitativo: acumula a produção do dia e deriva o % pela
+                # quantidade_total da tarefa (quantidade_acumulada / total). O
+                # sincronizar_percentuais_obra grava o percentual_concluido a partir
+                # da acumulada; calcular_progresso_rdo soma a executada_dia.
+                q = float(ap.get('quantidade') or 0)
+                acum = acum_qtd.get(tmpp, 0.0) + q
+                acum_qtd[tmpp] = acum
+                if db_id not in qtot_cache:
+                    _t = TarefaCronograma.query.get(db_id)
+                    qtot_cache[db_id] = float(_t.quantidade_total or 0) if _t else 0.0
+                qtot = qtot_cache[db_id]
+                pct = min(100.0, round(acum / qtot * 100, 2)) if qtot > 0 else 0.0
+                db.session.add(RDOApontamentoCronograma(
+                    rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
+                    quantidade_executada_dia=q, quantidade_acumulada=acum,
+                    percentual_realizado=pct, percentual_planejado=None))
+            else:
+                # Modo percentual direto (comportamento antigo)
+                pct = float(ap.get('pct') or 0)
+                db.session.add(RDOApontamentoCronograma(
+                    rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
+                    quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+                    percentual_realizado=pct, percentual_planejado=None))
 
         # Regra de foto no reimport: se a pasta do dia tiver arquivos, ELA manda
         # (reconstrói). Se vier vazia (0 fotos criadas), preserva as que já
