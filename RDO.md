@@ -116,6 +116,12 @@ fotos_rdos/
 - Precisa fixar o nome do arquivo em vez da ordem? Use a forma longa:
   `{ "arquivo": "2.jpg", "legenda": "..." }`.
 
+**Dia com fotos, mas SEM legenda:** se o RDO **não** tiver a chave `fotos` no JSON e
+a pasta do dia tiver imagens, o import anexa **todas** as imagens da pasta (ordem
+numérica) com **legenda vazia**. Ou seja: é só largar as fotos na pasta — tendo
+legenda ou não, elas entram no reimport. (Quando você manda legendas, aí eu ponho a
+lista `fotos` e cada foto sai legendada.)
+
 Detalhes também em `fotos_rdos/README.md`.
 
 ### Apagar as fotos da raiz depois de importar (para aliviar espaço)

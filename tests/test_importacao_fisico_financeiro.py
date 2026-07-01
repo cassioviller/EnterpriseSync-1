@@ -8,6 +8,21 @@ from app import app, db
 from models import MedicaoContrato
 
 
+@pytest.fixture(autouse=True)
+def _fotos_base_isolada(tmp_path):
+    """Isola FOTOS_RDO_BASE numa pasta VAZIA por padrão, para os testes deste
+    arquivo NÃO processarem as fotos reais do repo (fotos_rdos/) — mantém a suíte
+    rápida e determinística. Os testes de foto sobrescrevem `ff.FOTOS_RDO_BASE`
+    no corpo com o próprio tmp_path."""
+    from services import importacao_fisico_financeiro as ff
+    orig = ff.FOTOS_RDO_BASE
+    vazio = tmp_path / '_fotos_vazio'
+    vazio.mkdir(exist_ok=True)
+    ff.FOTOS_RDO_BASE = str(vazio)
+    yield
+    ff.FOTOS_RDO_BASE = orig
+
+
 @pytest.mark.integration
 def test_medicao_contrato_schema_existe():
     with app.app_context():
@@ -891,6 +906,42 @@ def test_import_anexa_fotos_do_rdo(tmp_path):
         assert [f.legenda for f in fotos] == ["Nível do platô", "Gabarito da Baia 01"]
         assert all(f.imagem_otimizada_base64 and f.thumbnail_base64 for f in fotos)
         assert all(f.nome_arquivo and f.caminho_arquivo for f in fotos)  # legados NOT NULL
+
+
+def test_import_auto_anexa_fotos_da_pasta_sem_legenda(tmp_path):
+    """RDO SEM `fotos` no JSON, mas com imagens na pasta do dia, anexa todas as
+    fotos (ordem numérica) com legenda vazia."""
+    import json, os
+    from PIL import Image
+    from services import importacao_fisico_financeiro as ff
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDO, RDOFoto
+
+    dia_dir = tmp_path / '2026-06-29'
+    dia_dir.mkdir()
+    for n in (1, 2, 3):
+        Image.new('RGB', (8, 8), (n * 20, 0, 0)).save(dia_dir / f'{n}.jpeg')
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    payload = json.load(open(caminho, encoding='utf-8'))
+    # RDO sem chave 'fotos' — as imagens da pasta devem ser anexadas mesmo assim
+    payload['rdos'] = [{"data": "2026-06-29", "comentario": "sem legenda",
+                        "apontamentos": [{"tarefa_mpp": 6, "pct": 60}]}]
+
+    with app.app_context():
+        aid = _novo_admin()
+        old = ff.FOTOS_RDO_BASE
+        ff.FOTOS_RDO_BASE = str(tmp_path)
+        try:
+            oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        finally:
+            ff.FOTOS_RDO_BASE = old
+        rdo = RDO.query.filter_by(obra_id=oid, admin_id=aid).first()
+        fotos = RDOFoto.query.filter_by(rdo_id=rdo.id).order_by(RDOFoto.ordem).all()
+        assert len(fotos) == 3
+        assert all((f.legenda or '') == '' for f in fotos)
+        assert all(f.imagem_otimizada_base64 for f in fotos)
 
 
 def test_reimport_sem_arquivos_preserva_fotos_do_rdo(tmp_path):

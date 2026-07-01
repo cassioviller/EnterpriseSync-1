@@ -297,27 +297,53 @@ def _resolver_arquivo_foto(pasta, indice, nome):
     return achados[0] if achados else None
 
 
-def _materializar_fotos_rdo(rdo, admin_id, dia, fotos):
-    """Anexa as fotos de um RDO a partir da lista `fotos` do JSON.
+def _listar_imagens_ordenadas(pasta):
+    """Lista os arquivos de imagem de `pasta`, em ordem numérica quando os nomes
+    forem 1.jpg, 2.png… (senão por nome). Usado para anexar as fotos de um RDO que
+    tem imagens na pasta mas NÃO trouxe legendas no JSON (dia sem legenda)."""
+    import glob
+    if not os.path.isdir(pasta):
+        return []
+    achados = set()
+    for e in ('jpg', 'jpeg', 'png', 'gif', 'webp'):
+        achados.update(glob.glob(os.path.join(pasta, f'*.{e}')))
+        achados.update(glob.glob(os.path.join(pasta, f'*.{e.upper()}')))
 
-    Cada item pode ser:
+    def _chave(p):
+        base = os.path.splitext(os.path.basename(p))[0]
+        return (0, int(base)) if base.isdigit() else (1, os.path.basename(p).lower())
+    return sorted(achados, key=_chave)
+
+
+def _materializar_fotos_rdo(rdo, admin_id, dia, fotos):
+    """Anexa as fotos de um RDO.
+
+    Com lista `fotos` no JSON, cada item pode ser:
       - uma STRING → só a legenda; o arquivo é inferido pela ordem na pasta
         `fotos_rdos/<data>/` (1.<ext>, 2.<ext>…);
       - um OBJETO `{"arquivo": "1.jpg", "legenda": "..."}` → nome explícito.
+
+    SEM lista `fotos` (dia com fotos na pasta mas sem legendas), anexa TODAS as
+    imagens da pasta em ordem numérica, com legenda vazia — assim dias sem legenda
+    também importam as fotos.
 
     Reusa `salvar_foto_rdo` (mesma otimização WebP + base64 do upload da tela), de
     modo que a foto fica persistida no banco (sobrevive a deploy/restart). Fotos
     ausentes na pasta viram warning — NÃO quebram o import. Retorna nº de fotos
     criadas. Idempotência: o RDO é recriado no reimport e a FK ON DELETE CASCADE
     remove as RDOFoto antigas junto, então não duplica."""
+    pasta = os.path.join(FOTOS_RDO_BASE, dia.isoformat())
     if not fotos:
-        return 0
+        auto = _listar_imagens_ordenadas(pasta)
+        if not auto:
+            return 0
+        fotos = [{'arquivo': os.path.basename(p), 'legenda': ''} for p in auto]
+
     from app import db
     from models import RDOFoto
     from services.rdo_foto_service import salvar_foto_rdo
     from werkzeug.datastructures import FileStorage
 
-    pasta = os.path.join(FOTOS_RDO_BASE, dia.isoformat())
     criadas = 0
     for i, f in enumerate(fotos):
         if isinstance(f, str):
