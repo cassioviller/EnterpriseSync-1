@@ -10,6 +10,7 @@ import logging
 import os
 import secrets
 from datetime import date, datetime
+from types import SimpleNamespace
 
 from flask import (
     Blueprint, abort, current_app, flash, redirect,
@@ -21,6 +22,7 @@ from werkzeug.utils import secure_filename
 from models import (
     db, Obra, TarefaCronograma, PedidoCompra, MedicaoObra, ConfiguracaoEmpresa, RDO,
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
+    RDOApontamentoCronograma,
     MapaConcorrencia, OpcaoConcorrencia, MapaConcorrenciaV2, RelatorioCompraMapa,
 )
 
@@ -646,6 +648,34 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
 
     fotos = RDOFoto.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).order_by(RDOFoto.ordem).all()
     subatividades = RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).order_by(RDOServicoSubatividade.ordem_execucao).all()
+
+    # Fallback: RDOs criados via cronograma (import/seed) não têm
+    # RDOServicoSubatividade — as atividades do dia ficam nos apontamentos do
+    # cronograma. Deriva a mesma estrutura que o template espera (nome + % anterior/
+    # incremento/atual) para a seção "Serviços / atividades" não aparecer vazia.
+    if not subatividades:
+        apontamentos = (
+            RDOApontamentoCronograma.query
+            .filter_by(rdo_id=rdo.id, admin_id=admin_id)
+            .all()
+        )
+        derivadas = []
+        for ap in apontamentos:
+            tarefa = db.session.get(TarefaCronograma, ap.tarefa_cronograma_id)
+            if tarefa is None:
+                continue
+            atual = ap.percentual_realizado or 0.0
+            incremento = ap.quantidade_executada_dia or 0.0
+            derivadas.append(SimpleNamespace(
+                nome_subatividade=tarefa.nome_tarefa,
+                descricao_subatividade=None,
+                observacoes_tecnicas=None,
+                percentual_anterior=max(0.0, round(atual - incremento, 2)),
+                incremento_dia=incremento,
+                percentual_conclusao=atual,
+                ordem_execucao=tarefa.ordem or 0,
+            ))
+        subatividades = sorted(derivadas, key=lambda s: s.ordem_execucao)
     mao_obra = RDOMaoObra.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
     equipamentos = RDOEquipamento.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
     ocorrencias = RDOOcorrencia.query.filter_by(rdo_id=rdo.id, admin_id=admin_id).all()
