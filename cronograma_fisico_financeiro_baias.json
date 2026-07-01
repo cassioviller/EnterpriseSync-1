@@ -1523,6 +1523,55 @@
         {"tarefa_mpp": 4, "pct": 65},
         {"tarefa_mpp": 6, "pct": 20}
       ]
+    },
+    {
+      "data": "2026-06-28",
+      "clima": "Não informado",
+      "precipitacao": "Sem chuva",
+      "comentario": "Prosseguimento da terraplenagem e nivelamento do platô do Galpão B, executados pela AJR (contratada pela Fazenda Santa Mônica). Os serviços visam adequar as cotas do terreno ao nível da calçada existente da Cabana, conforme definido pela equipe técnica, permitindo a correta implantação das futuras fundações das baias. A equipe de engenharia acompanhou a evolução dos serviços e as condições do terreno para posterior liberação das atividades de locação e fundação.",
+      "mao_de_obra": 0,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65},
+        {"tarefa_mpp": 6, "pct": 40}
+      ]
+    },
+    {
+      "data": "2026-06-29",
+      "clima": "Não informado",
+      "precipitacao": "Sem chuva",
+      "comentario": "Concluído o nivelamento do platô do Galpão B. Na sequência, a equipe de terraplenagem iniciou a regularização e o nivelamento do platô do Galpão A, conforme as cotas previamente definidas pela equipe técnica. Realizado o recebimento dos materiais destinados à execução dos gabaritos de locação da obra. Equipe de fundação programada para início amanhã (30/06).",
+      "mao_de_obra": 0,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65},
+        {"tarefa_mpp": 6, "pct": 65}
+      ]
+    },
+    {
+      "data": "2026-06-30",
+      "clima": "Não informado",
+      "precipitacao": "Sem chuva",
+      "comentario": "Atividades executadas:\n• Descarregamento e armazenamento do aço destinado à execução das fundações, garantindo a disponibilidade dos materiais para o avanço das próximas etapas.\n• Implantação do gabarito do Galpão B, definindo os eixos e referências necessários para a locação das fundações.\n• Marcação com cal das vigas baldrame do Galpão B, delimitando as áreas destinadas às escavações das fundações.\n• Iniciada a fabricação das armaduras das brocas — 10 unidades concluídas no período.\n\nObservações:\n• A AJR (contratada pela Fazenda) concluiu o nivelamento do platô do Galpão A, finalizando a adequação dos níveis para a implantação das baias.\n• Posicionada a caixa d'água provisória no local da obra, contribuindo para a estrutura inicial de apoio às atividades de campo.\n• Conforme o Sr. Cido (Fazenda), a instalação dos pontos provisórios de água dos Galpões A e B está prevista para 01/07; o pressurizador da caixa d'água e os pontos provisórios de energia seguem previstos até 03/07.\n• Reforçada junto à Sra. Ana (Fort) a necessidade de substituição da caçamba e a higienização do banheiro químico da obra.\n\nPróximas atividades (01/07):\n• Execução do gabarito do Galpão A.\n• Continuidade da fabricação das armaduras das brocas.\n• Início das escavações das vigas baldrame do Galpão B.\n• Continuidade da mobilização da infraestrutura provisória da obra.",
+      "mao_de_obra": 0,
+      "apontamentos": [
+        {"tarefa_mpp": 3, "pct": 100},
+        {"tarefa_mpp": 4, "pct": 65},
+        {"tarefa_mpp": 6, "pct": 100},
+        {"tarefa_mpp": 9, "pct": 50},
+        {"tarefa_mpp": 15, "pct": 10}
+      ],
+      "fotos": [
+        "Descarregamento do aço da fundação",
+        "Armazenamento do aço",
+        "Início de montagem do gabarito do Galpão B",
+        "Nivelamento de platô do Galpão A",
+        "Posicionamento da caixa d'água provisória",
+        "Marcação com cal das baias do Galpão B",
+        "Marcação com cal das baias do Galpão B",
+        "Execução de armação das brocas",
+        "Finalização de nivelamento do platô do Galpão A"
+      ]
     }
   ]
 }

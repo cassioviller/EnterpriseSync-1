@@ -607,8 +607,9 @@ def test_import_rdos_idempotente_e_opcional():
 
 
 def test_fixture_baia_traz_rdos_do_relatorio():
-    """A fixture canônica da Baia já contém os 6 RDOs do relatório 22–27/06 e o
-    import reproduz o físico: solo 100%, projetos 65%, nivelamento 20%."""
+    """A fixture canônica da Baia contém os RDOs diários do relatório (22–30/06) e o
+    import reproduz o físico acumulado até 30/06: solo 100%, projetos 65%,
+    nivelamento do platô 100% (Galpões A e B concluídos), gabarito 50%, ferragens 10%."""
     import json, os
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import RDO, TarefaCronograma
@@ -617,16 +618,17 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 6
+        assert len(payload.get('rdos', [])) == 9
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 6
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 9
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['ESTUDO DE SOLO SPT'] == 100.0
         assert por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA'] == 65.0
-        assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 20.0
+        assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 100.0
+        assert por_nome['EXECUÇÃO DE GABARITO'] == 50.0
+        assert por_nome['EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO'] == 10.0
         assert por_nome['MOBILIZAÇÃO EQUIPE'] == 0.0
-        assert por_nome['MARCAÇÃO DE OBRA'] == 0.0
 
 
 def test_calcular_progresso_rdo_fallback_sem_quantidade_total():
@@ -711,11 +713,19 @@ def test_cronograma_linha_raiz_alinha_progresso_v2():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
-        esperado = round(calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct'])
+        # data-perc da raiz = `progresso_geral_header|int` no template (trunca), com a
+        # métrica v2 calculada em `hoje` no route — espelhamos o mesmo int() aqui.
+        esperado = int(calcular_progresso_geral_obra_v2(oid, date.today(), aid)['progresso_geral_pct'])
         raiz = (TarefaCronograma.query
                 .filter_by(obra_id=oid, admin_id=aid, tarefa_pai_id=None).first())
-        # o rollup persistido da raiz é diferente da métrica v2 (senão o teste é vácuo)
-        assert round(float(raiz.percentual_concluido or 0)) != esperado
+        raiz_id = raiz.id  # captura antes do commit (evita DetachedInstanceError)
+        # força o rollup persistido a um valor distinto da métrica v2, para provar que
+        # o display usa a v2 (override no route/template), não o rollup gravado — robusto
+        # à evolução do físico (o rollup natural podia coincidir com a v2 e esvaziar o teste).
+        forcado = 5.0 if esperado != 5 else 95.0
+        raiz.percentual_concluido = forcado
+        db.session.commit()
+        assert int(forcado) != esperado
     with app.test_client() as c:
         with c.session_transaction() as s:
             s['_user_id'] = str(aid); s['_fresh'] = True
@@ -723,7 +733,7 @@ def test_cronograma_linha_raiz_alinha_progresso_v2():
         assert r.status_code == 200
         html = r.get_data(as_text=True)
         # a <tr> da raiz tem data-pai="" e data-perc = métrica v2
-        m = re.search(r'data-id="%d"[^>]*data-perc="(\d+)"' % raiz.id, html)
+        m = re.search(r'data-id="%d"[^>]*data-perc="(\d+)"' % raiz_id, html)
         assert m is not None and int(m.group(1)) == esperado
 
 
@@ -801,7 +811,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 6
+        assert len(rdo_ids) == 9
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -908,7 +918,7 @@ def test_reimport_sem_arquivos_preserva_fotos_do_rdo(tmp_path):
 
 def test_reimport_limpa_custo_obra_referenciando_rdo():
     """Reimport não viola FK quando há custo_obra (ex.: mão de obra) referenciando
-    os RDOs antigos; o custo derivado some junto e os 6 RDOs são recriados."""
+    os RDOs antigos; o custo derivado some junto e os RDOs são recriados."""
     import json, os
     from datetime import date
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
@@ -928,7 +938,7 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 6
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 9
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 
