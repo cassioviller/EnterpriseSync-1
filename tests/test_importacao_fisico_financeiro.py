@@ -83,8 +83,9 @@ def test_importa_cria_obra_com_contrato():
         obra = Obra.query.get(res['obra_id'])
         assert obra.admin_id == admin_id
         assert abs(float(obra.valor_contrato) - 1505613.76) < 0.01
-        assert obra.data_inicio == date(2026, 6, 4)
+        assert obra.data_inicio == date(2026, 6, 8)
         assert obra.data_previsao_fim == date(2026, 10, 8)
+        assert obra.endereco == 'Fazenda Santa Mônica'  # exibido no portal
 
 
 @pytest.mark.integration
@@ -592,7 +593,7 @@ def test_import_cria_rdos_da_secao_rdos():
         por_nome = {t.nome_tarefa: t for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert float(por_nome['ESTUDO DE SOLO SPT'].percentual_concluido) == 100.0
-        assert float(por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA'].percentual_concluido) == 65.0
+        assert float(por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA, ELETRICO, HIDRAULICO'].percentual_concluido) == 65.0
         assert float(por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'].percentual_concluido) == 20.0
         assert float(por_nome['MOBILIZAÇÃO EQUIPE'].percentual_concluido) == 0.0
 
@@ -673,7 +674,7 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['ESTUDO DE SOLO SPT'] == 100.0
-        assert por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA'] == 65.0
+        assert por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA, ELETRICO, HIDRAULICO'] == 65.0
         assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 100.0
         assert por_nome['EXECUÇÃO DE GABARITO'] == 50.0
         assert por_nome['EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO'] == 20.83  # 10/48

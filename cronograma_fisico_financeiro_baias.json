@@ -14,12 +14,13 @@
     "cliente": "Grupo Mônica / Kabod Cabana",
     "local": "Fazenda Santa Mônica, Itu/SP",
     "sistema": "Estrutura metálica + LSF, telha shingle",
+    "endereco": "Fazenda Santa Mônica",
     "num_baias_contrato": 22,
     "num_baias_projeto": 24
   },
   "contrato": {
     "valor_venda": 1505613.76,
-    "data_inicio": "2026-06-04",
+    "data_inicio": "2026-06-08",
     "data_fim_contratual": "2026-10-05",
     "data_fim_cronograma": "2026-10-08",
     "prazo_dias": 123,
@@ -660,7 +661,7 @@
     {
       "id": 4,
       "nivel": 3,
-      "nome": "EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA",
+      "nome": "EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA, ELETRICO, HIDRAULICO",
       "inicio": "2026-06-08",
       "fim": "2026-06-18",
       "dias": 9.0,

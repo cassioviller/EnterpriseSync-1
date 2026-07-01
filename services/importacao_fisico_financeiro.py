@@ -571,6 +571,9 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     obra.valor_contrato = float(contrato.get('valor_venda') or 0)
     obra.data_inicio = data_inicio
     obra.data_previsao_fim = _parse_date(contrato.get('data_fim_cronograma'))
+    # Endereço da obra (exibido no portal do cliente). Usa `endereco` do JSON;
+    # se ausente, cai para `local`. Sem isto o portal mostrava "—".
+    obra.endereco = obra_j.get('endereco') or obra_j.get('local')
     obra.cliente_id = cliente.id
     db.session.flush()
 
