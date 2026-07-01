@@ -988,6 +988,70 @@ def test_portal_rdo_foto_sem_prefixo_base64_duplicado(tmp_path):
         assert 'data:image/webp;base64,data:' not in html   # sem prefixo duplicado
 
 
+def test_import_apontamento_grava_percentual_planejado():
+    """O import grava o percentual_planejado (curva do cronograma) nos apontamentos.
+    A tela do RDO lê o valor ARMAZENADO — sem isto ficava tudo 'Sem plano'."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import RDOApontamentoCronograma, TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(
+            json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        t = (TarefaCronograma.query
+             .filter_by(obra_id=oid, admin_id=aid, is_cliente=False,
+                        nome_tarefa='ESTUDO DE SOLO SPT').first())
+        assert t.data_inicio is not None
+        aps = RDOApontamentoCronograma.query.filter_by(
+            tarefa_cronograma_id=t.id, admin_id=aid).all()
+        assert aps  # há apontamentos para a tarefa
+        # tarefa com datas -> planejado calculado e gravado (não None/'Sem plano')
+        assert all(a.percentual_planejado is not None for a in aps)
+
+
+def test_portal_cronograma_cliente_reflete_progresso_real():
+    """A árvore do cronograma do cliente (is_cliente=True, que não recebe sync de
+    RDO) reflete no portal o % REAL da tarefa interna de mesmo nome — não fica
+    congelada em 0%."""
+    import json, os
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import Obra, TarefaCronograma
+    with app.app_context():
+        aid = _novo_admin()
+        caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                               'cronograma_fisico_financeiro_baias.json')
+        oid = importar_fisico_financeiro(
+            json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
+        interna = (TarefaCronograma.query
+                   .filter_by(obra_id=oid, admin_id=aid, is_cliente=False,
+                              nome_tarefa='EXECUÇÃO DE GABARITO').first())
+        assert float(interna.percentual_concluido) == 50.0  # sincronizado do RDO
+
+        obra = Obra.query.get(oid)
+        token = f'tok-cli-{aid}'
+        obra.token_cliente = token
+        obra.portal_ativo = True
+        # cronograma-cliente CONGELADO em 0%: raiz OBRA + folha GABARITO (mesmo nome)
+        raiz = TarefaCronograma(obra_id=oid, admin_id=aid, nome_tarefa='OBRA',
+                                is_cliente=True, percentual_concluido=0.0,
+                                ordem=1, duracao_dias=1)
+        db.session.add(raiz); db.session.flush()
+        db.session.add(TarefaCronograma(
+            obra_id=oid, admin_id=aid, nome_tarefa='EXECUÇÃO DE GABARITO',
+            is_cliente=True, percentual_concluido=0.0, ordem=2,
+            duracao_dias=1, tarefa_pai_id=raiz.id))
+        db.session.commit()
+
+    with app.test_client() as c:
+        r = c.get(f'/portal/obra/{token}')
+        assert r.status_code == 200
+        html = r.get_data(as_text=True)
+        assert 'EXECUÇÃO DE GABARITO' in html
+        assert '50.0%' in html   # % real (sincronizado), não 0.0% congelado
+
+
 def test_reimport_sem_arquivos_preserva_fotos_do_rdo(tmp_path):
     """Importar com fotos, apagar os arquivos da pasta e reimportar NÃO perde as
     fotos já anexadas (ficam em base64 no banco); reimportar com arquivos novos

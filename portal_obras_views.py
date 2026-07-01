@@ -116,12 +116,23 @@ def portal_obra(token: str):
         .all()
     )
 
+    # Progresso REAL das tarefas internas (is_cliente=False), sincronizado dos RDOs,
+    # indexado por nome. O cronograma do cliente (is_cliente=True) NÃO recebe sync de
+    # RDO — suas folhas ficariam congeladas (ex.: 0% mesmo com o serviço concluído).
+    # Refletimos aqui o % da tarefa interna de mesmo nome para o portal mostrar o
+    # avanço real; sem correspondente, mantém o próprio percentual.
+    _sync_por_nome = {
+        t.nome_tarefa: (t.percentual_concluido or 0.0)
+        for t in tarefas if not t.is_cliente
+    }
+
     def _make_node(t):
         return SimpleNamespace(
             id=t.id,
             tarefa_pai_id=t.tarefa_pai_id,
             nome_tarefa=t.nome_tarefa,
-            percentual_apresentacao=t.percentual_concluido or 0.0,
+            percentual_apresentacao=_sync_por_nome.get(
+                t.nome_tarefa, t.percentual_concluido or 0.0),
             data_inicio_apresentacao=t.data_inicio,
             data_fim_apresentacao=t.data_fim,
             ordem=t.ordem,

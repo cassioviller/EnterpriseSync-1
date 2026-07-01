@@ -429,6 +429,7 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
                         CustoObra, NotificacaoCliente, MovimentacaoEstoque,
                         AlocacaoEquipe, TarefaCronograma)
+    from utils.cronograma_engine import calcular_progresso_rdo
 
     if not rdos:
         return 0
@@ -495,6 +496,10 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
             db_id = tid_to_db.get(tmpp)
             if db_id is None:
                 continue
+            # Planejado (curva do cronograma até a data do RDO). A tela do RDO lê o
+            # valor GRAVADO no apontamento (não recalcula) — sem isto, o import
+            # deixava tudo como "Sem plano". None = tarefa sem data_inicio/duração.
+            plan = calcular_progresso_rdo(db_id, dia, admin_id)['percentual_planejado']
             if ap.get('quantidade') is not None:
                 # Modo quantitativo: acumula a produção do dia e deriva o % pela
                 # quantidade_total da tarefa (quantidade_acumulada / total). O
@@ -511,14 +516,14 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
                 db.session.add(RDOApontamentoCronograma(
                     rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
                     quantidade_executada_dia=q, quantidade_acumulada=acum,
-                    percentual_realizado=pct, percentual_planejado=None))
+                    percentual_realizado=pct, percentual_planejado=plan))
             else:
                 # Modo percentual direto (comportamento antigo)
                 pct = float(ap.get('pct') or 0)
                 db.session.add(RDOApontamentoCronograma(
                     rdo_id=rdo.id, tarefa_cronograma_id=db_id, admin_id=admin_id,
                     quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
-                    percentual_realizado=pct, percentual_planejado=None))
+                    percentual_realizado=pct, percentual_planejado=plan))
 
         # Regra de foto no reimport: se a pasta do dia tiver arquivos, ELA manda
         # (reconstrói). Se vier vazia (0 fotos criadas), preserva as que já
