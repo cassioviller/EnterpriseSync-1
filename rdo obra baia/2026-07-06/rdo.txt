@@ -1,0 +1,21 @@
+RDO - 2026-07-06
+Obra: Baias Kabod - Fazenda Santa Monica, Itu
+Cliente: Grupo Monica / Kabod Cabana
+
+Clima / condicoes:
+Responsavel:
+
+== AVANCO FISICO DO DIA ==
+(descreva o que avancou hoje; pode usar % por etapa/tarefa)
+Avanco conforme MS Project (corte 06/07): fundacao em andamento — escavacao de baldrames e brocas concluidas (Galpao A e B); ferragens de fundacao em ~20-33%.
+-
+
+== EFETIVO / MAO DE OBRA ==
+-
+
+== OCORRENCIAS / IMPEDIMENTOS ==
+-
+
+== FOTOS ==
+(coloque as imagens na pasta ./fotos/ deste mesmo dia)
+-

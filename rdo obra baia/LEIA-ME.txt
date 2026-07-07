@@ -1,0 +1,33 @@
+RDO OBRA BAIA - Baias Kabod (Fazenda Santa Monica, Itu)
+=======================================================
+
+Uma pasta por dia (AAAA-MM-DD), de 2026-06-08 (inicio da obra no cronograma)
+ate 2026-07-07 (hoje). Todos os dias corridos.
+
+Dentro de cada dia:
+  rdo.txt   -> cole/escreva o texto do RDO do dia (ja vem com o modelo).
+  fotos/    -> jogue as imagens do dia aqui (.jpg / .png).
+
+COMO EU USO ISSO
+----------------
+Depois de preencher os dias, me chame: "reorganiza o JSON com os RDOs".
+Eu leio cada rdo.txt (e as fotos), atualizo o %fisico das etapas em
+tests/fixtures/cronograma_fisico_financeiro_baias.json e o cronograma fica
+pronto pra re-seedar.
+
+Pode escrever solto ("Fundacao Galpao A ~40%") ou em % por etapa. Eu converto.
+
+SITUACAO ATUAL (base do MS Project - corte 06/07)
+-------------------------------------------------
+Avanco ja registrado no cronograma: Preliminares ~73%, Fundacao ~19%,
+demais etapas 0%. Escavacoes de baldrame/broca concluidas nos dois galpoes;
+ferragens de fundacao em andamento. O dia 2026-07-06 traz essa nota no rdo.txt.
+
+CODIGOS DE ETAPA (usados no JSON)
+---------------------------------
+PRELIM Preliminares e projetos     FECHA  Fechamentos (plaqueamento)
+FUND   Fundacao (Galpao A + B)     PINT   Pintura / Stain
+ESTMET Estrutura metalica          MOLEDO Pedra moledo
+ESTLSF Estrutura LSF (baias)       PORTAO Portoes
+COBERT Cobertura (telhado shingle) ELET   Eletrica
+HIDRO  Hidraulica                  INDIRETOS Indiretos / gestao
