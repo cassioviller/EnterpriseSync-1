@@ -57,7 +57,7 @@ def test_importa_cria_obra_com_contrato():
         assert obra.admin_id == admin_id
         assert abs(float(obra.valor_contrato) - 1505613.76) < 0.01
         assert obra.data_inicio == date(2026, 6, 4)
-        assert obra.data_previsao_fim == date(2026, 9, 11)
+        assert obra.data_previsao_fim == date(2026, 10, 8)
 
 
 @pytest.mark.integration
@@ -164,7 +164,10 @@ def test_wrappers_de_servico():
         assert fc['linhas'] and 'lucro_em_caixa' in fc
 
         div = fluxo_caixa_divergencia(obra)
-        assert abs(float(div['resumo']['delta_veks']) - 90000) < 2000
+        # Indiretos agora são faseados verbatim pela Planilha1 (REV01): o
+        # faseamento das etapas bate com o snapshot da planilha, então a
+        # divergência que o painel denunciava está zerada.
+        assert abs(float(div['resumo']['delta_veks'])) < 1
 
         k = kpis(obra)
         assert abs(float(k['venda']) - 1505613.76) < 1.0
@@ -421,20 +424,23 @@ def test_indiretos_transversais_viram_linhas_mensais():
         linhas = ObraServicoCustoItem.query.filter_by(
             obra_servico_custo_id=ind.id).all()
 
-        # 10 itens × 5 meses (jun–out), todos nomeados com o mês
-        assert len(linhas) == 50
+        # 10 itens explodidos por mês (jun–out), todos nomeados com o mês.
+        # Nem todo item roda os 5 meses na Planilha1 REV01: 'Refeição Equipe
+        # Plaq.' e 'Refeição LSF' só jul (1 mês); 'Encarregado' e 'Refeição
+        # Encarregado' jul–out (4 meses). Total: 6×5 + 2×1 + 2×4 = 40 linhas.
+        assert len(linhas) == 40
         assert all('/' in (l.descricao or '') for l in linhas)
         assert any('(jun/26)' in l.descricao for l in linhas)
         assert any('(out/26)' in l.descricao for l in linhas)
         # cada linha mensal cai dentro do seu mês (data_inicio.month == data_fim.month)
         assert all(l.data_inicio and l.data_fim
                    and l.data_inicio.month == l.data_fim.month for l in linhas)
-        # total conservado (390.500) e perfil mensal (jul mais pesado, cauda out)
+        # total conservado (480.500) e perfil mensal (jul mais pesado, cauda out)
         por_mes = {}
         for l in linhas:
             k = f"{l.data_inicio.year:04d}-{l.data_inicio.month:02d}"
             por_mes[k] = por_mes.get(k, 0.0) + float(l.valor)
-        assert abs(sum(por_mes.values()) - 390500) < 1
+        assert abs(sum(por_mes.values()) - 480500) < 1
         assert sorted(por_mes) == ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
         assert por_mes['2026-07'] > por_mes['2026-06']   # jul é o pico do perfil
 

@@ -191,24 +191,34 @@ def _materializar_cronograma_fisico(obra, admin_id, imc, etapa, mpp, data_defaul
             t = mpp.get(tid, {})
             fdi = _parse_date(t.get("inicio")) or di
             fdf = _parse_date(t.get("fim")) or df
-            folhas.append((t.get("nome") or etapa["nome"], fdi, fdf, int(t.get("dias") or 1)))
+            pct = int(round(float(t.get("pct_fisico") or 0)))
+            folhas.append((t.get("nome") or etapa["nome"], fdi, fdf,
+                           int(t.get("dias") or 1), pct))
     else:
         dias = (df - di).days + 1 if (di and df) else 1
-        folhas.append((etapa["nome"], di, df, max(1, dias)))
+        pct = int(round(float(cron.get("pct_fisico") or 0)))
+        folhas.append((etapa["nome"], di, df, max(1, dias), pct))
         avisos.append(
             f"Etapa '{etapa['nome']}' sem tarefas do cronograma — "
             "faseada pela data da etapa.")
 
-    for nome_f, fdi, fdf, dias in folhas:
+    peso_total = sum(max(1, dias) for _, _, _, dias, _ in folhas) or 1
+    pct_pond = 0
+    for nome_f, fdi, fdf, dias, pct in folhas:
         folha = TarefaCronograma(obra_id=obra.id, admin_id=admin_id,
                                  nome_tarefa=nome_f, tarefa_pai_id=raiz.id,
                                  data_inicio=fdi, data_fim=fdf,
-                                 duracao_dias=dias, percentual_concluido=0)
+                                 duracao_dias=dias, percentual_concluido=pct)
         db.session.add(folha)
         db.session.flush()
         db.session.add(ItemMedicaoCronogramaTarefa(
             item_medicao_id=imc.id, cronograma_tarefa_id=folha.id,
             admin_id=admin_id, peso=max(1, dias)))
+        pct_pond += pct * max(1, dias)
+
+    # %físico da raiz = média das folhas ponderada por duração (avanço base do
+    # MS Project; o RDO refina depois, via re-seed do JSON atualizado).
+    raiz.percentual_concluido = int(round(pct_pond / peso_total))
     db.session.flush()
 
 

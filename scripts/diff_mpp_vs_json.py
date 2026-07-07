@@ -1,15 +1,14 @@
-"""Diff das datas do cronograma: CRONOGRAMA 16.06 (1).mpp  ×  JSON importado.
+"""Diff das datas do cronograma: CRONOGRAMA 06.07.mpp  ×  JSON importado.
 
 Objetivo: provar (ou refutar) que a tabela `cronograma_tarefas` do JSON
 (usada para fasear as etapas normais) está fiel ao MS Project.
 
 Uso:
-    python scripts/diff_mpp_vs_json.py
+    python scripts/diff_mpp_vs_json.py [caminho.mpp]
 
-Dependências do parser de .mpp (instalar se faltar — o repo não usa Java):
-    pip install mpxj jpype1 jdk4py
-`mpxj` lê .mpp via JPype; `jdk4py` provê um JRE em wheel (sem precisar de Java
-no sistema). O script aponta JAVA_HOME para o jdk4py automaticamente.
+Dependências do parser de .mpp:  pip install mpxj jpype1
+O parsing fica em scripts/dump_mpp.py (acha um JDK completo automaticamente —
+o jdk4py não serve porque não tem o charset MacRoman dos .mpp).
 """
 from __future__ import annotations
 
@@ -18,47 +17,25 @@ import os
 import sys
 from datetime import date
 
-MPP = "CRONOGRAMA 16.06 (1).mpp"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+MPP = "CRONOGRAMA 06.07.mpp"
 JSON = "tests/fixtures/cronograma_fisico_financeiro_baias.json"
-
-
-def _ensure_jvm():
-    """Garante um JRE para o JPype/mpxj. Usa jdk4py se o sistema não tem Java."""
-    if not os.environ.get("JAVA_HOME"):
-        try:
-            from jdk4py import JAVA_HOME  # type: ignore
-            os.environ["JAVA_HOME"] = str(JAVA_HOME)
-        except Exception:
-            pass  # se houver Java no sistema, segue
 
 
 def parse_mpp(caminho: str) -> dict[int, dict]:
     """Retorna {task_id: {'nome', 'inicio': date|None, 'fim': date|None}}."""
-    _ensure_jvm()
-    import jpype  # noqa
-    from mpxj import UniversalProjectReader  # type: ignore
+    from scripts.dump_mpp import dump
 
-    project = UniversalProjectReader().read(caminho)
+    def _iso(s):
+        return date.fromisoformat(s) if s else None
+
     out: dict[int, dict] = {}
-
-    def _d(v):
-        if v is None:
-            return None
-        # mpxj devolve java.time.LocalDateTime; tem year/month/day
-        try:
-            return date(v.getYear(), v.getMonthValue(), v.getDayOfMonth())
-        except Exception:
-            s = str(v)[:10]
-            return date.fromisoformat(s) if s[:4].isdigit() else None
-
-    for t in project.getTasks():
-        tid = t.getID()
-        if tid is None:
-            continue
-        out[int(tid.intValue() if hasattr(tid, "intValue") else tid)] = {
-            "nome": str(t.getName() or "").strip(),
-            "inicio": _d(t.getStart()),
-            "fim": _d(t.getFinish()),
+    for t in dump(caminho):
+        out[int(t["id"])] = {
+            "nome": t["nome"],
+            "inicio": _iso(t["inicio"]),
+            "fim": _iso(t["fim"]),
         }
     return out
 
@@ -82,9 +59,10 @@ def _iso(s):
 
 
 def main():
-    if not os.path.exists(MPP):
-        sys.exit(f"não achei {MPP}")
-    mpp = parse_mpp(MPP)
+    caminho = sys.argv[1] if len(sys.argv) > 1 else MPP
+    if not os.path.exists(caminho):
+        sys.exit(f"não achei {caminho}")
+    mpp = parse_mpp(caminho)
     js = parse_json(JSON)
     print(f"MPP: {len(mpp)} tarefas | JSON: {len(js)} tarefas\n")
 
