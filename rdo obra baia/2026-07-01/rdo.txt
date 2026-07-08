@@ -1,20 +1,33 @@
-RDO - 2026-07-01
+RDO - 01/07/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+Atividades Executadas
+• Foi iniciada a execução das escavações das vigas baldrame do Galpão B, conforme a locação previamente definida em projeto.
+• Foi executada a implantação do gabarito do Galpão A, permitindo a definição dos eixos e referências necessárias para a locação das fundações.
+• Foi realizada a marcação com cal das vigas baldrame do Galpão A, delimitando as áreas destinadas às futuras escavações das fundações.
+• Foi executada a armação de 14 brocas referentes ao Galpão B, dando continuidade aos serviços de preparação das fundações.
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+Observações
+• Foi constatada a ausência na entrega dos vergalhões Ø8 mm com comprimento de 12,00 m, necessários para a continuidade das armações. O fornecedor foi acionado e informou que a entrega do material será realizada no dia 02/07.
+• No período compreendido entre 12h30 e 14h30, os serviços de escavação foram temporariamente paralisados a pedido da Fort Gerenciadora, em razão da solicitação de esclarecimentos quanto ao procedimento executivo das vigas baldrame em relação à concretagem das brocas.
+• Ficou definida a realização de uma reunião na manhã do dia 02/07 entre as equipes da Kabod e da Fort Gerenciadora, visando o alinhamento e a definição do procedimento executivo a ser adotado.
+• Foi realizada reunião técnica entre Caroline, Gustavo e Alan para a definição dos itens relacionados às instalações hidráulicas e elétricas do empreendimento. Durante a reunião foram levantadas sugestões e alternativas técnicas que serão discutidas com a Fazenda na reunião prevista para o dia seguinte.
 
-== EFETIVO / MAO DE OBRA ==
--
+Próximas Atividades Previstas (02/07)
+• Continuidade e finalização das escavações das vigas baldrame do Galpão B.
+• Início das escavações das vigas baldrame do Galpão A.
+• Início da montagem das armaduras das sapatas do Galpão B.
+• Continuidade dos serviços de armação e preparação das fundações conforme disponibilidade dos materiais.
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+== FOTOS (ver pasta ./fotos/) ==
+  IMG-20260701-WA0090.jpg — Início Escavação das vigas baldrames galpão B
+  IMG-20260701-WA0031.jpg — Execução de montagem de armação das brocas
+  IMG-20260701-WA0091.jpg — Execução de montagem de armação das brocas
+  IMG-20260701-WA0093.jpg — Escavação das vigas baldrames do galpão B
+  IMG-20260701-WA0092.jpg — Escavação das vigas baldrames do galpão B
+  IMG-20260701-WA0094.jpg — Escavação das vigas baldrames do galpão B
+  IMG-20260701-WA0095.jpg — Todas as armações de broca do galpão B foram executadas
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-07-01 19:27 (RDO diario).

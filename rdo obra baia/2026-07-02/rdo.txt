@@ -1,20 +1,36 @@
-RDO - 2026-07-02
+RDO - 02/07/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+**RDO – 02/07/2026**
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+**Efetivo:** 03 colaboradores
 
-== EFETIVO / MAO DE OBRA ==
--
+### Atividades Executadas
+• Foi concluída a escavação das valas destinadas às vigas baldrame do Galpão B, deixando a frente de serviço preparada para as próximas etapas da fundação.
+• Foram executadas as perfurações de 10 brocas, conforme locação previamente realizada em campo.
+• Foi executada a armação de 24 blocos de coroamento, dando continuidade à preparação das fundações para concretagem.
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+### Observações
+• Os serviços de fundação seguem conforme a metodologia executiva prevista em projeto estrutural.
+• Os projetos estruturais da fundação encontram-se plotados e disponíveis na obra para consulta e conferência durante a execução.
+• Durante o período foi realizada reunião técnica entre representantes da Fazenda Santa Mônica, Fort Gerenciadora e Kabod Cabanas, onde foram definidas diretrizes referentes às instalações hidráulicas, elétricas e demais soluções executivas da obra.
+Em meio a todos os levantamentos da Fort Gerenciadora, Gustavo pediu para nossa equipe continuar a obra.
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+### Próximas Atividades Previstas (03/07)
+• Continuidade das perfurações das brocas.
+• Início da armação das vigas baldrame.
+• Continuidade da preparação das fundações para concretagem.
+
+== FOTOS (ver pasta ./fotos/) ==
+  VID-20260703-WA0085.mp4 — (sem legenda)
+  IMG-20260703-WA0073.jpg — Início perfuração broca Galpão B
+  IMG-20260703-WA0072.jpg — Execução de armação dos blocos de coroamento Galpão B
+  IMG-20260703-WA0075.jpg — Locação de tampões nas furações das brocas
+  IMG-20260703-WA0074.jpg — Locação de tampões nas furações das brocas
+  IMG-20260703-WA0076.jpg — Locação de tampões nas furações das brocas
+  IMG-20260703-WA0077.jpg — Locação de tampões nas furações das brocas
+  IMG-20260703-WA0078.jpg — Execução de armação dos blocos de coroamento do Galpão B
+
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-07-03 17:20 (RDO diario).

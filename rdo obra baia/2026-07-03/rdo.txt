@@ -1,20 +1,33 @@
-RDO - 2026-07-03
+RDO - 03/07/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+*RDO – 03/07/2026*
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+*Efetivo:* 03 colaboradores, 2 operadores de máquina (AJR)
 
-== EFETIVO / MAO DE OBRA ==
--
+### Atividades Executadas
+• Foram executadas as perfurações de 14 brocas referentes ao Galpão B, dando continuidade à execução das fundações profundas conforme projeto estrutural.
+• Foi iniciada a escavação das vigas baldrame do Galpão A, em conformidade com a sequência executiva prevista para a obra.
+• Foi iniciada a fabricação das armaduras das vigas baldrame, sendo concluídas duas vigas transversais durante o período.
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+### Observações
+• Durante a perfuração da broca correspondente ao bloco *B13* do Galpão B, foi identificada a presença de uma formação rochosa que impossibilitou o avanço da perfuração até a profundidade prevista em projeto. A broca atingiu aproximadamente *1,50 m*, em vez dos *3,00 m* especificados. A ocorrência foi comunicada ao projetista estrutural, permanecendo em análise para definição da solução técnica a ser adotada.
+• Foi realizada atualização do cronograma executivo da obra, ficando definida a concretagem de todas as brocas dos Galpões A e B para o dia *08/07*, antecedendo a concretagem das vigas baldrame. Também foi prevista a execução de uma camada de regularização em concreto com espessura de *5 cm* em todas as vigas baldrame, conforme metodologia executiva adotada no mesmo dia.
+• A projetista Priscila encaminhou um estudo preliminar de um modelo de cocho executado em **Light Steel Frame**, que será analisado pela equipe técnica quanto à sua viabilidade estrutural, construtiva e econômica, com o objetivo de apresentar essa solução como alternativa ao cliente.
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+### Próximas Atividades Previstas (04/07)
+• Continuação da escavação das vigas baldrame do Galpão A, com previsão de conclusão.
+
+• Execução das perfurações das brocas e continuidade da fabricação das armaduras das vigas baldrame. na segunda-feira (06/07), conforme programação da obra.
+
+== FOTOS (ver pasta ./fotos/) ==
+  IMG-20260703-WA0080.jpg — Execução das vigas transversais do Galpão B
+  VID-20260703-WA0086.mp4 — Furo de broca do B13 onde foi identificado formação rochosa.
+  IMG-20260703-WA0082.jpg — Croqui cocho em LSF
+  IMG-20260703-WA0081.jpg — Armazenamento da armação do galpão B
+  VID-20260703-WA0087.mp4 — Execução da armação das vigas transversais
+  IMG-20260703-WA0083.jpg — Execução de Escavação das vigas baldrames do Galpão A
+
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-07-03 17:56 (RDO diario).

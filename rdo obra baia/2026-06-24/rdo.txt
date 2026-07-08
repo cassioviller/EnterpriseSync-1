@@ -1,20 +1,20 @@
-RDO - 2026-06-24
+RDO - 24/06/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+• As chuvas ocorridas durante a manhã impediram novamente a realização dos serviços de terraplenagem.
+• Em reunião com o responsável pela terraplenagem, Sr. André (AJR), foi informado que seria necessário um período de aproximadamente dois dias de estiagem para permitir a entrada dos equipamentos e execução do nivelamento.
+• Em visita ao local, foi realizada reunião com a Sra. Ana, representante da Fazenda, para alinhamento das necessidades de adequação do platô.
+• Foi solicitada à Kabod a definição dos projetos hidráulico e elétrico, bem como dos detalhes de acabamento das calçadas.
+• Foram reforçadas as necessidades de infraestrutura provisória para o início da obra, incluindo:
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+* 1 ponto de energia para cada galpão;
+* 1 ponto de água para cada galpão;
+* disponibilização de containers para escritório e almoxarifado;
+* substituição da caçamba existente;
+* remoção do entulho de madeira presente no local.
+* foram enviados todos os projetos referentes a cobertura e pilares metálicos.
+* foi enviado o cronograma para apresentação com data de entrega da obra para 08/10/26.
 
-== EFETIVO / MAO DE OBRA ==
--
-
-== OCORRENCIAS / IMPEDIMENTOS ==
--
-
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-06-29 12:19 (via resumo semanal).

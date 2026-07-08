@@ -1,20 +1,30 @@
-RDO - 2026-07-04
+RDO - 04/07/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+*RDO – 04/07/2026*
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+*Efetivo:* 02 operadores de máquina (AJR)
 
-== EFETIVO / MAO DE OBRA ==
--
+### Atividades Executadas
+• Foi concluída a escavação das vigas baldrame do Galpão A.
+• Foram executadas as perfurações de 12 brocas do Galpão A, dando continuidade à execução das fundações profundas conforme projeto estrutural.
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+### Observações
+• A conclusão das perfurações das brocas do Galpão A está prevista para o período da manhã do dia *06/07*, finalizando a etapa de escavações das fundações.
+• Está programado para o dia *06/07* o início da fabricação das armaduras das brocas do Galpão A, visando manter o cronograma de execução.
+• Permanece prevista para o dia *08/07* a concretagem de todas as brocas dos Galpões A e B, conforme programação executiva da obra.
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+### Próximas Atividades Previstas (06/07)
+• Conclusão das perfurações das brocas do Galpão A.
+• Início da armação das brocas do Galpão A.
+• Continuidade da preparação das fundações para concretagem conjunta dos Galpões A e B no dia 08/07.
+
+== FOTOS (ver pasta ./fotos/) ==
+  IMG-20260704-WA0026.jpg — (sem legenda)
+  IMG-20260704-WA0027.jpg — (sem legenda)
+  IMG-20260704-WA0028.jpg — (sem legenda)
+  IMG-20260704-WA0029.jpg — (sem legenda)
+
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-07-04 17:16 (RDO diario).

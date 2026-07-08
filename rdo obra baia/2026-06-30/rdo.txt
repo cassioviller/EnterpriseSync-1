@@ -1,20 +1,36 @@
-RDO - 2026-06-30
+RDO - 30/06/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+Atividades Executadas
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+• Foi realizado o descarregamento e armazenamento do aço destinado à execução das fundações, garantindo a disponibilidade dos materiais para o avanço das próximas etapas da obra.
+• Foi executada a implantação do gabarito do Galpão B, permitindo a definição dos eixos e referências necessárias para a locação das fundações.
+• Foi realizada a marcação com cal das vigas baldrame do Galpão B, delimitando as áreas destinadas às escavações das fundações.
+• Foi iniciada a fabricação das armaduras das brocas, sendo concluídas 10 unidades durante o período.
 
-== EFETIVO / MAO DE OBRA ==
--
+Observações
+• A empresa AJR, contratada pela Fazenda Santa Mônica, concluiu os serviços de nivelamento do platô do Galpão A, finalizando a adequação dos níveis necessários para a implantação das baias.
+• Foi posicionada a caixa d'água provisória no local da obra, contribuindo para a estrutura inicial de apoio às atividades de campo.
+• Conforme informado pelo Sr. Cido, representante da Fazenda, está prevista para o dia 01/07 a instalação dos pontos provisórios de água dos Galpões A e B. A instalação do pressurizador da caixa d'água e os pontos provisórios de energia permanecem previstos para conclusão até o final da semana, em 03/07.
+• Foi reforçada junto à Sra. Ana, da Fort, a necessidade de substituição da caçamba existente e a realização da higienização do banheiro químico disponibilizado na obra.
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+Próximas Atividades Previstas (01/07)
+• Execução do gabarito do Galpão A.
+• Continuidade da fabricação das armaduras das brocas.
+• Início das escavações das vigas baldrame do Galpão B.
+• Continuidade da mobilização da infraestrutura provisória da obra.
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+== FOTOS (ver pasta ./fotos/) ==
+  IMG-20260701-WA0003.jpg — Descarregamento do aço da fundação
+  IMG-20260701-WA0004.jpg — Armazenamento do aço
+  IMG-20260701-WA0005.jpg — Início de montagem do gabarito do Galpão B
+  IMG-20260701-WA0007.jpg — Nivelamento de platô do Galpão A
+  IMG-20260701-WA0006.jpg — Posicionamento da caixa d'água provisória
+  IMG-20260701-WA0010.jpg — Marcação com cal das baias do galpão B
+  IMG-20260701-WA0008.jpg — Marcação com cal das baias do galpão B
+  IMG-20260701-WA0011.jpg — Execução de armação das brocas
+  IMG-20260701-WA0009.jpg — Finalização de nivelamento do platô do Galpão A
+
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-07-01 06:55 (RDO diario).

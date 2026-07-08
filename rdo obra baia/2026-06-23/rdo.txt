@@ -1,20 +1,13 @@
-RDO - 2026-06-23
+RDO - 23/06/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+• Após análise do levantamento topográfico, foi identificado um desnível significativo entre o terreno das futuras baias e a calçada da Cabana existente.
+• Verificou-se que a execução das fundações no nível atual do terreno resultaria em um piso acabado aproximadamente 35 cm abaixo da cota da Cabana, condição que poderia ocasionar problemas futuros de drenagem e patologias construtivas.
+• Em razão dessa condição, a marcação da obra prevista para o dia 24/06 foi suspensa, sendo necessária a execução do nivelamento dos platôs por parte da Fazenda antes do início das fundações.
+• O Eng. Alan realizou visita técnica para acompanhamento das condições do local e da mobilização dos serviços.
+• O relatório de sondagem do terreno foi encaminhado para análise da equipe técnica da Kabod.
+• Em função das fortes chuvas ocorridas no período, não foi possível a realização dos serviços de terraplenagem, sendo executada apenas a retirada da caixa d'água existente e a remoção parcial do material do morro localizado na área.
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
-
-== EFETIVO / MAO DE OBRA ==
--
-
-== OCORRENCIAS / IMPEDIMENTOS ==
--
-
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-06-29 12:19 (via resumo semanal).

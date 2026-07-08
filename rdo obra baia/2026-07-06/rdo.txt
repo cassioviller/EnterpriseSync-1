@@ -1,21 +1,44 @@
-RDO - 2026-07-06
+RDO - 06/07/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+RDO – 06/07/2026
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
-Avanco conforme MS Project (corte 06/07): fundacao em andamento — escavacao de baldrames e brocas concluidas (Galpao A e B); ferragens de fundacao em ~20-33%.
--
+Efetivo: 05 colaboradores + 02 operadores de maquinário
 
-== EFETIVO / MAO DE OBRA ==
--
+Atividades Executadas
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+• Foi concluída a perfuração das 12 brocas restantes do Galpão A, finalizando a etapa de escavação das fundações profundas dos dois galpões.
+• Foi executada a armação de 24 brocas do Galpão A, preparando a estrutura para a concretagem das fundações.
+• Foi executada a armação de 6 blocos de coroamento do Galpão A, dando continuidade à montagem das armaduras da fundação.
+• Com a conclusão das atividades acima, os Galpões A e B encontram-se preparados para a concretagem das brocas, prevista em cronograma.
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+Observações
+• O Eng. Gustavo reforçou a necessidade de que as chapas-base da estrutura metálica permaneçam embutidas na calçada acabada, evitando que os inserts fiquem aparentes após a execução da obra.
+• Foi conversado com a Eng. Ana Luísa, para reavaliação da metodologia de concretagem das vigas baldrame e das calçadas em etapa única. A proposta foi fundamentada na melhoria da produtividade, eliminação de juntas de concretagem e correto posicionamento dos inserts das chapas-base. Após análise, a Fort manteve a orientação de execução em etapas distintas, permanecendo esta metodologia para continuidade dos serviços.
+• Devido o furo da Broca B1 ter encontrado solo rochoso, projetista estrutural orientou fazer um furo na lateral da broca, afim de verificação de solo rochoso no entorno ou se seria apenas no furo específico da Broca B1.
+Foi executado o furo conforme orientação do projetista e conseguiu perfurar os 3m.
+Será necessário relocar o bloco de coroamento do local e reforçar o aço da borda da viga, conforme orientação dob calculista.
+• Em e-mail enviado pela Fort Gerenciadora, foi constatado a informação da necessidade do nicho em cada baia do lado externo, para fechamento de registro da alimentação de água e rede de esgoto do cocho do bebedouro.
+• Até o presente momento, a aquisição dos materiais do sistema Light Steel Frame permanece pendente em razão da indefinição quanto ao sistema construtivo dos cochos de alimentação das baias. Ao final do dia foi encaminhada ao Eng. Gustavo a proposta técnica e comercial para execução dos cochos em Light Steel Frame, que será analisada para definição da solução a ser adotada.
+
+Próximas Atividades Previstas (07/07)
+• Preparação para concretagem das brocas do Galpão A e B
+• Continuidade da armação das vigas baldrame do Galpão B.
+• Acompanhamento da definição do sistema construtivo dos cochos de alimentação para liberação da fabricação dos painéis em Light Steel Frame. <Mensagem editada>
+
+== FOTOS (ver pasta ./fotos/) ==
+  IMG-20260707-WA0037.jpg — Indicação do nicho pelo GM
+  IMG-20260707-WA0038.jpg — Execução de armação da ferragem das brocas do Galpão A
+  IMG-20260707-WA0041.jpg — Execução de armação da ferragem das brocas do Galpão A
+  IMG-20260707-WA0039.jpg — Finalização de escavação das brocas do Galpão A
+  IMG-20260707-WA0044.jpg — Finalização de escavação das brocas do Galpão A
+  IMG-20260707-WA0043.jpg — Orientação do calculista para deslocamento de bloco de coroamento e broca, devido Broca B1 ter encontrado solo rochoso
+  IMG-20260707-WA0042.jpg — Aumento de 1 ferro N1 na viga onde foi deslocado o bloco de coroamento
+  IMG-20260707-WA0040.jpg — Orientação de furo para verificação se havia solo rochoso em torno do bloco ou apenas no furo
+  IMG-20260707-WA0045.jpg — Execução de armação da ferragem das brocas do Galpão A
+  IMG-20260707-WA0046.jpg — Execução de armação da ferragem das brocas do Galpão A
+  IMG-20260707-WA0047.jpg — Execução de armação da ferragem das brocas do Galpão A
+
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-07-07 11:50 (RDO diario).

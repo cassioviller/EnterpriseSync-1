@@ -1,20 +1,17 @@
-RDO - 2026-06-27
+RDO - 27/06/2026
 Obra: Baias Kabod - Fazenda Santa Monica, Itu
 Cliente: Grupo Monica / Kabod Cabana
 
-Clima / condicoes:
-Responsavel:
+- Equipe de terraplanagem da AJR, contratado por parte da Fazenda, iniciou o nivelamento do plato do lado do galpão B.
+- Foram mantidos os piquetes das 4 extremidades do platô.
+- Equipe trabalhará amanhã (28/6 domingo) para adiantar e tentar finalizar o galpão B.
+- Sr. André, responsável pela empresa AJR da terraplanagem, informou que na segunda, devido o jogo do Brasil, confirmará se a equipe irá trabalhar pelo menos meio período.
 
-== AVANCO FISICO DO DIA ==
-(descreva o que avancou hoje; pode usar % por etapa/tarefa)
--
+Situação Atual da Obra
 
-== EFETIVO / MAO DE OBRA ==
--
+Atualmente a principal atividade crítica para o início das fundações é a conclusão do nivelamento dos platôs, atividade sob responsabilidade da Fazenda. Após a liberação do terreno, a equipe de fundação poderá iniciar imediatamente as atividades programadas.
 
-== OCORRENCIAS / IMPEDIMENTOS ==
--
+Paralelamente, seguem em andamento os levantamentos de materiais e definições executivas necessárias para as próximas etapas da obra.
 
-== FOTOS ==
-(coloque as imagens na pasta ./fotos/ deste mesmo dia)
--
+---
+Fonte: enviado por Eng. Alan Santos no grupo em 2026-06-29 12:19 (via resumo semanal).
