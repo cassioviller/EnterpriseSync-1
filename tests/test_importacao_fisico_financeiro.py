@@ -97,9 +97,9 @@ def test_importa_cria_etapas_tarefas_e_custos():
         admin_id = _novo_admin()
         res = importar_fisico_financeiro(_carregar_json(), admin_id)
         oid = res['obra_id']
-        # Cronograma físico = espelho fiel das 56 tarefas do .mpp, no outline.
+        # Cronograma físico = espelho fiel das 101 tarefas do .mpp (06.07, split A/B), no outline.
         tarefas = TarefaCronograma.query.filter_by(obra_id=oid, admin_id=admin_id).all()
-        assert len(tarefas) == 56
+        assert len(tarefas) == 101
         raizes = [t for t in tarefas if t.tarefa_pai_id is None]
         assert len(raizes) == 1 and 'OBRA' in (raizes[0].nome_tarefa or '').upper()
         nomes = {(t.nome_tarefa or '').upper() for t in tarefas}
@@ -202,8 +202,8 @@ def test_reimport_nao_duplica():
         oid2 = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
         assert oid1 == oid2
         assert Obra.query.filter_by(admin_id=admin_id).count() == 1
-        # cronograma não duplica: continua com as 56 tarefas do .mpp, 1 raiz (OBRA)
-        assert TarefaCronograma.query.filter_by(obra_id=oid1).count() == 56
+        # cronograma não duplica: continua com as 101 tarefas do .mpp, 1 raiz (OBRA)
+        assert TarefaCronograma.query.filter_by(obra_id=oid1).count() == 101
         assert TarefaCronograma.query.filter_by(obra_id=oid1, tarefa_pai_id=None).count() == 1
         assert MedicaoContrato.query.filter_by(obra_id=oid1).count() == 6
 
@@ -582,20 +582,20 @@ def test_import_cria_rdos_da_secao_rdos():
         payload['rdos'] = [
             {"data": "2026-06-22", "clima": "Nublado", "precipitacao": "Sem chuva",
              "comentario": "Topografia.", "mao_de_obra": 0,
-             "apontamentos": [{"tarefa_mpp": 3, "pct": 100}, {"tarefa_mpp": 4, "pct": 50}]},
+             "apontamentos": [{"tarefa_mpp": 2, "pct": 100}, {"tarefa_mpp": 3, "pct": 50}]},
             {"data": "2026-06-27", "clima": "Ensolarado", "precipitacao": "Sem chuva",
              "comentario": "Nivelamento galpão B.", "mao_de_obra": 0,
-             "apontamentos": [{"tarefa_mpp": 3, "pct": 100}, {"tarefa_mpp": 4, "pct": 65},
-                              {"tarefa_mpp": 6, "pct": 20}]},
+             "apontamentos": [{"tarefa_mpp": 2, "pct": 100}, {"tarefa_mpp": 3, "pct": 65},
+                              {"tarefa_mpp": 5, "pct": 20}]},
         ]
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
         assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 2
         por_nome = {t.nome_tarefa: t for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
-        assert float(por_nome['ESTUDO DE SOLO SPT'].percentual_concluido) == 100.0
-        assert float(por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA, ELETRICO, HIDRAULICO'].percentual_concluido) == 65.0
-        assert float(por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'].percentual_concluido) == 20.0
-        assert float(por_nome['MOBILIZAÇÃO EQUIPE'].percentual_concluido) == 0.0
+        assert float(por_nome['Estudo de Solo SPT'].percentual_concluido) == 100.0
+        assert float(por_nome['Execução de projetos LSF, Telhado, Piso, Baldrame, Fundação para Pilares de Madeira'].percentual_concluido) == 65.0
+        assert float(por_nome['Fazenda: Nivelamento dos Platôs'].percentual_concluido) == 20.0
+        assert float(por_nome['Mobilização Equipe'].percentual_concluido) == 0.0
 
 
 def test_apontamento_quantitativo_deriva_percentual_e_acumula():
@@ -613,13 +613,14 @@ def test_apontamento_quantitativo_deriva_percentual_e_acumula():
         payload = json.load(open(caminho, encoding='utf-8'))
         # t15 já tem quantidade_total=48 na fixture; aponta 10 e depois +15
         payload['rdos'] = [
-            {"data": "2026-06-30", "apontamentos": [{"tarefa_mpp": 15, "quantidade": 10}]},
-            {"data": "2026-07-01", "apontamentos": [{"tarefa_mpp": 15, "quantidade": 15}]},
+            {"data": "2026-06-30", "apontamentos": [{"tarefa_mpp": 14, "quantidade": 10}]},
+            {"data": "2026-07-01", "apontamentos": [{"tarefa_mpp": 14, "quantidade": 15}]},
         ]
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        # 2 tarefas homônimas (Galpão A/B); a com quantidade_total é a do apontamento
         t15 = (TarefaCronograma.query
-               .filter_by(obra_id=oid, admin_id=aid,
-                          nome_tarefa='EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO').first())
+               .filter_by(obra_id=oid, admin_id=aid)
+               .filter(TarefaCronograma.quantidade_total.isnot(None)).first())
         assert float(t15.quantidade_total) == 48.0
         # acumulado 25/48 = 52,08%
         assert float(t15.percentual_concluido) == 52.08
@@ -643,14 +644,14 @@ def test_apontamento_percentual_grava_incremento_diario():
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
         payload['rdos'] = [
-            {"data": "2026-06-22", "apontamentos": [{"tarefa_mpp": 4, "pct": 50}]},
-            {"data": "2026-06-23", "apontamentos": [{"tarefa_mpp": 4, "pct": 55}]},
-            {"data": "2026-06-24", "apontamentos": [{"tarefa_mpp": 4, "pct": 65}]},
+            {"data": "2026-06-22", "apontamentos": [{"tarefa_mpp": 3, "pct": 50}]},
+            {"data": "2026-06-23", "apontamentos": [{"tarefa_mpp": 3, "pct": 55}]},
+            {"data": "2026-06-24", "apontamentos": [{"tarefa_mpp": 3, "pct": 65}]},
         ]
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
         t4 = (TarefaCronograma.query
               .filter_by(obra_id=oid, admin_id=aid)
-              .filter(TarefaCronograma.nome_tarefa.like('EXECUÇÃO DE PROJETOS%')).first())
+              .filter(TarefaCronograma.nome_tarefa.like('Execução de projetos%')).first())
         aps = (RDOApontamentoCronograma.query
                .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
                .filter(RDOApontamentoCronograma.tarefa_cronograma_id == t4.id)
@@ -685,10 +686,11 @@ def test_import_rdos_idempotente_e_opcional():
 
 
 def test_fixture_baia_traz_rdos_do_relatorio():
-    """A fixture canônica da Baia contém os RDOs diários do relatório (22–30/06) e o
-    import reproduz o físico acumulado até 30/06: solo 100%, projetos 65%,
-    nivelamento do platô 100% (Galpões A e B concluídos), gabarito 50%, ferragens
-    20,83% (10 de 48 brocas — modo quantitativo)."""
+    """A fixture canônica da Baia contém os RDOs diários do relatório (22/06–06/07) e o
+    import reproduz o físico acumulado até 06/07: solo 100%, projetos 65%,
+    nivelamento do platô 100%, gabarito 100% (Galpões A e B), ferragens 100%
+    (48 de 48 brocas — modo quantitativo), escavação de baldrames e brocas 100%
+    (fundações profundas dos dois galpões concluídas)."""
     import json, os
     from services.importacao_fisico_financeiro import importar_fisico_financeiro
     from models import RDO, TarefaCronograma
@@ -697,17 +699,25 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 9
+        assert len(payload.get('rdos', [])) == 14
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 9
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 14
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
-        assert por_nome['ESTUDO DE SOLO SPT'] == 100.0
-        assert por_nome['EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA, ELETRICO, HIDRAULICO'] == 65.0
-        assert por_nome['FAZENDA: NIVELAMENTO DO PLATÔ'] == 100.0
-        assert por_nome['EXECUÇÃO DE GABARITO'] == 50.0
-        assert por_nome['EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO'] == 20.83  # 10/48
-        assert por_nome['MOBILIZAÇÃO EQUIPE'] == 0.0
+        assert por_nome['Estudo de Solo SPT'] == 100.0
+        assert por_nome['Execução de projetos LSF, Telhado, Piso, Baldrame, Fundação para Pilares de Madeira'] == 65.0
+        assert por_nome['Fazenda: Nivelamento dos Platôs'] == 100.0
+        assert por_nome['Execução de Gabarito'] == 100.0
+        # ferragens das brocas (id14, quantitativo 48/48) concluída até 06/07
+        ferr = (TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid)
+                .filter(TarefaCronograma.quantidade_total.isnot(None)).first())
+        assert round(float(ferr.percentual_concluido), 2) == 100.0  # 48/48
+        # escavações (baldrames e brocas) concluídas nos dois galpões
+        escav = [float(t.percentual_concluido or 0) for t in
+                 TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()
+                 if t.nome_tarefa in ('Escavação De Fundação Para Baldrames', 'Escavação Das Brocas')]
+        assert escav and all(v == 100.0 for v in escav)
+        assert por_nome['Mobilização Equipe'] == 0.0
 
 
 def test_calcular_progresso_rdo_fallback_sem_quantidade_total():
@@ -725,7 +735,7 @@ def test_calcular_progresso_rdo_fallback_sem_quantidade_total():
         oid = importar_fisico_financeiro(json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
         projetos = (TarefaCronograma.query
                     .filter_by(obra_id=oid, admin_id=aid)
-                    .filter(TarefaCronograma.nome_tarefa.like('EXECUÇÃO DE PROJETOS%'))
+                    .filter(TarefaCronograma.nome_tarefa.like('Execução de projetos%'))
                     .first())
         assert projetos is not None and not projetos.quantidade_total
         # antes do 1º apontamento (22/06) → 0
@@ -890,7 +900,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 9
+        assert len(rdo_ids) == 14
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -1032,7 +1042,7 @@ def test_import_apontamento_grava_percentual_planejado():
             json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
         t = (TarefaCronograma.query
              .filter_by(obra_id=oid, admin_id=aid, is_cliente=False,
-                        nome_tarefa='ESTUDO DE SOLO SPT').first())
+                        nome_tarefa='Estudo de Solo SPT').first())
         assert t.data_inicio is not None
         aps = RDOApontamentoCronograma.query.filter_by(
             tarefa_cronograma_id=t.id, admin_id=aid).all()
@@ -1056,8 +1066,8 @@ def test_portal_cronograma_cliente_reflete_progresso_real():
             json.load(open(caminho, encoding='utf-8')), aid)['obra_id']
         interna = (TarefaCronograma.query
                    .filter_by(obra_id=oid, admin_id=aid, is_cliente=False,
-                              nome_tarefa='EXECUÇÃO DE GABARITO').first())
-        assert float(interna.percentual_concluido) == 50.0  # sincronizado do RDO
+                              nome_tarefa='Execução de Gabarito').first())
+        assert float(interna.percentual_concluido) == 100.0  # sincronizado do RDO (gabarito concluído 01/07)
 
         obra = Obra.query.get(oid)
         token = f'tok-cli-{aid}'
@@ -1069,7 +1079,7 @@ def test_portal_cronograma_cliente_reflete_progresso_real():
                                 ordem=1, duracao_dias=1)
         db.session.add(raiz); db.session.flush()
         db.session.add(TarefaCronograma(
-            obra_id=oid, admin_id=aid, nome_tarefa='EXECUÇÃO DE GABARITO',
+            obra_id=oid, admin_id=aid, nome_tarefa='Execução de Gabarito',
             is_cliente=True, percentual_concluido=0.0, ordem=2,
             duracao_dias=1, tarefa_pai_id=raiz.id))
         db.session.commit()
@@ -1078,8 +1088,8 @@ def test_portal_cronograma_cliente_reflete_progresso_real():
         r = c.get(f'/portal/obra/{token}')
         assert r.status_code == 200
         html = r.get_data(as_text=True)
-        assert 'EXECUÇÃO DE GABARITO' in html
-        assert '50.0%' in html   # % real (sincronizado), não 0.0% congelado
+        assert 'Execução de Gabarito' in html
+        assert '100.0%' in html   # % real (sincronizado), não 0.0% congelado
 
 
 def test_reimport_sem_arquivos_preserva_fotos_do_rdo(tmp_path):
@@ -1161,7 +1171,7 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 9
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 14
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 

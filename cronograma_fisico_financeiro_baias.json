@@ -1,1580 +1,2321 @@
 {
-  "_meta": {
-    "gerado_em": "2026-06-26",
-    "fontes": [
-      "CRONOGRAMA OFICIAL.mpp (MS Project — cronograma físico, 57 tarefas)",
-      "Planilha de Custos REV01 / aba Planilha1 (plano de custos por etapa)"
-    ],
-    "descricao": "Cronograma físico-financeiro da obra Baias Kabod. A INTERLIGAÇÃO: cada nó da EAP carrega o CRONOGRAMA (datas, %físico do MS Project — agora com split BAIA 01/02) E o CUSTO (Veks + faturamento direto da Planilha1). Tarefas FAZENDA (nivelamento, drenagem) entram só no físico (sem custo), alocadas a Indiretos. Custos/peso preservados da REV01.",
-    "como_usar": "Importar como fonte do módulo físico-financeiro. O app distribui o custo de cada etapa ao longo das datas da etapa (linear ou por marcos), gera a Curva S física (avanço ponderado por custo) e financeira, o fluxo de caixa (medições - desembolso - abatimento do fat direto) e os indicadores de avanço físico × financeiro (PV/EV/AC, SPI/CPI)."
-  },
-  "obra": {
-    "nome": "Baias Kabod",
-    "codigo_obra": "10",
-    "cliente": "Grupo Mônica / Kabod Cabana",
-    "local": "Fazenda Santa Mônica, Itu/SP",
-    "sistema": "Estrutura metálica + LSF, telha shingle",
-    "endereco": "Fazenda Santa Mônica",
-    "num_baias_contrato": 22,
-    "num_baias_projeto": 24
-  },
-  "contrato": {
-    "valor_venda": 1505613.76,
-    "data_inicio": "2026-06-08",
-    "data_fim_contratual": "2026-10-05",
-    "data_fim_cronograma": "2026-10-08",
-    "prazo_dias": 123,
-    "multa_moratoria": {
-      "pct_dia": 0.03,
-      "teto_pct": 0.3
-    }
-  },
-  "parametros": {
-    "imposto_pct": 0.135,
-    "detalhe_imposto": "ISS 4% + DAS 9,5%",
-    "fat_competencia": "mesma",
-    "regra_fat_direto": "Faturamento direto NÃO é desembolso da Veks. fat_competencia='mesma': abate na PRÓPRIA medição (mesma competência), reduzindo a base de imposto do período a que pertence. Entrada de caixa = medição − fat_direto_do_período − imposto."
-  },
-  "medicoes": [
-    {
-      "nome": "Entrada",
-      "data": "2026-06-12",
-      "pct": 0.2,
-      "recebido_no_mes": "jun",
-      "obs": "5% (12/06) + 15% (16/06) — já recebida"
-    },
-    {
-      "nome": "Medição 1",
-      "data": "2026-07-10",
-      "pct": 0.3,
-      "recebido_no_mes": "jul"
-    },
-    {
-      "nome": "Medição 2",
-      "data": "2026-08-10",
-      "pct": 0.2,
-      "recebido_no_mes": "ago"
-    },
-    {
-      "nome": "Medição 3",
-      "data": "2026-09-10",
-      "pct": 0.2,
-      "recebido_no_mes": "set"
-    },
-    {
-      "nome": "Medição 4",
-      "data": "2026-10-05",
-      "pct": 0.05,
-      "recebido_no_mes": "out",
-      "obs": "entrega"
-    },
-    {
-      "nome": "Medição 5",
-      "data": "2026-11-20",
-      "pct": 0.05,
-      "recebido_no_mes": "nov",
-      "obs": "retenção"
-    }
+ "_meta": {
+  "gerado_em": "2026-06-26",
+  "fontes": [
+   "CRONOGRAMA 06.07.mpp (MS Project — cronograma físico, 101 tarefas c/ split Galpão A/B)",
+   "Planilha de Custos REV01 (custos por etapa — preservados da base de produção)"
   ],
-  "eap": [
-    {
-      "codigo": "PRELIM",
-      "nome": "Preliminares e projetos",
-      "grupo": "Mobilização",
-      "cronograma": {
-        "inicio": "2026-06-08",
-        "fim": "2026-06-30",
-        "pct_fisico": 83.3,
-        "tarefas_mpp": [
-          3,
-          4,
-          5,
-          9
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 51159.69,
-        "fat_direto": 0,
-        "total": 51159.69,
-        "peso_pct": 0.0378
-      },
-      "itens": [
-        {
-          "item": "Custos Externos",
-          "veks": 34219.69,
-          "fat": 0
-        },
-        {
-          "item": "Projetos",
-          "veks": 9500,
-          "fat": 0
-        },
-        {
-          "item": "Topografo",
-          "veks": 3000,
-          "fat": 0
-        },
-        {
-          "item": "Aso Func.",
-          "veks": 3000,
-          "fat": 0
-        },
-        {
-          "item": "Pgr | Pcmso",
-          "veks": 1440,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "FUND",
-      "nome": "Fundação",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-06-29",
-        "fim": "2026-08-07",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          11,
-          12,
-          14,
-          15,
-          17,
-          18,
-          20,
-          21,
-          22,
-          23
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 68100,
-        "fat_direto": 87882.64,
-        "total": 155982.64,
-        "peso_pct": 0.1154
-      },
-      "itens": [
-        {
-          "item": "M.O. Fundação",
-          "veks": 58800,
-          "fat": 0
-        },
-        {
-          "item": "Material Fundação - Ferragem",
-          "veks": 0,
-          "fat": 47882.64
-        },
-        {
-          "item": "Material Fundação",
-          "veks": 0,
-          "fat": 40000
-        },
-        {
-          "item": "Retroescavadeira",
-          "veks": 3800,
-          "fat": 0
-        },
-        {
-          "item": "Munck",
-          "veks": 3000,
-          "fat": 0
-        },
-        {
-          "item": "Perfuratriz",
-          "veks": 2500,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "ESTMET",
-      "nome": "Estrutura metálica (cobertura)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-07-06",
-        "fim": "2026-09-04",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          30,
-          31,
-          32
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 0,
-        "fat_direto": 332892,
-        "total": 332892,
-        "peso_pct": 0.2463
-      },
-      "itens": [
-        {
-          "item": "M.O Estrutura Metálica Cob.",
-          "veks": 0,
-          "fat": 172320
-        },
-        {
-          "item": "Material Estrutura Metálica Cob.",
-          "veks": 0,
-          "fat": 160572
-        }
-      ]
-    },
-    {
-      "codigo": "ESTLSF",
-      "nome": "Estrutura LSF (baias)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-07-06",
-        "fim": "2026-08-14",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          26,
-          27,
-          28
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 15000,
-        "fat_direto": 55000,
-        "total": 70000,
-        "peso_pct": 0.0518
-      },
-      "itens": [
-        {
-          "item": "Aço LSF",
-          "veks": 0,
-          "fat": 55000
-        },
-        {
-          "item": "M.O. Aço LSF",
-          "veks": 15000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "COBERT",
-      "nome": "Cobertura (Shingle)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-09-01",
-        "fim": "2026-09-25",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          33,
-          35
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 75400,
-        "fat_direto": 0,
-        "total": 75400,
-        "peso_pct": 0.0558
-      },
-      "itens": [
-        {
-          "item": "M.O. Shingle",
-          "veks": 75400,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "FECHA",
-      "nome": "Fechamentos (plaqueamento)",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-08-11",
-        "fim": "2026-09-15",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          40,
-          41,
-          42,
-          43,
-          44,
-          45
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 51000,
-        "fat_direto": 75000,
-        "total": 126000,
-        "peso_pct": 0.0932
-      },
-      "itens": [
-        {
-          "item": "Materiais De Placa Cimenticia",
-          "veks": 0,
-          "fat": 75000
-        },
-        {
-          "item": "M.O. Plaqueamento",
-          "veks": 30000,
-          "fat": 0
-        },
-        {
-          "item": "Basecoat",
-          "veks": 21000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "PINT",
-      "nome": "Pintura / Stain",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-08-21",
-        "fim": "2026-10-07",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          37,
-          38,
-          46,
-          47
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 51700,
-        "fat_direto": 0,
-        "total": 51700,
-        "peso_pct": 0.0382
-      },
-      "itens": [
-        {
-          "item": "Pintura Estrutura",
-          "veks": 35200,
-          "fat": 0
-        },
-        {
-          "item": "M.O. Aplicação De Stain",
-          "veks": 15500,
-          "fat": 0
-        },
-        {
-          "item": "Material Stain",
-          "veks": 1000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "MOLEDO",
-      "nome": "Pedra moledo",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-08-10",
-        "fim": "2026-09-01",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          24,
-          48
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 10000,
-        "fat_direto": 0,
-        "total": 10000,
-        "peso_pct": 0.0074
-      },
-      "itens": [
-        {
-          "item": "Estrutura Na Tora Para Pedra Moledo",
-          "veks": 10000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "PORTAO",
-      "nome": "Portões",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-06-29",
-        "fim": "2026-09-30",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          53,
-          54
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 10000,
-        "fat_direto": 0,
-        "total": 10000,
-        "peso_pct": 0.0074
-      },
-      "itens": [
-        {
-          "item": "Carpintaria",
-          "veks": 10000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "ELET",
-      "nome": "Elétrica",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-09-01",
-        "fim": "2026-09-07",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          50,
-          51
-        ],
-        "transversal": false
-      },
-      "custo": {
-        "veks": 7200,
-        "fat_direto": 0,
-        "total": 7200,
-        "peso_pct": 0.0053
-      },
-      "itens": [
-        {
-          "item": "M.O. Elétrica",
-          "veks": 4800,
-          "fat": 0
-        },
-        {
-          "item": "Material Elétrico",
-          "veks": 2400,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "HIDRO",
-      "nome": "Hidráulica",
-      "grupo": "Baias",
-      "cronograma": {
-        "inicio": "2026-07-07",
-        "fim": "2026-07-14",
-        "pct_fisico": 0.0,
-        "tarefas_mpp": [
-          13,
-          16
-        ],
-        "transversal": false,
-        "obs": "sem tarefa própria no MS Project; alocada junto à elétrica"
-      },
-      "custo": {
-        "veks": 4400,
-        "fat_direto": 0,
-        "total": 4400,
-        "peso_pct": 0.0033
-      },
-      "itens": [
-        {
-          "item": "M.O. Hidraulica",
-          "veks": 2400,
-          "fat": 0
-        },
-        {
-          "item": "Material Hidraulico",
-          "veks": 2000,
-          "fat": 0
-        }
-      ]
-    },
-    {
-      "codigo": "INDIRETOS",
-      "nome": "Indiretos / gestão (período)",
-      "grupo": "Transversal",
-      "cronograma": {
-        "inicio": "2026-06-08",
-        "fim": "2026-10-08",
-        "pct_fisico": null,
-        "tarefas_mpp": [],
-        "transversal": true,
-        "tipo": "periodo",
-        "obs": "custo de período — sem tarefa no .mpp; faseado pelos meses da Planilha1 (jun-out). Não vira tarefa no cronograma/RDO/portal."
-      },
-      "custo": {
-        "veks": 457000,
-        "fat_direto": 0,
-        "total": 457000,
-        "peso_pct": 0.3381
-      },
-      "itens": [
-        {
-          "item": "Escritório",
-          "veks": 220000,
-          "fat": 0,
-          "meses_veks": {
-            "2026-06": 44000,
-            "2026-07": 44000,
-            "2026-08": 44000,
-            "2026-09": 44000,
-            "2026-10": 44000
-          }
-        },
-        {
-          "item": "Emprestimo",
-          "veks": 64000,
-          "fat": 0,
-          "meses_veks": {
-            "2026-07": 16000,
-            "2026-08": 16000,
-            "2026-09": 16000,
-            "2026-10": 16000
-          }
-        },
-        {
-          "item": "Miscelanea",
-          "veks": 47000,
-          "fat": 0,
-          "meses_veks": {
-            "2026-06": 7000,
-            "2026-07": 10000,
-            "2026-08": 10000,
-            "2026-09": 10000,
-            "2026-10": 10000
-          }
-        },
-        {
-          "item": "Estadia",
-          "veks": 32500,
-          "fat": 0,
-          "meses_veks": {
-            "2026-06": 10500,
-            "2026-07": 5500,
-            "2026-08": 5500,
-            "2026-09": 5500,
-            "2026-10": 5500
-          }
-        },
-        {
-          "item": "Refeição",
-          "veks": 25000,
-          "fat": 0,
-          "meses_veks": {
-            "2026-06": 3000,
-            "2026-07": 5500,
-            "2026-08": 5500,
-            "2026-09": 5500,
-            "2026-10": 5500
-          }
-        },
-        {
-          "item": "Refeição Equipe Plaq.",
-          "veks": 5500,
-          "fat": 0,
-          "meses_veks": {
-            "2026-07": 5500
-          }
-        },
-        {
-          "item": "Refeição LSF",
-          "veks": 10500,
-          "fat": 0,
-          "meses_veks": {
-            "2026-07": 10500
-          }
-        },
-        {
-          "item": "Encarregado",
-          "veks": 20000,
-          "fat": 0,
-          "meses_veks": {
-            "2026-07": 5000,
-            "2026-08": 5000,
-            "2026-09": 5000,
-            "2026-10": 5000
-          }
-        },
-        {
-          "item": "Carro Alugado",
-          "veks": 12500,
-          "fat": 0,
-          "meses_veks": {
-            "2026-06": 2500,
-            "2026-07": 2500,
-            "2026-08": 2500,
-            "2026-09": 2500,
-            "2026-10": 2500
-          }
-        },
-        {
-          "item": "Refeição Encarregado",
-          "veks": 20000,
-          "fat": 0,
-          "meses_veks": {
-            "2026-07": 5000,
-            "2026-08": 5000,
-            "2026-09": 5000,
-            "2026-10": 5000
-          }
-        }
-      ]
-    }
-  ],
-  "cronograma_tarefas": [
-    {
-      "id": 1,
-      "nivel": 1,
-      "nome": "OBRA ITU - BAIAS FAZENDA SANTA MÔNICA",
-      "inicio": "2026-06-08",
-      "fim": "2026-10-08",
-      "dias": 89.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 2,
-      "nivel": 2,
-      "nome": "MOBILIZAÇÃO",
-      "inicio": "2026-06-08",
-      "fim": "2026-07-01",
-      "dias": 18.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 3,
-      "nivel": 3,
-      "nome": "ESTUDO DE SOLO SPT",
-      "inicio": "2026-06-11",
-      "fim": "2026-06-11",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 4,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE PROJETOS. LSF, TELHADO, PISO, BALDRAME, FUNDAÇÃO PARA PILARES DE MADEIRA, ELETRICO, HIDRAULICO",
-      "inicio": "2026-06-08",
-      "fim": "2026-06-18",
-      "dias": 9.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 5,
-      "nivel": 3,
-      "nome": "MOBILIZAÇÃO EQUIPE",
-      "inicio": "2026-06-29",
-      "fim": "2026-06-29",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 6,
-      "nivel": 3,
-      "nome": "FAZENDA: NIVELAMENTO DO PLATÔ",
-      "inicio": "2026-06-29",
-      "fim": "2026-07-01",
-      "dias": 3.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 7,
-      "nivel": 2,
-      "nome": "BAIAS",
-      "inicio": "2026-06-29",
-      "fim": "2026-10-08",
-      "dias": 74.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 8,
-      "nivel": 3,
-      "nome": "MARCAÇÃO DE OBRA",
-      "inicio": "2026-06-30",
-      "fim": "2026-06-30",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 9,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE GABARITO",
-      "inicio": "2026-06-30",
-      "fim": "2026-06-30",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 10,
-      "nivel": 3,
-      "nome": "FUNDAÇÃO",
-      "inicio": "2026-06-29",
-      "fim": "2026-08-14",
-      "dias": 35.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 11,
-      "nivel": 4,
-      "nome": "ESCAVAÇÃO DE FUNDAÇÃO  PARA BALDRAMES",
-      "inicio": "2026-07-01",
-      "fim": "2026-07-07",
-      "dias": 5.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        8
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 12,
-      "nivel": 4,
-      "nome": "ESCAVAÇÃO DE SAPATAS PARA PILARES",
-      "inicio": "2026-07-02",
-      "fim": "2026-07-07",
-      "dias": 4.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 13,
-      "nivel": 4,
-      "nome": "ESCAVAÇÃO PARA INSTALAÇÃO DA HIDRAULICA",
-      "inicio": "2026-07-07",
-      "fim": "2026-07-07",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 14,
-      "nivel": 4,
-      "nome": "ESCAVAÇÃO DAS BROCAS",
-      "inicio": "2026-07-06",
-      "fim": "2026-07-07",
-      "dias": 2.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 15,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE FERRAGENS PARA FUNDAÇÃO",
-      "inicio": "2026-06-29",
-      "fim": "2026-07-21",
-      "dias": 17.0,
-      "quantidade_total": 48,
-      "unidade": "un",
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 16,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE TUBULAÇÃO HIDRAULICA",
-      "inicio": "2026-07-08",
-      "fim": "2026-07-14",
-      "dias": 5.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        11
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 17,
-      "nivel": 4,
-      "nome": "CONCRETAGEM DAS BROCAS",
-      "inicio": "2026-07-08",
-      "fim": "2026-07-08",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        11
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 18,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE CONCRETAGEM DAS VIGAS",
-      "inicio": "2026-07-22",
-      "fim": "2026-07-22",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        15
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 19,
-      "nivel": 4,
-      "nome": "FAZENDA: ESCAVAÇÃO DAS VALAS DE DRENAGEM E PREENCHIMENTO 1ª CAMADA DE MATERIAL DRENANTE",
-      "inicio": "2026-07-23",
-      "fim": "2026-07-31",
-      "dias": 7.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        18
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 20,
-      "nivel": 4,
-      "nome": "IÇAMENTO DOS PILARES DE MADEIRA",
-      "inicio": "2026-08-03",
-      "fim": "2026-08-03",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        19
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 21,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE CONCRETAGEM DAS CALÇADAS  E SAPATAS PILARES TRONCO",
-      "inicio": "2026-08-03",
-      "fim": "2026-08-04",
-      "dias": 2.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        19
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 22,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE ACABAMENTO DA CALÇADA (À SER DEFINIDO)",
-      "inicio": "2026-08-05",
-      "fim": "2026-08-05",
-      "dias": 1.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        21
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 23,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE BLOCO DE ALVENARIA EM VOLTO DAS TORAS",
-      "inicio": "2026-08-05",
-      "fim": "2026-08-07",
-      "dias": 3.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        21
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 24,
-      "nivel": 4,
-      "nome": "ASSENTAMENTO DE PEDRA MOLEDO",
-      "inicio": "2026-08-10",
-      "fim": "2026-08-14",
-      "dias": 5.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        23
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 25,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE ESTRUTURA EM LSF PARA BAIAS",
-      "inicio": "2026-07-06",
-      "fim": "2026-08-14",
-      "dias": 30.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 26,
-      "nivel": 4,
-      "nome": "PAINELIZAÇÃO DE LSF BAIAS",
-      "inicio": "2026-07-06",
-      "fim": "2026-07-15",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 27,
-      "nivel": 4,
-      "nome": "VERTICALIZAÇÃO DE LSF BAIA 01",
-      "inicio": "2026-08-05",
-      "fim": "2026-08-10",
-      "dias": 4.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        21
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 28,
-      "nivel": 4,
-      "nome": "VERTICALIZAÇÃO DE LSF BAIA 02",
-      "inicio": "2026-08-11",
-      "fim": "2026-08-14",
-      "dias": 4.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        27
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 29,
-      "nivel": 3,
-      "nome": "COBERTURA",
-      "inicio": "2026-07-06",
-      "fim": "2026-10-07",
-      "dias": 68.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 30,
-      "nivel": 4,
-      "nome": "FABRICAÇÃO DE AÇO PARA TELHADO",
-      "inicio": "2026-07-06",
-      "fim": "2026-07-31",
-      "dias": 20.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 31,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE ESTRUTURA METÁLICA PARA TELHADO BAIA 01",
-      "inicio": "2026-08-11",
-      "fim": "2026-08-31",
-      "dias": 15.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        27
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 32,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE ESTRUTURA METÁLICA PARA TELHADO BAIA 02",
-      "inicio": "2026-08-17",
-      "fim": "2026-09-04",
-      "dias": 15.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        28
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 33,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE TELHADO SINGLE BAIA 01",
-      "inicio": "2026-09-01",
-      "fim": "2026-09-21",
-      "dias": 15.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        31
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 34,
-      "nivel": 4,
-      "nome": "FAZENDA: PREENCHIMENTO 2ª CAMADA MATERIAL DRENANTE BAIA 01",
-      "inicio": "2026-09-18",
-      "fim": "2026-09-22",
-      "dias": 3.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 35,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE TELHADO SINGLE BAIA 02",
-      "inicio": "2026-09-07",
-      "fim": "2026-09-25",
-      "dias": 15.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        32
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 36,
-      "nivel": 4,
-      "nome": "FAZENDA: PREENCHIMENTO 2ª CAMADA MATERIAL DRENANTE BAIA 02",
-      "inicio": "2026-09-24",
-      "fim": "2026-09-28",
-      "dias": 3.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 37,
-      "nivel": 4,
-      "nome": "PINTURA DE ESTRUTURA DO TELHADO BAIA 01",
-      "inicio": "2026-09-22",
-      "fim": "2026-10-01",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        33
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 38,
-      "nivel": 4,
-      "nome": "PINTURA DE ESTRUTURA DO TELHADO BAIA 02",
-      "inicio": "2026-09-28",
-      "fim": "2026-10-07",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        35
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 39,
-      "nivel": 3,
-      "nome": "PLAQUEAMENTO",
-      "inicio": "2026-08-11",
-      "fim": "2026-09-15",
-      "dias": 26.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 40,
-      "nivel": 4,
-      "nome": "PLAQUEAMENTO MADEIRA EXTERNA DA BAIA 01",
-      "inicio": "2026-08-11",
-      "fim": "2026-08-20",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        27
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 41,
-      "nivel": 4,
-      "nome": "PLAQUEAMENTO MADEIRA EXTERNA DA BAIA 02",
-      "inicio": "2026-08-17",
-      "fim": "2026-08-26",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        28
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 42,
-      "nivel": 4,
-      "nome": "PLAQUEAMENTO CIMENTICIA INTERNO DA BAIA 01",
-      "inicio": "2026-08-11",
-      "fim": "2026-08-20",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        27
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 43,
-      "nivel": 4,
-      "nome": "PLAQUEAMENTO CIMENTICIA INTERNO DA BAIA 02",
-      "inicio": "2026-08-21",
-      "fim": "2026-09-01",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        42
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 44,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE BASECOAT BAIA 01",
-      "inicio": "2026-08-21",
-      "fim": "2026-09-03",
-      "dias": 10.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        42
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 45,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE BASECOAT BAIA 02",
-      "inicio": "2026-09-02",
-      "fim": "2026-09-15",
-      "dias": 10.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        43
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 46,
-      "nivel": 4,
-      "nome": "PINTURA COM STAIN DAS MADEIRAS PINUS BAIA 01",
-      "inicio": "2026-08-21",
-      "fim": "2026-09-01",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        40
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 47,
-      "nivel": 4,
-      "nome": "PINTURA COM STAIN DAS MADEIRAS PINUS BAIA 02",
-      "inicio": "2026-08-27",
-      "fim": "2026-09-07",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        41
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 48,
-      "nivel": 4,
-      "nome": "APLICAÇÃO DE RESINA SOBRE PEDRA MODELO",
-      "inicio": "2026-08-21",
-      "fim": "2026-09-01",
-      "dias": 8.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        42
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 49,
-      "nivel": 3,
-      "nome": "ELÉTRICA",
-      "inicio": "2026-09-01",
-      "fim": "2026-09-07",
-      "dias": 5.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 50,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE 1 PONTO DE ILUMINAÇÃO POR BAIA",
-      "inicio": "2026-09-01",
-      "fim": "2026-09-07",
-      "dias": 5.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        31
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 51,
-      "nivel": 4,
-      "nome": "EXECUÇÃO DE 1 PONTO DE ELÉTRICA EM CADA PILAR",
-      "inicio": "2026-09-01",
-      "fim": "2026-09-07",
-      "dias": 5.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        31
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 52,
-      "nivel": 3,
-      "nome": "EXECUÇÃO DE PORTÃO DAS BAIAS",
-      "inicio": "2026-06-29",
-      "fim": "2026-09-30",
-      "dias": 68.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": true
-    },
-    {
-      "id": 53,
-      "nivel": 4,
-      "nome": "PRODUÇÃO DOS PORTÕES",
-      "inicio": "2026-06-29",
-      "fim": "2026-07-24",
-      "dias": 20.0,
-      "pct_fisico": 0,
-      "predecessoras": [],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 54,
-      "nivel": 4,
-      "nome": "INSTALAÇÃO DOS PORTÕES",
-      "inicio": "2026-08-27",
-      "fim": "2026-09-30",
-      "dias": 25.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        41
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 55,
-      "nivel": 3,
-      "nome": "LIMPEZA GERAL",
-      "inicio": "2026-10-01",
-      "fim": "2026-10-05",
-      "dias": 3.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        54
-      ],
-      "marco": false,
-      "resumo": false
-    },
-    {
-      "id": 56,
-      "nivel": 3,
-      "nome": "DESMOBILIZAÇÃO",
-      "inicio": "2026-10-06",
-      "fim": "2026-10-08",
-      "dias": 3.0,
-      "pct_fisico": 0,
-      "predecessoras": [
-        55
-      ],
-      "marco": false,
-      "resumo": false
-    }
-  ],
-  "resumo": {
-    "custo_total": 1248160,
-    "desembolso_veks": 824460,
-    "faturamento_direto": 423700,
-    "imposto_estimado": 146058,
-    "lucro_projetado_estimado": 111396,
-    "lucro_pct_estimado": 0.074,
-    "obs": "Lucro é estimativa (venda − custo − imposto). O app recalcula com o modelo de caixa mês a mês a partir do faseamento pelo cronograma. Indiretos rodam 5 meses (jun-out) conforme Planilha1 REV01."
+  "descricao": "Cronograma físico-financeiro da obra Baias Kabod. A INTERLIGAÇÃO: cada nó da EAP carrega o CRONOGRAMA (datas, %físico do MS Project — agora com split BAIA 01/02) E o CUSTO (Veks + faturamento direto da Planilha1). Tarefas FAZENDA (nivelamento, drenagem) entram só no físico (sem custo), alocadas a Indiretos. Custos/peso preservados da REV01.",
+  "como_usar": "Importar como fonte do módulo físico-financeiro. O app distribui o custo de cada etapa ao longo das datas da etapa (linear ou por marcos), gera a Curva S física (avanço ponderado por custo) e financeira, o fluxo de caixa (medições - desembolso - abatimento do fat direto) e os indicadores de avanço físico × financeiro (PV/EV/AC, SPI/CPI).",
+  "cronograma_atualizado_em": "2026-07-08",
+  "obs_cronograma": "Reconstruído do CRONOGRAMA 06.07.mpp no formato do app (1 raiz, nesting por nível; eap mapeia tarefas->etapas de custo). Contrato, custos, RDOs, medições, fluxo e resumo preservados da produção."
+ },
+ "obra": {
+  "nome": "Baias Kabod",
+  "codigo_obra": "10",
+  "cliente": "Grupo Mônica / Kabod Cabana",
+  "local": "Fazenda Santa Mônica, Itu/SP",
+  "sistema": "Estrutura metálica + LSF, telha shingle",
+  "endereco": "Fazenda Santa Mônica",
+  "num_baias_contrato": 22,
+  "num_baias_projeto": 24
+ },
+ "contrato": {
+  "valor_venda": 1505613.76,
+  "data_inicio": "2026-06-08",
+  "data_fim_contratual": "2026-10-05",
+  "data_fim_cronograma": "2026-10-08",
+  "prazo_dias": 123,
+  "multa_moratoria": {
+   "pct_dia": 0.03,
+   "teto_pct": 0.3
+  }
+ },
+ "parametros": {
+  "imposto_pct": 0.135,
+  "detalhe_imposto": "ISS 4% + DAS 9,5%",
+  "fat_competencia": "mesma",
+  "regra_fat_direto": "Faturamento direto NÃO é desembolso da Veks. fat_competencia='mesma': abate na PRÓPRIA medição (mesma competência), reduzindo a base de imposto do período a que pertence. Entrada de caixa = medição − fat_direto_do_período − imposto."
+ },
+ "medicoes": [
+  {
+   "nome": "Entrada",
+   "data": "2026-06-12",
+   "pct": 0.2,
+   "recebido_no_mes": "jun",
+   "obs": "5% (12/06) + 15% (16/06) — já recebida"
   },
-  "fluxo_caixa_mensal": {
-    "_obs": "Forecast mensal da Planilha1 (REV01 nova), modelo CORRIGIDO: imposto incide todo mês inclusive junho/mobilização (base = medição − fat_direto, 13,5%); Indiretos na versão cara (5 meses). lucro em caixa = caixa_final de nov.",
-    "imposto_pct": 0.135,
-    "fat_competencia": "mesma",
-    "meses": [
-      "jun",
-      "jul",
-      "ago",
-      "set",
-      "out",
-      "nov"
-    ],
-    "medicao": [
-      301123,
-      451684,
-      301123,
-      301123,
-      75281,
-      75281
-    ],
-    "entrada_liquida": [
-      260471,
-      181221,
-      127004,
-      127004,
-      65118,
-      65118
-    ],
-    "caixa_inicial": [
-      260471,
-      301343,
-      227007,
-      173151,
-      74728,
-      24976
-    ],
-    "caixa_final": [
-      120121,
-      100003,
-      46147,
-      9611,
-      -40142,
-      24976
-    ],
-    "gasto_veks": [
-      140350,
-      201340,
-      180860,
-      163540,
-      114870,
-      0
-    ],
-    "fat_direto": [
-      0,
-      242180,
-      154297,
-      154297,
-      0,
-      0
-    ],
-    "imposto": [
-      40652,
-      28283,
-      19821,
-      19821,
-      10163,
-      10163
-    ],
-    "custo_veks_por_mes": {
-      "direto": [
-        73350,
-        91840,
-        87360,
-        70040,
-        21370,
-        0
-      ],
-      "indireto": [
-        67000,
-        109500,
-        93500,
-        93500,
-        93500,
-        0
-      ]
-    },
-    "lucro_caixa_final": 24976,
-    "inconsistencia": "RESOLVIDA: Indiretos adotados em 5 meses (versão cara). Imposto de junho corrigido (a planilha original deixava jun=0 e somava +20.000 na mão; o correto é tributar a mobilização → imposto total 128.903, lucro líquido = lucro em caixa = 24.976)."
+  {
+   "nome": "Medição 1",
+   "data": "2026-07-10",
+   "pct": 0.3,
+   "recebido_no_mes": "jul"
   },
-  "rdos": [
+  {
+   "nome": "Medição 2",
+   "data": "2026-08-10",
+   "pct": 0.2,
+   "recebido_no_mes": "ago"
+  },
+  {
+   "nome": "Medição 3",
+   "data": "2026-09-10",
+   "pct": 0.2,
+   "recebido_no_mes": "set"
+  },
+  {
+   "nome": "Medição 4",
+   "data": "2026-10-05",
+   "pct": 0.05,
+   "recebido_no_mes": "out",
+   "obs": "entrega"
+  },
+  {
+   "nome": "Medição 5",
+   "data": "2026-11-20",
+   "pct": 0.05,
+   "recebido_no_mes": "nov",
+   "obs": "retenção"
+  }
+ ],
+ "eap": [
+  {
+   "codigo": "PRELIM",
+   "nome": "Preliminares e projetos",
+   "grupo": "Mobilização",
+   "cronograma": {
+    "inicio": "2026-06-08",
+    "fim": "2026-06-30",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     2,
+     3,
+     4,
+     7
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 51159.69,
+    "fat_direto": 0,
+    "total": 51159.69,
+    "peso_pct": 0.0378
+   },
+   "itens": [
     {
-      "data": "2026-06-22",
-      "clima": "Nublado",
-      "precipitacao": "Sem chuva",
-      "comentario": "Responsabilidades repassadas à equipe da Fazenda para liberação das frentes. Apresentada à Kabod a necessidade de instalações provisórias (container com banheiro). Topógrafo realizou o levantamento dos níveis do terreno; dados enviados para análise da engenharia.",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 50}
-      ]
+     "item": "Custos Externos",
+     "veks": 34219.69,
+     "fat": 0
     },
     {
-      "data": "2026-06-23",
-      "clima": "Chuvoso",
-      "precipitacao": "Chuva forte",
-      "comentario": "Análise topográfica identificou desnível de ~35 cm entre o terreno das baias e a calçada da Cabana; a marcação prevista para 24/06 foi suspensa até o nivelamento dos platôs pela Fazenda. Visita técnica do Eng. Alan. Relatório de sondagem enviado à Kabod. Fortes chuvas impediram a terraplenagem; executadas apenas a retirada da caixa d'água e a remoção parcial do morro.",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 55}
-      ]
+     "item": "Projetos",
+     "veks": 9500,
+     "fat": 0
     },
     {
-      "data": "2026-06-24",
-      "clima": "Chuvoso",
-      "precipitacao": "Chuva forte",
-      "comentario": "Chuvas pela manhã impediram novamente a terraplenagem. Reunião com o Sr. André (AJR): cerca de 2 dias de estiagem necessários para a entrada dos equipamentos. Reunião com a Sra. Ana (Fazenda) sobre a adequação do platô. Solicitados projetos hidráulico/elétrico e detalhes das calçadas. Enviados os projetos de cobertura e pilares metálicos e o cronograma com entrega em 08/10/26. Reforçada a infraestrutura provisória (energia/água por galpão, containers, caçamba, remoção de entulho).",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65}
-      ]
+     "item": "Topografo",
+     "veks": 3000,
+     "fat": 0
     },
     {
-      "data": "2026-06-25",
-      "clima": "Parcialmente nublado",
-      "precipitacao": "Garoa",
-      "comentario": "Redução das chuvas pela manhã. A empresa de terraplenagem confirmou a autorização da Fazenda para o nivelamento dos platôs, tomando como referência a cota da calçada da Cabana existente.",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65}
-      ]
+     "item": "Aso Func.",
+     "veks": 3000,
+     "fat": 0
     },
     {
-      "data": "2026-06-26",
-      "clima": "Nublado",
-      "precipitacao": "Sem chuva",
-      "comentario": "Terreno ainda saturado pelas chuvas acumuladas; possível início do nivelamento em 27/06, conforme as condições climáticas. A equipe de fundação permanece mobilizada, com início previsto em 29/06 (montagem dos gabaritos e recebimento dos materiais de fundação).",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65}
-      ]
-    },
-    {
-      "data": "2026-06-27",
-      "clima": "Ensolarado",
-      "precipitacao": "Sem chuva",
-      "comentario": "A equipe de terraplenagem da AJR (contratada pela Fazenda) iniciou o nivelamento do platô do galpão B. Mantidos os piquetes das 4 extremidades do platô. A equipe trabalhará no domingo (28/06) para tentar concluir o galpão B; segunda-feira depende do jogo do Brasil.",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65},
-        {"tarefa_mpp": 6, "pct": 20}
-      ]
-    },
-    {
-      "data": "2026-06-28",
-      "clima": "Não informado",
-      "precipitacao": "Sem chuva",
-      "comentario": "Prosseguimento da terraplenagem e nivelamento do platô do Galpão B, executados pela AJR (contratada pela Fazenda Santa Mônica). Os serviços visam adequar as cotas do terreno ao nível da calçada existente da Cabana, conforme definido pela equipe técnica, permitindo a correta implantação das futuras fundações das baias. A equipe de engenharia acompanhou a evolução dos serviços e as condições do terreno para posterior liberação das atividades de locação e fundação.",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65},
-        {"tarefa_mpp": 6, "pct": 45}
-      ]
-    },
-    {
-      "data": "2026-06-29",
-      "clima": "Não informado",
-      "precipitacao": "Sem chuva",
-      "comentario": "Concluído o nivelamento do platô do Galpão B. Na sequência, a equipe de terraplenagem iniciou a regularização e o nivelamento do platô do Galpão A, conforme as cotas previamente definidas pela equipe técnica. Realizado o recebimento dos materiais destinados à execução dos gabaritos de locação da obra. Equipe de fundação programada para início amanhã (30/06).",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65},
-        {"tarefa_mpp": 6, "pct": 60}
-      ]
-    },
-    {
-      "data": "2026-06-30",
-      "clima": "Não informado",
-      "precipitacao": "Sem chuva",
-      "comentario": "Atividades executadas:\n• Descarregamento e armazenamento do aço destinado à execução das fundações, garantindo a disponibilidade dos materiais para o avanço das próximas etapas.\n• Implantação do gabarito do Galpão B, definindo os eixos e referências necessários para a locação das fundações.\n• Marcação com cal das vigas baldrame do Galpão B, delimitando as áreas destinadas às escavações das fundações.\n• Iniciada a fabricação das armaduras das brocas — 10 unidades concluídas no período.\n\nObservações:\n• A AJR (contratada pela Fazenda) concluiu o nivelamento do platô do Galpão A, finalizando a adequação dos níveis para a implantação das baias.\n• Posicionada a caixa d'água provisória no local da obra, contribuindo para a estrutura inicial de apoio às atividades de campo.\n• Conforme o Sr. Cido (Fazenda), a instalação dos pontos provisórios de água dos Galpões A e B está prevista para 01/07; o pressurizador da caixa d'água e os pontos provisórios de energia seguem previstos até 03/07.\n• Reforçada junto à Sra. Ana (Fort) a necessidade de substituição da caçamba e a higienização do banheiro químico da obra.\n\nPróximas atividades (01/07):\n• Execução do gabarito do Galpão A.\n• Continuidade da fabricação das armaduras das brocas.\n• Início das escavações das vigas baldrame do Galpão B.\n• Continuidade da mobilização da infraestrutura provisória da obra.",
-      "mao_de_obra": 0,
-      "apontamentos": [
-        {"tarefa_mpp": 3, "pct": 100},
-        {"tarefa_mpp": 4, "pct": 65},
-        {"tarefa_mpp": 6, "pct": 100},
-        {"tarefa_mpp": 9, "pct": 50},
-        {"tarefa_mpp": 15, "quantidade": 10}
-      ],
-      "fotos": [
-        "Descarregamento do aço da fundação",
-        "Armazenamento do aço",
-        "Início de montagem do gabarito do Galpão B",
-        "Nivelamento de platô do Galpão A",
-        "Posicionamento da caixa d'água provisória",
-        "Marcação com cal das baias do Galpão B",
-        "Marcação com cal das baias do Galpão B",
-        "Execução de armação das brocas",
-        "Finalização de nivelamento do platô do Galpão A"
-      ]
+     "item": "Pgr | Pcmso",
+     "veks": 1440,
+     "fat": 0
     }
-  ]
+   ]
+  },
+  {
+   "codigo": "FUND",
+   "nome": "Fundação",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-30",
+    "fim": "2026-08-17",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     11,
+     12,
+     14,
+     15,
+     16,
+     17,
+     18,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     30,
+     55,
+     56,
+     58,
+     59,
+     60,
+     61,
+     62,
+     63,
+     66,
+     67,
+     68,
+     69,
+     70,
+     71,
+     75
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 68100,
+    "fat_direto": 87882.64,
+    "total": 155982.64,
+    "peso_pct": 0.1154
+   },
+   "itens": [
+    {
+     "item": "M.O. Fundação",
+     "veks": 58800,
+     "fat": 0
+    },
+    {
+     "item": "Material Fundação - Ferragem",
+     "veks": 0,
+     "fat": 47882.64
+    },
+    {
+     "item": "Material Fundação",
+     "veks": 0,
+     "fat": 40000
+    },
+    {
+     "item": "Retroescavadeira",
+     "veks": 3800,
+     "fat": 0
+    },
+    {
+     "item": "Munck",
+     "veks": 3000,
+     "fat": 0
+    },
+    {
+     "item": "Perfuratriz",
+     "veks": 2500,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "ESTMET",
+   "nome": "Estrutura metálica (cobertura)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-29",
+    "fim": "2026-09-02",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     29,
+     31,
+     74,
+     76
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 0,
+    "fat_direto": 332892,
+    "total": 332892,
+    "peso_pct": 0.2463
+   },
+   "itens": [
+    {
+     "item": "M.O Estrutura Metálica Cob.",
+     "veks": 0,
+     "fat": 172320
+    },
+    {
+     "item": "Material Estrutura Metálica Cob.",
+     "veks": 0,
+     "fat": 160572
+    }
+   ]
+  },
+  {
+   "codigo": "ESTLSF",
+   "nome": "Estrutura LSF (baias)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-07-13",
+    "fim": "2026-09-08",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     36,
+     37,
+     81,
+     82
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 15000,
+    "fat_direto": 55000,
+    "total": 70000,
+    "peso_pct": 0.0518
+   },
+   "itens": [
+    {
+     "item": "Aço LSF",
+     "veks": 0,
+     "fat": 55000
+    },
+    {
+     "item": "M.O. Aço LSF",
+     "veks": 15000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "COBERT",
+   "nome": "Cobertura (Shingle)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-11",
+    "fim": "2026-09-09",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     32,
+     77
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 75400,
+    "fat_direto": 0,
+    "total": 75400,
+    "peso_pct": 0.0558
+   },
+   "itens": [
+    {
+     "item": "M.O. Shingle",
+     "veks": 75400,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "FECHA",
+   "nome": "Fechamentos (plaqueamento)",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-26",
+    "fim": "2026-10-02",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     42,
+     43,
+     44,
+     87,
+     88,
+     89
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 51000,
+    "fat_direto": 75000,
+    "total": 126000,
+    "peso_pct": 0.0932
+   },
+   "itens": [
+    {
+     "item": "Materiais De Placa Cimenticia",
+     "veks": 0,
+     "fat": 75000
+    },
+    {
+     "item": "M.O. Plaqueamento",
+     "veks": 30000,
+     "fat": 0
+    },
+    {
+     "item": "Basecoat",
+     "veks": 21000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "PINT",
+   "nome": "Pintura / Stain",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-18",
+    "fim": "2026-10-02",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     33,
+     45,
+     78,
+     90
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 51700,
+    "fat_direto": 0,
+    "total": 51700,
+    "peso_pct": 0.0382
+   },
+   "itens": [
+    {
+     "item": "Pintura Estrutura",
+     "veks": 35200,
+     "fat": 0
+    },
+    {
+     "item": "M.O. Aplicação De Stain",
+     "veks": 15500,
+     "fat": 0
+    },
+    {
+     "item": "Material Stain",
+     "veks": 1000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "MOLEDO",
+   "nome": "Pedra moledo",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-07-28",
+    "fim": "2026-09-16",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     27,
+     46,
+     72,
+     91
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 10000,
+    "fat_direto": 0,
+    "total": 10000,
+    "peso_pct": 0.0074
+   },
+   "itens": [
+    {
+     "item": "Estrutura Na Tora Para Pedra Moledo",
+     "veks": 10000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "PORTAO",
+   "nome": "Portões",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-06-29",
+    "fim": "2026-09-18",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     51,
+     52,
+     96,
+     97
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 10000,
+    "fat_direto": 0,
+    "total": 10000,
+    "peso_pct": 0.0074
+   },
+   "itens": [
+    {
+     "item": "Carpintaria",
+     "veks": 10000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "ELET",
+   "nome": "Elétrica",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-08-19",
+    "fim": "2026-09-29",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     40,
+     48,
+     49,
+     85,
+     93,
+     94
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 7200,
+    "fat_direto": 0,
+    "total": 7200,
+    "peso_pct": 0.0053
+   },
+   "itens": [
+    {
+     "item": "M.O. Elétrica",
+     "veks": 4800,
+     "fat": 0
+    },
+    {
+     "item": "Material Elétrico",
+     "veks": 2400,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "HIDRO",
+   "nome": "Hidráulica",
+   "grupo": "Baias",
+   "cronograma": {
+    "inicio": "2026-07-07",
+    "fim": "2026-09-15",
+    "pct_fisico": 0,
+    "tarefas_mpp": [
+     13,
+     39,
+     57,
+     84
+    ],
+    "transversal": false
+   },
+   "custo": {
+    "veks": 4400,
+    "fat_direto": 0,
+    "total": 4400,
+    "peso_pct": 0.0033
+   },
+   "itens": [
+    {
+     "item": "M.O. Hidraulica",
+     "veks": 2400,
+     "fat": 0
+    },
+    {
+     "item": "Material Hidraulico",
+     "veks": 2000,
+     "fat": 0
+    }
+   ]
+  },
+  {
+   "codigo": "INDIRETOS",
+   "nome": "Indiretos / gestão (período)",
+   "grupo": "Transversal",
+   "cronograma": {
+    "inicio": "2026-06-08",
+    "fim": "2026-10-08",
+    "pct_fisico": 0,
+    "tarefas_mpp": [],
+    "transversal": true
+   },
+   "custo": {
+    "veks": 457000,
+    "fat_direto": 0,
+    "total": 457000,
+    "peso_pct": 0.3381
+   },
+   "itens": [
+    {
+     "item": "Escritório",
+     "veks": 220000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 44000,
+      "2026-07": 44000,
+      "2026-08": 44000,
+      "2026-09": 44000,
+      "2026-10": 44000
+     }
+    },
+    {
+     "item": "Emprestimo",
+     "veks": 64000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 16000,
+      "2026-08": 16000,
+      "2026-09": 16000,
+      "2026-10": 16000
+     }
+    },
+    {
+     "item": "Miscelanea",
+     "veks": 47000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 7000,
+      "2026-07": 10000,
+      "2026-08": 10000,
+      "2026-09": 10000,
+      "2026-10": 10000
+     }
+    },
+    {
+     "item": "Estadia",
+     "veks": 32500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 10500,
+      "2026-07": 5500,
+      "2026-08": 5500,
+      "2026-09": 5500,
+      "2026-10": 5500
+     }
+    },
+    {
+     "item": "Refeição",
+     "veks": 25000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 3000,
+      "2026-07": 5500,
+      "2026-08": 5500,
+      "2026-09": 5500,
+      "2026-10": 5500
+     }
+    },
+    {
+     "item": "Refeição Equipe Plaq.",
+     "veks": 5500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 5500
+     }
+    },
+    {
+     "item": "Refeição LSF",
+     "veks": 10500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 10500
+     }
+    },
+    {
+     "item": "Encarregado",
+     "veks": 20000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 5000,
+      "2026-08": 5000,
+      "2026-09": 5000,
+      "2026-10": 5000
+     }
+    },
+    {
+     "item": "Carro Alugado",
+     "veks": 12500,
+     "fat": 0,
+     "meses_veks": {
+      "2026-06": 2500,
+      "2026-07": 2500,
+      "2026-08": 2500,
+      "2026-09": 2500,
+      "2026-10": 2500
+     }
+    },
+    {
+     "item": "Refeição Encarregado",
+     "veks": 20000,
+     "fat": 0,
+     "meses_veks": {
+      "2026-07": 5000,
+      "2026-08": 5000,
+      "2026-09": 5000,
+      "2026-10": 5000
+     }
+    }
+   ]
+  }
+ ],
+ "cronograma_tarefas": [
+  {
+   "id": 0,
+   "nivel": 1,
+   "nome": "Obra Itu - Baias Fazenda Santa Mônica",
+   "inicio": "2026-06-08",
+   "fim": "2026-10-08",
+   "dias": 89.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 1,
+   "nivel": 2,
+   "nome": "Mobilização",
+   "inicio": "2026-06-08",
+   "fim": "2026-07-01",
+   "dias": 18.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 2,
+   "nivel": 3,
+   "nome": "Estudo de Solo SPT",
+   "inicio": "2026-06-11",
+   "fim": "2026-06-11",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 3,
+   "nivel": 3,
+   "nome": "Execução de projetos LSF, Telhado, Piso, Baldrame, Fundação para Pilares de Madeira",
+   "inicio": "2026-06-08",
+   "fim": "2026-06-18",
+   "dias": 9.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 4,
+   "nivel": 3,
+   "nome": "Mobilização Equipe",
+   "inicio": "2026-06-29",
+   "fim": "2026-06-29",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 5,
+   "nivel": 3,
+   "nome": "Fazenda: Nivelamento dos Platôs",
+   "inicio": "2026-06-29",
+   "fim": "2026-07-01",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 6,
+   "nivel": 2,
+   "nome": "Marcação de Obra",
+   "inicio": "2026-06-30",
+   "fim": "2026-06-30",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 7,
+   "nivel": 3,
+   "nome": "Execução de Gabarito",
+   "inicio": "2026-06-30",
+   "fim": "2026-06-30",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 8,
+   "nivel": 2,
+   "nome": "Baias",
+   "inicio": "2026-06-29",
+   "fim": "2026-10-02",
+   "dias": 70.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 9,
+   "nivel": 3,
+   "nome": "Galpão B",
+   "inicio": "2026-06-29",
+   "fim": "2026-09-16",
+   "dias": 58.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 10,
+   "nivel": 4,
+   "nome": "Fundação",
+   "inicio": "2026-06-30",
+   "fim": "2026-07-30",
+   "dias": 23.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 11,
+   "nivel": 5,
+   "nome": "Escavação De Fundação Para Baldrames",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-03",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    6
+   ],
+   "resumo": false
+  },
+  {
+   "id": 12,
+   "nivel": 5,
+   "nome": "Escavação Das Brocas",
+   "inicio": "2026-07-03",
+   "fim": "2026-07-06",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    11
+   ],
+   "resumo": false
+  },
+  {
+   "id": 13,
+   "nivel": 5,
+   "nome": "Escavação Para Instalação Da Hidraulica",
+   "inicio": "2026-07-07",
+   "fim": "2026-07-07",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    12
+   ],
+   "resumo": false
+  },
+  {
+   "id": 14,
+   "nivel": 5,
+   "nome": "Execução de Ferragens Para Fundação",
+   "inicio": "2026-06-30",
+   "fim": "2026-07-13",
+   "dias": 10.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false,
+   "quantidade_total": 48,
+   "unidade": "un"
+  },
+  {
+   "id": 15,
+   "nivel": 5,
+   "nome": "Concretagem das Brocas",
+   "inicio": "2026-07-08",
+   "fim": "2026-07-08",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    12
+   ],
+   "resumo": false
+  },
+  {
+   "id": 16,
+   "nivel": 5,
+   "nome": "Aplicação Concreto Magro nas Vigas Baldrames",
+   "inicio": "2026-07-08",
+   "fim": "2026-07-08",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    15
+   ],
+   "resumo": false
+  },
+  {
+   "id": 17,
+   "nivel": 5,
+   "nome": "Locação das Chapas Base com Topógrafo",
+   "inicio": "2026-07-09",
+   "fim": "2026-07-13",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    16
+   ],
+   "resumo": false
+  },
+  {
+   "id": 18,
+   "nivel": 5,
+   "nome": "Execução de Concretagem Vigas e Travamento das Chapas Base - 1ª Etapa",
+   "inicio": "2026-07-14",
+   "fim": "2026-07-14",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    17
+   ],
+   "resumo": false
+  },
+  {
+   "id": 19,
+   "nivel": 5,
+   "nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante",
+   "inicio": "2026-07-15",
+   "fim": "2026-07-20",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    18
+   ],
+   "resumo": false
+  },
+  {
+   "id": 20,
+   "nivel": 5,
+   "nome": "AJR - Maquinário: Execução De Nivelamento Das Calçadas, Escavação Das Sapatas E Perfuração Dos Troncos",
+   "inicio": "2026-07-17",
+   "fim": "2026-07-20",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    19
+   ],
+   "resumo": false
+  },
+  {
+   "id": 21,
+   "nivel": 5,
+   "nome": "Execução Ferragem Calçada, Travamento Chapas Base",
+   "inicio": "2026-07-16",
+   "fim": "2026-07-21",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    19
+   ],
+   "resumo": false
+  },
+  {
+   "id": 22,
+   "nivel": 5,
+   "nome": "Passagem Conduítes Calçada",
+   "inicio": "2026-07-21",
+   "fim": "2026-07-21",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    21
+   ],
+   "resumo": false
+  },
+  {
+   "id": 23,
+   "nivel": 5,
+   "nome": "Execução de Concretagem das Calçadas e Sapatas Pilares Tronco",
+   "inicio": "2026-07-22",
+   "fim": "2026-07-22",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    21
+   ],
+   "resumo": false
+  },
+  {
+   "id": 24,
+   "nivel": 5,
+   "nome": "Içamento dos Pilares de Madeira",
+   "inicio": "2026-07-22",
+   "fim": "2026-07-22",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    21
+   ],
+   "resumo": false
+  },
+  {
+   "id": 25,
+   "nivel": 5,
+   "nome": "Execução de Acabamento da Calçada (À ser definido)",
+   "inicio": "2026-07-22",
+   "fim": "2026-07-22",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    23
+   ],
+   "resumo": false
+  },
+  {
+   "id": 26,
+   "nivel": 5,
+   "nome": "Execução Bloco de Alvenaria em volto das Toras",
+   "inicio": "2026-07-23",
+   "fim": "2026-07-27",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    24
+   ],
+   "resumo": false
+  },
+  {
+   "id": 27,
+   "nivel": 5,
+   "nome": "Assentamento Pedra Moledo",
+   "inicio": "2026-07-28",
+   "fim": "2026-07-30",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    26
+   ],
+   "resumo": false
+  },
+  {
+   "id": 28,
+   "nivel": 4,
+   "nome": "Cobertura",
+   "inicio": "2026-06-29",
+   "fim": "2026-08-28",
+   "dias": 45.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 29,
+   "nivel": 5,
+   "nome": "Fabricação de Aço Para Telhado",
+   "inicio": "2026-06-29",
+   "fim": "2026-08-05",
+   "dias": 28.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 30,
+   "nivel": 5,
+   "nome": "Marcação dos Pilares com Topógrafo",
+   "inicio": "2026-07-21",
+   "fim": "2026-07-22",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    23
+   ],
+   "resumo": false
+  },
+  {
+   "id": 31,
+   "nivel": 5,
+   "nome": "Execução de Estrutura Metálica para Telhado",
+   "inicio": "2026-08-06",
+   "fim": "2026-08-19",
+   "dias": 10.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    29
+   ],
+   "resumo": false
+  },
+  {
+   "id": 32,
+   "nivel": 5,
+   "nome": "Execução Telhado Shingle",
+   "inicio": "2026-08-11",
+   "fim": "2026-08-26",
+   "dias": 12.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    31
+   ],
+   "resumo": false
+  },
+  {
+   "id": 33,
+   "nivel": 5,
+   "nome": "Pintura Estrutura do Telhado",
+   "inicio": "2026-08-18",
+   "fim": "2026-08-27",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    32
+   ],
+   "resumo": false
+  },
+  {
+   "id": 34,
+   "nivel": 5,
+   "nome": "Fazenda: Preenchimento 2ª Camada Material Drenante",
+   "inicio": "2026-08-26",
+   "fim": "2026-08-28",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    33
+   ],
+   "resumo": false
+  },
+  {
+   "id": 35,
+   "nivel": 4,
+   "nome": "Execução Estrutura Em LSF para Baias",
+   "inicio": "2026-07-13",
+   "fim": "2026-08-18",
+   "dias": 27.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 36,
+   "nivel": 5,
+   "nome": "Painelização de LSF",
+   "inicio": "2026-07-13",
+   "fim": "2026-07-22",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 37,
+   "nivel": 5,
+   "nome": "Verticalização de LSF",
+   "inicio": "2026-08-13",
+   "fim": "2026-08-18",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    31
+   ],
+   "resumo": false
+  },
+  {
+   "id": 38,
+   "nivel": 4,
+   "nome": "Montagem Infra Elétrica e Hidráulica",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-25",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 39,
+   "nivel": 5,
+   "nome": "Instalação Infra Hidráulica",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-25",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    37
+   ],
+   "resumo": false
+  },
+  {
+   "id": 40,
+   "nivel": 5,
+   "nome": "Instalação Infra Elétrica",
+   "inicio": "2026-08-19",
+   "fim": "2026-08-25",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    37
+   ],
+   "resumo": false
+  },
+  {
+   "id": 41,
+   "nivel": 4,
+   "nome": "Plaqueamento",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-16",
+   "dias": 16.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 42,
+   "nivel": 5,
+   "nome": "Plaqueamento Madeira Externa",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-04",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    39
+   ],
+   "resumo": false
+  },
+  {
+   "id": 43,
+   "nivel": 5,
+   "nome": "Plaqueamento Cimenticia Interno",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-04",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    39
+   ],
+   "resumo": false
+  },
+  {
+   "id": 44,
+   "nivel": 5,
+   "nome": "Aplicação Basecoat",
+   "inicio": "2026-09-02",
+   "fim": "2026-09-15",
+   "dias": 10.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    43
+   ],
+   "resumo": false
+  },
+  {
+   "id": 45,
+   "nivel": 5,
+   "nome": "Pintura com Stain das Madeiras Pinus",
+   "inicio": "2026-09-02",
+   "fim": "2026-09-11",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    42
+   ],
+   "resumo": false
+  },
+  {
+   "id": 46,
+   "nivel": 5,
+   "nome": "Aplicação de Resina Sobre Pedra Moledo",
+   "inicio": "2026-09-07",
+   "fim": "2026-09-16",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    43
+   ],
+   "resumo": false
+  },
+  {
+   "id": 47,
+   "nivel": 4,
+   "nome": "Elétrica",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-08",
+   "dias": 10.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 48,
+   "nivel": 5,
+   "nome": "Execução 1 Ponto de Iluminação por Baia",
+   "inicio": "2026-08-26",
+   "fim": "2026-09-01",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    40
+   ],
+   "resumo": false
+  },
+  {
+   "id": 49,
+   "nivel": 5,
+   "nome": "Execução 1 Ponto de Elétrica em Cada Pilar",
+   "inicio": "2026-09-02",
+   "fim": "2026-09-08",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    48
+   ],
+   "resumo": false
+  },
+  {
+   "id": 50,
+   "nivel": 4,
+   "nome": "Execução Portão das Baias",
+   "inicio": "2026-06-29",
+   "fim": "2026-09-04",
+   "dias": 50.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 51,
+   "nivel": 5,
+   "nome": "Produção dos Portões",
+   "inicio": "2026-06-29",
+   "fim": "2026-07-24",
+   "dias": 20.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 52,
+   "nivel": 5,
+   "nome": "Instalação dos Portões",
+   "inicio": "2026-08-20",
+   "fim": "2026-09-04",
+   "dias": 12.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    31
+   ],
+   "resumo": false
+  },
+  {
+   "id": 53,
+   "nivel": 3,
+   "nome": "Galpão A",
+   "inicio": "2026-06-29",
+   "fim": "2026-10-02",
+   "dias": 70.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 54,
+   "nivel": 4,
+   "nome": "Fundação",
+   "inicio": "2026-06-30",
+   "fim": "2026-08-20",
+   "dias": 38.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 55,
+   "nivel": 5,
+   "nome": "Escavação De Fundação Para Baldrames",
+   "inicio": "2026-07-01",
+   "fim": "2026-07-03",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 56,
+   "nivel": 5,
+   "nome": "Escavação Das Brocas",
+   "inicio": "2026-07-03",
+   "fim": "2026-07-06",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    55
+   ],
+   "resumo": false
+  },
+  {
+   "id": 57,
+   "nivel": 5,
+   "nome": "Escavação Para Instalação Da Hidraulica",
+   "inicio": "2026-07-07",
+   "fim": "2026-07-07",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    56
+   ],
+   "resumo": false
+  },
+  {
+   "id": 58,
+   "nivel": 5,
+   "nome": "Execução de Ferragens para Brocas",
+   "inicio": "2026-07-06",
+   "fim": "2026-07-07",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 59,
+   "nivel": 5,
+   "nome": "Execução de Ferragens Para Fundação",
+   "inicio": "2026-06-30",
+   "fim": "2026-07-28",
+   "dias": 6.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    23
+   ],
+   "resumo": false
+  },
+  {
+   "id": 60,
+   "nivel": 5,
+   "nome": "Concretagem das Brocas",
+   "inicio": "2026-07-08",
+   "fim": "2026-07-08",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    15
+   ],
+   "resumo": false
+  },
+  {
+   "id": 61,
+   "nivel": 5,
+   "nome": "Aplicação Concreto Magro nas Vigas Baldrames",
+   "inicio": "2026-07-08",
+   "fim": "2026-07-08",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    60
+   ],
+   "resumo": false
+  },
+  {
+   "id": 62,
+   "nivel": 5,
+   "nome": "Locação das Chapas Base com Topógrafo",
+   "inicio": "2026-07-29",
+   "fim": "2026-07-31",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    59
+   ],
+   "resumo": false
+  },
+  {
+   "id": 63,
+   "nivel": 5,
+   "nome": "Execução de Concretagem Vigas e Travamento das Chapas Base - 1ª Etapa",
+   "inicio": "2026-08-04",
+   "fim": "2026-08-04",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    62
+   ],
+   "resumo": false
+  },
+  {
+   "id": 64,
+   "nivel": 5,
+   "nome": "Fazenda: Escavação das Valas de Drenagem e Preenchimento 1ª Camada de Material Drenante",
+   "inicio": "2026-08-05",
+   "fim": "2026-08-10",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    63
+   ],
+   "resumo": false
+  },
+  {
+   "id": 65,
+   "nivel": 5,
+   "nome": "Ajr - Maquinário: Execução De Nivelamento Das Calçadas, Escavação Das Sapatas E Perfuração Dos Troncos",
+   "inicio": "2026-08-07",
+   "fim": "2026-08-10",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    64
+   ],
+   "resumo": false
+  },
+  {
+   "id": 66,
+   "nivel": 5,
+   "nome": "Execução Ferragem Calçada, Travamento Chapas Base",
+   "inicio": "2026-08-06",
+   "fim": "2026-08-11",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    64
+   ],
+   "resumo": false
+  },
+  {
+   "id": 67,
+   "nivel": 5,
+   "nome": "Passagem Conduítes Calçada",
+   "inicio": "2026-08-11",
+   "fim": "2026-08-11",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    66
+   ],
+   "resumo": false
+  },
+  {
+   "id": 68,
+   "nivel": 5,
+   "nome": "Execução de Concretagem das Calçadas e Sapatas Pilares Tronco",
+   "inicio": "2026-08-12",
+   "fim": "2026-08-12",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    66
+   ],
+   "resumo": false
+  },
+  {
+   "id": 69,
+   "nivel": 5,
+   "nome": "Içamento dos Pilares de Madeira",
+   "inicio": "2026-08-12",
+   "fim": "2026-08-12",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    66
+   ],
+   "resumo": false
+  },
+  {
+   "id": 70,
+   "nivel": 5,
+   "nome": "Execução de Acabamento da Calçada (À ser definido)",
+   "inicio": "2026-07-22",
+   "fim": "2026-07-22",
+   "dias": 1.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    68
+   ],
+   "resumo": false
+  },
+  {
+   "id": 71,
+   "nivel": 5,
+   "nome": "Execução Bloco de Alvenaria em volto das Toras",
+   "inicio": "2026-08-13",
+   "fim": "2026-08-17",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    69
+   ],
+   "resumo": false
+  },
+  {
+   "id": 72,
+   "nivel": 5,
+   "nome": "Assentamento Pedra Moledo",
+   "inicio": "2026-08-18",
+   "fim": "2026-08-20",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    71
+   ],
+   "resumo": false
+  },
+  {
+   "id": 73,
+   "nivel": 4,
+   "nome": "Cobertura",
+   "inicio": "2026-06-29",
+   "fim": "2026-09-11",
+   "dias": 55.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 74,
+   "nivel": 5,
+   "nome": "Fabricação de Aço Para Telhado",
+   "inicio": "2026-06-29",
+   "fim": "2026-08-05",
+   "dias": 28.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 75,
+   "nivel": 5,
+   "nome": "Marcação dos Pilares com Topógrafo",
+   "inicio": "2026-07-21",
+   "fim": "2026-07-22",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    68
+   ],
+   "resumo": false
+  },
+  {
+   "id": 76,
+   "nivel": 5,
+   "nome": "Execução de Estrutura Metálica para Telhado",
+   "inicio": "2026-08-20",
+   "fim": "2026-09-02",
+   "dias": 10.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    31
+   ],
+   "resumo": false
+  },
+  {
+   "id": 77,
+   "nivel": 5,
+   "nome": "Execução Telhado Shingle",
+   "inicio": "2026-08-25",
+   "fim": "2026-09-09",
+   "dias": 12.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    76
+   ],
+   "resumo": false
+  },
+  {
+   "id": 78,
+   "nivel": 5,
+   "nome": "Pintura Estrutura do Telhado",
+   "inicio": "2026-09-01",
+   "fim": "2026-09-10",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    77
+   ],
+   "resumo": false
+  },
+  {
+   "id": 79,
+   "nivel": 5,
+   "nome": "Fazenda: Preenchimento 2ª Camada Material Drenante",
+   "inicio": "2026-09-09",
+   "fim": "2026-09-11",
+   "dias": 3.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    78
+   ],
+   "resumo": false
+  },
+  {
+   "id": 80,
+   "nivel": 4,
+   "nome": "Execução Estrutura Em LSF para Baias",
+   "inicio": "2026-07-13",
+   "fim": "2026-09-08",
+   "dias": 42.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 81,
+   "nivel": 5,
+   "nome": "Painelização de LSF",
+   "inicio": "2026-07-13",
+   "fim": "2026-07-22",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 82,
+   "nivel": 5,
+   "nome": "Verticalização de LSF",
+   "inicio": "2026-09-03",
+   "fim": "2026-09-08",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    76
+   ],
+   "resumo": false
+  },
+  {
+   "id": 83,
+   "nivel": 4,
+   "nome": "Montagem Infra Elétrica e Hidráulica",
+   "inicio": "2026-09-09",
+   "fim": "2026-09-15",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 84,
+   "nivel": 5,
+   "nome": "Instalação Infra Hidráulica",
+   "inicio": "2026-09-09",
+   "fim": "2026-09-15",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    82
+   ],
+   "resumo": false
+  },
+  {
+   "id": 85,
+   "nivel": 5,
+   "nome": "Instalação Infra Elétrica",
+   "inicio": "2026-09-09",
+   "fim": "2026-09-15",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    82
+   ],
+   "resumo": false
+  },
+  {
+   "id": 86,
+   "nivel": 4,
+   "nome": "Plaqueamento",
+   "inicio": "2026-08-21",
+   "fim": "2026-10-02",
+   "dias": 31.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 87,
+   "nivel": 5,
+   "nome": "Plaqueamento Madeira Externa",
+   "inicio": "2026-09-16",
+   "fim": "2026-09-25",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    85
+   ],
+   "resumo": false
+  },
+  {
+   "id": 88,
+   "nivel": 5,
+   "nome": "Plaqueamento Cimenticia Interno",
+   "inicio": "2026-09-16",
+   "fim": "2026-09-25",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    85
+   ],
+   "resumo": false
+  },
+  {
+   "id": 89,
+   "nivel": 5,
+   "nome": "Aplicação Basecoat",
+   "inicio": "2026-09-23",
+   "fim": "2026-10-02",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    88
+   ],
+   "resumo": false
+  },
+  {
+   "id": 90,
+   "nivel": 5,
+   "nome": "Pintura com Stain das Madeiras Pinus",
+   "inicio": "2026-09-23",
+   "fim": "2026-10-02",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    87
+   ],
+   "resumo": false
+  },
+  {
+   "id": 91,
+   "nivel": 5,
+   "nome": "Aplicação de Resina Sobre Pedra Moledo",
+   "inicio": "2026-08-21",
+   "fim": "2026-09-01",
+   "dias": 8.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    72
+   ],
+   "resumo": false
+  },
+  {
+   "id": 92,
+   "nivel": 4,
+   "nome": "Elétrica",
+   "inicio": "2026-09-16",
+   "fim": "2026-09-29",
+   "dias": 10.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 93,
+   "nivel": 5,
+   "nome": "Execução 1 Ponto de Iluminação por Baia",
+   "inicio": "2026-09-16",
+   "fim": "2026-09-22",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    85
+   ],
+   "resumo": false
+  },
+  {
+   "id": 94,
+   "nivel": 5,
+   "nome": "Execução 1 Ponto de Elétrica em Cada Pilar",
+   "inicio": "2026-09-23",
+   "fim": "2026-09-29",
+   "dias": 5.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    93
+   ],
+   "resumo": false
+  },
+  {
+   "id": 95,
+   "nivel": 4,
+   "nome": "Execução Portão das Baias",
+   "inicio": "2026-06-29",
+   "fim": "2026-09-18",
+   "dias": 60.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 96,
+   "nivel": 5,
+   "nome": "Produção dos Portões",
+   "inicio": "2026-06-29",
+   "fim": "2026-07-24",
+   "dias": 20.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": false
+  },
+  {
+   "id": 97,
+   "nivel": 5,
+   "nome": "Instalação dos Portões",
+   "inicio": "2026-09-03",
+   "fim": "2026-09-18",
+   "dias": 12.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    76
+   ],
+   "resumo": false
+  },
+  {
+   "id": 98,
+   "nivel": 2,
+   "nome": "Desmobilização",
+   "inicio": "2026-10-05",
+   "fim": "2026-10-08",
+   "dias": 4.0,
+   "pct_fisico": 0,
+   "predecessoras": [],
+   "resumo": true
+  },
+  {
+   "id": 99,
+   "nivel": 3,
+   "nome": "Limpeza Geral",
+   "inicio": "2026-10-05",
+   "fim": "2026-10-06",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    53
+   ],
+   "resumo": false
+  },
+  {
+   "id": 100,
+   "nivel": 3,
+   "nome": "Desmobilização",
+   "inicio": "2026-10-07",
+   "fim": "2026-10-08",
+   "dias": 2.0,
+   "pct_fisico": 0,
+   "predecessoras": [
+    99
+   ],
+   "resumo": false
+  }
+ ],
+ "resumo": {
+  "custo_total": 1248160,
+  "desembolso_veks": 824460,
+  "faturamento_direto": 423700,
+  "imposto_estimado": 146058,
+  "lucro_projetado_estimado": 111396,
+  "lucro_pct_estimado": 0.074,
+  "obs": "Lucro é estimativa (venda − custo − imposto). O app recalcula com o modelo de caixa mês a mês a partir do faseamento pelo cronograma. Indiretos rodam 5 meses (jun-out) conforme Planilha1 REV01."
+ },
+ "fluxo_caixa_mensal": {
+  "_obs": "Forecast mensal da Planilha1 (REV01 nova), modelo CORRIGIDO: imposto incide todo mês inclusive junho/mobilização (base = medição − fat_direto, 13,5%); Indiretos na versão cara (5 meses). lucro em caixa = caixa_final de nov.",
+  "imposto_pct": 0.135,
+  "fat_competencia": "mesma",
+  "meses": [
+   "jun",
+   "jul",
+   "ago",
+   "set",
+   "out",
+   "nov"
+  ],
+  "medicao": [
+   301123,
+   451684,
+   301123,
+   301123,
+   75281,
+   75281
+  ],
+  "entrada_liquida": [
+   260471,
+   181221,
+   127004,
+   127004,
+   65118,
+   65118
+  ],
+  "caixa_inicial": [
+   260471,
+   301343,
+   227007,
+   173151,
+   74728,
+   24976
+  ],
+  "caixa_final": [
+   120121,
+   100003,
+   46147,
+   9611,
+   -40142,
+   24976
+  ],
+  "gasto_veks": [
+   140350,
+   201340,
+   180860,
+   163540,
+   114870,
+   0
+  ],
+  "fat_direto": [
+   0,
+   242180,
+   154297,
+   154297,
+   0,
+   0
+  ],
+  "imposto": [
+   40652,
+   28283,
+   19821,
+   19821,
+   10163,
+   10163
+  ],
+  "custo_veks_por_mes": {
+   "direto": [
+    73350,
+    91840,
+    87360,
+    70040,
+    21370,
+    0
+   ],
+   "indireto": [
+    67000,
+    109500,
+    93500,
+    93500,
+    93500,
+    0
+   ]
+  },
+  "lucro_caixa_final": 24976,
+  "inconsistencia": "RESOLVIDA: Indiretos adotados em 5 meses (versão cara). Imposto de junho corrigido (a planilha original deixava jun=0 e somava +20.000 na mão; o correto é tributar a mobilização → imposto total 128.903, lucro líquido = lucro em caixa = 24.976)."
+ },
+ "rdos": [
+  {
+   "data": "2026-06-22",
+   "clima": "Nublado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Responsabilidades repassadas à equipe da Fazenda para liberação das frentes. Apresentada à Kabod a necessidade de instalações provisórias (container com banheiro). Topógrafo realizou o levantamento dos níveis do terreno; dados enviados para análise da engenharia.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 50
+    }
+   ]
+  },
+  {
+   "data": "2026-06-23",
+   "clima": "Chuvoso",
+   "precipitacao": "Chuva forte",
+   "comentario": "Análise topográfica identificou desnível de ~35 cm entre o terreno das baias e a calçada da Cabana; a marcação prevista para 24/06 foi suspensa até o nivelamento dos platôs pela Fazenda. Visita técnica do Eng. Alan. Relatório de sondagem enviado à Kabod. Fortes chuvas impediram a terraplenagem; executadas apenas a retirada da caixa d'água e a remoção parcial do morro.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 55
+    }
+   ]
+  },
+  {
+   "data": "2026-06-24",
+   "clima": "Chuvoso",
+   "precipitacao": "Chuva forte",
+   "comentario": "Chuvas pela manhã impediram novamente a terraplenagem. Reunião com o Sr. André (AJR): cerca de 2 dias de estiagem necessários para a entrada dos equipamentos. Reunião com a Sra. Ana (Fazenda) sobre a adequação do platô. Solicitados projetos hidráulico/elétrico e detalhes das calçadas. Enviados os projetos de cobertura e pilares metálicos e o cronograma com entrega em 08/10/26. Reforçada a infraestrutura provisória (energia/água por galpão, containers, caçamba, remoção de entulho).",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    }
+   ]
+  },
+  {
+   "data": "2026-06-25",
+   "clima": "Parcialmente nublado",
+   "precipitacao": "Garoa",
+   "comentario": "Redução das chuvas pela manhã. A empresa de terraplenagem confirmou a autorização da Fazenda para o nivelamento dos platôs, tomando como referência a cota da calçada da Cabana existente.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    }
+   ]
+  },
+  {
+   "data": "2026-06-26",
+   "clima": "Nublado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Terreno ainda saturado pelas chuvas acumuladas; possível início do nivelamento em 27/06, conforme as condições climáticas. A equipe de fundação permanece mobilizada, com início previsto em 29/06 (montagem dos gabaritos e recebimento dos materiais de fundação).",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    }
+   ]
+  },
+  {
+   "data": "2026-06-27",
+   "clima": "Ensolarado",
+   "precipitacao": "Sem chuva",
+   "comentario": "A equipe de terraplenagem da AJR (contratada pela Fazenda) iniciou o nivelamento do platô do galpão B. Mantidos os piquetes das 4 extremidades do platô. A equipe trabalhará no domingo (28/06) para tentar concluir o galpão B; segunda-feira depende do jogo do Brasil.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    },
+    {
+     "tarefa_mpp": 5,
+     "pct": 20
+    }
+   ]
+  },
+  {
+   "data": "2026-06-28",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Prosseguimento da terraplenagem e nivelamento do platô do Galpão B, executados pela AJR (contratada pela Fazenda Santa Mônica). Os serviços visam adequar as cotas do terreno ao nível da calçada existente da Cabana, conforme definido pela equipe técnica, permitindo a correta implantação das futuras fundações das baias. A equipe de engenharia acompanhou a evolução dos serviços e as condições do terreno para posterior liberação das atividades de locação e fundação.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    },
+    {
+     "tarefa_mpp": 5,
+     "pct": 45
+    }
+   ]
+  },
+  {
+   "data": "2026-06-29",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Concluído o nivelamento do platô do Galpão B. Na sequência, a equipe de terraplenagem iniciou a regularização e o nivelamento do platô do Galpão A, conforme as cotas previamente definidas pela equipe técnica. Realizado o recebimento dos materiais destinados à execução dos gabaritos de locação da obra. Equipe de fundação programada para início amanhã (30/06).",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    },
+    {
+     "tarefa_mpp": 5,
+     "pct": 60
+    }
+   ]
+  },
+  {
+   "data": "2026-06-30",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Atividades executadas:\n• Descarregamento e armazenamento do aço destinado à execução das fundações, garantindo a disponibilidade dos materiais para o avanço das próximas etapas.\n• Implantação do gabarito do Galpão B, definindo os eixos e referências necessários para a locação das fundações.\n• Marcação com cal das vigas baldrame do Galpão B, delimitando as áreas destinadas às escavações das fundações.\n• Iniciada a fabricação das armaduras das brocas — 10 unidades concluídas no período.\n\nObservações:\n• A AJR (contratada pela Fazenda) concluiu o nivelamento do platô do Galpão A, finalizando a adequação dos níveis para a implantação das baias.\n• Posicionada a caixa d'água provisória no local da obra, contribuindo para a estrutura inicial de apoio às atividades de campo.\n• Conforme o Sr. Cido (Fazenda), a instalação dos pontos provisórios de água dos Galpões A e B está prevista para 01/07; o pressurizador da caixa d'água e os pontos provisórios de energia seguem previstos até 03/07.\n• Reforçada junto à Sra. Ana (Fort) a necessidade de substituição da caçamba e a higienização do banheiro químico da obra.\n\nPróximas atividades (01/07):\n• Execução do gabarito do Galpão A.\n• Continuidade da fabricação das armaduras das brocas.\n• Início das escavações das vigas baldrame do Galpão B.\n• Continuidade da mobilização da infraestrutura provisória da obra.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 2,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 3,
+     "pct": 65
+    },
+    {
+     "tarefa_mpp": 5,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 7,
+     "pct": 50
+    },
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 10
+    }
+   ],
+   "fotos": [
+    "Descarregamento do aço da fundação",
+    "Armazenamento do aço",
+    "Início de montagem do gabarito do Galpão B",
+    "Nivelamento de platô do Galpão A",
+    "Posicionamento da caixa d'água provisória",
+    "Marcação com cal das baias do Galpão B",
+    "Marcação com cal das baias do Galpão B",
+    "Execução de armação das brocas",
+    "Finalização de nivelamento do platô do Galpão A"
+   ]
+  },
+  {
+   "data": "2026-07-01",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Efetivo: 04 colaboradores.\n\nAtividades executadas:\n• Iniciada a escavação das vigas baldrame do Galpão B.\n• Implantação do gabarito do Galpão A (marcação de obra concluída nos dois galpões).\n• Marcação com cal das vigas baldrame do Galpão A.\n• Armação de 14 brocas do Galpão B (24 brocas do galpão armadas no acumulado).\n\nObservações:\n• Aguardando entrega dos vergalhões Ø8 mm (12 m), prevista p/ 02/07.\n• Escavação paralisada 12h30–14h30 a pedido da Fort para alinhamento do procedimento executivo.\n\nPróximas atividades (02/07): finalizar baldrames do Galpão B e iniciar os do Galpão A.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 7,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 11,
+     "pct": 50
+    },
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 14
+    }
+   ],
+   "fotos": [
+    "Início Escavação das vigas baldrames galpão B",
+    "Execução de montagem de armação das brocas",
+    "Execução de montagem de armação das brocas",
+    "Escavação das vigas baldrames do galpão B",
+    "Escavação das vigas baldrames do galpão B",
+    "Escavação das vigas baldrames do galpão B",
+    "Todas as armações de broca do galpão B foram executadas"
+   ]
+  },
+  {
+   "data": "2026-07-02",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Efetivo: 03 colaboradores.\n\nAtividades executadas:\n• Concluída a escavação das valas das vigas baldrame do Galpão B.\n• Perfuração de 10 brocas do Galpão B.\n• Armação de 24 blocos de coroamento.\n\nObservações:\n• Fundação seguindo a metodologia executiva de projeto; projetos plotados na obra.\n\nPróximas atividades (03/07): continuidade das perfurações e início da armação das vigas baldrame.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 11,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 12,
+     "pct": 42
+    }
+   ],
+   "fotos": [
+    "Início perfuração broca Galpão B",
+    "Execução de armação dos blocos de coroamento Galpão B",
+    "Locação de tampões nas furações das brocas",
+    "Locação de tampões nas furações das brocas",
+    "Locação de tampões nas furações das brocas",
+    "Locação de tampões nas furações das brocas",
+    "Execução de armação dos blocos de coroamento do Galpão B"
+   ]
+  },
+  {
+   "data": "2026-07-03",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Efetivo: 03 colaboradores + 02 operadores de máquina (AJR).\n\nAtividades executadas:\n• Perfuração de 14 brocas do Galpão B (24 brocas do galpão concluídas).\n• Iniciada a escavação das vigas baldrame do Galpão A.\n• Iniciada a fabricação das armaduras das vigas baldrame (2 vigas transversais).\n\nObservações:\n• Na broca do bloco B1 (Galpão B) identificou-se formação rochosa (atingiu ~1,50 m em vez de 3,00 m); comunicado ao projetista.\n• Concretagem de todas as brocas dos Galpões A e B definida para 08/07.\n\nPróximas atividades (04/07): concluir escavação das vigas baldrame do Galpão A.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 12,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 55,
+     "pct": 50
+    }
+   ],
+   "fotos": [
+    "Execução das vigas transversais do Galpão B",
+    "Croqui cocho em LSF",
+    "Armazenamento da armação do galpão B",
+    "Execução de Escavação das vigas baldrames do Galpão A"
+   ]
+  },
+  {
+   "data": "2026-07-04",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Efetivo: 02 operadores de máquina (AJR).\n\nAtividades executadas:\n• Concluída a escavação das vigas baldrame do Galpão A.\n• Perfuração de 12 brocas do Galpão A.\n\nObservações:\n• Conclusão das perfurações do Galpão A prevista para a manhã de 06/07.\n• Concretagem das brocas dos dois galpões mantida para 08/07.\n\nPróximas atividades (06/07): concluir perfurações e iniciar a armação das brocas do Galpão A.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 55,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 56,
+     "pct": 50
+    }
+   ],
+   "fotos": [
+    "",
+    "",
+    "",
+    ""
+   ]
+  },
+  {
+   "data": "2026-07-06",
+   "clima": "Não informado",
+   "precipitacao": "Sem chuva",
+   "comentario": "Efetivo: 05 colaboradores + 02 operadores de maquinário.\n\nAtividades executadas:\n• Concluída a perfuração das 12 brocas restantes do Galpão A (escavação das fundações profundas dos dois galpões finalizada).\n• Armação de 24 brocas do Galpão A e de 6 blocos de coroamento.\n• Galpões A e B preparados para a concretagem das brocas.\n\nObservações:\n• Chapas-base devem permanecer embutidas na calçada acabada (orientação do Eng. Gustavo).\n• Na broca B1 (solo rochoso), por orientação do projetista foi feito furo lateral que atingiu 3 m; será necessário relocar o bloco de coroamento e reforçar o aço da borda da viga.\n\nPróximas atividades (07/07): preparação para a concretagem das brocas e continuidade da armação das vigas baldrame do Galpão B.",
+   "mao_de_obra": 0,
+   "apontamentos": [
+    {
+     "tarefa_mpp": 56,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 24
+    }
+   ],
+   "fotos": [
+    "Indicação do nicho pelo GM",
+    "Execução de armação da ferragem das brocas do Galpão A",
+    "Execução de armação da ferragem das brocas do Galpão A",
+    "Finalização de escavação das brocas do Galpão A",
+    "Finalização de escavação das brocas do Galpão A",
+    "Orientação do calculista para deslocamento de bloco de coroamento e broca, devido Broca B1 ter encontrado solo rochoso",
+    "Aumento de 1 ferro N1 na viga onde foi deslocado o bloco de coroamento",
+    "Orientação de furo para verificação se havia solo rochoso em torno do bloco ou apenas no furo",
+    "Execução de armação da ferragem das brocas do Galpão A",
+    "Execução de armação da ferragem das brocas do Galpão A",
+    "Execução de armação da ferragem das brocas do Galpão A"
+   ]
+  }
+ ]
 }
