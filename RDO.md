@@ -28,7 +28,7 @@
 O avanço físico da obra vem dos **RDOs** (seção `rdos` do JSON). Cada RDO tem
 **apontamentos** que dizem "tal tarefa está em X%". O app acumula isso por data e
 calcula o progresso geral (`calcular_progresso_geral_obra_v2`). Hoje a Baia tem
-**6 RDOs** (relatório de 22–27/06).
+**19 RDOs** (relatório de 22/06 a 13/07; sem RDO em domingos e no feriado 05/07).
 
 > Se o JSON **não** tiver a seção `rdos`, o import cai num modo de fallback: cria
 > **1 RDO sintético** a partir do `pct_fisico` das tarefas. Como agora usamos RDOs
