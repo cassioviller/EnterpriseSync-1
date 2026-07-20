@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns="http://schemas.microsoft.com/project">
+  <Name>mspdi_minimo.xml</Name>
+  <Title>Obra Minima</Title>
+  <Tasks>
+    <Task>
+      <UID>100</UID>
+      <ID>1</ID>
+      <Name>Fundacao</Name>
+      <WBS>1</WBS>
+      <OutlineLevel>1</OutlineLevel>
+      <Milestone>0</Milestone>
+      <Summary>1</Summary>
+      <Start>2026-07-06T08:00:00</Start>
+      <Finish>2026-07-07T17:00:00</Finish>
+      <Duration>PT16H0M0S</Duration>
+      <PercentComplete>0</PercentComplete>
+    </Task>
+    <Task>
+      <UID>101</UID>
+      <ID>2</ID>
+      <Name>Sapatas concluidas</Name>
+      <WBS>1.1</WBS>
+      <OutlineLevel>2</OutlineLevel>
+      <Milestone>1</Milestone>
+      <Summary>0</Summary>
+      <Start>2026-07-07T17:00:00</Start>
+      <Finish>2026-07-07T17:00:00</Finish>
+      <Duration>PT0H0M0S</Duration>
+      <PercentComplete>50</PercentComplete>
+      <PredecessorLink>
+        <PredecessorUID>100</PredecessorUID>
+        <Type>1</Type>
+        <CrossProject>0</CrossProject>
+        <LinkLag>4800</LinkLag>
+        <LagFormat>7</LagFormat>
+      </PredecessorLink>
+    </Task>
+  </Tasks>
+</Project>
