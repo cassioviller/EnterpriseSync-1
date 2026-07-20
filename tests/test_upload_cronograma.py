@@ -135,21 +135,31 @@ def test_upload_mspdi_real_parseia():
 
         assert resp.status_code == 201, resp.get_data(as_text=True)
         body = resp.get_json()
-        assert body['status'] == 'parseado'
+        assert body['status'] == 'normalizado'
         imp_id = body['importacao_id']
 
         imp = db.session.get(CronogramaImportacao, imp_id)
-        assert imp.status == 'parseado'
+        assert imp.status == 'normalizado'
         assert imp.origem == 'upload_mspdi'
         assert imp.parser_nome == 'mspdi_stdlib'
         assert len(imp.json_bruto['tarefas']) == 103
         assert len(imp.arquivo_sha256) == 64
 
+        # M04: normalização síncrona após o parse.
+        assert imp.normalizador_versao == '1.0'
+        tarefas_norm = imp.json_normalizado['tarefas']
+        assert len(tarefas_norm) == 103
+        chaves = [t['chave'] for t in tarefas_norm]
+        assert len(set(chaves)) == 103  # chaves únicas (uid presente em todas)
+
         eventos = CronogramaImportacaoEvento.query.filter_by(
             importacao_id=imp_id
         ).all()
         tipos = {e.evento for e in eventos}
-        assert tipos == {'upload', 'parse_ok'}
+        assert tipos == {'upload', 'parse_ok', 'normalizado'}
+        ev_norm = next(e for e in eventos if e.evento == 'normalizado')
+        assert ev_norm.detalhes['n_tarefas'] == 103
+        assert 'n_avisos' in ev_norm.detalhes
 
 
 # ───────────────────────────────────────────────────────────────────────────

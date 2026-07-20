@@ -36,6 +36,11 @@ from werkzeug.utils import secure_filename
 from app import db
 from decorators import cronograma_import_required
 from models import CronogramaImportacao, CronogramaImportacaoEvento, Obra
+from services.cronograma_normalizacao import (
+    NORMALIZADOR_VERSAO,
+    NormalizacaoError,
+    normalizar,
+)
 from services.mpp_parser import (
     MppParserError,
     java_disponivel,  # noqa: F401 — exposto para monkeypatch nos testes
@@ -244,5 +249,38 @@ def importar_cronograma(obra_id):
         },
         usuario_id=current_user.id,
     ))
+
+    # 7. Normalização determinística (M04): json_bruto → json_normalizado
+    # validado por schema, com chaves estáveis e avisos — insumo do M05.
+    try:
+        normalizado = normalizar(dados)
+    except NormalizacaoError as exc:
+        # Parse OK mas o bruto não normaliza: quase sempre bug nosso de
+        # schema/normalizador, não do usuário. Marca 'falhou' (o dedup
+        # ignora 'falhou', então re-upload após correção é permitido).
+        imp.status = 'falhou'
+        imp.erro = str(exc)
+        logger.error('normalização falhou importacao=%s: %s', imp.id, exc)
+        db.session.add(CronogramaImportacaoEvento(
+            importacao_id=imp.id,
+            admin_id=admin_id,
+            evento='normalizacao_erro',
+            detalhes={'erro': str(exc)[:500]},
+            usuario_id=current_user.id,
+        ))
+        db.session.commit()
+        return _erro('O cronograma foi lido mas não pôde ser normalizado. '
+                     'Registro salvo para análise.', 422, importacao_id=imp.id)
+
+    imp.json_normalizado = normalizado
+    imp.normalizador_versao = NORMALIZADOR_VERSAO
+    imp.status = 'normalizado'
+    db.session.add(CronogramaImportacaoEvento(
+        importacao_id=imp.id,
+        admin_id=admin_id,
+        evento='normalizado',
+        detalhes=normalizado['contadores'],
+        usuario_id=current_user.id,
+    ))
     db.session.commit()
-    return jsonify({'importacao_id': imp.id, 'status': 'parseado'}), 201
+    return jsonify({'importacao_id': imp.id, 'status': 'normalizado'}), 201
