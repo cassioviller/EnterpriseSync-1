@@ -21,16 +21,19 @@ Método: `UniversalProjectReader` lê o `.mpp` e `MSPDIWriter` grava o MSPDI; um
 ```
 CRONOGRAMA 06.07.mpp       mpxj= 101  purepy= 101  ids_iguais=True  divergencias=0
 CRONOGRAMA OFICIAL.mpp     mpxj=  57  purepy=  57  ids_iguais=True  divergencias=0
+CRONOGRAMA 16.07.mpp/.xml  mpxj= 103  purepy= 103  ids_iguais=True  divergencias=0   ← XML REAL do Project
 ```
 
-158 tarefas, 8 campos comparados (`outline`, `nome`, `inicio`, `fim`, `dias`, `pct_fisico`, `predecessoras`, `resumo`), **zero divergências**.
+261 tarefas, 8 campos comparados (`outline`, `nome`, `inicio`, `fim`, `dias`, `pct_fisico`, `predecessoras`, `resumo`), **zero divergências**.
+
+**Atualização 2026-07-20 (mesma data, mais tarde): a Task 1 foi cumprida.** O usuário forneceu `CRONOGRAMA 16.07.xml` exportado pelo **MS Project real** (`BuildNumber 16.0.19725.20170`, `standalone="yes"`) junto com o `.mpp` correspondente. O diff do parser stdlib sobre esse XML contra o baseline MPXJ sobre o `.mpp` deu **zero divergências em 103 tarefas** — a linha marcada acima. A ressalva da §3.1 está encerrada.
 
 Detalhe que custou uma iteração e precisa ficar registrado: na primeira tentativa `predecessoras` divergiu em 66/101 tarefas. **Não era perda de dado** — o MSPDI referencia predecessoras por `UID`, enquanto `dump_mpp.py` usa `getID()`. Resolvido com um mapa `uid → id` construído em uma passada prévia sobre `<Task>`. Qualquer reimplementação que pule esse mapa vai produzir predecessoras silenciosamente erradas, e o grafo de dependências é justamente o que alimenta `recalcular_cronograma` (`utils/cronograma_engine.py:237`).
 
 ## 3. Limites desta evidência — leia antes de confiar
 
-1. **O MSPDI foi gerado pelo MPXJ, não pelo MS Project.** É o mesmo schema (`http://schemas.microsoft.com/project`), mas o MPXJ pode normalizar o que o Project escreveria diferente (ordem de elementos, campos omitidos vs. vazios, formato de duração). **A paridade contra um export real do Project está NÃO VERIFICADA.** Task 1 existe para retirar essa dúvida antes de qualquer decisão de arquitetura.
-2. **Dois arquivos, uma origem.** Ambos vieram do mesmo autor/empresa (`Guilherme Angelin` / `VEKS ENGENHARIA`, code page 1252) e provavelmente da mesma versão do Project. Não exercitam: calendários customizados, recursos atribuídos, vínculos SS/SF/FF, lag ≠ 0, marcos, campos personalizados.
+1. ~~**O MSPDI foi gerado pelo MPXJ, não pelo MS Project.**~~ **RESOLVIDO em 2026-07-20**: paridade verificada contra `CRONOGRAMA 16.07.xml`, export real do MS Project (BuildNumber 16.0.19725.20170) — 103 tarefas, zero divergências (§2). A Task 1 abaixo fica mantida como passo de regressão (rodar o script de paridade sobre esse par de arquivos), não mais como dúvida aberta.
+2. **Três arquivos, uma origem.** Todos vieram do mesmo autor/empresa (`Guilherme Angelin` / `VEKS ENGENHARIA`, code page 1252) e provavelmente da mesma versão do Project. Não exercitam: calendários customizados, recursos atribuídos, vínculos SS/SF/FF, lag ≠ 0, marcos, campos personalizados.
 3. **A comparação cobre os 9 campos que a app usa hoje**, não o formato. O M03 §4.1 quer ampliar a extração (`uid`, `wbs`, `marco`, `tipo` de vínculo, `lag_dias`, recursos, notas, custom). Esses campos **não foram medidos** — `dias` bate hoje porque as durações desses arquivos são inteiras em dias; a conversão ISO-8601 → dias assume jornada de 8h e vai divergir em tarefa com duração fracionária ou calendário não-padrão.
 
 ## 4. Revisão do M03
@@ -55,23 +58,27 @@ MPXJ/JPype/JDK passam de "declarar em produção" para **opcionais**: se declara
 
 ---
 
-## Task 1: Retirar a dúvida da §3.1 (bloqueia as demais)
+## Task 1: Retirar a dúvida da §3.1 — **CUMPRIDA em 2026-07-20** (vira regressão)
 
 **Files:** nenhum — coleta de evidência.
 
-- [ ] **Step 1: Pedir ao usuário um MSPDI real**
+- [x] **Step 1: Obter um MSPDI real**
 
-Pedir um export feito no MS Project (*Arquivo → Salvar como → tipo XML*) a partir de `CRONOGRAMA 06.07.mpp`, salvo como `fixtures_mpp/cronograma_0607_project.xml`.
+O usuário forneceu `CRONOGRAMA 16.07.xml` (export do MS Project, BuildNumber 16.0.19725.20170) e o `CRONOGRAMA 16.07.mpp` correspondente, na raiz do projeto.
 
-- [ ] **Step 2: Rodar o diff de paridade contra o baseline MPXJ**
+- [x] **Step 2: Rodar o diff de paridade contra o baseline MPXJ**
 
-Run: `.pythonlibs/bin/python scripts/verificar_paridade_mspdi.py "CRONOGRAMA 06.07.mpp" fixtures_mpp/cronograma_0607_project.xml`
-(script criado na Task 2)
-Expected: `divergencias=0` em 101 tarefas.
+Feito inline (o script da Task 2 ainda não existia): baseline `dump_mpp.py::dump` sobre o `.mpp`, parser stdlib sobre o `.xml`.
+Resultado: `mpxj=103 purepy=103 ids_iguais=True divergencias=0`.
 
-- [ ] **Step 3: Decidir**
+- [x] **Step 3: Decidir**
 
-Se `divergencias=0` → seguir. Se houver divergência, **parar e reportar** com o campo e o exemplo: significa que o MPXJ normaliza algo, e o parser stdlib precisa tratar a variante real do Project. Não prosseguir "arredondando" a diferença.
+`divergencias=0` → o caminho MSPDI está validado contra a fonte real. Seguir.
+
+- [ ] **Step 4 (regressão, executar junto com a Task 2): reproduzir com o script**
+
+Run: `.pythonlibs/bin/python scripts/verificar_paridade_mspdi.py "CRONOGRAMA 16.07.mpp" "CRONOGRAMA 16.07.xml"`
+Expected: `divergencias=0` em 103 tarefas, exit 0.
 
 ---
 
