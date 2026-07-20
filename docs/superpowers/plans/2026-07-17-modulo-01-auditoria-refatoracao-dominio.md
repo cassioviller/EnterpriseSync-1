@@ -146,4 +146,4 @@ Nenhuma (primeiro módulo).
 - [x] Importador reorganizado sem mudança de comportamento (`6782960`)
 - [x] Decorator de autorização novo pronto para M3/M5/M8 (`decorators.cronograma_import_required`)
 - [x] Doc de casos de uso publicado (`docs/superpowers/specs/2026-07-20-separacao-casos-de-uso-importacao.md`)
-- [ ] `run_tests.sh --gate` verde
+- [x] Gate completo verde (2026-07-20: `pytest tests/ -m "not browser"` → 437 passed, 4 skipped; rodado direto no pytest — o wrapper `run_tests.sh` trava esperando servidor em localhost:5000)
