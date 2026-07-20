@@ -4931,6 +4931,19 @@ class TarefaCronograma(db.Model):
         foreign_keys=[gerada_por_proposta_item_id],
         viewonly=True,
     )
+    # ── Módulo 02 (cronograma-mpp), Migration 208: identidade estável ──
+    # UID do MS Project (getUniqueID / <UID> do MSPDI) — chave de reconciliação
+    mpp_uid = db.Column(db.BigInteger, nullable=True)
+    wbs_codigo = db.Column(db.String(50), nullable=True)
+    # Fingerprint determinístico do conteúdo (Módulo 4)
+    fingerprint = db.Column(db.String(64), nullable=True)
+    is_marco = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    # Arquivamento lógico: tarefa removida em versão nova NUNCA é deletada
+    ativa = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
+    arquivada_em = db.Column(db.DateTime, nullable=True)
+    versao_criacao_id = db.Column(db.Integer,
+                                  db.ForeignKey('cronograma_versao.id', ondelete='SET NULL'),
+                                  nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -4969,6 +4982,15 @@ class RDOApontamentoCronograma(db.Model):
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    # ── Módulo 02 (cronograma-mpp), Migration 209: semântica explícita ──
+    # 'quantitativo' (valor do dia em unidades) | 'percentual' (acumulado %).
+    # Hoje o modo é implícito por quantidade_total>0; os campos antigos NÃO
+    # mudam de significado (leitura legada intacta) — ver spec §13.2.
+    tipo_apontamento = db.Column(db.String(15), nullable=True)
+    percentual_acumulado = db.Column(db.Float, nullable=True)
+    percentual_incremento_dia = db.Column(db.Float, nullable=True)
+    quantidade_total_snapshot = db.Column(db.Float, nullable=True)
+    unidade_snapshot = db.Column(db.String(20), nullable=True)
 
     rdo = db.relationship(
         'RDO',
@@ -4981,6 +5003,199 @@ class RDOApontamentoCronograma(db.Model):
             f'<RDOApontamentoCronograma rdo={self.rdo_id} '
             f'tarefa={self.tarefa_cronograma_id} qty={self.quantidade_executada_dia}>'
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MÓDULO 02 (plano cronograma-mpp): importação e versionamento de cronograma
+# Migrations 207-210. Modelos PASSIVOS (regra §9 da spec: nenhuma lógica em
+# event listeners; snapshots são preenchidos explicitamente pelos serviços M5).
+# ─────────────────────────────────────────────────────────────────────────────
+class CronogramaImportacao(db.Model):
+    """Um upload de cronograma (.xml MSPDI ou .mpp) e seu pipeline de estados:
+    recebido → parseado → normalizado → reconciliado → aguardando_revisao →
+    aplicado | falhou | cancelado."""
+    __tablename__ = 'cronograma_importacao'
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+    arquivo_nome = db.Column(db.String(255))
+    arquivo_tamanho = db.Column(db.Integer)
+    arquivo_sha256 = db.Column(db.String(64), index=True)
+    arquivo_path = db.Column(db.String(512), nullable=True)
+    origem = db.Column(db.String(20))          # 'upload_mpp' | 'upload_mspdi' | 'json_cli'
+    parser_nome = db.Column(db.String(50))     # 'mspdi_stdlib' | 'mpxj'
+    parser_versao = db.Column(db.String(20))
+    normalizador_versao = db.Column(db.String(20))
+    status = db.Column(db.String(30), nullable=False, default='recebido')
+    json_bruto = db.Column(db.JSON, nullable=True)
+    json_normalizado = db.Column(db.JSON, nullable=True)
+    relatorio_diff = db.Column(db.JSON, nullable=True)
+    erro = db.Column(db.Text, nullable=True)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    aplicado_em = db.Column(db.DateTime, nullable=True)
+
+
+class CronogramaVersao(db.Model):
+    """Versão do cronograma de uma obra (nº sequencial por obra).
+    Uma e somente uma versão 'ativa' por obra — o unique parcial
+    (WHERE status='ativa') vive SÓ no DDL (migration 207), pois o
+    declarativo do SQLAlchemy não expressa índice parcial de forma portável."""
+    __tablename__ = 'cronograma_versao'
+    __table_args__ = (
+        db.UniqueConstraint('obra_id', 'numero', name='uq_cronograma_versao_obra_numero'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(
+        db.Integer,
+        db.ForeignKey('obra.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=False,
+        index=True,
+    )
+    # Sequencial por obra (unique composto obra_id+numero)
+    numero = db.Column(db.Integer, nullable=False)
+    # 'ativa' | 'arquivada'
+    status = db.Column(db.String(20), nullable=False, default='ativa')
+    # NULL para a versão nº1 criada pelo backfill (migration 210)
+    importacao_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_importacao.id'),
+        nullable=True,
+    )
+    aplicada_em = db.Column(db.DateTime, default=datetime.utcnow)
+    aplicada_por_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=True,
+    )
+    # Ex.: "backfill inicial", "rollback da v3"
+    observacao = db.Column(db.Text, nullable=True)
+
+
+class CronogramaTarefaSnapshot(db.Model):
+    """Fotografia integral de cada tarefa em cada versão (diff, rollback e
+    auditoria). Imutável após criado (spec §12)."""
+    __tablename__ = 'cronograma_tarefa_snapshot'
+
+    id = db.Column(db.Integer, primary_key=True)
+    versao_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_versao.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=False,
+    )
+    # Tarefa viva correspondente; SET NULL — pode ter sido arquivada/removida
+    tarefa_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    mpp_uid = db.Column(db.BigInteger, nullable=True)
+    wbs_codigo = db.Column(db.String(50), nullable=True)
+    nome_tarefa = db.Column(db.String(200), nullable=True)
+    tarefa_pai_snapshot_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_tarefa_snapshot.id'),
+        nullable=True,
+    )
+    # Lista de {uid, tipo, lag} — predecessoras múltiplas ficam só aqui (spec §4)
+    predecessoras_json = db.Column(db.JSON, nullable=True)
+    ordem = db.Column(db.Integer, nullable=True)
+    data_inicio = db.Column(db.Date, nullable=True)
+    data_fim = db.Column(db.Date, nullable=True)
+    duracao_dias = db.Column(db.Integer, nullable=True)
+    quantidade_total = db.Column(db.Float, nullable=True)
+    unidade_medida = db.Column(db.String(20), nullable=True)
+    is_marco = db.Column(db.Boolean, default=False)
+    is_resumo = db.Column(db.Boolean, default=False)
+    percentual_concluido_no_momento = db.Column(db.Float, nullable=True)
+    payload_extra = db.Column(db.JSON, nullable=True)
+
+
+class CronogramaTarefaMapeamento(db.Model):
+    """Resultado da reconciliação, por importação. Um par pode ter vários
+    registros de tipo (ex.: correspondencia_exata + datas_alteradas) —
+    uma linha por classificação simplifica filtros na UI (spec §4)."""
+    __tablename__ = 'cronograma_tarefa_mapeamento'
+
+    id = db.Column(db.Integer, primary_key=True)
+    importacao_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_importacao.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=False,
+    )
+    # NULL para tarefa nova (sem correspondente atual)
+    tarefa_atual_id = db.Column(
+        db.Integer,
+        db.ForeignKey('tarefa_cronograma.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    # uid/wbs/fingerprint da tarefa no arquivo novo; NULL para removida
+    chave_nova = db.Column(db.String(120), nullable=True)
+    # correspondencia_exata | correspondencia_provavel | nova | removida |
+    # renomeada | movida_hierarquia | datas_alteradas | duracao_alterada |
+    # predecessoras_alteradas | quantidade_alterada | unidade_alterada |
+    # ambigua | revisao_manual | dividida | fundida
+    tipo = db.Column(db.String(40), nullable=False)
+    # Confiança da correspondência (0-1)
+    score = db.Column(db.Float, nullable=True)
+    # 'auto' | 'manual'
+    origem_decisao = db.Column(db.String(20), nullable=True)
+    decidido_por_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=True,
+    )
+    detalhes = db.Column(db.JSON, nullable=True)
+
+
+class CronogramaImportacaoEvento(db.Model):
+    """Trilha de auditoria da importação. Eventos mínimos: upload,
+    parse_ok/parse_erro, normalizado, reconciliado, revisao_alterada,
+    aplicado, rollback, cancelado."""
+    __tablename__ = 'cronograma_importacao_evento'
+
+    id = db.Column(db.Integer, primary_key=True)
+    importacao_id = db.Column(
+        db.Integer,
+        db.ForeignKey('cronograma_importacao.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=False,
+    )
+    evento = db.Column(db.String(50), nullable=False)
+    detalhes = db.Column(db.JSON, nullable=True)
+    usuario_id = db.Column(
+        db.Integer,
+        db.ForeignKey('usuario.id'),
+        nullable=True,
+    )
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # ═══════════════════════════════════════════════════════════

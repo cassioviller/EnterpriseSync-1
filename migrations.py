@@ -4004,6 +4004,9 @@ def executar_migracoes():
             (204, "Lançamento por categoria — gestao_custo_pai.categoria_fluxo_caixa_id", _migration_204_gestao_custo_pai_categoria_fc),
             (205, "Compras por etapa — pedido_compra.obra_servico_custo_id", _migration_205_pedido_compra_obra_servico_custo),
             (206, "Alimentação/Transporte por etapa — obra_servico_custo_id", _migration_206_alimentacao_transporte_obra_servico_custo),
+            (207, "Cronograma-mpp M02 — tabelas de importação/versionamento (importacao, versao, snapshot, mapeamento, evento)", _migration_207_cronograma_versionamento),
+            (208, "Cronograma-mpp M02 — identidade estável em tarefa_cronograma (mpp_uid/wbs/fingerprint/is_marco/ativa)", _migration_208_tarefa_cronograma_identidade),
+            (209, "Cronograma-mpp M02 — semântica de apontamento em rdo_apontamento_cronograma (tipo/percentuais/snapshot)", _migration_209_rdo_apontamento_semantico),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -13868,4 +13871,175 @@ def _migration_183_fluxo_caixa_destinatario():
         logger.info("[Migration 183] fornecedor_id e funcionario_id adicionados a fluxo_caixa.")
     except Exception as e:
         logger.error(f"[Migration 183] Falha: {e}")
+        raise
+
+
+def _migration_207_cronograma_versionamento():
+    """Módulo 02 (cronograma-mpp) — 5 tabelas de importação/versionamento.
+    Aditivo e idempotente. Dicionário: docs/superpowers/plans/
+    2026-07-17-modulo-02-modelo-dados-migrations.md §4."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_importacao (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    arquivo_nome VARCHAR(255),
+                    arquivo_tamanho INTEGER,
+                    arquivo_sha256 VARCHAR(64),
+                    arquivo_path VARCHAR(512),
+                    origem VARCHAR(20),
+                    parser_nome VARCHAR(50),
+                    parser_versao VARCHAR(20),
+                    normalizador_versao VARCHAR(20),
+                    status VARCHAR(30) NOT NULL DEFAULT 'recebido',
+                    json_bruto JSONB,
+                    json_normalizado JSONB,
+                    relatorio_diff JSONB,
+                    erro TEXT,
+                    criado_por_id INTEGER REFERENCES usuario(id),
+                    criado_em TIMESTAMP DEFAULT NOW(),
+                    aplicado_em TIMESTAMP
+                )
+            """))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_imp_obra ON cronograma_importacao(obra_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_imp_admin ON cronograma_importacao(admin_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_imp_sha ON cronograma_importacao(arquivo_sha256)"))
+            # Dedup por conteúdo na MESMA obra, exceto tentativas falhas/canceladas
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_cron_imp_obra_sha
+                ON cronograma_importacao(obra_id, arquivo_sha256)
+                WHERE status NOT IN ('falhou', 'cancelado')
+            """))
+
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_versao (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    numero INTEGER NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'ativa',
+                    importacao_id INTEGER REFERENCES cronograma_importacao(id),
+                    aplicada_em TIMESTAMP DEFAULT NOW(),
+                    aplicada_por_id INTEGER REFERENCES usuario(id),
+                    observacao TEXT,
+                    CONSTRAINT uq_cronograma_versao_obra_numero UNIQUE (obra_id, numero)
+                )
+            """))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_versao_obra ON cronograma_versao(obra_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_versao_admin ON cronograma_versao(admin_id)"))
+            # Uma e somente uma versão ATIVA por obra (spec §12)
+            conn.execute(sa_text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_cron_versao_uma_ativa
+                ON cronograma_versao(obra_id) WHERE status = 'ativa'
+            """))
+
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_tarefa_snapshot (
+                    id SERIAL PRIMARY KEY,
+                    versao_id INTEGER NOT NULL REFERENCES cronograma_versao(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    tarefa_id INTEGER REFERENCES tarefa_cronograma(id) ON DELETE SET NULL,
+                    mpp_uid BIGINT,
+                    wbs_codigo VARCHAR(50),
+                    nome_tarefa VARCHAR(200),
+                    tarefa_pai_snapshot_id INTEGER REFERENCES cronograma_tarefa_snapshot(id),
+                    predecessoras_json JSONB,
+                    ordem INTEGER,
+                    data_inicio DATE,
+                    data_fim DATE,
+                    duracao_dias INTEGER,
+                    quantidade_total FLOAT,
+                    unidade_medida VARCHAR(20),
+                    is_marco BOOLEAN DEFAULT FALSE,
+                    is_resumo BOOLEAN DEFAULT FALSE,
+                    percentual_concluido_no_momento FLOAT,
+                    payload_extra JSONB
+                )
+            """))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_snap_versao ON cronograma_tarefa_snapshot(versao_id)"))
+
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_tarefa_mapeamento (
+                    id SERIAL PRIMARY KEY,
+                    importacao_id INTEGER NOT NULL REFERENCES cronograma_importacao(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    tarefa_atual_id INTEGER REFERENCES tarefa_cronograma(id) ON DELETE SET NULL,
+                    chave_nova VARCHAR(120),
+                    tipo VARCHAR(40) NOT NULL,
+                    score FLOAT,
+                    origem_decisao VARCHAR(20),
+                    decidido_por_id INTEGER REFERENCES usuario(id),
+                    detalhes JSONB
+                )
+            """))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_map_importacao ON cronograma_tarefa_mapeamento(importacao_id)"))
+
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_importacao_evento (
+                    id SERIAL PRIMARY KEY,
+                    importacao_id INTEGER NOT NULL REFERENCES cronograma_importacao(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    evento VARCHAR(50) NOT NULL,
+                    detalhes JSONB,
+                    usuario_id INTEGER REFERENCES usuario(id),
+                    criado_em TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cron_evt_importacao ON cronograma_importacao_evento(importacao_id)"))
+        logger.info("[Migration 207] tabelas de versionamento de cronograma criadas.")
+    except Exception as e:
+        logger.error(f"[Migration 207] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_208_tarefa_cronograma_identidade():
+    """Módulo 02 — identidade estável em tarefa_cronograma (uid/wbs/fingerprint,
+    marco, arquivamento lógico, versão de criação). Aditivo e idempotente."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS mpp_uid BIGINT"))
+            conn.execute(sa_text("ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS wbs_codigo VARCHAR(50)"))
+            conn.execute(sa_text("ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS fingerprint VARCHAR(64)"))
+            conn.execute(sa_text("ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS is_marco BOOLEAN NOT NULL DEFAULT FALSE"))
+            conn.execute(sa_text("ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS ativa BOOLEAN NOT NULL DEFAULT TRUE"))
+            conn.execute(sa_text("ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS arquivada_em TIMESTAMP"))
+            conn.execute(sa_text(
+                "ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS versao_criacao_id "
+                "INTEGER REFERENCES cronograma_versao(id) ON DELETE SET NULL"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_tarefa_cron_obra_uid ON tarefa_cronograma(obra_id, mpp_uid)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_tarefa_cron_ativa ON tarefa_cronograma(obra_id) WHERE ativa"))
+        logger.info("[Migration 208] identidade estável em tarefa_cronograma.")
+    except Exception as e:
+        logger.error(f"[Migration 208] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_209_rdo_apontamento_semantico():
+    """Módulo 02 — semântica explícita do apontamento (tipo, percentuais
+    próprios, snapshot de quantidade/unidade). Campos antigos INTACTOS."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("ALTER TABLE rdo_apontamento_cronograma ADD COLUMN IF NOT EXISTS tipo_apontamento VARCHAR(15)"))
+            conn.execute(sa_text("ALTER TABLE rdo_apontamento_cronograma ADD COLUMN IF NOT EXISTS percentual_acumulado FLOAT"))
+            conn.execute(sa_text("ALTER TABLE rdo_apontamento_cronograma ADD COLUMN IF NOT EXISTS percentual_incremento_dia FLOAT"))
+            conn.execute(sa_text("ALTER TABLE rdo_apontamento_cronograma ADD COLUMN IF NOT EXISTS quantidade_total_snapshot FLOAT"))
+            conn.execute(sa_text("ALTER TABLE rdo_apontamento_cronograma ADD COLUMN IF NOT EXISTS unidade_snapshot VARCHAR(20)"))
+        logger.info("[Migration 209] colunas semânticas em rdo_apontamento_cronograma.")
+    except Exception as e:
+        logger.error(f"[Migration 209] Falha: {e}", exc_info=True)
         raise
