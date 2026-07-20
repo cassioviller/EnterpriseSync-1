@@ -234,19 +234,23 @@ def visualizar_rdo(rdo_id):
 # função NUNCA foi despachada. Manter o registro só mantinha uma regra
 # fantasma no url_map. A função fica para o rollout do Módulo 07.
 def salvar_rdo():
-    """Salvar RDO (criar ou editar) — endpoint legado.
+    """Salvar RDO (criar ou editar) — endpoint legado, HOJE SEM ROTA.
 
-    Mantido para compatibilidade; o fluxo principal hoje é
-    POST /salvar-rdo-flexivel. A normalização de horas via
-    utils.rdo_horas.normalizar_horas_funcionario já é aplicada
-    abaixo (Task #8) e a linha logger.warning deste preâmbulo é
-    telemetria (Task #9) para confirmar quando este endpoint
-    legado é efetivamente usado em produção.
+    ATENÇÃO ao decidir remover esta função: a linha [LEGACY-RDO] abaixo
+    foi adicionada (Task #9) como telemetria de uso em produção, mas
+    NUNCA PÔDE DISPARAR — a rota `/rdo/salvar` desta view colidia com
+    @main_bp.route('/rdo/salvar') (views/rdo.py:2511), que é registrada
+    antes e sempre venceu o despacho. Ausência de [LEGACY-RDO] com
+    `rdo_crud.salvar_rdo` nos logs mede o ROTEAMENTO, não o uso — não
+    use isso como evidência de que ninguém chama este fluxo.
+
+    O fluxo principal é POST /salvar-rdo-flexivel; o legado alcançável
+    é POST /rdo/salvar → views.rdo:rdo_salvar_unificado.
     """
     try:
         logger.warning(
-            "[LEGACY-RDO] POST /rdo/salvar (rdo_crud.salvar_rdo) chamado — "
-            "endpoint legado. user=%s referrer=%s path=%s",
+            "[LEGACY-RDO] rdo_crud.salvar_rdo chamado — função legada SEM ROTA "
+            "(ver docstring). user=%s referrer=%s path=%s",
             getattr(current_user, 'email', '?'),
             request.referrer,
             request.path,
