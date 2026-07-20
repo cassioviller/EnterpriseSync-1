@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cronograma_bruto.schema.json",
+  "title": "Cronograma bruto — saída do parser M03 (MSPDI/MPXJ/CLI de contingência)",
+  "versao": "1.0",
+  "type": "object",
+  "required": ["projeto", "tarefas"],
+  "properties": {
+    "projeto": {
+      "type": "object",
+      "required": ["nome", "data_status"],
+      "properties": {
+        "nome": {"type": ["string", "null"]},
+        "data_status": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+      }
+    },
+    "tarefas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "uid", "wbs", "outline", "nome", "inicio", "fim",
+                     "dias", "pct_project", "resumo", "marco",
+                     "predecessoras", "notas"],
+        "properties": {
+          "id": {"type": "integer"},
+          "uid": {"type": ["integer", "null"]},
+          "wbs": {"type": ["string", "null"]},
+          "outline": {"type": ["integer", "null"], "minimum": 0},
+          "nome": {"type": "string"},
+          "inicio": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+          "fim": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+          "dias": {"type": ["number", "null"]},
+          "pct_project": {"type": ["number", "null"]},
+          "resumo": {"type": "boolean"},
+          "marco": {"type": "boolean"},
+          "predecessoras": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "uid", "tipo", "lag_dias"],
+              "properties": {
+                "id": {"type": "integer"},
+                "uid": {"type": ["integer", "null"]},
+                "tipo": {"enum": ["FS", "FF", "SS", "SF", null]},
+                "lag_dias": {"type": "number"}
+              }
+            }
+          },
+          "notas": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

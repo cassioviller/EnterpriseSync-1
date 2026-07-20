@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cronograma_normalizado.schema.json",
+  "title": "Cronograma normalizado — contrato do M04 para a reconciliação (M05)",
+  "versao": "1.0",
+  "type": "object",
+  "required": ["versao", "projeto", "tarefas", "avisos", "contadores"],
+  "additionalProperties": false,
+  "properties": {
+    "versao": {"const": "1.0"},
+    "projeto": {
+      "type": "object",
+      "required": ["nome", "data_status"],
+      "additionalProperties": false,
+      "properties": {
+        "nome": {"type": ["string", "null"], "maxLength": 255},
+        "data_status": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+      }
+    },
+    "tarefas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chave", "uid", "wbs", "id_arquivo", "nome_original",
+                     "nome_normalizado", "caminho", "fingerprint", "nivel",
+                     "pai_chave", "ordem", "inicio", "fim", "dias",
+                     "is_resumo", "is_marco", "categoria_sugerida",
+                     "predecessoras", "quantidade_total", "unidade",
+                     "pct_project", "notas"],
+        "additionalProperties": false,
+        "properties": {
+          "chave": {"type": "string", "pattern": "^(uid:-?\\d+|wbs:.+|fp:[0-9a-f]{16})$"},
+          "uid": {"type": ["integer", "null"]},
+          "wbs": {"type": ["string", "null"]},
+          "id_arquivo": {"type": "integer"},
+          "nome_original": {"type": "string", "maxLength": 255},
+          "nome_normalizado": {"type": "string", "maxLength": 255},
+          "caminho": {"type": "string"},
+          "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+          "nivel": {"type": "integer", "minimum": 0},
+          "pai_chave": {"type": ["string", "null"]},
+          "ordem": {"type": "integer", "minimum": 0},
+          "inicio": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+          "fim": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+          "dias": {"type": ["number", "null"]},
+          "is_resumo": {"type": "boolean"},
+          "is_marco": {"type": "boolean"},
+          "categoria_sugerida": {
+            "enum": ["HIDRO", "ELET", "PRELIM", "PORTAO", "PINT", "FECHA",
+                     "ESTLSF", "COBERT", "ESTMET", "FUND", null]
+          },
+          "predecessoras": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["chave", "tipo", "lag_dias"],
+              "additionalProperties": false,
+              "properties": {
+                "chave": {"type": "string"},
+                "tipo": {"enum": ["FS", "FF", "SS", "SF", null]},
+                "lag_dias": {"type": "number"}
+              }
+            }
+          },
+          "quantidade_total": {"type": ["number", "null"]},
+          "unidade": {"type": ["string", "null"]},
+          "pct_project": {"type": ["number", "null"]},
+          "notas": {"type": ["string", "null"], "maxLength": 2000}
+        }
+      }
+    },
+    "avisos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["codigo", "tarefa_chave", "mensagem"],
+        "additionalProperties": false,
+        "properties": {
+          "codigo": {
+            "enum": ["fim_antes_inicio", "folha_sem_datas",
+                     "duracao_zero_sem_marco", "predecessora_inexistente",
+                     "ciclo_predecessoras", "outline_salto",
+                     "nomes_duplicados_mesmo_pai", "ambiguidade_potencial",
+                     "pct_project_sera_ignorado"]
+          },
+          "tarefa_chave": {"type": ["string", "null"]},
+          "mensagem": {"type": "string"}
+        }
+      }
+    },
+    "contadores": {
+      "type": "object",
+      "required": ["n_tarefas", "n_folhas", "n_avisos"],
+      "additionalProperties": false,
+      "properties": {
+        "n_tarefas": {"type": "integer", "minimum": 0},
+        "n_folhas": {"type": "integer", "minimum": 0},
+        "n_avisos": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}
