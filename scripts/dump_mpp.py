@@ -1,96 +1,50 @@
-"""Dump completo de um .mpp -> JSON. Parser canônico de cronograma do repo.
+"""Dump de cronograma -> JSON legado de 9 campos. CLI fino sobre o M03.
 
 Uso:
     python scripts/dump_mpp.py "CRONOGRAMA 06.07.mpp" [saida.json]
 
-Sem o segundo argumento, escreve em stdout.
+Sem o segundo argumento, escreve em stdout. Aceita `.mpp` (worker MPXJ em
+subprocess, requer Java — ver services/mpp_parser_worker.py) e `.xml`
+(MSPDI, stdlib, sem Java).
 
-Dependências:  pip install mpxj jpype1
-`mpxj` traz os .jar e sobe a JVM via JPype. É preciso um JRE/JDK COMPLETO:
-o `jdk4py` (JRE em wheel) não inclui o charset MacRoman que os .mpp usam e
-quebra com UnsupportedCharsetException — por isso procuramos um Temurin/OpenJDK
-completo no sistema (inclusive no /nix/store dos ambientes Replit/Nix).
+Desde o M03 (Task 3) o parse canônico vive em
+`services.mpp_parser.parse_cronograma` (contrato completo com uid/wbs/
+marco/vínculos tipados); este script apenas PROJETA aquele contrato para o
+shape histórico de 9 campos consumido por `rebuild_baia_from_0607_mpp.py`
+e `verificar_paridade_mspdi.py`. Compatibilidade provada por diff da saída
+antiga vs nova sobre `CRONOGRAMA 06.07.mpp` (idêntica byte a byte).
 """
 from __future__ import annotations
 
-import glob
 import json
 import os
 import sys
-from datetime import date
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from services.mpp_parser import _achar_java_home, parse_cronograma  # noqa: E402,F401
+# _achar_java_home é re-exportado porque scripts/verificar_paridade_mspdi.py
+# (e o histórico de uso deste módulo) o importa daqui.
 
 
-def _achar_java_home():
-    if os.environ.get("JAVA_HOME"):
-        return os.environ["JAVA_HOME"]
-    # JDK completo no /nix/store (Replit/Nix) — precisa ter bin/java.
-    for padrao in ("*temurin*bin*", "*adoptopenjdk*hotspot*bin*", "*openjdk*bin*"):
-        for d in sorted(glob.glob(f"/nix/store/{padrao}")):
-            if os.path.exists(os.path.join(d, "bin", "java")):
-                return d
-    return None  # se houver Java no PATH, o JPype acha sozinho
-
-
-def _d(v):
-    if v is None:
-        return None
-    try:
-        return date(v.getYear(), v.getMonthValue(), v.getDayOfMonth()).isoformat()
-    except Exception:
-        s = str(v)[:10]
-        return s if s[:4].isdigit() else None
-
-
-def _num(v):
-    if v is None:
-        return None
-    try:
-        return float(v.doubleValue() if hasattr(v, "doubleValue") else v)
-    except Exception:
-        try:
-            return float(str(v))
-        except Exception:
-            return None
+def _projetar_legado(tarefa: dict) -> dict:
+    """Contrato do M03 → shape legado de 9 campos (spec §14)."""
+    return {
+        "id": tarefa["id"],
+        "outline": tarefa["outline"],
+        "nome": tarefa["nome"],
+        "inicio": tarefa["inicio"],
+        "fim": tarefa["fim"],
+        "dias": tarefa["dias"],
+        "pct_fisico": tarefa["pct_project"],
+        "predecessoras": [p["id"] for p in tarefa["predecessoras"]],
+        "resumo": tarefa["resumo"],
+    }
 
 
 def dump(caminho):
-    jh = _achar_java_home()
-    if jh:
-        os.environ["JAVA_HOME"] = jh
-    import mpxj  # noqa: F401  (registra os .jar no classpath e sobe a JVM)
-    import jpype
-    import jpype.imports  # noqa: F401
-    if not jpype.isJVMStarted():
-        jpype.startJVM()
-    from org.mpxj.reader import UniversalProjectReader
-
-    project = UniversalProjectReader().read(caminho)
-    out = []
-    for t in project.getTasks():
-        tid = t.getID()
-        if tid is None:
-            continue
-        preds = []
-        try:
-            for r in (t.getPredecessors() or []):
-                st = r.getPredecessorTask()
-                if st is not None and st.getID() is not None:
-                    preds.append(int(st.getID().intValue()))
-        except Exception:
-            pass
-        dur = t.getDuration()
-        out.append({
-            "id": int(tid.intValue()),
-            "outline": int(t.getOutlineLevel().intValue()) if t.getOutlineLevel() is not None else None,
-            "nome": str(t.getName() or "").strip(),
-            "inicio": _d(t.getStart()),
-            "fim": _d(t.getFinish()),
-            "dias": _num(dur.getDuration()) if dur is not None else None,
-            "pct_fisico": _num(t.getPercentageComplete()),
-            "predecessoras": preds,
-            "resumo": bool(t.getSummary()),
-        })
-    return out
+    """Lista de tarefas no shape legado — mesma assinatura/saída de sempre."""
+    return [_projetar_legado(t) for t in parse_cronograma(caminho)["tarefas"]]
 
 
 def main():

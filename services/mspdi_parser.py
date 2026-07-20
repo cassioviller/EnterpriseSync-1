@@ -107,7 +107,7 @@ def parse_mspdi(caminho: str) -> dict:
                 'id': id_pred,
                 'uid': uid_pred,
                 'tipo': _TIPO_VINCULO.get(int(tipo_raw)) if tipo_raw is not None else None,
-                'lag_dias': (int(lag_raw) / _LAG_POR_DIA) if lag_raw is not None else 0.0,
+                'lag_dias': round(int(lag_raw) / _LAG_POR_DIA, 6) if lag_raw is not None else 0.0,
             })
 
         tarefas.append({

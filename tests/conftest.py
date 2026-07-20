@@ -61,6 +61,9 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "browser: testes que requerem Playwright (browser real)"
     )
+    config.addinivalue_line(
+        "markers", "java: testes que sobem a JVM/MPXJ (skip sem JDK completo)"
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)
