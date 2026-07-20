@@ -265,3 +265,47 @@ def test_mpp_sem_java_422(monkeypatch):
         imp = db.session.get(CronogramaImportacao, body['importacao_id'])
         assert imp.status == 'falhou'
         assert imp.origem == 'upload_mpp'
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# 8. Bomba de entidades XML (billion laughs) → 422, sem expandir/persistir.
+# ───────────────────────────────────────────────────────────────────────────
+def test_xml_billion_laughs_rejeitado():
+    """Auditoria A1: defusedxml barra a expansão de entidades antes de tocar
+    disco/memória — 422, nada persistido, worker intacto."""
+    with app.app_context():
+        admin_id, obra_id = _ambiente()
+        c = _client_como(admin_id)
+        bomba = (
+            b'<?xml version="1.0"?>'
+            b'<!DOCTYPE Project [<!ENTITY a "AAAAAAAAAA">'
+            b'<!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">'
+            b'<!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">]>'
+            b'<Project xmlns="http://schemas.microsoft.com/project">&c;</Project>'
+        )
+        resp = _post(c, obra_id, bomba, 'bomba.xml')
+        assert resp.status_code == 422
+        assert CronogramaImportacao.query.filter_by(obra_id=obra_id).count() == 0
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# 9. MSPDI bem-formado com conteúdo inválido → 422 (falhou), nunca 500/órfão.
+# ───────────────────────────────────────────────────────────────────────────
+def test_mspdi_conteudo_invalido_vira_422_nao_500():
+    """Auditoria M1: XML bem-formado com <ID> não-numérico passa a validação
+    de raiz, mas o parse levanta ValueError → precisa virar MppParserError e
+    sair 422 com registro 'falhou' (consistente), não 500."""
+    with app.app_context():
+        admin_id, obra_id = _ambiente()
+        c = _client_como(admin_id)
+        xml = (
+            b'<?xml version="1.0" encoding="UTF-8"?>'
+            b'<Project xmlns="http://schemas.microsoft.com/project">'
+            b'<Name>x</Name><Tasks><Task><UID>1</UID><ID>abc</ID>'
+            b'<Name>t</Name></Task></Tasks></Project>'
+        )
+        resp = _post(c, obra_id, xml, 'ruim.xml')
+        assert resp.status_code == 422
+        imps = CronogramaImportacao.query.filter_by(obra_id=obra_id).all()
+        assert len(imps) == 1
+        assert imps[0].status == 'falhou'

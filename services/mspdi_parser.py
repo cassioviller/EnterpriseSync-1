@@ -21,7 +21,10 @@ Contrato de saída (plano M03, §"Contrato de saída do parser"):
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
+# defusedxml (não a stdlib): bloqueia expansão de entidades ("billion laughs")
+# e referências externas. Um MSPDI real não tem DOCTYPE/entidades, então isto
+# nunca rejeita arquivo legítimo — só barra XML malicioso.
+import defusedxml.ElementTree as ET
 
 NS = {'m': 'http://schemas.microsoft.com/project'}
 _ROOT = '{http://schemas.microsoft.com/project}Project'

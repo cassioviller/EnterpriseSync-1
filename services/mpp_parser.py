@@ -43,7 +43,7 @@ _STDERR_MAX = 2000
 _RAIZ_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MOTIVOS = ('java_indisponivel', 'arquivo_corrompido', 'timeout',
-           'erro_mpxj', 'extensao_invalida')
+           'erro_mpxj', 'extensao_invalida', 'erro_parse')
 
 
 class MppParserError(Exception):
@@ -86,7 +86,18 @@ def parse_cronograma(caminho: str, timeout_s: float = 120) -> dict:
     ext = os.path.splitext(caminho)[1].lower()
 
     if ext == '.xml':
-        return parse_mspdi(caminho)
+        try:
+            return parse_mspdi(caminho)
+        except MppParserError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — contrato: falha tipada, nunca crua
+            # MSPDI bem-formado mas com conteúdo inválido (ex.: <ID>abc</ID> →
+            # ValueError) ou entidade barrada pelo defusedxml. Sem este wrap a
+            # exceção sobe até a rota como HTTP 500 e deixa arquivo órfão.
+            raise MppParserError(
+                'erro_parse',
+                f'não foi possível interpretar o cronograma MSPDI ({exc}).',
+            ) from exc
 
     if ext != '.mpp':
         raise MppParserError(

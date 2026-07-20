@@ -18,12 +18,19 @@ nível deste módulo para que os testes possam monkeypatchá-los aqui
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import time
-import xml.etree.ElementTree as ET
+
+# defusedxml, não a stdlib: barra "billion laughs"/entidades externas num
+# upload .xml antes de qualquer processamento (o arquivo vem de um admin
+# autenticado, mas a expansão derruba o worker gunicorn compartilhado).
+import defusedxml.ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -36,7 +43,18 @@ from services.mpp_parser import (
 )
 from utils.tenant import get_tenant_admin_id
 
+logger = logging.getLogger(__name__)
+
 cronograma_importacao_bp = Blueprint('cronograma_importacao', __name__)
+
+# Mensagens ao cliente para motivos cujo texto interno embute stderr da JVM
+# (paths /nix/store, stack POI/MPXJ, versão do JDK). O detalhe completo fica
+# em imp.erro/log server-side; ao cliente só a versão sem fingerprint de infra.
+_MSG_CLIENTE_GENERICA = {
+    'arquivo_corrompido': 'O arquivo .mpp está corrompido ou não é um MS '
+                          'Project válido.',
+    'erro_mpxj': 'Não foi possível ler o arquivo .mpp.',
+}
 
 # Teto de upload — cronogramas MS Project reais ficam bem abaixo disso; o
 # limite protege disco/memória de arquivos absurdos ou maliciosos.
@@ -110,6 +128,11 @@ def importar_cronograma(obra_id):
     else:  # .xml — precisa ser MSPDI de verdade, antes de persistir
         try:
             raiz = ET.fromstring(conteudo)
+        except DefusedXmlException:
+            # DOCTYPE/entidades/refs externas: MSPDI legítimo não tem nada
+            # disso — é payload malicioso (billion laughs, XXE).
+            return _erro('O arquivo .xml contém construções não permitidas '
+                         '(entidades/DTD) e foi rejeitado.', 422)
         except ET.ParseError:
             return _erro('O arquivo .xml não é um XML válido.', 422)
         if raiz.tag != _RAIZ_MSPDI:
@@ -160,7 +183,22 @@ def importar_cronograma(obra_id):
         criado_por_id=current_user.id,
     )
     db.session.add(imp)
-    db.session.flush()  # obtém imp.id sem committar
+    try:
+        db.session.flush()  # obtém imp.id sem committar; dispara o índice único
+    except IntegrityError:
+        # Corrida: outro POST idêntico (mesma obra+sha) inseriu entre o SELECT
+        # de dedup e este flush. O índice parcial uq_cron_imp_obra_sha (M02) é
+        # o backstop — devolvemos o mesmo 409 amigável, não um 500 opaco.
+        db.session.rollback()
+        existente = CronogramaImportacao.query.filter(
+            CronogramaImportacao.obra_id == obra_id,
+            CronogramaImportacao.arquivo_sha256 == sha256,
+            CronogramaImportacao.status.notin_(['falhou', 'cancelado']),
+        ).first()
+        return _erro(
+            'Este cronograma já foi importado para esta obra.', 409,
+            importacao_existente_id=existente.id if existente else None,
+        )
 
     db.session.add(CronogramaImportacaoEvento(
         importacao_id=imp.id,
@@ -176,7 +214,9 @@ def importar_cronograma(obra_id):
         dados = parse_cronograma(destino_path)
     except MppParserError as exc:
         imp.status = 'falhou'
-        imp.erro = exc.mensagem
+        imp.erro = exc.mensagem  # completo (server-side, para suporte/auditoria)
+        logger.warning('parse de cronograma falhou importacao=%s motivo=%s: %s',
+                       imp.id, exc.motivo, exc.mensagem)
         db.session.add(CronogramaImportacaoEvento(
             importacao_id=imp.id,
             admin_id=admin_id,
@@ -185,7 +225,11 @@ def importar_cronograma(obra_id):
             usuario_id=current_user.id,
         ))
         db.session.commit()
-        return _erro(exc.mensagem, 422, importacao_id=imp.id)
+        # Ao cliente: mensagem sem fingerprint de infra para os motivos que
+        # embutem stderr da JVM; os demais (java_indisponivel, timeout, ...)
+        # já têm texto acionável e seguro.
+        msg_cliente = _MSG_CLIENTE_GENERICA.get(exc.motivo, exc.mensagem)
+        return _erro(msg_cliente, 422, importacao_id=imp.id)
 
     tempo_parse_ms = int((time.monotonic() - inicio) * 1000)
     imp.json_bruto = dados
