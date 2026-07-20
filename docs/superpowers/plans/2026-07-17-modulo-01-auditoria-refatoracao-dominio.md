@@ -144,6 +144,6 @@ Nenhuma (primeiro módulo).
 - [x] Serviço de apontamento único em uso pelos dois callers (`c58b98e`, `d60e107`)
 - [x] Colisão de rota resolvida e testada (2026-07-20; `tests/test_rota_rdo_salvar_unica.py`)
 - [x] Importador reorganizado sem mudança de comportamento (`6782960`)
-- [ ] Decorator de autorização novo pronto para M3/M5/M8
-- [ ] Doc de casos de uso publicado
+- [x] Decorator de autorização novo pronto para M3/M5/M8 (`decorators.cronograma_import_required`)
+- [x] Doc de casos de uso publicado (`docs/superpowers/specs/2026-07-20-separacao-casos-de-uso-importacao.md`)
 - [ ] `run_tests.sh --gate` verde
