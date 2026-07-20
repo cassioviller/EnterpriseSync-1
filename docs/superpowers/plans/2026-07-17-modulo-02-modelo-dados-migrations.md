@@ -157,8 +157,8 @@ M1 concluído (nenhuma técnica, mas evita conflito de merge).
 
 ## 22. Checklist de conclusão
 
-- [ ] 5 modelos novos + colunas novas em `models.py`
-- [ ] Migrations 200-203 registradas em `executar_migracoes()`
-- [ ] Idempotência provada por teste
-- [ ] Backfill testado com dados das baias
-- [ ] Suíte `--gate` verde
+- [x] 5 modelos novos + colunas novas em `models.py` (`e9ad566`)
+- [x] Migrations **207-210** registradas em `executar_migracoes()` — a spec previa 200-203, mas 200-206 já existiam no repo; ver plano de implementação `2026-07-20-modulo-02-implementacao-modelo-dados.md`
+- [x] Idempotência provada por teste (`test_reexecucao_das_migracoes_e_noop` + `test_backfill_reexecucao_noop`)
+- [x] Backfill testado com dados das baias (`f65b56f` — inclui campos antigos byte a byte intactos e multitenant)
+- [x] Suíte gate verde (2026-07-20: `pytest tests/ -m "not browser"` → 446 passed, 4 skipped)
