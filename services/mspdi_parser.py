@@ -32,10 +32,13 @@ _ROOT = '{http://schemas.microsoft.com/project}Project'
 _HORAS_POR_DIA = 8.0
 _DUR = re.compile(r'P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?')
 
-# <PredecessorLink><Type> → tipo de vínculo. Tabela CANDIDATA — a Task 2
-# do plano M03 confirma contra o MPXJ (RelationType por vínculo) nos 3
-# pares de arquivos do repo antes de remover o marcador abaixo.
-_TIPO_VINCULO = {0: 'FF', 1: 'FS', 2: 'SF', 3: 'SS'}  # VERIFICAR-T2
+# <PredecessorLink><Type> → tipo de vínculo. VERIFICADA contra o MPXJ
+# (str(rel.getType()) por vínculo) nos 3 pares de arquivos do repo em
+# 2026-07-20 via scripts/verificar_paridade_mspdi.py: 164 vínculos,
+# zero divergências (0→FF em 31, 1→FS em 111, 3→SS em 22). O valor
+# 2→SF não ocorre em nenhum arquivo — segue a especificação MSPDI
+# (mesma ordem FF/FS/SF/SS), mas sem cobertura empírica.
+_TIPO_VINCULO = {0: 'FF', 1: 'FS', 2: 'SF', 3: 'SS'}
 
 # <LinkLag> vem em décimos de minuto: 4800 = 480 min = 8 h = 1 dia útil.
 _LAG_POR_DIA = 4800.0
