@@ -143,7 +143,7 @@ Nenhuma (primeiro módulo).
 - [x] Caracterização congelada e verde (`3d94224`)
 - [x] Serviço de apontamento único em uso pelos dois callers (`c58b98e`, `d60e107`)
 - [x] Colisão de rota resolvida e testada (2026-07-20; `tests/test_rota_rdo_salvar_unica.py`)
-- [ ] Importador reorganizado sem mudança de comportamento
+- [x] Importador reorganizado sem mudança de comportamento (`6782960`)
 - [ ] Decorator de autorização novo pronto para M3/M5/M8
 - [ ] Doc de casos de uso publicado
 - [ ] `run_tests.sh --gate` verde
