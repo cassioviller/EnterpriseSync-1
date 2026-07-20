@@ -21,3 +21,12 @@ def test_salvar_rdo_flexivel_tem_url_propria():
     adapter = app.url_map.bind('localhost')
     endpoint, _args = adapter.match('/salvar-rdo-flexivel', method='POST')
     assert endpoint == 'main.salvar_rdo_flexivel'
+
+
+def test_rdo_salvar_tem_exatamente_uma_regra():
+    """Uma segunda regra em /rdo/salvar é inalcançável e engana quem lê o código."""
+    regras = [r for r in app.url_map.iter_rules() if r.rule == '/rdo/salvar']
+    endpoints = sorted(r.endpoint for r in regras)
+    assert endpoints == ['main.rdo_salvar_unificado'], (
+        f'esperava dono único, encontrei {endpoints}'
+    )

@@ -227,8 +227,12 @@ def visualizar_rdo(rdo_id):
     """Redirecionar para a visualização moderna unificada de RDO"""
     return redirect(url_for('main.visualizar_rdo', id=rdo_id))
 
-@rdo_crud_bp.route('/salvar', methods=['POST'])
-@login_required
+# Módulo 01 / passo 5 — rota REMOVIDA (não a função).
+# Esta view registrava `/rdo/salvar` sob o url_prefix do rdo_crud_bp,
+# colidindo com @main_bp.route('/rdo/salvar') em views/rdo.py:2511.
+# O main_bp é registrado antes (app.py:463 vs main.py:24), então esta
+# função NUNCA foi despachada. Manter o registro só mantinha uma regra
+# fantasma no url_map. A função fica para o rollout do Módulo 07.
 def salvar_rdo():
     """Salvar RDO (criar ou editar) — endpoint legado.
 
