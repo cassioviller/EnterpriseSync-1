@@ -547,49 +547,16 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
 
 
 # ----------------------------------------------------------------------
-# Orquestrador
+# Blocos do orquestrador (extração literal de importar_fisico_financeiro)
 # ----------------------------------------------------------------------
-def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
+def _importar_comercial(obra, cliente, admin_id: int, payload: dict,
+                        data_inicio, valor_venda, titulo: str):
+    """Materializa Orcamento, Proposta e itens da EAP e emite a aprovação
+    canônica (IMC + OSC). Extraído literalmente dos blocos 1)–3) de
+    importar_fisico_financeiro."""
     from app import db
     from event_manager import EventManager
-    from models import (Obra, Orcamento, OrcamentoItem, Proposta, PropostaItem,
-                        ItemMedicaoComercial, ObraServicoCusto)
-    from services.cliente_resolver import obter_ou_criar_cliente
-
-    obra_j = payload['obra']
-    contrato = payload.get('contrato', {})
-    data_inicio = _parse_date(contrato.get('data_inicio')) or date.today()
-
-    cliente = obter_ou_criar_cliente(nome=obra_j.get('cliente'), admin_id=admin_id)
-    if cliente is None:
-        raise ValueError(
-            "O arquivo precisa de 'obra.cliente' (nome do cliente) — "
-            "obrigatório para criar a obra."
-        )
-    codigo = obra_j.get('codigo_obra') or (obra_j.get('nome') or '')[:20]
-
-    obra = Obra.query.filter_by(codigo=codigo, admin_id=admin_id).first()
-    if obra is None:
-        obra = Obra(codigo=codigo, admin_id=admin_id, nome=obra_j.get('nome'),
-                    data_inicio=data_inicio)
-        db.session.add(obra)
-    obra.nome = obra_j.get('nome')
-    obra.valor_contrato = float(contrato.get('valor_venda') or 0)
-    obra.data_inicio = data_inicio
-    obra.data_previsao_fim = _parse_date(contrato.get('data_fim_cronograma'))
-    # Endereço da obra (exibido no portal do cliente). Usa `endereco` do JSON;
-    # se ausente, cai para `local`. Sem isto o portal mostrava "—".
-    obra.endereco = obra_j.get('endereco') or obra_j.get('local')
-    obra.cliente_id = cliente.id
-    db.session.flush()
-
-    valor_venda = Decimal(str(contrato.get('valor_venda') or 0))
-    avisos: list[str] = []
-
-    # Idempotência: zera os derivados (comercial + físico) desta obra.
-    _limpar_derivados(obra, admin_id)
-
-    titulo = f"Físico-financeiro — {obra.nome or codigo}"[:255]
+    from models import Orcamento, OrcamentoItem, Proposta, PropostaItem
 
     # 1) ORÇAMENTO (catálogo: serviços + insumos + composição) ---------------
     orc = Orcamento(admin_id=admin_id, numero=f'FF-{obra.id}', titulo=titulo,
@@ -657,12 +624,29 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
         'skip_contabil': True,
     }, admin_id, raise_on_error=True)
 
-    # 4) recupera IMC/OSC por PropostaItem e preenche custo + cronograma físico -
+    return orc, proposta, etapa_por_pi
+
+
+def _importar_cronograma(obra, admin_id: int, payload: dict):
+    """Materializa o cronograma físico espelho do .mpp e devolve os índices
+    (mpp por id, tarefa_id -> registro no banco). Extraído literalmente do
+    início do bloco 4) de importar_fisico_financeiro."""
     mpp = {t['id']: t for t in payload.get('cronograma_tarefas', [])}
     # Cronograma físico = espelho do .mpp (todas as tarefas, no outline), criado UMA
     # vez e independente de custo. As etapas de custo só REFERENCIAM essas tarefas.
     tid_to_db = _materializar_cronograma_mpp(
         obra, admin_id, payload.get('cronograma_tarefas', []))
+    return mpp, tid_to_db
+
+
+def _importar_custos(obra, admin_id: int, etapa_por_pi: dict, mpp: dict,
+                     tid_to_db: dict, avisos: list):
+    """Preenche as linhas de custo (OSC/OSCItem) de cada etapa via IMC e vincula
+    etapas às tarefas do cronograma. Extraído literalmente do restante do
+    bloco 4) de importar_fisico_financeiro; acrescenta avisos in-place."""
+    from app import db
+    from models import ItemMedicaoComercial, ObraServicoCusto
+
     imcs = ItemMedicaoComercial.query.filter_by(obra_id=obra.id, admin_id=admin_id).all()
     imc_por_pi = {i.proposta_item_id: i for i in imcs if i.proposta_item_id}
     for pi_id, info in etapa_por_pi.items():
@@ -735,7 +719,11 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
             recalcular_osc_dos_itens(osc)
         _vincular_etapa_tarefas(admin_id, imc, info['etapa'], mpp, tid_to_db, avisos)
 
-    # 5) medições de contrato + snapshot do fluxo de caixa da planilha --------
+
+def _importar_medicoes(obra, admin_id: int, payload: dict):
+    """Materializa as medições de contrato e o snapshot do fluxo de caixa da
+    planilha. Extraído literalmente do bloco 5) de importar_fisico_financeiro."""
+    from app import db
     from models import MedicaoContrato
     for i, med in enumerate(payload.get('medicoes', [])):
         db.session.add(MedicaoContrato(
@@ -747,15 +735,80 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
 
     obra.fluxo_caixa_planilha = payload.get('fluxo_caixa_mensal')
 
-    # RDOs (físico real) a partir do payload; depois sincroniza o % das tarefas
-    # pelo último apontamento. `tid_to_db` foi montado em _materializar_cronograma_mpp.
-    # Sem seção `rdos`, deriva o físico do `pct_fisico` do cronograma (lança a
-    # porcentagem da obra sem adicionar pessoas) — ver _rdos_sinteticos_do_pct_fisico.
+
+def _importar_rdos(obra, admin_id: int, payload: dict, tid_to_db: dict):
+    """Materializa os RDOs (físico real) do payload — ou sintéticos do
+    pct_fisico — e sincroniza os percentuais das tarefas. Extraído literalmente
+    do bloco final de importar_fisico_financeiro."""
+    from app import db
     rdos = payload.get('rdos') or _rdos_sinteticos_do_pct_fisico(payload)
     _materializar_rdos(obra, admin_id, rdos, tid_to_db)
     db.session.flush()
     from utils.cronograma_engine import sincronizar_percentuais_obra
     sincronizar_percentuais_obra(obra.id, admin_id)
+
+
+# ----------------------------------------------------------------------
+# Orquestrador
+# ----------------------------------------------------------------------
+def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
+    from app import db
+    from models import Obra
+    from services.cliente_resolver import obter_ou_criar_cliente
+
+    obra_j = payload['obra']
+    contrato = payload.get('contrato', {})
+    data_inicio = _parse_date(contrato.get('data_inicio')) or date.today()
+
+    cliente = obter_ou_criar_cliente(nome=obra_j.get('cliente'), admin_id=admin_id)
+    if cliente is None:
+        raise ValueError(
+            "O arquivo precisa de 'obra.cliente' (nome do cliente) — "
+            "obrigatório para criar a obra."
+        )
+    codigo = obra_j.get('codigo_obra') or (obra_j.get('nome') or '')[:20]
+
+    obra = Obra.query.filter_by(codigo=codigo, admin_id=admin_id).first()
+    if obra is None:
+        obra = Obra(codigo=codigo, admin_id=admin_id, nome=obra_j.get('nome'),
+                    data_inicio=data_inicio)
+        db.session.add(obra)
+    obra.nome = obra_j.get('nome')
+    obra.valor_contrato = float(contrato.get('valor_venda') or 0)
+    obra.data_inicio = data_inicio
+    obra.data_previsao_fim = _parse_date(contrato.get('data_fim_cronograma'))
+    # Endereço da obra (exibido no portal do cliente). Usa `endereco` do JSON;
+    # se ausente, cai para `local`. Sem isto o portal mostrava "—".
+    obra.endereco = obra_j.get('endereco') or obra_j.get('local')
+    obra.cliente_id = cliente.id
+    db.session.flush()
+
+    valor_venda = Decimal(str(contrato.get('valor_venda') or 0))
+    avisos: list[str] = []
+
+    # Idempotência: zera os derivados (comercial + físico) desta obra.
+    _limpar_derivados(obra, admin_id)
+
+    titulo = f"Físico-financeiro — {obra.nome or codigo}"[:255]
+
+    # 1)–3) ORÇAMENTO + PROPOSTA + APROVAÇÃO canônica → liga Obra + cria IMC/OSC
+    orc, proposta, etapa_por_pi = _importar_comercial(
+        obra, cliente, admin_id, payload, data_inicio, valor_venda, titulo)
+
+    # 4a) cronograma físico espelho do .mpp -----------------------------------
+    mpp, tid_to_db = _importar_cronograma(obra, admin_id, payload)
+
+    # 4b) recupera IMC/OSC por PropostaItem e preenche custo + vínculo físico --
+    _importar_custos(obra, admin_id, etapa_por_pi, mpp, tid_to_db, avisos)
+
+    # 5) medições de contrato + snapshot do fluxo de caixa da planilha --------
+    _importar_medicoes(obra, admin_id, payload)
+
+    # RDOs (físico real) a partir do payload; depois sincroniza o % das tarefas
+    # pelo último apontamento. `tid_to_db` foi montado em _materializar_cronograma_mpp.
+    # Sem seção `rdos`, deriva o físico do `pct_fisico` do cronograma (lança a
+    # porcentagem da obra sem adicionar pessoas) — ver _rdos_sinteticos_do_pct_fisico.
+    _importar_rdos(obra, admin_id, payload, tid_to_db)
 
     db.session.commit()
     return {'obra_id': obra.id, 'orcamento_id': orc.id,
