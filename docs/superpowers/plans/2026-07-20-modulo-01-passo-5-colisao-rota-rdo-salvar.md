@@ -99,7 +99,7 @@ Nenhuma URL muda de comportamento. `POST /rdo/salvar` continua atendido por `mai
 **Files:**
 - Create: `tests/test_rota_rdo_salvar_unica.py`
 
-- [ ] **Step 1: Escrever o teste de caracterização**
+- [x] **Step 1: Escrever o teste de caracterização**
 
 O `conftest.py` já monta o app canônico via fixture autouse `_registrar_blueprints_opcionais` (`import main`), então ambos os blueprints estão registrados na hora da coleta.
 
@@ -129,12 +129,12 @@ def test_salvar_rdo_flexivel_tem_url_propria():
     assert endpoint == 'main.salvar_rdo_flexivel'
 ```
 
-- [ ] **Step 2: Rodar e verificar que passa**
+- [x] **Step 2: Rodar e verificar que passa**
 
 Run: `.pythonlibs/bin/python -u -m pytest tests/test_rota_rdo_salvar_unica.py -p no:cacheprovider -q`
 Expected: `2 passed`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_rota_rdo_salvar_unica.py
@@ -149,7 +149,7 @@ git commit -m "test(rdo): congela o dono da rota POST /rdo/salvar"
 - Modify: `tests/test_rota_rdo_salvar_unica.py`
 - Modify: `crud_rdo_completo.py:230-232`
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar ao fim de `tests/test_rota_rdo_salvar_unica.py`:
 
@@ -163,12 +163,12 @@ def test_rdo_salvar_tem_exatamente_uma_regra():
     )
 ```
 
-- [ ] **Step 2: Rodar e verificar que falha**
+- [x] **Step 2: Rodar e verificar que falha**
 
 Run: `.pythonlibs/bin/python -u -m pytest tests/test_rota_rdo_salvar_unica.py::test_rdo_salvar_tem_exatamente_uma_regra -p no:cacheprovider -q`
 Expected: FAIL — `esperava dono único, encontrei ['main.rdo_salvar_unificado', 'rdo_crud.salvar_rdo']`
 
-- [ ] **Step 3: Remover o registro de rota da perdedora**
+- [x] **Step 3: Remover o registro de rota da perdedora**
 
 Em `crud_rdo_completo.py`, trocar as linhas 230-232:
 
@@ -192,17 +192,17 @@ def salvar_rdo():
 
 Manter o corpo inteiro da função intacto. `login_required` continua importado e usado por outras views do arquivo — não remover o import.
 
-- [ ] **Step 4: Rodar o arquivo de teste inteiro**
+- [x] **Step 4: Rodar o arquivo de teste inteiro**
 
 Run: `.pythonlibs/bin/python -u -m pytest tests/test_rota_rdo_salvar_unica.py -p no:cacheprovider -q`
 Expected: `3 passed`
 
-- [ ] **Step 5: Rodar os testes que exercitam os endpoints legados de RDO**
+- [x] **Step 5: Rodar os testes que exercitam os endpoints legados de RDO**
 
 Run: `.pythonlibs/bin/python -u -m pytest tests/test_rdo_legacy_endpoints_horas.py -p no:cacheprovider --tb=short -q`
 Expected: PASS — o cenário L2 (`POST /rdo/salvar`) continua atendido e continua emitindo `[LEGACY-RDO]`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/test_rota_rdo_salvar_unica.py crud_rdo_completo.py
@@ -216,7 +216,7 @@ git commit -m "fix(rdo): remove regra fantasma /rdo/salvar do url_map"
 **Files:**
 - Modify: `crud_rdo_completo.py:233-249`
 
-- [ ] **Step 1: Corrigir o docstring e a linha de log**
+- [x] **Step 1: Corrigir o docstring e a linha de log**
 
 O docstring atual afirma que a linha `[LEGACY-RDO]` é telemetria de uso em produção. Substituir o docstring de `salvar_rdo` por:
 
@@ -243,12 +243,12 @@ E trocar a string de log (`crud_rdo_completo.py:244`) para não afirmar um path 
             "(ver docstring). user=%s referrer=%s path=%s",
 ```
 
-- [ ] **Step 2: Rodar os testes das duas tarefas anteriores**
+- [x] **Step 2: Rodar os testes das duas tarefas anteriores**
 
 Run: `.pythonlibs/bin/python -u -m pytest tests/test_rota_rdo_salvar_unica.py tests/test_rdo_legacy_endpoints_horas.py -p no:cacheprovider -q`
 Expected: PASS — nenhum teste asserta a string antiga (`test_rdo_legacy_endpoints_horas.py` casa `[LEGACY-RDO]` do vencedor, em `views/rdo.py`).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add crud_rdo_completo.py
@@ -263,7 +263,7 @@ git commit -m "docs(rdo): registra que a telemetria de rdo_crud.salvar_rdo nunca
 - Modify: `docs/superpowers/plans/2026-07-17-cronograma-mpp-rdo-master-plan.md` (§1.3)
 - Modify: `docs/superpowers/plans/2026-07-17-modulo-01-auditoria-refatoracao-dominio.md` (§4, §22)
 
-- [ ] **Step 1: Corrigir §1.3 do plano mestre**
+- [x] **Step 1: Corrigir §1.3 do plano mestre**
 
 Trocar a frase final de §1.3 por:
 
@@ -271,7 +271,7 @@ Trocar a frase final de §1.3 por:
 - Três handlers de gravação redundantes: `salvar_rdo_flexivel` (`views/rdo.py:3849`, principal, em `/salvar-rdo-flexivel`), `rdo_salvar_unificado` (`views/rdo.py:2511`, legado, em `/rdo/salvar`) e `crud_rdo_completo.salvar_rdo` (`:230`, legado). Os dois últimos **colidiam na mesma URL `/rdo/salvar`** — resolvido no Módulo 01 passo 5: `rdo_salvar_unificado` sempre venceu (ordem de registro `app.py:463` < `main.py:24`) e o registro de rota da perdedora foi removido. `salvar_rdo_flexivel` **não** colide: URL distinta.
 ```
 
-- [ ] **Step 2: Corrigir §4 do Módulo 01**
+- [x] **Step 2: Corrigir §4 do Módulo 01**
 
 Trocar o bullet da colisão por:
 
@@ -279,7 +279,7 @@ Trocar o bullet da colisão por:
 - Resolução da colisão `/rdo/salvar`: verificado em runtime que `main.rdo_salvar_unificado` sempre vence (ordem de registro de blueprint, regras estáticas de mesmos métodos). A perdedora `rdo_crud.salvar_rdo` é inalcançável por construção, portanto NÃO pode redirecionar nem devolver 410 — qualquer resposta dela exigiria criar uma URL nova. Correção: remover o registro de rota da perdedora (função preservada para o rollout do Módulo 07). Ver `2026-07-20-modulo-01-passo-5-colisao-rota-rdo-salvar.md`.
 ```
 
-- [ ] **Step 3: Marcar o checklist de §22 do Módulo 01**
+- [x] **Step 3: Marcar o checklist de §22 do Módulo 01**
 
 ```markdown
 - [x] Caracterização congelada e verde
@@ -289,7 +289,7 @@ Trocar o bullet da colisão por:
 
 Deixar os demais itens desmarcados.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/plans/

@@ -30,7 +30,7 @@ Separar responsabilidades hoje entrelaçadas no importador físico-financeiro e 
 - Extração, sem mudança de comportamento, de:
   - `services/cronograma_apontamento_service.py` — função única `registrar_apontamento(tarefa, rdo, valor, tipo)` usada por `views/rdo.py` e `cronograma_views.py` (elimina duplicação §3.2).
   - `services/importacao_fisico_financeiro.py` reorganizado internamente em blocos nomeados: `_importar_comercial(...)`, `_importar_cronograma(...)`, `_importar_custos(...)`, `_importar_medicoes(...)`, `_importar_rdos(...)` — mesmas chamadas, mesma ordem, mesma transação (preparação para o Módulo 5 reusar `_importar_cronograma` isoladamente NÃO acontece aqui; aqui é só organização).
-- Resolução da colisão `/rdo/salvar`: manter o handler que hoje efetivamente atende (verificar ordem de registro em runtime com teste; documentar) e fazer o outro redirecionar/410.
+- Resolução da colisão `/rdo/salvar`: verificado em runtime que `main.rdo_salvar_unificado` sempre vence (ordem de registro de blueprint, regras estáticas de mesmos métodos). A perdedora `rdo_crud.salvar_rdo` é inalcançável por construção, portanto NÃO pode redirecionar nem devolver 410 — qualquer resposta dela exigiria criar uma URL nova. Correção: remover o registro de rota da perdedora (função preservada para o rollout do Módulo 07). Ver `2026-07-20-modulo-01-passo-5-colisao-rota-rdo-salvar.md`.
 - Definição documentada da separação de casos de uso: criação inicial de obra completa | importação/substituição de cronograma | importação de RDO | atualização de custos | atualização de medições (tabela de responsabilidade por serviço).
 - Reativar autorização real em `decorators.py` **apenas** para as rotas novas dos módulos 3/5/8 (decorator novo `cronograma_import_required`), sem tocar o comportamento das rotas existentes (mudar o bypass global é fora de escopo — risco amplo).
 
@@ -140,9 +140,9 @@ Nenhuma (primeiro módulo).
 
 ## 22. Checklist de conclusão
 
-- [ ] Caracterização congelada e verde
-- [ ] Serviço de apontamento único em uso pelos dois callers
-- [ ] Colisão de rota resolvida e testada
+- [x] Caracterização congelada e verde (`3d94224`)
+- [x] Serviço de apontamento único em uso pelos dois callers (`c58b98e`, `d60e107`)
+- [x] Colisão de rota resolvida e testada (2026-07-20; `tests/test_rota_rdo_salvar_unica.py`)
 - [ ] Importador reorganizado sem mudança de comportamento
 - [ ] Decorator de autorização novo pronto para M3/M5/M8
 - [ ] Doc de casos de uso publicado
