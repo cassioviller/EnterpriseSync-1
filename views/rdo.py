@@ -4553,11 +4553,14 @@ def salvar_rdo_flexivel():
                 db.session.rollback()
 
             # V2: Processar apontamentos de produção do cronograma
+            # Módulo 1 (cronograma-mpp): fórmula delegada ao serviço único
+            # services/cronograma_apontamento_service.registrar_apontamento
+            # (mesma semântica de antes — ver testes de caracterização).
             try:
                 from utils.tenant import is_v2_active
-                from models import RDOApontamentoCronograma, TarefaCronograma
-                from utils.cronograma_engine import calcular_progresso_rdo, atualizar_percentual_tarefa
-                from sqlalchemy import func as sqlfunc
+                from models import TarefaCronograma
+                from utils.cronograma_engine import atualizar_percentual_tarefa
+                from services.cronograma_apontamento_service import registrar_apontamento
                 if is_v2_active():
                     tarefa_ids_afetadas = []
                     for key, val in request.form.items():
@@ -4571,31 +4574,11 @@ def salvar_rdo_flexivel():
                                 tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=_admin_id).first()
                                 if not tarefa:
                                     continue
-                                acum_ant = (
-                                    db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
-                                    .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
-                                    .filter(
-                                        RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
-                                        RDOApontamentoCronograma.admin_id == _admin_id,
-                                        RDO.data_relatorio < data_relatorio,
-                                    )
-                                    .scalar()
-                                ) or 0.0
-                                nova_acum = acum_ant + qty
-                                progresso = calcular_progresso_rdo(tarefa_id, data_relatorio, _admin_id)
-                                perc_real = 0.0
-                                if tarefa.quantidade_total and tarefa.quantidade_total > 0:
-                                    perc_real = min(100.0, round(nova_acum / tarefa.quantidade_total * 100, 2))
-                                ap = RDOApontamentoCronograma(
-                                    rdo_id=rdo.id,
-                                    tarefa_cronograma_id=tarefa_id,
-                                    quantidade_executada_dia=qty,
-                                    quantidade_acumulada=nova_acum,
-                                    percentual_realizado=perc_real,
-                                    percentual_planejado=progresso['percentual_planejado'],
+                                registrar_apontamento(
+                                    rdo, tarefa,
+                                    quantidade_dia=qty,
                                     admin_id=_admin_id,
                                 )
-                                db.session.add(ap)
                                 tarefa_ids_afetadas.append(tarefa_id)
                             except (ValueError, TypeError) as e_p:
                                 logger.warning(f"[WARN] Apontamento cronograma inválido {key}={val}: {e_p}")

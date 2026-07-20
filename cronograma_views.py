@@ -1167,49 +1167,19 @@ def apontar_producao(rdo_id: int):
             'msg': 'Apontamentos não podem ser feitos em tarefas do cronograma do cliente'
         }), 400
 
-    # Buscar apontamento existente ou criar
-    ap = RDOApontamentoCronograma.query.filter_by(
-        rdo_id=rdo_id, tarefa_cronograma_id=tarefa_id
-    ).first()
-
-    if ap is None:
-        ap = RDOApontamentoCronograma(
-            rdo_id=rdo_id,
-            tarefa_cronograma_id=tarefa_id,
-            admin_id=admin_id,
-        )
-        db.session.add(ap)
-
-    # Calcular acumulado ANTES deste RDO
-    from sqlalchemy import func as sqlfunc
-    acum_anterior = (
-        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
-        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
-        .filter(
-            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
-            RDOApontamentoCronograma.admin_id == admin_id,
-            RDO.data_relatorio < rdo.data_relatorio,
-        )
-        .scalar()
-    ) or 0.0
-
-    nova_acumulada = acum_anterior + qty_dia
-
-    # Calcular percentuais
-    progresso = calcular_progresso_rdo(tarefa_id, rdo.data_relatorio, admin_id)
-
-    perc_realizado = 0.0
-    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
-        perc_realizado = min(100.0, round(nova_acumulada / tarefa.quantidade_total * 100, 2))
-
-    ap.quantidade_executada_dia = qty_dia
-    ap.quantidade_acumulada = nova_acumulada
-    ap.percentual_realizado = perc_realizado
-    # Task #142 — coluna agora é nullable. Persistimos `None` quando a tarefa
-    # não tem plano calculável (sem data_inicio/duração). A UI usa esse `None`
-    # para mostrar "—" / badge "Sem plano" em vez de 0%.
-    plan_calculado = progresso['percentual_planejado']
-    ap.percentual_planejado = plan_calculado
+    # Módulo 1 (cronograma-mpp): acumulado + percentuais + UPSERT delegados ao
+    # serviço único services/cronograma_apontamento_service.registrar_apontamento
+    # (mesma semântica de antes — ver testes de caracterização). Task #142:
+    # percentual_planejado fica `None` quando a tarefa não tem plano calculável
+    # (sem data_inicio/duração); a UI usa esse `None` para mostrar "—" /
+    # badge "Sem plano" em vez de 0%.
+    from services.cronograma_apontamento_service import registrar_apontamento
+    ap = registrar_apontamento(
+        rdo, tarefa,
+        quantidade_dia=qty_dia,
+        admin_id=admin_id,
+    )
+    plan_calculado = ap.percentual_planejado
 
     db.session.commit()
 
