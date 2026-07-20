@@ -248,6 +248,19 @@ except Exception as e:
     logger.error(f"[ERROR] Falha ao registrar catalogos: {e}", exc_info=True)
 
 try:
+    from views.cronograma_importacao import cronograma_importacao_bp
+    app.register_blueprint(cronograma_importacao_bp)
+    # Endpoint de API JSON/multipart (upload via fetch/XHR), como os demais
+    # blueprints de API do app — dispensa CSRF de formulário. Exempt aqui e
+    # não na lista acima porque aquele loop já rodou antes deste registro.
+    csrf.exempt(cronograma_importacao_bp)
+    logger.info("[OK] Blueprint cronograma_importacao registrado (CSRF exempt)")
+except ImportError as e:
+    logger.warning(f"[WARN] cronograma_importacao não encontrado: {e}", exc_info=True)
+except Exception as e:
+    logger.error(f"[ERROR] Falha ao registrar cronograma_importacao: {e}", exc_info=True)
+
+try:
     from views.quick_create_views import quick_create_bp
     app.register_blueprint(quick_create_bp)
     logger.info("[OK] Blueprint quick_create registrado")
