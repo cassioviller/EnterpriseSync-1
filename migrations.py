@@ -4007,6 +4007,7 @@ def executar_migracoes():
             (207, "Cronograma-mpp M02 — tabelas de importação/versionamento (importacao, versao, snapshot, mapeamento, evento)", _migration_207_cronograma_versionamento),
             (208, "Cronograma-mpp M02 — identidade estável em tarefa_cronograma (mpp_uid/wbs/fingerprint/is_marco/ativa)", _migration_208_tarefa_cronograma_identidade),
             (209, "Cronograma-mpp M02 — semântica de apontamento em rdo_apontamento_cronograma (tipo/percentuais/snapshot)", _migration_209_rdo_apontamento_semantico),
+            (210, "Cronograma-mpp M02 — backfill versão nº1 + snapshots + tipo_apontamento", _migration_210_backfill_versao_inicial),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14042,4 +14043,55 @@ def _migration_209_rdo_apontamento_semantico():
         logger.info("[Migration 209] colunas semânticas em rdo_apontamento_cronograma.")
     except Exception as e:
         logger.error(f"[Migration 209] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_210_backfill_versao_inicial():
+    """Módulo 02 — backfill: versão nº1 ativa + snapshots por obra com tarefas;
+    tipo_apontamento nos apontamentos existentes. Idempotente (pula o que já
+    tem); commit por obra para caber no timeout de startup."""
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.connect() as conn:
+            obras = conn.execute(sa_text("""
+                SELECT DISTINCT t.obra_id, t.admin_id FROM tarefa_cronograma t
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
+                )
+            """)).fetchall()
+        for obra_id, admin_id in obras:
+            with db.engine.begin() as conn:
+                versao_id = conn.execute(sa_text("""
+                    INSERT INTO cronograma_versao (obra_id, admin_id, numero, status, observacao)
+                    VALUES (:o, :a, 1, 'ativa', 'backfill inicial') RETURNING id
+                """), {'o': obra_id, 'a': admin_id}).scalar()
+                conn.execute(sa_text("""
+                    INSERT INTO cronograma_tarefa_snapshot
+                        (versao_id, admin_id, tarefa_id, nome_tarefa, ordem,
+                         data_inicio, data_fim, duracao_dias, quantidade_total,
+                         unidade_medida, percentual_concluido_no_momento)
+                    SELECT :v, t.admin_id, t.id, t.nome_tarefa, t.ordem,
+                           t.data_inicio, t.data_fim, t.duracao_dias, t.quantidade_total,
+                           t.unidade_medida, t.percentual_concluido
+                    FROM tarefa_cronograma t WHERE t.obra_id = :o
+                """), {'v': versao_id, 'o': obra_id})
+            logger.info(f"[Migration 210] obra {obra_id}: versão 1 + snapshots.")
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                UPDATE rdo_apontamento_cronograma ap SET
+                    tipo_apontamento = CASE
+                        WHEN t.quantidade_total > 0 THEN 'quantitativo' ELSE 'percentual' END,
+                    quantidade_total_snapshot = t.quantidade_total,
+                    unidade_snapshot = t.unidade_medida,
+                    percentual_acumulado = CASE
+                        WHEN t.quantidade_total > 0 THEN NULL ELSE ap.percentual_realizado END,
+                    percentual_incremento_dia = CASE
+                        WHEN t.quantidade_total > 0 THEN NULL ELSE ap.quantidade_executada_dia END
+                FROM tarefa_cronograma t
+                WHERE t.id = ap.tarefa_cronograma_id
+                  AND ap.tipo_apontamento IS NULL
+            """))
+        logger.info("[Migration 210] backfill concluído.")
+    except Exception as e:
+        logger.error(f"[Migration 210] Falha: {e}", exc_info=True)
         raise
