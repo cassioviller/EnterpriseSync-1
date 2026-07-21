@@ -142,37 +142,10 @@ def _rdo_com_apontamento(obra, admin, tarefa, acumulada=40.0, pct=40.0):
 # ---------------------------------------------------------------------------
 
 def _extrair_atuais(obra, admin):
-    """Extrai as tarefas VIVAS no shape TarefaAtual do reconciliador."""
-    vivas = (TarefaCronograma.query
-             .filter_by(obra_id=obra.id, admin_id=admin.id, is_cliente=False)
-             .filter(TarefaCronograma.ativa.is_(True))
-             .order_by(TarefaCronograma.id)
-             .all())
-    por_id = {t.id: t for t in vivas}
-
-    def _caminho(t):
-        partes, cur, visitados = [], t, set()
-        while cur is not None and cur.id not in visitados:
-            visitados.add(cur.id)
-            partes.append(normalizar_nome(cur.nome_tarefa))
-            cur = por_id.get(cur.tarefa_pai_id)
-        return '/'.join(reversed(partes))
-
-    return [{
-        'id': t.id,
-        'mpp_uid': t.mpp_uid,
-        'wbs_codigo': t.wbs_codigo,
-        'nome_normalizado': normalizar_nome(t.nome_tarefa),
-        'caminho': _caminho(t),
-        'fingerprint': t.fingerprint,
-        'tarefa_pai_id': t.tarefa_pai_id,
-        'data_inicio': t.data_inicio,
-        'data_fim': t.data_fim,
-        'duracao_dias': t.duracao_dias,
-        'quantidade_total': t.quantidade_total,
-        'unidade_medida': t.unidade_medida,
-        'predecessoras': [t.predecessora_id] if t.predecessora_id else [],
-    } for t in vivas]
+    """Extrai as tarefas VIVAS no shape TarefaAtual — pela ponte REAL de
+    produção (extrair_tarefas_atuais), não uma cópia de teste."""
+    from services.cronograma_versao_service import extrair_tarefas_atuais
+    return extrair_tarefas_atuais(obra.id, admin.id)
 
 
 def _nt(chave, nome, **kw):

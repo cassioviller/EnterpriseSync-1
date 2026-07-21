@@ -167,6 +167,47 @@ def _snapshot_versao(versao, tarefas, admin_id, preds_tipadas=None):
 
 
 # ---------------------------------------------------------------------------
+# Ponte ORM → reconciliador puro (Task 1 é PURA; a extração vive aqui)
+# ---------------------------------------------------------------------------
+
+def extrair_tarefas_atuais(obra_id: int, admin_id: int) -> list:
+    """Tarefas VIVAS do cronograma interno no shape TarefaAtual do
+    reconciliador (services.cronograma_reconciliacao)."""
+    from services.cronograma_normalizacao import normalizar_nome
+
+    vivas = (TarefaCronograma.query
+             .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+             .filter(TarefaCronograma.ativa.is_(True))
+             .order_by(TarefaCronograma.id)
+             .all())
+    por_id = {t.id: t for t in vivas}
+
+    def _caminho(t):
+        partes, cur, visitados = [], t, set()
+        while cur is not None and cur.id not in visitados:
+            visitados.add(cur.id)
+            partes.append(normalizar_nome(cur.nome_tarefa))
+            cur = por_id.get(cur.tarefa_pai_id)
+        return '/'.join(reversed(partes))
+
+    return [{
+        'id': t.id,
+        'mpp_uid': t.mpp_uid,
+        'wbs_codigo': t.wbs_codigo,
+        'nome_normalizado': normalizar_nome(t.nome_tarefa),
+        'caminho': _caminho(t),
+        'fingerprint': t.fingerprint,
+        'tarefa_pai_id': t.tarefa_pai_id,
+        'data_inicio': t.data_inicio,
+        'data_fim': t.data_fim,
+        'duracao_dias': t.duracao_dias,
+        'quantidade_total': t.quantidade_total,
+        'unidade_medida': t.unidade_medida,
+        'predecessoras': [t.predecessora_id] if t.predecessora_id else [],
+    } for t in vivas]
+
+
+# ---------------------------------------------------------------------------
 # Resolução mapeamentos + decisões → plano final (matches/inserir/arquivar)
 # ---------------------------------------------------------------------------
 

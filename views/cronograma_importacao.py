@@ -35,11 +35,26 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from decorators import cronograma_import_required
-from models import CronogramaImportacao, CronogramaImportacaoEvento, Obra
+from models import (
+    CronogramaImportacao,
+    CronogramaImportacaoEvento,
+    CronogramaTarefaMapeamento,
+    CronogramaVersao,
+    Obra,
+)
 from services.cronograma_normalizacao import (
     NORMALIZADOR_VERSAO,
     NormalizacaoError,
     normalizar,
+)
+from services.cronograma_reconciliacao import reconciliar
+from services.cronograma_versao_service import (
+    DecisaoInvalida,
+    EstadoInvalido,
+    PendenciasSemDecisao,
+    aplicar_versao,
+    extrair_tarefas_atuais,
+    restaurar_versao,
 )
 from services.mpp_parser import (
     MppParserError,
@@ -284,3 +299,237 @@ def importar_cronograma(obra_id):
     ))
     db.session.commit()
     return jsonify({'importacao_id': imp.id, 'status': 'normalizado'}), 201
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M05 — reconciliação, decisão manual, aplicação e restauração
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _importacao_do_tenant(obra_id, importacao_id, admin_id):
+    """(obra, imp) do tenant ou (None, None) — 404 na chamada."""
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if obra is None:
+        return None, None
+    imp = CronogramaImportacao.query.filter_by(
+        id=importacao_id, obra_id=obra_id, admin_id=admin_id).first()
+    return obra, imp
+
+
+def _mapeamento_para_json(mp):
+    det = mp.detalhes or {}
+    return {
+        'id': mp.id,
+        'id_temp': det.get('id_temp'),
+        'tarefa_atual_id': mp.tarefa_atual_id,
+        'chave_nova': mp.chave_nova,
+        'tipo': det.get('tipos') or [mp.tipo],
+        'nivel_match': det.get('nivel_match'),
+        'score': mp.score,
+        'decisao_requerida': bool(det.get('decisao_requerida')),
+        'candidatos': det.get('candidatos') or [],
+        'detalhes': det.get('diff') or {},
+        'decisao': det.get('decisao'),
+        'origem_decisao': mp.origem_decisao,
+        'decidido_por_id': mp.decidido_por_id,
+    }
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>'
+    '/reconciliar', methods=['POST']
+)
+@cronograma_import_required
+def reconciliar_importacao(obra_id, importacao_id):
+    """Roda a reconciliação (Task 1) contra as tarefas vivas e persiste
+    relatorio_diff + mapeamentos; re-executável enquanto não aplicada."""
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    if imp.status not in ('normalizado', 'aguardando_revisao'):
+        return _erro(
+            f"Importação está '{imp.status}' — reconciliação exige "
+            f"'normalizado' (ou re-execução em 'aguardando_revisao').", 409)
+
+    rel = reconciliar(extrair_tarefas_atuais(obra_id, admin_id),
+                      imp.json_normalizado)
+    imp.relatorio_diff = rel
+    imp.status = 'aguardando_revisao'
+
+    # Re-reconciliar regrava os mapeamentos (dados derivados do diff);
+    # decisões antigas caem — o diff pode ter mudado de forma.
+    CronogramaTarefaMapeamento.query.filter_by(
+        importacao_id=imp.id).delete()
+    for m in rel['mapeamentos']:
+        db.session.add(CronogramaTarefaMapeamento(
+            importacao_id=imp.id,
+            admin_id=admin_id,
+            tarefa_atual_id=m['tarefa_atual_id'],
+            chave_nova=m['chave_nova'],
+            tipo=m['tipo'][0],
+            score=m['score'],
+            origem_decisao=None if m['decisao_requerida'] else 'auto',
+            detalhes={
+                'id_temp': m['id_temp'],
+                'tipos': m['tipo'],
+                'nivel_match': m['nivel_match'],
+                'decisao_requerida': m['decisao_requerida'],
+                'candidatos': m['candidatos'],
+                'diff': m['detalhes'],
+            },
+        ))
+    pendencias = sum(1 for m in rel['mapeamentos'] if m['decisao_requerida'])
+    db.session.add(CronogramaImportacaoEvento(
+        importacao_id=imp.id,
+        admin_id=admin_id,
+        evento='reconciliado',
+        detalhes={'resumo': rel['resumo'], 'pendencias': pendencias},
+        usuario_id=current_user.id,
+    ))
+    db.session.commit()
+    return jsonify({
+        'importacao_id': imp.id,
+        'status': imp.status,
+        'resumo': rel['resumo'],
+        'pendencias': pendencias,
+        'sugestoes_split_merge': rel['sugestoes_split_merge'],
+    }), 200
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>/diff'
+)
+@cronograma_import_required
+def diff_importacao(obra_id, importacao_id):
+    """Relatório de reconciliação + estado das decisões, para a revisão."""
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    if not imp.relatorio_diff:
+        return _erro('Importação ainda não foi reconciliada.', 409)
+    mapeamentos = (CronogramaTarefaMapeamento.query
+                   .filter_by(importacao_id=imp.id)
+                   .order_by(CronogramaTarefaMapeamento.id)
+                   .all())
+    return jsonify({
+        'importacao_id': imp.id,
+        'status': imp.status,
+        'relatorio_diff': imp.relatorio_diff,
+        'mapeamentos': [_mapeamento_para_json(mp) for mp in mapeamentos],
+    }), 200
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>'
+    '/mapeamentos/<int:mapeamento_id>', methods=['PATCH']
+)
+@cronograma_import_required
+def decidir_mapeamento(obra_id, importacao_id, mapeamento_id):
+    """Registra a decisão manual de um mapeamento pendente
+    (acao: casar|arquivar|nova; casar exige chave_nova)."""
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    if imp.status != 'aguardando_revisao':
+        return _erro(
+            f"Importação está '{imp.status}' — decisões só em "
+            f"'aguardando_revisao'.", 409)
+    mp = CronogramaTarefaMapeamento.query.filter_by(
+        id=mapeamento_id, importacao_id=imp.id, admin_id=admin_id).first()
+    if mp is None:
+        return _erro('Mapeamento não encontrado nesta importação.', 404)
+    det = dict(mp.detalhes or {})
+    if not det.get('decisao_requerida'):
+        return _erro('Este mapeamento não requer decisão.', 422)
+
+    corpo = request.get_json(silent=True) or {}
+    acao = corpo.get('acao')
+    if acao not in ('casar', 'arquivar', 'nova'):
+        return _erro("Campo 'acao' deve ser casar, arquivar ou nova.", 422)
+    decisao = {'acao': acao}
+    if acao == 'casar':
+        chave = corpo.get('chave_nova')
+        if not chave:
+            return _erro("Ação 'casar' exige 'chave_nova'.", 422)
+        decisao['chave_nova'] = chave
+
+    det['decisao'] = decisao
+    mp.detalhes = det
+    mp.origem_decisao = 'manual'
+    mp.decidido_por_id = current_user.id
+    db.session.add(CronogramaImportacaoEvento(
+        importacao_id=imp.id,
+        admin_id=admin_id,
+        evento='revisao_alterada',
+        detalhes={'mapeamento_id': mp.id, 'id_temp': det.get('id_temp'),
+                  'decisao': decisao},
+        usuario_id=current_user.id,
+    ))
+    db.session.commit()
+    return jsonify(_mapeamento_para_json(mp)), 200
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>'
+    '/aplicar', methods=['POST']
+)
+@cronograma_import_required
+def aplicar_importacao(obra_id, importacao_id):
+    """Aplica a importação como nova versão (Task 2). 422 se ainda há
+    pendências sem decisão; 409 para estado inválido/concorrência."""
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+
+    decisoes = {}
+    for mp in CronogramaTarefaMapeamento.query.filter_by(
+            importacao_id=imp.id).all():
+        det = mp.detalhes or {}
+        if det.get('decisao') and det.get('id_temp') is not None:
+            decisoes[det['id_temp']] = det['decisao']
+
+    try:
+        versao = aplicar_versao(imp.id, decisoes, current_user.id)
+    except PendenciasSemDecisao as exc:
+        return _erro(str(exc), 422, pendencias=exc.id_temps)
+    except DecisaoInvalida as exc:
+        return _erro(str(exc), 422)
+    except EstadoInvalido as exc:
+        return _erro(str(exc), 409)
+    return jsonify({
+        'importacao_id': imp.id,
+        'status': 'aplicado',
+        'versao_id': versao.id,
+        'versao_numero': versao.numero,
+    }), 200
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/versoes/<int:versao_id>/restaurar',
+    methods=['POST']
+)
+@cronograma_import_required
+def restaurar_versao_endpoint(obra_id, versao_id):
+    """Rollback: restaura o cronograma ao snapshot da versão (Task 3)."""
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if obra is None:
+        return _erro('Obra não encontrada para este usuário.', 404)
+    versao = CronogramaVersao.query.filter_by(
+        id=versao_id, obra_id=obra_id, admin_id=admin_id).first()
+    if versao is None:
+        return _erro('Versão não encontrada para esta obra.', 404)
+
+    try:
+        nova = restaurar_versao(versao.id, current_user.id)
+    except EstadoInvalido as exc:
+        return _erro(str(exc), 409)
+    return jsonify({
+        'versao_id': nova.id,
+        'versao_numero': nova.numero,
+        'restaurada_de': versao.numero,
+        'status': 'ativa',
+    }), 200
