@@ -4015,6 +4015,7 @@ def executar_migracoes():
             # Fase 0.6 usa 217-219. A faixa 214-216 está reservada à Fase 1
             # (identidade e papéis) — ver ESTADO-ATUAL.md.
             (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
+            (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14226,6 +14227,178 @@ def _migration_217_canonizar_status_obra():
             f"de dropdown canonizadas.")
     except Exception as e:
         logger.error(f"[Migration 217] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_218_plano_contas_por_tenant():
+    """Fase 0.6 / D4 — a conta contábil passa a pertencer ao tenant.
+
+    `plano_contas.codigo` era PK global, apesar de a tabela ter `admin_id`, e
+    as seis tabelas dependentes tinham FK só por `codigo`. O seed usava
+    `ON CONFLICT (codigo) DO NOTHING`: do 2º tenant em diante inseria zero
+    contas e ainda assim marcava o tenant como semeado.
+
+    Medido em 2026-07-21 no banco de desenvolvimento: 315 tenants com
+    lançamentos contábeis, 2 com plano de contas, e 980 das 1.204 partidas
+    apontando para um par (admin_id, conta) inexistente — empresas lançando
+    contabilidade sobre o plano de contas de outra empresa.
+
+    A migração tem três atos, nesta ordem obrigatória:
+
+    1. **Backfill.** Para todo par (admin_id, codigo) referenciado por uma
+       linha dependente e ausente de `plano_contas`, copia a definição da
+       conta — e toda a cadeia de pais — para aquele tenant. Sem isto o ato 2
+       falharia nas 980 linhas.
+    2. **Troca de PK** para (admin_id, codigo), incluindo a auto-FK
+       `conta_pai_codigo`.
+    3. **FKs compostas** nas seis dependentes, que passam a impedir
+       estruturalmente o vazamento entre tenants.
+
+    Idempotente: cada passo verifica o estado antes de agir.
+    """
+    from sqlalchemy import text as sa_text
+
+    # (tabela, coluna que referencia plano_contas.codigo)
+    dependentes = [
+        ('partida_contabil', 'conta_codigo'),
+        ('balancete_mensal', 'conta_codigo'),
+        ('fluxo_caixa_contabil', 'conta_codigo'),
+        ('conta_pagar', 'conta_contabil_codigo'),
+        ('conta_receber', 'conta_contabil_codigo'),
+    ]
+
+    try:
+        with db.engine.begin() as conn:
+            ja_composta = conn.execute(sa_text("""
+                SELECT COUNT(*) FROM pg_index i
+                  JOIN pg_attribute a
+                    ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                 WHERE i.indrelid = 'plano_contas'::regclass
+                   AND i.indisprimary AND a.attname = 'admin_id'
+            """)).scalar()
+
+            # ── Ato 0: derrubar as FKs e trocar a PK ANTES do backfill ──────
+            # A ordem aqui é a parte não-óbvia da migração, e errá-la produz
+            # uma migração que "roda" sem fazer nada:
+            #
+            # - as FKs caem primeiro porque o backfill insere em ordem
+            #   arbitrária (filha antes do pai) e cria esqueletos para
+            #   códigos órfãos cujo pai não existe em plano nenhum;
+            # - a PK tem que virar composta ANTES do backfill. Com a PK ainda
+            #   global, o `ON CONFLICT DO NOTHING` de cada INSERT casaria com
+            #   a linha do OUTRO tenant que já ocupa aquele código — e o
+            #   backfill seria um no-op silencioso, exatamente o mesmo defeito
+            #   que ele existe para corrigir.
+            #
+            # Tudo roda numa transação só: se algo falhar, nada muda.
+            for tabela, coluna in dependentes:
+                conn.execute(sa_text(
+                    f"ALTER TABLE {tabela} DROP CONSTRAINT IF EXISTS "
+                    f"{tabela}_{coluna}_fkey"))
+            conn.execute(sa_text(
+                "ALTER TABLE plano_contas DROP CONSTRAINT IF EXISTS "
+                "plano_contas_conta_pai_codigo_fkey"))
+            if not ja_composta:
+                conn.execute(sa_text(
+                    "ALTER TABLE plano_contas DROP CONSTRAINT IF EXISTS "
+                    "plano_contas_pkey"))
+                conn.execute(sa_text(
+                    "ALTER TABLE plano_contas ADD CONSTRAINT plano_contas_pkey "
+                    "PRIMARY KEY (admin_id, codigo)"))
+
+            # ── Ato 1: backfill dos pares (admin_id, codigo) ausentes ────────
+            # Repetido até estabilizar: copiar uma conta pode exigir copiar o
+            # pai dela, que pode exigir o avô. A cadeia tem no máximo 4 níveis
+            # nos planos em uso, mas o laço não depende disso.
+            copiadas_total = 0
+            for _ in range(10):
+                faltantes = []
+                for tabela, coluna in dependentes:
+                    faltantes.extend(conn.execute(sa_text(f"""
+                        SELECT DISTINCT d.admin_id, d.{coluna}
+                          FROM {tabela} d
+                         WHERE d.{coluna} IS NOT NULL
+                           AND d.admin_id IS NOT NULL
+                           AND NOT EXISTS (
+                               SELECT 1 FROM plano_contas pc
+                                WHERE pc.codigo = d.{coluna}
+                                  AND pc.admin_id = d.admin_id
+                           )
+                    """)).fetchall())
+
+                # Pais ausentes das contas que já existem para o tenant.
+                faltantes.extend(conn.execute(sa_text("""
+                    SELECT DISTINCT pc.admin_id, pc.conta_pai_codigo
+                      FROM plano_contas pc
+                     WHERE pc.conta_pai_codigo IS NOT NULL
+                       AND NOT EXISTS (
+                           SELECT 1 FROM plano_contas pai
+                            WHERE pai.codigo = pc.conta_pai_codigo
+                              AND pai.admin_id = pc.admin_id
+                       )
+                """)).fetchall())
+
+                if not faltantes:
+                    break
+
+                for admin_id, codigo in set(faltantes):
+                    # Modelo da conta: qualquer definição existente dela.
+                    modelo = conn.execute(sa_text("""
+                        SELECT nome, tipo_conta, natureza, nivel,
+                               conta_pai_codigo, aceita_lancamento
+                          FROM plano_contas WHERE codigo = :c LIMIT 1
+                    """), {'c': codigo}).first()
+                    if modelo is None:
+                        # Conta referenciada que não existe em plano nenhum.
+                        # Cria um esqueleto para não perder o lançamento; o
+                        # nome deixa claro que veio de dado órfão.
+                        nivel = len(codigo.split('.'))
+                        pai = codigo.rsplit('.', 1)[0] if nivel > 1 else None
+                        modelo = (f'[órfã] {codigo}', 'DESPESA', 'DEVEDORA',
+                                  nivel, pai, True)
+                        logger.warning(
+                            f"[Migration 218] conta {codigo!r} não existe em "
+                            f"plano nenhum — criada como órfã para admin "
+                            f"{admin_id}")
+                    conn.execute(sa_text("""
+                        INSERT INTO plano_contas
+                            (codigo, nome, tipo_conta, natureza, nivel,
+                             conta_pai_codigo, aceita_lancamento, ativo, admin_id)
+                        VALUES (:codigo, :nome, :tipo, :natureza, :nivel,
+                                :pai, :aceita, true, :aid)
+                        ON CONFLICT DO NOTHING
+                    """), {
+                        'codigo': codigo, 'nome': modelo[0], 'tipo': modelo[1],
+                        'natureza': modelo[2], 'nivel': modelo[3],
+                        'pai': modelo[4], 'aceita': modelo[5], 'aid': admin_id,
+                    })
+                    copiadas_total += 1
+
+            # ── Ato 2: FKs compostas ────────────────────────────────────────
+            conn.execute(sa_text("""
+                ALTER TABLE plano_contas
+                  ADD CONSTRAINT plano_contas_conta_pai_codigo_fkey
+                  FOREIGN KEY (admin_id, conta_pai_codigo)
+                  REFERENCES plano_contas (admin_id, codigo)
+            """))
+            for tabela, coluna in dependentes:
+                conn.execute(sa_text(f"""
+                    ALTER TABLE {tabela}
+                      ADD CONSTRAINT {tabela}_{coluna}_fkey
+                      FOREIGN KEY (admin_id, {coluna})
+                      REFERENCES plano_contas (admin_id, codigo)
+                """))
+                # A PK composta não serve de índice para buscas só por código.
+                conn.execute(sa_text(
+                    f"CREATE INDEX IF NOT EXISTS idx_{tabela}_{coluna} "
+                    f"ON {tabela} ({coluna})"))
+
+        logger.info(
+            f"[Migration 218] plano_contas agora é por tenant. "
+            f"{copiadas_total} conta(s) copiadas no backfill; PK e 6 FKs "
+            f"reconstruídas como compostas.")
+    except Exception as e:
+        logger.error(f"[Migration 218] Falha: {e}", exc_info=True)
         raise
 
 

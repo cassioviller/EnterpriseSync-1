@@ -1765,7 +1765,7 @@ class ContaPagar(db.Model):
     data_vencimento = db.Column(db.Date, nullable=False)
     data_pagamento = db.Column(db.Date)
     status = db.Column(db.String(20), default='PENDENTE')
-    conta_contabil_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_contabil_codigo = db.Column(db.String(20))
     forma_pagamento = db.Column(db.String(50))
     observacoes = db.Column(db.Text)
     origem_tipo = db.Column(db.String(50))
@@ -1792,6 +1792,12 @@ class ContaPagar(db.Model):
         db.Index('idx_conta_pagar_status', 'status'),
         db.Index('idx_conta_pagar_fornecedor', 'fornecedor_id'),
         db.Index('idx_conta_pagar_obra', 'obra_id'),
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_contabil_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
         db.Index('idx_conta_pagar_admin', 'admin_id'),
     )
 
@@ -1812,7 +1818,7 @@ class ContaReceber(db.Model):
     data_vencimento = db.Column(db.Date, nullable=False)
     data_recebimento = db.Column(db.Date)
     status = db.Column(db.String(20), default='PENDENTE')
-    conta_contabil_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_contabil_codigo = db.Column(db.String(20))
     forma_recebimento = db.Column(db.String(50))
     observacoes = db.Column(db.Text)
     origem_tipo = db.Column(db.String(50))
@@ -1831,6 +1837,12 @@ class ContaReceber(db.Model):
         db.Index('idx_conta_receber_status', 'status'),
         db.Index('idx_conta_receber_cliente', 'cliente_cpf_cnpj'),
         db.Index('idx_conta_receber_obra', 'obra_id'),
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_contabil_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
         db.Index('idx_conta_receber_admin', 'admin_id'),
     )
 
@@ -2508,19 +2520,35 @@ class NotificacaoCliente(db.Model):
 # ===============================================================
 
 class PlanoContas(db.Model):
-    """Plano de Contas brasileiro completo e hierárquico."""
+    """Plano de Contas brasileiro completo e hierárquico.
+
+    Fase 0.6 / D4 — a PK é `(admin_id, codigo)`. Era só `codigo`, global,
+    apesar de a tabela sempre ter tido `admin_id`: a primeira empresa a
+    semear ficava dona de '1.1.01.001' e as demais não conseguiam criar a
+    própria (o seed usava `ON CONFLICT (codigo) DO NOTHING`). Em 21/07 havia
+    315 tenants com lançamentos contábeis e 2 com plano de contas.
+    Ver migration 218.
+    """
     __tablename__ = 'plano_contas'
+    __table_args__ = (
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_pai_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
+    # A ordem das colunas da PK segue a do índice criado pela migration 218.
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         primary_key=True, nullable=False)
     codigo = db.Column(db.String(20), primary_key=True)  # Ex: 1.1.01.001
     nome = db.Column(db.String(200), nullable=False)
     tipo_conta = db.Column(db.String(20), nullable=False)  # ATIVO, PASSIVO, PATRIMONIO, RECEITA, DESPESA
     natureza = db.Column(db.String(10), nullable=False)  # DEVEDORA, CREDORA
     nivel = db.Column(db.Integer, nullable=False)
-    conta_pai_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_pai_codigo = db.Column(db.String(20))
     aceita_lancamento = db.Column(db.Boolean, default=True)  # True para contas analíticas
     ativo = db.Column(db.Boolean, default=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
-    conta_pai = db.relationship('PlanoContas', remote_side=[codigo])
+    conta_pai = db.relationship('PlanoContas', remote_side=[admin_id, codigo])
     
     @staticmethod
     @lru_cache(maxsize=256)
@@ -2595,7 +2623,7 @@ class PartidaContabil(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lancamento_id = db.Column(db.Integer, db.ForeignKey('lancamento_contabil.id'), nullable=False)
     sequencia = db.Column(db.Integer, nullable=False)
-    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'), nullable=False, index=True)
+    conta_codigo = db.Column(db.String(20), nullable=False, index=True)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo_contabil.id'))
     tipo_partida = db.Column(db.String(10), nullable=False)  # DEBITO, CREDITO
     valor = db.Column(db.Numeric(15, 2), nullable=False)
@@ -2605,11 +2633,20 @@ class PartidaContabil(db.Model):
     conta = db.relationship('PlanoContas')
     centro_custo = db.relationship('CentroCustoContabil', back_populates='partidas')
 
+    __table_args__ = (
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
+
 class BalanceteMensal(db.Model):
     """Armazena os saldos mensais para geração rápida de relatórios."""
     __tablename__ = 'balancete_mensal'
     id = db.Column(db.Integer, primary_key=True)
-    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'), nullable=False)
+    conta_codigo = db.Column(db.String(20), nullable=False)
     mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
     saldo_anterior = db.Column(db.Numeric(15, 2), default=0)
     debitos_mes = db.Column(db.Numeric(15, 2), default=0)
@@ -2618,7 +2655,16 @@ class BalanceteMensal(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     processado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
-    __table_args__ = (db.UniqueConstraint('conta_codigo', 'mes_referencia', 'admin_id', name='uq_balancete_conta_mes_admin'),)
+    __table_args__ = (
+        db.UniqueConstraint('conta_codigo', 'mes_referencia', 'admin_id',
+                            name='uq_balancete_conta_mes_admin'),
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
 
 class DREMensal(db.Model):
     """Demonstração do Resultado do Exercício (DRE) mensal."""
@@ -2659,11 +2705,20 @@ class FluxoCaixaContabil(db.Model):
     categoria = db.Column(db.String(50), nullable=False)  # OPERACIONAL, INVESTIMENTO, FINANCIAMENTO
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(15, 2), nullable=False)
-    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_codigo = db.Column(db.String(20))
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo_contabil.id'))
     origem = db.Column(db.String(50))
     origem_id = db.Column(db.Integer)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    __table_args__ = (
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
 
 class ConciliacaoBancaria(db.Model):
     """Registros para conciliação bancária."""

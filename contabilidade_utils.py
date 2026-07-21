@@ -1591,37 +1591,55 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
     """
     Garante que o plano de contas mínimo V2 existe para o admin_id dado.
     Seguro para múltiplas chamadas (idempotente via ON CONFLICT e cache em memória).
+
+    Fase 0.6 / D4 — duas correções aqui:
+
+    1. `ON CONFLICT` passou a ser por `(admin_id, codigo)`. Era só `(codigo)`,
+       casando com a linha do PRIMEIRO tenant que semeou: do 2º em diante o
+       INSERT era descartado em silêncio e o tenant ficava sem plano.
+    2. O gate `if count == 0` virou incondicional. Ele presumia que "tem
+       alguma conta" significa "tem o plano V2 inteiro" — um tenant com uma
+       conta avulsa nunca recebia as 28 do seed. Enquanto a FK era global
+       isso passava despercebido (o lançamento ia para a conta de outro
+       tenant); agora a FK é composta e o lançamento falharia. As 28
+       inserções são idempotentes e baratas.
     """
     if admin_id in _v2_seeded_admins:
         return
     try:
         from sqlalchemy import text as sql_text
-        count = db.session.execute(
+        antes = db.session.execute(
             sql_text("SELECT COUNT(*) FROM plano_contas WHERE admin_id = :aid"),
             {'aid': admin_id}
         ).scalar() or 0
 
-        if count == 0:
-            for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
-                db.session.execute(sql_text("""
-                    INSERT INTO plano_contas
-                        (codigo, nome, tipo_conta, natureza, nivel,
-                         conta_pai_codigo, aceita_lancamento, ativo, admin_id)
-                    VALUES
-                        (:codigo, :nome, :tipo, :natureza, :nivel,
-                         :pai, :aceita, true, :aid)
-                    ON CONFLICT (codigo) DO NOTHING
-                """), {
-                    'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
-                    'natureza': natureza, 'nivel': nivel, 'pai': pai,
-                    'aceita': aceita, 'aid': admin_id,
-                })
+        # A ordem de _V2_CONTAS_SEED é por nível (raízes primeiro): a auto-FK
+        # composta de conta_pai_codigo exige o pai já inserido.
+        for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
+            db.session.execute(sql_text("""
+                INSERT INTO plano_contas
+                    (codigo, nome, tipo_conta, natureza, nivel,
+                     conta_pai_codigo, aceita_lancamento, ativo, admin_id)
+                VALUES
+                    (:codigo, :nome, :tipo, :natureza, :nivel,
+                     :pai, :aceita, true, :aid)
+                ON CONFLICT (admin_id, codigo) DO NOTHING
+            """), {
+                'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
+                'natureza': natureza, 'nivel': nivel, 'pai': pai,
+                'aceita': aceita, 'aid': admin_id,
+            })
 
-            db.session.flush()
+        db.session.flush()
+        depois = db.session.execute(
+            sql_text("SELECT COUNT(*) FROM plano_contas WHERE admin_id = :aid"),
+            {'aid': admin_id}
+        ).scalar() or 0
+        if depois != antes:
             PlanoContas.invalidar_cache()
             logger.info(
-                f"[OK] Plano de contas V2 seed para admin_id={admin_id} "
-                f"({len(_V2_CONTAS_SEED)} contas)"
+                f"[OK] Plano de contas V2 para admin_id={admin_id}: "
+                f"{depois - antes} conta(s) criada(s), {depois} no total"
             )
 
         _v2_seeded_admins.add(admin_id)
