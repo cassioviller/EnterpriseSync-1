@@ -26,7 +26,7 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `fix/fase-0-estancar` · **15 commits não pushados.**
+Branch: `fix/fase-0-estancar` · **27 commits não pushados.**
 
 🔬 21/07: `main` e `origin/main` estão **idênticos** em `8fe6ac9` — o merge do
 M10 subiu. (A 1ª versão dizia "67 commits à frente"; era verdade quando escrita.)
@@ -107,6 +107,76 @@ Três afirmações desta seção estavam erradas. Todas foram descobertas
    diferentes. O teste agora roda parametrizado nos dois modos. **Reproduza à
    mão além do teste.**
 
+## ✅ Fase 1 — identidade e papéis, fechada em 21/07
+
+11 tasks, 12 commits, migrations **214-216**, 59 testes verdes
+(`tests/test_fase1_*.py`). A fase está **inteiramente atrás de flag**:
+`configuracao_empresa.escopo_obra_ativo` nasce `FALSE` nos 1.230 tenants, e
+com ela desligada o comportamento é idêntico ao de antes.
+
+| O que entrou | Onde |
+|---|---|
+| FK `Usuario.funcionario_id` (nullable, UNIQUE parcial) | migration 214 |
+| Resolver único de identidade, falha FECHADA | `utils/identidade.py` |
+| `PapelObra` (GESTOR/APONTADOR/LEITOR) + `UsuarioObra` | migration 215 |
+| Flag de rollout por tenant | migration 216, `scripts/flag_escopo_obra.py` |
+| Chokepoint de autorização (2 eixos: tenant, depois obra) | `utils/autorizacao.py` |
+| Decorator `obra_required` + as 4 rotas sem decorator fechadas | `views/obras.py`, `views/dashboard.py`, `views/employees.py` |
+| Dois backfills, dry-run por padrão | `scripts/backfill_identidade_funcionario.py`, `scripts/backfill_usuario_obra.py` |
+| Runbook de rollout | `docs/fase-1-rollout.md` |
+
+**As seis heurísticas de identidade, removidas.** Substring do username sem
+`admin_id`; e-mail literal de um tenant; "o tenant com mais funcionários";
+o PRIMEIRO funcionário ativo do banco inteiro; mapa de e-mail chumbado em
+produção; e a que **criava** um `Funcionario` chamado "Administrador
+Sistema" a cada acesso sem vínculo — cujo resultado, desde a Task #12, nem
+era usado.
+
+**Bônus:** `/obras` dava ao SUPER_ADMIN "o `admin_id` com mais obras do
+banco", servindo obras de **outra empresa**. Agora usa o resolver de tenant.
+
+### 🔴 O bloqueio real do rollout — meça em produção antes de estimar
+
+🔬⚠️ dev 21/07, dry-run de `backfill_usuario_obra.py`:
+
+| | |
+|---|---|
+| obras totais | 8.723 |
+| obras com `responsavel_id` preenchido | **4** |
+| obras com a cadeia responsável → funcionário → usuário | **1** |
+| vínculos que o backfill conseguiu derivar | **0** |
+
+A cadeia de onde o GESTOR é derivado está praticamente vazia. **O escopo por
+obra não pode ser ligado a partir dos dados existentes.** Se produção
+estiver igual, decidir por qual critério atribuir gestor (quem mais apontou
+RDO? quem criou a obra?) vira pré-requisito do rollout — e é decisão de
+negócio, não do script. O `flag_escopo_obra.py --ligar` recusa
+corretamente enquanto `usuario_obra` estiver vazia.
+
+### Quatro erros do plano da Fase 1, achados ao executar
+
+O plano é bom e foi seguido quase literalmente. Estes quatro pontos não
+sobreviveram ao contato com o código:
+
+1. **Contradição interna (Task 4):** o comentário que ele manda inserir
+   contém exatamente as strings que o teste dele proíbe.
+2. **Modelo × migration (Task 5):** declarava `db.Enum(PapelObra)` nativo
+   enquanto a migration cria `VARCHAR(20)`. Como o schema usa enums nativos
+   do Postgres, o `create_all()` do startup criaria um tipo `papelobra` que
+   a migration não cria. Corrigido com `native_enum=False`.
+3. **`NotNullViolation` (Task 6):** o `definir_flag` sugerido cria
+   `ConfiguracaoEmpresa` sem `nome_empresa`, que é NOT NULL.
+4. **A flag deixava de ser reversível (Task 7)** — o mais sério. O
+   chokepoint devolvia `LEITOR` para não-admin com a flag **desligada**.
+   Mas `editar_obra` tem só `@login_required`: hoje qualquer autenticado do
+   tenant edita. Isso tiraria a edição de todo não-admin no dia do deploy,
+   o oposto da decisão nº 5 da própria fase. **Os testes do plano só
+   exercitavam a flag ligada** — foi a lacuna que escondeu o problema.
+
+> A lição repete a do D1 na Fase 0.6: **um teste pode passar pelo motivo
+> errado.** Nos dois casos o furo só apareceu ao conferir o código contra o
+> comportamento real, não relendo o plano.
+
 ## O plano aprovado
 
 | Fase | Conteúdo | Estado | Plano |
@@ -114,8 +184,8 @@ Três afirmações desta seção estavam erradas. Todas foram descobertas
 | **0** | Estancar | ✅ | — |
 | **0.5** | Backup, segredos, observabilidade, build, CI, índices | ✅ P1-2; 🟡 P3 parcial | — |
 | **0.6** | Os cinco defeitos de dinheiro (D1-D5) | ✅ **21/07** | ver seção acima |
-| **1** | Identidade e papéis (RBAC + escopo por obra) | ⬜ **próxima** | `fase-1-identidade-papeis.md` |
-| **1.5** | Cronograma editável + RDO em % | ⬜ | `cronograma-editavel-rdo-percentual.md` |
+| **1** | Identidade e papéis (RBAC + escopo por obra) | ✅ **21/07** — 11/11 tasks | `fase-1-identidade-papeis.md` |
+| **1.5** | Cronograma editável + RDO em % | ⬜ **próxima** | `cronograma-editavel-rdo-percentual.md` |
 | **2** | Máquina de estados da Obra + handoff do GP | ⬜ | `fase-2-maquina-estados-obra.md` |
 | **3** | Compras com governança | ⬜ | `fase-3-compras-governanca.md` |
 | **4** | Centro de custo obrigatório | ⬜ | `fase-4-centro-custo-obrigatorio.md` |
@@ -129,7 +199,7 @@ Todos em `docs/superpowers/plans/2026-07-21-*`. Faixas de migration reservadas
 sem colisão: 214-216 (F1), 220-221 (F1.5), 230-232 (F2), 240-247 (F3),
 250-254 (F4), 260-264 (F5), 270-276 (F6), 280-283 (F7), 290-295 (F8),
 300-307 (F9). A **Fase 0.6 usou 217-219**, fora de todas as faixas.
-🔬 Maior aplicada hoje: **219**.
+🔬 Maior aplicada hoje: **219**. A Fase 1 aplicou 214, 215 e 216.
 
 > **Os planos das Fases 6-9 têm validade menor.** Foram escritos sobre o schema
 > de hoje, e as Fases 1-5 vão mudá-lo. Cada um tem seção *"Premissas a
@@ -276,9 +346,10 @@ RDO**.
    para o filho. *(A 1ª versão dizia "1.118 linhas 100% órfãs"; o "100%" do
    dossiê queria dizer **estruturalmente**, porque a coluna não existe.)*
 
-4. **`Funcionario` não tem FK para `Usuario`.** 📖 O responsável pela obra não é
-   logável. A Fase 1 cria a FK; hoje a identidade é adivinhada por substring de
-   nome, e-mail chumbado e "o tenant com mais funcionários".
+4. ~~**`Funcionario` não tem FK para `Usuario`.**~~ ✅ **Resolvido na Fase 1**
+   (migration 214). As seis heurísticas de identidade foram removidas; o
+   resolver único é `utils/identidade.py` e falha FECHADA. Ver a seção da
+   Fase 1 abaixo.
 
 5. **A ordem de import em `app.py` é contrato não declarado.** Mover um
    `register_blueprint` acima da linha 386 quebra metade do sistema; a cascata
