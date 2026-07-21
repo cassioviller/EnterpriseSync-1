@@ -323,3 +323,56 @@ def test_backfill_recusa_email_ambiguo():
         relatorio = executar_backfill(dry_run=False, admin_id=admin.id)
         assert db.session.get(Usuario, uid).funcionario_id is None
         assert any(p['motivo'] == 'ambiguo' for p in relatorio['pendentes'])
+
+
+# ---------------------------------------------------------------------------
+# As heurísticas não podem voltar
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('arquivo,padrao,descricao', [
+    ('crud_rdo_completo.py', 'funcionario@valeverde.com',
+     'e-mail chumbado no mapeamento de identidade'),
+    ('crud_rdo_completo.py', '123@gmail.com',
+     'e-mail chumbado no mapeamento de identidade'),
+    ('views/employees.py', 'funcionario@valeverde.com',
+     'fallback para e-mail literal de um tenant'),
+    ('views/employees.py', 'Funcionario.nome.ilike',
+     'casamento de pessoa por substring de nome'),
+])
+def test_heuristica_de_identidade_nao_retorna(arquivo, padrao, descricao):
+    caminho = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), arquivo)
+    with open(caminho, encoding='utf-8') as fh:
+        conteudo = fh.read()
+    assert padrao not in conteudo, (
+        f'{arquivo} voltou a conter "{padrao}" — {descricao}')
+
+
+def test_dashboard_funcionario_sem_vinculo_nao_pega_estranho():
+    """Sem vínculo, a tela não pode mostrar dados de outra pessoa."""
+    with app.app_context():
+        admin_a = _admin('A')
+        admin_b = _admin('B')
+        # Tenant B tem muitos funcionários — era o que a heurística
+        # "tenant com mais funcionários" escolhia.
+        for _ in range(3):
+            _funcionario_registro(admin_b.id)
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1w_{suf}', email=f'f1w_{suf}@test.local',
+            nome='Sem vinculo', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin_a.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+        uid = u.id
+        nomes_b = [f.nome for f in
+                   Funcionario.query.filter_by(admin_id=admin_b.id).all()]
+
+    cliente = _cliente_de(uid)
+    resposta = cliente.get('/funcionario-dashboard', follow_redirects=True)
+    corpo = resposta.get_data(as_text=True)
+    for nome in nomes_b:
+        assert nome not in corpo, (
+            f'dashboard vazou o funcionário "{nome}" do tenant B')

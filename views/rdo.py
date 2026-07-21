@@ -2674,39 +2674,26 @@ def rdo_salvar_unificado():
             logger.debug(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
             logger.debug(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
             
-            # SISTEMA FLEXÍVEL: Admin ou Funcionário podem criar RDO
-            funcionario = None
-            
-            # Se é admin, pode criar RDO sem precisar ser funcionário
-            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                logger.debug(f"[TARGET] ADMIN CRIANDO RDO: {current_user.email}")
-                # Admin pode criar RDO diretamente, criar funcionário virtual se necessário
-                funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
-            else:
-                # Se é funcionário, buscar por email
-                funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id_correto, ativo=True).first()
-                logger.debug(f"[TARGET] FUNCIONÁRIO CRIANDO RDO: {funcionario.nome if funcionario else 'Não encontrado'}")
-            
-            # Se não encontrou funcionário, criar um funcionário padrão
-            if not funcionario:
-                logger.debug(f"Buscando funcionário para admin_id={admin_id_correto}")
-                funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
-                if funcionario:
-                    logger.info(f"[OK] Funcionário encontrado: {funcionario.nome} (ID: {funcionario.id})")
-                else:
-                    # Criar funcionário padrão se não existir nenhum
-                    logger.debug(f"Criando funcionário padrão para admin_id={admin_id_correto}")
-                    funcionario = Funcionario(
-                        nome="Administrador Sistema",
-                        email=f"admin{admin_id_correto}@sistema.com",
-                        admin_id=admin_id_correto,
-                        ativo=True,
-                        cargo="Administrador",
-                        departamento="Administração"
-                    )
-                    db.session.add(funcionario)
-                    db.session.flush()
-                    logger.info(f"[OK] Funcionário criado: {funcionario.nome} (ID: {funcionario.id})")
+            # Fase 1 — a identidade vem da FK e, sem vínculo, é None.
+            #
+            # O bloco anterior fazia uma cascata (admin → primeiro
+            # funcionário ativo do tenant; funcionário → busca por e-mail)
+            # e, se nada casasse, CRIAVA um `Funcionario` chamado
+            # "Administrador Sistema" — poluindo o RH de produção a cada
+            # acesso, com uma pessoa que não existe.
+            #
+            # O resultado nunca foi usado: desde a Task #12, `rdo.criado_por_id`
+            # recebe `current_user.id` (FK para `usuario.id`), não
+            # `funcionario.id`. O único efeito do bloco era o INSERT
+            # indevido. Fica só a resolução, para rastreabilidade no log.
+            from utils.identidade import funcionario_do_usuario
+            funcionario = funcionario_do_usuario()
+            if funcionario is None:
+                logger.info(
+                    "[RDO] usuario_id=%s sem vínculo de Funcionario ao salvar "
+                    "RDO. Nenhum registro de RH é criado — rode "
+                    "scripts/backfill_identidade_funcionario.py",
+                    current_user.id)
             
             # Task #12: ``RDO.criado_por_id`` é FK para ``usuario.id``,
             # então usamos ``current_user.id`` (sempre um usuario válido) em

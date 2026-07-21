@@ -24,10 +24,16 @@ def get_admin_id():
     if hasattr(current_user, 'admin_id') and current_user.admin_id:
         return current_user.admin_id
     
-    # Para funcionários legados, buscar através do email
+    # Fase 1 — a identidade vem da FK, não de e-mail chumbado. O bloco
+    # anterior traduzia um e-mail de login específico para o e-mail de um
+    # funcionário específico, ambos literais no código, e buscava
+    # Funcionario por e-mail SEM admin_id — casando pessoa de outro
+    # tenant. Ver utils/identidade.py. Os literais não são reproduzidos
+    # aqui de propósito: `tests/test_fase1_identidade.py` proíbe a string
+    # no arquivo, e é essa proibição que impede a heurística de voltar.
     if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario.name == 'FUNCIONARIO':
-        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
-        funcionario = Funcionario.query.filter_by(email=email_busca).first()
+        from utils.identidade import funcionario_do_usuario
+        funcionario = funcionario_do_usuario()
         if funcionario:
             return funcionario.admin_id
     

@@ -680,32 +680,22 @@ def funcionario_dashboard_desktop():
         logger.debug(f"DEBUG DASHBOARD: current_user.admin_id={current_user.admin_id}")
         logger.debug(f"DEBUG DASHBOARD: current_user.id={current_user.id}")
         
-        # Para sistema de username/senha, buscar funcionário por nome do usuário
-        funcionario_atual = None
-        if hasattr(current_user, 'username') and current_user.username:
-            # Buscar funcionário com nome que contenha o username
-            funcionario_atual = Funcionario.query.filter(
-                Funcionario.nome.ilike(f'%{current_user.username}%')
-            ).first()
-        
-        if not funcionario_atual:
-            # Fallback: buscar por email funcionario@valeverde.com
-            funcionario_atual = Funcionario.query.filter_by(email="funcionario@valeverde.com").first()
-        
-        if not funcionario_atual:
-            # Detectar admin_id dinamicamente
-            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id_dinamico = admin_counts[0] if admin_counts else current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id
-            funcionario_atual = Funcionario.query.filter_by(admin_id=admin_id_dinamico, ativo=True).first()
-        
-        if funcionario_atual:
-            logger.debug(f"DEBUG DASHBOARD: Funcionário encontrado: {funcionario_atual.nome} (admin_id={funcionario_atual.admin_id})")
-        else:
-            logger.debug(f"DEBUG DASHBOARD: NENHUM funcionário encontrado")
-            # Fallback: primeiro funcionário ativo de qualquer admin
-            funcionario_atual = Funcionario.query.filter_by(ativo=True).first()
-            if funcionario_atual:
-                logger.debug(f"DEBUG DASHBOARD: Usando primeiro funcionário ativo: {funcionario_atual.nome}")
+        # Fase 1 — identidade pela FK. A cascata anterior era: substring
+        # do username no nome do funcionário (sem admin_id) → um e-mail
+        # literal de um tenant específico → "o tenant com mais
+        # funcionários ativos" → o PRIMEIRO funcionário ativo do banco
+        # INTEIRO. Qualquer usuário sem vínculo enxergava os dados de um
+        # estranho, possivelmente de outra empresa. Os literais não são
+        # reproduzidos aqui: `tests/test_fase1_identidade.py` proíbe as
+        # strings no arquivo, e é a proibição que trava o retorno.
+        from utils.identidade import funcionario_do_usuario
+        funcionario_atual = funcionario_do_usuario()
+
+        if funcionario_atual is None:
+            logger.warning(
+                "[EMPLOYEES] usuario_id=%s sem vínculo de Funcionario — "
+                "dashboard vazio. Rode scripts/backfill_identidade_funcionario.py",
+                current_user.id)
         
         # Usar admin_id do funcionário encontrado ou detectar dinamicamente
         admin_id_correto = funcionario_atual.admin_id if funcionario_atual else (current_user.admin_id if hasattr(current_user, 'admin_id') else current_user.id)
