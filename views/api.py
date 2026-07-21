@@ -21,9 +21,19 @@ except ImportError:
         return decorator
 
 # ===== APIs PARA FRONTEND =====
-@main_bp.route('/api/funcionarios/<int:obra_id>')
+# Fase 0.5 / 3.2 — COLISÃO DE ROTA RESOLVIDA.
+# Esta regra era `/api/funcionarios/<int:obra_id>` e colidia com
+# `/api/funcionarios/<int:funcionario_id>` de `api_funcionarios.py:138`.
+# Como `main_bp` é registrado primeiro (app.py:474), ESTA vencia — e trata o
+# inteiro como obra_id, devolvendo uma LISTA. Quem chamasse
+# `/api/funcionarios/42` esperando o funcionário 42 recebia silenciosamente a
+# lista inteira do tenant: a única colisão do repositório que produzia
+# resposta ERRADA em vez de 404. O path agora diz o que a rota faz, e
+# `/api/funcionarios/<id>` passa a resolver para o handler correto.
+@main_bp.route('/api/obras/<int:obra_id>/funcionarios')
+@login_required
 def api_funcionarios_por_obra(obra_id):
-    """API: Funcionários ativos do tenant (escopo tenant-wide; obra_id reservado para filtragem futura)."""
+    """API: Funcionários ativos do tenant, no contexto de uma obra."""
     try:
         admin_id = get_tenant_admin_id()
         # Retorna todos os funcionários ativos do tenant.

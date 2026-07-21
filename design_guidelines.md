@@ -1,3 +1,15 @@
+> ⚠️ **DOCUMENTO HISTÓRICO — NÃO É NORMA.**
+>
+> Este arquivo prescreve **Tailwind** (`max-w-7xl`, `grid-cols-3`, `rounded-xl`,
+> "Spacing Primitives: Tailwind units"). O projeto **não usa Tailwind**: não há
+> `package.json`, `node_modules`, `tailwind.config.*` nem build step. O front é
+> Jinja2 + **Bootstrap 5.3** via CDN (`templates/base_completo.html`), e
+> `PRODUCT.md` diz explicitamente "Tema Bootstrap padrão com overrides; sem
+> tema customizado complexo".
+>
+> A norma de UI vigente é **`DESIGN.md`**. Este documento fica como registro do
+> estudo visual da landing page — seguir suas classes produziria código morto.
+
 # EnterpriseSync/SIGE Landing Page - Design Guidelines
 
 ## Design Approach

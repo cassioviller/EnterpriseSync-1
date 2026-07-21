@@ -97,24 +97,18 @@ def handle_exception(e):
 
 # Blueprint antigo removido - usando apenas CRUD de Serviços moderno
 
-# Registrar health check
-try:
-    from health import health_bp
-    app.register_blueprint(health_bp)
-    logger.info("[OK] Health check registrado")
-except ImportError as e:
-    logger.warning(f"[WARN] Health check não encontrado: {e}", exc_info=True)
+# Fase 0.5 / 3.2 — blueprint `health` removido: sua rota /health era
+# integralmente sombreada por `views/dashboard.py:25` (main.health_check),
+# que é registrada antes. O arquivo health.py era código morto.
 
 # Registrar API de Funcionários
 try:
     from api_funcionarios import api_funcionarios_bp
     app.register_blueprint(api_funcionarios_bp)
     logger.info("[OK] API de Funcionários registrada")
-    
-    # [OK] API de Busca de Funcionários
-    from api_funcionarios_buscar import api_buscar_funcionarios_bp
-    app.register_blueprint(api_buscar_funcionarios_bp)
-    logger.info("[OK] API de Busca de Funcionários registrada")
+    # Fase 0.5 / 3.2 — blueprint `api_funcionarios_buscar` removido: sua
+    # única rota (/api/funcionarios/buscar) era integralmente sombreada por
+    # `api_funcionarios.buscar_funcionarios`, registrada antes.
 except Exception as e:
     logger.error(f"[ERROR] Erro ao registrar API Funcionários: {e}", exc_info=True)
 

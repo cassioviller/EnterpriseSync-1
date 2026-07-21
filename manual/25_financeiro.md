@@ -65,5 +65,5 @@ O módulo **Financeiro** concentra o controle de **contas a pagar**, **contas a 
 - **Use sempre a obra** ao lançar contas a pagar/receber — sem obra, o custo não entra no resultado da obra e distorce a margem.
 - Em ambiente **V2**, despesas gerais devem ir pela **Gestão de Custos** (passa pelo aprovador). O banner amarelo no topo de Contas a Pagar lembra disso.
 - **Pagamentos parciais** ajustam o saldo automaticamente — basta repetir o "Pagar" várias vezes até zerar.
-- O **fluxo de caixa** combina previsões (contas em aberto) com realizado (contas baixadas). Se o número parecer estranho, confira se há contas vencidas em PENDENTE inflando o "previsto".
+- O **fluxo de caixa** apresenta **Previsto e Realizado separadamente** — nunca somados num número único (ADR 0003). O que a tela mostra é a **variação do período**, não saldo acumulado. Se o número parecer estranho, confira se há contas vencidas em PENDENTE inflando o "previsto".
 - **Conciliação bancária** fica em **Contabilidade** (`/contabilidade/conciliacao`), não em Bancos. Use-a periodicamente para garantir que extrato e SIGE batem.

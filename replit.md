@@ -1,4 +1,4 @@
-# SIGE v9.0
+# SIGE v10.0
 A multi-tenant business management system for SMBs, designed to automate and streamline critical operations from sales to project execution and financial management.
 
 ## Run & Operate
@@ -51,7 +51,9 @@ A multi-tenant business management system for SMBs, designed to automate and str
 - Priorizar soluções automáticas que funcionem no deploy
 - Evitar intervenção manual no banco de produção
 - Implementar logs detalhados para debugging
-- Interface moderna com cards elegantes, gradientes e animações suaves
+- Interface: seguir `DESIGN.md` (fonte única). NÃO prescrever gradientes aqui —
+  `DESIGN.md` os proíbe em botões de ação e chips, e `PRODUCT.md` lista
+  "cards com gradiente" como anti-referência.
 - Template unificado em todas as páginas do sistema
 - Operações destrutivas (exclusão) devem usar POST via formulários JavaScript
 - Evitar auto-fill de campos que possam interferir em filtros de busca
