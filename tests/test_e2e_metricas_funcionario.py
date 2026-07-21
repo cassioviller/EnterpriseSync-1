@@ -84,7 +84,11 @@ class MetricasTestRunner:
                           valor_va=0, valor_vt=0, nome_extra=''):
         sfx = _suffix()
         f = Funcionario(
-            codigo=f'FM{admin.id}{sfx[-4:]}',
+            # `Funcionario.codigo` é db.String(10) (models.py:209). O formato
+            # anterior, 'FM' + admin.id + 4 dígitos, cabia enquanto os ids
+            # tinham 4 dígitos e estourou quando passaram de 10.000:
+            # StringDataRightTruncation. O sufixo sozinho já é único e cabe.
+            codigo=f'FM{sfx[-8:]}',
             nome=f'Func {tipo} {nome_extra} {sfx[-6:]}',
             cpf=f'{admin.id:03d}{sfx[-8:]}'[:14],
             data_admissao=date.today() - timedelta(days=30),
