@@ -3251,6 +3251,16 @@ class PropostaItem(db.Model):
     # Task #82 — vínculo com catálogo de serviços (opcional, snapshot fica em preco_unitario)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True, index=True)
 
+    # Fase 0.6 / D1 — linhagem entre versões da proposta.
+    # Criar uma revisão CLONA os itens com ids novos. Sem este vínculo, a
+    # propagação proposta→obra não tinha como saber que o item da v2 é o
+    # MESMO item da v1, e criava um segundo ItemMedicaoComercial em vez de
+    # atualizar o existente: um aditivo de +20% virava +100% de itens.
+    # NULL no item original (v1) e nos itens acrescentados pela revisão.
+    proposta_item_origem_id = db.Column(
+        db.Integer, db.ForeignKey('proposta_itens.id'), nullable=True,
+        index=True)
+
     # Task #89 — snapshot do cálculo paramétrico (explosão de insumos)
     quantidade_medida = db.Column(db.Numeric(15, 4), nullable=True)
     custo_unitario = db.Column(db.Numeric(15, 4), nullable=True)
@@ -5647,12 +5657,21 @@ class MedicaoContrato(db.Model):
     obs = db.Column(db.Text)
     ordem = db.Column(db.Integer, default=0)
 
+    # Fase 0.6 / D1c — base contratual congelada no momento da emissão.
+    # `valor` sempre foi property calculada sobre `obra.valor_contrato`, e
+    # aprovar um aditivo reprecificava RETROATIVAMENTE toda medição já
+    # emitida — inclusive as que o cliente já pagou. NULL = ainda segue o
+    # contrato vigente, que é o comportamento correto para medição futura.
+    valor_base = db.Column(db.Numeric(15, 2), nullable=True)
+
     obra = db.relationship('Obra', backref='medicoes_contrato')
 
     @property
     def valor(self):
         from decimal import Decimal as _D
-        return (_D(str(self.obra.valor_contrato or 0)) * _D(str(self.pct or 0)))
+        base = (self.valor_base if self.valor_base is not None
+                else (self.obra.valor_contrato or 0))
+        return (_D(str(base)) * _D(str(self.pct or 0)))
 
     __table_args__ = (
         db.Index('ix_medicao_contrato_obra', 'obra_id'),

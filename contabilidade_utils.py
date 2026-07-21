@@ -1555,6 +1555,11 @@ _V2_CONTAS_SEED = [
     ('1.1',        'ATIVO CIRCULANTE',             'ATIVO',    'DEVEDORA', 2, '1',       False),
     ('2.1',        'PASSIVO CIRCULANTE',           'PASSIVO',  'CREDORA',  2, '2',       False),
     ('4.1',        'RECEITA BRUTA',                'RECEITA',  'CREDORA',  2, '4',       False),
+    # Fase 0.6 / D1b — destino do estorno de revisão para baixo. O DRE já
+    # subtrai 4.2.x da receita bruta (`deducoes`); lançar a redução como
+    # DÉBITO em 4.1.01 seria invisível, porque `receita_bruta` só conta
+    # partidas CREDITO. Reduzir contrato é dedução, não receita negativa.
+    ('4.2',        'DEDUÇÕES DA RECEITA BRUTA',    'RECEITA',  'DEVEDORA', 2, '4',       False),
     ('6.1',        'DESPESAS OPERACIONAIS',        'DESPESA',  'DEVEDORA', 2, '6',       False),
     # Nível 3
     ('1.1.01',     'DISPONÍVEL',                   'ATIVO',    'DEVEDORA', 3, '1.1',     False),
@@ -1564,6 +1569,7 @@ _V2_CONTAS_SEED = [
     ('2.1.02',     'OBRIGAÇÕES TRABALHISTAS',      'PASSIVO',  'CREDORA',  3, '2.1',     False),
     ('2.1.03',     'OBRIGAÇÕES FISCAIS',           'PASSIVO',  'CREDORA',  3, '2.1',     False),
     ('4.1.01',     'RECEITA DE SERVIÇOS',          'RECEITA',  'CREDORA',  3, '4.1',     False),
+    ('4.2.01',     'CANCELAMENTOS E REDUÇÕES',     'RECEITA',  'DEVEDORA', 3, '4.2',     False),
     ('6.1.01',     'DESPESAS COM PESSOAL',         'DESPESA',  'DEVEDORA', 3, '6.1',     False),
     ('6.1.02',     'DESPESAS GERAIS',              'DESPESA',  'DEVEDORA', 3, '6.1',     False),
     # Nível 4
@@ -1577,6 +1583,7 @@ _V2_CONTAS_SEED = [
     ('2.1.02.003', 'FGTS a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.02',  True),
     ('2.1.03.001', 'IRRF a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.03',  True),
     ('4.1.01.001', 'Receita de Serviços',          'RECEITA',  'CREDORA',  4, '4.1.01',  True),
+    ('4.2.01.001', 'Redução de Contrato',          'RECEITA',  'DEVEDORA', 4, '4.2.01',  True),
     ('6.1.01.001', 'Despesa com Salários',         'DESPESA',  'DEVEDORA', 4, '6.1.01',  True),
     ('6.1.01.002', 'Despesa com Alimentação',      'DESPESA',  'DEVEDORA', 4, '6.1.01',  True),
     ('6.1.02.001', 'Despesa com Combustível',      'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),

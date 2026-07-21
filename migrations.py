@@ -4016,6 +4016,7 @@ def executar_migracoes():
             # (identidade e papéis) — ver ESTADO-ATUAL.md.
             (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
             (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
+            (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14399,6 +14400,52 @@ def _migration_218_plano_contas_por_tenant():
             f"reconstruídas como compostas.")
     except Exception as e:
         logger.error(f"[Migration 218] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_219_revisao_proposta_linhagem_e_base():
+    """Fase 0.6 / D1 — duas colunas que faltavam para a revisão de proposta.
+
+    `proposta_itens.proposta_item_origem_id` — criar uma revisão CLONA os
+    itens com ids novos. Sem a linhagem, a propagação proposta→obra não tinha
+    como saber que o item da v2 é o MESMO item da v1, e criava um segundo
+    `ItemMedicaoComercial` em vez de atualizar o existente. Medido em 21/07:
+    v1 de R$ 100k + v2 de R$ 120k produziam 2 itens somando R$ 220.000 e
+    saldo de -R$ 100.000.
+
+    `medicao_contrato.valor_base` — `MedicaoContrato.valor` é property
+    calculada, `pct × obra.valor_contrato`. Aprovar um aditivo reprecificava
+    retroativamente TODA medição já emitida. A coluna congela a base no
+    momento da emissão; NULL segue o contrato vigente, que é o correto para
+    medição futura.
+
+    Backfill deliberadamente ausente nas duas:
+
+    - a linhagem histórica não é reconstituível com segurança — o clone não
+      deixava rastro. O handler cai no `item_numero` para as revisões
+      antigas, que o clone sempre copiou fielmente;
+    - congelar as 20.064 medições existentes no contrato de HOJE gravaria
+      como "valor de emissão" um número que já pode ter sido reprecificado
+      pelo defeito. NULL é honesto: significa "não sabemos, segue o
+      contrato". A partir daqui as novas emissões congelam corretamente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE proposta_itens ADD COLUMN IF NOT EXISTS "
+                "proposta_item_origem_id INTEGER REFERENCES proposta_itens(id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_proposta_itens_origem "
+                "ON proposta_itens (proposta_item_origem_id)"))
+            conn.execute(sa_text(
+                "ALTER TABLE medicao_contrato ADD COLUMN IF NOT EXISTS "
+                "valor_base NUMERIC(15, 2)"))
+        logger.info(
+            "[Migration 219] proposta_itens.proposta_item_origem_id e "
+            "medicao_contrato.valor_base criadas.")
+    except Exception as e:
+        logger.error(f"[Migration 219] Falha: {e}", exc_info=True)
         raise
 
 

@@ -1329,6 +1329,10 @@ def criar_nova_versao(id):
             db.session.add(PropostaItem(
                 admin_id=admin_id,
                 proposta_id=nova.id,
+                # Fase 0.6 / D1 — linhagem explícita: o item da revisão é o
+                # MESMO item da origem, com valor novo. Sem isto a propagação
+                # para a obra criava um ItemMedicaoComercial paralelo.
+                proposta_item_origem_id=(it.proposta_item_origem_id or it.id),
                 item_numero=it.item_numero,
                 ordem=it.ordem,
                 descricao=it.descricao,

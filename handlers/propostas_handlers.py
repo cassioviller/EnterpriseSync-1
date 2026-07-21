@@ -12,14 +12,63 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _linhagem_de_proposta(proposta, admin_id: int) -> list:
+    """Fase 0.6 / D1 — a proposta e todas as versões que a antecederam.
+
+    Uma revisão é uma linha NOVA em `propostas_comerciais`, ligada à anterior
+    por `proposta_origem_id` (`propostas_consolidated.py:1310`). Sem percorrer
+    a cadeia, cada aprovação parecia a primeira.
+    """
+    from models import Proposta
+    linhagem, atual, vistos = [], proposta, set()
+    while atual is not None and atual.id not in vistos:
+        vistos.add(atual.id)
+        linhagem.append(atual)
+        origem_id = getattr(atual, 'proposta_origem_id', None)
+        atual = (Proposta.query.filter_by(id=origem_id, admin_id=admin_id).first()
+                 if origem_id else None)
+    return linhagem
+
+
+def _chaves_de_linhagem(item) -> list:
+    """Identidades de um item ATRAVÉS das versões da proposta, em ordem de
+    confiança.
+
+    1. **Raiz da linhagem.** `proposta_item_origem_id` aponta sempre para o
+       item ORIGINAL (o clone propaga a raiz, não o pai imediato), então a
+       raiz é `proposta_item_origem_id or id`. Para o item da v1 isso dá o
+       próprio id; para o clone dele na v2, o mesmo id. É o que faz as duas
+       versões casarem.
+    2. **`item_numero`.** Fallback para as revisões criadas ANTES da Fase 0.6,
+       cujo `proposta_item_origem_id` é NULL nos dois lados — a raiz de cada
+       um seria o próprio id e nunca casariam. O clone sempre copiou o
+       `item_numero` fielmente.
+
+    Devolver as duas e casar na ordem evita o erro sutil de usar chaves de
+    tipos diferentes nos dois lados da comparação.
+    """
+    raiz = getattr(item, 'proposta_item_origem_id', None) or item.id
+    return [('raiz', raiz), ('numero', item.item_numero)]
+
+
 def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
     """Task #82: ao aprovar proposta, materializar cada PropostaItem como
     ItemMedicaoComercial na obra vinculada (se houver). O listener after_insert
     em ItemMedicaoComercial cria automaticamente o ObraServicoCusto pareado
     (valor_orcado = valor_comercial; servico_catalogo_id = servico_id).
 
-    Idempotente: se a obra já possui itens de medição vindos desta proposta,
-    não duplica.
+    Fase 0.6 / D1 — **a revisão reconcilia, não acumula.**
+
+    A idempotência era por `proposta_item_id`. Criar uma revisão CLONA os
+    itens com ids novos, então a chave nunca casava com os itens da versão
+    anterior: aprovar a v2 criava um SEGUNDO conjunto completo de itens de
+    medição, e o listener criava o custo pareado de cada um. Medido em 21/07
+    com v1 de R$ 100k e v2 de R$ 120k: 2 itens somando R$ 220.000 para um
+    contrato de R$ 120.000, e saldo de -R$ 100.000 em `medicao_views.py:72`.
+
+    Agora o item da revisão ATUALIZA o item de medição que já existe (mesmo
+    `id`, então as medições já feitas contra ele continuam válidas) e só cria
+    o que é genuinamente novo no escopo.
     """
     from models import Proposta, PropostaItem, ItemMedicaoComercial
     proposta = Proposta.query.filter_by(id=proposta_id, admin_id=admin_id).first()
@@ -28,45 +77,102 @@ def _propagar_proposta_para_obra(proposta_id: int, admin_id: int):
         return 0
     obra_id = proposta.obra_id
 
-    # Idempotência: dedupe determinístico por proposta_item_id (não por nome)
     itens = PropostaItem.query.filter_by(proposta_id=proposta_id).all()
     if not itens:
         return 0
-    ids_existentes = {
-        row[0] for row in db.session.query(ItemMedicaoComercial.proposta_item_id).filter(
-            ItemMedicaoComercial.admin_id == admin_id,
-            ItemMedicaoComercial.obra_id == obra_id,
-            ItemMedicaoComercial.proposta_item_id.in_([i.id for i in itens]),
-        ).all()
-    }
-    criados = 0
-    for it in itens:
-        if it.id in ids_existentes:
+
+    # Itens de TODAS as versões desta proposta, indexados pela identidade que
+    # atravessa versões.
+    ids_linhagem = [p.id for p in _linhagem_de_proposta(proposta, admin_id)]
+    itens_linhagem = PropostaItem.query.filter(
+        PropostaItem.proposta_id.in_(ids_linhagem)).all()
+    item_por_id = {i.id: i for i in itens_linhagem}
+
+    # ItemMedicaoComercial já materializados a partir de qualquer versão.
+    imcs = ItemMedicaoComercial.query.filter(
+        ItemMedicaoComercial.admin_id == admin_id,
+        ItemMedicaoComercial.obra_id == obra_id,
+        ItemMedicaoComercial.proposta_item_id.in_(list(item_por_id)),
+    ).all()
+    # Cada IMC é indexado por TODAS as chaves do item que o originou, para
+    # que o casamento funcione tanto na linhagem explícita quanto no
+    # fallback por item_numero das revisões antigas.
+    imc_por_chave = {}
+    for imc in imcs:
+        origem = item_por_id.get(imc.proposta_item_id)
+        if origem is None:
             continue
-        # Strict 1:1: criar SEMPRE um ItemMedicaoComercial por PropostaItem.
+        for chave in _chaves_de_linhagem(origem):
+            imc_por_chave.setdefault(chave, imc)
+
+    def _casar(item):
+        for chave in _chaves_de_linhagem(item):
+            achado = imc_por_chave.get(chave)
+            if achado is not None:
+                return achado
+        return None
+
+    criados = atualizados = 0
+    for it in itens:
+        # Strict 1:1: um ItemMedicaoComercial por PropostaItem.
         # Se nome estiver vazio, fallback para "Item N"; se valor for 0,
-        # cria assim mesmo (operador pode ajustar depois).
+        # materializa assim mesmo (operador pode ajustar depois).
         nome_item = (getattr(it, 'descricao', None) or getattr(it, 'item', None) or '').strip()
         if not nome_item:
             nome_item = f'Item {getattr(it, "item_numero", None) or getattr(it, "ordem", None) or it.id}'
         valor_total = Decimal(str(it.subtotal or 0))
         if valor_total < 0:
             valor_total = Decimal('0')
-        novo = ItemMedicaoComercial(
+        quantidade = (Decimal(str(it.quantidade or 0))
+                      if getattr(it, 'quantidade', None) is not None else None)
+
+        existente = _casar(it)
+        if existente is not None:
+            if existente.proposta_item_id == it.id:
+                continue  # mesma versão reaprovada — nada a fazer
+            existente.nome = nome_item[:200]
+            existente.valor_comercial = valor_total
+            existente.servico_id = getattr(it, 'servico_id', None)
+            existente.quantidade = quantidade
+            existente.proposta_item_id = it.id
+            atualizados += 1
+            continue
+
+        db.session.add(ItemMedicaoComercial(
             admin_id=admin_id,
             obra_id=obra_id,
             nome=nome_item[:200],
             valor_comercial=valor_total,
             servico_id=getattr(it, 'servico_id', None),
-            quantidade=Decimal(str(it.quantidade or 0)) if getattr(it, 'quantidade', None) is not None else None,
+            quantidade=quantidade,
             proposta_item_id=it.id,
             status='PENDENTE',
-        )
-        db.session.add(novo)
+        ))
         criados += 1
-    if criados:
+
+    # Itens que existiam numa versão anterior e sumiram desta NÃO são
+    # apagados: podem ter medição executada contra eles, e retirar escopo já
+    # medido é decisão de negócio (Fase 6 — orçamento versionado e aditivo).
+    # Mas o silêncio seria pior do que o aviso.
+    imcs_atuais = {id(_casar(i)) for i in itens} - {id(None)}
+    orfaos = {id(imc): imc for imc in imc_por_chave.values()
+              if id(imc) not in imcs_atuais}
+    orfaos = list(orfaos.values())
+    if orfaos:
+        logger.warning(
+            f"#82/D1: proposta {proposta_id} (obra {obra_id}) removeu "
+            f"{len(orfaos)} item(ns) que existiam na versão anterior: "
+            f"{[i.id for i in orfaos]}. Mantidos — retirar escopo já medido "
+            f"é decisão de negócio, não do handler."
+        )
+
+    if criados or atualizados:
         db.session.flush()
-        logger.info(f"#82: {criados} ItemMedicaoComercial criados para obra {obra_id} (proposta {proposta_id})")
+        logger.info(
+            f"#82: obra {obra_id} (proposta {proposta_id}) — "
+            f"{criados} ItemMedicaoComercial criado(s), "
+            f"{atualizados} atualizado(s) pela revisão"
+        )
     return criados
 
 
@@ -182,12 +288,57 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
     except Exception as _se:
         logger.warning(f"[WARN] seed_plano_contas_if_needed falhou (proposta {proposta_id}): {_se}")
 
+    # Fase 0.6 / D1b — a revisão lança o DELTA, não o valor cheio.
+    #
+    # Antes, aprovar a v2 de R$ 120.000 sobre a v1 de R$ 100.000 lançava
+    # 120.000 de novo: R$ 220.000 de receita para um contrato de R$ 120.000
+    # (medido em 21/07). Um aditivo não é uma segunda venda — é a mesma
+    # venda, por outro preço.
+    from models import Proposta as _Proposta
+    _proposta_obj = _Proposta.query.filter_by(
+        id=proposta_id, admin_id=admin_id).first()
+    ids_linhagem = (
+        [p.id for p in _linhagem_de_proposta(_proposta_obj, admin_id)]
+        if _proposta_obj else [proposta_id]
+    )
+    ja_lancado = Decimal(str(
+        db.session.query(db.func.sum(LancamentoContabil.valor_total)).filter(
+            LancamentoContabil.admin_id == admin_id,
+            LancamentoContabil.origem == 'PROPOSTAS',
+            LancamentoContabil.origem_id.in_(ids_linhagem),
+        ).scalar() or 0
+    ))
+    delta = valor_total - ja_lancado
+
+    if delta == 0:
+        logger.info(
+            f"⏭️ Proposta {proposta_id}: revisão sem mudança de valor "
+            f"(linhagem já lançou R$ {float(ja_lancado):.2f}) — nenhum "
+            f"lançamento contábil. Propagação continua."
+        )
+        _propagar_proposta_para_obra(proposta_id, admin_id)
+        _materializar_cronograma_se_houver()
+        return
+
+    # Delta negativo (revisão para baixo) inverte as partidas: estorna
+    # receita e reduz o valor a receber do cliente.
+    estorno = delta < 0
+    valor_partida = float(abs(delta))
+    if ja_lancado:
+        historico = (
+            f"Revisão de proposta #{proposta_id} - {cliente_nome} - "
+            f"{'estorno' if estorno else 'aditivo'} sobre "
+            f"R$ {float(ja_lancado):.2f}"
+        )
+    else:
+        historico = f"Proposta aprovada #{proposta_id} - {cliente_nome}"
+
     # 1. Criar lançamento contábil
     lancamento = LancamentoContabil(
         numero=gerar_numero_lancamento(admin_id),
         data_lancamento=data_aprovacao,
-        historico=f"Proposta aprovada #{proposta_id} - {cliente_nome}",
-        valor_total=float(valor_total),
+        historico=historico,
+        valor_total=float(delta),
         origem='PROPOSTAS',
         origem_id=proposta_id,
         admin_id=admin_id
@@ -197,19 +348,30 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
     logger.info(f"✅ Lançamento contábil #{lancamento.numero} criado")
 
     # 2. Partidas contábeis dobradas
+    #
+    # A contrapartida do estorno é `4.2.01.001` (Redução de Contrato), não um
+    # débito em `4.1.01.001`: `calcular_dre_mensal` monta a receita bruta com
+    # `calcular_valor_contas([...], 'CREDITO')` — só partidas CREDITO — e um
+    # débito na conta de receita ficaria INVISÍVEL no DRE. As deduções 4.2.x
+    # o DRE já subtrai. Contabilmente também é o certo: reduzir contrato é
+    # dedução da receita bruta, não receita negativa.
+    conta_resultado = '4.2.01.001' if estorno else '4.1.01.001'
     db.session.add(PartidaContabil(
         lancamento_id=lancamento.id, sequencia=1,
-        conta_codigo='1.1.02.001', tipo_partida='DEBITO',
-        valor=float(valor_total), admin_id=admin_id,
+        conta_codigo='1.1.02.001',
+        tipo_partida='CREDITO' if estorno else 'DEBITO',
+        valor=valor_partida, admin_id=admin_id,
     ))
     db.session.add(PartidaContabil(
         lancamento_id=lancamento.id, sequencia=2,
-        conta_codigo='4.1.01.001', tipo_partida='CREDITO',
-        valor=float(valor_total), admin_id=admin_id,
+        conta_codigo=conta_resultado,
+        tipo_partida='DEBITO' if estorno else 'CREDITO',
+        valor=valor_partida, admin_id=admin_id,
     ))
     logger.info(
-        f"✅ Partidas contábeis criadas - Débito R$ {float(valor_total):.2f} "
-        f"(1.1.02.001), Crédito R$ {float(valor_total):.2f} (4.1.01.001)"
+        f"✅ Partidas contábeis criadas - "
+        f"{'ESTORNO' if estorno else 'lançamento'} R$ {valor_partida:.2f} "
+        f"(1.1.02.001 × {conta_resultado})"
     )
 
     # Task #82: propagar para obra (IMC → OSC). Falha propaga.
