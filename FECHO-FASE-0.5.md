@@ -89,18 +89,21 @@ A varredura manual cobriu todos os arquivos rastreados + histórico via
 | Nível de log | `basicConfig` duplicado, **no-op** que suprimia todo DEBUG | `LOG_LEVEL`, aplicado num lugar só |
 | `IS_PRODUCTION` | **ausência** de `REPL_ID` | `SIGE_ENV` explícito |
 
-### 1.4 Branches órfãs e furos remanescentes
+### 1.4 Branches órfãs e furos remanescentes 🟡
 
-⚠️ **NÃO EXECUTADO.** A triagem de `fix/bloco2-segredos` (4 commits) e
-`fix/bloco1-blindagem-acesso` (5 commits) não foi feita, e os 3 furos de
-tenant do §2 (`views/rdo.py:1680` fallback `10`, `utils/tenant.py:101`
-backdoor `ALLOW_TENANT_AUTODETECT`, `views/rdo.py:2149` e-mail chumbado)
-**continuam abertos**.
+✅ **Os 3 furos de tenant foram fechados** (e eram 4, não 3):
 
-Razão: o conteúdo de `fix/bloco2-segredos` (placeholders + `sslmode=require`)
-foi reimplementado do zero neste pacote, de forma mais completa — mas
-**verificar isso commit a commit e decidir o destino das branches exige
-comparação que não fiz**. Não afirmo que estão cobertas.
+| Furo | Correção |
+|---|---|
+| `views/rdo.py` — `admin_id = ... if funcionario else 10` | **duas** ocorrências (1661 e 1684), não uma. Passam por `get_tenant_admin_id()`; sem tenant, a gravação é **recusada** em vez de cair num tenant concreto |
+| `utils/tenant.py:101` — backdoor `ALLOW_TENANT_AUTODETECT=true` | **removida**. Uma variável de ambiente transformava requisição sem tenant em acesso a empresa arbitrária — não sobrevive a um incidente, basta copiar o env de dev para o painel |
+| `views/rdo.py` — `"123@gmail.com" → "funcionario@valeverde.com"` | **3** ocorrências removidas |
+
+❌ **A triagem das branches órfãs não foi feita.** `fix/bloco2-segredos`
+(4 commits) e `fix/bloco1-blindagem-acesso` (5 commits) continuam órfãs. O
+conteúdo da primeira (placeholders + `sslmode=require`) foi reimplementado
+do zero neste pacote, de forma mais completa — mas **verificar isso commit a
+commit exige comparação que não fiz**. Não afirmo que estão cobertas.
 
 ---
 

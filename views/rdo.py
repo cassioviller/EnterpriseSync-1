@@ -80,7 +80,11 @@ def rdos():
                 admin_id = func_counts[0] if func_counts and func_counts[0] else current_user.id
         else:
             # Funcionário - buscar admin_id através do funcionário
-            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+            # Fase 0.5 / 1.4 — removido o mapeamento chumbado
+            # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
+            # tenant específico no código de produção, resquício da época
+            # de cliente único.
+            email_busca = current_user.email
             funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
             
             if not funcionario_atual:
@@ -1654,7 +1658,14 @@ def duplicar_rdo(id):
             else:
                 # Buscar funcionário para obter admin_id
                 funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                nova_sub.admin_id = funcionario.admin_id if funcionario else 10
+                # Fase 0.5 / 1.4 — o fallback era `else 10`: um tenant CONCRETO
+                # chumbado num caminho de ESCRITA. Registro sem tenant resolvido
+                # some de todo filtro depois, sem erro e sem alerta.
+                from utils.tenant import get_tenant_admin_id
+                _admin_resolvido = get_tenant_admin_id()
+                if not _admin_resolvido:
+                    raise ValueError("Sessão sem empresa vinculada; refaça o login.")
+                nova_sub.admin_id = _admin_resolvido
             
             db.session.add(nova_sub)
         
@@ -1677,7 +1688,14 @@ def duplicar_rdo(id):
             else:
                 # Buscar funcionário para obter admin_id
                 funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                nova_mao.admin_id = funcionario.admin_id if funcionario else 10
+                # Fase 0.5 / 1.4 — o fallback era `else 10`: um tenant CONCRETO
+                # chumbado num caminho de ESCRITA. Registro sem tenant resolvido
+                # some de todo filtro depois, sem erro e sem alerta.
+                from utils.tenant import get_tenant_admin_id
+                _admin_resolvido = get_tenant_admin_id()
+                if not _admin_resolvido:
+                    raise ValueError("Sessão sem empresa vinculada; refaça o login.")
+                nova_mao.admin_id = _admin_resolvido
             
             db.session.add(nova_mao)
         
@@ -2026,7 +2044,11 @@ def api_percentuais_ultimo_rdo(obra_id):
     """API CORRIGIDA: Percentuais do último RDO + novos serviços com 0%"""
     try:
         # Buscar funcionário correto para admin_id
-        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+        # Fase 0.5 / 1.4 — removido o mapeamento chumbado
+        # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
+        # tenant específico no código de produção, resquício da época
+        # de cliente único.
+        email_busca = current_user.email
         funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
         
         if not funcionario_atual:
@@ -2151,7 +2173,11 @@ def funcionario_rdo_consolidado():
         # Buscar funcionário para logs
         funcionario_atual = None
         if hasattr(current_user, 'email') and current_user.email:
-            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+            # Fase 0.5 / 1.4 — removido o mapeamento chumbado
+            # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
+            # tenant específico no código de produção, resquício da época
+            # de cliente único.
+            email_busca = current_user.email
             funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
         
         if not funcionario_atual:

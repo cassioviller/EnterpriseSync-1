@@ -98,18 +98,14 @@ def get_safe_admin_id():
     if tenant_id:
         return tenant_id
     
-    # DESENVOLVIMENTO: Fallback apenas se explicitamente permitido
-    import os
-    if os.environ.get('ALLOW_TENANT_AUTODETECT') == 'true':
-        logger.warning("⚠️ DESENVOLVIMENTO: Usando fallback de tenant - NUNCA usar em produção!")
-        try:
-            from models import Usuario
-            primeiro_admin = Usuario.query.filter_by(tipo_usuario=TipoUsuario.ADMIN).first()
-            if primeiro_admin:
-                return primeiro_admin.id
-        except Exception as e:
-            logger.error(f"Erro no fallback de desenvolvimento: {e}")
-    
+    # Fase 0.5 / 1.4 — BACKDOOR REMOVIDA.
+    # Havia aqui um fallback que, com `ALLOW_TENANT_AUTODETECT=true` no
+    # ambiente, devolvia "o primeiro ADMIN da tabela" — ou seja, uma variável
+    # de ambiente transformava qualquer requisição sem tenant em acesso a uma
+    # empresa arbitrária. Uma chave de escape assim não sobrevive a um
+    # incidente: basta alguém copiar o env de dev para o painel.
+    # Quem precisa de tenant em script/CLI passa `admin_id` explicitamente.
+
     # Falha segura - sem admin_id válido
     logger.error("❌ ERRO CRÍTICO: Nenhum admin_id válido encontrado!")
     return None
