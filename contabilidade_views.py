@@ -11,7 +11,6 @@ from flask_login import current_user
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
-from functools import wraps  # ✅ OTIMIZAÇÃO: Movido do inline (linha 33)
 from sqlalchemy.orm import joinedload  # ✅ OTIMIZAÇÃO: Eager loading para evitar N+1
 import calendar
 # Imports de contabilidade_utils consolidados (antes espalhados em várias linhas)
@@ -36,18 +35,9 @@ def get_admin_id():
     
     return None
 
-def admin_required(f):
-    """Decorator simples para admin - implementação temporária"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return redirect(url_for('main.login'))
-        # Verificação simplificada para Admin
-        if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario and current_user.tipo_usuario.name in ['ADMIN', 'SUPER_ADMIN']:
-            return f(*args, **kwargs)
-        flash('Acesso negado. Apenas administradores podem acessar esta página.', 'error')
-        return redirect(url_for('main.dashboard'))
-    return decorated_function
+# Fase 1 — usa a definição canônica. Havia uma cópia local idêntica aqui,
+# uma em folha_pagamento_views.py e um shim em decorators.py.
+from auth import admin_required
 
 @contabilidade_bp.route('/dashboard')
 @admin_required

@@ -376,3 +376,40 @@ def test_dashboard_funcionario_sem_vinculo_nao_pega_estranho():
     for nome in nomes_b:
         assert nome not in corpo, (
             f'dashboard vazou o funcionário "{nome}" do tenant B')
+
+
+# ---------------------------------------------------------------------------
+# Consolidação dos decorators
+# ---------------------------------------------------------------------------
+
+def test_existe_uma_unica_definicao_de_admin_required():
+    """Havia 4: auth.py:21, decorators.py:48, e cópias locais em
+    contabilidade_views.py:39 e folha_pagamento_views.py:22."""
+    import subprocess
+
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    saida = subprocess.run(
+        ['grep', '-rn', '--include=*.py', '^def admin_required', '.'],
+        cwd=raiz, capture_output=True, text=True).stdout
+    definicoes = [linha for linha in saida.splitlines()
+                  if './archive/' not in linha
+                  and './entrega_baia_rev10/' not in linha]
+    assert len(definicoes) == 1, (
+        f'esperava 1 definição de admin_required, achei '
+        f'{len(definicoes)}:\n' + '\n'.join(definicoes))
+    assert definicoes[0].startswith('./auth.py:'), (
+        f'a definição canônica deve morar em auth.py, está em {definicoes[0]}')
+
+
+@pytest.mark.parametrize('nome', [
+    'almoxarife_required',
+    'pode_gerenciar_almoxarifado',
+    'pode_lancar_materiais',
+])
+def test_codigo_morto_de_almoxarife_foi_removido(nome):
+    """0 rotas, 0 templates, 0 testes usavam — mas sugeriam RBAC que não existe."""
+    import auth
+    assert not hasattr(auth, nome), (
+        f'auth.{nome} continua existindo — 0 consumidores no censo de '
+        f'2026-07-21, e sugere um controle de acesso que o almoxarifado '
+        f'não tem (roda com @login_required puro)')

@@ -45,22 +45,18 @@ def cronograma_import_required(f):
     return decorated_function
 
 
-def admin_required(f):
-    """Requer que o usuário seja administrador.
-
-    Fase 0 / R2 — ATÉ 2026-07-21 este decorator era um NO-OP
-    (`return f(*args, **kwargs)` incondicional, comentado como "bypass de
-    desenvolvimento"). Como `configuracoes_views` e `ponto_views` o usam em
-    31 rotas, qualquer funcionário autenticado gravava as configurações da
-    empresa. Agora delega para a implementação REAL de `auth.admin_required`
-    (autenticado + tipo ADMIN/SUPER_ADMIN), que é a mesma usada pelo resto
-    do sistema. Import tardio para não criar ciclo com `auth`.
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        from auth import admin_required as _admin_required_real
-        return _admin_required_real(f)(*args, **kwargs)
-    return decorated_function
+# Fase 1 — `admin_required` deixa de ser redefinido aqui e passa a ser
+# apenas RE-EXPORTADO de `auth`.
+#
+# Na Fase 0 / R2 este shim já delegava para a implementação real (antes
+# disso era um NO-OP: `return f(*args, **kwargs)` incondicional, comentado
+# como "bypass de desenvolvimento" — qualquer funcionário autenticado
+# gravava as configurações da empresa, em 31 rotas de `configuracoes_views`
+# e `ponto_views`). Delegar já estava correto; o que sobrava era uma quarta
+# DEFINIÇÃO do mesmo nome, e ler o código exigia descobrir qual das quatro
+# uma rota estava usando. `ponto_views.py:29` e `configuracoes_views.py:11`
+# continuam importando daqui e nada muda para eles.
+from auth import admin_required  # noqa: F401 — re-export deliberado
 
 
 def login_required(f):
