@@ -4014,6 +4014,7 @@ def executar_migracoes():
             (213, "Fase 0.5 — índices que nunca nasceram (create_all antes das migrações) + poda de 61 redundantes", _migration_213_indices_faltantes_e_duplicados),
             (214, "Fase 1 — FK de identidade usuario.funcionario_id (nullable, UNIQUE parcial)", migration_214_usuario_funcionario_id),
             (215, "Fase 1 — tabela usuario_obra (escopo por obra: usuario_id, obra_id, papel)", migration_215_usuario_obra),
+            (216, "Fase 1 — flag de rollout configuracao_empresa.escopo_obra_ativo (default FALSE)", migration_216_escopo_obra_flag),
             # Fase 0.6 usou 217-219; a Fase 1 usa 214-216.
             (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
             (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
@@ -14264,6 +14265,21 @@ def migration_215_usuario_obra():
     db.session.commit()
 
     logger.info("[Migration 215] Concluída com sucesso")
+
+def migration_216_escopo_obra_flag():
+    """Fase 1 — flag de rollout configuracao_empresa.escopo_obra_ativo.
+
+    DEFAULT FALSE é deliberado: enquanto estiver desligada, a Fase 1 é
+    puramente aditiva e nenhum usuário perde acesso.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 216] Iniciando — escopo_obra_ativo")
+    db.session.execute(sa_text("""
+        ALTER TABLE configuracao_empresa
+        ADD COLUMN IF NOT EXISTS escopo_obra_ativo BOOLEAN NOT NULL DEFAULT FALSE
+    """))
+    db.session.commit()
+    logger.info("[Migration 216] Concluída com sucesso")
 
 def _migration_217_canonizar_status_obra():
     """Fase 0.6 / D5 — canoniza `obra.status` e o dropdown que o alimenta.

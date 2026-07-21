@@ -3785,6 +3785,14 @@ class ConfiguracaoEmpresa(db.Model):
     cronograma_mpp_ativo = db.Column(db.Boolean, nullable=False, default=False,
                                      server_default='false')
 
+    # Fase 1 — rollout do escopo por obra, por tenant. Desligada por
+    # padrão: com FALSE o comportamento é idêntico ao de antes da Fase 1
+    # (não-admin enxerga todas as obras do tenant). Ligar só depois de
+    # popular usuario_obra para o tenant, senão o pessoal de campo perde
+    # acesso. Mesmo padrão de cronograma_mpp_ativo (migration 211).
+    escopo_obra_ativo = db.Column(db.Boolean, nullable=False, default=False,
+                                  server_default='false')
+
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao

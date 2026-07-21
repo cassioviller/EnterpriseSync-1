@@ -106,3 +106,27 @@ def test_usuario_nao_se_vincula_duas_vezes_a_mesma_obra():
         with pytest.raises(IntegrityError):
             db.session.commit()
         db.session.rollback()
+
+
+# ---------------------------------------------------------------------------
+# Flag de rollout
+# ---------------------------------------------------------------------------
+
+def test_flag_escopo_obra_nasce_desligada():
+    from scripts.flag_escopo_obra import escopo_ativo
+
+    with app.app_context():
+        admin = _admin()
+        assert escopo_ativo(admin.id) is False, (
+            'flag ligada por padrão tiraria acesso de todo mundo no deploy')
+
+
+def test_flag_escopo_obra_liga_e_desliga():
+    from scripts.flag_escopo_obra import definir_flag, escopo_ativo
+
+    with app.app_context():
+        admin = _admin()
+        definir_flag(admin.id, True)
+        assert escopo_ativo(admin.id) is True
+        definir_flag(admin.id, False)
+        assert escopo_ativo(admin.id) is False
