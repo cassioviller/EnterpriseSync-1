@@ -130,3 +130,234 @@ def test_flag_escopo_obra_liga_e_desliga():
         assert escopo_ativo(admin.id) is True
         definir_flag(admin.id, False)
         assert escopo_ativo(admin.id) is False
+
+
+# ---------------------------------------------------------------------------
+# Chokepoint de autorização
+# ---------------------------------------------------------------------------
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def test_admin_ve_todas_as_obras_do_tenant_mesmo_com_flag_ligada():
+    """ADMIN não precisa de vínculo. Regra que evita apagão no deploy."""
+    from scripts.flag_escopo_obra import definir_flag
+    from utils.autorizacao import obras_visiveis
+
+    with app.app_context():
+        admin = _admin()
+        o1, o2 = _obra(admin.id, 'Um'), _obra(admin.id, 'Dois')
+        definir_flag(admin.id, True)
+        ids_esperados = {o1.id, o2.id}
+        aid = admin.id
+
+    cliente = _cliente_de(aid)
+    with cliente:
+        cliente.get('/dashboard')
+        visiveis = {o.id for o in obras_visiveis().all()}
+    assert ids_esperados <= visiveis
+
+
+def test_flag_desligada_preserva_o_comportamento_antigo():
+    """Não-admin sem vínculo continua vendo o tenant inteiro."""
+    from utils.autorizacao import obras_visiveis
+
+    with app.app_context():
+        admin = _admin()
+        o1 = _obra(admin.id)
+        op = _operador(admin.id)  # sem nenhum UsuarioObra
+        oid, opid = o1.id, op.id
+
+    cliente = _cliente_de(opid)
+    with cliente:
+        cliente.get('/dashboard')
+        visiveis = {o.id for o in obras_visiveis().all()}
+    assert oid in visiveis
+
+
+def test_flag_ligada_restringe_nao_admin_as_obras_vinculadas():
+    from scripts.flag_escopo_obra import definir_flag
+    from utils.autorizacao import obras_visiveis
+
+    with app.app_context():
+        admin = _admin()
+        minha, alheia = _obra(admin.id, 'Minha'), _obra(admin.id, 'Alheia')
+        op = _operador(admin.id)
+        db.session.add(UsuarioObra(usuario_id=op.id, obra_id=minha.id,
+                                   papel=PapelObra.APONTADOR, admin_id=admin.id))
+        db.session.commit()
+        definir_flag(admin.id, True)
+        minha_id, alheia_id, opid = minha.id, alheia.id, op.id
+
+    cliente = _cliente_de(opid)
+    with cliente:
+        cliente.get('/dashboard')
+        visiveis = {o.id for o in obras_visiveis().all()}
+    assert minha_id in visiveis
+    assert alheia_id not in visiveis, 'obra sem vínculo vazou com a flag ligada'
+
+
+def test_vinculo_inativo_nao_da_acesso():
+    from scripts.flag_escopo_obra import definir_flag
+    from utils.autorizacao import pode_ver_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        db.session.add(UsuarioObra(usuario_id=op.id, obra_id=obra.id,
+                                   papel=PapelObra.LEITOR, admin_id=admin.id,
+                                   ativo=False))
+        db.session.commit()
+        definir_flag(admin.id, True)
+        oid, opid = obra.id, op.id
+
+    cliente = _cliente_de(opid)
+    with cliente:
+        cliente.get('/dashboard')
+        assert pode_ver_obra(oid) is False
+
+
+def test_obra_de_outro_tenant_nunca_e_visivel():
+    """O eixo antigo (tenant) continua valendo, flag ou não."""
+    from utils.autorizacao import pode_ver_obra
+
+    with app.app_context():
+        admin_a, admin_b = _admin('A'), _admin('B')
+        obra_b = _obra(admin_b.id)
+        op_a = _operador(admin_a.id)
+        oid, opid = obra_b.id, op_a.id
+
+    cliente = _cliente_de(opid)
+    with cliente:
+        cliente.get('/dashboard')
+        assert pode_ver_obra(oid) is False
+
+
+def test_leitor_nao_edita_apontador_nao_edita_gestor_edita():
+    from scripts.flag_escopo_obra import definir_flag
+    from utils.autorizacao import pode_editar_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        definir_flag(admin.id, True)
+        atores = {}
+        for papel in (PapelObra.LEITOR, PapelObra.APONTADOR, PapelObra.GESTOR):
+            op = _operador(admin.id, papel.value)
+            db.session.add(UsuarioObra(usuario_id=op.id, obra_id=obra.id,
+                                       papel=papel, admin_id=admin.id))
+            atores[papel] = op.id
+        db.session.commit()
+        oid = obra.id
+
+    esperado = {PapelObra.LEITOR: False, PapelObra.APONTADOR: False,
+                PapelObra.GESTOR: True}
+    for papel, uid in atores.items():
+        cliente = _cliente_de(uid)
+        with cliente:
+            cliente.get('/dashboard')
+            assert pode_editar_obra(oid) is esperado[papel], (
+                f'{papel.name} deveria ter pode_editar_obra='
+                f'{esperado[papel]}')
+
+
+def test_anonimo_nao_ve_obra_nenhuma():
+    from utils.autorizacao import obras_visiveis, pode_ver_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        oid = obra.id
+
+    anon = app.test_client()
+    with anon:
+        anon.get('/dashboard')
+        assert obras_visiveis().count() == 0
+        assert pode_ver_obra(oid) is False
+
+
+# ---------------------------------------------------------------------------
+# Flag DESLIGADA — a promessa de reversibilidade
+# ---------------------------------------------------------------------------
+#
+# Lacuna encontrada ao revisar o chokepoint contra o código real, não
+# prevista pelo plano da Fase 1: os testes acima só exercitam a flag
+# LIGADA. A decisão nº 5 da fase diz que "com a flag desligada o
+# comportamento é idêntico ao de hoje" — e hoje `editar_obra`
+# (views/obras.py:848) tem apenas `@login_required`, sem `@admin_required`.
+# Qualquer usuário autenticado do tenant edita qualquer obra dele.
+#
+# A primeira versão do chokepoint devolvia LEITOR para não-admin com a flag
+# desligada, o que faria TODO não-admin perder a edição no dia do deploy —
+# exatamente o que a flag existe para impedir.
+
+def test_flag_desligada_nao_tira_edicao_de_ninguem():
+    from utils.autorizacao import pode_editar_obra, pode_ver_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        operador = _operador(admin.id, 'sem-vinculo')
+        db.session.commit()
+        oid, uid = obra.id, operador.id
+        # flag NÃO é ligada — é o estado de todo tenant no deploy
+
+    cliente = _cliente_de(uid)
+    with cliente:
+        cliente.get('/dashboard')
+        assert pode_ver_obra(oid) is True
+        assert pode_editar_obra(oid) is True, (
+            'com o escopo desligado, o não-admin perdeu a edição que tinha '
+            'antes da Fase 1 — a flag deixou de ser reversível')
+
+
+def test_flag_desligada_ignora_vinculo_restritivo():
+    """O backfill grava vínculos ANTES de a flag ser ligada.
+
+    Um LEITOR gravado nessa janela não pode restringir ninguém enquanto o
+    eixo de obra não estiver em vigor.
+    """
+    from utils.autorizacao import pode_editar_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        operador = _operador(admin.id, 'leitor-precoce')
+        db.session.add(UsuarioObra(usuario_id=operador.id, obra_id=obra.id,
+                                   papel=PapelObra.LEITOR, admin_id=admin.id))
+        db.session.commit()
+        oid, uid = obra.id, operador.id
+
+    cliente = _cliente_de(uid)
+    with cliente:
+        cliente.get('/dashboard')
+        assert pode_editar_obra(oid) is True, (
+            'vínculo gravado pelo backfill restringiu antes de a flag ligar'
+        )
+
+
+def test_flag_ligada_faz_o_vinculo_valer():
+    """A contraprova: o mesmo cenário, com o eixo em vigor, restringe."""
+    from scripts.flag_escopo_obra import definir_flag
+    from utils.autorizacao import pode_editar_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        operador = _operador(admin.id, 'leitor')
+        db.session.add(UsuarioObra(usuario_id=operador.id, obra_id=obra.id,
+                                   papel=PapelObra.LEITOR, admin_id=admin.id))
+        db.session.commit()
+        definir_flag(admin.id, True)
+        oid, uid = obra.id, operador.id
+
+    cliente = _cliente_de(uid)
+    with cliente:
+        cliente.get('/dashboard')
+        assert pode_editar_obra(oid) is False
