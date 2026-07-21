@@ -701,6 +701,110 @@ def progresso_geral_para_kpi(obra_id: int, admin_id: int) -> float:
     return _progresso_fallback_subatividades(obra_id)
 
 
+def replanejar_curvas_obra(obra_id: int, admin_id: int) -> dict:
+    """Recalcula `RDOApontamentoCronograma.percentual_planejado` de TODOS os
+    apontamentos da obra com as datas VIGENTES das tarefas (M06 §4.3).
+
+    Chamado após aplicar/restaurar versão (M05): o planejado gravado em cada
+    RDO é snapshot do plano da época e fica órfão quando as datas mudam.
+    NUNCA toca o realizado — `quantidade_executada_dia`,
+    `quantidade_acumulada`, `percentual_realizado` e `percentual_acumulado`
+    permanecem byte-idênticos. Ao final, sincroniza percentuais (pais
+    inclusive) e devolve o relatório:
+    ``{apontamentos_replanejados, tarefas_sem_historico_reconciliado,
+    progresso_antes, progresso_depois}`` — arquivadas com apontamento
+    entram na lista para revisão manual (histórico não reconciliado).
+    """
+    from models import RDO, RDOApontamentoCronograma, TarefaCronograma, db
+
+    hoje = date.today()
+    progresso_antes = calcular_progresso_geral_obra_v2(
+        obra_id, hoje, admin_id)['progresso_geral_pct']
+
+    cal = get_calendario(admin_id)
+    sab, dom = cal.considerar_sabado, cal.considerar_domingo
+    # Inclui arquivadas: apontamentos delas também são replanejados com as
+    # últimas datas conhecidas (e listados no relatório).
+    tarefas = {t.id: t for t in (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .all())}
+
+    linhas = (
+        db.session.query(RDOApontamentoCronograma, RDO.data_relatorio)
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(RDO.obra_id == obra_id,
+                RDOApontamentoCronograma.admin_id == admin_id)
+        .order_by(RDO.data_relatorio.asc(), RDOApontamentoCronograma.id.asc())
+        .all()
+    )
+
+    replanejados = 0
+    arquivadas_com_apontamento = set()
+    for ap, data_rdo in linhas:
+        t = tarefas.get(ap.tarefa_cronograma_id)
+        if t is None:
+            continue
+        if not t.ativa:
+            arquivadas_com_apontamento.add(t.id)
+        novo = _planejado_na_data(
+            t.data_inicio, t.data_fim, t.duracao_dias,
+            _is_marco_efetivo(t), data_rdo, sab, dom)
+        antigo = ap.percentual_planejado
+        mudou = ((antigo is None) != (novo is None)
+                 or (antigo is not None and novo is not None
+                     and abs(float(antigo) - float(novo)) > 1e-9))
+        if mudou:
+            ap.percentual_planejado = novo
+            replanejados += 1
+
+    db.session.commit()
+    sincronizar_percentuais_obra(obra_id, admin_id, cliente=False)
+
+    progresso_depois = calcular_progresso_geral_obra_v2(
+        obra_id, hoje, admin_id)['progresso_geral_pct']
+    return {
+        'apontamentos_replanejados': replanejados,
+        'tarefas_sem_historico_reconciliado':
+            sorted(arquivadas_com_apontamento),
+        'progresso_antes': progresso_antes,
+        'progresso_depois': progresso_depois,
+    }
+
+
+def verificar_consistencia_progresso(obra_id: int, admin_id: int) -> dict:
+    """Ferramenta de suporte (M06 §16): compara o `percentual_concluido`
+    persistido de cada folha viva com o recalculado pelo engine e loga o
+    drift. Não altera nada."""
+    from models import TarefaCronograma
+
+    folhas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .all()
+    )
+    pais_ids = {t.tarefa_pai_id for t in folhas if t.tarefa_pai_id}
+    divergencias = []
+    verificadas = 0
+    for t in folhas:
+        if t.id in pais_ids or getattr(t, 'responsavel', 'empresa') == 'terceiros':
+            continue  # pais são rollup; terceiros são manuais
+        verificadas += 1
+        recalc = calcular_progresso_rdo(t.id, date.today(), admin_id)[
+            'percentual_realizado']
+        persistido = float(t.percentual_concluido or 0.0)
+        if abs(persistido - float(recalc)) > 0.01:
+            divergencias.append({'tarefa_id': t.id,
+                                 'persistido': persistido,
+                                 'recalculado': float(recalc)})
+    if divergencias:
+        logger.warning(
+            'drift de progresso na obra %s: %d tarefa(s) divergente(s): %s',
+            obra_id, len(divergencias), divergencias)
+    return {'tarefas_verificadas': verificadas, 'divergencias': divergencias}
+
+
 def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
     """
     Recalcula e persiste o percentual_concluido da TarefaCronograma.

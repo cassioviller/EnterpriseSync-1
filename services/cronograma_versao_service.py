@@ -58,7 +58,7 @@ from models import (
 )
 from utils.cronograma_engine import (
     recalcular_cronograma,
-    sincronizar_percentuais_obra,
+    replanejar_curvas_obra,
 )
 
 logger = logging.getLogger(__name__)
@@ -370,12 +370,38 @@ def aplicar_versao(importacao_id: int, decisoes: dict | None,
     # as datas ficam fielmente as do arquivo (o MS Project já as calculou).
     # Assim que a obra tem RDO, o motor local volta a ser a fonte de verdade.
     if tem_rdo:
-        if not recalcular_cronograma(obra_id, admin_id, cliente=False):
-            logger.warning('recalcular_cronograma falhou após aplicar versão '
-                           '%s da obra %s (estado aplicado permanece válido)',
-                           versao.numero, obra_id)
-        sincronizar_percentuais_obra(obra_id, admin_id, cliente=False)
+        _motor_pos_commit(versao, obra_id, admin_id, usuario_id,
+                          versao.importacao_id)
     return versao
+
+
+def _motor_pos_commit(versao, obra_id, admin_id, usuario_id, importacao_id):
+    """Pós-commit para obra COM RDO: recalcula datas, replaneja as curvas
+    dos apontamentos com as datas novas (M06 — sincroniza percentuais no
+    processo) e audita o relatório num evento `replanejado`. O evento
+    `aplicado`/`rollback` já foi commitado na transação estrutural, por
+    isso o relatório ganha evento próprio (desvio documentado da spec M06
+    §4.3). Falha aqui não desfaz a versão aplicada — loga e segue."""
+    if not recalcular_cronograma(obra_id, admin_id, cliente=False):
+        logger.warning('recalcular_cronograma falhou após a versão %s da '
+                       'obra %s (estado aplicado permanece válido)',
+                       versao.numero, obra_id)
+    try:
+        relatorio = replanejar_curvas_obra(obra_id, admin_id)
+        if importacao_id is not None:
+            db.session.add(CronogramaImportacaoEvento(
+                importacao_id=importacao_id,
+                admin_id=admin_id,
+                evento='replanejado',
+                detalhes={'versao_id': versao.id,
+                          'versao_numero': versao.numero, **relatorio},
+                usuario_id=usuario_id,
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception('replanejamento pós-aplicação falhou na obra %s '
+                         '(estado aplicado permanece válido)', obra_id)
 
 
 def _aplicar(importacao_id, decisoes, usuario_id):
@@ -595,10 +621,8 @@ def restaurar_versao(versao_id: int, usuario_id: int | None) -> CronogramaVersao
         raise
 
     if tem_rdo:
-        if not recalcular_cronograma(obra_id, admin_id, cliente=False):
-            logger.warning('recalcular_cronograma falhou após restaurar '
-                           'versão %s da obra %s', versao.numero, obra_id)
-        sincronizar_percentuais_obra(obra_id, admin_id, cliente=False)
+        _motor_pos_commit(versao, obra_id, admin_id, usuario_id,
+                          versao.importacao_id)
     return versao
 
 
