@@ -951,6 +951,31 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         obra = Obra.query.filter_by(
             proposta_origem_id=proposta_id, admin_id=admin_id
         ).first()
+    if not obra:
+        # Fase 0 / R1 — sobe a cadeia de versões: a obra pode ter nascido de
+        # um ANCESTRAL desta proposta (v1 aprovada → obra; v2 é o aditivo).
+        # `criar_nova_versao` passou a herdar `obra_id`, mas as revisões já
+        # gravadas antes dessa correção não têm o campo — esta guarda evita
+        # que elas criem uma segunda obra ao serem aprovadas.
+        ancestral_id, visitados = proposta.proposta_origem_id, {proposta_id}
+        while ancestral_id and ancestral_id not in visitados and obra is None:
+            visitados.add(ancestral_id)
+            ancestral = Proposta.query.filter_by(
+                id=ancestral_id, admin_id=admin_id).first()
+            if ancestral is None:
+                break
+            if ancestral.obra_id:
+                obra = Obra.query.filter_by(
+                    id=ancestral.obra_id, admin_id=admin_id).first()
+            if obra is None:
+                obra = Obra.query.filter_by(
+                    proposta_origem_id=ancestral.id, admin_id=admin_id).first()
+            ancestral_id = ancestral.proposta_origem_id
+        if obra is not None:
+            logger.info(
+                "🔗 Proposta %s (revisão) reconciliada com a obra %s pela "
+                "cadeia de versões — nenhuma obra nova criada",
+                proposta.numero, obra.codigo)
 
     if not obra:
         ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter(

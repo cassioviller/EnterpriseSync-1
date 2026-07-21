@@ -284,32 +284,54 @@ def _relatorio_veiculos():
         'html': html
     })
 
+def _tenant_id():
+    """Fase 0 / R3 — tenant do usuário logado, falha segura.
+
+    Os três relatórios abaixo consultavam TODAS as empresas do banco
+    (`Funcionario.query.filter_by(ativo=True).count()`, `Obra.query.all()`,
+    `sum(CustoObra.valor)` sem predicado): um admin de qualquer tenant via
+    o consolidado de todos os outros.
+    """
+    from flask import abort
+
+    from utils.tenant import get_tenant_admin_id
+    admin_id = get_tenant_admin_id()
+    if not admin_id:
+        abort(403)
+    return admin_id
+
+
 def _relatorio_dashboard_executivo():
     """Dashboard executivo"""
-    total_funcionarios = Funcionario.query.filter_by(ativo=True).count()
+    admin_id = _tenant_id()
+    total_funcionarios = Funcionario.query.filter_by(
+        ativo=True, admin_id=admin_id).count()
     # Task #17: contar pelo flag `ativo` (mesmo padrão de Funcionario), não
     # mais pelo status textual — `ativo` é o que define se a obra entra nos
     # relatórios/dashboards do dia a dia.
-    total_obras = Obra.query.filter_by(ativo=True).count()
-    total_veiculos = Veiculo.query.count()
-    
+    total_obras = Obra.query.filter_by(ativo=True, admin_id=admin_id).count()
+    total_veiculos = Veiculo.query.filter_by(admin_id=admin_id).count()
+
     # Custos do mês atual
     hoje = date.today()
     primeiro_dia_mes = hoje.replace(day=1)
-    
+
     custos_mes = db.session.query(func.sum(CustoObra.valor)).filter(
+        CustoObra.admin_id == admin_id,
         CustoObra.data >= primeiro_dia_mes,
         CustoObra.data <= hoje
     ).scalar() or 0
-    
+
     # Horas trabalhadas do mês
     horas_mes = db.session.query(func.sum(RegistroPonto.horas_trabalhadas)).filter(
+        RegistroPonto.admin_id == admin_id,
         RegistroPonto.data >= primeiro_dia_mes,
         RegistroPonto.data <= hoje
     ).scalar() or 0
-    
+
     # Alimentação do mês
     alimentacao_mes = db.session.query(func.sum(RegistroAlimentacao.valor)).filter(
+        RegistroAlimentacao.admin_id == admin_id,
         RegistroAlimentacao.data >= primeiro_dia_mes,
         RegistroAlimentacao.data <= hoje
     ).scalar() or 0
@@ -333,7 +355,7 @@ def _relatorio_dashboard_executivo():
 
 def _relatorio_progresso_obras():
     """Relatório de progresso das obras"""
-    obras = Obra.query.all()
+    obras = Obra.query.filter_by(admin_id=_tenant_id()).all()  # Fase 0 / R3
     
     html = '<div class="table-responsive"><table class="table table-striped">'
     html += '<thead><tr><th>Obra</th><th>Progresso</th><th>Orçamento</th><th>Gasto Atual</th><th>Saldo</th><th>% Utilizado</th></tr></thead><tbody>'
@@ -361,7 +383,7 @@ def _relatorio_progresso_obras():
 
 def _relatorio_rentabilidade():
     """Análise de rentabilidade por obra"""
-    obras = Obra.query.all()
+    obras = Obra.query.filter_by(admin_id=_tenant_id()).all()  # Fase 0 / R3
     
     html = '<div class="table-responsive"><table class="table table-striped">'
     html += '<thead><tr><th>Obra</th><th>Receita Prevista</th><th>Custos</th><th>Margem</th><th>% Margem</th><th>Status</th></tr></thead><tbody>'

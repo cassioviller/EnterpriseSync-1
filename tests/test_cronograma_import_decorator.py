@@ -76,12 +76,47 @@ def test_funcionario_recebe_403():
             assert status == 403
 
 
-def test_decorators_legados_intactos():
-    """M01 §4: o bypass global NÃO muda neste módulo (risco amplo)."""
+def test_decorators_legados_nao_sao_mais_no_op():
+    """Fase 0 / R2 — trava INVERTIDA.
+
+    No M01 este teste garantia que o bypass global não fosse mexido (o
+    saneamento estava fora do escopo daquele módulo). A Fase 0 saneou:
+    `decorators.admin_required` e `decorators.login_required` agora delegam
+    para as implementações reais. O teste passa a impedir a regressão
+    contrária — que alguém devolva o `return f(*args, **kwargs)` solto.
+    """
     import inspect
+
     import decorators
-    for nome in ('admin_required', 'login_required'):
+
+    for nome, esperado in (('admin_required', 'auth import admin_required'),
+                           ('login_required', 'flask_login import login_required')):
         fonte = inspect.getsource(getattr(decorators, nome))
-        assert 'bypass' in fonte, (
-            f'{nome} mudou — fora do escopo do M01, reverta'
+        assert 'bypass para todos' not in fonte, (
+            f'{nome} voltou a ser no-op — 31 rotas de configuração e ponto '
+            f'ficam sem autorização'
         )
+        assert esperado in fonte, (
+            f'{nome} deveria delegar para a implementação real ({esperado})'
+        )
+
+
+def test_rotas_de_configuracao_exigem_admin():
+    """A consequência prática de R2: funcionário não grava configuração."""
+    import configuracoes_views  # noqa: F401 — registra o blueprint
+
+    with app.app_context():
+        func_id = _criar_usuario(TipoUsuario.FUNCIONARIO).id
+
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(func_id)
+        sess['_fresh'] = True
+    r = c.get('/configuracoes/empresa', follow_redirects=False)
+    # auth.admin_required redireciona (302) quem não é ADMIN.
+    assert r.status_code == 302, (
+        f'funcionário acessou /configuracoes/empresa (status {r.status_code})')
+
+    anon = app.test_client()
+    r = anon.get('/configuracoes/empresa', follow_redirects=False)
+    assert r.status_code == 302

@@ -2130,7 +2130,11 @@ def api_percentuais_ultimo_rdo(obra_id):
 
 
 # RDO Lista Consolidada
+# Fase 0 / R3 — esta rota estava SEM autenticação: com `get_admin_id_dinamico`
+# caindo em heurística para anônimo, ela devolvia RDOs de uma empresa
+# escolhida arbitrariamente. Não há before_request global no app.
 @main_bp.route('/funcionario/rdo/consolidado')
+@login_required
 @capture_db_errors
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
@@ -3885,37 +3889,42 @@ def salvar_rdo_flexivel():
         
         # Obter dados básicos da sessão e formulário
         funcionario_id = session.get('funcionario_id') or request.form.get('funcionario_id', type=int)
-        admin_id = session.get('admin_id') or request.form.get('admin_id_form', type=int)
         obra_id = request.form.get('obra_id', type=int)
 
-        # FALLBACK ADMIN: Se admin/super_admin fez login, usar seu ID diretamente
-        if not admin_id and current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                admin_id = current_user.id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id via current_user (ADMIN): {admin_id}")
-            elif current_user.tipo_usuario == TipoUsuario.FUNCIONARIO and current_user.admin_id:
-                admin_id = current_user.admin_id
-                funcionario_id = funcionario_id or current_user.id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id via current_user (FUNCIONARIO): {admin_id}")
+        # Fase 0 / R3 — O TENANT VEM DO USUÁRIO AUTENTICADO, NUNCA DO FORMULÁRIO.
+        # Até 2026-07-21 esta linha era:
+        #     admin_id = session.get('admin_id') or request.form.get('admin_id_form', type=int)
+        # e `session['admin_id']` só era gravado DENTRO desta própria função —
+        # ou seja, na primeira gravação da sessão o valor vinha do campo oculto
+        # `admin_id_form` do formulário. Como `@funcionario_required` só checa
+        # autenticação (auth.py:36), qualquer usuário logado podia postar o
+        # admin_id de outra empresa e ESCREVER um RDO no tenant alheio.
+        from utils.tenant import get_tenant_admin_id
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            logger.error('[SEC] salvar_rdo_flexivel sem tenant resolvido para '
+                         'usuario=%s', getattr(current_user, 'id', None))
+            return jsonify({'success': False,
+                            'message': 'Sessão sem empresa vinculada. '
+                                       'Faça login novamente.'}), 403
+        session['admin_id'] = admin_id
+        if (current_user.is_authenticated
+                and current_user.tipo_usuario == TipoUsuario.FUNCIONARIO):
+            funcionario_id = funcionario_id or current_user.id
 
-        # FALLBACK: Se sessão perdida, buscar admin_id dinamicamente
-        if not admin_id and funcionario_id:
-            funcionario = Funcionario.query.get(funcionario_id)
-            if funcionario:
-                admin_id = funcionario.admin_id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id recuperado via funcionário: {admin_id}")
-        
-        # Se ainda não tem admin_id, usar detecção automática baseada na obra
-        if not admin_id and obra_id:
-            obra = Obra.query.get(obra_id)
-            if obra:
-                admin_id = obra.admin_id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id recuperado via obra: {admin_id}")
-        
+        # A obra tem de pertencer ao tenant do usuário — impede apontar
+        # produção numa obra de outra empresa passando o id na mão.
+        if obra_id:
+            obra_do_tenant = Obra.query.filter_by(
+                id=obra_id, admin_id=admin_id).first()
+            if obra_do_tenant is None:
+                logger.warning('[SEC] obra %s nao pertence ao tenant %s',
+                               obra_id, admin_id)
+                return jsonify({'success': False,
+                                'message': 'Obra não encontrada para esta '
+                                           'empresa.'}), 404
+
+
         # ÚLTIMO RECURSO: Se não tem funcionario_id, usar o primeiro funcionário do admin
         if not funcionario_id and admin_id:
             funcionario = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).first()

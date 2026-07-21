@@ -46,17 +46,31 @@ def cronograma_import_required(f):
 
 
 def admin_required(f):
-    """Requer que o usuário seja administrador"""
+    """Requer que o usuário seja administrador.
+
+    Fase 0 / R2 — ATÉ 2026-07-21 este decorator era um NO-OP
+    (`return f(*args, **kwargs)` incondicional, comentado como "bypass de
+    desenvolvimento"). Como `configuracoes_views` e `ponto_views` o usam em
+    31 rotas, qualquer funcionário autenticado gravava as configurações da
+    empresa. Agora delega para a implementação REAL de `auth.admin_required`
+    (autenticado + tipo ADMIN/SUPER_ADMIN), que é a mesma usada pelo resto
+    do sistema. Import tardio para não criar ciclo com `auth`.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Durante desenvolvimento, bypass para todos
-        return f(*args, **kwargs)
+        from auth import admin_required as _admin_required_real
+        return _admin_required_real(f)(*args, **kwargs)
     return decorated_function
 
+
 def login_required(f):
-    """Requer que o usuário esteja logado"""
+    """Requer que o usuário esteja logado.
+
+    Fase 0 / R2 — era NO-OP pelo mesmo motivo acima. Passa a delegar para o
+    `login_required` do Flask-Login, que redireciona anônimo para o login.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Durante desenvolvimento, bypass para todos
-        return f(*args, **kwargs)
+        from flask_login import login_required as _login_required_real
+        return _login_required_real(f)(*args, **kwargs)
     return decorated_function

@@ -431,9 +431,21 @@ def get_admin_id_dinamico():
                 return current_user.admin_id
             else:
                 pass
-        
+
+        # Fase 0 / R3 — SEM USUÁRIO AUTENTICADO NÃO HÁ TENANT.
+        # Até 2026-07-21 este ponto caía numa cascata de heurísticas (admin
+        # com mais funcionários → com mais serviços → o primeiro → `return 1`)
+        # que devolvia dados de uma empresa arbitrária para requisições
+        # anônimas. Falha segura: devolve None e o caller decide (as rotas
+        # que dependiam disso passaram a exigir @login_required).
+        if not current_user.is_authenticated:
+            logger.warning(
+                '[SEC] get_admin_id_dinamico chamado sem usuário autenticado '
+                '— retornando None (sem auto-detecção de tenant)')
+            return None
+
         from sqlalchemy import text
-        
+
         admin_funcionarios = db.session.execute(
             text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 3")
         ).fetchall()
@@ -466,12 +478,11 @@ def get_admin_id_dinamico():
         return 1
         
     except Exception as e:
+        # Fase 0 / R3 — falha segura: erro ao resolver tenant NÃO pode
+        # devolver o tenant de outra empresa (antes caía em MIN(admin_id)
+        # e, no limite, em `return 1`).
         logger.error(f"[ERROR] ERRO GET_ADMIN_ID_DINAMICO: {str(e)}")
-        try:
-            primeiro_admin = db.session.execute(text("SELECT MIN(admin_id) FROM funcionario")).fetchone()
-            return primeiro_admin[0] if primeiro_admin and primeiro_admin[0] else 1
-        except:
-            return 1
+        return None
 
 
 def verificar_dados_producao(admin_id):
