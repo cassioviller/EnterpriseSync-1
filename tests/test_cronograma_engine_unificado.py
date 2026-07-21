@@ -382,3 +382,48 @@ def test_kpi_usa_v2_com_cronograma_e_fallback_sem():
     db.session.commit()
     # Último RDO (r2): (30+60)/2 = 45 — r1 ignorado (fórmula B vigente).
     assert progresso_geral_para_kpi(obra2.id, admin2.id) == 45.0
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — convergência: o MESMO número em todas as fontes
+# ---------------------------------------------------------------------------
+
+def test_convergencia_todas_as_fontes_dao_o_mesmo_numero():
+    """v2 direto (header/portal/card, travados pelos testes existentes),
+    KPI de detalhes, curva de avanço (mesma chamada com arquivadas
+    históricas) e a raiz do rollup de tarefas_rdo — um número só."""
+    from utils.cronograma_engine import (
+        calcular_progresso_geral_obra_v2,
+        progresso_geral_para_kpi,
+    )
+
+    admin, obra = _ambiente()
+    raiz = _tarefa(obra, admin, 'OBRA', ordem=0, duracao_dias=10,
+                   data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 14))
+    f1 = _tarefa(obra, admin, 'Fabricação', ordem=1, tarefa_pai_id=raiz.id,
+                 duracao_dias=2, data_inicio=date(2026, 7, 1),
+                 data_fim=date(2026, 7, 2))
+    f2 = _tarefa(obra, admin, 'Montagem', ordem=2, tarefa_pai_id=raiz.id,
+                 duracao_dias=8, data_inicio=date(2026, 7, 3),
+                 data_fim=date(2026, 7, 14))
+    r = _rdo(obra, admin, date(2026, 7, 10))
+    _apontar(r, f1, admin, 0.0, 0.0, 50.0)
+    _apontar(r, f2, admin, 0.0, 0.0, 100.0)
+    db.session.commit()
+
+    esperado = 90.0  # (50*2 + 100*8) / 10
+
+    hoje = date.today()
+    v2 = calcular_progresso_geral_obra_v2(
+        obra.id, hoje, admin.id)['progresso_geral_pct']
+    kpi = progresso_geral_para_kpi(obra.id, admin.id)
+    curva = calcular_progresso_geral_obra_v2(
+        obra.id, hoje, admin.id,
+        com_arquivadas_historicas=True)['progresso_geral_pct']
+
+    c = _client_como(admin.id)
+    resp = c.get(f'/cronograma/obra/{obra.id}/tarefas-rdo')
+    itens = {i['nome_tarefa']: i for i in resp.get_json()['tarefas']}
+    rollup_raiz = itens['OBRA']['percentual_realizado']
+
+    assert v2 == kpi == curva == rollup_raiz == esperado
