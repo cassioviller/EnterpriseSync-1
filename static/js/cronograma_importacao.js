@@ -274,6 +274,12 @@
             _feedback('', 'muted');
             const el = document.getElementById('modalImportarCronograma');
             if (el && window.bootstrap) {
+                // O modal nasce dentro do tab-pane (que tem transform de
+                // animação) — position:fixed quebraria e o backdrop
+                // engoliria os cliques. Movê-lo para o body resolve.
+                if (el.parentElement !== document.body) {
+                    document.body.appendChild(el);
+                }
                 window.bootstrap.Modal.getOrCreateInstance(el).show();
             }
         });
