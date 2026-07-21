@@ -416,6 +416,15 @@ else
     echo "   SIGE_ALLOW_PROD_SEED=1 python3 /app/scripts/seed_demo_alfa.py --ambiente prod" | tee -a "$LOG_FILE"
 fi
 
+# ── Smoke de JVM (cronograma-mpp M10 §4.4 fase 0) ────────────────────────────
+# AVISO, nunca bloqueio: o pipeline inteiro roda sem Java pelo caminho .xml
+# (MSPDI, "Salvar como XML" do MS Project). A JVM só habilita o .mpp binário.
+if command -v java > /dev/null 2>&1 || [ -n "${JAVA_HOME:-}" ]; then
+    echo "☕ JVM disponível — importação de cronograma aceita .mpp e .xml" | tee -a "$LOG_FILE"
+else
+    echo "ℹ️ Sem JVM — importação de cronograma aceita .xml (MSPDI); .mpp retorna 422 com instrução ao usuário" | tee -a "$LOG_FILE"
+fi
+
 echo "🚀 SIGE v10.0 PRONTO PARA PRODUÇÃO!" | tee -a "$LOG_FILE"
 echo "🌐 Iniciando aplicação em modo produção..." | tee -a "$LOG_FILE"
 
