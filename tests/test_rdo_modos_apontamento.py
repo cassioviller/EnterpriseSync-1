@@ -259,3 +259,47 @@ def test_apontar_producao_percentual_via_http(ctx):
         'tarefa_cronograma_id': t.id, 'percentual_acumulado': 20.0,
         'permitir_retrocesso': True, 'justificativa': 'medição refeita'})
     assert resp.status_code == 200, resp.get_json()
+
+
+def test_salvar_rdo_flexivel_modo_percentual_via_form(ctx):
+    """Task 4: o formulário do Novo RDO envia cronograma_tarefa_pct_<id>
+    (+ justificativa/confirmação) e o flexivel delega ao serviço."""
+    t = _tarefa(ctx, quantidade_total=None)
+    c = _client_como(ctx['admin_id'])
+
+    r = c.post('/salvar-rdo-flexivel', data={
+        'obra_id': str(ctx['obra_id']),
+        'admin_id_form': str(ctx['admin_id']),
+        'data_relatorio': D0.isoformat(),
+        'observacoes_gerais': 'RDO M07 percentual',
+        f'cronograma_tarefa_pct_{t.id}': '45.5',
+    })
+    assert r.status_code in (200, 302, 303)
+    ap = RDOApontamentoCronograma.query.filter_by(
+        tarefa_cronograma_id=t.id).one()
+    assert ap.tipo_apontamento == 'percentual'
+    assert ap.percentual_acumulado == 45.5
+    assert ap.percentual_incremento_dia == 45.5
+    assert ap.quantidade_executada_dia == 0.0
+    db.session.refresh(t)
+    assert t.percentual_concluido == 45.5
+
+    # Correção retroativa via form: pct menor + justificativa → aceita e
+    # grava incremento negativo.
+    r = c.post('/salvar-rdo-flexivel', data={
+        'obra_id': str(ctx['obra_id']),
+        'admin_id_form': str(ctx['admin_id']),
+        'data_relatorio': (D0 + timedelta(days=1)).isoformat(),
+        'observacoes_gerais': 'RDO M07 correção',
+        f'cronograma_tarefa_pct_{t.id}': '30.0',
+        f'retrocesso_justificativa_{t.id}': 'medição refeita em campo',
+    })
+    assert r.status_code in (200, 302, 303)
+    aps = (RDOApontamentoCronograma.query
+           .filter_by(tarefa_cronograma_id=t.id)
+           .order_by(RDOApontamentoCronograma.id).all())
+    assert len(aps) == 2
+    assert aps[1].percentual_acumulado == 30.0
+    assert aps[1].percentual_incremento_dia == -15.5
+    db.session.refresh(t)
+    assert t.percentual_concluido == 30.0

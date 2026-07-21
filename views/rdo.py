@@ -4572,7 +4572,33 @@ def salvar_rdo_flexivel():
                 if is_v2_active():
                     tarefa_ids_afetadas = []
                     for key, val in request.form.items():
-                        if key.startswith('cronograma_tarefa_'):
+                        # M07 — modo percentual: cronograma_tarefa_pct_<id> traz
+                        # o % ACUMULADO; justificativa/confirmação viajam em
+                        # retrocesso_justificativa_<id> / confirma_sobreexecucao_<id>.
+                        if key.startswith('cronograma_tarefa_pct_'):
+                            try:
+                                tarefa_id = int(key.replace('cronograma_tarefa_pct_', ''))
+                                pct = float(val)
+                                _admin_id = admin_id or (current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else None)
+                                tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=_admin_id).first()
+                                if not tarefa:
+                                    continue
+                                just = (request.form.get(
+                                    f'retrocesso_justificativa_{tarefa_id}') or '').strip() or None
+                                sobre = str(request.form.get(
+                                    f'confirma_sobreexecucao_{tarefa_id}') or '') in ('1', 'true', 'on', 'True')
+                                registrar_apontamento(
+                                    rdo, tarefa,
+                                    percentual_acumulado=pct,
+                                    admin_id=_admin_id,
+                                    permitir_retrocesso=bool(just),
+                                    justificativa=just,
+                                    permitir_sobreexecucao=sobre,
+                                )
+                                tarefa_ids_afetadas.append(tarefa_id)
+                            except (ValueError, TypeError) as e_p:
+                                logger.warning(f"[WARN] Apontamento percentual inválido {key}={val}: {e_p}")
+                        elif key.startswith('cronograma_tarefa_'):
                             try:
                                 tarefa_id = int(key.replace('cronograma_tarefa_', ''))
                                 qty = float(val or 0)

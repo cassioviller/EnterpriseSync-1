@@ -442,6 +442,12 @@
                     <span>Nenhuma tarefa cadastrada no cronograma desta obra.</span><br>
                     <small>Acesse o Cronograma da obra para criar tarefas.</small>
                 </div>
+                <div class="p-2 border-bottom">
+                    <input type="text" id="filtroTarefasRDO"
+                           class="form-control form-control-sm"
+                           placeholder="Filtrar tarefas por nome…"
+                           oninput="filtrarTarefasRDO(this.value)">
+                </div>
                 <div id="cronogramaTarefasRDO"></div>
             </div>
         </div>
@@ -1108,7 +1114,12 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
     const isTerceiros = resp === 'terceiros';
     const isSub = resp === 'subempreitada';
     const isEmpresa = resp === 'empresa';
-    const hasInput = !isPai && isEmpresa && t.quantidade_total > 0;
+    // M07: modo decidido pelo backend (tarefas_rdo.tipo_modo) — a UI só exibe.
+    const modo = t.tipo_modo || (t.quantidade_total > 0 ? 'quantidade' : 'percentual');
+    const isMarco = !!t.is_marco;
+    const pctAnterior = t.percentual_acumulado_anterior ?? 0;
+    const pctHoje = t.percentual_acumulado_hoje;
+    const hasInput = !isPai && isEmpresa;
     const expandido = _rdoV2PaisExpandidos.has(t.id);
     const chevronIcon = expandido ? 'fa-chevron-down' : 'fa-chevron-right';
     const nomeTarefaEsc = t.nome_tarefa.replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -1156,11 +1167,25 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
                   </button>
                 </div>`;
         } else {
-            acaoInner = `
-                ${t.quantidade_total ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
-                ${hasInput ? `
+            // M07: campo ÚNICO por modo — nunca dois campos, nunca "percentual"
+            // genérico. Marco = toggle binário 0/100.
+            let inputBlock = '';
+            if (isMarco) {
+                const marcoOk = (pctHoje ?? 0) >= 100;
+                inputBlock = `
+                <div class="form-check m-0" onclick="event.stopPropagation()">
+                  <input class="form-check-input" type="checkbox" id="chk_marco_${t.id}"
+                         ${marcoOk ? 'checked' : ''}
+                         onchange="apontarPercentualRDO(${t.id}, this.checked ? 100 : 0, ${pctAnterior})"
+                         style="transform:scale(1.2)">
+                  <label class="form-check-label small fw-semibold ms-1" for="chk_marco_${t.id}">
+                    Marco concluído
+                  </label>
+                </div>`;
+            } else if (modo === 'quantidade') {
+                inputBlock = `
                 <div class="d-flex align-items-center gap-1" style="min-width:180px" onclick="event.stopPropagation()">
-                    <small class="text-muted">Acum: ${qty_acum}</small>
+                    <small class="text-muted" title="Acumulado / saldo">Acum: ${qty_acum}${t.saldo != null ? ` · Saldo: ${t.saldo} ${t.unidade_medida || ''}` : ''}</small>
                     <input type="number"
                            id="qty_tarefa_${t.id}"
                            class="form-control form-control-sm"
@@ -1168,10 +1193,31 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
                            min="0" step="0.01"
                            placeholder="Hoje"
                            value="${qty_hoje > 0 ? qty_hoje : ''}"
+                           oninput="previewApontamentoRDO(${t.id})"
                            onchange="apontarProducaoRDO(${t.id}, this.value)"
-                           title="Quantidade executada hoje">
+                           title="Quantidade executada HOJE (${t.unidade_medida || ''})">
                     <span class="text-muted small">${t.unidade_medida || ''}</span>
-                </div>` : ''}
+                </div>`;
+            } else {
+                inputBlock = `
+                <div class="d-flex align-items-center gap-1" style="min-width:190px" onclick="event.stopPropagation()">
+                    <small class="text-muted" title="Percentual anterior">Ant: ${pctAnterior.toFixed(1)}%</small>
+                    <input type="number"
+                           id="pct_tarefa_${t.id}"
+                           class="form-control form-control-sm"
+                           style="width:90px"
+                           min="0" max="150" step="0.1"
+                           placeholder="% acum."
+                           value="${pctHoje != null ? pctHoje : ''}"
+                           oninput="previewApontamentoRDO(${t.id})"
+                           onchange="apontarPercentualRDO(${t.id}, this.value, ${pctAnterior})"
+                           title="Percentual ACUMULADO da tarefa (%)">
+                    <span class="text-muted small">%</span>
+                </div>`;
+            }
+            acaoInner = `
+                ${t.quantidade_total && modo === 'quantidade' ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
+                ${inputBlock}
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 px-2"
                         id="btn-equipe-${t.id}"
@@ -1213,10 +1259,17 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
             </div>
         </div>` : '';
 
+    // M07: linha de preview ao vivo (anterior → incremento → acumulado),
+    // preenchida por previewApontamentoRDO espelhando o backend.
+    const previewLinha = (!isPai && isEmpresa)
+        ? `<div class="px-3 pb-2 small d-none" id="preview_tarefa_${t.id}"></div>`
+        : '';
+
     return `
         <div class="border rounded mb-2 ${indent}" style="background:${bgCard};overflow:hidden" data-tarefa-id="${t.id}" data-is-pai="${isPai ? '1' : '0'}">
             ${headerInner}
             ${progresso}
+            ${previewLinha}
         </div>`;
 }
 
@@ -1313,6 +1366,116 @@ async function apontarProducaoRDO(tarefaId, valor) {
         h.value = qty;
         form.appendChild(h);
     }
+}
+
+// ── M07: modo percentual + preview + filtro ──────────────────
+
+function _rdoHidden(form, name, value) {
+    const prev = form.querySelector(`input[name="${name}"]`);
+    if (prev) prev.remove();
+    if (value === null || value === undefined || value === '') return;
+    const h = document.createElement('input');
+    h.type = 'hidden';
+    h.name = name;
+    h.value = value;
+    form.appendChild(h);
+}
+
+// Percentual ACUMULADO digitado (ou toggle de marco). Validações espelham o
+// backend (cortesia — o servidor valida sempre): >100 pede confirmação de
+// sobre-execução; menor que o anterior pede justificativa de correção.
+function apontarPercentualRDO(tarefaId, valor, pctAnterior) {
+    const form = document.getElementById('formNovoRDO');
+    if (!form) return;
+    ['cronograma_tarefa_pct_', 'retrocesso_justificativa_',
+     'confirma_sobreexecucao_'].forEach(p => _rdoHidden(form, p + tarefaId, null));
+
+    const pct = parseFloat(valor);
+    if (isNaN(pct)) return;
+
+    if (pct > 100) {
+        if (!confirm(`O acumulado ${pct}% passa de 100%. Confirmar sobre-execução? ` +
+                     `(o agregado da obra considera no máximo 100%)`)) {
+            const el = document.getElementById(`pct_tarefa_${tarefaId}`);
+            if (el) el.value = '';
+            return;
+        }
+        _rdoHidden(form, `confirma_sobreexecucao_${tarefaId}`, '1');
+    }
+    if (pct < (pctAnterior ?? 0)) {
+        const just = prompt(
+            `O acumulado ${pct}% é MENOR que o anterior (${pctAnterior}%). ` +
+            `Isso é uma correção retroativa. Informe a justificativa:`);
+        if (!just || !just.trim()) {
+            const el = document.getElementById(`pct_tarefa_${tarefaId}`);
+            if (el) el.value = '';
+            return;
+        }
+        _rdoHidden(form, `retrocesso_justificativa_${tarefaId}`, just.trim());
+    }
+    _rdoHidden(form, `cronograma_tarefa_pct_${tarefaId}`, pct);
+    previewApontamentoRDO(tarefaId);
+}
+
+// Linha viva "Anterior X% → +Y → Z% acumulado" (espelha a fórmula do backend).
+function previewApontamentoRDO(tarefaId) {
+    const t = (window.__tarefasRDOAll || []).find(x => x.id === tarefaId);
+    const box = document.getElementById(`preview_tarefa_${tarefaId}`);
+    if (!t || !box) return;
+    const modo = t.tipo_modo || (t.quantidade_total > 0 ? 'quantidade' : 'percentual');
+    const ant = t.percentual_acumulado_anterior ?? 0;
+    let html = '';
+    if (modo === 'quantidade') {
+        const el = document.getElementById(`qty_tarefa_${tarefaId}`);
+        const qty = parseFloat(el?.value);
+        if (!qty || qty <= 0) { box.classList.add('d-none'); return; }
+        const acumAntes = Math.max(0, (t.quantidade_acumulada ?? 0) - (t.quantidade_executada_hoje ?? 0));
+        const novoAcum = acumAntes + qty;
+        const total = t.quantidade_total || 0;
+        const novoPct = total > 0 ? Math.min(100, Math.round(novoAcum / total * 10000) / 100) : 0;
+        html = `<i class="fas fa-arrow-trend-up me-1"></i>` +
+               `Anterior ${ant.toFixed(1)}% → +${qty} ${t.unidade_medida || ''} hoje → ` +
+               `<b>${novoPct.toFixed(1)}% acumulado</b>` +
+               (novoAcum > total && total > 0 ? ' <span class="text-warning">(acima do total)</span>' : '');
+        box.className = 'px-3 pb-2 small text-primary';
+    } else {
+        const el = document.getElementById(`pct_tarefa_${tarefaId}`);
+        const pct = parseFloat(el?.value);
+        if (isNaN(pct)) { box.classList.add('d-none'); return; }
+        const inc = Math.round((pct - ant) * 100) / 100;
+        html = `<i class="fas fa-arrow-trend-up me-1"></i>` +
+               `Anterior ${ant.toFixed(1)}% → incremento ${inc >= 0 ? '+' : ''}${inc.toFixed(1)} pp`;
+        box.className = 'px-3 pb-2 small ' +
+            (inc < 0 ? 'text-danger' : (pct > 100 ? 'text-warning' : 'text-primary'));
+    }
+    box.innerHTML = html;
+}
+
+// Busca client-side na árvore: mostra tarefas cujo nome contém o termo e
+// seus ancestrais (a árvore já veio de tarefas_rdo — sem nova requisição).
+function filtrarTarefasRDO(termo) {
+    const q = (termo || '').trim().toLowerCase();
+    const container = document.getElementById('cronogramaTarefasRDO');
+    if (!container) return;
+    const cards = container.querySelectorAll('[data-tarefa-id]');
+    if (!q) { cards.forEach(c => { c.style.display = ''; }); return; }
+
+    const tarefas = window.__tarefasRDOAll || [];
+    const pais = {};
+    tarefas.forEach(t => { pais[t.id] = t.tarefa_pai_id; });
+    const visiveis = new Set();
+    tarefas.forEach(t => {
+        if ((t.nome_tarefa || '').toLowerCase().includes(q)) {
+            let cur = t.id;
+            let guarda = 0;
+            while (cur && guarda++ < 50) { visiveis.add(cur); cur = pais[cur]; }
+        }
+    });
+    expandirTodosCronogramaRDO(true);
+    cards.forEach(c => {
+        const id = Number(c.getAttribute('data-tarefa-id'));
+        c.style.display = visiveis.has(id) ? '' : 'none';
+    });
 }
 
 // ── Equipe por Atividade (Cronograma V2) — Modal ─────────────
