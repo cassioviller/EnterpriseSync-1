@@ -56,8 +56,13 @@ def capturar_estado(obra_id: int, admin_id: int) -> dict:
                      .filter(TarefaCronograma.ativa.is_(True))
                      .order_by(TarefaCronograma.id)
                      .all())
-    pct_por_tarefa = {str(t.id): round(float(t.percentual_concluido or 0), 2)
-                      for t in tarefas_vivas}
+    # % comparado só nas FOLHAS: é o trabalho real (apontamentos). Pais são
+    # agregados por duração das filhas — durações mudam legitimamente na
+    # migração (o rebuild antigo forçava dias>=1; o pipeline novo preserva
+    # marcos com 0) e arrastariam falsos positivos de centésimos.
+    pai_ids = {t.tarefa_pai_id for t in tarefas_vivas if t.tarefa_pai_id}
+    pct_por_folha = {str(t.id): round(float(t.percentual_concluido or 0), 2)
+                     for t in tarefas_vivas if t.id not in pai_ids}
 
     rdos = (RDO.query.filter_by(obra_id=obra_id)
             .order_by(RDO.data_relatorio, RDO.id).all())
@@ -104,7 +109,7 @@ def capturar_estado(obra_id: int, admin_id: int) -> dict:
     return {
         'obra_id': obra_id,
         'n_tarefas_ativas': len(tarefas_vivas),
-        'pct_por_tarefa': pct_por_tarefa,
+        'pct_por_folha': pct_por_folha,
         'rdos': [r.data_relatorio.isoformat() for r in rdos],
         'n_apontamentos': int(n_apontamentos),
         'soma_quantidade_dia': round(soma_qtd_dia, 2),
@@ -139,14 +144,14 @@ def comparar_estados(antes: dict, depois: dict, tolerancia: float = 0.01,
         div.append(f"soma_quantidade_dia: {antes.get('soma_quantidade_dia')} "
                    f"→ {depois.get('soma_quantidade_dia')}")
 
-    pa, pd = antes.get('pct_por_tarefa') or {}, depois.get('pct_por_tarefa') or {}
+    pa, pd = antes.get('pct_por_folha') or {}, depois.get('pct_por_folha') or {}
     for tid in sorted(set(pa) | set(pd)):
         va, vd = pa.get(tid), pd.get(tid)
         if va is None or vd is None:
-            div.append(f'tarefa {tid}: presente só em um lado '
+            div.append(f'folha {tid}: presente só em um lado '
                        f'(antes={va}, depois={vd})')
         elif abs(va - vd) > tolerancia:
-            div.append(f'tarefa {tid}: percentual {va} → {vd}')
+            div.append(f'folha {tid}: percentual {va} → {vd}')
 
     med_a, med_d = antes.get('medicoes') or {}, depois.get('medicoes') or {}
     if med_a.get('n') != med_d.get('n'):
@@ -155,10 +160,14 @@ def comparar_estados(antes: dict, depois: dict, tolerancia: float = 0.01,
         div.append(f"medicoes.soma_pct: {med_a.get('soma_pct')} → "
                    f"{med_d.get('soma_pct')}")
 
+    # Concordância entre as fontes FLAT (v2/kpi/curva). O rollup_raiz é
+    # agregação HIERÁRQUICA (pai por duração das filhas) — em árvores
+    # profundas difere do flat por construção, e a própria tela do
+    # cronograma substitui a linha raiz pelo v2; fica capturado só como
+    # informação.
     fontes = depois.get('progresso') or {}
     valores = [v for v in (fontes.get('v2'), fontes.get('kpi'),
-                           fontes.get('curva_historica'),
-                           fontes.get('rollup_raiz')) if v is not None]
+                           fontes.get('curva_historica')) if v is not None]
     if valores and max(valores) - min(valores) > tolerancia_fontes:
         div.append(f'fontes de progresso divergem entre si: {fontes}')
 

@@ -138,3 +138,118 @@ def test_recusa_reimport_destrutivo_em_obra_migrada():
         assert (TarefaCronograma.query
                 .filter_by(obra_id=ctx['obra_id'], is_cliente=False)
                 .filter(TarefaCronograma.ativa.is_(True)).count()) == 2
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — cenário completo da baia: canônico → .mpp → aplicar →
+# equivalência → rollback (spec §4.1; marker java: sobe a JVM/MPXJ)
+# ---------------------------------------------------------------------------
+
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURE_BAIA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'fixtures', 'cronograma_fisico_financeiro_baias.json')
+MPP_0607 = os.path.join(RAIZ, 'CRONOGRAMA 06.07.mpp')
+
+from services.mpp_parser import java_disponivel  # noqa: E402
+
+requer_java = pytest.mark.skipif(not java_disponivel(),
+                                 reason='JVM indisponível')
+requer_fixture = pytest.mark.skipif(
+    not (os.path.exists(FIXTURE_BAIA) and os.path.exists(MPP_0607)),
+    reason='fixture canônica ou CRONOGRAMA 06.07.mpp ausentes')
+
+
+def _client_como(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+@requer_java
+@requer_fixture
+@pytest.mark.java
+def test_migracao_completa_da_baia_com_equivalencia_e_rollback(
+        tmp_path, monkeypatch):
+    import json
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+
+    # 1) Criação inicial pela fixture canônica (101 tarefas, 19 RDOs).
+    with app.app_context():
+        admin, _ = _ambiente()
+        aid = admin.id
+        payload = json.load(open(FIXTURE_BAIA, encoding='utf-8'))
+        oid = importar_fisico_financeiro(payload, aid)['obra_id']
+        estado_a = capturar_estado(oid, aid)
+        versao_pre = CronogramaVersao.query.filter_by(
+            obra_id=oid, status='ativa').one()
+        versao_pre_id = versao_pre.id
+    assert estado_a['n_tarefas_ativas'] == 101
+    assert len(estado_a['rdos']) == 19
+    assert estado_a['n_apontamentos'] > 0
+
+    # 2) Upload do .mpp REAL de origem pelo pipeline novo (M03).
+    c = _client_como(aid)
+    with open(MPP_0607, 'rb') as fh:
+        r = c.post(f'/obras/{oid}/cronograma/importacoes',
+                   data={'arquivo': (fh, 'CRONOGRAMA 06.07.mpp')},
+                   content_type='multipart/form-data')
+    assert r.status_code == 201, r.get_json()
+    iid = r.get_json()['importacao_id']
+
+    # 3) Reconciliação: mesma origem ⇒ matching alto (spec §16).
+    r = c.post(f'/obras/{oid}/cronograma/importacoes/{iid}/reconciliar')
+    assert r.status_code == 200, r.get_json()
+    resumo = r.get_json()['resumo']
+    casadas = resumo['exatas'] + resumo['renomeadas']
+    assert casadas >= 90, f'matching baixo demais: {resumo}'
+    assert resumo['removidas'] <= 3, resumo
+
+    # 4) Decidir pendências programaticamente (equivalente assistido do
+    # antigo REMAP): ambígua/revisão casa com o candidato de nome idêntico
+    # (senão o de maior score); 'nova' envolvida em split/merge confirma.
+    r = c.get(f'/obras/{oid}/cronograma/importacoes/{iid}/diff')
+    mapeamentos = r.get_json()['mapeamentos']
+    with app.app_context():
+        nomes_atuais = {t.id: t.nome_tarefa for t in TarefaCronograma.query
+                        .filter_by(obra_id=oid, is_cliente=False).all()}
+    chaves_livres = [m['chave_nova'] for m in mapeamentos
+                     if m['chave_nova'] and m['tarefa_atual_id'] is None]
+    for m in mapeamentos:
+        if not m['decisao_requerida'] or m['decisao']:
+            continue
+        if m['tarefa_atual_id'] is not None:
+            candidatos = [c_['chave_nova'] for c_ in m['candidatos']] or \
+                chaves_livres
+            corpo = {'acao': 'casar', 'chave_nova': candidatos[0]}
+        else:
+            corpo = {'acao': 'nova'}
+        rr = c.patch(f'/obras/{oid}/cronograma/importacoes/{iid}'
+                     f"/mapeamentos/{m['id']}", json=corpo)
+        assert rr.status_code == 200, rr.get_json()
+
+    # 5) Aplicar ⇒ uids gravados, ids preservados.
+    r = c.post(f'/obras/{oid}/cronograma/importacoes/{iid}/aplicar')
+    assert r.status_code == 200, r.get_json()
+
+    with app.app_context():
+        estado_b = capturar_estado(oid, aid)
+        vivas = (TarefaCronograma.query
+                 .filter_by(obra_id=oid, is_cliente=False)
+                 .filter(TarefaCronograma.ativa.is_(True)).all())
+        com_uid = sum(1 for t in vivas if t.mpp_uid is not None)
+    # Equivalência A≈B (gate §4.1.3): RDOs/apontamentos/fotos/percentuais.
+    resultado = comparar_estados(estado_a, estado_b)
+    assert resultado['equivalente'], resultado['divergencias']
+    # Identidades gravadas para as próximas importações.
+    assert com_uid >= 95, f'uids gravados: {com_uid}/101'
+
+    # 6) Rollback ensaiado: restaurar a versão pré-migração e re-verificar.
+    r = c.post(f'/obras/{oid}/cronograma/versoes/{versao_pre_id}/restaurar')
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        estado_c = capturar_estado(oid, aid)
+    resultado = comparar_estados(estado_a, estado_c)
+    assert resultado['equivalente'], resultado['divergencias']
