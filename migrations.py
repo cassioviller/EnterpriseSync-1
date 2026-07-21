@@ -4012,6 +4012,9 @@ def executar_migracoes():
             (211, "Cronograma-mpp M10 — flag de rollout configuracao_empresa.cronograma_mpp_ativo (default FALSE)", _migration_211_configuracao_empresa_cronograma_mpp),
             (212, "Cronograma-mpp — backfill versão nº1 nas obras criadas após a 210 (ponto de rollback do 1º import)", _migration_212_backfill_versao_inicial_obras_novas),
             (213, "Fase 0.5 — índices que nunca nasceram (create_all antes das migrações) + poda de 61 redundantes", _migration_213_indices_faltantes_e_duplicados),
+            # Fase 0.6 usa 217-219. A faixa 214-216 está reservada à Fase 1
+            # (identidade e papéis) — ver ESTADO-ATUAL.md.
+            (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14167,6 +14170,62 @@ def _migration_212_backfill_versao_inicial_obras_novas():
         logger.info(f"[Migration 212] backfill em {len(obras)} obra(s) sem versão.")
     except Exception as e:
         logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_217_canonizar_status_obra():
+    """Fase 0.6 / D5 — canoniza `obra.status` e o dropdown que o alimenta.
+
+    Duas grafias do mesmo estado conviviam: o formulário gravava
+    'Em Andamento' (vindo de `_SLUG_DEFAULTS['obra_status']`) e a listagem
+    filtrava por 'Em andamento' com igualdade exata (`views/obras.py:83`).
+    Medição de 2026-07-21 no banco de desenvolvimento: 7.926 obras na grafia
+    canônica, 53 na divergente — estas existiam e sumiam da tela.
+
+    Daqui em diante a convergência é na escrita (`Obra._normalizar_status`);
+    esta migração só acerta o passado. Faz também o `dropdown_opcao`, senão o
+    `<select>` dos tenants que já foram semeados continua oferecendo a grafia
+    errada. Idempotente por construção (UPDATE condicionado ao valor antigo).
+    """
+    from sqlalchemy import text as sa_text
+    from utils.status_obra import STATUS_OBRA_CANONICOS, normalizar_status_obra
+    try:
+        with db.engine.begin() as conn:
+            distintos = [
+                r[0] for r in conn.execute(sa_text(
+                    "SELECT DISTINCT status FROM obra WHERE status IS NOT NULL"
+                )).fetchall()
+            ]
+            corrigidas = 0
+            for antigo in distintos:
+                novo = normalizar_status_obra(antigo)
+                if novo == antigo:
+                    continue
+                corrigidas += conn.execute(
+                    sa_text("UPDATE obra SET status = :novo WHERE status = :antigo"),
+                    {'novo': novo, 'antigo': antigo},
+                ).rowcount
+                logger.info(
+                    f"[Migration 217] obra.status {antigo!r} → {novo!r}")
+
+            # O grupo de dropdown só existe nos tenants em que a 175 rodou.
+            opcoes = 0
+            for canonico in STATUS_OBRA_CANONICOS:
+                for r in conn.execute(sa_text("""
+                    SELECT o.id, o.valor FROM dropdown_opcao o
+                    JOIN dropdown_grupo g ON g.id = o.grupo_id
+                    WHERE g.slug = 'obra_status'
+                """)).fetchall():
+                    if normalizar_status_obra(r[1]) == canonico and r[1] != canonico:
+                        conn.execute(
+                            sa_text("UPDATE dropdown_opcao SET valor = :v WHERE id = :i"),
+                            {'v': canonico, 'i': r[0]})
+                        opcoes += 1
+        logger.info(
+            f"[Migration 217] {corrigidas} obra(s) e {opcoes} opção(ões) "
+            f"de dropdown canonizadas.")
+    except Exception as e:
+        logger.error(f"[Migration 217] Falha: {e}", exc_info=True)
         raise
 
 

@@ -80,7 +80,15 @@ def obras():
     if filtros['nome']:
         query = query.filter(Obra.nome.ilike(f"%{filtros['nome']}%"))
     if filtros['status']:
-        query = query.filter(Obra.status == filtros['status'])
+        # Fase 0.6 / D5 — o filtro é igualdade exata sobre texto livre. O banco
+        # está canonizado (migration 217) e a escrita converge pelo @validates
+        # do modelo, mas links e favoritos antigos ainda mandam 'Em Andamento'
+        # na query string. Normalizar a ENTRADA faz esses links continuarem
+        # achando as obras em vez de devolverem lista vazia.
+        from utils.status_obra import normalizar_status_obra
+        query = query.filter(
+            Obra.status == normalizar_status_obra(filtros['status'])
+        )
     if filtros['cliente']:
         # Task #176: a obra agora referencia Cliente por FK (cliente_id).
         # Filtra pelo nome do Cliente vinculado (mesmo tenant).

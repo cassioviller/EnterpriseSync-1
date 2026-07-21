@@ -47,7 +47,7 @@
                 <a href="{{ url_for('main.obras', status='Planejamento') }}" class="btn btn-outline-info {{ 'active' if filtros.status == 'Planejamento' else '' }}">
                     <i class="fas fa-drafting-compass"></i> Planejamento
                 </a>
-                <a href="{{ url_for('main.obras', status='Em Andamento') }}" class="btn btn-outline-warning {{ 'active' if filtros.status == 'Em Andamento' else '' }}">
+                <a href="{{ url_for('main.obras', status='Em andamento') }}" class="btn btn-outline-warning {{ 'active' if filtros.status == 'Em andamento' else '' }}">
                     <i class="fas fa-play-circle"></i> Em Andamento
                 </a>
                 <a href="{{ url_for('main.obras', status='Concluída') }}" class="btn btn-outline-success {{ 'active' if filtros.status == 'Concluída' else '' }}">
@@ -79,7 +79,7 @@
                     <select class="form-select" id="status" name="status">
                         <option value="">Todos os Status</option>
                         <option value="Planejamento" {{ 'selected' if filtros.status == 'Planejamento' else '' }}>Planejamento</option>
-                        <option value="Em Andamento" {{ 'selected' if filtros.status == 'Em Andamento' else '' }}>Em Andamento</option>
+                        <option value="Em andamento" {{ 'selected' if filtros.status == 'Em andamento' else '' }}>Em Andamento</option>
                         <option value="Concluída" {{ 'selected' if filtros.status == 'Concluída' else '' }}>Concluída</option>
                         <option value="Pausada" {{ 'selected' if filtros.status == 'Pausada' else '' }}>Pausada</option>
                         <option value="Cancelada" {{ 'selected' if filtros.status == 'Cancelada' else '' }}>Cancelada</option>

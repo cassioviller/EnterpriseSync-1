@@ -91,7 +91,11 @@ TODOS_GRUPOS_META: list[dict] = CRM_GRUPOS_META + NOVOS_GRUPOS_META
 # Valores padrão para seed de cada slug
 # ---------------------------------------------------------------------------
 _SLUG_DEFAULTS: dict[str, list[str]] = {
-    'obra_status':              ['Em Andamento', 'Concluída', 'Pausada', 'Cancelada'],
+    # Fase 0.6 / D5 — a grafia aqui era 'Em Andamento' e era a origem do
+    # <select> do formulário de obra, enquanto o modelo, o contador e o filtro
+    # da listagem usavam 'Em andamento'. Manter em sincronia com
+    # utils.status_obra.STATUS_OBRA_CANONICOS (há teste que trava isso).
+    'obra_status':              ['Em andamento', 'Pausada', 'Concluída', 'Cancelada'],
     'cronograma_categoria':     ['Fundação', 'Estrutura', 'Alvenaria', 'Cobertura', 'Fachada', 'Instalações', 'Acabamento'],
     'cronograma_responsavel':   ['Empresa', 'Terceiros', 'Subempreitada'],
     'orcamento_obra_categoria': ['Mão de Obra', 'Material', 'Equipamento', 'Serviços de Terceiros', 'Alimentação', 'Transporte', 'Outros'],

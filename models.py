@@ -6,7 +6,7 @@ from datetime import datetime, date, time
 from sqlalchemy import func, JSON, Column, Integer, String, Text, DateTime, Numeric, ForeignKey
 from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship, validates
 from functools import lru_cache
 import logging
 import secrets
@@ -254,6 +254,8 @@ class Obra(db.Model):
     valor_contrato = db.Column(db.Float, default=0.0)  # Valor do contrato para cálculo de margem
     fluxo_caixa_planilha = db.Column(db.JSON)  # snapshot verbatim da Planilha1 (fluxo_caixa_mensal)
     area_total_m2 = db.Column(db.Float, default=0.0)  # Área total da obra
+    # Fase 0.6 / D5 — texto livre, mas com vocabulário canônico convergido na
+    # escrita pelo @validates abaixo. Ver utils/status_obra.py.
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     
@@ -312,6 +314,16 @@ class Obra(db.Model):
     # Task #172 — relacionamento com Cliente cadastrado.
     # backref 'obras' permite Cliente.obras para listar todas as obras do cliente.
     cliente_ref = db.relationship('Cliente', foreign_keys=[cliente_id], backref='obras')
+
+    # Fase 0.6 / D5 — convergência do vocabulário de status na ESCRITA.
+    # O formulário oferecia 'Em Andamento' e a listagem filtrava por
+    # 'Em andamento' com igualdade exata (views/obras.py:83): 53 obras
+    # existiam e sumiam da tela. Normalizar aqui, e não em cada view, cobre
+    # também event_manager.py, os seeds e os importadores.
+    @validates('status')
+    def _normalizar_status(self, _key, valor):
+        from utils.status_obra import normalizar_status_obra
+        return normalizar_status_obra(valor)
 
     # ── Task #176: properties simplificadas — apenas a FK Cliente é fonte de
     # verdade. Os antigos campos texto cliente_nome/email/telefone foram
