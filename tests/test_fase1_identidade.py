@@ -118,3 +118,85 @@ def test_funcionario_id_e_opcional():
     with app.app_context():
         admin = _admin()
         assert admin.funcionario_id is None
+
+
+# ---------------------------------------------------------------------------
+# Resolver de identidade
+# ---------------------------------------------------------------------------
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def test_vincular_funcionario_recusa_cross_tenant():
+    """O invariante que a FK sozinha não consegue expressar."""
+    from utils.identidade import VinculoInvalido, vincular_funcionario
+
+    with app.app_context():
+        admin_a = _admin('A')
+        admin_b = _admin('B')
+        func_b = _funcionario_registro(admin_b.id)
+        suf = uuid.uuid4().hex[:8]
+        u_a = Usuario(
+            username=f'f1x_{suf}', email=f'f1x_{suf}@test.local',
+            nome='Do tenant A', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin_a.id,
+        )
+        db.session.add(u_a)
+        db.session.commit()
+
+        with pytest.raises(VinculoInvalido):
+            vincular_funcionario(u_a, func_b)
+
+        db.session.rollback()
+        assert db.session.get(Usuario, u_a.id).funcionario_id is None
+
+
+def test_vincular_funcionario_aceita_mesmo_tenant():
+    from utils.identidade import vincular_funcionario
+
+    with app.app_context():
+        admin = _admin()
+        func = _funcionario_registro(admin.id)
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1y_{suf}', email=f'f1y_{suf}@test.local',
+            nome='Operador', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+
+        vincular_funcionario(u, func)
+        db.session.commit()
+        assert db.session.get(Usuario, u.id).funcionario_id == func.id
+
+
+def test_funcionario_do_usuario_devolve_none_sem_vinculo():
+    """Falha fechada: sem vínculo é None, NUNCA o primeiro do banco."""
+    from utils.identidade import funcionario_do_usuario
+
+    with app.app_context():
+        admin = _admin()
+        _funcionario_registro(admin.id)  # existe funcionário no banco
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1z_{suf}', email=f'f1z_{suf}@test.local',
+            nome='Sem vinculo', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+        uid = u.id
+
+    cliente = _cliente_de(uid)
+    with cliente:
+        cliente.get('/dashboard')
+        assert funcionario_do_usuario() is None
