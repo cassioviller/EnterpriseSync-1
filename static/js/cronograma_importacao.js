@@ -46,6 +46,38 @@
         });
     }
 
+    function _dur(ms) {
+        if (ms == null) return null;
+        return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+    }
+
+    // Métricas §4.3 do M10 — a visão de suporte: quanto demorou, quanto o
+    // matching resolveu sozinho e quanto exigiu decisão humana.
+    function _metricas(m) {
+        if (!m) return '—';
+        const linhas = [];
+        if (m.n_tarefas != null) linhas.push(`${m.n_tarefas} tarefas`);
+        const parse = _dur(m.tempo_parse_ms);
+        if (parse) linhas.push(`parse ${parse}`);
+        const total = _dur(m.tempo_total_ms);
+        if (total) linhas.push(`total ${total}`);
+        if (m.n_auto != null) {
+            linhas.push(`${m.n_auto} auto / ${m.n_conflitos || 0} conflito(s)`);
+        }
+        if (m.n_manuais) linhas.push(`${m.n_manuais} decisão(ões) manual(is)`);
+        if (m.n_avisos) linhas.push(`${m.n_avisos} aviso(s)`);
+        if (m.rollbacks) linhas.push(`${m.rollbacks} rollback(s)`);
+        const niveis = m.matches_por_nivel || {};
+        // Nunca interpolado em atributo: _esc não escapa aspas.
+        const detalheNiveis = Object.keys(niveis).length
+            ? `<br><span class="text-muted" style="font-size:.75rem">${
+                _esc(Object.entries(niveis).map(([k, v]) => `${k}=${v}`)
+                    .join(', '))}</span>`
+            : '';
+        if (!linhas.length && !detalheNiveis) return '—';
+        return `${_esc(linhas.join(' · '))}${detalheNiveis}`;
+    }
+
     const BADGES = {
         recebido: 'bg-secondary', parseado: 'bg-secondary',
         normalizado: 'bg-info text-dark',
@@ -164,7 +196,7 @@
             <table class="table table-sm align-middle mb-0" style="font-size:.85rem">
                 <thead><tr>
                     <th>Arquivo</th><th>Status</th><th>Enviada em</th>
-                    <th>Detalhe</th><th class="text-end">Ações</th>
+                    <th>Detalhe</th><th>Métricas</th><th class="text-end">Ações</th>
                 </tr></thead>
                 <tbody>
                 ${imps.map(i => `
@@ -177,6 +209,9 @@
                               : i.status === 'aguardando_revisao' && i.pendencias
                                 ? `<span class="text-warning fw-semibold">${i.pendencias} pendência(s) de revisão</span>`
                               : i.status === 'aplicado' ? `Aplicada em ${_fmtData(i.aplicado_em)}` : ''}
+                        </td>
+                        <td class="text-muted small" data-imp-metricas="${i.id}">
+                            ${_metricas(i.metricas)}
                         </td>
                         <td class="text-end text-nowrap">
                             ${['normalizado', 'aguardando_revisao'].includes(i.status) ? `

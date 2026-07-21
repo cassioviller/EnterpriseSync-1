@@ -61,6 +61,10 @@ from services.mpp_parser import (
     java_disponivel,  # noqa: F401 — exposto para monkeypatch nos testes
     parse_cronograma,
 )
+from services.cronograma_observabilidade import (
+    log_transicao,
+    metricas_da_importacao,
+)
 from utils.tenant import get_tenant_admin_id
 
 logger = logging.getLogger(__name__)
@@ -227,6 +231,8 @@ def importar_cronograma(obra_id):
         detalhes={'tamanho': tamanho, 'sha256': sha256},
         usuario_id=current_user.id,
     ))
+    log_transicao('upload', imp.id, obra_id=obra_id, tamanho=tamanho,
+                  origem=imp.origem, arquivo=imp.arquivo_nome)
 
     # 6. Parse síncrono — um único commit por ramo (o flush acima já deu o id).
     inicio = time.monotonic()
@@ -244,6 +250,8 @@ def importar_cronograma(obra_id):
             detalhes={'motivo': exc.motivo},
             usuario_id=current_user.id,
         ))
+        log_transicao('parse_erro', imp.id, obra_id=obra_id, erro=True,
+                      motivo=exc.motivo)
         db.session.commit()
         # Ao cliente: mensagem sem fingerprint de infra para os motivos que
         # embutem stderr da JVM; os demais (java_indisponivel, timeout, ...)
@@ -264,6 +272,9 @@ def importar_cronograma(obra_id):
         },
         usuario_id=current_user.id,
     ))
+    log_transicao('parse_ok', imp.id, obra_id=obra_id,
+                  tempo_parse_ms=tempo_parse_ms, n_tarefas=len(dados['tarefas']),
+                  parser=imp.parser_nome)
 
     # 7. Normalização determinística (M04): json_bruto → json_normalizado
     # validado por schema, com chaves estáveis e avisos — insumo do M05.
@@ -283,6 +294,8 @@ def importar_cronograma(obra_id):
             detalhes={'erro': str(exc)[:500]},
             usuario_id=current_user.id,
         ))
+        log_transicao('normalizacao_erro', imp.id, obra_id=obra_id, erro=True,
+                      detalhe=str(exc)[:200])
         db.session.commit()
         return _erro('O cronograma foi lido mas não pôde ser normalizado. '
                      'Registro salvo para análise.', 422, importacao_id=imp.id)
@@ -297,6 +310,9 @@ def importar_cronograma(obra_id):
         detalhes=normalizado['contadores'],
         usuario_id=current_user.id,
     ))
+    log_transicao('normalizado', imp.id, obra_id=obra_id,
+                  n_tarefas=normalizado['contadores']['n_tarefas'],
+                  n_avisos=sum(normalizado['contadores']['n_avisos'].values()))
     db.session.commit()
     return jsonify({'importacao_id': imp.id, 'status': 'normalizado'}), 201
 
@@ -346,13 +362,26 @@ def _executar_reconciliacao(imp, admin_id):
             },
         ))
     pendencias = sum(1 for m in rel['mapeamentos'] if m['decisao_requerida'])
+    # Métricas §4.3 do M10: o matching é observável no momento em que
+    # acontece (a aplicação recontabiliza depois o que foi de fato aplicado).
+    niveis = {}
+    for m in rel['mapeamentos']:
+        nivel = m['nivel_match']
+        niveis[nivel] = niveis.get(nivel, 0) + 1
     db.session.add(CronogramaImportacaoEvento(
         importacao_id=imp.id,
         admin_id=admin_id,
         evento='reconciliado',
-        detalhes={'resumo': rel['resumo'], 'pendencias': pendencias},
+        detalhes={'resumo': rel['resumo'], 'pendencias': pendencias,
+                  'matches_por_nivel': dict(sorted(niveis.items())),
+                  'n_auto': len(rel['mapeamentos']) - pendencias,
+                  'n_conflitos': pendencias},
         usuario_id=current_user.id,
     ))
+    log_transicao('reconciliado', imp.id, obra_id=imp.obra_id,
+                  n_mapeamentos=len(rel['mapeamentos']),
+                  n_auto=len(rel['mapeamentos']) - pendencias,
+                  n_conflitos=pendencias)
     return rel, pendencias
 
 
@@ -587,6 +616,9 @@ def listar_importacoes(obra_id):
             'aplicado_em': (imp.aplicado_em.isoformat()
                             if imp.aplicado_em else None),
             'pendencias': pendencias,
+            # M10 §4.3 — métricas consolidadas dos eventos (parcial enquanto
+            # a jornada não termina). É a visão de suporte da spec.
+            'metricas': metricas_da_importacao(imp.id),
         })
     return jsonify({'obra_id': obra_id, 'obra_nome': obra.nome,
                     'importacoes': saida}), 200
@@ -663,6 +695,7 @@ def cancelar_importacao(obra_id, importacao_id):
         detalhes={},
         usuario_id=current_user.id,
     ))
+    log_transicao('cancelado', imp.id, obra_id=obra_id)
     db.session.commit()
     return jsonify({'importacao_id': imp.id, 'status': 'cancelado'}), 200
 

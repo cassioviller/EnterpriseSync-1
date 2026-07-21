@@ -56,6 +56,7 @@ from models import (
     RDO,
     TarefaCronograma,
 )
+from services.cronograma_observabilidade import log_transicao
 from utils.cronograma_engine import (
     recalcular_cronograma,
     replanejar_curvas_obra,
@@ -579,6 +580,10 @@ def _aplicar(importacao_id, decisoes, usuario_id):
     imp.aplicado_em = agora
 
     niveis = Counter(m['nivel_match'] for m in rel['mapeamentos'])
+    # M10 §4.3 — jornada ponta a ponta: do upload à aplicação. Mede o que o
+    # usuário espera, não só o parse.
+    tempo_total_ms = (int((agora - imp.criado_em).total_seconds() * 1000)
+                      if imp.criado_em else None)
     db.session.add(CronogramaImportacaoEvento(
         importacao_id=imp.id,
         admin_id=admin_id,
@@ -589,6 +594,7 @@ def _aplicar(importacao_id, decisoes, usuario_id):
             'resumo': rel['resumo'],
             'matching_por_nivel': dict(sorted(niveis.items())),
             'decisoes_manuais': len(decisoes),
+            'tempo_total_ms': tempo_total_ms,
             'antes': {'n_tarefas_vivas': len(vivas)},
             'depois': {'n_tarefas_vivas': len(aplicadas),
                        'arquivadas': len(arquivar),
@@ -596,6 +602,11 @@ def _aplicar(importacao_id, decisoes, usuario_id):
         },
         usuario_id=usuario_id,
     ))
+    log_transicao('aplicado', imp.id, obra_id=obra.id,
+                  versao_numero=nova_versao.numero,
+                  decisoes_manuais=len(decisoes),
+                  tempo_total_ms=tempo_total_ms,
+                  n_tarefas_vivas=len(aplicadas))
     return nova_versao, obra.id, admin_id, tem_rdo
 
 
@@ -774,6 +785,10 @@ def _restaurar(versao_id, usuario_id):
     imp_id = alvo.importacao_id or (
         versao_atual.importacao_id if versao_atual is not None else None)
     if imp_id is not None:
+        # M10 §4.3 — quantos rollbacks esta importação já sofreu (o atual
+        # inclusive): sinal de qualidade do matching que a gerou.
+        anteriores = CronogramaImportacaoEvento.query.filter_by(
+            importacao_id=imp_id, evento='rollback').count()
         db.session.add(CronogramaImportacaoEvento(
             importacao_id=imp_id,
             admin_id=admin_id,
@@ -785,9 +800,14 @@ def _restaurar(versao_id, usuario_id):
                 'versao_nova_numero': nova_versao.numero,
                 'restauradas': len(restauradas),
                 'arquivadas': arquivadas,
+                'rollbacks': anteriores + 1,
             },
             usuario_id=usuario_id,
         ))
+        log_transicao('rollback', imp_id, obra_id=obra.id,
+                      versao_alvo_numero=alvo.numero,
+                      versao_nova_numero=nova_versao.numero,
+                      rollbacks=anteriores + 1)
 
     tem_rdo = (db.session.query(RDO.id)
                .filter_by(obra_id=obra.id).first() is not None)
