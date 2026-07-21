@@ -281,6 +281,17 @@ def inject_v2_flag():
         return {'is_v2_active': lambda: False}
 
 
+# Context processor para a flag da área de importação de cronograma (M08;
+# o rollout do M10 endurece em utils/tenant.cronograma_mpp_ativo)
+@app.context_processor
+def inject_cronograma_mpp_flag():
+    try:
+        from utils.tenant import cronograma_mpp_ativo
+        return {'cronograma_mpp_ativo': cronograma_mpp_ativo}
+    except Exception:
+        return {'cronograma_mpp_ativo': lambda: False}
+
+
 # Context processor para configurações da empresa
 @app.context_processor
 def inject_company_config():

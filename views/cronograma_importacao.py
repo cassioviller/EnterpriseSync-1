@@ -533,3 +533,128 @@ def restaurar_versao_endpoint(obra_id, versao_id):
         'restaurada_de': versao.numero,
         'status': 'ativa',
     }), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M08 — apoio à interface da obra: listas, status (polling) e cancelamento
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ESTADOS_PRE_APLICACAO = ('recebido', 'parseado', 'normalizado',
+                          'aguardando_revisao')
+
+
+def _nome_usuario(usuario_id):
+    if not usuario_id:
+        return None
+    from models import Usuario
+    u = db.session.get(Usuario, usuario_id)
+    return u.nome if u else None
+
+
+@cronograma_importacao_bp.route('/obras/<int:obra_id>/cronograma/importacoes')
+@cronograma_import_required
+def listar_importacoes(obra_id):
+    """Lista as importações da obra (mais recentes primeiro) para a seção
+    da aba Cronograma."""
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if obra is None:
+        return _erro('Obra não encontrada para este usuário.', 404)
+    imps = (CronogramaImportacao.query
+            .filter_by(obra_id=obra_id, admin_id=admin_id)
+            .order_by(CronogramaImportacao.id.desc())
+            .all())
+    saida = []
+    for imp in imps:
+        pendencias = None
+        if imp.status == 'aguardando_revisao' and imp.relatorio_diff:
+            pendencias = sum(1 for m in imp.relatorio_diff['mapeamentos']
+                             if m['decisao_requerida'])
+        saida.append({
+            'id': imp.id,
+            'arquivo_nome': imp.arquivo_nome,
+            'origem': imp.origem,
+            'status': imp.status,
+            'erro': imp.erro,
+            'criado_em': imp.criado_em.isoformat() if imp.criado_em else None,
+            'aplicado_em': (imp.aplicado_em.isoformat()
+                            if imp.aplicado_em else None),
+            'pendencias': pendencias,
+        })
+    return jsonify({'obra_id': obra_id, 'obra_nome': obra.nome,
+                    'importacoes': saida}), 200
+
+
+@cronograma_importacao_bp.route('/obras/<int:obra_id>/cronograma/versoes')
+@cronograma_import_required
+def listar_versoes(obra_id):
+    """Histórico de versões do cronograma da obra (ativa primeiro)."""
+    from models import CronogramaTarefaSnapshot
+
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if obra is None:
+        return _erro('Obra não encontrada para este usuário.', 404)
+    versoes = (CronogramaVersao.query
+               .filter_by(obra_id=obra_id, admin_id=admin_id)
+               .order_by(CronogramaVersao.numero.desc())
+               .all())
+    saida = []
+    for v in versoes:
+        imp = (db.session.get(CronogramaImportacao, v.importacao_id)
+               if v.importacao_id else None)
+        n_snaps = (db.session.query(CronogramaTarefaSnapshot.id)
+                   .filter_by(versao_id=v.id).count())
+        saida.append({
+            'id': v.id,
+            'numero': v.numero,
+            'status': v.status,
+            'aplicada_em': v.aplicada_em.isoformat() if v.aplicada_em else None,
+            'aplicada_por': _nome_usuario(v.aplicada_por_id),
+            'observacao': v.observacao,
+            'arquivo_nome': imp.arquivo_nome if imp else None,
+            'arquivo_sha256': imp.arquivo_sha256 if imp else None,
+            'n_snapshots': n_snaps,
+            'restauravel': v.status == 'arquivada' and n_snaps > 0,
+        })
+    return jsonify({'obra_id': obra_id, 'versoes': saida}), 200
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>/status')
+@cronograma_import_required
+def status_importacao(obra_id, importacao_id):
+    """Polling leve do estado do processamento."""
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    return jsonify({'importacao_id': imp.id, 'status': imp.status,
+                    'erro': imp.erro}), 200
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>'
+    '/cancelar', methods=['POST'])
+@cronograma_import_required
+def cancelar_importacao(obra_id, importacao_id):
+    """Cancela uma importação ainda não aplicada (M08 §12). O dedup do M03
+    ignora 'cancelado', então o mesmo arquivo pode ser reenviado."""
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    if imp.status not in _ESTADOS_PRE_APLICACAO:
+        return _erro(
+            f"Importação está '{imp.status}' — só se cancela antes da "
+            f'aplicação.', 409)
+    imp.status = 'cancelado'
+    db.session.add(CronogramaImportacaoEvento(
+        importacao_id=imp.id,
+        admin_id=admin_id,
+        evento='cancelado',
+        detalhes={},
+        usuario_id=current_user.id,
+    ))
+    db.session.commit()
+    return jsonify({'importacao_id': imp.id, 'status': 'cancelado'}), 200

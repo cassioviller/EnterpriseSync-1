@@ -113,3 +113,12 @@ def get_safe_admin_id():
     # Falha segura - sem admin_id válido
     logger.error("❌ ERRO CRÍTICO: Nenhum admin_id válido encontrado!")
     return None
+
+def cronograma_mpp_ativo() -> bool:
+    """Flag da área de importação de cronograma na obra (M08).
+
+    PONTO ÚNICO para o rollout do M10 endurecer (flag por tenant / env).
+    Hoje: liberada para todo tenant V2 — a área é aditiva e invisível
+    fora do V2.
+    """
+    return is_v2_active()
