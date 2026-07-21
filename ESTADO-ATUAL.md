@@ -22,8 +22,10 @@ fa215fa  fix   Fase 0 — obra duplicada e furos de autorização
 … + 7 commits do M10 (cronograma .mpp)
 ```
 
-`main` local está 67 commits à frente de `origin/main` — o merge do M10 foi
-feito localmente e **também não subiu**.
+`main` local e `origin/main` estão **idênticos** em `8fe6ac9` — o merge do M10
+subiu. (Conferido em 21/07; a versão anterior deste documento dizia que `main`
+estava 67 commits à frente, o que já não era verdade.) O que continua não
+pushado são os **10 commits desta branch**.
 
 ## 🔴 Três coisas travadas do lado humano
 
@@ -67,26 +69,48 @@ Levantado por você em 21/07 e **ainda não especificado em detalhe**:
 > **"Cronograma igual ao Project, totalmente editável, sem precisar cadastrar
 > insumos. RDO em porcentagem."**
 
-Diagnóstico confirmado no código — são o mesmo problema:
-
-1. **O cronograma nasce preso à proposta.** As tarefas vêm de
-   `materializar_cronograma` (`services/cronograma_proposta.py:451`), que
-   exige serviço → composição → insumo. Sem catálogo cadastrado, não há
-   cronograma.
-2. **O RDO decide o modo sozinho.** `services/cronograma_apontamento_service.py:73`
-   devolve `'quantidade'` quando a tarefa tem `quantidade_total` **e**
-   unidade; só cai em `'percentual'` quando não tem. Você não escolhe.
-
 Sua queixa literal: *"demora para levantar o quantitativo e fazer o
 cronograma; sem cadastrar os insumos não faz o cronograma"*.
 
-**O que já existe a favor** (não é greenfield): o Gantt interativo de
-`templates/obras/cronograma.html` (2.465 linhas) já arrasta barras e altera
-datas; o motor de percentual do M07 já funciona; o import `.mpp`/`.xml`
-(M03–M08) já cria tarefas sem passar por insumo nenhum.
+> ⚠️ **Diagnóstico revisado em 21/07.** A versão anterior deste documento
+> dizia que "o cronograma nasce preso à proposta — sem catálogo cadastrado,
+> não há cronograma". **Isso é falso para a criação manual de tarefa**, e um
+> plano baseado nessa premissa reconstruiria código que já existe.
 
-**O que falta:** desacoplar a criação de tarefa do catálogo, e deixar o modo
-de apontamento ser uma **escolha da tarefa**, não uma dedução.
+**Criar tarefa sem insumo JÁ FUNCIONA** — resolvido pela Task #116:
+
+- `cronograma_views.py:269` (`criar_tarefa`): *"servico_id é opcional. (…) a
+  tarefa é salva com `servico_id=None` (sem vínculo de serviço)"*. O único
+  campo obrigatório é `nome_tarefa`.
+- `templates/obras/cronograma.html:1658` (`salvarNovaTarefa()`) só valida o
+  nome; `subatividade_mestre_id` e `servico_id` vão nulos se o usuário não
+  escolher no dropdown. Existe `limparSelecaoCatalogo()` para desvincular.
+- O Gantt já tem POST/PUT/DELETE de tarefa ligados
+  (`templates/obras/cronograma.html:1691`, `:1864`, `:2036` →
+  `cronograma_views.py:269`, `:450`, `:659`).
+- `TarefaCronograma.servico_id` é nullable no schema (`models.py:4903`).
+- O import `.mpp` cria tarefa sem serviço, subatividade ou insumo
+  (`services/cronograma_versao_service.py:534`).
+
+**O que continua verdadeiro e é a frente real de trabalho:**
+
+1. **O modo de apontamento é deduzido, não escolhido.**
+   `services/cronograma_apontamento_service.py`, `modo_da_tarefa()`: devolve
+   `'quantidade'` quando a tarefa tem `quantidade_total > 0` **e**
+   `unidade_medida`; só cai em `'percentual'` caso contrário. Você não
+   escolhe.
+2. **O caminho automático proposta→obra ainda exige a cadeia
+   serviço → composição → insumo** — `materializar_cronograma`
+   (`services/cronograma_proposta.py:452`). Vale para a obra que nasce de
+   proposta aprovada, não para a criação manual.
+3. **Pode ser só flag desligada.** Todo o módulo passa por `_check_v2()`
+   (`cronograma_views.py:39`), que redireciona ao dashboard se o admin do
+   tenant não tiver `versao_sistema == 'v2'`; e `cronograma_mpp_ativo`
+   (`models.py:3620`) nasce desligada, escondendo a aba de importação.
+   **Verificar as flags do tenant ANTES de planejar qualquer código.**
+
+Plano detalhado em
+`docs/superpowers/plans/2026-07-21-cronograma-editavel-rdo-percentual.md`.
 
 ## O que está em aberto da Fase 0.5
 
