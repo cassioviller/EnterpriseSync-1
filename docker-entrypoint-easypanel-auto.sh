@@ -359,8 +359,14 @@ echo "==============================================" | tee -a "$LOG_FILE"
 # (Sem export, ${VAR:-default} só vale para o teste do bash; o python
 #  herda apenas variáveis exportadas — bug original que impedia o seed
 #  de rodar em deploys EasyPanel sem variáveis configuradas no painel.)
-export SIGE_ENABLE_DEMO_SEED="${SIGE_ENABLE_DEMO_SEED:-true}"
-export SIGE_ALLOW_PROD_SEED="${SIGE_ALLOW_PROD_SEED:-1}"
+# Fase 0.5 / 2.1 — defaults INVERTIDOS (defesa em profundidade).
+# Os defaults eram `true`/`1`: auto-seed de dados de demonstração LIGADO por
+# padrão em produção. O comentário acima pedia "DEPOIS DO PRÓXIMO DEPLOY
+# BEM-SUCEDIDO, REVERTER" — nunca foi revertido. Combinado com
+# SIGE_FORCE_RESEED, todo deploy podia apagar e replantar o tenant demo.
+# Agora o seed só roda se alguém pedir EXPLICITAMENTE no painel.
+export SIGE_ENABLE_DEMO_SEED="${SIGE_ENABLE_DEMO_SEED:-false}"
+export SIGE_ALLOW_PROD_SEED="${SIGE_ALLOW_PROD_SEED:-0}"
 # Task #59 — Gate de refresh da demo Alfa via env-var no painel EasyPanel.
 # Quando SIGE_FORCE_RESEED ∈ {1,true,yes,on} (case-insensitive), o
 # entrypoint chama o seed com `--reset`, que apaga e replanta SOMENTE o

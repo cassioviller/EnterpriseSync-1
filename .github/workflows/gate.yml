@@ -1,0 +1,122 @@
+# Gate automático — Fase 0.5 / 2.2
+#
+# Até 2026-07-21 não havia CI nenhum: o gate era manual, levava ~39 min e por
+# isso era pulado. Duas famílias de teste ficaram vermelhas do M06 ao M09
+# atravessando quatro fechos que se declararam verdes.
+#
+# Duas das três "dependências" que faziam o gate parecer inautomatizável eram
+# falsas: o servidor em :5000 é subido pelo run_tests.sh antes da bifurcação
+# de flags, mas NENHUM teste do gate acessa localhost — então aqui chamamos
+# pytest direto. A dependência real é o PostgreSQL, que é um service nativo.
+name: gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar ruff
+        run: pip install ruff
+
+      # BLOQUEANTE — regras que hoje estão em ZERO violações. Erro de sintaxe
+      # (E9), comparação/asserção sempre-verdadeira (F63) e sintaxe inválida
+      # em f-string/except (F7) são bugs, não estilo. Se uma aparecer, o PR
+      # trava.
+      - name: ruff — regras bloqueantes
+        run: ruff check . --select E9,F63,F7
+
+      # INFORMATIVO — o repositório tem 543 violações herdadas, das quais 186
+      # são F821 (nome indefinido). Algumas são bombas reais: por exemplo
+      # `crud_rdo_completo.py:804` usa `os.path.join` sem importar `os` (rota
+      # registrada, mas hoje não referenciada por nenhum template). Não dá
+      # para bloquear no total sem parar o time; o número é a meta a baixar.
+      - name: ruff — relatório completo (não bloqueante)
+        continue-on-error: true
+        run: |
+          ruff check . --statistics || true
+          echo "--- baseline em 2026-07-21: 543 violações (186 F821) ---"
+
+  gate:
+    name: pytest (não-browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sige
+          POSTGRES_PASSWORD: sige
+          POSTGRES_DB: sige_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://sige:sige@localhost:5432/sige_ci?sslmode=disable
+      SESSION_SECRET: ci-ephemeral-secret-not-used-in-production
+      SIGE_ENV: ci
+      LOG_LEVEL: WARNING
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar uv
+        run: pip install uv==0.5.*
+
+      # `--frozen` faz o job falhar se o uv.lock estiver dessincronizado do
+      # pyproject — o estado em que o repositório estava até esta fase.
+      - name: Instalar dependências (lock)
+        run: uv sync --frozen --group dev
+
+      - name: Aplicar schema e migrações
+        run: uv run python pre_start.py
+
+      # Os testes que faziam `skipif` por ausência de dados PULARIAM todos num
+      # banco novo, produzindo verde falso. O seed os torna executáveis.
+      - name: Seed de dados
+        run: |
+          uv run python scripts/seed_demo_alfa.py --ambiente ci || true
+          uv run python scripts/seed_demo_veks.py || true
+        env:
+          SIGE_ENABLE_DEMO_SEED: 'true'
+          SIGE_ALLOW_PROD_SEED: '1'
+
+      # `not java` explícito: os 3 testes com JVM já pulam sozinhos, mas
+      # depender de comportamento implícito é o que produziu o verde falso.
+      - name: Gate
+        run: >
+          uv run pytest tests/
+          -m "not browser and not java"
+          --junitxml=gate-report.xml
+          -q
+
+      - name: Relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report
+          path: gate-report.xml
+          if-no-files-found: ignore

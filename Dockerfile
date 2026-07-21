@@ -1,6 +1,9 @@
 # SIGE v10.0 - Dockerfile Otimizado para Produção EasyPanel
 # Versão simplificada para deploy rápido e confiável
-FROM python:3.11-slim
+# Fase 0.5 / 2.1 — base com DIGEST fixado. `python:3.11-slim` é tag
+# flutuante: dois builds do mesmo commit podiam partir de imagens diferentes.
+# Para atualizar a base, troque o digest conscientemente.
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
 
 # Variáveis de ambiente básicas
 ENV PYTHONUNBUFFERED=1
@@ -40,9 +43,18 @@ https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar e instalar dependências Python
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
+# Fase 0.5 / 2.1 — INSTALAÇÃO PELO LOCKFILE.
+# Antes: `COPY pyproject.toml` + `pip install .` — o `uv.lock` NUNCA entrava
+# na imagem e o pip re-resolvia do PyPI a cada build, respeitando só os pisos
+# `>=`. Dois builds do mesmo commit produziam dependências diferentes, e o
+# rollback do EasyPanel (rebuild do commit anterior) não reproduzia a imagem
+# anterior. Agora o lock governa, e o build FALHA se ele estiver
+# dessincronizado do pyproject (`--frozen`).
+COPY pyproject.toml uv.lock ./
+RUN pip install --no-cache-dir uv==0.5.* \
+    && uv sync --frozen --no-dev --no-install-project \
+    && uv cache clean
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copiar código da aplicação
 COPY . .
@@ -58,6 +70,13 @@ RUN mkdir -p \
 # Copiar e configurar entrypoint otimizado
 COPY docker-entrypoint-easypanel-auto.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
+
+# Fase 0.5 / 2.1 — usuário NÃO-ROOT. O container rodava como root: qualquer
+# falha de parser de arquivo não confiável (upload de .mpp/.xlsx/imagem)
+# executava com privilégio total e acesso a todo o filesystem.
+RUN groupadd --system sige && useradd --system --gid sige --home /app sige \
+    && chown -R sige:sige /app
+USER sige
 
 # Expor porta
 EXPOSE 5000
