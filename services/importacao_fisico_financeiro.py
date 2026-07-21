@@ -769,6 +769,12 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     codigo = obra_j.get('codigo_obra') or (obra_j.get('nome') or '')[:20]
 
     obra = Obra.query.filter_by(codigo=codigo, admin_id=admin_id).first()
+    if obra is not None:
+        # M09 §4.2 — obra já versionada pela importação de cronograma
+        # (fluxo novo M03-M08): o reimport canônico é DESTRUTIVO (recria
+        # tudo) e atropelaria o histórico de versões. Recusa ANTES de
+        # qualquer mutação.
+        _recusar_se_versionada_pelo_fluxo_novo(obra)
     if obra is None:
         obra = Obra(codigo=codigo, admin_id=admin_id, nome=obra_j.get('nome'),
                     data_inicio=data_inicio)
@@ -810,6 +816,85 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     # porcentagem da obra sem adicionar pessoas) — ver _rdos_sinteticos_do_pct_fisico.
     _importar_rdos(obra, admin_id, payload, tid_to_db)
 
+    # M09 §4.2 — a criação inicial passa a registrar versão + snapshots +
+    # CronogramaImportacao(origem='json_canonico'): a obra nasce integrada
+    # ao versionamento do M05 (aditivo; nada do comportamento acima muda).
+    _registrar_versao_inicial(obra, admin_id, payload)
+
     db.session.commit()
     return {'obra_id': obra.id, 'orcamento_id': orc.id,
             'proposta_id': proposta.id, 'avisos': avisos}
+
+
+def _recusar_se_versionada_pelo_fluxo_novo(obra) -> None:
+    """Levanta ValueError se a obra tem versão aplicada por importação de
+    cronograma (upload .xml/.mpp do fluxo novo). O reimport físico-
+    financeiro segue permitido em obra apenas-canônica (versões de
+    origem 'json_canonico' não bloqueiam)."""
+    from app import db
+    from models import CronogramaImportacao, CronogramaVersao
+
+    versionada = (
+        db.session.query(CronogramaVersao.id)
+        .join(CronogramaImportacao,
+              CronogramaVersao.importacao_id == CronogramaImportacao.id)
+        .filter(CronogramaVersao.obra_id == obra.id,
+                CronogramaImportacao.origem.in_(
+                    ('upload_mspdi', 'upload_mpp')))
+        .first()
+    )
+    if versionada is not None:
+        raise ValueError(
+            f"A obra '{obra.nome}' já é versionada pela importação de "
+            f'cronograma (MS Project). O reimport físico-financeiro é '
+            f'destrutivo e apagaria o histórico de versões — use a '
+            f'importação de cronograma na aba Cronograma da página da obra.'
+        )
+
+
+def _registrar_versao_inicial(obra, admin_id: int, payload: dict) -> None:
+    """Cria CronogramaVersao ativa + snapshots + CronogramaImportacao de
+    origem 'json_canonico' para o cronograma recém-materializado. Reimport
+    canônico (obra ainda não migrada) arquiva a versão ativa anterior e
+    vira a próxima versão — mesma disciplina do M05, sem DELETE."""
+    from datetime import datetime
+
+    from app import db
+    from models import (CronogramaImportacao, CronogramaVersao,
+                        TarefaCronograma)
+    from services.cronograma_versao_service import _snapshot_versao
+    from sqlalchemy import func
+
+    agora = datetime.utcnow()
+    nome_meta = ((payload.get('_meta') or {}).get('arquivo')
+                 or 'json_canonico')
+    imp = CronogramaImportacao(
+        obra_id=obra.id, admin_id=admin_id,
+        arquivo_nome=str(nome_meta)[:255],
+        origem='json_canonico', parser_nome='json_canonico',
+        status='aplicado', aplicado_em=agora, criado_por_id=None,
+    )
+    db.session.add(imp)
+    db.session.flush()
+
+    maior = (db.session.query(func.max(CronogramaVersao.numero))
+             .filter_by(obra_id=obra.id).scalar()) or 0
+    ativa = (CronogramaVersao.query
+             .filter_by(obra_id=obra.id, status='ativa').first())
+    if ativa is not None:
+        ativa.status = 'arquivada'
+        db.session.flush()
+    versao = CronogramaVersao(
+        obra_id=obra.id, admin_id=admin_id, numero=maior + 1,
+        status='ativa', importacao_id=imp.id, aplicada_em=agora,
+        observacao='importação físico-financeira (json_canonico)',
+    )
+    db.session.add(versao)
+    db.session.flush()
+
+    vivas = (TarefaCronograma.query
+             .filter_by(obra_id=obra.id, admin_id=admin_id, is_cliente=False)
+             .filter(TarefaCronograma.ativa.is_(True))
+             .all())
+    if vivas:
+        _snapshot_versao(versao, vivas, admin_id)
