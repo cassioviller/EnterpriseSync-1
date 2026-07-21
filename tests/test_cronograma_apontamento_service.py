@@ -6,8 +6,10 @@ Chamam o serviço DIRETAMENTE (sem HTTP) contra o banco real e verificam a
 mesma semântica congelada nos testes de caracterização:
   - modo quantitativo: acumulado anterior + dia → percentual com
     round(..., 2) e teto min(100.0, ...); fallback 0.0 sem quantidade_total;
-  - modo percentual: incremento = max(0.0, round(pct - anterior, 2)),
-    quantidade_acumulada = 0.0 (semântica do import físico-financeiro);
+  - modo percentual (contrato NOVO do M07): acumulado digitado vai para
+    percentual_acumulado, incremento para percentual_incremento_dia,
+    quantidade_executada_dia/quantidade_acumulada ficam 0.0 (quantidade
+    nunca guarda percentual); retrocesso exige justificativa;
   - XOR obrigatório entre quantidade_dia e percentual_acumulado;
   - UPSERT por (rdo_id, tarefa_cronograma_id);
   - sem commit (caller comita).
@@ -157,11 +159,14 @@ def test_quantitativo_fallback_sem_quantidade_total(ctx):
     assert ap.percentual_planejado is None
 
 
-def test_percentual_incremento_por_diferenca(ctx):
-    """Modo percentual (semântica do import físico-financeiro): incremento
-    diário = max(0.0, round(pct - anterior, 2)); quantidade_acumulada 0.0;
-    percentual_realizado = pct informado. Regressão de pct não gera
-    incremento negativo."""
+def test_percentual_semantica_m02_e_retrocesso(ctx):
+    """Contrato NOVO do M07: acumulado digitado → percentual_acumulado;
+    incremento → percentual_incremento_dia; campos de quantidade ficam
+    0.0 (quantidade nunca guarda percentual). Retrocesso sem justificativa
+    é bloqueado; com permitir_retrocesso+justificativa grava incremento
+    negativo."""
+    from services.cronograma_apontamento_service import RetrocessoNaoPermitido
+
     tarefa = _tarefa(ctx, quantidade_total=None, com_datas=False)
     rdo1 = _rdo(ctx, D0)
     rdo2 = _rdo(ctx, D0 + timedelta(days=1))
@@ -170,21 +175,34 @@ def test_percentual_incremento_por_diferenca(ctx):
     ap1 = registrar_apontamento(rdo1, tarefa, percentual_acumulado=10.0,
                                 admin_id=ctx['admin_id'])
     db.session.commit()
-    assert ap1.quantidade_executada_dia == 10.0   # 10 - 0
+    assert ap1.tipo_apontamento == 'percentual'
+    assert ap1.quantidade_executada_dia == 0.0    # fim do abuso
     assert ap1.quantidade_acumulada == 0.0
+    assert ap1.percentual_acumulado == 10.0
+    assert ap1.percentual_incremento_dia == 10.0  # 10 - 0
     assert ap1.percentual_realizado == 10.0
     assert ap1.percentual_planejado is None
 
     ap2 = registrar_apontamento(rdo2, tarefa, percentual_acumulado=25.5,
                                 admin_id=ctx['admin_id'])
     db.session.commit()
-    assert ap2.quantidade_executada_dia == 15.5   # 25.5 - 10
+    assert ap2.percentual_acumulado == 25.5
+    assert ap2.percentual_incremento_dia == 15.5  # 25.5 - 10
     assert ap2.percentual_realizado == 25.5
 
-    ap3 = registrar_apontamento(rdo3, tarefa, percentual_acumulado=20.0,
-                                admin_id=ctx['admin_id'])
+    # Regressão sem justificativa: bloqueada (nada gravado).
+    with pytest.raises(RetrocessoNaoPermitido):
+        registrar_apontamento(rdo3, tarefa, percentual_acumulado=20.0,
+                              admin_id=ctx['admin_id'])
+    db.session.rollback()
+
+    # Correção justificada: incremento NEGATIVO explícito.
+    ap3 = registrar_apontamento(
+        rdo3, tarefa, percentual_acumulado=20.0, admin_id=ctx['admin_id'],
+        permitir_retrocesso=True, justificativa='medição refeita em campo')
     db.session.commit()
-    assert ap3.quantidade_executada_dia == 0.0    # max(0.0, 20 - 25.5)
+    assert ap3.percentual_acumulado == 20.0
+    assert ap3.percentual_incremento_dia == -5.5  # 20 - 25.5
     assert ap3.percentual_realizado == 20.0
 
 
