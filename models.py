@@ -25,6 +25,25 @@ class TipoUsuario(Enum):
     ALMOXARIFE = "almoxarife"  # MÓDULO 4: Almoxarifado
     FUNCIONARIO = "funcionario"
 
+
+class PapelObra(Enum):
+    """Papel de um usuário DENTRO de uma obra específica — Fase 1.
+
+    Ortogonal a `TipoUsuario`, que é o papel no TENANT. Um usuário pode
+    ser FUNCIONARIO na empresa e GESTOR de uma obra; outro pode ser
+    FUNCIONARIO na empresa e APONTADOR de três obras. ADMIN e
+    SUPER_ADMIN não precisam de vínculo: enxergam todas as obras do
+    tenant por definição (ver utils/autorizacao.obras_visiveis).
+
+    Deliberadamente três valores. COMPRADOR entra na Fase 3, quando a
+    governança de compras existir para consumi-lo — antes disso seria
+    permissão sem verbo.
+    """
+    GESTOR = "gestor"        # responde pela obra: edita, aprova, faz handoff
+    APONTADOR = "apontador"  # lança RDO e apontamento; não edita a obra
+    LEITOR = "leitor"        # só leitura
+
+
 class Usuario(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -359,6 +378,56 @@ class Obra(db.Model):
     @property
     def cliente_telefone_efetivo(self):
         return (self.cliente_ref.telefone or '') if self.cliente_ref is not None else ''
+
+
+class UsuarioObra(db.Model):
+    """Vínculo usuário ↔ obra — o segundo eixo de autorização (Fase 1).
+
+    Antes desta tabela o sistema tinha um eixo só: `admin_id`. Qualquer
+    usuário autenticado de um tenant alcançava todas as obras dele. As
+    tabelas que pareciam vínculo não eram: `FuncionarioObrasPonto`
+    (models.py:605) governa um DROPDOWN de ponto e falha ABERTA — sem
+    configuração, `ponto_views.py:674` devolve todas as obras do tenant;
+    `AlocacaoEquipe` (models.py:1522) é planejamento diário.
+
+    Chaveada por `usuario_id` (não `funcionario_id`) porque autorização
+    é sobre quem loga. Quem é a pessoa por trás do login é a FK
+    `Usuario.funcionario_id`, resolvida em utils/identidade.py.
+    """
+    __tablename__ = 'usuario_obra'
+    __table_args__ = (
+        db.UniqueConstraint('usuario_id', 'obra_id', name='uq_usuario_obra'),
+        db.Index('ix_usuario_obra_usuario_ativo', 'usuario_id', 'ativo'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id', ondelete='CASCADE'),
+                           nullable=False, index=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    # `native_enum=False` — DESVIO DELIBERADO do plano da Fase 1, que
+    # declarava `db.Enum(PapelObra)` enquanto a migration 215 cria
+    # `papel VARCHAR(20)`. Este schema usa enums NATIVOS do Postgres
+    # (`usuario.tipo_usuario` é do tipo `tipousuario`), então o padrão
+    # `native_enum=True` faria o `create_all()` do startup tentar criar
+    # um tipo `papelobra` que a migration não cria — modelo e migration
+    # descrevendo coisas diferentes. VARCHAR também é o que permite
+    # acrescentar COMPRADOR na Fase 3 sem ALTER TYPE.
+    papel = db.Column(db.Enum(PapelObra, native_enum=False, length=20),
+                      nullable=False, default=PapelObra.LEITOR)
+    # admin_id redundante com obra.admin_id, mas presente por consistência
+    # com o resto do schema e para permitir filtro de tenant sem join.
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id],
+                              backref=db.backref('obras_vinculadas', lazy='dynamic'))
+    obra = db.relationship('Obra', foreign_keys=[obra_id],
+                           backref=db.backref('usuarios_vinculados', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<UsuarioObra u={self.usuario_id} o={self.obra_id} {self.papel.value}>'
 
 
 class ServicoObra(db.Model):

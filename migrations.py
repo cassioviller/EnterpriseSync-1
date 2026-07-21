@@ -4013,6 +4013,7 @@ def executar_migracoes():
             (212, "Cronograma-mpp — backfill versão nº1 nas obras criadas após a 210 (ponto de rollback do 1º import)", _migration_212_backfill_versao_inicial_obras_novas),
             (213, "Fase 0.5 — índices que nunca nasceram (create_all antes das migrações) + poda de 61 redundantes", _migration_213_indices_faltantes_e_duplicados),
             (214, "Fase 1 — FK de identidade usuario.funcionario_id (nullable, UNIQUE parcial)", migration_214_usuario_funcionario_id),
+            (215, "Fase 1 — tabela usuario_obra (escopo por obra: usuario_id, obra_id, papel)", migration_215_usuario_obra),
             # Fase 0.6 usou 217-219; a Fase 1 usa 214-216.
             (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
             (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
@@ -14220,6 +14221,49 @@ def migration_214_usuario_funcionario_id():
 
     logger.info("[Migration 214] Concluída com sucesso")
 
+
+def migration_215_usuario_obra():
+    """Fase 1 — tabela usuario_obra (escopo por obra).
+
+    Aditiva: nenhuma rota consulta esta tabela até a flag
+    `configuracao_empresa.escopo_obra_ativo` (migration 216) ser ligada
+    para o tenant. Criar vazia é seguro.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 215] Iniciando — tabela usuario_obra")
+
+    db.session.execute(sa_text("""
+        CREATE TABLE IF NOT EXISTS usuario_obra (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+            obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+            papel VARCHAR(20) NOT NULL DEFAULT 'LEITOR',
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(sa_text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_obra
+        ON usuario_obra (usuario_id, obra_id)
+    """))
+    db.session.execute(sa_text("""
+        CREATE INDEX IF NOT EXISTS ix_usuario_obra_usuario_ativo
+        ON usuario_obra (usuario_id, ativo)
+    """))
+    db.session.execute(sa_text("""
+        CREATE INDEX IF NOT EXISTS ix_usuario_obra_obra_id
+        ON usuario_obra (obra_id)
+    """))
+    db.session.execute(sa_text("""
+        CREATE INDEX IF NOT EXISTS ix_usuario_obra_admin_id
+        ON usuario_obra (admin_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 215] Concluída com sucesso")
 
 def _migration_217_canonizar_status_obra():
     """Fase 0.6 / D5 — canoniza `obra.status` e o dropdown que o alimenta.
