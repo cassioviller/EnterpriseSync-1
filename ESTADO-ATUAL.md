@@ -26,7 +26,7 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `fix/fase-0-estancar` · **10 commits não pushados.**
+Branch: `fix/fase-0-estancar` · **15 commits não pushados.**
 
 🔬 21/07: `main` e `origin/main` estão **idênticos** em `8fe6ac9` — o merge do
 M10 subiu. (A 1ª versão dizia "67 commits à frente"; era verdade quando escrita.)
@@ -44,52 +44,68 @@ do volume na Hostinger, `SIGE_ENABLE_DEMO_SEED=false`, a grafia do domínio
 (`cassioviller` × `cassiovillar`, as duas no código) e o acesso ao banco de
 produção — que é pré-requisito de **quase toda medição pendente abaixo**.
 
-## 🔥 Defeitos com efeito em dinheiro — achados em 21/07
+## ✅ Fase 0.6 — os cinco defeitos de dinheiro, corrigidos em 21/07
 
-Nenhum destes era conhecido antes. Não estão em nenhuma fase: são correções que
-podem furar a fila.
+Estes cinco não estavam em nenhuma fase. Furaram a fila e foram fechados,
+cada um com teste de regressão próprio (**52 testes verdes**, arquivos
+`tests/test_fase06_d*.py`). Migrations **217-219** — a faixa 214-216 continua
+reservada à Fase 1.
 
-### D1 — Aprovar revisão de proposta fatura errado
-🔬 Medido executando o fluxo real (v1 R$ 100k → v2 R$ 120k):
-`IMC=2 LANC=2 valor_contrato=120000 soma_itens=220000`.
+| # | O quê | Como ficou |
+|---|---|---|
+| D1 | Aprovar revisão de proposta faturava errado | 🔬 v1 100k → v2 120k dava 2 itens/220k, saldo −100k, receita 220k. Agora: 1 item/120k, saldo 0, receita 120k |
+| D2 | POST anônimo do portal aprovava compra fora de escopo | Rotas passam a escopar tenant + tipo e a exigir transição de estado válida |
+| D3 | Nenhuma despesa do motor V2 aparecia no DRE | Linhas declaradas num mapa único + **linha residual**, que torna omissão silenciosa impossível |
+| D4 | Plano de contas só era semeado para o 1º tenant | 🔬 PK virou `(admin_id, codigo)`; 2.639 contas copiadas; **0 partidas órfãs** (era 980) |
+| D5 | Obra salva pelo formulário sumia da listagem | Vocabulário canônico + `@validates` no modelo; 53 obras recuperadas |
 
-- `ItemMedicaoComercial` **duplica** → saldo em `medicao_views.py:72` vai a
-  −100.000; `ObraServicoCusto` dobra via listener 📖 `models.py:6263`.
-- Lançamento contábil sai pelo **valor cheio, não pelo delta** → receita de
-  R$ 220k para contrato de R$ 120k.
-- 📖 `event_manager.py:1043` sobrescreve `obra.valor_contrato`
-  retroativamente; como `MedicaoContrato.valor` é property calculada
-  (📖 `models.py:5586-5588`), **toda medição já emitida é reprecificada**.
+### O que a execução corrigiu no diagnóstico
 
-### D2 — POST anônimo cria custo com status PAGO
-📖 `portal_obras_views.py:343-361`. A linha 354 grava `APROVADO`
-**incondicionalmente**, antes de checar o tipo — o único filtro da query é
-`obra_id` (`:345`), então qualquer pedido da obra é carimbado, inclusive
-`tipo_compra='normal'`. Se o tipo for `aprovacao_cliente`, a linha 361 chama
-`processar_compra_aprovada_cliente(compra, usuario_id=compra.admin_id)`, que
-cria `GestaoCustoPai` com `status='PAGO'` e movimenta estoque — **atribuído ao
-admin**, que não fez a ação. O comentário da linha 360 admite: *"portal é
-anônimo, não tem current_user"*.
+Três afirmações desta seção estavam erradas. Todas foram descobertas
+**executando o fluxo**, não relendo o código:
 
-### D3 — Nenhuma despesa do motor V2 aparece no DRE
-📖 O DRE soma `5.1.01`, `5.1.02`, `5.1.04`, `5.1.05`, `5.1.06`
-(`contabilidade_utils.py:596-600`). O `MAPEAMENTO_CONTABIL` do motor V2 debita
-em `6.1.01.001`, `6.1.01.002`, `6.1.02.002` (`:1451-1454`). **Interseção
-vazia.** Alimentação, transporte e folha são lançados e não entram no
-resultado — o DRE mostra a empresa mais lucrativa do que é.
+1. **D2 não criava custo PAGO para `tipo_compra='normal'`.**
+   `compras_views.py:296-300` levanta `ValueError` para tipo diferente de
+   `aprovacao_cliente`, e a rota nem chegava lá. O caminho que criava custo
+   indevido era o da compra **já recusada** pelo cliente, que voltava a
+   APROVADO. O dano do `tipo='normal'` era outro e não estava mapeado: a
+   compra interna carimbada passava a aparecer em `compras_resolvidas`
+   (`portal_obras_views.py:177`, que não filtra tipo) — **vazamento de compra
+   interna no portal do cliente**.
 
-### D4 — Plano de contas só é semeado para o primeiro tenant
-📖 `PlanoContas.codigo` é PK **global** (`models.py:2501`), apesar de a tabela
-ter `admin_id`. O seed usa `ON CONFLICT (codigo) DO NOTHING`
-(`contabilidade_utils.py:1502-1539`): do 2º tenant em diante insere **zero**
-contas e marca como semeado. A contabilidade V2 dos demais tenants opera sobre
-plano de contas vazio.
+2. **D3 era maior: há QUATRO planos de contas concorrentes**, não um
+   desalinhamento de prefixo. Dois dão significados opostos ao mesmo código —
+   `5.1.01` é "MÃO DE OBRA" em `financeiro_seeds.py:71` e "Materiais Diretos"
+   em `contabilidade_utils.py:84`. E há **dois lançadores de "Salários"**:
+   `contabilidade_utils.py:229` grava em `6.1.01.001`, `event_manager.py:1114`
+   em `5.1.01.001`. Unificar é decisão da **Fase 8**.
 
-### D5 — Obra salva pelo formulário some da tela
-📖 `templates/obra_form.html:322` grava `'Em Andamento'`; o filtro
-(`templates/obras_moderno.html:616`) e o contador (`:572`) procuram
-`'Em andamento'`, com igualdade exata em `views/obras.py:83`.
-🔬⚠️ dev 21/07: **53 obras** nessa condição — existem, somem da listagem.
+3. **D5 era maior: 6 arquivos**, e `templates/obras.html` divergia **de si
+   mesmo** — o botão de filtro (`:50`) mandava `'Em Andamento'` e o badge
+   (`:213`) testava `'Em andamento'`.
+
+### O que a Fase 0.6 deliberadamente NÃO fez
+
+| Deixado para | O quê |
+|---|---|
+| **Fase 2** | O `'Planejamento'` dos filtros de obra é opção-fantasma: nenhum caminho de escrita produz esse valor, o filtro sempre volta vazio. Quem define o vocabulário de estados é a máquina de estados da Obra |
+| **Fase 6** | Item que existia numa versão da proposta e sumiu da revisão **não é apagado** — pode ter medição executada contra ele. Fica `WARNING` no log com os ids |
+| **Fase 8** | A unificação dos quatro planos de contas. Enquanto isso, o subgrupo `6.1.02` cai na linha residual do DRE: entra no resultado, honestamente rotulado como "outras" |
+| **Fase 9a** | A autoria da aprovação no portal segue atribuída ao `admin_id`, que não fez a ação. Só a identidade do portal resolve |
+
+### Duas armadilhas que a Fase 0.6 revelou
+
+1. **A ordem dos atos de uma migration de troca de PK.** A 218 falhou na 1ª
+   tentativa: com a PK ainda global, o `ON CONFLICT DO NOTHING` do backfill
+   casava com a linha do **outro** tenant e o backfill virava no-op
+   silencioso — o mesmo defeito que ele existia para corrigir. A PK tem de
+   virar composta **antes** do backfill.
+
+2. **Um teste que passa pelo motivo errado.** O casamento de linhagem do D1
+   passou no teste (que não preenchia `proposta_item_origem_id`) e falhou na
+   reprodução manual (que preenchia): raiz e filho geravam chaves de tipos
+   diferentes. O teste agora roda parametrizado nos dois modos. **Reproduza à
+   mão além do teste.**
 
 ## O plano aprovado
 
@@ -97,6 +113,7 @@ plano de contas vazio.
 |---|---|---|---|
 | **0** | Estancar | ✅ | — |
 | **0.5** | Backup, segredos, observabilidade, build, CI, índices | ✅ P1-2; 🟡 P3 parcial | — |
+| **0.6** | Os cinco defeitos de dinheiro (D1-D5) | ✅ **21/07** | ver seção acima |
 | **1** | Identidade e papéis (RBAC + escopo por obra) | ⬜ **próxima** | `fase-1-identidade-papeis.md` |
 | **1.5** | Cronograma editável + RDO em % | ⬜ | `cronograma-editavel-rdo-percentual.md` |
 | **2** | Máquina de estados da Obra + handoff do GP | ⬜ | `fase-2-maquina-estados-obra.md` |
@@ -111,7 +128,8 @@ plano de contas vazio.
 Todos em `docs/superpowers/plans/2026-07-21-*`. Faixas de migration reservadas
 sem colisão: 214-216 (F1), 220-221 (F1.5), 230-232 (F2), 240-247 (F3),
 250-254 (F4), 260-264 (F5), 270-276 (F6), 280-283 (F7), 290-295 (F8),
-300-307 (F9). 📖 Maior registrada hoje: **213** (`migrations.py:4014`).
+300-307 (F9). A **Fase 0.6 usou 217-219**, fora de todas as faixas.
+🔬 Maior aplicada hoje: **219**.
 
 > **Os planos das Fases 6-9 têm validade menor.** Foram escritos sobre o schema
 > de hoje, e as Fases 1-5 vão mudá-lo. Cada um tem seção *"Premissas a
