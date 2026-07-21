@@ -423,3 +423,76 @@ def test_detalhe_de_obra_sem_vinculo_devolve_404_com_flag_ligada():
     cliente = _cliente_de(opid)
     r = cliente.get(f'/obras/{oid}', follow_redirects=False)
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Backfill de vínculos
+# ---------------------------------------------------------------------------
+
+def test_obra_tem_relationship_responsavel():
+    """`obra.responsavel` resolvia para Undefined nos templates."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        assert hasattr(obra, 'responsavel')
+        assert obra.responsavel is None  # sem responsavel_id
+
+
+def test_backfill_promove_responsavel_da_obra_a_gestor():
+    from datetime import date as _date
+
+    from models import Funcionario
+    from scripts.backfill_usuario_obra import executar_backfill_obras
+    from utils.identidade import vincular_funcionario
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        suf = uuid.uuid4().hex[:8]
+        func = Funcionario(
+            codigo=f'R{suf[:6].upper()}', nome=f'Responsavel {suf}',
+            cpf=f'{suf[:11]}', email=f'resp_{suf}@test.local',
+            data_admissao=_date(2026, 1, 1), admin_id=admin.id, ativo=True)
+        db.session.add(func)
+        db.session.commit()
+
+        op = _operador(admin.id)
+        vincular_funcionario(op, func)
+        obra.responsavel_id = func.id
+        db.session.commit()
+        oid, opid = obra.id, op.id
+
+        executar_backfill_obras(dry_run=False, admin_id=admin.id)
+
+        vinculo = UsuarioObra.query.filter_by(
+            usuario_id=opid, obra_id=oid).first()
+        assert vinculo is not None, 'responsável não virou GESTOR'
+        assert vinculo.papel == PapelObra.GESTOR
+
+
+def test_backfill_obras_e_idempotente():
+    from scripts.backfill_usuario_obra import executar_backfill_obras
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        db.session.add(UsuarioObra(usuario_id=op.id, obra_id=obra.id,
+                                   papel=PapelObra.GESTOR, admin_id=admin.id))
+        db.session.commit()
+
+        relatorio = executar_backfill_obras(dry_run=False, admin_id=admin.id)
+        assert relatorio['criados'] == 0
+
+
+def test_backfill_obras_nao_cruza_tenant():
+    from scripts.backfill_usuario_obra import executar_backfill_obras
+
+    with app.app_context():
+        admin_a, admin_b = _admin('A'), _admin('B')
+        obra_b = _obra(admin_b.id)
+        _operador(admin_a.id)
+        executar_backfill_obras(dry_run=False, admin_id=admin_a.id)
+
+        vazou = UsuarioObra.query.filter_by(obra_id=obra_b.id).count()
+        assert vazou == 0

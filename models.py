@@ -353,6 +353,13 @@ class Obra(db.Model):
     # backref 'obras' permite Cliente.obras para listar todas as obras do cliente.
     cliente_ref = db.relationship('Cliente', foreign_keys=[cliente_id], backref='obras')
 
+    # Fase 1 — `responsavel_id` existe desde sempre (models.py:258) mas
+    # NUNCA teve relationship: `obra.responsavel` resolvia para Undefined
+    # em templates/obras.html:266 e obra_form.html:449 (sempre "Sem
+    # responsável") e estourava AttributeError na f-string de
+    # relatorios_funcionais.py:217.
+    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id])
+
     # Fase 0.6 / D5 — convergência do vocabulário de status na ESCRITA.
     # O formulário oferecia 'Em Andamento' e a listagem filtrava por
     # 'Em andamento' com igualdade exata (views/obras.py:83): 53 obras
