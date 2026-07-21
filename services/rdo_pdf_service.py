@@ -628,8 +628,17 @@ def gerar_pdf_rdo(rdo):
         for ap, tarefa in apontamentos_v2:
             nome = tarefa.nome_tarefa if tarefa else f'#{ap.tarefa_cronograma_id}'
             unid = (tarefa.unidade_medida or '') if tarefa else ''
-            qtd_dia = f"{ap.quantidade_executada_dia or 0:g} {unid}".strip()
-            qtd_ac = f"{ap.quantidade_acumulada or 0:g} {unid}".strip()
+            if ap.tipo_apontamento == 'percentual':
+                # M07: linha percentual mostra o incremento persistido em
+                # pontos percentuais — não "0 {unidade}".
+                inc_pp = float(ap.percentual_incremento_dia or 0)
+                qtd_dia = f'{inc_pp:+g} pp'
+                qtd_ac = _fmt_pct(ap.percentual_acumulado
+                                  if ap.percentual_acumulado is not None
+                                  else ap.percentual_realizado)
+            else:
+                qtd_dia = f"{ap.quantidade_executada_dia or 0:g} {unid}".strip()
+                qtd_ac = f"{ap.quantidade_acumulada or 0:g} {unid}".strip()
             data.append([
                 Paragraph(nome, styles['cell']),
                 _data_bar(ap.percentual_realizado, width=70, height=4),

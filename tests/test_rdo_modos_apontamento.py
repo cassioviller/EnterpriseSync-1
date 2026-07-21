@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app, db
-from models import RDO, TarefaCronograma
+from models import RDO, RDOApontamentoCronograma, TarefaCronograma
 from services.cronograma_apontamento_service import (
     MarcoApenasZeroOuCem,
     SobreexecucaoNaoConfirmada,
@@ -25,6 +25,23 @@ from test_cronograma_apontamento_service import ctx  # noqa: F401 — fixture
 pytestmark = pytest.mark.integration
 
 D0 = date(2026, 6, 15)
+
+
+@pytest.fixture(autouse=True)
+def _config():
+    app.config['TESTING'] = True
+    app.config['WTF_CSRF_ENABLED'] = False
+    if not app.secret_key:
+        app.secret_key = 'test-modos-apontamento'
+    yield
+
+
+def _client_como(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
 
 
 def _suffix() -> str:
@@ -162,3 +179,83 @@ def test_marco_so_aceita_zero_ou_cem(ctx):
     db.session.commit()
     assert ap.percentual_acumulado == 100.0
     assert ap.percentual_realizado == 100.0
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — contrato tarefas_rdo e apontar_producao percentual via HTTP
+# ---------------------------------------------------------------------------
+
+def test_tarefas_rdo_expoe_contrato_de_modos(ctx):
+    """O JSON de tarefas_rdo carrega tipo_modo/is_marco/anterior/saldo —
+    a UI não decide fórmula, só exibe (spec §4.2)."""
+    t_q = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2')
+    t_p = _tarefa(ctx, quantidade_total=None)
+    t_m = _tarefa(ctx, quantidade_total=None, is_marco=True, duracao_dias=0)
+    r0 = RDO(numero_rdo=f'RH-{_suffix()[4:]}'[:20], obra_id=ctx['obra_id'],
+             admin_id=ctx['admin_id'], data_relatorio=D0, local='Campo',
+             status='Finalizado')
+    db.session.add(r0)
+    db.session.commit()
+    registrar_apontamento(r0, t_q, quantidade_dia=30.0,
+                          admin_id=ctx['admin_id'])
+    registrar_apontamento(r0, t_p, percentual_acumulado=40.0,
+                          admin_id=ctx['admin_id'])
+    db.session.commit()
+
+    c = _client_como(ctx['admin_id'])
+    dia_seguinte = (D0 + timedelta(days=1)).isoformat()
+    resp = c.get(f"/cronograma/obra/{ctx['obra_id']}/tarefas-rdo"
+                 f'?data={dia_seguinte}')
+    assert resp.status_code == 200
+    itens = {i['id']: i for i in resp.get_json()['tarefas']}
+
+    q = itens[t_q.id]
+    assert q['tipo_modo'] == 'quantidade'
+    assert q['is_marco'] is False
+    assert q['percentual_acumulado_anterior'] == 30.0
+    assert q['saldo'] == 70.0                    # 100 − 30
+
+    p = itens[t_p.id]
+    assert p['tipo_modo'] == 'percentual'
+    assert p['percentual_acumulado_anterior'] == 40.0
+    assert p['saldo'] is None
+
+    m = itens[t_m.id]
+    assert m['tipo_modo'] == 'percentual'
+    assert m['is_marco'] is True
+
+
+def test_apontar_producao_percentual_via_http(ctx):
+    t = _tarefa(ctx, quantidade_total=None)
+    r1 = RDO(numero_rdo=f'RH-{_suffix()[4:]}'[:20], obra_id=ctx['obra_id'],
+             admin_id=ctx['admin_id'], data_relatorio=D0, local='Campo',
+             status='Finalizado')
+    db.session.add(r1)
+    db.session.commit()
+    c = _client_como(ctx['admin_id'])
+
+    resp = c.post(f'/cronograma/rdo/{r1.id}/apontar', json={
+        'tarefa_cronograma_id': t.id, 'percentual_acumulado': 35.0})
+    assert resp.status_code == 200, resp.get_json()
+    ap = db.session.get(RDOApontamentoCronograma,
+                        resp.get_json()['apontamento']['id'])
+    assert ap.tipo_apontamento == 'percentual'
+    assert ap.percentual_acumulado == 35.0
+    assert ap.quantidade_executada_dia == 0.0
+
+    # Retrocesso sem justificativa → 422 com mensagem acionável.
+    r2 = RDO(numero_rdo=f'RH-{_suffix()[4:]}'[:20], obra_id=ctx['obra_id'],
+             admin_id=ctx['admin_id'], data_relatorio=D0 + timedelta(days=1),
+             local='Campo', status='Finalizado')
+    db.session.add(r2)
+    db.session.commit()
+    resp = c.post(f'/cronograma/rdo/{r2.id}/apontar', json={
+        'tarefa_cronograma_id': t.id, 'percentual_acumulado': 20.0})
+    assert resp.status_code == 422
+    assert 'justificativa' in resp.get_json()['msg'].lower()
+
+    # Com retrocesso autorizado → 200.
+    resp = c.post(f'/cronograma/rdo/{r2.id}/apontar', json={
+        'tarefa_cronograma_id': t.id, 'percentual_acumulado': 20.0,
+        'permitir_retrocesso': True, 'justificativa': 'medição refeita'})
+    assert resp.status_code == 200, resp.get_json()

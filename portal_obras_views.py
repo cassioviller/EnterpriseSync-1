@@ -664,24 +664,31 @@ def portal_rdo_detalhe(token: str, rdo_id: int):
             tarefa = db.session.get(TarefaCronograma, ap.tarefa_cronograma_id)
             if tarefa is None:
                 continue
-            atual = ap.percentual_realizado or 0.0
-            # % anterior = último acumulado da MESMA tarefa em um RDO anterior desta
-            # obra. Deriva o incremento daí (o gravado em quantidade_executada_dia
-            # pode vir zerado em imports antigos no modo percentual).
-            ant_ap = (
-                RDOApontamentoCronograma.query
-                .join(RDO, RDOApontamentoCronograma.rdo_id == RDO.id)
-                .filter(
-                    RDOApontamentoCronograma.tarefa_cronograma_id == ap.tarefa_cronograma_id,
-                    RDOApontamentoCronograma.admin_id == admin_id,
-                    RDO.obra_id == obra.id,
-                    RDO.data_relatorio < rdo.data_relatorio,
+            atual = (ap.percentual_acumulado
+                     if ap.percentual_acumulado is not None
+                     else (ap.percentual_realizado or 0.0))
+            if ap.percentual_incremento_dia is not None:
+                # M07: linhas novas trazem o incremento PERSISTIDO — a
+                # derivação em memória fica só como fallback legado.
+                incremento = max(0.0, round(float(ap.percentual_incremento_dia), 2))
+                anterior = round(float(atual) - float(ap.percentual_incremento_dia), 2)
+            else:
+                # Fallback (linhas pré-M02 sem backfill): % anterior = último
+                # acumulado da MESMA tarefa em um RDO anterior desta obra.
+                ant_ap = (
+                    RDOApontamentoCronograma.query
+                    .join(RDO, RDOApontamentoCronograma.rdo_id == RDO.id)
+                    .filter(
+                        RDOApontamentoCronograma.tarefa_cronograma_id == ap.tarefa_cronograma_id,
+                        RDOApontamentoCronograma.admin_id == admin_id,
+                        RDO.obra_id == obra.id,
+                        RDO.data_relatorio < rdo.data_relatorio,
+                    )
+                    .order_by(RDO.data_relatorio.desc())
+                    .first()
                 )
-                .order_by(RDO.data_relatorio.desc())
-                .first()
-            )
-            anterior = (ant_ap.percentual_realizado or 0.0) if ant_ap else 0.0
-            incremento = max(0.0, round(atual - anterior, 2))
+                anterior = (ant_ap.percentual_realizado or 0.0) if ant_ap else 0.0
+                incremento = max(0.0, round(atual - anterior, 2))
             # Só entra no RDO do dia a atividade que efetivamente avançou; tarefas
             # que só arrastam o acumulado (incremento 0%) não são "atividade do dia".
             if incremento <= 0:

@@ -876,6 +876,7 @@ def tarefas_rdo(obra_id: int):
     pai_ids = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
 
     # Montar dict com progresso
+    from services.cronograma_apontamento_service import modo_da_tarefa
     resultado = []
     item_por_id: dict[int, dict] = {}
     for t in tarefas:
@@ -883,6 +884,7 @@ def tarefas_rdo(obra_id: int):
 
         # Buscar apontamento específico deste RDO para esta tarefa (se existir)
         qty_hoje = 0.0
+        pct_hoje = None
         apontamento_id = None
         if rdo_id:
             ap = RDOApontamentoCronograma.query.filter_by(
@@ -890,7 +892,33 @@ def tarefas_rdo(obra_id: int):
             ).first()
             if ap:
                 qty_hoje = ap.quantidade_executada_dia
+                pct_hoje = ap.percentual_acumulado
                 apontamento_id = ap.id
+
+        # M07: "Anterior X%" do preview = último acumulado ANTES da data do
+        # RDO (exclui o apontamento do próprio dia).
+        ant_row = (
+            db.session.query(RDOApontamentoCronograma.percentual_acumulado,
+                             RDOApontamentoCronograma.percentual_realizado)
+            .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+            .filter(
+                RDOApontamentoCronograma.tarefa_cronograma_id == t.id,
+                RDOApontamentoCronograma.admin_id == admin_id,
+                RDO.data_relatorio < data_rdo,
+            )
+            .order_by(RDO.data_relatorio.desc(),
+                      RDOApontamentoCronograma.id.desc())
+            .first()
+        )
+        pct_anterior = 0.0
+        if ant_row is not None:
+            pct_anterior = float(ant_row[0] if ant_row[0] is not None
+                                 else (ant_row[1] or 0.0))
+        tipo_modo = modo_da_tarefa(t)
+        saldo = None
+        if tipo_modo == 'quantidade':
+            saldo = round(float(t.quantidade_total or 0)
+                          - float(progresso['quantidade_acumulada'] or 0), 2)
 
         item = {
             'id': t.id,
@@ -907,6 +935,12 @@ def tarefas_rdo(obra_id: int):
             'quantidade_acumulada': progresso['quantidade_acumulada'],
             'quantidade_executada_hoje': qty_hoje,
             'apontamento_id': apontamento_id,
+            # M07 — contrato de modos: a UI não decide fórmula, só exibe.
+            'tipo_modo': tipo_modo,
+            'is_marco': bool(getattr(t, 'is_marco', False)),
+            'percentual_acumulado_anterior': pct_anterior,
+            'percentual_acumulado_hoje': pct_hoje,
+            'saldo': saldo,
             'responsavel': getattr(t, 'responsavel', 'empresa') or 'empresa',
             'is_pai': t.id in pai_ids,
             'data_entrega_real': (
@@ -1110,6 +1144,9 @@ def apontar_producao(rdo_id: int):
     admin_id = _admin_id()
     data = request.get_json(silent=True) or {}
     tarefa_id = data.get('tarefa_cronograma_id')
+    # M07: modo percentual quando o body traz percentual_acumulado;
+    # senão modo quantitativo legado (quantidade_executada_dia).
+    pct_acumulado = data.get('percentual_acumulado')
     qty_dia = float(data.get('quantidade_executada_dia', 0) or 0)
 
     if not tarefa_id:
@@ -1141,14 +1178,29 @@ def apontar_producao(rdo_id: int):
     # (sem data_inicio/duração); a UI usa esse `None` para mostrar "—" /
     # badge "Sem plano" em vez de 0%.
     from services.cronograma_apontamento_service import (
+        ApontamentoInvalido,
         recomputar_cadeia,
         registrar_apontamento,
     )
-    ap = registrar_apontamento(
-        rdo, tarefa,
-        quantidade_dia=qty_dia,
-        admin_id=admin_id,
-    )
+    try:
+        if pct_acumulado is not None:
+            ap = registrar_apontamento(
+                rdo, tarefa,
+                percentual_acumulado=float(pct_acumulado),
+                admin_id=admin_id,
+                permitir_retrocesso=bool(data.get('permitir_retrocesso')),
+                justificativa=(data.get('justificativa') or '').strip() or None,
+                permitir_sobreexecucao=bool(data.get('permitir_sobreexecucao')),
+            )
+        else:
+            ap = registrar_apontamento(
+                rdo, tarefa,
+                quantidade_dia=qty_dia,
+                admin_id=admin_id,
+            )
+    except ApontamentoInvalido as exc:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': str(exc)}), 422
     plan_calculado = ap.percentual_planejado
     # Correção retroativa/edição: RDOs posteriores recalculados na MESMA
     # transação (M07 — recomputo em cadeia determinístico).
