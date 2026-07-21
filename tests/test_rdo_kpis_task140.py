@@ -183,11 +183,17 @@ class Runner:
                     abs(progs[2] - 100.0) < 0.5,
                     f"[bug2] último RDO encerra em ~100% (real={progs[2]})",
                 )
-                # média ponderada por quantidade_total: pesos 100, 50, 10 → soma 160
-                # rdo1: (20% * 100 + 0 * 50 + 0 * 10)/160 = 12.5
+                # Média ponderada por quantidade_total. ATUALIZADO no M10 para
+                # a tabela normativa §12 do M06 (commit 845db37): t3
+                # ('Mobilização (sem plano)', duracao_dias=0, sem datas) é
+                # MARCO EFETIVO — peso 0 no agregado e fora do critério de
+                # homogeneidade de unidade. Sobram t1 (100 m²) e t2 (50 m²),
+                # mesma unidade ⇒ usar_qtd=True com soma de pesos 150.
+                # rdo1: (20% * 100 + 0 * 50)/150 = 13.33
+                # (Antes do M06 o marco pesava 10 e a soma era 160 → 12.5.)
                 self.check(
-                    abs(progs[0] - 12.5) < 0.5,
-                    f"[bug2] média ponderada do 1º RDO ≈ 12.5% (real={progs[0]})",
+                    abs(progs[0] - 13.33) < 0.5,
+                    f"[bug2] média ponderada do 1º RDO ≈ 13.33% (real={progs[0]})",
                 )
 
                 # ── Bug #3: contador de atividades V2 ──

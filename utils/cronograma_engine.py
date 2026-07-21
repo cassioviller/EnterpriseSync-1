@@ -634,10 +634,18 @@ def rollup_realizado(itens: list) -> dict:
     filhas, de baixo para cima (mesma fórmula do recálculo/sync — um só
     lugar, M06 §4.1).
 
-    `itens`: dicts com `id`, `tarefa_pai_id`, `ordem`, `duracao_dias`,
-    `percentual_realizado`. Pais mais profundos primeiro (ordem
-    decrescente, mesma heurística do motor); um pai intermediário usa o
-    valor agregado dos próprios filhos. Devolve `{pai_id: pct}`.
+    `itens`: dicts com `id`, `tarefa_pai_id`, `duracao_dias`,
+    `percentual_realizado`. Um pai intermediário usa o valor JÁ agregado
+    dos próprios filhos, então a ordem de processamento tem de ser
+    bottom-up de verdade: os pais são ordenados pela PROFUNDIDADE real na
+    árvore (mais fundo primeiro), não por `ordem`.
+
+    A heurística antiga (`ordem` decrescente) silenciava em dois casos: se
+    o caller não passasse `ordem` — todos viravam 0 e a raiz era calculada
+    ANTES do subgrupo, lendo 0 em vez do agregado — ou se `ordem` não
+    correlacionasse com profundidade. Era o caso do payload de
+    `/cronograma/obra/<id>/tarefas-rdo`, que nunca teve a chave `ordem`.
+    Devolve `{pai_id: pct}`.
     """
     filhas_por_pai: dict = {}
     for it in itens:
@@ -645,9 +653,21 @@ def rollup_realizado(itens: list) -> dict:
             filhas_por_pai.setdefault(it['tarefa_pai_id'], []).append(it)
     por_id = {it['id']: it for it in itens}
 
+    def _profundidade(item_id) -> int:
+        """Distância até a raiz. Defensivo contra ciclos e pai órfão."""
+        nivel, visto, atual = 0, {item_id}, por_id.get(item_id)
+        while atual is not None and atual.get('tarefa_pai_id'):
+            pai_id = atual['tarefa_pai_id']
+            if pai_id in visto:  # ciclo: para de subir
+                break
+            visto.add(pai_id)
+            nivel += 1
+            atual = por_id.get(pai_id)
+        return nivel
+
     resultado: dict = {}
     pais = [por_id[p] for p in filhas_por_pai if p in por_id]
-    for pai in sorted(pais, key=lambda x: x.get('ordem') or 0, reverse=True):
+    for pai in sorted(pais, key=lambda x: _profundidade(x['id']), reverse=True):
         filhas = filhas_por_pai[pai['id']]
         total_dur = sum(max(int(f.get('duracao_dias') or 1), 1)
                         for f in filhas)
