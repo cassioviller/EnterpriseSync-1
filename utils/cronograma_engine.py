@@ -629,6 +629,78 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date,
     }
 
 
+def rollup_realizado(itens: list) -> dict:
+    """Percentual realizado dos PAIS: média ponderada pela duração das
+    filhas, de baixo para cima (mesma fórmula do recálculo/sync — um só
+    lugar, M06 §4.1).
+
+    `itens`: dicts com `id`, `tarefa_pai_id`, `ordem`, `duracao_dias`,
+    `percentual_realizado`. Pais mais profundos primeiro (ordem
+    decrescente, mesma heurística do motor); um pai intermediário usa o
+    valor agregado dos próprios filhos. Devolve `{pai_id: pct}`.
+    """
+    filhas_por_pai: dict = {}
+    for it in itens:
+        if it.get('tarefa_pai_id'):
+            filhas_por_pai.setdefault(it['tarefa_pai_id'], []).append(it)
+    por_id = {it['id']: it for it in itens}
+
+    resultado: dict = {}
+    pais = [por_id[p] for p in filhas_por_pai if p in por_id]
+    for pai in sorted(pais, key=lambda x: x.get('ordem') or 0, reverse=True):
+        filhas = filhas_por_pai[pai['id']]
+        total_dur = sum(max(int(f.get('duracao_dias') or 1), 1)
+                        for f in filhas)
+        if total_dur <= 0:
+            continue
+        agregado = sum(
+            (resultado.get(f['id'], f.get('percentual_realizado')) or 0)
+            * max(int(f.get('duracao_dias') or 1), 1)
+            for f in filhas
+        ) / total_dur
+        resultado[pai['id']] = round(agregado, 2)
+    return resultado
+
+
+def _progresso_fallback_subatividades(obra_id: int) -> float:
+    """Caminho C (legado, obras SEM cronograma): média simples de
+    `percentual_conclusao` das subatividades do último RDO — a antiga
+    "FÓRMULA SIMPLES" do KPI de detalhes da obra, preservada apenas como
+    fallback documentado (spec M06 §4.1)."""
+    from models import RDO, RDOServicoSubatividade
+
+    ultimo = (RDO.query.filter_by(obra_id=obra_id)
+              .order_by(RDO.data_relatorio.desc()).first())
+    if ultimo is None:
+        return 0.0
+    subs = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo.id).all()
+    if not subs:
+        return 0.0
+    return round(sum(s.percentual_conclusao or 0 for s in subs) / len(subs), 1)
+
+
+def progresso_geral_para_kpi(obra_id: int, admin_id: int) -> float:
+    """Progresso geral para o KPI de detalhes da obra (M06 §4.1).
+
+    Mesma bifurcação do card de RDO: obra com cronograma interno vivo →
+    `calcular_progresso_geral_obra_v2` de hoje (converge com header,
+    portal, card e curva); sem cronograma → fallback V1 por subatividades
+    do último RDO.
+    """
+    from models import TarefaCronograma
+
+    tem_cronograma = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .first() is not None
+    )
+    if tem_cronograma:
+        return calcular_progresso_geral_obra_v2(
+            obra_id, date.today(), admin_id)['progresso_geral_pct']
+    return _progresso_fallback_subatividades(obra_id)
+
+
 def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
     """
     Recalcula e persiste o percentual_concluido da TarefaCronograma.
@@ -636,8 +708,14 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
     Usa o `percentual_realizado` do apontamento mais recente (por data_relatorio),
     que por sua vez é calculado com base em `quantidade_acumulada / quantidade_total`.
     Isso evita dupla contagem ao somar `quantidade_executada_dia` de múltiplos dias.
+
+    Subempreitada (M06 §4.1): quando a tarefa é quantitativa e existem
+    `RDOSubempreitadaApontamento`, a produção da sub soma-se à acumulada
+    da empresa — este é o ÚNICO caminho (o helper da view delega aqui).
     """
-    from models import TarefaCronograma, RDOApontamentoCronograma, RDO, db
+    from models import (RDO, RDOApontamentoCronograma,
+                        RDOSubempreitadaApontamento, TarefaCronograma, db)
+    from sqlalchemy import func as sqlfunc
 
     tarefa = TarefaCronograma.query.get(tarefa_id)
     if not tarefa:
@@ -658,15 +736,26 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
         .first()
     )
 
-    if ultimo is None:
-        # Sem apontamentos — mantém 0
-        tarefa.percentual_concluido = 0.0
-    elif tarefa.quantidade_total and tarefa.quantidade_total > 0:
-        # Usa quantidade_acumulada do último RDO (mais preciso que somar qty_dia)
+    qtd_sub = (
+        db.session.query(sqlfunc.coalesce(
+            sqlfunc.sum(RDOSubempreitadaApontamento.quantidade_produzida), 0.0))
+        .filter(RDOSubempreitadaApontamento.tarefa_cronograma_id == tarefa_id,
+                RDOSubempreitadaApontamento.admin_id == admin_id)
+        .scalar()
+    ) or 0.0
+
+    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        # Empresa: quantidade_acumulada do último RDO (evita dupla contagem);
+        # subempreitada: soma da produção registrada.
+        acum_empresa = float(ultimo.quantidade_acumulada) if ultimo else 0.0
         tarefa.percentual_concluido = min(
             100.0,
-            round(float(ultimo.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
+            round((acum_empresa + float(qtd_sub))
+                  / tarefa.quantidade_total * 100, 2)
         )
+    elif ultimo is None:
+        # Sem apontamentos — mantém 0
+        tarefa.percentual_concluido = 0.0
     else:
         # Sem quantidade_total: usa o percentual_realizado diretamente do apontamento
         tarefa.percentual_concluido = min(100.0, float(ultimo.percentual_realizado or 0))

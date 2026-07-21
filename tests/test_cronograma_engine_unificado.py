@@ -296,3 +296,89 @@ def test_arquivada_entra_no_historico_e_sai_do_presente():
     assert calcular_progresso_geral_obra_v2(
         obra.id, date(2026, 7, 20), admin.id,
         com_arquivadas_historicas=True)['progresso_geral_pct'] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — rollup, subempreitada e KPI unificados no engine
+# ---------------------------------------------------------------------------
+
+def test_rollup_realizado_funcao_pura_com_hierarquia_aninhada():
+    from utils.cronograma_engine import rollup_realizado
+
+    itens = [
+        {'id': 1, 'tarefa_pai_id': None, 'ordem': 0, 'duracao_dias': 10,
+         'percentual_realizado': 0.0},                       # avô
+        {'id': 2, 'tarefa_pai_id': 1, 'ordem': 1, 'duracao_dias': 10,
+         'percentual_realizado': 0.0},                       # pai
+        {'id': 3, 'tarefa_pai_id': 2, 'ordem': 2, 'duracao_dias': 2,
+         'percentual_realizado': 50.0},
+        {'id': 4, 'tarefa_pai_id': 2, 'ordem': 3, 'duracao_dias': 8,
+         'percentual_realizado': 100.0},
+    ]
+    resultado = rollup_realizado(itens)
+    # pai: (50*2 + 100*8)/10 = 90; avô herda o agregado do pai (não o 0 cru).
+    assert resultado[2] == 90.0
+    assert resultado[1] == 90.0
+
+
+def test_subempreitada_agora_no_atualizar_percentual_tarefa():
+    from utils.cronograma_engine import atualizar_percentual_tarefa
+
+    admin, obra = _ambiente()
+    t = _tarefa(obra, admin, 'Cobertura', ordem=0,
+                quantidade_total=100.0, unidade_medida='m2')
+    sub = Subempreiteiro(nome=f'Sub {uuid.uuid4().hex[:6]}', admin_id=admin.id)
+    db.session.add(sub)
+    db.session.flush()
+    r = _rdo(obra, admin, date(2026, 7, 10))
+    db.session.add(RDOSubempreitadaApontamento(
+        rdo_id=r.id, tarefa_cronograma_id=t.id, subempreiteiro_id=sub.id,
+        qtd_pessoas=2, horas_trabalhadas=8.0, quantidade_produzida=20.0,
+        admin_id=admin.id))
+    db.session.commit()
+
+    # SÓ subempreitada (sem apontamento da empresa): 20/100 = 20%.
+    atualizar_percentual_tarefa(t.id, admin.id)
+    db.session.refresh(t)
+    assert t.percentual_concluido == 20.0
+
+    # Empresa acumula 30 → 50% (soma, não substitui).
+    _apontar(r, t, admin, 30.0, 30.0, 30.0)
+    db.session.commit()
+    atualizar_percentual_tarefa(t.id, admin.id)
+    db.session.refresh(t)
+    assert t.percentual_concluido == 50.0
+
+
+def test_kpi_usa_v2_com_cronograma_e_fallback_sem():
+    from utils.cronograma_engine import (
+        calcular_progresso_geral_obra_v2,
+        progresso_geral_para_kpi,
+    )
+
+    # Obra COM cronograma: KPI == v2 de hoje (convergência).
+    admin, obra = _ambiente()
+    t = _tarefa(obra, admin, 'Alvenaria', ordem=0, duracao_dias=10,
+                data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 14))
+    r = _rdo(obra, admin, date(2026, 7, 10))
+    _apontar(r, t, admin, 0.0, 0.0, 40.0)
+    db.session.commit()
+    v2_hoje = calcular_progresso_geral_obra_v2(
+        obra.id, date.today(), admin.id)['progresso_geral_pct']
+    assert progresso_geral_para_kpi(obra.id, admin.id) == v2_hoje == 40.0
+
+    # Obra SEM cronograma: fallback C — média simples das subatividades do
+    # último RDO (a antiga FÓRMULA SIMPLES do KPI, agora extraída — trava B).
+    admin2, obra2 = _ambiente()
+    r1 = _rdo(obra2, admin2, date(2026, 7, 10))
+    r2 = _rdo(obra2, admin2, date(2026, 7, 11))
+    db.session.add(RDOServicoSubatividade(
+        rdo_id=r1.id, nome_subatividade='Corte', percentual_conclusao=90.0,
+        admin_id=admin2.id))
+    for nome, pct in (('Corte', 30.0), ('Solda', 60.0)):
+        db.session.add(RDOServicoSubatividade(
+            rdo_id=r2.id, nome_subatividade=nome, percentual_conclusao=pct,
+            admin_id=admin2.id))
+    db.session.commit()
+    # Último RDO (r2): (30+60)/2 = 45 — r1 ignorado (fórmula B vigente).
+    assert progresso_geral_para_kpi(obra2.id, admin2.id) == 45.0

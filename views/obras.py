@@ -1691,29 +1691,14 @@ def detalhes_obra(id):
 
         logger.debug(f"DEBUG CUSTOS DETALHADOS: Alimentação={custo_alimentacao} (tabela={custo_alimentacao_tabela}, outros={custo_alimentacao_outros}), Transporte VT={custo_transporte}, Veículos={custos_transporte_total}, Outros={outros_custos}")
         
-        # Calcular progresso geral da obra baseado no último RDO
+        # Progresso geral da obra — fórmula única do engine (M06): v2 quando
+        # há cronograma (mesmo número do header/portal/card RDO/curva);
+        # fallback por subatividades do último RDO para obras sem cronograma.
         progresso_geral = 0.0
         try:
-            from models import RDO, RDOServicoSubatividade
-            
-            # Buscar o último RDO da obra
-            ultimo_rdo_obra = RDO.query.filter_by(obra_id=obra_id).order_by(RDO.data_relatorio.desc()).first()
-            
-            if ultimo_rdo_obra:
-                # Buscar subatividades do último RDO
-                subatividades_rdo = RDOServicoSubatividade.query.filter_by(rdo_id=ultimo_rdo_obra.id).all()
-                
-                if subatividades_rdo:
-                    total_percentuais = sum(sub.percentual_conclusao or 0 for sub in subatividades_rdo)
-                    total_sub = len(subatividades_rdo)
-                    # FÓRMULA SIMPLES
-                    progresso_geral = round(total_percentuais / total_sub, 1) if total_sub > 0 else 0.0
-                    logger.debug(f"[TARGET] KPI OBRA PROGRESSO: {total_percentuais}÷{total_sub} = {progresso_geral}%")
-                    logger.debug(f"DEBUG PROGRESSO OBRA: {len(subatividades_rdo)} subatividades, progresso geral: {progresso_geral:.1f}%")
-                else:
-                    logger.debug("DEBUG PROGRESSO: Último RDO sem subatividades registradas")
-            else:
-                logger.debug("DEBUG PROGRESSO: Nenhum RDO encontrado para esta obra")
+            from utils.cronograma_engine import progresso_geral_para_kpi
+            progresso_geral = progresso_geral_para_kpi(
+                obra_id, admin_id if admin_id is not None else obra.admin_id)
         except Exception as e:
             logger.error(f"ERRO ao calcular progresso da obra: {e}")
             progresso_geral = 0.0

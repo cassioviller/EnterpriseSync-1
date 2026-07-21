@@ -917,28 +917,13 @@ def tarefas_rdo(obra_id: int):
         resultado.append(item)
         item_por_id[t.id] = item
 
-    # Bottom-up: % realizado dos pais = média ponderada por duração das filhas
-    # (mesma fórmula de cronograma_engine.recalcular_cronograma). Garante que
-    # o subgrupo no RDO mostra o mesmo valor agregado do cronograma, mesmo se
-    # `percentual_concluido` persistido ainda estiver desatualizado.
-    filhas_por_pai: dict[int, list[dict]] = {}
-    for it in resultado:
-        if it['tarefa_pai_id']:
-            filhas_por_pai.setdefault(it['tarefa_pai_id'], []).append(it)
-
-    pais_ord = [t for t in tarefas if t.id in pai_ids]
-    for pai in sorted(pais_ord, key=lambda x: x.ordem, reverse=True):
-        filhas = filhas_por_pai.get(pai.id, [])
-        if not filhas:
-            continue
-        total_dur = sum(max(int((item_por_id[f['id']].get('duracao_dias') or 1)), 1) for f in filhas)
-        if total_dur > 0:
-            agregado = sum(
-                (f.get('percentual_realizado') or 0) * max(int(f.get('duracao_dias') or 1), 1)
-                for f in filhas
-            ) / total_dur
-            item_por_id[pai.id]['percentual_realizado'] = round(agregado, 2)
-            item_por_id[pai.id]['percentual_concluido'] = round(agregado, 2)
+    # Bottom-up: % realizado dos pais — fórmula única do engine (M06).
+    # Garante que o subgrupo no RDO mostra o mesmo valor agregado do
+    # cronograma, mesmo se `percentual_concluido` ainda estiver desatualizado.
+    from utils.cronograma_engine import rollup_realizado
+    for pai_id, pct in rollup_realizado(resultado).items():
+        item_por_id[pai_id]['percentual_realizado'] = pct
+        item_por_id[pai_id]['percentual_concluido'] = pct
 
     return jsonify({'status': 'ok', 'tarefas': resultado})
 
@@ -1104,36 +1089,11 @@ def excluir_apontamento_subempreitada(apt_id: int):
 
 
 def _atualizar_percentual_com_subempreitada(tarefa_id: int, admin_id: int):
-    """
-    Recalcula percentual_concluido da tarefa considerando produção total
-    (apontamentos da empresa + apontamentos de subempreitada).
-    """
-    from sqlalchemy import func as sqlfunc
-    from models import RDOSubempreitadaApontamento
-
-    tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
-    if not tarefa:
-        return
-
-    qtd_empresa = (
-        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
-        .filter(RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
-                RDOApontamentoCronograma.admin_id == admin_id)
-        .scalar()
-    ) or 0.0
-
-    qtd_sub = (
-        db.session.query(sqlfunc.coalesce(sqlfunc.sum(RDOSubempreitadaApontamento.quantidade_produzida), 0.0))
-        .filter(RDOSubempreitadaApontamento.tarefa_cronograma_id == tarefa_id,
-                RDOSubempreitadaApontamento.admin_id == admin_id)
-        .scalar()
-    ) or 0.0
-
-    qtd_total = float(qtd_empresa) + float(qtd_sub)
-
-    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
-        tarefa.percentual_concluido = min(100.0, round(qtd_total / tarefa.quantidade_total * 100, 2))
-    db.session.commit()
+    """Delegação fina (M06): a soma empresa+subempreitada vive no engine,
+    em `atualizar_percentual_tarefa` — fórmula num só lugar. Mantida pelas
+    chamadas existentes nas rotas de apontamento."""
+    from utils.cronograma_engine import atualizar_percentual_tarefa
+    atualizar_percentual_tarefa(tarefa_id, admin_id)
 
 
 @cronograma_bp.route('/rdo/<int:rdo_id>/apontar', methods=['POST'])
