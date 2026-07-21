@@ -89,6 +89,108 @@ def _is_marco(tarefa) -> bool:
     return dur is not None and int(dur) == 0
 
 
+def recomputar_cadeia(tarefa_id: int, a_partir_de, admin_id: int) -> int:
+    """Reprocessa em ordem cronológica ((data_relatorio, id) — desempate
+    estável) os apontamentos da tarefa com `data_relatorio >= a_partir_de`,
+    recalculando os DERIVADOS a partir do estado anterior à janela:
+
+    - quantitativo: `quantidade_acumulada` = acumulado anterior + dia;
+      `percentual_realizado` pelo `quantidade_total_snapshot` DA LINHA
+      (senão total vigente da tarefa — linhas pré-M02);
+    - percentual: `percentual_incremento_dia` = acumulado − anterior;
+      `percentual_realizado` = clamp(0, 100, acumulado).
+
+    NUNCA altera: `quantidade_executada_dia` (fato bruto do dia),
+    `percentual_acumulado` digitado, snapshots, `percentual_planejado`
+    (replanejamento M06 é o dono). Sem commit — roda na MESMA transação do
+    caller (correção retroativa atômica, spec §12). Devolve o nº de linhas
+    alteradas. Chamar após criar/editar/excluir apontamento retroativo.
+    """
+    from sqlalchemy import func as sqlfunc
+    from models import TarefaCronograma
+
+    tarefa = db.session.get(TarefaCronograma, tarefa_id)
+    if tarefa is None:
+        return 0
+
+    # Estado ANTES da janela.
+    acum = (
+        db.session.query(sqlfunc.coalesce(
+            sqlfunc.sum(RDOApontamentoCronograma.quantidade_executada_dia), 0.0))
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+            RDO.data_relatorio < a_partir_de,
+        )
+        .scalar()
+    ) or 0.0
+    ant = (
+        db.session.query(RDOApontamentoCronograma.percentual_acumulado,
+                         RDOApontamentoCronograma.percentual_realizado)
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+            RDO.data_relatorio < a_partir_de,
+        )
+        .order_by(RDO.data_relatorio.desc(), RDOApontamentoCronograma.id.desc())
+        .first()
+    )
+    pct_ant = 0.0
+    if ant is not None:
+        pct_ant = float(ant[0] if ant[0] is not None else (ant[1] or 0.0))
+
+    linhas = (
+        db.session.query(RDOApontamentoCronograma)
+        .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
+        .filter(
+            RDOApontamentoCronograma.tarefa_cronograma_id == tarefa_id,
+            RDOApontamentoCronograma.admin_id == admin_id,
+            RDO.data_relatorio >= a_partir_de,
+        )
+        .order_by(RDO.data_relatorio.asc(), RDOApontamentoCronograma.id.asc())
+        .all()
+    )
+
+    alteradas = 0
+    for ap in linhas:
+        # Mesma regra de classificação do backfill (migration 210).
+        tipo = ap.tipo_apontamento or (
+            'quantitativo' if (tarefa.quantidade_total or 0) > 0
+            else 'percentual')
+        antes = (ap.quantidade_acumulada, ap.percentual_realizado,
+                 ap.percentual_incremento_dia, ap.percentual_acumulado)
+        if tipo == 'quantitativo':
+            acum += float(ap.quantidade_executada_dia or 0)
+            total = float(ap.quantidade_total_snapshot or 0) or float(
+                tarefa.quantidade_total or 0)
+            pct = (min(100.0, round(acum / total * 100, 2))
+                   if total > 0 else 0.0)
+            ap.quantidade_acumulada = acum
+            ap.percentual_realizado = pct
+            ap.percentual_acumulado = pct
+            ap.percentual_incremento_dia = round(pct - pct_ant, 2)
+            pct_ant = pct
+        else:
+            pct = float(ap.percentual_acumulado
+                        if ap.percentual_acumulado is not None
+                        else (ap.percentual_realizado or 0.0))
+            ap.percentual_realizado = max(0.0, min(100.0, pct))
+            ap.percentual_acumulado = pct
+            ap.percentual_incremento_dia = round(pct - pct_ant, 2)
+            pct_ant = pct
+        if (ap.quantidade_acumulada, ap.percentual_realizado,
+                ap.percentual_incremento_dia, ap.percentual_acumulado) != antes:
+            alteradas += 1
+
+    if alteradas:
+        logger.info('[recomputo-cadeia] tarefa=%s a_partir_de=%s admin=%s: '
+                    '%d de %d apontamento(s) recalculado(s)',
+                    tarefa_id, a_partir_de, admin_id, alteradas, len(linhas))
+    return alteradas
+
+
 def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
                           percentual_acumulado=None,
                           admin_id,

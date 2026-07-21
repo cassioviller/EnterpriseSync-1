@@ -1140,13 +1140,20 @@ def apontar_producao(rdo_id: int):
     # percentual_planejado fica `None` quando a tarefa não tem plano calculável
     # (sem data_inicio/duração); a UI usa esse `None` para mostrar "—" /
     # badge "Sem plano" em vez de 0%.
-    from services.cronograma_apontamento_service import registrar_apontamento
+    from services.cronograma_apontamento_service import (
+        recomputar_cadeia,
+        registrar_apontamento,
+    )
     ap = registrar_apontamento(
         rdo, tarefa,
         quantidade_dia=qty_dia,
         admin_id=admin_id,
     )
     plan_calculado = ap.percentual_planejado
+    # Correção retroativa/edição: RDOs posteriores recalculados na MESMA
+    # transação (M07 — recomputo em cadeia determinístico).
+    db.session.flush()
+    recalculados = recomputar_cadeia(tarefa_id, rdo.data_relatorio, admin_id)
 
     db.session.commit()
 
@@ -1155,6 +1162,7 @@ def apontar_producao(rdo_id: int):
 
     return jsonify({
         'status': 'ok',
+        'rdos_posteriores_recalculados': recalculados,
         'apontamento': {
             'id': ap.id,
             'quantidade_executada_dia': ap.quantidade_executada_dia,

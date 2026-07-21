@@ -495,14 +495,19 @@ def excluir_rdo(rdo_id):
         db.session.query(RDOServicoSubatividade).filter(RDOServicoSubatividade.rdo_id == rdo_id).delete()
         db.session.query(RDOOcorrencia).filter(RDOOcorrencia.rdo_id == rdo_id).delete()
 
-        # V2: Excluir apontamentos de cronograma e recalcular percentuais das tarefas
+        # V2: Excluir apontamentos de cronograma, recomputar a cadeia dos
+        # RDOs posteriores (M07) e recalcular percentuais das tarefas
         try:
             from models import RDOApontamentoCronograma
             from utils.cronograma_engine import atualizar_percentual_tarefa
+            from services.cronograma_apontamento_service import recomputar_cadeia
+            data_rdo_excluido = rdo.data_relatorio
             aps = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo_id).all()
             tarefa_ids_afetadas = [ap.tarefa_cronograma_id for ap in aps]
             db.session.query(RDOApontamentoCronograma).filter_by(rdo_id=rdo_id).delete()
             db.session.flush()
+            for tid in tarefa_ids_afetadas:
+                recomputar_cadeia(tid, data_rdo_excluido, admin_id)
             for tid in tarefa_ids_afetadas:
                 atualizar_percentual_tarefa(tid, admin_id)
         except Exception as e_v2:
@@ -4560,7 +4565,10 @@ def salvar_rdo_flexivel():
                 from utils.tenant import is_v2_active
                 from models import TarefaCronograma
                 from utils.cronograma_engine import atualizar_percentual_tarefa
-                from services.cronograma_apontamento_service import registrar_apontamento
+                from services.cronograma_apontamento_service import (
+                    recomputar_cadeia,
+                    registrar_apontamento,
+                )
                 if is_v2_active():
                     tarefa_ids_afetadas = []
                     for key, val in request.form.items():
@@ -4584,10 +4592,16 @@ def salvar_rdo_flexivel():
                                 logger.warning(f"[WARN] Apontamento cronograma inválido {key}={val}: {e_p}")
                     if tarefa_ids_afetadas:
                         db.session.flush()
+                        # RDO retroativo: recomputa a cadeia dos RDOs
+                        # posteriores na MESMA transação (M07).
+                        recalc = 0
+                        for tid in tarefa_ids_afetadas:
+                            recalc += recomputar_cadeia(
+                                tid, data_relatorio, _admin_id)
                         for tid in tarefa_ids_afetadas:
                             atualizar_percentual_tarefa(tid, _admin_id)
                         db.session.commit()
-                        logger.info(f"[OK] {len(tarefa_ids_afetadas)} apontamento(s) cronograma V2 salvos no RDO {rdo.id}")
+                        logger.info(f"[OK] {len(tarefa_ids_afetadas)} apontamento(s) cronograma V2 salvos no RDO {rdo.id}; cadeia recalculada: {recalc}")
             except Exception as e_v2:
                 logger.warning(f"[WARN] Falha ao salvar apontamentos V2 no salvar_rdo_flexivel: {e_v2}")
 
