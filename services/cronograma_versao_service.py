@@ -152,6 +152,9 @@ def _snapshot_versao(versao, tarefas, admin_id, preds_tipadas=None):
             is_marco=t.is_marco,
             is_resumo=t.id in pai_ids,
             percentual_concluido_no_momento=t.percentual_concluido,
+            # fingerprint não tem coluna própria no snapshot — vai no
+            # payload_extra para a restauração devolver a identidade M04.
+            payload_extra={'fingerprint': t.fingerprint},
         )
         db.session.add(snap)
         snaps[t.id] = snap
@@ -526,4 +529,201 @@ def _aplicar(importacao_id, decisoes, usuario_id):
         },
         usuario_id=usuario_id,
     ))
+    return nova_versao, obra.id, admin_id, tem_rdo
+
+
+# ---------------------------------------------------------------------------
+# Restauração de versão (rollback por snapshot) — M05 Task 3
+# ---------------------------------------------------------------------------
+
+def restaurar_versao(versao_id: int, usuario_id: int | None) -> CronogramaVersao:
+    """Restaura o cronograma da obra ao estado fotografado em `versao_id`.
+
+    Reconstrói a partir de CronogramaTarefaSnapshot: tarefas vivas casadas
+    por `tarefa_id` recebem UPDATE, arquivadas voltam (`ativa=True`),
+    tarefas criadas depois da versão alvo são arquivadas — NUNCA DELETE.
+    Vira uma NOVA versão ativa (`observacao='rollback da vN'`); a versão
+    alvo permanece 'arquivada' e imutável. Mesma política pós-commit do
+    aplicar: motor só roda se a obra tem RDO.
+    """
+    try:
+        versao, obra_id, admin_id, tem_rdo = _restaurar(versao_id, usuario_id)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    if tem_rdo:
+        if not recalcular_cronograma(obra_id, admin_id, cliente=False):
+            logger.warning('recalcular_cronograma falhou após restaurar '
+                           'versão %s da obra %s', versao.numero, obra_id)
+        sincronizar_percentuais_obra(obra_id, admin_id, cliente=False)
+    return versao
+
+
+def _restaurar(versao_id, usuario_id):
+    alvo = db.session.get(CronogramaVersao, versao_id)
+    if alvo is None:
+        raise EstadoInvalido(f'Versão {versao_id} não encontrada.')
+    admin_id = alvo.admin_id
+
+    obra = (db.session.query(Obra)
+            .filter_by(id=alvo.obra_id, admin_id=admin_id)
+            .with_for_update().first())
+    if obra is None:
+        raise EstadoInvalido('Obra da versão não encontrada.')
+    db.session.refresh(alvo)
+    if alvo.status == 'ativa':
+        raise EstadoInvalido(
+            f'Versão {alvo.numero} já é a versão ativa — nada a restaurar.')
+
+    snaps = (CronogramaTarefaSnapshot.query
+             .filter_by(versao_id=alvo.id)
+             .order_by(CronogramaTarefaSnapshot.ordem,
+                       CronogramaTarefaSnapshot.id)
+             .all())
+    if not snaps:
+        raise EstadoInvalido(
+            f'Versão {alvo.numero} não tem snapshot — não é restaurável.')
+
+    todas = (TarefaCronograma.query
+             .filter_by(obra_id=obra.id, admin_id=admin_id, is_cliente=False)
+             .all())
+    por_id = {t.id: t for t in todas}
+    vivas_antes = [t for t in todas if t.ativa]
+    n_tarefas_antes = len(todas)
+
+    # Fotografa a versão ativa corrente antes de mexer (se ainda sem foto).
+    versao_atual = (CronogramaVersao.query
+                    .filter_by(obra_id=obra.id, status='ativa')
+                    .first())
+    if versao_atual is not None:
+        tem_snapshot = (db.session.query(CronogramaTarefaSnapshot.id)
+                        .filter_by(versao_id=versao_atual.id)
+                        .first() is not None)
+        if not tem_snapshot and vivas_antes:
+            _snapshot_versao(versao_atual, vivas_antes, admin_id)
+
+    maior = (db.session.query(func.max(CronogramaVersao.numero))
+             .filter_by(obra_id=obra.id).scalar()) or 0
+    if versao_atual is not None:
+        versao_atual.status = 'arquivada'
+        db.session.flush()
+    nova_versao = CronogramaVersao(
+        obra_id=obra.id,
+        admin_id=admin_id,
+        numero=maior + 1,
+        status='ativa',
+        importacao_id=alvo.importacao_id,
+        aplicada_em=datetime.utcnow(),
+        aplicada_por_id=usuario_id,
+        observacao=f'rollback da v{alvo.numero}',
+    )
+    db.session.add(nova_versao)
+    db.session.flush()
+
+    # 1ª passada: conteúdo. UPDATE nas casadas por tarefa_id (reativando
+    # arquivadas); INSERT quando a tarefa da foto não existe mais no banco
+    # (tarefa_id NULL — só possível em dados legados; nunca deletamos).
+    restauradas = {}      # snap.id → TarefaCronograma
+    for s in snaps:
+        t = por_id.get(s.tarefa_id)
+        extra = s.payload_extra or {}
+        if t is None:
+            t = TarefaCronograma(
+                obra_id=obra.id,
+                admin_id=admin_id,
+                is_cliente=False,
+                nome_tarefa=s.nome_tarefa or '(sem nome)',
+                ordem=s.ordem or 0,
+                duracao_dias=s.duracao_dias if s.duracao_dias is not None else 1,
+                percentual_concluido=s.percentual_concluido_no_momento or 0.0,
+                versao_criacao_id=nova_versao.id,
+            )
+            db.session.add(t)
+        else:
+            t.nome_tarefa = s.nome_tarefa or t.nome_tarefa
+            t.ordem = s.ordem if s.ordem is not None else t.ordem
+            if s.duracao_dias is not None:
+                t.duracao_dias = s.duracao_dias
+            if s.percentual_concluido_no_momento is not None:
+                t.percentual_concluido = s.percentual_concluido_no_momento
+        t.data_inicio = s.data_inicio
+        t.data_fim = s.data_fim
+        t.quantidade_total = s.quantidade_total
+        t.unidade_medida = s.unidade_medida
+        t.is_marco = bool(s.is_marco)
+        t.mpp_uid = s.mpp_uid
+        t.wbs_codigo = s.wbs_codigo
+        if 'fingerprint' in extra:
+            t.fingerprint = extra['fingerprint']
+        t.ativa = True
+        t.arquivada_em = None
+        restauradas[s.id] = t
+    db.session.flush()
+
+    # 2ª passada: hierarquia (self-FK entre snapshots) e predecessora única
+    # (primeira FS da lista tipada; ids da foto ainda existem — anti-DELETE).
+    for s in snaps:
+        t = restauradas[s.id]
+        if s.tarefa_pai_snapshot_id and s.tarefa_pai_snapshot_id in restauradas:
+            t.tarefa_pai_id = restauradas[s.tarefa_pai_snapshot_id].id
+        else:
+            t.tarefa_pai_id = None
+        pred_id = None
+        for p in s.predecessoras_json or []:
+            if p.get('tipo') == 'FS' and p.get('tarefa_id') in por_id:
+                pred_id = p['tarefa_id']
+                break
+        t.predecessora_id = pred_id
+
+    # Tarefas fora da foto (criadas depois da versão alvo) são arquivadas.
+    agora = datetime.utcnow()
+    ids_restaurados = {t.id for t in restauradas.values()}
+    arquivadas = 0
+    for t in todas:
+        if t.id not in ids_restaurados and t.ativa:
+            t.ativa = False
+            t.arquivada_em = agora
+            arquivadas += 1
+    db.session.flush()
+
+    n_tarefas_depois = (db.session.query(func.count(TarefaCronograma.id))
+                        .filter_by(obra_id=obra.id, admin_id=admin_id,
+                                   is_cliente=False)
+                        .scalar())
+    if n_tarefas_depois < n_tarefas_antes:
+        raise AssertionError(
+            f'restaurar_versao deletou tarefas ({n_tarefas_antes} → '
+            f'{n_tarefas_depois}) — proibido')
+
+    # Foto da nova versão preservando as predecessoras tipadas da alvo.
+    preds_tipadas = {restauradas[s.id].id: list(s.predecessoras_json or [])
+                     for s in snaps}
+    _snapshot_versao(nova_versao, list(restauradas.values()), admin_id,
+                     preds_tipadas)
+
+    # Trilha de auditoria: evento exige importacao_id — usa o da versão
+    # alvo ou o da versão que estava ativa; sem nenhum (backfill puro),
+    # não há importação para auditar e o evento é omitido.
+    imp_id = alvo.importacao_id or (
+        versao_atual.importacao_id if versao_atual is not None else None)
+    if imp_id is not None:
+        db.session.add(CronogramaImportacaoEvento(
+            importacao_id=imp_id,
+            admin_id=admin_id,
+            evento='rollback',
+            detalhes={
+                'versao_alvo_id': alvo.id,
+                'versao_alvo_numero': alvo.numero,
+                'versao_nova_id': nova_versao.id,
+                'versao_nova_numero': nova_versao.numero,
+                'restauradas': len(restauradas),
+                'arquivadas': arquivadas,
+            },
+            usuario_id=usuario_id,
+        ))
+
+    tem_rdo = (db.session.query(RDO.id)
+               .filter_by(obra_id=obra.id).first() is not None)
     return nova_versao, obra.id, admin_id, tem_rdo
