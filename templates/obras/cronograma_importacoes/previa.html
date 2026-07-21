@@ -1,0 +1,172 @@
+{% extends 'base_completo.html' %}
+{% block title %}Prévia da importação — {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" id="paginaPreviaImportacao"
+     data-obra-id="{{ obra.id }}" data-importacao-id="{{ imp.id }}">
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h4 class="mb-0">
+            <i class="fas fa-code-compare me-1"></i>
+            Prévia da importação #{{ imp.id }}
+        </h4>
+        <span class="badge bg-warning text-dark">aguardando revisão</span>
+        <span class="ms-auto small text-muted">
+            <i class="fas fa-file me-1"></i>{{ imp.arquivo_nome }}
+        </span>
+    </div>
+    <div class="alert alert-info py-2 px-3" style="font-size:.85rem">
+        <i class="fas fa-info-circle me-1"></i>
+        Esta importação altera somente a obra <strong>{{ obra.nome }}</strong>.
+        Nada é gravado até você clicar em "Aplicar nova versão".
+    </div>
+
+    {# ── Resumo numérico do diff ── #}
+    <div class="row g-2 mb-3" id="previaResumo">
+        {% for rotulo, valor, cor in [
+            ('Exatas', resumo.exatas, 'success'),
+            ('Renomeadas', resumo.renomeadas, 'primary'),
+            ('Novas', resumo.novas, 'info'),
+            ('Removidas', resumo.removidas, 'secondary'),
+            ('Ambíguas', resumo.ambiguas, 'warning'),
+            ('Revisão manual', resumo.revisao_manual, 'danger'),
+        ] %}
+        <div class="col-6 col-md-2">
+            <div class="border rounded text-center p-2 bg-white">
+                <div class="fw-bold fs-5 text-{{ cor }}">{{ valor }}</div>
+                <div class="small text-muted">{{ rotulo }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="small text-muted mb-3">
+        Alterações — datas: <b>{{ resumo.alteracoes.datas }}</b> ·
+        duração: <b>{{ resumo.alteracoes.duracao }}</b> ·
+        predecessoras: <b>{{ resumo.alteracoes.predecessoras }}</b>
+        {% if sugestoes %} · sugestões de divisão/fusão:
+        <b>{{ sugestoes|length }}</b>{% endif %}
+    </div>
+
+    {# ── Filtros + busca ── #}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <div class="btn-group btn-group-sm" role="group" id="previaFiltros">
+            <button class="btn btn-outline-secondary active" data-filtro="tudo">Tudo</button>
+            <button class="btn btn-outline-warning" data-filtro="pendentes">Pendentes</button>
+            <button class="btn btn-outline-primary" data-filtro="alteradas">Alteradas</button>
+            <button class="btn btn-outline-info" data-filtro="novas">Novas</button>
+            <button class="btn btn-outline-secondary" data-filtro="removidas">Removidas</button>
+        </div>
+        <input type="text" class="form-control form-control-sm" id="previaBusca"
+               style="max-width:260px" placeholder="Buscar tarefa por nome…">
+        <span class="ms-auto small">
+            Pendências: <b id="previaPendencias">{{ pendencias }}</b>
+        </span>
+    </div>
+
+    <div class="table-responsive border rounded bg-white mb-3">
+        <table class="table table-sm table-hover align-middle mb-0"
+               style="font-size:.83rem">
+            <thead class="table-light"><tr>
+                <th style="min-width:200px">Tarefa atual</th>
+                <th style="min-width:200px">Tarefa nova</th>
+                <th>Classificação</th>
+                <th>Nível</th>
+                <th>Score</th>
+                <th style="min-width:220px">Alterações</th>
+                <th class="text-end">Decisão</th>
+            </tr></thead>
+            <tbody id="previaCorpo"></tbody>
+        </table>
+    </div>
+
+    {# ── Rodapé de ações ── #}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <button class="btn btn-success" id="btnAplicarVersao"
+                {% if pendencias %}disabled{% endif %}>
+            <i class="fas fa-check me-1"></i> Aplicar nova versão
+        </button>
+        <button class="btn btn-outline-danger" id="btnCancelarImportacao">
+            Cancelar importação
+        </button>
+        <a class="btn btn-outline-secondary"
+           href="{{ url_for('main.detalhes_obra', id=obra.id) }}#cronograma">
+            Voltar à obra
+        </a>
+        <span class="small text-muted" id="previaMsgAplicar">
+            {% if pendencias %}Resolva as {{ pendencias }} pendência(s) para
+            liberar a aplicação.{% endif %}
+        </span>
+    </div>
+
+    {# ── Auditoria ── #}
+    <h6 class="fw-bold"><i class="fas fa-scroll me-1"></i> Auditoria</h6>
+    <div class="border rounded bg-white p-2 mb-4" style="font-size:.82rem">
+        {% for e in eventos %}
+        <div class="d-flex gap-2 border-bottom py-1">
+            <span class="text-muted" style="min-width:130px">
+                {{ e.criado_em.strftime('%d/%m/%Y %H:%M') if e.criado_em else '—' }}
+            </span>
+            <span class="badge bg-light text-dark">{{ e.evento }}</span>
+            <span class="text-muted">{{ nome_usuario(e.usuario_id) or 'sistema' }}</span>
+            <span class="text-truncate" style="max-width:520px"
+                  title="{{ e.detalhes|tojson if e.detalhes else '' }}">
+                {{ e.detalhes|tojson if e.detalhes else '' }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{# Modal de decisão #}
+<div class="modal fade" id="modalDecisao" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Decidir mapeamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small mb-2" id="decisaoContexto"></div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="decisaoAcao"
+                   id="acaoCasar" value="casar">
+            <label class="form-check-label" for="acaoCasar">
+                Vincular a uma tarefa do arquivo novo
+            </label>
+        </div>
+        <select class="form-select form-select-sm my-1 d-none" id="decisaoChave">
+        </select>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="decisaoAcao"
+                   id="acaoArquivar" value="arquivar">
+            <label class="form-check-label" for="acaoArquivar">
+                Confirmar remoção (arquivar — RDOs preservados)
+            </label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="radio" name="decisaoAcao"
+                   id="acaoNova" value="nova">
+            <label class="form-check-label" for="acaoNova">
+                Inserir como tarefa nova
+            </label>
+        </div>
+        <div class="small text-danger mt-2 d-none" id="decisaoErro"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm"
+                data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-primary btn-sm"
+                id="btnSalvarDecisao">Salvar decisão</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="dadosPrevia" type="application/json">{{ {
+    'linhas': linhas,
+    'chaves_novas': chaves_novas,
+    'obra_id': obra.id,
+    'importacao_id': imp.id,
+}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/cronograma_previa.js') }}"></script>
+{% endblock %}

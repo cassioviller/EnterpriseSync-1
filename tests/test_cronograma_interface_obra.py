@@ -193,3 +193,71 @@ def test_secao_visivel_para_v2_e_ausente_sem_v2():
     r = c2.get(f'/obras/{obra_v1_id}')
     assert r.status_code == 200
     assert 'secaoCronogramaMpp' not in r.get_data(as_text=True)
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — prévia (reconcile automático, XSS), pendência e resultado
+# ---------------------------------------------------------------------------
+
+def test_previa_reconcilia_automaticamente_e_escapa_nomes():
+    # Nome de tarefa vindo do "arquivo" com payload XSS: renderiza escapado.
+    ctx = _setup_obra_com_importacao(
+        _nt('uid:1', '<script>alert("xss")</script> Fundação', uid=1))
+    c = _client_como(ctx['admin_id'])
+    base = f"/obras/{ctx['obra_id']}/cronograma/importacoes/{ctx['imp_id']}"
+
+    r = c.get(f'{base}/previa')
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert '<script>alert(' not in html          # nunca cru
+    assert '\\u003cscript\\u003e' in html or '&lt;script&gt;' in html
+    # Reconcile automático: status avançou e o resumo aparece na página.
+    with app.app_context():
+        imp = db.session.get(CronogramaImportacao, ctx['imp_id'])
+        assert imp.status == 'aguardando_revisao'
+        assert imp.relatorio_diff is not None
+    assert 'Aplicar nova versão' in html
+    assert ctx['obra_nome'] in html              # escopo explícito
+
+
+def test_previa_com_pendencia_desabilita_aplicar_e_api_bloqueia():
+    ctx = _setup_obra_com_importacao(
+        _nt('n1', 'Pintura Interna 1',
+            inicio='2026-07-01', fim='2026-07-10', dias=8.0),
+        _nt('n2', 'Pintura Interna 2',
+            inicio='2026-07-01', fim='2026-07-10', dias=8.0),
+        tarefa_kw={'nome': 'Pintura Interna',
+                   'data_inicio': date(2026, 7, 1),
+                   'data_fim': date(2026, 7, 10), 'duracao_dias': 8})
+    c = _client_como(ctx['admin_id'])
+    base = f"/obras/{ctx['obra_id']}/cronograma/importacoes/{ctx['imp_id']}"
+
+    html = c.get(f'{base}/previa').get_data(as_text=True)
+    assert 'btnAplicarVersao' in html
+    assert 'disabled' in html.split('btnAplicarVersao')[1][:120]
+    # API também bloqueia (impossível aplicar com pendência — critério 2).
+    assert c.post(f'{base}/aplicar').status_code == 422
+
+
+def test_resultado_apos_aplicar_e_estados_invalidos():
+    ctx = _setup_obra_com_importacao(
+        _nt('uid:1', 'Fundação Revisada', uid=1),
+        _nt('uid:2', 'Cobertura Nova', uid=2))
+    c = _client_como(ctx['admin_id'])
+    base = f"/obras/{ctx['obra_id']}/cronograma/importacoes/{ctx['imp_id']}"
+
+    # Resultado antes de aplicar: 409.
+    c.get(f'{base}/previa')                       # reconcilia
+    assert c.get(f'{base}/resultado').status_code == 409
+
+    assert c.post(f'{base}/aplicar').status_code == 200
+    r = c.get(f'{base}/resultado')
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'aplicada' in html
+    assert 'Auditoria' in html
+    assert 'aplicado' in html                     # evento na trilha
+    # Prévia de importação aplicada redireciona ao resultado.
+    r = c.get(f'{base}/previa')
+    assert r.status_code == 302
+    assert r.headers['Location'].endswith('/resultado')

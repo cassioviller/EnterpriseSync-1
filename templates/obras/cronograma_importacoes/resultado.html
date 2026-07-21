@@ -1,0 +1,121 @@
+{% extends 'base_completo.html' %}
+{% block title %}Resultado da importação — {{ obra.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:1000px">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <h4 class="mb-0">
+            <i class="fas fa-clipboard-check text-success me-1"></i>
+            Importação #{{ imp.id }} aplicada
+        </h4>
+        <span class="badge bg-success">aplicado</span>
+        <span class="ms-auto small text-muted">
+            <i class="fas fa-file me-1"></i>{{ imp.arquivo_nome }}
+        </span>
+    </div>
+
+    <div class="alert alert-success py-2 px-3" style="font-size:.9rem">
+        <i class="fas fa-check-circle me-1"></i>
+        {% if versao %}A obra <strong>{{ obra.nome }}</strong> agora usa a
+        <strong>versão v{{ versao.numero }}</strong> do cronograma
+        (aplicada em {{ versao.aplicada_em.strftime('%d/%m/%Y %H:%M')
+            if versao.aplicada_em else '—' }}).
+        {% else %}Versão aplicada com sucesso.{% endif %}
+        RDOs, medições e fotos foram preservados.
+    </div>
+
+    {# ── Antes / depois ── #}
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <div class="border rounded p-3 bg-white h-100">
+                <div class="small text-muted mb-1">Tarefas vivas</div>
+                <div class="fs-5 fw-bold">
+                    {{ ev_aplicado.get('antes', {}).get('n_tarefas_vivas', '—') }}
+                    <i class="fas fa-arrow-right mx-1 text-muted small"></i>
+                    {{ ev_aplicado.get('depois', {}).get('n_tarefas_vivas', '—') }}
+                </div>
+                <div class="small text-muted">
+                    {{ ev_aplicado.get('depois', {}).get('inseridas', 0) }} inserida(s) ·
+                    {{ ev_aplicado.get('depois', {}).get('arquivadas', 0) }} arquivada(s)
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="border rounded p-3 bg-white h-100">
+                <div class="small text-muted mb-1">Progresso geral (realizado)</div>
+                {% if ev_replanejado %}
+                <div class="fs-5 fw-bold">
+                    {{ ev_replanejado.get('progresso_antes', '—') }}%
+                    <i class="fas fa-arrow-right mx-1 text-muted small"></i>
+                    {{ ev_replanejado.get('progresso_depois', '—') }}%
+                </div>
+                <div class="small text-muted">
+                    {{ ev_replanejado.get('apontamentos_replanejados', 0) }}
+                    apontamento(s) replanejado(s)
+                </div>
+                {% else %}
+                <div class="small text-muted">Obra sem RDO — curvas serão
+                calculadas a partir do primeiro relatório.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="border rounded p-3 bg-white h-100">
+                <div class="small text-muted mb-1">Matching por nível</div>
+                <div class="small">
+                    {% for nivel, n in (ev_aplicado.get('matching_por_nivel') or {}).items() %}
+                    <span class="badge bg-light text-dark border me-1 mb-1">
+                        {{ nivel }}: {{ n }}</span>
+                    {% else %}<span class="text-muted">—</span>{% endfor %}
+                </div>
+                <div class="small text-muted mt-1">
+                    {{ ev_aplicado.get('decisoes_manuais', 0) }} decisão(ões) manual(is)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if nao_reconciliado %}
+    <div class="alert alert-warning py-2 px-3" style="font-size:.85rem">
+        <i class="fas fa-triangle-exclamation me-1"></i>
+        <strong>Histórico não reconciliado:</strong> as tarefas abaixo foram
+        arquivadas mas têm apontamentos de RDO — o trabalho segue visível na
+        curva histórica.
+        <ul class="mb-0 mt-1">
+            {% for t in nao_reconciliado %}
+            <li>{{ t.nome_tarefa }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2 mb-4">
+        <a class="btn btn-primary"
+           href="{{ url_for('main.detalhes_obra', id=obra.id) }}#cronograma">
+            <i class="fas fa-arrow-left me-1"></i> Voltar à obra
+        </a>
+        <a class="btn btn-outline-secondary" target="_blank"
+           href="{{ url_for('cronograma.cronograma_obra', obra_id=obra.id) }}">
+            Abrir cronograma interno
+        </a>
+    </div>
+
+    {# ── Auditoria ── #}
+    <h6 class="fw-bold"><i class="fas fa-scroll me-1"></i> Auditoria</h6>
+    <div class="border rounded bg-white p-2" style="font-size:.82rem">
+        {% for e in eventos %}
+        <div class="d-flex gap-2 border-bottom py-1">
+            <span class="text-muted" style="min-width:130px">
+                {{ e.criado_em.strftime('%d/%m/%Y %H:%M') if e.criado_em else '—' }}
+            </span>
+            <span class="badge bg-light text-dark">{{ e.evento }}</span>
+            <span class="text-muted">{{ nome_usuario(e.usuario_id) or 'sistema' }}</span>
+            <span class="text-truncate" style="max-width:520px"
+                  title="{{ e.detalhes|tojson if e.detalhes else '' }}">
+                {{ e.detalhes|tojson if e.detalhes else '' }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

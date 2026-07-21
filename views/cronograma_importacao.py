@@ -315,6 +315,47 @@ def _importacao_do_tenant(obra_id, importacao_id, admin_id):
     return obra, imp
 
 
+def _executar_reconciliacao(imp, admin_id):
+    """Roda a reconciliação (Task 1 do M05) e persiste diff + mapeamentos.
+    Re-execução regrava os mapeamentos (dados derivados do diff; decisões
+    antigas caem — o diff pode ter mudado de forma). Caller comita.
+    Devolve (relatorio_diff, pendencias)."""
+    rel = reconciliar(extrair_tarefas_atuais(imp.obra_id, admin_id),
+                      imp.json_normalizado)
+    imp.relatorio_diff = rel
+    imp.status = 'aguardando_revisao'
+
+    CronogramaTarefaMapeamento.query.filter_by(
+        importacao_id=imp.id).delete()
+    for m in rel['mapeamentos']:
+        db.session.add(CronogramaTarefaMapeamento(
+            importacao_id=imp.id,
+            admin_id=admin_id,
+            tarefa_atual_id=m['tarefa_atual_id'],
+            chave_nova=m['chave_nova'],
+            tipo=m['tipo'][0],
+            score=m['score'],
+            origem_decisao=None if m['decisao_requerida'] else 'auto',
+            detalhes={
+                'id_temp': m['id_temp'],
+                'tipos': m['tipo'],
+                'nivel_match': m['nivel_match'],
+                'decisao_requerida': m['decisao_requerida'],
+                'candidatos': m['candidatos'],
+                'diff': m['detalhes'],
+            },
+        ))
+    pendencias = sum(1 for m in rel['mapeamentos'] if m['decisao_requerida'])
+    db.session.add(CronogramaImportacaoEvento(
+        importacao_id=imp.id,
+        admin_id=admin_id,
+        evento='reconciliado',
+        detalhes={'resumo': rel['resumo'], 'pendencias': pendencias},
+        usuario_id=current_user.id,
+    ))
+    return rel, pendencias
+
+
 def _mapeamento_para_json(mp):
     det = mp.detalhes or {}
     return {
@@ -351,41 +392,7 @@ def reconciliar_importacao(obra_id, importacao_id):
             f"Importação está '{imp.status}' — reconciliação exige "
             f"'normalizado' (ou re-execução em 'aguardando_revisao').", 409)
 
-    rel = reconciliar(extrair_tarefas_atuais(obra_id, admin_id),
-                      imp.json_normalizado)
-    imp.relatorio_diff = rel
-    imp.status = 'aguardando_revisao'
-
-    # Re-reconciliar regrava os mapeamentos (dados derivados do diff);
-    # decisões antigas caem — o diff pode ter mudado de forma.
-    CronogramaTarefaMapeamento.query.filter_by(
-        importacao_id=imp.id).delete()
-    for m in rel['mapeamentos']:
-        db.session.add(CronogramaTarefaMapeamento(
-            importacao_id=imp.id,
-            admin_id=admin_id,
-            tarefa_atual_id=m['tarefa_atual_id'],
-            chave_nova=m['chave_nova'],
-            tipo=m['tipo'][0],
-            score=m['score'],
-            origem_decisao=None if m['decisao_requerida'] else 'auto',
-            detalhes={
-                'id_temp': m['id_temp'],
-                'tipos': m['tipo'],
-                'nivel_match': m['nivel_match'],
-                'decisao_requerida': m['decisao_requerida'],
-                'candidatos': m['candidatos'],
-                'diff': m['detalhes'],
-            },
-        ))
-    pendencias = sum(1 for m in rel['mapeamentos'] if m['decisao_requerida'])
-    db.session.add(CronogramaImportacaoEvento(
-        importacao_id=imp.id,
-        admin_id=admin_id,
-        evento='reconciliado',
-        detalhes={'resumo': rel['resumo'], 'pendencias': pendencias},
-        usuario_id=current_user.id,
-    ))
+    rel, pendencias = _executar_reconciliacao(imp, admin_id)
     db.session.commit()
     return jsonify({
         'importacao_id': imp.id,
@@ -658,3 +665,121 @@ def cancelar_importacao(obra_id, importacao_id):
     ))
     db.session.commit()
     return jsonify({'importacao_id': imp.id, 'status': 'cancelado'}), 200
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M08 — páginas: prévia (com decisão) e resultado
+# ─────────────────────────────────────────────────────────────────────────────
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>/previa')
+@cronograma_import_required
+def previa_importacao(obra_id, importacao_id):
+    """Prévia de diferenças com decisão de mapeamentos (M08 §4.2).
+    Importação 'normalizado' é reconciliada automaticamente ao abrir."""
+    from flask import redirect, render_template, url_for
+    from models import TarefaCronograma
+
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    if imp.status == 'aplicado':
+        return redirect(url_for('cronograma_importacao.resultado_importacao',
+                                obra_id=obra_id, importacao_id=imp.id))
+    if imp.status == 'normalizado':
+        _executar_reconciliacao(imp, admin_id)
+        db.session.commit()
+    if imp.status != 'aguardando_revisao':
+        return _erro(
+            f"Importação está '{imp.status}' — sem prévia disponível.", 409)
+
+    mapeamentos = (CronogramaTarefaMapeamento.query
+                   .filter_by(importacao_id=imp.id)
+                   .order_by(CronogramaTarefaMapeamento.id)
+                   .all())
+    # Enriquecimento para a tela: nomes das tarefas atuais e das novas.
+    ids_atuais = [mp.tarefa_atual_id for mp in mapeamentos
+                  if mp.tarefa_atual_id]
+    nomes_atuais = {t.id: t.nome_tarefa for t in TarefaCronograma.query
+                    .filter(TarefaCronograma.id.in_(ids_atuais or [0])).all()}
+    novos = {t['chave']: t for t in imp.json_normalizado['tarefas']}
+
+    linhas = []
+    for mp in mapeamentos:
+        d = _mapeamento_para_json(mp)
+        d['tarefa_atual_nome'] = nomes_atuais.get(mp.tarefa_atual_id)
+        novo = novos.get(mp.chave_nova)
+        d['tarefa_nova_nome'] = novo['nome_original'] if novo else None
+        d['candidatos'] = [{
+            **c,
+            'nome': (novos.get(c['chave_nova']) or {}).get('nome_original'),
+        } for c in d['candidatos']]
+        linhas.append(d)
+    pendencias = sum(1 for l in linhas
+                     if l['decisao_requerida'] and not l['decisao'])
+    eventos = (CronogramaImportacaoEvento.query
+               .filter_by(importacao_id=imp.id)
+               .order_by(CronogramaImportacaoEvento.id)
+               .all())
+    # Chaves ainda "livres" para o select do casar (novas sem par).
+    chaves_novas = [{'chave': l['chave_nova'], 'nome': l['tarefa_nova_nome']}
+                    for l in linhas
+                    if l['chave_nova'] and l['tarefa_atual_id'] is None]
+    return render_template(
+        'obras/cronograma_importacoes/previa.html',
+        obra=obra, imp=imp,
+        resumo=imp.relatorio_diff['resumo'],
+        sugestoes=imp.relatorio_diff.get('sugestoes_split_merge') or [],
+        linhas=linhas,
+        pendencias=pendencias,
+        chaves_novas=chaves_novas,
+        eventos=eventos,
+        nome_usuario=_nome_usuario,
+    )
+
+
+@cronograma_importacao_bp.route(
+    '/obras/<int:obra_id>/cronograma/importacoes/<int:importacao_id>/resultado')
+@cronograma_import_required
+def resultado_importacao(obra_id, importacao_id):
+    """Página pós-aplicação: antes/depois + replanejamento + auditoria."""
+    from flask import render_template
+    from models import TarefaCronograma
+
+    admin_id = get_tenant_admin_id()
+    obra, imp = _importacao_do_tenant(obra_id, importacao_id, admin_id)
+    if imp is None:
+        return _erro('Importação não encontrada para esta obra.', 404)
+    if imp.status != 'aplicado':
+        return _erro(
+            f"Importação está '{imp.status}' — resultado só existe após a "
+            f'aplicação.', 409)
+
+    versao = (CronogramaVersao.query
+              .filter_by(importacao_id=imp.id, obra_id=obra_id)
+              .order_by(CronogramaVersao.numero.desc())
+              .first())
+    eventos = (CronogramaImportacaoEvento.query
+               .filter_by(importacao_id=imp.id)
+               .order_by(CronogramaImportacaoEvento.id)
+               .all())
+    ev_aplicado = next((e.detalhes for e in eventos
+                        if e.evento == 'aplicado'), {}) or {}
+    ev_replanejado = next((e.detalhes for e in reversed(eventos)
+                           if e.evento == 'replanejado'), None)
+    nao_reconciliado = []
+    if ev_replanejado:
+        ids = ev_replanejado.get('tarefas_sem_historico_reconciliado') or []
+        if ids:
+            nao_reconciliado = TarefaCronograma.query.filter(
+                TarefaCronograma.id.in_(ids)).all()
+    return render_template(
+        'obras/cronograma_importacoes/resultado.html',
+        obra=obra, imp=imp, versao=versao,
+        ev_aplicado=ev_aplicado,
+        ev_replanejado=ev_replanejado,
+        nao_reconciliado=nao_reconciliado,
+        eventos=eventos,
+        nome_usuario=_nome_usuario,
+    )
