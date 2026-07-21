@@ -200,3 +200,126 @@ def test_funcionario_do_usuario_devolve_none_sem_vinculo():
     with cliente:
         cliente.get('/dashboard')
         assert funcionario_do_usuario() is None
+
+
+# ---------------------------------------------------------------------------
+# Backfill
+# ---------------------------------------------------------------------------
+
+def test_backfill_casa_por_email_exato_no_mesmo_tenant():
+    from scripts.backfill_identidade_funcionario import executar_backfill
+
+    with app.app_context():
+        admin = _admin()
+        email = f'casa_{uuid.uuid4().hex[:8]}@test.local'
+        func = _funcionario_registro(admin.id, email=email)
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1b_{suf}', email=email.upper(),  # caixa diferente
+            nome='Casa por email', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+        uid, fid = u.id, func.id
+
+        relatorio = executar_backfill(dry_run=False, admin_id=admin.id)
+        assert relatorio['casados'] >= 1
+        assert db.session.get(Usuario, uid).funcionario_id == fid
+
+
+def test_backfill_nao_casa_entre_tenants():
+    from scripts.backfill_identidade_funcionario import executar_backfill
+
+    with app.app_context():
+        admin_a = _admin('A')
+        admin_b = _admin('B')
+        email = f'mesmo_{uuid.uuid4().hex[:8]}@test.local'
+        _funcionario_registro(admin_b.id, email=email)  # RH no tenant B
+        suf = uuid.uuid4().hex[:8]
+        u_a = Usuario(
+            username=f'f1c_{suf}', email=email,  # mesmo e-mail, tenant A
+            nome='Do tenant A', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin_a.id,
+        )
+        db.session.add(u_a)
+        db.session.commit()
+        uid = u_a.id
+
+        executar_backfill(dry_run=False, admin_id=admin_a.id)
+        assert db.session.get(Usuario, uid).funcionario_id is None, (
+            'backfill casou entre tenants — vazamento de identidade')
+
+
+def test_backfill_dry_run_nao_escreve():
+    from scripts.backfill_identidade_funcionario import executar_backfill
+
+    with app.app_context():
+        admin = _admin()
+        email = f'dry_{uuid.uuid4().hex[:8]}@test.local'
+        _funcionario_registro(admin.id, email=email)
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1e_{suf}', email=email,
+            nome='Dry run', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+        uid = u.id
+
+        relatorio = executar_backfill(dry_run=True, admin_id=admin.id)
+        assert relatorio['casados'] >= 1  # conta o que casaria
+        assert db.session.get(Usuario, uid).funcionario_id is None
+
+
+def test_backfill_e_idempotente():
+    from scripts.backfill_identidade_funcionario import executar_backfill
+
+    with app.app_context():
+        admin = _admin()
+        email = f'idem_{uuid.uuid4().hex[:8]}@test.local'
+        func = _funcionario_registro(admin.id, email=email)
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1g_{suf}', email=email,
+            nome='Idempotente', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+        uid, fid = u.id, func.id
+
+        executar_backfill(dry_run=False, admin_id=admin.id)
+        segunda = executar_backfill(dry_run=False, admin_id=admin.id)
+        assert segunda['casados'] == 0, 'segunda passada não deve recasar'
+        assert db.session.get(Usuario, uid).funcionario_id == fid
+
+
+def test_backfill_recusa_email_ambiguo():
+    """Dois funcionários com o mesmo e-mail no tenant: não escolher."""
+    from scripts.backfill_identidade_funcionario import executar_backfill
+
+    with app.app_context():
+        admin = _admin()
+        email = f'ambig_{uuid.uuid4().hex[:8]}@test.local'
+        _funcionario_registro(admin.id, email=email)
+        _funcionario_registro(admin.id, email=email)
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'f1h_{suf}', email=email,
+            nome='Ambiguo', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(u)
+        db.session.commit()
+        uid = u.id
+
+        relatorio = executar_backfill(dry_run=False, admin_id=admin.id)
+        assert db.session.get(Usuario, uid).funcionario_id is None
+        assert any(p['motivo'] == 'ambiguo' for p in relatorio['pendentes'])
