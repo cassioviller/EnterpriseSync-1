@@ -4,6 +4,7 @@ API para sistema de organização avançada de propostas
 
 from flask import Blueprint, request, jsonify
 from models import db, PropostaTemplate, Proposta, PropostaItem
+from flask_login import login_required  # Fase 0.5 / 3.3
 # bypass_auth removido - usar current_user diretamente
 def get_current_user_bypass():
     from flask_login import current_user
@@ -59,6 +60,7 @@ def listar_templates():
         }), 500
 
 @api_organizer.route('/templates/carregar-multiplos', methods=['POST'])
+@login_required
 def carregar_templates_multiplos():
     """Carrega múltiplos templates em uma proposta"""
     try:
@@ -141,6 +143,7 @@ def carregar_templates_multiplos():
         }), 500
 
 @api_organizer.route('/propostas/salvar-organizacao', methods=['POST'])
+@login_required
 def salvar_organizacao():
     """Salva a organização personalizada da proposta"""
     try:

@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, session
 from models import db, ServicoObraReal, Servico, Usuario
 from datetime import date, datetime
 import logging
+from flask_login import login_required  # Fase 0.5 / 3.3
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ def get_admin_id():
         return None
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servicos', methods=['GET'])
+@login_required
 def listar_servicos_obra(obra_id):
     """Lista serviços da obra (nova tabela)"""
     try:
@@ -79,6 +81,7 @@ def listar_servicos_obra(obra_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servicos', methods=['POST'])
+@login_required
 def adicionar_servico_obra(obra_id):
     """Adiciona serviço à obra (nova tabela)"""
     try:
@@ -155,6 +158,7 @@ def adicionar_servico_obra(obra_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servico/<int:servico_obra_id>', methods=['PUT'])
+@login_required
 def atualizar_servico_obra(obra_id, servico_obra_id):
     """Atualiza serviço da obra"""
     try:
@@ -213,6 +217,7 @@ def atualizar_servico_obra(obra_id, servico_obra_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servico/<int:servico_obra_id>', methods=['DELETE'])
+@login_required
 def remover_servico_obra(obra_id, servico_obra_id):
     """Remove serviço da obra (desativa)"""
     try:

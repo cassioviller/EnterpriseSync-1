@@ -4011,6 +4011,7 @@ def executar_migracoes():
             (210, "Cronograma-mpp M02 — backfill versão nº1 + snapshots + tipo_apontamento", _migration_210_backfill_versao_inicial),
             (211, "Cronograma-mpp M10 — flag de rollout configuracao_empresa.cronograma_mpp_ativo (default FALSE)", _migration_211_configuracao_empresa_cronograma_mpp),
             (212, "Cronograma-mpp — backfill versão nº1 nas obras criadas após a 210 (ponto de rollback do 1º import)", _migration_212_backfill_versao_inicial_obras_novas),
+            (213, "Fase 0.5 — índices que nunca nasceram (create_all antes das migrações) + poda de 61 redundantes", _migration_213_indices_faltantes_e_duplicados),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14167,3 +14168,156 @@ def _migration_212_backfill_versao_inicial_obras_novas():
     except Exception as e:
         logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
         raise
+
+
+def _migration_213_indices_faltantes_e_duplicados():
+    """Fase 0.5 / 3.1 — cria os índices que nunca nasceram e poda os redundantes.
+
+    CAUSA MECÂNICA (dossiê D3/10): `pre_start.py` roda `db.create_all()` ANTES
+    de `executar_migracoes()`. Migrações que criam tabela com guard
+    `IF NOT EXISTS` colocam os `CREATE INDEX` DENTRO do ramo de criação; como
+    `create_all()` já criou a tabela — sem os índices, porque o modelo não os
+    declara em `__table_args__` — a migração cai no `else: SKIP` e os índices
+    nunca nascem.
+
+    Caso mais caro: `rdo_apontamento_cronograma`, 61.923 linhas e UM índice (a
+    PK). O motor filtra sempre por `(tarefa_cronograma_id, admin_id)`
+    (`utils/cronograma_engine.py:181,233,467,485`) e esse índice exato está
+    escrito na migração 76 desde sempre, sem nunca ter sido criado. EXPLAIN
+    medido antes: Seq Scan, 66.024 linhas filtradas, 881 ms por consulta.
+
+    Aqui os índices são criados FORA de qualquer ramo condicional — é o padrão
+    a seguir daqui em diante.
+    """
+    from sqlalchemy import text as sa_text
+
+    criar = [
+        ('idx_rdo_apont_tarefa_admin',
+         'CREATE INDEX IF NOT EXISTS idx_rdo_apont_tarefa_admin '
+         'ON rdo_apontamento_cronograma (tarefa_cronograma_id, admin_id)'),
+        ('idx_rdo_apont_rdo',
+         'CREATE INDEX IF NOT EXISTS idx_rdo_apont_rdo '
+         'ON rdo_apontamento_cronograma (rdo_id)'),
+        ('idx_rdo_obra', 'CREATE INDEX IF NOT EXISTS idx_rdo_obra ON rdo (obra_id)'),
+        ('idx_rdo_admin', 'CREATE INDEX IF NOT EXISTS idx_rdo_admin ON rdo (admin_id)'),
+        ('idx_obra_admin_ativo',
+         'CREATE INDEX IF NOT EXISTS idx_obra_admin_ativo ON obra (admin_id, ativo)'),
+        ('idx_cliente_admin',
+         'CREATE INDEX IF NOT EXISTS idx_cliente_admin ON cliente (admin_id)'),
+        ('idx_gcf_admin_data',
+         'CREATE INDEX IF NOT EXISTS idx_gcf_admin_data '
+         'ON gestao_custo_filho (admin_id, data_referencia)'),
+        ('idx_gcf_pai',
+         'CREATE INDEX IF NOT EXISTS idx_gcf_pai ON gestao_custo_filho (pai_id)'),
+        ('idx_pedido_compra_admin_obra',
+         'CREATE INDEX IF NOT EXISTS idx_pedido_compra_admin_obra '
+         'ON pedido_compra (admin_id, obra_id)'),
+        ('idx_fluxo_caixa_admin_data',
+         'CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_admin_data '
+         'ON fluxo_caixa (admin_id, data_movimento)'),
+        ('idx_rdo_mao_obra_rdo',
+         'CREATE INDEX IF NOT EXISTS idx_rdo_mao_obra_rdo ON rdo_mao_obra (rdo_id)'),
+        ('idx_tarefa_cron_admin',
+         'CREATE INDEX IF NOT EXISTS idx_tarefa_cron_admin ON tarefa_cronograma (admin_id)'),
+    ]
+
+    duplicados = [
+        'idx_composicao_servico_admin',
+        'idx_composicao_servico_svc',
+        'idx_cotacao_linha_cotacao',
+        'idx_csh_composicao_servico_id',
+        'idx_equipe_planejada_servico',
+        'idx_notif_orc_ativa',
+        'idx_notif_orc_obra',
+        'idx_notif_orc_svc',
+        'idx_obra_servico_custo_admin',
+        'idx_obra_servico_custo_catalogo',
+        'idx_op_admin',
+        'idx_op_item_op',
+        'idx_op_item_versao_ate',
+        'idx_op_obra',
+        'idx_orc_item_admin',
+        'idx_orcamento_item_cronograma_override',
+        'idx_orcamento_proposta',
+        'idx_preco_base_insumo_admin',
+        'idx_preco_base_insumo_insumo',
+        'idx_proposta_itens_servico',
+        'idx_proposta_orcamento_id',
+        'idx_rdo_foto_rdo_id',
+        'idx_webhook_entrega_status',
+        'ix_alimentacao_lancamento_data',
+        'ix_composicao_servico_historico_admin_id',
+        'ix_composicao_servico_insumo_id',
+        'ix_cron_imp_admin',
+        'ix_cron_imp_sha',
+        'ix_cron_snap_versao',
+        'ix_cronograma_importacao_evento_importacao_id',
+        'ix_cronograma_importacao_obra_id',
+        'ix_cronograma_tarefa_mapeamento_importacao_id',
+        'ix_cronograma_versao_admin_id',
+        'ix_cronograma_versao_obra_id',
+        'ix_gestao_custo_filho_obra_servico_custo_id',
+        'ix_insumo_admin_id',
+        'ix_item_medicao_comercial_servico_id',
+        'ix_lead_historico_lead_id',
+        'ix_notificacao_orcamento_admin_id',
+        'ix_obra_orcamento_operacional_item_admin_id',
+        'ix_obra_orcamento_operacional_item_versao_admin_id',
+        'ix_obra_orcamento_operacional_item_versao_vigente_de',
+        'ix_obra_servico_cotacao_interna_admin_id',
+        'ix_obra_servico_cotacao_interna_linha_admin_id',
+        'ix_obra_servico_cotacao_interna_obra_servico_custo_id',
+        'ix_obra_servico_custo_item_admin_id',
+        'ix_obra_servico_custo_item_obra_servico_custo_id',
+        'ix_obra_servico_custo_obra_id',
+        'ix_obra_servico_equipe_planejada_admin_id',
+        'ix_orcamento_admin_id',
+        'ix_orcamento_item_orcamento_id',
+        'ix_orcamento_item_servico_id',
+        'ix_orcamento_status',
+        'ix_proposta_itens_cronograma_template_override_id',
+        'ix_proposta_template_clausula_template_id',
+        'ix_rdo_foto_admin_id',
+        'ix_subatividade_mao_obra_admin_id',
+        'ix_subatividade_mao_obra_composicao_servico_id',
+        'ix_subatividade_mao_obra_subatividade_mestre_id',
+        'ix_webhook_entrega_admin_id',
+        'ix_webhook_entrega_event',
+    ]
+
+    criados = falhos = dropados = 0
+    for nome, ddl in criar:
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(sa_text(ddl))
+            criados += 1
+        except Exception as e:
+            falhos += 1
+            logger.warning(f"[Migration 213] indice {nome} falhou: {e}")
+
+    # UNIQUE da migração 76 que nunca foi criado. Tolera falha: se houver
+    # duplicata histórica de apontamento, o índice não nasce e o log diz —
+    # limpar duplicata é decisão de DADO, não de schema, e não deve travar
+    # o boot.
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                'CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_apont_rdo_tarefa '
+                'ON rdo_apontamento_cronograma (rdo_id, tarefa_cronograma_id)'))
+        criados += 1
+        logger.info("[Migration 213] UNIQUE(rdo_id, tarefa_cronograma_id) criado.")
+    except Exception as e:
+        logger.warning(
+            f"[Migration 213] UNIQUE da migracao 76 NAO criado — provavel "
+            f"duplicata historica de apontamento. Investigar: {e}")
+
+    for nome in duplicados:
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(sa_text(f'DROP INDEX IF EXISTS {nome}'))
+            dropados += 1
+        except Exception as e:
+            logger.warning(f"[Migration 213] drop de {nome} falhou: {e}")
+
+    logger.info(f"[Migration 213] {criados} indice(s) criado(s), "
+                f"{dropados} redundante(s) removido(s), {falhos} falha(s).")
