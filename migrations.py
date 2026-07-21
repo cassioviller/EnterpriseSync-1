@@ -4008,6 +4008,7 @@ def executar_migracoes():
             (208, "Cronograma-mpp M02 — identidade estável em tarefa_cronograma (mpp_uid/wbs/fingerprint/is_marco/ativa)", _migration_208_tarefa_cronograma_identidade),
             (209, "Cronograma-mpp M02 — semântica de apontamento em rdo_apontamento_cronograma (tipo/percentuais/snapshot)", _migration_209_rdo_apontamento_semantico),
             (210, "Cronograma-mpp M02 — backfill versão nº1 + snapshots + tipo_apontamento", _migration_210_backfill_versao_inicial),
+            (211, "Cronograma-mpp M10 — flag de rollout configuracao_empresa.cronograma_mpp_ativo (default FALSE)", _migration_211_configuracao_empresa_cronograma_mpp),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14094,4 +14095,22 @@ def _migration_210_backfill_versao_inicial():
         logger.info("[Migration 210] backfill concluído.")
     except Exception as e:
         logger.error(f"[Migration 210] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_211_configuracao_empresa_cronograma_mpp():
+    """Módulo 10 — flag de rollout da importação de cronograma por tenant.
+
+    Aditiva e default FALSE: nenhum tenant vê a área do M08 até que a fase
+    do rollout ligue explicitamente (scripts/flag_cronograma_mpp.py).
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+                "cronograma_mpp_ativo BOOLEAN NOT NULL DEFAULT FALSE"))
+        logger.info("[Migration 211] configuracao_empresa.cronograma_mpp_ativo.")
+    except Exception as e:
+        logger.error(f"[Migration 211] Falha: {e}", exc_info=True)
         raise

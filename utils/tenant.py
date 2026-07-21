@@ -115,10 +115,26 @@ def get_safe_admin_id():
     return None
 
 def cronograma_mpp_ativo() -> bool:
-    """Flag da área de importação de cronograma na obra (M08).
+    """Flag da área de importação de cronograma na obra (M08/M10).
 
-    PONTO ÚNICO para o rollout do M10 endurecer (flag por tenant / env).
-    Hoje: liberada para todo tenant V2 — a área é aditiva e invisível
-    fora do V2.
+    PONTO ÚNICO do rollout: exige V2 **e** a flag ligada no tenant
+    (`configuracao_empresa.cronograma_mpp_ativo`, migração 211, default
+    FALSE). Liga-se por fase com `scripts/flag_cronograma_mpp.py`.
+
+    Lida em context processor ⇒ NUNCA levanta: sem linha de configuração,
+    sem tenant resolvido ou com erro de banco, devolve False.
     """
-    return is_v2_active()
+    if not is_v2_active():
+        return False
+
+    admin_id = get_tenant_admin_id()
+    if not admin_id:
+        return False
+
+    try:
+        from models import ConfiguracaoEmpresa
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        return bool(config and config.cronograma_mpp_ativo)
+    except Exception as e:
+        logger.warning(f"Flag cronograma_mpp indisponível ({e}) — assumindo desligada")
+        return False

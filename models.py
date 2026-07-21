@@ -3614,7 +3614,12 @@ class ConfiguracaoEmpresa(db.Model):
     cor_header_nav = db.Column(db.String(7), default='#1e293b')  # Cor de fundo do header/navbar
     cor_fundo_app = db.Column(db.String(7), default='#f8fafc')   # Cor de fundo da aplicação
     tema_preset = db.Column(db.String(40), default='azul_profundo')  # Identificador do preset ativo
-    
+
+    # Cronograma-mpp M10 — flag de rollout da importação de cronograma por
+    # tenant. Default FALSE: liga-se por fase (scripts/flag_cronograma_mpp.py).
+    cronograma_mpp_ativo = db.Column(db.Boolean, nullable=False, default=False,
+                                     server_default='false')
+
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao

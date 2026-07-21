@@ -95,6 +95,10 @@ def _ambiente():
     )
     db.session.add(obra)
     db.session.commit()
+    # M10: a área do M08 exige a flag de rollout ligada no tenant (default
+    # FALSE desde a migração 211). Ambiente de teste = tenant já liberado.
+    from scripts.flag_cronograma_mpp import definir_flag
+    definir_flag(admin.id, True)
     return admin, obra
 
 

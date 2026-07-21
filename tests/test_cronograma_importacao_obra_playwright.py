@@ -95,6 +95,10 @@ def seed_dados():
         )
         db.session.add(obra); db.session.flush()
 
+        # M10: flag de rollout ligada — sem ela a seção não renderiza.
+        from scripts.flag_cronograma_mpp import definir_flag
+        definir_flag(admin.id, True)
+
         base = dict(admin_id=admin.id, obra_id=obra.id, responsavel='empresa',
                     is_cliente=False)
         t1 = TarefaCronograma(nome_tarefa='Alvenaria Terreo', ordem=1,
