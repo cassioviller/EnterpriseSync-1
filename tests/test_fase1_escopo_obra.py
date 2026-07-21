@@ -361,3 +361,65 @@ def test_flag_ligada_faz_o_vinculo_valer():
     with cliente:
         cliente.get('/dashboard')
         assert pode_editar_obra(oid) is False
+
+
+# ---------------------------------------------------------------------------
+# Rotas
+# ---------------------------------------------------------------------------
+
+ROTAS_QUE_EXIGEM_LOGIN = [
+    '/obras',
+    '/dashboard',
+]
+
+
+@pytest.mark.parametrize('rota', ROTAS_QUE_EXIGEM_LOGIN)
+def test_rota_anonima_exige_login(rota):
+    """Rotas que estavam SEM decorator nenhum até a Fase 1."""
+    anon = app.test_client()
+    r = anon.get(rota, follow_redirects=False)
+    assert r.status_code in (302, 401), (
+        f'{rota} devolveu {r.status_code} para anônimo — deveria exigir login')
+    if r.status_code == 302:
+        assert '/login' in r.headers.get('Location', '')
+
+
+def test_detalhe_de_obra_exige_login():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        oid = obra.id
+
+    anon = app.test_client()
+    r = anon.get(f'/obras/{oid}', follow_redirects=False)
+    assert r.status_code in (302, 401), (
+        f'/obras/{oid} devolveu {r.status_code} para anônimo')
+
+
+def test_detalhe_de_obra_de_outro_tenant_devolve_404():
+    """404 e não 403: não vazar sequer a existência da obra."""
+    with app.app_context():
+        admin_a, admin_b = _admin('A'), _admin('B')
+        obra_b = _obra(admin_b.id)
+        op_a = _operador(admin_a.id)
+        oid, opid = obra_b.id, op_a.id
+
+    cliente = _cliente_de(opid)
+    r = cliente.get(f'/obras/{oid}', follow_redirects=False)
+    assert r.status_code == 404, (
+        f'obra de outro tenant devolveu {r.status_code} — deveria ser 404')
+
+
+def test_detalhe_de_obra_sem_vinculo_devolve_404_com_flag_ligada():
+    from scripts.flag_escopo_obra import definir_flag
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)  # sem vínculo
+        definir_flag(admin.id, True)
+        oid, opid = obra.id, op.id
+
+    cliente = _cliente_de(opid)
+    r = cliente.get(f'/obras/{oid}', follow_redirects=False)
+    assert r.status_code == 404

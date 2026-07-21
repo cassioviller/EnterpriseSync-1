@@ -139,3 +139,59 @@ def pode_editar_obra(obra_id):
 def pode_apontar_na_obra(obra_id):
     """Lançar RDO/apontamento. Consumido de verdade na Fase 5."""
     return papel_na_obra(obra_id) in PAPEIS_QUE_APONTAM
+
+
+def obra_required(papel_minimo=None):
+    """Exige login + acesso à obra do `obra_id` da URL.
+
+    Devolve **404** (não 403) quando a obra existe mas está fora do
+    alcance, para não vazar a existência de obra de outro tenant. Mesma
+    escolha já travada por
+    `tests/test_cronograma_permissoes.py::test_admin_de_outro_tenant_recebe_404_sem_vazar_existencia`.
+
+    Args:
+        papel_minimo: None → basta ver. `PapelObra.GESTOR` → exige edição.
+
+    Uso:
+        @app.route('/obras/<int:obra_id>')
+        @obra_required()
+        def detalhe(obra_id): ...
+    """
+    from functools import wraps
+
+    def decorador(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            from flask import abort, jsonify, redirect, request, url_for
+
+            quer_json = request.path.startswith('/api/') or \
+                request.accept_mimetypes.best == 'application/json'
+
+            try:
+                autenticado = current_user.is_authenticated
+            except Exception:
+                autenticado = False
+            if not autenticado:
+                if quer_json:
+                    return jsonify({'error': 'Autenticação necessária'}), 401
+                return redirect(url_for('main.login'))
+
+            obra_id = kwargs.get('obra_id') or kwargs.get('id')
+            if obra_id is None:
+                logger.error('obra_required em rota sem obra_id: %s',
+                             request.endpoint)
+                abort(500)
+
+            if papel_minimo in PAPEIS_QUE_EDITAM_OBRA:
+                permitido = pode_editar_obra(obra_id)
+            else:
+                permitido = pode_ver_obra(obra_id)
+
+            if not permitido:
+                if quer_json:
+                    return jsonify({'error': 'Obra não encontrada'}), 404
+                abort(404)
+
+            return f(*args, **kwargs)
+        return wrapper
+    return decorador

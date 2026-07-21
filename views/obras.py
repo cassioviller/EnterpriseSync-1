@@ -2,6 +2,7 @@ from flask import render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from models import db, TipoUsuario, Funcionario, Obra, Cliente, RDO, Servico, ServicoObraReal, RDOServicoSubatividade, PedidoCompra, PedidoCompraItem, Fornecedor, MapaConcorrencia, OpcaoConcorrencia, CronogramaCliente, MapaConcorrenciaV2, MapaFornecedor, MapaItemCotacao, MapaCotacao, RelatorioCompraMapa, ConfiguracaoEmpresa
 from auth import admin_required
+from utils.autorizacao import obra_required, obras_visiveis
 from utils.tenant import get_tenant_admin_id
 from utils import calcular_valor_hora_periodo
 from utils.database_diagnostics import capture_db_errors
@@ -41,28 +42,18 @@ except ImportError:
         return decorator
 
 @main_bp.route('/obras')
+@login_required   # Fase 1 — rota estava SEM decorator nenhum (censo de 2026-07-21)
 def obras():
-    # Sistema dinâmico de detecção de admin_id
-    admin_id = None
-    
-    if hasattr(current_user, 'tipo_usuario') and current_user.is_authenticated:
-        if current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-            # SUPER_ADMIN pode ver todas as obras - buscar admin_id com mais dados
-            obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id = obra_counts[0] if obra_counts else current_user.admin_id
-        elif current_user.tipo_usuario == TipoUsuario.ADMIN:
-            admin_id = current_user.id
-        else:
-            # Funcionário - usar admin_id do funcionário
-            admin_id = current_user.admin_id if hasattr(current_user, 'admin_id') and current_user.admin_id else current_user.id
-    else:
-        # Sistema de bypass - detectar dinamicamente
-        try:
-            obra_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM obra GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            admin_id = obra_counts[0] if obra_counts else 1
-        except Exception as e:
-            logger.error(f"Erro ao detectar admin_id: {e}")
-            admin_id = 1
+    # Fase 1 — o tenant vem do resolver único, não de heurística.
+    #
+    # O bloco anterior tinha duas: para SUPER_ADMIN, "o admin_id com MAIS
+    # obras no banco" — servindo obras de outra empresa a quem entrasse; e,
+    # para anônimo, a mesma detecção com fallback `admin_id = 1`. O ramo
+    # anônimo ficou inalcançável com o `@login_required` acima, e o de
+    # SUPER_ADMIN passa a devolver o próprio tenant, como
+    # `utils/tenant.get_tenant_admin_id` já fazia no resto do sistema.
+    from utils.tenant import get_tenant_admin_id
+    admin_id = get_tenant_admin_id()
     
     # Obter filtros da query string
     filtros = {
@@ -73,8 +64,9 @@ def obras():
         'data_fim': request.args.get('data_fim', '')
     }
     
-    # Construir query base
-    query = Obra.query.filter_by(admin_id=admin_id)
+    # Fase 1 — a listagem passa pelo chokepoint. Antes montava
+    # `Obra.query.filter_by(admin_id=...)` na mão, sem eixo de obra.
+    query = obras_visiveis(admin_id)
     
     # Aplicar filtros se fornecidos
     if filtros['nome']:
@@ -1367,6 +1359,8 @@ def trocar_cliente_obra(id):
 # Detalhes de uma obra específica
 @main_bp.route('/obras/<int:id>')
 @main_bp.route('/obras/detalhes/<int:id>')
+@login_required
+@obra_required()   # Fase 1 — 404 para obra fora de alcance
 @capture_db_errors
 def detalhes_obra(id):
     try:

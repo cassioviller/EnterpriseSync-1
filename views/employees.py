@@ -1,5 +1,6 @@
 from flask import render_template, request, redirect, url_for, flash, jsonify, make_response
 from flask_login import login_required, current_user
+from auth import admin_required
 from models import db, TipoUsuario, Funcionario, Funcao, Departamento, HorarioTrabalho, Obra, RDO, RegistroPonto
 from auth import funcionario_required
 from utils.tenant import get_tenant_admin_id
@@ -283,6 +284,8 @@ def funcionarios():
 
 # Rota para perfil de funcionário com KPIs calculados
 @main_bp.route('/funcionario_perfil/<int:id>')
+@login_required     # Fase 1 — rota estava sem decorator nenhum
+@admin_required
 def funcionario_perfil(id):
     
     funcionario = Funcionario.query.get_or_404(id)
