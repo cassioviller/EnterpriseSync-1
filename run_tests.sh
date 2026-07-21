@@ -16,6 +16,7 @@
 #   bash run_tests.sh --bloco6           # Apenas BLOCO 6 (Financeiro)
 #   bash run_tests.sh --bloco7           # Apenas BLOCO 7 (CRM/Frota/demais)
 #   bash run_tests.sh --integracao       # Apenas testes de integração E2E
+#   bash run_tests.sh --java             # Família que sobe a JVM/MPXJ (pula sem JDK)
 #   bash run_tests.sh --jornada          # Jornada E2E proposta→cronograma (browser real)
 #   bash run_tests.sh --varredura        # Varredura de todas as páginas do menu (browser real)
 #   bash run_tests.sh --standalone       # Modo standalone (sem pytest)
@@ -42,6 +43,10 @@ while [[ $# -gt 0 ]]; do
         --bloco6)       BLOCO_FILTER="::TestBloco6Financeiro"; shift ;;
         --bloco7)       BLOCO_FILTER="::TestBloco7Demais"; shift ;;
         --integracao)   BLOCO_FILTER="-k integra"; shift ;;
+        # --java roda SÓ a família com JVM (parser MPXJ, migração das baias).
+        # O --gate continua incluindo essa família: sem JDK ela pula sozinha
+        # (marcador registrado em tests/conftest.py), com JDK ela cobre.
+        --java)         TARGET_FILE="tests/"; MARKER_ARGS=(-m "java"); shift ;;
         --jornada)      TARGET_FILE="tests/test_e2e_jornada_proposta_cronograma_playwright.py"; BLOCO_FILTER=""; shift ;;
         --varredura)    TARGET_FILE="tests/test_e2e_varredura_paginas_playwright.py"; BLOCO_FILTER=""; shift ;;
         --standalone)   STANDALONE=1; shift ;;
