@@ -489,8 +489,10 @@ def get_admin_id_robusta(obra=None, current_user=None):
         return None
         
     except Exception as e:
+        # Fase 0.5 / 3.5 — devolvia `1` (um tenant CONCRETO) em qualquer
+        # exceção. Erro ao resolver tenant não pode virar acesso à empresa 1.
         logger.error(f"ERRO CRÍTICO get_admin_id_robusta: {e}")
-        return 1  # Fallback de produção
+        return None  # Fallback de produção
 
 def verificar_dados_producao(admin_id):
     """Verifica se admin_id tem dados suficientes para funcionar em produção"""

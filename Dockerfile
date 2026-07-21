@@ -75,7 +75,12 @@ RUN chmod +x /app/docker-entrypoint.sh
 # falha de parser de arquivo não confiável (upload de .mpp/.xlsx/imagem)
 # executava com privilégio total e acesso a todo o filesystem.
 RUN groupadd --system sige && useradd --system --gid sige --home /app sige \
-    && chown -R sige:sige /app
+    && mkdir -p /var/backups/sige \
+    && chown -R sige:sige /app /var/backups/sige
+# O diretório de backup PRECISA ser volume persistente montado pelo painel —
+# sem isso os dumps somem no restart do container. O VOLUME declara a intenção
+# e garante que o caminho exista com o dono certo mesmo sem montagem.
+VOLUME ["/var/backups/sige"]
 USER sige
 
 # Expor porta

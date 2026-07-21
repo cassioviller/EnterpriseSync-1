@@ -1005,83 +1005,20 @@ def api_remover_servico_obra():
         }), 500
 
 def get_admin_id_dinamico():
-    """Função helper para detectar admin_id dinamicamente no sistema multi-tenant"""
-    try:
-        from sqlalchemy import text
-        
-        # 1. Se usuário autenticado, usar sua lógica
-        if current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                return current_user.id
-            elif current_user.tipo_usuario == TipoUsuario.SUPER_ADMIN:
-                # SUPER_ADMIN pode ver tudo - buscar admin_id com mais dados
-                obra_counts = db.session.execute(
-                    text("SELECT admin_id, COUNT(*) as total FROM obra WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-                ).fetchone()
-                if obra_counts and obra_counts[0]:
-                    logger.info(f"[OK] SUPER_ADMIN: usando admin_id={obra_counts[0]} ({obra_counts[1]} obras)")
-                    return obra_counts[0]
-                # Fallback para funcionários
-                func_counts = db.session.execute(
-                    text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-                ).fetchone()
-                if func_counts and func_counts[0]:
-                    return func_counts[0]
-                return current_user.id
-            elif current_user.admin_id:
-                return current_user.admin_id
-            else:
-                # Funcionário sem admin_id definido - buscar dinamicamente
-                pass
-        
-        # 2. Sistema de bypass - detectar admin_id baseado nos dados disponíveis
-        from sqlalchemy import text
-        
-        # Primeiro: verificar se existe admin_id com funcionários
-        admin_funcionarios = db.session.execute(
-            text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 3")
-        ).fetchall()
-        
-        logger.debug(f"[DEBUG] ADMINS DISPONÍVEIS: {admin_funcionarios}")
-        
-        # Priorizar admin com mais funcionários (mas pelo menos 1)
-        for admin_info in admin_funcionarios:
-            admin_id, total = admin_info
-            if total >= 1:  # Qualquer admin com pelo menos 1 funcionário
-                logger.info(f"[OK] SELECIONADO: admin_id={admin_id} ({total} funcionários)")
-                return admin_id
-        
-        # Fallback: qualquer admin com serviços
-        admin_servicos = db.session.execute(
-            text("SELECT admin_id, COUNT(*) as total FROM servico WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-        ).fetchone()
-        
-        if admin_servicos:
-            logger.info(f"[OK] FALLBACK SERVIÇOS: admin_id={admin_servicos[0]} ({admin_servicos[1]} serviços)")
-            return admin_servicos[0]
-            
-        # Último fallback: primeiro admin_id encontrado na tabela funcionario
-        primeiro_admin = db.session.execute(
-            text("SELECT DISTINCT admin_id FROM funcionario ORDER BY admin_id LIMIT 1")
-        ).fetchone()
-        
-        if primeiro_admin:
-            logger.info(f"[OK] ÚLTIMO FALLBACK: admin_id={primeiro_admin[0]}")
-            return primeiro_admin[0]
-            
-        # Se nada funcionar, retornar 1
-            logger.warning("[WARN] USANDO DEFAULT: admin_id=1")
-        return 1
-        
-    except Exception as e:
-        logger.error(f"[ERROR] ERRO GET_ADMIN_ID_DINAMICO: {str(e)}")
-        # Em caso de erro, tentar um fallback mais simples
-        try:
-            primeiro_admin = db.session.execute(text("SELECT MIN(admin_id) FROM funcionario")).fetchone()
-            return primeiro_admin[0] if primeiro_admin and primeiro_admin[0] else 1
-        except Exception:
-            return 1
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
 
+    Fase 0.5 / 3.5 — esta função era uma das 41 definições concorrentes de
+    resolvedor de tenant, e a mais perigosa: depois de tentar `current_user`,
+    caía numa cascata de heurísticas (admin com mais funcionários → com mais
+    serviços → o primeiro da tabela) terminando em `return 1`.
+
+    A correção da Fase 0 guardou apenas o caminho ANÔNIMO — mas um usuário
+    AUTENTICADO sem `admin_id` (funcionário órfão) escapava pelo `else: pass`
+    e chegava ao `return 1` do mesmo jeito. A cascata inteira foi removida:
+    quem não tem tenant não recebe o tenant de outra empresa.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 @main_bp.route('/api/servicos')
 @login_required
 def api_servicos():

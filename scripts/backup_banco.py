@@ -28,6 +28,7 @@ Retenção: 7 diários + 4 semanais (domingo). A poda roda ao fim de cada
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import re
 import subprocess
@@ -43,10 +44,50 @@ _RE_NOME = re.compile(
     rf'^{PREFIXO}(\d{{8}}_\d{{6}})(_semanal)?(_sem_fotos)?{re.escape(SUFIXO)}$')
 
 
+# Tempos-limite: um pg_dump travado não pode pendurar o deploy para sempre
+# (o backup roda ANTES das migrações, no entrypoint).
+TIMEOUT_DUMP = int(os.environ.get('SIGE_BACKUP_TIMEOUT', '3600'))
+TIMEOUT_RESTORE = int(os.environ.get('SIGE_RESTORE_TIMEOUT', '7200'))
+
+
 def _destino() -> str:
     d = os.environ.get('SIGE_BACKUP_DIR', DIR_PADRAO)
-    os.makedirs(d, exist_ok=True)
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError as e:
+        print(f'ERRO: destino de backup {d} inutilizavel: {e}\n'
+              f'      O container roda como usuario NAO-ROOT. Garanta que o '
+              f'diretorio existe e pertence a ele (o Dockerfile cria e faz '
+              f'chown de /var/backups/sige), ou defina SIGE_BACKUP_DIR.',
+              file=sys.stderr)
+        raise SystemExit(2)
+    if not os.access(d, os.W_OK):
+        print(f'ERRO: sem permissao de escrita em {d}.', file=sys.stderr)
+        raise SystemExit(2)
     return d
+
+
+def _ambiente_pg(url: str):
+    """(args de conexao, env) com a SENHA FORA do argv.
+
+    Argumento de processo é visível para qualquer usuário via `ps`, e a URL
+    carrega a senha. libpq lê PGPASSWORD do ambiente — é o caminho suportado.
+    """
+    from urllib.parse import unquote, urlparse
+
+    u = urlparse(url)
+    env = dict(os.environ)
+    if u.password:
+        env['PGPASSWORD'] = unquote(u.password)
+    args = []
+    if u.hostname:
+        args += ['--host', u.hostname]
+    if u.port:
+        args += ['--port', str(u.port)]
+    if u.username:
+        args += ['--username', unquote(u.username)]
+    args += ['--dbname', (u.path or '/').lstrip('/')]
+    return args, env
 
 
 def _url() -> str:
@@ -97,8 +138,17 @@ def criar(sem_fotos: bool = False) -> int:
             cmd.append(f'--exclude-table-data={t}')
         print(f'[backup] ENSAIO — dados de {", ".join(TABELAS_PESADAS)} '
               f'excluídos (schema preservado)')
-    cmd += ['--file', parcial, url]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    conexao, env = _ambiente_pg(url)
+    cmd += ['--file', parcial] + conexao
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=TIMEOUT_DUMP, env=env)
+    except subprocess.TimeoutExpired:
+        print(f'[backup] TIMEOUT apos {TIMEOUT_DUMP}s — dump abortado',
+              file=sys.stderr)
+        if os.path.exists(parcial):
+            os.remove(parcial)
+        return 1
     if r.returncode != 0:
         print(f'[backup] FALHOU: {r.stderr.strip()[:800]}', file=sys.stderr)
         if os.path.exists(parcial):
@@ -141,9 +191,16 @@ def podar() -> int:
     semanais = [i for i in completos if i[1]]
     remover = (diarios[RETENCAO_DIARIOS:] + semanais[RETENCAO_SEMANAIS:]
                + ensaios[1:])
+    n = 0
     for item in remover:
-        os.remove(item[-1])
-    return len(remover)
+        try:
+            os.remove(item[-1])
+            n += 1
+        except OSError as e:
+            # Poda é higiene: falhar aqui NÃO pode invalidar um dump que já
+            # foi feito com sucesso (o backup roda antes das migrações).
+            logging.warning(f'[backup] nao removi {item[-1]}: {e}')
+    return n
 
 
 def listar() -> int:
@@ -195,14 +252,29 @@ def restaurar(arquivo: str, destino_url: str) -> int:
 
     print(f'[restore] arquivo={arquivo}')
     print(f'[restore] destino={_mascarar(destino_url)}')
-    r = subprocess.run(
-        ['pg_restore', '--no-owner', '--no-privileges', '--clean',
-         '--if-exists', '--dbname', destino_url, arquivo],
-        capture_output=True, text=True)
-    # pg_restore devolve != 0 por avisos benignos (ex.: DROP de objeto
-    # inexistente com --clean); o que importa é o banco ficar consultável.
+    conexao, env = _ambiente_pg(destino_url)
+    try:
+        r = subprocess.run(
+            ['pg_restore', '--no-owner', '--no-privileges', '--clean',
+             '--if-exists'] + conexao + [arquivo],
+            capture_output=True, text=True, timeout=TIMEOUT_RESTORE, env=env)
+    except subprocess.TimeoutExpired:
+        print(f'[restore] TIMEOUT apos {TIMEOUT_RESTORE}s', file=sys.stderr)
+        return 1
+
+    # `pg_restore --clean` emite avisos benignos (DROP de objeto inexistente)
+    # que não são falha. Mas "erro fatal" e "connection" são: separar os dois
+    # é o que faz esta ferramenta saber falhar, em vez de sempre dizer "ok".
+    erros = [l for l in r.stderr.split('\n')
+             if l.strip() and 'error:' in l.lower()
+             and 'does not exist' not in l.lower()]
+    if erros:
+        print(f'[restore] {len(erros)} ERRO(S):', file=sys.stderr)
+        for l in erros[:20]:
+            print(f'  {l}', file=sys.stderr)
+        return 1
     if r.returncode != 0:
-        print(f'[restore] avisos/erros:\n{r.stderr.strip()[:2000]}')
+        print(f'[restore] avisos ignorados:\n{r.stderr.strip()[:800]}')
     print('[restore] concluído — valide com --contar')
     return 0
 

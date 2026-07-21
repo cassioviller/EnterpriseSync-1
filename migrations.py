@@ -14170,6 +14170,97 @@ def _migration_212_backfill_versao_inicial_obras_novas():
         raise
 
 
+def _indices_declarados_no_modelo():
+    """Nomes dos índices que os modelos SQLAlchemy declaram."""
+    from models import db as _db
+    return {ix.name for t in _db.metadata.tables.values() for ix in t.indexes}
+
+
+def _indices_redundantes_a_dropar():
+    """Índices verdadeiramente redundantes, preservando os do modelo.
+
+    Equivalência = mesma tabela, mesmas colunas na mesma ordem, mesma
+    unicidade e mesmo predicado parcial. Entre equivalentes, sobrevive
+    (nesta ordem): a PRIMARY KEY, o índice declarado no modelo, e por fim
+    qualquer um.
+    """
+    import collections
+
+    from sqlalchemy import text as sa_text
+
+    declarados = _indices_declarados_no_modelo()
+    with db.engine.connect() as conn:
+        linhas = conn.execute(sa_text("""
+            SELECT t.relname, i.relname,
+                   array_to_string(array_agg(a.attname ORDER BY k.ord), ',') AS cols,
+                   ix.indisunique, ix.indisprimary,
+                   pg_get_expr(ix.indpred, ix.indrelid)
+            FROM pg_index ix
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_class t ON t.oid = ix.indrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = 'public'
+            JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+            GROUP BY 1,2,4,5,6
+        """)).fetchall()
+
+    grupos = collections.defaultdict(list)
+    for tab, idx, cols, uniq, pk, parcial in linhas:
+        grupos[(tab, cols, uniq, parcial)].append((idx, pk))
+
+    dropar = []
+    for idxs in grupos.values():
+        if len(idxs) < 2:
+            continue
+        pks = [i for i, pk in idxs if pk]
+        do_modelo = [i for i, pk in idxs if not pk and i in declarados]
+        outros = [i for i, pk in idxs if not pk and i not in declarados]
+        if pks:
+            dropar += do_modelo + outros
+        elif do_modelo:
+            dropar += do_modelo[1:] + outros
+        else:
+            dropar += outros[1:]
+    return dropar
+
+
+def _recriar_indices_do_modelo_ausentes():
+    """Cria todo índice declarado no modelo que não existe no banco.
+
+    É a cura da causa mecânica: `db.create_all()` NÃO cria índice em tabela
+    que já existe, então qualquer `index=True` acrescentado a um modelo
+    depois da criação da tabela nunca vira índice de verdade. Roda toda vez;
+    idempotente por natureza.
+    """
+    from sqlalchemy import text as sa_text
+
+    from models import db as _db
+
+    with db.engine.connect() as conn:
+        existentes = {r[0] for r in conn.execute(sa_text(
+            "SELECT indexname FROM pg_indexes WHERE schemaname='public'"))}
+        tabelas = {r[0] for r in conn.execute(sa_text(
+            "SELECT tablename FROM pg_tables WHERE schemaname='public'"))}
+
+    criados = 0
+    for tabela in _db.metadata.tables.values():
+        if tabela.name not in tabelas:
+            continue
+        for ix in tabela.indexes:
+            if ix.name in existentes:
+                continue
+            try:
+                with db.engine.begin() as conn:
+                    ix.create(bind=conn)
+                criados += 1
+            except Exception as e:
+                logger.warning(f"[Migration 213] indice do modelo {ix.name} "
+                               f"nao recriado: {e}")
+    if criados:
+        logger.info(f"[Migration 213] {criados} indice(s) do modelo recriado(s).")
+    return criados
+
+
 def _migration_213_indices_faltantes_e_duplicados():
     """Fase 0.5 / 3.1 — cria os índices que nunca nasceram e poda os redundantes.
 
@@ -14221,69 +14312,16 @@ def _migration_213_indices_faltantes_e_duplicados():
          'CREATE INDEX IF NOT EXISTS idx_tarefa_cron_admin ON tarefa_cronograma (admin_id)'),
     ]
 
-    duplicados = [
-        'idx_composicao_servico_admin',
-        'idx_composicao_servico_svc',
-        'idx_cotacao_linha_cotacao',
-        'idx_csh_composicao_servico_id',
-        'idx_equipe_planejada_servico',
-        'idx_notif_orc_ativa',
-        'idx_notif_orc_obra',
-        'idx_notif_orc_svc',
-        'idx_obra_servico_custo_admin',
-        'idx_obra_servico_custo_catalogo',
-        'idx_op_admin',
-        'idx_op_item_op',
-        'idx_op_item_versao_ate',
-        'idx_op_obra',
-        'idx_orc_item_admin',
-        'idx_orcamento_item_cronograma_override',
-        'idx_orcamento_proposta',
-        'idx_preco_base_insumo_admin',
-        'idx_preco_base_insumo_insumo',
-        'idx_proposta_itens_servico',
-        'idx_proposta_orcamento_id',
-        'idx_rdo_foto_rdo_id',
-        'idx_webhook_entrega_status',
-        'ix_alimentacao_lancamento_data',
-        'ix_composicao_servico_historico_admin_id',
-        'ix_composicao_servico_insumo_id',
-        'ix_cron_imp_admin',
-        'ix_cron_imp_sha',
-        'ix_cron_snap_versao',
-        'ix_cronograma_importacao_evento_importacao_id',
-        'ix_cronograma_importacao_obra_id',
-        'ix_cronograma_tarefa_mapeamento_importacao_id',
-        'ix_cronograma_versao_admin_id',
-        'ix_cronograma_versao_obra_id',
-        'ix_gestao_custo_filho_obra_servico_custo_id',
-        'ix_insumo_admin_id',
-        'ix_item_medicao_comercial_servico_id',
-        'ix_lead_historico_lead_id',
-        'ix_notificacao_orcamento_admin_id',
-        'ix_obra_orcamento_operacional_item_admin_id',
-        'ix_obra_orcamento_operacional_item_versao_admin_id',
-        'ix_obra_orcamento_operacional_item_versao_vigente_de',
-        'ix_obra_servico_cotacao_interna_admin_id',
-        'ix_obra_servico_cotacao_interna_linha_admin_id',
-        'ix_obra_servico_cotacao_interna_obra_servico_custo_id',
-        'ix_obra_servico_custo_item_admin_id',
-        'ix_obra_servico_custo_item_obra_servico_custo_id',
-        'ix_obra_servico_custo_obra_id',
-        'ix_obra_servico_equipe_planejada_admin_id',
-        'ix_orcamento_admin_id',
-        'ix_orcamento_item_orcamento_id',
-        'ix_orcamento_item_servico_id',
-        'ix_orcamento_status',
-        'ix_proposta_itens_cronograma_template_override_id',
-        'ix_proposta_template_clausula_template_id',
-        'ix_rdo_foto_admin_id',
-        'ix_subatividade_mao_obra_admin_id',
-        'ix_subatividade_mao_obra_composicao_servico_id',
-        'ix_subatividade_mao_obra_subatividade_mestre_id',
-        'ix_webhook_entrega_admin_id',
-        'ix_webhook_entrega_event',
-    ]
+    # Fase 0.5 — REGRA CORRIGIDA. A primeira versão desta migração dropava 61
+    # índices "redundantes" escolhendo o sobrevivente arbitrariamente (o
+    # primeiro da lista). Isso derrubou 34 índices que o MODELO declara com
+    # `index=True` — entre eles `ix_rdo_foto_admin_id`, numa tabela de 14 GB.
+    # `create_all()` não recria índice em tabela existente, então o schema
+    # divergiria do modelo permanentemente.
+    #
+    # Regra certa: entre índices equivalentes, o canônico é o que o MODELO
+    # declara. Só se nenhum for do modelo é que se escolhe um para manter.
+    duplicados = _indices_redundantes_a_dropar()
 
     criados = falhos = dropados = 0
     for nome, ddl in criar:
@@ -14319,5 +14357,20 @@ def _migration_213_indices_faltantes_e_duplicados():
         except Exception as e:
             logger.warning(f"[Migration 213] drop de {nome} falhou: {e}")
 
+    # Reconcilia com o modelo DEPOIS dos drops — recria o que for do modelo e
+    # estiver faltando, inclusive o que uma execução anterior tenha removido
+    # por engano.
+    recriados = _recriar_indices_do_modelo_ausentes()
+
     logger.info(f"[Migration 213] {criados} indice(s) criado(s), "
-                f"{dropados} redundante(s) removido(s), {falhos} falha(s).")
+                f"{dropados} redundante(s) removido(s), "
+                f"{recriados} do modelo recriado(s), {falhos} falha(s).")
+
+    # Padrão de migrations.py (ver 211/212): falha LEVANTA, para a migração não
+    # ser gravada como aplicada e nunca mais rodar. Antes desta correção a 213
+    # engolia tudo e ficava marcada como success mesmo se os 12 índices
+    # falhassem — exatamente o problema que ela existe para consertar.
+    if falhos:
+        raise RuntimeError(
+            f'[Migration 213] {falhos} indice(s) essencial(is) nao criado(s) — '
+            f'ver warnings acima. A migracao NAO sera marcada como aplicada.')

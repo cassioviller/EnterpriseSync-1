@@ -219,6 +219,34 @@ def test_itens_de_medicao_nao_sao_replicados_em_obra_nova():
         assert {i.obra_id for i in imcs} == {obra_id}
 
 
+def test_aprovar_revisao_atualiza_valor_de_contrato():
+    """O critério do R1 que faltava: a obra existente reflete a revisão.
+
+    Não basta parar de duplicar — se o aditivo sobe o valor e a obra fica no
+    valor da v1, todo o faturamento sai errado
+    (`MedicaoContrato.valor = pct × obra.valor_contrato`).
+    """
+    with app.app_context():
+        admin, _cliente, v1 = _ambiente()
+        admin_id = admin.id
+
+        _aprovar(v1, admin_id)
+        obra = _obras_do_tenant(admin_id)[0]
+        assert float(obra.valor_contrato) == 100000.0, (
+            f'v1 deveria fixar o contrato em 100k, veio {obra.valor_contrato}')
+        obra_id = obra.id
+
+        # v2 é o aditivo: 100k → 120k
+        v2 = _clonar_como_revisao(v1, admin_id, herdar_obra=True)
+        _aprovar(v2, admin_id)
+
+        db.session.expire_all()
+        obra = db.session.get(Obra, obra_id)
+        assert float(obra.valor_contrato) == 120000.0, (
+            f'aprovar o aditivo não atualizou o valor de contrato: '
+            f'ficou em {obra.valor_contrato}')
+
+
 def test_rota_real_de_nova_versao_herda_obra_id():
     """Exercita `criar_nova_versao` DE VERDADE (POST /propostas/<id>/nova-versao).
 

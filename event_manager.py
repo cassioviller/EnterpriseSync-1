@@ -1031,8 +1031,20 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         # Task #176 — popula cliente_id em obras pré-existentes (legado).
         if not obra.cliente_id and cliente_obj:
             obra.cliente_id = cliente_obj.id
-        if (obra.valor_contrato or 0) <= 0 and valor_total > 0:
+        # Fase 0.5 — APROVAR REVISÃO ATUALIZA O VALOR DE CONTRATO.
+        # Antes: `if (obra.valor_contrato or 0) <= 0` — só preenchia campo
+        # VAZIO. Aprovar um aditivo com valor novo deixava o contrato no valor
+        # da v1, em silêncio, e todo o faturamento seguia a base errada
+        # (`MedicaoContrato.valor = pct × obra.valor_contrato`).
+        # Este é o critério do R1 que a Fase 0 não cumpriu: não basta parar de
+        # duplicar a obra, a obra existente tem de refletir a revisão.
+        if valor_total > 0 and float(obra.valor_contrato or 0) != float(valor_total):
+            anterior = float(obra.valor_contrato or 0)
             obra.valor_contrato = valor_total
+            logger.info(
+                "💰 Obra %s: valor_contrato %.2f → %.2f pela aprovação da "
+                "proposta %s", obra.codigo, anterior, valor_total,
+                proposta.numero)
         if (obra.orcamento or 0) <= 0 and valor_total > 0:
             obra.orcamento = valor_total
 

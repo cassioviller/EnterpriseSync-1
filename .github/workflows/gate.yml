@@ -96,9 +96,13 @@ jobs:
 
       # Os testes que faziam `skipif` por ausência de dados PULARIAM todos num
       # banco novo, produzindo verde falso. O seed os torna executáveis.
+      # `--ambiente` só aceita dev|prod (scripts/seed_demo_alfa.py). Usar
+      # `ci` fazia o script sair com código 2, mascarado pelo `|| true`: o
+      # seed era NO-OP e os testes com skipif de dado continuariam pulando,
+      # que é exatamente o verde falso que este job existe para impedir.
       - name: Seed de dados
         run: |
-          uv run python scripts/seed_demo_alfa.py --ambiente ci || true
+          uv run python scripts/seed_demo_alfa.py --ambiente dev
           uv run python scripts/seed_demo_veks.py || true
         env:
           SIGE_ENABLE_DEMO_SEED: 'true'
