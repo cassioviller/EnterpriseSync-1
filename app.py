@@ -19,18 +19,52 @@ app = Flask(__name__)
 # ======================================================================
 # == DETECÇÃO DE AMBIENTE: PRODUÇÃO vs DESENVOLVIMENTO ==
 # ======================================================================
-# REPL_ID existe apenas no ambiente Replit (desenvolvimento)
-# Em produção (EasyPanel/Docker), esta variável não existe
-IS_PRODUCTION = "REPL_ID" not in os.environ
-logger.info(f"[ENV] Ambiente detectado: {'PRODUÇÃO' if IS_PRODUCTION else 'DESENVOLVIMENTO (Replit)'}")
+# Fase 0.5 / 1.3 — ambiente por variável EXPLÍCITA.
+# Antes: `IS_PRODUCTION = "REPL_ID" not in os.environ` — produção definida
+# pela AUSÊNCIA de uma variável do Replit. Qualquer `docker run` local, um
+# teste fora do sandbox ou um CI virava "produção" e ligava
+# SESSION_COOKIE_SECURE, quebrando login em HTTP de forma silenciosa.
+# Agora: SIGE_ENV governa. Sem a variável, mantém-se a heurística antiga
+# APENAS para não quebrar ambientes que ainda não foram configurados — e o
+# log avisa. Quando o painel definir SIGE_ENV, a heurística morre.
+SIGE_ENV = os.environ.get("SIGE_ENV", "").strip().lower()
+if SIGE_ENV in ("production", "producao", "prod"):
+    IS_PRODUCTION = True
+elif SIGE_ENV in ("development", "desenvolvimento", "dev", "test", "ci"):
+    IS_PRODUCTION = False
+else:
+    IS_PRODUCTION = "REPL_ID" not in os.environ
+    logger.warning(
+        "[ENV] SIGE_ENV não definido — usando heurística legada (REPL_ID). "
+        "Defina SIGE_ENV=production no painel para remover a ambiguidade."
+    )
+logger.info(f"[ENV] Ambiente: {'PRODUÇÃO' if IS_PRODUCTION else 'DESENVOLVIMENTO'}"
+            f" (SIGE_ENV={SIGE_ENV or 'não definido'})")
 
 # ======================================================================
 # == [LOCK] CHAVE SECRETA VIA VARIAVEL DE AMBIENTE ==
 # ======================================================================
+# Fase 0.5 / 1.2 — FAIL-CLOSED. O fallback literal
+# ("dev-only-fallback-key-not-for-production") era pior que inútil: como o
+# valor está publicado neste repositório, produção sem a variável subia com
+# uma chave conhecida, e o único sinal era uma linha de log. Com a chave de
+# sessão, forja-se cookie de qualquer usuário de qualquer tenant.
 app.secret_key = os.environ.get("SESSION_SECRET")
 if not app.secret_key:
-    logger.error("[ERROR] SESSION_SECRET not set! Using fallback for development only.")
-    app.secret_key = "dev-only-fallback-key-not-for-production"
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            "SESSION_SECRET não definido. O sistema NÃO sobe em produção sem "
+            "uma chave de sessão própria — defina a variável no painel com "
+            "um valor gerado por `python -c \"import secrets; "
+            "print(secrets.token_urlsafe(64))\"`."
+        )
+    # Fora de produção, gera uma chave EFÊMERA por processo: as sessões não
+    # sobrevivem a um restart (o que é correto em dev) e nenhum valor
+    # adivinhável fica no código.
+    import secrets as _secrets
+    app.secret_key = _secrets.token_urlsafe(64)
+    logger.warning("[DEV] SESSION_SECRET ausente — chave efêmera gerada para "
+                   "esta execução; sessões não persistem entre restarts.")
 app.config["SECRET_KEY"] = app.secret_key
 logger.info(f"[OK] Secret key configurada (length: {len(app.secret_key)})")
 
@@ -52,10 +86,33 @@ if IS_PRODUCTION:
 else:
     logger.info("[INFO] [DEV] Configurações de cookie padrão para desenvolvimento")
 
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+# Fase 0.5 / 1.3 — `x_for=1` acrescentado. Sem ele, X-Forwarded-For era
+# ignorado e `request.remote_addr` devolvia o IP do proxy do EasyPanel: o IP
+# real do cliente NUNCA era registrável. Efeito colateral corrigido de
+# quebra: o rate limiter usa `get_remote_address` como chave, então todos os
+# clientes do mundo compartilhavam o mesmo bucket.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Fase 0.5 / 1.3 — trilha de acesso para rotas de escrita (logger
+# 'sige.acesso'). Escrita por usuário anônimo sobe para WARNING.
+try:
+    from utils.auditoria_acesso import registrar as _registrar_auditoria
+    _registrar_auditoria(app)
+    logger.info("[OK] Trilha de auditoria de acesso instalada")
+except Exception as _e_aud:
+    logger.error(f"[ERROR] Auditoria de acesso NÃO instalada: {_e_aud}",
+                 exc_info=True)
 
 # Database configuration - v10.0 Digital Mastery
-database_url = os.environ.get("DATABASE_URL", "postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable")
+# Fase 0.5 / 1.2 — FAIL-CLOSED, sem credencial default no código. O valor
+# que estava aqui era a connection string REAL de produção (usuário, senha e
+# host), replicada em mais 5 arquivos.
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    raise RuntimeError(
+        "DATABASE_URL não definida. Configure a variável no painel do "
+        "ambiente — não há mais credencial default no código."
+    )
 
 # Auto-detectar ambiente - CREDENTIALS MASCARADAS POR SEGURANÇA
 def mask_database_url(url):
@@ -78,10 +135,16 @@ else:
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-# Garantir que sslmode=disable está presente para EasyPanel
+# Fase 0.5 / 1.2 — sslmode. Antes o código FORÇAVA `sslmode=disable` quando
+# ausente, ou seja, o tráfego app↔banco ia em claro mesmo onde TLS estava
+# disponível. Agora o default é `require` em produção; `disable` só quando o
+# ambiente pede explicitamente (banco local de dev/CI sem TLS).
 if database_url and "sslmode=" not in database_url:
     separator = "&" if "?" in database_url else "?"
-    database_url = f"{database_url}{separator}sslmode=disable"
+    sslmode = os.environ.get("DATABASE_SSLMODE") or (
+        "require" if IS_PRODUCTION else "disable")
+    database_url = f"{database_url}{separator}sslmode={sslmode}"
+    logger.info(f"[CONFIG] sslmode ausente na URL — aplicado '{sslmode}'")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -353,12 +416,11 @@ try:
 except Exception as e:
     logging.warning(f"[WARN] Event Manager não carregado: {e}", exc_info=True)
 
-# Import event handlers to auto-register
-try:
-    import handlers.folha_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
-    logging.info("[OK] Handler de folha de pagamento registrado")
-except Exception as e:
-    logging.warning(f"[WARN] Handler de folha não carregado: {e}", exc_info=True)
+# Fase 0.5 / 3.2 — removido o import de `handlers.folha_handlers`: o módulo
+# NUNCA existiu no repositório (confirmado em todo o histórico do git). O
+# `try/except` engolia o ModuleNotFoundError e o boot logava "[OK] Handler de
+# folha de pagamento registrado" sobre algo inexistente — um log que mente.
+# O evento `folha_processada` funciona: seu handler está em event_manager.py.
 
 try:
     import handlers.propostas_handlers  # noqa: F401  (efeito colateral: auto-registra handler)
@@ -605,8 +667,21 @@ with app.app_context():
         executar_migracoes()
         logger.info("[OK] Migrações executadas com sucesso!")
     except Exception as e:
-        logger.error(f"[ERROR] Erro ao executar migrações: {e}", exc_info=True)
-        logger.warning("[WARN] Aplicação continuará mesmo com erro nas migrações")
+        # Fase 0.5 / 1.1 — FALHA DE MIGRAÇÃO ABORTA O BOOT.
+        # Antes: `logger.warning("Aplicação continuará mesmo com erro nas
+        # migrações")` — o app passava a servir tráfego contra um schema
+        # meio-migrado, e isso rodava em TODO boot de worker do gunicorn.
+        # Combinado com a ausência de backup (o entrypoint só imprimia que
+        # fazia um), uma migração destrutiva mal formulada corrompia dados
+        # e o app subia dizendo estar saudável.
+        logger.critical(f"[FATAL] Migração falhou: {e}", exc_info=True)
+        if IS_PRODUCTION:
+            raise RuntimeError(
+                f"Migração de banco falhou — boot abortado para não servir "
+                f"tráfego contra schema inconsistente. Erro: {e}"
+            ) from e
+        logger.warning("[DEV] Fora de produção: seguindo apesar da falha de "
+                       "migração (em produção isso abortaria o boot)")
     
     # [CONFIG] AUTO-FIX UNIVERSAL - Correção automática de admin_id em TODAS as tabelas
     # Executa SEMPRE no startup para garantir que TODAS as tabelas tenham admin_id

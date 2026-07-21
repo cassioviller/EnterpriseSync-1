@@ -1,5 +1,6 @@
 from app import app
 import logging
+import os
 logger = logging.getLogger(__name__)
 
 # API RDO Refatorada removida - funcionalidade integrada em salvar_rdo_flexivel
@@ -26,58 +27,73 @@ try:
 except ImportError as e:
     logger.warning(f"[WARN] Sistema CRUD RDO não encontrado: {e}", exc_info=True)
 
-from flask import redirect, url_for, render_template_string
+from flask import redirect, url_for, render_template_string, render_template
 import traceback
 
-# Configurar logging detalhado
-logging.basicConfig(level=logging.DEBUG)
+# Fase 0.5 / 1.3 — o nível de log é decidido em UM lugar só.
+# Antes havia aqui um `logging.basicConfig(level=logging.DEBUG)` que era
+# NO-OP: `from app import app` (linha 1) já configurou o root logger, e sem
+# `force=True` o basicConfig não faz nada. Resultado: todo `logger.debug()`
+# do sistema era descartado, e quem escreveu esperava o contrário.
+# Agora o nível vem de LOG_LEVEL (default INFO) e é aplicado de fato.
+_nivel = os.environ.get('LOG_LEVEL', 'INFO').upper()
+logging.getLogger().setLevel(getattr(logging, _nivel, logging.INFO))
+logger.info(f"[OK] Nivel de log: {_nivel}")
 
-# Error handler global para capturar todos os erros
+
+# Fase 0.5 / 1.3 — handler global de exceção.
+# Antes esta função renderizava o TRACEBACK PYTHON COMPLETO numa página HTML,
+# com botão "Copiar Erro Completo", SEM qualquer verificação de ambiente.
+# Qualquer 500 em produção — inclusive provocado de propósito por um visitante
+# anônimo — expunha caminhos de arquivo, nomes de tabela e trechos de código.
 @app.errorhandler(Exception)
 def handle_exception(e):
-    """Captura e exibe erros detalhados para debugging"""
+    """Loga o erro completo; mostra detalhe ao usuário SÓ fora de produção."""
+    from werkzeug.exceptions import HTTPException
+
+    # HTTPException (404, 403, 422...) tem tratamento próprio — não são falhas
+    # do sistema e não devem virar 500.
+    if isinstance(e, HTTPException):
+        return e
+
     error_trace = traceback.format_exc()
     error_msg = str(e)
-    
+
     logger.error(f"ERRO GLOBAL CAPTURADO: {error_msg}")
     logger.error(f"TRACEBACK COMPLETO:\n{error_trace}")
-    
-    # Template simples para mostrar erro ao usuário
+
+    from app import IS_PRODUCTION
+    if IS_PRODUCTION:
+        try:
+            return render_template('error.html',
+                                   error_code=500,
+                                   error_message='Erro interno do sistema.'), 500
+        except Exception:
+            return ('<h1>Erro interno</h1><p>O erro foi registrado. '
+                    'Procure o suporte informando o horário.</p>'), 500
+
+    # Fora de produção: detalhe completo, que é onde ele é útil.
     error_template = """
     <!DOCTYPE html>
     <html>
-    <head>
-        <title>Erro do Sistema</title>
+    <head><title>Erro do Sistema (dev)</title>
         <style>
             body { font-family: Arial, sans-serif; margin: 20px; }
             .error-box { background: #f8d7da; border: 1px solid #f5c6cb; padding: 20px; border-radius: 5px; }
             .error-trace { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin-top: 10px; font-family: monospace; white-space: pre-wrap; overflow-x: auto; }
-            .copy-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px; }
         </style>
     </head>
     <body>
         <div class="error-box">
-            <h2>[ALERT] Erro do Sistema - Para Debug</h2>
+            <h2>Erro do Sistema — ambiente de desenvolvimento</h2>
             <p><strong>Erro:</strong> {{ error_msg }}</p>
             <div class="error-trace">{{ error_trace }}</div>
-            <button class="copy-btn" onclick="copyError()">[LIST] Copiar Erro Completo</button>
-            <br><br>
-            <a href="/funcionario/dashboard">← Voltar ao Dashboard</a>
         </div>
-        
-        <script>
-        function copyError() {
-            const errorText = `ERRO: {{ error_msg }}\\n\\nTRACE:\\n{{ error_trace }}`;
-            navigator.clipboard.writeText(errorText).then(function() {
-                alert('Erro copiado! Cole no chat para resolução.');
-            });
-        }
-        </script>
     </body>
     </html>
     """
-    
-    return render_template_string(error_template, error_msg=error_msg, error_trace=error_trace), 500
+    return render_template_string(error_template, error_msg=error_msg,
+                                  error_trace=error_trace), 500
 
 # Blueprint antigo removido - usando apenas CRUD de Serviços moderno
 

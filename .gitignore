@@ -1,3 +1,15 @@
+# ── Segredos (Fase 0.5 / 1.2) ────────────────────────────────────────────────
+# `.env.easypanel` estava RASTREADO, com o SESSION_SECRET de produção e a
+# DATABASE_URL com senha. Foi removido do índice — mas os valores continuam no
+# histórico do git para sempre, então a única correção real é ROTACIONAR as
+# credenciais no painel. Ver DOSSIE-REPO.md §17.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!static/**/*.key
+
 # RDO Photos
 static/uploads/rdo/*
 static/uploads/relatorios_mapa/

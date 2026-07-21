@@ -3781,7 +3781,8 @@ def executar_migracoes():
         logger.info("=" * 80)
         
         # Mascarar credenciais por segurança
-        database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
+        # Fase 0.5 / 1.2 — sem credencial default (era a string real de produção).
+        database_url = os.environ.get('DATABASE_URL', '')
         logger.info(f"🎯 DATABASE: {mask_database_url(database_url)}")
         
         # PASSO 1: Garantir tabela de rastreamento existe
