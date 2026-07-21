@@ -1,6 +1,31 @@
 """
-Motor de agendamento para o Módulo de Cronograma de Obras (MS Project style).
-Calcula datas de início/fim respeitando dias úteis e cadeia de predecessoras.
+Motor de agendamento e progresso do Módulo de Cronograma de Obras.
+
+FONTE ÚNICA das fórmulas de progresso (M06): views nunca implementam
+fórmula — consomem este módulo. Tabela normativa (spec M06 §12):
+
+| Caso                                   | Peso agregado        | Planejado            | Realizado                |
+|----------------------------------------|----------------------|----------------------|--------------------------|
+| Folha quantitativa (TODAS c/ qtd e     | quantidade           | linear dias úteis    | Σqtd_dia/total           |
+|   MESMA unidade)                       |                      |                      |                          |
+| Folha sem qtd (ou mix de qtd/unidade)  | duração (>0) senão 1 | linear dias úteis    | último acumulado %       |
+| Pai/resumo                             | excluído (rollup por | rollup               | rollup                   |
+|                                        | duração das filhas)  |                      |                          |
+| Marco (is_marco ou duração 0)          | 0                    | degrau na data_inicio| 0 ou 100 (binário)       |
+| Terceiros (responsavel='terceiros')    | igual às demais      | linear               | manual (sem sync do RDO) |
+| Sem datas/duração                      | duração/1            | None (agrega como 0) | normal                   |
+| Arquivada (M05)                        | 0 no presente/futuro | —                    | mantido p/ data_ref <    |
+|                                        |                      |                      | arquivada_em (curva)     |
+
+Regras de peso do agregado (calcular_progresso_geral_obra_v2): quantidade
+SÓ quando TODAS as folhas não-marco têm quantidade E a mesma unidade —
+nunca soma m+un+dias; senão duração; senão 1. Arquivadas só entram via
+`com_arquivadas_historicas=True` (curva de avanço) e apenas para datas em
+que ainda estavam vivas.
+
+Também calcula datas de início/fim respeitando dias úteis e cadeia de
+predecessoras (FS simples — tipos SS/FF/SF e lag ficam preservados no
+snapshot do M05 para evolução futura; limitação documentada).
 """
 from __future__ import annotations
 
@@ -104,6 +129,40 @@ def verificar_ciclo(tarefa_id: int, proposta_pred_id: int, admin_id: int) -> boo
 # ─────────────────────────────────────────────────────────────────────────────
 # Motor principal de recálculo
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _is_marco_efetivo(tarefa) -> bool:
+    """Marco explícito (`is_marco`, M02) ou duração zero não-marco —
+    tratada como marco para peso/planejado (spec M06 §4.2; o M04 emite
+    aviso `duracao_zero_sem_marco` no import)."""
+    if getattr(tarefa, 'is_marco', False):
+        return True
+    dur = getattr(tarefa, 'duracao_dias', None)
+    return dur is not None and int(dur) == 0
+
+
+def _planejado_na_data(data_inicio, data_fim, duracao_dias, marco,
+                       data_ref: date, sab: bool, dom: bool):
+    """Percentual planejado (0-100) na `data_ref`, ou None sem plano.
+
+    Marco: degrau — 0 antes de `data_inicio`, 100 a partir dela (sem
+    data_inicio → None). Demais: interpolação linear por dias úteis —
+    mesma fórmula de calcular_progresso_rdo e do replanejamento (M06);
+    mudou aqui, mudou nos dois.
+    """
+    if marco:
+        if not data_inicio:
+            return None
+        return 100.0 if data_ref >= data_inicio else 0.0
+    if not (data_inicio and duracao_dias and duracao_dias > 0):
+        return None
+    if data_ref < data_inicio:
+        return 0.0
+    fim = data_fim or calcular_data_fim(data_inicio, duracao_dias, sab, dom)
+    if data_ref >= fim:
+        return 100.0
+    dias_passados = dias_uteis_entre(data_inicio, data_ref, sab, dom)
+    return min(100.0, round(dias_passados / duracao_dias * 100, 2))
+
 
 def _atualizar_percentual_sem_commit(tarefa, admin_id: int) -> None:
     """
@@ -388,26 +447,14 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
     if not tarefa:
         return {'percentual_planejado': None, 'percentual_realizado': 0.0, 'quantidade_acumulada': 0.0}
 
-    # ── Planejado (interpolação linear por dias úteis) ──
-    if tarefa.data_inicio and tarefa.duracao_dias and tarefa.duracao_dias > 0:
-        if data_rdo < tarefa.data_inicio:
-            perc_planejado = 0.0
-        else:
-            cal = get_calendario(admin_id)
-            sab, dom = cal.considerar_sabado, cal.considerar_domingo
-            # data_fim conhecida? prefere a persistida; senão calcula por dias úteis
-            data_fim = tarefa.data_fim or calcular_data_fim(
-                tarefa.data_inicio, tarefa.duracao_dias, sab, dom
-            )
-            if data_rdo >= data_fim:
-                perc_planejado = 100.0
-            else:
-                dias_passados = dias_uteis_entre(tarefa.data_inicio, data_rdo, sab, dom)
-                perc_planejado = min(100.0, round(dias_passados / tarefa.duracao_dias * 100, 2))
-    else:
-        # Sem plano calculável: a UI deve mostrar "—" e badge "Sem plano",
-        # NÃO 0% (que pareceria atraso).
-        perc_planejado = None
+    # ── Planejado ── marco = degrau na data_inicio; demais = interpolação
+    # linear por dias úteis; None = "Sem plano" (a UI mostra "—", NÃO 0%,
+    # que pareceria atraso).
+    marco = _is_marco_efetivo(tarefa)
+    cal = get_calendario(admin_id)
+    perc_planejado = _planejado_na_data(
+        tarefa.data_inicio, tarefa.data_fim, tarefa.duracao_dias, marco,
+        data_rdo, cal.considerar_sabado, cal.considerar_domingo)
 
     # ── Realizado ──
     from sqlalchemy import func as sqlfunc
@@ -449,6 +496,10 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
                 # calcular_progresso_geral_obra_v2 (testa quantidade_acumulada > 0)
                 acumulado = perc_realizado
 
+    # Marco é binário: só existe "não entregue" (0) ou "entregue" (100).
+    if marco:
+        perc_realizado = 100.0 if perc_realizado >= 100.0 else 0.0
+
     return {
         'percentual_planejado': perc_planejado,
         'percentual_realizado': perc_realizado,
@@ -456,7 +507,9 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
     }
 
 
-def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int) -> dict:
+def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date,
+                                     admin_id: int, *,
+                                     com_arquivadas_historicas: bool = False) -> dict:
     """
     Calcula o **progresso geral acumulado da obra** (modo V2) até `data_ref`.
 
@@ -485,14 +538,26 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
       - n_tarefas_apontadas: int (folhas com pelo menos 1 apontamento até data_ref)
     """
     from models import TarefaCronograma
+    from sqlalchemy import and_, or_
 
-    folhas = (
+    consulta = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id)
         .filter_by(is_cliente=False)
-        .filter(TarefaCronograma.ativa.is_(True))
-        .all()
     )
+    if com_arquivadas_historicas:
+        # Curva histórica (M06 §4.2): tarefa arquivada DEPOIS de data_ref
+        # ainda estava viva na data consultada — o trabalho feito nela não
+        # some da curva. Arquivadas antes de data_ref ficam de fora (peso 0
+        # no presente/futuro).
+        consulta = consulta.filter(or_(
+            TarefaCronograma.ativa.is_(True),
+            and_(TarefaCronograma.arquivada_em.isnot(None),
+                 TarefaCronograma.arquivada_em > data_ref),
+        ))
+    else:
+        consulta = consulta.filter(TarefaCronograma.ativa.is_(True))
+    folhas = consulta.all()
     if not folhas:
         return {
             'progresso_geral_pct': 0.0,
@@ -517,14 +582,20 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
     soma_pesos = 0.0
     n_apontadas = 0
 
-    # Peso: usa `quantidade_total` SÓ quando TODAS as folhas o têm (unidade
-    # consistente entre tarefas). Se apenas algumas têm (ex.: 48 brocas numa obra
-    # cujas demais tarefas não têm quantitativo), usar qty como peso misturaria
-    # unidades incomparáveis ("brocas" × "dias") e distorceria a média — então
-    # cai para a duração em todas. Nesse caso o `quantidade_total` governa apenas o
-    # % da própria tarefa (calcular_progresso_rdo / sincronizar_percentuais_obra).
-    usar_qtd = all(t.quantidade_total and float(t.quantidade_total) > 0
-                   for t in folhas_efetivas)
+    # Peso: usa `quantidade_total` SÓ quando TODAS as folhas não-marco o têm
+    # E com a MESMA unidade (M06 §4.2 — nunca soma m+un+dias). Se apenas
+    # algumas têm (ex.: 48 brocas numa obra cujas demais tarefas não têm
+    # quantitativo) ou as unidades divergem, usar qty como peso misturaria
+    # unidades incomparáveis e distorceria a média — então cai para a duração
+    # em todas. Nesse caso o `quantidade_total` governa apenas o % da própria
+    # tarefa (calcular_progresso_rdo / sincronizar_percentuais_obra).
+    # Marcos ficam fora do critério E do peso (peso 0 — tabela §12).
+    nao_marcos = [t for t in folhas_efetivas if not _is_marco_efetivo(t)]
+    usar_qtd = bool(nao_marcos) and all(
+        t.quantidade_total and float(t.quantidade_total) > 0
+        for t in nao_marcos
+    ) and len({(t.unidade_medida or '').strip().lower()
+               for t in nao_marcos}) == 1
 
     for t in folhas_efetivas:
         prog = calcular_progresso_rdo(t.id, data_ref, admin_id)
@@ -532,8 +603,10 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
         # Sem plano calculável conta como 0 no agregado planejado.
         perc_plan = float(prog.get('percentual_planejado') or 0.0)
 
-        # Escolha do peso (ver comentário acima)
-        if usar_qtd:
+        # Escolha do peso (ver comentário acima). Marco pesa 0.
+        if _is_marco_efetivo(t):
+            peso = 0.0
+        elif usar_qtd:
             peso = float(t.quantidade_total)
         elif t.duracao_dias and int(t.duracao_dias) > 0:
             peso = float(t.duracao_dias)

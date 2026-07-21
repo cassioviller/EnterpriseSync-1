@@ -2611,8 +2611,12 @@ def curva_avanco_obra(obra_id):
         for rdo in rdos_finalizados:
             d = rdo.data_relatorio
             if d not in cache_data:
+                # Curva histórica inclui tarefas arquivadas que ainda
+                # estavam vivas na data (M06 §4.2) — trabalho feito antes
+                # do arquivamento não some da curva.
                 cache_data[d] = calcular_progresso_geral_obra_v2(
-                    obra_id, d, admin_id_obra
+                    obra_id, d, admin_id_obra,
+                    com_arquivadas_historicas=True,
                 )
             agg = cache_data[d]
             pontos.append({
