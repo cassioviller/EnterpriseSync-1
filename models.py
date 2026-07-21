@@ -34,11 +34,30 @@ class Usuario(UserMixin, db.Model):
     ativo = db.Column(db.Boolean, default=True)
     tipo_usuario = db.Column(db.Enum(TipoUsuario), default=TipoUsuario.FUNCIONARIO, nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para funcionários, referencia seu admin
+    # Fase 1 — identidade estável da pessoa. Até 2026-07-21 não existia
+    # nenhuma FK ligando o login à linha de RH: `views/employees.py:686`
+    # casava por substring do username, `crud_rdo_completo.py:30` tinha um
+    # e-mail chumbado, e o último fallback pegava o primeiro funcionário
+    # ativo do banco INTEIRO. Nullable porque nem todo usuário é
+    # funcionário (o admin da construtora não é) e nem todo funcionário
+    # tem login. UNIQUE porque uma pessoa de RH tem no máximo um login —
+    # no Postgres UNIQUE admite múltiplos NULL, que é o que queremos.
+    # INVARIANTE DE TENANT: o Funcionario apontado tem que ser do mesmo
+    # tenant do Usuario. Não dá para expressar como CHECK entre tabelas;
+    # é garantido por `utils.identidade.vincular_funcionario` e travado
+    # por `tests/test_fase1_identidade.py::test_vinculo_cross_tenant_e_recusado`.
+    funcionario_id = db.Column(
+        db.Integer,
+        db.ForeignKey('funcionario.id', ondelete='SET NULL'),
+        unique=True, nullable=True, index=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     versao_sistema = db.Column(db.String(10), default='v1', nullable=False)  # 'v1' ou 'v2' - Feature Flag V2
-    
+
     # Relacionamentos
     funcionarios = db.relationship('Usuario', backref=db.backref('admin', remote_side=[id]), lazy='dynamic')
+    funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id],
+                                  backref=db.backref('usuario', uselist=False))
 
 class Departamento(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -4012,8 +4012,8 @@ def executar_migracoes():
             (211, "Cronograma-mpp M10 — flag de rollout configuracao_empresa.cronograma_mpp_ativo (default FALSE)", _migration_211_configuracao_empresa_cronograma_mpp),
             (212, "Cronograma-mpp — backfill versão nº1 nas obras criadas após a 210 (ponto de rollback do 1º import)", _migration_212_backfill_versao_inicial_obras_novas),
             (213, "Fase 0.5 — índices que nunca nasceram (create_all antes das migrações) + poda de 61 redundantes", _migration_213_indices_faltantes_e_duplicados),
-            # Fase 0.6 usa 217-219. A faixa 214-216 está reservada à Fase 1
-            # (identidade e papéis) — ver ESTADO-ATUAL.md.
+            (214, "Fase 1 — FK de identidade usuario.funcionario_id (nullable, UNIQUE parcial)", migration_214_usuario_funcionario_id),
+            # Fase 0.6 usou 217-219; a Fase 1 usa 214-216.
             (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
             (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
             (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
@@ -14173,6 +14173,52 @@ def _migration_212_backfill_versao_inicial_obras_novas():
     except Exception as e:
         logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
         raise
+
+
+def migration_214_usuario_funcionario_id():
+    """Fase 1 — FK de identidade usuario.funcionario_id.
+
+    Aditiva e idempotente: coluna nullable + UNIQUE + índice. Nenhuma linha
+    é preenchida aqui; o casamento é feito pelo
+    `scripts/backfill_identidade_funcionario.py`, que roda em dry-run por
+    padrão e exige revisão humana dos não-casados.
+
+    ON DELETE SET NULL: apagar a linha de RH não pode apagar o login (nem
+    estourar a FK); o usuário fica sem vínculo e aparece no relatório.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 214] Iniciando — usuario.funcionario_id")
+
+    db.session.execute(sa_text("""
+        ALTER TABLE usuario
+        ADD COLUMN IF NOT EXISTS funcionario_id INTEGER
+    """))
+    db.session.commit()
+
+    existe_fk = db.session.execute(sa_text("""
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_usuario_funcionario_id'
+          AND table_name = 'usuario'
+        LIMIT 1
+    """)).fetchone()
+    if not existe_fk:
+        db.session.execute(sa_text("""
+            ALTER TABLE usuario
+            ADD CONSTRAINT fk_usuario_funcionario_id
+            FOREIGN KEY (funcionario_id) REFERENCES funcionario(id)
+            ON DELETE SET NULL
+        """))
+        db.session.commit()
+        logger.info("[Migration 214] FK fk_usuario_funcionario_id criada")
+
+    db.session.execute(sa_text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_funcionario_id
+        ON usuario (funcionario_id)
+        WHERE funcionario_id IS NOT NULL
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 214] Concluída com sucesso")
 
 
 def _migration_217_canonizar_status_obra():
