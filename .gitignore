@@ -1,6 +1,8 @@
 # RDO Photos
 static/uploads/rdo/*
 static/uploads/relatorios_mapa/
+# Cronograma .mpp/.xml enviados (runtime, gerados pelos testes de upload)
+static/uploads/cronograma/
 
 # Playwright test reports (runtime output, not source)
 tests/reports/*.html
