@@ -2450,6 +2450,15 @@ def cronograma_revisar_inicial_post(id):
                 recalcular_cronograma(obra.id, admin_id)
             except Exception as _e_eng:
                 logger.warning(f"#200: recalcular_cronograma falhou para obra={obra.id}: {_e_eng}")
+            # Versão nº1 DEPOIS do recálculo, para a foto valer o estado
+            # final (datas/predecessoras resolvidas). Sem ela o primeiro
+            # import da obra não teria ponto de rollback.
+            from services.cronograma_versao_service import registrar_versao_inicial
+            registrar_versao_inicial(
+                obra.id, admin_id,
+                observacao='cronograma inicial (revisão na criação da obra)',
+                usuario_id=getattr(current_user, 'id', None),
+            )
         obra.cronograma_revisado_em = datetime.utcnow()
         db.session.commit()
 

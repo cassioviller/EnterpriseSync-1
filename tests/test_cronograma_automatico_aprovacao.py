@@ -226,6 +226,24 @@ class CronogramaAprovacaoRunner:
             self._assert(abs(soma - 100.0) < 0.5,
                          f'pesos somam ~100 (achou {soma})')
 
+        # A obra nasce VERSIONADA: sem a versão nº1 o primeiro import
+        # (.mpp/.xml) não teria estado anterior para fotografar e o
+        # Restaurar ficaria sem destino.
+        from models import CronogramaTarefaSnapshot, CronogramaVersao
+        versoes = CronogramaVersao.query.filter_by(
+            obra_id=self.proposta.obra_id).all()
+        self._assert(len(versoes) == 1,
+                     f'obra nasce com 1 versão de cronograma (achou {len(versoes)})')
+        if versoes:
+            v1 = versoes[0]
+            self._assert(v1.numero == 1 and v1.status == 'ativa',
+                         f'versão nº1 ativa (achou nº{v1.numero}/{v1.status})')
+            n_snaps = CronogramaTarefaSnapshot.query.filter_by(
+                versao_id=v1.id).count()
+            self._assert(n_snaps == len(tarefas),
+                         f'versão nº1 fotografa as {len(tarefas)} tarefas '
+                         f'(achou {n_snaps})')
+
     def teste_recalcular_datas_e_obra_seed(self):
         """Verifica que recalcular_cronograma rodou: tarefas têm data_fim setada
         e datas começam a partir de obra.data_inicio (não de date.today())."""

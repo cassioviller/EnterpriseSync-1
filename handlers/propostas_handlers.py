@@ -136,6 +136,16 @@ def handle_proposta_aprovada(data: dict, admin_id: int):
                 _proposta_obj, admin_id, _proposta_obj.obra_id,
                 arvore_marcada=_proposta_obj.cronograma_default_json,
             )
+            # Versão nº1 do cronograma que acabou de nascer: sem ela o
+            # primeiro import (.mpp/.xml) não teria estado anterior para
+            # fotografar — e o rollback ficaria sem destino.
+            from services.cronograma_versao_service import (
+                registrar_versao_inicial,
+            )
+            registrar_versao_inicial(
+                _proposta_obj.obra_id, admin_id,
+                observacao='cronograma inicial (aprovação da proposta)',
+            )
             # Task #200: obra nasce já revisada (admin pré-configurou).
             obra_obj = _Obra.query.filter_by(id=_proposta_obj.obra_id).first()
             if obra_obj and obra_obj.cronograma_revisado_em is None:

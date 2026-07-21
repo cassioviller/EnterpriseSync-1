@@ -168,6 +168,57 @@ def _snapshot_versao(versao, tarefas, admin_id, preds_tipadas=None):
 
 
 # ---------------------------------------------------------------------------
+# Versão nº1 de obra cujo cronograma nasceu FORA do fluxo de importação
+# ---------------------------------------------------------------------------
+
+def registrar_versao_inicial(obra_id: int, admin_id: int,
+                             observacao: str,
+                             usuario_id: int | None = None):
+    """Cria a versão nº1 ativa + snapshots do cronograma recém-materializado.
+
+    Sem isso a obra fica SEM versão até o primeiro import, e `aplicar_versao`
+    só fotografa o estado anterior quando já existe versão ativa — ou seja, o
+    primeiro import de uma obra nova seria IRREVERSÍVEL (não haveria a que
+    restaurar). Mesma disciplina que o importador físico-financeiro adotou no
+    M09, generalizada para os caminhos de materialização (aprovação de
+    proposta e gate de revisão inicial).
+
+    Idempotente: se a obra já tem qualquer `CronogramaVersao`, não faz nada —
+    o versionamento a partir daí é do fluxo de importação (M05).
+    NÃO commita: o caller é dono da transação.
+
+    Devolve a versão criada, ou None se nada foi feito.
+    """
+    ja_versionada = (db.session.query(CronogramaVersao.id)
+                     .filter_by(obra_id=obra_id).first())
+    if ja_versionada is not None:
+        return None
+
+    vivas = (TarefaCronograma.query
+             .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+             .filter(TarefaCronograma.ativa.is_(True))
+             .all())
+    if not vivas:
+        return None  # sem cronograma não há o que versionar
+
+    versao = CronogramaVersao(
+        obra_id=obra_id,
+        admin_id=admin_id,
+        numero=1,
+        status='ativa',
+        aplicada_em=datetime.utcnow(),
+        aplicada_por_id=usuario_id,
+        observacao=observacao,
+    )
+    db.session.add(versao)
+    db.session.flush()
+    _snapshot_versao(versao, vivas, admin_id)
+    logger.info('versão inicial nº1 criada para obra %s (%d tarefas): %s',
+                obra_id, len(vivas), observacao)
+    return versao
+
+
+# ---------------------------------------------------------------------------
 # Ponte ORM → reconciliador puro (Task 1 é PURA; a extração vive aqui)
 # ---------------------------------------------------------------------------
 

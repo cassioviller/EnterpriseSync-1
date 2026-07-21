@@ -4009,6 +4009,7 @@ def executar_migracoes():
             (209, "Cronograma-mpp M02 — semântica de apontamento em rdo_apontamento_cronograma (tipo/percentuais/snapshot)", _migration_209_rdo_apontamento_semantico),
             (210, "Cronograma-mpp M02 — backfill versão nº1 + snapshots + tipo_apontamento", _migration_210_backfill_versao_inicial),
             (211, "Cronograma-mpp M10 — flag de rollout configuracao_empresa.cronograma_mpp_ativo (default FALSE)", _migration_211_configuracao_empresa_cronograma_mpp),
+            (212, "Cronograma-mpp — backfill versão nº1 nas obras criadas após a 210 (ponto de rollback do 1º import)", _migration_212_backfill_versao_inicial_obras_novas),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14113,4 +14114,55 @@ def _migration_211_configuracao_empresa_cronograma_mpp():
         logger.info("[Migration 211] configuracao_empresa.cronograma_mpp_ativo.")
     except Exception as e:
         logger.error(f"[Migration 211] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_212_backfill_versao_inicial_obras_novas():
+    """Cronograma-mpp — repete o backfill da 210 para as obras que nasceram
+    DEPOIS dela sem passar pelo fluxo de importação.
+
+    A 210 versionou as obras que tinham tarefas naquele momento. Obras
+    criadas depois (aprovação de proposta, gate de revisão inicial) ficaram
+    sem versão, e `aplicar_versao` só fotografa o estado anterior quando já
+    existe versão ativa — o primeiro import delas seria irreversível. Os
+    caminhos de materialização agora registram a versão nº1; esta migração
+    cobre o intervalo. Idempotente (pula obra que já tem versão); commit por
+    obra para caber no timeout de startup.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.connect() as conn:
+            obras = conn.execute(sa_text("""
+                SELECT DISTINCT t.obra_id, t.admin_id FROM tarefa_cronograma t
+                WHERE t.ativa IS TRUE AND t.is_cliente IS FALSE
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cronograma_versao v WHERE v.obra_id = t.obra_id
+                )
+            """)).fetchall()
+        for obra_id, admin_id in obras:
+            with db.engine.begin() as conn:
+                versao_id = conn.execute(sa_text("""
+                    INSERT INTO cronograma_versao
+                        (obra_id, admin_id, numero, status, observacao, aplicada_em)
+                    VALUES (:o, :a, 1, 'ativa',
+                            'cronograma inicial (backfill 212)', NOW())
+                    RETURNING id
+                """), {'o': obra_id, 'a': admin_id}).scalar()
+                conn.execute(sa_text("""
+                    INSERT INTO cronograma_tarefa_snapshot
+                        (versao_id, admin_id, tarefa_id, mpp_uid, wbs_codigo,
+                         nome_tarefa, ordem, data_inicio, data_fim,
+                         duracao_dias, quantidade_total, unidade_medida,
+                         is_marco, percentual_concluido_no_momento)
+                    SELECT :v, t.admin_id, t.id, t.mpp_uid, t.wbs_codigo,
+                           t.nome_tarefa, t.ordem, t.data_inicio, t.data_fim,
+                           t.duracao_dias, t.quantidade_total, t.unidade_medida,
+                           t.is_marco, t.percentual_concluido
+                    FROM tarefa_cronograma t
+                    WHERE t.obra_id = :o AND t.ativa IS TRUE
+                      AND t.is_cliente IS FALSE
+                """), {'v': versao_id, 'o': obra_id})
+        logger.info(f"[Migration 212] backfill em {len(obras)} obra(s) sem versão.")
+    except Exception as e:
+        logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
         raise
