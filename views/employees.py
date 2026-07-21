@@ -28,10 +28,14 @@ except ImportError:
 
 # ===== FUNCIONÁRIOS =====
 @main_bp.route('/funcionarios', methods=['GET', 'POST'])
+@login_required
 @capture_db_errors
 def funcionarios():
-    # Temporariamente remover decorator para testar
-    # @admin_required
+    # Fase 0 / R3 — o decorator estava comentado com "Temporariamente
+    # remover decorator para testar" e nunca foi restaurado, deixando a
+    # listagem de funcionários (com salários) acessível sem autenticação.
+    # Restaurado como @login_required; promover a @admin_required é decisão
+    # de produto (hoje encarregados podem precisar da tela).
     from models import Departamento, Funcao, HorarioTrabalho, Funcionario
     from sqlalchemy import text
     from werkzeug.utils import secure_filename

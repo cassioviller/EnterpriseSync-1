@@ -8,6 +8,7 @@ from flask_login import current_user
 from models import db, CategoriaServico
 from datetime import datetime
 import logging
+from flask_login import login_required
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -17,18 +18,19 @@ categorias_bp = Blueprint('categorias_servicos', __name__, url_prefix='/categori
 
 # Função para obter admin_id dinâmico
 def get_admin_id():
-    """Obtém admin_id dinamicamente baseado no usuário logado"""
-    try:
-        if hasattr(current_user, 'tipo_usuario'):
-            if current_user.tipo_usuario.name in ['ADMIN', 'SUPER_ADMIN']:
-                return current_user.id
-            else:
-                return current_user.admin_id or 10
-        return 10
-    except:
-        return 10
+    """Tenant do usuário autenticado — falha segura.
+
+    Fase 0 / R3 — antes caía em `return 10` (um tenant concreto, chumbado)
+    em três caminhos distintos: usuário sem `tipo_usuario`, funcionário sem
+    `admin_id`, e qualquer exceção. Como as 5 rotas deste blueprint — duas
+    delas de escrita (`POST /api/criar`, `DELETE /api/<id>/excluir`) — não
+    tinham autenticação, o efeito era gravar e apagar categorias no tenant 10.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 @categorias_bp.route('/', methods=['GET'])
+@login_required
 def index():
     """Página principal de gestão de categorias.
 
@@ -44,6 +46,7 @@ def index():
 # ================================
 
 @categorias_bp.route('/api/listar')
+@login_required
 def api_listar_categorias():
     """API para listar categorias do usuário"""
     try:
@@ -75,6 +78,7 @@ def api_listar_categorias():
         }), 500
 
 @categorias_bp.route('/api/criar', methods=['POST'])
+@login_required
 def api_criar_categoria():
     """API para criar nova categoria"""
     try:
@@ -144,6 +148,7 @@ def api_criar_categoria():
         }), 500
 
 @categorias_bp.route('/api/<int:categoria_id>/excluir', methods=['DELETE'])
+@login_required
 def api_excluir_categoria(categoria_id):
     """API para excluir categoria (soft delete)"""
     try:
@@ -182,6 +187,7 @@ def api_excluir_categoria(categoria_id):
         }), 500
 
 @categorias_bp.route('/api/<int:categoria_id>/editar', methods=['POST'])
+@login_required
 def api_editar_categoria(categoria_id):
     """API para editar categoria existente"""
     try:

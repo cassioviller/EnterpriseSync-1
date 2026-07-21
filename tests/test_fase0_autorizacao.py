@@ -73,6 +73,47 @@ def test_rdo_consolidado_exige_autenticacao():
         assert '/login' in r.headers.get('Location', '')
 
 
+@pytest.mark.parametrize('rota', [
+    # F2 — blueprint /prod: 6 rotas anônimas com tenant por heurística
+    '/prod/safe-funcionarios',
+    '/prod/safe-dashboard',
+    '/prod/safe-obras',
+    '/prod/debug-info',
+    # F3 — api_funcionarios: `utils.auth_utils` não existe, o except era o
+    # único caminho e o ramo anônimo caía em `return 10`
+    '/api/funcionarios-ativos',
+    '/api/funcionarios/buscar',
+    # F6 — decorator comentado "temporariamente" e nunca restaurado
+    '/funcionarios',
+])
+def test_rotas_anonimas_de_tenant_exigem_login(rota):
+    anon = app.test_client()
+    r = anon.get(rota, follow_redirects=False)
+    assert r.status_code in (302, 401, 403), (
+        f'{rota} respondeu {r.status_code} para anônimo — deveria exigir login')
+
+
+def test_categoria_servicos_nao_grava_sem_login():
+    """F4 — POST/DELETE sem auth gravavam no tenant 10 chumbado."""
+    anon = app.test_client()
+    r = anon.post('/categorias-servicos/api/criar',
+                  json={'nome': 'INVASOR'}, follow_redirects=False)
+    assert r.status_code in (302, 401, 403), (
+        f'criação de categoria aceita sem login (status {r.status_code})')
+
+
+def test_resolvedores_de_tenant_nao_tem_mais_fallback_chumbado():
+    """Nenhum resolvedor pode devolver um tenant concreto (1, 2 ou 10)."""
+    from api_funcionarios import get_admin_id as admin_id_api
+    from categoria_servicos import get_admin_id as admin_id_cat
+    from views.helpers import get_admin_id_dinamico
+
+    with app.test_request_context('/'):
+        assert admin_id_api() is None
+        assert admin_id_cat() is None
+        assert get_admin_id_dinamico() is None
+
+
 def test_resolucao_de_tenant_sem_usuario_nao_chuta_empresa():
     """`get_admin_id_dinamico` não pode mais auto-detectar tenant."""
     from views.helpers import get_admin_id_dinamico
