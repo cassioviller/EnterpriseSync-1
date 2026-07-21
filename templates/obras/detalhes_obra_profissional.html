@@ -2128,6 +2128,13 @@
              ═══════════════════════════════════════════════════════════════ -->
         <div class="tab-pane fade" id="tab-cronograma" role="tabpanel">
 
+        {# M08 — importação/versionamento de cronograma (MS Project), atrás
+           de flag; único ponto de toque deste template para a área nova. #}
+        {% if is_v2_active is defined and is_v2_active() and
+              cronograma_mpp_ativo is defined and cronograma_mpp_ativo() %}
+        {% include 'obras/cronograma_importacoes/_secao.html' %}
+        {% endif %}
+
         <div class="obra-card" id="card-cronograma" style="scroll-margin-top: 80px;">
             <div class="obra-card-header" style="--accent: var(--c-teal);">
                 <h3><i class="fas fa-calendar-alt"></i> Cronograma do Cliente</h3>

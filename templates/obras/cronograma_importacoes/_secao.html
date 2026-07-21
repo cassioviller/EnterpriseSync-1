@@ -1,0 +1,82 @@
+{# M08 — Seção "Importações e versões" da aba Cronograma da obra.
+   Incluída em detalhes_obra_profissional.html atrás de cronograma_mpp_ativo().
+   Dados carregados via JS (static/js/cronograma_importacao.js) dos endpoints
+   tenant-scoped do M03/M05/M08. Tudo escopado à obra atual. #}
+<div class="obra-card" id="secaoCronogramaMpp"
+     data-obra-id="{{ obra.id }}"
+     data-obra-nome="{{ obra.nome|e }}">
+    <div class="obra-card-header" style="--accent: var(--c-teal);">
+        <h3><i class="fas fa-file-import"></i> Importação de Cronograma (MS Project)</h3>
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <span class="badge bg-light text-primary" style="font-size:.65rem">V2</span>
+            <button type="button" class="btn btn-sm btn-primary"
+                    id="btnAbrirModalImportarCronograma">
+                <i class="fas fa-upload me-1"></i> Importar cronograma
+            </button>
+        </div>
+    </div>
+    <div class="obra-card-body" style="padding: 1rem 1rem 1.25rem;">
+        <div class="alert alert-info py-2 px-3 mb-3" style="font-size:.85rem">
+            <i class="fas fa-info-circle me-1"></i>
+            Esta importação altera somente a obra
+            <strong>{{ obra.nome|e }}</strong>. RDOs, medições e fotos são
+            preservados; tarefas removidas são arquivadas, nunca apagadas.
+        </div>
+
+        {# Cartão de status da versão ativa #}
+        <div id="cronMppStatusVersao" class="border rounded p-3 mb-3"
+             style="background:#f8fafc">
+            <span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>
+            Carregando versão ativa…</span>
+        </div>
+
+        {# Lista de importações #}
+        <h6 class="fw-bold mt-3 mb-2">
+            <i class="fas fa-inbox me-1"></i> Importações
+        </h6>
+        <div id="cronMppListaImportacoes" class="mb-3">
+            <span class="text-muted small">Carregando…</span>
+        </div>
+
+        {# Histórico de versões #}
+        <h6 class="fw-bold mt-3 mb-2">
+            <i class="fas fa-history me-1"></i> Histórico de versões
+        </h6>
+        <div id="cronMppListaVersoes">
+            <span class="text-muted small">Carregando…</span>
+        </div>
+    </div>
+</div>
+
+{# Modal de upload #}
+<div class="modal fade" id="modalImportarCronograma" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+            <i class="fas fa-file-import me-1"></i> Importar cronograma —
+            {{ obra.nome|e }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">
+            Envie o cronograma exportado do MS Project:
+            <strong>.xml</strong> (Arquivo → Salvar como → tipo XML — recomendado)
+            ou <strong>.mpp</strong>. Limite: 20 MB.
+        </p>
+        <input type="file" class="form-control" id="inputArquivoCronograma"
+               accept=".xml,.mpp">
+        <div id="uploadCronogramaFeedback" class="small mt-2 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnEnviarCronograma">
+            <i class="fas fa-upload me-1"></i> Enviar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/cronograma_importacao.js') }}"></script>

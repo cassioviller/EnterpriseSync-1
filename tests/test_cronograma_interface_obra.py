@@ -148,3 +148,48 @@ def test_cancelar_aplicada_e_409_e_outra_obra_404():
         outra_id = outra.id
     assert c.get(f"/obras/{outra_id}/cronograma/importacoes/{ctx['imp_id']}"
                  f'/status').status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — seção na aba Cronograma da página da obra (atrás de flag)
+# ---------------------------------------------------------------------------
+
+def test_secao_visivel_para_v2_e_ausente_sem_v2():
+    ctx = _setup_obra_com_importacao(_nt('uid:1', 'Fundação', uid=1))
+    with app.app_context():
+        from werkzeug.security import generate_password_hash
+        from models import Cliente, TipoUsuario, Usuario
+        import uuid
+        suf = uuid.uuid4().hex[:8]
+        v1 = Usuario(username=f'v1_{suf}', email=f'v1_{suf}@test.local',
+                     nome='Admin V1',
+                     password_hash=generate_password_hash('Senha@2026'),
+                     tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+                     versao_sistema='v1')
+        db.session.add(v1)
+        db.session.flush()
+        cli = Cliente(admin_id=v1.id, nome=f'Cli {suf}',
+                      email=f'c_{suf}@test.local', telefone='119')
+        db.session.add(cli)
+        db.session.flush()
+        obra_v1 = Obra(nome=f'Obra V1 {suf}', codigo=f'V1-{suf}',
+                       admin_id=v1.id, cliente_id=cli.id,
+                       status='Em andamento', data_inicio=date(2026, 7, 1))
+        db.session.add(obra_v1)
+        db.session.commit()
+        v1_id, obra_v1_id = v1.id, obra_v1.id
+
+    # Admin V2: seção presente com o aviso de escopo por obra.
+    c = _client_como(ctx['admin_id'])
+    r = c.get(f"/obras/{ctx['obra_id']}")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'secaoCronogramaMpp' in html
+    assert 'altera somente a obra' in html
+    assert 'cronograma_importacao.js' in html
+
+    # Admin V1 (flag desligada): página renderiza SEM a seção.
+    c2 = _client_como(v1_id)
+    r = c2.get(f'/obras/{obra_v1_id}')
+    assert r.status_code == 200
+    assert 'secaoCronogramaMpp' not in r.get_data(as_text=True)
