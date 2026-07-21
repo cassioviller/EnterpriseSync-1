@@ -179,6 +179,7 @@ def cronograma_obra(obra_id: int):
     tarefas_raw = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
         .order_by(TarefaCronograma.ordem)
         .all()
     )
@@ -320,6 +321,7 @@ def criar_tarefa(obra_id: int):
     ultima = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
         .order_by(TarefaCronograma.ordem.desc())
         .first()
     )
@@ -641,7 +643,8 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     db.session.refresh(tarefa)
     todas = TarefaCronograma.query.filter_by(
         obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
-    ).order_by(TarefaCronograma.ordem, TarefaCronograma.id).all()
+    ).filter(TarefaCronograma.ativa.is_(True)).order_by(
+        TarefaCronograma.ordem, TarefaCronograma.id).all()
     return jsonify({
         'status': 'ok',
         'tarefa': _tarefa_to_dict(tarefa),
@@ -680,7 +683,8 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
     # Devolver lista atualizada para o frontend re-renderizar hierarquia
     todas = TarefaCronograma.query.filter_by(
         obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
-    ).order_by(TarefaCronograma.ordem, TarefaCronograma.id).all()
+    ).filter(TarefaCronograma.ativa.is_(True)).order_by(
+        TarefaCronograma.ordem, TarefaCronograma.id).all()
     return jsonify({'status': 'ok', 'tarefas': [_tarefa_to_dict(t) for t in todas]})
 
 
@@ -706,6 +710,7 @@ def recalcular(obra_id: int):
     tarefas = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
         .order_by(TarefaCronograma.ordem)
         .all()
     )
@@ -765,6 +770,7 @@ def reordenar(obra_id: int):
         TarefaCronograma.obra_id == obra_id,
         TarefaCronograma.admin_id == admin_id,
         TarefaCronograma.is_cliente == cliente_mode,
+        TarefaCronograma.ativa.is_(True),
     ).all()
 
     if len(tarefas) != len(ordem_ids):
@@ -859,6 +865,7 @@ def tarefas_rdo(obra_id: int):
     tarefas = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=False)
+        .filter(TarefaCronograma.ativa.is_(True))
         .order_by(TarefaCronograma.ordem)
         .all()
     )

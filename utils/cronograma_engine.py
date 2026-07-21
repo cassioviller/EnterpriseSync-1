@@ -154,6 +154,7 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
     tarefas = (
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente)
+        .filter(TarefaCronograma.ativa.is_(True))
         .all()
     )
     if not tarefas:
@@ -258,6 +259,7 @@ def recalcular_cronograma(obra_id: int, admin_id: int, cliente: bool = False) ->
         tarefas = (
             TarefaCronograma.query
             .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente)
+            .filter(TarefaCronograma.ativa.is_(True))
             .order_by(TarefaCronograma.ordem)
             .all()
         )
@@ -488,6 +490,7 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date, admin_id: int
         TarefaCronograma.query
         .filter_by(obra_id=obra_id, admin_id=admin_id)
         .filter_by(is_cliente=False)
+        .filter(TarefaCronograma.ativa.is_(True))
         .all()
     )
     if not folhas:
