@@ -4,6 +4,14 @@
 > (texto + fotos numa pasta), eu edito o JSON, você reimporta.** Não precisa mexer
 > no RDO pela tela — o reimport reconstrói tudo (comentário, clima, % de avanço e
 > fotos).
+>
+> **ATUALIZAÇÃO (2026-07-21, M09):** para atualizar o CRONOGRAMA a obra não
+> usa mais reimport de JSON — use a aba Cronograma da página da obra
+> (Importar cronograma .xml/.mpp → prévia → Aplicar), que preserva RDOs,
+> fotos e histórico com versões restauráveis. O reimport de JSON é recusado
+> em obra já migrada; segue valendo apenas como criação inicial. RDOs do
+> dia a dia: registre pela tela de Novo RDO (M07 — modos quantitativo e
+> percentual). Ver `ESTADO_ATUALIZACAO_BAIA.md`.
 
 ---
 

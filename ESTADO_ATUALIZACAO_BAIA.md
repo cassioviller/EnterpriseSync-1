@@ -1,7 +1,34 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-06-30**.
+> Documento de handoff. Última atualização: **2026-07-21** (M09).
 > Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## Rodada 2026-07-21 — M09: atualização de cronograma migra para a UI da obra
+
+O fluxo de ATUALIZAÇÃO de cronograma deixou de ser "regenerar JSON +
+reimportar": agora é a **aba Cronograma da página da obra** (M08) —
+Importar cronograma (.xml/.mpp) → prévia com decisão de mapeamentos →
+Aplicar (IDs/RDOs/fotos preservados, tarefas removidas arquivadas) →
+Restaurar versão se preciso. O reimport do JSON canônico:
+
+- continua valendo para **criação inicial** (e agora registra
+  `CronogramaVersao` nº1 + snapshots + importação `json_canonico`);
+- é **recusado** em obra já versionada pela importação de cronograma
+  (mensagem manda usar a aba da obra) — o caminho destrutivo não
+  atropela mais o histórico.
+
+Verificação de equivalência automatizada:
+`scripts/verificar_equivalencia_obra.py` (genérico por obra) e o cenário
+completo em `tests/test_migracao_baias_equivalencia.py` (canônico →
+`CRONOGRAMA 06.07.mpp` real → reconciliar → aplicar → equivalência →
+rollback). **Procedimento homolog/produção**: (1) backup `pg_dump`;
+(2) `--salvar estado.json` antes; (3) importar o .mpp pela aba da obra,
+decidir pendências na prévia, aplicar; (4) `--comparar estado.json` —
+qualquer divergência ⇒ Restaurar versão anterior e investigar.
+Descontinuação dos scripts antigos (rebuild/diff/REMAP): agendada para
+após 2 semanas de estabilidade em produção (spec M09 §4.3).
 
 ---
 

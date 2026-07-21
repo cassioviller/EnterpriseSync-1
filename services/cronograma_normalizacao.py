@@ -49,10 +49,10 @@ _RE_CONTROLE_NOTAS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]')
 # Sufixo de duplicata que o MS Project acrescenta ao colar tarefa: " (2)".
 _RE_SUFIXO_DUPLICATA = re.compile(r'\s*\(\d+\)$')
 
-# Tabela de categorias: generalizada de scripts/rebuild_baia_from_0607_mpp.py
-# ::etapa_de(), SEM os casos específicos da obra (fazenda/ajr/moledo e as
-# regras de "físico-puro" ficam fora — M09 mapeia manualmente). É DADO, não
-# if-chain: lista ordenada de (palavras-chave normalizadas, categoria);
+# Tabela de categorias: generalizada do script legado de rebuild da
+# obra-piloto (etapa_de()), SEM os casos específicos daquela obra (regras
+# de "físico-puro" ficam fora — decisão manual na prévia do M05/M08). É
+# DADO, não if-chain: lista ordenada de (palavras-chave normalizadas, categoria);
 # o PRIMEIRO match vence (ex.: 'projetos' classifica PRELIM antes de 'lsf'
 # ter chance). Sem match ⇒ None — nunca inventa.
 CATEGORIAS = (

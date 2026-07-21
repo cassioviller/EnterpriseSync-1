@@ -252,7 +252,8 @@ def _rdos_sinteticos_do_pct_fisico(payload):
 
     Tarefas-resumo não entram (são rollup dos filhos → evitam dupla contagem).
     Retorna [] quando não há físico a lançar (cai no comportamento padrão).
-    Ver spec 2026-06-30-pct-fisico-no-import-baia."""
+    Ver docs/superpowers/specs/2026-06-30-pct-fisico-no-import*
+    (histórico) e ESTADO_ATUALIZACAO_BAIA.md (fluxo atual, M09)."""
     tarefas = payload.get('cronograma_tarefas', []) or []
     apont = [
         {'tarefa_mpp': t['id'], 'pct': float(t.get('pct_fisico') or 0)}
@@ -424,7 +425,9 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     """Cria os RDOs da obra a partir do payload (seção `rdos`), referenciando as
     tarefas pelo id do .mpp (traduzido por `tid_to_db`). Idempotente: apaga os RDOs
     da obra antes de recriar. Mão de obra é só realismo do documento (não gera
-    custo). Retorna o nº de RDOs criados. Ver spec 2026-06-30-rdos-no-import-baia."""
+    custo). Retorna o nº de RDOs criados. Ver docs/superpowers/specs/
+    2026-06-30-rdos-no-import* (histórico) e ESTADO_ATUALIZACAO_BAIA.md
+    (fluxo atual, M09 — atualização de cronograma migrou para a UI da obra)."""
     from app import db
     from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
                         CustoObra, NotificacaoCliente, MovimentacaoEstoque,
