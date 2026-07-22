@@ -276,7 +276,12 @@ def nova_obra():
             # Obter dados do formulário - Campos novos incluídos
             nome = request.form.get('nome')
             endereco = request.form.get('endereco', '')
-            status = request.form.get('status', 'Em andamento')
+            # Fase 2 — o formulário não escolhe mais o estado. Toda obra
+            # nasce em PLANEJAMENTO e sai de lá pelo handoff; o campo
+            # `status` do form virou badge somente-leitura no template.
+            from models import EstadoObra as _EstadoObra
+            from services.obra_estado import ROTULOS as _ROTULOS_ESTADO
+            status = _ROTULOS_ESTADO[_EstadoObra.PLANEJAMENTO]
             codigo = request.form.get('codigo', '')
             area_total_m2 = request.form.get('area_total_m2')
             responsavel_id = request.form.get('responsavel_id')
@@ -391,6 +396,7 @@ def nova_obra():
                 valor_contrato=valor_contrato,
                 area_total_m2=area_total_m2,
                 status=status,
+                estado=_EstadoObra.PLANEJAMENTO.value,
                 ativo=ativo,
                 responsavel_id=responsavel_id,
                 cliente_id=cliente_obj.id,
@@ -404,6 +410,42 @@ def nova_obra():
             
             db.session.add(nova_obra)
             db.session.flush()  # Para obter o ID da obra
+
+            # Fase 2 — primeira linha do histórico: a obra nasceu.
+            from models import ObraTransicaoEstado as _OTE
+            db.session.add(_OTE(
+                obra_id=nova_obra.id, admin_id=admin_id,
+                estado_de=None, estado_para=_EstadoObra.PLANEJAMENTO.value,
+                motivo='Obra criada manualmente',
+                detalhes={'origem': 'nova_obra'},
+                usuario_id=current_user.id,
+            ))
+            db.session.flush()
+
+            # Fase 2 — atalho de ergonomia: quem já indicou o responsável no
+            # formulário não precisa de um segundo passo. O handoff roda na
+            # MESMA transação, com histórico e UsuarioObra iguais aos do
+            # fluxo em duas etapas. Se o funcionário não tiver login, a obra
+            # é criada mesmo assim e fica em PLANEJAMENTO — criar a obra não
+            # pode falhar por causa do handoff.
+            if responsavel_id:
+                from services.obra_handoff import (
+                    HandoffInvalido, executar_handoff,
+                )
+                _func = Funcionario.query.filter_by(
+                    id=responsavel_id, admin_id=admin_id).first()
+                if _func is not None:
+                    try:
+                        executar_handoff(
+                            nova_obra, _func, usuario_id=current_user.id,
+                            motivo='Handoff automático na criação da obra')
+                    except HandoffInvalido as _e_hand:
+                        logger.info(
+                            'Fase 2: obra %s criada sem handoff automático: %s',
+                            nova_obra.id, _e_hand)
+                        flash(f'Obra criada em Planejamento — {_e_hand}',
+                              'warning')
+
             
             # [OK] CORREÇÃO CRÍTICA: Processar serviços selecionados usando função refatorada
             # SEMPRE chamar processar_servicos_obra(), mesmo com lista vazia (igual à edição)

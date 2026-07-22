@@ -886,6 +886,8 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
     (Obra + IMC + lançamento contábil + cronograma — tudo ou nada).
     """
     from models import db, Proposta, Obra
+    from models import EstadoObra as _EstadoObra
+    from services.obra_estado import ROTULOS as _ROTULOS_ESTADO
     from sqlalchemy import func
     import secrets
 
@@ -1015,7 +1017,14 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             data_inicio=datetime.now().date(),
             valor_contrato=valor_total,
             orcamento=valor_total,
-            status='Em andamento',
+            # Fase 2 — a obra nasce em PLANEJAMENTO, não em execução.
+            # Antes: `status='Em andamento'` — a obra entrava em execução no
+            # instante da aprovação, sem GP, sem aceite e sem cronograma
+            # revisado. O `status` continua sendo escrito (é o espelho legado
+            # lido por dezenas de templates/queries), agora derivado do
+            # estado por services.obra_estado.ROTULOS.
+            status=_ROTULOS_ESTADO[_EstadoObra.PLANEJAMENTO],
+            estado=_EstadoObra.PLANEJAMENTO.value,
             proposta_origem_id=proposta_id,
             admin_id=admin_id,
             ativo=True,
@@ -1027,6 +1036,25 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
             f"📋 Obra {codigo_obra} criada para proposta {proposta.numero} "
             f"(cliente_id={obra.cliente_id})"
         )
+        # Fase 2 — primeira linha do histórico de estado. `estado_de` é NULL
+        # porque a obra não veio de estado nenhum: ela nasceu.
+        #
+        # Escrito AQUI, dentro deste handler, e não num handler novo:
+        # `EventManager._handlers` é uma lista percorrida na ordem de
+        # registro, e a ordem de registro é a ordem dos imports em app.py.
+        # Registrar mais um handler para `proposta_aprovada` acrescentaria
+        # uma terceira dependência de ordem a um contrato já não declarado.
+        from models import ObraTransicaoEstado as _OTE
+        db.session.add(_OTE(
+            obra_id=obra.id, admin_id=admin_id,
+            estado_de=None, estado_para=_EstadoObra.PLANEJAMENTO.value,
+            motivo='Obra criada pela aprovação da proposta',
+            detalhes={'origem': 'proposta_aprovada',
+                      'proposta_id': proposta_id,
+                      'proposta_numero': proposta.numero},
+            usuario_id=None,
+        ))
+        db.session.flush()
     else:
         # Task #176 — popula cliente_id em obras pré-existentes (legado).
         if not obra.cliente_id and cliente_obj:

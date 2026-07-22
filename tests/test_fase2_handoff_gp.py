@@ -574,3 +574,152 @@ def test_rota_handoff_post_com_gp_sem_login_devolve_400():
     assert r.status_code == 400
     with app.app_context():
         assert db.session.get(Obra, obra_id).estado == 'planejamento'
+
+
+# ---------------------------------------------------------------------------
+# Task 9 — a obra nasce em PLANEJAMENTO
+# ---------------------------------------------------------------------------
+
+def test_obra_criada_pela_cascata_da_proposta_nasce_em_planejamento():
+    """O estado inicial é escrito DENTRO de `propagar_proposta_para_obra`,
+    sem handler novo: `EventManager._handlers` é uma lista percorrida na
+    ordem dos imports de app.py, e mais um handler seria mais uma dependência
+    de ordem num contrato já não declarado."""
+    from datetime import date as _date
+
+    from event_manager import propagar_proposta_para_obra
+    from models import ObraTransicaoEstado, Proposta
+    with app.app_context():
+        admin = _admin()
+        suf = _suf()
+        prop = Proposta(
+            numero=f'PROP-{suf}', cliente_nome=f'Cliente {suf}',
+            cliente_email=f'c_{suf}@test.local', titulo=f'Casa {suf}',
+            valor_total=250000.0, admin_id=admin.id, status='RASCUNHO',
+            criado_por=admin.id, data_proposta=_date(2026, 7, 1),
+        )
+        db.session.add(prop)
+        db.session.commit()
+
+        propagar_proposta_para_obra({'proposta_id': prop.id}, admin.id)
+        db.session.commit()
+
+        obra = Obra.query.filter_by(proposta_origem_id=prop.id).one()
+        assert obra.estado == 'planejamento'
+        assert obra.status == 'Planejamento'
+        assert obra.ativo is True
+        linha = ObraTransicaoEstado.query.filter_by(obra_id=obra.id).one()
+        assert linha.estado_de is None
+        assert linha.estado_para == 'planejamento'
+        assert linha.detalhes['origem'] == 'proposta_aprovada'
+        assert linha.detalhes['proposta_id'] == prop.id
+
+
+def test_cascata_nao_reescreve_estado_de_obra_ja_existente():
+    """O ramo `else` do handler (revisão/aditivo) não toca em estado."""
+    from datetime import date as _date
+
+    from event_manager import propagar_proposta_para_obra
+    from models import Proposta
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        suf = _suf()
+        prop = Proposta(
+            numero=f'PROP-{suf}', cliente_nome=f'Cliente {suf}',
+            titulo=f'Aditivo {suf}', valor_total=300000.0,
+            admin_id=admin.id, status='RASCUNHO', obra_id=obra.id,
+            criado_por=admin.id, data_proposta=_date(2026, 7, 1),
+        )
+        db.session.add(prop)
+        db.session.commit()
+
+        propagar_proposta_para_obra({'proposta_id': prop.id}, admin.id)
+        db.session.commit()
+        db.session.refresh(obra)
+        assert obra.estado == 'em_execucao'
+
+
+def test_nova_obra_sem_responsavel_nasce_em_planejamento():
+    with app.app_context():
+        admin = _admin()
+        admin_id = admin.id
+    c = _cliente_logado(admin_id)
+    suf = _suf()
+    r = c.post('/obras/nova', data={
+        'nome': f'Obra manual {suf}', 'codigo': f'M{suf[:7].upper()}',
+        'data_inicio': '2026-07-01', 'cliente_busca': f'Cliente {suf}',
+        'ativo': 'on',
+    }, follow_redirects=False)
+    assert r.status_code in (302, 303), r.get_data(as_text=True)[:300]
+    with app.app_context():
+        from models import ObraTransicaoEstado
+        o = Obra.query.filter_by(admin_id=admin_id,
+                                 nome=f'Obra manual {suf}').one()
+        assert o.estado == 'planejamento'
+        assert o.status == 'Planejamento'
+        assert ObraTransicaoEstado.query.filter_by(
+            obra_id=o.id, estado_para='planejamento').count() == 1
+
+
+def test_nova_obra_com_responsavel_ja_faz_o_handoff():
+    """Ergonomia preservada: quem preenche o responsável na criação não
+    precisa de segundo passo — mas histórico e UsuarioObra são criados
+    exatamente como no fluxo em duas etapas."""
+    with app.app_context():
+        admin = _admin()
+        func = _funcionario(admin)
+        admin_id, func_id = admin.id, func.id
+    c = _cliente_logado(admin_id)
+    suf = _suf()
+    r = c.post('/obras/nova', data={
+        'nome': f'Obra com GP {suf}', 'codigo': f'G{suf[:7].upper()}',
+        'data_inicio': '2026-07-01', 'cliente_busca': f'Cliente {suf}',
+        'responsavel_id': str(func_id), 'ativo': 'on',
+    }, follow_redirects=False)
+    assert r.status_code in (302, 303), r.get_data(as_text=True)[:300]
+    with app.app_context():
+        from models import ObraTransicaoEstado
+        o = Obra.query.filter_by(admin_id=admin_id,
+                                 nome=f'Obra com GP {suf}').one()
+        assert o.estado == 'em_execucao'
+        assert o.responsavel_id == func_id
+        assert UsuarioObra.query.filter_by(
+            obra_id=o.id, papel=PapelObra.GESTOR, ativo=True).count() == 1
+        assert ObraTransicaoEstado.query.filter_by(
+            obra_id=o.id, estado_para='em_execucao').count() == 1
+
+
+def test_nova_obra_com_gp_sem_login_e_criada_em_planejamento():
+    """Criar a obra não pode falhar por causa do handoff: GP sem login →
+    obra criada, aviso, e fica em PLANEJAMENTO."""
+    with app.app_context():
+        admin = _admin()
+        func = _funcionario(admin, com_login=False)
+        admin_id, func_id = admin.id, func.id
+    c = _cliente_logado(admin_id)
+    suf = _suf()
+    r = c.post('/obras/nova', data={
+        'nome': f'Obra GP sem login {suf}', 'codigo': f'S{suf[:7].upper()}',
+        'data_inicio': '2026-07-01', 'cliente_busca': f'Cliente {suf}',
+        'responsavel_id': str(func_id), 'ativo': 'on',
+    }, follow_redirects=False)
+    assert r.status_code in (302, 303)
+    with app.app_context():
+        o = Obra.query.filter_by(admin_id=admin_id,
+                                 nome=f'Obra GP sem login {suf}').one()
+        assert o.estado == 'planejamento'
+        assert UsuarioObra.query.filter_by(obra_id=o.id).count() == 0
+
+
+def test_obra_em_planejamento_aparece_no_dashboard():
+    """Achado B da revisão: os filtros do dashboard comparavam contra
+    'planejamento' minúsculo num IN case-sensitive — toda obra nova
+    sumiria dos contadores. Agora filtram por `estado`."""
+    from views import dashboard as dash_mod
+    import inspect
+    fonte = inspect.getsource(dash_mod)
+    assert fonte.count("Obra.estado.in_") == 4, 'os 4 filtros migram juntos'
+    assert "Obra.status.in_" not in fonte, (
+        'filtro por texto de status voltou ao dashboard — case-sensitive, '
+        'não reconhece Planejamento')

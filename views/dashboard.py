@@ -426,7 +426,12 @@ def dashboard():
         obras_ativas = Obra.query.filter_by(
             admin_id=admin_id, ativo=True
         ).filter(
-            Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
+            # Fase 2 (achado B da revisão) — filtro por `estado`, a fonte de
+            # verdade. A lista de strings anterior era defensiva ('ATIVO' e
+            # 'ativa' não existem em nenhuma linha) e case-sensitive: quando a
+            # obra passou a nascer com status='Planejamento', o IN contra
+            # 'planejamento' minúsculo a tornava invisível aqui.
+            Obra.estado.in_(['planejamento', 'em_execucao', 'pausada'])
         ).order_by(Obra.created_at.desc()).limit(5).all()
         logger.debug(f"DEBUG: {len(obras_ativas)} obras ativas encontradas - Status: {[o.status for o in obras_ativas]}")
         
@@ -1011,7 +1016,12 @@ def dashboard():
         ).filter(
             Obra.admin_id == admin_id,
             Obra.ativo == True,
-            Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])
+            # Fase 2 (achado B da revisão) — filtro por `estado`, a fonte de
+            # verdade. A lista de strings anterior era defensiva ('ATIVO' e
+            # 'ativa' não existem em nenhuma linha) e case-sensitive: quando a
+            # obra passou a nascer com status='Planejamento', o IN contra
+            # 'planejamento' minúsculo a tornava invisível aqui.
+            Obra.estado.in_(['planejamento', 'em_execucao', 'pausada'])
         ).scalar() or 0
         
         # Calcular margem percentual
@@ -1033,7 +1043,8 @@ def dashboard():
     # cancelamentos/rascunhos, mas só contamos obras com `ativo == True`.
     obras_ativas_count = safe_db_operation(
         lambda: Obra.query.filter_by(admin_id=admin_id, ativo=True).filter(
-            Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+            # Fase 2 (achado B) — mesmo motivo do filtro acima.
+            Obra.estado.in_(['planejamento', 'em_execucao', 'pausada'])
         ).count(),
         default_value=0
     )
@@ -1052,7 +1063,8 @@ def dashboard():
     # Task #17: respeitar `Obra.ativo` (flag canônica) além do status legado.
     obras_andamento = safe_db_operation(
         lambda: Obra.query.filter_by(admin_id=admin_id, ativo=True).filter(
-            Obra.status.in_(['andamento', 'Em andamento', 'ativa', 'planejamento'])
+            # Fase 2 (achado B) — mesmo motivo do filtro acima.
+            Obra.estado.in_(['planejamento', 'em_execucao', 'pausada'])
         ).order_by(Obra.data_inicio.desc()).limit(5).all(),
         default_value=[]
     )
