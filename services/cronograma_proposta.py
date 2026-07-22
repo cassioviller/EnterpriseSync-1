@@ -17,8 +17,9 @@ Funções:
       cria TarefaCronograma (3 níveis) + ItemMedicaoCronogramaTarefa com peso
       por horas para cada nó marcado. Idempotente: nunca duplica para o mesmo
       proposta_item_id (chave gerada_por_proposta_item_id).
-    - tem_conteudo_para_revisar(proposta, admin_id): True se ao menos um
-      PropostaItem tem servico com template_padrao_id.
+    - tem_itens_materializaveis(proposta, admin_id): True se a proposta tem
+      ao menos um item que pode virar tarefa — critério do gate de revisão
+      inicial da obra. Não exige template: item sem template vira esqueleto.
 
 Decisões:
     - Peso é calculado por `duracao_estimada_horas` da SubatividadeMestre
@@ -443,49 +444,36 @@ def montar_arvore_preview_orcamento(orcamento, admin_id: int) -> list[dict]:
     return arvore
 
 
-def tem_conteudo_para_revisar(proposta, admin_id: int) -> bool:
-    """True se há pelo menos um PropostaItem com template efetivo e acessível:
-    override por linha (Task #118) OU padrão do serviço (Task #102).
+def tem_itens_materializaveis(proposta, admin_id: int) -> bool:
+    """True se a proposta tem ao menos um item que PODE virar tarefa.
 
-    Fix #6: agora junta CronogramaTemplate para garantir que o template
-    referenciado realmente existe e pertence ao mesmo tenant (admin_id).
-    O campo `ativo` NÃO é verificado — alinhado com montar_arvore_preview
-    que também aceita templates desativados para propostas existentes.
+    Substitui `tem_conteudo_para_revisar`, que perguntava "há template
+    configurado?" e era o critério do gate de revisão inicial
+    (`views/obras._precisa_revisao_cronograma_inicial`). Aquela pergunta
+    deixou de ser a certa: desde a tolerância a catálogo incompleto, um item
+    **sem** template também vira tarefa (esqueleto de nível 0) quando o admin
+    o marca na tela — logo a existência de PropostaItem já basta para valer a
+    pena oferecer a tela, e exigir template fazia a obra abrir muda.
+
+    Por que a antiga saiu em vez de virar um `or`: os dois ramos dela partiam
+    de `PropostaItem.proposta_id == proposta.id`, então "tem template" implica
+    "tem item" — `tem_conteudo_para_revisar(p) or tem_itens_materializaveis(p)`
+    tem exatamente o mesmo valor-verdade que o segundo termo sozinho. Com o
+    `or` redundante ela ficava sem nenhum chamador, e o que ela codificava
+    (precedência override→padrão + filtro de tenant do template) continua vivo
+    e exercitado dentro de `montar_arvore_preview`.
+
+    Filtro de tenant: a proposta já chega carregada por `admin_id` pelo caller
+    (`views/obras._proposta_origem_obra`), e PropostaItem não tem `admin_id`
+    próprio — a proposta é o escopo. `admin_id` fica na assinatura por
+    simetria com as demais funções do módulo.
     """
-    # Task #118: override tem precedência → basta um item com override acessível.
-    has_override = (
+    return (
         db.session.query(PropostaItem.id)
-        .join(
-            CronogramaTemplate,
-            CronogramaTemplate.id == PropostaItem.cronograma_template_override_id,
-        )
-        .filter(
-            PropostaItem.proposta_id == proposta.id,
-            PropostaItem.cronograma_template_override_id.isnot(None),
-            CronogramaTemplate.admin_id == admin_id,
-        )
+        .filter(PropostaItem.proposta_id == proposta.id)
         .limit(1)
         .first()
-    )
-    if has_override:
-        return True
-    # Template padrão do serviço: verifica que o template existe e é do mesmo tenant.
-    q = (
-        db.session.query(Servico.id)
-        .join(PropostaItem, PropostaItem.servico_id == Servico.id)
-        .join(
-            CronogramaTemplate,
-            CronogramaTemplate.id == Servico.template_padrao_id,
-        )
-        .filter(
-            PropostaItem.proposta_id == proposta.id,
-            Servico.admin_id == admin_id,
-            Servico.template_padrao_id.isnot(None),
-            CronogramaTemplate.admin_id == admin_id,
-        )
-        .limit(1)
-    )
-    return q.first() is not None
+    ) is not None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

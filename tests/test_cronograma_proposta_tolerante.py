@@ -478,3 +478,122 @@ def test_orcamento_servico_de_outro_tenant_nao_vaza():
         no = montar_arvore_preview_orcamento(c['orcamento'], admin_a.id)[0]
         assert no['sem_template'] is True
         assert no['servico_id'] is None
+
+
+# ---------------------------------------------------------------------------
+# Task 12 — o gate de revisão dispara mesmo sem template
+# ---------------------------------------------------------------------------
+# Faltava o caso mais silencioso: quando NENHUM item da proposta tinha
+# template, `tem_conteudo_para_revisar` devolvia False, o gate cortava em
+# `views/obras.py:2364` e o usuário nunca chegava à tela onde a tarefa-esqueleto
+# pode ser marcada. A obra abria muda — o mesmo sintoma que os testes acima
+# travam pelo lado do serviço, só que por outro caminho.
+
+
+def _obra_de_proposta(admin_id, com_template=False):
+    """Cenário do gate: obra não revisada, ligada à proposta, sem tarefas."""
+    c = _cenario(admin_id)
+    if com_template:
+        _com_template(admin_id, c['servico'])
+    c['obra'].proposta_origem_id = c['proposta'].id
+    c['obra'].cronograma_revisado_em = None
+    db.session.commit()
+    return c
+
+
+def test_proposta_sem_template_tem_itens_materializaveis():
+    from services.cronograma_proposta import tem_itens_materializaveis
+
+    with app.app_context():
+        admin = _admin()
+        c = _cenario(admin.id)
+        assert tem_itens_materializaveis(c['proposta'], admin.id) is True
+
+
+def test_proposta_vazia_nao_dispara_o_gate():
+    """Sem PropostaItem não há o que oferecer — a tela seria uma parede vazia."""
+    from services.cronograma_proposta import tem_itens_materializaveis
+
+    with app.app_context():
+        admin = _admin()
+        suf = _suf()
+        cliente = Cliente(nome=f'Cliente Vazio {suf}', admin_id=admin.id)
+        db.session.add(cliente)
+        db.session.flush()
+        proposta = Proposta(numero=f'PV-{suf[:10]}', admin_id=admin.id,
+                            cliente_id=cliente.id, cliente_nome=cliente.nome,
+                            criado_por=admin.id)
+        db.session.add(proposta)
+        db.session.commit()
+        assert tem_itens_materializaveis(proposta, admin.id) is False
+
+
+def test_gate_dispara_para_obra_com_proposta_sem_template():
+    from views.obras import _precisa_revisao_cronograma_inicial
+
+    with app.app_context():
+        admin = _admin()
+        c = _obra_de_proposta(admin.id)
+        assert _precisa_revisao_cronograma_inicial(c['obra'], admin.id) is True, (
+            'obra nasceria muda: sem template o gate não disparava e o '
+            'usuário nunca via a tela de revisão')
+
+
+def test_gate_continua_disparando_com_template():
+    """Regressão do caminho que já funcionava.
+
+    O gate deixou de consultar `tem_conteudo_para_revisar` (removida — virou
+    função sem chamador quando o `or` se mostrou redundante). Uma proposta COM
+    template tem itens, então continua entrando pelo mesmo critério.
+    """
+    from views.obras import _precisa_revisao_cronograma_inicial
+
+    with app.app_context():
+        admin = _admin()
+        c = _obra_de_proposta(admin.id, com_template=True)
+        assert _precisa_revisao_cronograma_inicial(c['obra'], admin.id) is True
+
+
+def test_gate_nao_dispara_para_obra_ja_revisada():
+    from datetime import datetime
+
+    from views.obras import _precisa_revisao_cronograma_inicial
+
+    with app.app_context():
+        admin = _admin()
+        c = _obra_de_proposta(admin.id)
+        c['obra'].cronograma_revisado_em = datetime.utcnow()
+        db.session.commit()
+        assert _precisa_revisao_cronograma_inicial(c['obra'], admin.id) is False
+
+
+def test_gate_nao_dispara_para_obra_que_ja_tem_tarefa():
+    """Obra legada com tarefas não pode cair no gate (critério (c) do #200)."""
+    from views.obras import _precisa_revisao_cronograma_inicial
+
+    with app.app_context():
+        admin = _admin()
+        c = _obra_de_proposta(admin.id)
+        db.session.add(TarefaCronograma(
+            obra_id=c['obra'].id, admin_id=admin.id, nome_tarefa='Já existe',
+            ordem=0, duracao_dias=1, is_cliente=False,
+        ))
+        db.session.commit()
+        assert _precisa_revisao_cronograma_inicial(c['obra'], admin.id) is False
+
+
+def test_gate_nao_dispara_para_obra_sem_proposta():
+    from views.obras import _precisa_revisao_cronograma_inicial
+
+    with app.app_context():
+        admin = _admin()
+        suf = _suf()
+        cliente = Cliente(nome=f'Cliente Solto {suf}', admin_id=admin.id)
+        db.session.add(cliente)
+        db.session.flush()
+        obra = Obra(nome=f'Obra Solta {suf}', codigo=f'SO-{suf[:8].upper()}',
+                    admin_id=admin.id, cliente_id=cliente.id,
+                    data_inicio=date(2026, 1, 1))
+        db.session.add(obra)
+        db.session.commit()
+        assert _precisa_revisao_cronograma_inicial(obra, admin.id) is False

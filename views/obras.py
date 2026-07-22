@@ -2344,7 +2344,9 @@ def _precisa_revisao_cronograma_inicial(obra, admin_id):
 
     Critérios (TODOS precisam ser True):
       a) Obra ainda NÃO foi revisada (`obra.cronograma_revisado_em IS NULL`).
-      b) Existe uma Proposta de origem (FK direta ou inversa) com `tem_conteudo_para_revisar`.
+      b) Existe uma Proposta de origem (FK direta ou inversa) com ao menos um
+         item — `tem_itens_materializaveis`. NÃO exige template: item sem
+         template vira tarefa-esqueleto na própria tela de revisão.
       c) Obra ainda não tem NENHUMA TarefaCronograma materializada (interno) — evita
          cair no gate em obras legadas que já têm tarefas (mesmo que `cronograma_revisado_em`
          seja NULL antes do backfill).
@@ -2360,8 +2362,14 @@ def _precisa_revisao_cronograma_inicial(obra, admin_id):
     proposta = _proposta_origem_obra(obra, admin_id)
     if proposta is None:
         return False
-    from services.cronograma_proposta import tem_conteudo_para_revisar
-    if not tem_conteudo_para_revisar(proposta, admin_id):
+    # Antes o critério era `tem_conteudo_para_revisar`: ao menos um item com
+    # CronogramaTemplate. Quando nenhum serviço da proposta tinha
+    # `template_padrao_id` o gate não disparava, o usuário nunca via a tela de
+    # revisão e a obra abria com cronograma vazio — em silêncio. Como um item
+    # SEM template agora também vira tarefa (esqueleto de nível 0, marcável na
+    # própria tela), basta existir item.
+    from services.cronograma_proposta import tem_itens_materializaveis
+    if not tem_itens_materializaveis(proposta, admin_id):
         return False
     # Obra legada que já tem tarefas internas materializadas — não cai no gate.
     from models import TarefaCronograma as _TC
