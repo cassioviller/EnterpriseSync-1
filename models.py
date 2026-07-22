@@ -434,6 +434,56 @@ class Obra(db.Model):
         return (self.cliente_ref.telefone or '') if self.cliente_ref is not None else ''
 
 
+class ObraTransicaoEstado(db.Model):
+    """Histórico de transições de estado da Obra — Fase 2.
+
+    Molde: `CronogramaImportacaoEvento`, a única trilha de auditoria de
+    máquina de estados que já existia no sistema. Mesma forma: FK para o
+    agregado, tenant desnormalizado, `detalhes` em JSON livre, `usuario_id`
+    nullable (transição feita por migração ou por automação não tem usuário).
+
+    `estado_de` é NULL apenas na linha de backfill escrita pela migration
+    231, que registra o NASCIMENTO do estado derivado do texto legado — não
+    é transição, é origem. Essa linha carrega, no `motivo`, o valor VERBATIM
+    de `Obra.status` e de `Obra.ativo` antes da migração; é o que torna a
+    migration 232 reversível a partir do próprio banco.
+    """
+    __tablename__ = 'obra_transicao_estado'
+    __table_args__ = (
+        db.Index('ix_obra_transicao_obra_criado', 'obra_id', 'criado_em'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(
+        db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+        nullable=False, index=True,
+    )
+    admin_id = db.Column(
+        db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True,
+    )
+    # Guardamos o `.value` do EstadoObra, não o Enum: a coluna precisa ser
+    # legível por SQL cru nas migrações e nos relatórios de censo.
+    estado_de = db.Column(db.String(20), nullable=True)
+    estado_para = db.Column(db.String(20), nullable=False)
+    motivo = db.Column(db.Text, nullable=True)
+    detalhes = db.Column(db.JSON, nullable=True)
+    usuario_id = db.Column(
+        db.Integer, db.ForeignKey('usuario.id'), nullable=True,
+    )
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    obra = db.relationship(
+        'Obra', foreign_keys=[obra_id],
+        backref=db.backref('transicoes', lazy='select',
+                           order_by='ObraTransicaoEstado.criado_em',
+                           cascade='all, delete-orphan'),
+    )
+
+    def __repr__(self):
+        return (f'<ObraTransicaoEstado obra={self.obra_id} '
+                f'{self.estado_de}→{self.estado_para}>')
+
+
 class UsuarioObra(db.Model):
     """Vínculo usuário ↔ obra — o segundo eixo de autorização (Fase 1).
 

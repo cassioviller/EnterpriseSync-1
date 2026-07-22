@@ -215,3 +215,148 @@ def test_rotulo_sobrevive_ao_validates_de_status():
         assert normalizar_status_obra(rotulo) == rotulo, (
             f'{estado}: @validates reescreveria {rotulo!r} como '
             f'{normalizar_status_obra(rotulo)!r}')
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — tabela de histórico `obra_transicao_estado`
+# ---------------------------------------------------------------------------
+# `Obra.cliente_id` é NOT NULL, então todo cenário cria Cliente antes.
+# A fixture NÃO passa `estado=` por default (achado E da revisão de 22/07):
+# a coluna só nasce na Task 3, e a versão original do plano tornava esta task
+# não verificável isoladamente.
+import uuid
+from datetime import date
+
+from werkzeug.security import generate_password_hash
+
+
+@pytest.fixture(autouse=True)
+def _config():
+    app.config['TESTING'] = True
+    app.config['WTF_CSRF_ENABLED'] = False
+    if not app.secret_key:
+        app.secret_key = 'test-fase2-estados'
+    yield
+
+
+def _admin(prefixo='f2a'):
+    from models import TipoUsuario, Usuario
+    suf = uuid.uuid4().hex[:8]
+    u = Usuario(
+        username=f'{prefixo}_{suf}', email=f'{prefixo}_{suf}@test.local',
+        nome=f'Admin {suf}',
+        password_hash=generate_password_hash('Senha@2026'),
+        tipo_usuario=TipoUsuario.ADMIN, ativo=True, versao_sistema='v2',
+    )
+    db.session.add(u)
+    db.session.commit()
+    return u
+
+
+def _obra(admin, estado=None, status='Planejamento', ativo=True):
+    from models import Cliente, Obra
+    suf = uuid.uuid4().hex[:8]
+    cli = Cliente(nome=f'Cliente {suf}', admin_id=admin.id)
+    db.session.add(cli)
+    db.session.flush()
+    kwargs = {'estado': estado} if estado is not None else {}
+    o = Obra(
+        nome=f'Obra {suf}', codigo=f'F2{suf[:6].upper()}',
+        cliente_id=cli.id, data_inicio=date(2026, 7, 1),
+        status=status, ativo=ativo, admin_id=admin.id, **kwargs,
+    )
+    db.session.add(o)
+    db.session.commit()
+    return o
+
+
+def test_tabela_de_historico_existe_e_grava():
+    from models import ObraTransicaoEstado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        reg = ObraTransicaoEstado(
+            obra_id=obra.id, admin_id=admin.id,
+            estado_de='planejamento', estado_para='em_execucao',
+            motivo='teste', detalhes={'origem': 'pytest'},
+            usuario_id=admin.id,
+        )
+        db.session.add(reg)
+        db.session.commit()
+        lido = db.session.get(ObraTransicaoEstado, reg.id)
+        assert lido.estado_de == 'planejamento'
+        assert lido.estado_para == 'em_execucao'
+        assert lido.detalhes == {'origem': 'pytest'}
+        assert lido.usuario_id == admin.id
+        assert lido.criado_em is not None
+
+
+def test_historico_e_acessivel_pela_obra_em_ordem_cronologica():
+    with app.app_context():
+        from models import ObraTransicaoEstado
+        admin = _admin()
+        obra = _obra(admin)
+        for de, para in (('planejamento', 'em_execucao'),
+                         ('em_execucao', 'pausada')):
+            db.session.add(ObraTransicaoEstado(
+                obra_id=obra.id, admin_id=admin.id,
+                estado_de=de, estado_para=para, usuario_id=admin.id))
+        db.session.commit()
+        db.session.refresh(obra)
+        assert [t.estado_para for t in obra.transicoes] == [
+            'em_execucao', 'pausada']
+
+
+def test_estado_de_aceita_null_para_a_linha_de_backfill():
+    """A linha que a migration 231 escreve não tem origem — é o nascimento
+    do estado, não uma transição. `estado_de` NULL é o que a distingue."""
+    from models import ObraTransicaoEstado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        db.session.add(ObraTransicaoEstado(
+            obra_id=obra.id, admin_id=admin.id,
+            estado_de=None, estado_para='em_execucao',
+            motivo='backfill — status legado=Em andamento | ativo=true'))
+        db.session.commit()
+        linha = ObraTransicaoEstado.query.filter_by(
+            obra_id=obra.id, estado_de=None).one()
+        assert linha.usuario_id is None, 'migração não tem usuário'
+
+
+def test_apagar_obra_leva_o_historico_junto():
+    """FK com ON DELETE CASCADE: histórico órfão apontaria para obra que
+    não existe mais e quebraria qualquer relatório que faça join."""
+    from models import Obra, ObraTransicaoEstado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        db.session.add(ObraTransicaoEstado(
+            obra_id=obra.id, admin_id=admin.id,
+            estado_de=None, estado_para='planejamento'))
+        db.session.commit()
+        obra_id = obra.id
+        db.session.delete(db.session.get(Obra, obra_id))
+        db.session.commit()
+        assert ObraTransicaoEstado.query.filter_by(obra_id=obra_id).count() == 0
+
+
+def test_migration_230_e_idempotente():
+    from migrations import migration_230_obra_transicao_estado
+    with app.app_context():
+        migration_230_obra_transicao_estado()
+        migration_230_obra_transicao_estado()
+
+
+def test_migration_230_garante_os_indices():
+    """`create_all` roda ANTES das migrações (app.py:595 vs :703), então o
+    CREATE TABLE da 230 é no-op numa base onde o modelo já foi importado —
+    e os índices declarados só no DDL nunca nasceriam. Por isso são criados
+    separadamente, e é isso que este teste trava."""
+    from migrations import migration_230_obra_transicao_estado
+    with app.app_context():
+        migration_230_obra_transicao_estado()
+        nomes = {r[0] for r in db.session.execute(db.text(
+            "SELECT indexname FROM pg_indexes "
+            "WHERE tablename = 'obra_transicao_estado'"))}
+        assert 'ix_obra_transicao_obra_criado' in nomes, nomes

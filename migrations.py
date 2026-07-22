@@ -3863,6 +3863,62 @@ def migration_221_backfill_modo_apontamento():
     logger.info("[Migration 221] Concluída com sucesso")
 
 
+def migration_230_obra_transicao_estado():
+    """Fase 2 — tabela `obra_transicao_estado` (histórico de transições).
+
+    ATENÇÃO: `db.create_all()` roda ANTES das migrações (app.py:595 vs
+    app.py:703), então numa base onde o modelo já foi importado a tabela já
+    existe e o `CREATE TABLE IF NOT EXISTS` abaixo é no-op. Isso é esperado
+    — a prova de que acontece está na migration 207, que declara
+    `json_bruto JSONB` sobre uma coluna que o Postgres reporta como `json`,
+    porque quem a criou foi o create_all.
+
+    Por isso cada índice é criado separadamente e de forma idempotente, em
+    vez de embutido no CREATE TABLE: índices declarados só no DDL da
+    migração nunca nasceriam numa base assim. É a mesma lição da 213.
+
+    Idempotente: seguro re-executar.
+    """
+    try:
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS obra_transicao_estado (
+                id SERIAL PRIMARY KEY,
+                obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                estado_de VARCHAR(20) NULL,
+                estado_para VARCHAR(20) NOT NULL,
+                motivo TEXT NULL,
+                detalhes JSON NULL,
+                usuario_id INTEGER NULL REFERENCES usuario(id),
+                criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """))
+
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_obra_transicao_estado_obra_id
+                ON obra_transicao_estado (obra_id)
+        """))
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_obra_transicao_estado_admin_id
+                ON obra_transicao_estado (admin_id)
+        """))
+        # Índice do caso de uso quente: "linha do tempo desta obra".
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_obra_transicao_obra_criado
+                ON obra_transicao_estado (obra_id, criado_em)
+        """))
+
+        db.session.commit()
+        logger.info(
+            "MIGRACAO 230 CONCLUIDA: tabela obra_transicao_estado "
+            "verificada + 3 indices garantidos"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 230] Erro: {e}")
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4114,6 +4170,7 @@ def executar_migracoes():
             (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
             (220, "Cronograma editável — tarefa_cronograma.modo_apontamento (quantidade|percentual, NULL = dedução legada)", migration_220_tarefa_modo_apontamento),
             (221, "Cronograma editável — backfill de modo_apontamento congelando a dedução vigente (no-op de comportamento)", migration_221_backfill_modo_apontamento),
+            (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
