@@ -296,3 +296,67 @@ def transitar(obra, para, usuario_id=None, motivo: str = '',
         logger.debug('falha ao logar transição de obra', exc_info=True)
 
     return registro
+
+
+def pode_transitar_como(obra, para, usuario=None) -> bool:
+    """`usuario` pode disparar esta transição nesta obra?
+
+    Dois eixos, ambos obrigatórios (Fase 1):
+      • tenant  — a obra tem de pertencer ao tenant do usuário;
+      • obra    — 'admin' exige TipoUsuario.ADMIN/SUPER_ADMIN;
+                  'gestor' aceita também quem tem UsuarioObra(GESTOR).
+
+    Falha FECHADA: anônimo, tenant divergente, transição fora do grafo ou
+    estado ilegível devolvem False, nunca exceção. A rota converte isso em
+    403/404; o serviço não decide resposta HTTP.
+
+    `usuario=None` significa "use o current_user".
+    """
+    from models import PapelObra, TipoUsuario, UsuarioObra
+    from utils.identidade import tenant_do_usuario
+
+    if obra is None:
+        return False
+
+    if usuario is None:
+        try:
+            from flask_login import current_user
+            if not current_user.is_authenticated:
+                return False
+            usuario = current_user
+        except Exception:
+            return False
+
+    tenant = tenant_do_usuario(usuario)
+    if tenant is None or obra.admin_id != tenant:
+        return False
+
+    try:
+        de = estado_atual(obra)
+        destino = coagir(para)
+    except EstadoDesconhecido:
+        return False
+
+    if destino not in TRANSICOES.get(de, ()):
+        return False
+
+    e_admin = usuario.tipo_usuario in (TipoUsuario.ADMIN, TipoUsuario.SUPER_ADMIN)
+    if e_admin:
+        return True
+
+    if autoridade_necessaria(de, destino) == 'admin':
+        return False
+
+    # 'gestor': exige vínculo explícito com papel GESTOR nesta obra.
+    #
+    # Consultamos `UsuarioObra` direto em vez de usar
+    # `utils.autorizacao.papel_na_obra` porque aquela função devolve GESTOR
+    # para TODO usuário do tenant enquanto `escopo_obra_ativo` está desligada
+    # — deliberado, para o deploy da Fase 1 não tirar acesso de ninguém, e
+    # correto para LEITURA. Para ESCRITA DE ESTADO seria um furo: hoje 586
+    # dos 607 tenants estão com a flag desligada, então qualquer usuário
+    # autenticado poderia pausar ou concluir obra.
+    # `test_autorizacao_nao_afrouxa_com_a_flag_de_escopo_desligada` trava isso.
+    vinculo = UsuarioObra.query.filter_by(
+        usuario_id=usuario.id, obra_id=obra.id, ativo=True).first()
+    return vinculo is not None and vinculo.papel == PapelObra.GESTOR

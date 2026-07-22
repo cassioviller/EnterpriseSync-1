@@ -682,3 +682,161 @@ def test_write_through_passa_pelo_validates_sem_ser_reescrito():
                 f'{estado}: @validates reescreveu {ROTULOS[estado]!r} '
                 f'como {obra.status!r}')
         db.session.rollback()
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — autorização por transição
+# ---------------------------------------------------------------------------
+
+def _funcionario(admin, nome='GP Teste'):
+    from models import Funcionario
+    suf = uuid.uuid4().hex[:8]
+    f = Funcionario(
+        codigo=f'F2{suf[:6].upper()}', nome=f'{nome} {suf}',
+        cpf=f'{uuid.uuid4().int % 10**11:011d}',
+        data_admissao=date(2026, 1, 5), admin_id=admin.id, ativo=True,
+    )
+    db.session.add(f)
+    db.session.commit()
+    return f
+
+
+def _usuario_comum(admin, funcionario=None):
+    """Usuário FUNCIONARIO do tenant, opcionalmente ligado a um Funcionario."""
+    from models import TipoUsuario, Usuario
+    from utils.identidade import vincular_funcionario
+    suf = uuid.uuid4().hex[:8]
+    u = Usuario(
+        username=f'f2u_{suf}', email=f'f2u_{suf}@test.local',
+        nome=f'Usuario {suf}',
+        password_hash=generate_password_hash('Senha@2026'),
+        tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+        admin_id=admin.id, versao_sistema='v2',
+    )
+    db.session.add(u)
+    db.session.flush()
+    if funcionario is not None:
+        vincular_funcionario(u, funcionario)
+    db.session.commit()
+    return u
+
+
+def _vincular(usuario, obra, papel=None):
+    from models import PapelObra, UsuarioObra
+    v = UsuarioObra(usuario_id=usuario.id, obra_id=obra.id,
+                    papel=papel or PapelObra.GESTOR,
+                    admin_id=obra.admin_id, ativo=True)
+    db.session.add(v)
+    db.session.commit()
+    return v
+
+
+def test_gestor_da_obra_pausa_mas_nao_cancela():
+    from models import EstadoObra
+    from services.obra_estado import pode_transitar_como
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        gp = _usuario_comum(admin, _funcionario(admin))
+        _vincular(gp, obra)
+        assert pode_transitar_como(obra, EstadoObra.PAUSADA, gp) is True
+        assert pode_transitar_como(obra, EstadoObra.CONCLUIDA, gp) is True
+        # Cancelar é decisão comercial: exige 'admin'.
+        assert pode_transitar_como(obra, EstadoObra.CANCELADA, gp) is False
+
+
+def test_gestor_nao_faz_o_handoff_da_propria_obra():
+    """Quem entrega a obra é a diretoria, não o próprio GP."""
+    from models import EstadoObra
+    from services.obra_estado import pode_transitar_como
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='planejamento', status='Planejamento')
+        gp = _usuario_comum(admin, _funcionario(admin))
+        _vincular(gp, obra)
+        assert pode_transitar_como(obra, EstadoObra.EM_EXECUCAO, gp) is False
+
+
+def test_admin_do_tenant_pode_todas_as_transicoes_do_grafo():
+    from models import EstadoObra
+    from services.obra_estado import TRANSICOES, pode_transitar_como
+    with app.app_context():
+        admin = _admin()
+        for origem, destinos in TRANSICOES.items():
+            obra = _obra(admin, estado=origem.value,
+                         ativo=origem.value not in ('concluida', 'cancelada'))
+            for destino in destinos:
+                assert pode_transitar_como(obra, destino, admin) is True, (
+                    f'ADMIN barrado em {origem.value} → {destino.value}')
+            for destino in EstadoObra:
+                if destino not in destinos:
+                    assert pode_transitar_como(obra, destino, admin) is False
+
+
+def test_usuario_sem_vinculo_nao_transita_nada():
+    from models import EstadoObra
+    from services.obra_estado import pode_transitar_como
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        estranho = _usuario_comum(admin)
+        assert pode_transitar_como(obra, EstadoObra.PAUSADA, estranho) is False
+
+
+def test_vinculo_de_apontador_nao_transiciona_estado():
+    """O eixo de transição é mais estreito que o de apontamento: APONTADOR
+    lança RDO (Fase 1.5) mas não muda o estado da obra."""
+    from models import EstadoObra, PapelObra
+    from services.obra_estado import pode_transitar_como
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        u = _usuario_comum(admin, _funcionario(admin))
+        _vincular(u, obra, papel=PapelObra.APONTADOR)
+        assert pode_transitar_como(obra, EstadoObra.PAUSADA, u) is False
+
+
+def test_admin_de_outro_tenant_nao_transita():
+    from models import EstadoObra
+    from services.obra_estado import pode_transitar_como
+    with app.app_context():
+        dono = _admin()
+        intruso = _admin('f2i')
+        obra = _obra(dono, estado='em_execucao', status='Em andamento')
+        assert pode_transitar_como(obra, EstadoObra.PAUSADA, intruso) is False
+
+
+def test_autorizacao_nao_afrouxa_com_a_flag_de_escopo_desligada():
+    """`utils.autorizacao.papel_na_obra` devolve GESTOR para TODO usuário do
+    tenant quando `escopo_obra_ativo` está desligada (utils/autorizacao.py,
+    e é deliberado: a flag existe para o deploy não tirar acesso de ninguém).
+
+    Usar aquela função aqui deixaria qualquer usuário autenticado pausar e
+    concluir obra enquanto a flag estivesse desligada — que é o estado de 586
+    dos 607 tenants. Por isso a autorização de ESTADO consulta `UsuarioObra`
+    diretamente. Este teste trava a diferença.
+    """
+    from models import EstadoObra
+    from services.obra_estado import pode_transitar_como
+    from utils.autorizacao import PapelObra as _P
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        estranho = _usuario_comum(admin)
+        # A flag nasce desligada; nenhum vínculo foi criado.
+        assert pode_transitar_como(obra, EstadoObra.PAUSADA, estranho) is False
+        _vincular(estranho, obra, papel=_P.GESTOR)
+        assert pode_transitar_como(obra, EstadoObra.PAUSADA, estranho) is True
+
+
+def test_pode_transitar_como_falha_fechada_sem_usuario():
+    """Anônimo, obra None e transição fora do grafo devolvem False, nunca
+    exceção — a rota converte em 403/404; o serviço não decide HTTP."""
+    from models import EstadoObra
+    from services.obra_estado import pode_transitar_como
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='cancelada', status='Cancelada', ativo=False)
+        assert pode_transitar_como(None, EstadoObra.PAUSADA, admin) is False
+        assert pode_transitar_como(obra, EstadoObra.EM_EXECUCAO, admin) is False
+        assert pode_transitar_como(obra, 'lixo', admin) is False
