@@ -77,28 +77,38 @@ def test_funcionario_recebe_403():
 
 
 def test_decorators_legados_nao_sao_mais_no_op():
-    """Fase 0 / R2 — trava INVERTIDA.
+    """Fase 0 / R2 — trava INVERTIDA (atualizada na Fase 1).
 
     No M01 este teste garantia que o bypass global não fosse mexido (o
-    saneamento estava fora do escopo daquele módulo). A Fase 0 saneou:
-    `decorators.admin_required` e `decorators.login_required` agora delegam
-    para as implementações reais. O teste passa a impedir a regressão
-    contrária — que alguém devolva o `return f(*args, **kwargs)` solto.
+    saneamento estava fora do escopo daquele módulo). A Fase 0 saneou com
+    shims que delegavam; a Fase 1 foi além e `decorators.admin_required`
+    virou RE-EXPORT do real (`from auth import admin_required`) — identidade,
+    não delegação. `inspect.getsource` sobre o re-export devolve o fonte de
+    `auth.admin_required`, então a checagem de string do shim deixou de
+    fazer sentido para ele. O teste passa a travar cada um pelo que é:
+    identidade para `admin_required`, delegação para `login_required`.
     """
     import inspect
 
+    import auth
     import decorators
 
-    for nome, esperado in (('admin_required', 'auth import admin_required'),
-                           ('login_required', 'flask_login import login_required')):
-        fonte = inspect.getsource(getattr(decorators, nome))
-        assert 'bypass para todos' not in fonte, (
-            f'{nome} voltou a ser no-op — 31 rotas de configuração e ponto '
-            f'ficam sem autorização'
-        )
-        assert esperado in fonte, (
-            f'{nome} deveria delegar para a implementação real ({esperado})'
-        )
+    assert decorators.admin_required is auth.admin_required, (
+        'decorators.admin_required deixou de ser o re-export de '
+        'auth.admin_required — se voltou a ser definição própria, confira '
+        'que não é o no-op ("bypass para todos") que deixava 31 rotas de '
+        'configuração e ponto sem autorização'
+    )
+
+    fonte = inspect.getsource(decorators.login_required)
+    assert 'bypass para todos' not in fonte, (
+        'login_required voltou a ser no-op — 31 rotas de configuração e '
+        'ponto ficam sem autorização'
+    )
+    assert 'flask_login import login_required' in fonte, (
+        'login_required deveria delegar para a implementação real '
+        '(flask_login import login_required)'
+    )
 
 
 def test_rotas_de_configuracao_exigem_admin():

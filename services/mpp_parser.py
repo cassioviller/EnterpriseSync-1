@@ -12,6 +12,7 @@ saída do parser"): {"projeto": {...}, "tarefas": [...]}.
 from __future__ import annotations
 
 import glob
+import importlib.util
 import json
 import os
 import shutil
@@ -74,8 +75,19 @@ def _achar_java_home():
 
 
 def java_disponivel() -> bool:
-    """True se o worker MPXJ tem JVM para subir (JAVA_HOME/nix ou PATH)."""
-    return _achar_java_home() is not None or shutil.which('java') is not None
+    """True se o worker MPXJ consegue rodar: JVM (JAVA_HOME/nix ou PATH)
+    E os pacotes Python `mpxj`/`jpype1` instalados.
+
+    A segunda condição existe porque os pacotes não estão no lockfile de
+    produção (o worker é opcional) — num ambiente com JVM do nix mas sem
+    `pip install mpxj jpype1`, só checar a JVM fazia o worker subir e
+    morrer com ModuleNotFoundError, virando 'erro_mpxj' em vez do
+    'java_indisponivel' acionável (que orienta exportar como XML).
+    """
+    if _achar_java_home() is None and shutil.which('java') is None:
+        return False
+    return (importlib.util.find_spec('mpxj') is not None
+            and importlib.util.find_spec('jpype') is not None)
 
 
 def parse_cronograma(caminho: str, timeout_s: float = 120) -> dict:
