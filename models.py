@@ -325,6 +325,23 @@ class Obra(db.Model):
     # Fase 0.6 / D5 — texto livre, mas com vocabulário canônico convergido na
     # escrita pelo @validates abaixo. Ver utils/status_obra.py.
     status = db.Column(db.String(20), default='Em andamento')
+
+    # Fase 2 — estado canônico da obra. `status` (acima) e `ativo` (abaixo)
+    # passam a ser DERIVADOS deste campo por write-through em
+    # services/obra_estado. Quase nenhuma leitura de `status` precisou mudar:
+    # ela continua recebendo os mesmos textos ('Em andamento', 'Concluída').
+    # A exceção são os filtros do dashboard, que não reconheciam
+    # 'Planejamento' — corrigidos junto com a Task 9, que introduz o valor.
+    #
+    # VARCHAR + CHECK em vez de ENUM nativo: ver docstring de EstadoObra.
+    # O CHECK é criado pela migration 231, não pelo declarativo — o
+    # SQLAlchemy criaria uma constraint sem nome estável, impossível de
+    # dropar num rollback.
+    estado = db.Column(
+        db.String(20), nullable=False,
+        default='planejamento', server_default='planejamento',
+        index=True,
+    )
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     
     # MÓDULO 2: Portal do Cliente - Campos Completos

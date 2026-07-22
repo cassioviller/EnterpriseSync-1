@@ -3919,6 +3919,186 @@ def migration_230_obra_transicao_estado():
         raise
 
 
+# Fase 2 — regra de derivação do estado da obra a partir do legado
+# (`status` + `ativo`). Extraída para constante por dois motivos:
+#
+#   1. TESTABILIDADE. Os testes precisam exercitar a regra sobre a matriz de
+#      combinações, e depois que a 231 roda a coluna é NOT NULL — não dá mais
+#      para reproduzir a base pré-migração com `UPDATE ... SET estado = NULL`.
+#      Com a regra isolada, o teste a aplica sobre um VALUES e é repetível.
+#   2. FONTE ÚNICA. `services.obra_estado.estado_atual` reproduz esta MESMA
+#      ordem em Python (é o fallback de runtime para obra sem estado). Duas
+#      implementações da mesma regra divergem; com a versão SQL num só lugar,
+#      o teste que compara as duas tem o que citar.
+#
+# Ordem (importa): cancelada > ativo=false > mapeamento de status > em_execucao.
+# `ativo` vence `status` porque é a flag que a UI de fato respeita — o
+# dashboard filtra por ela e a listagem chama as inativas de "Concluídas /
+# Inativas". Obra com status='Em andamento' e ativo=false JÁ é concluída para
+# o usuário; fazer o estado dizer outra coisa criaria uma terceira verdade.
+_CASE_DERIVA_ESTADO_OBRA = """CASE
+                WHEN lower(coalesce({status}, '')) IN
+                     ('cancelada', 'cancelado', 'distratada')
+                    THEN 'cancelada'
+                WHEN {ativo} = false
+                    THEN 'concluida'
+                WHEN lower(coalesce({status}, '')) IN
+                     ('concluída', 'concluida', 'concluído', 'concluido',
+                      'finalizada', 'finalizado', 'entregue')
+                    THEN 'concluida'
+                WHEN lower(coalesce({status}, '')) IN
+                     ('pausada', 'pausado', 'paralisada', 'paralisado')
+                    THEN 'pausada'
+                WHEN lower(coalesce({status}, '')) IN
+                     ('planejamento', 'planejada', 'planejado')
+                    THEN 'planejamento'
+                ELSE 'em_execucao'
+            END"""
+
+
+def migration_231_obra_estado():
+    """Fase 2 — coluna `obra.estado` + backfill das obras reais.
+
+    Roda sobre produção. Desenho para não deixar obra em estado inválido:
+
+      1. ADD COLUMN ... NULL           (sem server_default ainda)
+      2. UPDATE derivando de status/ativo, só onde estado IS NULL
+      3. INSERT do histórico de backfill, só para obras sem histórico
+      4. salvaguarda: qualquer NULL remanescente vira 'em_execucao'
+      5. SET DEFAULT + SET NOT NULL + CHECK
+
+    O passo 1 NÃO usa server_default de propósito: com ele TODAS as obras
+    nasceriam 'planejamento' e ficariam assim caso o passo 2 falhasse — um
+    estado errado é pior que um ausente, porque ninguém desconfia dele.
+
+    NÃO confie num abort de boot aqui. `run_migration_safe` (:198) diz
+    literalmente "Não propagar exceção - apenas logar" e devolve False;
+    `executar_migracoes` conta a falha e segue. O `except` de app.py:706
+    nunca dispara por falha de migração individual, e mesmo se disparasse o
+    abort é `if IS_PRODUCTION`. Prova viva: as migrations 48 e 132 falham em
+    todo boot e a aplicação sobe. O que de fato protege:
+      - `is_migration_executed` só aceita 'success', logo esta é RETENTADA
+        no boot seguinte;
+      - o passo 1 commita sozinho, então a coluna sobrevive e o 2 reexecuta;
+      - `estado_atual()` (Task 4) nunca levanta em obra sem estado — é o que
+        segura a UI durante a janela.
+
+    Regra de derivação, em ordem (a ordem importa):
+      a) status mapeia para 'cancelada'  -> cancelada
+      b) ativo = false                   -> concluida
+      c) status mapeia para algo         -> esse algo
+      d) resto                           -> em_execucao
+
+    Por que (b) vem antes de (c): `Obra.ativo` é a flag que a UI de fato
+    respeita — o dashboard filtra por ela e a listagem chama as inativas de
+    "Obras Concluídas / Inativas". Uma obra com status='Em andamento' e
+    ativo=false JÁ é concluída para o usuário; fazer o estado dizer outra
+    coisa criaria uma terceira verdade. `services.obra_estado.estado_atual`
+    reproduz esta MESMA ordem — se mudar aqui, mude lá.
+
+    Idempotente: seguro re-executar.
+    """
+    ESTADOS = ('planejamento', 'em_execucao', 'pausada', 'concluida', 'cancelada')
+
+    try:
+        # 1) coluna, sem default e sem NOT NULL
+        db.session.execute(text("""
+            ALTER TABLE obra ADD COLUMN IF NOT EXISTS estado VARCHAR(20) NULL
+        """))
+        db.session.commit()
+
+        # 2) derivação. lower() resolve caixa; a enumeração explícita das
+        #    formas com e sem acento evita depender da extensão unaccent,
+        #    que não é garantida no Postgres do EasyPanel.
+        atualizadas = db.session.execute(text(f"""
+            UPDATE obra SET estado =
+            {_CASE_DERIVA_ESTADO_OBRA.format(status='status', ativo='ativo')}
+            WHERE estado IS NULL
+        """)).rowcount
+        db.session.commit()
+        logger.info(f"[Migration 231] {atualizadas} obra(s) com estado derivado")
+
+        # 3) linha de histórico com o valor legado verbatim. `obra.admin_id`
+        #    é nullable e a coluna do histórico é NOT NULL — obras sem tenant
+        #    ficam de fora e são contadas no log.
+        sem_tenant = db.session.execute(text("""
+            SELECT count(*) FROM obra WHERE admin_id IS NULL
+        """)).scalar()
+        if sem_tenant:
+            logger.warning(
+                f"[Migration 231] {sem_tenant} obra(s) com admin_id NULL "
+                "ficaram sem linha de historico de backfill"
+            )
+
+        inseridas = db.session.execute(text("""
+            INSERT INTO obra_transicao_estado
+                (obra_id, admin_id, estado_de, estado_para, motivo,
+                 usuario_id, criado_em)
+            SELECT o.id, o.admin_id, NULL, o.estado,
+                   'backfill migration 231 — status legado='
+                     || coalesce(o.status, '<NULL>')
+                     || ' | ativo=' || o.ativo::text,
+                   NULL,
+                   coalesce(o.created_at, NOW())
+            FROM obra o
+            WHERE o.admin_id IS NOT NULL
+              AND o.estado IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM obra_transicao_estado t
+                  WHERE t.obra_id = o.id AND t.estado_de IS NULL
+              )
+        """)).rowcount
+        db.session.commit()
+        logger.info(f"[Migration 231] {inseridas} linha(s) de historico de backfill")
+
+        # 4) salvaguarda — nunca deixar obra em estado invalido
+        restantes = db.session.execute(text("""
+            UPDATE obra SET estado = 'em_execucao' WHERE estado IS NULL
+        """)).rowcount
+        if restantes:
+            logger.warning(
+                f"[Migration 231] {restantes} obra(s) cairam na salvaguarda "
+                "'em_execucao' — investigar (o CASE do passo 2 deveria ser total)"
+            )
+        db.session.commit()
+
+        # 5) trancar o contrato
+        db.session.execute(text("""
+            ALTER TABLE obra ALTER COLUMN estado SET DEFAULT 'planejamento'
+        """))
+        db.session.execute(text("""
+            ALTER TABLE obra ALTER COLUMN estado SET NOT NULL
+        """))
+        lista = ", ".join(f"'{e}'" for e in ESTADOS)
+        db.session.execute(text(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'ck_obra_estado'
+                ) THEN
+                    ALTER TABLE obra ADD CONSTRAINT ck_obra_estado
+                        CHECK (estado IN ({lista}));
+                END IF;
+            END $$;
+        """))
+        db.session.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_obra_estado ON obra (estado)
+        """))
+        db.session.commit()
+
+        distribuicao = db.session.execute(text("""
+            SELECT estado, count(*) FROM obra GROUP BY estado ORDER BY 2 DESC
+        """)).fetchall()
+        logger.info(
+            "MIGRACAO 231 CONCLUIDA: obra.estado NOT NULL + CHECK + indice. "
+            f"Distribuicao: {[(r[0], r[1]) for r in distribuicao]}"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 231] Erro: {e}")
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4171,6 +4351,7 @@ def executar_migracoes():
             (220, "Cronograma editável — tarefa_cronograma.modo_apontamento (quantidade|percentual, NULL = dedução legada)", migration_220_tarefa_modo_apontamento),
             (221, "Cronograma editável — backfill de modo_apontamento congelando a dedução vigente (no-op de comportamento)", migration_221_backfill_modo_apontamento),
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
+            (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

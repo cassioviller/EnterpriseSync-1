@@ -360,3 +360,155 @@ def test_migration_230_garante_os_indices():
             "SELECT indexname FROM pg_indexes "
             "WHERE tablename = 'obra_transicao_estado'"))}
         assert 'ix_obra_transicao_obra_criado' in nomes, nomes
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — coluna `Obra.estado` + migration 231 (backfill)
+# ---------------------------------------------------------------------------
+
+def test_coluna_estado_existe_com_default_planejamento():
+    """Obra criada sem informar `estado` nasce em PLANEJAMENTO — decisão 4
+    da Fase 2: não existe obra em execução sem GP."""
+    from models import Cliente, Obra
+    with app.app_context():
+        admin = _admin()
+        suf = uuid.uuid4().hex[:8]
+        cli = Cliente(nome=f'Cliente {suf}', admin_id=admin.id)
+        db.session.add(cli)
+        db.session.flush()
+        o = Obra(nome=f'Obra {suf}', codigo=f'F2D{suf[:5].upper()}',
+                 cliente_id=cli.id, data_inicio=date(2026, 7, 1),
+                 admin_id=admin.id)
+        db.session.add(o)
+        db.session.commit()
+        assert o.estado == 'planejamento'
+
+
+def test_check_constraint_recusa_estado_fora_do_vocabulario():
+    from sqlalchemy.exc import DatabaseError
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        with pytest.raises(DatabaseError):
+            db.session.execute(
+                db.text('UPDATE obra SET estado = :e WHERE id = :i'),
+                {'e': 'inventado', 'i': obra.id})
+            db.session.commit()
+        db.session.rollback()
+
+
+def test_derivacao_sql_cobre_a_matriz_de_status_e_ativo():
+    """A regra de derivação da 231, sobre todas as combinações que importam.
+
+    NÃO usa `UPDATE obra SET estado = NULL` para simular a base
+    pré-migração, como o plano propunha: depois que a 231 roda, a coluna é
+    NOT NULL e aquele teste passaria uma única vez na vida do banco. A regra
+    foi extraída para `migrations._CASE_DERIVA_ESTADO_OBRA` e é exercida aqui
+    sobre um VALUES — repetível, e sem tocar em nenhuma obra real.
+    """
+    from migrations import _CASE_DERIVA_ESTADO_OBRA
+    matriz = [
+        ('Em andamento', True, 'em_execucao'),
+        ('Em andamento', False, 'concluida'),    # ativo vence status
+        ('Em Andamento', True, 'em_execucao'),   # caixa
+        ('Concluída', True, 'concluida'),
+        ('Concluída', False, 'concluida'),
+        ('CONCLUIDA', True, 'concluida'),        # sem acento, caixa alta
+        ('Pausada', True, 'pausada'),
+        ('Pausada', False, 'concluida'),         # ativo vence status
+        ('Cancelada', True, 'cancelada'),        # cancelada vence ativo=true
+        ('Cancelada', False, 'cancelada'),
+        ('Planejamento', True, 'planejamento'),
+        ('Aguardando ART', True, 'em_execucao'), # customizado desconhecido
+        ('Aguardando ART', False, 'concluida'),
+        (None, True, 'em_execucao'),             # status NULL
+    ]
+    expr = _CASE_DERIVA_ESTADO_OBRA.format(status='t.status', ativo='t.ativo')
+    with app.app_context():
+        for status, ativo, esperado in matriz:
+            obtido = db.session.execute(
+                db.text(f'SELECT {expr} FROM (SELECT CAST(:s AS text) AS status, '
+                        f'CAST(:a AS boolean) AS ativo) AS t'),
+                {'s': status, 'a': ativo}).scalar()
+            assert obtido == esperado, (
+                f'status={status!r} ativo={ativo} → {obtido!r}, '
+                f'esperado {esperado!r}')
+
+
+def test_derivacao_sql_e_python_concordam():
+    """Achado D da revisão de 22/07: a regra vive em SQL (a 231) e em Python
+    (`estado_atual`, Task 4 — fallback de runtime para obra sem estado).
+
+    Duas implementações da mesma regra divergem. Divergiam justamente em
+    `status='Em andamento'` + `ativo=False`: o SQL diz 'concluida' porque
+    `ativo` vence, e a versão original do Python consultava `status` primeiro.
+    Este teste compara as duas sobre a mesma matriz; enquanto `estado_atual`
+    não existe (Task 4), ele documenta o contrato que ela terá de cumprir.
+    """
+    from migrations import _CASE_DERIVA_ESTADO_OBRA
+    try:
+        from services.obra_estado import estado_atual
+    except ImportError:
+        pytest.skip('estado_atual chega na Task 4 — contrato já travado acima')
+
+    class _ObraFalsa:
+        def __init__(self, status, ativo):
+            self.estado, self.status, self.ativo = None, status, ativo
+
+    expr = _CASE_DERIVA_ESTADO_OBRA.format(status='t.status', ativo='t.ativo')
+    casos = [('Em andamento', True), ('Em andamento', False),
+             ('Concluída', True), ('Pausada', False), ('Cancelada', True),
+             ('Planejamento', True), ('Aguardando ART', False), (None, True)]
+    with app.app_context():
+        for status, ativo in casos:
+            do_sql = db.session.execute(
+                db.text(f'SELECT {expr} FROM (SELECT CAST(:s AS text) AS status, '
+                        f'CAST(:a AS boolean) AS ativo) AS t'),
+                {'s': status, 'a': ativo}).scalar()
+            do_python = estado_atual(_ObraFalsa(status, ativo)).value
+            assert do_sql == do_python, (
+                f'status={status!r} ativo={ativo}: SQL diz {do_sql!r}, '
+                f'Python diz {do_python!r} — a regra divergiu de si mesma')
+
+
+def test_backfill_231_grava_historico_com_o_legado_verbatim():
+    """A linha de backfill precisa carregar `status` e `ativo` originais —
+    é o que torna a migration 232 reversível a partir do próprio banco."""
+    from migrations import migration_231_obra_estado
+    from models import ObraTransicaoEstado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='concluida', status='Em andamento',
+                     ativo=False)
+        migration_231_obra_estado()
+        linha = ObraTransicaoEstado.query.filter_by(
+            obra_id=obra.id, estado_de=None).one()
+        assert linha.estado_para == 'concluida'
+        assert 'Em andamento' in linha.motivo
+        assert 'ativo=false' in linha.motivo
+        assert linha.usuario_id is None
+
+
+def test_backfill_231_e_idempotente():
+    from migrations import migration_231_obra_estado
+    from models import ObraTransicaoEstado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        migration_231_obra_estado()
+        n1 = ObraTransicaoEstado.query.filter_by(obra_id=obra.id).count()
+        migration_231_obra_estado()
+        n2 = ObraTransicaoEstado.query.filter_by(obra_id=obra.id).count()
+        assert n1 == n2, 'reexecutar a 231 duplicou histórico'
+        db.session.refresh(obra)
+        assert obra.estado == 'em_execucao'
+
+
+def test_backfill_231_nao_deixa_nenhuma_obra_sem_estado():
+    from migrations import migration_231_obra_estado
+    from models import Obra
+    with app.app_context():
+        migration_231_obra_estado()
+        orfas = db.session.query(Obra.id).filter(Obra.estado.is_(None)).count()
+        assert orfas == 0
+
