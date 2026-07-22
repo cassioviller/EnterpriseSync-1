@@ -197,9 +197,16 @@ def recomputar_cadeia(tarefa_id: int, a_partir_de, admin_id: int) -> int:
 
     alteradas = 0
     for ap in linhas:
-        # Mesma regra de classificação do backfill (migration 210).
+        # Classificação de linha SEM `tipo_apontamento` (só as anteriores à
+        # migration 209 — de lá para cá `registrar_apontamento` grava sempre
+        # em toda escrita nova). O fallback antigo era `quantidade_total > 0`, a
+        # mesma regra do backfill da migration 210, mas DIFERENTE da que a UI
+        # usa: `modo_da_tarefa` também exige unidade e trata marco. Uma
+        # tarefa com quantidade e sem unidade era 'percentual' na tela e
+        # 'quantitativo' aqui. Agora as duas pontas usam o mesmo resolver —
+        # que, desde a migration 220, respeita a escolha do usuário.
         tipo = ap.tipo_apontamento or (
-            'quantitativo' if (tarefa.quantidade_total or 0) > 0
+            'quantitativo' if modo_da_tarefa(tarefa) == 'quantidade'
             else 'percentual')
         antes = (ap.quantidade_acumulada, ap.percentual_realizado,
                  ap.percentual_incremento_dia, ap.percentual_acumulado)

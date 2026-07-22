@@ -273,3 +273,71 @@ def test_modos_validos_e_o_contrato_publico():
     from services.cronograma_apontamento_service import MODOS_APONTAMENTO
 
     assert MODOS_APONTAMENTO == ('quantidade', 'percentual')
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — recomputo usa o mesmo classificador da UI
+# ---------------------------------------------------------------------------
+
+def _rdo(ctx, data_rdo):
+    from models import RDO
+    r = RDO(numero_rdo=f'MD-{_suf()[:12]}', obra_id=ctx['obra_id'],
+            admin_id=ctx['admin_id'], data_relatorio=data_rdo,
+            local='Campo', status='Finalizado')
+    db.session.add(r)
+    db.session.commit()
+    return r
+
+
+def test_recomputo_classifica_linha_antiga_pelo_modo_da_tarefa(ctx):
+    """Linha pré-M02 (tipo_apontamento NULL) numa tarefa marcada percentual.
+
+    Antes desta task o fallback de `recomputar_cadeia` olhava só
+    `quantidade_total > 0` e chamaria a linha de 'quantitativo', divergindo
+    do que a UI mostra (`modo_da_tarefa`).
+    """
+    from models import RDOApontamentoCronograma
+    from services.cronograma_apontamento_service import recomputar_cadeia
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        r = _rdo(ctx, D0)
+        ap = RDOApontamentoCronograma(
+            rdo_id=r.id, tarefa_cronograma_id=t.id, admin_id=ctx['admin_id'],
+            quantidade_executada_dia=0.0, quantidade_acumulada=0.0,
+            percentual_realizado=42.0,
+            tipo_apontamento=None,          # linha pré-M02
+            percentual_acumulado=42.0,
+        )
+        db.session.add(ap)
+        db.session.commit()
+
+        recomputar_cadeia(t.id, D0, ctx['admin_id'])
+        db.session.flush()
+
+        assert ap.percentual_realizado == 42.0, (
+            'a linha foi tratada como quantitativa: 0/100 zerou o percentual')
+        assert ap.percentual_acumulado == 42.0
+
+
+def test_recomputo_quantitativo_continua_igual(ctx):
+    """Guarda de não-regressão do caminho quantitativo."""
+    from services.cronograma_apontamento_service import (recomputar_cadeia,
+                                                         registrar_apontamento)
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=200.0, unidade_medida='m2',
+                    modo_apontamento='quantidade')
+        r1 = _rdo(ctx, D0 - timedelta(days=2))
+        r2 = _rdo(ctx, D0)
+        registrar_apontamento(r1, t, quantidade_dia=50.0,
+                              admin_id=ctx['admin_id'])
+        ap2 = registrar_apontamento(r2, t, quantidade_dia=30.0,
+                                    admin_id=ctx['admin_id'])
+        db.session.commit()
+
+        recomputar_cadeia(t.id, D0 - timedelta(days=2), ctx['admin_id'])
+        db.session.flush()
+        assert ap2.quantidade_acumulada == 80.0
+        assert ap2.percentual_realizado == 40.0
