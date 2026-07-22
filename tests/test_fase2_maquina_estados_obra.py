@@ -840,3 +840,75 @@ def test_pode_transitar_como_falha_fechada_sem_usuario():
         assert pode_transitar_como(None, EstadoObra.PAUSADA, admin) is False
         assert pode_transitar_como(obra, EstadoObra.EM_EXECUCAO, admin) is False
         assert pode_transitar_como(obra, 'lixo', admin) is False
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — migration 232: alinhar o `status` legado ao `estado`
+# ---------------------------------------------------------------------------
+# Reescrita na revisão de 22/07 (achado A): o trabalho original desta task —
+# deduplicar grafia ('Em Andamento' → 'Em andamento') — já foi feito pela
+# migration 217 (Fase 0.6 / D5), e o `@validates('status')` de models.py
+# impede que a divergência volte. O que sobra, e continua necessário: depois
+# que a 231 derivou `estado` de `status`+`ativo`, as duas colunas podem
+# discordar — uma obra com status='Em andamento' e ativo=false virou
+# estado='concluida', mas o texto de `status` continua dizendo o contrário.
+
+def test_migration_232_alinha_status_ao_estado():
+    from migrations import migration_232_normalizar_status_legado
+    with app.app_context():
+        admin = _admin()
+        divergentes = [
+            _obra(admin, estado='concluida', status='Em andamento', ativo=False),
+            _obra(admin, estado='planejamento', status='Em andamento'),
+            _obra(admin, estado='pausada', status='Em andamento'),
+            _obra(admin, estado='cancelada', status='Em andamento', ativo=False),
+        ]
+        migration_232_normalizar_status_legado()
+        esperados = ['Concluída', 'Planejamento', 'Pausada', 'Cancelada']
+        for obra, esperado in zip(divergentes, esperados):
+            db.session.refresh(obra)
+            assert obra.status == esperado
+
+
+def test_migration_232_e_idempotente():
+    from migrations import migration_232_normalizar_status_legado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='pausada', status='Em andamento')
+        migration_232_normalizar_status_legado()
+        db.session.refresh(obra)
+        primeiro = obra.status
+        migration_232_normalizar_status_legado()
+        db.session.refresh(obra)
+        assert obra.status == primeiro == 'Pausada'
+
+
+def test_todo_status_do_banco_e_um_rotulo_conhecido_apos_232():
+    """Depois da 232 não pode sobrar grafia fora do vocabulário."""
+    from migrations import migration_232_normalizar_status_legado
+    from services.obra_estado import ROTULOS
+    with app.app_context():
+        migration_232_normalizar_status_legado()
+        valores = {r[0] for r in db.session.execute(
+            db.text('SELECT DISTINCT status FROM obra')).fetchall()}
+        assert valores <= set(ROTULOS.values()), (
+            f'grafias fora do vocabulário: {valores - set(ROTULOS.values())}')
+
+
+def test_232_nao_desfaz_o_write_through_de_transitar():
+    """A 232 e `aplicar_estado` têm que produzir o MESMO texto para o mesmo
+    estado — são duas escritas do espelho, e divergir faria a migração
+    "corrigir" o que a transição acabou de gravar certo."""
+    from migrations import migration_232_normalizar_status_legado
+    from models import EstadoObra
+    from services.obra_estado import transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        transitar(obra, EstadoObra.PAUSADA, usuario_id=admin.id,
+                  motivo='paralisação por chuva')
+        db.session.commit()
+        antes = obra.status
+        migration_232_normalizar_status_legado()
+        db.session.refresh(obra)
+        assert obra.status == antes == 'Pausada'

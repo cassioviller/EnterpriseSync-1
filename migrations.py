@@ -4099,6 +4099,57 @@ def migration_231_obra_estado():
         raise
 
 
+def migration_232_normalizar_status_legado():
+    """Fase 2 — alinha `obra.status` (texto legado) ao `obra.estado`.
+
+    Depois da 231, `estado` é a fonte de verdade e `status` é espelho. Esta
+    migração faz o espelho refletir de fato: as linhas antigas ainda carregam
+    o texto com que foram gravadas, e a derivação pode ter mudado o estado
+    sem mudar o texto — uma obra com status='Em andamento' e ativo=false
+    virou 'concluida', mas continua dizendo "Em andamento" na tela.
+
+    ESCOPO REVISADO EM 22/07: a versão original desta migração existia para
+    deduplicar grafia ('Em Andamento' → 'Em andamento'). Esse trabalho JÁ foi
+    feito pela migration 217 (Fase 0.6 / D5), e o `@validates('status')` de
+    models.Obra impede que a divergência volte pela escrita. Sobrou o
+    alinhamento com `estado`, que é o inverso da 231.
+
+    Reversível: a linha de backfill da 231 guarda o `status` original
+    verbatim no campo `motivo` de `obra_transicao_estado`.
+
+    Idempotente: o WHERE só toca linhas já divergentes.
+    """
+    try:
+        rotulo_sql = """
+            CASE o.estado
+                WHEN 'planejamento' THEN 'Planejamento'
+                WHEN 'em_execucao'  THEN 'Em andamento'
+                WHEN 'pausada'      THEN 'Pausada'
+                WHEN 'concluida'    THEN 'Concluída'
+                WHEN 'cancelada'    THEN 'Cancelada'
+                ELSE o.status
+            END
+        """
+        alteradas = db.session.execute(text(f"""
+            UPDATE obra o
+               SET status = {rotulo_sql}
+             WHERE o.status IS DISTINCT FROM ({rotulo_sql})
+        """)).rowcount
+        db.session.commit()
+
+        restantes = db.session.execute(text("""
+            SELECT status, count(*) FROM obra GROUP BY status ORDER BY 2 DESC
+        """)).fetchall()
+        logger.info(
+            f"MIGRACAO 232 CONCLUIDA: {alteradas} obra(s) com status legado "
+            f"alinhado ao estado. Distribuicao final: {[(r[0], r[1]) for r in restantes]}"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[Migration 232] Erro: {e}")
+        raise
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4352,6 +4403,7 @@ def executar_migracoes():
             (221, "Cronograma editável — backfill de modo_apontamento congelando a dedução vigente (no-op de comportamento)", migration_221_backfill_modo_apontamento),
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
             (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
+            (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
