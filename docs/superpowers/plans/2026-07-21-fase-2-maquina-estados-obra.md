@@ -4,13 +4,46 @@
 
 **Goal:** Trocar o texto livre de `Obra.status` por uma máquina de estados com transições explícitas, histórico auditável de quem mudou o quê e por quê, e fazer da entrada em execução um ato formal — o handoff do Gerente de Projeto, que atribui o responsável e cria o vínculo `UsuarioObra` com papel `GESTOR`.
 
-**Architecture:** Coluna nova `Obra.estado` (vocabulário fechado) convivendo com a coluna legada `Obra.status`, que passa a ser **derivada** por write-through. Nenhuma das ~40 queries e templates que leem `status` hoje precisa mudar no dia do deploy — mudam quando cada fase seguinte chegar nelas. O único caminho de escrita é `services/obra_estado.transitar()`, que valida o grafo, exige motivo nas transições que precisam, grava uma linha em `obra_transicao_estado` e sincroniza `status` e `ativo`. O handoff é uma transição especializada (`PLANEJAMENTO → EM_EXECUCAO`) empacotada em `services/obra_handoff.executar_handoff()`, que só passa se houver um `Funcionario` do mesmo tenant com login (`Usuario.funcionario_id`, Fase 1) e se o gate de cronograma estiver resolvido.
+**Architecture:** Coluna nova `Obra.estado` (vocabulário fechado) convivendo com a coluna legada `Obra.status`, que passa a ser **derivada** por write-through. Quase todas as ~40 queries e templates que leem `status` seguem corretas sem mudança — mas **não todas**, e a exceção é obrigatória, não opcional (ver revisão de 22/07, achado B): a Task 9 faz a obra nascer com `status='Planejamento'`, valor que os quatro filtros do dashboard não reconhecem porque comparam contra `'planejamento'` minúsculo em `IN` case-sensitive. A Task 9 corrige esses filtros na mesma task que cria o problema. O único caminho de escrita é `services/obra_estado.transitar()`, que valida o grafo, exige motivo nas transições que precisam, grava uma linha em `obra_transicao_estado` e sincroniza `status` e `ativo`. O handoff é uma transição especializada (`PLANEJAMENTO → EM_EXECUCAO`) empacotada em `services/obra_handoff.executar_handoff()`, que só passa se houver um `Funcionario` do mesmo tenant com login (`Usuario.funcionario_id`, Fase 1) e se o gate de cronograma estiver resolvido.
 
 **Tech Stack:** Flask 3 + Flask-Login, SQLAlchemy 2 (`models.py`), sistema de migrações próprio numerado (`migrations.py`, `run_migration_safe`), pytest (`bash run_tests.sh --gate`), PostgreSQL, Jinja2 + Bootstrap 5.
 
 ---
 
 ## Contexto verificado no código (leia antes de começar)
+
+> ### ⚠️ Revisão de 22/07 — leia antes da tabela abaixo
+>
+> O plano foi escrito em 21/07 no commit `fb4147b`. A **Fase 0.6 / D5 entrou no
+> mesmo dia e pisou neste terreno**, e a Fase 1.5 andou ~30 commits por cima.
+> Seis pontos foram corrigidos no corpo do plano; os que mudam desenho:
+>
+> 1. **`utils/status_obra.py` já existe** e se declara *"a única fonte da
+>    verdade do vocabulário"* de `Obra.status`. Tem `_chave()` — a mesma
+>    normalização de acento/caixa que a Task 1 reimplementava como
+>    `_sem_acento()` — e um `@validates('status')` em `models.py:415` que
+>    intercepta **toda** escrita, inclusive o write-through de
+>    `aplicar_estado()`. Reaproveitar, não duplicar.
+> 2. **`'Planejamento'` não está em `STATUS_OBRA_CANONICOS`.** Precisa entrar,
+>    senão o estado novo nasce fora do vocabulário canônico do próprio módulo
+>    que governa o vocabulário.
+> 3. **Os filtros do dashboard quebram com `'Planejamento'`** — achado B,
+>    tratado na Task 9.
+> 4. **A migration 217 já canonizou `obra.status`** ('Em Andamento' →
+>    'Em andamento'). A Task 6 foi reescrita: o que sobra para ela é alinhar
+>    `status` ao `estado` recém-derivado, não deduplicar grafia.
+> 5. **Falha de migração NÃO aborta o boot** — `run_migration_safe`
+>    (`migrations.py:198`) diz literalmente *"Não propagar exceção - apenas
+>    logar"*. A justificativa da migration 231 foi corrigida na Task 3.
+> 6. **Censo real deste banco: 2.110 `'Em andamento'`, 0 `'Em Andamento'`,
+>    4 `'Concluída'`** — e não 7.958/53/13. Os números do plano vieram de
+>    outra base. Reconferir em produção antes do rollout.
+>
+> Âncoras que derivaram: `Obra.status` `:257`→`:297` · `TipoUsuario` `:20`→`:21`
+> · `create_all` `:582`→`:595` · migrações `:667`→`:703` · maior migration
+> registrada `213`→`221` · `forms.py:42 default='Em Andamento'` →
+> `forms.py:44 default='Em andamento'` · `views/obras.py:82-83` já não compara
+> igualdade crua, passa por `normalizar_status_obra()`.
 
 Tudo abaixo foi conferido em 2026-07-21 no commit `fb4147b`. Não são suposições.
 
@@ -606,16 +639,29 @@ def _admin(prefixo='f2a'):
     return u
 
 
-def _obra(admin, estado='planejamento', status='Planejamento', ativo=True):
+def _obra(admin, estado=None, status='Planejamento', ativo=True):
+    """CORREÇÃO 22/07 (achado E): `estado` é opcional e só é aplicado quando
+    passado explicitamente.
+
+    A versão original tinha `estado='planejamento'` como default, o que fazia
+    os testes da Task 2 dependerem de uma coluna que só nasce na Task 3 — o
+    Step 6 da Task 2 admitia isso ("os testes ainda não passarão se
+    `Obra.estado` não existir") e o Step 7 mandava commitar mesmo assim. Com
+    o default None, a Task 2 é verificável sozinha e a Task 3 passa o estado
+    quando precisa dele.
+    """
     from models import Cliente, Obra
     suf = uuid.uuid4().hex[:8]
     cli = Cliente(nome=f'Cliente {suf}', admin_id=admin.id)
     db.session.add(cli)
     db.session.flush()
+    kwargs = {}
+    if estado is not None:
+        kwargs['estado'] = estado
     o = Obra(
         nome=f'Obra {suf}', codigo=f'F2{suf[:6].upper()}',
         cliente_id=cli.id, data_inicio=date(2026, 7, 1),
-        status=status, estado=estado, ativo=ativo, admin_id=admin.id,
+        status=status, ativo=ativo, admin_id=admin.id, **kwargs,
     )
     db.session.add(o)
     db.session.commit()
@@ -983,9 +1029,27 @@ def migration_231_obra_estado():
       5. SET DEFAULT + SET NOT NULL + CHECK
 
     O passo 1 NÃO usa server_default de propósito: com server_default
-    todas as 7.984 obras nasceriam 'planejamento' e ficariam assim caso
-    o passo 2 falhasse. Sem ele, a coluna fica NULL e o boot aborta
-    (app.py:668) antes de servir tráfego com estado errado.
+    TODAS as obras nasceriam 'planejamento' e ficariam assim caso o passo
+    2 falhasse — um estado errado é pior que um estado ausente, porque
+    ninguém desconfia dele.
+
+    CORREÇÃO 22/07: a versão anterior deste texto dizia "sem ele a coluna
+    fica NULL e o boot aborta (app.py:668)". Isso é FALSO.
+    `run_migration_safe` (migrations.py:198) diz literalmente "Não
+    propagar exceção - apenas logar" e devolve False; `executar_migracoes`
+    conta a falha e segue. O `except` de app.py:706 nunca dispara por
+    falha de migração individual — e mesmo se disparasse, o abort é
+    `if IS_PRODUCTION`. Prova viva: as migrations 48 e 132 falham em todo
+    boot e a aplicação sobe.
+
+    O que de fato protege, então:
+      - `is_migration_executed` só aceita status 'success', logo a 231 é
+        RETENTADA no boot seguinte;
+      - o passo 1 commita sozinho, então a coluna sobrevive à falha e o
+        passo 2 reexecuta do zero;
+      - `estado_atual()` (Task 4) nunca levanta em obra sem estado — é o
+        que segura a UI durante a janela entre a falha e o boot seguinte.
+    Não confie num abort que não existe.
 
     Regra de derivação, em ordem (a ordem importa):
       a) status mapeia para 'cancelada'  → cancelada
@@ -1283,16 +1347,33 @@ def estado_atual(obra) -> EstadoObra:
     migração), cai no texto de `obra.status` e, em último caso, no
     eixo `obra.ativo`. Nunca levanta — quem lê estado de uma obra não
     pode ser derrubado por dado sujo.
+
+    CORREÇÃO 22/07 (achado D): a ordem abaixo tem que ser a MESMA do CASE
+    da migration 231, senão a regra de derivação existe duas vezes, em
+    duas linguagens, e discorda de si mesma. O caso em que discordava:
+    `status='Em andamento'` + `ativo=False` — o SQL diz 'concluida'
+    (ativo vence), a versão anterior desta função dizia 'em_execucao'
+    (status vencia). E este fallback só roda quando `estado` está vazio,
+    que é exatamente a janela pós-falha da 231.
+
+    Ordem canônica, idêntica à do passo 2 da migration 231:
+      a) status mapeia para 'cancelada'  → cancelada
+      b) ativo = false                   → concluida
+      c) status mapeia para algo         → esse algo
+      d) resto                           → em_execucao
     """
     try:
         return coagir(getattr(obra, 'estado', None))
     except EstadoDesconhecido:
         pass
     do_legado = estado_do_status_legado(getattr(obra, 'status', None))
-    if do_legado is not None:
+    if do_legado is EstadoObra.CANCELADA:          # (a)
+        return EstadoObra.CANCELADA
+    if getattr(obra, 'ativo', True) is False:      # (b) — ativo vence status
+        return EstadoObra.CONCLUIDA
+    if do_legado is not None:                      # (c)
         return do_legado
-    return (EstadoObra.CONCLUIDA if getattr(obra, 'ativo', True) is False
-            else EstadoObra.EM_EXECUCAO)
+    return EstadoObra.EM_EXECUCAO                  # (d)
 
 
 def aplicar_estado(obra, estado: EstadoObra) -> None:
@@ -1598,9 +1679,25 @@ para escrita de estado."
 
 ---
 
-## Task 6: Migration 232 — normalizar o texto legado de `status`
+## Task 6: Migration 232 — alinhar o `status` legado ao `estado`
 
-Depois da 231, `estado` é verdade e `status` é espelho — mas as 7 984 linhas existentes ainda têm o texto antigo, incluindo as 53 grafadas `'Em Andamento'` que o filtro vivo nunca encontra.
+> **Reescrita na revisão de 22/07 (achado A).** A premissa original era
+> deduplicar grafia — "as 53 linhas gravadas `'Em Andamento'` que o filtro vivo
+> nunca encontra". Esse trabalho **já foi feito**: a migration 217
+> (`_migration_217_canonizar_status_obra`, Fase 0.6 / D5) canonizou
+> `obra.status` e o dropdown que o alimenta, e o `@validates('status')` de
+> `models.py:415` impede que a divergência volte. Por isso este banco tem zero
+> `'Em Andamento'`.
+>
+> O que **sobra** para a 232, e continua necessário: depois que a 231 derivou
+> `estado` de `status`+`ativo`, as duas colunas podem discordar — uma obra com
+> `status='Em andamento'` e `ativo=false` virou `estado='concluida'`, mas o
+> texto de `status` continua dizendo "Em andamento". A 232 realinha `status`
+> ao `estado`, que passou a ser a fonte de verdade. É o inverso da 231.
+>
+> Consequência prática: só toca linhas onde `status <> ROTULOS[estado]`. Neste
+> banco isso é 1 obra (a única com `ativo=false` e status de andamento); em
+> produção, reconferir.
 
 **Files:**
 - Modify: `migrations.py`
@@ -2651,9 +2748,30 @@ transicao invalida ou motivo faltando."
 
 ## Task 9: A obra nasce em `PLANEJAMENTO` (cascata da proposta e criação manual)
 
+> ### 🔴 Achado B da revisão de 22/07 — esta task quebra o dashboard se não for corrigida
+>
+> Fazer a obra nascer com `status='Planejamento'` a torna **invisível** nos
+> quatro filtros do dashboard, que fazem
+> `Obra.status.in_(['ATIVO', 'andamento', 'Em andamento', 'ativa', 'planejamento'])`
+> — `'planejamento'` **minúsculo**, e `IN` no Postgres é case-sensitive.
+> Confirmado por query: `'Planejamento' IN (...)` → `False`.
+>
+> Efeito sem a correção: toda obra nova vinda de proposta aprovada some dos
+> contadores de obras ativas e da tabela "obras em andamento". O bug é latente
+> hoje (o `<select>` de `obras_moderno.html:619` já oferece
+> `value="Planejamento"`, mas nenhuma obra usa o valor); esta task o tornaria
+> universal.
+>
+> **A correção faz parte desta task, não é opcional.** E a correção certa não é
+> acrescentar `'Planejamento'` à lista de strings: é filtrar por `Obra.estado`,
+> que existe desde a Task 3 e é a fonte de verdade. Isso ainda mata a lista
+> defensiva `['ATIVO', 'ativa']`, cujos valores não existem em nenhuma linha do
+> banco.
+
 **Files:**
 - Modify: `event_manager.py:1010-1026` (dentro de `propagar_proposta_para_obra`)
 - Modify: `views/obras.py:383-403` (`nova_obra`)
+- Modify: `views/dashboard.py:429`, `:1014`, `:1036`, `:1055` (filtros → `Obra.estado`)
 - Test: `tests/test_fase2_handoff_gp.py`
 
 - [ ] **Step 1: Escreva o teste que falha**

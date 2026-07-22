@@ -3,11 +3,12 @@
 Antes desta fase `Obra.status` era `db.Column(db.String(20),
 default='Em andamento')` (models.py:297): texto livre, alimentado por um
 dropdown editável pelo tenant (`services/dropdown_service.py:94`), sem
-transição validada e sem histórico. Três grafias convivem no código para
-os mesmos dois conceitos — `'Em andamento'` em `models.py:297`,
-`'Em Andamento'` em `forms.py:42` e no dropdown — e o filtro de
-`views/obras.py:82-83` compara igualdade exata de string, então nunca casa
-com metade delas.
+transição validada e sem histórico. A Fase 0.6 / D5 já atacou metade do problema: `utils/status_obra.py`
+canonizou a grafia (`'Em Andamento'` → `'Em andamento'`, migration 217) e
+o `@validates('status')` de `models.py:415` impede que ela volte. O que a
+Fase 2 acrescenta é o que falta: transição validada, histórico de quem
+mudou o quê e por quê, e um vocabulário FECHADO — hoje `status` continua
+aceitando qualquer texto que o tenant digite no dropdown.
 
 `Obra.ativo` é um segundo eixo, paralelo e nunca sincronizado com
 `status`: a UI chama `ativo=False` de "Concluída / Inativa"
@@ -171,3 +172,46 @@ def test_toda_transicao_que_exige_motivo_existe_no_grafo():
     from services.obra_estado import TRANSICOES, TRANSICOES_QUE_EXIGEM_MOTIVO
     pares = {(o, d) for o, destinos in TRANSICOES.items() for d in destinos}
     assert TRANSICOES_QUE_EXIGEM_MOTIVO <= pares
+
+
+def test_normalizacao_e_compartilhada_com_utils_status_obra():
+    """Achado A da revisão de 22/07: `utils/status_obra.py` já existia e se
+    declara "a única fonte da verdade do vocabulário" de `Obra.status`.
+
+    Uma cópia local de `_chave` dentro de `obra_estado` seria a TERCEIRA
+    implementação da mesma normalização e poderia divergir em silêncio do
+    vocabulário que deveria espelhar. Este teste trava a identidade — não a
+    equivalência — para que a duplicação não volte por descuido.
+    """
+    from utils.status_obra import chave_status
+    from services import obra_estado
+    assert obra_estado._sem_acento is chave_status
+
+
+def test_planejamento_entrou_no_vocabulario_canonico():
+    """A Fase 2 faz a obra NASCER em PLANEJAMENTO e o write-through grava o
+    rótulo em `Obra.status`. Fora de STATUS_OBRA_CANONICOS, o estado inicial
+    de toda obra nova seria não-canônico para o módulo que governa o
+    vocabulário."""
+    from services.obra_estado import ROTULOS
+    from models import EstadoObra
+    from utils.status_obra import STATUS_OBRA_CANONICOS, eh_status_canonico
+    assert 'Planejamento' in STATUS_OBRA_CANONICOS
+    for estado in EstadoObra:
+        assert eh_status_canonico(ROTULOS[estado]), (
+            f'{estado}: rótulo {ROTULOS[estado]!r} fora do vocabulário canônico')
+
+
+def test_rotulo_sobrevive_ao_validates_de_status():
+    """`models.Obra` tem `@validates('status')` (models.py:415) que passa todo
+    valor por `normalizar_status_obra`. O write-through desta fase escreve
+    ROTULOS[estado] nesse campo — se o validador reescrevesse o texto, o
+    espelho divergiria do estado sem ninguém notar."""
+    from services.obra_estado import ROTULOS
+    from models import EstadoObra
+    from utils.status_obra import normalizar_status_obra
+    for estado in EstadoObra:
+        rotulo = ROTULOS[estado]
+        assert normalizar_status_obra(rotulo) == rotulo, (
+            f'{estado}: @validates reescreveria {rotulo!r} como '
+            f'{normalizar_status_obra(rotulo)!r}')

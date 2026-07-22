@@ -17,7 +17,19 @@ A grafia canônica é a do default do modelo, não a do formulário: 7.926 das
 import unicodedata
 
 # Ordem = ordem de exibição nos `<select>`.
+#
+# Fase 2: 'Planejamento' entrou aqui porque a máquina de estados passa a fazer
+# a obra NASCER nele (`EstadoObra.PLANEJAMENTO`), e o write-through grava o
+# rótulo neste campo. Deixá-lo fora faria o estado inicial de toda obra nova
+# ser considerado não-canônico pelo módulo que governa o vocabulário.
+#
+# Não entrou em `services.dropdown_service._SLUG_DEFAULTS['obra_status']` de
+# propósito: aquele é o `<select>` do formulário de obra, e a Fase 2 tira do
+# formulário a capacidade de mudar estado — quem transiciona é
+# `services.obra_estado.transitar()`. O filtro da listagem
+# (`templates/obras_moderno.html:619`) já oferecia 'Planejamento'.
 STATUS_OBRA_CANONICOS: tuple[str, ...] = (
+    'Planejamento',
     'Em andamento',
     'Pausada',
     'Concluída',
@@ -36,6 +48,19 @@ def _chave(valor: str) -> str:
         c for c in unicodedata.normalize('NFKD', valor)
         if not unicodedata.combining(c)
     )
+
+
+def chave_status(valor: str | None) -> str:
+    """Chave comparável de um texto de status — sem acento, sem caixa.
+
+    Exposta para `services/obra_estado.py` (Fase 2), que precisa da MESMA
+    normalização para traduzir texto legado em `EstadoObra`. Este módulo já era
+    a segunda implementação da técnica — a primeira foi o `_norm` local de
+    `views/obras.py:971`, que ele substituiu. Uma terceira cópia dentro de
+    `obra_estado` tornaria possível as duas divergirem justamente no vocabulário
+    que este arquivo existe para manter único.
+    """
+    return _chave(valor)
 
 
 _POR_CHAVE = {_chave(s): s for s in STATUS_OBRA_CANONICOS}

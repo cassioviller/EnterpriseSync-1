@@ -22,9 +22,16 @@ handlers de evento (`event_manager.py:882-887`).
 from __future__ import annotations
 
 import logging
-import unicodedata
 
 from models import EstadoObra
+# A normalização de acento/caixa vem de `utils.status_obra`, não é
+# reimplementada aqui. Aquele módulo se declara "a única fonte da verdade do
+# vocabulário" de `Obra.status` (Fase 0.6 / D5) e já intercepta toda escrita
+# pelo `@validates('status')` de models.py:415 — inclusive o write-through
+# desta fase. Uma cópia local seria a TERCEIRA implementação da mesma regra
+# (a primeira foi o `_norm` de views/obras.py, que aquele módulo substituiu)
+# e poderia divergir em silêncio do vocabulário que ela deveria espelhar.
+from utils.status_obra import chave_status as _sem_acento
 
 logger = logging.getLogger('obra.estado')
 
@@ -96,16 +103,9 @@ AUTORIDADE: dict[tuple[EstadoObra, EstadoObra], str] = {
 }
 
 
-def _sem_acento(texto: str) -> str:
-    """'Concluída' → 'concluida'. Mesma técnica de views/obras.py:969-973."""
-    texto = (texto or '').strip().lower()
-    return ''.join(c for c in unicodedata.normalize('NFKD', texto)
-                   if not unicodedata.combining(c))
-
-
 # Mapa do texto legado → estado. Chaves já normalizadas por `_sem_acento`.
 # Cobre as grafias que existem no banco e no código (o dropdown editável do
-# tenant, `forms.py:42`, o default do modelo) e as variantes plausíveis de
+# tenant, `forms.py:44`, o default do modelo) e as variantes plausíveis de
 # um tenant que editou o dropdown `obra_status`.
 _MAPA_LEGADO: dict[str, EstadoObra] = {
     'planejamento': EstadoObra.PLANEJAMENTO,
