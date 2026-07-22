@@ -1148,3 +1148,79 @@ def test_relatorio_e_somente_leitura():
                      'db.session.execute', 'db.session.delete', 'UPDATE ',
                      'INSERT ', 'DELETE '):
         assert proibido not in fonte, f'censo escreveria no banco: {proibido}'
+
+
+# ---------------------------------------------------------------------------
+# Task 14 — matriz completa: 5 estados × destinos × 3 atores. Uma tabela só,
+# para que a regra de negócio seja legível numa tela, em vez de espalhada em
+# vinte asserts.
+# ---------------------------------------------------------------------------
+# Legenda: 'ok' = permitido; '-' = fora do grafo; 'x' = no grafo mas sem
+# autoridade para este ator.
+_MATRIZ = {
+    #                         admin  gestor  estranho
+    ('planejamento', 'em_execucao'): ('ok', 'x',  'x'),
+    ('planejamento', 'cancelada'):   ('ok', 'x',  'x'),
+    ('planejamento', 'pausada'):     ('-',  '-',  '-'),
+    ('planejamento', 'concluida'):   ('-',  '-',  '-'),
+    ('em_execucao', 'pausada'):      ('ok', 'ok', 'x'),
+    ('em_execucao', 'concluida'):    ('ok', 'ok', 'x'),
+    ('em_execucao', 'cancelada'):    ('ok', 'x',  'x'),
+    ('em_execucao', 'planejamento'): ('-',  '-',  '-'),
+    ('pausada', 'em_execucao'):      ('ok', 'ok', 'x'),
+    ('pausada', 'cancelada'):        ('ok', 'x',  'x'),
+    ('pausada', 'concluida'):        ('-',  '-',  '-'),
+    ('concluida', 'em_execucao'):    ('ok', 'x',  'x'),
+    ('concluida', 'cancelada'):      ('-',  '-',  '-'),
+    ('cancelada', 'em_execucao'):    ('-',  '-',  '-'),
+    ('cancelada', 'planejamento'):   ('-',  '-',  '-'),
+}
+
+
+@pytest.mark.parametrize('chave', sorted(_MATRIZ))
+def test_matriz_de_transicoes_por_ator(chave):
+    from services.obra_estado import pode_transitar, pode_transitar_como
+    origem, destino = chave
+    esperado_admin, esperado_gestor, esperado_estranho = _MATRIZ[chave]
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado=origem,
+                     ativo=origem not in ('concluida', 'cancelada'))
+        gestor = _usuario_comum(admin, _funcionario(admin))
+        _vincular(gestor, obra)
+        estranho = _usuario_comum(admin)
+
+        no_grafo = pode_transitar(origem, destino)
+        assert no_grafo is (esperado_admin != '-'), (
+            f'{origem}→{destino}: grafo diz {no_grafo}, matriz diz '
+            f'{esperado_admin!r}')
+
+        for ator, esperado in ((admin, esperado_admin),
+                               (gestor, esperado_gestor),
+                               (estranho, esperado_estranho)):
+            obtido = pode_transitar_como(obra, destino, ator)
+            assert obtido is (esperado == 'ok'), (
+                f'{origem}→{destino} para {ator.tipo_usuario}: '
+                f'obtido {obtido}, matriz diz {esperado!r}')
+
+
+def test_todo_par_do_grafo_esta_na_matriz():
+    """Guarda contra grafo e matriz divergirem em silêncio."""
+    from services.obra_estado import TRANSICOES
+    pares_do_grafo = {
+        (o.value, d.value) for o, destinos in TRANSICOES.items()
+        for d in destinos
+    }
+    pares_da_matriz = {k for k, v in _MATRIZ.items() if v[0] == 'ok'}
+    assert pares_do_grafo == pares_da_matriz
+
+
+def test_nenhuma_obra_do_banco_tem_estado_fora_do_vocabulario():
+    """Invariante global, roda sobre tudo o que existir na base de teste."""
+    from models import EstadoObra, Obra
+    with app.app_context():
+        validos = {e.value for e in EstadoObra}
+        fora = db.session.query(Obra.estado).filter(
+            Obra.estado.notin_(list(validos))).distinct().all()
+        assert fora == [], f'estados fora do vocabulário: {fora}'
