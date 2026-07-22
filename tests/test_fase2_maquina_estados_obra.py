@@ -1096,3 +1096,55 @@ def test_tela_de_handoff_renderiza():
     r = c.get(f'/obras/{obra_id}/handoff')
     assert r.status_code == 200
     assert b'Gerente de Projeto' in r.data
+
+
+# ---------------------------------------------------------------------------
+# Task 13 — script de censo
+# ---------------------------------------------------------------------------
+
+def test_relatorio_lista_grafias_desconhecidas_e_divergencias():
+    from scripts.relatorio_estado_obra import levantar
+    with app.app_context():
+        admin = _admin()
+        _obra(admin, estado='em_execucao', status='Em andamento')
+        _obra(admin, estado='em_execucao', status='Aguardando ART')
+        _obra(admin, estado='em_execucao', status='Em andamento', ativo=False)
+
+        rel = levantar(admin_id=admin.id)
+
+        assert rel['total'] == 3
+        assert rel['por_estado']['em_execucao'] == 3
+        assert 'Aguardando ART' in rel['grafias_desconhecidas']
+        # ativo=False com estado ativo é divergência a reportar.
+        assert rel['divergencias_ativo'] == 1
+        assert rel['sem_estado'] == 0
+
+
+def test_relatorio_conta_obras_sem_gestor():
+    """O número que vai para o Cássio: a fila de handoff que o backfill da
+    231 criou — obras EM EXECUÇÃO que nunca passaram por handoff."""
+    from models import PapelObra, UsuarioObra
+    from scripts.relatorio_estado_obra import levantar
+    with app.app_context():
+        admin = _admin()
+        sem_gp = _obra(admin, estado='em_execucao', status='Em andamento')
+        com_gp = _obra(admin, estado='em_execucao', status='Em andamento')
+        gp = _usuario_comum(admin, _funcionario(admin))
+        db.session.add(UsuarioObra(usuario_id=gp.id, obra_id=com_gp.id,
+                                   papel=PapelObra.GESTOR,
+                                   admin_id=admin.id, ativo=True))
+        db.session.commit()
+        rel = levantar(admin_id=admin.id)
+        assert rel['em_execucao_sem_gestor'] == 1
+
+
+def test_relatorio_e_somente_leitura():
+    """O script promete "nunca escreve nada" no docstring — trava aqui."""
+    import inspect
+
+    from scripts import relatorio_estado_obra as mod
+    fonte = inspect.getsource(mod)
+    for proibido in ('db.session.add', 'db.session.commit',
+                     'db.session.execute', 'db.session.delete', 'UPDATE ',
+                     'INSERT ', 'DELETE '):
+        assert proibido not in fonte, f'censo escreveria no banco: {proibido}'
