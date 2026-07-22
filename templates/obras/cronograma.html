@@ -429,6 +429,19 @@
             <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Unidade</label>
             <input type="text" id="nt_unidade" class="form-control" placeholder="ex: m²">
           </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small text-uppercase text-muted ls-1">
+              <i class="fas fa-ruler-combined me-1 text-primary"></i>Como apontar no RDO
+            </label>
+            <select id="nt_modo" class="form-select">
+              <option value="">Automático (quantidade se houver unidade)</option>
+              <option value="percentual">Percentual — informar % acumulado</option>
+              <option value="quantidade">Quantidade — informar produção do dia</option>
+            </select>
+            <div class="form-text small">
+              Escolha "Percentual" para acompanhar a tarefa sem levantar quantitativo.
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer bg-light border-0 gap-2">
@@ -531,6 +544,17 @@
       <div class="col-6 d-none" id="ed_unidade_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">Unidade</label>
         <input type="text" id="ed_unidade" class="form-control" placeholder="ex: m²">
+      </div>
+      <div class="col-12" id="ed_modo_row">
+        <label class="form-label fw-semibold small text-uppercase text-muted">
+          <i class="fas fa-ruler-combined me-1 text-primary"></i>Como apontar no RDO
+        </label>
+        <select id="ed_modo" class="form-select">
+          <option value="">Automático (quantidade se houver unidade)</option>
+          <option value="percentual">Percentual — informar % acumulado</option>
+          <option value="quantidade">Quantidade — informar produção do dia</option>
+        </select>
+        <div class="form-text small" id="ed_modo_hint"></div>
       </div>
 
       {# Preview progresso #}
@@ -1340,6 +1364,7 @@ function abrirModalNovaTarefa() {
   document.getElementById('nt_inicio').value = new Date().toISOString().slice(0,10);
   document.getElementById('nt_qtd').value = '';
   document.getElementById('nt_unidade').value = '';
+  document.getElementById('nt_modo').value = '';
   document.getElementById('nt_resp').value = 'empresa';
   document.getElementById('nt_catalogo_id').value = '';
   document.getElementById('nt_servico_id').value = '';
@@ -1685,6 +1710,9 @@ async function salvarNovaTarefa() {
     responsavel:             document.getElementById('nt_resp').value || 'empresa',
     subatividade_mestre_id:  subatividadeId,
     servico_id:              servicoId,
+    // '' = automático (o backend grava NULL e a deducao legada continua
+    // valendo). Ver _parse_modo_apontamento em cronograma_views.py.
+    modo_apontamento:        document.getElementById('nt_modo').value || '',
   };
   let res;
   try {
@@ -1752,6 +1780,13 @@ function abrirEditar(tarefaId) {
   document.getElementById('ed_fim').value      = t.data_fim || '';
   document.getElementById('ed_qtd').value      = t.quantidade_total || '';
   document.getElementById('ed_unidade').value  = t.unidade_medida || '';
+  document.getElementById('ed_modo').value = t.modo_apontamento || '';
+  // Dica explicando o efetivo quando o usuário deixa em "Automático".
+  const modoEfetivo = (t.quantidade_total > 0 && (t.unidade_medida || '').trim())
+        ? 'quantidade' : 'percentual';
+  document.getElementById('ed_modo_hint').textContent = t.modo_apontamento
+        ? ''
+        : `Automático hoje resolve para "${modoEfetivo}".`;
   document.getElementById('ed_resp').value     = t.responsavel || 'empresa';
   document.getElementById('ed_catalogo_id').value = t.subatividade_mestre_id || '';
   document.getElementById('ed_servico_id').value  = t.servico_id || '';
@@ -1776,6 +1811,10 @@ function abrirEditar(tarefaId) {
   const unidRow    = document.getElementById('ed_unidade_row');
   const inicioRow  = document.getElementById('ed_inicio_row');
   const fimRow     = document.getElementById('ed_fim_row');
+  // Tarefa pai não é apontada (o % dela é rollup das filhas, ver
+  // utils/cronograma_engine.rollup_realizado) — esconder o seletor evita
+  // sugerir uma escolha que não tem efeito nenhum.
+  const modoRow    = document.getElementById('ed_modo_row');
   const duracaoEl  = document.getElementById('ed_duracao');
 
   if (temFilhos) {
@@ -1784,6 +1823,7 @@ function abrirEditar(tarefaId) {
     unidRow?.classList.add('d-none');
     inicioRow?.classList.add('d-none');
     fimRow?.classList.add('d-none');
+    modoRow?.classList.add('d-none');
     duracaoEl.disabled = true;
     duracaoEl.title = 'Calculado automaticamente pelas subtarefas';
   } else {
@@ -1792,6 +1832,7 @@ function abrirEditar(tarefaId) {
     unidRow?.classList.remove('d-none');
     inicioRow?.classList.remove('d-none');
     fimRow?.classList.remove('d-none');
+    modoRow?.classList.remove('d-none');
     duracaoEl.disabled = false;
     duracaoEl.title = '';
   }
@@ -1856,6 +1897,8 @@ async function salvarEditar() {
     responsavel:            document.getElementById('ed_resp').value || 'empresa',
     subatividade_mestre_id: edSubId,
     servico_id:             edSvcId,
+    // '' limpa a escolha e devolve a tarefa ao modo automático.
+    modo_apontamento:       document.getElementById('ed_modo').value || '',
     // percentual_concluido NÃO é enviado — calculado automaticamente pelo RDO (empresa) ou checkbox (terceiros)
   };
   if (!body.nome_tarefa) { toast('Nome da tarefa obrigatório', 'warning'); return; }
