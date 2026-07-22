@@ -462,6 +462,15 @@ def criar_tarefa(obra_id: int):
         return jsonify({'status': 'error', 'msg': erro_modo}), 400
     modo_apontamento = modo_apontamento or None
 
+    # Default por obra: `regime_medicao == 'percentual'` significa que a obra
+    # fatura pelo % físico apurado via RDO (models.py, coluna regime_medicao)
+    # — exigir quantitativo por tarefa nessa obra é contraditório. Só vale
+    # quando o usuário NÃO escolheu: escolha explícita sempre vence.
+    # 'fixa' (o default do schema) deixa NULL e mantém a dedução legada, para
+    # que nada mude nas obras existentes.
+    if modo_apontamento is None and (obra.regime_medicao or '').lower() == 'percentual':
+        modo_apontamento = 'percentual'
+
     tarefa = TarefaCronograma(
         obra_id=obra_id,
         tarefa_pai_id=tarefa_pai_id,

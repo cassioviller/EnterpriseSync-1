@@ -327,8 +327,25 @@ class Obra(db.Model):
     # Regime de medição/faturamento da obra:
     #   'fixa'       → fatura por marcos contratuais (MedicaoContrato, datas/% fixos).
     #   'percentual' → fatura pelo % físico das etapas apurado via RDO (MedicaoObra).
-    # Governa se o vínculo custo↔tarefa é obrigatório (percentual) ou opcional (fixa).
-    # Ver spec 2026-06-27-custo-cronograma-fieis-regime-medicao.
+    #
+    # O que esta coluna governa DE FATO (conferido em 2026-07-21): o modo de
+    # apontamento padrão das tarefas criadas na obra. Com 'percentual',
+    # `cronograma_views.criar_tarefa` grava `modo_apontamento='percentual'`
+    # na tarefa nova quando o usuário não escolheu — faz sentido: se a obra
+    # fatura pelo % físico, exigir quantitativo por tarefa é contraditório.
+    # Escolha explícita do usuário sempre vence.
+    #
+    # O que esta coluna NÃO governa (o comentário anterior afirmava que sim,
+    # e era falso): o vínculo custo↔tarefa. Nenhum código lia esta coluna
+    # antes do plano `2026-07-21-cronograma-editavel-rdo-percentual.md`;
+    # a única leitura era o teste de existência em
+    # tests/test_importacao_fisico_financeiro.py:41. Tornar o vínculo
+    # custo↔tarefa obrigatório em regime percentual é escopo da Fase 4
+    # (centro de custo obrigatório).
+    #
+    # Ver spec 2026-06-27-custo-cronograma-fieis-regime-medicao e a
+    # migration 201, que backfilla 'percentual' para obras com medição
+    # física preexistente.
     regime_medicao = db.Column(db.String(20), default='fixa', nullable=False)
 
     # Task #200 — Revisão de cronograma na primeira entrada da obra.

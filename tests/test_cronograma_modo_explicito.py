@@ -538,3 +538,58 @@ def test_tarefas_rdo_reflete_a_escolha(ctx):
     assert itens[tid]['modo_apontamento'] == 'percentual'
     assert itens[tid]['saldo'] is None, (
         'saldo só faz sentido no modo quantidade')
+
+
+# ---------------------------------------------------------------------------
+# Task 9 — regime_medicao da obra é o default do modo
+# ---------------------------------------------------------------------------
+
+def test_obra_percentual_cria_tarefa_percentual_por_padrao(ctx):
+    """Obra que fatura pelo % físico não deveria exigir quantitativo."""
+    from models import Obra
+
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        obra.regime_medicao = 'percentual'
+        db.session.commit()
+
+    c = _cliente(ctx['admin_id'])
+    resp = c.post(f"/cronograma/obra/{ctx['obra_id']}/tarefa",
+                  json={'nome_tarefa': 'Estrutura metálica',
+                        'quantidade_total': 300, 'unidade_medida': 'm2'})
+    assert resp.status_code == 201
+    corpo = resp.get_json()['tarefa']
+    assert corpo['modo_apontamento'] == 'percentual'
+
+
+def test_obra_fixa_nao_forca_modo(ctx):
+    """'fixa' é o default do schema; não pode mudar o comportamento antigo."""
+    from models import Obra
+
+    with app.app_context():
+        assert db.session.get(Obra, ctx['obra_id']).regime_medicao == 'fixa'
+
+    c = _cliente(ctx['admin_id'])
+    resp = c.post(f"/cronograma/obra/{ctx['obra_id']}/tarefa",
+                  json={'nome_tarefa': 'Fundação',
+                        'quantidade_total': 40, 'unidade_medida': 'm3'})
+    assert resp.status_code == 201
+    corpo = resp.get_json()['tarefa']
+    assert corpo['modo_apontamento'] is None
+
+
+def test_escolha_explicita_vence_o_regime_da_obra(ctx):
+    from models import Obra
+
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        obra.regime_medicao = 'percentual'
+        db.session.commit()
+
+    c = _cliente(ctx['admin_id'])
+    resp = c.post(f"/cronograma/obra/{ctx['obra_id']}/tarefa",
+                  json={'nome_tarefa': 'Contrapiso',
+                        'quantidade_total': 120, 'unidade_medida': 'm2',
+                        'modo_apontamento': 'quantidade'})
+    assert resp.status_code == 201
+    assert resp.get_json()['tarefa']['modo_apontamento'] == 'quantidade'
