@@ -430,3 +430,111 @@ def test_apontar_producao_devolve_422_no_modo_errado(ctx):
                   json={'tarefa_cronograma_id': tid,
                         'quantidade_executada_dia': 5.0})
     assert resp.status_code == 422, resp.get_data(as_text=True)[:400]
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — contrato HTTP
+# ---------------------------------------------------------------------------
+
+def _cliente(admin_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(admin_id)
+        sess['_fresh'] = True
+    return c
+
+
+def test_criar_tarefa_aceita_modo_apontamento(ctx):
+    oid, aid = ctx['obra_id'], ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.post(f'/cronograma/obra/{oid}/tarefa',
+                  json={'nome_tarefa': 'Montagem de painéis',
+                        'modo_apontamento': 'percentual'})
+    assert resp.status_code == 201, resp.get_data(as_text=True)[:400]
+    corpo = resp.get_json()['tarefa']
+    assert corpo['modo_apontamento'] == 'percentual'
+
+    with app.app_context():
+        t = db.session.get(TarefaCronograma, corpo['id'])
+        assert t.modo_apontamento == 'percentual'
+
+
+def test_criar_tarefa_sem_modo_deixa_nulo(ctx):
+    """Sem escolha explícita, a dedução legada continua no comando."""
+    oid, aid = ctx['obra_id'], ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.post(f'/cronograma/obra/{oid}/tarefa',
+                  json={'nome_tarefa': 'Tarefa sem modo',
+                        'quantidade_total': 80, 'unidade_medida': 'm2'})
+    assert resp.status_code == 201
+    corpo = resp.get_json()['tarefa']
+    with app.app_context():
+        t = db.session.get(TarefaCronograma, corpo['id'])
+        assert t.modo_apontamento is None
+
+
+def test_criar_tarefa_recusa_modo_invalido(ctx):
+    oid, aid = ctx['obra_id'], ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.post(f'/cronograma/obra/{oid}/tarefa',
+                  json={'nome_tarefa': 'Tarefa ruim',
+                        'modo_apontamento': 'banana'})
+    assert resp.status_code == 400
+    assert 'modo_apontamento' in resp.get_json()['msg']
+
+
+def test_atualizar_tarefa_muda_o_modo(ctx):
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2')
+        oid, tid, aid = ctx['obra_id'], t.id, ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.put(f'/cronograma/obra/{oid}/tarefa/{tid}',
+                 json={'modo_apontamento': 'percentual'})
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:400]
+
+    with app.app_context():
+        assert db.session.get(
+            TarefaCronograma, tid).modo_apontamento == 'percentual'
+
+
+def test_atualizar_tarefa_limpa_o_modo_com_string_vazia(ctx):
+    """Voltar para "automático" precisa ser possível pela UI."""
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        oid, tid, aid = ctx['obra_id'], t.id, ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.put(f'/cronograma/obra/{oid}/tarefa/{tid}',
+                 json={'modo_apontamento': ''})
+    assert resp.status_code == 200
+
+    with app.app_context():
+        assert db.session.get(TarefaCronograma, tid).modo_apontamento is None
+
+
+def test_atualizar_tarefa_recusa_modo_quantidade_em_marco(ctx):
+    """Decisão D6: marco é sempre percentual."""
+    with app.app_context():
+        m = _tarefa(ctx, is_marco=True, duracao_dias=0)
+        oid, mid, aid = ctx['obra_id'], m.id, ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.put(f'/cronograma/obra/{oid}/tarefa/{mid}',
+                 json={'modo_apontamento': 'quantidade'})
+    assert resp.status_code == 400
+    assert 'marco' in resp.get_json()['msg'].lower()
+
+
+def test_tarefas_rdo_reflete_a_escolha(ctx):
+    """`tipo_modo` é o contrato que templates/rdo/novo.html:1118 consome."""
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        oid, tid, aid = ctx['obra_id'], t.id, ctx['admin_id']
+    c = _cliente(aid)
+    resp = c.get(f'/cronograma/obra/{oid}/tarefas-rdo?data={D0.isoformat()}')
+    assert resp.status_code == 200
+    itens = {i['id']: i for i in resp.get_json()['tarefas']}
+    assert itens[tid]['tipo_modo'] == 'percentual'
+    assert itens[tid]['modo_apontamento'] == 'percentual'
+    assert itens[tid]['saldo'] is None, (
+        'saldo só faz sentido no modo quantidade')

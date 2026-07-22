@@ -66,6 +66,10 @@ def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> d
         'data_fim': t.data_fim.isoformat() if t.data_fim else None,
         'quantidade_total': t.quantidade_total,
         'unidade_medida': t.unidade_medida,
+        # Escolha explícita de modo (migration 220). None = automático:
+        # `modo_da_tarefa` deduz de quantidade_total + unidade_medida como
+        # sempre fez. A UI do Gantt usa este campo para posicionar o seletor.
+        'modo_apontamento': getattr(t, 'modo_apontamento', None),
         'subatividade_mestre_id': getattr(t, 'subatividade_mestre_id', None),
         'subatividade_mestre_nome': sub_nome,
         'servico_id': getattr(t, 'servico_id', None),
@@ -85,6 +89,38 @@ def _parse_date(s: str | None) -> date | None:
         return date.fromisoformat(s)
     except (ValueError, TypeError):
         return None
+
+
+def _parse_modo_apontamento(data, tarefa_is_marco=False):
+    """Lê `modo_apontamento` do corpo. Devolve (valor, erro).
+
+    Contrato:
+      * chave ausente  → (None, None)  — não mexer no que já está gravado;
+      * '' / None      → ('', None)    — LIMPAR (voltar ao automático);
+      * valor válido   → (valor, None);
+      * qualquer outra → (None, mensagem de erro).
+
+    O sentinel '' distingue "não mandou" de "mandou vazio para limpar" —
+    sem ele não haveria como voltar uma tarefa ao modo automático pela UI.
+    """
+    from services.cronograma_apontamento_service import MODOS_APONTAMENTO
+
+    if 'modo_apontamento' not in data:
+        return None, None
+
+    bruto = data.get('modo_apontamento')
+    if bruto in (None, ''):
+        return '', None
+
+    valor = str(bruto).strip().lower()
+    if valor not in MODOS_APONTAMENTO:
+        return None, (
+            f'modo_apontamento inválido: {bruto!r}. '
+            f'Use um de {", ".join(MODOS_APONTAMENTO)}, ou vazio para automático.')
+    if tarefa_is_marco and valor == 'quantidade':
+        return None, ('Um marco só admite apontamento percentual (0% ou 100%) '
+                      '— modo_apontamento="quantidade" é inválido para marco.')
+    return valor, None
 
 
 def _modo_cliente() -> bool:
@@ -418,6 +454,14 @@ def criar_tarefa(obra_id: int):
                 ),
             }), 400
 
+    # Modo de apontamento escolhido (migration 220). Ausente ⇒ None, e a
+    # dedução legada (`_modo_deduzido`) continua no comando — exatamente o
+    # comportamento anterior à coluna.
+    modo_apontamento, erro_modo = _parse_modo_apontamento(data)
+    if erro_modo:
+        return jsonify({'status': 'error', 'msg': erro_modo}), 400
+    modo_apontamento = modo_apontamento or None
+
     tarefa = TarefaCronograma(
         obra_id=obra_id,
         tarefa_pai_id=tarefa_pai_id,
@@ -429,6 +473,7 @@ def criar_tarefa(obra_id: int):
         data_fim=data_fim,
         quantidade_total=float(data.get('quantidade_total') or 0) or None,
         unidade_medida=(data.get('unidade_medida') or '').strip() or None,
+        modo_apontamento=modo_apontamento,
         subatividade_mestre_id=sub_mestre_id,
         servico_id=servico_id,
         percentual_concluido=0.0,
@@ -486,6 +531,15 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
     if 'unidade_medida' in data:
         tarefa.unidade_medida = str(data['unidade_medida']).strip() or None
+
+    if 'modo_apontamento' in data:
+        # '' significa "voltar ao automático" (grava NULL); valor válido
+        # significa "o usuário escolheu". Ver _parse_modo_apontamento.
+        novo_modo, erro_modo = _parse_modo_apontamento(
+            data, tarefa_is_marco=bool(getattr(tarefa, 'is_marco', False)))
+        if erro_modo:
+            return jsonify({'status': 'error', 'msg': erro_modo}), 400
+        tarefa.modo_apontamento = novo_modo or None
 
     if 'subatividade_mestre_id' in data:
         try:
@@ -937,6 +991,10 @@ def tarefas_rdo(obra_id: int):
             'apontamento_id': apontamento_id,
             # M07 — contrato de modos: a UI não decide fórmula, só exibe.
             'tipo_modo': tipo_modo,
+            # Escolha explícita (None = automático). `tipo_modo` acima é o
+            # modo EFETIVO já resolvido; este campo diz se veio de escolha
+            # ou de dedução — a UI do Gantt precisa dos dois.
+            'modo_apontamento': getattr(t, 'modo_apontamento', None),
             'is_marco': bool(getattr(t, 'is_marco', False)),
             'percentual_acumulado_anterior': pct_anterior,
             'percentual_acumulado_hoje': pct_hoje,
