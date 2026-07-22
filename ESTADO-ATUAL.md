@@ -31,6 +31,34 @@ Branch: `fix/fase-0-estancar` · **27 commits não pushados.**
 🔬 21/07: `main` e `origin/main` estão **idênticos** em `8fe6ac9` — o merge do
 M10 subiu. (A 1ª versão dizia "67 commits à frente"; era verdade quando escrita.)
 
+## 🔴 RETOMADA IMEDIATA — banco de dev recriado vazio em 22/07
+
+O Postgres do ambiente (`helium`) caiu em 22/07 ~00:30, não se recuperou e
+foi **recriado do zero** — o banco de desenvolvimento está vazio. Nenhum
+código foi perdido (26 commits, árvore limpa). Ao retomar, nesta ordem:
+
+1. O boot do app reconstrói o schema sozinho: `create_all()` + migrations
+   1-219, todas idempotentes. Basta o workflow do Replit subir. Se quiser
+   forçar: `python -c "import main"`.
+2. **Rodar o gate completo**, que ficou INCONCLUSIVO: a única rodada sobre
+   o estado final (commit `e782f70`) morreu junto com o banco (80 falhas,
+   todas `OperationalError`). O último verde íntegro foi 745 passed sobre
+   o estado até a Task 7 da Fase 1; as Tasks 8-11 têm regressões dirigidas
+   verdes (145 + 49 passed), não gate cheio.
+   `bash run_tests.sh --gate` ou
+   `python -m pytest tests/ -m "not browser" -q --timeout=240`.
+3. As volumetrias ⚠️ dev deste documento (8.723 obras, 53 'Em Andamento',
+   980 partidas órfãs etc.) descrevem o banco ANTIGO. Continuam válidas
+   como forma do problema; o banco novo nasce limpo e as migrations
+   preventivas (217-219) rodam como no-op.
+4. Dois commits alheios ao plano entraram na queda: `f52a7c7` (Replit
+   Agent, retry no create_all) e `e782f70` (meu: esgotado o retry, aborta
+   o boot em produção — alinhado à política da Fase 0.5/1.1). O segundo
+   NÃO foi testado contra banco vivo; o gate do passo 2 o cobre.
+
+Parado em: Fase 1.5, Task 2 de 14 (coluna `modo_apontamento`, migration
+220). O plano é `docs/superpowers/plans/2026-07-21-cronograma-editavel-rdo-percentual.md`.
+
 ## 🔴 Travado do lado humano
 
 | # | O quê | Por que trava |
