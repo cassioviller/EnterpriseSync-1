@@ -3770,6 +3770,46 @@ def _aposentar_migracoes_retiradas():
             pass
 
 
+def migration_220_tarefa_modo_apontamento():
+    """Coluna tarefa_cronograma.modo_apontamento ('quantidade'|'percentual').
+
+    Aditiva, idempotente e SEM backfill: a coluna nasce NULL em todas as
+    linhas, e NULL significa "ninguém escolheu" — `modo_da_tarefa` continua
+    deduzindo exatamente como antes. O backfill que congela o modo atual é a
+    migration 221, separada de propósito: se algo der errado nela, a coluna
+    já está no lugar e nada de comportamento mudou.
+
+    O CHECK impede que qualquer caminho grave lixo na coluna. Não é
+    redundante com a validação de aplicação: `cronograma_views.atualizar_tarefa`
+    escreve string vinda de JSON.
+    """
+    logger.info("[Migration 220] Iniciando — tarefa_cronograma.modo_apontamento")
+
+    db.session.execute(text("""
+        ALTER TABLE tarefa_cronograma
+        ADD COLUMN IF NOT EXISTS modo_apontamento VARCHAR(12)
+    """))
+    db.session.commit()
+
+    existe_check = db.session.execute(text("""
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'ck_tarefa_cronograma_modo_apontamento'
+          AND table_name = 'tarefa_cronograma'
+        LIMIT 1
+    """)).fetchone()
+    if not existe_check:
+        db.session.execute(text("""
+            ALTER TABLE tarefa_cronograma
+            ADD CONSTRAINT ck_tarefa_cronograma_modo_apontamento
+            CHECK (modo_apontamento IS NULL
+                   OR modo_apontamento IN ('quantidade', 'percentual'))
+        """))
+        db.session.commit()
+        logger.info("[Migration 220] CHECK ck_tarefa_cronograma_modo_apontamento criado")
+
+    logger.info("[Migration 220] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4019,6 +4059,7 @@ def executar_migracoes():
             (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
             (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
             (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
+            (220, "Cronograma editável — tarefa_cronograma.modo_apontamento (quantidade|percentual, NULL = dedução legada)", migration_220_tarefa_modo_apontamento),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

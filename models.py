@@ -5072,6 +5072,29 @@ class TarefaCronograma(db.Model):
     data_fim = db.Column(db.Date, nullable=True)
     quantidade_total = db.Column(db.Float, nullable=True)
     unidade_medida = db.Column(db.String(20), nullable=True)
+    # Modo de apontamento ESCOLHIDO para esta tarefa: 'quantidade' (o RDO
+    # pede quantidade do dia na unidade da tarefa) ou 'percentual' (o RDO
+    # pede o % acumulado). Até 2026-07-21 isso não era escolha: era
+    # deduzido em `services/cronograma_apontamento_service.modo_da_tarefa`
+    # a partir de `quantidade_total > 0 AND unidade_medida != ''`, ou seja,
+    # preencher "Quantidade" no modal do Gantt mudava o modo do RDO como
+    # efeito colateral. A queixa do dono em 21/07/2026 — "RDO em
+    # porcentagem" — é exatamente isso.
+    #
+    # NULL significa "ninguém escolheu" e mantém a dedução antiga
+    # (`_modo_deduzido`). É o default de propósito: o importador .mpp
+    # (services/cronograma_versao_service.py:534) e qualquer construção
+    # direta do modelo continuam se comportando como sempre.
+    #
+    # Vocabulário: mesmo de `modo_da_tarefa()` e do JSON `tipo_modo` que a
+    # UI do RDO já consome (templates/rdo/novo.html:1118). NÃO confundir
+    # com `RDOApontamentoCronograma.tipo_apontamento` (models.py:5139),
+    # que usa 'quantitativo'/'percentual' e descreve a LINHA de
+    # apontamento, não a tarefa.
+    #
+    # Marco (`is_marco`) ignora esta coluna e é sempre percentual binário —
+    # o guard vem antes da leitura, em `modo_da_tarefa`.
+    modo_apontamento = db.Column(db.String(12), nullable=True)
     subatividade_mestre_id = db.Column(
         db.Integer,
         db.ForeignKey('subatividade_mestre.id', ondelete='SET NULL'),
