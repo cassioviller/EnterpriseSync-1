@@ -71,9 +71,10 @@
     border-left: 4px solid #198754;
 }
 .tree-card.no-template {
+    /* Sem opacity: o card agora é acionável (gera 1 tarefa se marcado) e não
+       pode parecer inerte. Mesma decisão de propostas/cronograma_revisar.html. */
     border-left-color: #adb5bd;
     background: #f8f9fa;
-    opacity: 0.85;
 }
 ul.cron-tree, ul.cron-tree ul {
     list-style: none;
@@ -260,16 +261,17 @@ ul.cron-tree .node-sub > .node-label {
 
         {% for item in arvore %}
         <div class="tree-card {% if item.sem_template %}no-template{% endif %}"
-             data-pi-id="{{ item.proposta_item_id }}">
+             data-pi-id="{{ item.proposta_item_id }}"
+             {% if item.sem_template %}data-dias="{{ item.duracao_dias or 1 }}"{% endif %}>
             <div class="servico-header">
-                {% if not item.sem_template %}
+                {# Marcável mesmo sem template: gera 1 tarefa-esqueleto com o
+                   quantitativo do item (services/cronograma_proposta.py:553).
+                   O checkbox era `disabled` e a obra nascia vazia. #}
                 <input type="checkbox" class="form-check-input chk-raiz"
                        data-pi-id="{{ item.proposta_item_id }}"
+                       {% if item.sem_template %}data-sem-template="1"
+                       title="Sem template: marcar cria 1 tarefa única com o quantitativo do item, para detalhar depois no Gantt"{% endif %}
                        {% if item.marcado %}checked{% endif %}>
-                {% else %}
-                <input type="checkbox" class="form-check-input" disabled
-                       title="Sem template padrão definido — não gera tarefas">
-                {% endif %}
                 <h5>
                     <i class="fas fa-cube text-success me-1"></i>
                     {{ item.servico_nome }}
@@ -278,8 +280,9 @@ ul.cron-tree .node-sub > .node-label {
                 <span class="badge bg-info">📋 {{ item.template_nome }}</span>
                 {% endif %}
                 {% if item.sem_template %}
-                <span class="badge bg-secondary">
-                    <i class="fas fa-ban me-1"></i> Sem template padrão — não gera tarefas
+                <span class="badge bg-secondary"
+                      title="{{ item.quantidade_prevista|num(2) }} {{ item.unidade_medida or '' }}">
+                    <i class="fas fa-cube me-1"></i> Sem template — 1 tarefa única
                 </span>
                 {% endif %}
                 {% if item.horas_totais_estimadas %}
@@ -338,7 +341,14 @@ function _recalcular() {
     let totHoras = 0;
     let foldersFallback = 0;
     document.querySelectorAll('.tree-card').forEach(card => {
-        if (card.classList.contains('no-template')) return;
+        if (card.classList.contains('no-template')) {
+            // Sem folhas: a raiz é a tarefa. Conta no resumo, mas fora de
+            // foldersFallback — 0h aqui é o esperado, não peso a revisar
+            // (services/cronograma_proposta.py:703).
+            const raizNT = card.querySelector('.chk-raiz');
+            if (raizNT && raizNT.checked) totMarcados += 1;
+            return;
+        }
         const folhas = card.querySelectorAll('li.node-sub');
         folhas.forEach(li => {
             const ck = li.querySelector(':scope > .node-label > .chk-node');
@@ -435,6 +445,13 @@ function _construirArvoreFinal() {
             template_nome: item.template_nome,
             sem_template: item.sem_template,
             horas_totais_estimadas: item.horas_totais_estimadas,
+            // Sem estes 4 o nó sem template volta sem quantitativo e a
+            // tarefa-esqueleto nasce sem como ser apontada por quantidade
+            // (services/cronograma_proposta.py:597).
+            duracao_dias: item.duracao_dias,
+            quantidade_prevista: item.quantidade_prevista,
+            unidade_medida: item.unidade_medida,
+            responsavel: item.responsavel,
             marcado: marcadoRaiz,
             filhos: filhosOut,
         };

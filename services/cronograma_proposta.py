@@ -24,7 +24,10 @@ Decisões:
     - Peso é calculado por `duracao_estimada_horas` da SubatividadeMestre
       vinculada (fallback: divisão igual entre folhas marcadas).
     - PropostaItem/OrcamentoItem sem servico/template é exibido na árvore como
-      `sem_template=True` e marcação default = False (não materializa tarefa).
+      `sem_template=True` e marcação default = False. Se o admin MARCAR o nó,
+      ele materializa uma tarefa-esqueleto de nível 0 (sem filhos) com o
+      quantitativo do próprio item — antes o nó era descartado em silêncio e a
+      obra podia nascer sem nenhuma tarefa.
     - Atomicidade é responsabilidade do caller (handler) — funções operam
       via db.session sem commit explícito.
 """
@@ -151,13 +154,19 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
     Estrutura retornada (lista, uma entrada por PropostaItem):
         [{
             'proposta_item_id': int,
-            'servico_id': int | None,
+            'servico_id': int | None,   # já filtrado por admin_id
             'servico_nome': str,
-            'sem_template': bool,   # True quando não há template para materializar
+            'sem_template': bool,   # True quando não há template
             'horas_totais_estimadas': float,
             'marcado': bool,
             'filhos': [ ...nós do template... ]
         }, ...]
+
+    Nós com `sem_template=True` trazem ainda `duracao_dias`,
+    `quantidade_prevista`, `unidade_medida` e `responsavel`: sem filhos, a
+    própria raiz é a tarefa, então ela carrega o quantitativo do PropostaItem.
+    Se marcada, vira uma tarefa-esqueleto de nível 0 em
+    `materializar_cronograma` — não é mais descartada.
 
     Fix #6: O filtro `CronogramaTemplate.ativo == True` foi removido desta
     função. O campo `ativo` controla a exibição do template nos seletores de
@@ -277,13 +286,29 @@ def montar_arvore_preview(proposta, admin_id: int) -> list[dict]:
             entrada['horas_totais_estimadas'] = _somar_horas_folhas(filhos)
             arvore.append(entrada)
         else:
+            # Nó sem template: o único quantitativo disponível é o do próprio
+            # PropostaItem. Damos corpo a ele (duração/quantidade/unidade) para
+            # que, se o admin marcá-lo, `materializar_cronograma` consiga criar
+            # uma tarefa-esqueleto apontável em vez de descartar o item.
             arvore.append({
                 'proposta_item_id': it.id,
-                'servico_id': it.servico_id,
+                # `servico.id`, não `it.servico_id`: `servicos` já passou pelo
+                # filtro de admin_id (:181). Devolver o ID cru expunha um
+                # serviço de OUTRO tenant quando o PropostaItem apontava para
+                # fora do próprio.
+                'servico_id': servico.id if servico else None,
                 'servico_nome': nome_serv,
                 'template_id': None,
                 'template_nome': None,
+                'origem_template': None,
                 'sem_template': True,
+                'duracao_dias': 1,
+                # float(), não o Decimal cru: esta árvore é persistida em
+                # `Proposta.cronograma_default_json` (coluna JSON) e Decimal
+                # não é serializável — o ramo com template já usa Float (:76).
+                'quantidade_prevista': float(it.quantidade) if it.quantidade is not None else None,
+                'unidade_medida': it.unidade or (servico.unidade_medida if servico else None),
+                'responsavel': 'empresa',
                 'horas_totais_estimadas': 0.0,
                 'marcado': bool(pre.get('marcado')) if pre else False,
                 'filhos': [],
@@ -322,6 +347,10 @@ def montar_arvore_preview_orcamento(orcamento, admin_id: int) -> list[dict]:
             'marcado': bool,
             'filhos': [ ...nós do template... ]
         }, ...]
+
+    Como em `montar_arvore_preview`, nós `sem_template=True` trazem também
+    `duracao_dias`/`quantidade_prevista`/`unidade_medida`/`responsavel`. Aqui
+    são informativos: esta árvore é preview e nunca é materializada.
     """
     from models import OrcamentoItem
 
@@ -386,12 +415,27 @@ def montar_arvore_preview_orcamento(orcamento, admin_id: int) -> list[dict]:
         else:
             arvore.append({
                 'orcamento_item_id': it.id,
-                'servico_id': it.servico_id,
+                # Mesmo filtro de tenant do ramo com template (:376): `servicos`
+                # já é filtrado por admin_id, `it.servico_id` não.
+                'servico_id': servico.id if servico else None,
                 'servico_nome': nome_serv,
                 'template_id': None,
                 'template_nome': None,
                 'origem_template': None,
                 'sem_template': True,
+                # Paridade com `montar_arvore_preview` (:299): mesmo shape de nó
+                # sem template nas duas árvores. Aqui os campos são informativos
+                # — esta árvore é PREVIEW (renderizada em orcamentos/editar.html
+                # e servida por /orcamentos/<id>/preview-cronograma), nunca é
+                # persistida nem passa por `materializar_cronograma`, que lê
+                # `proposta_item_id`. Divergir do shape faria a tela do orçamento
+                # prometer um cronograma diferente do que a proposta gera.
+                'duracao_dias': 1,
+                # float(): `OrcamentoItem.quantidade` é Numeric → Decimal, e este
+                # dict vai direto para `jsonify`. Mesmo motivo de :300.
+                'quantidade_prevista': float(it.quantidade) if it.quantidade is not None else None,
+                'unidade_medida': it.unidade or (servico.unidade_medida if servico else None),
+                'responsavel': 'empresa',
                 'horas_totais_estimadas': 0.0,
                 'marcado': False,
                 'filhos': [],
@@ -529,8 +573,15 @@ def materializar_cronograma(
         pi_id = nivel0.get('proposta_item_id')
         if not nivel0.get('marcado'):
             continue
-        if nivel0.get('sem_template'):
-            continue
+        # `sem_template` NÃO é mais motivo de descarte. Até 2026-07-21 havia um
+        # `continue` aqui: uma proposta cujos serviços não tinham
+        # `template_padrao_id` aprovava, criava a obra e a deixava com ZERO
+        # tarefa — sem erro e sem mensagem. Agora o nó vira uma tarefa-esqueleto
+        # de nível 0 (sem filhos), com o quantitativo do PropostaItem, que o
+        # admin detalha depois no Gantt. Continua valendo o default
+        # `marcado=False` de `montar_arvore_preview` — nada é materializado
+        # sem marcação explícita.
+        sem_template = bool(nivel0.get('sem_template'))
         if pi_id in ja_existem:
             logger.info(f"#102: proposta_item_id={pi_id} já materializado em obra={obra_id} — skip")
             continue
@@ -556,16 +607,23 @@ def materializar_cronograma(
                 f"(id={tarefa_serv.id}) — reuso (skip insert)"
             )
         else:
+            # Com template a raiz é um GRUPO agregador: quantitativo mora nas
+            # folhas e a duração é sobrescrita pelo somatório mais abaixo. Sem
+            # template a raiz é a ÚNICA tarefa, então ela mesma carrega o
+            # quantitativo do PropostaItem — é o que dá a ela um modo de
+            # apontamento ('quantidade') em vez de cair no fallback percentual.
             tarefa_serv = TarefaCronograma(
                 obra_id=obra_id,
                 nome_tarefa=nome_serv,
-                duracao_dias=1,
+                duracao_dias=max(1, int(nivel0.get('duracao_dias') or 1)) if sem_template else 1,
                 data_inicio=data_seed,
+                quantidade_total=nivel0.get('quantidade_prevista') if sem_template else None,
+                unidade_medida=nivel0.get('unidade_medida') if sem_template else None,
                 tarefa_pai_id=None,
                 ordem=ordem_seq[0],
                 admin_id=admin_id,
                 is_cliente=False,
-                responsavel='empresa',
+                responsavel=(nivel0.get('responsavel') or 'empresa') if sem_template else 'empresa',
                 gerada_por_proposta_item_id=pi_id,
                 servico_id=servico_id_no,
             )
@@ -580,6 +638,12 @@ def materializar_cronograma(
 
         # Coletar folhas marcadas com horas para cálculo de peso
         folhas_marcadas: list[tuple[TarefaCronograma, float]] = []
+
+        # Esqueleto: sem filhos, a própria raiz é a folha. Sem isto ela não
+        # entraria no vínculo ItemMedicaoCronogramaTarefa abaixo e o avanço da
+        # tarefa não moveria a medição comercial do item.
+        if sem_template:
+            folhas_marcadas.append((tarefa_serv, 0.0))
 
         # Recursivo nos filhos (grupos e subatividades).
         # NOTA: data_inicio das folhas é setada apenas como SEED (igual à da
@@ -656,7 +720,10 @@ def materializar_cronograma(
         if imc and folhas_marcadas:
             soma_horas = sum(h for _, h in folhas_marcadas)
             n_folhas = len(folhas_marcadas)
-            if soma_horas <= 0:
+            # `sem_template` fica fora do aviso abaixo: ali a folha única é a
+            # própria tarefa-esqueleto, e 100% nela é o resultado correto — não
+            # um fallback que o operador precise corrigir.
+            if soma_horas <= 0 and not sem_template:
                 # Task #102: aviso explícito quando NENHUMA folha marcada tem
                 # `duracao_estimada_horas` configurada — peso é distribuído
                 # igualmente entre as folhas (fallback). Operador deve revisar

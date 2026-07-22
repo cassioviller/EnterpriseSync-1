@@ -69,9 +69,10 @@
     border-left: 4px solid #0d6efd;
 }
 .tree-card.no-template {
+    /* Cinza para diferenciar de um card com template, mas SEM opacity: o card
+       agora é acionável (gera 1 tarefa se marcado) e não pode parecer inerte. */
     border-left-color: #adb5bd;
     background: #f8f9fa;
-    opacity: 0.85;
 }
 ul.cron-tree, ul.cron-tree ul {
     list-style: none;
@@ -256,16 +257,19 @@ ul.cron-tree .node-sub > .node-label {
 
         {% for item in arvore %}
         <div class="tree-card {% if item.sem_template %}no-template{% endif %}"
-             data-pi-id="{{ item.proposta_item_id }}">
+             data-pi-id="{{ item.proposta_item_id }}"
+             {% if item.sem_template %}data-dias="{{ item.duracao_dias or 1 }}"{% endif %}>
             <div class="servico-header">
-                {% if not item.sem_template %}
+                {# Nó sem template também é marcável: gera UMA tarefa-esqueleto
+                   com o quantitativo do item (services/cronograma_proposta.py:553).
+                   Antes o checkbox vinha `disabled` e a proposta cujos serviços
+                   não tinham template aprovava com a obra vazia. Continua
+                   desmarcado por default — quem marca é o admin. #}
                 <input type="checkbox" class="form-check-input chk-raiz"
                        data-pi-id="{{ item.proposta_item_id }}"
+                       {% if item.sem_template %}data-sem-template="1"
+                       title="Sem template: marcar cria 1 tarefa única com o quantitativo do item, para detalhar depois no Gantt"{% endif %}
                        {% if item.marcado %}checked{% endif %}>
-                {% else %}
-                <input type="checkbox" class="form-check-input" disabled
-                       title="Sem template padrão definido — não gera tarefas">
-                {% endif %}
                 <h5>
                     <i class="fas fa-cube text-primary me-1"></i>
                     {{ item.servico_nome }}
@@ -285,8 +289,9 @@ ul.cron-tree .node-sub > .node-label {
                 {% endif %}
                 {% endif %}
                 {% if item.sem_template %}
-                <span class="badge bg-secondary">
-                    <i class="fas fa-ban me-1"></i> Sem template padrão — não gera tarefas
+                <span class="badge bg-secondary"
+                      title="{{ item.quantidade_prevista|num(2) }} {{ item.unidade_medida or '' }}">
+                    <i class="fas fa-cube me-1"></i> Sem template — 1 tarefa única
                 </span>
                 {% endif %}
                 {% if item.horas_totais_estimadas %}
@@ -392,7 +397,19 @@ function _recalcular() {
     let foldersFallback = 0;
     document.querySelectorAll('.tree-card').forEach(card => {
         const isNoTemplate = card.classList.contains('no-template');
-        if (isNoTemplate) return;
+        if (isNoTemplate) {
+            // Card sem template não tem folhas: a própria raiz é a tarefa.
+            // Entra no resumo (1 tarefa, sua duração) para o total bater com o
+            // que a obra vai receber. Fica FORA de foldersFallback de
+            // propósito: 0h aqui é o esperado, não um peso a revisar — mesma
+            // decisão do backend em services/cronograma_proposta.py:703.
+            const raizNT = card.querySelector('.chk-raiz');
+            if (raizNT && raizNT.checked) {
+                totMarcados += 1;
+                totDias += parseInt(card.dataset.dias || '1', 10) || 1;
+            }
+            return;
+        }
         const folhas = card.querySelectorAll('li.node-sub');
         folhas.forEach(li => {
             const ck = li.querySelector(':scope > .node-label > .chk-node');
@@ -506,6 +523,15 @@ function _construirArvoreFinal() {
             template_nome: item.template_nome,
             sem_template: item.sem_template,
             horas_totais_estimadas: item.horas_totais_estimadas,
+            // Sem estes 4 o nó sem template volta ao servidor sem quantitativo:
+            // `materializar_cronograma` lê `quantidade_prevista` (:597) e a
+            // tarefa-esqueleto nasceria sem como ser apontada por quantidade,
+            // caindo no fallback percentual. `_serializeNode` (:482) já os
+            // carrega para os filhos — a raiz é que os descartava.
+            duracao_dias: item.duracao_dias,
+            quantidade_prevista: item.quantidade_prevista,
+            unidade_medida: item.unidade_medida,
+            responsavel: item.responsavel,
             marcado: marcadoRaiz,
             filhos: filhosOut,
         };
