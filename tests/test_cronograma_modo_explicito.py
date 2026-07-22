@@ -341,3 +341,92 @@ def test_recomputo_quantitativo_continua_igual(ctx):
         db.session.flush()
         assert ap2.quantidade_acumulada == 80.0
         assert ap2.percentual_realizado == 40.0
+
+
+# ---------------------------------------------------------------------------
+# Task 6 — o modo escolhido é respeitado na escrita
+# ---------------------------------------------------------------------------
+
+def test_quantidade_em_tarefa_marcada_percentual_e_recusada(ctx):
+    from services.cronograma_apontamento_service import (ModoIncompativel,
+                                                         registrar_apontamento)
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        with pytest.raises(ModoIncompativel):
+            registrar_apontamento(_rdo(ctx, D0), t, quantidade_dia=10.0,
+                                  admin_id=ctx['admin_id'])
+        db.session.rollback()
+
+
+def test_percentual_em_tarefa_marcada_quantidade_e_recusado(ctx):
+    from services.cronograma_apontamento_service import (ModoIncompativel,
+                                                         registrar_apontamento)
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='quantidade')
+        with pytest.raises(ModoIncompativel):
+            registrar_apontamento(_rdo(ctx, D0), t, percentual_acumulado=30.0,
+                                  admin_id=ctx['admin_id'])
+        db.session.rollback()
+
+
+def test_sem_escolha_explicita_nada_e_recusado(ctx):
+    """Decisão D3: coluna NULL => tolerância legada, os dois modos passam.
+
+    É o que mantém verdes as fixtures que criam tarefa com
+    quantidade_total sem unidade e apontam com quantidade_dia
+    (tests/test_cronograma_apontamento_service.py:101).
+    """
+    from services.cronograma_apontamento_service import registrar_apontamento
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida=None)
+        assert t.modo_apontamento is None
+        ap = registrar_apontamento(_rdo(ctx, D0), t, quantidade_dia=10.0,
+                                   admin_id=ctx['admin_id'])
+        db.session.commit()
+        assert ap.tipo_apontamento == 'quantitativo'
+
+
+def test_marco_continua_aceitando_percentual(ctx):
+    """Marco resolve para 'percentual' antes de olhar a coluna."""
+    from services.cronograma_apontamento_service import registrar_apontamento
+
+    with app.app_context():
+        m = _tarefa(ctx, quantidade_total=None, is_marco=True, duracao_dias=0,
+                    modo_apontamento='percentual')
+        ap = registrar_apontamento(_rdo(ctx, D0), m, percentual_acumulado=100.0,
+                                   admin_id=ctx['admin_id'])
+        db.session.commit()
+        assert ap.percentual_realizado == 100.0
+
+
+def test_modo_incompativel_e_valueerror(ctx):
+    """Contrato do módulo: os laços legados de views/rdo.py protegem com
+    `except (ValueError, TypeError)`. A exceção nova precisa cair ali, senão
+    um item divergente derruba o RDO inteiro (views/rdo.py:4635)."""
+    from services.cronograma_apontamento_service import ModoIncompativel
+
+    assert issubclass(ModoIncompativel, ValueError)
+
+
+def test_apontar_producao_devolve_422_no_modo_errado(ctx):
+    """Caminho HTTP: cronograma_views.py:1203 mapeia ApontamentoInvalido→422."""
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        r = _rdo(ctx, D0)
+        tid, rid, aid = t.id, r.id, ctx['admin_id']
+
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+
+    resp = c.post(f'/cronograma/rdo/{rid}/apontar',
+                  json={'tarefa_cronograma_id': tid,
+                        'quantidade_executada_dia': 5.0})
+    assert resp.status_code == 422, resp.get_data(as_text=True)[:400]

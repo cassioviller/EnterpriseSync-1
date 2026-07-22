@@ -70,6 +70,20 @@ class MarcoApenasZeroOuCem(ApontamentoInvalido):
     """Marco é binário: o percentual digitado só pode ser 0 ou 100."""
 
 
+class ModoIncompativel(ApontamentoInvalido):
+    """Apontamento enviado num modo diferente do ESCOLHIDO para a tarefa.
+
+    Só dispara quando alguém escolheu de fato — `tarefa.modo_apontamento`
+    não-NULL (coluna da migration 220). Tarefa com a coluna NULL mantém a
+    tolerância de sempre: os dois modos são aceitos e o `tipo_apontamento`
+    da linha sai do argumento recebido. Ver Decisão D3 do plano
+    `2026-07-21-cronograma-editavel-rdo-percentual.md`: enforcement
+    incondicional quebraria as fixtures de caracterização, que criam tarefa
+    com `quantidade_total` sem `unidade_medida` e apontam com
+    `quantidade_dia` (tests/test_cronograma_apontamento_service.py:101).
+    """
+
+
 # Domínio do modo de apontamento da TAREFA. Vocabulário deliberadamente
 # igual ao que `modo_da_tarefa` já devolvia e ao JSON `tipo_modo` que a UI
 # do RDO consome (templates/rdo/novo.html:1118). NÃO confundir com
@@ -256,6 +270,22 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
             'registrar_apontamento: informe exatamente um entre '
             'quantidade_dia e percentual_acumulado'
         )
+
+    # Guard de modo: honra a ESCOLHA do usuário. Marco não entra aqui —
+    # `modo_da_tarefa` já resolve marco para 'percentual' antes de olhar a
+    # coluna, e a validação binária é a MarcoApenasZeroOuCem mais abaixo.
+    modo_escolhido = (getattr(tarefa, 'modo_apontamento', None) or '').strip().lower()
+    if modo_escolhido in MODOS_APONTAMENTO and not getattr(tarefa, 'is_marco', False):
+        if quantidade_dia is not None and modo_escolhido != 'quantidade':
+            raise ModoIncompativel(
+                f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
+                f'apontamento em PERCENTUAL — envie o % acumulado, não '
+                f'quantidade.')
+        if percentual_acumulado is not None and modo_escolhido != 'percentual':
+            raise ModoIncompativel(
+                f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
+                f'apontamento por QUANTIDADE ({tarefa.unidade_medida or "un"}) '
+                f'— envie a quantidade do dia, não percentual.')
 
     from sqlalchemy import func as sqlfunc
 
