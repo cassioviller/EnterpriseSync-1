@@ -79,8 +79,8 @@ que, na minha leitura, precedem qualquer roadmap de features.
 
 | Item | Veredito |
 |---|---|
-| Máquina de estados da Obra | **CONSTRUIR.** `Obra.status` é `String(20)` de **texto livre**, alimentado por dropdown editável pelo tenant. Não existe "vendida" nem "em_execução" |
-| Handoff do GP | **CONSTRUIR.** Sem estado, sem aceite, sem GP |
+| Máquina de estados da Obra | **✅ CONSTRUÍDA em 22/07** (Fase 2). `Obra.estado` com 5 estados, grafo validado em `services/obra_estado.transitar()`, histórico em `obra_transicao_estado`, `status`/`ativo` viraram espelhos por write-through. "Vendida" ficou de fora de propósito: venda é estado da Proposta, não da Obra |
+| Handoff do GP | **✅ CONSTRUÍDO em 22/07** (Fase 2). `services/obra_handoff.executar_handoff`: responsável + `UsuarioObra(GESTOR)` + gate de cronograma na mesma transação; tela com dossiê; evento `obra.handoff` para o n8n |
 | RBAC por papel | **CONSTRUIR.** CRM, Compras, Financeiro, Custos e Cronograma usam **apenas** `login_required` do flask_login — autenticação, sem papel |
 | Escopo por obra | **CONSTRUIR.** `views/rdo.py:2168` filtra só por `admin_id`. Alan e Abel veriam todas as obras da Veks |
 | Trilha de auditoria | **PARCIAL.** Excelente no cronograma (`CronogramaImportacaoEvento`), na proposta (`PropostaHistorico`) e no CRM (`LeadHistorico`). Ausente em compras, financeiro e obra |

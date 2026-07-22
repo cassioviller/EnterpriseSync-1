@@ -56,12 +56,12 @@ código foi perdido (26 commits, árvore limpa). Ao retomar, nesta ordem:
    o boot em produção — alinhado à política da Fase 0.5/1.1). O segundo
    NÃO foi testado contra banco vivo; o gate do passo 2 o cobre.
 
-Parado em: Fase 2 (máquina de estados da Obra). A Fase 1.5 fechou em 22/07 —
-14/14 tasks do plano
-`docs/superpowers/plans/2026-07-21-cronograma-editavel-rdo-percentual.md`.
-Pendência de rollout, não de código: ligar `escopo_obra_ativo` por tenant
-(`scripts/flag_escopo_obra.py <admin_id> --ligar`) para o RBAC da Task 13
-sair do modo transparente.
+Parado em: Fase 3 (compras com governança). As Fases 1.5 e 2 fecharam em
+22/07 — a 2 com 14/14 tasks (`fase-2-maquina-estados-obra.md`; runbook em
+`docs/fase-2-rollout.md`). Pendências de rollout, não de código:
+`escopo_obra_ativo` por tenant (RBAC da 1.5) e a fila de handoff — rodar
+`python scripts/relatorio_estado_obra.py` em produção e levar o número de
+"EM EXECUÇÃO sem gestor" ao Cássio (em dev: 2.481).
 
 > ⚠️ **O RBAC do cronograma NÃO é transparente para todo mundo no deploy.**
 > O plano de 21/07 assume a flag desligada, mas a Fase 1 já a ligou em
@@ -236,7 +236,7 @@ sobreviveram ao contato com o código:
 | **0.6** | Os cinco defeitos de dinheiro (D1-D5) | ✅ **21/07** | ver seção acima |
 | **1** | Identidade e papéis (RBAC + escopo por obra) | ✅ **21/07** — 11/11 tasks | `fase-1-identidade-papeis.md` |
 | **1.5** | Cronograma editável + RDO em % | ✅ **22/07** — 14/14 tasks | `cronograma-editavel-rdo-percentual.md` |
-| **2** | Máquina de estados da Obra + handoff do GP | ⬜ | `fase-2-maquina-estados-obra.md` |
+| **2** | Máquina de estados da Obra + handoff do GP | ✅ **22/07** — 14/14 tasks | `fase-2-maquina-estados-obra.md` + `docs/fase-2-rollout.md` |
 | **3** | Compras com governança | ⬜ | `fase-3-compras-governanca.md` |
 | **4** | Centro de custo obrigatório | ⬜ | `fase-4-centro-custo-obrigatorio.md` |
 | **5** | RDO com ciclo de vida e assinatura | ⬜ | `fase-5-rdo-ciclo-vida-assinatura.md` |
