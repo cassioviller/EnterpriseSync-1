@@ -512,3 +512,173 @@ def test_backfill_231_nao_deixa_nenhuma_obra_sem_estado():
         orfas = db.session.query(Obra.id).filter(Obra.estado.is_(None)).count()
         assert orfas == 0
 
+
+
+# ---------------------------------------------------------------------------
+# Task 4 — `transitar()`: a guarda que recusa transição inválida
+# ---------------------------------------------------------------------------
+
+def test_transitar_grava_historico_e_sincroniza_status_e_ativo():
+    from models import EstadoObra, ObraTransicaoEstado
+    from services.obra_estado import transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        reg = transitar(obra, EstadoObra.CONCLUIDA, usuario_id=admin.id)
+        db.session.commit()
+        db.session.refresh(obra)
+        assert obra.estado == 'concluida'
+        assert obra.status == 'Concluída'      # write-through no campo legado
+        assert obra.ativo is False             # ativo passa a ser derivado
+        assert reg.estado_de == 'em_execucao'
+        assert reg.estado_para == 'concluida'
+        assert reg.usuario_id == admin.id
+        assert ObraTransicaoEstado.query.filter_by(
+            obra_id=obra.id, estado_para='concluida').count() == 1
+
+
+def test_transitar_recusa_salto_fora_do_grafo_e_nao_grava_nada():
+    from models import EstadoObra, ObraTransicaoEstado
+    from services.obra_estado import TransicaoInvalida, transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='planejamento', status='Planejamento')
+        antes = ObraTransicaoEstado.query.filter_by(obra_id=obra.id).count()
+        with pytest.raises(TransicaoInvalida):
+            transitar(obra, EstadoObra.CONCLUIDA, usuario_id=admin.id)
+        db.session.rollback()
+        db.session.refresh(obra)
+        assert obra.estado == 'planejamento'
+        assert ObraTransicaoEstado.query.filter_by(obra_id=obra.id).count() == antes
+
+
+def test_transitar_de_cancelada_nunca_passa():
+    from models import EstadoObra
+    from services.obra_estado import TransicaoInvalida, transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='cancelada', status='Cancelada', ativo=False)
+        for destino in EstadoObra:
+            with pytest.raises(TransicaoInvalida):
+                transitar(obra, destino, usuario_id=admin.id, motivo='tentativa')
+        db.session.rollback()
+
+
+def test_transitar_exige_motivo_onde_o_contrato_manda():
+    from models import EstadoObra
+    from services.obra_estado import TransicaoInvalida, transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        with pytest.raises(TransicaoInvalida) as exc:
+            transitar(obra, EstadoObra.PAUSADA, usuario_id=admin.id, motivo='   ')
+        assert 'motivo' in str(exc.value).lower()
+        db.session.rollback()
+        db.session.refresh(obra)
+        assert obra.estado == 'em_execucao'
+
+
+def test_transitar_aceita_motivo_e_registra_detalhes():
+    from models import EstadoObra
+    from services.obra_estado import transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        reg = transitar(obra, EstadoObra.PAUSADA, usuario_id=admin.id,
+                        motivo='Chuva por 12 dias seguidos',
+                        detalhes={'origem': 'pytest'})
+        db.session.commit()
+        assert reg.motivo == 'Chuva por 12 dias seguidos'
+        assert reg.detalhes == {'origem': 'pytest'}
+        db.session.refresh(obra)
+        assert obra.ativo is True   # pausada continua ativa na listagem
+
+
+def test_transitar_nao_commita_sozinho():
+    """Contrato do repo: quem chama é dono da transação
+    (event_manager.py:882-887)."""
+    from models import EstadoObra, Obra
+    from services.obra_estado import transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id = obra.id
+        transitar(obra, EstadoObra.CONCLUIDA, usuario_id=admin.id)
+        db.session.rollback()
+        recarregada = db.session.get(Obra, obra_id)
+        assert recarregada.estado == 'em_execucao'
+
+
+def test_transitar_reabre_obra_concluida_com_motivo():
+    """CONCLUIDA → EM_EXECUCAO é a única saída de um terminal de negócio, e
+    exige motivo: sem ele, reabertura vira desfazer acidental."""
+    from models import EstadoObra
+    from services.obra_estado import TransicaoInvalida, transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='concluida', status='Concluída', ativo=False)
+        with pytest.raises(TransicaoInvalida):
+            transitar(obra, EstadoObra.EM_EXECUCAO, usuario_id=admin.id)
+        db.session.rollback()
+        obra = _obra(admin, estado='concluida', status='Concluída', ativo=False)
+        transitar(obra, EstadoObra.EM_EXECUCAO, usuario_id=admin.id,
+                  motivo='Cliente pediu complemento de fachada')
+        db.session.commit()
+        db.session.refresh(obra)
+        assert obra.estado == 'em_execucao'
+        assert obra.ativo is True, 'reabrir tem que devolver a obra à listagem'
+
+
+def test_estado_atual_deriva_quando_a_coluna_esta_vazia():
+    """`estado_atual` existe para a obra cujo `estado` não é legível.
+
+    No schema atual isso NÃO acontece no banco: a migration 231 deixou a
+    coluna NOT NULL + CHECK, então nem NULL nem '' passam — conferido ao
+    escrever este teste, quando a tentativa de gravar '' foi recusada pela
+    constraint. A defesa continua valendo para dois casos reais: o objeto
+    ainda transitório em memória (antes do flush, quando o default do
+    modelo não foi aplicado) e a janela em que a 231 falhou entre o passo 1
+    (ADD COLUMN NULL) e o passo 5 (SET NOT NULL) e ainda não foi retentada.
+    """
+    from models import EstadoObra, Obra
+    from services.obra_estado import estado_atual
+    obra = Obra()
+    obra.estado, obra.status, obra.ativo = None, 'Em andamento', True
+    assert estado_atual(obra) is EstadoObra.EM_EXECUCAO
+    obra.estado = ''
+    assert estado_atual(obra) is EstadoObra.EM_EXECUCAO
+    obra.ativo = False   # ativo vence status, como no CASE da 231
+    assert estado_atual(obra) is EstadoObra.CONCLUIDA
+    obra.status = 'Cancelada'
+    assert estado_atual(obra) is EstadoObra.CANCELADA, 'cancelada vence ativo'
+
+
+def test_check_constraint_recusa_estado_vazio():
+    """Descoberto ao escrever o teste acima: o CHECK da 231 não deixa nem
+    string vazia entrar, então a coluna nunca fica ilegível no banco."""
+    from sqlalchemy.exc import DatabaseError
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        with pytest.raises(DatabaseError):
+            db.session.execute(db.text(
+                "UPDATE obra SET estado = '' WHERE id = :i"), {'i': obra.id})
+            db.session.commit()
+        db.session.rollback()
+
+
+def test_write_through_passa_pelo_validates_sem_ser_reescrito():
+    """`models.Obra` tem `@validates('status')`. Se ele reescrevesse o rótulo
+    que `aplicar_estado` grava, o espelho divergiria do estado em silêncio."""
+    from models import EstadoObra, Obra
+    from services.obra_estado import ROTULOS, aplicar_estado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        for estado in EstadoObra:
+            aplicar_estado(obra, estado)
+            db.session.flush()
+            assert obra.status == ROTULOS[estado], (
+                f'{estado}: @validates reescreveu {ROTULOS[estado]!r} '
+                f'como {obra.status!r}')
+        db.session.rollback()

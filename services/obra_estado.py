@@ -185,3 +185,114 @@ def exige_motivo(de, para) -> bool:
 def autoridade_necessaria(de, para) -> str:
     """'admin' ou 'gestor'. Transição fora do grafo é tratada como 'admin'."""
     return AUTORIDADE.get((coagir(de), coagir(para)), 'admin')
+
+
+def estado_atual(obra) -> EstadoObra:
+    """Estado corrente da obra, tolerante a linha legada.
+
+    Se `obra.estado` vier vazio (obra inserida por SQL cru, ou a janela em
+    que a migration 231 falhou e ainda não foi retentada), cai no texto de
+    `obra.status` e, em último caso, no eixo `obra.ativo`. Nunca levanta —
+    quem lê o estado de uma obra não pode ser derrubado por dado sujo.
+
+    A ordem abaixo é a MESMA de `migrations._CASE_DERIVA_ESTADO_OBRA`, e tem
+    que continuar sendo: a regra de derivação vive em dois lugares, um em SQL
+    (o backfill) e outro aqui em Python (o fallback de runtime), e duas
+    implementações da mesma regra divergem. Divergiam, aliás, exatamente em
+    `status='Em andamento'` + `ativo=False` — o SQL diz 'concluida' porque
+    `ativo` vence, e a primeira versão desta função consultava `status`
+    primeiro. `test_derivacao_sql_e_python_concordam` compara as duas.
+
+    Ordem canônica:
+      a) status mapeia para 'cancelada'  → cancelada
+      b) ativo = false                   → concluida
+      c) status mapeia para algo         → esse algo
+      d) resto                           → em_execucao
+    """
+    try:
+        return coagir(getattr(obra, 'estado', None))
+    except EstadoDesconhecido:
+        pass
+    do_legado = estado_do_status_legado(getattr(obra, 'status', None))
+    if do_legado is EstadoObra.CANCELADA:          # (a)
+        return EstadoObra.CANCELADA
+    if getattr(obra, 'ativo', True) is False:      # (b) — ativo vence status
+        return EstadoObra.CONCLUIDA
+    if do_legado is not None:                      # (c)
+        return do_legado
+    return EstadoObra.EM_EXECUCAO                  # (d)
+
+
+def aplicar_estado(obra, estado: EstadoObra) -> None:
+    """Escreve o estado e sincroniza os dois campos derivados.
+
+    `status` e `ativo` continuam existindo porque dezenas de templates e
+    queries os leem. Eles deixam de ser fonte de verdade e passam a ser
+    espelho — `estado` é quem manda.
+
+    O rótulo gravado em `status` passa ainda pelo `@validates('status')` de
+    `models.py`, que o normaliza contra `utils.status_obra`. Os cinco rótulos
+    são canônicos lá justamente para atravessarem esse validador intactos;
+    `test_write_through_passa_pelo_validates_sem_ser_reescrito` trava isso.
+    """
+    obra.estado = estado.value
+    obra.status = ROTULOS[estado]
+    obra.ativo = estado not in ESTADOS_INATIVOS
+
+
+def transitar(obra, para, usuario_id=None, motivo: str = '',
+              detalhes: dict | None = None):
+    """Executa uma transição validada e devolve o registro de histórico.
+
+    Valida, nesta ordem: vocabulário → grafo → motivo obrigatório.
+    NÃO valida autorização — isso é `pode_transitar_como`, chamado pela rota,
+    porque este serviço também é usado por migração e por seed, onde não
+    existe `current_user`.
+
+    Não commita: a rota (ou o handler) é dona da transação, mesmo contrato de
+    `propagar_proposta_para_obra`. Faz `flush` para que o id do registro
+    exista para o chamador.
+    """
+    from models import ObraTransicaoEstado, db
+
+    de = estado_atual(obra)
+    destino = coagir(para)
+
+    if destino not in TRANSICOES.get(de, ()):
+        permitidos = ', '.join(e.value for e in TRANSICOES.get(de, ())) or '(nenhum)'
+        raise TransicaoInvalida(
+            f'Obra {getattr(obra, "id", "?")}: transição '
+            f'{de.value} → {destino.value} não é permitida. '
+            f'A partir de {de.value} só é possível ir para: {permitidos}.')
+
+    motivo_limpo = (motivo or '').strip()
+    if (de, destino) in TRANSICOES_QUE_EXIGEM_MOTIVO and not motivo_limpo:
+        raise TransicaoInvalida(
+            f'A transição {de.value} → {destino.value} exige motivo escrito.')
+
+    aplicar_estado(obra, destino)
+
+    registro = ObraTransicaoEstado(
+        obra_id=obra.id,
+        admin_id=obra.admin_id,
+        estado_de=de.value,
+        estado_para=destino.value,
+        motivo=motivo_limpo or None,
+        detalhes=detalhes or None,
+        usuario_id=usuario_id,
+    )
+    db.session.add(registro)
+    db.session.flush()
+
+    # Log estruturado, no molde de services/cronograma_observabilidade.
+    # Nunca derruba o fluxo.
+    try:
+        logger.info(
+            'evento=transicao obra_id=%s admin_id=%s de=%s para=%s '
+            'usuario_id=%s motivo=%r',
+            obra.id, obra.admin_id, de.value, destino.value,
+            usuario_id, motivo_limpo[:120])
+    except Exception:
+        logger.debug('falha ao logar transição de obra', exc_info=True)
+
+    return registro
