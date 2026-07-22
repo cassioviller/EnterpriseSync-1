@@ -567,6 +567,22 @@ def materializar_cronograma(
     _obra = _Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
     data_corrente = (_obra.data_inicio if _obra and _obra.data_inicio else date.today())
     data_seed = data_corrente
+
+    # Mesmo default por obra que `cronograma_views.criar_tarefa:471` aplica:
+    # numa obra que fatura pelo % físico apurado no RDO, exigir quantitativo
+    # por tarefa é contraditório. Aquele commit (0ad1822) só cobriu o caminho
+    # de criação MANUAL — tarefa nascida de proposta ficava com a coluna NULL e
+    # `modo_da_tarefa` deduzia 'quantidade' a partir do quantitativo comercial,
+    # contradizendo o regime da obra.
+    # `'fixa'` (default do schema) deixa NULL e mantém a dedução legada, então
+    # nada muda nas obras existentes. Escolha explícita não existe aqui: a
+    # árvore de preview não carrega modo por nó — quem quiser divergir edita a
+    # tarefa depois, e aí a escolha vence (modo_da_tarefa:135).
+    modo_padrao_obra = (
+        'percentual'
+        if _obra and (_obra.regime_medicao or '').strip().lower() == 'percentual'
+        else None
+    )
     total_criadas = 0
 
     for nivel0 in arvore_marcada:
@@ -610,8 +626,10 @@ def materializar_cronograma(
             # Com template a raiz é um GRUPO agregador: quantitativo mora nas
             # folhas e a duração é sobrescrita pelo somatório mais abaixo. Sem
             # template a raiz é a ÚNICA tarefa, então ela mesma carrega o
-            # quantitativo do PropostaItem — é o que dá a ela um modo de
-            # apontamento ('quantidade') em vez de cair no fallback percentual.
+            # quantitativo do PropostaItem — é o que faz `modo_da_tarefa`
+            # deduzir 'quantidade' em vez do fallback percentual (a não ser
+            # que a obra seja de regime percentual: aí `modo_padrao_obra`
+            # grava a escolha e vence a dedução).
             tarefa_serv = TarefaCronograma(
                 obra_id=obra_id,
                 nome_tarefa=nome_serv,
@@ -619,6 +637,7 @@ def materializar_cronograma(
                 data_inicio=data_seed,
                 quantidade_total=nivel0.get('quantidade_prevista') if sem_template else None,
                 unidade_medida=nivel0.get('unidade_medida') if sem_template else None,
+                modo_apontamento=modo_padrao_obra,
                 tarefa_pai_id=None,
                 ordem=ordem_seq[0],
                 admin_id=admin_id,
@@ -685,6 +704,10 @@ def materializar_cronograma(
                         data_inicio=data_seed if not is_grupo else None,
                         quantidade_total=None if is_grupo else qty,
                         unidade_medida=None if is_grupo else n.get('unidade_medida'),
+                        # Grupo é agregador (não se aponta), mas gravar o modo
+                        # nele é inofensivo e mantém o subtree coerente se
+                        # virar folha depois.
+                        modo_apontamento=modo_padrao_obra,
                         responsavel=n.get('responsavel') or 'empresa',
                         tarefa_pai_id=pai_id,
                         ordem=ordem_seq[0],

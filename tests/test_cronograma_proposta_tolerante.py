@@ -304,6 +304,98 @@ def test_tela_de_revisao_deixa_marcar_o_no_sem_template():
         'copy desatualizada: o nó sem template agora gera 1 tarefa')
 
 
+def _com_template(admin_id, servico, n_folhas=2):
+    """Vincula um template de 2 folhas ao serviço, para exercitar o ramo
+    COM template de `materializar_cronograma` (folhas, não raiz-esqueleto)."""
+    from models import (CronogramaTemplate, CronogramaTemplateItem,
+                        SubatividadeMestre)
+
+    suf = _suf()
+    tmpl = CronogramaTemplate(nome=f'Tmpl {suf}', categoria='Estrutural',
+                              admin_id=admin_id, ativo=True)
+    db.session.add(tmpl)
+    db.session.flush()
+    for i in range(n_folhas):
+        sub = SubatividadeMestre(servico_id=servico.id, tipo='subatividade',
+                                 nome=f'Sub {i} {suf}', admin_id=admin_id,
+                                 duracao_estimada_horas=8.0,
+                                 unidade_medida='m2')
+        db.session.add(sub)
+        db.session.flush()
+        db.session.add(CronogramaTemplateItem(
+            template_id=tmpl.id, subatividade_mestre_id=sub.id,
+            admin_id=admin_id, nome_tarefa=sub.nome, duracao_dias=2,
+            quantidade_prevista=20.0, ordem=i))
+    servico.template_padrao_id = tmpl.id
+    db.session.commit()
+    return tmpl
+
+
+def _materializar_em_regime(admin_id, regime, com_template=False):
+    """Materializa uma proposta numa obra do regime dado. Devolve as tarefas."""
+    from services.cronograma_proposta import (materializar_cronograma,
+                                              montar_arvore_preview)
+
+    c = _cenario(admin_id)
+    if com_template:
+        _com_template(admin_id, c['servico'])
+    c['obra'].regime_medicao = regime
+    db.session.commit()
+
+    arvore = montar_arvore_preview(c['proposta'], admin_id)
+    arvore[0]['marcado'] = True
+    materializar_cronograma(c['proposta'], admin_id, c['obra'].id,
+                            arvore_marcada=arvore)
+    db.session.commit()
+    return TarefaCronograma.query.filter_by(
+        obra_id=c['obra'].id, admin_id=admin_id).all()
+
+
+@pytest.mark.parametrize('com_template', [False, True],
+                         ids=['esqueleto', 'folhas-de-template'])
+def test_obra_percentual_materializa_tarefa_em_modo_percentual(com_template):
+    """`cronograma_views.criar_tarefa:471` aplica o default de regime da obra,
+    mas só no caminho de criação MANUAL.
+
+    Tarefa nascida de proposta ficava com `modo_apontamento` NULL, e
+    `modo_da_tarefa` deduzia 'quantidade' a partir do quantitativo comercial
+    — contradizendo uma obra que fatura pelo % físico do RDO.
+    """
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    with app.app_context():
+        admin = _admin()
+        tarefas = _materializar_em_regime(admin.id, 'percentual',
+                                          com_template=com_template)
+        assert tarefas
+        for t in tarefas:
+            assert t.modo_apontamento == 'percentual', (
+                f'{t.nome_tarefa}: regime da obra não chegou à tarefa')
+            assert modo_da_tarefa(t) == 'percentual', (
+                f'{t.nome_tarefa}: modo contradiz o regime da obra')
+
+
+@pytest.mark.parametrize('com_template', [False, True],
+                         ids=['esqueleto', 'folhas-de-template'])
+def test_obra_fixa_mantem_a_deducao_legada(com_template):
+    """`'fixa'` é o default do schema: a coluna fica NULL e a dedução por
+    quantitativo continua valendo. Nada muda nas obras existentes."""
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    with app.app_context():
+        admin = _admin()
+        tarefas = _materializar_em_regime(admin.id, 'fixa',
+                                          com_template=com_template)
+        assert tarefas
+        for t in tarefas:
+            assert t.modo_apontamento is None, (
+                f'{t.nome_tarefa}: obra fixa não deve gravar modo explícito')
+        folhas = [t for t in tarefas if t.quantidade_total]
+        assert folhas, 'cenário não produziu folha com quantitativo'
+        for t in folhas:
+            assert modo_da_tarefa(t) == 'quantidade'
+
+
 def _cenario_orcamento(admin_id, servico_admin_id=None):
     """Orçamento com 1 item apontando para um Servico SEM template."""
     from models import Orcamento, OrcamentoItem
