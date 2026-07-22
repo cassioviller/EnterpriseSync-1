@@ -119,3 +119,73 @@ def test_modo_apontamento_recusa_valor_fora_do_dominio(ctx):
         with pytest.raises((IntegrityError, DataError)):
             _tarefa(ctx, quantidade_total=1.0, modo_apontamento='qualquer')
         db.session.rollback()
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — backfill congela o modo deduzido HOJE
+# ---------------------------------------------------------------------------
+
+def _backfill():
+    from migrations import migration_221_backfill_modo_apontamento
+    migration_221_backfill_modo_apontamento()
+
+
+@pytest.mark.parametrize('kwargs,esperado,porque', [
+    ({'quantidade_total': 100.0, 'unidade_medida': 'm2'}, 'quantidade',
+     'quantidade + unidade => quantitativa (regra antiga)'),
+    ({'quantidade_total': 100.0, 'unidade_medida': None}, 'percentual',
+     'quantidade SEM unidade => percentual (regra antiga)'),
+    ({'quantidade_total': 100.0, 'unidade_medida': '   '}, 'percentual',
+     'unidade só com espaços conta como vazia (regra antiga usa .strip())'),
+    ({'quantidade_total': 0.0, 'unidade_medida': 'm2'}, 'percentual',
+     'quantidade zero => percentual (regra antiga)'),
+    ({'quantidade_total': None, 'unidade_medida': None}, 'percentual',
+     'sem quantidade => percentual'),
+])
+def test_backfill_grava_exatamente_o_modo_deduzido_hoje(ctx, kwargs, esperado,
+                                                        porque):
+    from services.cronograma_apontamento_service import _modo_deduzido
+
+    with app.app_context():
+        t = _tarefa(ctx, **kwargs)
+        assert _modo_deduzido(t) == esperado, f'premissa quebrada: {porque}'
+        tid = t.id
+
+        _backfill()
+        db.session.expire_all()
+        assert db.session.get(TarefaCronograma, tid).modo_apontamento == esperado, (
+            f'backfill divergiu da dedução: {porque}')
+
+
+def test_backfill_marco_sempre_percentual(ctx):
+    """Mesmo com quantidade + unidade, marco é percentual binário."""
+    with app.app_context():
+        m = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    is_marco=True, duracao_dias=0)
+        mid = m.id
+        _backfill()
+        db.session.expire_all()
+        assert db.session.get(TarefaCronograma, mid).modo_apontamento == 'percentual'
+
+
+def test_backfill_nao_sobrescreve_escolha_existente(ctx):
+    """Idempotência: quem já escolheu não é reclassificado."""
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        tid = t.id
+        _backfill()
+        db.session.expire_all()
+        assert db.session.get(TarefaCronograma, tid).modo_apontamento == 'percentual'
+
+
+def test_backfill_e_idempotente(ctx):
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=50.0, unidade_medida='un')
+        tid = t.id
+        _backfill()
+        db.session.expire_all()
+        primeiro = db.session.get(TarefaCronograma, tid).modo_apontamento
+        _backfill()
+        db.session.expire_all()
+        assert db.session.get(TarefaCronograma, tid).modo_apontamento == primeiro

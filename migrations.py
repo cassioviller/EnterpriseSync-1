@@ -3810,6 +3810,59 @@ def migration_220_tarefa_modo_apontamento():
     logger.info("[Migration 220] Concluída com sucesso")
 
 
+def migration_221_backfill_modo_apontamento():
+    """Congela em tarefa_cronograma.modo_apontamento o modo que
+    `services.cronograma_apontamento_service.modo_da_tarefa` devolveria HOJE.
+
+    Esta migration é, por construção, um NO-OP DE COMPORTAMENTO: o CASE
+    abaixo é a transcrição literal de `modo_da_tarefa` (linhas 72-81 daquele
+    arquivo), incluindo os dois detalhes fáceis de perder:
+
+      * marco é SEMPRE 'percentual', mesmo com quantidade e unidade
+        preenchidas (guard `if getattr(tarefa, 'is_marco', False)` vem antes
+        de tudo);
+      * a unidade passa por `.strip()` — unidade só com espaços conta como
+        vazia, logo a tarefa é percentual.
+
+    ATENÇÃO: a regra aqui é DIFERENTE da usada no backfill da migration 210,
+    que classificou `rdo_apontamento_cronograma` olhando só
+    `quantidade_total > 0`, sem unidade e sem marco. As duas coexistem de
+    propósito: a 210 descreve linhas de apontamento já gravadas (histórico,
+    imutável); esta descreve o modo da TAREFA daqui para frente.
+
+    Só toca linhas com `modo_apontamento IS NULL` — quem já escolheu não é
+    reclassificado. Idempotente.
+    """
+    logger.info("[Migration 221] Iniciando — backfill de modo_apontamento")
+
+    resultado = db.session.execute(text("""
+        UPDATE tarefa_cronograma
+        SET modo_apontamento = CASE
+            WHEN is_marco IS TRUE THEN 'percentual'
+            WHEN quantidade_total IS NOT NULL
+                 AND quantidade_total > 0
+                 AND unidade_medida IS NOT NULL
+                 AND btrim(unidade_medida) <> ''
+            THEN 'quantidade'
+            ELSE 'percentual'
+        END
+        WHERE modo_apontamento IS NULL
+    """))
+    db.session.commit()
+
+    totais = db.session.execute(text("""
+        SELECT modo_apontamento, COUNT(*)
+        FROM tarefa_cronograma
+        GROUP BY modo_apontamento
+        ORDER BY modo_apontamento
+    """)).fetchall()
+
+    logger.info(f"[Migration 221] {resultado.rowcount} tarefa(s) classificada(s)")
+    for modo, qtd in totais:
+        logger.info(f"[Migration 221]   modo_apontamento={modo!r}: {qtd}")
+    logger.info("[Migration 221] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4060,6 +4113,7 @@ def executar_migracoes():
             (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
             (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
             (220, "Cronograma editável — tarefa_cronograma.modo_apontamento (quantidade|percentual, NULL = dedução legada)", migration_220_tarefa_modo_apontamento),
+            (221, "Cronograma editável — backfill de modo_apontamento congelando a dedução vigente (no-op de comportamento)", migration_221_backfill_modo_apontamento),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
