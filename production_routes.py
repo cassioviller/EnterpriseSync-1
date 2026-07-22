@@ -1,26 +1,36 @@
 """
 Rotas específicas para produção com tratamento robusto de erro
 """
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, abort
+from flask_login import login_required
 from models import db, Funcionario, Obra
 from sqlalchemy import text
 import logging
 
 production_bp = Blueprint('production', __name__)
 
+
 def get_safe_admin_id():
-    """Função segura para obter admin_id em produção"""
-    try:
-        # Buscar admin_id com mais funcionários ativos
-        result = db.session.execute(
-            text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")
-        ).fetchone()
-        return result[0] if result else 2
-    except Exception as e:
-        logging.error(f"Erro ao detectar admin_id: {e}")
-        return 2
+    """Tenant do usuário autenticado — falha segura.
+
+    Fase 0 / R3 — ATÉ 2026-07-21 esta função ignorava `current_user` por
+    completo e devolvia o admin com MAIS FUNCIONÁRIOS
+    (`SELECT admin_id ... ORDER BY total DESC LIMIT 1`), ou `2` como último
+    recurso. Como as 6 rotas deste blueprint não tinham decorator de
+    autenticação e estão registradas em `/prod` (app.py:475), qualquer
+    visitante anônimo obtinha a listagem de funcionários, obras, veículos e
+    o dashboard de uma empresa escolhida por heurística.
+    """
+    from utils.tenant import get_tenant_admin_id
+
+    admin_id = get_tenant_admin_id()
+    if not admin_id:
+        logging.error('[SEC] /prod sem tenant resolvido — abortando')
+        abort(403)
+    return admin_id
 
 @production_bp.route('/safe-funcionarios')
+@login_required
 def safe_funcionarios():
     """Rota segura para funcionários em produção"""
     try:
@@ -108,6 +118,7 @@ DIAGNÓSTICO:
                              error_timestamp=error_timestamp), 500
 
 @production_bp.route('/safe-dashboard')
+@login_required
 def safe_dashboard():
     """Rota segura para dashboard em produção"""
     try:
@@ -184,6 +195,7 @@ DIAGNÓSTICO:
                              error_timestamp=error_timestamp), 500
 
 @production_bp.route('/debug-info')
+@login_required
 def debug_info():
     """Rota para debug em produção"""
     try:
@@ -209,6 +221,7 @@ def debug_info():
         }), 500
 
 @production_bp.route('/safe-obras')
+@login_required
 def safe_obras():
     """Rota segura para obras sem erros de template"""
     try:
@@ -260,6 +273,7 @@ DIAGNÓSTICO:
                              error_timestamp=error_timestamp), 500
 
 @production_bp.route('/safe-veiculos')
+@login_required
 def safe_veiculos():
     """Rota segura para veículos sem erros de template"""
     try:
@@ -316,6 +330,7 @@ DIAGNÓSTICO:
                              error_timestamp=error_timestamp), 500
 
 @production_bp.route('/safe-alimentacao')
+@login_required
 def safe_alimentacao():
     """Rota segura para alimentação sem erros de template"""
     try:

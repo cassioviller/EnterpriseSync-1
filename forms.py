@@ -39,7 +39,9 @@ class ObraForm(FlaskForm):
     data_previsao_fim = DateField('Data de Previsão de Fim', validators=[Optional()])
     orcamento = FloatField('Orçamento', validators=[Optional(), NumberRange(min=0)])
 
-    status = SelectField('Status', choices=[], validate_choice=False, default='Em Andamento')
+    # Fase 0.6 / D5 — grafia canônica (utils.status_obra), igual ao default do
+    # modelo. Era 'Em Andamento' e produzia obra invisível na listagem.
+    status = SelectField('Status', choices=[], validate_choice=False, default='Em andamento')
     responsavel_id = SelectField('Responsável', coerce=int, validators=[Optional()])
 
 class VeiculoForm(FlaskForm):

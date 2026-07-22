@@ -1308,6 +1308,13 @@ def criar_nova_versao(id):
         nova.cronograma_default_json = origem.cronograma_default_json
         nova.versao = nova_versao_num
         nova.proposta_origem_id = origem.id
+        # Fase 0 / R1 — a revisão HERDA a obra da origem. Sem isso, aprovar
+        # uma v2 de proposta já convertida fazia `propagar_proposta_para_obra`
+        # não encontrar a obra (busca por proposta.obra_id e por
+        # proposta_origem_id == id_da_v2, mas a obra aponta para a v1) e
+        # CRIAR UMA SEGUNDA OBRA, duplicando itens de medição e custos.
+        # É o fluxo do aditivo: revisar proposta aprovada é o caso normal.
+        nova.obra_id = origem.obra_id
         # Por design: ao re-editar, o admin pode revisar tudo de novo.
         # Mas como já foi revisado antes do envio anterior, marcamos
         # vazio (sem pendências) — o admin pode editar livremente
@@ -1322,6 +1329,10 @@ def criar_nova_versao(id):
             db.session.add(PropostaItem(
                 admin_id=admin_id,
                 proposta_id=nova.id,
+                # Fase 0.6 / D1 — linhagem explícita: o item da revisão é o
+                # MESMO item da origem, com valor novo. Sem isto a propagação
+                # para a obra criava um ItemMedicaoComercial paralelo.
+                proposta_item_origem_id=(it.proposta_item_origem_id or it.id),
                 item_numero=it.item_numero,
                 ordem=it.ordem,
                 descricao=it.descricao,

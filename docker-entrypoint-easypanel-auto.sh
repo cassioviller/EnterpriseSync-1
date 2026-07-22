@@ -25,13 +25,14 @@ export DIGITAL_MASTERY_MODE=true
 export AUTO_MIGRATIONS_ENABLED=true
 export DEPLOYMENT_TIMESTAMP=$(date +%s)
 
-# DATABASE_URL padrão para EasyPanel/Hostinger
+# Fase 0.5 / 1.2 — sem credencial default. Havia aqui a connection string
+# REAL de produção (usuário, senha e host). Sem DATABASE_URL o deploy para,
+# em vez de conectar num banco adivinhado.
 if [ -z "$DATABASE_URL" ]; then
-    export DATABASE_URL="postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable"
-    echo "🔧 DATABASE_URL padrão EasyPanel configurada" | tee -a "$LOG_FILE"
-else
-    echo "🔧 DATABASE_URL existente detectada" | tee -a "$LOG_FILE"
+    echo "❌ DATABASE_URL não definida — defina no painel do EasyPanel." | tee -a "$LOG_FILE"
+    exit 1
 fi
+echo "🔧 DATABASE_URL detectada" | tee -a "$LOG_FILE"
 
 # Mascarar DATABASE_URL nos logs por segurança
 DB_HOST=$(echo "$DATABASE_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
@@ -114,9 +115,20 @@ fi
 echo "🔄 FASE 3.4: MIGRAÇÕES AUTOMÁTICAS v2.0 - RASTREAMENTO ATIVO" | tee -a "$LOG_FILE"
 echo "============================================================" | tee -a "$LOG_FILE"
 
-# Backup de segurança antes das migrações
-BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-echo "💾 Criando backup de segurança: $BACKUP_TIMESTAMP" | tee -a "$LOG_FILE"
+# ── Backup de segurança ANTES das migrações (Fase 0.5 / 1.1) ────────────────
+# Até 2026-07-21 este bloco apenas IMPRIMIA "Criando backup de segurança" e
+# não executava comando nenhum — um log que mentia, imediatamente antes de
+# rodar migrações. Agora faz o backup de verdade, e migração destrutiva sem
+# ponto de retorno deixa de ser possível.
+echo "💾 Backup pré-migração..." | tee -a "$LOG_FILE"
+if python3 /app/scripts/backup_banco.py --criar 2>&1 | tee -a "$LOG_FILE"; then
+    echo "✅ Backup concluído — prosseguindo para as migrações" | tee -a "$LOG_FILE"
+else
+    echo "❌ BACKUP FALHOU — abortando o deploy ANTES de tocar no schema." | tee -a "$LOG_FILE"
+    echo "   Migração sem ponto de retorno é o risco que esta fase eliminou." | tee -a "$LOG_FILE"
+    echo "   Verifique SIGE_BACKUP_DIR (volume persistente) e DATABASE_URL." | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 # Executar migrações via pre_start.py com timeout e logs detalhados
 echo "🚀 Executando sistema de migrações v2.0 (idempotente)..." | tee -a "$LOG_FILE"
@@ -347,8 +359,14 @@ echo "==============================================" | tee -a "$LOG_FILE"
 # (Sem export, ${VAR:-default} só vale para o teste do bash; o python
 #  herda apenas variáveis exportadas — bug original que impedia o seed
 #  de rodar em deploys EasyPanel sem variáveis configuradas no painel.)
-export SIGE_ENABLE_DEMO_SEED="${SIGE_ENABLE_DEMO_SEED:-true}"
-export SIGE_ALLOW_PROD_SEED="${SIGE_ALLOW_PROD_SEED:-1}"
+# Fase 0.5 / 2.1 — defaults INVERTIDOS (defesa em profundidade).
+# Os defaults eram `true`/`1`: auto-seed de dados de demonstração LIGADO por
+# padrão em produção. O comentário acima pedia "DEPOIS DO PRÓXIMO DEPLOY
+# BEM-SUCEDIDO, REVERTER" — nunca foi revertido. Combinado com
+# SIGE_FORCE_RESEED, todo deploy podia apagar e replantar o tenant demo.
+# Agora o seed só roda se alguém pedir EXPLICITAMENTE no painel.
+export SIGE_ENABLE_DEMO_SEED="${SIGE_ENABLE_DEMO_SEED:-false}"
+export SIGE_ALLOW_PROD_SEED="${SIGE_ALLOW_PROD_SEED:-0}"
 # Task #59 — Gate de refresh da demo Alfa via env-var no painel EasyPanel.
 # Quando SIGE_FORCE_RESEED ∈ {1,true,yes,on} (case-insensitive), o
 # entrypoint chama o seed com `--reset`, que apaga e replanta SOMENTE o

@@ -501,6 +501,59 @@ def executar_auditoria_automatica(admin_id):
     db.session.commit()
     return alertas
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fase 0.6 / D3 — mapa único das linhas de despesa do DRE
+#
+# O DRE somava despesas operacionais por prefixo fixo em 5.1.x. O motor
+# contábil V2 (MAPEAMENTO_CONTABIL, abaixo neste arquivo) debita em 6.1.x.
+# Interseção vazia: alimentação, transporte e folha eram lançados e não
+# entravam no resultado. Medido em 21/07 no banco de desenvolvimento —
+# R$ 840 em 6.1.01.002 e R$ 2.400 em 6.1.02.002, lançados e invisíveis.
+#
+# O sistema tem QUATRO planos de contas concorrentes, e dois deles dão
+# significados diferentes ao mesmo código (5.1.01 é "MÃO DE OBRA" em
+# financeiro_seeds.py e "Materiais Diretos" em criar_plano_contas_padrao
+# aqui mesmo). Unificá-los é decisão da Fase 8 — ver a decisão pendente
+# "Plano de contas e regime do Domínio" no ESTADO-ATUAL.md.
+#
+# O que este mapa garante é mais estreito e verificável: toda linha de
+# despesa do DRE está declarada num lugar só, e o que não casar com nenhuma
+# delas cai em `outras` pelo cálculo residual — nunca desaparece.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Prefixos que o DRE reporta em linha PRÓPRIA, fora das despesas operacionais.
+# Ficam de fora do residual para não serem contados duas vezes.
+_DRE_PREFIXOS_FORA_DAS_OPERACIONAIS = ('5.1.03', '5.2.01', '5.3.01', '5.3.02')
+
+# Raízes de conta de resultado devedor. Nos quatro planos em uso, '5' é
+# CUSTOS/DESPESAS e '6' é DESPESAS — nenhum usa outra raiz para débito de
+# resultado.
+_DRE_RAIZES_DESPESA = ('5', '6')
+
+_DRE_LINHAS_DESPESA_OPERACIONAL = {
+    # linha do DRE      → prefixos
+    # Só entram aqui os prefixos cujo significado é o MESMO nos planos que os
+    # definem. `6.1.01` é "DESPESAS COM PESSOAL" tanto no _V2_CONTAS_SEED
+    # quanto em criar_plano_contas_padrao — pode ser classificado.
+    'pessoal':          ('5.1.01', '6.1.01'),
+    'materiais':        ('5.1.02',),
+    'administrativas':  ('5.1.04',),
+    'comerciais':       ('5.1.05',),
+    # 'outras' não é declarada: é o RESIDUAL, calculado por diferença.
+    #
+    # O subgrupo 6.1.02 fica DELIBERADAMENTE fora. Os dois planos que o
+    # definem discordam no nível 4: 6.1.02.001 é "Despesa com Combustível"
+    # no _V2_CONTAS_SEED e "Material de Escritório" em
+    # criar_plano_contas_padrao; 6.1.02.003 é "Despesa com Material" num e
+    # "Energia Elétrica" no outro. Classificar seria escolher um dos dois
+    # sem ter como saber qual o tenant usa. No residual esses valores
+    # aparecem no resultado (que é o que o D3 quebrava) e ficam rotulados
+    # como "outras" — honestamente não classificados até a Fase 8 unificar
+    # os planos de contas.
+}
+
+
 def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
     """
     Calcula DRE completo baseado na estrutura contábil brasileira
@@ -592,18 +645,53 @@ def calcular_dre_mensal(admin_id: int, ano: int, mes: int):
         # 5. LUCRO BRUTO
         lucro_bruto = receita_liquida - cmv
         
-        # 6. DESPESAS OPERACIONAIS (contas 5.1.x - DEBITO, exceto 5.1.03)
-        despesas_pessoal = calcular_valor_contas(['5.1.01'], 'DEBITO')
-        despesas_materiais = calcular_valor_contas(['5.1.02'], 'DEBITO')
-        despesas_administrativas = calcular_valor_contas(['5.1.04'], 'DEBITO')
-        despesas_comerciais = calcular_valor_contas(['5.1.05'], 'DEBITO')
-        outras_despesas = calcular_valor_contas(['5.1.06'], 'DEBITO')
-        
-        total_despesas_operacionais = (
-            despesas_pessoal + despesas_materiais + despesas_administrativas + 
-            despesas_comerciais + outras_despesas
+        # 6. DESPESAS OPERACIONAIS
+        # Fase 0.6 / D3 — as linhas vêm do mapa único declarado no topo do
+        # módulo, e cobrem tanto o 5.1.x quanto o 6.1.x do motor V2.
+        despesas_pessoal = calcular_valor_contas(
+            list(_DRE_LINHAS_DESPESA_OPERACIONAL['pessoal']), 'DEBITO')
+        despesas_materiais = calcular_valor_contas(
+            list(_DRE_LINHAS_DESPESA_OPERACIONAL['materiais']), 'DEBITO')
+        despesas_administrativas = calcular_valor_contas(
+            list(_DRE_LINHAS_DESPESA_OPERACIONAL['administrativas']), 'DEBITO')
+        despesas_comerciais = calcular_valor_contas(
+            list(_DRE_LINHAS_DESPESA_OPERACIONAL['comerciais']), 'DEBITO')
+
+        # `outras` é RESIDUAL, não um prefixo. Era `5.1.06`, uma conta que
+        # não existe em nenhum dos quatro planos de contas do sistema — ou
+        # seja, uma linha que só podia dar zero. Calculando por diferença,
+        # todo débito em conta de resultado que não casou com nenhuma linha
+        # declarada aparece aqui em vez de sumir. É esta linha que impede o
+        # D3 de renascer quando alguém criar a próxima conta.
+        total_debitos_resultado = calcular_valor_contas(
+            list(_DRE_RAIZES_DESPESA), 'DEBITO')
+        ja_reportado_em_linha_propria = calcular_valor_contas(
+            list(_DRE_PREFIXOS_FORA_DAS_OPERACIONAIS), 'DEBITO')
+        declarado_nas_operacionais = (
+            despesas_pessoal + despesas_materiais
+            + despesas_administrativas + despesas_comerciais
         )
-        
+        outras_despesas = (
+            total_debitos_resultado
+            - ja_reportado_em_linha_propria
+            - declarado_nas_operacionais
+        )
+        if outras_despesas < 0:
+            # Só acontece se um prefixo declarado passar a se sobrepor a
+            # outro (ex.: '5.1' e '5.1.01' na mesma lista). Não silenciar:
+            # um total negativo aqui significa despesa contada em dobro.
+            logger.error(
+                f"[DRE] Residual de despesas NEGATIVO ({outras_despesas}) para "
+                f"admin={admin_id} {mes}/{ano} — há prefixo declarado se "
+                f"sobrepondo a outro em _DRE_LINHAS_DESPESA_OPERACIONAL. "
+                f"Despesa está sendo contada mais de uma vez."
+            )
+            outras_despesas = Decimal('0')
+
+        total_despesas_operacionais = (
+            declarado_nas_operacionais + outras_despesas
+        )
+
         # 7. EBITDA
         ebitda = lucro_bruto - total_despesas_operacionais
         
@@ -1467,6 +1555,11 @@ _V2_CONTAS_SEED = [
     ('1.1',        'ATIVO CIRCULANTE',             'ATIVO',    'DEVEDORA', 2, '1',       False),
     ('2.1',        'PASSIVO CIRCULANTE',           'PASSIVO',  'CREDORA',  2, '2',       False),
     ('4.1',        'RECEITA BRUTA',                'RECEITA',  'CREDORA',  2, '4',       False),
+    # Fase 0.6 / D1b — destino do estorno de revisão para baixo. O DRE já
+    # subtrai 4.2.x da receita bruta (`deducoes`); lançar a redução como
+    # DÉBITO em 4.1.01 seria invisível, porque `receita_bruta` só conta
+    # partidas CREDITO. Reduzir contrato é dedução, não receita negativa.
+    ('4.2',        'DEDUÇÕES DA RECEITA BRUTA',    'RECEITA',  'DEVEDORA', 2, '4',       False),
     ('6.1',        'DESPESAS OPERACIONAIS',        'DESPESA',  'DEVEDORA', 2, '6',       False),
     # Nível 3
     ('1.1.01',     'DISPONÍVEL',                   'ATIVO',    'DEVEDORA', 3, '1.1',     False),
@@ -1476,6 +1569,7 @@ _V2_CONTAS_SEED = [
     ('2.1.02',     'OBRIGAÇÕES TRABALHISTAS',      'PASSIVO',  'CREDORA',  3, '2.1',     False),
     ('2.1.03',     'OBRIGAÇÕES FISCAIS',           'PASSIVO',  'CREDORA',  3, '2.1',     False),
     ('4.1.01',     'RECEITA DE SERVIÇOS',          'RECEITA',  'CREDORA',  3, '4.1',     False),
+    ('4.2.01',     'CANCELAMENTOS E REDUÇÕES',     'RECEITA',  'DEVEDORA', 3, '4.2',     False),
     ('6.1.01',     'DESPESAS COM PESSOAL',         'DESPESA',  'DEVEDORA', 3, '6.1',     False),
     ('6.1.02',     'DESPESAS GERAIS',              'DESPESA',  'DEVEDORA', 3, '6.1',     False),
     # Nível 4
@@ -1489,6 +1583,7 @@ _V2_CONTAS_SEED = [
     ('2.1.02.003', 'FGTS a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.02',  True),
     ('2.1.03.001', 'IRRF a Recolher',              'PASSIVO',  'CREDORA',  4, '2.1.03',  True),
     ('4.1.01.001', 'Receita de Serviços',          'RECEITA',  'CREDORA',  4, '4.1.01',  True),
+    ('4.2.01.001', 'Redução de Contrato',          'RECEITA',  'DEVEDORA', 4, '4.2.01',  True),
     ('6.1.01.001', 'Despesa com Salários',         'DESPESA',  'DEVEDORA', 4, '6.1.01',  True),
     ('6.1.01.002', 'Despesa com Alimentação',      'DESPESA',  'DEVEDORA', 4, '6.1.01',  True),
     ('6.1.02.001', 'Despesa com Combustível',      'DESPESA',  'DEVEDORA', 4, '6.1.02',  True),
@@ -1503,37 +1598,55 @@ def seed_plano_contas_if_needed(admin_id: int) -> None:
     """
     Garante que o plano de contas mínimo V2 existe para o admin_id dado.
     Seguro para múltiplas chamadas (idempotente via ON CONFLICT e cache em memória).
+
+    Fase 0.6 / D4 — duas correções aqui:
+
+    1. `ON CONFLICT` passou a ser por `(admin_id, codigo)`. Era só `(codigo)`,
+       casando com a linha do PRIMEIRO tenant que semeou: do 2º em diante o
+       INSERT era descartado em silêncio e o tenant ficava sem plano.
+    2. O gate `if count == 0` virou incondicional. Ele presumia que "tem
+       alguma conta" significa "tem o plano V2 inteiro" — um tenant com uma
+       conta avulsa nunca recebia as 28 do seed. Enquanto a FK era global
+       isso passava despercebido (o lançamento ia para a conta de outro
+       tenant); agora a FK é composta e o lançamento falharia. As 28
+       inserções são idempotentes e baratas.
     """
     if admin_id in _v2_seeded_admins:
         return
     try:
         from sqlalchemy import text as sql_text
-        count = db.session.execute(
+        antes = db.session.execute(
             sql_text("SELECT COUNT(*) FROM plano_contas WHERE admin_id = :aid"),
             {'aid': admin_id}
         ).scalar() or 0
 
-        if count == 0:
-            for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
-                db.session.execute(sql_text("""
-                    INSERT INTO plano_contas
-                        (codigo, nome, tipo_conta, natureza, nivel,
-                         conta_pai_codigo, aceita_lancamento, ativo, admin_id)
-                    VALUES
-                        (:codigo, :nome, :tipo, :natureza, :nivel,
-                         :pai, :aceita, true, :aid)
-                    ON CONFLICT (codigo) DO NOTHING
-                """), {
-                    'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
-                    'natureza': natureza, 'nivel': nivel, 'pai': pai,
-                    'aceita': aceita, 'aid': admin_id,
-                })
+        # A ordem de _V2_CONTAS_SEED é por nível (raízes primeiro): a auto-FK
+        # composta de conta_pai_codigo exige o pai já inserido.
+        for (codigo, nome, tipo_conta, natureza, nivel, pai, aceita) in _V2_CONTAS_SEED:
+            db.session.execute(sql_text("""
+                INSERT INTO plano_contas
+                    (codigo, nome, tipo_conta, natureza, nivel,
+                     conta_pai_codigo, aceita_lancamento, ativo, admin_id)
+                VALUES
+                    (:codigo, :nome, :tipo, :natureza, :nivel,
+                     :pai, :aceita, true, :aid)
+                ON CONFLICT (admin_id, codigo) DO NOTHING
+            """), {
+                'codigo': codigo, 'nome': nome, 'tipo': tipo_conta,
+                'natureza': natureza, 'nivel': nivel, 'pai': pai,
+                'aceita': aceita, 'aid': admin_id,
+            })
 
-            db.session.flush()
+        db.session.flush()
+        depois = db.session.execute(
+            sql_text("SELECT COUNT(*) FROM plano_contas WHERE admin_id = :aid"),
+            {'aid': admin_id}
+        ).scalar() or 0
+        if depois != antes:
             PlanoContas.invalidar_cache()
             logger.info(
-                f"[OK] Plano de contas V2 seed para admin_id={admin_id} "
-                f"({len(_V2_CONTAS_SEED)} contas)"
+                f"[OK] Plano de contas V2 para admin_id={admin_id}: "
+                f"{depois - antes} conta(s) criada(s), {depois} no total"
             )
 
         _v2_seeded_admins.add(admin_id)

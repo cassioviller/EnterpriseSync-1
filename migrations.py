@@ -3781,7 +3781,8 @@ def executar_migracoes():
         logger.info("=" * 80)
         
         # Mascarar credenciais por segurança
-        database_url = os.environ.get('DATABASE_URL', 'postgresql://sige:sige@viajey_sige:5432/sige')
+        # Fase 0.5 / 1.2 — sem credencial default (era a string real de produção).
+        database_url = os.environ.get('DATABASE_URL', '')
         logger.info(f"🎯 DATABASE: {mask_database_url(database_url)}")
         
         # PASSO 1: Garantir tabela de rastreamento existe
@@ -4010,6 +4011,14 @@ def executar_migracoes():
             (210, "Cronograma-mpp M02 — backfill versão nº1 + snapshots + tipo_apontamento", _migration_210_backfill_versao_inicial),
             (211, "Cronograma-mpp M10 — flag de rollout configuracao_empresa.cronograma_mpp_ativo (default FALSE)", _migration_211_configuracao_empresa_cronograma_mpp),
             (212, "Cronograma-mpp — backfill versão nº1 nas obras criadas após a 210 (ponto de rollback do 1º import)", _migration_212_backfill_versao_inicial_obras_novas),
+            (213, "Fase 0.5 — índices que nunca nasceram (create_all antes das migrações) + poda de 61 redundantes", _migration_213_indices_faltantes_e_duplicados),
+            (214, "Fase 1 — FK de identidade usuario.funcionario_id (nullable, UNIQUE parcial)", migration_214_usuario_funcionario_id),
+            (215, "Fase 1 — tabela usuario_obra (escopo por obra: usuario_id, obra_id, papel)", migration_215_usuario_obra),
+            (216, "Fase 1 — flag de rollout configuracao_empresa.escopo_obra_ativo (default FALSE)", migration_216_escopo_obra_flag),
+            # Fase 0.6 usou 217-219; a Fase 1 usa 214-216.
+            (217, "Fase 0.6 / D5 — canoniza obra.status ('Em Andamento' → 'Em andamento') e o dropdown obra_status", _migration_217_canonizar_status_obra),
+            (218, "Fase 0.6 / D4 — plano_contas por tenant: backfill + PK (admin_id, codigo) + 6 FKs compostas", _migration_218_plano_contas_por_tenant),
+            (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
@@ -14166,3 +14175,587 @@ def _migration_212_backfill_versao_inicial_obras_novas():
     except Exception as e:
         logger.error(f"[Migration 212] Falha: {e}", exc_info=True)
         raise
+
+
+def migration_214_usuario_funcionario_id():
+    """Fase 1 — FK de identidade usuario.funcionario_id.
+
+    Aditiva e idempotente: coluna nullable + UNIQUE + índice. Nenhuma linha
+    é preenchida aqui; o casamento é feito pelo
+    `scripts/backfill_identidade_funcionario.py`, que roda em dry-run por
+    padrão e exige revisão humana dos não-casados.
+
+    ON DELETE SET NULL: apagar a linha de RH não pode apagar o login (nem
+    estourar a FK); o usuário fica sem vínculo e aparece no relatório.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 214] Iniciando — usuario.funcionario_id")
+
+    db.session.execute(sa_text("""
+        ALTER TABLE usuario
+        ADD COLUMN IF NOT EXISTS funcionario_id INTEGER
+    """))
+    db.session.commit()
+
+    existe_fk = db.session.execute(sa_text("""
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_usuario_funcionario_id'
+          AND table_name = 'usuario'
+        LIMIT 1
+    """)).fetchone()
+    if not existe_fk:
+        db.session.execute(sa_text("""
+            ALTER TABLE usuario
+            ADD CONSTRAINT fk_usuario_funcionario_id
+            FOREIGN KEY (funcionario_id) REFERENCES funcionario(id)
+            ON DELETE SET NULL
+        """))
+        db.session.commit()
+        logger.info("[Migration 214] FK fk_usuario_funcionario_id criada")
+
+    db.session.execute(sa_text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_funcionario_id
+        ON usuario (funcionario_id)
+        WHERE funcionario_id IS NOT NULL
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 214] Concluída com sucesso")
+
+
+def migration_215_usuario_obra():
+    """Fase 1 — tabela usuario_obra (escopo por obra).
+
+    Aditiva: nenhuma rota consulta esta tabela até a flag
+    `configuracao_empresa.escopo_obra_ativo` (migration 216) ser ligada
+    para o tenant. Criar vazia é seguro.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 215] Iniciando — tabela usuario_obra")
+
+    db.session.execute(sa_text("""
+        CREATE TABLE IF NOT EXISTS usuario_obra (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+            obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+            papel VARCHAR(20) NOT NULL DEFAULT 'LEITOR',
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(sa_text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_obra
+        ON usuario_obra (usuario_id, obra_id)
+    """))
+    db.session.execute(sa_text("""
+        CREATE INDEX IF NOT EXISTS ix_usuario_obra_usuario_ativo
+        ON usuario_obra (usuario_id, ativo)
+    """))
+    db.session.execute(sa_text("""
+        CREATE INDEX IF NOT EXISTS ix_usuario_obra_obra_id
+        ON usuario_obra (obra_id)
+    """))
+    db.session.execute(sa_text("""
+        CREATE INDEX IF NOT EXISTS ix_usuario_obra_admin_id
+        ON usuario_obra (admin_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 215] Concluída com sucesso")
+
+def migration_216_escopo_obra_flag():
+    """Fase 1 — flag de rollout configuracao_empresa.escopo_obra_ativo.
+
+    DEFAULT FALSE é deliberado: enquanto estiver desligada, a Fase 1 é
+    puramente aditiva e nenhum usuário perde acesso.
+    """
+    from sqlalchemy import text as sa_text
+    logger.info("[Migration 216] Iniciando — escopo_obra_ativo")
+    db.session.execute(sa_text("""
+        ALTER TABLE configuracao_empresa
+        ADD COLUMN IF NOT EXISTS escopo_obra_ativo BOOLEAN NOT NULL DEFAULT FALSE
+    """))
+    db.session.commit()
+    logger.info("[Migration 216] Concluída com sucesso")
+
+def _migration_217_canonizar_status_obra():
+    """Fase 0.6 / D5 — canoniza `obra.status` e o dropdown que o alimenta.
+
+    Duas grafias do mesmo estado conviviam: o formulário gravava
+    'Em Andamento' (vindo de `_SLUG_DEFAULTS['obra_status']`) e a listagem
+    filtrava por 'Em andamento' com igualdade exata (`views/obras.py:83`).
+    Medição de 2026-07-21 no banco de desenvolvimento: 7.926 obras na grafia
+    canônica, 53 na divergente — estas existiam e sumiam da tela.
+
+    Daqui em diante a convergência é na escrita (`Obra._normalizar_status`);
+    esta migração só acerta o passado. Faz também o `dropdown_opcao`, senão o
+    `<select>` dos tenants que já foram semeados continua oferecendo a grafia
+    errada. Idempotente por construção (UPDATE condicionado ao valor antigo).
+    """
+    from sqlalchemy import text as sa_text
+    from utils.status_obra import STATUS_OBRA_CANONICOS, normalizar_status_obra
+    try:
+        with db.engine.begin() as conn:
+            distintos = [
+                r[0] for r in conn.execute(sa_text(
+                    "SELECT DISTINCT status FROM obra WHERE status IS NOT NULL"
+                )).fetchall()
+            ]
+            corrigidas = 0
+            for antigo in distintos:
+                novo = normalizar_status_obra(antigo)
+                if novo == antigo:
+                    continue
+                corrigidas += conn.execute(
+                    sa_text("UPDATE obra SET status = :novo WHERE status = :antigo"),
+                    {'novo': novo, 'antigo': antigo},
+                ).rowcount
+                logger.info(
+                    f"[Migration 217] obra.status {antigo!r} → {novo!r}")
+
+            # O grupo de dropdown só existe nos tenants em que a 175 rodou.
+            opcoes = 0
+            for canonico in STATUS_OBRA_CANONICOS:
+                for r in conn.execute(sa_text("""
+                    SELECT o.id, o.valor FROM dropdown_opcao o
+                    JOIN dropdown_grupo g ON g.id = o.grupo_id
+                    WHERE g.slug = 'obra_status'
+                """)).fetchall():
+                    if normalizar_status_obra(r[1]) == canonico and r[1] != canonico:
+                        conn.execute(
+                            sa_text("UPDATE dropdown_opcao SET valor = :v WHERE id = :i"),
+                            {'v': canonico, 'i': r[0]})
+                        opcoes += 1
+        logger.info(
+            f"[Migration 217] {corrigidas} obra(s) e {opcoes} opção(ões) "
+            f"de dropdown canonizadas.")
+    except Exception as e:
+        logger.error(f"[Migration 217] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_218_plano_contas_por_tenant():
+    """Fase 0.6 / D4 — a conta contábil passa a pertencer ao tenant.
+
+    `plano_contas.codigo` era PK global, apesar de a tabela ter `admin_id`, e
+    as seis tabelas dependentes tinham FK só por `codigo`. O seed usava
+    `ON CONFLICT (codigo) DO NOTHING`: do 2º tenant em diante inseria zero
+    contas e ainda assim marcava o tenant como semeado.
+
+    Medido em 2026-07-21 no banco de desenvolvimento: 315 tenants com
+    lançamentos contábeis, 2 com plano de contas, e 980 das 1.204 partidas
+    apontando para um par (admin_id, conta) inexistente — empresas lançando
+    contabilidade sobre o plano de contas de outra empresa.
+
+    A migração tem três atos, nesta ordem obrigatória:
+
+    1. **Backfill.** Para todo par (admin_id, codigo) referenciado por uma
+       linha dependente e ausente de `plano_contas`, copia a definição da
+       conta — e toda a cadeia de pais — para aquele tenant. Sem isto o ato 2
+       falharia nas 980 linhas.
+    2. **Troca de PK** para (admin_id, codigo), incluindo a auto-FK
+       `conta_pai_codigo`.
+    3. **FKs compostas** nas seis dependentes, que passam a impedir
+       estruturalmente o vazamento entre tenants.
+
+    Idempotente: cada passo verifica o estado antes de agir.
+    """
+    from sqlalchemy import text as sa_text
+
+    # (tabela, coluna que referencia plano_contas.codigo)
+    dependentes = [
+        ('partida_contabil', 'conta_codigo'),
+        ('balancete_mensal', 'conta_codigo'),
+        ('fluxo_caixa_contabil', 'conta_codigo'),
+        ('conta_pagar', 'conta_contabil_codigo'),
+        ('conta_receber', 'conta_contabil_codigo'),
+    ]
+
+    try:
+        with db.engine.begin() as conn:
+            ja_composta = conn.execute(sa_text("""
+                SELECT COUNT(*) FROM pg_index i
+                  JOIN pg_attribute a
+                    ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                 WHERE i.indrelid = 'plano_contas'::regclass
+                   AND i.indisprimary AND a.attname = 'admin_id'
+            """)).scalar()
+
+            # ── Ato 0: derrubar as FKs e trocar a PK ANTES do backfill ──────
+            # A ordem aqui é a parte não-óbvia da migração, e errá-la produz
+            # uma migração que "roda" sem fazer nada:
+            #
+            # - as FKs caem primeiro porque o backfill insere em ordem
+            #   arbitrária (filha antes do pai) e cria esqueletos para
+            #   códigos órfãos cujo pai não existe em plano nenhum;
+            # - a PK tem que virar composta ANTES do backfill. Com a PK ainda
+            #   global, o `ON CONFLICT DO NOTHING` de cada INSERT casaria com
+            #   a linha do OUTRO tenant que já ocupa aquele código — e o
+            #   backfill seria um no-op silencioso, exatamente o mesmo defeito
+            #   que ele existe para corrigir.
+            #
+            # Tudo roda numa transação só: se algo falhar, nada muda.
+            for tabela, coluna in dependentes:
+                conn.execute(sa_text(
+                    f"ALTER TABLE {tabela} DROP CONSTRAINT IF EXISTS "
+                    f"{tabela}_{coluna}_fkey"))
+            conn.execute(sa_text(
+                "ALTER TABLE plano_contas DROP CONSTRAINT IF EXISTS "
+                "plano_contas_conta_pai_codigo_fkey"))
+            if not ja_composta:
+                conn.execute(sa_text(
+                    "ALTER TABLE plano_contas DROP CONSTRAINT IF EXISTS "
+                    "plano_contas_pkey"))
+                conn.execute(sa_text(
+                    "ALTER TABLE plano_contas ADD CONSTRAINT plano_contas_pkey "
+                    "PRIMARY KEY (admin_id, codigo)"))
+
+            # ── Ato 1: backfill dos pares (admin_id, codigo) ausentes ────────
+            # Repetido até estabilizar: copiar uma conta pode exigir copiar o
+            # pai dela, que pode exigir o avô. A cadeia tem no máximo 4 níveis
+            # nos planos em uso, mas o laço não depende disso.
+            copiadas_total = 0
+            for _ in range(10):
+                faltantes = []
+                for tabela, coluna in dependentes:
+                    faltantes.extend(conn.execute(sa_text(f"""
+                        SELECT DISTINCT d.admin_id, d.{coluna}
+                          FROM {tabela} d
+                         WHERE d.{coluna} IS NOT NULL
+                           AND d.admin_id IS NOT NULL
+                           AND NOT EXISTS (
+                               SELECT 1 FROM plano_contas pc
+                                WHERE pc.codigo = d.{coluna}
+                                  AND pc.admin_id = d.admin_id
+                           )
+                    """)).fetchall())
+
+                # Pais ausentes das contas que já existem para o tenant.
+                faltantes.extend(conn.execute(sa_text("""
+                    SELECT DISTINCT pc.admin_id, pc.conta_pai_codigo
+                      FROM plano_contas pc
+                     WHERE pc.conta_pai_codigo IS NOT NULL
+                       AND NOT EXISTS (
+                           SELECT 1 FROM plano_contas pai
+                            WHERE pai.codigo = pc.conta_pai_codigo
+                              AND pai.admin_id = pc.admin_id
+                       )
+                """)).fetchall())
+
+                if not faltantes:
+                    break
+
+                for admin_id, codigo in set(faltantes):
+                    # Modelo da conta: qualquer definição existente dela.
+                    modelo = conn.execute(sa_text("""
+                        SELECT nome, tipo_conta, natureza, nivel,
+                               conta_pai_codigo, aceita_lancamento
+                          FROM plano_contas WHERE codigo = :c LIMIT 1
+                    """), {'c': codigo}).first()
+                    if modelo is None:
+                        # Conta referenciada que não existe em plano nenhum.
+                        # Cria um esqueleto para não perder o lançamento; o
+                        # nome deixa claro que veio de dado órfão.
+                        nivel = len(codigo.split('.'))
+                        pai = codigo.rsplit('.', 1)[0] if nivel > 1 else None
+                        modelo = (f'[órfã] {codigo}', 'DESPESA', 'DEVEDORA',
+                                  nivel, pai, True)
+                        logger.warning(
+                            f"[Migration 218] conta {codigo!r} não existe em "
+                            f"plano nenhum — criada como órfã para admin "
+                            f"{admin_id}")
+                    conn.execute(sa_text("""
+                        INSERT INTO plano_contas
+                            (codigo, nome, tipo_conta, natureza, nivel,
+                             conta_pai_codigo, aceita_lancamento, ativo, admin_id)
+                        VALUES (:codigo, :nome, :tipo, :natureza, :nivel,
+                                :pai, :aceita, true, :aid)
+                        ON CONFLICT DO NOTHING
+                    """), {
+                        'codigo': codigo, 'nome': modelo[0], 'tipo': modelo[1],
+                        'natureza': modelo[2], 'nivel': modelo[3],
+                        'pai': modelo[4], 'aceita': modelo[5], 'aid': admin_id,
+                    })
+                    copiadas_total += 1
+
+            # ── Ato 2: FKs compostas ────────────────────────────────────────
+            conn.execute(sa_text("""
+                ALTER TABLE plano_contas
+                  ADD CONSTRAINT plano_contas_conta_pai_codigo_fkey
+                  FOREIGN KEY (admin_id, conta_pai_codigo)
+                  REFERENCES plano_contas (admin_id, codigo)
+            """))
+            for tabela, coluna in dependentes:
+                conn.execute(sa_text(f"""
+                    ALTER TABLE {tabela}
+                      ADD CONSTRAINT {tabela}_{coluna}_fkey
+                      FOREIGN KEY (admin_id, {coluna})
+                      REFERENCES plano_contas (admin_id, codigo)
+                """))
+                # A PK composta não serve de índice para buscas só por código.
+                conn.execute(sa_text(
+                    f"CREATE INDEX IF NOT EXISTS idx_{tabela}_{coluna} "
+                    f"ON {tabela} ({coluna})"))
+
+        logger.info(
+            f"[Migration 218] plano_contas agora é por tenant. "
+            f"{copiadas_total} conta(s) copiadas no backfill; PK e 6 FKs "
+            f"reconstruídas como compostas.")
+    except Exception as e:
+        logger.error(f"[Migration 218] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_219_revisao_proposta_linhagem_e_base():
+    """Fase 0.6 / D1 — duas colunas que faltavam para a revisão de proposta.
+
+    `proposta_itens.proposta_item_origem_id` — criar uma revisão CLONA os
+    itens com ids novos. Sem a linhagem, a propagação proposta→obra não tinha
+    como saber que o item da v2 é o MESMO item da v1, e criava um segundo
+    `ItemMedicaoComercial` em vez de atualizar o existente. Medido em 21/07:
+    v1 de R$ 100k + v2 de R$ 120k produziam 2 itens somando R$ 220.000 e
+    saldo de -R$ 100.000.
+
+    `medicao_contrato.valor_base` — `MedicaoContrato.valor` é property
+    calculada, `pct × obra.valor_contrato`. Aprovar um aditivo reprecificava
+    retroativamente TODA medição já emitida. A coluna congela a base no
+    momento da emissão; NULL segue o contrato vigente, que é o correto para
+    medição futura.
+
+    Backfill deliberadamente ausente nas duas:
+
+    - a linhagem histórica não é reconstituível com segurança — o clone não
+      deixava rastro. O handler cai no `item_numero` para as revisões
+      antigas, que o clone sempre copiou fielmente;
+    - congelar as 20.064 medições existentes no contrato de HOJE gravaria
+      como "valor de emissão" um número que já pode ter sido reprecificado
+      pelo defeito. NULL é honesto: significa "não sabemos, segue o
+      contrato". A partir daqui as novas emissões congelam corretamente.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE proposta_itens ADD COLUMN IF NOT EXISTS "
+                "proposta_item_origem_id INTEGER REFERENCES proposta_itens(id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_proposta_itens_origem "
+                "ON proposta_itens (proposta_item_origem_id)"))
+            conn.execute(sa_text(
+                "ALTER TABLE medicao_contrato ADD COLUMN IF NOT EXISTS "
+                "valor_base NUMERIC(15, 2)"))
+        logger.info(
+            "[Migration 219] proposta_itens.proposta_item_origem_id e "
+            "medicao_contrato.valor_base criadas.")
+    except Exception as e:
+        logger.error(f"[Migration 219] Falha: {e}", exc_info=True)
+        raise
+
+
+def _indices_declarados_no_modelo():
+    """Nomes dos índices que os modelos SQLAlchemy declaram."""
+    from models import db as _db
+    return {ix.name for t in _db.metadata.tables.values() for ix in t.indexes}
+
+
+def _indices_redundantes_a_dropar():
+    """Índices verdadeiramente redundantes, preservando os do modelo.
+
+    Equivalência = mesma tabela, mesmas colunas na mesma ordem, mesma
+    unicidade e mesmo predicado parcial. Entre equivalentes, sobrevive
+    (nesta ordem): a PRIMARY KEY, o índice declarado no modelo, e por fim
+    qualquer um.
+    """
+    import collections
+
+    from sqlalchemy import text as sa_text
+
+    declarados = _indices_declarados_no_modelo()
+    with db.engine.connect() as conn:
+        linhas = conn.execute(sa_text("""
+            SELECT t.relname, i.relname,
+                   array_to_string(array_agg(a.attname ORDER BY k.ord), ',') AS cols,
+                   ix.indisunique, ix.indisprimary,
+                   pg_get_expr(ix.indpred, ix.indrelid)
+            FROM pg_index ix
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_class t ON t.oid = ix.indrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = 'public'
+            JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+            GROUP BY 1,2,4,5,6
+        """)).fetchall()
+
+    grupos = collections.defaultdict(list)
+    for tab, idx, cols, uniq, pk, parcial in linhas:
+        grupos[(tab, cols, uniq, parcial)].append((idx, pk))
+
+    dropar = []
+    for idxs in grupos.values():
+        if len(idxs) < 2:
+            continue
+        pks = [i for i, pk in idxs if pk]
+        do_modelo = [i for i, pk in idxs if not pk and i in declarados]
+        outros = [i for i, pk in idxs if not pk and i not in declarados]
+        if pks:
+            dropar += do_modelo + outros
+        elif do_modelo:
+            dropar += do_modelo[1:] + outros
+        else:
+            dropar += outros[1:]
+    return dropar
+
+
+def _recriar_indices_do_modelo_ausentes():
+    """Cria todo índice declarado no modelo que não existe no banco.
+
+    É a cura da causa mecânica: `db.create_all()` NÃO cria índice em tabela
+    que já existe, então qualquer `index=True` acrescentado a um modelo
+    depois da criação da tabela nunca vira índice de verdade. Roda toda vez;
+    idempotente por natureza.
+    """
+    from sqlalchemy import text as sa_text
+
+    from models import db as _db
+
+    with db.engine.connect() as conn:
+        existentes = {r[0] for r in conn.execute(sa_text(
+            "SELECT indexname FROM pg_indexes WHERE schemaname='public'"))}
+        tabelas = {r[0] for r in conn.execute(sa_text(
+            "SELECT tablename FROM pg_tables WHERE schemaname='public'"))}
+
+    criados = 0
+    for tabela in _db.metadata.tables.values():
+        if tabela.name not in tabelas:
+            continue
+        for ix in tabela.indexes:
+            if ix.name in existentes:
+                continue
+            try:
+                with db.engine.begin() as conn:
+                    ix.create(bind=conn)
+                criados += 1
+            except Exception as e:
+                logger.warning(f"[Migration 213] indice do modelo {ix.name} "
+                               f"nao recriado: {e}")
+    if criados:
+        logger.info(f"[Migration 213] {criados} indice(s) do modelo recriado(s).")
+    return criados
+
+
+def _migration_213_indices_faltantes_e_duplicados():
+    """Fase 0.5 / 3.1 — cria os índices que nunca nasceram e poda os redundantes.
+
+    CAUSA MECÂNICA (dossiê D3/10): `pre_start.py` roda `db.create_all()` ANTES
+    de `executar_migracoes()`. Migrações que criam tabela com guard
+    `IF NOT EXISTS` colocam os `CREATE INDEX` DENTRO do ramo de criação; como
+    `create_all()` já criou a tabela — sem os índices, porque o modelo não os
+    declara em `__table_args__` — a migração cai no `else: SKIP` e os índices
+    nunca nascem.
+
+    Caso mais caro: `rdo_apontamento_cronograma`, 61.923 linhas e UM índice (a
+    PK). O motor filtra sempre por `(tarefa_cronograma_id, admin_id)`
+    (`utils/cronograma_engine.py:181,233,467,485`) e esse índice exato está
+    escrito na migração 76 desde sempre, sem nunca ter sido criado. EXPLAIN
+    medido antes: Seq Scan, 66.024 linhas filtradas, 881 ms por consulta.
+
+    Aqui os índices são criados FORA de qualquer ramo condicional — é o padrão
+    a seguir daqui em diante.
+    """
+    from sqlalchemy import text as sa_text
+
+    criar = [
+        ('idx_rdo_apont_tarefa_admin',
+         'CREATE INDEX IF NOT EXISTS idx_rdo_apont_tarefa_admin '
+         'ON rdo_apontamento_cronograma (tarefa_cronograma_id, admin_id)'),
+        ('idx_rdo_apont_rdo',
+         'CREATE INDEX IF NOT EXISTS idx_rdo_apont_rdo '
+         'ON rdo_apontamento_cronograma (rdo_id)'),
+        ('idx_rdo_obra', 'CREATE INDEX IF NOT EXISTS idx_rdo_obra ON rdo (obra_id)'),
+        ('idx_rdo_admin', 'CREATE INDEX IF NOT EXISTS idx_rdo_admin ON rdo (admin_id)'),
+        ('idx_obra_admin_ativo',
+         'CREATE INDEX IF NOT EXISTS idx_obra_admin_ativo ON obra (admin_id, ativo)'),
+        ('idx_cliente_admin',
+         'CREATE INDEX IF NOT EXISTS idx_cliente_admin ON cliente (admin_id)'),
+        ('idx_gcf_admin_data',
+         'CREATE INDEX IF NOT EXISTS idx_gcf_admin_data '
+         'ON gestao_custo_filho (admin_id, data_referencia)'),
+        ('idx_gcf_pai',
+         'CREATE INDEX IF NOT EXISTS idx_gcf_pai ON gestao_custo_filho (pai_id)'),
+        ('idx_pedido_compra_admin_obra',
+         'CREATE INDEX IF NOT EXISTS idx_pedido_compra_admin_obra '
+         'ON pedido_compra (admin_id, obra_id)'),
+        ('idx_fluxo_caixa_admin_data',
+         'CREATE INDEX IF NOT EXISTS idx_fluxo_caixa_admin_data '
+         'ON fluxo_caixa (admin_id, data_movimento)'),
+        ('idx_rdo_mao_obra_rdo',
+         'CREATE INDEX IF NOT EXISTS idx_rdo_mao_obra_rdo ON rdo_mao_obra (rdo_id)'),
+        ('idx_tarefa_cron_admin',
+         'CREATE INDEX IF NOT EXISTS idx_tarefa_cron_admin ON tarefa_cronograma (admin_id)'),
+    ]
+
+    # Fase 0.5 — REGRA CORRIGIDA. A primeira versão desta migração dropava 61
+    # índices "redundantes" escolhendo o sobrevivente arbitrariamente (o
+    # primeiro da lista). Isso derrubou 34 índices que o MODELO declara com
+    # `index=True` — entre eles `ix_rdo_foto_admin_id`, numa tabela de 14 GB.
+    # `create_all()` não recria índice em tabela existente, então o schema
+    # divergiria do modelo permanentemente.
+    #
+    # Regra certa: entre índices equivalentes, o canônico é o que o MODELO
+    # declara. Só se nenhum for do modelo é que se escolhe um para manter.
+    duplicados = _indices_redundantes_a_dropar()
+
+    criados = falhos = dropados = 0
+    for nome, ddl in criar:
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(sa_text(ddl))
+            criados += 1
+        except Exception as e:
+            falhos += 1
+            logger.warning(f"[Migration 213] indice {nome} falhou: {e}")
+
+    # UNIQUE da migração 76 que nunca foi criado. Tolera falha: se houver
+    # duplicata histórica de apontamento, o índice não nasce e o log diz —
+    # limpar duplicata é decisão de DADO, não de schema, e não deve travar
+    # o boot.
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                'CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_apont_rdo_tarefa '
+                'ON rdo_apontamento_cronograma (rdo_id, tarefa_cronograma_id)'))
+        criados += 1
+        logger.info("[Migration 213] UNIQUE(rdo_id, tarefa_cronograma_id) criado.")
+    except Exception as e:
+        logger.warning(
+            f"[Migration 213] UNIQUE da migracao 76 NAO criado — provavel "
+            f"duplicata historica de apontamento. Investigar: {e}")
+
+    for nome in duplicados:
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(sa_text(f'DROP INDEX IF EXISTS {nome}'))
+            dropados += 1
+        except Exception as e:
+            logger.warning(f"[Migration 213] drop de {nome} falhou: {e}")
+
+    # Reconcilia com o modelo DEPOIS dos drops — recria o que for do modelo e
+    # estiver faltando, inclusive o que uma execução anterior tenha removido
+    # por engano.
+    recriados = _recriar_indices_do_modelo_ausentes()
+
+    logger.info(f"[Migration 213] {criados} indice(s) criado(s), "
+                f"{dropados} redundante(s) removido(s), "
+                f"{recriados} do modelo recriado(s), {falhos} falha(s).")
+
+    # Padrão de migrations.py (ver 211/212): falha LEVANTA, para a migração não
+    # ser gravada como aplicada e nunca mais rodar. Antes desta correção a 213
+    # engolia tudo e ficava marcada como success mesmo se os 12 índices
+    # falhassem — exatamente o problema que ela existe para consertar.
+    if falhos:
+        raise RuntimeError(
+            f'[Migration 213] {falhos} indice(s) essencial(is) nao criado(s) — '
+            f'ver warnings acima. A migracao NAO sera marcada como aplicada.')

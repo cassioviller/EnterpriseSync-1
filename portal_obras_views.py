@@ -340,24 +340,71 @@ def portal_obra(token: str):
     )
 
 
+# Fase 0.6 / D2 — estados a partir dos quais o cliente ainda pode decidir.
+# São exatamente os que a listagem de pendentes oferece (`:165-171`): se a
+# compra não está numa destas, o portal não deveria estar mostrando botão.
+_STATUS_COMPRA_DECIDIVEL = (None, 'PENDENTE', 'AGUARDANDO_APROVACAO_CLIENTE')
+
+
+def _get_compra_do_portal(obra, compra_id: int) -> PedidoCompra:
+    """Fase 0.6 / D2 — a compra tem que ser uma que o portal de fato oferece.
+
+    Antes, `aprovar_compra` e `recusar_compra` filtravam só `id` e `obra_id`.
+    Faltavam as duas restrições que a listagem já aplicava e que as rotas de
+    mapa deste mesmo arquivo (`:436`, `:551`) sempre aplicaram:
+
+    - **tenant**: `admin_id` da obra;
+    - **tipo**: só `aprovacao_cliente` é apresentada ao cliente. Uma compra
+      `tipo_compra='normal'` carimbada como APROVADO passava a aparecer em
+      `compras_resolvidas` (`:177`), que não filtra tipo — compra interna
+      vazando no portal do cliente.
+
+    404 (e não 403) porque, para o portal, o que ele não oferece não existe:
+    responder 403 confirmaria que aquele id pertence à obra.
+    """
+    return PedidoCompra.query.filter_by(
+        id=compra_id,
+        obra_id=obra.id,
+        admin_id=obra.admin_id,
+        tipo_compra='aprovacao_cliente',
+    ).first_or_404()
+
+
 @portal_obras_bp.route('/obra/<token>/compra/<int:compra_id>/aprovar', methods=['POST'])
 def aprovar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
-    compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
+    compra = _get_compra_do_portal(obra, compra_id)
 
     # Já aprovada? idempotente
-    if compra.status_aprovacao_cliente == 'APROVADO' and compra.processada_apos_aprovacao:
-        flash('Esta compra já foi aprovada e processada.', 'info')
+    if compra.status_aprovacao_cliente == 'APROVADO':
+        flash('Esta compra já foi aprovada.', 'info')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    # Fase 0.6 / D2 — desfazer a própria recusa não é ação de portal.
+    # Sem esta guarda, um POST anônimo levava uma compra RECUSADA de volta a
+    # APROVADO e, aí sim, `processar_compra_aprovada_cliente` criava
+    # `GestaoCustoPai` com status='PAGO' e movimentava o almoxarifado
+    # (medido em 21/07). Reabrir a decisão é ação de gestor, autenticada.
+    if compra.status_aprovacao_cliente not in _STATUS_COMPRA_DECIDIVEL:
+        logger.warning(
+            f"[PORTAL] Tentativa de aprovar compra {compra_id} em estado "
+            f"{compra.status_aprovacao_cliente!r} — obra {obra.id}. Recusado."
+        )
+        flash(
+            'Esta compra já foi recusada. Fale com a empresa para reabri-la.',
+            'warning')
         return redirect(url_for('portal_obras.portal_obra', token=token))
 
     try:
         compra.status_aprovacao_cliente = 'APROVADO'
 
-        # Se for tipo 'aprovacao_cliente' e ainda não processada, gera agora os custos
-        # (FATURAMENTO_DIRETO sem FluxoCaixa) + entrada + saída no almoxarifado.
-        if compra.tipo_compra == 'aprovacao_cliente' and not compra.processada_apos_aprovacao:
+        # Gera agora os custos (FATURAMENTO_DIRETO sem FluxoCaixa) + entrada
+        # + saída no almoxarifado. O tipo já foi garantido na query.
+        if not compra.processada_apos_aprovacao:
             from compras_views import processar_compra_aprovada_cliente
-            # usuario_id = admin do tenant (portal é anônimo, não tem current_user)
+            # usuario_id = admin do tenant: o portal é anônimo e não tem
+            # current_user. A autoria fica atribuída a quem não agiu — só a
+            # Fase 9a (identidade do portal) resolve isso de verdade.
             processar_compra_aprovada_cliente(compra, usuario_id=compra.admin_id)
 
         db.session.commit()
@@ -377,7 +424,25 @@ def aprovar_compra(token: str, compra_id: int):
 @portal_obras_bp.route('/obra/<token>/compra/<int:compra_id>/recusar', methods=['POST'])
 def recusar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
-    compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
+    compra = _get_compra_do_portal(obra, compra_id)
+
+    if compra.status_aprovacao_cliente == 'RECUSADO':
+        flash('Esta compra já foi recusada.', 'info')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
+    # Fase 0.6 / D2 — mesma simetria da aprovação: uma compra já aprovada (e
+    # possivelmente já custeada e baixada do almoxarifado) não é estornada por
+    # POST anônimo. O estorno é operação de gestor.
+    if compra.status_aprovacao_cliente not in _STATUS_COMPRA_DECIDIVEL:
+        logger.warning(
+            f"[PORTAL] Tentativa de recusar compra {compra_id} em estado "
+            f"{compra.status_aprovacao_cliente!r} — obra {obra.id}. Recusado."
+        )
+        flash(
+            'Esta compra já foi aprovada. Fale com a empresa para estorná-la.',
+            'warning')
+        return redirect(url_for('portal_obras.portal_obra', token=token))
+
     compra.status_aprovacao_cliente = 'RECUSADO'
     db.session.commit()
     logger.info(f"[PORTAL] Compra {compra_id} RECUSADA pelo cliente — obra {obra.id}")

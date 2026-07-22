@@ -69,7 +69,18 @@ def novo_usuario():
 @admin_required
 def editar_usuario(user_id):
     """Editar usuário"""
-    usuario = Usuario.query.get_or_404(user_id)
+    # Fase 0 / R3 — escopo de tenant. Antes era `Usuario.query.get_or_404`
+    # puro: um ADMIN da empresa A editava (e trocava a senha de) um usuário
+    # da empresa B só sabendo o id. Mesmo predicado da listagem acima.
+    from multitenant_helper import get_admin_id
+    admin_id = get_admin_id()
+    usuario = Usuario.query.filter(
+        Usuario.id == user_id,
+        db.or_(
+            Usuario.admin_id == admin_id,
+            Usuario.id == admin_id,
+        ),
+    ).first_or_404()
     
     if request.method == 'POST':
         try:

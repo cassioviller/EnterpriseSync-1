@@ -6,7 +6,7 @@ from datetime import datetime, date, time
 from sqlalchemy import func, JSON, Column, Integer, String, Text, DateTime, Numeric, ForeignKey
 from enum import Enum
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship, validates
 from functools import lru_cache
 import logging
 import secrets
@@ -25,6 +25,25 @@ class TipoUsuario(Enum):
     ALMOXARIFE = "almoxarife"  # MÓDULO 4: Almoxarifado
     FUNCIONARIO = "funcionario"
 
+
+class PapelObra(Enum):
+    """Papel de um usuário DENTRO de uma obra específica — Fase 1.
+
+    Ortogonal a `TipoUsuario`, que é o papel no TENANT. Um usuário pode
+    ser FUNCIONARIO na empresa e GESTOR de uma obra; outro pode ser
+    FUNCIONARIO na empresa e APONTADOR de três obras. ADMIN e
+    SUPER_ADMIN não precisam de vínculo: enxergam todas as obras do
+    tenant por definição (ver utils/autorizacao.obras_visiveis).
+
+    Deliberadamente três valores. COMPRADOR entra na Fase 3, quando a
+    governança de compras existir para consumi-lo — antes disso seria
+    permissão sem verbo.
+    """
+    GESTOR = "gestor"        # responde pela obra: edita, aprova, faz handoff
+    APONTADOR = "apontador"  # lança RDO e apontamento; não edita a obra
+    LEITOR = "leitor"        # só leitura
+
+
 class Usuario(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -34,11 +53,30 @@ class Usuario(UserMixin, db.Model):
     ativo = db.Column(db.Boolean, default=True)
     tipo_usuario = db.Column(db.Enum(TipoUsuario), default=TipoUsuario.FUNCIONARIO, nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)  # Para funcionários, referencia seu admin
+    # Fase 1 — identidade estável da pessoa. Até 2026-07-21 não existia
+    # nenhuma FK ligando o login à linha de RH: `views/employees.py:686`
+    # casava por substring do username, `crud_rdo_completo.py:30` tinha um
+    # e-mail chumbado, e o último fallback pegava o primeiro funcionário
+    # ativo do banco INTEIRO. Nullable porque nem todo usuário é
+    # funcionário (o admin da construtora não é) e nem todo funcionário
+    # tem login. UNIQUE porque uma pessoa de RH tem no máximo um login —
+    # no Postgres UNIQUE admite múltiplos NULL, que é o que queremos.
+    # INVARIANTE DE TENANT: o Funcionario apontado tem que ser do mesmo
+    # tenant do Usuario. Não dá para expressar como CHECK entre tabelas;
+    # é garantido por `utils.identidade.vincular_funcionario` e travado
+    # por `tests/test_fase1_identidade.py::test_vinculo_cross_tenant_e_recusado`.
+    funcionario_id = db.Column(
+        db.Integer,
+        db.ForeignKey('funcionario.id', ondelete='SET NULL'),
+        unique=True, nullable=True, index=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     versao_sistema = db.Column(db.String(10), default='v1', nullable=False)  # 'v1' ou 'v2' - Feature Flag V2
-    
+
     # Relacionamentos
     funcionarios = db.relationship('Usuario', backref=db.backref('admin', remote_side=[id]), lazy='dynamic')
+    funcionario = db.relationship('Funcionario', foreign_keys=[funcionario_id],
+                                  backref=db.backref('usuario', uselist=False))
 
 class Departamento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -254,6 +292,8 @@ class Obra(db.Model):
     valor_contrato = db.Column(db.Float, default=0.0)  # Valor do contrato para cálculo de margem
     fluxo_caixa_planilha = db.Column(db.JSON)  # snapshot verbatim da Planilha1 (fluxo_caixa_mensal)
     area_total_m2 = db.Column(db.Float, default=0.0)  # Área total da obra
+    # Fase 0.6 / D5 — texto livre, mas com vocabulário canônico convergido na
+    # escrita pelo @validates abaixo. Ver utils/status_obra.py.
     status = db.Column(db.String(20), default='Em andamento')
     responsavel_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'))
     
@@ -313,6 +353,23 @@ class Obra(db.Model):
     # backref 'obras' permite Cliente.obras para listar todas as obras do cliente.
     cliente_ref = db.relationship('Cliente', foreign_keys=[cliente_id], backref='obras')
 
+    # Fase 1 — `responsavel_id` existe desde sempre (models.py:258) mas
+    # NUNCA teve relationship: `obra.responsavel` resolvia para Undefined
+    # em templates/obras.html:266 e obra_form.html:449 (sempre "Sem
+    # responsável") e estourava AttributeError na f-string de
+    # relatorios_funcionais.py:217.
+    responsavel = db.relationship('Funcionario', foreign_keys=[responsavel_id])
+
+    # Fase 0.6 / D5 — convergência do vocabulário de status na ESCRITA.
+    # O formulário oferecia 'Em Andamento' e a listagem filtrava por
+    # 'Em andamento' com igualdade exata (views/obras.py:83): 53 obras
+    # existiam e sumiam da tela. Normalizar aqui, e não em cada view, cobre
+    # também event_manager.py, os seeds e os importadores.
+    @validates('status')
+    def _normalizar_status(self, _key, valor):
+        from utils.status_obra import normalizar_status_obra
+        return normalizar_status_obra(valor)
+
     # ── Task #176: properties simplificadas — apenas a FK Cliente é fonte de
     # verdade. Os antigos campos texto cliente_nome/email/telefone foram
     # removidos do schema; nada de fallback legado.
@@ -328,6 +385,56 @@ class Obra(db.Model):
     @property
     def cliente_telefone_efetivo(self):
         return (self.cliente_ref.telefone or '') if self.cliente_ref is not None else ''
+
+
+class UsuarioObra(db.Model):
+    """Vínculo usuário ↔ obra — o segundo eixo de autorização (Fase 1).
+
+    Antes desta tabela o sistema tinha um eixo só: `admin_id`. Qualquer
+    usuário autenticado de um tenant alcançava todas as obras dele. As
+    tabelas que pareciam vínculo não eram: `FuncionarioObrasPonto`
+    (models.py:605) governa um DROPDOWN de ponto e falha ABERTA — sem
+    configuração, `ponto_views.py:674` devolve todas as obras do tenant;
+    `AlocacaoEquipe` (models.py:1522) é planejamento diário.
+
+    Chaveada por `usuario_id` (não `funcionario_id`) porque autorização
+    é sobre quem loga. Quem é a pessoa por trás do login é a FK
+    `Usuario.funcionario_id`, resolvida em utils/identidade.py.
+    """
+    __tablename__ = 'usuario_obra'
+    __table_args__ = (
+        db.UniqueConstraint('usuario_id', 'obra_id', name='uq_usuario_obra'),
+        db.Index('ix_usuario_obra_usuario_ativo', 'usuario_id', 'ativo'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id', ondelete='CASCADE'),
+                           nullable=False, index=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    # `native_enum=False` — DESVIO DELIBERADO do plano da Fase 1, que
+    # declarava `db.Enum(PapelObra)` enquanto a migration 215 cria
+    # `papel VARCHAR(20)`. Este schema usa enums NATIVOS do Postgres
+    # (`usuario.tipo_usuario` é do tipo `tipousuario`), então o padrão
+    # `native_enum=True` faria o `create_all()` do startup tentar criar
+    # um tipo `papelobra` que a migration não cria — modelo e migration
+    # descrevendo coisas diferentes. VARCHAR também é o que permite
+    # acrescentar COMPRADOR na Fase 3 sem ALTER TYPE.
+    papel = db.Column(db.Enum(PapelObra, native_enum=False, length=20),
+                      nullable=False, default=PapelObra.LEITOR)
+    # admin_id redundante com obra.admin_id, mas presente por consistência
+    # com o resto do schema e para permitir filtro de tenant sem join.
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id],
+                              backref=db.backref('obras_vinculadas', lazy='dynamic'))
+    obra = db.relationship('Obra', foreign_keys=[obra_id],
+                           backref=db.backref('usuarios_vinculados', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<UsuarioObra u={self.usuario_id} o={self.obra_id} {self.papel.value}>'
 
 
 class ServicoObra(db.Model):
@@ -1753,7 +1860,7 @@ class ContaPagar(db.Model):
     data_vencimento = db.Column(db.Date, nullable=False)
     data_pagamento = db.Column(db.Date)
     status = db.Column(db.String(20), default='PENDENTE')
-    conta_contabil_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_contabil_codigo = db.Column(db.String(20))
     forma_pagamento = db.Column(db.String(50))
     observacoes = db.Column(db.Text)
     origem_tipo = db.Column(db.String(50))
@@ -1780,6 +1887,12 @@ class ContaPagar(db.Model):
         db.Index('idx_conta_pagar_status', 'status'),
         db.Index('idx_conta_pagar_fornecedor', 'fornecedor_id'),
         db.Index('idx_conta_pagar_obra', 'obra_id'),
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_contabil_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
         db.Index('idx_conta_pagar_admin', 'admin_id'),
     )
 
@@ -1800,7 +1913,7 @@ class ContaReceber(db.Model):
     data_vencimento = db.Column(db.Date, nullable=False)
     data_recebimento = db.Column(db.Date)
     status = db.Column(db.String(20), default='PENDENTE')
-    conta_contabil_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_contabil_codigo = db.Column(db.String(20))
     forma_recebimento = db.Column(db.String(50))
     observacoes = db.Column(db.Text)
     origem_tipo = db.Column(db.String(50))
@@ -1819,6 +1932,12 @@ class ContaReceber(db.Model):
         db.Index('idx_conta_receber_status', 'status'),
         db.Index('idx_conta_receber_cliente', 'cliente_cpf_cnpj'),
         db.Index('idx_conta_receber_obra', 'obra_id'),
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_contabil_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
         db.Index('idx_conta_receber_admin', 'admin_id'),
     )
 
@@ -2496,19 +2615,35 @@ class NotificacaoCliente(db.Model):
 # ===============================================================
 
 class PlanoContas(db.Model):
-    """Plano de Contas brasileiro completo e hierárquico."""
+    """Plano de Contas brasileiro completo e hierárquico.
+
+    Fase 0.6 / D4 — a PK é `(admin_id, codigo)`. Era só `codigo`, global,
+    apesar de a tabela sempre ter tido `admin_id`: a primeira empresa a
+    semear ficava dona de '1.1.01.001' e as demais não conseguiam criar a
+    própria (o seed usava `ON CONFLICT (codigo) DO NOTHING`). Em 21/07 havia
+    315 tenants com lançamentos contábeis e 2 com plano de contas.
+    Ver migration 218.
+    """
     __tablename__ = 'plano_contas'
+    __table_args__ = (
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_pai_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
+    # A ordem das colunas da PK segue a do índice criado pela migration 218.
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         primary_key=True, nullable=False)
     codigo = db.Column(db.String(20), primary_key=True)  # Ex: 1.1.01.001
     nome = db.Column(db.String(200), nullable=False)
     tipo_conta = db.Column(db.String(20), nullable=False)  # ATIVO, PASSIVO, PATRIMONIO, RECEITA, DESPESA
     natureza = db.Column(db.String(10), nullable=False)  # DEVEDORA, CREDORA
     nivel = db.Column(db.Integer, nullable=False)
-    conta_pai_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_pai_codigo = db.Column(db.String(20))
     aceita_lancamento = db.Column(db.Boolean, default=True)  # True para contas analíticas
     ativo = db.Column(db.Boolean, default=True)
-    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
 
-    conta_pai = db.relationship('PlanoContas', remote_side=[codigo])
+    conta_pai = db.relationship('PlanoContas', remote_side=[admin_id, codigo])
     
     @staticmethod
     @lru_cache(maxsize=256)
@@ -2583,7 +2718,7 @@ class PartidaContabil(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lancamento_id = db.Column(db.Integer, db.ForeignKey('lancamento_contabil.id'), nullable=False)
     sequencia = db.Column(db.Integer, nullable=False)
-    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'), nullable=False, index=True)
+    conta_codigo = db.Column(db.String(20), nullable=False, index=True)
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo_contabil.id'))
     tipo_partida = db.Column(db.String(10), nullable=False)  # DEBITO, CREDITO
     valor = db.Column(db.Numeric(15, 2), nullable=False)
@@ -2593,11 +2728,20 @@ class PartidaContabil(db.Model):
     conta = db.relationship('PlanoContas')
     centro_custo = db.relationship('CentroCustoContabil', back_populates='partidas')
 
+    __table_args__ = (
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
+
 class BalanceteMensal(db.Model):
     """Armazena os saldos mensais para geração rápida de relatórios."""
     __tablename__ = 'balancete_mensal'
     id = db.Column(db.Integer, primary_key=True)
-    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'), nullable=False)
+    conta_codigo = db.Column(db.String(20), nullable=False)
     mes_referencia = db.Column(db.Date, nullable=False)  # Primeiro dia do mês
     saldo_anterior = db.Column(db.Numeric(15, 2), default=0)
     debitos_mes = db.Column(db.Numeric(15, 2), default=0)
@@ -2606,7 +2750,16 @@ class BalanceteMensal(db.Model):
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     processado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
-    __table_args__ = (db.UniqueConstraint('conta_codigo', 'mes_referencia', 'admin_id', name='uq_balancete_conta_mes_admin'),)
+    __table_args__ = (
+        db.UniqueConstraint('conta_codigo', 'mes_referencia', 'admin_id',
+                            name='uq_balancete_conta_mes_admin'),
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
 
 class DREMensal(db.Model):
     """Demonstração do Resultado do Exercício (DRE) mensal."""
@@ -2647,11 +2800,20 @@ class FluxoCaixaContabil(db.Model):
     categoria = db.Column(db.String(50), nullable=False)  # OPERACIONAL, INVESTIMENTO, FINANCIAMENTO
     descricao = db.Column(db.String(200), nullable=False)
     valor = db.Column(db.Numeric(15, 2), nullable=False)
-    conta_codigo = db.Column(db.String(20), db.ForeignKey('plano_contas.codigo'))
+    conta_codigo = db.Column(db.String(20))
     centro_custo_id = db.Column(db.Integer, db.ForeignKey('centro_custo_contabil.id'))
     origem = db.Column(db.String(50))
     origem_id = db.Column(db.Integer)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    __table_args__ = (
+        # Fase 0.6 / D4 — a conta contábil pertence ao tenant: FK composta
+        # contra a PK (admin_id, codigo) de plano_contas. Ver migration 218.
+        db.ForeignKeyConstraint(
+            ['admin_id', 'conta_codigo'],
+            ['plano_contas.admin_id', 'plano_contas.codigo'],
+        ),
+    )
 
 class ConciliacaoBancaria(db.Model):
     """Registros para conciliação bancária."""
@@ -3184,6 +3346,16 @@ class PropostaItem(db.Model):
     # Task #82 — vínculo com catálogo de serviços (opcional, snapshot fica em preco_unitario)
     servico_id = db.Column(db.Integer, db.ForeignKey('servico.id'), nullable=True, index=True)
 
+    # Fase 0.6 / D1 — linhagem entre versões da proposta.
+    # Criar uma revisão CLONA os itens com ids novos. Sem este vínculo, a
+    # propagação proposta→obra não tinha como saber que o item da v2 é o
+    # MESMO item da v1, e criava um segundo ItemMedicaoComercial em vez de
+    # atualizar o existente: um aditivo de +20% virava +100% de itens.
+    # NULL no item original (v1) e nos itens acrescentados pela revisão.
+    proposta_item_origem_id = db.Column(
+        db.Integer, db.ForeignKey('proposta_itens.id'), nullable=True,
+        index=True)
+
     # Task #89 — snapshot do cálculo paramétrico (explosão de insumos)
     quantidade_medida = db.Column(db.Numeric(15, 4), nullable=True)
     custo_unitario = db.Column(db.Numeric(15, 4), nullable=True)
@@ -3619,6 +3791,14 @@ class ConfiguracaoEmpresa(db.Model):
     # tenant. Default FALSE: liga-se por fase (scripts/flag_cronograma_mpp.py).
     cronograma_mpp_ativo = db.Column(db.Boolean, nullable=False, default=False,
                                      server_default='false')
+
+    # Fase 1 — rollout do escopo por obra, por tenant. Desligada por
+    # padrão: com FALSE o comportamento é idêntico ao de antes da Fase 1
+    # (não-admin enxerga todas as obras do tenant). Ligar só depois de
+    # popular usuario_obra para o tenant, senão o pessoal de campo perde
+    # acesso. Mesmo padrão de cronograma_mpp_ativo (migration 211).
+    escopo_obra_ativo = db.Column(db.Boolean, nullable=False, default=False,
+                                  server_default='false')
 
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
@@ -5580,12 +5760,21 @@ class MedicaoContrato(db.Model):
     obs = db.Column(db.Text)
     ordem = db.Column(db.Integer, default=0)
 
+    # Fase 0.6 / D1c — base contratual congelada no momento da emissão.
+    # `valor` sempre foi property calculada sobre `obra.valor_contrato`, e
+    # aprovar um aditivo reprecificava RETROATIVAMENTE toda medição já
+    # emitida — inclusive as que o cliente já pagou. NULL = ainda segue o
+    # contrato vigente, que é o comportamento correto para medição futura.
+    valor_base = db.Column(db.Numeric(15, 2), nullable=True)
+
     obra = db.relationship('Obra', backref='medicoes_contrato')
 
     @property
     def valor(self):
         from decimal import Decimal as _D
-        return (_D(str(self.obra.valor_contrato or 0)) * _D(str(self.pct or 0)))
+        base = (self.valor_base if self.valor_base is not None
+                else (self.obra.valor_contrato or 0))
+        return (_D(str(base)) * _D(str(self.pct or 0)))
 
     __table_args__ = (
         db.Index('ix_medicao_contrato_obra', 'obra_id'),

@@ -9,7 +9,6 @@ from models import (db, FolhaPagamento, ParametrosLegais, Funcionario, Beneficio
 from flask_login import current_user
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta  # [OK] OTIMIZAÇÃO: Movido do inline (linha 41)
-from functools import wraps  # [OK] OTIMIZAÇÃO: Movido do inline (linha 20)
 from io import BytesIO
 import logging
 logger = logging.getLogger(__name__)
@@ -19,18 +18,8 @@ from event_manager import EventManager  # [OK] OTIMIZAÇÃO: Movido do inline (l
 
 folha_bp = Blueprint('folha', __name__)
 
-def admin_required(f):
-    """Decorator simples para admin - implementação temporária"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return redirect(url_for('main.login'))
-        # Verificação simplificada para Admin
-        if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario and current_user.tipo_usuario.name in ['ADMIN', 'SUPER_ADMIN']:
-            return f(*args, **kwargs)
-        flash('Acesso negado. Apenas administradores podem acessar esta página.', 'error')
-        return redirect(url_for('main.dashboard'))
-    return decorated_function
+# Fase 1 — usa a definição canônica (ver contabilidade_views.py).
+from auth import admin_required
 
 # ================================
 # DASHBOARD PRINCIPAL

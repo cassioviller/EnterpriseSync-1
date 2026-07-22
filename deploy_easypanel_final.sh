@@ -28,11 +28,11 @@ ls -la main.py app.py docker-entrypoint.sh 2>/dev/null || echo "   ⚠️ Alguns
 # 3. Criar arquivo de configuração específico para EasyPanel
 cat > .env.easypanel << 'EOF'
 # Configurações EasyPanel - SIGE v10.0
-DATABASE_URL=postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable
+DATABASE_URL=__defina_no_painel_easypanel__
 FLASK_APP=main.py
 DIGITAL_MASTERY_MODE=true
 OBSERVABILITY_ENABLED=true
-SESSION_SECRET=sige-production-secret-2025
+SESSION_SECRET=__gere_com_secrets.token_urlsafe(64)_e_defina_no_painel__
 EOF
 
 echo "✅ Arquivo .env.easypanel criado com configurações de produção"
@@ -105,7 +105,7 @@ echo "      git push"
 echo ""
 echo "   2. No EasyPanel:"
 echo "      • Usar .env.easypanel como base para variáveis de ambiente"
-echo "      • DATABASE_URL: postgresql://sige:sige@viajey_sige:5432/sige?sslmode=disable"
+echo "      • DATABASE_URL: (defina no painel — não fica no repositório)"
 echo "      • Build command: docker build -t sige ."
 echo "      • Run command: bash docker-entrypoint.sh gunicorn --bind 0.0.0.0:5000 main:app"
 echo ""

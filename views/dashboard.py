@@ -1,5 +1,5 @@
 from flask import render_template, request, redirect, url_for
-from flask_login import current_user
+from flask_login import current_user, login_required
 from models import db, Usuario, TipoUsuario, Funcionario, Obra, RDO
 from utils.tenant import get_tenant_admin_id
 from views.helpers import safe_db_operation, _calcular_funcionarios_funcao, _calcular_custos_obra, _calcular_custos_obra_acumulado, _calcular_serie_temporal_custos
@@ -187,6 +187,7 @@ def health_check_veiculos():
 
 # ===== DASHBOARD PRINCIPAL =====
 @main_bp.route('/dashboard')
+@login_required          # Fase 1 — rota estava sem decorator nenhum
 @circuit_breaker(
     name="database_heavy_query",
     failure_threshold=2,

@@ -951,6 +951,31 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         obra = Obra.query.filter_by(
             proposta_origem_id=proposta_id, admin_id=admin_id
         ).first()
+    if not obra:
+        # Fase 0 / R1 — sobe a cadeia de versões: a obra pode ter nascido de
+        # um ANCESTRAL desta proposta (v1 aprovada → obra; v2 é o aditivo).
+        # `criar_nova_versao` passou a herdar `obra_id`, mas as revisões já
+        # gravadas antes dessa correção não têm o campo — esta guarda evita
+        # que elas criem uma segunda obra ao serem aprovadas.
+        ancestral_id, visitados = proposta.proposta_origem_id, {proposta_id}
+        while ancestral_id and ancestral_id not in visitados and obra is None:
+            visitados.add(ancestral_id)
+            ancestral = Proposta.query.filter_by(
+                id=ancestral_id, admin_id=admin_id).first()
+            if ancestral is None:
+                break
+            if ancestral.obra_id:
+                obra = Obra.query.filter_by(
+                    id=ancestral.obra_id, admin_id=admin_id).first()
+            if obra is None:
+                obra = Obra.query.filter_by(
+                    proposta_origem_id=ancestral.id, admin_id=admin_id).first()
+            ancestral_id = ancestral.proposta_origem_id
+        if obra is not None:
+            logger.info(
+                "🔗 Proposta %s (revisão) reconciliada com a obra %s pela "
+                "cadeia de versões — nenhuma obra nova criada",
+                proposta.numero, obra.codigo)
 
     if not obra:
         ultimo_codigo = db.session.query(func.max(Obra.codigo)).filter(
@@ -1006,8 +1031,42 @@ def propagar_proposta_para_obra(data: dict, admin_id: int):
         # Task #176 — popula cliente_id em obras pré-existentes (legado).
         if not obra.cliente_id and cliente_obj:
             obra.cliente_id = cliente_obj.id
-        if (obra.valor_contrato or 0) <= 0 and valor_total > 0:
+        # Fase 0.5 — APROVAR REVISÃO ATUALIZA O VALOR DE CONTRATO.
+        # Antes: `if (obra.valor_contrato or 0) <= 0` — só preenchia campo
+        # VAZIO. Aprovar um aditivo com valor novo deixava o contrato no valor
+        # da v1, em silêncio, e todo o faturamento seguia a base errada
+        # (`MedicaoContrato.valor = pct × obra.valor_contrato`).
+        # Este é o critério do R1 que a Fase 0 não cumpriu: não basta parar de
+        # duplicar a obra, a obra existente tem de refletir a revisão.
+        if valor_total > 0 and float(obra.valor_contrato or 0) != float(valor_total):
+            anterior = float(obra.valor_contrato or 0)
+            # Fase 0.6 / D1c — congela a base das medições JÁ EMITIDAS antes
+            # de mexer no contrato. `MedicaoContrato.valor` é property
+            # calculada sobre `obra.valor_contrato` (models.py), então sem
+            # este passo o aditivo reprecificava retroativamente até o que o
+            # cliente já pagou: uma medição de 10% emitida sobre contrato de
+            # 100k valia 10.000 e passava a valer 12.000, sem registro.
+            # Medição ainda não emitida NÃO congela — seguir o contrato novo
+            # é justamente o que um aditivo significa.
+            if anterior > 0:
+                from models import MedicaoContrato as _MC
+                congeladas = _MC.query.filter(
+                    _MC.obra_id == obra.id,
+                    _MC.admin_id == obra.admin_id,
+                    _MC.valor_base.is_(None),
+                    _MC.recebido_no_mes.isnot(None),
+                    _MC.recebido_no_mes != '',
+                ).update({'valor_base': anterior}, synchronize_session=False)
+                if congeladas:
+                    logger.info(
+                        "🔒 Obra %s: %d medição(ões) já emitida(s) congelada(s) "
+                        "na base %.2f antes do aditivo",
+                        obra.codigo, congeladas, anterior)
             obra.valor_contrato = valor_total
+            logger.info(
+                "💰 Obra %s: valor_contrato %.2f → %.2f pela aprovação da "
+                "proposta %s", obra.codigo, anterior, valor_total,
+                proposta.numero)
         if (obra.orcamento or 0) <= 0 and valor_total > 0:
             obra.orcamento = valor_total
 

@@ -80,7 +80,11 @@ def rdos():
                 admin_id = func_counts[0] if func_counts and func_counts[0] else current_user.id
         else:
             # Funcionário - buscar admin_id através do funcionário
-            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+            # Fase 0.5 / 1.4 — removido o mapeamento chumbado
+            # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
+            # tenant específico no código de produção, resquício da época
+            # de cliente único.
+            email_busca = current_user.email
             funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
             
             if not funcionario_atual:
@@ -1654,7 +1658,14 @@ def duplicar_rdo(id):
             else:
                 # Buscar funcionário para obter admin_id
                 funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                nova_sub.admin_id = funcionario.admin_id if funcionario else 10
+                # Fase 0.5 / 1.4 — o fallback era `else 10`: um tenant CONCRETO
+                # chumbado num caminho de ESCRITA. Registro sem tenant resolvido
+                # some de todo filtro depois, sem erro e sem alerta.
+                from utils.tenant import get_tenant_admin_id
+                _admin_resolvido = get_tenant_admin_id()
+                if not _admin_resolvido:
+                    raise ValueError("Sessão sem empresa vinculada; refaça o login.")
+                nova_sub.admin_id = _admin_resolvido
             
             db.session.add(nova_sub)
         
@@ -1677,7 +1688,14 @@ def duplicar_rdo(id):
             else:
                 # Buscar funcionário para obter admin_id
                 funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                nova_mao.admin_id = funcionario.admin_id if funcionario else 10
+                # Fase 0.5 / 1.4 — o fallback era `else 10`: um tenant CONCRETO
+                # chumbado num caminho de ESCRITA. Registro sem tenant resolvido
+                # some de todo filtro depois, sem erro e sem alerta.
+                from utils.tenant import get_tenant_admin_id
+                _admin_resolvido = get_tenant_admin_id()
+                if not _admin_resolvido:
+                    raise ValueError("Sessão sem empresa vinculada; refaça o login.")
+                nova_mao.admin_id = _admin_resolvido
             
             db.session.add(nova_mao)
         
@@ -2026,7 +2044,11 @@ def api_percentuais_ultimo_rdo(obra_id):
     """API CORRIGIDA: Percentuais do último RDO + novos serviços com 0%"""
     try:
         # Buscar funcionário correto para admin_id
-        email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+        # Fase 0.5 / 1.4 — removido o mapeamento chumbado
+        # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
+        # tenant específico no código de produção, resquício da época
+        # de cliente único.
+        email_busca = current_user.email
         funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
         
         if not funcionario_atual:
@@ -2130,7 +2152,11 @@ def api_percentuais_ultimo_rdo(obra_id):
 
 
 # RDO Lista Consolidada
+# Fase 0 / R3 — esta rota estava SEM autenticação: com `get_admin_id_dinamico`
+# caindo em heurística para anônimo, ela devolvia RDOs de uma empresa
+# escolhida arbitrariamente. Não há before_request global no app.
 @main_bp.route('/funcionario/rdo/consolidado')
+@login_required
 @capture_db_errors
 def funcionario_rdo_consolidado():
     """Lista RDOs consolidada - página original que estava funcionando"""
@@ -2147,7 +2173,11 @@ def funcionario_rdo_consolidado():
         # Buscar funcionário para logs
         funcionario_atual = None
         if hasattr(current_user, 'email') and current_user.email:
-            email_busca = "funcionario@valeverde.com" if current_user.email == "123@gmail.com" else current_user.email
+            # Fase 0.5 / 1.4 — removido o mapeamento chumbado
+            # "123@gmail.com" -> "funcionario@valeverde.com": e-mail de um
+            # tenant específico no código de produção, resquício da época
+            # de cliente único.
+            email_busca = current_user.email
             funcionario_atual = Funcionario.query.filter_by(email=email_busca).first()
         
         if not funcionario_atual:
@@ -2644,39 +2674,26 @@ def rdo_salvar_unificado():
             logger.debug(f"DEBUG MULTITENANT: current_user.admin_id={current_user.admin_id}")
             logger.debug(f"DEBUG MULTITENANT: current_user.id={current_user.id}")
             
-            # SISTEMA FLEXÍVEL: Admin ou Funcionário podem criar RDO
-            funcionario = None
-            
-            # Se é admin, pode criar RDO sem precisar ser funcionário
-            if hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                logger.debug(f"[TARGET] ADMIN CRIANDO RDO: {current_user.email}")
-                # Admin pode criar RDO diretamente, criar funcionário virtual se necessário
-                funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
-            else:
-                # Se é funcionário, buscar por email
-                funcionario = Funcionario.query.filter_by(email=current_user.email, admin_id=admin_id_correto, ativo=True).first()
-                logger.debug(f"[TARGET] FUNCIONÁRIO CRIANDO RDO: {funcionario.nome if funcionario else 'Não encontrado'}")
-            
-            # Se não encontrou funcionário, criar um funcionário padrão
-            if not funcionario:
-                logger.debug(f"Buscando funcionário para admin_id={admin_id_correto}")
-                funcionario = Funcionario.query.filter_by(admin_id=admin_id_correto, ativo=True).first()
-                if funcionario:
-                    logger.info(f"[OK] Funcionário encontrado: {funcionario.nome} (ID: {funcionario.id})")
-                else:
-                    # Criar funcionário padrão se não existir nenhum
-                    logger.debug(f"Criando funcionário padrão para admin_id={admin_id_correto}")
-                    funcionario = Funcionario(
-                        nome="Administrador Sistema",
-                        email=f"admin{admin_id_correto}@sistema.com",
-                        admin_id=admin_id_correto,
-                        ativo=True,
-                        cargo="Administrador",
-                        departamento="Administração"
-                    )
-                    db.session.add(funcionario)
-                    db.session.flush()
-                    logger.info(f"[OK] Funcionário criado: {funcionario.nome} (ID: {funcionario.id})")
+            # Fase 1 — a identidade vem da FK e, sem vínculo, é None.
+            #
+            # O bloco anterior fazia uma cascata (admin → primeiro
+            # funcionário ativo do tenant; funcionário → busca por e-mail)
+            # e, se nada casasse, CRIAVA um `Funcionario` chamado
+            # "Administrador Sistema" — poluindo o RH de produção a cada
+            # acesso, com uma pessoa que não existe.
+            #
+            # O resultado nunca foi usado: desde a Task #12, `rdo.criado_por_id`
+            # recebe `current_user.id` (FK para `usuario.id`), não
+            # `funcionario.id`. O único efeito do bloco era o INSERT
+            # indevido. Fica só a resolução, para rastreabilidade no log.
+            from utils.identidade import funcionario_do_usuario
+            funcionario = funcionario_do_usuario()
+            if funcionario is None:
+                logger.info(
+                    "[RDO] usuario_id=%s sem vínculo de Funcionario ao salvar "
+                    "RDO. Nenhum registro de RH é criado — rode "
+                    "scripts/backfill_identidade_funcionario.py",
+                    current_user.id)
             
             # Task #12: ``RDO.criado_por_id`` é FK para ``usuario.id``,
             # então usamos ``current_user.id`` (sempre um usuario válido) em
@@ -3885,37 +3902,42 @@ def salvar_rdo_flexivel():
         
         # Obter dados básicos da sessão e formulário
         funcionario_id = session.get('funcionario_id') or request.form.get('funcionario_id', type=int)
-        admin_id = session.get('admin_id') or request.form.get('admin_id_form', type=int)
         obra_id = request.form.get('obra_id', type=int)
 
-        # FALLBACK ADMIN: Se admin/super_admin fez login, usar seu ID diretamente
-        if not admin_id and current_user.is_authenticated:
-            if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                admin_id = current_user.id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id via current_user (ADMIN): {admin_id}")
-            elif current_user.tipo_usuario == TipoUsuario.FUNCIONARIO and current_user.admin_id:
-                admin_id = current_user.admin_id
-                funcionario_id = funcionario_id or current_user.id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id via current_user (FUNCIONARIO): {admin_id}")
+        # Fase 0 / R3 — O TENANT VEM DO USUÁRIO AUTENTICADO, NUNCA DO FORMULÁRIO.
+        # Até 2026-07-21 esta linha era:
+        #     admin_id = session.get('admin_id') or request.form.get('admin_id_form', type=int)
+        # e `session['admin_id']` só era gravado DENTRO desta própria função —
+        # ou seja, na primeira gravação da sessão o valor vinha do campo oculto
+        # `admin_id_form` do formulário. Como `@funcionario_required` só checa
+        # autenticação (auth.py:36), qualquer usuário logado podia postar o
+        # admin_id de outra empresa e ESCREVER um RDO no tenant alheio.
+        from utils.tenant import get_tenant_admin_id
+        admin_id = get_tenant_admin_id()
+        if not admin_id:
+            logger.error('[SEC] salvar_rdo_flexivel sem tenant resolvido para '
+                         'usuario=%s', getattr(current_user, 'id', None))
+            return jsonify({'success': False,
+                            'message': 'Sessão sem empresa vinculada. '
+                                       'Faça login novamente.'}), 403
+        session['admin_id'] = admin_id
+        if (current_user.is_authenticated
+                and current_user.tipo_usuario == TipoUsuario.FUNCIONARIO):
+            funcionario_id = funcionario_id or current_user.id
 
-        # FALLBACK: Se sessão perdida, buscar admin_id dinamicamente
-        if not admin_id and funcionario_id:
-            funcionario = Funcionario.query.get(funcionario_id)
-            if funcionario:
-                admin_id = funcionario.admin_id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id recuperado via funcionário: {admin_id}")
-        
-        # Se ainda não tem admin_id, usar detecção automática baseada na obra
-        if not admin_id and obra_id:
-            obra = Obra.query.get(obra_id)
-            if obra:
-                admin_id = obra.admin_id
-                session['admin_id'] = admin_id
-                logger.info(f"[SYNC] Admin_id recuperado via obra: {admin_id}")
-        
+        # A obra tem de pertencer ao tenant do usuário — impede apontar
+        # produção numa obra de outra empresa passando o id na mão.
+        if obra_id:
+            obra_do_tenant = Obra.query.filter_by(
+                id=obra_id, admin_id=admin_id).first()
+            if obra_do_tenant is None:
+                logger.warning('[SEC] obra %s nao pertence ao tenant %s',
+                               obra_id, admin_id)
+                return jsonify({'success': False,
+                                'message': 'Obra não encontrada para esta '
+                                           'empresa.'}), 404
+
+
         # ÚLTIMO RECURSO: Se não tem funcionario_id, usar o primeiro funcionário do admin
         if not funcionario_id and admin_id:
             funcionario = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).first()

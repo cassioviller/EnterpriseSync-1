@@ -38,7 +38,7 @@
                 <a href="{{ url_for('main.obras', status='Planejamento') }}" class="btn btn-outline-info">
                     <i class="fas fa-drafting-compass"></i> Planejamento
                 </a>
-                <a href="{{ url_for('main.obras', status='Em Andamento') }}" class="btn btn-outline-warning">
+                <a href="{{ url_for('main.obras', status='Em andamento') }}" class="btn btn-outline-warning">
                     <i class="fas fa-play-circle"></i> Em Andamento
                 </a>
                 <a href="{{ url_for('main.obras', status='Concluída') }}" class="btn btn-outline-success">
@@ -69,7 +69,7 @@
                     <select class="form-select" id="status" name="status">
                         <option value="">Todos</option>
                         <option value="Planejamento">Planejamento</option>
-                        <option value="Em Andamento">Em Andamento</option>
+                        <option value="Em andamento">Em Andamento</option>
                         <option value="Concluída">Concluída</option>
                         <option value="Pausada">Pausada</option>
                         <option value="Cancelada">Cancelada</option>
@@ -130,7 +130,7 @@
                             <td>
                                 {% set status_class = {
                                     'Planejamento': 'info',
-                                    'Em Andamento': 'warning',
+                                    'Em andamento': 'warning',
                                     'Concluída': 'success',
                                     'Pausada': 'secondary',
                                     'Cancelada': 'danger'

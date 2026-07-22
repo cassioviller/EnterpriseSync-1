@@ -7,11 +7,13 @@ from flask import Blueprint, request, redirect, url_for, flash, render_template_
 from models import db, Obra, Servico
 from sqlalchemy import text
 import logging
+from flask_login import login_required  # Fase 0.5 / 3.3
 logger = logging.getLogger(__name__)
 
 cadastrar_servico_bp = Blueprint('cadastrar_servico', __name__)
 
 @cadastrar_servico_bp.route('/obra/<int:obra_id>/cadastrar-servico', methods=['GET', 'POST'])
+@login_required
 def cadastrar_servico_obra(obra_id):
     """Cadastrar um serviço específico em uma obra"""
     obra = Obra.query.get_or_404(obra_id)

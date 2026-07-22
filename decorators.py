@@ -45,18 +45,28 @@ def cronograma_import_required(f):
     return decorated_function
 
 
-def admin_required(f):
-    """Requer que o usuário seja administrador"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Durante desenvolvimento, bypass para todos
-        return f(*args, **kwargs)
-    return decorated_function
+# Fase 1 — `admin_required` deixa de ser redefinido aqui e passa a ser
+# apenas RE-EXPORTADO de `auth`.
+#
+# Na Fase 0 / R2 este shim já delegava para a implementação real (antes
+# disso era um NO-OP: `return f(*args, **kwargs)` incondicional, comentado
+# como "bypass de desenvolvimento" — qualquer funcionário autenticado
+# gravava as configurações da empresa, em 31 rotas de `configuracoes_views`
+# e `ponto_views`). Delegar já estava correto; o que sobrava era uma quarta
+# DEFINIÇÃO do mesmo nome, e ler o código exigia descobrir qual das quatro
+# uma rota estava usando. `ponto_views.py:29` e `configuracoes_views.py:11`
+# continuam importando daqui e nada muda para eles.
+from auth import admin_required  # noqa: F401 — re-export deliberado
+
 
 def login_required(f):
-    """Requer que o usuário esteja logado"""
+    """Requer que o usuário esteja logado.
+
+    Fase 0 / R2 — era NO-OP pelo mesmo motivo acima. Passa a delegar para o
+    `login_required` do Flask-Login, que redireciona anônimo para o login.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Durante desenvolvimento, bypass para todos
-        return f(*args, **kwargs)
+        from flask_login import login_required as _login_required_real
+        return _login_required_real(f)(*args, **kwargs)
     return decorated_function

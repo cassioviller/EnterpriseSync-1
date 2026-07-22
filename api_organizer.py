@@ -4,6 +4,7 @@ API para sistema de organização avançada de propostas
 
 from flask import Blueprint, request, jsonify
 from models import db, PropostaTemplate, Proposta, PropostaItem
+from flask_login import login_required  # Fase 0.5 / 3.3
 # bypass_auth removido - usar current_user diretamente
 def get_current_user_bypass():
     from flask_login import current_user
@@ -26,6 +27,7 @@ def api_status():
     })
 
 @api_organizer.route('/templates/listar', methods=['GET'])
+@login_required
 def listar_templates():
     """Lista todos os templates disponíveis"""
     try:
@@ -59,6 +61,7 @@ def listar_templates():
         }), 500
 
 @api_organizer.route('/templates/carregar-multiplos', methods=['POST'])
+@login_required
 def carregar_templates_multiplos():
     """Carrega múltiplos templates em uma proposta"""
     try:
@@ -141,6 +144,7 @@ def carregar_templates_multiplos():
         }), 500
 
 @api_organizer.route('/propostas/salvar-organizacao', methods=['POST'])
+@login_required
 def salvar_organizacao():
     """Salva a organização personalizada da proposta"""
     try:
@@ -178,10 +182,25 @@ def salvar_organizacao():
         }), 500
 
 @api_organizer.route('/propostas/<int:proposta_id>/itens-organizados', methods=['GET'])
+@login_required
 def obter_itens_organizados(proposta_id):
-    """Obtém itens da proposta organizados por categoria"""
+    """Obtém itens da proposta organizados por categoria."""
     try:
-        itens = PropostaItem.query.filter_by(proposta_id=proposta_id).order_by(
+        # Fase 0.5 / 3.3 — a rota era anônima E sem predicado de tenant:
+        # `PropostaItem.query.filter_by(proposta_id=...)` devolvia os itens
+        # (com PREÇOS) de qualquer proposta de qualquer empresa, para
+        # visitante não autenticado. A varredura automática pegou só os POST
+        # deste arquivo; estes dois GET ficaram de fora.
+        from utils.tenant import get_tenant_admin_id
+        from models import Proposta
+        admin_id = get_tenant_admin_id()
+        proposta = Proposta.query.filter_by(
+            id=proposta_id, admin_id=admin_id).first()
+        if proposta is None:
+            return jsonify({'success': False,
+                            'message': 'Proposta não encontrada.'}), 404
+        itens = PropostaItem.query.filter_by(
+            proposta_id=proposta_id, admin_id=admin_id).order_by(
             PropostaItem.grupo_ordem.asc(),
             PropostaItem.item_ordem_no_grupo.asc()
         ).all()

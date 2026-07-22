@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 from models import db, Funcionario, TipoUsuario
 from services.funcionario_metrics import calcular_valor_hora, get_modo_remuneracao
 import logging
+from flask_login import login_required
 
 
 def _valor_hora_api(func):
@@ -25,27 +26,20 @@ logger = logging.getLogger(__name__)
 api_funcionarios_bp = Blueprint('api_funcionarios', __name__, url_prefix='/api')
 
 def get_admin_id():
-    """Obter admin_id do usuário atual"""
-    try:
-        from utils.auth_utils import get_admin_id_from_user
-        return get_admin_id_from_user()
-    except ImportError:
-        # bypass_auth removido - usar admin_id do current_user
-        from flask_login import current_user
-        if hasattr(current_user, 'is_authenticated') and current_user.is_authenticated:
-            if hasattr(current_user, 'tipo_usuario'):
-                if current_user.tipo_usuario == TipoUsuario.ADMIN:
-                    return current_user.id
-                else:
-                    return getattr(current_user, 'admin_id', current_user.id)
-            return getattr(current_user, 'admin_id', current_user.id)
-        else:
-            # Sistema de fallback automático
-            from sqlalchemy import text
-            admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-            return admin_counts[0] if admin_counts else 10
+    """Tenant do usuário autenticado — falha segura.
+
+    Fase 0 / R3 — o `try` importava `utils.auth_utils`, módulo que NÃO
+    EXISTE no repositório: o `except ImportError` era portanto o único
+    caminho executado, e o seu ramo anônimo escolhia o admin com mais
+    funcionários, caindo em `return 10`. Com as rotas deste blueprint sem
+    decorator de autenticação, era listagem de funcionários de uma empresa
+    arbitrária para visitante não autenticado.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 @api_funcionarios_bp.route('/funcionarios-ativos', methods=['GET'])
+@login_required
 def funcionarios_ativos():
     """Retorna lista de funcionários ativos para autocomplete"""
     try:
@@ -87,6 +81,7 @@ def funcionarios_ativos():
         }), 500
 
 @api_funcionarios_bp.route('/funcionarios/buscar', methods=['GET'])
+@login_required
 def buscar_funcionarios():
     """Busca funcionários com filtro de texto"""
     try:
@@ -137,6 +132,7 @@ def buscar_funcionarios():
         }), 500
 
 @api_funcionarios_bp.route('/funcionarios/<int:funcionario_id>', methods=['GET'])
+@login_required
 def obter_funcionario(funcionario_id):
     """Obtém dados de um funcionário específico"""
     try:

@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, session
 from models import db, ServicoObraReal, Servico, Usuario
 from datetime import date, datetime
 import logging
+from flask_login import login_required  # Fase 0.5 / 3.3
 
 logger = logging.getLogger(__name__)
 
@@ -14,18 +15,19 @@ logger = logging.getLogger(__name__)
 api_servicos_obra_bp = Blueprint('api_servicos_obra_limpa', __name__)
 
 def get_admin_id():
-    """Obtém admin_id do usuário logado"""
-    try:
-        if 'user_id' in session:
-            user = Usuario.query.get(session['user_id'])
-            if user:
-                return user.admin_id or user.id
-        return None
-    except Exception as e:
-        logger.error(f"Erro ao obter admin_id: {e}")
-        return None
+    """Tenant do usuário autenticado. DELEGA para o resolvedor canônico.
+
+    Fase 0.5 / 3.5 — lia `session['user_id']`, chave que NADA no código vivo
+    grava (o Flask-Login usa `_user_id`). A função devolvia sempre `None`, o
+    que fazia as 4 rotas deste blueprint responderem como se a obra não
+    existisse. A Fase 0.5 acrescentou `@login_required` aqui, mas o
+    resolvedor quebrado tornava as rotas inúteis de qualquer forma.
+    """
+    from utils.tenant import get_tenant_admin_id
+    return get_tenant_admin_id()
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servicos', methods=['GET'])
+@login_required
 def listar_servicos_obra(obra_id):
     """Lista serviços da obra (nova tabela)"""
     try:
@@ -79,6 +81,7 @@ def listar_servicos_obra(obra_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servicos', methods=['POST'])
+@login_required
 def adicionar_servico_obra(obra_id):
     """Adiciona serviço à obra (nova tabela)"""
     try:
@@ -155,6 +158,7 @@ def adicionar_servico_obra(obra_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servico/<int:servico_obra_id>', methods=['PUT'])
+@login_required
 def atualizar_servico_obra(obra_id, servico_obra_id):
     """Atualiza serviço da obra"""
     try:
@@ -213,6 +217,7 @@ def atualizar_servico_obra(obra_id, servico_obra_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_servicos_obra_bp.route('/api/obra/<int:obra_id>/servico/<int:servico_obra_id>', methods=['DELETE'])
+@login_required
 def remover_servico_obra(obra_id, servico_obra_id):
     """Remove serviço da obra (desativa)"""
     try:
