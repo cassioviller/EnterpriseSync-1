@@ -2135,8 +2135,35 @@ def detalhes_obra(id):
         except Exception as _e_cp:
             logger.warning(f"#102 cronograma_pendente check falhou: {_e_cp}")
 
+        # Fase 2 — contexto do painel de estado. Destinos JÁ filtrados por
+        # pode_transitar_como: o select nunca oferece o que o backend
+        # recusaria.
+        from models import EstadoObra as _EO, ObraTransicaoEstado as _OTE
+        from services.obra_estado import (
+            ROTULOS as _ROT, autoridade_necessaria as _autoridade,
+            estado_atual as _estado_atual, exige_motivo as _exige_motivo,
+            pode_transitar_como as _pode_como,
+            transicoes_possiveis as _possiveis,
+        )
+        _estado = _estado_atual(obra)
+        _destinos = [
+            (d.value, _ROT[d], _exige_motivo(_estado, d), _autoridade(_estado, d))
+            for d in _possiveis(_estado)
+            if _pode_como(obra, d, current_user)
+        ]
+        _historico = (_OTE.query.filter_by(obra_id=obra.id)
+                      .order_by(_OTE.criado_em.desc(), _OTE.id.desc())
+                      .limit(30).all())
+        _pode_handoff = (_estado is _EO.PLANEJAMENTO
+                         and _pode_como(obra, _EO.EM_EXECUCAO, current_user))
+
         return render_template('obras/detalhes_obra_profissional.html', 
                              obra=obra, 
+                             estado_atual=_estado,
+                             estado_rotulo=_ROT[_estado],
+                             estado_destinos=_destinos,
+                             estado_historico=_historico,
+                             estado_pode_handoff=_pode_handoff, 
                              cronograma_pendente=cronograma_pendente,
                              resumo=resumo_custos,
                              notificacoes_orcamento=notificacoes_orcamento,

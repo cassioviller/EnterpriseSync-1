@@ -1037,3 +1037,62 @@ def test_formulario_de_obra_nao_tem_mais_select_de_status():
     assert 'name="status"' not in fonte, (
         'o select de status voltou ao formulário — estado muda só pelas '
         'rotas de transição')
+
+
+# ---------------------------------------------------------------------------
+# Task 12 — painel de estado e tela de handoff
+# ---------------------------------------------------------------------------
+
+def test_detalhe_da_obra_mostra_o_painel_de_estado_com_as_opcoes_validas():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.get(f'/obras/{obra_id}')
+    assert r.status_code == 200
+    corpo = r.data.decode('utf-8', 'replace')
+    assert 'id="estado-obra"' in corpo
+    # A partir de EM_EXECUCAO só existem três destinos.
+    assert 'value="pausada"' in corpo
+    assert 'value="concluida"' in corpo
+    assert 'value="cancelada"' in corpo
+    assert 'value="planejamento"' not in corpo
+
+
+def test_detalhe_de_obra_em_planejamento_oferece_o_handoff():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='planejamento', status='Planejamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.get(f'/obras/{obra_id}')
+    corpo = r.data.decode('utf-8', 'replace')
+    assert f'/obras/{obra_id}/handoff' in corpo
+
+
+def test_detalhe_mostra_o_historico_de_transicoes():
+    from models import EstadoObra
+    from services.obra_estado import transitar
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        transitar(obra, EstadoObra.PAUSADA, usuario_id=admin.id,
+                  motivo='Falta de perfil galvanizado')
+        db.session.commit()
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.get(f'/obras/{obra_id}')
+    corpo = r.data.decode('utf-8', 'replace')
+    assert 'Falta de perfil galvanizado' in corpo
+
+
+def test_tela_de_handoff_renderiza():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='planejamento', status='Planejamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.get(f'/obras/{obra_id}/handoff')
+    assert r.status_code == 200
+    assert b'Gerente de Projeto' in r.data

@@ -1,0 +1,89 @@
+{# Fase 2 — painel de estado da obra.
+
+   Substitui a ação que o badge estático do cabeçalho nunca teve: ele só
+   imprimia `obra.status` (texto livre) sem oferecer transição nenhuma. O
+   contexto vem de `views.obras.detalhes_obra`:
+     estado_atual        — EstadoObra corrente
+     estado_rotulo       — rótulo humano
+     estado_destinos     — [(value, rotulo, exige_motivo, autoridade)],
+                           JÁ filtrado por pode_transitar_como: o select
+                           nunca oferece o que o backend recusaria
+     estado_historico    — ObraTransicaoEstado, mais recente primeiro
+     estado_pode_handoff — bool
+#}
+<div class="card mb-3" id="estado-obra">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="fas fa-flag me-2"></i>Estado da obra</span>
+    <span class="badge bg-primary fs-6">{{ estado_rotulo }}</span>
+  </div>
+  <div class="card-body">
+
+    {% if estado_pode_handoff %}
+      <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <strong>Esta obra ainda não tem Gerente de Projeto.</strong>
+          Ela entra em execução pelo handoff, que atribui o responsável e
+          dá a ele o papel de gestor da obra.
+        </div>
+        <a class="btn btn-primary"
+           href="{{ url_for('main.handoff_obra_get', id=obra.id) }}">
+          Entregar ao GP
+        </a>
+      </div>
+    {% endif %}
+
+    {% if estado_destinos %}
+      <form method="POST" action="{{ url_for('main.alterar_estado_obra', id=obra.id) }}"
+            class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label" for="estado-destino">Mudar para</label>
+          <select class="form-select" id="estado-destino" name="estado" required>
+            <option value="">Selecione…</option>
+            {% for valor, rotulo, exige, _autoridade in estado_destinos %}
+              <option value="{{ valor }}" data-exige-motivo="{{ 1 if exige else 0 }}">
+                {{ rotulo }}{% if exige %} (exige motivo){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="estado-motivo">Motivo</label>
+          <input class="form-control" id="estado-motivo" name="motivo"
+                 maxlength="500" placeholder="Ex.: chuva por 12 dias seguidos">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-outline-primary w-100">Aplicar</button>
+        </div>
+      </form>
+    {% elif not estado_pode_handoff %}
+      <p class="text-muted mb-0">
+        Esta obra está em <strong>{{ estado_rotulo }}</strong> —
+        não há transições disponíveis para o seu papel.
+      </p>
+    {% endif %}
+
+    {% if estado_historico %}
+      <hr>
+      <h6 class="text-muted">Histórico</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr><th>Quando</th><th>De → Para</th><th>Quem</th><th>Motivo</th></tr>
+          </thead>
+          <tbody>
+            {% for t in estado_historico %}
+            <tr>
+              <td class="text-nowrap">{{ t.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td class="text-nowrap">
+                {{ t.estado_de or '—' }} &rarr; <strong>{{ t.estado_para }}</strong>
+              </td>
+              <td>{{ t.usuario_id or 'sistema' }}</td>
+              <td>{{ t.motivo or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>

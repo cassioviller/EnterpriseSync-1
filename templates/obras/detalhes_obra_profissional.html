@@ -871,6 +871,13 @@
             </div>
         </div>
 
+        {# Fase 2 — painel de estado com transições válidas, handoff e
+           histórico. O badge do cabeçalho continua, agora alimentado por um
+           campo derivado do estado. #}
+        <div class="container-fluid" style="padding: 1rem 15px 0;">
+            {% include 'obras/_estado_obra.html' %}
+        </div>
+
         <!-- ═══════════════════════════════════════════════════════════════
              ABAS DE NAVEGAÇÃO DA OBRA
              ═══════════════════════════════════════════════════════════════ -->

@@ -1,0 +1,100 @@
+{% extends "base_completo.html" %}
+{% block title %}Handoff — {{ obra.nome }}{% endblock %}
+{% block content %}
+{# Fase 2 — tela de handoff. O dossiê (proposta vigente, cliente,
+   cronograma) é o "pacote" que o GP recebe: contexto junto com a
+   responsabilidade, não só um campo preenchido. #}
+<div class="container-fluid py-3">
+  <h3 class="mb-3">
+    <i class="fas fa-people-arrows me-2"></i>
+    Entregar a obra ao Gerente de Projeto
+  </h3>
+  <p class="text-muted">
+    {{ obra.codigo }} — {{ obra.nome }}
+  </p>
+
+  {% if dossie.bloqueios %}
+    <div class="alert alert-danger">
+      <strong>O handoff está bloqueado:</strong>
+      <ul class="mb-0">
+        {% for b in dossie.bloqueios %}<li>{{ b }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">Dossiê</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5">Cliente</dt>
+            <dd class="col-7">{{ dossie.cliente.nome or '—' }}</dd>
+            <dt class="col-5">Contato</dt>
+            <dd class="col-7">
+              {{ dossie.cliente.email or '—' }}<br>{{ dossie.cliente.telefone or '' }}
+            </dd>
+            <dt class="col-5">Endereço</dt>
+            <dd class="col-7">{{ dossie.obra.endereco or '—' }}</dd>
+            <dt class="col-5">Início / previsão</dt>
+            <dd class="col-7">
+              {{ dossie.obra.data_inicio or '—' }} → {{ dossie.obra.data_previsao_fim or '—' }}
+            </dd>
+            <dt class="col-5">Valor de contrato</dt>
+            <dd class="col-7">R$ {{ '%.2f'|format(dossie.obra.valor_contrato) }}</dd>
+            <dt class="col-5">Área</dt>
+            <dd class="col-7">{{ dossie.obra.area_total_m2 }} m²</dd>
+            <dt class="col-5">Proposta vigente</dt>
+            <dd class="col-7">
+              {% if dossie.proposta %}
+                {{ dossie.proposta.numero }} (v{{ dossie.proposta.versao }})
+              {% else %}—{% endif %}
+            </dd>
+            <dt class="col-5">Cronograma</dt>
+            <dd class="col-7">
+              {{ dossie.cronograma.total_tarefas }} tarefa(s);
+              {{ 'revisado' if dossie.cronograma.revisado else 'PENDENTE de revisão' }}
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">Gerente de Projeto</div>
+        <div class="card-body">
+          <form method="POST"
+                action="{{ url_for('main.handoff_obra_post', id=obra.id) }}">
+            <div class="mb-3">
+              <label class="form-label" for="responsavel_id">Responsável</label>
+              <select class="form-select" id="responsavel_id"
+                      name="responsavel_id" required>
+                <option value="">Selecione…</option>
+                {% for cand in dossie.candidatos %}
+                  <option value="{{ cand.id }}">{{ cand.nome }} ({{ cand.codigo }})</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">
+                Só aparecem funcionários ativos que já têm login — o handoff
+                cria o papel de gestor no usuário, não no cadastro de RH.
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="motivo">Observação (opcional)</label>
+              <textarea class="form-control" id="motivo" name="motivo"
+                        rows="3" maxlength="500"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary"
+                    {{ 'disabled' if dossie.bloqueios else '' }}>
+              Entregar a obra
+            </button>
+            <a class="btn btn-link"
+               href="{{ url_for('main.detalhes_obra', id=obra.id) }}">Cancelar</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
