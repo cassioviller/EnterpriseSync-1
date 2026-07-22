@@ -334,3 +334,243 @@ def test_dossie_reusa_o_gate_de_cronograma_em_vez_de_clonar():
     import inspect
     fonte = inspect.getsource(obra_handoff._cronograma_pendente)
     assert '_precisa_revisao_cronograma_inicial' in fonte
+
+
+# ---------------------------------------------------------------------------
+# Eventos de catálogo (Task 10 — movida para antes das rotas na execução,
+# eliminando os stubs provisórios que o plano previa)
+# ---------------------------------------------------------------------------
+
+def test_eventos_novos_estao_na_allowlist_do_webhook():
+    from utils.webhook_dispatcher import WEBHOOK_EVENT_ALLOWLIST
+    assert 'obra.estado_alterado' in WEBHOOK_EVENT_ALLOWLIST
+    assert 'obra.handoff' in WEBHOOK_EVENT_ALLOWLIST
+
+
+def test_emit_obra_estado_alterado_monta_payload_completo():
+    from unittest.mock import patch
+
+    from utils import catalogo_eventos
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='pausada', status='Pausada')
+        with patch.object(catalogo_eventos, '_safe_emit') as m:
+            catalogo_eventos.emit_obra_estado_alterado(
+                obra, admin.id, estado_de='em_execucao',
+                estado_para='pausada', motivo='Chuva', usuario_id=admin.id)
+        assert m.called
+        nome, payload, aid = m.call_args.args
+        assert nome == 'obra.estado_alterado'
+        assert aid == admin.id
+        assert payload['obra_id'] == obra.id
+        assert payload['estado_de'] == 'em_execucao'
+        assert payload['estado_para'] == 'pausada'
+        assert payload['estado_para_rotulo'] == 'Pausada'
+        assert payload['motivo'] == 'Chuva'
+
+
+def test_emit_obra_handoff_monta_payload_com_gp_e_dossie():
+    from unittest.mock import patch
+
+    from utils import catalogo_eventos
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        func = _funcionario(admin)
+        with patch.object(catalogo_eventos, '_safe_emit') as m:
+            catalogo_eventos.emit_obra_handoff(
+                obra, admin.id, funcionario=func, usuario_gp_id=1,
+                entregue_por_id=admin.id)
+        nome, payload, _aid = m.call_args.args
+        assert nome == 'obra.handoff'
+        assert payload['gerente_projeto']['funcionario_id'] == func.id
+        assert payload['gerente_projeto']['nome'] == func.nome
+        assert payload['dossie']['obra']['id'] == obra.id
+
+
+def test_emit_nunca_propaga_excecao():
+    """Contrato do catálogo: webhook é best-effort e jamais quebra a
+    transação de negócio."""
+    from unittest.mock import patch
+
+    from utils import catalogo_eventos
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        with patch('event_manager.EventManager.emit',
+                   side_effect=RuntimeError('n8n fora do ar')):
+            catalogo_eventos.emit_obra_estado_alterado(
+                obra, admin.id, estado_de='planejamento',
+                estado_para='em_execucao', motivo='', usuario_id=admin.id)
+
+
+# ---------------------------------------------------------------------------
+# Rotas (Task 8) — o único caminho HTTP de mudança de estado
+# ---------------------------------------------------------------------------
+
+def _cliente_logado(user_id):
+    """Login por injeção de sessão — padrão do repo. O test_client é criado
+    FORA de qualquer app_context aberto (Flask-Login cacheia g._login_user)."""
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def test_rota_estado_recusa_transicao_invalida_com_400():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/obras/{obra_id}/estado',
+               data={'estado': 'concluida'}, follow_redirects=False)
+    assert r.status_code == 400, f'devolveu {r.status_code}'
+    with app.app_context():
+        assert db.session.get(Obra, obra_id).estado == 'planejamento'
+
+
+def test_rota_estado_recusa_falta_de_motivo_com_400():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/obras/{obra_id}/estado', data={'estado': 'pausada'})
+    assert r.status_code == 400
+
+
+def test_rota_estado_aplica_transicao_valida():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/obras/{obra_id}/estado',
+               data={'estado': 'pausada', 'motivo': 'Chuva 12 dias'},
+               follow_redirects=False)
+    assert r.status_code in (302, 303), r.get_data(as_text=True)[:200]
+    with app.app_context():
+        from models import ObraTransicaoEstado
+        o = db.session.get(Obra, obra_id)
+        assert o.estado == 'pausada'
+        assert o.status == 'Pausada'
+        t = ObraTransicaoEstado.query.filter_by(
+            obra_id=obra_id, estado_para='pausada').one()
+        assert t.motivo == 'Chuva 12 dias'
+        assert t.usuario_id == admin_id
+
+
+def test_rota_estado_de_outro_tenant_devolve_404():
+    with app.app_context():
+        dono = _admin()
+        intruso = _admin('f2z')
+        obra = _obra(dono, estado='em_execucao', status='Em andamento')
+        obra_id, intruso_id = obra.id, intruso.id
+    c = _cliente_logado(intruso_id)
+    r = c.post(f'/obras/{obra_id}/estado',
+               data={'estado': 'pausada', 'motivo': 'x'})
+    assert r.status_code == 404
+
+
+def test_rota_estado_exige_login():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id = obra.id
+    anon = app.test_client()
+    r = anon.post(f'/obras/{obra_id}/estado',
+                  data={'estado': 'pausada', 'motivo': 'x'},
+                  follow_redirects=False)
+    assert r.status_code in (302, 401, 403)
+
+
+def test_rota_estado_recusa_usuario_sem_autoridade_com_403():
+    """FUNCIONARIO sem vínculo GESTOR alcança a obra (mesmo tenant) mas não
+    transiciona: 403, não 404 — a obra existe para ele."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        suf = _suf()
+        comum = Usuario(
+            username=f'hfx_{suf}', email=f'hfx_{suf}@test.local',
+            nome=f'Comum {suf}',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id, versao_sistema='v2')
+        db.session.add(comum)
+        db.session.commit()
+        obra_id, comum_id = obra.id, comum.id
+    c = _cliente_logado(comum_id)
+    r = c.post(f'/obras/{obra_id}/estado',
+               data={'estado': 'pausada', 'motivo': 'x'})
+    assert r.status_code == 403, f'devolveu {r.status_code}'
+    with app.app_context():
+        assert db.session.get(Obra, obra_id).estado == 'em_execucao'
+
+
+def test_rota_handoff_get_devolve_dossie_json():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, revisado_em=None)
+        _funcionario(admin)
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.get(f'/obras/{obra_id}/handoff',
+              headers={'Accept': 'application/json'})
+    assert r.status_code == 200
+    dados = r.get_json()
+    assert dados['obra']['id'] == obra_id
+    assert dados['pode_entrar_em_execucao'] is True
+    assert isinstance(dados['candidatos'], list)
+    assert len(dados['candidatos']) >= 1
+
+
+def test_rota_handoff_get_nao_oferece_funcionario_sem_login():
+    """Filtrar candidatos aqui evita oferecer no select alguém que
+    `executar_handoff` vai recusar depois."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        sem_login = _funcionario(admin, com_login=False)
+        obra_id, admin_id, sem_login_id = obra.id, admin.id, sem_login.id
+    c = _cliente_logado(admin_id)
+    dados = _cliente_logado(admin_id).get(
+        f'/obras/{obra_id}/handoff',
+        headers={'Accept': 'application/json'}).get_json()
+    ids = {c['id'] for c in dados['candidatos']}
+    assert sem_login_id not in ids
+
+
+def test_rota_handoff_post_entrega_a_obra():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        func = _funcionario(admin)
+        obra_id, admin_id, func_id = obra.id, admin.id, func.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/obras/{obra_id}/handoff',
+               data={'responsavel_id': str(func_id), 'motivo': 'Kickoff'},
+               follow_redirects=False)
+    assert r.status_code in (302, 303), r.get_data(as_text=True)[:200]
+    with app.app_context():
+        o = db.session.get(Obra, obra_id)
+        assert o.estado == 'em_execucao'
+        assert o.responsavel_id == func_id
+        assert UsuarioObra.query.filter_by(
+            obra_id=obra_id, papel=PapelObra.GESTOR, ativo=True).count() == 1
+
+
+def test_rota_handoff_post_com_gp_sem_login_devolve_400():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin)
+        func = _funcionario(admin, com_login=False)
+        obra_id, admin_id, func_id = obra.id, admin.id, func.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/obras/{obra_id}/handoff',
+               data={'responsavel_id': str(func_id)})
+    assert r.status_code == 400
+    with app.app_context():
+        assert db.session.get(Obra, obra_id).estado == 'planejamento'

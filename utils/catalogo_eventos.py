@@ -296,3 +296,66 @@ def emit_obra_concluida(obra, admin_id: int | None) -> None:
         'valor_contrato': _safe_float(getattr(obra, 'valor_contrato', 0)),
     })
     _safe_emit('obra.concluida', payload, admin_id)
+
+
+def emit_obra_estado_alterado(obra, admin_id: int | None, *, estado_de: str,
+                              estado_para: str, motivo: str = '',
+                              usuario_id: int | None = None) -> None:
+    """Emite `obra.estado_alterado` a cada transição da máquina (Fase 2).
+
+    Complementa — não substitui — `emit_obra_concluida`. A conclusão
+    continua tendo evento próprio porque o consumidor n8n dela já existe
+    na allowlist e é um marco de negócio, não uma mudança qualquer.
+    """
+    from services.obra_estado import ROTULOS, coagir
+
+    payload = _payload_obra_basico(obra)
+
+    def _rotulo(valor):
+        try:
+            return ROTULOS[coagir(valor)]
+        except Exception:
+            return valor
+
+    payload.update({
+        'estado_de': estado_de,
+        'estado_de_rotulo': _rotulo(estado_de) if estado_de else None,
+        'estado_para': estado_para,
+        'estado_para_rotulo': _rotulo(estado_para),
+        'motivo': (motivo or '')[:500],
+        'usuario_id': usuario_id,
+        'data_transicao': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+    })
+    _safe_emit('obra.estado_alterado', payload, admin_id)
+
+
+def emit_obra_handoff(obra, admin_id: int | None, *, funcionario,
+                      usuario_gp_id: int | None,
+                      entregue_por_id: int | None = None) -> None:
+    """Emite `obra.handoff` — o gatilho de "avisar o GP" da Fase 2.
+
+    Carrega o dossiê inteiro no payload para que o n8n monte a mensagem
+    (e-mail/WhatsApp) sem um segundo round-trip, mesma escolha de
+    `emit_obra_rdo_publicado`.
+    """
+    payload = _payload_obra_basico(obra)
+    dossie = {}
+    try:
+        from services.obra_handoff import dossie_handoff
+        dossie = dossie_handoff(obra)
+    except Exception:
+        logger.exception('[catalogo_eventos] dossiê de handoff falhou (obra %s)',
+                         getattr(obra, 'id', None))
+    payload.update({
+        'gerente_projeto': {
+            'funcionario_id': getattr(funcionario, 'id', None),
+            'nome': getattr(funcionario, 'nome', None),
+            'email': getattr(funcionario, 'email', None),
+            'telefone': getattr(funcionario, 'telefone', None),
+            'usuario_id': usuario_gp_id,
+        },
+        'entregue_por_id': entregue_por_id,
+        'data_handoff': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'dossie': dossie,
+    })
+    _safe_emit('obra.handoff', payload, admin_id)

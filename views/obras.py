@@ -3448,3 +3448,240 @@ def deletar_mapa_v2(obra_id, mapa_id):
 
 
 # ===== SUPER ADMIN =====
+
+
+# ────────────────────────────────────────────────────────────────────
+# Fase 2 — máquina de estados da Obra e handoff do GP
+#
+# Antes daqui, mudar o estado de uma obra era escrever texto livre em
+# `obra.status` pelo formulário de edição ou flipar `obra.ativo` num
+# toggle. Nenhum dos dois validava transição nem registrava quem mudou.
+#
+# Estas rotas passam a ser o ÚNICO caminho HTTP de mudança de estado.
+# Devolvem 404 (não 403) para obra fora do alcance, mesma escolha da
+# Fase 1 em utils/autorizacao.obra_required — não vazar a existência de
+# obra de outro tenant.
+# ────────────────────────────────────────────────────────────────────
+
+def _quer_json():
+    return (request.path.startswith('/api/')
+            or request.accept_mimetypes.best == 'application/json')
+
+
+def _notificar_transicao(obra, estado_anterior, destino, motivo, registro):
+    """Dispara os eventos de catálogo de uma transição — best-effort.
+
+    Substitui a detecção de conclusão por comparação de string que vivia
+    em `editar_obra`, feita DEPOIS do commit e sujeita a grafia
+    ('Concluída'/'Concluida'/'CONCLUÍDA'). Agora a conclusão é um fato da
+    máquina, não uma inferência de texto.
+    """
+    from models import EstadoObra
+    try:
+        from utils.catalogo_eventos import (
+            emit_obra_concluida, emit_obra_estado_alterado,
+        )
+        emit_obra_estado_alterado(
+            obra, obra.admin_id, estado_de=estado_anterior,
+            estado_para=destino.value, motivo=motivo,
+            usuario_id=getattr(current_user, 'id', None))
+        if destino is EstadoObra.CONCLUIDA:
+            emit_obra_concluida(obra, obra.admin_id)
+    except Exception as e:
+        logger.warning('Fase 2: emissão de evento de transição falhou '
+                       '(best-effort): %s', e)
+
+
+def _notificar_handoff(obra, funcionario, resultado, estado_anterior):
+    """Dispara `obra.handoff` e `obra.estado_alterado` — best-effort."""
+    try:
+        from utils.catalogo_eventos import (
+            emit_obra_estado_alterado, emit_obra_handoff,
+        )
+        emit_obra_estado_alterado(
+            obra, obra.admin_id, estado_de=estado_anterior,
+            estado_para=obra.estado, motivo='handoff',
+            usuario_id=getattr(current_user, 'id', None))
+        emit_obra_handoff(
+            obra, obra.admin_id, funcionario=funcionario,
+            usuario_gp_id=resultado.get('usuario_gp_id'),
+            entregue_por_id=getattr(current_user, 'id', None))
+    except Exception as e:
+        logger.warning('Fase 2: emissão de evento de handoff falhou '
+                       '(best-effort): %s', e)
+
+
+@main_bp.route('/obras/<int:id>/estado', methods=['POST'])
+@login_required
+def alterar_estado_obra(id):
+    """Aplica uma transição de estado validada.
+
+    Form: `estado` (o `.value` do EstadoObra) e `motivo` (texto).
+    """
+    from services.obra_estado import (
+        EstadoDesconhecido, TransicaoInvalida, coagir, pode_transitar_como,
+        transitar,
+    )
+
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first() if admin_id else None
+    if obra is None:
+        if _quer_json():
+            return jsonify({'erro': 'Obra não encontrada'}), 404
+        return 'Obra não encontrada', 404
+
+    try:
+        destino = coagir(request.form.get('estado'))
+    except EstadoDesconhecido as e:
+        if _quer_json():
+            return jsonify({'erro': str(e)}), 400
+        flash(f'Estado inválido: {request.form.get("estado")!r}', 'error')
+        return redirect(url_for('main.detalhes_obra', id=obra.id)), 400
+
+    if not pode_transitar_como(obra, destino, current_user):
+        # Distinguimos "não pode" de "não existe" só no log — a resposta é
+        # 400/403, porque o usuário JÁ provou alcançar a obra (o filtro de
+        # tenant acima passou). `pode_transitar_como` devolve False tanto
+        # para falta de autoridade quanto para transição fora do grafo;
+        # separamos os dois para a mensagem não culpar a pessoa errada.
+        logger.warning(
+            'transicao negada obra_id=%s usuario_id=%s de=%s para=%s',
+            obra.id, getattr(current_user, 'id', None), obra.estado,
+            destino.value)
+        from services.obra_estado import pode_transitar
+        if pode_transitar(obra.estado, destino):
+            codigo, msg = 403, 'Sem permissão para esta transição.'
+        else:
+            codigo, msg = 400, 'Transição de estado não permitida.'
+        if _quer_json():
+            return jsonify({'erro': msg}), codigo
+        flash(msg, 'error')
+        return redirect(url_for('main.detalhes_obra', id=obra.id)), codigo
+
+    motivo = (request.form.get('motivo') or '').strip()
+    estado_anterior = obra.estado
+    try:
+        registro = transitar(obra, destino, usuario_id=current_user.id,
+                             motivo=motivo, detalhes={'origem': 'ui'})
+        db.session.commit()
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        if _quer_json():
+            return jsonify({'erro': str(e)}), 400
+        flash(str(e), 'error')
+        return redirect(url_for('main.detalhes_obra', id=obra.id)), 400
+    except Exception as e:
+        db.session.rollback()
+        logger.error('falha ao transitar obra %s: %s', obra.id, e, exc_info=True)
+        if _quer_json():
+            return jsonify({'erro': 'Falha ao alterar o estado da obra'}), 500
+        flash(f'Erro ao alterar o estado da obra: {e}', 'error')
+        return redirect(url_for('main.detalhes_obra', id=obra.id)), 500
+
+    _notificar_transicao(obra, estado_anterior, destino, motivo, registro)
+
+    if _quer_json():
+        return jsonify({
+            'ok': True, 'estado': obra.estado, 'status': obra.status,
+            'ativo': obra.ativo, 'transicao_id': registro.id,
+        })
+    flash(f'Obra "{obra.nome}" agora está em {obra.status}.', 'success')
+    return redirect(url_for('main.detalhes_obra', id=obra.id))
+
+
+@main_bp.route('/obras/<int:id>/handoff', methods=['GET'])
+@login_required
+def handoff_obra_get(id):
+    """Dossiê de handoff + lista de candidatos a GP.
+
+    Candidato = `Funcionario` ativo do tenant QUE TEM LOGIN. Filtrar aqui
+    evita oferecer no select alguém que `executar_handoff` vai recusar.
+    """
+    from models import Usuario
+    from services.obra_handoff import dossie_handoff
+
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first() if admin_id else None
+    if obra is None:
+        if _quer_json():
+            return jsonify({'erro': 'Obra não encontrada'}), 404
+        return 'Obra não encontrada', 404
+
+    candidatos = (
+        db.session.query(Funcionario.id, Funcionario.nome, Funcionario.codigo)
+        .join(Usuario, Usuario.funcionario_id == Funcionario.id)
+        .filter(Funcionario.admin_id == admin_id,
+                Funcionario.ativo.is_(True),
+                Usuario.ativo.is_(True))
+        .order_by(Funcionario.nome)
+        .all()
+    )
+    dossie = dossie_handoff(obra)
+    dossie['candidatos'] = [
+        {'id': c.id, 'nome': c.nome, 'codigo': c.codigo} for c in candidatos]
+
+    if _quer_json():
+        return jsonify(dossie)
+    return render_template('obras/handoff.html', obra=obra, dossie=dossie)
+
+
+@main_bp.route('/obras/<int:id>/handoff', methods=['POST'])
+@login_required
+def handoff_obra_post(id):
+    """Executa o handoff: responsável + UsuarioObra(GESTOR) + EM_EXECUCAO."""
+    from models import EstadoObra
+    from services.obra_estado import TransicaoInvalida, pode_transitar_como
+    from services.obra_handoff import HandoffInvalido, executar_handoff
+
+    admin_id = get_tenant_admin_id()
+    obra = Obra.query.filter_by(id=id, admin_id=admin_id).first() if admin_id else None
+    if obra is None:
+        if _quer_json():
+            return jsonify({'erro': 'Obra não encontrada'}), 404
+        return 'Obra não encontrada', 404
+
+    if not pode_transitar_como(obra, EstadoObra.EM_EXECUCAO, current_user):
+        if _quer_json():
+            return jsonify({'erro': 'Sem permissão para entregar esta obra'}), 403
+        flash('Somente o administrador do tenant faz o handoff da obra.', 'error')
+        return redirect(url_for('main.detalhes_obra', id=obra.id)), 403
+
+    try:
+        responsavel_id = int(request.form.get('responsavel_id') or 0)
+    except (TypeError, ValueError):
+        responsavel_id = 0
+    funcionario = Funcionario.query.filter_by(
+        id=responsavel_id, admin_id=admin_id).first() if responsavel_id else None
+    if funcionario is None:
+        if _quer_json():
+            return jsonify({'erro': 'Selecione o Gerente de Projeto'}), 400
+        flash('Selecione o Gerente de Projeto responsável pela obra.', 'error')
+        return redirect(url_for('main.handoff_obra_get', id=obra.id)), 400
+
+    motivo = (request.form.get('motivo') or '').strip()
+    estado_anterior = obra.estado
+    try:
+        resultado = executar_handoff(obra, funcionario,
+                                     usuario_id=current_user.id, motivo=motivo)
+        db.session.commit()
+    except (HandoffInvalido, TransicaoInvalida) as e:
+        db.session.rollback()
+        if _quer_json():
+            return jsonify({'erro': str(e)}), 400
+        flash(str(e), 'error')
+        return redirect(url_for('main.handoff_obra_get', id=obra.id)), 400
+    except Exception as e:
+        db.session.rollback()
+        logger.error('handoff falhou obra %s: %s', obra.id, e, exc_info=True)
+        if _quer_json():
+            return jsonify({'erro': 'Falha ao executar o handoff'}), 500
+        flash(f'Erro no handoff: {e}', 'error')
+        return redirect(url_for('main.handoff_obra_get', id=obra.id)), 500
+
+    _notificar_handoff(obra, funcionario, resultado, estado_anterior)
+
+    if _quer_json():
+        return jsonify({'ok': True, **resultado})
+    flash(f'Obra entregue a {funcionario.nome}. A obra está em execução.',
+          'success')
+    return redirect(url_for('main.detalhes_obra', id=obra.id))

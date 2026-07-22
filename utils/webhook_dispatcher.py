@@ -68,6 +68,9 @@ WEBHOOK_EVENT_ALLOWLIST: set[str] = {
     "obra.medicao_publicada",
     "obra.cronograma_atualizado",
     "obra.concluida",
+    # — Obras / Fase 2: máquina de estados e handoff do GP —
+    "obra.estado_alterado",
+    "obra.handoff",
 }
 
 # Backoff em segundos por número da tentativa que acabou de falhar.
