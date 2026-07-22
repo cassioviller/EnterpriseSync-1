@@ -578,9 +578,20 @@ def obter_foto_funcionario(funcionario):
 with app.app_context():
     # Import models
     import models  # noqa: F401
-    
-    db.create_all()
-    logging.info("Database tables created/verified")
+
+    import time as _time
+    for _attempt in range(5):
+        try:
+            db.create_all()
+            logging.info("Database tables created/verified")
+            break
+        except Exception as _db_err:
+            if _attempt < 4:
+                logging.warning(f"[DB] create_all falhou (tentativa {_attempt+1}/5): {_db_err} — aguardando 3s")
+                _time.sleep(3)
+            else:
+                logging.error(f"[DB] create_all falhou após 5 tentativas: {_db_err} — continuando sem garantia de schema")
+                break
 
     # ------------------------------------------------------------------
     # Auto-seed demo Construtora Alfa (Task #113)
