@@ -63,6 +63,24 @@ Pendência de rollout, não de código: ligar `escopo_obra_ativo` por tenant
 (`scripts/flag_escopo_obra.py <admin_id> --ligar`) para o RBAC da Task 13
 sair do modo transparente.
 
+> ⚠️ **O RBAC do cronograma NÃO é transparente para todo mundo no deploy.**
+> O plano de 21/07 assume a flag desligada, mas a Fase 1 já a ligou em
+> **21 tenants** — neles o guard entra em vigor no momento em que este código
+> subir. Medido no banco de desenvolvimento em 22/07 (conferir em produção
+> antes de subir):
+>
+> | Quem | Qtd | Efeito no deploy |
+> |---|---|---|
+> | não-admin **sem** vínculo em `usuario_obra` | 9 | perde acesso ao cronograma da obra |
+> | `LEITOR` | 9 | perde edição **e** apontamento |
+> | `APONTADOR` | 9 | perde edição da estrutura; mantém apontamento |
+> | `GESTOR` | 6 | sem mudança |
+>
+> Os 9 sem vínculo são o caso a resolver antes: populá-los em `usuario_obra`
+> ou desligar a flag nesses tenants até que estejam. Para `LEITOR` e
+> `APONTADOR` a perda é a semântica pretendida da Fase 1, não um defeito —
+> mas é mudança visível para 18 pessoas e merece aviso.
+
 ## 🔴 Travado do lado humano
 
 | # | O quê | Por que trava |
