@@ -579,19 +579,44 @@ with app.app_context():
     # Import models
     import models  # noqa: F401
 
+    # O retry existe para o caso real: o banco leva alguns segundos a mais
+    # que o app para aceitar conexão, e sem ele o worker do gunicorn morria
+    # no boot por uma indisponibilidade de 2 segundos.
+    #
+    # Esgotado o retry, o boot ABORTA em produção — mesma política do bloco
+    # de migrações mais abaixo neste arquivo (Fase 0.5 / 1.1), e pelo mesmo
+    # motivo: servir tráfego contra um schema não verificado troca uma
+    # falha alta e óbvia no boot por falhas espalhadas e difíceis de
+    # diagnosticar em cada requisição. Fora de produção, segue com aviso.
     import time as _time
+    _erro_create_all = None
     for _attempt in range(5):
         try:
             db.create_all()
             logging.info("Database tables created/verified")
+            _erro_create_all = None
             break
         except Exception as _db_err:
+            _erro_create_all = _db_err
             if _attempt < 4:
-                logging.warning(f"[DB] create_all falhou (tentativa {_attempt+1}/5): {_db_err} — aguardando 3s")
+                logging.warning(
+                    f"[DB] create_all falhou (tentativa {_attempt + 1}/5): "
+                    f"{_db_err} — aguardando 3s")
                 _time.sleep(3)
-            else:
-                logging.error(f"[DB] create_all falhou após 5 tentativas: {_db_err} — continuando sem garantia de schema")
-                break
+
+    if _erro_create_all is not None:
+        logging.critical(
+            f"[FATAL] create_all falhou após 5 tentativas: {_erro_create_all}",
+            exc_info=True)
+        if IS_PRODUCTION:
+            raise RuntimeError(
+                f"Banco indisponível no boot — abortado para não servir "
+                f"tráfego contra schema não verificado. "
+                f"Erro: {_erro_create_all}"
+            ) from _erro_create_all
+        logging.warning(
+            "[DEV] Fora de produção: seguindo sem schema verificado "
+            "(em produção isso abortaria o boot)")
 
     # ------------------------------------------------------------------
     # Auto-seed demo Construtora Alfa (Task #113)
