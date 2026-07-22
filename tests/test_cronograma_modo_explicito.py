@@ -189,3 +189,87 @@ def test_backfill_e_idempotente(ctx):
         _backfill()
         db.session.expire_all()
         assert db.session.get(TarefaCronograma, tid).modo_apontamento == primeiro
+
+
+# ---------------------------------------------------------------------------
+# Task 4 — resolução do modo
+# ---------------------------------------------------------------------------
+
+def test_coluna_vence_a_deducao(ctx):
+    """O ponto do plano: a escolha do usuário manda."""
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    with app.app_context():
+        # Tarefa que a dedução chamaria de 'quantidade', marcada como percentual.
+        t = _tarefa(ctx, quantidade_total=250.0, unidade_medida='m2',
+                    modo_apontamento='percentual')
+        assert modo_da_tarefa(t) == 'percentual'
+
+        # E o inverso: sem quantidade nenhuma, mas marcada como quantidade.
+        t2 = _tarefa(ctx, quantidade_total=None, unidade_medida=None,
+                     modo_apontamento='quantidade')
+        assert modo_da_tarefa(t2) == 'quantidade'
+
+
+def test_coluna_nula_cai_na_deducao_antiga(ctx):
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    with app.app_context():
+        assert modo_da_tarefa(
+            _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2')) == 'quantidade'
+        assert modo_da_tarefa(
+            _tarefa(ctx, quantidade_total=100.0, unidade_medida=None)) == 'percentual'
+        assert modo_da_tarefa(
+            _tarefa(ctx, quantidade_total=None)) == 'percentual'
+
+
+def test_marco_ignora_a_coluna(ctx):
+    """Marco é binário; nem o usuário pode torná-lo quantitativo."""
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    with app.app_context():
+        m = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2',
+                    is_marco=True, duracao_dias=0, modo_apontamento='quantidade')
+        assert modo_da_tarefa(m) == 'percentual'
+
+
+def test_valor_invalido_na_coluna_cai_na_deducao(ctx):
+    """Falha tolerante: lixo na coluna não pode derrubar o RDO.
+
+    O CHECK do banco impede gravar lixo, mas o objeto em memória pode ter
+    qualquer coisa antes do flush — e `modo_da_tarefa` é chamado dentro do
+    laço de montagem de `tarefas_rdo` (cronograma_views.py:917), que serve
+    a tela inteira.
+    """
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=100.0, unidade_medida='m2')
+        # no_autoflush é parte do cenário, não conveniência: com o CHECK da
+        # migration 220 no banco, o refresh de qualquer atributo expirado
+        # (is_marco, após o commit da fixture) dispararia autoflush do
+        # 'lixo' e morreria em CheckViolation ANTES de exercitar a
+        # resolução — exatamente o tipo de morte que este teste exige que
+        # modo_da_tarefa não tenha.
+        with db.session.no_autoflush:
+            t.modo_apontamento = 'lixo'
+            assert modo_da_tarefa(t) == 'quantidade'
+        db.session.rollback()
+
+
+def test_modo_da_tarefa_aceita_objeto_sem_o_atributo(ctx):
+    """Robustez: o serviço é chamado com objetos leves em alguns caminhos."""
+    from services.cronograma_apontamento_service import modo_da_tarefa
+
+    class TarefaFalsa:
+        is_marco = False
+        quantidade_total = 10.0
+        unidade_medida = 'm'
+
+    assert modo_da_tarefa(TarefaFalsa()) == 'quantidade'
+
+
+def test_modos_validos_e_o_contrato_publico():
+    from services.cronograma_apontamento_service import MODOS_APONTAMENTO
+
+    assert MODOS_APONTAMENTO == ('quantidade', 'percentual')

@@ -70,16 +70,58 @@ class MarcoApenasZeroOuCem(ApontamentoInvalido):
     """Marco é binário: o percentual digitado só pode ser 0 ou 100."""
 
 
-def modo_da_tarefa(tarefa) -> str:
-    """Modo de apontamento que a UI deve oferecer para a tarefa (spec §4.1):
-    'quantidade' quando há quantitativo E unidade; senão 'percentual'
-    (marco incluído — sempre percentual binário)."""
-    if getattr(tarefa, 'is_marco', False):
-        return 'percentual'
+# Domínio do modo de apontamento da TAREFA. Vocabulário deliberadamente
+# igual ao que `modo_da_tarefa` já devolvia e ao JSON `tipo_modo` que a UI
+# do RDO consome (templates/rdo/novo.html:1118). NÃO confundir com
+# `RDOApontamentoCronograma.tipo_apontamento` ('quantitativo'|'percentual'),
+# que descreve a LINHA de apontamento — models.py:5139.
+MODOS_APONTAMENTO = ('quantidade', 'percentual')
+
+
+def _modo_deduzido(tarefa) -> str:
+    """Regra ANTIGA, preservada literalmente como fallback.
+
+    Era o corpo inteiro de `modo_da_tarefa` até 2026-07-21: sem coluna para
+    guardar a escolha, o modo saía de `quantidade_total > 0` E
+    `unidade_medida` não-vazia. Continua valendo para toda tarefa com
+    `modo_apontamento IS NULL` — o importador .mpp
+    (services/cronograma_versao_service.py:534) não preenche a coluna, e
+    qualquer construção direta do modelo também não.
+    """
     if (tarefa.quantidade_total and float(tarefa.quantidade_total) > 0
             and (tarefa.unidade_medida or '').strip()):
         return 'quantidade'
     return 'percentual'
+
+
+def modo_da_tarefa(tarefa) -> str:
+    """Modo de apontamento que a UI deve oferecer para a tarefa (spec §4.1).
+
+    Ordem de resolução, do mais forte para o mais fraco:
+
+      1. **marco** → 'percentual' sempre. Marco é binário (0 ou 100) e a
+         validação `MarcoApenasZeroOuCem` depende disso. Nem a escolha
+         explícita do usuário sobrepõe.
+      2. **escolha explícita** em `tarefa.modo_apontamento` (coluna criada
+         na migration 220). É o ponto do requisito "RDO em porcentagem":
+         uma tarefa com quantitativo levantado pode, ainda assim, ser
+         apontada em %.
+      3. **dedução legada** (`_modo_deduzido`) quando a coluna é NULL ou
+         traz valor fora do domínio.
+
+    Falha tolerante no passo 3: valor inválido não levanta. Esta função roda
+    dentro do laço que monta a tela inteira de apontamento
+    (`cronograma_views.py:917`); uma linha corrompida não pode derrubar o
+    RDO do dia.
+    """
+    if getattr(tarefa, 'is_marco', False):
+        return 'percentual'
+
+    escolhido = (getattr(tarefa, 'modo_apontamento', None) or '').strip().lower()
+    if escolhido in MODOS_APONTAMENTO:
+        return escolhido
+
+    return _modo_deduzido(tarefa)
 
 
 def _is_marco(tarefa) -> bool:
