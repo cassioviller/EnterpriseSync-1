@@ -50,6 +50,39 @@ def _admin_id() -> int:
     return get_tenant_admin_id()
 
 
+def _guard_editar_obra(obra_id: int):
+    """Fase 1 — segundo eixo de autorização nas rotas que MEXEM na obra.
+
+    Devolve uma resposta JSON 404 quando o usuário não pode editar aquela
+    obra, ou None quando pode. 404 e não 403 é deliberado: a mesma escolha
+    já travada por `tests/test_cronograma_permissoes.py` — a existência de
+    uma obra fora do alcance não vaza.
+
+    Com `configuracao_empresa.escopo_obra_ativo` DESLIGADA (o default),
+    `papel_na_obra` devolve GESTOR para todo usuário do tenant
+    (utils/autorizacao.py:107-121) e este guard é transparente. É o que torna
+    esta mudança reversível sem rollback.
+    """
+    from utils.autorizacao import pode_editar_obra
+    if not pode_editar_obra(obra_id):
+        return jsonify({'status': 'error', 'msg': 'Obra não encontrada'}), 404
+    return None
+
+
+def _guard_apontar_obra(obra_id: int):
+    """Fase 1 — mesmo guard, para as rotas de APONTAMENTO.
+
+    GESTOR e APONTADOR passam; LEITOR não. Separado de `_guard_editar_obra`
+    porque lançar produção e reestruturar o cronograma são permissões
+    diferentes (PAPEIS_QUE_APONTAM vs PAPEIS_QUE_EDITAM_OBRA em
+    utils/autorizacao.py).
+    """
+    from utils.autorizacao import pode_apontar_na_obra
+    if not pode_apontar_na_obra(obra_id):
+        return jsonify({'status': 'error', 'msg': 'Obra não encontrada'}), 404
+    return None
+
+
 def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> dict:
     sub_nome = None
     if getattr(t, 'subatividade_mestre', None):
@@ -311,6 +344,9 @@ def criar_tarefa(obra_id: int):
 
     admin_id = _admin_id()
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
+    escopo = _guard_editar_obra(obra_id)
+    if escopo:
+        return escopo
     cliente_mode = _modo_cliente()
 
     data = request.get_json(silent=True) or request.form.to_dict()
@@ -509,6 +545,9 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
 
     admin_id = _admin_id()
+    escopo = _guard_editar_obra(obra_id)
+    if escopo:
+        return escopo
     cliente_mode = _modo_cliente()
     tarefa = TarefaCronograma.query.filter_by(
         id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
@@ -727,6 +766,9 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
 
     admin_id = _admin_id()
+    escopo = _guard_editar_obra(obra_id)
+    if escopo:
+        return escopo
     cliente_mode = _modo_cliente()
     tarefa = TarefaCronograma.query.filter_by(
         id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
@@ -763,6 +805,9 @@ def recalcular(obra_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
 
     admin_id = _admin_id()
+    escopo = _guard_editar_obra(obra_id)
+    if escopo:
+        return escopo
     cliente_mode = _modo_cliente()
     Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
 
@@ -802,6 +847,9 @@ def reordenar(obra_id: int):
         return jsonify({'status': 'error', 'msg': 'V2 only'}), 403
 
     admin_id = _admin_id()
+    escopo = _guard_editar_obra(obra_id)
+    if escopo:
+        return escopo
     cliente_mode = _modo_cliente()
 
     obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
@@ -1052,6 +1100,17 @@ def apontar_subempreitada(rdo_id: int):
     from models import RDO, RDOSubempreitadaApontamento, Subempreiteiro
 
     admin_id = _admin_id()
+
+    # Autorização ANTES de validar payload: quem não pode apontar nesta obra
+    # não deve nem descobrir quais campos o endpoint exige. O escopo é da OBRA
+    # do RDO — esta rota recebe rdo_id, não obra_id.
+    rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
+    if not rdo:
+        return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
+    escopo = _guard_apontar_obra(rdo.obra_id)
+    if escopo:
+        return escopo
+
     data = request.get_json(silent=True) or {}
 
     apt_id = data.get('id')
@@ -1064,10 +1123,6 @@ def apontar_subempreitada(rdo_id: int):
 
     if not tarefa_id or not sub_id:
         return jsonify({'status': 'error', 'msg': 'tarefa_cronograma_id e subempreiteiro_id obrigatórios'}), 400
-
-    rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
-    if not rdo:
-        return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
 
     tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
     if not tarefa:
@@ -1141,6 +1196,13 @@ def listar_apontamentos_subempreitada(rdo_id: int):
     if not rdo:
         return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
 
+    # LEITURA: escopo de VER, não de apontar. Barrar um LEITOR aqui esconderia
+    # dele o que ele tem direito de consultar — o eixo de escrita é o das
+    # rotas de POST/DELETE abaixo.
+    from utils.autorizacao import pode_ver_obra
+    if not pode_ver_obra(rdo.obra_id):
+        return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
+
     rows = (
         db.session.query(RDOSubempreitadaApontamento, Subempreiteiro)
         .join(Subempreiteiro, Subempreiteiro.id == RDOSubempreitadaApontamento.subempreiteiro_id)
@@ -1181,6 +1243,15 @@ def excluir_apontamento_subempreitada(apt_id: int):
     apt = RDOSubempreitadaApontamento.query.filter_by(id=apt_id, admin_id=admin_id).first()
     if not apt:
         return jsonify({'status': 'error', 'msg': 'Não encontrado'}), 404
+
+    # Esta rota não traz obra_id NEM rdo_id na URL: o escopo sai do RDO do
+    # próprio apontamento. Sem isto, apagar apontamento seria a única operação
+    # de escrita do cronograma sem segundo eixo.
+    from models import RDO as _RDO
+    _rdo = db.session.get(_RDO, apt.rdo_id)
+    escopo = _guard_apontar_obra(_rdo.obra_id) if _rdo else None
+    if escopo:
+        return escopo
 
     tarefa_id = apt.tarefa_cronograma_id
     db.session.delete(apt)
@@ -1224,6 +1295,11 @@ def apontar_producao(rdo_id: int):
     rdo = RDO.query.filter_by(id=rdo_id, admin_id=admin_id).first()
     if not rdo:
         return jsonify({'status': 'error', 'msg': 'RDO não encontrado'}), 404
+
+    # O escopo é da OBRA do RDO — estas rotas recebem rdo_id, não obra_id.
+    escopo = _guard_apontar_obra(rdo.obra_id)
+    if escopo:
+        return escopo
 
     tarefa = TarefaCronograma.query.filter_by(id=tarefa_id, admin_id=admin_id).first()
     if not tarefa:
