@@ -26,6 +26,36 @@ class TipoUsuario(Enum):
     FUNCIONARIO = "funcionario"
 
 
+class EstadoObra(Enum):
+    """Estados da Obra — Fase 2.
+
+    Antes desta fase o estado da obra era `Obra.status`, um
+    `db.Column(db.String(20), default='Em andamento')` de texto livre
+    alimentado por um dropdown editável pelo tenant
+    (`services/dropdown_service.py:94`). Três grafias convivem para os
+    mesmos dois conceitos — `'Em andamento'` gravado por `models.py:297`,
+    `'Em Andamento'` oferecido por `forms.py:42` e pelo dropdown — e o
+    filtro de `views/obras.py:82-83` compara igualdade exata, então nunca
+    casa com metade delas. Há ainda um segundo eixo paralelo, `Obra.ativo`,
+    que a UI chama de "Concluída / Inativa"
+    (`templates/obras_moderno.html:803`) sem nunca sincronizar com `status`.
+
+    Os cinco valores abaixo são exatamente os que o código já produz ou já
+    oferece ao usuário — nenhum foi inventado. O rótulo humano de cada um
+    vive em `services.obra_estado.ROTULOS` e é o texto gravado no campo
+    legado `Obra.status`, que passa a ser derivado por write-through.
+
+    Gravado como VARCHAR(20) + CHECK, não como ENUM nativo do Postgres:
+    acrescentar valor a um tipo ENUM exige ALTER TYPE, que não roda dentro
+    do bloco transacional em que as migrações deste repo executam.
+    """
+    PLANEJAMENTO = "planejamento"   # obra existe, sem GP, cronograma não aceito
+    EM_EXECUCAO = "em_execucao"     # handoff feito; é o 'Em andamento' de hoje
+    PAUSADA = "pausada"             # paralisada, com motivo registrado
+    CONCLUIDA = "concluida"         # entregue; equivale ao ativo=False de hoje
+    CANCELADA = "cancelada"         # terminal: distrato/desistência
+
+
 class PapelObra(Enum):
     """Papel de um usuário DENTRO de uma obra específica — Fase 1.
 
