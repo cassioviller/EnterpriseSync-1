@@ -912,3 +912,128 @@ def test_232_nao_desfaz_o_write_through_de_transitar():
         migration_232_normalizar_status_legado()
         db.session.refresh(obra)
         assert obra.status == antes == 'Pausada'
+
+
+# ---------------------------------------------------------------------------
+# Task 11 — fechar os caminhos antigos de escrita de estado
+# ---------------------------------------------------------------------------
+# Enquanto editar_obra, toggle_status_obra e toggle_ativo_obra_api
+# escreverem direto, a máquina é decorativa.
+
+def _cliente_logado(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def test_editar_obra_ignora_o_campo_status_do_formulario():
+    """Postar 'Concluída' não pode concluir a obra pelas costas da máquina."""
+    from models import Obra
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id, admin_id = obra.id, admin.id
+        nome, cli_nome = obra.nome, obra.cliente_ref.nome
+    c = _cliente_logado(admin_id)
+    c.post(f'/obras/editar/{obra_id}', data={
+        'nome': nome, 'data_inicio': '2026-07-01',
+        'cliente_busca': cli_nome, 'status': 'Concluída', 'ativo': 'on',
+    }, follow_redirects=False)
+    with app.app_context():
+        o = db.session.get(Obra, obra_id)
+        assert o.estado == 'em_execucao'
+        assert o.status == 'Em andamento'
+
+
+def test_toggle_ativo_passa_pela_maquina_e_grava_historico():
+    """Inverter só o booleano deixava `ativo` e `status` discordando — foi
+    assim que nasceram as obras com status='Em andamento' e ativo=false que
+    a migration 231 encontrou."""
+    from models import Obra, ObraTransicaoEstado
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/api/obra/{obra_id}/toggle-ativo')
+    assert r.status_code == 200, r.get_data(as_text=True)[:200]
+    with app.app_context():
+        o = db.session.get(Obra, obra_id)
+        assert o.estado == 'concluida'
+        assert o.status == 'Concluída'
+        assert o.ativo is False
+        assert ObraTransicaoEstado.query.filter_by(
+            obra_id=obra_id, estado_para='concluida').count() == 1
+
+
+def test_toggle_ativo_reabre_obra_concluida():
+    from models import Obra
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='concluida', status='Concluída',
+                     ativo=False)
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/api/obra/{obra_id}/toggle-ativo')
+    assert r.status_code == 200
+    with app.app_context():
+        o = db.session.get(Obra, obra_id)
+        assert o.estado == 'em_execucao'
+        assert o.ativo is True
+
+
+def test_toggle_nao_conclui_obra_em_planejamento():
+    """PLANEJAMENTO → CONCLUIDA está fora do grafo: não se conclui obra que
+    nunca começou. O toggle devolve o erro da máquina, não força."""
+    from models import Obra
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='planejamento', status='Planejamento')
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/api/obra/{obra_id}/toggle-ativo')
+    assert r.status_code == 400
+    with app.app_context():
+        o = db.session.get(Obra, obra_id)
+        assert o.estado == 'planejamento'
+        assert o.ativo is True
+
+
+def test_toggle_nao_reabre_obra_cancelada():
+    """CANCELADA é terminal — nem pelo botão da listagem."""
+    from models import Obra
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='cancelada', status='Cancelada',
+                     ativo=False)
+        obra_id, admin_id = obra.id, admin.id
+    c = _cliente_logado(admin_id)
+    r = c.post(f'/api/obra/{obra_id}/toggle-ativo')
+    assert r.status_code == 400
+    with app.app_context():
+        assert db.session.get(Obra, obra_id).estado == 'cancelada'
+
+
+def test_filtro_da_listagem_acha_a_obra_pelas_tres_grafias():
+    """?status=Em+andamento (canônica), ?estado=em_execucao (novo) e
+    ?status=Em+Andamento (grafia de favorito antigo) acham a mesma obra."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin, estado='em_execucao', status='Em andamento')
+        nome, admin_id = obra.nome, admin.id
+    c = _cliente_logado(admin_id)
+    for query in ('status=Em+andamento', 'estado=em_execucao',
+                  'status=Em+Andamento'):
+        r = c.get(f'/obras?{query}')
+        assert r.status_code == 200
+        assert nome.encode() in r.data, f'obra sumiu com ?{query}'
+
+
+def test_formulario_de_obra_nao_tem_mais_select_de_status():
+    from app import app as _app
+    fonte = open('templates/obra_form.html').read()
+    assert 'name="status"' not in fonte, (
+        'o select de status voltou ao formulário — estado muda só pelas '
+        'rotas de transição')

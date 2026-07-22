@@ -71,16 +71,33 @@ def obras():
     # Aplicar filtros se fornecidos
     if filtros['nome']:
         query = query.filter(Obra.nome.ilike(f"%{filtros['nome']}%"))
-    if filtros['status']:
-        # Fase 0.6 / D5 — o filtro é igualdade exata sobre texto livre. O banco
-        # está canonizado (migration 217) e a escrita converge pelo @validates
-        # do modelo, mas links e favoritos antigos ainda mandam 'Em Andamento'
-        # na query string. Normalizar a ENTRADA faz esses links continuarem
-        # achando as obras em vez de devolverem lista vazia.
+    # Fase 2 — o filtro passou a operar sobre `estado`, a fonte de verdade.
+    # A camada da Fase 0.6 / D5 (normalizar a entrada contra grafia de link
+    # antigo) continua valendo como primeiro passo; o que muda é o alvo da
+    # query. Aceita `?estado=em_execucao` (novo) e `?status=Em andamento`
+    # (legado, inclusive 'Em Andamento' de favoritos antigos). Valor
+    # customizado que o mapa não conhece mantém o comportamento anterior —
+    # igualdade sobre `status` — em vez de devolver lista vazia.
+    from services.obra_estado import (
+        EstadoDesconhecido, coagir, estado_do_status_legado,
+    )
+    _filtro_estado = (request.args.get('estado') or '').strip()
+    _alvo = None
+    if _filtro_estado:
+        try:
+            _alvo = coagir(_filtro_estado)
+        except EstadoDesconhecido:
+            _alvo = None
+    if _alvo is None and filtros['status']:
+        _alvo = estado_do_status_legado(filtros['status'])
+    if _alvo is not None:
+        query = query.filter(Obra.estado == _alvo.value)
+    elif filtros['status']:
         from utils.status_obra import normalizar_status_obra
         query = query.filter(
             Obra.status == normalizar_status_obra(filtros['status'])
         )
+    filtros['estado'] = _filtro_estado
     if filtros['cliente']:
         # Task #176: a obra agora referencia Cliente por FK (cliente_id).
         # Filtra pelo nome do Cliente vinculado (mesmo tenant).
@@ -895,14 +912,22 @@ def editar_obra(id):
             
                 logger.info(f"[CONFIG] INICIANDO EDIÇÃO DA OBRA {id}: {obra.nome}")
 
-            # Task #45 — captura status anterior ANTES da edição para
-            # detectar transição → 'Concluída' e emitir obra.concluida.
-            status_anterior = (obra.status or '').strip()
-
             # Atualizar dados básicos da obra
             obra.nome = request.form.get('nome')
             obra.endereco = request.form.get('endereco', '')
-            obra.status = request.form.get('status', 'Em andamento')
+            # Fase 2 — o formulário NÃO muda mais o estado da obra. Antes
+            # bastava postar 'Concluída' no campo `status` para concluir a
+            # obra sem validação, sem motivo e sem registro de quem fez. O
+            # caminho passou a ser POST /obras/<id>/estado, que valida o
+            # grafo e grava obra_transicao_estado. `obra.status` continua
+            # existindo como espelho, escrito por
+            # services.obra_estado.aplicar_estado.
+            _status_form = request.form.get('status')
+            if _status_form and _status_form != obra.status:
+                logger.info(
+                    'Fase 2: campo status=%r ignorado na edição da obra %s '
+                    '(estado atual=%r) — use POST /obras/%s/estado',
+                    _status_form, obra.id, obra.estado, obra.id)
             obra.data_inicio = datetime.strptime(request.form.get('data_inicio'), '%Y-%m-%d').date()
             
             if request.form.get('data_previsao_fim'):
@@ -1004,22 +1029,11 @@ def editar_obra(id):
                 db.session.commit()
                 logger.info(f"[OK] OBRA {obra.id} ATUALIZADA: {servicos_processados} serviços processados")
 
-                # Task #45 — catálogo `dominio.acao`: obra.concluida
-                # disparado APENAS na transição (status_anterior != 'Concluída'
-                # AND novo == 'Concluída'). Mantém canal idempotente.
-                # Comparação resiliente a acento (Concluída/Concluida/CONCLUÍDA).
-                try:
-                    import unicodedata as _ud
-                    def _norm(s: str) -> str:
-                        s = (s or '').strip().lower()
-                        return ''.join(c for c in _ud.normalize('NFKD', s)
-                                       if not _ud.combining(c))
-                    if (_norm(obra.status) == 'concluida'
-                            and _norm(status_anterior) != 'concluida'):
-                        from utils.catalogo_eventos import emit_obra_concluida
-                        emit_obra_concluida(obra, obra.admin_id)
-                except Exception as _e_cat:
-                    logger.warning(f"#45: emit obra.concluida falhou (best-effort): {_e_cat}")
+                # Fase 2 — a emissão de `obra.concluida` migrou para
+                # `_notificar_transicao`, chamada pela rota de transição. O
+                # bloco removido daqui comparava strings normalizadas DEPOIS
+                # do commit para adivinhar se a obra tinha sido concluída;
+                # agora a conclusão é um fato da máquina.
 
                 flash(f'Obra "{obra.nome}" atualizada com sucesso!', 'success')
                 return redirect(url_for('main.detalhes_obra', id=obra.id))
@@ -1299,11 +1313,29 @@ def toggle_status_obra(id):
             flash('Obra não encontrada.', 'error')
             return redirect(url_for('main.obras'))
 
-        obra.ativo = not obra.ativo
-        db.session.commit()
+        # Fase 2 — o toggle deixou de escrever `ativo` direto. `ativo` é
+        # derivado do estado (services.obra_estado.aplicar_estado), e
+        # inverter só o booleano deixava os dois eixos discordando — foi
+        # assim que nasceram as obras com status='Em andamento' E
+        # ativo=false que a migration 231 encontrou. Obra PAUSADA ou em
+        # PLANEJAMENTO não conclui pelo toggle (fora do grafo → mensagem),
+        # e CANCELADA não reabre: o grafo decide, não o botão.
+        from models import EstadoObra
+        from services.obra_estado import TransicaoInvalida, transitar
+        destino = (EstadoObra.CONCLUIDA if obra.ativo
+                   else EstadoObra.EM_EXECUCAO)
+        try:
+            transitar(obra, destino, usuario_id=current_user.id,
+                      motivo=('Reabertura pelo botão da listagem'
+                              if destino is EstadoObra.EM_EXECUCAO else ''),
+                      detalhes={'origem': 'toggle_status_obra'})
+            db.session.commit()
+        except TransicaoInvalida as e:
+            db.session.rollback()
+            flash(str(e), 'error')
+            return redirect(url_for('main.detalhes_obra', id=id))
 
-        status_texto = "ATIVA" if obra.ativo else "CONCLUÍDA"
-        flash(f'Obra "{obra.nome}" alterada para {status_texto}!', 'success')
+        flash(f'Obra "{obra.nome}" agora está em {obra.status}!', 'success')
 
         return redirect(url_for('main.detalhes_obra', id=id))
 
@@ -1333,16 +1365,28 @@ def toggle_ativo_obra_api(obra_id):
         if not obra:
             return jsonify({'success': False, 'message': 'Obra não encontrada'}), 404
 
-        obra.ativo = not obra.ativo
-        db.session.commit()
+        # Fase 2 — mesma razão do toggle acima: `ativo` é derivado.
+        from models import EstadoObra
+        from services.obra_estado import TransicaoInvalida, transitar
+        destino = (EstadoObra.CONCLUIDA if obra.ativo
+                   else EstadoObra.EM_EXECUCAO)
+        try:
+            transitar(obra, destino, usuario_id=current_user.id,
+                      motivo=('Reabertura pela listagem'
+                              if destino is EstadoObra.EM_EXECUCAO else ''),
+                      detalhes={'origem': 'toggle_ativo_obra_api'})
+            db.session.commit()
+        except TransicaoInvalida as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 400
 
-        status_texto = "reativada" if obra.ativo else "concluída"
-        logger.info(f"[OK] Obra {obra.nome} {status_texto} (admin_id={admin_id})")
-
+        logger.info(f"[OK] Obra {obra.nome} → {obra.estado} (admin_id={admin_id})")
         return jsonify({
             'success': True,
-            'message': f'Obra {status_texto} com sucesso',
+            'message': f'Obra agora está em {obra.status}',
             'ativo': obra.ativo,
+            'estado': obra.estado,
+            'status': obra.status,
         })
 
     except Exception as e:

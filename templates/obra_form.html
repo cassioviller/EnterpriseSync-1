@@ -313,16 +313,28 @@
                                     </div>
                                 </div>
                                 
+                                {# Fase 2 — o estado da obra deixou de ser um campo
+                                   editável. Antes este select gravava texto livre em
+                                   Obra.status; o estado agora muda só pelas rotas
+                                   POST /obras/<id>/estado e POST /obras/<id>/handoff,
+                                   com validação de grafo e registro de quem/por quê. #}
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="status" class="form-label">
-                                            <i class="fas fa-flag"></i>Status
+                                        <label class="form-label">
+                                            <i class="fas fa-flag"></i>Estado da obra
                                         </label>
-                                        <select class="form-select" id="status" name="status">
-                                            {% for s in (opcoes_obra_status or ['Em andamento','Pausada','Concluída','Cancelada']) %}
-                                            <option value="{{ s }}" {{ 'selected' if obra and obra.status == s else '' }}>{{ s }}</option>
-                                            {% endfor %}
-                                        </select>
+                                        <div>
+                                            <span class="badge bg-secondary fs-6">{{ obra.status if obra else 'Planejamento' }}</span>
+                                            {% if obra %}
+                                            <a class="btn btn-sm btn-outline-primary ms-2"
+                                               href="{{ url_for('main.detalhes_obra', id=obra.id) }}#estado-obra">
+                                                Alterar estado
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                        <div class="form-text">
+                                            O estado muda pelo painel da obra, com registro de quem alterou e por quê.
+                                        </div>
                                     </div>
                                 </div>
                             </div>
