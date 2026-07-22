@@ -56,8 +56,12 @@ código foi perdido (26 commits, árvore limpa). Ao retomar, nesta ordem:
    o boot em produção — alinhado à política da Fase 0.5/1.1). O segundo
    NÃO foi testado contra banco vivo; o gate do passo 2 o cobre.
 
-Parado em: Fase 1.5, Task 2 de 14 (coluna `modo_apontamento`, migration
-220). O plano é `docs/superpowers/plans/2026-07-21-cronograma-editavel-rdo-percentual.md`.
+Parado em: Fase 2 (máquina de estados da Obra). A Fase 1.5 fechou em 22/07 —
+14/14 tasks do plano
+`docs/superpowers/plans/2026-07-21-cronograma-editavel-rdo-percentual.md`.
+Pendência de rollout, não de código: ligar `escopo_obra_ativo` por tenant
+(`scripts/flag_escopo_obra.py <admin_id> --ligar`) para o RBAC da Task 13
+sair do modo transparente.
 
 ## 🔴 Travado do lado humano
 
@@ -213,7 +217,7 @@ sobreviveram ao contato com o código:
 | **0.5** | Backup, segredos, observabilidade, build, CI, índices | ✅ P1-2; 🟡 P3 parcial | — |
 | **0.6** | Os cinco defeitos de dinheiro (D1-D5) | ✅ **21/07** | ver seção acima |
 | **1** | Identidade e papéis (RBAC + escopo por obra) | ✅ **21/07** — 11/11 tasks | `fase-1-identidade-papeis.md` |
-| **1.5** | Cronograma editável + RDO em % | ⬜ **próxima** | `cronograma-editavel-rdo-percentual.md` |
+| **1.5** | Cronograma editável + RDO em % | ✅ **22/07** — 14/14 tasks | `cronograma-editavel-rdo-percentual.md` |
 | **2** | Máquina de estados da Obra + handoff do GP | ⬜ | `fase-2-maquina-estados-obra.md` |
 | **3** | Compras com governança | ⬜ | `fase-3-compras-governanca.md` |
 | **4** | Centro de custo obrigatório | ⬜ | `fase-4-centro-custo-obrigatorio.md` |
@@ -247,12 +251,19 @@ O diagnóstico passou por **três versões**, e as duas primeiras estavam errada
 | correção intermediária | criar tarefa à mão já funciona (Task #116) | ✔️ verdade, mas era metade |
 | **atual** | o caminho automático **descarta em silêncio** quem não tem template | ✅ **é a causa** |
 
-**A causa raiz.** 📖 `services/cronograma_proposta.py:532` —
-`if nivel0.get('sem_template'): continue`. Duas linhas, sem log, sem erro. A
+**A causa raiz — corrigida em 22/07.** Era `if nivel0.get('sem_template'):
+continue` em `materializar_cronograma`: duas linhas, sem log, sem erro. A
 cadeia exigida **não é** serviço→composição→insumo: é
 `Servico.template_padrao_id` → `CronogramaTemplate` → `SubatividadeMestre`.
-Item de proposta cujo Serviço não tem template é descartado — a obra nasce com
-**cronograma vazio, sem avisar**.
+Item de proposta cujo Serviço não tinha template era descartado e a obra
+nascia com **cronograma vazio, sem avisar**.
+
+Hoje esse item vira uma **tarefa-esqueleto de nível 0** com o quantitativo do
+próprio PropostaItem, quando o admin a marca na tela de revisão
+(`b966218`). O `continue` saiu; o default continua desmarcado, então nada é
+materializado sem escolha explícita. O gate de revisão também deixou de exigir
+template (`27c62bb`) — antes ele cortava justamente nas propostas que mais
+precisavam da tela, e a obra abria muda sem ninguém ver.
 
 **Criar tarefa à mão já funciona** (Task #116) — não replanejar:
 📖 `cronograma_views.py:269` só obriga `nome_tarefa` e aceita `servico_id=None`;
@@ -261,8 +272,21 @@ Item de proposta cujo Serviço não tem template é descartado — a obra nasce 
 📖 o import `.mpp` cria tarefa sem serviço nenhum
 (`services/cronograma_versao_service.py:534`).
 
-**Ainda de pé:** 📖 o modo de apontamento é **deduzido**, não escolhido
-(`services/cronograma_apontamento_service.py`, `modo_da_tarefa()`).
+**Resolvido em 21-22/07:** o modo de apontamento era **deduzido**, não
+escolhido. Agora a tarefa tem coluna própria (`modo_apontamento`, migrations
+220/221 — o backfill congela a dedução vigente, então é no-op de
+comportamento), a UI do Gantt tem o seletor "Como apontar no RDO", apontar no
+modo errado devolve 422, e `Obra.regime_medicao='percentual'` define o padrão
+das tarefas novas da obra — inclusive as que nascem de proposta (`e4de6c5`).
+📖 `modo_da_tarefa()` em `services/cronograma_apontamento_service.py:111`
+resolve na ordem marco → escolha explícita → dedução legada.
+
+**Fechado em 22/07 (`eec0969`):** as rotas de tarefa e apontamento do
+cronograma só verificavam tenant — qualquer usuário autenticado editava o
+cronograma de qualquer obra da empresa. Agora as 5 rotas de edição exigem
+`pode_editar_obra` e as 3 de apontamento `pode_apontar_na_obra`. Com
+`escopo_obra_ativo` desligada (o default) o guard é transparente, então o
+deploy não tira acesso de ninguém — ligar a flag é o passo de rollout.
 
 **Antes de qualquer código, verifique as flags do tenant:** 📖 `_check_v2()`
 (`cronograma_views.py:39`) redireciona ao dashboard se o admin não tiver
@@ -391,10 +415,11 @@ RDO**.
    📖 `models.py:288-291` afirma governar o vínculo custo↔tarefa. **Nada no
    código a lê.**
 
-8. **Furo de tenant latente.** 📖 `services/cronograma_proposta.py:282` devolve
-   `servico_id` cru, sem filtro de `admin_id`, no ramo `sem_template`.
-   Inofensivo hoje porque o ramo é descartado — perigoso assim que a Fase 1.5
-   fizer esse nó virar tarefa.
+8. ~~**Furo de tenant latente.**~~ **Fechado em 22/07 (`b966218`).** O ramo
+   `sem_template` das duas árvores de preview devolvia `servico_id` cru, sem
+   filtro de `admin_id`. Deixou de ser latente no mesmo commit que fez o nó
+   virar tarefa: as duas pontas foram corrigidas juntas, e o teste
+   `test_servico_de_outro_tenant_nao_vaza_para_a_arvore` trava a regressão.
 
 9. **`utils/notifications.py` não é sistema de notificação.** 📖 São ~200 linhas
    de alerta de estouro de orçamento (`NotificacaoOrcamento`). O despachante real
