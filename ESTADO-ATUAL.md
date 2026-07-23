@@ -56,12 +56,31 @@ código foi perdido (26 commits, árvore limpa). Ao retomar, nesta ordem:
    o boot em produção — alinhado à política da Fase 0.5/1.1). O segundo
    NÃO foi testado contra banco vivo; o gate do passo 2 o cobre.
 
-Parado em: Fase 3 (compras com governança). As Fases 1.5 e 2 fecharam em
-22/07 — a 2 com 14/14 tasks (`fase-2-maquina-estados-obra.md`; runbook em
-`docs/fase-2-rollout.md`). Pendências de rollout, não de código:
-`escopo_obra_ativo` por tenant (RBAC da 1.5) e a fila de handoff — rodar
-`python scripts/relatorio_estado_obra.py` em produção e levar o número de
-"EM EXECUÇÃO sem gestor" ao Cássio (em dev: 2.481).
+Parado em: Fase 4 (centro de custo obrigatório). A **Fase 3 (compras com
+governança) fechou em 23/07 — 12/12 tasks**, 91 testes verdes
+(`fase-3-compras-governanca.md`; runbook em `docs/fase-3-rollout.md`).
+Entregou o fluxo requisição→aprovação→alçada→pedido, o `PapelObra.COMPRADOR`
+e as correções de segurança do portal por token. Está no branch
+`feat/fase-3-compras-governanca`, **não mergeada em `main` ainda** — o gate
+completo confirma antes do merge. Pendências de rollout, não de código:
+ligar `compras_governanca_ativa` por tenant só depois dos passos 1-3 do
+runbook e da confirmação do Cássio sobre os valores de alçada (decisão D1;
+recomendação semeada: R$ 5.000 / R$ 30.000 / acima).
+
+As Fases 1.5 e 2 fecharam em 22/07 — a 2 com 14/14 tasks
+(`fase-2-maquina-estados-obra.md`; runbook em `docs/fase-2-rollout.md`).
+Pendências de rollout, não de código: `escopo_obra_ativo` por tenant (RBAC
+da 1.5) e a fila de handoff — rodar `python scripts/relatorio_estado_obra.py`
+em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev:
+2.481).
+
+> ⚠️ **Fase 3 — duas armadilhas para quem retomar.** (1) O portal por token
+> agora **expira em 180 dias**, carimbado a cada `toggle_portal`; token
+> antigo sem data segue valendo (não derruba portal de obra em andamento).
+> (2) `compras_governanca_ativa` **nasce desligada** — o fluxo antigo de
+> compras continua idêntico até ela ser ligada por tenant. Todo o risco está
+> em ligar: ver `docs/fase-3-rollout.md`. As migrations da fase são **240-247**
+> (a lacuna 233-239 é intencional; 245 é a 1ª extensão de enum nativo do repo).
 
 > ⚠️ **O RBAC do cronograma NÃO é transparente para todo mundo no deploy.**
 > O plano de 21/07 assume a flag desligada, mas a Fase 1 já a ligou em
@@ -237,7 +256,7 @@ sobreviveram ao contato com o código:
 | **1** | Identidade e papéis (RBAC + escopo por obra) | ✅ **21/07** — 11/11 tasks | `fase-1-identidade-papeis.md` |
 | **1.5** | Cronograma editável + RDO em % | ✅ **22/07** — 14/14 tasks | `cronograma-editavel-rdo-percentual.md` |
 | **2** | Máquina de estados da Obra + handoff do GP | ✅ **22/07** — 14/14 tasks | `fase-2-maquina-estados-obra.md` + `docs/fase-2-rollout.md` |
-| **3** | Compras com governança | ⬜ | `fase-3-compras-governanca.md` |
+| **3** | Compras com governança | ✅ **23/07** — 12/12 tasks | `fase-3-compras-governanca.md` + `docs/fase-3-rollout.md` |
 | **4** | Centro de custo obrigatório | ⬜ | `fase-4-centro-custo-obrigatorio.md` |
 | **5** | RDO com ciclo de vida e assinatura | ⬜ | `fase-5-rdo-ciclo-vida-assinatura.md` |
 | **6** | Orçamento versionado e aditivo | ⬜ | `fase-6-orcamento-versionado-aditivo.md` |
