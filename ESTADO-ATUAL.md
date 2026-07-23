@@ -246,6 +246,61 @@ sobreviveram ao contato com o código:
 > errado.** Nos dois casos o furo só apareceu ao conferir o código contra o
 > comportamento real, não relendo o plano.
 
+## ✅ Fase 3 — compras com governança, fechada em 23/07
+
+12/12 tasks no branch `feat/fase-3-compras-governanca` (15 commits, **não
+mergeado em `main`** — aguarda o gate). Entregou: `RequisicaoCompra` com
+máquina de estados e trilha auditada (`valor_no_momento`), alçada por tenant
+(`FaixaAlcada`, seed 5k/30k/acima **recomendado**, decisão D1 pendente do
+Cássio), `PapelObra.COMPRADOR`, flag `compras_governanca_ativa` (nasce OFF),
+6 rotas de requisição, emissão de pedido com 3 guardas, e as correções de
+segurança do portal por token (expiração 180d + trilha IP/UA, **sem flag**).
+Migrations **240-247**. Runbook: `docs/fase-3-rollout.md`.
+
+### Revisão de código de 23/07 — escopo e resultados
+
+🔬 23/07: `/code-review` (multiagente) rodou sobre **o diff inteiro do
+branch da Fase 3** — os 13 commits de código então existentes, cobrindo
+`models.py`, `migrations.py`, `services/requisicao_compra.py`,
+`services/alcada_compras.py`, `utils/autorizacao.py`, `compras_views.py`,
+`portal_obras_views.py`, `scripts/flag_compras_governanca.py`, os 3
+templates de requisição e os 4 arquivos de teste da fase. Não cobriu o
+resto do app (não era o alvo). **8 achados**, tratados no commit
+`d1f7f34f`:
+
+| # | Achado (arquivo) | Gravidade | Desfecho |
+|---|---|---|---|
+| 1 | Governança **colapsa com `escopo_obra_ativo` OFF**: `papel_na_obra` devolve GESTOR a todo autenticado → qualquer um aprova e só ADMIN emite (`services/alcada_compras.py`) | 🔴 a mais séria | ✅ `--ligar` recusa tenant sem escopo; dependência dura documentada no runbook (passo 0) |
+| 2 | Voto de rodada **rejeitada/reenviada contava** para a rodada nova (`votos_de_aprovacao`) | 🔴 | ✅ contagem escopada à rodada corrente (entrada real em AGUARDANDO); trilha íntegra; +1 teste |
+| 3 | **Preço podia trocar de item** na emissão: template e rota ordenavam itens de formas potencialmente divergentes | 🔴 | ✅ `order_by` fixo no relationship `itens`; +1 teste |
+| 4 | Comentário do `toggle_portal` **prometia rotação de token** que o código não faz | 🟡 | ✅ comentário corrigido (reabrir reaproveita a URL; revogar = zerar o token) |
+| 5 | Entrada não-numérica em qtd/preço → **HTTP 500** | 🟡 | ✅ `_num` engole `ValueError` (vale 0); +1 teste |
+| 6 | Parser BR lê `'1.500'` como 1.5 (ponto de milhar sem vírgula) | 🟡 | ⏸️ **mantido**: espelha a convenção de parsing do app inteiro; consertar só aqui criaria comportamento divergente |
+| 7 | Seed de faixas **perdido no rollback** do retry de numeração → flash anunciava alçada errada | 🟡 | ✅ seed commita antes do loop |
+| 8 | Badges de estado **subcontavam** além de 200 requisições (contagem sobre lista limitada) | 🟡 | ✅ contagem via agregado SQL |
+
+Três adaptações do plano ao código real, já registradas nos commits (mesma
+lição da Fase 1 — o plano envelhece contra o código):
+
+1. O furo "portal aprova compra `normal`" **já estava fechado** pela Fase
+   0.6/D2 (`_get_compra_do_portal`); aplicar o passo 5e do plano seria
+   **regressão de segurança**. Mantido o resolver da 0.6.
+2. Os testes de papel do plano assumiam `escopo_obra_ativo` ligado sem
+   ligá-lo — com a flag OFF todo autenticado é GESTOR e a matriz não
+   distingue ninguém. As fixtures ligam a flag (foi este tropeço que
+   antecipou o achado nº 1 do review).
+3. O teste de envio criava requisição **sem itens** e esperava a
+   transição — colidia com a guarda da própria rota. Passou a criar item.
+
+### Gate da Fase 3
+
+🔬 23/07: regressões dirigidas todas verdes — **91 testes da Fase 3** + 149
+de regressão (fluxo antigo de compras + Fases 0/1/2) + 3 novos do review.
+O **gate completo** (`pytest tests/ -m "not browser"`, 1.118 testes) está
+**em execução** sobre o código pós-correções; até o teste ~900, **zero
+falhas**. ⏳ O resultado final entra aqui quando fechar — até lá a fase
+está "código completo, gate pendente", e o merge em `main` espera.
+
 ## O plano aprovado
 
 | Fase | Conteúdo | Estado | Plano |
