@@ -597,6 +597,8 @@ def funcionario_horario_padrao(funcionario_id):
 
 # Rota para exportar PDF do funcionário - COM CIRCUIT BREAKER
 @main_bp.route('/funcionario_perfil/<int:id>/pdf')
+@login_required     # triagem 23/07 (Anexo B) — mesma proteção da rota irmã sem /pdf
+@admin_required
 @circuit_breaker(
     name="pdf_generation", 
     failure_threshold=3, 

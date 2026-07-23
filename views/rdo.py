@@ -925,8 +925,9 @@ def criar_rdo():
         return redirect(url_for('main.novo_rdo'))
 
 @main_bp.route('/rdo/<int:id>')
+@login_required     # triagem 23/07 (Anexo B) — anônimo caía em AttributeError engolido
 def visualizar_rdo(id):
-    """Visualizar RDO específico - SEM VERIFICAÇÃO DE PERMISSÃO"""
+    """Visualizar RDO específico (escopo por tenant no corpo da query)"""
     try:
         # LOG DE VERSÃO E ROTA - DESENVOLVIMENTO
         logger.info("[TARGET] RDO VISUALIZAR VERSÃO: DESENVOLVIMENTO v10.0 Digital Mastery")

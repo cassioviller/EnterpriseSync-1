@@ -61,6 +61,7 @@ def api_funcionarios_por_obra(obra_id):
 
 
 @main_bp.route('/api/funcionarios')
+@login_required     # triagem 23/07 (Anexo B) — anônimo recebia o maior tenant do banco
 def api_funcionarios_consolidada():
     """API CONSOLIDADA para funcionários - Unifica admin e mobile"""
     try:
@@ -97,18 +98,12 @@ def api_funcionarios_consolidada():
                 admin_id = current_user.admin_id or 10
                 funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
         else:
-            # Sistema de bypass para produção - buscar admin com mais funcionários
-            try:
-                from sqlalchemy import text
-                admin_counts = db.session.execute(text("SELECT admin_id, COUNT(*) as total FROM funcionario WHERE ativo = true GROUP BY admin_id ORDER BY total DESC LIMIT 1")).fetchone()
-                admin_id = admin_counts[0] if admin_counts else 10
-                funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-            except Exception as e:
-                logger.error(f"Erro ao detectar admin_id automaticamente: {e}")
-                admin_id = 10
-                funcionarios = Funcionario.query.filter_by(admin_id=admin_id, ativo=True).all()
-        
-                logger.debug(f"DEBUG API FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}, formato={formato_retorno}")
+            # Inalcançável com @login_required; o antigo "bypass de produção"
+            # entregava o tenant com mais funcionários a qualquer anônimo.
+            return jsonify({'success': False, 'funcionarios': [],
+                            'error': 'autenticação obrigatória'}), 401
+
+        logger.debug(f"DEBUG API FUNCIONÁRIOS: {len(funcionarios)} funcionários para admin_id={admin_id}, formato={formato_retorno}")
         
         # Converter para JSON baseado no formato solicitado
         funcionarios_json = []
