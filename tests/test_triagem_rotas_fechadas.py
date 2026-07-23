@@ -52,6 +52,26 @@ def test_anonimo_nao_recebe_dado(rota):
             f'{rota}: redirect anônimo deveria ir para /login')
 
 
+@pytest.mark.parametrize('rota', [
+    # As 4 APIs de RDO com vazamento cross-tenant latente (mortas por
+    # referência, vivas por URL até 23/07):
+    '/rdo/api/ultimo-rdo/1',
+    '/api/test/rdo/servicos-obra/1',
+    '/api/ultimo-rdo-dados/1',
+    '/api/servicos-obra-primeira-rdo/1',
+    # Páginas de debug/teste sem referência viva:
+    '/ponto-diagnostico',
+    '/ponto/debug',
+    '/test',
+])
+def test_rota_morta_removida(rota):
+    """Rotas de veredito MORTA do Anexo B foram removidas — 404 para todos."""
+    c = app.test_client()
+    r = c.get(rota, follow_redirects=False)
+    assert r.status_code == 404, (
+        f'{rota}: esperava 404 (rota removida), veio {r.status_code}')
+
+
 def test_api_funcionarios_segue_servindo_autenticado():
     """O fechamento não pode quebrar o consumidor legítimo (obras.html, logado)."""
     suf = uuid.uuid4().hex[:8]

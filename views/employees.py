@@ -736,11 +736,6 @@ def funcionario_dashboard_desktop():
                              total_obras=0,
                              total_rdos=0)
 
-# ===== ROTAS BÁSICAS DE TESTE =====
-@main_bp.route('/test')
-def test():
-    return jsonify({'status': 'ok', 'message': 'SIGE v8.0 funcionando!'})
-
 # [WARN] ROTA /veiculos REMOVIDA - Conflito corrigido!
 # [OK] Conflito de rota resolvido! Agora usa apenas a função veiculos() moderna
 

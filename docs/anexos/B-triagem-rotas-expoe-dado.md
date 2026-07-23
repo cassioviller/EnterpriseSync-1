@@ -24,7 +24,7 @@
 | FECHAR | 3 |
 | TOKEN | 2 |
 | PÚBLICA | 5 |
-| MORTA | 9 |
+| MORTA | 9 — **as 7 que ainda existiam foram REMOVIDAS em 23/07** (as outras 2, `/health` e `/health/simple`, já tinham morrido com `health.py` em `549bdf06`). Junto foi `templates/rdo/novo_backup.html`, o único referenciador e que nenhum `.py` renderiza. Regressão: `tests/test_triagem_rotas_fechadas.py::test_rota_morta_removida` |
 | DECISÃO | 1 |
 | **Total** | **29** |
 

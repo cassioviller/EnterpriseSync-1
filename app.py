@@ -503,35 +503,6 @@ except Exception as e:
     logging.error(f"[ERROR] Erro ao importar ponto_views: {e}\n{ponto_import_error}")
 
 # Rota de diagnóstico do ponto (sempre disponível)
-@app.route('/ponto-diagnostico')
-def ponto_diagnostico():
-    """Diagnóstico do módulo de ponto"""
-    if ponto_import_error:
-        return f"""
-        <html>
-        <head><title>Diagnóstico Ponto</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #fff3cd;">
-            <h1 style="color: red;">ERRO: Módulo Ponto NÃO carregou!</h1>
-            <h3>Isso explica o 404 na página /ponto</h3>
-            <pre style="background: #fff; padding: 15px; border: 1px solid #ccc; overflow-x: auto; white-space: pre-wrap;">
-{ponto_import_error}
-            </pre>
-            <p><a href="/dashboard">Voltar ao Dashboard</a></p>
-        </body>
-        </html>
-        """
-    else:
-        return """
-        <html>
-        <head><title>Diagnóstico Ponto</title></head>
-        <body style="font-family: monospace; padding: 20px; background: #d4edda;">
-            <h1 style="color: green;">Módulo Ponto OK!</h1>
-            <p>O blueprint foi carregado corretamente.</p>
-            <p><a href="/ponto">Ir para /ponto</a></p>
-        </body>
-        </html>
-        """
-
 # Register main blueprint
 app.register_blueprint(main_bp)
 app.register_blueprint(production_bp, url_prefix='/prod')

@@ -573,24 +573,6 @@ except Exception as e:
     logger.warning(f"⚠️ Não foi possível iniciar preload: {e}")
 
 # Rota de debug para verificar se o blueprint está funcionando
-@ponto_bp.route('/debug')
-def ponto_debug():
-    """Rota de debug para verificar se o blueprint está acessível"""
-    import sys
-    return f"""
-    <html>
-    <head><title>Debug Ponto</title></head>
-    <body style="font-family: monospace; padding: 20px;">
-        <h1 style="color: green;">Blueprint Ponto OK!</h1>
-        <p>Python: {sys.version}</p>
-        <p>Hora Brasil: {get_datetime_brasil().strftime('%d/%m/%Y %H:%M:%S')}</p>
-        <p>Blueprints carregados corretamente.</p>
-        <p><a href="/ponto">Ir para /ponto</a></p>
-    </body>
-    </html>
-    """
-
-
 @ponto_bp.route('/')
 @login_required
 def index():
