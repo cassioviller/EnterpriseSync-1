@@ -60,9 +60,10 @@ Parado em: Fase 4 (centro de custo obrigatório). A **Fase 3 (compras com
 governança) fechou em 23/07 — 12/12 tasks**, 91 testes verdes
 (`fase-3-compras-governanca.md`; runbook em `docs/fase-3-rollout.md`).
 Entregou o fluxo requisição→aprovação→alçada→pedido, o `PapelObra.COMPRADOR`
-e as correções de segurança do portal por token. Está no branch
-`feat/fase-3-compras-governanca`, **não mergeada em `main` ainda** — o gate
-completo confirma antes do merge. Pendências de rollout, não de código:
+e as correções de segurança do portal por token. 🔬 23/07: **mergeada em
+`main`** (fast-forward, gate verde antes do merge; `main` está 16 commits
+à frente de `origin/main` — o push segue travado no item humano nº 2).
+Pendências de rollout, não de código:
 ligar `compras_governanca_ativa` por tenant só depois dos passos 1-3 do
 runbook e da confirmação do Cássio sobre os valores de alçada (decisão D1;
 recomendação semeada: R$ 5.000 / R$ 30.000 / acima).
@@ -248,8 +249,9 @@ sobreviveram ao contato com o código:
 
 ## ✅ Fase 3 — compras com governança, fechada em 23/07
 
-12/12 tasks no branch `feat/fase-3-compras-governanca` (15 commits, **não
-mergeado em `main`** — aguarda o gate). Entregou: `RequisicaoCompra` com
+12/12 tasks — 16 commits, desenvolvidos em `feat/fase-3-compras-governanca`
+e 🔬 23/07 **mergeados em `main`** por fast-forward após o gate verde.
+Entregou: `RequisicaoCompra` com
 máquina de estados e trilha auditada (`valor_no_momento`), alçada por tenant
 (`FaixaAlcada`, seed 5k/30k/acima **recomendado**, decisão D1 pendente do
 Cássio), `PapelObra.COMPRADOR`, flag `compras_governanca_ativa` (nasce OFF),
@@ -304,8 +306,8 @@ Fase 3 + 149 de regressão (fluxo antigo de compras + Fases 0/1/2) + 3
 novos do review. Este é também o **primeiro gate completo íntegro desde a
 recriação do banco de 22/07** — fecha o item 2 da "RETOMADA IMEDIATA"
 acima (o gate que estava INCONCLUSIVO) e cobre de quebra o commit
-`e782f70` (aborto de boot), que nunca tinha visto banco vivo. O branch
-está pronto para merge em `main`.
+`e782f70` (aborto de boot), que nunca tinha visto banco vivo. Após o
+gate, o branch foi **mergeado em `main`** (fast-forward, 23/07).
 
 ## O plano aprovado
 
