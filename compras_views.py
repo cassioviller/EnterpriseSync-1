@@ -1400,3 +1400,97 @@ def requisicao_cancelar(requisicao_id):
 
     return redirect(url_for('compras.requisicao_detalhe',
                             requisicao_id=requisicao_id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/aprovar', methods=['POST'])
+@login_required
+def requisicao_aprovar(requisicao_id):
+    """Registra UM voto de aprovação; move para APROVADA quando a alçada fecha.
+
+    Um voto não é uma transição de estado: a faixa pode exigir dois. Por
+    isso `registrar_aprovacao` grava a RequisicaoTransicao com
+    `para_estado == estado atual` (voto) e só depois, se
+    `esta_totalmente_aprovada`, é que `transicionar` roda de verdade.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    permitido, motivo = pode_aprovar(requisicao, current_user)
+    if not permitido:
+        flash(motivo, 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    observacao = (request.form.get('observacao') or '').strip() or None
+
+    try:
+        registrar_aprovacao(requisicao, current_user, observacao=observacao)
+
+        if esta_totalmente_aprovada(requisicao):
+            transicionar(requisicao, EstadoRequisicao.APROVADA, current_user,
+                         motivo='alçada atendida')
+            db.session.commit()
+            flash(f'Requisição {requisicao.numero} APROVADA. Já pode virar '
+                  f'pedido de compra.', 'success')
+        else:
+            db.session.commit()
+            faltando = '; '.join(pendencias_de_aprovacao(requisicao))
+            flash(f'Sua aprovação foi registrada. Ainda falta: {faltando}.',
+                  'info')
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+    except Exception as e:
+        db.session.rollback()
+        logger.error('[fase3] falha ao aprovar requisicao %s: %s',
+                     requisicao_id, e, exc_info=True)
+        flash('Não foi possível registrar a aprovação. Tente novamente.',
+              'danger')
+
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/rejeitar', methods=['POST'])
+@login_required
+def requisicao_rejeitar(requisicao_id):
+    """AGUARDANDO_APROVACAO → REJEITADA. Motivo obrigatório.
+
+    Rejeitar sem motivo é a forma mais rápida de tornar a trilha inútil:
+    seis meses depois ninguém sabe se a compra foi barrada por preço, por
+    prazo ou por especificação errada.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    permitido, motivo_recusa = pode_aprovar(requisicao, current_user)
+    if not permitido:
+        flash(motivo_recusa, 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    motivo = (request.form.get('motivo') or '').strip()
+    if not motivo:
+        flash('Informe o motivo da rejeição — sem ele o histórico não '
+              'serve para nada.', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    try:
+        transicionar(requisicao, EstadoRequisicao.REJEITADA, current_user,
+                     motivo=motivo[:2000])
+        db.session.commit()
+        flash(f'Requisição {requisicao.numero} rejeitada. O solicitante pode '
+              f'corrigir e reenviar.', 'warning')
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))

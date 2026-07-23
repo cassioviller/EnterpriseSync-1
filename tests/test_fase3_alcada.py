@@ -464,3 +464,159 @@ def test_predicados_de_obra_respondem_pelo_vinculo():
             login_user(db.session.get(Usuario, lid))
             assert pode_requisitar_na_obra(oid) is False
             assert pode_comprar_na_obra(oid) is False
+
+
+# ---------------------------------------------------------------------------
+# Rotas de aprovação
+# ---------------------------------------------------------------------------
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def _cenario(valor, papel_do_aprovador=PapelObra.GESTOR):
+    """admin + obra + solicitante + aprovador vinculado, requisição já
+    aguardando aprovação. Devolve os ids (fora de app_context aberto).
+
+    Liga escopo_obra_ativo: sem a flag, papel_na_obra devolve GESTOR a
+    todo autenticado (comportamento pré-Fase 1) e LEITOR/COMPRADOR
+    aprovariam — que é justamente o que estes testes negam. É o eixo de
+    obra ligado que faz o papel valer.
+    """
+    from scripts.flag_escopo_obra import definir_flag
+    from services.requisicao_compra import proximo_numero
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        _faixas_de_teste(admin.id)
+        solicitante = _operador(admin.id, 'Solicitante')
+        aprovador = _operador(admin.id, 'Aprovador')
+        _vincular(solicitante, obra, PapelObra.COMPRADOR)
+        _vincular(aprovador, obra, papel_do_aprovador)
+        definir_flag(admin.id, True)
+        req = RequisicaoCompra(
+            numero=proximo_numero(admin.id), obra_id=obra.id,
+            solicitante_id=solicitante.id, admin_id=admin.id,
+            estado=EstadoRequisicao.AGUARDANDO_APROVACAO,
+            valor_estimado=Decimal(valor))
+        db.session.add(req)
+        db.session.commit()
+        return {'admin': admin.id, 'obra': obra.id,
+                'solicitante': solicitante.id, 'aprovador': aprovador.id,
+                'req': req.id}
+
+
+def test_aprovacao_unica_leva_para_aprovada():
+    c = _cenario('50.00')  # faixa 1: 1 aprovação, sem admin
+    r = _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    assert r.status_code == 302
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.APROVADA
+
+
+def test_primeira_de_duas_aprovacoes_nao_muda_o_estado():
+    c = _cenario('500.00')  # faixa 2: 2 aprovações + admin
+    _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+
+
+def test_segunda_aprovacao_do_admin_fecha_a_alcada():
+    from services.alcada_compras import aprovacoes_registradas
+
+    c = _cenario('500.00')
+    _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    _cliente_de(c['admin']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert aprovacoes_registradas(req) == 2
+        assert req.estado == EstadoRequisicao.APROVADA
+
+
+def test_solicitante_nao_aprova_pela_rota():
+    c = _cenario('50.00')
+    _cliente_de(c['solicitante']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+
+
+def test_leitor_da_obra_nao_aprova():
+    c = _cenario('50.00', papel_do_aprovador=PapelObra.LEITOR)
+    _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+
+
+def test_comprador_nao_aprova():
+    """COMPRADOR pede e emite; não aprova. É a separação de funções."""
+    c = _cenario('50.00', papel_do_aprovador=PapelObra.COMPRADOR)
+    _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+
+
+def test_aprovador_de_outro_tenant_recebe_404():
+    c = _cenario('50.00')
+    with app.app_context():
+        estranho = _admin('Estranho')
+        eid = estranho.id
+    r = _cliente_de(eid).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    assert r.status_code == 404
+
+
+def test_rejeicao_exige_motivo_e_grava_trilha():
+    from models import RequisicaoTransicao
+
+    c = _cenario('50.00')
+    sem_motivo = _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/rejeitar", data={'motivo': ''},
+        follow_redirects=False)
+    assert sem_motivo.status_code == 302
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, c['req']).estado == \
+            EstadoRequisicao.AGUARDANDO_APROVACAO
+
+    _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/rejeitar",
+        data={'motivo': 'sem verba neste mês'}, follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.REJEITADA
+        t = (RequisicaoTransicao.query
+             .filter_by(requisicao_id=req.id,
+                        para_estado=EstadoRequisicao.REJEITADA).one())
+        assert 'sem verba' in t.motivo
+        assert t.valor_no_momento == Decimal('50.00')
+
+
+def test_valor_gravado_e_o_do_momento_da_aprovacao():
+    """Editar a requisição depois não pode reescrever o histórico da alçada."""
+    from services.alcada_compras import votos_de_aprovacao
+
+    c = _cenario('50.00')
+    _cliente_de(c['aprovador']).post(
+        f"/compras/requisicoes/{c['req']}/aprovar", follow_redirects=False)
+    with app.app_context():
+        req = db.session.get(RequisicaoCompra, c['req'])
+        req.valor_estimado = Decimal('99999.00')
+        db.session.commit()
+        voto = votos_de_aprovacao(req)[0]
+        assert voto.valor_no_momento == Decimal('50.00')
