@@ -44,7 +44,20 @@ HEADER = [
 def _pick_admin_id():
     u = Usuario.query.filter_by(tipo_usuario='ADMIN').first() or Usuario.query.first()
     if u is None:
-        pytest.skip('Sem usuário no banco')
+        # Banco recém-criado: semear o próprio admin em vez de skipar —
+        # o skip aqui produzia verde falso em banco novo (Fase 0.5).
+        import uuid
+        from werkzeug.security import generate_password_hash
+        from models import TipoUsuario
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'{PREFIX}{suf}', email=f'{PREFIX}{suf}@test.local',
+            nome=f'Admin Composicoes {suf}',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+        )
+        db.session.add(u)
+        db.session.commit()
     return u.id
 
 

@@ -53,7 +53,19 @@ def admin_user(app_ctx):
          .filter(Usuario.tipo_usuario == TipoUsuario.ADMIN)
          .first()) or Usuario.query.first()
     if u is None:
-        pytest.skip('Sem usuário no banco — teste pula.')
+        # Banco recém-criado: semear o próprio admin em vez de skipar —
+        # o skip aqui produzia verde falso em banco novo (Fase 0.5).
+        import uuid
+        from werkzeug.security import generate_password_hash
+        suf = uuid.uuid4().hex[:8]
+        u = Usuario(
+            username=f'__t44_{suf}', email=f'__t44_{suf}@test.local',
+            nome=f'Admin T44 {suf}',
+            password_hash=generate_password_hash('Senha@2026'),
+            tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+        )
+        db.session.add(u)
+        db.session.commit()
     return u
 
 
