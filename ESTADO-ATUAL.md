@@ -27,10 +27,12 @@ defeito de fabricação que produziu os cinco erros.
 ## Onde estamos
 
 Branch: `main` · 🔬 23/07: **à frente de `origin/main` com a Fase 3
-inteira** (16 commits de fase + registros; mergeada por fast-forward de
-`feat/fase-3-compras-governanca` após gate verde). O push segue travado no
-item humano nº 2 (credential helper). `origin/main` continua em `8fe6ac9`
-(merge do M10).
+inteira** (mergeada por fast-forward de `feat/fase-3-compras-governanca`
+após gate verde) **mais a rodada de pendências de 23/07** (fotos ×
+UPLOADS_PATH, skips de precondição, gitleaks — ver Fase 0.5 abaixo). O push
+segue travado no item humano nº 2 — que piorou: o `gh` perdeu a autenticação
+na recriação do ambiente e refazer o login é interativo. `origin/main`
+continua em `8fe6ac9` (merge do M10).
 
 ## ✅ RETOMADA de 22/07 — resolvida em 23/07
 
@@ -104,13 +106,19 @@ em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev
 | # | O quê | Por que trava |
 |---|---|---|
 | 1 | **Rotacionar `SESSION_SECRET` e a senha do Postgres** no EasyPanel | Os valores estão no **histórico do git para sempre**. Com a chave de sessão forja-se cookie de qualquer usuário de qualquer tenant |
-| 2 | **`gh auth setup-git`** (ou push manual) | 🔬 21/07: o `gh` **já está autenticado** como `cassioviller` com escopo `repo`. Falta só o credential helper. Sem push, o CI nunca rodou verde |
-| 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads — ver a armadilha nº 2, que é pior do que parece |
+| 2 | **`gh auth login` + `gh auth setup-git`** (ou push manual) | 🔬 23/07: o `gh` **perdeu a autenticação** na recriação do ambiente (em 21/07 estava logado como `cassioviller`; hoje `gh auth status` diz "not logged in" e o push recusa credencial). Refazer o login é interativo — só o humano consegue. Sem push, o CI nunca rodou verde |
+| 3 | **Criar o volume persistente** no painel | Vale para `/var/backups/sige` (dumps) **e** para os uploads. O pré-requisito de código caiu em 23/07: a armadilha nº 2 (descasamento do `UPLOADS_PATH`) está corrigida — montar o volume e definir a variável já é seguro |
 
 Também pendem: conferir divergência entre painel e valores commitados, snapshot
-do volume na Hostinger, `SIGE_ENABLE_DEMO_SEED=false`, a grafia do domínio
-(`cassioviller` × `cassiovillar`, as duas no código) e o acesso ao banco de
+do volume na Hostinger, `SIGE_ENABLE_DEMO_SEED=false` e o acesso ao banco de
 produção — que é pré-requisito de **quase toda medição pendente abaixo**.
+
+~~A grafia do domínio (`cassioviller` × `cassiovillar`)~~ — **resolvida em
+23/07**: 🔬 grep na árvore inteira (inclusive `attached_assets/`) só encontra
+`cassiovillar` nos dois documentos de diagnóstico; a fonte da grafia errada era
+`EXECUTAR_PRODUCAO_AGORA.sh`, deletado na Fase 0.5 (`1f428106`). O código usa
+`cassioviller` consistentemente (`app.py:194`, `templates/landing.html`). Só
+resta conferir o DNS/painel, que é do lado humano.
 
 ## ✅ Fase 0.6 — os cinco defeitos de dinheiro, corrigidos em 21/07
 
@@ -424,15 +432,27 @@ Flask-Login**: a identidade é o token na URL, sem sessão e sem `current_user`.
 
 | Item | Situação |
 |---|---|
-| Triagem de `fix/bloco2-segredos` e `fix/bloco1-blindagem-acesso` | ❌ órfãs, 402 commits atrás |
-| `gitleaks`/`trufflehog` | ❌ indisponíveis; varredura manual não cobriu blobs binários |
+| Triagem de `fix/bloco2-segredos` e `fix/bloco1-blindagem-acesso` | ❌ os branches nem existem localmente — a triagem exige `git fetch`, travado no item humano nº 2 (auth) |
+| `gitleaks`/`trufflehog` | ✅ **23/07** — gitleaks 8.21.2 varreu os 3.921 commits: **24 achados**, ver abaixo |
 | Conflito `opencv-python` × `headless` | ❌ entra por `deepface`/`retina-face`; exige decidir sobre reconhecimento facial |
-| `psycopg2-binary` → `psycopg2` compilado | ⏸️ recomendado (1h); psycopg 3 **não** agora |
-| 28 rotas `EXPOE DADO` sem auth | ❌ triagem caso a caso |
+| `psycopg2-binary` → `psycopg2` compilado | ⏸️ recomendado (1h); psycopg 3 **não** agora. 🔬 23/07: sem `pg_config` no ambiente de dev — a troca é no Dockerfile (adicionar `libpq-dev`+`gcc` no estágio de build) e só se valida no build de produção |
+| 28 rotas `EXPOE DADO` sem auth | 🟡 triagem caso a caso em andamento (23/07) — resultado em `docs/anexos/B-triagem-rotas-expoe-dado.md` |
 | Backup **agendado** | ❌ só existe o pré-migração; usar job do EasyPanel, não APScheduler |
-| Skips de precondição de dado | ❌ ainda produzem verde falso em banco novo |
+| Skips de precondição de dado | ✅ **23/07** — os 4 arquivos que skipavam por falta de dado agora semeiam o próprio cenário (`a23ea772`); skips restantes são de ativo ausente (JVM, .xlsx/.xml), legítimos |
 | ~~`duplicar_rdo` emite webhook sem lançar custos (bug 6d)~~ | ✅ **rediagnosticado — ver abaixo** |
 | `scripts/medir_producao.py` | ❌ aguarda acesso ao banco |
+
+**Varredura de segredos, feita em 23/07.** 🔬 gitleaks 8.21.2 sobre o
+histórico completo (3.921 commits, 22s): **24 achados**. Na árvore ATUAL
+sobram só placeholders (`secret_key` de teste, exemplos de docs, o
+`sua_chave_secreta` do legado arquivado) e um token de portal em
+`scripts/capturar_manual_ciclo.py:12` — que aponta para o banco de dev
+ANTERIOR à recriação de 22/07, portanto morto. Os segredos reais — as duas
+`SESSION_SECRET` chumbadas (`app.py` em commits antigos), senhas de Postgres
+coladas em `attached_assets/` e um JWT no manual — estão **só no histórico**,
+o que confirma o item humano nº 1: **rotacionar é o único remédio**
+(reescrever o histórico quebraria clones e não vale o custo). Relatório
+completo fora do repo (contém os segredos em claro).
 
 **Bug 6d, corrigido o diagnóstico.** 🔬 21/07: `duplicar_rdo`
 (`views/rdo.py:1596`) lê `rdo_original.tempo_manha` na linha 1624, e **esse
@@ -477,13 +497,16 @@ RDO**.
    prova a *forma* do problema, nunca o volume. **Rodar as mesmas queries em
    produção antes de dimensionar qualquer coisa.**
 
-2. **⚠️ Definir `UPLOADS_PATH` hoje faz todas as fotos sumirem da tela.**
-   📖 `salvar_foto_rdo` grava em `$UPLOADS_PATH/rdo/…`, mas `servir_foto`
-   (`crud_rdo_completo.py:804`) procura em `os.getcwd()/static/…`. A variável
-   está **vazia** hoje — e é exatamente por isso que a base64 existe: o disco
-   atual é o filesystem efêmero do container. Corrigir o descasamento **antes**
-   de montar o volume. Bônus: 📖 `crud_rdo_completo.py:718` monta `RDOFoto` sem
-   `nome_arquivo`/`caminho_arquivo`, que são NOT NULL.
+2. ~~**Definir `UPLOADS_PATH` faz todas as fotos sumirem da tela.**~~
+   ✅ **Corrigido em 23/07 (`b6d01a0b`)** — o volume persistente (item humano
+   nº 3) pode ser montado. Eram TRÊS defeitos em `crud_rdo_completo.py`, não
+   dois: além do descasamento (`servir_foto` só olhava `static/`; agora
+   resolve via `_resolver_arquivo_foto`, com o legado como fallback) e do
+   `RDOFoto` sem os NOT NULL `nome_arquivo`/`caminho_arquivo`, o arquivo
+   usava `os.path` **sem importar `os`** — toda chamada a `servir_foto`
+   morria em `NameError` engolido pelo except genérico (500 sempre; é por
+   isso que ninguém notava o descasamento: a rota nunca funcionou). 6 testes
+   em `tests/test_rdo_foto_uploads_path.py`.
 
 3. **`gestao_custo_pai` não tem `obra_id` — mas os dados NÃO estão perdidos.**
    🔬⚠️ dev 21/07: a obra está no filho (📖 `models.py:5302`, preenchido em
