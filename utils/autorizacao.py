@@ -35,6 +35,20 @@ logger = logging.getLogger('autorizacao')
 PAPEIS_QUE_EDITAM_OBRA = (PapelObra.GESTOR,)
 PAPEIS_QUE_APONTAM = (PapelObra.GESTOR, PapelObra.APONTADOR)
 
+# Fase 3 — quem PEDE e quem COMPRA, por papel na obra.
+#
+# A assimetria entre as duas listas é a separação de funções no nível do
+# papel, e é de propósito:
+#   * GESTOR requisita e APROVA (services/alcada_compras.pode_aprovar),
+#     mas NÃO emite pedido — quem aprova não emite.
+#   * COMPRADOR requisita e EMITE, mas não aprova e não edita a obra.
+#   * APONTADOR e LEITOR não fazem nem uma coisa nem outra.
+# ADMIN/SUPER_ADMIN passam por cima das duas listas (papel_na_obra
+# devolve GESTOR implícito para eles), e é por isso que a checagem de
+# "não aprove a própria requisição" existe também para ADMIN.
+PAPEIS_QUE_REQUISITAM = (PapelObra.GESTOR, PapelObra.COMPRADOR)
+PAPEIS_QUE_COMPRAM = (PapelObra.COMPRADOR,)
+
 
 def _e_admin_do_tenant():
     try:
@@ -139,6 +153,32 @@ def pode_editar_obra(obra_id):
 def pode_apontar_na_obra(obra_id):
     """Lançar RDO/apontamento. Consumido de verdade na Fase 5."""
     return papel_na_obra(obra_id) in PAPEIS_QUE_APONTAM
+
+
+def pode_requisitar_na_obra(obra_id):
+    """Criar/editar requisição de compra nesta obra. Fase 3."""
+    papel = papel_na_obra(obra_id)
+    if papel is None:
+        return False
+    if _e_admin_do_tenant():
+        return True
+    return papel in PAPEIS_QUE_REQUISITAM
+
+
+def pode_comprar_na_obra(obra_id):
+    """Emitir PedidoCompra a partir de requisição aprovada. Fase 3.
+
+    ADMIN pode — não há como impedir o dono da empresa de comprar. Mas
+    quando ele emite, `compras_views.requisicao_emitir_pedido` recusa se
+    ele foi um dos aprovadores e a faixa exigia mais de uma aprovação
+    (Task 8): a separação de funções sobrevive ao acúmulo de chapéus.
+    """
+    papel = papel_na_obra(obra_id)
+    if papel is None:
+        return False
+    if _e_admin_do_tenant():
+        return True
+    return papel in PAPEIS_QUE_COMPRAM
 
 
 def obra_required(papel_minimo=None):

@@ -4353,6 +4353,69 @@ def migration_243_faixa_alcada():
     logger.info("[Migration 243] Concluída com sucesso — %s faixas", total)
 
 
+def migration_245_papel_obra_comprador():
+    """Fase 3 — acrescenta COMPRADOR ao papel de obra.
+
+    PRIMEIRA extensão de enum nativo deste repositório: até 2026-07-21,
+    `grep -rn "ALTER TYPE|ADD VALUE" migrations.py` devolvia zero.
+
+    Trata as duas formas em que a coluna `usuario_obra.papel` pode existir:
+
+      * VARCHAR — foi o DDL da migration 215 (Fase 1) que criou a tabela.
+        Nada a fazer: o SQLAlchemy grava o NOME do membro e a coluna
+        aceita qualquer string do tamanho.
+      * enum nativo — `db.create_all()` (app.py:582) criou a tabela ANTES
+        da migração, a partir de `db.Enum(PapelObra)`. Aqui é preciso
+        `ALTER TYPE ... ADD VALUE`.
+
+    `ALTER TYPE ... ADD VALUE` **não pode rodar dentro de um bloco de
+    transação** em Postgres < 12, e mesmo em 12+ o valor novo não pode ser
+    usado na mesma transação. Por isso a conexão abaixo é aberta em
+    AUTOCOMMIT, fora da sessão do SQLAlchemy.
+    """
+    from sqlalchemy import text as sa_text
+
+    logger.info("[Migration 245] Iniciando — PapelObra.COMPRADOR")
+
+    linha = db.session.execute(sa_text("""
+        SELECT data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_name = 'usuario_obra' AND column_name = 'papel'
+    """)).fetchone()
+
+    if linha is None:
+        logger.error("[Migration 245] usuario_obra.papel não existe — a "
+                     "Fase 1 (migration 215) não foi aplicada. Abortando.")
+        raise RuntimeError('migration 215 (usuario_obra) é pré-requisito da 245')
+
+    data_type, udt_name = linha[0], linha[1]
+
+    if data_type != 'USER-DEFINED':
+        logger.info("[Migration 245] usuario_obra.papel é %s — nenhum DDL "
+                    "necessário, o membro novo do enum Python basta.", data_type)
+        logger.info("[Migration 245] Concluída com sucesso")
+        return
+
+    rotulos = db.session.execute(sa_text("""
+        SELECT e.enumlabel
+        FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+        WHERE t.typname = :nome
+    """), {'nome': udt_name}).scalars().all()
+
+    if 'COMPRADOR' in rotulos:
+        logger.info("[Migration 245] COMPRADOR já existe em %s — no-op.", udt_name)
+        logger.info("[Migration 245] Concluída com sucesso")
+        return
+
+    # Fora da sessão: ADD VALUE exige autocommit.
+    with db.engine.connect() as conn:
+        conn = conn.execution_options(isolation_level='AUTOCOMMIT')
+        conn.execute(sa_text(
+            f'ALTER TYPE {udt_name} ADD VALUE IF NOT EXISTS \'COMPRADOR\''))
+    logger.info("[Migration 245] COMPRADOR adicionado ao tipo %s", udt_name)
+    logger.info("[Migration 245] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4611,6 +4674,7 @@ def executar_migracoes():
             (241, "Fase 3 — tabela requisicao_compra_item", migration_241_requisicao_compra_item),
             (242, "Fase 3 — trilha de auditoria requisicao_transicao (quem/quando/valor)", migration_242_requisicao_transicao),
             (243, "Fase 3 — faixa_alcada + seed das faixas recomendadas (5k / 30k / acima) por tenant", migration_243_faixa_alcada),
+            (245, "Fase 3 — PapelObra.COMPRADOR (estende o enum de papel de obra)", migration_245_papel_obra_comprador),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

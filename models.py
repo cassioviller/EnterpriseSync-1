@@ -65,13 +65,16 @@ class PapelObra(Enum):
     SUPER_ADMIN não precisam de vínculo: enxergam todas as obras do
     tenant por definição (ver utils/autorizacao.obras_visiveis).
 
-    Deliberadamente três valores. COMPRADOR entra na Fase 3, quando a
-    governança de compras existir para consumi-lo — antes disso seria
-    permissão sem verbo.
+    COMPRADOR entrou na Fase 3, quando passaram a existir verbos para
+    ele: criar requisição de compra e emitir pedido a partir de
+    requisição aprovada (compras_views.py). Ele NÃO aprova — quem aprova
+    é GESTOR ou ADMIN, e a separação de funções é checada em
+    services/alcada_compras.pode_aprovar.
     """
     GESTOR = "gestor"        # responde pela obra: edita, aprova, faz handoff
     APONTADOR = "apontador"  # lança RDO e apontamento; não edita a obra
     LEITOR = "leitor"        # só leitura
+    COMPRADOR = "comprador"  # requisita e emite pedido; NÃO aprova e NÃO edita a obra
 
 
 class EstadoRequisicao(Enum):

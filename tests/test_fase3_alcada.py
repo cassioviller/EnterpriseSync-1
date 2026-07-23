@@ -377,3 +377,90 @@ def test_garantir_faixas_e_idempotente():
         garantir_faixas_do_tenant(admin.id)
         db.session.commit()
         assert FaixaAlcada.query.filter_by(admin_id=admin.id).count() == 3
+
+
+# ---------------------------------------------------------------------------
+# PapelObra.COMPRADOR
+# ---------------------------------------------------------------------------
+
+def test_papel_obra_ganhou_comprador():
+    """A Fase 1 parou em GESTOR/APONTADOR/LEITOR de propósito. O COMPRADOR
+    só entra quando existem verbos: criar requisição e emitir pedido."""
+    assert {p.name for p in PapelObra} == {
+        'GESTOR', 'APONTADOR', 'LEITOR', 'COMPRADOR'}
+
+
+def test_comprador_persiste_no_vinculo():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        v = _vincular(op, obra, PapelObra.COMPRADOR)
+        vid = v.id
+
+    with app.app_context():
+        recarregado = db.session.get(UsuarioObra, vid)
+        assert recarregado.papel == PapelObra.COMPRADOR
+
+
+def test_comprador_requisita_mas_nao_edita_a_obra():
+    """COMPRADOR não é GESTOR de bolso: ele pede e emite, não manda na obra."""
+    from utils.autorizacao import (PAPEIS_QUE_COMPRAM, PAPEIS_QUE_EDITAM_OBRA,
+                                   PAPEIS_QUE_REQUISITAM)
+
+    assert PapelObra.COMPRADOR in PAPEIS_QUE_REQUISITAM
+    assert PapelObra.COMPRADOR in PAPEIS_QUE_COMPRAM
+    assert PapelObra.COMPRADOR not in PAPEIS_QUE_EDITAM_OBRA
+
+
+def test_gestor_requisita_mas_nao_emite_pedido():
+    """Separação de funções no nível do papel: quem aprova não emite."""
+    from utils.autorizacao import PAPEIS_QUE_COMPRAM, PAPEIS_QUE_REQUISITAM
+
+    assert PapelObra.GESTOR in PAPEIS_QUE_REQUISITAM
+    assert PapelObra.GESTOR not in PAPEIS_QUE_COMPRAM
+
+
+def test_apontador_e_leitor_nao_requisitam():
+    from utils.autorizacao import PAPEIS_QUE_REQUISITAM
+
+    assert PapelObra.APONTADOR not in PAPEIS_QUE_REQUISITAM
+    assert PapelObra.LEITOR not in PAPEIS_QUE_REQUISITAM
+
+
+def test_predicados_de_obra_respondem_pelo_vinculo():
+    from scripts.flag_escopo_obra import definir_flag
+    from utils.autorizacao import pode_comprar_na_obra, pode_requisitar_na_obra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        comprador = _operador(admin.id, 'Comprador')
+        leitor = _operador(admin.id, 'Leitor')
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        _vincular(leitor, obra, PapelObra.LEITOR)
+        # O eixo de obra só estreita acesso com a flag ligada; sem ela,
+        # papel_na_obra devolve GESTOR a todo autenticado (comportamento
+        # pré-Fase 1) e o vínculo não distingue ninguém. É o escopo ligado
+        # que faz o predicado "responder pelo vínculo".
+        definir_flag(admin.id, True)
+        db.session.commit()
+        oid, cid, lid = obra.id, comprador.id, leitor.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(cid)
+        sess['_fresh'] = True
+    with app.test_request_context():
+        from flask_login import login_user
+        with app.app_context():
+            login_user(db.session.get(Usuario, cid))
+            assert pode_requisitar_na_obra(oid) is True
+            assert pode_comprar_na_obra(oid) is True
+
+    with app.test_request_context():
+        from flask_login import login_user
+        with app.app_context():
+            login_user(db.session.get(Usuario, lid))
+            assert pode_requisitar_na_obra(oid) is False
+            assert pode_comprar_na_obra(oid) is False

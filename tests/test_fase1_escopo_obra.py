@@ -70,8 +70,10 @@ def _obra(admin_id, nome='Obra'):
     return o
 
 
-def test_papel_obra_tem_os_tres_valores_da_fase_1():
-    assert {p.name for p in PapelObra} == {'GESTOR', 'APONTADOR', 'LEITOR'}
+def test_papel_obra_tem_os_valores_esperados():
+    """Três na Fase 1; COMPRADOR entrou na Fase 3, com rota que o consome."""
+    assert {p.name for p in PapelObra} == {
+        'GESTOR', 'APONTADOR', 'LEITOR', 'COMPRADOR'}
 
 
 def test_vinculo_usuario_obra_persiste():
