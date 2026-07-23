@@ -29,10 +29,13 @@ defeito de fabricação que produziu os cinco erros.
 Branch: `main` · 🔬 23/07: **à frente de `origin/main` com a Fase 3
 inteira** (mergeada por fast-forward de `feat/fase-3-compras-governanca`
 após gate verde) **mais a rodada de pendências de 23/07** (fotos ×
-UPLOADS_PATH, skips de precondição, gitleaks — ver Fase 0.5 abaixo). O push
-segue travado no item humano nº 2 — que piorou: o `gh` perdeu a autenticação
-na recriação do ambiente e refazer o login é interativo. `origin/main`
-continua em `8fe6ac9` (merge do M10).
+UPLOADS_PATH, skips de precondição, gitleaks, fechamento das 3 rotas da
+triagem — ver Fase 0.5 abaixo). 🔬 23/07 ~14h: **gate completo VERDE sobre
+o estado final** (`41034faa`): `pytest tests/ -m "not browser"` → **1122
+passed, 6 skipped, 0 falhas** em 38min04s. O push segue travado no item
+humano nº 2 — que piorou: o `gh` perdeu a autenticação na recriação do
+ambiente e refazer o login é interativo. `origin/main` continua em
+`8fe6ac9` (merge do M10).
 
 ## ✅ RETOMADA de 22/07 — resolvida em 23/07
 
