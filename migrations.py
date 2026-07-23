@@ -4282,6 +4282,77 @@ def migration_242_requisicao_transicao():
     logger.info("[Migration 242] Concluída com sucesso")
 
 
+def migration_243_faixa_alcada():
+    """Fase 3 — tabela faixa_alcada + seed das faixas RECOMENDADAS.
+
+    Os valores (R$ 5.000 / R$ 30.000 / acima) são a recomendação do plano
+    da Fase 3, decisão D1 — a pergunta 3 da DEVOLUTIVA nunca foi
+    respondida pelo negócio. São DADO, editável por tenant sem deploy.
+
+    O seed roda para todo usuário ADMIN/SUPER_ADMIN existente. Tenants
+    criados depois desta migração são semeados sob demanda por
+    `services.alcada_compras.garantir_faixas_do_tenant`, chamado na
+    criação da primeira requisição.
+    """
+    logger.info("[Migration 243] Iniciando — tabela faixa_alcada")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS faixa_alcada (
+            id SERIAL PRIMARY KEY,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            ordem INTEGER NOT NULL DEFAULT 1,
+            valor_ate NUMERIC(15,2),
+            aprovacoes_necessarias INTEGER NOT NULL DEFAULT 1,
+            exige_admin BOOLEAN NOT NULL DEFAULT FALSE,
+            exige_mapa_concorrencia BOOLEAN NOT NULL DEFAULT FALSE,
+            ativo BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_faixa_alcada_admin_ordem
+        ON faixa_alcada (admin_id, ordem)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_faixa_alcada_admin_ativo
+        ON faixa_alcada (admin_id, ativo)
+    """))
+    db.session.commit()
+
+    # Seed por tenant. INSERT ... SELECT com NOT EXISTS: idempotente e sem
+    # laço em Python sobre 6.479 admins (o banco de desenvolvimento tem
+    # essa volumetria de suíte — ESTADO-ATUAL.md, armadilha 1).
+    from services.alcada_compras import FAIXAS_RECOMENDADAS
+
+    for ordem, valor_ate, aprov, exige_admin, exige_mapa in FAIXAS_RECOMENDADAS:
+        db.session.execute(text("""
+            INSERT INTO faixa_alcada
+                (admin_id, ordem, valor_ate, aprovacoes_necessarias,
+                 exige_admin, exige_mapa_concorrencia, ativo)
+            SELECT u.id, :ordem, :valor_ate, :aprov, :exige_admin,
+                   :exige_mapa, TRUE
+            FROM usuario u
+            WHERE u.tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+              AND NOT EXISTS (
+                  SELECT 1 FROM faixa_alcada f
+                  WHERE f.admin_id = u.id AND f.ordem = :ordem
+              )
+        """), {
+            'ordem': ordem,
+            'valor_ate': valor_ate,
+            'aprov': aprov,
+            'exige_admin': exige_admin,
+            'exige_mapa': exige_mapa,
+        })
+    db.session.commit()
+
+    total = db.session.execute(
+        text("SELECT COUNT(*) FROM faixa_alcada")).scalar()
+    logger.info("[Migration 243] Concluída com sucesso — %s faixas", total)
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4539,6 +4610,7 @@ def executar_migracoes():
             (240, "Fase 3 — tabela requisicao_compra (documento de demanda, obra_id NOT NULL)", migration_240_requisicao_compra),
             (241, "Fase 3 — tabela requisicao_compra_item", migration_241_requisicao_compra_item),
             (242, "Fase 3 — trilha de auditoria requisicao_transicao (quem/quando/valor)", migration_242_requisicao_transicao),
+            (243, "Fase 3 — faixa_alcada + seed das faixas recomendadas (5k / 30k / acima) por tenant", migration_243_faixa_alcada),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

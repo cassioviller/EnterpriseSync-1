@@ -5270,6 +5270,49 @@ class RequisicaoTransicao(db.Model):
         return f'<RequisicaoTransicao req={self.requisicao_id} {de}→{self.para_estado.value}>'
 
 
+class FaixaAlcada(db.Model):
+    """Faixa de alçada de aprovação de compra, POR TENANT — Fase 3.
+
+    Alçada é dado, não código. A pergunta 3 da DEVOLUTIVA ("qual o valor
+    de X?") continua sem resposta do negócio, e a resposta não pode virar
+    um `if valor > 5000` no meio de uma view. Os valores semeados pela
+    migration 243 são a RECOMENDAÇÃO do plano da Fase 3 e podem ser
+    trocados sem deploy.
+
+    Leitura de uma linha: "compra de até `valor_ate` precisa de
+    `aprovacoes_necessarias` aprovações distintas; se `exige_admin`, uma
+    delas tem que ser de ADMIN/SUPER_ADMIN; se `exige_mapa_concorrencia`,
+    a requisição precisa apontar para um MapaConcorrenciaV2 concluído com
+    pelo menos dois fornecedores".
+
+    `valor_ate = NULL` é o teto aberto — tem que existir exatamente uma
+    faixa assim por tenant, e ela é sempre a de maior `ordem`.
+    """
+    __tablename__ = 'faixa_alcada'
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'ordem', name='uq_faixa_alcada_admin_ordem'),
+        db.Index('ix_faixa_alcada_admin_ativo', 'admin_id', 'ativo'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+    ordem = db.Column(db.Integer, nullable=False, default=1)
+    # NULL = sem teto. Comparação é `valor <= valor_ate` (inclusivo): a
+    # compra de exatamente R$ 5.000,00 fica na faixa de R$ 5.000,00.
+    valor_ate = db.Column(db.Numeric(15, 2), nullable=True)
+    aprovacoes_necessarias = db.Column(db.Integer, nullable=False, default=1)
+    exige_admin = db.Column(db.Boolean, nullable=False, default=False)
+    exige_mapa_concorrencia = db.Column(db.Boolean, nullable=False, default=False)
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        teto = f'<= {self.valor_ate}' if self.valor_ate is not None else 'sem teto'
+        return (f'<FaixaAlcada #{self.ordem} {teto} '
+                f'{self.aprovacoes_necessarias} aprov>')
+
+
 # ================================
 # MÓDULO V2: TRANSPORTE
 # ================================
