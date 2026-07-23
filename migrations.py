@@ -4416,6 +4416,26 @@ def migration_245_papel_obra_comprador():
     logger.info("[Migration 245] Concluída com sucesso")
 
 
+def migration_246_flag_compras_governanca():
+    """Fase 3 — configuracao_empresa.compras_governanca_ativa.
+
+    Aditiva, idempotente, e deliberadamente FALSE por padrão. O schema
+    inteiro da Fase 3 é aditivo enquanto esta flag estiver desligada: o
+    risco da fase está em LIGÁ-LA, não em aplicá-la. Ver
+    docs/fase-3-rollout.md.
+    """
+    logger.info("[Migration 246] Iniciando — compras_governanca_ativa")
+
+    db.session.execute(text("""
+        ALTER TABLE configuracao_empresa
+        ADD COLUMN IF NOT EXISTS compras_governanca_ativa
+        BOOLEAN NOT NULL DEFAULT FALSE
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 246] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4675,6 +4695,7 @@ def executar_migracoes():
             (242, "Fase 3 — trilha de auditoria requisicao_transicao (quem/quando/valor)", migration_242_requisicao_transicao),
             (243, "Fase 3 — faixa_alcada + seed das faixas recomendadas (5k / 30k / acima) por tenant", migration_243_faixa_alcada),
             (245, "Fase 3 — PapelObra.COMPRADOR (estende o enum de papel de obra)", migration_245_papel_obra_comprador),
+            (246, "Fase 3 — flag por tenant compras_governanca_ativa (default FALSE)", migration_246_flag_compras_governanca),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

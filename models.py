@@ -3938,6 +3938,16 @@ class ConfiguracaoEmpresa(db.Model):
     escopo_obra_ativo = db.Column(db.Boolean, nullable=False, default=False,
                                   server_default='false')
 
+    # Fase 3 — flag de rollout da governança de compras, por tenant.
+    # Default FALSE: com ela desligada, `compras.nova_post` registra compra
+    # exatamente como antes (compras_views.py:709-711) e as telas de
+    # requisição existem como caminho OPCIONAL. Ligada, pedido sem
+    # requisição aprovada é recusado. Liga-se por
+    # scripts/flag_compras_governanca.py. Irmã de cronograma_mpp_ativo
+    # (acima) e de escopo_obra_ativo (Fase 1).
+    compras_governanca_ativa = db.Column(db.Boolean, nullable=False,
+                                         default=False, server_default='false')
+
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao

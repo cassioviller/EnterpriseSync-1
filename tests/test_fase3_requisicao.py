@@ -309,3 +309,38 @@ def test_historico_fica_em_ordem_e_completo():
         assert [t.para_estado for t in trilha] == [
             EstadoRequisicao.AGUARDANDO_APROVACAO, EstadoRequisicao.APROVADA]
         assert [t.usuario_id for t in trilha] == [op.id, admin.id]
+
+
+# ---------------------------------------------------------------------------
+# Flag de rollout
+# ---------------------------------------------------------------------------
+
+def test_governanca_nasce_desligada():
+    """Ligada por padrão, o deploy quebraria o registro de compra de todo
+    mundo no mesmo minuto."""
+    from scripts.flag_compras_governanca import governanca_ativa
+
+    with app.app_context():
+        admin = _admin()
+        assert governanca_ativa(admin.id) is False
+
+
+def test_governanca_liga_e_desliga():
+    from scripts.flag_compras_governanca import definir_flag, governanca_ativa
+
+    with app.app_context():
+        admin = _admin()
+        definir_flag(admin.id, True)
+        assert governanca_ativa(admin.id) is True
+        definir_flag(admin.id, False)
+        assert governanca_ativa(admin.id) is False
+
+
+def test_flag_ilegivel_e_tratada_como_desligada():
+    """Falha para o lado do comportamento antigo, não para o lado de
+    travar o registro de compra de uma empresa em obra."""
+    from scripts.flag_compras_governanca import governanca_ativa
+
+    with app.app_context():
+        assert governanca_ativa(None) is False
+        assert governanca_ativa(-1) is False
