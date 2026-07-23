@@ -582,6 +582,43 @@ def upload_comprovante(token: str, compra_id: int):
     return redirect(url_for('portal_obras.portal_obra', token=token))
 
 
+def _arquivo_comprovante(compra):
+    """Resolve o caminho físico do comprovante de `compra` ou aborta 404.
+
+    Só o basename da URL gravada é usado; o diretório é sempre o de
+    comprovantes (UPLOAD_FOLDER, com o legado em static/ como fallback) —
+    nunca o que a URL diga, para a rota não virar leitor arbitrário do
+    volume, que era exatamente o defeito de /persistent-uploads.
+    """
+    url = compra.comprovante_pagamento_url or ''
+    filename = secure_filename(os.path.basename(url))
+    if not filename:
+        abort(404)
+    candidatos = [
+        os.path.join(UPLOAD_FOLDER, filename),
+        os.path.join(os.getcwd(), 'static', 'uploads', 'comprovantes', filename),
+    ]
+    for caminho in candidatos:
+        if os.path.exists(caminho):
+            return caminho
+    abort(404)
+
+
+@portal_obras_bp.route('/obra/<token>/compra/<int:compra_id>/comprovante')
+def ver_comprovante(token: str, compra_id: int):
+    """Serve o comprovante ao cliente, escopado pelo token da obra.
+
+    Substitui o consumo de /persistent-uploads/<path> no portal (triagem
+    de 23/07, Anexo B): aquela rota servia o volume de uploads INTEIRO a
+    qualquer anônimo por path adivinhável, e foi removida.
+    """
+    from flask import send_file
+    obra = _get_obra_by_token(token)
+    compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
+    _registrar_acesso(obra, 'compra_comprovante_ver', 'pedido_compra', compra_id)
+    return send_file(_arquivo_comprovante(compra))
+
+
 @portal_obras_bp.route('/obra/<token>/mapa/<int:mapa_id>/aprovar', methods=['POST'])
 def aprovar_mapa_concorrencia(token: str, mapa_id: int):
     """O cliente seleciona a opção preferida no Mapa de Concorrência."""

@@ -48,7 +48,7 @@
 
 | Rota | Arquivo:linha (hoje) | Dado exposto a anônimo | Veredito | Justificativa |
 |---|---|---|---|---|
-| `/persistent-uploads/<path:filename>` | 📖 `app.py:178-183` | QUALQUER arquivo do volume de uploads (comprovantes de pagamento, fotos, planilhas) por path adivinhável, sem escopo de tenant | **TOKEN** | O portal por token consome (📖 `portal_obras_views.py:578` grava a URL; `templates/portal/_portal_compras.html:98` renderiza) — precisa servir comprovante verificando o escopo do token, não o volume inteiro aberto. |
+| `/persistent-uploads/<path:filename>` | 📖 `app.py:178-183` | QUALQUER arquivo do volume de uploads (comprovantes de pagamento, fotos, planilhas) por path adivinhável, sem escopo de tenant | **TOKEN** — ✅ **executado em 23/07**: rota REMOVIDA; comprovantes saem por `portal_obras.ver_comprovante` (escopo do token, só o basename da URL gravada, diretório fixo) e `compras.comprovante` (login + tenant). Testes em `test_triagem_rotas_fechadas.py` | O portal por token consumia (📖 `portal_obras_views.py:578` grava a URL; `_portal_compras.html` renderiza) — agora os dois templates usam as rotas escopadas. |
 | `/ponto-diagnostico` | 📖 `app.py:506-507` | Traceback de import (paths internos, trechos de código) | **MORTA** | Página de debug de incidente antigo; zero referências. |
 | `/health` (`health.py:14`) | 📖 arquivo deletado em `549bdf06` | — | **MORTA** | `health.py` removido na Fase 0.5/3.2 (era sombreado por `views/dashboard.py`); já resolvida. |
 | `/health/simple` (`health.py:56`) | 📖 arquivo deletado em `549bdf06` | — | **MORTA** | Idem — removida junto com o arquivo. |

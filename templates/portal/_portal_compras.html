@@ -95,7 +95,7 @@
                         </button>
                     </form>
                     {% elif c.comprovante_pagamento_url %}
-                    <a href="{{ c.comprovante_pagamento_url }}" target="_blank" rel="noopener"
+                    <a href="{{ url_for('portal_obras.ver_comprovante', token=obra.token_cliente, compra_id=c.id) }}" target="_blank" rel="noopener"
                        class="btn btn-portal-outline">
                         <i class="far fa-file-alt me-1"></i> Ver comprovante
                     </a>

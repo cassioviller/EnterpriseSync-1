@@ -874,6 +874,21 @@ def detalhe(pedido_id):
     )
 
 
+@compras_bp.route('/<int:pedido_id>/comprovante')
+@login_required
+def comprovante(pedido_id):
+    """Serve o comprovante ao usuário interno, escopado por tenant.
+
+    Substitui o consumo de /persistent-uploads/<path> em compras/detalhe
+    (triagem de 23/07, Anexo B — a rota aberta foi removida).
+    """
+    from flask import send_file
+    admin_id = _admin_id()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, admin_id=admin_id).first_or_404()
+    from portal_obras_views import _arquivo_comprovante
+    return send_file(_arquivo_comprovante(pedido))
+
+
 # ─────────────────────────────────────────────
 # RECEBIMENTO NO ALMOXARIFADO
 # ─────────────────────────────────────────────

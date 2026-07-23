@@ -173,14 +173,10 @@ app.jinja_env.auto_reload = True
 app.config['DIGITAL_MASTERY_MODE'] = True
 app.config['OBSERVABILITY_ENABLED'] = True
 
-# [OK] CONFIGURAÇÃO STORAGE PERSISTENTE (v9.0.3)
-# Rota para servir uploads do volume persistente
-@app.route('/persistent-uploads/<path:filename>')
-def persistent_uploads(filename):
-    """Serve arquivos do storage persistente (produção)"""
-    from flask import send_from_directory
-    uploads_path = os.environ.get('UPLOADS_PATH', os.path.join(os.getcwd(), 'static', 'uploads'))
-    return send_from_directory(uploads_path, filename)
+# /persistent-uploads/<path> REMOVIDA (triagem 23/07, Anexo B): servia o
+# volume de uploads INTEIRO (comprovantes, fotos) a anônimo por path
+# adivinhável. Comprovantes agora saem por rota escopada — token do portal
+# (portal_obras.ver_comprovante) ou login+tenant (compras.comprovante).
 app.config['RUN_MIGRATIONS_FLAG'] = os.environ.get('RUN_MIGRATIONS', '').lower() in ['1', 'true', 'yes']
 app.config['RDO_MASTERY_ENABLED'] = True
 
