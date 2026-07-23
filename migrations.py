@@ -4150,6 +4150,103 @@ def migration_232_normalizar_status_legado():
         raise
 
 
+def migration_240_requisicao_compra():
+    """Fase 3 — tabela requisicao_compra.
+
+    Aditiva e idempotente. Nasce vazia e sem consumidor obrigatório: a
+    flag `configuracao_empresa.compras_governanca_ativa` (migration 246)
+    nasce FALSE, então `compras.nova_post` continua funcionando como hoje.
+
+    obra_id é NOT NULL desde já — é tabela nova, não há linha órfã para
+    classificar (o problema caro do §3.4 da DEVOLUTIVA é o pedido_compra,
+    não este).
+
+    Nota sobre o tipo da coluna `estado`: o modelo declara
+    `db.Enum(EstadoRequisicao)`, e `db.create_all()` (app.py:582) roda
+    ANTES desta migração no boot. Em banco novo a tabela já terá nascido
+    com um tipo enum nativo; o CREATE TABLE IF NOT EXISTS abaixo é no-op.
+    Em banco existente, esta migração cria a tabela com VARCHAR e o
+    SQLAlchemy grava/lê o NOME do membro ('RASCUNHO'). As duas formas
+    convivem — é por isso que o DEFAULT abaixo usa o nome, não o valor.
+    """
+    logger.info("[Migration 240] Iniciando — tabela requisicao_compra")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS requisicao_compra (
+            id SERIAL PRIMARY KEY,
+            numero VARCHAR(30) NOT NULL,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+            obra_servico_custo_id INTEGER
+                REFERENCES obra_servico_custo(id) ON DELETE SET NULL,
+            solicitante_id INTEGER NOT NULL REFERENCES usuario(id),
+            estado VARCHAR(30) NOT NULL DEFAULT 'RASCUNHO',
+            justificativa TEXT,
+            data_necessidade DATE,
+            valor_estimado NUMERIC(15,2) NOT NULL DEFAULT 0,
+            mapa_v2_id INTEGER
+                REFERENCES mapa_concorrencia_v2(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_requisicao_admin_numero
+        ON requisicao_compra (admin_id, numero)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_requisicao_obra_estado
+        ON requisicao_compra (obra_id, estado)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_requisicao_admin_estado
+        ON requisicao_compra (admin_id, estado)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_requisicao_solicitante
+        ON requisicao_compra (solicitante_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 240] Concluída com sucesso")
+
+
+def migration_241_requisicao_compra_item():
+    """Fase 3 — tabela requisicao_compra_item. Aditiva e idempotente.
+
+    Sem coluna `subtotal`: ele é derivado em
+    RequisicaoCompraItem.subtotal. Persistir quantidade, preço E subtotal
+    (como faz pedido_compra_item, models.py:4788) cria três fontes para
+    um número só, e portanto a chance de divergirem.
+    """
+    logger.info("[Migration 241] Iniciando — tabela requisicao_compra_item")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS requisicao_compra_item (
+            id SERIAL PRIMARY KEY,
+            requisicao_id INTEGER NOT NULL
+                REFERENCES requisicao_compra(id) ON DELETE CASCADE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            almoxarifado_item_id INTEGER REFERENCES almoxarifado_item(id),
+            descricao VARCHAR(200) NOT NULL,
+            unidade VARCHAR(20) DEFAULT 'un',
+            quantidade NUMERIC(12,3) NOT NULL DEFAULT 1,
+            preco_estimado NUMERIC(15,2) NOT NULL DEFAULT 0
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_requisicao_item_requisicao
+        ON requisicao_compra_item (requisicao_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 241] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4404,6 +4501,8 @@ def executar_migracoes():
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
             (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
             (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),
+            (240, "Fase 3 — tabela requisicao_compra (documento de demanda, obra_id NOT NULL)", migration_240_requisicao_compra),
+            (241, "Fase 3 — tabela requisicao_compra_item", migration_241_requisicao_compra_item),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

@@ -74,6 +74,27 @@ class PapelObra(Enum):
     LEITOR = "leitor"        # só leitura
 
 
+class EstadoRequisicao(Enum):
+    """Ciclo de vida da RequisicaoCompra — Fase 3.
+
+    Mesma forma da máquina de estados da Obra (Fase 2) e da
+    CronogramaImportacao (models.py:5037): enum de estado + tabela de
+    transição auditada + um único chokepoint que valida. Não há
+    `transicionar` no modelo de propósito — ele vive em
+    services/requisicao_compra.py, para que exista UM caminho de escrita.
+
+    Terminais: REJEITADA, CONVERTIDA e CANCELADA. De CONVERTIDA não se
+    volta: o PedidoCompra já existe e já gerou GestaoCustoPai e
+    ContaPagar (compras_views.py:193-254).
+    """
+    RASCUNHO = "rascunho"
+    AGUARDANDO_APROVACAO = "aguardando_aprovacao"
+    APROVADA = "aprovada"
+    REJEITADA = "rejeitada"
+    CONVERTIDA = "convertida"
+    CANCELADA = "cancelada"
+
+
 class Usuario(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -5084,6 +5105,124 @@ class PedidoCompraItem(db.Model):
 
     # Relacionamentos
     almoxarifado_item = db.relationship('AlmoxarifadoItem', backref='pedido_itens', foreign_keys=[almoxarifado_item_id])
+
+
+class RequisicaoCompra(db.Model):
+    """Documento de DEMANDA de compra — Fase 3.
+
+    O que existia até 2026-07-21 era só o `PedidoCompra`, que é registro a
+    posteriori de NF/recibo: `compras_views.py:709-711` cria o pedido, os
+    GestaoCustoPai, os ContaPagar e os movimentos de almoxarifado no MESMO
+    request do formulário. Não havia lugar onde alguém pedisse antes de
+    comprar, nem onde alguém aprovasse.
+
+    Diferenças deliberadas em relação a PedidoCompra:
+      * `obra_id` é NOT NULL aqui (lá é nullable — models.py:4736). Tabela
+        nova, sem órfão para migrar; a Fase 4 encontra o terreno pronto.
+      * `valor_estimado` é ESTIMATIVA. O valor real é o do pedido emitido.
+        A alçada decide pela estimativa, e a Task 8 recusa emitir pedido
+        acima da faixa aprovada.
+    """
+    __tablename__ = 'requisicao_compra'
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'numero', name='uq_requisicao_admin_numero'),
+        db.Index('ix_requisicao_obra_estado', 'obra_id', 'estado'),
+        db.Index('ix_requisicao_admin_estado', 'admin_id', 'estado'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(30), nullable=False)  # RC-2026-0001, por tenant
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+
+    # Vínculo obrigatório com obra. É a regra central da fase: requisição
+    # sem obra não existe, porque custo sem obra não é rastreável
+    # (DEVOLUTIVA R4 / services/resumo_custos_obra.py:190, que hoje rateia
+    # órfão por estimativa).
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    # Etapa/centro de custo — opcional, exatamente como em
+    # pedido_compra.obra_servico_custo_id (models.py:4740, migration 205).
+    obra_servico_custo_id = db.Column(
+        db.Integer, db.ForeignKey('obra_servico_custo.id', ondelete='SET NULL'),
+        nullable=True)
+
+    solicitante_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                               nullable=False, index=True)
+    estado = db.Column(db.Enum(EstadoRequisicao), nullable=False,
+                       default=EstadoRequisicao.RASCUNHO)
+
+    justificativa = db.Column(db.Text)
+    data_necessidade = db.Column(db.Date, nullable=True)
+    valor_estimado = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+
+    # Mapa de concorrência opcional. FK, NÃO reparentagem: os mapas
+    # existentes continuam pendurados na obra (models.py:5604) e continuam
+    # funcionando. Faixas de alçada altas podem exigir que esta FK esteja
+    # preenchida e o mapa concluído (FaixaAlcada.exige_mapa_concorrencia).
+    mapa_v2_id = db.Column(
+        db.Integer, db.ForeignKey('mapa_concorrencia_v2.id', ondelete='SET NULL'),
+        nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow,
+                           onupdate=datetime.utcnow)
+
+    obra = db.relationship('Obra', foreign_keys=[obra_id],
+                           backref=db.backref('requisicoes', lazy='dynamic'))
+    obra_servico_custo = db.relationship('ObraServicoCusto',
+                                         foreign_keys=[obra_servico_custo_id])
+    solicitante = db.relationship('Usuario', foreign_keys=[solicitante_id])
+    mapa_v2 = db.relationship('MapaConcorrenciaV2', foreign_keys=[mapa_v2_id])
+    itens = db.relationship('RequisicaoCompraItem', backref='requisicao',
+                            lazy='dynamic', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<RequisicaoCompra {self.numero} obra={self.obra_id} {self.estado.value}>'
+
+
+class RequisicaoCompraItem(db.Model):
+    """Linha de uma RequisicaoCompra.
+
+    Espelha PedidoCompraItem (models.py:4778) de propósito: a conversão em
+    pedido é uma cópia campo a campo, sem tradução. A diferença é que aqui
+    o preço é ESTIMADO (o solicitante de campo raramente sabe o preço
+    fechado) e existe `unidade`, que PedidoCompraItem não tem.
+    """
+    __tablename__ = 'requisicao_compra_item'
+    __table_args__ = (
+        db.Index('ix_requisicao_item_requisicao', 'requisicao_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    requisicao_id = db.Column(
+        db.Integer, db.ForeignKey('requisicao_compra.id', ondelete='CASCADE'),
+        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    # Opcional: item do catálogo do almoxarifado (models.py:4508). Quando
+    # preenchido, a conversão em pedido leva o vínculo junto e a entrada de
+    # estoque é gerada por _gerar_entrada_almoxarifado (compras_views.py:80).
+    almoxarifado_item_id = db.Column(
+        db.Integer, db.ForeignKey('almoxarifado_item.id'), nullable=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    unidade = db.Column(db.String(20), default='un')
+    quantidade = db.Column(db.Numeric(12, 3), nullable=False, default=1)
+    preco_estimado = db.Column(db.Numeric(15, 2), nullable=False, default=0)
+
+    almoxarifado_item = db.relationship('AlmoxarifadoItem',
+                                        foreign_keys=[almoxarifado_item_id])
+
+    @property
+    def subtotal(self):
+        """Derivado, não persistido: não existe caminho em que subtotal e
+        quantidade*preco divirjam, e persistir os dois cria a chance de
+        divergirem (é o que acontece em PedidoCompraItem.subtotal)."""
+        from decimal import Decimal as _D
+        return (_D(str(self.quantidade or 0)) * _D(str(self.preco_estimado or 0))
+                ).quantize(_D('0.01'))
+
+    def __repr__(self):
+        return f'<RequisicaoCompraItem req={self.requisicao_id} {self.descricao[:30]}>'
 
 
 # ================================
