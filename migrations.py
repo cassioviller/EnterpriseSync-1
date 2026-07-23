@@ -4353,6 +4353,35 @@ def migration_243_faixa_alcada():
     logger.info("[Migration 243] Concluída com sucesso — %s faixas", total)
 
 
+def migration_244_pedido_compra_requisicao_id():
+    """Fase 3 — pedido_compra.requisicao_id.
+
+    Aditiva, nullable e idempotente. Todos os pedidos existentes ficam com
+    NULL, que é a leitura correta: eles foram registrados direto pelo
+    formulário, sem requisição, porque não havia requisição no sistema.
+
+    ON DELETE SET NULL: apagar a requisição não pode apagar o pedido — o
+    pedido já gerou GestaoCustoPai e ContaPagar (compras_views.py:193-254),
+    e sumir com ele deixaria o financeiro órfão.
+
+    Roda DEPOIS da 240 (a FK referencia requisicao_compra).
+    """
+    from sqlalchemy import text as sa_text
+
+    logger.info("[Migration 244] Iniciando — pedido_compra.requisicao_id")
+
+    with db.engine.begin() as conn:
+        conn.execute(sa_text(
+            "ALTER TABLE pedido_compra "
+            "ADD COLUMN IF NOT EXISTS requisicao_id INTEGER "
+            "REFERENCES requisicao_compra(id) ON DELETE SET NULL"))
+        conn.execute(sa_text(
+            "CREATE INDEX IF NOT EXISTS ix_pedido_compra_requisicao "
+            "ON pedido_compra (requisicao_id)"))
+
+    logger.info("[Migration 244] Concluída com sucesso")
+
+
 def migration_245_papel_obra_comprador():
     """Fase 3 — acrescenta COMPRADOR ao papel de obra.
 
@@ -4694,6 +4723,7 @@ def executar_migracoes():
             (241, "Fase 3 — tabela requisicao_compra_item", migration_241_requisicao_compra_item),
             (242, "Fase 3 — trilha de auditoria requisicao_transicao (quem/quando/valor)", migration_242_requisicao_transicao),
             (243, "Fase 3 — faixa_alcada + seed das faixas recomendadas (5k / 30k / acima) por tenant", migration_243_faixa_alcada),
+            (244, "Fase 3 — pedido_compra.requisicao_id (origem do pedido; NULL = avulso legado)", migration_244_pedido_compra_requisicao_id),
             (245, "Fase 3 — PapelObra.COMPRADOR (estende o enum de papel de obra)", migration_245_papel_obra_comprador),
             (246, "Fase 3 — flag por tenant compras_governanca_ativa (default FALSE)", migration_246_flag_compras_governanca),
         ]

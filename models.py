@@ -5092,6 +5092,16 @@ class PedidoCompra(db.Model):
     responsavel_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
     data_vencimento_primeira_parcela = db.Column(db.Date, nullable=True)
     intervalo_parcelas_dias = db.Column(db.Integer, nullable=True)
+    # Fase 3 — origem do pedido. NULL = pedido avulso, registrado direto
+    # pelo formulário (compras_views.py:532), que é como TODOS os pedidos
+    # nasceram até 2026-07-21. Preenchido = pedido emitido a partir de
+    # requisição aprovada, com alçada registrada em requisicao_transicao.
+    # A coluna é o que permite a Task 9 recusar pedido sem requisição
+    # quando `compras_governanca_ativa` está ligada, sem invalidar
+    # nenhum registro histórico.
+    requisicao_id = db.Column(
+        db.Integer, db.ForeignKey('requisicao_compra.id', ondelete='SET NULL'),
+        nullable=True, index=True)
 
     # Relacionamentos
     fornecedor = db.relationship('Fornecedor', backref='pedidos_compra', foreign_keys=[fornecedor_id])
@@ -5101,6 +5111,9 @@ class PedidoCompra(db.Model):
         'ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
     itens = db.relationship('PedidoCompraItem', backref='pedido', lazy='dynamic', cascade='all, delete-orphan')
     responsavel = db.relationship('Usuario', foreign_keys=[responsavel_id], backref='pedidos_compra_responsavel')
+    requisicao = db.relationship(
+        'RequisicaoCompra', foreign_keys=[requisicao_id],
+        backref=db.backref('pedidos', lazy='dynamic'))
 
 
 class PedidoCompraItem(db.Model):

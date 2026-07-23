@@ -165,10 +165,53 @@
           {% endif %}
 
           {% if requisicao.estado == EstadoRequisicao.APROVADA and pode_emitir %}
+            <hr>
+            <h6 class="fw-bold">Emitir pedido de compra</h6>
             <form method="POST"
                   action="{{ url_for('compras.requisicao_emitir_pedido', requisicao_id=requisicao.id) }}">
-              <button class="btn btn-primary w-100">
-                <i class="fas fa-file-invoice-dollar me-1"></i> Emitir pedido de compra
+              <label class="form-label small mb-1">Fornecedor</label>
+              <select name="fornecedor_id" class="form-select form-select-sm mb-2" required>
+                <option value="">Selecione…</option>
+                {% for f in fornecedores %}
+                  <option value="{{ f.id }}">{{ f.nome }}</option>
+                {% endfor %}
+              </select>
+
+              <label class="form-label small mb-1">Nº da NF/recibo (opcional)</label>
+              <input type="text" name="numero" class="form-control form-control-sm mb-2">
+
+              <label class="form-label small mb-1">Data da compra</label>
+              <input type="date" name="data_compra" class="form-control form-control-sm mb-2"
+                     value="{{ hoje }}" required>
+
+              <label class="form-label small mb-1">Condição de pagamento</label>
+              <select name="condicao_pagamento" class="form-select form-select-sm mb-2">
+                {% for chave, rotulo in CONDICOES.items() %}
+                  <option value="{{ chave }}">{{ rotulo }}</option>
+                {% endfor %}
+              </select>
+
+              <label class="form-label small mb-1">Parcelas</label>
+              <input type="number" name="parcelas" min="1" value="1"
+                     class="form-control form-control-sm mb-2">
+
+              <p class="small text-muted mb-2">
+                Preço fechado por item (vazio = usa o estimado). O total não
+                pode ultrapassar os R$ {{ '%.2f'|format(requisicao.valor_estimado or 0) }} aprovados.
+              </p>
+              {% for i in itens %}
+                <div class="input-group input-group-sm mb-1">
+                  <span class="input-group-text" style="max-width:60%">
+                    {{ i.descricao[:28] }}
+                  </span>
+                  <input type="text" name="item_preco_real[]"
+                         class="form-control"
+                         placeholder="{{ '%.2f'|format(i.preco_estimado or 0) }}">
+                </div>
+              {% endfor %}
+
+              <button class="btn btn-primary w-100 mt-2">
+                <i class="fas fa-file-invoice-dollar me-1"></i> Emitir pedido
               </button>
             </form>
           {% endif %}

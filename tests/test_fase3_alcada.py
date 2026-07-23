@@ -620,3 +620,160 @@ def test_valor_gravado_e_o_do_momento_da_aprovacao():
         db.session.commit()
         voto = votos_de_aprovacao(req)[0]
         assert voto.valor_no_momento == Decimal('50.00')
+
+
+# ---------------------------------------------------------------------------
+# Emissão do pedido
+# ---------------------------------------------------------------------------
+
+def _cenario_aprovado(valor='50.00'):
+    """Requisição com item, já APROVADA, e um COMPRADOR vinculado."""
+    from scripts.flag_escopo_obra import definir_flag
+    from models import Fornecedor, RequisicaoCompraItem
+    from services.alcada_compras import registrar_aprovacao
+    from services.requisicao_compra import (proximo_numero, recalcular_valor,
+                                            transicionar)
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        _faixas_de_teste(admin.id)
+        solicitante = _operador(admin.id, 'Solicitante')
+        gestor = _operador(admin.id, 'Gestor')
+        comprador = _operador(admin.id, 'Comprador')
+        _vincular(solicitante, obra, PapelObra.COMPRADOR)
+        _vincular(gestor, obra, PapelObra.GESTOR)
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        definir_flag(admin.id, True)
+
+        forn = Fornecedor(nome='Forn Teste', cnpj=f'{uuid.uuid4().hex[:14]}',
+                          admin_id=admin.id, ativo=True)
+        db.session.add(forn)
+
+        req = RequisicaoCompra(
+            numero=proximo_numero(admin.id), obra_id=obra.id,
+            solicitante_id=solicitante.id, admin_id=admin.id,
+            estado=EstadoRequisicao.AGUARDANDO_APROVACAO)
+        db.session.add(req)
+        db.session.flush()
+        db.session.add(RequisicaoCompraItem(
+            requisicao_id=req.id, admin_id=admin.id, descricao='Perfil U90',
+            unidade='m', quantidade=Decimal('10.000'),
+            preco_estimado=Decimal(valor) / Decimal('10')))
+        db.session.flush()
+        recalcular_valor(req)
+        registrar_aprovacao(req, gestor, papel='GESTOR')
+        registrar_aprovacao(req, admin, papel='ADMIN')
+        transicionar(req, EstadoRequisicao.APROVADA, gestor, motivo='ok')
+        db.session.commit()
+        return {'admin': admin.id, 'obra': obra.id, 'req': req.id,
+                'comprador': comprador.id, 'gestor': gestor.id,
+                'solicitante': solicitante.id, 'fornecedor': forn.id}
+
+
+def test_emitir_pedido_cria_pedido_vinculado_com_obra():
+    from models import PedidoCompra
+
+    c = _cenario_aprovado()
+    r = _cliente_de(c['comprador']).post(
+        f"/compras/requisicoes/{c['req']}/emitir-pedido",
+        data={'fornecedor_id': str(c['fornecedor']),
+              'data_compra': '2026-08-01',
+              'condicao_pagamento': 'a_vista', 'parcelas': '1'},
+        follow_redirects=False)
+    assert r.status_code == 302
+
+    with app.app_context():
+        pedido = PedidoCompra.query.filter_by(requisicao_id=c['req']).one()
+        assert pedido.obra_id == c['obra'], 'pedido emitido sem obra'
+        assert pedido.admin_id == c['admin']
+        assert pedido.itens.count() == 1
+        req = db.session.get(RequisicaoCompra, c['req'])
+        assert req.estado == EstadoRequisicao.CONVERTIDA
+
+
+def test_requisicao_nao_aprovada_nao_vira_pedido():
+    from models import PedidoCompra
+
+    c = _cenario('50.00')  # AGUARDANDO_APROVACAO
+    with app.app_context():
+        comprador = _operador(c['admin'], 'Comprador')
+        obra = db.session.get(Obra, c['obra'])
+        _vincular(comprador, obra, PapelObra.COMPRADOR)
+        cid = comprador.id
+        forn_id = None
+        from models import Fornecedor
+        f = Fornecedor(nome='F', cnpj=uuid.uuid4().hex[:14],
+                       admin_id=c['admin'], ativo=True)
+        db.session.add(f)
+        db.session.commit()
+        forn_id = f.id
+
+    _cliente_de(cid).post(
+        f"/compras/requisicoes/{c['req']}/emitir-pedido",
+        data={'fornecedor_id': str(forn_id), 'data_compra': '2026-08-01'},
+        follow_redirects=False)
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 0
+
+
+def test_gestor_que_aprovou_nao_emite_o_pedido():
+    """Separação de funções: quem aprova não emite, quando a faixa exigiu
+    mais de uma aprovação."""
+    from models import PedidoCompra
+
+    c = _cenario_aprovado()
+    _cliente_de(c['gestor']).post(
+        f"/compras/requisicoes/{c['req']}/emitir-pedido",
+        data={'fornecedor_id': str(c['fornecedor']),
+              'data_compra': '2026-08-01'},
+        follow_redirects=False)
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 0
+
+
+def test_nao_se_emite_duas_vezes_a_mesma_requisicao():
+    from models import PedidoCompra
+
+    c = _cenario_aprovado()
+    dados = {'fornecedor_id': str(c['fornecedor']),
+             'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'}
+    cliente = _cliente_de(c['comprador'])
+    cliente.post(f"/compras/requisicoes/{c['req']}/emitir-pedido", data=dados)
+    cliente.post(f"/compras/requisicoes/{c['req']}/emitir-pedido", data=dados)
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 1
+
+
+def test_pedido_acima_do_valor_aprovado_e_recusado():
+    """A alçada aprovou R$ 50; emitir R$ 5.000 seria burlar a faixa."""
+    from models import PedidoCompra
+
+    c = _cenario_aprovado()
+    _cliente_de(c['comprador']).post(
+        f"/compras/requisicoes/{c['req']}/emitir-pedido",
+        data={'fornecedor_id': str(c['fornecedor']),
+              'data_compra': '2026-08-01',
+              'item_preco_real[]': ['500.00']},  # 10 x 500 = 5000
+        follow_redirects=False)
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 0
+
+
+def test_emissao_gera_custo_na_obra():
+    """O pedido emitido continua fazendo o que compras_views.py:162 sempre
+    fez: GestaoCustoPai + GestaoCustoFilho na obra."""
+    from models import GestaoCustoFilho, PedidoCompra
+
+    c = _cenario_aprovado()
+    _cliente_de(c['comprador']).post(
+        f"/compras/requisicoes/{c['req']}/emitir-pedido",
+        data={'fornecedor_id': str(c['fornecedor']),
+              'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'},
+        follow_redirects=False)
+    with app.app_context():
+        pedido = PedidoCompra.query.filter_by(requisicao_id=c['req']).one()
+        filhos = GestaoCustoFilho.query.filter_by(
+            origem_tabela='pedido_compra', origem_id=pedido.id).all()
+        assert filhos, 'emissão não gerou custo'
+        assert all(f.obra_id == c['obra'] for f in filhos)

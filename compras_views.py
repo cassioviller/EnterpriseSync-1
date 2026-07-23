@@ -1336,6 +1336,11 @@ def requisicao_detalhe(requisicao_id):
         pode_emitir=pode_comprar_na_obra(requisicao.obra_id),
         pedidos=pedidos,
         EstadoRequisicao=EstadoRequisicao,
+        fornecedores=Fornecedor.query.filter_by(
+            admin_id=requisicao.admin_id, ativo=True).order_by(
+                Fornecedor.nome).all(),
+        CONDICOES=CONDICOES,
+        hoje=date.today().isoformat(),
     )
 
 
@@ -1491,6 +1496,190 @@ def requisicao_rejeitar(requisicao_id):
     except TransicaoInvalida as e:
         db.session.rollback()
         flash(str(e), 'danger')
+
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/emitir-pedido',
+                  methods=['POST'])
+@login_required
+def requisicao_emitir_pedido(requisicao_id):
+    """APROVADA → CONVERTIDA, criando o PedidoCompra.
+
+    Este é o ponto em que a governança encontra o módulo que já existia: a
+    partir daqui o fluxo é EXATAMENTE o de `compras.nova_post`
+    (compras_views.py:668-711) — mesmo `PedidoCompra`, mesmos itens, mesmo
+    `processar_compra_normal`. A diferença é que agora existe uma
+    requisição aprovada por trás, com quem/quando/valor gravados.
+
+    Três guardas, nesta ordem:
+      1. estado APROVADA (senão a alçada não valeu de nada);
+      2. quem emite não pode ter sido aprovador — quando a faixa exigiu
+         mais de uma aprovação;
+      3. o valor do pedido não pode ultrapassar o valor aprovado, senão
+         aprova-se R$ 50 e compra-se R$ 5.000.
+    """
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+    admin_id = requisicao.admin_id
+
+    if not pode_comprar_na_obra(requisicao.obra_id):
+        flash('Você não tem papel de comprador nesta obra.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # Guarda 1 — só requisição aprovada vira pedido.
+    if requisicao.estado != EstadoRequisicao.APROVADA:
+        flash(f'A requisição está em {requisicao.estado.value}. Só se emite '
+              f'pedido a partir de requisição aprovada.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # Guarda 2 — separação de funções. Só vale quando a faixa exigiu mais
+    # de uma aprovação: numa faixa de aprovação única, exigir uma terceira
+    # pessoa para clicar em "emitir" travaria a compra de R$ 200 numa
+    # equipe de três.
+    from services.alcada_compras import votos_de_aprovacao
+
+    faixa = faixa_para_valor(admin_id, requisicao.valor_estimado)
+    aprovadores = {v.usuario_id for v in votos_de_aprovacao(requisicao)}
+    if faixa.aprovacoes_necessarias > 1 and current_user.id in aprovadores:
+        flash('Você aprovou esta requisição e por isso não pode emitir o '
+              'pedido dela. Peça a outra pessoa com papel de comprador.',
+              'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # Idempotência — a requisição só produz um pedido.
+    if PedidoCompra.query.filter_by(requisicao_id=requisicao.id).count() > 0:
+        flash('Esta requisição já gerou um pedido de compra.', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # ── Fornecedor (obrigatório, mesmo predicado de compras_views.py:552) ──
+    forn_bruto = (request.form.get('fornecedor_id') or '').strip()
+    try:
+        fornecedor_id = int(forn_bruto)
+    except (TypeError, ValueError):
+        flash('Selecione um fornecedor para emitir o pedido.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+    if not Fornecedor.query.filter_by(
+            id=fornecedor_id, admin_id=admin_id, ativo=True).first():
+        flash('Fornecedor não encontrado ou não pertence à sua conta.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    data_bruta = (request.form.get('data_compra') or '').strip()
+    try:
+        data_compra = (datetime.strptime(data_bruta, '%Y-%m-%d').date()
+                       if data_bruta else date.today())
+    except ValueError:
+        data_compra = date.today()
+
+    condicao = request.form.get('condicao_pagamento', 'a_vista')
+    try:
+        parcelas = max(1, int(request.form.get('parcelas', 1)))
+    except (TypeError, ValueError):
+        parcelas = 1
+
+    # ── Itens: da requisição, com preço real opcional ──────────────────────
+    # O comprador fecha o preço com o fornecedor; se o campo vier vazio,
+    # vale o preço estimado da requisição.
+    precos_reais = request.form.getlist('item_preco_real[]')
+    itens_requisicao = requisicao.itens.order_by(RequisicaoCompraItem.id).all()
+
+    itens_validos = []
+    valor_total = 0.0
+    for idx, item in enumerate(itens_requisicao):
+        bruto = (precos_reais[idx] if idx < len(precos_reais) else '') or ''
+        bruto = str(bruto).strip()
+        if bruto:
+            try:
+                preco = float(bruto.replace('.', '').replace(',', '.')
+                              if ',' in bruto else bruto)
+            except ValueError:
+                preco = float(item.preco_estimado or 0)
+        else:
+            preco = float(item.preco_estimado or 0)
+        qtd = float(item.quantidade or 0)
+        subtotal = round(qtd * preco, 2)
+        valor_total += subtotal
+        itens_validos.append((item.descricao, qtd, preco,
+                              item.almoxarifado_item_id, subtotal))
+    valor_total = round(valor_total, 2)
+
+    # Guarda 3 — o pedido não pode estourar o que foi aprovado.
+    from decimal import Decimal as _D
+    aprovado = _D(str(requisicao.valor_estimado or 0))
+    if _D(str(valor_total)) > aprovado:
+        flash(f'O pedido soma R$ {valor_total:.2f}, acima dos R$ {aprovado} '
+              f'aprovados. Volte a requisição para rascunho, corrija os '
+              f'valores e passe pela alçada de novo.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    try:
+        pedido = PedidoCompra(
+            numero=(request.form.get('numero') or '').strip() or None,
+            fornecedor_id=fornecedor_id,
+            data_compra=data_compra,
+            # Obra e etapa vêm da REQUISIÇÃO, não do formulário. É o que
+            # torna o vínculo obrigatório de fato: não há campo para
+            # esvaziar.
+            obra_id=requisicao.obra_id,
+            obra_servico_custo_id=requisicao.obra_servico_custo_id,
+            condicao_pagamento=condicao,
+            parcelas=parcelas,
+            valor_total=valor_total,
+            observacoes=f'Emitido a partir da requisição {requisicao.numero}',
+            tipo_compra='normal',
+            processada_apos_aprovacao=False,
+            status_aprovacao_cliente=None,
+            admin_id=admin_id,
+            responsavel_id=current_user.id,
+            requisicao_id=requisicao.id,
+        )
+        db.session.add(pedido)
+        db.session.flush()
+
+        for desc, qtd, preco, almox_id, subtotal in itens_validos:
+            db.session.add(PedidoCompraItem(
+                pedido_id=pedido.id,
+                almoxarifado_item_id=almox_id,
+                descricao=desc,
+                quantidade=qtd,
+                preco_unitario=preco,
+                subtotal=subtotal,
+                admin_id=admin_id,
+            ))
+        db.session.flush()
+
+        # Mesmíssimo processamento do fluxo antigo — GCP + ContaPagar por
+        # parcela + entrada/saída de almoxarifado (compras_views.py:162).
+        processar_compra_normal(pedido, itens_validos, admin_id, current_user.id)
+
+        transicionar(requisicao, EstadoRequisicao.CONVERTIDA, current_user,
+                     motivo=f'pedido de compra #{pedido.id} emitido')
+        db.session.commit()
+
+        flash(f'Pedido de compra emitido a partir da requisição '
+              f'{requisicao.numero}. Custo, contas a pagar e entrada no '
+              f'almoxarifado gerados.', 'success')
+        return redirect(url_for('compras.detalhe', pedido_id=pedido.id))
+
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+    except Exception as e:
+        db.session.rollback()
+        logger.error('[fase3] falha ao emitir pedido da requisicao %s: %s',
+                     requisicao_id, e, exc_info=True)
+        flash('Não foi possível emitir o pedido. Nada foi gravado.', 'danger')
 
     return redirect(url_for('compras.requisicao_detalhe',
                             requisicao_id=requisicao_id))
