@@ -517,6 +517,13 @@ def nova():
     if guard:
         return guard
 
+    from scripts.flag_compras_governanca import governanca_ativa
+
+    if governanca_ativa(_admin_id()):
+        flash('A governança de compras está ativa: comece pela requisição.',
+              'info')
+        return redirect(url_for('compras.requisicao_nova'))
+
     admin_id = _admin_id()
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
     obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by('nome').all()
@@ -548,6 +555,24 @@ def nova_post():
     guard = _check_v2()
     if guard:
         return guard
+
+    # ── Fase 3 — governança de compras ────────────────────────────────────
+    # Com `compras_governanca_ativa` ligada para o tenant, esta rota deixa
+    # de ser um caminho para criar pedido: todo pedido tem que sair de uma
+    # requisição aprovada (compras.requisicao_emitir_pedido), que grava
+    # quem aprovou, quando e por quanto em requisicao_transicao.
+    #
+    # A flag existe porque desligar este atalho sem aviso travaria o
+    # registro de compra de quem está em obra hoje. Default FALSE; liga-se
+    # por tenant com scripts/flag_compras_governanca.py, e o runbook em
+    # docs/fase-3-rollout.md diz em que ordem.
+    from scripts.flag_compras_governanca import governanca_ativa
+
+    if governanca_ativa(_admin_id()):
+        flash('A governança de compras está ativa nesta empresa: todo pedido '
+              'precisa sair de uma requisição aprovada. Abra a requisição, '
+              'passe pela alçada e emita o pedido por lá.', 'warning')
+        return redirect(url_for('compras.requisicao_nova'))
 
     admin_id = _admin_id()
 

@@ -777,3 +777,78 @@ def test_emissao_gera_custo_na_obra():
             origem_tabela='pedido_compra', origem_id=pedido.id).all()
         assert filhos, 'emissão não gerou custo'
         assert all(f.obra_id == c['obra'] for f in filhos)
+
+
+# ---------------------------------------------------------------------------
+# Guard de governança no registro direto de compra
+# ---------------------------------------------------------------------------
+
+def _post_compra_direta(cliente, obra_id, fornecedor_id):
+    return cliente.post('/compras/nova', data={
+        'fornecedor_id': str(fornecedor_id),
+        'data_compra': '2026-08-01',
+        'condicao_pagamento': 'a_vista',
+        'parcelas': '1',
+        'obra_id': str(obra_id),
+        'tipo_compra': 'normal',
+        'item_descricao[]': ['Perfil U90'],
+        'item_quantidade[]': ['10'],
+        'item_preco[]': ['18,50'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False)
+
+
+def _admin_obra_fornecedor():
+    from models import Fornecedor
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        forn = Fornecedor(nome='Forn', cnpj=uuid.uuid4().hex[:14],
+                          admin_id=admin.id, ativo=True)
+        db.session.add(forn)
+        db.session.commit()
+        return admin.id, obra.id, forn.id
+
+
+def test_com_flag_desligada_o_fluxo_antigo_continua_funcionando():
+    """Nenhuma empresa pode acordar sem conseguir registrar compra."""
+    from models import PedidoCompra
+
+    aid, oid, fid = _admin_obra_fornecedor()
+    r = _post_compra_direta(_cliente_de(aid), oid, fid)
+    assert r.status_code == 302
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(admin_id=aid).count() == 1
+
+
+def test_com_flag_ligada_pedido_sem_requisicao_e_recusado():
+    from models import PedidoCompra
+    from scripts.flag_compras_governanca import definir_flag
+
+    aid, oid, fid = _admin_obra_fornecedor()
+    with app.app_context():
+        definir_flag(aid, True)
+
+    r = _post_compra_direta(_cliente_de(aid), oid, fid)
+    assert r.status_code == 302
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(admin_id=aid).count() == 0, (
+            'pedido nasceu sem requisição aprovada com a governança ligada')
+
+
+def test_com_flag_ligada_a_emissao_pela_requisicao_continua_funcionando():
+    """A governança fecha o atalho, não o caminho."""
+    from models import PedidoCompra
+    from scripts.flag_compras_governanca import definir_flag
+
+    c = _cenario_aprovado()
+    with app.app_context():
+        definir_flag(c['admin'], True)
+
+    _cliente_de(c['comprador']).post(
+        f"/compras/requisicoes/{c['req']}/emitir-pedido",
+        data={'fornecedor_id': str(c['fornecedor']),
+              'data_compra': '2026-08-01', 'condicao_pagamento': 'a_vista'},
+        follow_redirects=False)
+    with app.app_context():
+        assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 1
