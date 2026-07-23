@@ -454,9 +454,37 @@ def aprovar_compra(token: str, compra_id: int):
     try:
         compra.status_aprovacao_cliente = 'APROVADO'
 
+        # ── Fase 3 ────────────────────────────────────────────────────────
+        # Com a governança de compras ligada, a decisão do cliente é
+        # CIÊNCIA, não lançamento. O que criava GestaoCustoPai com
+        # status='PAGO' aqui era um POST sem autenticação nenhuma
+        # (o portal é anônimo por construção — ver o docstring do módulo),
+        # e o movimento de almoxarifado saía atribuído ao ADMIN do tenant,
+        # que não fez a ação.
+        #
+        # Com a flag ligada, quem emite o custo é a cadeia interna de
+        # alçada (compras.requisicao_emitir_pedido), onde existe usuário
+        # autenticado, papel na obra e trilha em requisicao_transicao.
+        from scripts.flag_compras_governanca import governanca_ativa
+
+        sob_governanca = governanca_ativa(obra.admin_id)
+
+        if sob_governanca:
+            _registrar_acesso(
+                obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                {'modo': 'ciencia', 'valor_total': str(compra.valor_total)})
+            db.session.commit()
+            logger.info('[PORTAL] Compra %s — ciência do cliente registrada '
+                        '(governança ativa; custo NÃO gerado aqui). Obra %s',
+                        compra_id, obra.id)
+            flash('Sua aprovação foi registrada. A compra segue para '
+                  'liberação interna antes de ser efetivada.', 'success')
+            return redirect(url_for('portal_obras.portal_obra', token=token))
+
+        # Comportamento anterior à Fase 3, preservado com a flag desligada.
         # Gera agora os custos (FATURAMENTO_DIRETO sem FluxoCaixa) + entrada
         # + saída no almoxarifado. O tipo já foi garantido na query.
-        if not compra.processada_apos_aprovacao:
+        if compra.tipo_compra == 'aprovacao_cliente' and not compra.processada_apos_aprovacao:
             from compras_views import processar_compra_aprovada_cliente
             # usuario_id = admin do tenant: o portal é anônimo e não tem
             # current_user. A autoria fica atribuída a quem não agiu — só a

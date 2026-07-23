@@ -202,3 +202,76 @@ def test_post_no_portal_grava_trilha_com_ip():
         assert any(e.ip == '203.0.113.7' for e in eventos)
         assert any('pytest-portal' in (e.user_agent or '') for e in eventos)
         assert any(e.acao == 'compra_aprovar' for e in eventos)
+
+
+# ---------------------------------------------------------------------------
+# Governança ligada: o cliente dá ciência, não cria custo
+# ---------------------------------------------------------------------------
+
+def test_sem_governanca_o_portal_continua_criando_custo():
+    """Comportamento de hoje, preservado enquanto a flag estiver desligada."""
+    from models import GestaoCustoPai
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(admin.id)
+        compra = _compra(admin.id, obra.id)
+        token, cid, aid = obra.token_cliente, compra.id, admin.id
+
+    anon = app.test_client()
+    anon.post(f'/portal/obra/{token}/compra/{cid}/aprovar',
+              follow_redirects=False)
+
+    with app.app_context():
+        compra = db.session.get(PedidoCompra, cid)
+        assert compra.status_aprovacao_cliente == 'APROVADO'
+        assert compra.processada_apos_aprovacao is True
+        assert GestaoCustoPai.query.filter_by(
+            admin_id=aid, tipo_categoria='FATURAMENTO_DIRETO').count() == 1
+
+
+def test_com_governanca_o_portal_registra_ciencia_sem_criar_custo():
+    from models import GestaoCustoPai
+    from scripts.flag_compras_governanca import definir_flag
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(admin.id)
+        compra = _compra(admin.id, obra.id)
+        definir_flag(admin.id, True)
+        token, cid, aid = obra.token_cliente, compra.id, admin.id
+
+    anon = app.test_client()
+    anon.post(f'/portal/obra/{token}/compra/{cid}/aprovar',
+              follow_redirects=False)
+
+    with app.app_context():
+        compra = db.session.get(PedidoCompra, cid)
+        # a ciência do cliente FICA registrada…
+        assert compra.status_aprovacao_cliente == 'APROVADO'
+        # …mas o custo NÃO nasceu de um POST anônimo
+        assert compra.processada_apos_aprovacao is False
+        assert GestaoCustoPai.query.filter_by(
+            admin_id=aid, tipo_categoria='FATURAMENTO_DIRETO').count() == 0
+
+
+def test_com_governanca_a_trilha_marca_ciencia():
+    from models import PortalAcessoEvento
+    from scripts.flag_compras_governanca import definir_flag
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(admin.id)
+        compra = _compra(admin.id, obra.id)
+        definir_flag(admin.id, True)
+        token, cid, oid = obra.token_cliente, compra.id, obra.id
+
+    anon = app.test_client()
+    anon.post(f'/portal/obra/{token}/compra/{cid}/aprovar',
+              follow_redirects=False)
+
+    with app.app_context():
+        eventos = PortalAcessoEvento.query.filter_by(
+            obra_id=oid, acao='compra_aprovar').all()
+        assert eventos
+        assert any((e.detalhes or {}).get('modo') == 'ciencia' for e in eventos)
