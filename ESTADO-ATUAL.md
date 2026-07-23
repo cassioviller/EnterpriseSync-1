@@ -292,14 +292,20 @@ lição da Fase 1 — o plano envelhece contra o código):
 3. O teste de envio criava requisição **sem itens** e esperava a
    transição — colidia com a guarda da própria rota. Passou a criar item.
 
-### Gate da Fase 3
+### Gate da Fase 3 — ✅ VERDE
 
-🔬 23/07: regressões dirigidas todas verdes — **91 testes da Fase 3** + 149
-de regressão (fluxo antigo de compras + Fases 0/1/2) + 3 novos do review.
-O **gate completo** (`pytest tests/ -m "not browser"`, 1.118 testes) está
-**em execução** sobre o código pós-correções; até o teste ~900, **zero
-falhas**. ⏳ O resultado final entra aqui quando fechar — até lá a fase
-está "código completo, gate pendente", e o merge em `main` espera.
+🔬 23/07, sobre o código pós-correções do review (commit `d1f7f34f`):
+
+    pytest tests/ -m "not browser" → 1109 passed, 9 skipped,
+    201 deselected in 2260.55s (0:37:40) — exit 0
+
+**Zero falhas.** Além do gate cheio, as regressões dirigidas: 91 testes da
+Fase 3 + 149 de regressão (fluxo antigo de compras + Fases 0/1/2) + 3
+novos do review. Este é também o **primeiro gate completo íntegro desde a
+recriação do banco de 22/07** — fecha o item 2 da "RETOMADA IMEDIATA"
+acima (o gate que estava INCONCLUSIVO) e cobre de quebra o commit
+`e782f70` (aborto de boot), que nunca tinha visto banco vivo. O branch
+está pronto para merge em `main`.
 
 ## O plano aprovado
 
