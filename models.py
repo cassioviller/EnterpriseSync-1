@@ -5207,8 +5207,14 @@ class RequisicaoCompra(db.Model):
                                          foreign_keys=[obra_servico_custo_id])
     solicitante = db.relationship('Usuario', foreign_keys=[solicitante_id])
     mapa_v2 = db.relationship('MapaConcorrenciaV2', foreign_keys=[mapa_v2_id])
+    # order_by fixo: a emissão do pedido casa item ↔ preço pela ORDEM
+    # (compras_views.requisicao_emitir_pedido lê item_preco_real[] por índice).
+    # Sem ordenação determinística, `requisicao.itens.all()` no template e o
+    # `.order_by(id)` na rota poderiam divergir no Postgres e trocar o preço
+    # de um item pelo de outro. Fixar aqui garante a mesma ordem nos dois.
     itens = db.relationship('RequisicaoCompraItem', backref='requisicao',
-                            lazy='dynamic', cascade='all, delete-orphan')
+                            lazy='dynamic', cascade='all, delete-orphan',
+                            order_by='RequisicaoCompraItem.id')
 
     def __repr__(self):
         return f'<RequisicaoCompra {self.numero} obra={self.obra_id} {self.estado.value}>'

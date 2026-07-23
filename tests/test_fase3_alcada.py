@@ -852,3 +852,76 @@ def test_com_flag_ligada_a_emissao_pela_requisicao_continua_funcionando():
         follow_redirects=False)
     with app.app_context():
         assert PedidoCompra.query.filter_by(requisicao_id=c['req']).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# Correções pós-revisão de código
+# ---------------------------------------------------------------------------
+
+def test_votos_de_rodada_anterior_nao_contam_apos_reenvio():
+    """Achado #2: rejeitar e reenviar abre rodada nova; o voto da rodada
+    anterior não pode fechar a alçada da requisição reenviada."""
+    from services.alcada_compras import (aprovacoes_registradas,
+                                         esta_totalmente_aprovada,
+                                         registrar_aprovacao)
+    from services.requisicao_compra import transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        _faixas_de_teste(admin.id)
+        gestor = _operador(admin.id, 'Gestor')
+        solicitante = _operador(admin.id, 'Solicitante')
+        _vincular(gestor, obra, PapelObra.GESTOR)
+        r = _requisicao(admin, obra, solicitante, '500.00')  # faixa 2: 2 + admin
+
+        transicionar(r, EstadoRequisicao.AGUARDANDO_APROVACAO, solicitante)
+        registrar_aprovacao(r, gestor, papel='GESTOR')  # voto da rodada 1
+        db.session.commit()
+        assert aprovacoes_registradas(r) == 1
+
+        # rejeita e reenvia
+        transicionar(r, EstadoRequisicao.REJEITADA, admin, motivo='faltou cotação')
+        transicionar(r, EstadoRequisicao.RASCUNHO, solicitante, motivo='corrigido')
+        transicionar(r, EstadoRequisicao.AGUARDANDO_APROVACAO, solicitante)
+        db.session.commit()
+
+        # rodada nova: o voto do gestor da rodada 1 NÃO conta
+        assert aprovacoes_registradas(r) == 0
+        assert esta_totalmente_aprovada(r) is False
+
+
+def test_itens_da_requisicao_vem_ordenados_por_id():
+    """Achado #3: a emissão casa item↔preço por ORDEM; o relationship precisa
+    devolver os itens sempre na mesma ordem determinística."""
+    from models import RequisicaoCompraItem
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        r = _requisicao(admin, obra, admin, '0')
+        for d in ['A', 'B', 'C', 'D']:
+            db.session.add(RequisicaoCompraItem(
+                requisicao_id=r.id, admin_id=admin.id, descricao=d,
+                quantidade=Decimal('1'), preco_estimado=Decimal('1')))
+        db.session.commit()
+        ids = [i.id for i in r.itens.all()]
+        assert ids == sorted(ids), 'itens fora de ordem de id'
+
+
+def test_quantidade_nao_numerica_nao_derruba_o_form():
+    """Achado #5: entrada não-numérica não pode virar HTTP 500."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        aid, oid = admin.id, obra.id
+
+    r = _cliente_de(aid).post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid), 'justificativa': 'entrada suja',
+        'item_descricao[]': ['Item'], 'item_unidade[]': ['un'],
+        'item_quantidade[]': ['abc'], 'item_preco[]': ['xyz'],
+        'item_almoxarifado_id[]': [''],
+    }, follow_redirects=False)
+    assert r.status_code == 302, f'esperava 302, veio {r.status_code}'
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=aid).count() == 1

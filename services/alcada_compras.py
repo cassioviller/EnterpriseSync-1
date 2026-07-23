@@ -99,11 +99,37 @@ def faixa_para_valor(admin_id, valor):
     return faixas[-1]
 
 
+def _inicio_da_rodada_atual(requisicao):
+    """id da transição que ENTROU na rodada de aprovação corrente.
+
+    Um voto de aprovação é uma RequisicaoTransicao AGUARDANDO→AGUARDANDO
+    (de == para). A ENTRADA numa rodada é uma transição REAL para
+    AGUARDANDO_APROVACAO (de != para) — tipicamente RASCUNHO→AGUARDANDO.
+    Rejeitar e reenviar (REJEITADA→RASCUNHO→AGUARDANDO) abre uma rodada
+    nova; os votos da rodada anterior não podem contar para esta, senão a
+    requisição reenviada fecha a alçada com menos aprovações reais do que
+    a faixa exige. Devolve 0 quando ainda não houve entrada (a requisição
+    nunca saiu de RASCUNHO)."""
+    entrada = (RequisicaoTransicao.query
+               .filter_by(requisicao_id=requisicao.id,
+                          para_estado=EstadoRequisicao.AGUARDANDO_APROVACAO)
+               .filter(RequisicaoTransicao.de_estado !=
+                       EstadoRequisicao.AGUARDANDO_APROVACAO)
+               .order_by(RequisicaoTransicao.id.desc())
+               .first())
+    return entrada.id if entrada else 0
+
+
 def votos_de_aprovacao(requisicao):
-    """As RequisicaoTransicao que são voto de aprovação, em ordem."""
+    """Os votos de aprovação DA RODADA ATUAL, em ordem.
+
+    Escopado à rodada corrente (ver `_inicio_da_rodada_atual`): um voto
+    gravado numa tentativa anterior, já rejeitada e reenviada, não conta
+    aqui. A trilha inteira continua no banco — o que muda é só a contagem."""
     return (RequisicaoTransicao.query
             .filter_by(requisicao_id=requisicao.id)
             .filter(RequisicaoTransicao.motivo.like(f'{MARCA_APROVACAO}%'))
+            .filter(RequisicaoTransicao.id > _inicio_da_rodada_atual(requisicao))
             .order_by(RequisicaoTransicao.id)
             .all())
 

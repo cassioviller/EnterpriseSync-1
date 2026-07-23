@@ -14,7 +14,20 @@ que o código sobe — não há flag. São elas:
 **O resto está atrás de `compras_governanca_ativa`, desligada por
 padrão.** Todo o risco está em ligá-la.
 
+> ⚠️ **Dependência dura: a governança de compras exige `escopo_obra_ativo`
+> ligado no mesmo tenant.** Com o escopo desligado,
+> `utils.autorizacao.papel_na_obra` devolve `GESTOR` para todo usuário
+> autenticado do tenant (comportamento pré-Fase 1). Nesse estado a alçada
+> colapsa: **qualquer** autenticado aprovaria, e **só o ADMIN** conseguiria
+> emitir pedido (o COMPRADOR de verdade resolve para GESTOR e cai fora de
+> `PAPEIS_QUE_COMPRAM`). Por isso `flag_compras_governanca.py --ligar`
+> **recusa** tenant sem escopo ligado. Ligue o escopo primeiro
+> (`scripts/flag_escopo_obra.py <ID> --ligar`, depois de popular
+> `usuario_obra` — ver runbook da Fase 1/1.5).
+
 ## Antes de ligar, por tenant
+
+0. **Confira que `escopo_obra_ativo` está ligado** (pré-requisito duro, acima).
 
 1. **Confira as faixas de alçada.**
 

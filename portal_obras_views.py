@@ -633,10 +633,14 @@ def toggle_portal(obra_id: int):
     obra.portal_ativo = not obra.portal_ativo
 
     if obra.portal_ativo:
-        # Fase 3 — rotacionar o token e carimbar a validade a cada vez que
-        # o portal é (re)aberto. Antes, o token era gerado uma vez e valia
-        # para sempre; reabrir o portal reaproveitava a MESMA URL, o que
-        # tornava o "desligar o portal" uma revogação apenas temporária.
+        # Fase 3 — ao (re)abrir o portal, gera o token se ainda não houver e
+        # (re)carimba a validade em +180 dias. ATENÇÃO: NÃO rotaciona um
+        # token já existente — reabrir reaproveita a MESMA URL. Ou seja,
+        # desligar o portal é revogação apenas ENQUANTO desligado; reabrir
+        # devolve o mesmo link. Para revogar de fato uma URL vazada, zere
+        # `obra.token_cliente` antes de reabrir (um novo token é gerado).
+        # A troca por login de cliente, que encerra o token de vez, é a
+        # Fase 9a (decisão D3 do plano).
         if not obra.token_cliente:
             obra.token_cliente = secrets.token_urlsafe(32)
         obra.token_cliente_expira_em = (

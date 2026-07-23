@@ -1133,8 +1133,14 @@ def _itens_do_form():
 
         def _num(lista, idx, padrao='0'):
             bruto = (lista[idx] if idx < len(lista) else '') or padrao
-            return float(str(bruto).replace('.', '').replace(',', '.')
-                         if ',' in str(bruto) else str(bruto))
+            try:
+                return float(str(bruto).replace('.', '').replace(',', '.')
+                             if ',' in str(bruto) else str(bruto))
+            except (TypeError, ValueError):
+                # Entrada não-numérica ('abc', vazio malformado) não pode
+                # virar HTTP 500 — vale 0 e a linha entra com valor zero,
+                # que o usuário vê e corrige, em vez de perder o formulário.
+                return 0.0
 
         almox_bruto = almox_ids[i] if i < len(almox_ids) else ''
         itens.append({
@@ -1173,10 +1179,20 @@ def requisicoes():
 
     requisicoes_lista = query.order_by(RequisicaoCompra.id.desc()).limit(200).all()
 
-    contagem = {}
-    for estado in EstadoRequisicao:
-        contagem[estado.name] = sum(
-            1 for r in requisicoes_lista if r.estado == estado)
+    # Contagem por estado vem de um agregado sobre TODAS as requisições
+    # visíveis, não da lista limitada a 200 — senão os badges subcontam num
+    # tenant com mais de 200 requisições. `query` já carrega os dois filtros
+    # (tenant + escopo de obra); removo só o filtro de estado, se houver.
+    from sqlalchemy import func
+    contagem_base = (db.session.query(RequisicaoCompra.estado, func.count())
+                     .filter(RequisicaoCompra.admin_id == admin_id)
+                     .filter(RequisicaoCompra.obra_id.in_(ids_visiveis or [-1]))
+                     .group_by(RequisicaoCompra.estado).all())
+    contagem = {e.name: 0 for e in EstadoRequisicao}
+    for estado, n in contagem_base:
+        nome = estado.name if hasattr(estado, 'name') else str(estado)
+        if nome in contagem:
+            contagem[nome] = n
 
     return render_template(
         'compras/requisicoes.html',
@@ -1273,8 +1289,12 @@ def requisicao_nova_post():
         data_necessidade = None
 
     # Tenants criados depois da migration 243 não têm faixa; semeia aqui,
-    # antes de existir requisição que dependa delas.
-    garantir_faixas_do_tenant(admin_id)
+    # antes de existir requisição que dependa delas. COMMIT próprio: se o
+    # loop de numeração abaixo der rollback numa colisão, o seed não pode ir
+    # junto — senão a requisição persistiria sem faixa e cairia na faixa de
+    # segurança, e o flash final anunciaria a alçada errada.
+    if garantir_faixas_do_tenant(admin_id):
+        db.session.commit()
 
     # Retry de numeração: o UNIQUE (admin_id, numero) fecha a corrida entre
     # dois requests simultâneos. Mesmo padrão de views/obras.py:3279.

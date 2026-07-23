@@ -59,6 +59,23 @@ def _tem_faixa(admin_id):
     return FaixaAlcada.query.filter_by(admin_id=admin_id, ativo=True).count() > 0
 
 
+def _escopo_ligado(admin_id):
+    """True se `escopo_obra_ativo` está ligado para o tenant.
+
+    Dependência DURA e não-óbvia: com o escopo desligado,
+    `utils.autorizacao.papel_na_obra` devolve GESTOR para TODO usuário
+    autenticado do tenant (comportamento pré-Fase 1), o que colapsa a
+    governança — qualquer um aprovaria, e só o ADMIN emitiria pedido
+    (o COMPRADOR real resolve para GESTOR e cai fora de PAPEIS_QUE_COMPRAM).
+    Por isso ligar a governança sem o escopo é ligar uma alçada de mentira.
+    """
+    try:
+        from scripts.flag_escopo_obra import escopo_ativo
+        return bool(escopo_ativo(admin_id))
+    except Exception:
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description='Flag de governança de compras')
     parser.add_argument('admin_id', type=int)
@@ -77,6 +94,15 @@ def main():
                       f'alçada ativa. Toda compra cairia na faixa de '
                       f'segurança (2 aprovações + ADMIN). Rode a migration '
                       f'243 ou use --forcar se for isso mesmo.')
+                return 1
+            if not _escopo_ligado(args.admin_id) and not args.forcar:
+                print(f'RECUSADO: tenant {args.admin_id} está com '
+                      f'escopo_obra_ativo DESLIGADO. Sem o escopo, '
+                      f'papel_na_obra devolve GESTOR a todo usuário e a '
+                      f'governança vira alçada de mentira: qualquer um '
+                      f'aprova e só o ADMIN emite pedido. Ligue o escopo '
+                      f'antes (scripts/flag_escopo_obra.py <ID> --ligar) '
+                      f'ou use --forcar se souber o que está fazendo.')
                 return 1
             definir_flag(args.admin_id, True)
             print(f'tenant {args.admin_id}: governança de compras LIGADA')
