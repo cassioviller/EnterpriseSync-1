@@ -664,3 +664,101 @@ A fase está pronta quando **todos** forem verdade, cada um com teste:
 - **Modelo `Contrato` completo** (cláusulas, vigência, partes, alertas de vencimento) — é o módulo 4.10, Fase 9. Aqui só existe o **valor** contratado e sua história. `ObraContratoVersao` foi nomeada assim, e não `Contrato`, exatamente para não colidir com essa fase.
 - **Alçada de aprovação por valor.** Depende do valor de X (pergunta 3 da DEVOLUTIVA), que não foi respondida. `AditivoContrato` já tem os campos para acomodá-la sem migration nova.
 - **SINAPI** e **sugestão de preço a partir de cotações** — itens 4.4 da DEVOLUTIVA que não têm relação com versionamento.
+
+---
+
+## Revisão de premissas — 2026-07-23 (pós-Fase 3)
+
+> Reconferência integral contra `main` em `8948573a` (Fases 1, 1.5, 2 e 3
+> mergeadas; migrations aplicadas até 247 registradas). Todo `arquivo:linha`
+> abaixo foi aberto e lido hoje — nada deduzido por nome. A descoberta
+> central: **a Fase 0.6/D1 (migration 219, fechada no MESMO dia 21/07 em que
+> este plano foi escrito) já implementou o núcleo das Tasks 6, 7 e 8.** O
+> plano foi escrito sobre o commit `fb4147b`, anterior ao fecho da 0.6 — a
+> medição de §1.1 era verdade de manhã e deixou de ser à noite.
+
+### Premissas do §7, uma a uma
+
+| # | Premissa | Veredito | Evidência (hoje) | Ajuste necessário |
+|---|---|---|---|---|
+| 1 | `valor_contrato` é Float, escrito só em `event_manager.py:1043`, `views/obras.py:391` e `:873` | **PARCIAL** | Float sim (`models.py:346`). Escritores reais: `event_manager.py:1018` (criação) e `:1093` (revisão), `views/obras.py:326`/`:413` (criação) e `:940` (edição), **`services/importacao_fisico_financeiro.py:786`** e `scripts/seed_demo_alfa.py:1084`/`:2650` | A lista da premissa estava incompleta: o importador físico-financeiro é um 4º escritor de produção. D6 (escritor único) precisa domá-lo também — o risco "obra sem baseline" do §9 já o citava, mas como criador de obra, não como escritor de `valor_contrato` |
+| 2 | A duplicação de IMC/lançamento de §1.1 ainda acontece (2 itens/220k, saldo −100k) | **QUEBRADA** — a mais importante | Fase 0.6/D1: `handlers/propostas_handlers.py:54-176` reconcilia IMC por linhagem (atualiza em vez de inserir; item sumido vira `WARNING` com ids, `:153-167`); `:291-375` lança **o delta** contábil (estorno via conta de dedução `4.2.01.001`, não inversão de partidas); `event_manager.py:1069-1093` congela `valor_base` das medições recebidas antes de sobrescrever o contrato. ESTADO-ATUAL/D1: "Agora: 1 item/120k, saldo 0, receita 120k" | Tasks 7 e 8 mudam de "criar" para "completar" — ver Impacto. O Step 2 da Task 7 ("se seus números divergirem, pare e reinvestigue") já tem resposta: foi a 0.6 |
+| 3 | `handlers/propostas_handlers.py` é o único criador de IMC a partir de proposta | **CONFIRMADA** | Único `ItemMedicaoComercial(` a partir de proposta: `handlers/propostas_handlers.py:141`. `medicao_views.py:198` cria IMC **manual** (sem `proposta_item_id`) — fora do escopo da premissa. O importador reusa o caminho canônico com `skip_contabil` (`handlers/propostas_handlers.py:203-204`) | Nenhum |
+| 4 | Maior migration abaixo de 270 | **CONFIRMADA** | Maior registrada: **247** (Fase 3). Faixa **270-276 livre** — zero ocorrências em `migrations_to_run`. Fases usaram: 214-216 (F1), 217-219 (F0.6), 220-221 (F1.5), 230-232 (F2), 240-247 (F3) | Duas ressalvas: `migrations_to_run` está em `migrations.py:4567` (não `:3831-4014` como diz a Task 14); e a **Fase 4 está em curso** num worktree consumindo 250-254 (ver N7) |
+| 5 | `MedicaoContrato` sem UI de escrita | **CONFIRMADA** | Único criador: `services/importacao_fisico_financeiro.py:732`; grep em `views/` → nada | Mas o modelo ganhou `valor_base` (D1c, `models.py:6209`) e a property `valor` já lê por ela (`:6213-6218`) — a Task 4 muda de forma (ver N8) |
+| 6 | Decorator de autorização por obra da Fase 1 | **CONFIRMADA** | `utils/autorizacao.py`: `obra_required(papel_minimo=None)` (`:184`), `papel_na_obra` (`:102`), `pode_editar_obra` (`:149`), `pode_ver_obra` (`:145`) — os nomes do plano da F1 valeram | Risco novo N4: colapso do papel com `escopo_obra_ativo` OFF |
+| 7 | Fase 4 não tornou centro de custo obrigatório | **CONFIRMADA em `main`** | Nada de NOT NULL/CHECK em `LancamentoContabil`/`ObraServicoCusto` no `main` de hoje | **F4 em execução** no worktree `.claude/worktrees/fase-4` (branch `feat/fase-4-centro-custo`, migrations 250-254). O CHECK dela é em `gestao_custo_filho` (destino do custo), não nas tabelas que a F6 insere — mas reconferir no merge da F4 |
+| 8 | `Obra.regime_medicao` continua `'fixa'\|'percentual'` | **CONFIRMADA na forma; semântica mudou** | `models.py:427` — String(20), mesmos valores. Mas a F1.5 a tornou **viva**: define o `modo_apontamento` default das tarefas novas (comentário reescrito em `models.py:405-427`) | Nenhum para D4; apenas não repetir a frase "coluna morta" (armadilha 7 do ESTADO-ATUAL foi superada) |
+| 9 | `criar_nova_versao` é a única porta; gate em `:1511-1518` | **CONFIRMADA (linhas ok)** | Gate `rascunho`: `propostas_consolidated.py:1507-1518`. `criar_nova_versao`: `:1248`; clone de itens `:1328-1354` | O clone **agora grava linhagem** (`proposta_item_origem_id=(it.proposta_item_origem_id or it.id)`, `:1335` — semântica de **raiz**, não de pai imediato) e **continua perdendo os 6 campos dimensionais** (`tipo_medicao_override`/`dim_*`, `models.py:3527-3532`, ausentes do bloco). Metade da Task 6 feita, metade de pé |
+| 10 | `TarefaCronograma.ativa` existe, sem semântica conflitante | **CONFIRMADA** | `models.py:5568` (era `:4947`). Uso de negócio: rollback de importação (`services/cronograma_versao_service.py:592`, `:787`, `:812-813`) — exatamente o já previsto no fundamento de D3 | Nenhum |
+
+### Demais premissas verificáveis do corpo do plano
+
+| Premissa (§ do plano) | Veredito | Evidência / ajuste |
+|---|---|---|
+| Linhas de `models.py` citadas em §1 | **QUEBRADAS em bloco** (deslocamento ~+1100 pelas F1/2/3) | Mapa novo: `Obra` 335 (`valor_contrato` 346, `status` 351, **`estado` 364 — novo, F2**, `proposta_origem_id` 387, `regime_medicao` 427); `Proposta` 3225 (cadeia 3326-3328, `cadeia_versoes` ~3404); `PropostaItem` 3471 (linhagem **3500**, dim 3527-3532); `TarefaCronograma` 5461 (`ativa` 5568); `ItemMedicaoComercial` 6054 (UNIQUE `proposta_item_id` `:6069`); `MedicaoContrato` 6189 (`valor_base` 6209, property 6213-6218); listener IMC `after_insert` **6893** (era 6263); `Orcamento` 7142; `OrcamentoItem` 7190; `ObraOrcamentoOperacional` 7560 / `ItemVersao` 7615 (índice `idx_op_item_versao_lookup` `:7624`) |
+| `Orcamento` não versiona, sem trava; rotas em `views/orcamentos_views.py:282/315/382/472/497/514/527/592` | **CONFIRMADA — intacta** | `models.py:7142-7188`: sem `versao`/`origem_id`/`travado_em`; nenhuma rota olha `status` antes de editar; as 8 linhas de rota conferem **exatamente**. Tasks 10-12 valem como escritas |
+| Saldo em `medicao_views.py:70-72` | **CONFIRMADA** | Mesmas linhas: `:70` `valor_contrato`, `:72` `saldo = valor_contrato - soma_itens` |
+| PDF devolve HTML (`propostas_consolidated.py:1165`) | **CONFIRMADA** | `return html_content` na `:1165`; `gerar_pdf` na `:1066` |
+| `aprovar` é dona única da transação | **CONFIRMADA** | `propostas_consolidated.py:2335+`: `EventManager.emit(..., raise_on_error=True)`, rollback nos excepts, `db.session.commit()` único |
+| Idempotência da materialização em duas camadas | **CONFIRMADA, com fluxo novo** | `services/cronograma_proposta.py:483+` (era `:451`); camadas em `:513-517` e `:523-529`. **Mudou o gatilho** (F1.5/#200): o handler só materializa quando há `cronograma_default_json` (`handlers/propostas_handlers.py:240-244`) — e o clone da revisão **copia** esse snapshot (`propostas_consolidated.py:1308`), logo aprovar v2 re-executa a materialização; a idempotência via linhagem precisa de teste dedicado na Task 9. `registrar_versao_inicial` **já é idempotente** (`services/cronograma_versao_service.py:174-189`) — o cuidado da Task 9 já está atendido pelo código |
+| Dependência da F2: "tabela de histórico de transição" | **SATISFEITA** | `ObraTransicaoEstado` (`models.py:485`) + `services/obra_estado.py`. **Não há** API "registrar evento sem transição" (`transitar`, `:243`, exige transição válida); o padrão sancionado é INSERT direto da linha, como faz `event_manager.py:1047-1056`. Docstring reserva `estado_de=NULL` ao nascimento → para `aditivo_aprovado`, usar `estado_de == estado_para` com `detalhes`, ou registrar só em `AditivoContrato` (o fallback do §4 do plano vale) |
+| D2: "`Obra.status` é String(20) de texto livre, inutilizável" | **ENVELHECIDA (a favor)** | F2 criou `Obra.estado` canônico (VARCHAR+CHECK, migration 231) com máquina de estados. O **divisor de D2 (contrato vigente) segue sendo o recomendado** — mas o argumento contra "obra já começou" mudou de "não existe" para "existe e ainda assim é o critério errado" (contrato assinado com obra em `planejamento` continua sendo o caso real) |
+| Task 5: `views/obras.py:873` / `obra_form.html:491-498` | **Linhas deslocadas** | `editar_obra` agora `views/obras.py:901`, gravação livre de `valor_contrato` na `:940`; criação `:326`/`:413`. Conferir a âncora do template ao executar. Atenção ao write-through estado→status da F2 ao mexer no POST |
+| Task 14: gate de referência "878 testes" | **QUEBRADA** | Gate de 23/07 (`ESTADO-ATUAL.md`): **1122 passed, 6 skipped, 0 falhas** (`41034faa`). Usar este número como base |
+| `reportlab` em `pyproject.toml:17` | **CONFIRMADA** | `"reportlab>=4.4.2"` na linha 17 |
+| Pergunta 1 da DEVOLUTIVA (linha 281) | **CONFIRMADA** | `DEVOLUTIVA.md:279-283` — a pergunta segue lá, e a resposta de D1 (três donos) segue respondendo-a |
+| Os 7 testes de `test_proposta_revisao_nao_duplica_obra.py` | **CONFIRMADA** | 7 `def test_`, incl. `test_aprovar_revisao_atualiza_valor_de_contrato` (`:222`) — a linha citada pelo plano era `:220-247`, ok |
+
+### Premissas NOVAS — o que as Fases 0.6-3 criaram e o plano não previu
+
+| # | Risco novo | Evidência | Consequência para a fase |
+|---|---|---|---|
+| N1 | **Já existe UMA linhagem de item — não criar outra.** `proposta_itens.proposta_item_origem_id` (migration 219) aponta para a **raiz** da cadeia (o clone propaga a raiz, não o pai — `propostas_consolidated.py:1335`), com fallback de casamento por `item_numero` para revisões pré-0.6 (`handlers/propostas_handlers.py:33-51`) | `models.py:3494-3502` | A Task 6 **não cria** `PropostaItem.item_origem_id` nem a migration 273: **adota** a coluna existente. O diff da Task 12 pareia por raiz (dois itens casam se têm a mesma raiz), não por pai imediato. Duas linhagens paralelas seria o novo defeito da fase |
+| N2 | **Mudar `origem` do lançamento quebra a própria soma do delta.** O handler soma o já-lançado da linhagem filtrando `origem == 'PROPOSTAS'` (`handlers/propostas_handlers.py:304-310`). Se a Task 8 gravar o aditivo com `origem='ADITIVO'` sem ajustar essa query, o próximo delta não enxerga o anterior e **volta a duplicar receita** | `handlers/propostas_handlers.py:304-311` | Task 8: ou mantém `origem='PROPOSTAS'` (e marca o aditivo por `historico`/campo próprio), ou muda a query para `origem.in_(('PROPOSTAS','ADITIVO'))` no mesmo commit. O critério de pronto nº 1 do §10 já cobre a regressão — rodar o teste dos dois jeitos |
+| N3 | **O backfill da migration 276 contradiz uma decisão registrada.** A migration 219 documenta por que **não** backfillou a linhagem ("não é reconstituível com segurança — o clone não deixava rastro") e resolveu o legado em **runtime** via `item_numero` (`migrations.py:15277-15285`) | `migrations.py:15261-15304` | Rediscutir a 276 antes de escrever: backfillar por `(descricao, ordem)` grava em disco um casamento que a 219 julgou inseguro. Alternativa coerente: o diff usa o mesmo fallback `item_numero` em runtime e a 276 morre (libera número da faixa) |
+| N4 | **O guard de papel colapsa com `escopo_obra_ativo` OFF** — achado nº 1 do review da F3: `papel_na_obra` devolve GESTOR a **todo autenticado** do tenant quando a flag está desligada; foi por isso que o `--ligar` da governança de compras recusa tenant sem escopo | `utils/autorizacao.py:102-143`; ESTADO-ATUAL, armadilha F3 nº 3 | Task 13: `obra_required(papel_minimo='GESTOR')` em tenant sem escopo autoriza qualquer um a aprovar aditivo. Decidir de saída: (a) aceitar documentado (comportamento igual ao resto do app), ou (b) exigir a flag como a F3 fez. Recomendado (a) — aditivo não tem o risco financeiro-imediato da alçada de compra, e (b) travaria a fase no rollout da F1 que está bloqueado por dados |
+| N5 | **A obra agora nasce em `planejamento` com linha de histórico**, e `status` é espelho derivado de `estado` por write-through | `event_manager.py:1020-1056`; `models.py:353-368` | Tasks 5 e 13: não escrever `Obra.status` direto; o registro do `aditivo_aprovado` tem destino real (`ObraTransicaoEstado`) — o TODO do §4 virou implementável |
+| N6 | **A F3 criou o precedente de alçada por tenant** (`FaixaAlcada`, `models.py:5312` + `services/alcada_compras.py`) e estendeu `PapelObra` com COMPRADOR (migration 245) | `models.py:5312`; `services/alcada_compras.py:37-100` | A decisão nº 7 do §8 (dupla aprovação de aditivo por valor) deixou de ser "precisa do valor de X": há infra e seed de referência para copiar. Continua fora do escopo mínimo — mas se o Cássio pedir, o desenho é o da F3, não um novo |
+| N7 | **Fase 4 em execução** no worktree `.claude/worktrees/fase-4` (`feat/fase-4-centro-custo`), migrations **250-254**: CHECK `ck_gestao_custo_filho_destino` (NOT VALID → VALIDATE), `gestao_custo_pai.obra_id`, centro administrativo por tenant | `git branch` + `migrations.py` do worktree `:5105-5109` | Nenhuma colisão de faixa (250-254 ≠ 270-276) e o CHECK não alcança as tabelas que a F6 insere (`LancamentoContabil`, `PartidaContabil`, IMC, `ObraServicoCusto`). Mas a F4 **vai mergear antes** da F6: reconfirmar a premissa 7 do §7 contra o merge real, não contra este snapshot |
+| N8 | **O congelamento de medição já existe por `valor_base`, com critério `recebido_no_mes`** — automático, sem preview: ao subir o contrato, as medições **recebidas** congelam na base anterior; as não recebidas seguem o contrato novo em silêncio | `event_manager.py:1069-1093`; `models.py:6204-6218` | A Task 4 muda de desenho: `valor_base` é o mecanismo canônico de imutabilidade — a FK `contrato_versao_id` vira **rastreabilidade** (nullable, "de qual versão veio esta base"), não o mecanismo. O que a F6 acrescenta de fato é o **repontamento explícito com preview** dos marcos não recebidos (D4), que hoje acontece implícito |
+
+### Impacto no plano
+
+**A Fase 6 segue executável e segue necessária — mas três tasks mudam de
+natureza.** O que continua inexistindo (verificado hoje): `ObraContratoVersao`,
+`AditivoContrato`, extrato/UI de aditivo, trava de edição do orçamento
+convertido, cadeia de revisões do Orçamento, comparador de versões, e a cópia
+dos campos dimensionais na revisão. **Tasks 1-5, 10-13 valem como escritas**
+(ajustando linhas e o write-through da F2). A faixa 270-276 está livre.
+
+O que muda:
+
+1. **Task 6 encolhe pela metade**: a linhagem existe (`proposta_item_origem_id`,
+   semântica de raiz — N1); resta copiar os 6 campos dimensionais no clone.
+   A migration 273 provavelmente morre.
+2. **Task 7 deixa de ser "matar a duplicação" (morta pela 0.6/D1) e vira
+   "completar a reconciliação"**: transformar o `WARNING` de item suprimido
+   (`handlers/propostas_handlers.py:153-167` — o gancho que a 0.6 deixou
+   explicitamente para esta fase, cf. ESTADO-ATUAL §"O que a Fase 0.6
+   deliberadamente NÃO fez") em `status='SUPRIMIDO'`, e acrescentar a guarda
+   de redução abaixo do já medido. O cenário de teste do Step 1 não vai mais
+   reproduzir os números de §1.1 — escrever o teste contra o comportamento
+   novo desejado, não contra o defeito extinto.
+3. **Task 8 encolhe**: o delta com estorno já existe (via conta de dedução
+   `4.2.01.001`, desenho **melhor** que o proposto em D5 — não reverta para
+   inversão de partidas, o DRE só soma CREDITO na receita). Resta amarrar o
+   lançamento ao `AditivoContrato` sem quebrar a soma da linhagem (N2).
+4. **Task 4 se redesenha sobre `valor_base`** (N8): a FK de versão vira
+   rastreabilidade; o entregável real é o repontamento explícito com preview.
+5. **Migration 276: rediscutir ou eliminar** (N3).
+6. **Números de referência**: gate = 1122 passed (23/07); maior migration =
+   247; `migrations_to_run` em `migrations.py:4567`; linhas de `models.py`
+   pelo mapa desta revisão, não pelo §1.
+
+Em soma: o esforço total cai (o núcleo financeiro das Tasks 7-8 já está em
+produção de código), mas a fase ganha um pré-requisito de disciplina — **operar
+sobre os mecanismos da 0.6 (linhagem por raiz, `valor_base`, delta por
+linhagem) em vez de recriá-los**. Recomendação: revisar as Tasks 4, 6, 7, 8 e
+12 contra esta seção antes da primeira linha de código, e reconfirmar a
+premissa 7 (§7) depois do merge da Fase 4.

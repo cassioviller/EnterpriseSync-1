@@ -4467,3 +4467,88 @@ git log --oneline -20
 ```
 
 E anote em `ESTADO-ATUAL.md` que a Fase 8 **Parte B** está concluída, que a Parte A depende das Fases 1/3/4/6, e que o item aberto do lado humano é **o arquivo-modelo do Domínio e o plano de contas da Veks** — sem eles, `LAYOUT_CONFERIDO` continua `False` e o de/para continua vazio.
+
+---
+
+## Revisão de premissas — 2026-07-23 (pós-Fase 3)
+
+> Conferido contra o código de `main` em 23/07 (commit `8948573a` — Fases 0.6,
+> 1, 1.5, 2 e 3 mergeadas; maior migration definida: **247**). O plano foi
+> escrito sobre o commit `fb4147b` (21/07); a Fase 0.6 fechou no MESMO dia e
+> parte do que este plano lista como "buraco" foi corrigido horas depois da
+> escrita. Nada do texto acima foi alterado — esta seção é a errata.
+
+### Tabela de vereditos
+
+| Premissa (seção do plano) | Veredito | Evidência em 23/07 | Ajuste necessário |
+|---|---|---|---|
+| `FluxoCaixa` razão de caixa, `valor Numeric(15,2)` (`models.py:781-812`) | CONFIRMADA | `models.py:1033-1064`; `valor` em `:1042`. Só linhas deslocadas (+~250) | atualizar refs ao executar |
+| `calcular_fluxo_caixa` / `agregar_fluxo_mensal` / tela | CONFIRMADA | `financeiro_service.py:437` e `:730` intactos; tela `financeiro_views.py:677-679`; rotas `:740` e `:801` batem com o plano | nenhum |
+| 45 categorias `_DEFAULTS` (9 ENTRADA + 36 SAIDA) | CONFIRMADA | `models.py:7822-7889` (contado: 9+36). B16 segue válida | refs deslocadas |
+| Classificador por cadastro + `_norm` | CONFIRMADA | `services/classificador_cadastro.py:69`; modelos em `models.py:7898/7933/7954` | nenhum |
+| Importador `ImportacaoFluxoCaixa` (`processar`/`importar`/dedup) | CONFIRMADA | `processar` em `services/importacao_excel.py:1795`; `importar :2129`; `_ja_existe_* :2183/:2205` | nenhum |
+| Contabilidade interna (balancete/razão/DRE/telas) | CONFIRMADA | `contabilidade_views.py`: balancete `:507`, razão `:647`, DRE `:680-682`; sped `:1341-1354` | refs deslocadas |
+| Motor V2 + `MAPEAMENTO_CONTABIL` + 6 chamadores | CONFIRMADA | `gerar_lancamento_contabil_automatico` em `contabilidade_utils.py:1668` (default `centro_custo_id=None` em `:1674`); `MAPEAMENTO_CONTABIL :1536`; chamadores: `gestao_custos_views.py:759,893`, `financeiro_service.py:188`, `folha_pagamento_views.py:266`, `alimentacao_views.py:519`, `compras_views.py:756`, `transporte_views.py:254` | refs de folha (277→266) e compras (717→756, deslocada pela F3) |
+| **Buraco A** — nada de Domínio/11758 existe | CONFIRMADA | grep hoje acha `dominio` só no catálogo de webhooks (`dominio.acao`, Task #45 — outro sentido) e nos docs; `SpedContabil` (`models.py:2985`) segue só lido por `contabilidade_views.py:1341-1354` | nenhum |
+| **Buraco B** — transferência nunca entra no razão | CONFIRMADA | detecção `services/importacao_excel.py:1961-1972`; payload `:2122`; `importar` (`:2295`, `:2451`) só lê `saidas`/`entradas`; `importacao_views.py:453,473,515,550,701` nas MESMAS linhas; o confirmar (`:941-947`) segue sem repassar `transferencias` | B14 segue necessária e como escrita |
+| **Buraco C** — DRE não enxerga despesas V2 | **QUEBRADA** (corrigida pela Fase 0.6/D3) | `calcular_dre_mensal` reescrito: mapa único `_DRE_LINHAS_DESPESA_OPERACIONAL` (`contabilidade_utils.py:534-554`) cobre `5.1.x` E `6.1.x`, e a linha "outras" virou **residual calculado** (`:660-693`) — nenhum débito de resultado some mais. O `6.1.02` fica DELIBERADAMENTE no residual (`:545-553`) porque os planos discordam no nível 4 | A1 muda de alvo: não é "fazer o DRE ver o V2" (feito), é unificar os planos e tirar o `6.1.02` do residual |
+| **Buraco D** — `PlanoContas` single-tenant, seed quebrado | **QUEBRADA** (corrigida pela Fase 0.6/D4, migration 218) | PK é `(admin_id, codigo)` (`models.py:2779-2782`); FKs compostas em `PartidaContabil` (`:2876-2883`), `BalanceteMensal`, `FluxoCaixaContabil`; seed com `ON CONFLICT (admin_id, codigo)` e gate incondicional (`contabilidade_utils.py:1597-1652`); `get_conta_cached` filtra por tenant (`models.py:2793-2813`) | ver "Impacto" — A1 como escrita está obsoleta; o fundamento da D1 ("PK global") caiu, mas a recomendação da D1 (tabela `conta_dominio` separada) sobrevive pelo argumento do código reduzido |
+| **Buraco E** — seções do DRE permanentemente zeradas | **PARCIALMENTE QUEBRADA** | `4.2`/`4.2.01`/`4.2.01.001` agora EXISTEM no `_V2_CONTAS_SEED` (`contabilidade_utils.py:1562,1572,1586`) e recebem o estorno de revisão de proposta (`handlers/propostas_handlers.py:352-358`, Fase 0.6/D1) — deduções deixou de ser estruturalmente zero. `4.3.01` e `5.3.x` seguem inexistentes em todos os seeds. `5.2.01` existe só em `criar_plano_contas_padrao` (`contabilidade_utils.py:87`) como "Materiais Indiretos" — **conflita** com a leitura do DRE, que soma `5.2.01` como despesa financeira (`:700`) | A1 herda o conflito de `5.2.01` além do `6.1.02` |
+| **Buraco F** — não existe DRE por obra | CONFIRMADA | `calcular_dre_mensal(admin_id, ano, mes)` (`contabilidade_utils.py:557`) sem obra; rota `/dre` (`contabilidade_views.py:680`) só lê mês/ano; `contabilizar_proposta_aprovada :157` | A2 segue necessária |
+| **Buraco G** — `ConciliacaoBancaria` órfã | CONFIRMADA | `models.py:2963-2974` (sem `banco_id`); único uso no repo é a própria definição; zero OFX | A5 segue como escrita |
+| **Buraco H** — sem competência no razão | CONFIRMADA | `FluxoCaixa` (`models.py:1033-1064`) só tem `data_movimento` | A3 segue |
+| **Buraco I** — `float` em coluna `NUMERIC` | **PARCIALMENTE QUEBRADA** | o importador JÁ usa `_parse_decimal` nas gravações de fluxo (`services/importacao_excel.py:2297` saídas, `:2452` entradas — commit `b30923b5`, 22/07). O que resta é só `financeiro_views._parse_valor` devolvendo `float` (`:25-44`; consumidores `:751`, `:818`, `round` em `:825`) | A4 encolhe para o lado `financeiro_views`; o passo do plano sobre `:2334,2385,2494` já está feito |
+| **Buraco J** — importador ignora a obra administrativa | **PARCIALMENTE QUEBRADA** | `importar` JÁ aplica `_obra_efetiva(...)` na gravação (`services/importacao_excel.py:2301` saídas, `:2456` entradas; mesmo commit `b30923b5`). `FluxoCaixa.obra_id` segue nullable (`models.py:1044`) | a metade "importador" da premissa 1 está resolvida; a obrigatoriedade da coluna segue sendo da Fase 4 |
+| **Buraco K** — `CentroCusto` × `CentroCustoContabil` sem ponte | CONFIRMADA | `FluxoCaixa.centro_custo_id → centro_custo` (`models.py:1045`); `PartidaContabil.centro_custo_id → centro_custo_contabil` (`:2867`); `CentroCusto.codigo` segue `unique=True` global (`:964`) | premissa 3 da Parte A segue aberta |
+| Premissa A-1 — `obra_id` obrigatório? | NÃO (metade resolvida) | coluna nullable (`models.py:1044`); importador corrigido (ver buraco J) | aguarda Fase 4 |
+| Premissa A-2 — obra do custo mudou de lugar? | NÃO MUDOU | `GestaoCustoFilho.obra_id` (`models.py:5923`); pai sem coluna (`:5831-5911`); filtros `.itens.any` (`financeiro_service.py:514-517`, `:545-548` — mesmas linhas) | aguarda Fase 4 |
+| Premissa A-3 — de/para de centros criado? | NÃO | ver buraco K | aguarda Fase 4 |
+| Premissa A-4 — PK de `PlanoContas` corrigida? | **SIM** (Fase 0.6/D4) | ver buraco D. 2.639 contas copiadas, 0 partidas órfãs (ESTADO-ATUAL) | A1 reescopada — ver "Impacto" |
+| Premissa A-5 — `saldo_atual` mantido? | INALTERADA (pergunta segue aberta) | `registrar_pagamento` decrementa `saldo_atual` quando `banco_id` vem informado (`financeiro_service.py:108-117`), mas nada nas Fases 1-3 tornou a manutenção sistemática; ADR-0003 segue valendo | reconfirmar em produção antes de A5 |
+| Premissa A-6 — vínculo pedido → pagamento? | **SIM, existe cadeia** (melhor que o previsto) | `PedidoCompra.requisicao_id` (`models.py:5109`, migration 244); `ContaPagar.pedido_compra_id` (`models.py:2021`); a emissão da F3 reusa `processar_compra_normal` criando GCP + `ContaPagar` por parcela com `origem_tabela='pedido_compra'` (`compras_views.py:1720-1725`, `:207-262`); a baixa gera `FluxoCaixa` com `referencia_tabela='conta_pagar'` (`financeiro_views.py:407-416`) | A5 parte 2 ("conciliação de compromisso") tem matéria-prima: requisição → pedido → conta a pagar → fluxo. Não é FK direta pedido→FluxoCaixa, é cadeia em 2 saltos — desenhar A5 sobre ela |
+| Premissa A-7 — versão-base do orçamento | INALTERADA | Fase 6 não executada | aguarda Fase 6 |
+| Dependência da Fase 1 (`admin_required` / autorização) | **RESOLVIDA** | Fase 1 fechou em 21/07; `utils/autorizacao.py` existe; `auth.py:21` (`admin_required`) intacto, exatamente na linha citada | a "única adaptação" para rodar a Parte B antes da F1 caiu — não é mais necessária |
+| Faixa de migrations 290-299 livre | CONFIRMADA | maior migration definida: `migration_247_*` (`migrations.py:4468`); nenhum `migration_29x` existe; `migrations_to_run` termina em 247 (`migrations.py:4770`) | **290-295 livres.** Atenção: ESTADO-ATUAL registra a faixa da F8 como 290-**295**; as migrations 296-299 da Parte A (A1-A3, A5) estão fora da faixa registrada, mas não colidem com a F9 (300-307). Registrar 296-299 no ESTADO-ATUAL ao executar a Parte A |
+| `migrations_to_run` "após a linha 4014" | QUEBRADA (deslocamento) | a lista hoje começa em `migrations.py:4567` e o último item (247) está em `:4770` | inserir 290-295 após a linha do 247 |
+| `app.py:726-731` bloco do `financeiro_bp` | CONFIRMADA (deslocada) | `app.py:730-731` | nenhum |
+| Índices `idx_fluxo_caixa_admin_data` / `_banco_data` | CONFIRMADA | migration 213 agora em `migrations.py:15440`; 186 em `:14599` | refs deslocadas |
+| Padrão de teste (`test_fase0_autorizacao.py`, `test_endpoint_classificar_termo.py`) | CONFIRMADA | ambos existem em `tests/` | nenhum |
+| Correção 2 (obra mora no filho, não órfã) | CONFIRMADA | mesmas evidências da premissa A-2 | nenhum |
+
+### Riscos NOVOS que as Fases 0.6-3 criaram (o plano não previa)
+
+| # | Risco novo | Evidência | O que fazer |
+|---|---|---|---|
+| N1 | **São QUATRO planos de contas, não dois.** O buraco C falava de 2 dialetos (`financeiro_seeds` × `_V2_CONTAS_SEED`); a Fase 0.6 documentou 4: além dos dois, `criar_plano_contas_padrao` (`contabilidade_utils.py:21-100`, `5.1.01` = "Materiais Diretos" vs "MÃO DE OBRA" em `financeiro_seeds.py:71`) e os códigos chumbados fora de seed (`event_manager.py:1164` grava salários em `5.1.01.001`; `contabilidade_utils.py:229` grava em `6.1.01.001` — **dois lançadores de salários em contas diferentes**) | comentário em `contabilidade_utils.py:514-518` remete a unificação explicitamente à Fase 8 | A1 e o de/para da B12 precisam mapear os 4 dialetos e os dois lançadores de salários; escolher o dialeto é a conversa com o contador (mesma da D1) |
+| N2 | **Lançamentos novos em `4.2.01.001` (Redução de Contrato).** A Fase 0.6/D1 passou a estornar revisão de proposta para baixo como dedução (`handlers/propostas_handlers.py:352-358`) | partidas reais em conta que o plano dizia não existir | não afeta a Parte B (que lê `FluxoCaixa`, não partidas); afeta A1/A2 — o DRE por obra tem de carregar as deduções |
+| N3 | **A Fase 3 multiplica lançamentos do fluxo velho, não cria fluxo novo.** A emissão de pedido reusa `processar_compra_normal` (GCP + ContaPagar por parcela + almoxarifado; `compras_views.py:1724`) e a baixa segue gerando `pagamento_fornecedor` via `gerar_lancamento_contabil_automatico` (`financeiro_service.py:178-195`) | nenhum novo tipo de `FluxoCaixa`, nenhuma nova categoria | Parte B intacta. Volume de `ContaPagar`/partidas cresce quando `compras_governanca_ativa` ligar — irrelevante para o layout |
+| N4 | **`6.1.02` cai na linha residual do DRE até a Fase 8** (`contabilidade_utils.py:545-553`; ESTADO-ATUAL, "O que a Fase 0.6 deliberadamente NÃO fez") | transporte (`6.1.02.002`) hoje aparece como "outras", honesto mas não classificado | é literalmente a herança que A1 recebe; o critério de pronto de A1 deve incluir "6.1.02 sai do residual" |
+| N5 | **Worktree `.claude/worktrees/fase-4/` presente no repo** (untracked) — a Fase 4 pode começar em paralelo | `git status` de 23/07 | nada a fazer aqui além do que o plano já diz: a Parte A espera a Fase 4 fechar E este plano ser re-revisado depois dela |
+
+### Impacto no plano
+
+**Parte B (Domínio 11758): segue executável como escrita, com ajustes cosméticos.**
+Nenhuma das 20 tasks depende do que mudou: os buracos A, B, G, H e K estão
+intactos, as linhas de `importacao_views.py` citadas pela B14 nem se moveram, a
+faixa 290-295 está livre e o `admin_required` está exatamente onde o plano
+aponta. Os ajustes são: (1) atualizar refs de linha deslocadas (`models.py`
++~250/+600, `contabilidade_utils.py` +~90, `migrations.py` +~1200,
+`compras_views.py:717→756`); (2) ignorar a nota "antes da Fase 1" — a Fase 1 já
+fechou; (3) o gargalo real continua sendo humano: arquivo-modelo do Domínio e
+plano de contas da Veks (lacunas 1-8 e D1).
+
+**Parte A: a A1 está obsoleta como escrita e deve ser replanejada; o resto
+segue como estava (aguardando as Fases 4/6).** A migração de PK que a A1
+propunha (surrogate `id` + `UniqueConstraint`) já não faz sentido: a Fase
+0.6/D4 resolveu o multi-tenant mantendo a PK natural composta `(admin_id,
+codigo)` com FKs compostas — refazer isso como surrogate seria uma SEGUNDA
+migração de PK numa tabela agora saudável, sem ganho. O que sobra da A1 é o
+seu miolo verdadeiro, que cresceu: unificar QUATRO dialetos (não dois),
+reconciliar os dois lançadores de salários, tirar `6.1.02` do residual do DRE
+e criar as contas que faltam (`4.3.01`, `5.3.x`) resolvendo o conflito de
+significado de `5.2.01`. A A4 encolheu (o lado do importador já está feito;
+resta `financeiro_views._parse_valor`). A A5 ganhou matéria-prima: a cadeia
+requisição → pedido → `ContaPagar.pedido_compra_id` → baixa → `FluxoCaixa`
+existe de ponta a ponta — a premissa 6 deixou de ser bloqueio. As premissas
+1, 2, 3 e 7 continuam abertas e travadas nas Fases 4 e 6, exatamente como o
+plano previa.

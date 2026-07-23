@@ -6280,3 +6280,93 @@ de submeter o RDO que ele lançou.
 - Números de migration: 260-264. A maior registrada hoje é a **213**
   (`migrations.py:4014`); a Fase 1 usa 214-216. Confira antes de aplicar,
   caso outra branch tenha avançado.
+
+---
+
+## Revisão de premissas — 2026-07-23 (pós-Fase 3)
+
+> Conferida sobre `main` em `8948573a`, com as Fases 1, 1.5, 2 e 3 mergeadas
+> e a rodada de pendências de 23/07 aplicada (triagem do Anexo B, conserto
+> fotos × `UPLOADS_PATH` em `b6d01a0b`, remoção de rotas mortas em
+> `4d500473`/`8948573a`). Cada linha abaixo foi aberta no código de hoje —
+> nada foi deduzido pelo nome. Baseline de testes: gate completo VERDE de
+> 23/07 (`pytest tests/ -m "not browser"` → 1122 passed, 0 falhas).
+
+### Tabela de vereditos
+
+| # | Premissa do plano | Veredito | Evidência hoje | Ajuste necessário |
+|---|---|---|---|---|
+| 1 | `RDO.status` `String(20)` default `'Finalizado'`, comentário "Task #12" (`models.py:860`) | ✅ CONFIRMADA | `models.py:1112` (linha deslocada) | Nenhum além de linha |
+| 2 | Oito caminhos de escrita gravam `status='Finalizado'` (`views/rdo.py:698,1539,1629,1754,2742,4574`; `rdo_editar_sistema.py:221`; `crud_rdo_completo.py:331,565`) | ✅ CONFIRMADA | `views/rdo.py:698,1540,1630,1755,2614,3967`; `rdo_editar_sistema.py:221` (exata); `crud_rdo_completo.py:338,572` | Atualizar os números nos comentários/docstrings que o plano manda escrever |
+| 3 | "**9 consumidores** filtram `status == 'Finalizado'`" | ⚠️ QUEBRADA (cresceu) | Hoje são **11** ocorrências: `cronograma_views.py:2458,2488`; `portal_obras_views.py:239`; `services/medicao_service.py:243`; `services/rdo_custos.py:330`; `services/metricas_produtividade.py:186,972,1302,1320` **+ `:1397,:1416` (novos, F1.5)** | A decisão (coluna nova, `status` intocado) sai **reforçada**. Trocar "nove" por "≥9" nos textos/testes que citam o número |
+| 4 | Migration 154 executou `'Rascunho'`→`'Finalizado'` (`migrations.py:11469-11670`) | ✅ CONFIRMADA | `migration_154_force_rdo_finalizado` em `migrations.py:12225` | Só linha |
+| 5 | `finalizar_rdo` morta (guard `status=='Finalizado'` × default) e `@admin_required` recusa FUNCIONARIO | ✅ CONFIRMADA | `views/rdo.py:1522-1540` (guard `:1535`, escrita `:1540`); `auth.py:29` | Só linha (1521→1522, 1533→1535) |
+| 6 | Sem assinatura; `_signature_block` com linha para caneta (`rdo_pdf_service.py:798-865`); `_section_rule` `:259` | ✅ CONFIRMADA | `services/rdo_pdf_service.py:798` e `:259` — linhas **exatas** | Nenhum |
+| 7 | "Não há tabela de eventos de RDO" (`cronograma_apontamento_service.py:330-331`) | ✅ CONFIRMADA | Comentário hoje em `:28` e `:410` do mesmo arquivo | Só linha |
+| 8 | Moldes: `CronogramaImportacaoEvento` (`models.py:5178`), `log_transicao` (`cronograma_observabilidade.py:34`), listeners (`models.py:1422`, `:7018`) | ✅ CONFIRMADA | `log_transicao` `:34` exata; `RDOServicoSubatividade` `models.py:1614`; after_insert do RDO `models.py:7649`; `CronogramaImportacao` `models.py:5639` | Só linha. Ver também premissa NOVA N2: a Fase 2 criou molde ainda mais próximo |
+| 9 | `visualizar_rdo` **sem decorator**, docstring "SEM VERIFICAÇÃO DE PERMISSÃO" (`views/rdo.py:926-928`) | ❌ QUEBRADA (já corrigida) | Triagem de 23/07 (Anexo B): a rota tem `@login_required` e filtro de tenant no corpo — `views/rdo.py:926-929` | **Task 11, Steps 1-3 já estão feitos.** Resta só o Step 4 (recusar exclusão de RDO imutável) + os testes. O "substitua as linhas 926-928" do Step 3 não casa mais com o texto |
+| 10 | Não há `before_request` global (`views/rdo.py:2157`) | ✅ CONFIRMADA | Comentário hoje em `views/rdo.py:2042` | Só linha |
+| 11 | Sem handler de RDO em `handlers/`; `lancar_custos_rdo` `event_manager.py:578`; `recalcular_medicao_apos_rdo` `:1357` | ✅ CONFIRMADA | `ls handlers/` = financeiro + propostas; `event_manager.py:579` e `:1408` | Só linha |
+| 12 | `ProxyFix(x_for=1)` (`app.py:94`) | ✅ CONFIRMADA | `app.py:94` — exata | Nenhum |
+| 13 | Maior migration registrada é a **213** (`migrations.py:4014`); faixa 260-264 livre | ⚠️ QUEBRADA (esperada) | Maior registrada hoje: **247** (Fase 3); lista termina em `migrations.py:4771`; `def executar_migracoes()` agora na `:4509`. **250-254 (F4) e 260-264 (F5) continuam livres** — conferido na `migrations_to_run` inteira | Task 1: registrar a 260 **após a entrada 247**, não após a 213; função nova antes da `:4509`, não da `:3773` |
+| 14 | Bug 6d: `duplicar_rdo` lê atributos-fantasma e morre antes do webhook; rota morta sem link | ✅ CONFIRMADA | `views/rdo.py:1625-1628` (`tempo_manha` etc. — colunas seguem inexistentes no modelo, `models.py:1096-1109`); `nova_mao.observacoes` `:1688` (`RDOMaoObra` sem `observacoes`, `models.py:1169-1226`); `emit_obra_rdo_publicado` `:1706` inalcançável | Task 10 segue necessária como está (só linhas) |
+| 15 | Escritas silenciosas em atributo inexistente em `views/rdo.py:688` e `:2732` (dívida fora de escopo) | ✅ CONFIRMADA | `views/rdo.py:688-691` e `:2604` | Só linha |
+| 16 | `RDO.fotos` `lazy='selectin'` (`models.py:1104`); 3 colunas base64 + comentário "NUNCA são perdidas" (`models.py:1095-1096`); `rdo_foto_service` gera base64 e devolve caminho relativo (`:377-383`) | ✅ CONFIRMADA | `models.py:1356` (selectin), `:1347-1352` (base64); `services/rdo_foto_service.py:197-297` (gera), `:377` (relativo) | Tasks 14-15 seguem necessárias; só linhas |
+| 17 | `servir_foto` procura só em `os.getcwd()/static` (`crud_rdo_completo.py:804`) e o `INSERT` de `RDOFoto` omite `nome_arquivo`/`caminho_arquivo` NOT NULL (`:718`) | ❌ QUEBRADA (já corrigida) | Commit `b6d01a0b` (23/07): `_resolver_arquivo_foto` em `crud_rdo_completo.py:782-801`, usado por `servir_foto` `:841`; os INSERTs preenchem os NOT NULL (`crud_rdo_completo.py:725-733`, `views/rdo.py:803-820`); o modelo declara `nullable=False` (`models.py:1334-1336`); `import os` presente (`:10`). **Sobra da Task 13:** `deletar_foto` ainda monta `os.getcwd()/static` (`crud_rdo_completo.py:938`), e a coluna `RDOFoto.armazenamento` + migration 264 não existem | **Reescopar a Task 13**: não criar resolver paralelo em `rdo_foto_service.py` — reutilizar `_resolver_arquivo_foto` (ou movê-lo para o service e reapontar). Manter da task só: `deletar_foto`, coluna `armazenamento`, migration 264 e testes que não dupliquem `tests/test_rdo_foto_uploads_path.py` |
+| 18 | Volumetria: 16 GB em `rdo_foto`, 28.870 fotos / 5.532 RDOs, `du` 13 GB (medidos 21/07 no banco de dev) | ⚠️ QUEBRADA (contexto) | O Postgres de dev caiu em 22/07 e foi **recriado do zero** — o dev atual não tem esses dados. A *forma* do problema persiste (colunas base64 + `selectin`), o volume não é mais observável em dev | Tasks 13-15 e o backfill "5.532 RDOs → `preenchido`" dependem de **medir produção** (o script `scripts/medir_producao.py` segue aguardando acesso). Os números do plano viram ordem de grandeza, não fato |
+| 19 | Docstring da Task 7 cita a heurística "Administrador Sistema" como código vivo (`views/rdo.py:2698-2708`) | ⚠️ QUEBRADA (cosmética) | A heurística foi **removida na Fase 1**; hoje só existe o comentário histórico (`views/rdo.py:2560-2575`) e a resolução via `utils.identidade.funcionario_do_usuario` | A substância da task está certa (é exatamente o resolver que ela usa); corrigir o docstring para citar a remoção como fato passado |
+| 20 | Matriz da Task 16 distingue LEITOR/APONTADOR/GESTOR via `papel_na_obra` | ❌ QUEBRADA | `_montar_cenario` (plano, linhas 5817-5876) **não liga `escopo_obra_ativo`**. Com a flag OFF — o default — `papel_na_obra` devolve **GESTOR a todo autenticado do tenant** (`utils/autorizacao.py:122-135`, decisão da Fase 1, erro nº 4) e as linhas LEITOR/APONTADOR da matriz **falham**. É a mesma armadilha que a Fase 3 tropeçou (adaptação nº 2 + achado nº 1 do review de 23/07) | As fixtures da Task 16 (e dos testes de autorização das Tasks 7/8) precisam criar `ConfiguracaoEmpresa` com `escopo_obra_ativo=True` para o tenant do cenário |
+| 21 | Teste de fecho posta em `/rdo/editar/<id>/salvar` | ❌ QUEBRADA | A rota POST real é **`/rdo/editar/<int:rdo_id>`** (`rdo_editar_sistema.py:16` `url_prefix='/rdo/editar'` + `:164`). O caminho `/salvar` não existe: o POST daria 404 e o teste passaria **vazio**, sem exercitar `rdo_editar_sistema.py:221` | Corrigir a URL no `test_rdo_assinado_nunca_muda_de_conteudo_em_nenhum_caminho` para `/rdo/editar/{rdo_id}` |
+| 22 | Assinaturas da Fase 1 (`pode_apontar_na_obra`, `pode_editar_obra`, `funcionario_do_usuario`, `PapelObra`, `UsuarioObra`) | ✅ CONFIRMADA | `utils/autorizacao.py:149-155` (`PAPEIS_QUE_APONTAM = (GESTOR, APONTADOR)` `:36`); `utils/identidade.py`; `models.py:59-76` | Nenhum |
+| 23 | `_gerar_numero_rdo_unico(obra_id, data_relatorio, admin_id)` em `views/rdo.py:25`; `funcao_exercida` NOT NULL; `Obra.cliente_id` NOT NULL | ✅ CONFIRMADA | `views/rdo.py:25` — exata; `models.py:1176`; fixtures OK | Nenhum |
+| 24 | Rotas citadas nos testes: `/rdo/salvar`, `/salvar-rdo-flexivel`, `/rdo/<id>/atualizar`, `/rdo/excluir/<id>` | ✅ CONFIRMADA | `views/rdo.py:2431`, `:3277`, `:1722`, `:462` | Nenhum (exceção: item 21) |
+| 25 | Colunas usadas nos testes de `RDOApontamentoCronograma` (`quantidade_executada_dia`, `quantidade_acumulada`, `percentual_realizado`, `tipo_apontamento` via getattr) | ✅ CONFIRMADA | `models.py:5580-5620` | Nenhum |
+| 26 | Nenhum artefato da fase existe ainda (sem `RDO.estado`, `rdo_retificado_id`, `RDOTransicaoEstado`, `RDOAssinatura`, `services/rdo_ciclo_vida|rdo_hash|rdo_assinatura`, `tests/test_fase5_*`) | ✅ CONFIRMADA | grep em `models.py`, `migrations.py`, `services/`, `tests/` — zero ocorrências | A fase está intacta para executar |
+
+### Premissas NOVAS (criadas pelas Fases 1-3, que o plano não previu)
+
+| # | O que apareceu | Evidência | O que a Fase 5 precisa fazer |
+|---|---|---|---|
+| N1 | **`PapelObra.COMPRADOR`** (Fase 3, migration 245) | `models.py:59-76`; `utils/autorizacao.py:49-50` | A matriz da Task 16 não tem linha para COMPRADOR. O comportamento default já é o correto (`PAPEIS_QUE_APONTAM` não o inclui ⇒ não assina; `PAPEIS_QUE_EDITAM_OBRA` idem ⇒ não aprova/reabre/retifica), mas a matriz deve ganhar linhas COMPRADOR para **provar** isso |
+| N2 | **Máquina de estados da Obra** (Fase 2): `Obra.estado`, `services/obra_estado.py`, `ObraTransicaoEstado`, migrations 230-232 | `models.py:353`; `services/obra_estado.py` (transições, `ROTULOS`, trilha) | Duas consequências: (a) hoje **nada** impede criar/assinar RDO em obra `CONCLUIDA`/`CANCELADA` — o plano não define essa interação; registrar decisão explícita (recomendado: fora de escopo nesta fase, anotar na seção "o que a fase NÃO faz", ou uma guarda leve na criação); (b) o "molde" que a Task 3 previu copiar de `CronogramaImportacao` agora tem irmão mais próximo e mais recente — espelhar a nomenclatura de `services/obra_estado.py` (`TransicaoInvalida`, `ROTULOS`, `transicoes_possiveis`) onde não conflitar com os nomes já travados na autorrevisão |
+| N3 | **Dependência de `escopo_obra_ativo`** (achado nº 1 do review da F3, generalizado): com a flag OFF, todo autenticado do tenant é GESTOR ⇒ **qualquer um assina, aprova, reabre e retifica** RDO | `utils/autorizacao.py:122-135`; `docs/fase-3-rollout.md` passo 0 | A Fase 5 não tem flag própria (decisão nº 4) e isso continua certo — mas o runbook (`docs/fase-5-rollout.md`, Task 16) precisa de um passo 0 igual ao da F3: a **diferenciação de papel na assinatura só existe em tenant com `escopo_obra_ativo=TRUE`**. Em tenant com a flag OFF a assinatura ainda vale como autoria (identidade vem de `funcionario_do_usuario`, não do papel), mas não como controle de alçada |
+| N4 | **O "plano irmão" já executou** (Fase 1.5 fechada em 22/07): `modo_apontamento` existe (migrations 220/221), `modo_da_tarefa` mudou para `cronograma_apontamento_service.py:111`, `registrar_apontamento` para `:257` | `migrations.py` entradas 220/221; `services/cronograma_apontamento_service.py` | Nenhuma coordenação pendente — as regras de não-colisão da fronteira seguraram. O contrato `garantir_editavel` oferecido nunca foi consumido pela F1.5 (a F5 não existia); o `before_flush` cobre, como o próprio plano previa. Texto da fronteira está datado ("sendo escrito em paralelo"), sem efeito prático |
+| N5 | **`tests/test_rdo_foto_uploads_path.py`** (6 testes, 23/07) já trava a resolução de caminho foto × `UPLOADS_PATH` | arquivo em `tests/` | Tasks 13/15 não podem duplicar nem regredir esses testes; os testes novos da fase devem cobrir só o que falta (deletar_foto, coluna `armazenamento`, backfill) |
+| N6 | **Rodada de 23/07 mexeu em `views/rdo.py`**: 4 APIs mortas de RDO removidas (`4d500473`) e `/persistent-uploads` substituída por rotas escopadas (`8948573a`) | git log; triagem `docs/anexos/B-triagem-rotas-expoe-dado.md` | É a causa dos deslocamentos de linha da tabela acima. Bônus para a nota da Task 14 sobre o portal: `portal_obras.ver_comprovante` agora é precedente in-repo de "servir arquivo por token escopado" — o desenho que a Fase 9a usará para a miniatura |
+
+### Impacto no plano
+
+O desenho da fase — coluna `estado` nova, listener `before_flush`, assinatura
+com hash, retificador, migrations 260-264 — **continua válido e a faixa de
+migrations continua livre** (maior registrada: 247). Nenhuma decisão de
+arquitetura precisa mudar. Antes de executar, porém, são obrigatórios estes
+ajustes, em ordem de importância:
+
+1. **Task 16 (e testes de papel das Tasks 7/8): ligar `escopo_obra_ativo`
+   nas fixtures** (item 20). Sem isso a matriz LEITOR/APONTADOR falha em
+   bloco — é a mesma armadilha que custou uma adaptação à Fase 3.
+2. **Task 16: corrigir a URL `/rdo/editar/<id>/salvar` → `/rdo/editar/<id>`**
+   (item 21), senão o teste de fecho passa sem testar um dos oito caminhos.
+3. **Task 16: acrescentar linhas COMPRADOR à matriz** (N1).
+4. **Task 13: reescopar** (item 17) — a parte de resolução de caminho e dos
+   NOT NULL já foi entregue em `b6d01a0b`; restam `deletar_foto`, a coluna
+   `RDOFoto.armazenamento`, a migration 264 e os testes complementares a
+   `tests/test_rdo_foto_uploads_path.py` (N5).
+5. **Task 11: pular os Steps 1-3** (item 9) — `visualizar_rdo` já exige login
+   e escopa tenant; executar só o Step 4 (exclusão de RDO imutável).
+6. **Task 1: registrar a migration 260 após a entrada 247** (item 13), não
+   após a 213.
+7. **Tasks 13-15 / backfill da 260: medir produção antes** (item 18) — a
+   volumetria do plano descreve o banco de dev ANTIGO, recriado em 22/07.
+   A Parte B do runbook (fotos) já era bloqueada por infra; agora também é
+   bloqueada por medição.
+8. **Runbook: passo 0 documentando a dependência de `escopo_obra_ativo`**
+   (N3) e **decisão explícita sobre RDO × estado da Obra** (N2).
+9. Cosméticos: linhas deslocadas nos comentários que o plano manda escrever
+   (itens 1-8, 10-16, 19), "nove consumidores" → "≥9" (item 3).
+
+Com os ajustes 1-6 aplicados durante a execução (nenhum exige replanejar uma
+task inteira — são correções de fixture, URL, escopo e ponto de inserção), a
+Fase 5 **segue executável como planejada**. Os itens 7-8 são pré-requisitos de
+rollout, não de código, e já estavam parcialmente previstos na Parte B do
+runbook.
