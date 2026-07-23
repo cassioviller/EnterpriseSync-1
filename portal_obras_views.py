@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 from flask import (
@@ -24,6 +24,7 @@ from models import (
     RDOFoto, RDOServicoSubatividade, RDOMaoObra, RDOEquipamento, RDOOcorrencia,
     RDOApontamentoCronograma,
     MapaConcorrencia, OpcaoConcorrencia, MapaConcorrenciaV2, RelatorioCompraMapa,
+    PortalAcessoEvento,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,12 @@ else:
 
 ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
 
+# Fase 3 — prazo de validade do token do portal. 180 dias é deliberadamente
+# longo: token curto gera chamado de suporte a cada obra, e a equipe acaba
+# desligando a expiração. 180 dias fecha a janela do ex-cliente e do link
+# vazado sem atrapalhar a obra em curso. Ver decisão D4 do plano da Fase 3.
+PRAZO_TOKEN_DIAS = 180
+
 
 def _ensure_upload_folder():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -48,9 +55,23 @@ def _ensure_upload_folder():
 
 def _get_obra_by_token(token: str) -> Obra:
     """Para rotas de ação (POST): retorna a Obra ativa ou aborta com 404.
-    Portal desativado é tratado como ausência para evitar mutações."""
+
+    Portal desativado é tratado como ausência para evitar mutações.
+
+    Fase 3 — token EXPIRADO também é ausência. Até 2026-07-21 o token não
+    expirava nunca (`models.py:261` é só um String(255) unique), então
+    qualquer URL vazada continuava aprovando compra indefinidamente.
+    Token sem data (`token_cliente_expira_em IS NULL`) continua valendo:
+    são os emitidos antes da migration 247, e derrubá-los tiraria o portal
+    de obra em andamento.
+    """
     obra = Obra.query.filter_by(token_cliente=token, portal_ativo=True).first()
     if not obra:
+        abort(404)
+    if obra.token_cliente_expira_em and \
+            obra.token_cliente_expira_em < datetime.utcnow():
+        logger.warning('[PORTAL] token expirado usado — obra %s (expirou em %s)',
+                       obra.id, obra.token_cliente_expira_em)
         abort(404)
     return obra
 
@@ -63,6 +84,10 @@ def _resolve_obra_for_view(token: str):
     obra = Obra.query.filter_by(token_cliente=token).first()
     if not obra:
         abort(404)
+    if obra.token_cliente_expira_em and \
+            obra.token_cliente_expira_em < datetime.utcnow():
+        logger.warning('[PORTAL] token expirado (GET) — obra %s', obra.id)
+        abort(404)
     if not obra.portal_ativo:
         config = ConfiguracaoEmpresa.query.filter_by(admin_id=obra.admin_id).first()
         nome_empresa = config.nome_empresa if config else 'Construtora'
@@ -74,6 +99,33 @@ def _resolve_obra_for_view(token: str):
         )
         return obra, response
     return obra, None
+
+
+def _registrar_acesso(obra, acao, alvo_tipo=None, alvo_id=None, detalhes=None):
+    """Grava PortalAcessoEvento com IP e user-agent. NÃO commita.
+
+    Nunca levanta: uma falha de auditoria não pode impedir o cliente de
+    aprovar uma compra — mas o log fica, para que a falha apareça.
+
+    `X-Forwarded-For` vem primeiro porque a aplicação roda atrás de proxy
+    (EasyPanel); sem isso, todo evento registraria o IP do proxy.
+    """
+    try:
+        encaminhado = request.headers.get('X-Forwarded-For', '')
+        ip = (encaminhado.split(',')[0].strip() if encaminhado
+              else (request.remote_addr or ''))[:64]
+        db.session.add(PortalAcessoEvento(
+            obra_id=obra.id,
+            admin_id=obra.admin_id,
+            acao=acao,
+            alvo_tipo=alvo_tipo,
+            alvo_id=alvo_id,
+            ip=ip or None,
+            user_agent=(request.headers.get('User-Agent') or '')[:300] or None,
+            detalhes=detalhes,
+        ))
+    except Exception as e:
+        logger.error('[PORTAL] falha ao registrar trilha de acesso: %s', e)
 
 
 @portal_obras_bp.route('/obra/<token>')
@@ -375,6 +427,10 @@ def aprovar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = _get_compra_do_portal(obra, compra_id)
 
+    # Fase 3 — trilha do POST anônimo (IP/UA). Persistida no commit adiante.
+    _registrar_acesso(obra, 'compra_aprovar', 'pedido_compra', compra_id,
+                      {'valor_total': str(compra.valor_total)})
+
     # Já aprovada? idempotente
     if compra.status_aprovacao_cliente == 'APROVADO':
         flash('Esta compra já foi aprovada.', 'info')
@@ -426,6 +482,8 @@ def recusar_compra(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = _get_compra_do_portal(obra, compra_id)
 
+    _registrar_acesso(obra, 'compra_recusar', 'pedido_compra', compra_id)
+
     if compra.status_aprovacao_cliente == 'RECUSADO':
         flash('Esta compra já foi recusada.', 'info')
         return redirect(url_for('portal_obras.portal_obra', token=token))
@@ -454,6 +512,8 @@ def recusar_compra(token: str, compra_id: int):
 def upload_comprovante(token: str, compra_id: int):
     obra = _get_obra_by_token(token)
     compra = PedidoCompra.query.filter_by(id=compra_id, obra_id=obra.id).first_or_404()
+
+    _registrar_acesso(obra, 'compra_comprovante', 'pedido_compra', compra_id)
 
     if compra.status_aprovacao_cliente != 'APROVADO':
         flash('Comprovante só pode ser enviado para compras aprovadas.', 'danger')
@@ -502,6 +562,8 @@ def aprovar_mapa_concorrencia(token: str, mapa_id: int):
         id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
     ).first_or_404()
 
+    _registrar_acesso(obra, 'mapa_v1_aprovar', 'mapa_concorrencia', mapa_id)
+
     if mapa.status != 'pendente':
         flash('Este mapa de concorrência já foi concluído e não pode ser alterado.', 'warning')
         return redirect(url_for('portal_obras.portal_obra', token=token))
@@ -542,8 +604,15 @@ def toggle_portal(obra_id: int):
 
     obra.portal_ativo = not obra.portal_ativo
 
-    if obra.portal_ativo and not obra.token_cliente:
-        obra.token_cliente = secrets.token_urlsafe(32)
+    if obra.portal_ativo:
+        # Fase 3 — rotacionar o token e carimbar a validade a cada vez que
+        # o portal é (re)aberto. Antes, o token era gerado uma vez e valia
+        # para sempre; reabrir o portal reaproveitava a MESMA URL, o que
+        # tornava o "desligar o portal" uma revogação apenas temporária.
+        if not obra.token_cliente:
+            obra.token_cliente = secrets.token_urlsafe(32)
+        obra.token_cliente_expira_em = (
+            datetime.utcnow() + timedelta(days=PRAZO_TOKEN_DIAS))
 
     db.session.commit()
     status = 'ativado' if obra.portal_ativo else 'desativado'
@@ -615,6 +684,8 @@ def selecionar_mapa_v2(token: str, mapa_id: int):
     mapa = MapaConcorrenciaV2.query.filter_by(
         id=mapa_id, obra_id=obra.id, admin_id=obra.admin_id
     ).first_or_404()
+
+    _registrar_acesso(obra, 'mapa_v2_selecionar', 'mapa_concorrencia_v2', mapa_id)
 
     if mapa.status == 'concluido':
         flash('Este mapa já foi aprovado e não pode ser alterado.', 'warning')

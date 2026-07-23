@@ -4465,6 +4465,47 @@ def migration_246_flag_compras_governanca():
     logger.info("[Migration 246] Concluída com sucesso")
 
 
+def migration_247_portal_token_expiracao_e_trilha():
+    """Fase 3 — obra.token_cliente_expira_em + tabela portal_acesso_evento.
+
+    Aditiva e idempotente. A coluna nasce NULL em todas as obras: token já
+    emitido continua valendo até ser rotacionado pelo toggle do portal.
+    Isso é deliberado — carimbar uma data retroativa derrubaria o portal
+    de toda obra em andamento no dia do deploy.
+    """
+    logger.info("[Migration 247] Iniciando — expiração de token + trilha do portal")
+
+    db.session.execute(text("""
+        ALTER TABLE obra
+        ADD COLUMN IF NOT EXISTS token_cliente_expira_em TIMESTAMP
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS portal_acesso_evento (
+            id SERIAL PRIMARY KEY,
+            obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            acao VARCHAR(50) NOT NULL,
+            alvo_tipo VARCHAR(40),
+            alvo_id INTEGER,
+            ip VARCHAR(64),
+            user_agent VARCHAR(300),
+            detalhes JSONB,
+            criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_portal_acesso_obra_criado
+        ON portal_acesso_evento (obra_id, criado_em)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 247] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4726,6 +4767,7 @@ def executar_migracoes():
             (244, "Fase 3 — pedido_compra.requisicao_id (origem do pedido; NULL = avulso legado)", migration_244_pedido_compra_requisicao_id),
             (245, "Fase 3 — PapelObra.COMPRADOR (estende o enum de papel de obra)", migration_245_papel_obra_comprador),
             (246, "Fase 3 — flag por tenant compras_governanca_ativa (default FALSE)", migration_246_flag_compras_governanca),
+            (247, "Fase 3 — obra.token_cliente_expira_em + trilha portal_acesso_evento (IP/UA)", migration_247_portal_token_expiracao_e_trilha),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

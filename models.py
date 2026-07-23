@@ -370,6 +370,13 @@ class Obra(db.Model):
     
     # MÓDULO 2: Portal do Cliente - Campos Completos
     token_cliente = db.Column(db.String(255), unique=True)
+    # Fase 3 — expiração do token do portal. Até 2026-07-21 o token não
+    # expirava NUNCA: quem tivesse a URL mantinha acesso (e poder de POST)
+    # para sempre, inclusive ex-cliente e link vazado em grupo de
+    # mensagem. NULLABLE de propósito: token já emitido sem data continua
+    # valendo até ser rotacionado, para que o deploy não derrube portal de
+    # obra em andamento. O carimbo entra no `toggle_portal`.
+    token_cliente_expira_em = db.Column(db.DateTime, nullable=True)
     # Task #176 — Cliente é vínculo único e obrigatório (FK NOT NULL). Os
     # antigos campos texto cliente_nome/email/telefone/cliente foram
     # removidos: a única fonte de verdade é o cadastro de Cliente.
@@ -5337,6 +5344,44 @@ class FaixaAlcada(db.Model):
         teto = f'<= {self.valor_ate}' if self.valor_ate is not None else 'sem teto'
         return (f'<FaixaAlcada #{self.ordem} {teto} '
                 f'{self.aprovacoes_necessarias} aprov>')
+
+
+class PortalAcessoEvento(db.Model):
+    """Trilha dos acessos que MUTAM estado pelo portal por token — Fase 3.
+
+    O portal é anônimo por construção (portal_obras_views.py:3). Isso
+    significa que, até esta tabela existir, uma aprovação de compra pelo
+    portal produzia um GestaoCustoPai atribuído ao ADMIN do tenant
+    (portal_obras_views.py:360-361, `usuario_id=compra.admin_id`) — a
+    trilha do almoxarifado registrava como autor alguém que não fez a
+    ação.
+
+    Não identifica pessoa (não há como, sem login — isso é a Fase 9a).
+    Identifica ORIGEM: IP, user-agent e momento. É o suficiente para
+    responder "de onde veio essa aprovação?" numa auditoria, e para
+    detectar um token vazado sendo usado de vários lugares.
+    """
+    __tablename__ = 'portal_acesso_evento'
+    __table_args__ = (
+        db.Index('ix_portal_acesso_obra_criado', 'obra_id', 'criado_em'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    acao = db.Column(db.String(50), nullable=False)
+    alvo_tipo = db.Column(db.String(40), nullable=True)   # 'pedido_compra', 'mapa_v2'…
+    alvo_id = db.Column(db.Integer, nullable=True)
+    ip = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(300), nullable=True)
+    detalhes = db.Column(db.JSON, nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    obra = db.relationship('Obra', foreign_keys=[obra_id])
+
+    def __repr__(self):
+        return f'<PortalAcessoEvento {self.acao} obra={self.obra_id} ip={self.ip}>'
 
 
 # ================================
