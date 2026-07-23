@@ -8,9 +8,23 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from models import (AlmoxarifadoItem, AlmoxarifadoEstoque, AlmoxarifadoMovimento,
-                    ContaPagar, Fornecedor, Funcionario, Obra, PedidoCompra, PedidoCompraItem,
+                    ContaPagar, EstadoRequisicao, Fornecedor, Funcionario,
+                    MapaConcorrenciaV2, Obra, ObraServicoCusto, PedidoCompra,
+                    PedidoCompraItem, RequisicaoCompra, RequisicaoCompraItem,
                     GestaoCustoPai, GestaoCustoFilho, Usuario)
 from utils.tenant import get_tenant_admin_id, is_v2_active
+
+# Fase 3 — governança de compras. Imports no topo de propósito: estes
+# módulos não importam compras_views de volta, então não há ciclo.
+from services.alcada_compras import (esta_totalmente_aprovada,
+                                     garantir_faixas_do_tenant,
+                                     faixa_para_valor,
+                                     pendencias_de_aprovacao, pode_aprovar,
+                                     registrar_aprovacao)
+from services.requisicao_compra import (TransicaoInvalida, proximo_numero,
+                                        recalcular_valor, transicionar)
+from utils.autorizacao import (obras_visiveis, pode_comprar_na_obra,
+                               pode_requisitar_na_obra, pode_ver_obra)
 
 logger = logging.getLogger(__name__)
 
@@ -1047,3 +1061,342 @@ def excluir(pedido_id):
         db.session.rollback()
         flash(f'Erro ao excluir: {e}', 'danger')
     return redirect(url_for('compras.index'))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FASE 3 — REQUISIÇÃO DE COMPRA (requisição → aprovação → pedido)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Estas rotas existem SEMPRE. O que a flag `compras_governanca_ativa`
+# muda é apenas se `POST /compras/nova` continua aceitando pedido sem
+# requisição (Task 9). Com a flag desligada, este é um caminho opcional
+# que não tira nada de ninguém.
+
+
+def _requisicao_do_tenant(requisicao_id):
+    """Carrega a requisição do tenant logado ou aborta com 404.
+
+    404 e não 403, pela mesma razão do `obra_required` da Fase 1: não
+    vazar sequer a existência de documento de outra empresa.
+    """
+    from flask import abort
+
+    admin_id = _admin_id()
+    if admin_id is None:
+        abort(404)
+    req = RequisicaoCompra.query.filter_by(
+        id=requisicao_id, admin_id=admin_id).first()
+    if req is None:
+        abort(404)
+    return req
+
+
+def _itens_do_form():
+    """Lê os itens do formulário. Devolve lista de dicts, ignorando linhas
+    sem descrição (o formulário mantém uma linha-modelo vazia)."""
+    descricoes = request.form.getlist('item_descricao[]')
+    unidades = request.form.getlist('item_unidade[]')
+    quantidades = request.form.getlist('item_quantidade[]')
+    precos = request.form.getlist('item_preco[]')
+    almox_ids = request.form.getlist('item_almoxarifado_id[]')
+
+    itens = []
+    for i, desc in enumerate(descricoes):
+        desc = (desc or '').strip()
+        if not desc:
+            continue
+
+        def _num(lista, idx, padrao='0'):
+            bruto = (lista[idx] if idx < len(lista) else '') or padrao
+            return float(str(bruto).replace('.', '').replace(',', '.')
+                         if ',' in str(bruto) else str(bruto))
+
+        almox_bruto = almox_ids[i] if i < len(almox_ids) else ''
+        itens.append({
+            'descricao': desc[:200],
+            'unidade': ((unidades[i] if i < len(unidades) else '') or 'un')[:20],
+            'quantidade': _num(quantidades, i, '1'),
+            'preco': _num(precos, i, '0'),
+            'almoxarifado_item_id': int(almox_bruto) if almox_bruto else None,
+        })
+    return itens
+
+
+@compras_bp.route('/requisicoes')
+@login_required
+def requisicoes():
+    """Lista de requisições do tenant, filtrada pelo escopo de obra."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    estado_filtro = (request.args.get('estado') or '').strip().upper()
+
+    query = RequisicaoCompra.query.filter_by(admin_id=admin_id)
+
+    # Fase 1 — escopo por obra. `obras_visiveis()` já aplica os dois eixos
+    # (tenant sempre; obra só com a flag do tenant ligada). Sem isso, a
+    # listagem repetiria o erro de `compras_views.py:421`, que filtra só
+    # por admin_id.
+    ids_visiveis = [o.id for o in obras_visiveis(admin_id).with_entities(Obra.id)]
+    query = query.filter(RequisicaoCompra.obra_id.in_(ids_visiveis or [-1]))
+
+    if estado_filtro in {e.name for e in EstadoRequisicao}:
+        query = query.filter(RequisicaoCompra.estado ==
+                             EstadoRequisicao[estado_filtro])
+
+    requisicoes_lista = query.order_by(RequisicaoCompra.id.desc()).limit(200).all()
+
+    contagem = {}
+    for estado in EstadoRequisicao:
+        contagem[estado.name] = sum(
+            1 for r in requisicoes_lista if r.estado == estado)
+
+    return render_template(
+        'compras/requisicoes.html',
+        requisicoes=requisicoes_lista,
+        contagem=contagem,
+        estado_filtro=estado_filtro,
+        estados=list(EstadoRequisicao),
+    )
+
+
+@compras_bp.route('/requisicoes/nova', methods=['GET'])
+@login_required
+def requisicao_nova():
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+    obras = obras_visiveis(admin_id).filter(Obra.ativo.is_(True)).order_by(
+        Obra.nome).all()
+    itens_catalogo = AlmoxarifadoItem.query.filter_by(
+        admin_id=admin_id).order_by(AlmoxarifadoItem.nome).all()
+
+    return render_template(
+        'compras/requisicao_nova.html',
+        obras=obras,
+        itens_catalogo=itens_catalogo,
+        hoje=date.today().isoformat(),
+    )
+
+
+@compras_bp.route('/requisicoes/nova', methods=['POST'])
+@login_required
+def requisicao_nova_post():
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    admin_id = _admin_id()
+
+    obra_id_bruto = (request.form.get('obra_id') or '').strip()
+    if not obra_id_bruto:
+        flash('Toda requisição precisa de uma obra. É o vínculo que faz o '
+              'custo aparecer no lugar certo.', 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+    try:
+        obra_id = int(obra_id_bruto)
+    except (TypeError, ValueError):
+        flash('Obra inválida. Selecione uma obra pelo menu.', 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+
+    # Defesa de tenant + escopo de obra (Fase 1) num só predicado.
+    if not pode_ver_obra(obra_id):
+        flash('Obra não encontrada ou fora do seu acesso.', 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+    if not pode_requisitar_na_obra(obra_id):
+        flash('Você não tem papel de gestor ou comprador nesta obra e não '
+              'pode abrir requisição para ela.', 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+
+    # Etapa opcional — mesma validação de pedido_compra (compras_views.py:597)
+    osc_id_bruto = (request.form.get('obra_servico_custo_id') or '').strip()
+    osc_id = None
+    if osc_id_bruto:
+        try:
+            candidato = int(osc_id_bruto)
+        except (TypeError, ValueError):
+            candidato = None
+        if candidato and ObraServicoCusto.query.filter_by(
+                id=candidato, obra_id=obra_id, admin_id=admin_id).first():
+            osc_id = candidato
+
+    mapa_id_bruto = (request.form.get('mapa_v2_id') or '').strip()
+    mapa_id = None
+    if mapa_id_bruto:
+        try:
+            candidato = int(mapa_id_bruto)
+        except (TypeError, ValueError):
+            candidato = None
+        if candidato and MapaConcorrenciaV2.query.filter_by(
+                id=candidato, obra_id=obra_id, admin_id=admin_id).first():
+            mapa_id = candidato
+
+    itens = _itens_do_form()
+    if not itens:
+        flash('Adicione pelo menos um item à requisição.', 'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+
+    data_nec_bruta = (request.form.get('data_necessidade') or '').strip()
+    try:
+        data_necessidade = (datetime.strptime(data_nec_bruta, '%Y-%m-%d').date()
+                            if data_nec_bruta else None)
+    except ValueError:
+        data_necessidade = None
+
+    # Tenants criados depois da migration 243 não têm faixa; semeia aqui,
+    # antes de existir requisição que dependa delas.
+    garantir_faixas_do_tenant(admin_id)
+
+    # Retry de numeração: o UNIQUE (admin_id, numero) fecha a corrida entre
+    # dois requests simultâneos. Mesmo padrão de views/obras.py:3279.
+    from sqlalchemy.exc import IntegrityError
+
+    for tentativa in range(3):
+        try:
+            requisicao = RequisicaoCompra(
+                numero=proximo_numero(admin_id),
+                admin_id=admin_id,
+                obra_id=obra_id,
+                obra_servico_custo_id=osc_id,
+                mapa_v2_id=mapa_id,
+                solicitante_id=current_user.id,
+                estado=EstadoRequisicao.RASCUNHO,
+                justificativa=(request.form.get('justificativa') or '').strip() or None,
+                data_necessidade=data_necessidade,
+                valor_estimado=0,
+            )
+            db.session.add(requisicao)
+            db.session.flush()
+
+            for item in itens:
+                db.session.add(RequisicaoCompraItem(
+                    requisicao_id=requisicao.id,
+                    admin_id=admin_id,
+                    almoxarifado_item_id=item['almoxarifado_item_id'],
+                    descricao=item['descricao'],
+                    unidade=item['unidade'],
+                    quantidade=item['quantidade'],
+                    preco_estimado=item['preco'],
+                ))
+            db.session.flush()
+            recalcular_valor(requisicao)
+            db.session.commit()
+            break
+        except IntegrityError:
+            db.session.rollback()
+            logger.warning('colisão de numeração de requisição no tenant %s '
+                           '(tentativa %s)', admin_id, tentativa + 1)
+    else:
+        flash('Não foi possível gerar o número da requisição. Tente novamente.',
+              'danger')
+        return redirect(url_for('compras.requisicao_nova'))
+
+    faixa = faixa_para_valor(admin_id, requisicao.valor_estimado)
+    flash(f'Requisição {requisicao.numero} criada (R$ '
+          f'{requisicao.valor_estimado}). Pela alçada configurada, ela vai '
+          f'precisar de {faixa.aprovacoes_necessarias} aprovação(ões).',
+          'success')
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao.id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>')
+@login_required
+def requisicao_detalhe(requisicao_id):
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    from flask import abort
+    if not pode_ver_obra(requisicao.obra_id):
+        abort(404)
+
+    faixa = faixa_para_valor(requisicao.admin_id, requisicao.valor_estimado)
+    pode, motivo_recusa = pode_aprovar(requisicao, current_user)
+
+    pedidos = PedidoCompra.query.filter_by(
+        requisicao_id=requisicao.id).all() if hasattr(
+            PedidoCompra, 'requisicao_id') else []
+
+    return render_template(
+        'compras/requisicao_detalhe.html',
+        requisicao=requisicao,
+        itens=requisicao.itens.all(),
+        transicoes=requisicao.transicoes.all(),
+        faixa=faixa,
+        pendencias=pendencias_de_aprovacao(requisicao),
+        pode_aprovar=pode,
+        motivo_recusa=motivo_recusa,
+        pode_emitir=pode_comprar_na_obra(requisicao.obra_id),
+        pedidos=pedidos,
+        EstadoRequisicao=EstadoRequisicao,
+    )
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/enviar', methods=['POST'])
+@login_required
+def requisicao_enviar(requisicao_id):
+    """RASCUNHO → AGUARDANDO_APROVACAO."""
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    if not pode_requisitar_na_obra(requisicao.obra_id):
+        flash('Você não pode movimentar requisições desta obra.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    # Requisição sem item aprovada é assinatura em branco.
+    if requisicao.itens.count() == 0:
+        flash('Requisição sem itens não vai para aprovação.', 'warning')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    recalcular_valor(requisicao)
+    try:
+        transicionar(requisicao, EstadoRequisicao.AGUARDANDO_APROVACAO,
+                     current_user,
+                     motivo=(request.form.get('motivo') or '').strip() or None)
+        db.session.commit()
+        flash(f'Requisição {requisicao.numero} enviada para aprovação.', 'success')
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))
+
+
+@compras_bp.route('/requisicoes/<int:requisicao_id>/cancelar', methods=['POST'])
+@login_required
+def requisicao_cancelar(requisicao_id):
+    guard = _check_v2()
+    if guard:
+        return guard
+
+    requisicao = _requisicao_do_tenant(requisicao_id)
+
+    if not pode_requisitar_na_obra(requisicao.obra_id):
+        flash('Você não pode movimentar requisições desta obra.', 'danger')
+        return redirect(url_for('compras.requisicao_detalhe',
+                                requisicao_id=requisicao_id))
+
+    try:
+        transicionar(requisicao, EstadoRequisicao.CANCELADA, current_user,
+                     motivo=(request.form.get('motivo') or '').strip() or None)
+        db.session.commit()
+        flash(f'Requisição {requisicao.numero} cancelada.', 'info')
+    except TransicaoInvalida as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+
+    return redirect(url_for('compras.requisicao_detalhe',
+                            requisicao_id=requisicao_id))

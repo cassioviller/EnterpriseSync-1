@@ -963,6 +963,13 @@
                                     <i class="fas fa-plus-circle me-1 text-success"></i> Nova Compra
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('compras.requisicoes') }}">
+                                    <i class="fas fa-clipboard-list me-1"></i> Requisições
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('compras.requisicao_nova') }}">
+                                    <i class="fas fa-plus-circle me-1 text-success"></i> Nova Requisição
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('compras.aprovacao') }}">
                                     <i class="fas fa-user-check me-1 text-warning"></i> Aprovação do Cliente
                                 </a></li>

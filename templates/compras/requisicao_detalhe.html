@@ -1,0 +1,208 @@
+{% extends "base_completo.html" %}
+{% block title %}Requisição {{ requisicao.numero }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('compras.requisicoes') }}" class="btn btn-outline-secondary me-3">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div class="flex-grow-1">
+      <h1 class="h3 mb-0 fw-bold">{{ requisicao.numero }}</h1>
+      <small class="text-muted">
+        {{ requisicao.obra.nome if requisicao.obra else '—' }}
+        {% if requisicao.obra_servico_custo %}
+          · etapa: {{ requisicao.obra_servico_custo.nome }}
+        {% endif %}
+      </small>
+    </div>
+    {% set cor = {
+         'RASCUNHO': 'secondary', 'AGUARDANDO_APROVACAO': 'warning',
+         'APROVADA': 'success', 'REJEITADA': 'danger',
+         'CONVERTIDA': 'primary', 'CANCELADA': 'dark'
+       }.get(requisicao.estado.name, 'secondary') %}
+    <span class="badge bg-{{ cor }} fs-6">
+      {{ requisicao.estado.value|replace('_', ' ')|title }}
+    </span>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-8">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Itens</div>
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Descrição</th><th>Unid.</th>
+                <th class="text-end">Qtd.</th>
+                <th class="text-end">Preço est.</th>
+                <th class="text-end">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in itens %}
+                <tr>
+                  <td>{{ i.descricao }}</td>
+                  <td class="small text-muted">{{ i.unidade }}</td>
+                  <td class="text-end">{{ '%.3f'|format(i.quantidade or 0) }}</td>
+                  <td class="text-end">R$ {{ '%.2f'|format(i.preco_estimado or 0) }}</td>
+                  <td class="text-end fw-semibold">R$ {{ '%.2f'|format(i.subtotal) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <th colspan="4" class="text-end">Total estimado</th>
+                <th class="text-end">R$ {{ '%.2f'|format(requisicao.valor_estimado or 0) }}</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          Histórico de aprovação
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead class="table-light">
+              <tr><th>Quando</th><th>Quem</th><th>Papel</th><th>O quê</th>
+                  <th class="text-end">Valor</th><th>Motivo</th></tr>
+            </thead>
+            <tbody>
+              {% for t in transicoes %}
+                <tr>
+                  <td class="small">{{ t.criado_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                  <td class="small">{{ t.usuario.nome if t.usuario else '—' }}</td>
+                  <td class="small">{{ t.papel_aplicado or '—' }}</td>
+                  <td class="small">
+                    {% if t.motivo and t.motivo.startswith('[aprovacao]') %}
+                      <span class="badge bg-success">aprovou</span>
+                    {% else %}
+                      {{ (t.de_estado.value if t.de_estado else '—') }}
+                      →
+                      <strong>{{ t.para_estado.value }}</strong>
+                    {% endif %}
+                  </td>
+                  <td class="text-end small">R$ {{ '%.2f'|format(t.valor_no_momento or 0) }}</td>
+                  <td class="small text-muted">
+                    {{ (t.motivo or '')|replace('[aprovacao]', '')|trim }}
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">
+                  Nenhuma movimentação ainda.
+                </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-lg-4">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <h6 class="fw-bold">Alçada</h6>
+          <p class="small text-muted mb-2">
+            Faixa aplicada: até
+            {% if faixa.valor_ate is none %}sem teto{% else %}R$ {{ '%.2f'|format(faixa.valor_ate) }}{% endif %}
+            · {{ faixa.aprovacoes_necessarias }} aprovação(ões)
+            {% if faixa.exige_admin %} · uma tem que ser de administrador{% endif %}
+            {% if faixa.exige_mapa_concorrencia %} · exige mapa de concorrência{% endif %}
+          </p>
+          {% if pendencias %}
+            <ul class="small text-danger mb-0">
+              {% for p in pendencias %}<li>{{ p }}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <p class="small text-success mb-0">
+              <i class="fas fa-check me-1"></i>Requisitos de alçada atendidos.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body d-grid gap-2">
+
+          {% if requisicao.estado == EstadoRequisicao.RASCUNHO %}
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_enviar', requisicao_id=requisicao.id) }}">
+              <button class="btn btn-primary w-100">
+                <i class="fas fa-paper-plane me-1"></i> Enviar para aprovação
+              </button>
+            </form>
+          {% endif %}
+
+          {% if requisicao.estado == EstadoRequisicao.AGUARDANDO_APROVACAO %}
+            {% if pode_aprovar %}
+              <form method="POST"
+                    action="{{ url_for('compras.requisicao_aprovar', requisicao_id=requisicao.id) }}">
+                <input type="text" name="observacao" class="form-control form-control-sm mb-2"
+                       placeholder="Observação (opcional)">
+                <button class="btn btn-success w-100">
+                  <i class="fas fa-check me-1"></i> Aprovar
+                </button>
+              </form>
+              <form method="POST"
+                    action="{{ url_for('compras.requisicao_rejeitar', requisicao_id=requisicao.id) }}">
+                <input type="text" name="motivo" class="form-control form-control-sm mb-2"
+                       placeholder="Motivo da rejeição" required>
+                <button class="btn btn-outline-danger w-100">
+                  <i class="fas fa-times me-1"></i> Rejeitar
+                </button>
+              </form>
+            {% else %}
+              <div class="alert alert-secondary small mb-0">{{ motivo_recusa }}</div>
+            {% endif %}
+          {% endif %}
+
+          {% if requisicao.estado == EstadoRequisicao.APROVADA and pode_emitir %}
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_emitir_pedido', requisicao_id=requisicao.id) }}">
+              <button class="btn btn-primary w-100">
+                <i class="fas fa-file-invoice-dollar me-1"></i> Emitir pedido de compra
+              </button>
+            </form>
+          {% endif %}
+
+          {% if requisicao.estado.name in ('RASCUNHO', 'AGUARDANDO_APROVACAO', 'APROVADA', 'REJEITADA') %}
+            <form method="POST"
+                  action="{{ url_for('compras.requisicao_cancelar', requisicao_id=requisicao.id) }}"
+                  onsubmit="return confirm('Cancelar esta requisição?')">
+              <input type="text" name="motivo" class="form-control form-control-sm mb-2"
+                     placeholder="Motivo do cancelamento">
+              <button class="btn btn-outline-dark w-100 btn-sm">Cancelar requisição</button>
+            </form>
+          {% endif %}
+
+          {% if pedidos %}
+            <hr>
+            <h6 class="fw-bold">Pedidos emitidos</h6>
+            <ul class="list-unstyled small mb-0">
+              {% for p in pedidos %}
+                <li>
+                  <a href="{{ url_for('compras.detalhe', pedido_id=p.id) }}">
+                    {{ p.numero or ('Pedido #' ~ p.id) }}
+                  </a>
+                  — R$ {{ '%.2f'|format(p.valor_total or 0) }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

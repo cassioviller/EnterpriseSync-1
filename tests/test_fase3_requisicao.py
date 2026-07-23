@@ -344,3 +344,160 @@ def test_flag_ilegivel_e_tratada_como_desligada():
     with app.app_context():
         assert governanca_ativa(None) is False
         assert governanca_ativa(-1) is False
+
+
+# ---------------------------------------------------------------------------
+# Rotas
+# ---------------------------------------------------------------------------
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+@pytest.mark.parametrize('rota', [
+    '/compras/requisicoes',
+    '/compras/requisicoes/nova',
+])
+def test_rotas_de_requisicao_exigem_login(rota):
+    anon = app.test_client()
+    r = anon.get(rota, follow_redirects=False)
+    assert r.status_code in (302, 401), (
+        f'{rota} devolveu {r.status_code} para anônimo')
+
+
+def test_listagem_abre_para_admin():
+    with app.app_context():
+        admin = _admin()
+        aid = admin.id
+    r = _cliente_de(aid).get('/compras/requisicoes')
+    assert r.status_code == 200
+
+
+def test_criar_requisicao_gera_numero_e_itens():
+    from models import RequisicaoCompraItem
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        aid, oid = admin.id, obra.id
+
+    r = _cliente_de(aid).post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid),
+        'justificativa': 'Perfis para o painel P3',
+        'data_necessidade': '2026-08-15',
+        'item_descricao[]': ['Perfil U90', 'Parafuso GN25'],
+        'item_unidade[]': ['m', 'cx'],
+        'item_quantidade[]': ['120', '4'],
+        'item_preco[]': ['18,50', '89,90'],
+        'item_almoxarifado_id[]': ['', ''],
+    }, follow_redirects=False)
+    assert r.status_code == 302
+
+    with app.app_context():
+        req = RequisicaoCompra.query.filter_by(admin_id=aid).one()
+        assert req.numero.startswith('RC-')
+        assert req.obra_id == oid
+        assert req.estado == EstadoRequisicao.RASCUNHO
+        assert req.valor_estimado == Decimal('2579.60')
+        assert RequisicaoCompraItem.query.filter_by(
+            requisicao_id=req.id).count() == 2
+
+
+def test_requisicao_sem_obra_e_recusada():
+    with app.app_context():
+        admin = _admin()
+        aid = admin.id
+
+    r = _cliente_de(aid).post('/compras/requisicoes/nova', data={
+        'obra_id': '',
+        'justificativa': 'sem obra',
+        'item_descricao[]': ['Qualquer'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['10'],
+    }, follow_redirects=False)
+    assert r.status_code == 302
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=aid).count() == 0
+
+
+def test_obra_de_outro_tenant_e_recusada():
+    with app.app_context():
+        a1, a2 = _admin('A'), _admin('B')
+        obra_b = _obra(a2.id)
+        aid, oid_b = a1.id, obra_b.id
+
+    r = _cliente_de(aid).post('/compras/requisicoes/nova', data={
+        'obra_id': str(oid_b),
+        'justificativa': 'atravessando tenant',
+        'item_descricao[]': ['X'],
+        'item_quantidade[]': ['1'],
+        'item_preco[]': ['10'],
+    }, follow_redirects=False)
+    assert r.status_code == 302
+    with app.app_context():
+        assert RequisicaoCompra.query.filter_by(admin_id=aid).count() == 0
+
+
+def test_detalhe_de_requisicao_de_outro_tenant_devolve_404():
+    with app.app_context():
+        a1, a2 = _admin('A'), _admin('B')
+        obra_b = _obra(a2.id)
+        req = RequisicaoCompra(numero='RC-2026-0001', obra_id=obra_b.id,
+                               solicitante_id=a2.id, admin_id=a2.id)
+        db.session.add(req)
+        db.session.commit()
+        aid, rid = a1.id, req.id
+
+    r = _cliente_de(aid).get(f'/compras/requisicoes/{rid}')
+    assert r.status_code == 404
+
+
+def test_enviar_para_aprovacao_muda_o_estado():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        from services.requisicao_compra import proximo_numero
+        req = RequisicaoCompra(
+            numero=proximo_numero(admin.id), obra_id=obra.id,
+            solicitante_id=op.id, admin_id=admin.id,
+            valor_estimado=Decimal('100.00'))
+        db.session.add(req)
+        db.session.flush()
+        db.session.add(RequisicaoCompraItem(
+            requisicao_id=req.id, admin_id=admin.id, descricao='Item',
+            quantidade=Decimal('1'), preco_estimado=Decimal('100.00')))
+        db.session.commit()
+        opid, rid = op.id, req.id
+
+    r = _cliente_de(opid).post(f'/compras/requisicoes/{rid}/enviar',
+                               follow_redirects=False)
+    assert r.status_code == 302
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, rid).estado == \
+            EstadoRequisicao.AGUARDANDO_APROVACAO
+
+
+def test_requisicao_sem_item_nao_vai_para_aprovacao():
+    """Requisição vazia aprovada é assinatura em branco."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        from services.requisicao_compra import proximo_numero
+        req = RequisicaoCompra(
+            numero=proximo_numero(admin.id), obra_id=obra.id,
+            solicitante_id=admin.id, admin_id=admin.id,
+            valor_estimado=Decimal('0.00'))
+        db.session.add(req)
+        db.session.commit()
+        aid, rid = admin.id, req.id
+
+    _cliente_de(aid).post(f'/compras/requisicoes/{rid}/enviar',
+                          follow_redirects=False)
+    with app.app_context():
+        assert db.session.get(RequisicaoCompra, rid).estado == \
+            EstadoRequisicao.RASCUNHO
