@@ -4506,6 +4506,340 @@ def migration_247_portal_token_expiracao_e_trilha():
     logger.info("[Migration 247] Concluída com sucesso")
 
 
+def migration_250_centro_custo_unicidade_por_tenant():
+    """Fase 4 — `centro_custo.codigo` deixa de ser único GLOBAL.
+
+    O banco tinha `centro_custo_codigo_key UNIQUE (codigo)` (conferido em
+    2026-07-21), espelhando o modelo. Num sistema multi-tenant isso é um
+    defeito: o primeiro tenant a usar o código 'ADM' bloqueia todos os
+    outros. A Fase 4 precisa de exatamente um centro administrativo POR
+    TENANT, então a unicidade passa a ser (admin_id, codigo).
+
+    Também cria o índice único PARCIAL que garante um único centro
+    `tipo='administrativo'` por tenant.
+
+    NÃO DESTRUTIVA: se houver duplicidade de (admin_id, codigo) a migração
+    não derruba a constraint antiga; loga os pares em conflito e levanta.
+    `run_migration_safe` grava status 'failed' e a migração é retentada no
+    próximo boot, porque `is_migration_executed` só considera aplicada a
+    que terminou com 'success'.
+    """
+    logger.info("[Migration 250] Iniciando — unicidade de centro_custo por tenant")
+
+    duplicados = db.session.execute(text("""
+        SELECT admin_id, codigo, count(*) AS n
+        FROM centro_custo
+        GROUP BY admin_id, codigo
+        HAVING count(*) > 1
+        ORDER BY n DESC
+        LIMIT 50
+    """)).fetchall()
+    if duplicados:
+        for admin_id, codigo, n in duplicados:
+            logger.error(
+                "[Migration 250] CONFLITO admin_id=%s codigo=%s ocorre %s vezes",
+                admin_id, codigo, n)
+        raise RuntimeError(
+            f"[Migration 250] {len(duplicados)} par(es) (admin_id, codigo) "
+            "duplicado(s) em centro_custo. Resolva manualmente e reinicie — "
+            "a constraint antiga foi preservada.")
+
+    db.session.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_centro_custo_admin_codigo
+        ON centro_custo (admin_id, codigo)
+    """))
+    db.session.commit()
+    logger.info("[Migration 250] Índice uq_centro_custo_admin_codigo garantido")
+
+    db.session.execute(text("""
+        ALTER TABLE centro_custo
+        DROP CONSTRAINT IF EXISTS centro_custo_codigo_key
+    """))
+    db.session.commit()
+    logger.info("[Migration 250] Constraint global centro_custo_codigo_key removida")
+
+    duplicados_adm = db.session.execute(text("""
+        SELECT admin_id, count(*) AS n
+        FROM centro_custo
+        WHERE tipo = 'administrativo'
+        GROUP BY admin_id
+        HAVING count(*) > 1
+        LIMIT 50
+    """)).fetchall()
+    if duplicados_adm:
+        for admin_id, n in duplicados_adm:
+            logger.error(
+                "[Migration 250] admin_id=%s tem %s centros administrativos",
+                admin_id, n)
+        raise RuntimeError(
+            "[Migration 250] Há tenant com mais de um centro administrativo. "
+            "Resolva manualmente e reinicie.")
+
+    db.session.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_centro_custo_administrativo
+        ON centro_custo (admin_id)
+        WHERE tipo = 'administrativo'
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 250] Concluída com sucesso")
+
+
+def migration_251_seed_centro_custo_administrativo():
+    """Fase 4 — semeia um centro de custo administrativo por tenant.
+
+    Segue o molde de `migration_182_replace_categorias_fluxo_caixa`: varre
+    os usuários ADMIN/SUPER_ADMIN e trata cada um como um tenant, com
+    try/except por tenant para que um dado ruim não derrube a migração
+    inteira.
+
+    Idempotente: o índice único parcial `uq_centro_custo_administrativo`
+    (migration 250) garante no máximo um por tenant, e a inserção é
+    condicionada a NOT EXISTS.
+
+    O código 'ADM' pode colidir com um centro pré-existente do mesmo tenant
+    (a unicidade agora é (admin_id, codigo)). Nesse caso usamos 'ADM-<n>'
+    incrementando até achar um livre — o código é rótulo, o que identifica o
+    centro é `tipo='administrativo'`.
+    """
+    logger.info("[Migration 251] Iniciando — centro administrativo por tenant")
+
+    rows = db.session.execute(text("""
+        SELECT id FROM usuario
+        WHERE tipo_usuario IN ('ADMIN', 'SUPER_ADMIN')
+    """)).fetchall()
+    admin_ids = [r[0] for r in rows]
+    logger.info("[Migration 251] %s tenant(s) a processar", len(admin_ids))
+
+    criados = 0
+    ja_tinham = 0
+    falhas = 0
+
+    for aid in admin_ids:
+        try:
+            existe = db.session.execute(text("""
+                SELECT id FROM centro_custo
+                WHERE admin_id = :aid AND tipo = 'administrativo'
+                LIMIT 1
+            """), {'aid': aid}).fetchone()
+            if existe:
+                ja_tinham += 1
+                continue
+
+            nome_empresa = db.session.execute(text("""
+                SELECT COALESCE(NULLIF(TRIM(c.nome_empresa), ''), NULLIF(TRIM(u.nome), ''),
+                                'Empresa ' || u.id::text)
+                FROM usuario u
+                LEFT JOIN configuracao_empresa c ON c.admin_id = u.id
+                WHERE u.id = :aid
+                LIMIT 1
+            """), {'aid': aid}).scalar() or f'Empresa {aid}'
+
+            codigo = 'ADM'
+            for tentativa in range(1, 50):
+                livre = db.session.execute(text("""
+                    SELECT 1 FROM centro_custo
+                    WHERE admin_id = :aid AND codigo = :codigo LIMIT 1
+                """), {'aid': aid, 'codigo': codigo}).fetchone()
+                if not livre:
+                    break
+                codigo = f'ADM-{tentativa}'
+
+            db.session.execute(text("""
+                INSERT INTO centro_custo
+                    (admin_id, codigo, nome, descricao, tipo, ativo, obra_id, created_at)
+                VALUES
+                    (:aid, :codigo, :nome, :descricao, 'administrativo', true, NULL, NOW())
+            """), {
+                'aid': aid,
+                'codigo': codigo,
+                'nome': f'Administração — {nome_empresa}'[:100],
+                'descricao': ('Destino dos custos que não pertencem a nenhuma obra: '
+                              'folha administrativa, estoque, despesas de escritório. '
+                              'Criado pela Fase 4 (centro de custo obrigatório).'),
+            })
+            db.session.commit()
+            criados += 1
+        except Exception as e:
+            db.session.rollback()
+            falhas += 1
+            logger.error("[Migration 251] tenant %s falhou: %s", aid, e)
+
+    logger.info(
+        "[Migration 251] Concluída — %s criados, %s já tinham, %s falhas",
+        criados, ja_tinham, falhas)
+
+
+def migration_252_gestao_custo_pai_obra_id():
+    """Fase 4 — `gestao_custo_pai.obra_id` (nullable, derivada).
+
+    Aditiva e idempotente: coluna + FK + índice. NENHUMA linha é preenchida
+    aqui. O backfill é `scripts/backfill_destino_custo.py`, que roda em
+    dry-run por padrão e exige revisão do relatório antes de gravar.
+
+    Sem `ON DELETE CASCADE`: apagar uma obra não pode apagar título a pagar.
+    Sem `ON DELETE SET NULL` também — se alguém tentar apagar uma obra com
+    custo lançado, é melhor que o banco recuse e o humano decida. É a mesma
+    postura de `gestao_custo_filho_obra_id_fkey`, que já é FK simples.
+    """
+    logger.info("[Migration 252] Iniciando — gestao_custo_pai.obra_id")
+
+    db.session.execute(text("""
+        ALTER TABLE gestao_custo_pai
+        ADD COLUMN IF NOT EXISTS obra_id INTEGER
+    """))
+    db.session.commit()
+
+    existe_fk = db.session.execute(text("""
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_gestao_custo_pai_obra_id'
+          AND table_name = 'gestao_custo_pai'
+        LIMIT 1
+    """)).fetchone()
+    if not existe_fk:
+        db.session.execute(text("""
+            ALTER TABLE gestao_custo_pai
+            ADD CONSTRAINT fk_gestao_custo_pai_obra_id
+            FOREIGN KEY (obra_id) REFERENCES obra(id)
+        """))
+        db.session.commit()
+        logger.info("[Migration 252] FK fk_gestao_custo_pai_obra_id criada")
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_gestao_custo_pai_obra_id
+        ON gestao_custo_pai (obra_id)
+    """))
+    db.session.commit()
+
+    total = db.session.execute(text(
+        "SELECT count(*) FROM gestao_custo_pai")).scalar()
+    logger.info(
+        "[Migration 252] Concluída — %s linha(s) em gestao_custo_pai, todas "
+        "com obra_id NULL até o backfill", total)
+
+
+def migration_253_check_destino_custo_not_valid():
+    """Fase 4 — CHECK de destino em `gestao_custo_filho`, em modo NOT VALID.
+
+    A invariante: todo lançamento de custo aponta uma obra OU um centro de
+    custo. Nunca nenhum dos dois.
+
+    Por que o CHECK vai no FILHO e não um NOT NULL no pai:
+    `utils/financeiro_integration.py:118-131` reaproveita o mesmo
+    `GestaoCustoPai` em aberto para o mesmo (tenant, categoria, entidade,
+    categoria de fluxo de caixa), SEM olhar obra — um título a pagar
+    legitimamente carrega linhas de obras diferentes (9 casos no banco de
+    dev em 2026-07-21). `NOT NULL` em `gestao_custo_pai.obra_id` quebraria
+    esses documentos e todo o fluxo administrativo.
+
+    Por que NOT VALID e não a constraint pronta: `NOT VALID` faz o Postgres
+    aplicar a regra a toda linha NOVA ou ATUALIZADA sem varrer a tabela e
+    sem exigir que o histórico já esteja limpo. É o que permite subir a
+    trava com o backfill ainda em revisão. A validação do histórico é a
+    migration 254, que é a ÚLTIMA tarefa desta fase e só roda com o
+    relatório de conformidade zerado.
+    """
+    logger.info("[Migration 253] Iniciando — CHECK de destino (NOT VALID)")
+
+    existe = db.session.execute(text("""
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'gestao_custo_filho'::regclass
+          AND conname = 'ck_gestao_custo_filho_destino'
+        LIMIT 1
+    """)).fetchone()
+
+    if existe:
+        logger.info("[Migration 253] Constraint já existe — nada a fazer")
+        return
+
+    db.session.execute(text("""
+        ALTER TABLE gestao_custo_filho
+        ADD CONSTRAINT ck_gestao_custo_filho_destino
+        CHECK (obra_id IS NOT NULL OR centro_custo_id IS NOT NULL)
+        NOT VALID
+    """))
+    db.session.commit()
+
+    pendentes = db.session.execute(text("""
+        SELECT count(*) FROM gestao_custo_filho
+        WHERE obra_id IS NULL AND centro_custo_id IS NULL
+    """)).scalar()
+    logger.info(
+        "[Migration 253] Concluída — escrita nova travada. %s linha(s) "
+        "histórica(s) ainda sem destino; rode "
+        "scripts/backfill_destino_custo.py --aplicar antes da migration 254",
+        pendentes)
+
+
+def migration_254_validate_check_destino_custo():
+    """Fase 4 — valida o CHECK de destino contra o histórico. ÚLTIMO PASSO.
+
+    `VALIDATE CONSTRAINT` varre a tabela e recusa se houver qualquer linha
+    violando a regra. Por isso ela é a última migração da fase, e por isso
+    ela mesma faz a contagem antes de tentar: se houver pendência, loga a
+    contagem e por origem e ABORTA sem tocar na constraint.
+
+    Abortar é seguro. `run_migration_safe` grava status 'failed' sem
+    propagar a exceção, e `is_migration_executed` só considera aplicada a
+    que terminou com 'success' — então ela é retentada em todo boot, até
+    que o backfill limpe o histórico. Enquanto isso o CHECK continua em
+    NOT VALID, ou seja, a escrita NOVA já está travada. Nada regride.
+    """
+    logger.info("[Migration 254] Iniciando — VALIDATE do CHECK de destino")
+
+    existe = db.session.execute(text("""
+        SELECT convalidated FROM pg_constraint
+        WHERE conrelid = 'gestao_custo_filho'::regclass
+          AND conname = 'ck_gestao_custo_filho_destino'
+        LIMIT 1
+    """)).fetchone()
+
+    if not existe:
+        raise RuntimeError(
+            "[Migration 254] ck_gestao_custo_filho_destino não existe. "
+            "A migration 253 tem de rodar antes.")
+
+    if existe[0] is True:
+        logger.info("[Migration 254] Constraint já validada — nada a fazer")
+        return
+
+    pendentes = db.session.execute(text("""
+        SELECT count(*) FROM gestao_custo_filho
+        WHERE obra_id IS NULL AND centro_custo_id IS NULL
+    """)).scalar() or 0
+
+    if pendentes:
+        por_origem = db.session.execute(text("""
+            SELECT COALESCE(origem_tabela, '(sem origem)'), count(*)
+            FROM gestao_custo_filho
+            WHERE obra_id IS NULL AND centro_custo_id IS NULL
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 20
+        """)).fetchall()
+        for origem, n in por_origem:
+            logger.error("[Migration 254] pendente origem=%s n=%s", origem, n)
+        raise RuntimeError(
+            f"[Migration 254] {pendentes} lançamento(s) ainda sem destino. "
+            "Rode `python scripts/backfill_destino_custo.py --aplicar` e "
+            "reinicie. A escrita nova já está travada pelo CHECK NOT VALID "
+            "da migration 253 — nada regride enquanto isso.")
+
+    db.session.execute(text("""
+        ALTER TABLE gestao_custo_filho
+        VALIDATE CONSTRAINT ck_gestao_custo_filho_destino
+    """))
+    db.session.commit()
+
+    total = db.session.execute(text(
+        "SELECT count(*) FROM gestao_custo_filho")).scalar()
+    com_obra = db.session.execute(text(
+        "SELECT count(*) FROM gestao_custo_filho WHERE obra_id IS NOT NULL"
+    )).scalar()
+    logger.info(
+        "[Migration 254] Concluída — %s linha(s) validada(s), %s com obra, "
+        "%s no centro administrativo",
+        total, com_obra, total - com_obra)
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4768,6 +5102,11 @@ def executar_migracoes():
             (245, "Fase 3 — PapelObra.COMPRADOR (estende o enum de papel de obra)", migration_245_papel_obra_comprador),
             (246, "Fase 3 — flag por tenant compras_governanca_ativa (default FALSE)", migration_246_flag_compras_governanca),
             (247, "Fase 3 — obra.token_cliente_expira_em + trilha portal_acesso_evento (IP/UA)", migration_247_portal_token_expiracao_e_trilha),
+            (250, "Fase 4 — centro_custo: unicidade (admin_id, codigo) + índice único parcial do centro administrativo", migration_250_centro_custo_unicidade_por_tenant),
+            (251, "Fase 4 — seed do centro de custo administrativo (um por tenant)", migration_251_seed_centro_custo_administrativo),
+            (252, "Fase 4 — gestao_custo_pai.obra_id (nullable, derivada dos filhos)", migration_252_gestao_custo_pai_obra_id),
+            (253, "Fase 4 — CHECK ck_gestao_custo_filho_destino em modo NOT VALID (trava a escrita nova)", migration_253_check_destino_custo_not_valid),
+            (254, "Fase 4 — VALIDATE do CHECK de destino (varre o histórico; aborta e retenta se houver pendência)", migration_254_validate_check_destino_custo),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

@@ -239,16 +239,31 @@ def processar_folha_mes(ano, mes):
                             )
                             db.session.add(gcp)
                             db.session.flush()
+                            # Fase 4 — a folha é custo ADMINISTRATIVO. A mão
+                            # de obra que é custo de obra já entra por outro
+                            # caminho e já vem com obra: os filhos de origem
+                            # rdo_mao_obra / rdo_mao_obra_va / rdo_mao_obra_vt
+                            # / rdo_custo_diario têm obra em 100% dos casos
+                            # (conferido no banco em 2026-07-21). Mandar a
+                            # folha para obra seria contagem dupla.
+                            from utils.centro_custo import id_do_centro_administrativo
+                            from services.destino_custo import sincronizar_obra_do_pai
+
                             gcf = GestaoCustoFilho(
                                 pai_id=gcp.id,
                                 admin_id=current_user.id,
                                 data_referencia=mes_referencia,
                                 descricao=f"Salário {mes_ref_str} - {funcionario.nome}",
                                 valor=salario_liq,
+                                obra_id=None,
+                                centro_custo_id=id_do_centro_administrativo(
+                                    current_user.id, criar=True),
                                 origem_tabela='folha_pagamento',
                                 origem_id=folha.id,
                             )
                             db.session.add(gcf)
+                            db.session.flush()
+                            sincronizar_obra_do_pai(gcp)
                 except Exception as _ge:
                     logger.warning(f"[WARN] GestaoCusto folha não registrado para {funcionario.nome}: {_ge}")
             else:

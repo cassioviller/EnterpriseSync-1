@@ -121,11 +121,18 @@ def index():
     if filtro_busca:
         q = q.filter(GestaoCustoPai.entidade_nome.ilike(f'%{filtro_busca}%'))
     if filtro_obra_id:
-        # Filtra GestaoCustoPai que têm ao menos um filho ligado à obra
+        # Fase 4 — o caminho rápido é `pai.obra_id` (coluna derivada, com
+        # índice `ix_gestao_custo_pai_obra_id`), que resolve ~94% dos casos
+        # sem subquery. O OR com a subquery continua necessário para os pais
+        # MULTI-OBRA, cujo `obra_id` é NULL de propósito: o documento tem
+        # linhas na obra filtrada, mas não é "daquela obra".
         sub = db.session.query(GestaoCustoFilho.pai_id).filter_by(
             obra_id=filtro_obra_id, admin_id=admin_id
         ).subquery()
-        q = q.filter(GestaoCustoPai.id.in_(sub))
+        q = q.filter(db.or_(
+            GestaoCustoPai.obra_id == filtro_obra_id,
+            GestaoCustoPai.id.in_(db.session.query(sub.c.pai_id)),
+        ))
 
     registros = q.order_by(GestaoCustoPai.data_criacao.desc()).all()
 
@@ -167,7 +174,13 @@ def index():
     )
     resumo = {row[0]: {'qtd': row[1], 'total': float(row[2] or 0)} for row in totais}
 
-    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    # Fase 4 + Fase 1 — a lista de obras da tela de custos respeita o escopo
+    # por obra (`utils/autorizacao.obras_visiveis`, criado na Fase 1). Com a
+    # flag `escopo_obra_ativo` desligada o resultado é idêntico ao anterior.
+    from utils.autorizacao import obras_visiveis
+    obras = (obras_visiveis(admin_id=admin_id)
+             .filter(Obra.ativo.is_(True))
+             .order_by(Obra.nome).all())
     bancos = BancoEmpresa.query.filter_by(admin_id=admin_id, ativo=True).order_by(BancoEmpresa.nome_banco).all()
 
     return render_template(
@@ -199,7 +212,13 @@ def novo():
         return err
 
     from models import Subempreiteiro
-    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    # Fase 4 + Fase 1 — a lista de obras da tela de custos respeita o escopo
+    # por obra (`utils/autorizacao.obras_visiveis`, criado na Fase 1). Com a
+    # flag `escopo_obra_ativo` desligada o resultado é idêntico ao anterior.
+    from utils.autorizacao import obras_visiveis
+    obras = (obras_visiveis(admin_id=admin_id)
+             .filter(Obra.ativo.is_(True))
+             .order_by(Obra.nome).all())
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.nome).all()
     subempreiteiros = Subempreiteiro.query.filter_by(admin_id=admin_id, ativo=True).order_by(Subempreiteiro.nome).all()
     today = date.today().strftime('%Y-%m-%d')
@@ -272,6 +291,20 @@ def novo():
             db.session.add(pai)
             db.session.flush()
 
+            # Fase 4 — destino obrigatório. Sem obra o custo vai para o centro
+            # administrativo do tenant, nunca para lugar nenhum.
+            from services.destino_custo import (DestinoIndefinido,
+                                                destino_de_filho_novo,
+                                                sincronizar_obra_do_pai)
+            try:
+                obra_id, centro_custo_id = destino_de_filho_novo(
+                    admin_id=admin_id, obra_id=obra_id, centro_custo_id=None,
+                    origem_tabela='manual', tipo_categoria=tipo_categoria)
+            except DestinoIndefinido as e:
+                db.session.rollback()
+                flash(str(e), 'danger')
+                return redirect(url_for('gestao_custos.novo'))
+
             filho = GestaoCustoFilho(
                 pai_id=pai.id,
                 admin_id=admin_id,
@@ -279,9 +312,12 @@ def novo():
                 descricao=descricao or entidade_nome,
                 valor=valor,
                 obra_id=obra_id,
+                centro_custo_id=centro_custo_id,
                 origem_tabela='manual',
             )
             db.session.add(filho)
+            db.session.flush()
+            sincronizar_obra_do_pai(pai)
             db.session.commit()
             flash(f'Custo "{entidade_nome}" lançado com sucesso.', 'success')
             return redirect(url_for('gestao_custos.index'))
@@ -413,11 +449,20 @@ def filhos(pai_id):
 # ───────────────────────────────────────────────────────────────
 
 def _recalcular_total_pai(pai):
-    """Recalcula valor_total + saldo do pai a partir dos filhos atuais."""
+    """Recalcula valor_total, saldo e obra_id do pai a partir dos filhos.
+
+    Fase 4: `pai.obra_id` é DERIVADO (models.py, class GestaoCustoPai). Toda
+    escrita que mexe nos filhos passa por aqui, então é aqui que a derivação
+    se mantém honesta — inclusive voltando para NULL quando o documento vira
+    multi-obra.
+    """
+    from services.destino_custo import sincronizar_obra_do_pai
+
     total = (db.session.query(func.coalesce(func.sum(GestaoCustoFilho.valor), 0))
              .filter_by(pai_id=pai.id).scalar()) or Decimal('0.00')
     pai.valor_total = Decimal(str(total))
     pai.saldo = pai.valor_total - Decimal(str(pai.valor_pago or 0))
+    sincronizar_obra_do_pai(pai)
 
 
 @gestao_custos_bp.route('/filho/<int:filho_id>/editar', methods=['POST'])
@@ -459,23 +504,44 @@ def editar_filho(filho_id):
                 return jsonify({'status': 'error', 'message': 'Valor deve ser maior que zero.'}), 400
             filho.valor = valor
 
+        # ── Fase 4 — o campo vazio não significa mais "sem destino".
+        # Até 2026-07-21 esta rota fazia `filho.obra_id = None` e pronto: o
+        # custo já lançado sumia do orçado×real da obra sem erro e sem
+        # alerta. Agora, obra vazia = centro de custo administrativo do
+        # tenant, que é um destino nomeado e somável.
+        from services.destino_custo import (DestinoIndefinido,
+                                            destino_de_filho_novo)
+
         obra_id_raw = request.form.get('obra_id', '').strip()
         obra_alterada = False
         obras_afetadas = set()
         if filho.obra_id:
             obras_afetadas.add(filho.obra_id)
+
         if obra_id_raw == '':
             if filho.obra_id is not None:
                 obra_alterada = True
+            try:
+                _obra, centro_id = destino_de_filho_novo(
+                    admin_id=admin_id, obra_id=None, centro_custo_id=None,
+                    origem_tabela=filho.origem_tabela,
+                    tipo_categoria=pai.tipo_categoria)
+            except DestinoIndefinido as e:
+                db.session.rollback()
+                return jsonify({'status': 'error', 'message': str(e)}), 400
             filho.obra_id = None
+            filho.centro_custo_id = centro_id
         else:
             try:
                 novo_obra_id = int(obra_id_raw)
                 if novo_obra_id != filho.obra_id:
                     obra_alterada = True
                 filho.obra_id = novo_obra_id
+                # Passou a ter obra: o carimbo administrativo sai de cena.
+                filho.centro_custo_id = None
             except ValueError:
-                pass
+                return jsonify({'status': 'error',
+                                'message': 'Obra inválida.'}), 400
 
         # Vínculo direto custo→serviço (Task #74).
         # Aceita string vazia para "Sem serviço".
@@ -861,6 +927,18 @@ def pagar(pai_id):
             flash('Selecione o banco para registrar o pagamento no Fluxo de Caixa.', 'danger')
             return redirect(url_for('gestao_custos.index'))
 
+        # Fase 4 — o movimento de caixa herda o destino do documento. Antes
+        # de 2026-07-21 o `FluxoCaixa` nascia sem obra e sem centro de custo
+        # (0 de 15 linhas tinham centro no banco de dev), de modo que o
+        # dinheiro saía sem atribuição nenhuma.
+        # `pai.obra_id` é NULL quando o documento é multi-obra — nesse caso
+        # não inventamos uma: a atribuição fina fica nos filhos, e o
+        # movimento de caixa aponta para o centro administrativo.
+        from utils.centro_custo import id_do_centro_administrativo
+        fc_obra_id = pai.obra_id
+        fc_centro_id = (None if fc_obra_id
+                        else id_do_centro_administrativo(admin_id, criar=True))
+
         # Criar FluxoCaixa para o valor pago agora
         fc = FluxoCaixa(
             admin_id=admin_id,
@@ -869,6 +947,8 @@ def pagar(pai_id):
             categoria=cat_fc,
             valor=valor_pago_agora,
             descricao=f'{label} — {pai.entidade_nome}',
+            obra_id=fc_obra_id,
+            centro_custo_id=fc_centro_id,
             referencia_id=pai.id,
             referencia_tabela='gestao_custo_pai',
             observacoes=conta or None,
@@ -934,7 +1014,13 @@ def editar(pai_id):
         return redirect(url_for('gestao_custos.index'))
 
     from models import Subempreiteiro
-    obras = Obra.query.filter_by(admin_id=admin_id, ativo=True).order_by(Obra.nome).all()
+    # Fase 4 + Fase 1 — a lista de obras da tela de custos respeita o escopo
+    # por obra (`utils/autorizacao.obras_visiveis`, criado na Fase 1). Com a
+    # flag `escopo_obra_ativo` desligada o resultado é idêntico ao anterior.
+    from utils.autorizacao import obras_visiveis
+    obras = (obras_visiveis(admin_id=admin_id)
+             .filter(Obra.ativo.is_(True))
+             .order_by(Obra.nome).all())
     fornecedores = Fornecedor.query.filter_by(admin_id=admin_id, ativo=True).order_by(Fornecedor.nome).all()
     subempreiteiros = Subempreiteiro.query.filter_by(admin_id=admin_id, ativo=True).order_by(Subempreiteiro.nome).all()
 
@@ -984,10 +1070,24 @@ def editar(pai_id):
                 pai.total_parcelas       = total_parcelas
                 pai.conta_contabil_codigo= conta_contabil
 
+                # Fase 4 — destino obrigatório também na edição do pai.
+                from services.destino_custo import (DestinoIndefinido,
+                                                    destino_de_filho_novo)
+                try:
+                    obra_destino, centro_destino = destino_de_filho_novo(
+                        admin_id=admin_id, obra_id=obra_id_filho,
+                        centro_custo_id=None, origem_tabela='manual',
+                        tipo_categoria=tipo_categoria)
+                except DestinoIndefinido as e:
+                    db.session.rollback()
+                    flash(str(e), 'danger')
+                    return redirect(url_for('gestao_custos.editar', pai_id=pai.id))
+
                 # Atualizar ou criar filho principal
                 if filho_principal:
                     filho_principal.descricao        = descricao_filho
-                    filho_principal.obra_id          = obra_id_filho
+                    filho_principal.obra_id          = obra_destino
+                    filho_principal.centro_custo_id  = centro_destino
                     filho_principal.data_referencia  = data_ref
                     filho_principal.valor            = valor
                 else:
@@ -997,10 +1097,14 @@ def editar(pai_id):
                         data_referencia=data_ref,
                         descricao=descricao_filho,
                         valor=valor,
-                        obra_id=obra_id_filho,
+                        obra_id=obra_destino,
+                        centro_custo_id=centro_destino,
                         origem_tabela='manual',
                     )
                     db.session.add(novo_filho)
+
+                db.session.flush()
+                _recalcular_total_pai(pai)
 
                 db.session.commit()
                 flash(f'Registro "{entidade_nome}" atualizado com sucesso.', 'success')

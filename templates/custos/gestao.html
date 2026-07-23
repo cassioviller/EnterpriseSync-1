@@ -173,13 +173,17 @@
     </div>
 
     <div class="mb-4">
-      <label class="form-label fw-semibold">Obra (opcional)</label>
-      <select name="obra_id" class="form-select">
-        <option value="">— Nenhuma —</option>
+      <label class="form-label fw-semibold">Destino do custo *</label>
+      <select name="obra_id" class="form-select" required>
+        <option value="">— Administrativo (não é de obra) —</option>
         {% for o in obras %}
         <option value="{{ o.id }}" {% if v_obra == o.id %}selected{% endif %}>{{ o.nome }}</option>
         {% endfor %}
       </select>
+      <small class="text-muted">
+        Todo custo tem destino. Sem obra, ele entra no centro de custo
+        administrativo da empresa — não desaparece do resultado.
+      </small>
     </div>
   {% endmacro %}
 
@@ -530,9 +534,9 @@
               <input type="text" class="form-control" name="descricao" id="editFilhoDesc" maxlength="300" required>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold small text-uppercase text-muted">Obra</label>
+              <label class="form-label fw-semibold small text-uppercase text-muted">Destino do custo</label>
               <select class="form-select" name="obra_id" id="editFilhoObra">
-                <option value="">— Sem obra —</option>
+                <option value="">— Administrativo (não é de obra) —</option>
               </select>
             </div>
             <div class="col-12">

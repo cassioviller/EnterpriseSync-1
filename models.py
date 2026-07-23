@@ -961,7 +961,11 @@ class CentroCusto(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    codigo = db.Column(db.String(20), unique=True, nullable=False)  # CC001, CC002, etc.
+    # Fase 4 — a unicidade é POR TENANT. Até 2026-07-21 esta coluna era
+    # `unique=True` global (constraint `centro_custo_codigo_key`): o primeiro
+    # tenant que criasse o código 'ADM' impedia todos os demais de criar o
+    # deles. Ver migration 250.
+    codigo = db.Column(db.String(20), nullable=False)
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.Text)
     tipo = db.Column(db.String(20), nullable=False)  # 'obra', 'departamento', 'projeto', 'atividade'
@@ -969,10 +973,22 @@ class CentroCusto(db.Model):
     obra_id = db.Column(db.Integer, db.ForeignKey('obra.id'))  # Associação opcional com obra
     departamento_id = db.Column(db.Integer, db.ForeignKey('departamento.id'))  # Associação opcional com departamento
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relacionamentos
     obra = db.relationship('Obra', overlaps="centros_custo_lista")
     departamento = db.relationship('Departamento', overlaps="centros_custo_lista")
+
+    __table_args__ = (
+        db.UniqueConstraint('admin_id', 'codigo',
+                            name='uq_centro_custo_admin_codigo'),
+        # Um único centro administrativo por tenant — o destino obrigatório
+        # dos custos que não pertencem a obra nenhuma (Fase 4). Índice PARCIAL
+        # porque só vale para tipo='administrativo'; centros de obra e de
+        # departamento continuam podendo ser vários.
+        db.Index('uq_centro_custo_administrativo', 'admin_id',
+                 unique=True,
+                 postgresql_where=db.text("tipo = 'administrativo'")),
+    )
 
 class Receita(db.Model):
     """Registro de receitas da empresa"""
@@ -5858,6 +5874,24 @@ class GestaoCustoPai(db.Model):
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     fluxo_caixa_id = db.Column(db.Integer, db.ForeignKey('fluxo_caixa.id'), nullable=True)
+    # ── Fase 4 — obra do documento. COLUNA DERIVADA, e nullable PARA SEMPRE.
+    #
+    # O destino do custo mora no FILHO (`GestaoCustoFilho.obra_id`). Esta
+    # coluna é o resumo do documento, mantida em dia por
+    # `services.destino_custo.sincronizar_obra_do_pai`:
+    #
+    #   * preenchida  → todos os filhos com obra apontam a MESMA obra;
+    #   * NULL        → o documento é multi-obra ou é administrativo.
+    #
+    # Por que nunca vira NOT NULL: `utils/financeiro_integration.py:118-131`
+    # reaproveita o mesmo pai em aberto para o mesmo (tenant, categoria,
+    # entidade, categoria de fluxo de caixa), SEM olhar obra. Um título a
+    # pagar de um fornecedor legitimamente carrega linhas de obras
+    # diferentes — em 2026-07-21 havia 9 desses no banco de dev. A
+    # obrigatoriedade do destino é travada no filho, pelo CHECK
+    # `ck_gestao_custo_filho_destino` (migration 253).
+    obra_id = db.Column(
+        db.Integer, db.ForeignKey('obra.id'), nullable=True, index=True)
     # Categoria de fluxo de caixa (catálogo curável) — categoriza o custo no relatório
     # de Fluxo de Caixa e no lançamento por etapa (spec 2026-06-29-lancamento-categoria-fluxo-caixa).
     categoria_fluxo_caixa_id = db.Column(
@@ -5886,6 +5920,7 @@ class GestaoCustoPai(db.Model):
     itens = db.relationship('GestaoCustoFilho', backref='pai', lazy=True,
                             cascade='all, delete-orphan')
     fornecedor = db.relationship('Fornecedor', foreign_keys=[fornecedor_id])
+    obra = db.relationship('Obra', foreign_keys=[obra_id])
     categoria_fluxo_caixa = db.relationship(
         'CategoriaFluxoCaixa', foreign_keys=[categoria_fluxo_caixa_id])
     subempreiteiro = db.relationship('Subempreiteiro', foreign_keys=[subempreiteiro_id], backref='custos_lancados')
@@ -5935,6 +5970,15 @@ class GestaoCustoFilho(db.Model):
 
     obra = db.relationship('Obra', foreign_keys=[obra_id])
     obra_servico_custo = db.relationship('ObraServicoCusto', foreign_keys=[obra_servico_custo_id])
+
+    __table_args__ = (
+        # Fase 4 — todo lançamento de custo tem destino: uma obra OU o
+        # centro de custo administrativo do tenant. Criada pela migration
+        # 253 em modo NOT VALID e validada pela 254.
+        db.CheckConstraint(
+            'obra_id IS NOT NULL OR centro_custo_id IS NOT NULL',
+            name='ck_gestao_custo_filho_destino'),
+    )
 
     def __repr__(self):
         return f'<GestaoCustoFilho pai={self.pai_id} R${self.valor} {self.descricao[:30]}>'

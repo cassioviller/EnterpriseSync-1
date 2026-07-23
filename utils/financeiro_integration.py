@@ -89,6 +89,20 @@ def registrar_custo_automatico(
 
     Retorna o objeto GestaoCustoFilho criado, ou None em caso de erro.
     """
+    # ── Fase 4 — destino obrigatório. Fica FORA do try/except abaixo de
+    # propósito: o `except Exception: return None` do corpo engoliria a
+    # recusa e o chamador acharia que gravou. Um custo sem destino tem de
+    # explodir na cara de quem tentou gravar.
+    from services.destino_custo import destino_de_filho_novo
+
+    obra_id, centro_custo_id = destino_de_filho_novo(
+        admin_id=admin_id,
+        obra_id=obra_id,
+        centro_custo_id=centro_custo_id,
+        origem_tabela=origem_tabela,
+        tipo_categoria=tipo_categoria,
+    )
+
     try:
         if not force_v2:
             from utils.tenant import is_v2_active
@@ -207,9 +221,18 @@ def registrar_custo_automatico(
 
         pai.valor_total = Decimal(str(total_existente)) + valor_dec
 
+        # Fase 4 — `pai.obra_id` é derivado dos filhos e tem de acompanhar.
+        # Precisa vir DEPOIS do add do filho e antes do flush final para que
+        # a query de irmãos já enxergue a linha nova (o autoflush do
+        # SQLAlchemy resolve isso dentro de `sincronizar_obra_do_pai`).
+        from services.destino_custo import sincronizar_obra_do_pai
+        sincronizar_obra_do_pai(pai)
+
         db.session.flush()
         logger.info(
-            f"[OK] GestaoCustoFilho adicionado: pai={pai.id} valor={valor_dec} desc={descricao[:50]}"
+            f"[OK] GestaoCustoFilho adicionado: pai={pai.id} valor={valor_dec} "
+            f"obra={filho.obra_id} centro={filho.centro_custo_id} "
+            f"desc={descricao[:50]}"
         )
         return filho
 

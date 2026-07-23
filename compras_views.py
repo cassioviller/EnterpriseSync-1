@@ -226,6 +226,10 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
         db.session.add(gcp)
         db.session.flush()
 
+        # Fase 4 — `pedido.obra_id` é nullable e a rota aceita ausência com
+        # `or None`. Compra de material de escritório é legítima; o que não
+        # pode é o custo ficar sem destino.
+        from utils.centro_custo import id_do_centro_administrativo
         gcf = GestaoCustoFilho(
             pai_id=gcp.id,
             admin_id=admin_id,
@@ -233,11 +237,14 @@ def processar_compra_normal(pedido, itens_validos, admin_id, usuario_id):
             descricao=desc_cp[:300],
             valor=v,
             obra_id=pedido.obra_id,
+            centro_custo_id=(None if pedido.obra_id
+                             else id_do_centro_administrativo(admin_id, criar=True)),
             obra_servico_custo_id=pedido.obra_servico_custo_id,
             origem_tabela='pedido_compra',
             origem_id=pedido.id,
         )
         db.session.add(gcf)
+        gcp.obra_id = pedido.obra_id
 
         # Task #11 — Arquitetura de duas camadas (sem dupla contagem):
         #   GCP (acima)  = camada de CUSTO: centro de custo da obra, DRE, relatórios.
@@ -347,6 +354,17 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
     db.session.add(gcp)
     db.session.flush()
 
+    # Fase 4 — FATURAMENTO_DIRETO é material que o CLIENTE paga direto ao
+    # fornecedor DA OBRA. Sem obra ele não significa nada, então aqui não há
+    # fallback administrativo: recusa. Exceção, não redirect: este é um
+    # helper ("Levanta exceção em caso de erro (chamador faz rollback)"),
+    # chamado inclusive pelo portal (portal_obras_views.py).
+    if not pedido.obra_id:
+        from services.destino_custo import DestinoIndefinido
+        raise DestinoIndefinido(
+            'Faturamento direto exige uma obra: é material que o cliente '
+            'paga direto ao fornecedor da obra.')
+
     gcf = GestaoCustoFilho(
         pai_id=gcp.id,
         admin_id=admin_id,
@@ -359,6 +377,7 @@ def processar_compra_aprovada_cliente(pedido, usuario_id):
         origem_id=pedido.id,
     )
     db.session.add(gcf)
+    gcp.obra_id = pedido.obra_id
 
     # 2) Reconstituir itens_validos a partir dos PedidoCompraItem para gerar movimentos
     itens_pedido = PedidoCompraItem.query.filter_by(pedido_id=pedido.id).all()

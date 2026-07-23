@@ -220,16 +220,27 @@ def criar_conta_pagar_entrada_material(data: dict, admin_id: int):
         db.session.add(gcp)
         db.session.flush()
 
+        # Fase 4 — material que ENTRA em estoque ainda não é custo de obra;
+        # vira quando sai. Até 2026-07-21 esta linha nascia sem obra e sem
+        # centro, e o custo sumia do resultado. Destino: centro
+        # administrativo do tenant.
+        from utils.centro_custo import id_do_centro_administrativo
+        from services.destino_custo import sincronizar_obra_do_pai
+
         gcf = GestaoCustoFilho(
             pai_id=gcp.id,
             admin_id=admin_id,
             data_referencia=data_mov,
             descricao=f"Entrada de material - {item_nome} (Movimento #{movimento_id})",
             valor=valor_total,
+            obra_id=None,
+            centro_custo_id=id_do_centro_administrativo(admin_id, criar=True),
             origem_tabela='almoxarifado_movimento',
             origem_id=movimento_id,
         )
         db.session.add(gcf)
+        db.session.flush()
+        sincronizar_obra_do_pai(gcp)
         db.session.commit()
 
         logger.info(f"✅ GestaoCustoPai COMPRA criado (ID {gcp.id}) para movimento {movimento_id} - R$ {valor_total}")
