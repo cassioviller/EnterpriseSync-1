@@ -7,6 +7,7 @@ from models import db, RDO, Obra, Funcionario, RDOServicoSubatividade, RDOMaoObr
 from datetime import datetime
 import json
 import logging
+import os
 logger = logging.getLogger(__name__)
 
 # Blueprint para RDO CRUD
@@ -724,6 +725,10 @@ def upload_foto_rdo(rdo_id):
                 nova_foto = RDOFoto(
                     admin_id=admin_id,
                     rdo_id=rdo_id,
+                    # nome_arquivo/caminho_arquivo são NOT NULL no banco;
+                    # sem eles o flush abaixo estoura IntegrityError
+                    nome_arquivo=resultado['nome_original'],
+                    caminho_arquivo=resultado['arquivo_original'],
                     descricao=legenda,
                     arquivo_original=resultado['arquivo_original'],
                     arquivo_otimizado=resultado['arquivo_otimizado'],
@@ -774,6 +779,32 @@ def upload_foto_rdo(rdo_id):
         return jsonify({'error': f'Erro no servidor: {str(e)}'}), 500
 
 
+def _resolver_arquivo_foto(caminho):
+    """Resolve o caminho físico de uma foto a partir do relativo gravado no
+    banco (ex.: 'uploads/rdo/<admin>/<rdo>/x.webp').
+
+    Com UPLOADS_PATH definido, `salvar_foto_rdo` grava em $UPLOADS_PATH/rdo/…,
+    fora de static/ — servir só de static/ faria toda foto nova sumir da tela
+    no momento em que o volume persistente fosse montado. Fotos gravadas antes
+    da variável existir continuam sob static/uploads/, por isso o legado fica
+    como fallback. Lê o ambiente a cada chamada (não no import) para valer
+    também quando a variável muda entre deploys.
+    """
+    candidatos = []
+    uploads_path = os.environ.get('UPLOADS_PATH', '')
+    if uploads_path:
+        base = uploads_path if os.path.isabs(uploads_path) else os.path.join(os.getcwd(), uploads_path)
+        partes = caminho.split('/')
+        # o relativo começa com 'uploads/'; sob UPLOADS_PATH esse prefixo não existe
+        relativo = os.path.join(*partes[1:]) if partes[0] == 'uploads' and len(partes) > 1 else caminho
+        candidatos.append(os.path.join(base, relativo))
+    candidatos.append(os.path.join(os.getcwd(), 'static', caminho))
+    for candidato in candidatos:
+        if os.path.exists(candidato):
+            return candidato
+    return None
+
+
 @rdo_crud_bp.route('/foto/<int:foto_id>/<tipo>', methods=['GET'])
 @login_required
 def servir_foto(foto_id, tipo):
@@ -806,10 +837,10 @@ def servir_foto(foto_id, tipo):
         if not caminho:
             return "Arquivo não disponível", 404
         
-        # 3. Montar caminho completo
-        caminho_completo = os.path.join(os.getcwd(), 'static', caminho)
-        
-        if not os.path.exists(caminho_completo):
+        # 3. Resolver caminho físico (UPLOADS_PATH ou legado em static/)
+        caminho_completo = _resolver_arquivo_foto(caminho)
+
+        if not caminho_completo:
             return "Arquivo não encontrado no servidor", 404
         
         # 4. Servir arquivo com cache
