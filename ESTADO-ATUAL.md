@@ -1,6 +1,6 @@
 # ESTADO ATUAL — SIGE / Veks
 
-> Snapshot de **2026-07-21** (2ª revisão, após a rodada de planejamento).
+> Snapshot de **2026-07-23** (3ª revisão, após o fecho da Fase 3).
 > Este é o documento a ler PRIMEIRO ao retomar. Os demais (`DEVOLUTIVA.md`,
 > `DOSSIE-REPO.md`, `FECHO-FASE-0.5.md`) são o detalhe; este é o mapa.
 
@@ -26,44 +26,38 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `fix/fase-0-estancar` · **27 commits não pushados.**
+Branch: `main` · 🔬 23/07: **à frente de `origin/main` com a Fase 3
+inteira** (16 commits de fase + registros; mergeada por fast-forward de
+`feat/fase-3-compras-governanca` após gate verde). O push segue travado no
+item humano nº 2 (credential helper). `origin/main` continua em `8fe6ac9`
+(merge do M10).
 
-🔬 21/07: `main` e `origin/main` estão **idênticos** em `8fe6ac9` — o merge do
-M10 subiu. (A 1ª versão dizia "67 commits à frente"; era verdade quando escrita.)
+## ✅ RETOMADA de 22/07 — resolvida em 23/07
 
-## 🔴 RETOMADA IMEDIATA — banco de dev recriado vazio em 22/07
+O Postgres do ambiente (`helium`) caiu em 22/07 ~00:30 e foi **recriado do
+zero**. Nenhum código foi perdido. Dos 4 itens da retomada, 3 fecharam:
 
-O Postgres do ambiente (`helium`) caiu em 22/07 ~00:30, não se recuperou e
-foi **recriado do zero** — o banco de desenvolvimento está vazio. Nenhum
-código foi perdido (26 commits, árvore limpa). Ao retomar, nesta ordem:
-
-1. O boot do app reconstrói o schema sozinho: `create_all()` + migrations
-   1-219, todas idempotentes. Basta o workflow do Replit subir. Se quiser
-   forçar: `python -c "import main"`.
-2. **Rodar o gate completo**, que ficou INCONCLUSIVO: a única rodada sobre
-   o estado final (commit `e782f70`) morreu junto com o banco (80 falhas,
-   todas `OperationalError`). O último verde íntegro foi 745 passed sobre
-   o estado até a Task 7 da Fase 1; as Tasks 8-11 têm regressões dirigidas
-   verdes (145 + 49 passed), não gate cheio.
-   `bash run_tests.sh --gate` ou
-   `python -m pytest tests/ -m "not browser" -q --timeout=240`.
-3. As volumetrias ⚠️ dev deste documento (8.723 obras, 53 'Em Andamento',
-   980 partidas órfãs etc.) descrevem o banco ANTIGO. Continuam válidas
-   como forma do problema; o banco novo nasce limpo e as migrations
-   preventivas (217-219) rodam como no-op.
-4. Dois commits alheios ao plano entraram na queda: `f52a7c7` (Replit
-   Agent, retry no create_all) e `e782f70` (meu: esgotado o retry, aborta
-   o boot em produção — alinhado à política da Fase 0.5/1.1). O segundo
-   NÃO foi testado contra banco vivo; o gate do passo 2 o cobre.
+1. ✅ O boot reconstruiu o schema: `create_all()` + migrations (agora
+   **1-247**, todas idempotentes) rodaram no banco novo.
+2. ✅ **Gate completo VERDE em 23/07**: `pytest tests/ -m "not browser"` →
+   **1109 passed, 9 skipped, 201 deselected** em 37min40s, exit 0 — sobre
+   o código da Fase 3 pós-review (commit `d1f7f34f`). Era o gate que
+   estava INCONCLUSIVO desde a queda (80 falhas `OperationalError`).
+3. ⚠️ **Continua valendo:** as volumetrias ⚠️ dev deste documento (8.723
+   obras, 980 partidas órfãs etc.) descrevem o banco ANTIGO. Válidas como
+   forma do problema; o banco novo nasceu limpo e cresce por carga de
+   suíte. Medir em produção antes de dimensionar qualquer coisa.
+4. ✅ Os dois commits da queda (`f52a7c7` retry do create_all; `e782f70`
+   aborto de boot em produção) foram cobertos pelo gate do item 2 contra
+   banco vivo.
 
 Parado em: Fase 4 (centro de custo obrigatório). A **Fase 3 (compras com
 governança) fechou em 23/07 — 12/12 tasks**, 91 testes verdes
 (`fase-3-compras-governanca.md`; runbook em `docs/fase-3-rollout.md`).
 Entregou o fluxo requisição→aprovação→alçada→pedido, o `PapelObra.COMPRADOR`
 e as correções de segurança do portal por token. 🔬 23/07: **mergeada em
-`main`** (fast-forward, gate verde antes do merge; `main` está 16 commits
-à frente de `origin/main` — o push segue travado no item humano nº 2).
-Pendências de rollout, não de código:
+`main`** (fast-forward, gate verde antes do merge; o push segue travado no
+item humano nº 2). Pendências de rollout, não de código:
 ligar `compras_governanca_ativa` por tenant só depois dos passos 1-3 do
 runbook e da confirmação do Cássio sobre os valores de alçada (decisão D1;
 recomendação semeada: R$ 5.000 / R$ 30.000 / acima).
@@ -75,12 +69,16 @@ da 1.5) e a fila de handoff — rodar `python scripts/relatorio_estado_obra.py`
 em produção e levar o número de "EM EXECUÇÃO sem gestor" ao Cássio (em dev:
 2.481).
 
-> ⚠️ **Fase 3 — duas armadilhas para quem retomar.** (1) O portal por token
+> ⚠️ **Fase 3 — três armadilhas para quem retomar.** (1) O portal por token
 > agora **expira em 180 dias**, carimbado a cada `toggle_portal`; token
 > antigo sem data segue valendo (não derruba portal de obra em andamento).
 > (2) `compras_governanca_ativa` **nasce desligada** — o fluxo antigo de
 > compras continua idêntico até ela ser ligada por tenant. Todo o risco está
-> em ligar: ver `docs/fase-3-rollout.md`. As migrations da fase são **240-247**
+> em ligar: ver `docs/fase-3-rollout.md`. (3) **A governança depende de
+> `escopo_obra_ativo` ligado no mesmo tenant** (achado nº 1 do review de
+> 23/07): com o escopo OFF, `papel_na_obra` devolve GESTOR a todo autenticado
+> e a alçada colapsa — o `--ligar` do script recusa, mas quem mexer na flag
+> por SQL direto não tem essa guarda. As migrations da fase são **240-247**
 > (a lacuna 233-239 é intencional; 245 é a 1ª extensão de enum nativo do repo).
 
 > ⚠️ **O RBAC do cronograma NÃO é transparente para todo mundo no deploy.**
@@ -461,7 +459,7 @@ RDO**.
 | Rotas totais / sem autenticação | 724 / 40 | 🧮 |
 | Rotas de **escrita** por token eterno | **8** | 📖 21/07 — não "1", ver acima |
 | Índice `rdo_apontamento_cronograma` | 881 ms → 0,034 ms | 🔬 |
-| Testes | 878, gate ~39 min | 🧮 |
+| Testes | gate 23/07: **1109 passed**, 9 skipped, 201 deselected, 37min40s | 🔬 23/07 |
 | Violações de ruff herdadas | 543, das quais 186 F821 | 🧮 |
 | Tabelas vazias | ~65 de 178 (37%) | 🧮 |
 | `models.py` / `migrations.py` | 7.610 / 14.300+ linhas | 🧮 |
@@ -536,14 +534,14 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 
 | Tema | Onde | O que decidir |
 |---|---|---|
-| Alçada de aprovação de compra | F3 | Faixas em R$ (recomendado: 5k / 30k, absoluto e não % — `Obra.orcamento` é `Float default 0.0`) |
+| Alçada de aprovação de compra | F3 | **Já implementada como dado editável** (23/07): faixas 5k / 30k / acima semeadas por tenant na migration 243. Confirmar ou trocar os números é UPDATE na tabela `faixa_alcada`, sem deploy — mas confirme ANTES de ligar a flag |
 | Estados da Obra | F2 | Os 5 propostos, todos ancorados em valor que o código já usa |
 | Regra de derivação das linhas órfãs | F4 | E o destino das ~77 irrecuperáveis |
 | Folha e almoxarifado são administrativos? | F4 | Recomendado sim para ambos (evita contagem dupla com o RDO) |
 | Valor jurídico da assinatura | F5, F9a | Recomendado: autoria + integridade (MP 2.200-2 art. 10 §2º), sem ICP-Brasil |
 | Plano de contas e regime do Domínio | F8 | Recomendado: tabela por tenant + regime de caixa |
 | **11 lacunas do layout 11758** | F8 | A 1ª é a mais básica: a spec **nunca define a ordem das colunas**. Um `.csv` já aceito pelo Domínio resolve 8 de uma vez |
-| Expiração do token do portal | F9a | Recomendado: 90 dias, parametrizável |
+| Expiração do token do portal | ~~F9a~~ **F3, decidida** | 🔬 23/07: implementada em **180 dias** (D4 da F3 — o plano da F9a dizia 90; a F3 escolheu 180 para não gerar chamado de suporte a cada obra). Token antigo sem data segue valendo até rotacionar |
 | Miniatura do portal × migração de fotos | F5 | Único ponto sem recomendação: ou a rota por token vem antes, ou o portal fica sem miniatura no intervalo |
 
 ## Mapa dos documentos
@@ -552,7 +550,8 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 |---|---|
 | **`ESTADO-ATUAL.md`** | este — leia primeiro |
 | `docs/superpowers/plans/2026-07-21-*` | **os 10 planos das fases** (ver tabela acima) |
-| `DEVOLUTIVA.md` | aderência à especificação + sequência de fases. ⚠️ `:73` erra ao dizer que "não existe recebimento" — existe (`compras_views.py:841-948`) |
+| `DEVOLUTIVA.md` | aderência à especificação + sequência de fases. (O erro do `:73` sobre "não existe recebimento" foi corrigido em 23/07 — o recebimento existe, só não é o gatilho financeiro) |
+| `docs/fase-1-rollout.md` / `fase-2-rollout.md` / `fase-3-rollout.md` | **runbooks de rollout por fase** — pré-checagens, ordem de ligar flags e rollback |
 | `DOSSIE-REPO.md` | as 29 respostas sobre arquitetura, dados, infra e qualidade |
 | `docs/anexos/A-rotas-sem-autenticacao.md` | censo AST das 724 rotas. ⚠️ `:16` classifica as rotas por token como "desenho correto" — foi o que produziu o "1 rota de escrita sem auth" |
 | `FECHO-FASE-0.5.md` | o que a Fase 0.5 entregou e o que não |
