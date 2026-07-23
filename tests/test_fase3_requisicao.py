@@ -201,3 +201,111 @@ def test_etapa_e_opcional_e_validada_contra_a_obra():
         db.session.add(r2)
         db.session.commit()
         assert r2.obra_servico_custo_id is None
+
+
+# ---------------------------------------------------------------------------
+# Máquina de estados
+# ---------------------------------------------------------------------------
+
+def _requisicao(admin_id, obra_id, solicitante_id, valor='1000.00'):
+    from services.requisicao_compra import proximo_numero
+    r = RequisicaoCompra(
+        numero=proximo_numero(admin_id), obra_id=obra_id,
+        solicitante_id=solicitante_id, admin_id=admin_id,
+        valor_estimado=Decimal(valor),
+        justificativa='Material da semana')
+    db.session.add(r)
+    db.session.commit()
+    return r
+
+
+def test_transicao_valida_grava_historico():
+    from models import RequisicaoTransicao
+    from services.requisicao_compra import transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        r = _requisicao(admin.id, obra.id, op.id, valor='2579.60')
+
+        transicionar(r, EstadoRequisicao.AGUARDANDO_APROVACAO, op,
+                     motivo='enviada para aprovação')
+        db.session.commit()
+
+        assert r.estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+        t = RequisicaoTransicao.query.filter_by(requisicao_id=r.id).one()
+        assert t.de_estado == EstadoRequisicao.RASCUNHO
+        assert t.para_estado == EstadoRequisicao.AGUARDANDO_APROVACAO
+        assert t.usuario_id == op.id
+        # o valor no momento da transição é o dado que a auditoria precisa:
+        # a requisição pode ser editada depois, e o histórico não pode mentir
+        assert t.valor_no_momento == Decimal('2579.60')
+        assert t.criado_em is not None
+
+
+def test_transicao_invalida_e_recusada():
+    from services.requisicao_compra import TransicaoInvalida, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        r = _requisicao(admin.id, obra.id, op.id)
+        # RASCUNHO → CONVERTIDA pula a aprovação inteira
+        with pytest.raises(TransicaoInvalida):
+            transicionar(r, EstadoRequisicao.CONVERTIDA, op)
+        db.session.rollback()
+
+
+def test_estado_terminal_nao_transiciona():
+    from services.requisicao_compra import TransicaoInvalida, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        r = _requisicao(admin.id, obra.id, op.id)
+        transicionar(r, EstadoRequisicao.CANCELADA, op, motivo='desistiu')
+        db.session.commit()
+        with pytest.raises(TransicaoInvalida):
+            transicionar(r, EstadoRequisicao.RASCUNHO, op)
+        db.session.rollback()
+
+
+def test_rejeitada_volta_para_rascunho():
+    """Rejeitar não é matar: o solicitante corrige e reenvia. É o único
+    caminho de volta de um estado de decisão."""
+    from services.requisicao_compra import transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        r = _requisicao(admin.id, obra.id, op.id)
+        transicionar(r, EstadoRequisicao.AGUARDANDO_APROVACAO, op)
+        transicionar(r, EstadoRequisicao.REJEITADA, admin, motivo='sem verba')
+        transicionar(r, EstadoRequisicao.RASCUNHO, op, motivo='corrigindo')
+        db.session.commit()
+        assert r.estado == EstadoRequisicao.RASCUNHO
+
+
+def test_historico_fica_em_ordem_e_completo():
+    from models import RequisicaoTransicao
+    from services.requisicao_compra import transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        op = _operador(admin.id)
+        r = _requisicao(admin.id, obra.id, op.id)
+        transicionar(r, EstadoRequisicao.AGUARDANDO_APROVACAO, op)
+        transicionar(r, EstadoRequisicao.APROVADA, admin, motivo='ok')
+        db.session.commit()
+
+        trilha = (RequisicaoTransicao.query
+                  .filter_by(requisicao_id=r.id)
+                  .order_by(RequisicaoTransicao.id).all())
+        assert [t.para_estado for t in trilha] == [
+            EstadoRequisicao.AGUARDANDO_APROVACAO, EstadoRequisicao.APROVADA]
+        assert [t.usuario_id for t in trilha] == [op.id, admin.id]

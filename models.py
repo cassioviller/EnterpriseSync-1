@@ -5225,6 +5225,51 @@ class RequisicaoCompraItem(db.Model):
         return f'<RequisicaoCompraItem req={self.requisicao_id} {self.descricao[:30]}>'
 
 
+class RequisicaoTransicao(db.Model):
+    """Trilha de auditoria da RequisicaoCompra — quem, quando, de onde para
+    onde, e por QUANTO.
+
+    Mesma forma de CronogramaImportacaoEvento (models.py:5178) e de
+    PropostaHistorico (models.py:3140), que são as duas trilhas que já
+    funcionam neste repositório. A diferença é `valor_no_momento`: numa
+    aprovação por alçada, o valor da decisão é parte da decisão. Sem ele,
+    editar a requisição depois de aprovada reescreveria a história — que é
+    exatamente o buraco que uma alçada tem que fechar.
+
+    `papel_aplicado` guarda com que chapéu a pessoa agiu ('ADMIN',
+    'GESTOR', 'COMPRADOR'), porque o vínculo em usuario_obra pode mudar
+    depois e o histórico não pode mudar junto.
+    """
+    __tablename__ = 'requisicao_transicao'
+    __table_args__ = (
+        db.Index('ix_requisicao_transicao_req', 'requisicao_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    requisicao_id = db.Column(
+        db.Integer, db.ForeignKey('requisicao_compra.id', ondelete='CASCADE'),
+        nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    de_estado = db.Column(db.Enum(EstadoRequisicao), nullable=True)
+    para_estado = db.Column(db.Enum(EstadoRequisicao), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    papel_aplicado = db.Column(db.String(20), nullable=True)
+    valor_no_momento = db.Column(db.Numeric(15, 2), nullable=True)
+    motivo = db.Column(db.Text, nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    requisicao = db.relationship(
+        'RequisicaoCompra',
+        backref=db.backref('transicoes', lazy='dynamic',
+                           order_by='RequisicaoTransicao.id',
+                           cascade='all, delete-orphan'))
+    usuario = db.relationship('Usuario', foreign_keys=[usuario_id])
+
+    def __repr__(self):
+        de = self.de_estado.value if self.de_estado else '-'
+        return f'<RequisicaoTransicao req={self.requisicao_id} {de}→{self.para_estado.value}>'
+
+
 # ================================
 # MÓDULO V2: TRANSPORTE
 # ================================

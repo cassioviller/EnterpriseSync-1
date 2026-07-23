@@ -4247,6 +4247,41 @@ def migration_241_requisicao_compra_item():
     logger.info("[Migration 241] Concluída com sucesso")
 
 
+def migration_242_requisicao_transicao():
+    """Fase 3 — trilha de auditoria da requisição. Aditiva e idempotente.
+
+    `valor_no_momento` é NULLable porque transições que não são de decisão
+    (cancelamento, volta para rascunho) não têm valor relevante — mas
+    aprovação e rejeição sempre gravam.
+    """
+    logger.info("[Migration 242] Iniciando — tabela requisicao_transicao")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS requisicao_transicao (
+            id SERIAL PRIMARY KEY,
+            requisicao_id INTEGER NOT NULL
+                REFERENCES requisicao_compra(id) ON DELETE CASCADE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            de_estado VARCHAR(30),
+            para_estado VARCHAR(30) NOT NULL,
+            usuario_id INTEGER REFERENCES usuario(id),
+            papel_aplicado VARCHAR(20),
+            valor_no_momento NUMERIC(15,2),
+            motivo TEXT,
+            criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_requisicao_transicao_req
+        ON requisicao_transicao (requisicao_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 242] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -4503,6 +4538,7 @@ def executar_migracoes():
             (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),
             (240, "Fase 3 — tabela requisicao_compra (documento de demanda, obra_id NOT NULL)", migration_240_requisicao_compra),
             (241, "Fase 3 — tabela requisicao_compra_item", migration_241_requisicao_compra_item),
+            (242, "Fase 3 — trilha de auditoria requisicao_transicao (quem/quando/valor)", migration_242_requisicao_transicao),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
