@@ -937,6 +937,42 @@ def criar_rdo():
         flash(f'Erro ao criar RDO: {str(e)}', 'error')
         return redirect(url_for('main.novo_rdo'))
 
+def _estado_para_template(rdo):
+    """Rótulo + cor do estado, para o selo da tela. Nunca levanta."""
+    try:
+        from services.rdo_ciclo_vida import CORES, ROTULOS, estado_de
+        atual = estado_de(rdo)
+        return {'valor': atual,
+                'rotulo': ROTULOS.get(atual, atual),
+                'cor': CORES.get(atual, 'secondary')}
+    except Exception:
+        logger.warning('[Fase5] estado do RDO ilegível', exc_info=True)
+        return {'valor': 'rascunho', 'rotulo': 'Rascunho', 'cor': 'secondary'}
+
+
+def _acoes_para_template(rdo):
+    """Quais botões de transição este usuário vê. Falha FECHADA."""
+    vazio = {'submeter': False, 'assinar': False, 'aprovar': False,
+             'reabrir': False, 'retificar': False}
+    try:
+        from services.rdo_ciclo_vida import (APROVADO, ASSINADO, PREENCHIDO,
+                                             RASCUNHO, estado_de)
+        from utils.autorizacao import pode_apontar_na_obra, pode_editar_obra
+        atual = estado_de(rdo)
+        aponta = pode_apontar_na_obra(rdo.obra_id)
+        edita = pode_editar_obra(rdo.obra_id)
+        return {
+            'submeter': aponta and atual == RASCUNHO,
+            'assinar': aponta and atual == PREENCHIDO,
+            'aprovar': edita and atual == ASSINADO,
+            'reabrir': edita and atual == PREENCHIDO,
+            'retificar': edita and atual in (ASSINADO, APROVADO),
+        }
+    except Exception:
+        logger.warning('[Fase5] ações do RDO ilegíveis', exc_info=True)
+        return vazio
+
+
 @main_bp.route('/rdo/<int:id>')
 @login_required     # triagem 23/07 (Anexo B) — anônimo caía em AttributeError engolido
 def visualizar_rdo(id):
@@ -1484,7 +1520,11 @@ def visualizar_rdo(id):
                              apontamentos_cronograma=apontamentos_cronograma,
                              custos_dia_map=custos_dia_map,
                              custos_gerados_rdo=custos_gerados_rdo,
-                             indice_medio_por_subatividade=indice_medio_por_subatividade)
+                             indice_medio_por_subatividade=indice_medio_por_subatividade,
+                             # ── Fase 5 — ciclo de vida ──────────────
+                             estado_rdo=_estado_para_template(rdo),
+                             assinaturas_rdo=list(rdo.assinaturas or []),
+                             acoes_rdo=_acoes_para_template(rdo))
         
     except Exception as e:
         logger.error(f"ERRO VISUALIZAR RDO: {str(e)}")

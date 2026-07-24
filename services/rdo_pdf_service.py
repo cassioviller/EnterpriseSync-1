@@ -796,10 +796,68 @@ def gerar_pdf_rdo(rdo):
 
 
 def _signature_block(rdo, config, styles):
-    """Bloco de assinaturas no rodapé do conteúdo (não confundir com o
-    footer da página). Coluna esquerda: responsável pelo preenchimento
-    (criado_por). Coluna direita: engenheiro/responsável técnico
-    (EngenheiroResponsavel padrão da empresa)."""
+    """Bloco de assinaturas no rodapé do conteúdo.
+
+    Fase 5: quando existe `RDOAssinatura` (assinatura eletrônica com
+    hash + carimbo de tempo + IP), o PDF imprime a EVIDÊNCIA — nome,
+    papel, data/hora, IP e prefixo do hash — em vez da linha em branco
+    para caneta. Sem assinatura eletrônica, o comportamento antigo é
+    preservado integralmente: coluna do responsável pelo preenchimento +
+    coluna do engenheiro responsável, com linha para assinar à mão.
+    """
+    assinaturas = list(getattr(rdo, 'assinaturas', None) or [])
+
+    if assinaturas:
+        cabecalho_style = ParagraphStyle(
+            'sig_head', parent=styles['body'], fontSize=8, leading=10,
+            textColor=INK)
+        celula_style = ParagraphStyle(
+            'sig_cell', parent=styles['body'], fontSize=7.5, leading=9.5,
+            textColor=INK)
+
+        linhas = [[
+            Paragraph('<b>Papel</b>', cabecalho_style),
+            Paragraph('<b>Assinado por</b>', cabecalho_style),
+            Paragraph('<b>Data/hora (UTC)</b>', cabecalho_style),
+            Paragraph('<b>IP</b>', cabecalho_style),
+            Paragraph('<b>SHA-256</b>', cabecalho_style),
+        ]]
+        for a in assinaturas:
+            quando = (a.assinado_em.strftime('%d/%m/%Y %H:%M:%S')
+                      if a.assinado_em else '—')
+            nome = a.nome_signatario or '—'
+            if a.cargo_signatario:
+                nome = f'{nome}<br/><font size="6.5">{a.cargo_signatario}</font>'
+            linhas.append([
+                Paragraph((a.papel or '').capitalize(), celula_style),
+                Paragraph(nome, celula_style),
+                Paragraph(quando, celula_style),
+                Paragraph(a.ip or '—', celula_style),
+                Paragraph((a.hash_conteudo or '')[:24] + '…', celula_style),
+            ])
+
+        tabela = Table(linhas, colWidths=[52, 150, 92, 72, 134])
+        tabela.setStyle(TableStyle([
+            ('LINEBELOW', (0, 0), (-1, 0), 0.6, INK),
+            ('LINEBELOW', (0, 1), (-1, -1), 0.25, INK),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+
+        nota = Paragraph(
+            'Assinatura eletrônica com registro de autoria e verificação de '
+            'integridade (SHA-256 sobre o conteúdo do RDO), nos termos do '
+            'art. 10, §2º da MP 2.200-2/2001. Carimbo de tempo do servidor.',
+            ParagraphStyle('sig_nota', parent=styles['body_muted'],
+                           fontSize=6.5, leading=8.5))
+
+        return KeepTogether([_section_rule('Assinaturas', styles), tabela,
+                             Spacer(1, 4), nota])
+
+    # ── Sem assinatura eletrônica: comportamento pré-Fase 5 ──────────
     responsavel_nome = rdo.criado_por.nome if rdo.criado_por else 'Responsável pelo preenchimento'
     responsavel_cargo = 'Apontador / Mestre de Obras'
 

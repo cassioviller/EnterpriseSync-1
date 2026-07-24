@@ -921,3 +921,106 @@ def test_nao_retifica_rdo_em_rascunho():
     with app.app_context():
         assert db.session.get(RDO, rid).estado == RASCUNHO
         assert RDO.query.filter_by(rdo_retificado_id=rid).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# UI e PDF
+# ---------------------------------------------------------------------------
+
+def test_tela_do_rdo_mostra_o_selo_de_estado():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    corpo = _cliente_de(aid).get(f'/rdo/{rid}').get_data(as_text=True)
+    assert 'Rascunho' in corpo, 'o selo de estado não apareceu na tela'
+
+
+def test_tela_mostra_botao_de_assinar_para_quem_pode():
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid = rdo.id, op.id
+
+    corpo = _cliente_de(opid).get(f'/rdo/{rid}').get_data(as_text=True)
+    assert f'/rdo/{rid}/assinar' in corpo
+
+
+def test_tela_nao_mostra_botao_de_assinar_para_leitor():
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.LEITOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid = rdo.id, op.id
+
+    corpo = _cliente_de(opid).get(f'/rdo/{rid}').get_data(as_text=True)
+    assert f'/rdo/{rid}/assinar' not in corpo
+
+
+def test_tela_do_rdo_assinado_mostra_quem_assinou():
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid, nome = rdo.id, op.id, func.nome
+
+    _assinar_pela_rota(rid, opid)
+    corpo = _cliente_de(opid).get(f'/rdo/{rid}').get_data(as_text=True)
+    assert nome in corpo
+    assert 'Assinado' in corpo
+
+
+def test_pdf_do_rdo_assinado_e_gerado_com_a_assinatura():
+    from models import RDOAssinatura
+    from services.rdo_pdf_service import gerar_pdf_rdo
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid = rdo.id, op.id
+
+    _assinar_pela_rota(rid, opid)
+
+    with app.app_context():
+        rdo = db.session.get(RDO, rid)
+        assinaturas = RDOAssinatura.query.filter_by(rdo_id=rid).all()
+        assert len(assinaturas) == 1
+        pdf = gerar_pdf_rdo(rdo)
+        assert pdf, 'gerar_pdf_rdo devolveu vazio para RDO assinado'
+        assert pdf[:4] == b'%PDF'
+
+
+def test_pdf_do_rdo_sem_assinatura_continua_gerando():
+    """Regressão: o bloco de assinatura manuscrita não pode sumir."""
+    from services.rdo_pdf_service import gerar_pdf_rdo
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        pdf = gerar_pdf_rdo(rdo)
+        assert pdf and pdf[:4] == b'%PDF'
