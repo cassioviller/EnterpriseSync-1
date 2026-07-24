@@ -1519,25 +1519,44 @@ def exportar_rdo_pdf(rdo_id):
 
 
 @main_bp.route('/rdo/<int:id>/finalizar', methods=['POST'])
-@admin_required
+@login_required   # Fase 5 — era @admin_required, que recusa FUNCIONARIO
+                  # (auth.py:29). O APONTADOR não conseguia submeter o
+                  # próprio RDO. A autorização fina é por obra, abaixo.
 def finalizar_rdo(id):
-    """Finalizar RDO - mudança de status"""
+    """Submeter o RDO: `rascunho` → `preenchido`.
+
+    Publica o dia: lança os custos de mão de obra (via
+    `rdo_finalizado` → `event_manager.lancar_custos_rdo`), recalcula a
+    medição e notifica pelo webhook `obra.rdo_publicado`.
+    """
+    from services.rdo_ciclo_vida import (PREENCHIDO, RASCUNHO, estado_de,
+                                         transicionar)
+    from utils.autorizacao import pode_apontar_na_obra
+
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
-        # Buscar RDO com verificação de acesso
-        rdo = RDO.query.join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id
-        ).first_or_404()
-        
-        # Verificar se pode finalizar (só rascunhos)
-        if rdo.status == 'Finalizado':
-            flash('RDO já está finalizado.', 'warning')
+        rdo = _rdo_do_tenant_ou_404(id)
+        admin_id = rdo.admin_id or rdo.obra.admin_id
+
+        if not pode_apontar_na_obra(rdo.obra_id):
+            flash('Você não tem permissão para lançar RDO nesta obra.',
+                  'error')
             return redirect(url_for('main.visualizar_rdo', id=id))
-        
-        # Finalizar RDO
+
+        # Fase 5 — o guard antigo era `if rdo.status == 'Finalizado'`, e
+        # models.py:1128 faz TODO RDO nascer com esse valor: a rota
+        # inteira sempre retornava aqui. Agora o guard é o estado real.
+        if estado_de(rdo) != RASCUNHO:
+            flash(f'RDO {rdo.numero_rdo} já foi submetido.', 'warning')
+            return redirect(url_for('main.visualizar_rdo', id=id))
+
+        # `status` continua 'Finalizado' — ≥9 consumidores filtram por
+        # ele (cronograma_views.py:2458,2488; portal_obras_views.py:239;
+        # services/medicao_service.py:243; services/rdo_custos.py:330;
+        # services/metricas_produtividade.py:186,972,1302,1320,1397,1416).
         rdo.status = 'Finalizado'
+        transicionar(rdo, PREENCHIDO, usuario=current_user,
+                     ip=request.remote_addr,
+                     detalhes={'origem': 'finalizar_rdo'})
 
         # Calcular produtividade por funcionário vinculado (V2) — mesma transação
         # Fórmula: produtividade_real = quantidade / horas_totais_equipe (taxa da equipe, igual para todos)
@@ -1648,6 +1667,81 @@ def assinar_rdo(id):
         db.session.rollback()
         logger.error(f"ERRO ASSINAR RDO {id}: {e}", exc_info=True)
         flash('Erro ao assinar o RDO.', 'error')
+
+    return redirect(url_for('main.visualizar_rdo', id=id))
+
+
+@main_bp.route('/rdo/<int:id>/aprovar', methods=['POST'])
+@login_required
+def aprovar_rdo(id):
+    """Aceite do gestor da obra: `assinado` → `aprovado`.
+
+    Autorização: `pode_editar_obra` (Fase 1) — só o GESTOR da obra e o
+    ADMIN do tenant. APONTADOR assina o que executou; não homologa.
+    """
+    from services.rdo_assinatura import aprovar
+    from services.rdo_ciclo_vida import CicloVidaInvalido
+    from utils.autorizacao import pode_editar_obra
+
+    rdo = _rdo_do_tenant_ou_404(id)
+
+    if not pode_editar_obra(rdo.obra_id):
+        flash('Só o gestor da obra pode aprovar o RDO.', 'error')
+        return redirect(url_for('main.visualizar_rdo', id=id))
+
+    try:
+        aprovar(rdo, current_user,
+                observacao=(request.form.get('observacao') or '').strip() or None)
+        db.session.commit()
+        flash(f'RDO {rdo.numero_rdo} aprovado.', 'success')
+    except CicloVidaInvalido as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO APROVAR RDO {id}: {e}", exc_info=True)
+        flash('Erro ao aprovar o RDO.', 'error')
+
+    return redirect(url_for('main.visualizar_rdo', id=id))
+
+
+@main_bp.route('/rdo/<int:id>/reabrir', methods=['POST'])
+@login_required
+def reabrir_rdo(id):
+    """Devolve o RDO de `preenchido` para `rascunho`, com motivo.
+
+    Só existe enquanto o RDO NÃO foi assinado — a máquina de estados
+    (services/rdo_ciclo_vida.TRANSICOES_VALIDAS) não tem aresta saindo de
+    `assinado` para trás, então mesmo que a autorização passe, a
+    transição é recusada.
+    """
+    from services.rdo_ciclo_vida import (CicloVidaInvalido, RASCUNHO,
+                                         transicionar)
+    from utils.autorizacao import pode_editar_obra
+
+    rdo = _rdo_do_tenant_ou_404(id)
+
+    if not pode_editar_obra(rdo.obra_id):
+        flash('Só o gestor da obra pode reabrir um RDO.', 'error')
+        return redirect(url_for('main.visualizar_rdo', id=id))
+
+    motivo = (request.form.get('motivo') or '').strip()
+    if not motivo:
+        flash('Informe o motivo da reabertura.', 'error')
+        return redirect(url_for('main.visualizar_rdo', id=id))
+
+    try:
+        transicionar(rdo, RASCUNHO, usuario=current_user, motivo=motivo,
+                     ip=request.remote_addr)
+        db.session.commit()
+        flash(f'RDO {rdo.numero_rdo} reaberto para edição.', 'success')
+    except CicloVidaInvalido as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO REABRIR RDO {id}: {e}", exc_info=True)
+        flash('Erro ao reabrir o RDO.', 'error')
 
     return redirect(url_for('main.visualizar_rdo', id=id))
 

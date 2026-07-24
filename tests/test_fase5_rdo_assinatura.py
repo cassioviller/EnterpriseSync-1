@@ -574,3 +574,203 @@ def test_rdo_assinado_nao_aceita_mais_edicao_pela_rota():
     with app.app_context():
         assert db.session.get(RDO, rid).comentario_geral == \
             'Montagem dos perfis de aço do painel P3.'
+
+
+# ---------------------------------------------------------------------------
+# Aprovação e reabertura
+# ---------------------------------------------------------------------------
+
+def _assinar_pela_rota(rdo_id, usuario_id):
+    _cliente_de(usuario_id).post(f'/rdo/{rdo_id}/assinar')
+
+
+def test_gestor_aprova_rdo_assinado():
+    from models import RDOAssinatura
+    from services.rdo_ciclo_vida import APROVADO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        f_ap, f_ge = _funcionario(admin.id, 'Ap'), _funcionario(admin.id, 'Ge')
+        ap, ge = _operador(admin.id, f_ap), _operador(admin.id, f_ge, 'Gestor')
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid, geid = rdo.id, ap.id, ge.id
+
+    _assinar_pela_rota(rid, apid)
+    resposta = _cliente_de(geid).post(f'/rdo/{rid}/aprovar',
+                                      follow_redirects=False)
+    assert resposta.status_code in (200, 302)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == APROVADO
+        papeis = {a.papel for a in RDOAssinatura.query.filter_by(rdo_id=rid)}
+        assert papeis == {RDOAssinatura.PAPEL_EXECUTOR,
+                          RDOAssinatura.PAPEL_GESTOR}
+
+
+def test_apontador_nao_aprova():
+    from services.rdo_ciclo_vida import ASSINADO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        ap = _operador(admin.id, func)
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid = rdo.id, ap.id
+
+    _assinar_pela_rota(rid, apid)
+    _cliente_de(apid).post(f'/rdo/{rid}/aprovar')
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == ASSINADO, (
+            'APONTADOR aprovou o próprio RDO — aprovação é do GESTOR')
+
+
+def test_nao_aprova_rdo_apenas_preenchido():
+    from services.rdo_ciclo_vida import PREENCHIDO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id, 'Ge')
+        ge = _operador(admin.id, func, 'Gestor')
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ge)
+        rid, geid = rdo.id, ge.id
+
+    _cliente_de(geid).post(f'/rdo/{rid}/aprovar')
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == PREENCHIDO
+
+
+def test_gestor_reabre_rdo_preenchido():
+    from models import RDOTransicaoEstado
+    from services.rdo_ciclo_vida import RASCUNHO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id, 'Ge')
+        ge = _operador(admin.id, func, 'Gestor')
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ge)
+        rid, geid = rdo.id, ge.id
+
+    _cliente_de(geid).post(f'/rdo/{rid}/reabrir',
+                           data={'motivo': 'horas lançadas erradas'})
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == RASCUNHO
+        ultima = (RDOTransicaoEstado.query.filter_by(rdo_id=rid)
+                  .order_by(RDOTransicaoEstado.id.desc()).first())
+        assert ultima.estado_novo == RASCUNHO
+        assert ultima.motivo == 'horas lançadas erradas'
+
+
+def test_apontador_nao_reabre():
+    from services.rdo_ciclo_vida import PREENCHIDO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        ap = _operador(admin.id, func)
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid = rdo.id, ap.id
+
+    _cliente_de(apid).post(f'/rdo/{rid}/reabrir', data={'motivo': 'quero'})
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == PREENCHIDO
+
+
+def test_nao_reabre_rdo_assinado():
+    from services.rdo_ciclo_vida import ASSINADO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        f_ap, f_ge = _funcionario(admin.id, 'Ap'), _funcionario(admin.id, 'Ge')
+        ap, ge = _operador(admin.id, f_ap), _operador(admin.id, f_ge, 'Gestor')
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid, geid = rdo.id, ap.id, ge.id
+
+    _assinar_pela_rota(rid, apid)
+    _cliente_de(geid).post(f'/rdo/{rid}/reabrir', data={'motivo': 'errei'})
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == ASSINADO, (
+            'RDO assinado foi reaberto — imutabilidade furada')
+
+
+def test_finalizar_rdo_leva_de_rascunho_para_preenchido():
+    """`finalizar_rdo` (views/rdo.py:1521) é a rota de SUBMISSÃO.
+
+    Ela já gravava `status='Finalizado'` e emitia `rdo_finalizado` +
+    `obra.rdo_publicado`. O que faltava era mover o `estado` — sem isso o
+    RDO nunca sai de rascunho e nunca pode ser assinado.
+    """
+    from services.rdo_ciclo_vida import PREENCHIDO, RASCUNHO
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        ap = _operador(admin.id, func)
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id, criado_por_id=ap.id)
+        assert rdo.estado == RASCUNHO
+        rid, aid = rdo.id, admin.id
+
+    _cliente_de(aid).post(f'/rdo/{rid}/finalizar', follow_redirects=True)
+
+    with app.app_context():
+        recarregado = db.session.get(RDO, rid)
+        assert recarregado.estado == PREENCHIDO
+        assert recarregado.status == 'Finalizado', (
+            'o status legado tem que continuar Finalizado — ≥9 '
+            'consumidores filtram por ele')
+
+
+def test_finalizar_rdo_ja_preenchido_e_no_op():
+    """Reenvio de formulário não pode duplicar trilha nem quebrar."""
+    from models import RDOTransicaoEstado
+    from services.rdo_ciclo_vida import PREENCHIDO
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = _cliente_de(aid)
+    cliente.post(f'/rdo/{rid}/finalizar', follow_redirects=True)
+    cliente.post(f'/rdo/{rid}/finalizar', follow_redirects=True)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == PREENCHIDO
+        transicoes = RDOTransicaoEstado.query.filter_by(
+            rdo_id=rid, estado_novo=PREENCHIDO).count()
+        assert transicoes == 1, (
+            f'{transicoes} transições para preenchido — o no-op de '
+            f'`transicionar` não está funcionando')
