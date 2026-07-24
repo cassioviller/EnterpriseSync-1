@@ -210,7 +210,14 @@
                 <span class="pred-val"
                       ondblclick="iniciarEdicao(this, {{ t.id }}, 'predecessora_id')"
                       title="Duplo-clique para editar">
-                  {% if t.predecessora_id %}
+                  {% if editor_v2 %}
+                    {# Editor v2 (Fase 1): formato Project ("12TI+3;15II-2") vindo
+                       de tarefas_dict — mesma ordem/índices do loop de tarefas. #}
+                    {% set pred_txt = tarefas_dict[loop.index0].predecessoras_texto %}
+                    {% if pred_txt %}
+                      <span class="badge bg-light text-secondary border">{{ pred_txt }}</span>
+                    {% else %}—{% endif %}
+                  {% elif t.predecessora_id %}
                     <span class="badge bg-light text-secondary border" data-pred-id="{{ t.predecessora_id }}">#{{ t.predecessora_id }}</span>
                   {% else %}—{% endif %}
                 </span>
@@ -843,6 +850,10 @@
 .gantt-bar-leaf { background: linear-gradient(90deg,#1976d2,#42a5f5); }
 .gantt-bar-done { background: linear-gradient(90deg,#16a34a,#22c55e); }
 .gantt-bar-low  { background: linear-gradient(90deg,#ef4444,#f87171); }
+/* Editor v2 (Fase 1) — caminho crítico. Classe só é aplicada com a flag
+   cronograma_editor_v2 ligada (EDITOR_V2 em renderGantt); inerte com flag off. */
+.gantt-bar-critica { background: #dc3545; }
+.gantt-bar-critica .gantt-progress { background: rgba(0,0,0,.28); }
 .gantt-progress { height: 100%; background: rgba(255,255,255,.3); }
 .gantt-bar-label {
   position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
@@ -882,6 +893,9 @@ const MODO_CLIENTE = {{ 'true' if modo_cliente else 'false' }};
 const QS_CLIENTE = MODO_CLIENTE ? '?cliente=1' : '';
 function apiUrl(suffix) { return URL_BASE + suffix + QS_CLIENTE; }
 const DAY_W    = 26;
+// Fase 1 (editor v2): todo comportamento novo fica atrás desta flag —
+// com ela desligada, nenhum caminho de código JS muda.
+const EDITOR_V2 = {{ 'true' if editor_v2 else 'false' }};
 
 let tarefas = {{ tarefas_dict | tojson }};
 
@@ -998,6 +1012,37 @@ function iniciarEdicao(el, tarefaId, campo) {
   }
 
   if (campo === 'predecessora_id') {
+    if (EDITOR_V2) {
+      // Editor v2: célula de predecessoras em formato Project ("12;15TT+1")
+      // sobre a numeração VISUAL da grade. Envia {predecessoras_texto} —
+      // predecessora_id fica congelado no backend.
+      const tarefa = tarefas.find(t => t.id === tarefaId);
+      const oldTexto = tarefa ? (tarefa.predecessoras_texto || '') : '';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'cell-input';
+      inp.style.cssText = 'width:auto;min-width:110px;max-width:170px;font-size:.78rem';
+      inp.placeholder = 'ex: 12; 15TT+1';
+      inp.title = 'Formato Project: 12, 12TI+3, 12II-2 — separe múltiplas com ";"';
+      inp.value = oldTexto;
+      el.innerHTML = '';
+      el.appendChild(inp);
+      inp.focus();
+      inp.select();
+      let done = false;
+      const commit = async () => {
+        if (done) return; done = true;
+        const val = inp.value.trim();
+        if (val === oldTexto.trim()) { restaurarCelulaPred(el, tarefaId); return; }
+        await salvarCampo(tarefaId, 'predecessoras_texto', val, el, oldTexto);
+      };
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+        if (e.key === 'Escape') { done = true; restaurarCelulaPred(el, tarefaId); }
+      });
+      return;
+    }
     // Select dropdown
     const sel = document.createElement('select');
     sel.className = 'cell-input';
@@ -1139,9 +1184,23 @@ function renderPredBadge(predId) {
   return `<span class="badge bg-light text-secondary border" data-pred-id="${pid}">${getIndiceTabela(pid)}</span>`;
 }
 
+// Editor v2: célula de predecessoras a partir do objeto tarefa completo.
+// Flag ON  → texto em formato Project (predecessoras_texto) ou '—';
+//            sem data-pred-id, então updatePredBadges legado não a toca.
+// Flag OFF → badge legado por predecessora_id (comportamento intocado).
+function renderPredCell(t) {
+  if (EDITOR_V2) {
+    const txt = t && t.predecessoras_texto ? String(t.predecessoras_texto) : '';
+    return txt ? `<span class="badge bg-light text-secondary border">${txt}</span>` : '—';
+  }
+  return renderPredBadge(t ? t.predecessora_id : null);
+}
+
 function restaurarCelulaPred(el, tarefaId) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
-  el.innerHTML = renderPredBadge(tarefa ? tarefa.predecessora_id : null);
+  // Em erro/cancelamento, `tarefas` ainda guarda o predecessoras_texto
+  // anterior — a célula reverte para ele (flag on) ou para o badge legado.
+  el.innerHTML = renderPredCell(tarefa);
 }
 function restaurarCelulaDate(el, tarefaId, tipo) {
   const tarefa = tarefas.find(t => t.id === tarefaId);
@@ -1185,6 +1244,7 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
   try {
     const body = {};
     if (campo === 'nome_tarefa' || campo === 'responsavel') body[campo] = valor;
+    else if (campo === 'predecessoras_texto') body[campo] = valor; // editor v2: '' remove todos os vínculos
     else if (campo === 'data_inicio') body[campo] = valor || null;
     else body[campo] = valor === '' ? null : Number(valor);
 
@@ -1194,7 +1254,13 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
     });
     const data = await res.json();
     if (data.status === 'ok') {
-      if (data.tarefas && data.tarefas.length) {
+      if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
+        // Editor v2: batch-update sem reload — aplica só a tarefa editada
+        // e os diffs do motor; NÃO chama recalcularTudo (o PUT já recalculou).
+        if (data.tarefa) updateTarefaLocal(data.tarefa);
+        data.tarefas_afetadas.forEach(t => updateTarefaLocal(t));
+        renderGantt();
+      } else if (data.tarefas && data.tarefas.length) {
         tarefas = data.tarefas;
         data.tarefas.forEach(t => updateTarefaLocal(t));
         renderGantt();
@@ -1210,15 +1276,19 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
       else if (campo === 'duracao_dias') el.textContent = (t ? t.duracao_dias : valor) + 'd';
       else if (campo === 'percentual_concluido') el.textContent = Math.round(t ? t.percentual_concluido || 0 : valor) + '%';
       else if (campo === 'data_inicio') el.textContent = t && t.data_inicio ? formatDate(t.data_inicio) : '—';
-      else if (campo === 'predecessora_id') restaurarCelulaPred(el, tarefaId);
+      else if (campo === 'predecessora_id' || campo === 'predecessoras_texto') restaurarCelulaPred(el, tarefaId);
       else if (campo === 'responsavel') restaurarCelulaResp(el, tarefaId);
-      toast(campo === 'nome_tarefa' ? 'Nome atualizado' : campo === 'responsavel' ? 'Responsável atualizado' : 'Campo atualizado');
+      toast(campo === 'nome_tarefa' ? 'Nome atualizado' : campo === 'responsavel' ? 'Responsável atualizado' : campo === 'predecessoras_texto' ? 'Predecessoras atualizadas' : 'Campo atualizado');
     } else {
-      restaurarCelula(el, campo, oldRaw, tarefaId);
+      // Mensagens do backend (ciclo, tarefa ancorada, erro de parse) chegam
+      // prontas em data.msg e aparecem verbatim no toast.
+      if (campo === 'predecessoras_texto') restaurarCelulaPred(el, tarefaId);
+      else restaurarCelula(el, campo, oldRaw, tarefaId);
       toast(data.msg || 'Erro ao salvar', 'error');
     }
   } catch(e) {
-    restaurarCelula(el, campo, oldRaw, tarefaId);
+    if (campo === 'predecessoras_texto') restaurarCelulaPred(el, tarefaId);
+    else restaurarCelula(el, campo, oldRaw, tarefaId);
     toast('Erro de rede', 'error');
   }
 }
@@ -1239,7 +1309,11 @@ function updateTarefaLocal(t) {
 
   if (ini) ini.textContent = t.data_inicio ? formatDate(t.data_inicio) : '—';
   if (fim) fim.textContent = t.data_fim ? formatDate(t.data_fim) : '—';
-  if (pred) pred.innerHTML = renderPredBadge(t.predecessora_id);
+  // Editor v2: renderPredCell também cobre predecessoras_texto — o objeto
+  // local já foi trocado acima (tarefas[idx]=t), levando junto is_critica e
+  // folga_dias. Com flag on não sobrescreve um input de edição aberto;
+  // com flag off o comportamento é o de sempre (renderPredBadge).
+  if (pred && (!EDITOR_V2 || !pred.querySelector('input, select'))) pred.innerHTML = renderPredCell(t);
   const resp = t.responsavel || 'empresa';
   if (percEl) {
     if (resp === 'terceiros') {
@@ -1745,6 +1819,10 @@ async function salvarNovaTarefa() {
     bootstrap.Modal.getInstance(document.getElementById('modalNovaTarefa'))?.hide();
     tarefas.push(data.tarefa);
     adicionarLinhaTabela(data.tarefa);
+    if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
+      // Editor v2: cascata do motor aplicada sem reload nem recálculo extra.
+      data.tarefas_afetadas.forEach(t => updateTarefaLocal(t));
+    }
     renumerarTudo();
     renderGantt();
     toast('Tarefa criada com sucesso', 'success');
@@ -1911,7 +1989,12 @@ async function salvarEditar() {
     const data = await res.json();
     if (data.status === 'ok') {
       bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvasEditar')).hide();
-      if (data.tarefas && data.tarefas.length) {
+      if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
+        // Editor v2: aplica a tarefa editada + diffs do motor, sem trocar o
+        // array inteiro (preserva a ordem visual local) e sem recalcularTudo.
+        if (data.tarefa) updateTarefaLocal(data.tarefa);
+        data.tarefas_afetadas.forEach(t => updateTarefaLocal(t));
+      } else if (data.tarefas && data.tarefas.length) {
         tarefas = data.tarefas;
         data.tarefas.forEach(t => updateTarefaLocal(t));
       } else {
@@ -1985,7 +2068,7 @@ function adicionarLinhaTabela(t) {
     <td class="td-center"><span class="badge-dur dur-val" ondblclick="iniciarEdicao(this,${t.id},'duracao_dias')" title="Duplo-clique para editar">${t.duracao_dias}d</span></td>
     <td class="td-center small"><span class="date-chip inicio-val" ondblclick="iniciarEdicao(this,${t.id},'data_inicio')" title="Duplo-clique para editar">${t.data_inicio ? formatDate(t.data_inicio) : '—'}</span></td>
     <td class="td-center small"><span class="date-chip fim-val">${t.data_fim ? formatDate(t.data_fim) : '—'}</span></td>
-    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${renderPredBadge(t.predecessora_id)}</span></td>
+    <td class="td-center small"><span class="pred-val" ondblclick="iniciarEdicao(this,${t.id},'predecessora_id')" title="Duplo-clique para editar">${renderPredCell(t)}</span></td>
     <td class="td-center small text-muted"><span class="qty-val" ondblclick="iniciarEdicao(this,${t.id},'quantidade_total')" title="Duplo-clique para editar">${qtdHtml}</span></td>
     <td class="td-center td-resp small">${respBadge}</td>
     <td class="td-perc plan-val">${planCell}</td>
@@ -2058,6 +2141,12 @@ async function excluirTarefa(id, nome, doContrato) {
             if (btn) btn.outerHTML = '<span class="toggle-placeholder"></span>';
           }
         });
+      }
+
+      if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
+        // Editor v2: ex-sucessoras refluídas pelo motor — atualiza células de
+        // datas/duração/pred sem reload (o bloco acima só corrige hierarquia).
+        data.tarefas_afetadas.forEach(t => updateTarefaLocal(t));
       }
 
       renumerarTudo();
@@ -2150,7 +2239,12 @@ document.addEventListener('mouseup', async e => {
     });
     const data = await res.json();
     if (data.status === 'ok') {
-      if (data.tarefas && data.tarefas.length) {
+      if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
+        // Editor v2: tarefa movida + cascata do motor, sem trocar o array
+        // inteiro e sem recálculo extra no cliente.
+        if (data.tarefa) updateTarefaLocal(data.tarefa);
+        data.tarefas_afetadas.forEach(t => updateTarefaLocal(t));
+      } else if (data.tarefas && data.tarefas.length) {
         tarefas = data.tarefas;
         data.tarefas.forEach(t => updateTarefaLocal(t));
       } else {
@@ -2159,6 +2253,9 @@ document.addEventListener('mouseup', async e => {
       renderGantt();
       toast('Tarefa movida');
     } else {
+      // Ex.: "Tarefa já iniciada por apontamento de RDO — o início não pode
+      // ser alterado" (editor v2) — msg do backend aparece verbatim; a barra
+      // reverte para a posição original.
       barEl.style.left = origLeft + 'px';
       toast(data.msg || 'Erro ao mover', 'error');
     }
@@ -2233,14 +2330,23 @@ function renderGantt() {
       const progW  = Math.round(perc / 100 * widPx);
       const plan   = Math.round(t.percentual_planejado || 0);
       const planW  = Math.round(plan / 100 * widPx);
-      const barClass = isPai ? 'gantt-bar-pai' : perc >= 100 ? 'gantt-bar-done' : perc < 20 ? 'gantt-bar-low' : 'gantt-bar-leaf';
+      let barClass = isPai ? 'gantt-bar-pai' : perc >= 100 ? 'gantt-bar-done' : perc < 20 ? 'gantt-bar-low' : 'gantt-bar-leaf';
+      // Editor v2: caminho crítico em vermelho. Precedência: done > crítica >
+      // classes existentes (low/leaf) — tarefa concluída nunca fica vermelha.
+      if (EDITOR_V2 && t.is_critica && !isPai && perc < 100) barClass = 'gantt-bar-critica';
+      // Editor v2: crítico/folga no tooltip da barra (só folhas, flag on).
+      let tipExtra = '';
+      if (EDITOR_V2 && !isPai) {
+        if (t.is_critica) tipExtra = ' • Caminho crítico (folga 0d)';
+        else if (t.folga_dias !== null && t.folga_dias !== undefined) tipExtra = ` • Folga: ${t.folga_dias}d`;
+      }
       // Indicador de planejado: linha vertical tracejada sobre a barra
       const planMarker = (plan > 0 && plan < 100)
         ? `<div class="gantt-plan-marker" style="left:${planW}px" title="Planejado hoje: ${plan}%"></div>`
         : '';
       barHtml = `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}"
         style="left:${leftPx}px;width:${widPx}px"
-        title="${t.nome_tarefa} — Real: ${perc}% / Plan: ${plan}% — ${formatDate(t.data_inicio)} → ${formatDate(t.data_fim)}">
+        title="${t.nome_tarefa} — Real: ${perc}% / Plan: ${plan}% — ${formatDate(t.data_inicio)} → ${formatDate(t.data_fim)}${tipExtra}">
         <div class="gantt-progress" style="width:${progW}px"></div>
         ${planMarker}
         ${widPx > 60 ? `<span class="gantt-bar-label">${perc}%</span>` : ''}
@@ -2412,12 +2518,36 @@ function initRowDrag() {
       }
       renderGantt();
       toast('Ordem salva');
+
+      if (EDITOR_V2) {
+        // Editor v2: reordenar muda a numeração VISUAL das linhas, então os
+        // predecessoras_texto locais ("12TI+3") ficam defasados. O endpoint
+        // /reordenar devolve só {status:'ok'}, e não existe GET JSON das
+        // tarefas da obra — o refresh vem de POST /recalcular (via
+        // recalcularTudo(false)), que devolve a lista completa com
+        // predecessoras_texto recomputado pelo servidor (autoridade da
+        // numeração, mesmo helper ordenar_arvore_visual da grade). Com a
+        // flag ligada o motor novo é idempotente, então o recálculo extra
+        // não altera datas já normalizadas.
+        await recalcularTudo(false);
+      }
     },
   });
 }
 
 // ── Init ──
 function updatePredBadges() {
+  if (EDITOR_V2) {
+    // Editor v2: células PRED mostram predecessoras_texto (formato Project).
+    // Re-renderiza a partir do estado local `tarefas`; após um drag-reorder
+    // o texto pode estar momentaneamente defasado até o refresh do servidor
+    // (ver onEnd do SortableJS) — o servidor é a autoridade da numeração.
+    tarefas.forEach(t => {
+      const cell = document.querySelector(`tr.tarefa-row[data-id="${t.id}"] .pred-val`);
+      if (cell && !cell.querySelector('input, select')) cell.innerHTML = renderPredCell(t);
+    });
+    return;
+  }
   document.querySelectorAll('[data-pred-id]').forEach(badge => {
     const pid = Number(badge.dataset.predId);
     badge.textContent = getIndiceTabela(pid);

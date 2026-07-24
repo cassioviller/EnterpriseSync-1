@@ -11,10 +11,21 @@ from flask import Blueprint, jsonify, redirect, render_template, request, send_f
 from flask_login import login_required
 
 from models import (
-    db, Obra, TarefaCronograma, RDOApontamentoCronograma,
+    db, Obra, TarefaCronograma, TarefaVinculo, RDOApontamentoCronograma,
     CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
     RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario,
     ComposicaoServico, SubatividadeMaoObra,
+)
+from services.cronograma_predecessor_parser import (
+    ErroParsePredecessora,
+    formatar_predecessoras,
+    parsear_predecessoras,
+)
+from services.cronograma_scheduler import (
+    TIPOS_VINCULO,
+    ErroCiclo,
+    ids_tarefas_iniciadas,
+    recalcular_obra,
 )
 from utils.cronograma_engine import (
     recalcular_cronograma,
@@ -25,6 +36,7 @@ from utils.cronograma_engine import (
     calcular_progresso_geral_obra_v2,
     atualizar_percentual_tarefa,
     sincronizar_percentuais_obra,
+    ordenar_arvore_visual,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,10 +95,94 @@ def _guard_apontar_obra(obra_id: int):
     return None
 
 
-def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> dict:
+def _editor_v2_on() -> bool:
+    """Flag do editor de cronograma v2 no tenant atual (Fase 1).
+
+    Import tardio (padrão deste módulo para utils.tenant): nunca levanta,
+    default False — com a flag desligada TODAS as rotas se comportam
+    exatamente como antes.
+    """
+    from utils.tenant import cronograma_editor_v2_ativo
+    return cronograma_editor_v2_ativo()
+
+
+def _mapas_vinculos(obra_id: int, admin_id: int, cliente_mode: bool,
+                    tarefas: list | None = None):
+    """Mapas do editor v2 para a obra — uma query de vínculos, zero N+1.
+
+    Devolve `(vinculos_por_sucessora, linha_para_tarefa, tarefa_para_linha,
+    ids_resumo)`. A numeração de linhas (1-based) vem de
+    `ordenar_arvore_visual` — a MESMA da grade e do parser de predecessoras,
+    para os números nunca divergirem. Vínculos com qualquer ponta fora da
+    grade (outro modo cliente/interno ou dado sujo) ficam fora dos mapas,
+    então `formatar_predecessoras` nunca levanta na serialização.
+    """
+    if tarefas is None:
+        tarefas = (
+            TarefaCronograma.query
+            .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+            .filter(TarefaCronograma.ativa.is_(True))
+            .order_by(TarefaCronograma.ordem, TarefaCronograma.id)
+            .all()
+        )
+    ordenadas = ordenar_arvore_visual(tarefas)
+    linha_para_tarefa = {i + 1: t.id for i, t in enumerate(ordenadas)}
+    tarefa_para_linha = {t.id: i + 1 for i, t in enumerate(ordenadas)}
+    ids_resumo = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
+
+    vinculos_por_sucessora: dict[int, list] = {}
+    vincs = (
+        TarefaVinculo.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .order_by(TarefaVinculo.id)
+        .all()
+    )
+    for v in vincs:
+        if v.predecessora_id in tarefa_para_linha and v.sucessora_id in tarefa_para_linha:
+            vinculos_por_sucessora.setdefault(v.sucessora_id, []).append(v)
+    return vinculos_por_sucessora, linha_para_tarefa, tarefa_para_linha, ids_resumo
+
+
+def _dual_write_vinculo_legado(tarefa: TarefaCronograma, admin_id: int) -> None:
+    """Flag OFF — espelha silenciosamente o `predecessora_id` legado em
+    `TarefaVinculo` TI/0 (removendo antes os vínculos da sucessora), para a
+    tabela não ficar obsoleta enquanto a flag não liga (plano C3/Riscos).
+    NUNCA falha a request: qualquer erro vira rollback + warning.
+    """
+    try:
+        TarefaVinculo.query.filter_by(
+            sucessora_id=tarefa.id, obra_id=tarefa.obra_id, admin_id=admin_id
+        ).delete(synchronize_session=False)
+        if tarefa.predecessora_id:
+            db.session.add(TarefaVinculo(
+                admin_id=admin_id,
+                obra_id=tarefa.obra_id,
+                predecessora_id=tarefa.predecessora_id,
+                sucessora_id=tarefa.id,
+                tipo='TI',
+                lag_dias=0,
+            ))
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning('[editor-v2] dual-write de vínculo falhou (tarefa %s): %s',
+                       tarefa.id, exc)
+
+
+def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0, *,
+                    vinculos_por_sucessora: dict | None = None,
+                    tarefa_para_linha: dict | None = None) -> dict:
     sub_nome = None
     if getattr(t, 'subatividade_mestre', None):
         sub_nome = t.subatividade_mestre.nome
+    # Fase 1 (editor v2) — `predecessoras_texto` só é montado quando o
+    # chamador passa os mapas da obra (`_mapas_vinculos`); sem mapas, ''
+    # barato — nunca há query por tarefa aqui (sem N+1).
+    predecessoras_texto = ''
+    if vinculos_por_sucessora is not None and tarefa_para_linha is not None:
+        vincs = vinculos_por_sucessora.get(t.id) or []
+        if vincs:
+            predecessoras_texto = formatar_predecessoras(vincs, tarefa_para_linha)
     return {
         'id': t.id,
         'obra_id': t.obra_id,
@@ -112,6 +208,10 @@ def _tarefa_to_dict(t: TarefaCronograma, percentual_planejado: float = 0.0) -> d
         # Task #102: marcador para o front exibir aviso ao editar/excluir tarefas
         # geradas automaticamente pela aprovação de proposta.
         'gerada_por_proposta_item_id': getattr(t, 'gerada_por_proposta_item_id', None),
+        # Fase 1 (editor v2) — campos aditivos, inofensivos com a flag off.
+        'is_critica': bool(getattr(t, 'is_critica', False)),
+        'folga_dias': getattr(t, 'folga_dias', None),
+        'predecessoras_texto': predecessoras_texto,
     }
 
 
@@ -253,31 +353,22 @@ def cronograma_obra(obra_id: int):
         .all()
     )
 
-    # Tree-flatten (recursive DFS): interleave each task with all its
-    # descendants so rows appear immediately after their parent in the rendered
-    # table, regardless of nesting depth.  Also builds a depth map so the
-    # template can indent each row proportionally.
-    filhas_map: dict[int, list] = {}
-    raiz: list = []
-    for t in tarefas_raw:
-        if t.tarefa_pai_id:
-            filhas_map.setdefault(t.tarefa_pai_id, []).append(t)
-        else:
-            raiz.append(t)
-
-    tarefas: list = []
-    nivel_map: dict[int, int] = {}  # task_id → depth (0 = root)
-
-    def _dfs(node, depth: int) -> None:
-        tarefas.append(node)
-        nivel_map[node.id] = depth
-        for child in filhas_map.get(node.id, []):
-            _dfs(child, depth + 1)
-
-    for t in raiz:
-        _dfs(t, 0)
+    # Tree-flatten (recursive DFS) extraído para helper compartilhado
+    # (`ordenar_arvore_visual`): define a ordem visual das linhas e o mapa de
+    # profundidade para indentação — mesma numeração usada pelo parser de
+    # predecessoras.
+    tarefas, nivel_map = ordenar_arvore_visual(tarefas_raw, com_nivel=True)
 
     cal = get_calendario(admin_id)
+
+    # Fase 1 (editor v2): com a flag ligada, os dicts levam
+    # `predecessoras_texto` real (mapas da obra em uma query — sem N+1).
+    flag_on = _editor_v2_on()
+    _kw_v2: dict = {}
+    if flag_on:
+        vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode,
+                                          tarefas=tarefas)
+        _kw_v2 = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
 
     # Calcula progresso planejado de hoje para cada tarefa
     hoje = date.today()
@@ -287,7 +378,7 @@ def cronograma_obra(obra_id: int):
         prog = calcular_progresso_rdo(t.id, hoje, admin_id)
         planejado = prog['percentual_planejado']
         planejados_map[t.id] = planejado
-        tarefas_dict.append(_tarefa_to_dict(t, planejado))
+        tarefas_dict.append(_tarefa_to_dict(t, planejado, **_kw_v2))
 
     # Build lookup maps for rendering
     pai_ids = {t.tarefa_pai_id for t in tarefas if t.tarefa_pai_id}
@@ -327,6 +418,8 @@ def cronograma_obra(obra_id: int):
         nome_empresa=nome_empresa,
         progresso_geral_header=progresso_geral_header,
         modo_cliente=cliente_mode,
+        # Fase 1 (editor v2): o Step D define `const EDITOR_V2` a partir daqui.
+        editor_v2=flag_on,
         base_template='base_iframe.html' if cliente_mode else 'base_completo.html',
     )
 
@@ -527,10 +620,66 @@ def criar_tarefa(obra_id: int):
         is_cliente=cliente_mode,
     )
     db.session.add(tarefa)
-    db.session.commit()
 
-    logger.info(f"[OK] TarefaCronograma criada id={tarefa.id} obra_id={obra_id}")
-    return jsonify({'status': 'ok', 'tarefa': _tarefa_to_dict(tarefa)}), 201
+    flag_on = _editor_v2_on()
+    if not flag_on:
+        # Caminho legado intocado + dual-write silencioso do vínculo TI/0.
+        db.session.commit()
+        logger.info(f"[OK] TarefaCronograma criada id={tarefa.id} obra_id={obra_id}")
+        if predecessora_id:
+            _dual_write_vinculo_legado(tarefa, admin_id)
+        return jsonify({'status': 'ok', 'tarefa': _tarefa_to_dict(tarefa)}), 201
+
+    # ── Editor v2 (flag ON) — plano C3 ──
+    db.session.flush()  # garante tarefa.id para os vínculos
+    if predecessora_id:
+        # Modal legado: o predecessora_id da criação vira vínculo TI/0 (a
+        # coluna gravada acima fica congelada — o motor lê só tarefa_vinculo).
+        db.session.add(TarefaVinculo(
+            admin_id=admin_id, obra_id=obra_id,
+            predecessora_id=predecessora_id, sucessora_id=tarefa.id,
+            tipo='TI', lag_dias=0))
+    if (data.get('predecessoras_texto') or '').strip():
+        _, linha_para_tarefa, _, ids_resumo = _mapas_vinculos(
+            obra_id, admin_id, cliente_mode)
+        try:
+            vincs = parsear_predecessoras(
+                str(data.get('predecessoras_texto') or ''),
+                linha_para_tarefa,
+                sucessora_id=tarefa.id,
+                ids_resumo=ids_resumo,
+            )
+        except ErroParsePredecessora as exc:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'msg': str(exc)}), 400
+        # O texto vence o predecessora_id legado: substitui os vínculos
+        # da sucessora (delete + insert).
+        TarefaVinculo.query.filter_by(
+            sucessora_id=tarefa.id, obra_id=obra_id, admin_id=admin_id
+        ).delete(synchronize_session=False)
+        for v in vincs:
+            db.session.add(TarefaVinculo(
+                admin_id=admin_id, obra_id=obra_id,
+                predecessora_id=v.predecessora_id, sucessora_id=tarefa.id,
+                tipo=v.tipo, lag_dias=v.lag_dias))
+
+    try:
+        resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode,
+                                    commit=False)
+        db.session.commit()
+    except ErroCiclo as exc:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': str(exc)}), 400
+
+    logger.info(f"[OK] TarefaCronograma criada id={tarefa.id} obra_id={obra_id} (editor v2)")
+    vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode)
+    _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+    return jsonify({
+        'status': 'ok',
+        'tarefa': _tarefa_to_dict(tarefa, **_kw),
+        'tarefas_afetadas': [_tarefa_to_dict(t, **_kw)
+                             for t in resultado.tarefas_afetadas],
+    }), 201
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -553,6 +702,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).first_or_404()
 
+    flag_on = _editor_v2_on()
     data = request.get_json(silent=True) or {}
 
     if 'nome_tarefa' in data:
@@ -569,6 +719,16 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
     if 'data_inicio' in data:
         d = _parse_date(data['data_inicio'])
         if d:
+            # Editor v2: tarefa ancorada (iniciada) tem o início congelado —
+            # o motor novo nunca mexe nas datas dela (plano C3/B3).
+            if flag_on and tarefa.id in ids_tarefas_iniciadas(
+                    obra_id, admin_id, cliente=cliente_mode):
+                db.session.rollback()
+                return jsonify({
+                    'status': 'error',
+                    'msg': ('Tarefa já iniciada por apontamento de RDO — '
+                            'o início não pode ser alterado'),
+                }), 400
             tarefa.data_inicio = d
 
     if 'quantidade_total' in data:
@@ -656,7 +816,10 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         d = _parse_date(data['data_entrega_real']) if data.get('data_entrega_real') else None
         tarefa.data_entrega_real = d
 
-    if 'predecessora_id' in data:
+    # Editor v2 (flag ON): `predecessora_id` fica CONGELADO — a fonte de
+    # verdade passa a ser `tarefa_vinculo` (campo `predecessoras_texto`
+    # abaixo). Com a flag OFF o bloco legado roda intocado.
+    if 'predecessora_id' in data and not flag_on:
         pred_val = data['predecessora_id']
         if pred_val in (None, '', '0', 0):
             tarefa.predecessora_id = None
@@ -680,6 +843,38 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
                     'msg': 'Referência circular: A depende de B e B depende de A'
                 }), 400
             tarefa.predecessora_id = pred_id
+
+    if flag_on and 'predecessoras_texto' in data:
+        # Formato Project ("12;15TT+1") sobre a numeração VISUAL da grade —
+        # aplica diff em TarefaVinculo (delete + insert); `predecessora_id`
+        # legado não é mais gravado (congelado).
+        _, linha_para_tarefa, _, ids_resumo = _mapas_vinculos(
+            obra_id, admin_id, cliente_mode)
+        if tarefa.id in ids_resumo:
+            db.session.rollback()
+            return jsonify({
+                'status': 'error',
+                'msg': ('Tarefa-resumo não pode ter predecessoras — '
+                        'vincule apenas tarefas-folha'),
+            }), 400
+        try:
+            vincs = parsear_predecessoras(
+                str(data.get('predecessoras_texto') or ''),
+                linha_para_tarefa,
+                sucessora_id=tarefa.id,
+                ids_resumo=ids_resumo,
+            )
+        except ErroParsePredecessora as exc:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'msg': str(exc)}), 400
+        TarefaVinculo.query.filter_by(
+            sucessora_id=tarefa.id, obra_id=obra_id, admin_id=admin_id
+        ).delete(synchronize_session=False)
+        for v in vincs:
+            db.session.add(TarefaVinculo(
+                admin_id=admin_id, obra_id=obra_id,
+                predecessora_id=v.predecessora_id, sucessora_id=tarefa.id,
+                tipo=v.tipo, lag_dias=v.lag_dias))
 
     if 'tarefa_pai_id' in data:
         pai_val = data['tarefa_pai_id']
@@ -720,9 +915,6 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
             cal.considerar_sabado, cal.considerar_domingo,
         )
 
-    db.session.commit()
-    logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id}")
-
     # Recálculo em cadeia apenas quando campos de agendamento foram alterados.
     # Se percentual_concluido foi passado explicitamente, reaplicar APÓS o recálculo
     # (recalcular_cronograma chama atualizar_percentual_tarefa que pode sobrescrevê-lo).
@@ -734,12 +926,43 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         except (ValueError, TypeError):
             pass
 
-    if _SCHEDULING_FIELDS & set(data.keys()):
-        recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
-        # Re-aplicar o percentual manual caso o recálculo tenha sobrescrito
-        if perc_manual is not None:
+    afetadas: list = []
+    if flag_on:
+        # Editor v2: motor novo (services/cronograma_scheduler) em commit
+        # único — mutações + vínculos + diffs do recálculo entram juntos;
+        # ErroCiclo desfaz TUDO (inclusive os vínculos recém-criados).
+        precisa_recalc = bool(
+            (_SCHEDULING_FIELDS | {'predecessoras_texto'}) & set(data.keys()))
+        resultado = None
+        try:
+            if precisa_recalc:
+                resultado = recalcular_obra(obra_id, admin_id,
+                                            cliente=cliente_mode, commit=False)
+            db.session.commit()
+        except ErroCiclo as exc:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'msg': str(exc)}), 400
+        logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id} (editor v2)")
+        if resultado is not None:
+            afetadas = resultado.tarefas_afetadas
+        if perc_manual is not None and precisa_recalc:
             tarefa.percentual_concluido = perc_manual
             db.session.commit()
+    else:
+        db.session.commit()
+        logger.info(f"[OK] TarefaCronograma atualizada id={tarefa_id}")
+
+        # Dual-write silencioso (plano C3): espelha o predecessora_id legado
+        # em TarefaVinculo TI/0 para quando a flag ligar.
+        if 'predecessora_id' in data:
+            _dual_write_vinculo_legado(tarefa, admin_id)
+
+        if _SCHEDULING_FIELDS & set(data.keys()):
+            recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
+            # Re-aplicar o percentual manual caso o recálculo tenha sobrescrito
+            if perc_manual is not None:
+                tarefa.percentual_concluido = perc_manual
+                db.session.commit()
 
     # Devolver tarefa atualizada + lista completa após recalc para redesenho do Gantt
     db.session.refresh(tarefa)
@@ -747,6 +970,16 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
         obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).filter(TarefaCronograma.ativa.is_(True)).order_by(
         TarefaCronograma.ordem, TarefaCronograma.id).all()
+    if flag_on:
+        vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode,
+                                          tarefas=todas)
+        _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+        return jsonify({
+            'status': 'ok',
+            'tarefa': _tarefa_to_dict(tarefa, **_kw),
+            'tarefas': [_tarefa_to_dict(t, **_kw) for t in todas],
+            'tarefas_afetadas': [_tarefa_to_dict(t, **_kw) for t in afetadas],
+        })
     return jsonify({
         'status': 'ok',
         'tarefa': _tarefa_to_dict(tarefa),
@@ -785,11 +1018,34 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
     db.session.commit()
     logger.info(f"[OK] TarefaCronograma excluída id={tarefa_id} cliente={cliente_mode}")
 
+    # Editor v2: os vínculos da tarefa caem por CASCADE (FK de tarefa_vinculo);
+    # o recálculo reflui as ex-sucessoras. Excluir não cria ciclo — o guard é
+    # só defensivo (dado sujo pré-existente não pode derrubar a exclusão).
+    flag_on = _editor_v2_on()
+    afetadas: list = []
+    if flag_on:
+        try:
+            resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode)
+            afetadas = resultado.tarefas_afetadas
+        except ErroCiclo as exc:
+            db.session.rollback()
+            logger.warning('[editor-v2] recálculo pós-exclusão pulado '
+                           '(ciclo pré-existente na obra %s): %s', obra_id, exc)
+
     # Devolver lista atualizada para o frontend re-renderizar hierarquia
     todas = TarefaCronograma.query.filter_by(
         obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
     ).filter(TarefaCronograma.ativa.is_(True)).order_by(
         TarefaCronograma.ordem, TarefaCronograma.id).all()
+    if flag_on:
+        vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode,
+                                          tarefas=todas)
+        _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+        return jsonify({
+            'status': 'ok',
+            'tarefas': [_tarefa_to_dict(t, **_kw) for t in todas],
+            'tarefas_afetadas': [_tarefa_to_dict(t, **_kw) for t in afetadas],
+        })
     return jsonify({'status': 'ok', 'tarefas': [_tarefa_to_dict(t) for t in todas]})
 
 
@@ -811,9 +1067,20 @@ def recalcular(obra_id: int):
     cliente_mode = _modo_cliente()
     Obra.query.filter_by(id=obra_id, admin_id=admin_id).first_or_404()
 
-    ok = recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
-    if not ok:
-        return jsonify({'status': 'error', 'msg': 'Erro ao recalcular cronograma'}), 500
+    # Editor v2 (flag ON): motor novo. Flag OFF: engine antigo, intocado.
+    flag_on = _editor_v2_on()
+    afetadas: list = []
+    if flag_on:
+        try:
+            resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode)
+            afetadas = resultado.tarefas_afetadas
+        except ErroCiclo as exc:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'msg': str(exc)}), 400
+    else:
+        ok = recalcular_cronograma(obra_id, admin_id, cliente=cliente_mode)
+        if not ok:
+            return jsonify({'status': 'error', 'msg': 'Erro ao recalcular cronograma'}), 500
 
     tarefas = (
         TarefaCronograma.query
@@ -822,7 +1089,195 @@ def recalcular(obra_id: int):
         .order_by(TarefaCronograma.ordem)
         .all()
     )
+    if flag_on:
+        vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode,
+                                          tarefas=tarefas)
+        _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+        return jsonify({
+            'status': 'ok',
+            'tarefas': [_tarefa_to_dict(t, **_kw) for t in tarefas],
+            'tarefas_afetadas': [_tarefa_to_dict(t, **_kw) for t in afetadas],
+        })
     return jsonify({'status': 'ok', 'tarefas': [_tarefa_to_dict(t) for t in tarefas]})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VÍNCULOS TIPADOS (editor v2) — CRUD explícito (plano C4)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _vinculo_to_dict(v: TarefaVinculo) -> dict:
+    return {
+        'id': v.id,
+        'obra_id': v.obra_id,
+        'predecessora_id': v.predecessora_id,
+        'sucessora_id': v.sucessora_id,
+        'tipo': v.tipo,
+        'lag_dias': v.lag_dias,
+    }
+
+
+def _guard_rotas_vinculo(obra_id: int):
+    """Guards comuns das rotas de vínculo — mesmo padrão das rotas irmãs
+    (`atualizar_tarefa`): V2 → flag → tenant/obra → escopo de edição.
+
+    Com a flag `cronograma_editor_v2` DESLIGADA as rotas "não existem"
+    (404 opaco), como qualquer URL desconhecida — nada vaza para tenants
+    fora do rollout. Devolve resposta de erro ou None (pode seguir).
+    """
+    guard = _check_v2()
+    if guard:
+        return jsonify({'status': 'error', 'msg': 'V2 apenas'}), 403
+    if not _editor_v2_on():
+        return jsonify({'status': 'error', 'msg': 'Não encontrado'}), 404
+    admin_id = _admin_id()
+    obra = Obra.query.filter_by(id=obra_id, admin_id=admin_id).first()
+    if not obra:
+        return jsonify({'status': 'error', 'msg': 'Obra não encontrada'}), 404
+    escopo = _guard_editar_obra(obra_id)
+    if escopo:
+        return escopo
+    return None
+
+
+def _recalc_e_resposta_vinculo(obra_id: int, admin_id: int, cliente_mode: bool,
+                               vinculo: TarefaVinculo | None, status_http: int = 200):
+    """Recalcula (motor novo, commit único) e monta a resposta padrão das
+    rotas de vínculo: `{status, vinculo?, tarefas_afetadas}`. ErroCiclo →
+    rollback (desfaz o vínculo pendente) + 400 com a mensagem pt-BR."""
+    try:
+        resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode,
+                                    commit=False)
+        db.session.commit()
+    except ErroCiclo as exc:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': str(exc)}), 400
+
+    vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode)
+    _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+    corpo = {
+        'status': 'ok',
+        'tarefas_afetadas': [_tarefa_to_dict(t, **_kw)
+                             for t in resultado.tarefas_afetadas],
+    }
+    if vinculo is not None:
+        corpo['vinculo'] = _vinculo_to_dict(vinculo)
+    return jsonify(corpo), status_http
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/vinculo', methods=['POST'])
+@login_required
+def criar_vinculo(obra_id: int):
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+
+    data = request.get_json(silent=True) or {}
+    try:
+        pred_id = int(data.get('predecessora_id') or 0)
+        suc_id = int(data.get('sucessora_id') or 0)
+    except (ValueError, TypeError):
+        return jsonify({'status': 'error',
+                        'msg': 'predecessora_id e sucessora_id inválidos'}), 400
+    if not pred_id or not suc_id:
+        return jsonify({'status': 'error',
+                        'msg': 'predecessora_id e sucessora_id são obrigatórios'}), 400
+    if pred_id == suc_id:
+        return jsonify({'status': 'error',
+                        'msg': 'Uma tarefa não pode ser predecessora dela mesma'}), 400
+
+    tipo = str(data.get('tipo') or 'TI').strip().upper()
+    if tipo not in TIPOS_VINCULO:
+        return jsonify({'status': 'error',
+                        'msg': f"Tipo de vínculo inválido: '{tipo}' "
+                               '(use TI, II, TT ou IT)'}), 400
+    try:
+        lag_dias = int(data.get('lag_dias') or 0)
+    except (ValueError, TypeError):
+        return jsonify({'status': 'error', 'msg': 'lag_dias inválido'}), 400
+
+    # Mesma obra/tenant/modo + ambas folhas — uma query (mapas da grade).
+    _, _, tarefa_para_linha, ids_resumo = _mapas_vinculos(
+        obra_id, admin_id, cliente_mode)
+    for tid in (pred_id, suc_id):
+        if tid not in tarefa_para_linha:
+            return jsonify({'status': 'error',
+                            'msg': f'Tarefa id={tid} não encontrada nesta obra.'}), 400
+        if tid in ids_resumo:
+            return jsonify({'status': 'error',
+                            'msg': f'Tarefa id={tid} é uma tarefa-resumo — '
+                                   'vincule apenas tarefas-folha'}), 400
+
+    ja_existe = TarefaVinculo.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id,
+        predecessora_id=pred_id, sucessora_id=suc_id,
+    ).first()
+    if ja_existe:
+        return jsonify({'status': 'error',
+                        'msg': 'Vínculo entre essas tarefas já existe'}), 400
+
+    vinculo = TarefaVinculo(
+        admin_id=admin_id, obra_id=obra_id,
+        predecessora_id=pred_id, sucessora_id=suc_id,
+        tipo=tipo, lag_dias=lag_dias,
+    )
+    db.session.add(vinculo)
+    # Ciclo é detectado ANTES do commit: recalcular_obra levanta ErroCiclo e
+    # o rollback descarta o vínculo pendente.
+    return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode,
+                                      vinculo, status_http=201)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/vinculo/<int:vid>', methods=['PUT', 'PATCH'])
+@login_required
+def atualizar_vinculo(obra_id: int, vid: int):
+    """Edita tipo/lag de um vínculo existente (endpoints não mudam aqui —
+    para religar tarefas, exclua e crie outro vínculo)."""
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+
+    vinculo = TarefaVinculo.query.filter_by(
+        id=vid, obra_id=obra_id, admin_id=admin_id).first()
+    if not vinculo:
+        return jsonify({'status': 'error', 'msg': 'Vínculo não encontrado'}), 404
+
+    data = request.get_json(silent=True) or {}
+    if 'tipo' in data:
+        tipo = str(data.get('tipo') or '').strip().upper()
+        if tipo not in TIPOS_VINCULO:
+            return jsonify({'status': 'error',
+                            'msg': f"Tipo de vínculo inválido: '{tipo}' "
+                                   '(use TI, II, TT ou IT)'}), 400
+        vinculo.tipo = tipo
+    if 'lag_dias' in data:
+        try:
+            vinculo.lag_dias = int(data.get('lag_dias') or 0)
+        except (ValueError, TypeError):
+            return jsonify({'status': 'error', 'msg': 'lag_dias inválido'}), 400
+
+    return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode, vinculo)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/vinculo/<int:vid>', methods=['DELETE'])
+@login_required
+def excluir_vinculo(obra_id: int, vid: int):
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+
+    vinculo = TarefaVinculo.query.filter_by(
+        id=vid, obra_id=obra_id, admin_id=admin_id).first()
+    if not vinculo:
+        return jsonify({'status': 'error', 'msg': 'Vínculo não encontrado'}), 404
+
+    db.session.delete(vinculo)
+    return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode, None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

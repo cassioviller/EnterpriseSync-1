@@ -4159,6 +4159,15 @@ class ConfiguracaoEmpresa(db.Model):
     compras_governanca_ativa = db.Column(db.Boolean, nullable=False,
                                          default=False, server_default='false')
 
+    # Cronograma editável Fase 1 — flag de rollout do motor de agendamento
+    # novo (multi-predecessoras via tarefa_vinculo, caminho crítico). Default
+    # FALSE: com ela desligada, cada rota do cronograma executa exatamente o
+    # código de hoje (engine antigo). Liga-se por
+    # scripts/flag_cronograma_editor_v2.py. Irmã de cronograma_mpp_ativo
+    # (acima, migration 211); migração espelho: 222.
+    cronograma_editor_v2 = db.Column(db.Boolean, nullable=False, default=False,
+                                     server_default='false')
+
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao
@@ -5774,6 +5783,40 @@ class TarefaCronograma(db.Model):
     versao_criacao_id = db.Column(db.Integer,
                                   db.ForeignKey('cronograma_versao.id', ondelete='SET NULL'),
                                   nullable=True)
+    # ── Cronograma editável Fase 1 (Migration 222): saída do motor novo ──
+    # Preenchidas SOMENTE pelo scheduler novo (services/cronograma_scheduler,
+    # flag cronograma_editor_v2). folga_dias NULL = nunca calculado.
+    is_critica = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
+    folga_dias = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class TarefaVinculo(db.Model):
+    """Vínculo tipado entre duas tarefas-folha do cronograma (Fase 1).
+
+    Substitui (sem apagar) o legado `TarefaCronograma.predecessora_id`, que
+    só sabe FS lag 0 e um por tarefa. Tipos no vocabulário pt-BR do MS
+    Project: TI (término→início, FS), II (início→início, SS), TT
+    (término→término, FF), IT (início→término, SF). `lag_dias` em dias
+    úteis, pode ser negativo (antecipação).
+
+    `ondelete='CASCADE'` nas FKs de tarefa é deliberado:
+    `cronograma_views.excluir_tarefa` faz hard delete e os vínculos devem
+    morrer junto. Backfill do legado: migration 223.
+    """
+    __tablename__ = 'tarefa_vinculo'
+    __table_args__ = (
+        db.UniqueConstraint('predecessora_id', 'sucessora_id', name='uq_tarefa_vinculo_par'),
+        db.CheckConstraint('predecessora_id <> sucessora_id', name='ck_tarefa_vinculo_nao_reflexivo'),
+        db.CheckConstraint("tipo IN ('TI','II','TT','IT')", name='ck_tarefa_vinculo_tipo'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False, index=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'), nullable=False, index=True)
+    predecessora_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'), nullable=False, index=True)
+    sucessora_id = db.Column(db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'), nullable=False, index=True)
+    tipo = db.Column(db.String(2), nullable=False, default='TI', server_default='TI')
+    lag_dias = db.Column(db.Integer, nullable=False, default=0, server_default='0')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

@@ -424,6 +424,7 @@ def aplicar_versao(importacao_id: int, decisoes: dict | None,
     if tem_rdo:
         _motor_pos_commit(versao, obra_id, admin_id, usuario_id,
                           versao.importacao_id)
+    _sincronizar_vinculos_pos_commit(obra_id, admin_id)
     return versao
 
 
@@ -454,6 +455,23 @@ def _motor_pos_commit(versao, obra_id, admin_id, usuario_id, importacao_id):
         db.session.rollback()
         logger.exception('replanejamento pós-aplicação falhou na obra %s '
                          '(estado aplicado permanece válido)', obra_id)
+
+
+def _sincronizar_vinculos_pos_commit(obra_id, admin_id):
+    """Fase 1 (editor v2, plano C5): materializa em `tarefa_vinculo` os
+    `predecessora_id` gravados pela aplicação/restauração (TI/0) — a tabela
+    não fica obsoleta com a flag desligada. Mesma postura do
+    `_motor_pos_commit`: falha aqui não desfaz a versão aplicada — loga e
+    segue."""
+    try:
+        from services.cronograma_scheduler import (
+            sincronizar_vinculos_de_predecessora_id,
+        )
+        sincronizar_vinculos_de_predecessora_id(obra_id, admin_id)
+    except Exception:
+        db.session.rollback()
+        logger.exception('sincronização de vínculos pós-aplicação falhou na '
+                         'obra %s (estado aplicado permanece válido)', obra_id)
 
 
 def _aplicar(importacao_id, decisoes, usuario_id):
@@ -685,6 +703,7 @@ def restaurar_versao(versao_id: int, usuario_id: int | None) -> CronogramaVersao
     if tem_rdo:
         _motor_pos_commit(versao, obra_id, admin_id, usuario_id,
                           versao.importacao_id)
+    _sincronizar_vinculos_pos_commit(obra_id, admin_id)
     return versao
 
 

@@ -134,3 +134,29 @@ def cronograma_mpp_ativo() -> bool:
     except Exception as e:
         logger.warning(f"Flag cronograma_mpp indisponível ({e}) — assumindo desligada")
         return False
+
+
+def cronograma_editor_v2_ativo() -> bool:
+    """Flag do editor de cronograma v2 / motor de agendamento novo (Fase 1).
+
+    PONTO ÚNICO do rollout: exige V2 **e** a flag ligada no tenant
+    (`configuracao_empresa.cronograma_editor_v2`, migração 222, default
+    FALSE). Liga-se por fase com `scripts/flag_cronograma_editor_v2.py`.
+
+    Espelho de `cronograma_mpp_ativo` (acima) ⇒ NUNCA levanta: sem linha de
+    configuração, sem tenant resolvido ou com erro de banco, devolve False.
+    """
+    if not is_v2_active():
+        return False
+
+    admin_id = get_tenant_admin_id()
+    if not admin_id:
+        return False
+
+    try:
+        from models import ConfiguracaoEmpresa
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        return bool(config and config.cronograma_editor_v2)
+    except Exception as e:
+        logger.warning(f"Flag cronograma_editor_v2 indisponível ({e}) — assumindo desligada")
+        return False

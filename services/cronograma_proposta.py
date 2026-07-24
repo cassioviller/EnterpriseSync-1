@@ -780,6 +780,14 @@ def materializar_cronograma(
         # cronograma persistido com datas seed inconsistentes.
         from utils.cronograma_engine import recalcular_cronograma
         recalcular_cronograma(obra_id, admin_id, cliente=False)
+        # Fase 1 (editor v2, plano C5): materializa em tarefa_vinculo os
+        # predecessora_id recém-gravados (TI/0) — a tabela não fica obsoleta
+        # com a flag desligada. Mesma postura do recálculo acima: falha
+        # propaga e o caller desfaz a sessão.
+        from services.cronograma_scheduler import (
+            sincronizar_vinculos_de_predecessora_id,
+        )
+        sincronizar_vinculos_de_predecessora_id(obra_id, admin_id)
         logger.info(
             f"#102: {total_criadas} TarefaCronograma + pesos materializados "
             f"para obra={obra_id} proposta={proposta.id}"

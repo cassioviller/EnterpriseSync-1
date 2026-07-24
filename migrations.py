@@ -3863,6 +3863,119 @@ def migration_221_backfill_modo_apontamento():
     logger.info("[Migration 221] Concluída com sucesso")
 
 
+def _migration_222_tarefa_vinculo_e_colunas():
+    """Cronograma editável Fase 1 — tabela `tarefa_vinculo` (multi-
+    predecessoras tipadas TI/II/TT/IT com lag) + colunas de saída do motor
+    novo em tarefa_cronograma (is_critica, folga_dias) + flag de rollout
+    configuracao_empresa.cronograma_editor_v2 (default FALSE).
+
+    ATENÇÃO: `db.create_all()` roda ANTES das migrações, então numa base
+    onde o modelo `TarefaVinculo` já foi importado a tabela já existe e todo
+    o DDL abaixo é no-op — por isso TUDO é `IF NOT EXISTS` e os constraints
+    têm os MESMOS nomes do `__table_args__` do modelo (create_all e migração
+    convergem). Padrão das migrations 207 (tabela) e 211 (flag).
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS tarefa_vinculo (
+                    id SERIAL PRIMARY KEY,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    obra_id INTEGER NOT NULL REFERENCES obra(id) ON DELETE CASCADE,
+                    predecessora_id INTEGER NOT NULL
+                        REFERENCES tarefa_cronograma(id) ON DELETE CASCADE,
+                    sucessora_id INTEGER NOT NULL
+                        REFERENCES tarefa_cronograma(id) ON DELETE CASCADE,
+                    tipo VARCHAR(2) NOT NULL DEFAULT 'TI',
+                    lag_dias INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP,
+                    CONSTRAINT uq_tarefa_vinculo_par
+                        UNIQUE (predecessora_id, sucessora_id),
+                    CONSTRAINT ck_tarefa_vinculo_nao_reflexivo
+                        CHECK (predecessora_id <> sucessora_id),
+                    CONSTRAINT ck_tarefa_vinculo_tipo
+                        CHECK (tipo IN ('TI','II','TT','IT'))
+                )
+            """))
+            # Mesmos nomes que o create_all gera para index=True
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_tarefa_vinculo_admin_id "
+                "ON tarefa_vinculo(admin_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_tarefa_vinculo_obra_id "
+                "ON tarefa_vinculo(obra_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_tarefa_vinculo_predecessora_id "
+                "ON tarefa_vinculo(predecessora_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_tarefa_vinculo_sucessora_id "
+                "ON tarefa_vinculo(sucessora_id)"))
+
+            conn.execute(sa_text(
+                "ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS "
+                "is_critica BOOLEAN NOT NULL DEFAULT FALSE"))
+            conn.execute(sa_text(
+                "ALTER TABLE tarefa_cronograma ADD COLUMN IF NOT EXISTS "
+                "folga_dias INTEGER"))
+
+            conn.execute(sa_text(
+                "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+                "cronograma_editor_v2 BOOLEAN NOT NULL DEFAULT FALSE"))
+        logger.info("[Migration 222] tarefa_vinculo + is_critica/folga_dias + "
+                    "cronograma_editor_v2 criados.")
+    except Exception as e:
+        logger.error(f"[Migration 222] Falha: {e}", exc_info=True)
+        raise
+
+
+def _migration_223_backfill_vinculos_de_predecessora():
+    """Cronograma editável Fase 1 — materializa o legado
+    `tarefa_cronograma.predecessora_id` como vínculo TI lag 0 em
+    `tarefa_vinculo`.
+
+    Regras (mesmas de `sincronizar_vinculos_de_predecessora_id`, Fase 1
+    Step B): só intra-obra e intra-tenant (há dado sujo real com
+    predecessora cruzando obra/tenant — essas linhas são PULADAS e contadas
+    no log, não corrigidas); auto-referência ignorada; par já existente não
+    duplica (idempotente). `predecessora_id` fica congelado (leitura) — não
+    é apagado.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            puladas_sujas = conn.execute(sa_text("""
+                SELECT COUNT(*) FROM tarefa_cronograma t
+                JOIN tarefa_cronograma p ON p.id = t.predecessora_id
+                WHERE t.predecessora_id IS NOT NULL
+                  AND (p.obra_id <> t.obra_id OR p.admin_id <> t.admin_id)
+            """)).scalar() or 0
+
+            resultado = conn.execute(sa_text("""
+                INSERT INTO tarefa_vinculo
+                    (admin_id, obra_id, predecessora_id, sucessora_id, tipo, lag_dias)
+                SELECT t.admin_id, t.obra_id, t.predecessora_id, t.id, 'TI', 0
+                FROM tarefa_cronograma t
+                JOIN tarefa_cronograma p ON p.id = t.predecessora_id
+                WHERE t.predecessora_id IS NOT NULL
+                  AND t.predecessora_id <> t.id
+                  AND p.obra_id = t.obra_id AND p.admin_id = t.admin_id
+                  AND NOT EXISTS (SELECT 1 FROM tarefa_vinculo v
+                                  WHERE v.predecessora_id = t.predecessora_id
+                                    AND v.sucessora_id = t.id)
+            """))
+        logger.info(f"[Migration 223] {resultado.rowcount} vínculo(s) "
+                    f"criado(s) a partir de predecessora_id")
+        if puladas_sujas:
+            logger.warning(f"[Migration 223] {puladas_sujas} predecessora(s) "
+                           f"pulada(s) por cruzar obra/tenant (dado sujo — "
+                           f"não migrada, não corrigida)")
+        logger.info("[Migration 223] Concluída com sucesso")
+    except Exception as e:
+        logger.error(f"[Migration 223] Falha: {e}", exc_info=True)
+        raise
+
+
 def migration_230_obra_transicao_estado():
     """Fase 2 — tabela `obra_transicao_estado` (histórico de transições).
 
@@ -5332,6 +5445,8 @@ def executar_migracoes():
             (219, "Fase 0.6 / D1 — linhagem de item entre versões da proposta + base congelada da medição emitida", _migration_219_revisao_proposta_linhagem_e_base),
             (220, "Cronograma editável — tarefa_cronograma.modo_apontamento (quantidade|percentual, NULL = dedução legada)", migration_220_tarefa_modo_apontamento),
             (221, "Cronograma editável — backfill de modo_apontamento congelando a dedução vigente (no-op de comportamento)", migration_221_backfill_modo_apontamento),
+            (222, "Cronograma editável Fase 1 — tabela tarefa_vinculo + is_critica/folga_dias + flag cronograma_editor_v2 (default FALSE)", _migration_222_tarefa_vinculo_e_colunas),
+            (223, "Cronograma editável Fase 1 — backfill predecessora_id → tarefa_vinculo TI/0 (intra-obra/tenant; sujas puladas e logadas)", _migration_223_backfill_vinculos_de_predecessora),
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
             (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
             (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),

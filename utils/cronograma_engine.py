@@ -102,6 +102,50 @@ def get_calendario(admin_id: int):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Ordem visual da grade (tree-flatten)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def ordenar_arvore_visual(tarefas: list, com_nivel: bool = False):
+    """Tree-flatten (DFS recursivo): intercala cada tarefa com todas as suas
+    descendentes, de modo que as linhas apareçam imediatamente após o pai na
+    grade renderizada, em qualquer profundidade de aninhamento.
+
+    FONTE ÚNICA da numeração visual de linhas (1-based na grade): usada pela
+    view `cronograma_obra` e pelo parser de predecessoras — os números nunca
+    podem divergir. A ordem relativa entre irmãos é a ordem da lista de
+    entrada (o chamador consulta com `ORDER BY ordem`); tarefas cujo
+    `tarefa_pai_id` aponta para um pai fora da lista não entram no resultado
+    (mesmo comportamento do flatten original da view).
+
+    Com `com_nivel=True`, devolve `(lista, nivel_map)` onde `nivel_map` é
+    task_id → profundidade (0 = raiz), para indentação no template.
+    """
+    filhas_map: dict[int, list] = {}
+    raiz: list = []
+    for t in tarefas:
+        if t.tarefa_pai_id:
+            filhas_map.setdefault(t.tarefa_pai_id, []).append(t)
+        else:
+            raiz.append(t)
+
+    ordenadas: list = []
+    nivel_map: dict[int, int] = {}  # task_id → depth (0 = root)
+
+    def _dfs(node, depth: int) -> None:
+        ordenadas.append(node)
+        nivel_map[node.id] = depth
+        for child in filhas_map.get(node.id, []):
+            _dfs(child, depth + 1)
+
+    for t in raiz:
+        _dfs(t, 0)
+
+    if com_nivel:
+        return ordenadas, nivel_map
+    return ordenadas
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Detecção de ciclos
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -294,6 +338,34 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
         db.session.rollback()
 
 
+def rollup_percentual_pos_recalculo(tarefas: list, pai_ids: set, admin_id: int) -> None:
+    """Sincroniza `percentual_concluido` após um recálculo de datas — SEM commit.
+
+    Extraído byte-idêntico de `recalcular_cronograma` (o bloco entre os dois
+    commits) para ser REAPROVEITADO pelo motor novo
+    (`services/cronograma_scheduler.recalcular_obra`) sem duplicar fórmula
+    (Fase 1 do cronograma editável): folhas recebem o último apontamento do
+    RDO (`_atualizar_percentual_sem_commit`); pais recebem média ponderada
+    pela duração das filhas, de baixo para cima. O commit é do caller.
+    """
+    # Sincronizar percentual_concluido de folhas com o último apontamento do RDO
+    for tarefa in tarefas:
+        if tarefa.id not in pai_ids:  # só folhas recebem sync do RDO
+            _atualizar_percentual_sem_commit(tarefa, admin_id)
+
+    # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração)
+    pais = [t for t in tarefas if t.id in pai_ids]
+    for pai in sorted(pais, key=lambda t: t.ordem, reverse=True):
+        filhas = [t for t in tarefas if t.tarefa_pai_id == pai.id]
+        if not filhas:
+            continue
+        total_dur = sum(max(f.duracao_dias or 1, 1) for f in filhas)
+        if total_dur > 0:
+            pai.percentual_concluido = round(
+                sum((f.percentual_concluido or 0) * max(f.duracao_dias or 1, 1) for f in filhas) / total_dur, 2
+            )
+
+
 def recalcular_cronograma(obra_id: int, admin_id: int, cliente: bool = False) -> bool:
     """
     Recalcula as datas de todas as tarefas de uma obra.
@@ -388,21 +460,7 @@ def recalcular_cronograma(obra_id: int, admin_id: int, cliente: bool = False) ->
 
         db.session.commit()
 
-        # Sincronizar percentual_concluido de folhas com o último apontamento do RDO
-        for tarefa in tarefas:
-            if tarefa.id not in pai_ids:  # só folhas recebem sync do RDO
-                _atualizar_percentual_sem_commit(tarefa, admin_id)
-
-        # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração)
-        for pai in sorted(pais, key=lambda t: t.ordem, reverse=True):
-            filhas = [t for t in tarefas if t.tarefa_pai_id == pai.id]
-            if not filhas:
-                continue
-            total_dur = sum(max(f.duracao_dias or 1, 1) for f in filhas)
-            if total_dur > 0:
-                pai.percentual_concluido = round(
-                    sum((f.percentual_concluido or 0) * max(f.duracao_dias or 1, 1) for f in filhas) / total_dur, 2
-                )
+        rollup_percentual_pos_recalculo(tarefas, pai_ids, admin_id)
 
         db.session.commit()
 
