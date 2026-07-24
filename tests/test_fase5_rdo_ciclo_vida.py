@@ -481,3 +481,178 @@ def test_qualquer_caminho_de_escrita_e_barrado():
             'Concretagem do radier.', (
             'salvar_rdo_flexivel reescreveu um RDO assinado — a guarda '
             'before_flush não pegou este caminho')
+
+
+# ---------------------------------------------------------------------------
+# Bug 6d — duplicar_rdo
+# ---------------------------------------------------------------------------
+
+def _cliente_de(user_id):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_user_id'] = str(user_id)
+        sess['_fresh'] = True
+    return c
+
+
+def test_duplicar_rdo_nao_quebra_em_atributo_fantasma():
+    """Regressão do bug 6d, parte 1.
+
+    Antes: views/rdo.py:1624 lia `rdo_original.tempo_manha`, que NÃO é
+    coluna de RDO (as colunas de clima são clima_geral, temperatura_media,
+    umidade_relativa, vento_velocidade, precipitacao, condicoes_trabalho,
+    observacoes_climaticas). A leitura levantava AttributeError, a função
+    caía no `except` da linha 1715 e a rota NUNCA duplicava nada.
+    """
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid, oid = rdo.id, admin.id, obra.id
+
+    resposta = _cliente_de(aid).post(f'/rdo/{rid}/duplicar',
+                                     follow_redirects=False)
+    assert resposta.status_code in (200, 302)
+
+    with app.app_context():
+        copias = RDO.query.filter(RDO.obra_id == oid, RDO.id != rid).all()
+        assert len(copias) == 1, (
+            'duplicar_rdo não criou o RDO copiado — provavelmente ainda '
+            'morre no atributo fantasma tempo_manha (views/rdo.py:1624)')
+        assert copias[0].clima_geral == 'Nublado'
+
+
+def test_duplicar_rdo_nasce_em_rascunho():
+    """Regressão do bug 6d, parte 2.
+
+    Antes: views/rdo.py:1629 gravava status='Finalizado' na cópia. Um RDO
+    duplicado é um ponto de partida para edição, não um documento
+    publicado — e era exatamente essa premissa falsa que justificava o
+    webhook da linha 1708.
+    """
+    from services.rdo_ciclo_vida import RASCUNHO
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid, oid = rdo.id, admin.id, obra.id
+
+    _cliente_de(aid).post(f'/rdo/{rid}/duplicar')
+
+    with app.app_context():
+        copia = RDO.query.filter(RDO.obra_id == oid, RDO.id != rid).first()
+        assert copia.estado == RASCUNHO
+
+
+def test_duplicar_rdo_nao_emite_webhook(monkeypatch):
+    """Regressão do bug 6d, parte 3 — o bug nomeado no ESTADO-ATUAL.md.
+
+    `duplicar_rdo` era a ÚNICA rota de escrita de RDO que chamava
+    `emit_obra_rdo_publicado` (views/rdo.py:1708) sem chamar
+    `EventManager.emit('rdo_finalizado')` — que é quem dispara
+    `lancar_custos_rdo` (event_manager.py:578) e
+    `recalcular_medicao_apos_rdo` (event_manager.py:1357). As irmãs
+    emitem os dois (:1570/:1583, :1819/:1831, :4769/:4781).
+
+    A correção adotada NÃO é "emitir os dois": é não emitir nenhum,
+    porque um RDO duplicado nasce em rascunho e ainda não publicou nada.
+    O webhook sai quando ele for submetido/assinado.
+    """
+    emitidos = []
+
+    import utils.catalogo_eventos as catalogo
+    monkeypatch.setattr(catalogo, 'emit_obra_rdo_publicado',
+                        lambda rdo, admin_id: emitidos.append(rdo.id))
+
+    from event_manager import EventManager
+    eventos_legados = []
+    original_emit = EventManager.emit
+    monkeypatch.setattr(
+        EventManager, 'emit',
+        staticmethod(lambda nome, dados, admin_id=None: (
+            eventos_legados.append(nome) or original_emit(nome, dados, admin_id)
+            if nome != 'rdo_finalizado' else eventos_legados.append(nome))))
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    _cliente_de(aid).post(f'/rdo/{rid}/duplicar')
+
+    assert emitidos == [], (
+        'duplicar_rdo emitiu obra.rdo_publicado para um RDO que nasce em '
+        'rascunho — bug 6d')
+    assert 'rdo_finalizado' not in eventos_legados
+
+
+def test_duplicar_rdo_nao_lanca_custo_de_mao_de_obra():
+    """A outra metade do bug 6d: webhook sem custo.
+
+    Se o RDO duplicado não publica, também não pode gerar RDOCustoDiario
+    nem GestaoCustoFilho — nem pelo evento, nem por chamada direta.
+    """
+    from models import RDOCustoDiario, RDOMaoObra
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        func = Funcionario(
+            nome=f'Montador {_sfx()}', cpf=_sfx().ljust(14, '0')[:14],
+            codigo=f'FD{_sfx()[:6].upper()}', data_admissao=date(2025, 1, 1),
+            admin_id=admin.id, ativo=True, tipo_remuneracao='diaria',
+            valor_diaria=200.0)
+        db.session.add(func)
+        rdo = _rdo(obra, admin.id)
+        db.session.commit()
+        db.session.add(RDOMaoObra(
+            rdo_id=rdo.id, admin_id=admin.id, funcionario_id=func.id,
+            funcao_exercida='Montador', horas_trabalhadas=8.0))
+        db.session.commit()
+        rid, aid, oid = rdo.id, admin.id, obra.id
+
+    _cliente_de(aid).post(f'/rdo/{rid}/duplicar')
+
+    with app.app_context():
+        copia = RDO.query.filter(RDO.obra_id == oid, RDO.id != rid).first()
+        assert RDOMaoObra.query.filter_by(rdo_id=copia.id).count() == 1, (
+            'a mão de obra não foi copiada')
+        assert RDOCustoDiario.query.filter_by(rdo_id=copia.id).count() == 0, (
+            'RDO duplicado em rascunho lançou custo diário')
+
+
+def test_duplicar_rdo_de_outro_tenant_devolve_404():
+    with app.app_context():
+        admin_a, admin_b = _admin('A'), _admin('B')
+        obra_b = _obra(admin_b.id)
+        rdo_b = _rdo(obra_b, admin_b.id)
+        # obra_b.id capturado AQUI: o commit de _rdo expira a instância e
+        # acessá-la num segundo app_context levanta DetachedInstanceError.
+        rid, aid, obid = rdo_b.id, admin_a.id, obra_b.id
+
+    resposta = _cliente_de(aid).post(f'/rdo/{rid}/duplicar',
+                                     follow_redirects=False)
+    assert resposta.status_code in (302, 404)
+
+    with app.app_context():
+        assert RDO.query.filter_by(obra_id=obid).count() == 1
+
+
+def test_duplicar_rdo_assinado_e_permitido():
+    """Duplicar não é editar: o original não é tocado."""
+    from services.rdo_ciclo_vida import ASSINADO
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+        rid, aid, oid = rdo.id, admin.id, obra.id
+
+    _cliente_de(aid).post(f'/rdo/{rid}/duplicar')
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == ASSINADO
+        assert RDO.query.filter(RDO.obra_id == oid, RDO.id != rid).count() == 1

@@ -1784,127 +1784,105 @@ def retificar_rdo(id):
 
 
 @main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
-@admin_required
+@login_required
 def duplicar_rdo(id):
-    """Duplicar RDO existente"""
+    """Cria um RDO novo a partir de outro, como ponto de partida de edição.
+
+    ── Bug 6d, corrigido na Fase 5 ──────────────────────────────────────
+    A versão anterior tinha três defeitos empilhados:
+
+      1. Lia `rdo_original.tempo_manha`, `.tempo_tarde`, `.tempo_noite` e
+         `.observacoes_meteorologicas` (linhas 1624-1627). NENHUM desses
+         atributos é coluna de `RDO` — as colunas de clima são
+         `clima_geral`, `temperatura_media`, `umidade_relativa`,
+         `vento_velocidade`, `precipitacao`, `condicoes_trabalho` e
+         `observacoes_climaticas` (models.py:844-851). A leitura
+         levantava `AttributeError`, a função caía no `except` e a rota
+         NUNCA duplicou nada.
+      2. Copiava `mao_original.observacoes`, que também não existe em
+         `RDOMaoObra` (models.py:917-966).
+      3. Se os dois anteriores fossem consertados isoladamente, apareceria
+         o bug catalogado como 6d: era a ÚNICA rota de escrita de RDO que
+         chamava `emit_obra_rdo_publicado` (webhook n8n) sem chamar
+         `EventManager.emit('rdo_finalizado')`, que é quem lança os custos
+         de mão de obra (`event_manager.py:578`) e recalcula a medição
+         (`event_manager.py:1357`). O cliente recebia "RDO publicado" de
+         um documento que não existia no custo.
+
+    A correção não é emitir os dois eventos: é **não emitir nenhum**. Um
+    RDO duplicado nasce em `rascunho`. Ele publica — e aí sim emite —
+    quando for submetido e assinado, pelos caminhos da Fase 5.
+    """
+    from services.rdo_ciclo_vida import RASCUNHO
+
+    rdo_original = _rdo_do_tenant_ou_404(id)
+    admin_id = rdo_original.admin_id or rdo_original.obra.admin_id
+
     try:
-        admin_id = current_user.id if current_user.tipo_usuario == TipoUsuario.ADMIN else current_user.admin_id
-        
-        # Buscar RDO original com verificação de acesso
-        rdo_original = RDO.query.join(Obra).filter(
-            RDO.id == id,
-            Obra.admin_id == admin_id
-        ).first_or_404()
-        
-        # Criar novo RDO baseado no original
-        novo_rdo = RDO()
-        novo_rdo.obra_id = rdo_original.obra_id
-        novo_rdo.data_relatorio = date.today()  # Data atual
-        # Task #12: gerar número globalmente único em vez da função livre inexistente
-        novo_rdo.numero_rdo = _gerar_numero_rdo_unico(
-            novo_rdo.obra_id, novo_rdo.data_relatorio, admin_id
+        novo_rdo = RDO(
+            obra_id=rdo_original.obra_id,
+            data_relatorio=date.today(),
+            admin_id=admin_id,
+            criado_por_id=current_user.id,
+            estado=RASCUNHO,
+            comentario_geral=(
+                f'Duplicado de {rdo_original.numero_rdo}. '
+                f'{rdo_original.comentario_geral or ""}').strip(),
         )
-        
-        # Task #12: ``RDO.criado_por_id`` é FK para ``usuario.id`` —
-        # usar ``current_user.id`` em vez de funcionario.id (mesmo bug do
-        # criar_rdo / rdo_salvar_unificado).
-        novo_rdo.criado_por_id = current_user.id
-        
-        # Copiar dados climáticos
-        novo_rdo.tempo_manha = rdo_original.tempo_manha
-        novo_rdo.tempo_tarde = rdo_original.tempo_tarde
-        novo_rdo.tempo_noite = rdo_original.tempo_noite
-        novo_rdo.observacoes_meteorologicas = rdo_original.observacoes_meteorologicas
-        
-        novo_rdo.status = 'Finalizado'
-        novo_rdo.comentario_geral = f'Duplicado de {rdo_original.numero_rdo}'
-        
+        novo_rdo.numero_rdo = _gerar_numero_rdo_unico(
+            novo_rdo.obra_id, novo_rdo.data_relatorio, admin_id)
+
+        # Clima: os nomes REAIS das colunas (models.py:844-851).
+        for campo in ('clima_geral', 'temperatura_media', 'umidade_relativa',
+                      'vento_velocidade', 'precipitacao', 'condicoes_trabalho',
+                      'observacoes_climaticas', 'local'):
+            setattr(novo_rdo, campo, getattr(rdo_original, campo, None))
+
         db.session.add(novo_rdo)
-        db.session.flush()  # Para obter o ID
-        
-        # Duplicar subatividades
-        subatividades_originais = RDOServicoSubatividade.query.filter_by(
-            rdo_id=rdo_original.id
-        ).all()
-        
-        for sub_original in subatividades_originais:
-            nova_sub = RDOServicoSubatividade()
-            nova_sub.rdo_id = novo_rdo.id
-            nova_sub.servico_id = sub_original.servico_id
-            nova_sub.nome_subatividade = sub_original.nome_subatividade
-            nova_sub.descricao_subatividade = sub_original.descricao_subatividade
-            nova_sub.percentual_conclusao = sub_original.percentual_conclusao
-            nova_sub.observacoes_tecnicas = sub_original.observacoes_tecnicas
-            nova_sub.ordem_execucao = sub_original.ordem_execucao
-            # Copiar campos de produtividade do original (snapshot já capturado)
-            nova_sub.subatividade_mestre_id = getattr(sub_original, 'subatividade_mestre_id', None)
-            nova_sub.meta_produtividade_snapshot = getattr(sub_original, 'meta_produtividade_snapshot', None)
-            nova_sub.unidade_medida_snapshot = getattr(sub_original, 'unidade_medida_snapshot', None)
-            # Detectar admin_id correto dinamicamente
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                nova_sub.admin_id = current_user.admin_id
-            elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                nova_sub.admin_id = current_user.id
-            else:
-                # Buscar funcionário para obter admin_id
-                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                # Fase 0.5 / 1.4 — o fallback era `else 10`: um tenant CONCRETO
-                # chumbado num caminho de ESCRITA. Registro sem tenant resolvido
-                # some de todo filtro depois, sem erro e sem alerta.
-                from utils.tenant import get_tenant_admin_id
-                _admin_resolvido = get_tenant_admin_id()
-                if not _admin_resolvido:
-                    raise ValueError("Sessão sem empresa vinculada; refaça o login.")
-                nova_sub.admin_id = _admin_resolvido
-            
-            db.session.add(nova_sub)
-        
-        # Duplicar mão de obra
-        mao_obra_original = RDOMaoObra.query.filter_by(
-            rdo_id=rdo_original.id
-        ).all()
-        
-        for mao_original in mao_obra_original:
-            nova_mao = RDOMaoObra()
-            nova_mao.rdo_id = novo_rdo.id
-            nova_mao.funcionario_id = mao_original.funcionario_id
-            nova_mao.horas_trabalhadas = mao_original.horas_trabalhadas
-            nova_mao.observacoes = mao_original.observacoes
-            # Detectar admin_id correto dinamicamente
-            if hasattr(current_user, 'admin_id') and current_user.admin_id:
-                nova_mao.admin_id = current_user.admin_id
-            elif hasattr(current_user, 'tipo_usuario') and current_user.tipo_usuario == TipoUsuario.ADMIN:
-                nova_mao.admin_id = current_user.id
-            else:
-                # Buscar funcionário para obter admin_id
-                funcionario = Funcionario.query.filter_by(email=current_user.email).first()
-                # Fase 0.5 / 1.4 — o fallback era `else 10`: um tenant CONCRETO
-                # chumbado num caminho de ESCRITA. Registro sem tenant resolvido
-                # some de todo filtro depois, sem erro e sem alerta.
-                from utils.tenant import get_tenant_admin_id
-                _admin_resolvido = get_tenant_admin_id()
-                if not _admin_resolvido:
-                    raise ValueError("Sessão sem empresa vinculada; refaça o login.")
-                nova_mao.admin_id = _admin_resolvido
-            
-            db.session.add(nova_mao)
-        
+        db.session.flush()
+
+        for sub in RDOServicoSubatividade.query.filter_by(
+                rdo_id=rdo_original.id).all():
+            db.session.add(RDOServicoSubatividade(
+                rdo_id=novo_rdo.id,
+                admin_id=admin_id,
+                servico_id=sub.servico_id,
+                nome_subatividade=sub.nome_subatividade,
+                descricao_subatividade=sub.descricao_subatividade,
+                percentual_conclusao=sub.percentual_conclusao,
+                percentual_anterior=sub.percentual_anterior,
+                observacoes_tecnicas=sub.observacoes_tecnicas,
+                ordem_execucao=sub.ordem_execucao,
+                subatividade_mestre_id=sub.subatividade_mestre_id,
+                meta_produtividade_snapshot=sub.meta_produtividade_snapshot,
+                unidade_medida_snapshot=sub.unidade_medida_snapshot,
+            ))
+
+        for mo in RDOMaoObra.query.filter_by(rdo_id=rdo_original.id).all():
+            db.session.add(RDOMaoObra(
+                rdo_id=novo_rdo.id,
+                admin_id=admin_id,
+                funcionario_id=mo.funcionario_id,
+                # `funcao_exercida` é NOT NULL (models.py:924).
+                funcao_exercida=mo.funcao_exercida or 'Geral',
+                horas_trabalhadas=mo.horas_trabalhadas,
+                tarefa_cronograma_id=mo.tarefa_cronograma_id,
+                peso_distribuicao=mo.peso_distribuicao,
+            ))
+
         db.session.commit()
 
-        # Task #45 — catálogo `dominio.acao`: novo RDO já nasce
-        # Finalizado, então também é uma "publicação" que vale notificar.
-        try:
-            from utils.catalogo_eventos import emit_obra_rdo_publicado
-            emit_obra_rdo_publicado(novo_rdo, admin_id)
-        except Exception as _e_cat:
-            logger.warning(f"#45: emit obra.rdo_publicado (duplicar) falhou: {_e_cat}")
+        # Nenhum evento é emitido aqui. Ver o bloco "Bug 6d" no docstring.
+        logger.info('[RDO] %s duplicado a partir de %s — nasce em rascunho, '
+                    'sem evento', novo_rdo.numero_rdo, rdo_original.numero_rdo)
 
-        flash(f'RDO duplicado com sucesso! Novo RDO: {novo_rdo.numero_rdo}', 'success')
-        return redirect(url_for('main.editar_rdo', id=novo_rdo.id))
-        
+        flash(f'RDO duplicado como {novo_rdo.numero_rdo} (rascunho). '
+              f'Revise, submeta e assine.', 'success')
+        return redirect(url_for('main.visualizar_rdo', id=novo_rdo.id))
+
     except Exception as e:
         db.session.rollback()
-        logger.error(f"ERRO DUPLICAR RDO: {str(e)}")
+        logger.error(f"ERRO DUPLICAR RDO {id}: {e}", exc_info=True)
         flash('Erro ao duplicar RDO.', 'error')
         return redirect(url_for('main.rdos'))
 
