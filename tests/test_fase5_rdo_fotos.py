@@ -292,3 +292,158 @@ def test_tela_do_rdo_usa_url_e_nao_data_uri():
     assert '/rdo/foto/' in corpo, 'a tela não usa a URL de servir_foto'
     assert 'data:image/webp;base64' not in corpo, (
         'a tela ainda embute a imagem inteira no HTML')
+
+
+# ---------------------------------------------------------------------------
+# Backfill (tarefa de risco)
+# ---------------------------------------------------------------------------
+
+def _foto_base64_only(admin_id, rdo_id, ordem=0):
+    """Foto legada: existe SÓ em base64, sem arquivo em disco."""
+    import base64
+    from io import BytesIO
+
+    from PIL import Image
+    buf = BytesIO()
+    Image.new('RGB', (320, 240), (10, 120, 200)).save(buf, format='WEBP')
+    dados = base64.b64encode(buf.getvalue()).decode('utf-8')
+    uri = f'data:image/webp;base64,{dados}'
+    f = RDOFoto(admin_id=admin_id, rdo_id=rdo_id,
+                nome_arquivo='legada.webp', caminho_arquivo='legada.webp',
+                nome_original='legada.jpg', descricao='foto legada',
+                ordem=ordem, armazenamento='banco',
+                imagem_original_base64=uri, imagem_otimizada_base64=uri,
+                thumbnail_base64=uri)
+    db.session.add(f)
+    db.session.commit()
+    return f
+
+
+def test_migrar_dry_run_nao_escreve(tmp_path, monkeypatch):
+    from scripts.migrar_fotos_rdo_para_disco import migrar_para_disco
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        foto = _foto_base64_only(admin.id, rdo.id)
+        fid = foto.id
+
+        relatorio = migrar_para_disco(admin_id=admin.id, aplicar=False)
+        assert relatorio['migradas'] >= 1
+        db.session.expire_all()
+        recarregada = db.session.get(RDOFoto, fid)
+        assert recarregada.armazenamento == 'banco'
+        assert recarregada.imagem_otimizada_base64 is not None
+
+
+def test_migrar_escreve_o_arquivo_e_marca_disco(tmp_path, monkeypatch):
+    from services.rdo_foto_service import caminho_absoluto
+    from scripts.migrar_fotos_rdo_para_disco import migrar_para_disco
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        foto = _foto_base64_only(admin.id, rdo.id)
+        fid = foto.id
+
+        migrar_para_disco(admin_id=admin.id, aplicar=True)
+        db.session.expire_all()
+        recarregada = db.session.get(RDOFoto, fid)
+        assert recarregada.armazenamento == 'disco'
+        # Passada 1 NÃO libera a base64 — reversibilidade.
+        assert recarregada.imagem_otimizada_base64 is not None
+        for campo in ('arquivo_original', 'arquivo_otimizado', 'thumbnail'):
+            caminho = caminho_absoluto(getattr(recarregada, campo))
+            assert caminho and os.path.exists(caminho), (
+                f'{campo} não foi escrito em disco')
+            assert os.path.getsize(caminho) > 0
+
+
+def test_migrar_e_idempotente(tmp_path, monkeypatch):
+    from scripts.migrar_fotos_rdo_para_disco import migrar_para_disco
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _foto_base64_only(admin.id, rdo.id)
+
+        migrar_para_disco(admin_id=admin.id, aplicar=True)
+        segunda = migrar_para_disco(admin_id=admin.id, aplicar=True)
+        assert segunda['migradas'] == 0
+
+
+def test_verificar_recusa_liberar_quando_o_arquivo_sumiu(tmp_path, monkeypatch):
+    """A trava que impede perder a foto."""
+    from services.rdo_foto_service import caminho_absoluto
+    from scripts.migrar_fotos_rdo_para_disco import (liberar_base64,
+                                                     migrar_para_disco)
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        foto = _foto_base64_only(admin.id, rdo.id)
+        migrar_para_disco(admin_id=admin.id, aplicar=True)
+        db.session.expire_all()
+        fid = foto.id
+
+        # Simula perda do arquivo (deploy sem volume montado).
+        alvo = caminho_absoluto(db.session.get(RDOFoto, fid).arquivo_otimizado)
+        os.remove(alvo)
+
+        relatorio = liberar_base64(admin_id=admin.id, aplicar=True)
+        assert relatorio['liberadas'] == 0
+        assert relatorio['recusadas'] >= 1
+        db.session.expire_all()
+        assert db.session.get(RDOFoto, fid).imagem_otimizada_base64 is not None, (
+            'a base64 foi apagada com o arquivo ausente — perda de dado')
+
+
+def test_liberar_base64_zera_as_tres_colunas(tmp_path, monkeypatch):
+    from scripts.migrar_fotos_rdo_para_disco import (liberar_base64,
+                                                     migrar_para_disco)
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        foto = _foto_base64_only(admin.id, rdo.id)
+        fid = foto.id
+
+        migrar_para_disco(admin_id=admin.id, aplicar=True)
+        relatorio = liberar_base64(admin_id=admin.id, aplicar=True)
+        assert relatorio['liberadas'] >= 1
+
+        db.session.expire_all()
+        r = db.session.get(RDOFoto, fid)
+        assert r.imagem_original_base64 is None
+        assert r.imagem_otimizada_base64 is None
+        assert r.thumbnail_base64 is None
+        assert r.armazenamento == 'disco'
+
+
+def test_reverter_volta_para_banco(tmp_path, monkeypatch):
+    """Rollback da passada 1: enquanto a base64 existir, é um comando."""
+    from scripts.migrar_fotos_rdo_para_disco import migrar_para_disco, reverter
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        foto = _foto_base64_only(admin.id, rdo.id)
+        fid = foto.id
+
+        migrar_para_disco(admin_id=admin.id, aplicar=True)
+        relatorio = reverter(admin_id=admin.id, aplicar=True)
+        assert relatorio['revertidas'] >= 1
+        db.session.expire_all()
+        assert db.session.get(RDOFoto, fid).armazenamento == 'banco'
