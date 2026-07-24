@@ -180,3 +180,124 @@ def test_transicao_e_apagada_junto_com_o_rdo():
         db.session.delete(rdo)
         db.session.commit()
         assert RDOTransicaoEstado.query.filter_by(rdo_id=rid).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Máquina de estados
+# ---------------------------------------------------------------------------
+
+def test_conjunto_de_estados_e_fechado():
+    from services.rdo_ciclo_vida import ESTADOS
+
+    assert ESTADOS == {'rascunho', 'preenchido', 'assinado',
+                       'aprovado', 'retificado'}
+
+
+def test_transicoes_validas_sao_as_esperadas():
+    from services.rdo_ciclo_vida import TRANSICOES_VALIDAS
+
+    assert TRANSICOES_VALIDAS['rascunho'] == {'preenchido'}
+    assert TRANSICOES_VALIDAS['preenchido'] == {'rascunho', 'assinado'}
+    assert TRANSICOES_VALIDAS['assinado'] == {'aprovado', 'retificado'}
+    assert TRANSICOES_VALIDAS['aprovado'] == {'retificado'}
+    assert TRANSICOES_VALIDAS['retificado'] == set()
+
+
+def test_transicionar_grava_estado_e_trilha():
+    from models import RDOTransicaoEstado
+    from services.rdo_ciclo_vida import PREENCHIDO, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+
+        transicionar(rdo, PREENCHIDO, usuario=admin, motivo='fim do dia',
+                     ip='203.0.113.7')
+        db.session.commit()
+        rid = rdo.id
+
+    with app.app_context():
+        recarregado = db.session.get(RDO, rid)
+        assert recarregado.estado == PREENCHIDO
+        trilha = RDOTransicaoEstado.query.filter_by(rdo_id=rid).all()
+        assert len(trilha) == 1
+        assert trilha[0].estado_anterior == 'rascunho'
+        assert trilha[0].estado_novo == PREENCHIDO
+        assert trilha[0].motivo == 'fim do dia'
+        assert trilha[0].ip == '203.0.113.7'
+
+
+def test_transicao_invalida_e_recusada():
+    from services.rdo_ciclo_vida import APROVADO, TransicaoInvalida, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)  # rascunho
+
+        with pytest.raises(TransicaoInvalida):
+            transicionar(rdo, APROVADO, usuario=admin)
+        db.session.rollback()
+        assert db.session.get(RDO, rdo.id).estado == 'rascunho'
+
+
+def test_estado_desconhecido_e_recusado():
+    from services.rdo_ciclo_vida import TransicaoInvalida, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        with pytest.raises(TransicaoInvalida):
+            transicionar(rdo, 'homologado', usuario=admin)
+        db.session.rollback()
+
+
+def test_transicao_para_o_mesmo_estado_e_no_op_sem_trilha():
+    """Reenviar o mesmo estado não pode poluir a trilha."""
+    from models import RDOTransicaoEstado
+    from services.rdo_ciclo_vida import RASCUNHO, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        transicionar(rdo, RASCUNHO, usuario=admin)
+        db.session.commit()
+        assert RDOTransicaoEstado.query.filter_by(rdo_id=rdo.id).count() == 0
+
+
+def test_estados_imutaveis_sao_os_tres_finais():
+    from services.rdo_ciclo_vida import ESTADOS_IMUTAVEIS
+
+    assert ESTADOS_IMUTAVEIS == {'assinado', 'aprovado', 'retificado'}
+
+
+def test_garantir_editavel_passa_em_rascunho_e_preenchido():
+    from services.rdo_ciclo_vida import (PREENCHIDO, garantir_editavel,
+                                         transicionar)
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        garantir_editavel(rdo)          # rascunho: passa
+        transicionar(rdo, PREENCHIDO, usuario=admin)
+        db.session.commit()
+        garantir_editavel(rdo)          # preenchido: passa
+
+
+def test_garantir_editavel_recusa_assinado():
+    from services.rdo_ciclo_vida import (ASSINADO, PREENCHIDO, RDOImutavel,
+                                         garantir_editavel, transicionar)
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        transicionar(rdo, PREENCHIDO, usuario=admin)
+        transicionar(rdo, ASSINADO, usuario=admin)
+        db.session.commit()
+        with pytest.raises(RDOImutavel):
+            garantir_editavel(rdo)
