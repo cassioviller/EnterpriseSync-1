@@ -67,8 +67,31 @@ zero**. Nenhum código foi perdido. Dos 4 itens da retomada, 3 fecharam:
    aborto de boot em produção) foram cobertos pelo gate do item 2 contra
    banco vivo.
 
-Parado em: Fase 5 (RDO com ciclo de vida e assinatura) — plano já
-revalidado em 23/07 (apêndice "Revisão de premissas" no próprio plano).
+A **Fase 5 (RDO com ciclo de vida e assinatura) fechou em 24/07 —
+16/16 tasks** no branch `feat/fase-5-rdo-ciclo-vida` (plano
+`fase-5-rdo-ciclo-vida-assinatura.md`; runbook em
+`docs/fase-5-rollout.md`). 🔬 24/07: **gate completo VERDE** sobre a fase
+inteira: `bash run_tests.sh --gate` → **1284 passed, 6 skipped, 201
+deselected em 28min46s, exit 0** (baseline da Fase 4: 1177 passed).
+Entregou: `rdo.estado` (migration 260, backfill honesto → 'preenchido'),
+trilha `rdo_transicao_estado` (261), máquina de estados
+(`services/rdo_ciclo_vida.py`), guarda de imutabilidade `before_flush`
+(um ponto só, cobre os 8 caminhos de escrita), `rdo_assinatura` (262 —
+autoria pela identidade da Fase 1 + hash SHA-256 + IP/UA), hash canônico
+(`services/rdo_hash.py`), rotas assinar/aprovar/reabrir/retificar, RDO
+retificador (263), conserto do bug 6d (`duplicar_rdo` nasce rascunho sem
+webhook), exclusão de RDO imutável recusada ANTES de mexer no
+financeiro, selo/botões na tela e evidência de assinatura no PDF,
+`caminho_absoluto` + `rdo_foto.armazenamento` (264), fim da gravação de
+base64 (colunas viram `deferred`; `RDO.fotos` sai de `selectin`), script
+de migração de fotos em duas passadas e matriz papel×estado×ação (19
+testes). 🔬 24/07 dev pós-gate: estado = preenchido 22.990 / rascunho
+3.618 / assinado 142 / aprovado 30 / retificado 17; **assinado sem
+trilha = 0**. ⚠️ A **Task 15 NÃO foi executada** — a migração destrutiva
+das fotos (16 GB) espera os 6 pré-requisitos humanos de infra (volume,
+`UPLOADS_PATH`, dump, snapshot, janela) do runbook. A diferenciação de
+papel (quem assina/aprova) só vale em tenant com `escopo_obra_ativo=TRUE`
+— passo 0 do runbook.
 
 A **Fase 4 (centro de custo obrigatório) fechou em 24/07 — 13/13 tasks**,
 44 testes da fase + 123 de regressão dirigida
@@ -359,7 +382,7 @@ gate, o branch foi **mergeado em `main`** (fast-forward, 23/07).
 | **2** | Máquina de estados da Obra + handoff do GP | ✅ **22/07** — 14/14 tasks | `fase-2-maquina-estados-obra.md` + `docs/fase-2-rollout.md` |
 | **3** | Compras com governança | ✅ **23/07** — 12/12 tasks | `fase-3-compras-governanca.md` + `docs/fase-3-rollout.md` |
 | **4** | Centro de custo obrigatório | ✅ **24/07** — 13/13 tasks | `fase-4-centro-custo-obrigatorio.md` |
-| **5** | RDO com ciclo de vida e assinatura | ⬜ | `fase-5-rdo-ciclo-vida-assinatura.md` |
+| **5** | RDO com ciclo de vida e assinatura | ✅ **24/07** — 16/16 tasks (Task 15: código pronto, execução espera infra) | `fase-5-rdo-ciclo-vida-assinatura.md` + `docs/fase-5-rollout.md` |
 | **6** | Orçamento versionado e aditivo | ⬜ | `fase-6-orcamento-versionado-aditivo.md` |
 | **7** | Planejamento avançado (CPM, baseline, EVM) | ⬜ | `fase-7-planejamento-avancado-cpm-evm.md` |
 | **8** | Financeiro avançado + exportação Domínio | ⬜ | `fase-8-financeiro-avancado-dominio.md` |
@@ -486,7 +509,15 @@ o que confirma o item humano nº 1: **rotacionar é o único remédio**
 (reescrever o histórico quebraria clones e não vale o custo). Relatório
 completo fora do repo (contém os segredos em claro).
 
-**Bug 6d, corrigido o diagnóstico.** 🔬 21/07: `duplicar_rdo`
+**Bug 6d — ✅ CORRIGIDO na Fase 5 (24/07, `b2bd930e`).** A rota foi
+reescrita: os quatro atributos fantasma de clima e o
+`mao_original.observacoes` saíram, e o RDO duplicado passa a nascer em
+`rascunho` **sem emitir** `obra.rdo_publicado` nem `rdo_finalizado` — ele
+publica quando for submetido e assinado. 6 testes de regressão em
+`tests/test_fase5_rdo_ciclo_vida.py`. O diagnóstico histórico abaixo
+fica como registro:
+
+🔬 21/07: `duplicar_rdo`
 (`views/rdo.py:1596`) lê `rdo_original.tempo_manha` na linha 1624, e **esse
 atributo não existe** no modelo (`AttributeError` confirmado por execução; as
 colunas de clima são `clima_geral`, `temperatura_media`, `umidade_relativa`,
@@ -498,11 +529,13 @@ fato a única escrita de RDO que chamaria `emit_obra_rdo_publicado` sem
 `EventManager.emit('rdo_finalizado')` — e é este último que dispara
 `lancar_custos_rdo` e `recalcular_medicao_apos_rdo`.
 
-**Segunda rota morta, achada junto:** 📖 `finalizar_rdo` (`views/rdo.py:1520`)
-tem guard `if rdo.status == 'Finalizado': return` — e `models.py:860` faz todo
-RDO **nascer** com esse valor. É também `@admin_required`, que recusa
-`FUNCIONARIO` (`auth.py:29`): **o apontador não consegue submeter o próprio
-RDO**.
+**Segunda rota morta — ✅ ressuscitada na Fase 5 (Task 8):** `finalizar_rdo`
+virou a submissão do ciclo de vida (`rascunho` → `preenchido`, coluna
+`estado`, não mais o guard sobre `status`), com `@login_required` +
+`pode_apontar_na_obra` — o apontador consegue submeter o próprio RDO.
+*(Diagnóstico de 21/07: guard `if rdo.status == 'Finalizado': return`
+com todo RDO nascendo 'Finalizado', e `@admin_required` recusando
+FUNCIONARIO.)*
 
 ## Números que valem lembrar
 
@@ -597,7 +630,7 @@ nenhum plano está bloqueado esperando resposta. Revise quando puder.
 | Plano de contas e regime do Domínio | F8 | Recomendado: tabela por tenant + regime de caixa |
 | **11 lacunas do layout 11758** | F8 | A 1ª é a mais básica: a spec **nunca define a ordem das colunas**. Um `.csv` já aceito pelo Domínio resolve 8 de uma vez |
 | Expiração do token do portal | ~~F9a~~ **F3, decidida** | 🔬 23/07: implementada em **180 dias** (D4 da F3 — o plano da F9a dizia 90; a F3 escolheu 180 para não gerar chamado de suporte a cada obra). Token antigo sem data segue valendo até rotacionar |
-| Miniatura do portal × migração de fotos | F5 | Único ponto sem recomendação: ou a rota por token vem antes, ou o portal fica sem miniatura no intervalo |
+| Miniatura do portal × migração de fotos | F5 | Único ponto sem recomendação — **agora é gate da passada 2 da Task 15** (a parte destrutiva ainda não rodou): ou a rota de foto por token (Fase 9a) vem antes, ou o portal fica sem miniatura no intervalo. Foto NOVA (sem base64 desde 24/07) já cai no fallback de arquivo no detalhe e no ícone genérico na listagem |
 
 ## Mapa dos documentos
 
