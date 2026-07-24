@@ -100,6 +100,21 @@ def caminho_absoluto(caminho_relativo):
                      caminho_relativo)
         return None
     return candidato
+
+
+def volume_persistente_ativo():
+    """True quando há volume persistente configurado (UPLOADS_PATH definido).
+
+    É o interruptor da otimização da Fase 5. COM volume, o arquivo em disco
+    é a fonte de verdade e a base64 no banco (16 GB de duplicata, medição de
+    21/07) é pulada. SEM volume, o disco é efêmero — some no deploy — e a
+    base64 no banco é a única cópia durável, então `salvar_foto_rdo` volta a
+    gravá-la. Lê o ambiente a cada chamada (não no import) para valer também
+    quando a variável muda entre deploys.
+    """
+    return bool(os.environ.get('UPLOADS_PATH'))
+
+
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_FOTOS_POR_RDO = 20
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
@@ -415,17 +430,6 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
             pass
         raise Exception("Erro ao gerar thumbnail")
     
-    # ── Fase 5 — base64 NÃO é mais gerada no upload ──────────────────
-    # Até 2026-07-21 esta função gerava, além dos três arquivos em disco,
-    # TRÊS cópias base64 do mesmo conteúdo, gravadas em colunas TEXT.
-    # Medição do banco de desenvolvimento nesse dia:
-    #   pg_total_relation_size('rdo_foto') = 16 GB (TOAST = 16 GB)
-    #   28.870 fotos × ~442 KB de base64 cada
-    #   28.860 delas JÁ tinham o arquivo em disco — pura duplicata.
-    # A função `processar_imagem_base64` continua existindo: é o que o
-    # script de migração usa para RECUPERAR as 10 fotos legadas que só
-    # existem em base64, e o caminho de restauração de emergência.
-
     base_relativo = f"uploads/rdo/{admin_id}/{rdo_id}"
 
     resultado = {
@@ -434,8 +438,36 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
         'thumbnail': f"{base_relativo}/{os.path.basename(caminho_thumbnail)}",
         'nome_original': file.filename,
         'tamanho_bytes': tamanho,
+        # As chaves base64 vêm SEMPRE (para o caller não precisar saber a
+        # política); o VALOR só é preenchido quando não há volume.
+        'imagem_original_base64': None,
+        'imagem_otimizada_base64': None,
+        'thumbnail_base64': None,
+        'armazenamento': 'disco',
     }
 
-    logger.info("✅ Foto processada (disco): %s → %s (%s bytes)",
-                file.filename, resultado['arquivo_otimizado'], tamanho)
+    # ── Fase 5 — a base64 é a REDE DE SEGURANÇA do disco efêmero ──────
+    # Com volume persistente (UPLOADS_PATH), o arquivo em disco é a fonte
+    # de verdade e a base64 seria pura duplicata — medição de 21/07:
+    # rdo_foto ocupava 16 GB de TOAST, 28.860 de 28.870 fotos já em disco.
+    # Nesse caso a pulamos.
+    # SEM volume, o disco é EFÊMERO: some no próximo deploy. Aí a base64 no
+    # banco (persistente) é a ÚNICA cópia durável, então voltamos a gravá-la
+    # (comportamento pré-Fase 5) e marcamos armazenamento='banco'. É o
+    # interruptor que torna a otimização segura: ela só liga quando existe
+    # um volume de verdade para onde migrar.
+    if not volume_persistente_ativo():
+        file.seek(0)
+        dados = processar_imagem_base64(file)
+        resultado['imagem_original_base64'] = dados['imagem_original_base64']
+        resultado['imagem_otimizada_base64'] = dados['imagem_otimizada_base64']
+        resultado['thumbnail_base64'] = dados['thumbnail_base64']
+        resultado['armazenamento'] = 'banco'
+        logger.info("✅ Foto processada (disco + base64 no banco — SEM volume "
+                    "persistente): %s → %s (%s bytes)",
+                    file.filename, resultado['arquivo_otimizado'], tamanho)
+    else:
+        logger.info("✅ Foto processada (só disco — volume persistente ativo): "
+                    "%s → %s (%s bytes)",
+                    file.filename, resultado['arquivo_otimizado'], tamanho)
     return resultado

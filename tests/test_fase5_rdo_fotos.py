@@ -187,11 +187,15 @@ def test_backfill_da_migration_marcou_o_acervo():
 
 
 # ---------------------------------------------------------------------------
-# Parar a sangria
+# Parar a sangria — mas SÓ quando há volume persistente
 # ---------------------------------------------------------------------------
+# A política é condicional (Fase 5, opção B): base64 é a rede de segurança
+# do disco efêmero. COM volume (UPLOADS_PATH) o upload pula a base64; SEM
+# volume ele a grava, porque o arquivo em disco some no próximo deploy.
 
-def test_upload_novo_nao_grava_base64():
-    """A partir da Fase 5, foto nova vai só para o disco."""
+def test_upload_com_volume_pula_base64(tmp_path, monkeypatch):
+    """Com volume persistente, foto nova vai só para o disco (sem base64)."""
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
     with app.app_context():
         admin = _admin()
         obra = _obra(admin.id)
@@ -210,23 +214,66 @@ def test_upload_novo_nao_grava_base64():
         foto = RDOFoto.query.filter_by(rdo_id=rid).first()
         assert foto is not None
         assert foto.imagem_original_base64 is None, (
-            'upload novo ainda grava base64 — 442 KB por foto no banco')
+            'com volume, o upload não devia gravar base64 (16 GB de duplicata)')
         assert foto.imagem_otimizada_base64 is None
         assert foto.thumbnail_base64 is None
         assert foto.armazenamento == 'disco'
         assert foto.arquivo_otimizado
 
 
-def test_salvar_foto_rdo_nao_devolve_mais_base64(tmp_path, monkeypatch):
+def test_upload_sem_volume_mantem_base64(monkeypatch):
+    """SEM volume (disco efêmero), a foto nova PRECISA guardar a base64 —
+    é a única cópia que sobrevive ao deploy. Esta é a rede de segurança."""
+    monkeypatch.delenv('UPLOADS_PATH', raising=False)
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+    cliente.post(f'/rdo/{rid}/fotos/upload',
+                 data={'fotos[]': _imagem_falsa()},
+                 content_type='multipart/form-data')
+
+    with app.app_context():
+        foto = RDOFoto.query.filter_by(rdo_id=rid).first()
+        assert foto is not None
+        assert foto.armazenamento == 'banco', (
+            'sem volume persistente a foto tem de nascer "banco" — senão '
+            'some no deploy')
+        assert foto.thumbnail_base64 and foto.thumbnail_base64.startswith('data:')
+        assert foto.imagem_otimizada_base64
+
+
+def test_salvar_foto_com_volume_pula_base64(tmp_path, monkeypatch):
     from services.rdo_foto_service import salvar_foto_rdo
 
     monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
     with app.app_context():
         resultado = salvar_foto_rdo(_imagem_falsa(), 1, 1)
-    assert 'imagem_original_base64' not in resultado
-    assert 'imagem_otimizada_base64' not in resultado
-    assert 'thumbnail_base64' not in resultado
+    # a chave existe sempre; com volume o valor é None
+    assert resultado['imagem_original_base64'] is None
+    assert resultado['imagem_otimizada_base64'] is None
+    assert resultado['thumbnail_base64'] is None
+    assert resultado['armazenamento'] == 'disco'
     assert resultado['arquivo_otimizado'].startswith('uploads/rdo/1/1/')
+
+
+def test_salvar_foto_sem_volume_mantem_base64(tmp_path, monkeypatch):
+    from services import rdo_foto_service as svc
+
+    monkeypatch.delenv('UPLOADS_PATH', raising=False)
+    # isola a escrita em disco (UPLOAD_BASE é congelado no import)
+    monkeypatch.setattr(svc, 'UPLOAD_BASE', str(tmp_path / 'rdo'))
+    with app.app_context():
+        resultado = svc.salvar_foto_rdo(_imagem_falsa(), 1, 1)
+    assert resultado['armazenamento'] == 'banco'
+    assert resultado['imagem_otimizada_base64'].startswith('data:image/webp;base64,')
+    assert resultado['thumbnail_base64'].startswith('data:')
 
 
 def test_consulta_de_rdo_nao_carrega_base64_por_padrao():
@@ -273,7 +320,9 @@ def test_url_da_foto_e_servida_do_disco():
     assert resposta.headers['Content-Type'].startswith('image/')
 
 
-def test_tela_do_rdo_usa_url_e_nao_data_uri():
+def test_tela_com_volume_usa_url_e_nao_data_uri(tmp_path, monkeypatch):
+    """Com volume, a foto é 'disco' e a tela serve por URL (HTML leve)."""
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
     with app.app_context():
         admin = _admin()
         obra = _obra(admin.id)
@@ -292,6 +341,29 @@ def test_tela_do_rdo_usa_url_e_nao_data_uri():
     assert '/rdo/foto/' in corpo, 'a tela não usa a URL de servir_foto'
     assert 'data:image/webp;base64' not in corpo, (
         'a tela ainda embute a imagem inteira no HTML')
+
+
+def test_tela_sem_volume_usa_base64(monkeypatch):
+    """SEM volume, a foto é 'banco' e a tela renderiza a base64 — que é a
+    cópia que sobrevive ao deploy. Não pode tentar o disco (some no deploy)."""
+    monkeypatch.delenv('UPLOADS_PATH', raising=False)
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+    cliente.post(f'/rdo/{rid}/fotos/upload',
+                 data={'fotos[]': _imagem_falsa()},
+                 content_type='multipart/form-data')
+
+    corpo = cliente.get(f'/rdo/{rid}').get_data(as_text=True)
+    assert 'data:image/webp;base64' in corpo, (
+        'sem volume, a tela tem de servir a base64 — o disco some no deploy')
 
 
 # ---------------------------------------------------------------------------

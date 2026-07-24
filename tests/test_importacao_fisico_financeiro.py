@@ -934,8 +934,10 @@ def test_import_cria_rdos_em_estado_preenchido():
 def test_import_anexa_fotos_do_rdo(tmp_path):
     """Um RDO com `fotos` (legendas em ordem) anexa RDOFoto lendo os arquivos
     numerados de fotos_rdos/<data>/; a legenda e os arquivos em disco são
-    persistidos (Fase 5: sem base64 — armazenamento='disco'), e uma
-    foto ausente é pulada sem quebrar o import."""
+    persistidos, e uma foto ausente é pulada sem quebrar o import.
+
+    Fase 5 (opção B): sem UPLOADS_PATH no ambiente de teste (disco efêmero),
+    a foto nasce 'banco' com base64 — a rede de segurança do deploy."""
     import json, os
     from PIL import Image
     from services import importacao_fisico_financeiro as ff
@@ -972,11 +974,11 @@ def test_import_anexa_fotos_do_rdo(tmp_path):
         # 2 fotos anexadas (a 3ª foi pulada por não ter arquivo)
         assert len(fotos) == 2
         assert [f.legenda for f in fotos] == ["Nível do platô", "Gabarito da Baia 01"]
-        # Fase 5 — foto nova mora em disco; base64 não é mais gravada.
-        assert all(f.armazenamento == 'disco' for f in fotos)
         assert all(f.arquivo_otimizado and f.thumbnail for f in fotos)
-        assert all(f.imagem_otimizada_base64 is None for f in fotos)
         assert all(f.nome_arquivo and f.caminho_arquivo for f in fotos)  # legados NOT NULL
+        # Sem volume (default do teste): 'banco' + base64 preservada.
+        assert all(f.armazenamento == 'banco' for f in fotos)
+        assert all(f.imagem_otimizada_base64 for f in fotos)
 
 
 def test_import_auto_anexa_fotos_da_pasta_sem_legenda(tmp_path):
@@ -1012,17 +1014,18 @@ def test_import_auto_anexa_fotos_da_pasta_sem_legenda(tmp_path):
         fotos = RDOFoto.query.filter_by(rdo_id=rdo.id).order_by(RDOFoto.ordem).all()
         assert len(fotos) == 3
         assert all((f.legenda or '') == '' for f in fotos)
-        # Fase 5 — foto nova mora em disco; base64 não é mais gravada.
         assert all(f.arquivo_otimizado for f in fotos)
-        assert all(f.armazenamento == 'disco' for f in fotos)
+        # Sem volume (default do teste): 'banco' + base64 preservada.
+        assert all(f.armazenamento == 'banco' for f in fotos)
 
 
 def test_portal_rdo_foto_sem_prefixo_base64_duplicado(tmp_path):
-    """Fase 5: foto importada não tem mais base64 — o portal cai no fallback
-    de arquivo (`/{{ f.arquivo_otimizado }}`) até a rota por token da Fase 9a
-    (decisão "miniatura do portal × migração de fotos", ESTADO-ATUAL.md).
-    O invariante que sobrevive do bug original: prefixo `data:...;base64,`
-    duplicado nunca pode voltar a aparecer."""
+    """A foto importada aparece no portal com UM único prefixo
+    `data:image/...;base64,` — regressão do bug que duplicava o prefixo.
+
+    Fase 5 (opção B): sem UPLOADS_PATH (disco efêmero, default do teste) a
+    foto guarda base64, então o portal a renderiza como data URI — e o
+    invariante é que o prefixo nunca aparece duplicado."""
     import json, os
     from PIL import Image
     from services import importacao_fisico_financeiro as ff
@@ -1059,8 +1062,8 @@ def test_portal_rdo_foto_sem_prefixo_base64_duplicado(tmp_path):
         r = c.get(f'/portal/obra/{token}/rdo/{rdo_id}')
         assert r.status_code == 200
         html = r.get_data(as_text=True)
-        # Fase 5 — a foto nova referencia o arquivo em disco, não data URI.
-        assert 'uploads/rdo/' in html                       # fallback de arquivo
+        # Sem volume: base64 preservada → portal renderiza data URI.
+        assert 'data:image/webp;base64,' in html            # a foto renderiza
         assert 'data:image/webp;base64,data:' not in html   # sem prefixo duplicado
 
 

@@ -737,9 +737,13 @@ def upload_foto_rdo(rdo_id):
                     nome_original=resultado['nome_original'],
                     tamanho_bytes=resultado['tamanho_bytes'],
                     ordem=fotos_existentes + len(fotos_criadas),
-                    # Fase 5 — esta rota grava em disco e nunca preenche
-                    # as colunas base64: a fonte de verdade é o arquivo.
-                    armazenamento='disco',
+                    # Fase 5 — a política (só disco × disco+base64) mora em
+                    # salvar_foto_rdo e depende de haver volume persistente.
+                    # Sem volume, a base64 vem preenchida e é a cópia durável.
+                    imagem_original_base64=resultado.get('imagem_original_base64'),
+                    imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
+                    thumbnail_base64=resultado.get('thumbnail_base64'),
+                    armazenamento=resultado.get('armazenamento', 'disco'),
                 )
                 
                 db.session.add(nova_foto)

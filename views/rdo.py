@@ -824,9 +824,12 @@ def criar_rdo():
                             thumbnail=resultado['thumbnail'],
                             nome_original=resultado['nome_original'],
                             tamanho_bytes=resultado['tamanho_bytes'],
-                            # Fase 5 — sem base64. Ver
-                            # services/rdo_foto_service.salvar_foto_rdo.
-                            armazenamento='disco',
+                            # Fase 5 — política (só disco × disco+base64) em
+                            # salvar_foto_rdo; sem volume, a base64 vem preenchida.
+                            imagem_original_base64=resultado.get('imagem_original_base64'),
+                            imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
+                            thumbnail_base64=resultado.get('thumbnail_base64'),
+                            armazenamento=resultado.get('armazenamento', 'disco'),
                         )
                         
                         db.session.add(nova_foto)
@@ -4155,8 +4158,12 @@ def salvar_rdo_flexivel():
                                 thumbnail=resultado['thumbnail'],
                                 nome_original=resultado['nome_original'],
                                 tamanho_bytes=resultado['tamanho_bytes'],
-                                # Fase 5 — sem base64.
-                                armazenamento='disco',
+                                # Fase 5 — política em salvar_foto_rdo; sem
+                                # volume persistente, a base64 vem preenchida.
+                                imagem_original_base64=resultado.get('imagem_original_base64'),
+                                imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
+                                thumbnail_base64=resultado.get('thumbnail_base64'),
+                                armazenamento=resultado.get('armazenamento', 'disco'),
                             )
                             
                             db.session.add(nova_foto)

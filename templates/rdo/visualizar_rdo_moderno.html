@@ -1895,8 +1895,11 @@ console.log('Initializing RDO view with light theme...');
                 <div class="foto-card" style="border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.3s; cursor: pointer;"
                      onclick="openLightbox('fotoLightbox{{ foto.id }}')">
                     <div class="foto-wrapper" style="position: relative; width: 100%; height: 200px; background: #f8f9fa;">
-                        {# Fase 5 — servir por URL; base64 só como fallback do legado ainda não migrado #}
-                        {% if foto.armazenamento == 'disco' or foto.thumbnail %}
+                        {# Fase 5 — a ORDEM importa: 'disco' serve por URL (o
+                           arquivo é a fonte de verdade). Senão, prefere a
+                           base64, que em disco efêmero é a única cópia que
+                           sobrevive ao deploy. URL por caminho é último recurso. #}
+                        {% if foto.armazenamento == 'disco' %}
                             <img src="{{ url_for('rdo_crud.servir_foto', foto_id=foto.id, tipo='thumbnail') }}"
                                  alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
                                  loading="lazy"
@@ -1904,6 +1907,12 @@ console.log('Initializing RDO view with light theme...');
                                  onerror="handleImageError(this)">
                         {% elif foto.thumbnail_base64 %}
                             <img src="{{ foto.thumbnail_base64 }}"
+                                 alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
+                                 loading="lazy"
+                                 style="width: 100%; height: 100%; object-fit: cover; display: block;"
+                                 onerror="handleImageError(this)">
+                        {% elif foto.thumbnail %}
+                            <img src="{{ url_for('rdo_crud.servir_foto', foto_id=foto.id, tipo='thumbnail') }}"
                                  alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
                                  loading="lazy"
                                  style="width: 100%; height: 100%; object-fit: cover; display: block;"
@@ -1950,14 +1959,20 @@ console.log('Initializing RDO view with light theme...');
         <i class="fas fa-times"></i>
     </button>
     <div class="foto-lightbox-content">
-        {# Fase 5 — servir por URL; base64 só como fallback do legado ainda não migrado #}
-        {% if foto.armazenamento == 'disco' or foto.arquivo_otimizado %}
+        {# Fase 5 — mesma ordem do thumbnail: disco→URL, senão base64
+           (durável em disco efêmero), senão URL por caminho como último recurso. #}
+        {% if foto.armazenamento == 'disco' %}
             <img src="{{ url_for('rdo_crud.servir_foto', foto_id=foto.id, tipo='otimizado') }}"
                  alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
                  class="foto-lightbox-img"
                  onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22800%22 height=%22600%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22800%22 height=%22600%22/%3E%3Ctext fill=%22%236c757d%22 font-family=%22Arial%22 font-size=%2224%22 x=%2250%%25%22 y=%2250%%25%22 text-anchor=%22middle%22%3EImagem não encontrada%3C/text%3E%3C/svg%3E';">
         {% elif foto.imagem_otimizada_base64 %}
             <img src="{{ foto.imagem_otimizada_base64 }}"
+                 alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
+                 class="foto-lightbox-img"
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22800%22 height=%22600%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22800%22 height=%22600%22/%3E%3Ctext fill=%22%236c757d%22 font-family=%22Arial%22 font-size=%2224%22 x=%2250%%25%22 y=%2250%%25%22 text-anchor=%22middle%22%3EImagem não encontrada%3C/text%3E%3C/svg%3E';">
+        {% elif foto.arquivo_otimizado %}
+            <img src="{{ url_for('rdo_crud.servir_foto', foto_id=foto.id, tipo='otimizado') }}"
                  alt="{{ foto.descricao or foto.legenda or 'Foto do RDO' }}"
                  class="foto-lightbox-img"
                  onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22800%22 height=%22600%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22800%22 height=%22600%22/%3E%3Ctext fill=%22%236c757d%22 font-family=%22Arial%22 font-size=%2224%22 x=%2250%%25%22 y=%2250%%25%22 text-anchor=%22middle%22%3EImagem não encontrada%3C/text%3E%3C/svg%3E';">

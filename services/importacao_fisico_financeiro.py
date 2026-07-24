@@ -380,21 +380,28 @@ def _materializar_fotos_rdo(rdo, admin_id, dia, fotos):
             nome_original=res['nome_original'],
             tamanho_bytes=res['tamanho_bytes'],
             ordem=i,
-            # Fase 5 — salvar_foto_rdo não devolve mais base64; a fonte
-            # de verdade é o arquivo em disco.
-            armazenamento='disco',
+            # Fase 5 — política (só disco × disco+base64) em salvar_foto_rdo:
+            # sem volume persistente a base64 vem preenchida e é a cópia
+            # durável, com volume vem None e o arquivo é a fonte de verdade.
+            imagem_original_base64=res.get('imagem_original_base64'),
+            imagem_otimizada_base64=res.get('imagem_otimizada_base64'),
+            thumbnail_base64=res.get('thumbnail_base64'),
+            armazenamento=res.get('armazenamento', 'disco'),
         ))
         criadas += 1
     return criadas
 
 
 # Colunas de RDOFoto copiadas ao preservar/restaurar (tudo menos id e rdo_id).
-# Fase 5 — as três colunas base64 saíram: foto nova não as tem, e copiá-las
-# no snapshot puxaria o TOAST (agora deferred) do acervo inteiro a cada
-# reimport. O marcador `armazenamento` entra no lugar.
+# Fase 5 — as três colunas base64 CONTINUAM aqui: quando não há volume
+# persistente (disco efêmero) elas são a única cópia durável da foto, e o
+# snapshot roda só sobre os RDOs de UMA obra no reimport (conjunto pequeno),
+# não sobre o acervo — então não há risco de puxar o TOAST inteiro. Com
+# volume elas vêm None e o copy é barato. `armazenamento` entra junto.
 _FOTO_COLS = ('nome_arquivo', 'caminho_arquivo', 'legenda', 'descricao',
               'arquivo_original', 'arquivo_otimizado', 'thumbnail', 'nome_original',
-              'tamanho_bytes', 'ordem', 'armazenamento')
+              'tamanho_bytes', 'ordem', 'armazenamento',
+              'imagem_original_base64', 'imagem_otimizada_base64', 'thumbnail_base64')
 
 
 def _snapshot_fotos_por_data(rdos_antigos):
