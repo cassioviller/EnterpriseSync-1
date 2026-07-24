@@ -380,20 +380,21 @@ def _materializar_fotos_rdo(rdo, admin_id, dia, fotos):
             nome_original=res['nome_original'],
             tamanho_bytes=res['tamanho_bytes'],
             ordem=i,
-            # v9.0.4 (base64 — persistência no banco)
-            imagem_original_base64=res['imagem_original_base64'],
-            imagem_otimizada_base64=res['imagem_otimizada_base64'],
-            thumbnail_base64=res['thumbnail_base64'],
+            # Fase 5 — salvar_foto_rdo não devolve mais base64; a fonte
+            # de verdade é o arquivo em disco.
+            armazenamento='disco',
         ))
         criadas += 1
     return criadas
 
 
 # Colunas de RDOFoto copiadas ao preservar/restaurar (tudo menos id e rdo_id).
+# Fase 5 — as três colunas base64 saíram: foto nova não as tem, e copiá-las
+# no snapshot puxaria o TOAST (agora deferred) do acervo inteiro a cada
+# reimport. O marcador `armazenamento` entra no lugar.
 _FOTO_COLS = ('nome_arquivo', 'caminho_arquivo', 'legenda', 'descricao',
               'arquivo_original', 'arquivo_otimizado', 'thumbnail', 'nome_original',
-              'tamanho_bytes', 'ordem', 'imagem_original_base64',
-              'imagem_otimizada_base64', 'thumbnail_base64')
+              'tamanho_bytes', 'ordem', 'armazenamento')
 
 
 def _snapshot_fotos_por_data(rdos_antigos):

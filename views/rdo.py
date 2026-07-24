@@ -812,24 +812,21 @@ def criar_rdo():
                         resultado = salvar_foto_rdo(foto_file, admin_id, rdo.id)
                         logger.info(f" [OK] Service retornou: {resultado}")
                         
-                        # [OK] CORREÇÃO 3: Criar RDOFoto com CAMPOS LEGADOS preenchidos
                         nova_foto = RDOFoto(
                             admin_id=admin_id,
                             rdo_id=rdo.id,
-                            # [OK] CAMPOS LEGADOS OBRIGATÓRIOS (NOT NULL no banco)
+                            # NOT NULL no banco.
                             nome_arquivo=resultado['nome_original'],
                             caminho_arquivo=resultado['arquivo_original'],
-                            # Novos campos v9.0
                             descricao='',
                             arquivo_original=resultado['arquivo_original'],
                             arquivo_otimizado=resultado['arquivo_otimizado'],
                             thumbnail=resultado['thumbnail'],
                             nome_original=resultado['nome_original'],
                             tamanho_bytes=resultado['tamanho_bytes'],
-                            # [READY] CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
-                            imagem_original_base64=resultado.get('imagem_original_base64'),
-                            imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
-                            thumbnail_base64=resultado.get('thumbnail_base64')
+                            # Fase 5 — sem base64. Ver
+                            # services/rdo_foto_service.salvar_foto_rdo.
+                            armazenamento='disco',
                         )
                         
                         db.session.add(nova_foto)
@@ -4152,15 +4149,14 @@ def salvar_rdo_flexivel():
                                 nome_arquivo=resultado['nome_original'],
                                 caminho_arquivo=resultado['arquivo_original'],
                                 descricao=legenda,
+                                legenda=legenda,
                                 arquivo_original=resultado['arquivo_original'],
                                 arquivo_otimizado=resultado['arquivo_otimizado'],
                                 thumbnail=resultado['thumbnail'],
                                 nome_original=resultado['nome_original'],
                                 tamanho_bytes=resultado['tamanho_bytes'],
-                                # [READY] CAMPOS BASE64 (v9.0.4) - Persistência no banco de dados
-                                imagem_original_base64=resultado.get('imagem_original_base64'),
-                                imagem_otimizada_base64=resultado.get('imagem_otimizada_base64'),
-                                thumbnail_base64=resultado.get('thumbnail_base64')
+                                # Fase 5 — sem base64.
+                                armazenamento='disco',
                             )
                             
                             db.session.add(nova_foto)

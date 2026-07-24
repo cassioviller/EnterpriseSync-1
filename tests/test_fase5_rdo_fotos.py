@@ -184,3 +184,111 @@ def test_backfill_da_migration_marcou_o_acervo():
         nulos = db.session.execute(text(
             "SELECT count(*) FROM rdo_foto WHERE armazenamento IS NULL")).scalar()
         assert nulos == 0, f'{nulos} fotos ficaram sem marcador de armazenamento'
+
+
+# ---------------------------------------------------------------------------
+# Parar a sangria
+# ---------------------------------------------------------------------------
+
+def test_upload_novo_nao_grava_base64():
+    """A partir da Fase 5, foto nova vai só para o disco."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+    cliente.post(f'/rdo/{rid}/fotos/upload',
+                 data={'fotos[]': _imagem_falsa()},
+                 content_type='multipart/form-data')
+
+    with app.app_context():
+        foto = RDOFoto.query.filter_by(rdo_id=rid).first()
+        assert foto is not None
+        assert foto.imagem_original_base64 is None, (
+            'upload novo ainda grava base64 — 442 KB por foto no banco')
+        assert foto.imagem_otimizada_base64 is None
+        assert foto.thumbnail_base64 is None
+        assert foto.armazenamento == 'disco'
+        assert foto.arquivo_otimizado
+
+
+def test_salvar_foto_rdo_nao_devolve_mais_base64(tmp_path, monkeypatch):
+    from services.rdo_foto_service import salvar_foto_rdo
+
+    monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
+    with app.app_context():
+        resultado = salvar_foto_rdo(_imagem_falsa(), 1, 1)
+    assert 'imagem_original_base64' not in resultado
+    assert 'imagem_otimizada_base64' not in resultado
+    assert 'thumbnail_base64' not in resultado
+    assert resultado['arquivo_otimizado'].startswith('uploads/rdo/1/1/')
+
+
+def test_consulta_de_rdo_nao_carrega_base64_por_padrao():
+    """models.py:1104 era lazy='selectin': TODA consulta de RDO puxava as
+    três colunas TEXT de todas as fotos — inclusive a listagem paginada
+    de crud_rdo_completo.py:80."""
+    from sqlalchemy import inspect as sa_inspect
+
+    with app.app_context():
+        mapper = sa_inspect(RDOFoto)
+        for coluna in ('imagem_original_base64', 'imagem_otimizada_base64',
+                       'thumbnail_base64'):
+            assert mapper.attrs[coluna].deferred is True, (
+                f'{coluna} não está deferred — continua vindo em toda query')
+
+        relacao = sa_inspect(RDO).relationships['fotos']
+        assert relacao.lazy != 'selectin', (
+            'RDO.fotos ainda é selectin: cada listagem de RDO puxa o TOAST '
+            'inteiro das fotos')
+
+
+def test_url_da_foto_e_servida_do_disco():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+    cliente.post(f'/rdo/{rid}/fotos/upload',
+                 data={'fotos[]': _imagem_falsa()},
+                 content_type='multipart/form-data')
+
+    with app.app_context():
+        foto_id = RDOFoto.query.filter_by(rdo_id=rid).first().id
+
+    resposta = cliente.get(f'/rdo/foto/{foto_id}/thumbnail')
+    assert resposta.status_code == 200, (
+        f'servir_foto devolveu {resposta.status_code} — a foto não está '
+        f'sendo encontrada no disco')
+    assert resposta.headers['Content-Type'].startswith('image/')
+
+
+def test_tela_do_rdo_usa_url_e_nao_data_uri():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+    cliente.post(f'/rdo/{rid}/fotos/upload',
+                 data={'fotos[]': _imagem_falsa()},
+                 content_type='multipart/form-data')
+
+    corpo = cliente.get(f'/rdo/{rid}').get_data(as_text=True)
+    assert '/rdo/foto/' in corpo, 'a tela não usa a URL de servir_foto'
+    assert 'data:image/webp;base64' not in corpo, (
+        'a tela ainda embute a imagem inteira no HTML')

@@ -415,28 +415,27 @@ def salvar_foto_rdo(file, admin_id, rdo_id):
             pass
         raise Exception("Erro ao gerar thumbnail")
     
-    # 7. Processar versões Base64 (v9.0.4 - persistência no banco)
-    logger.info("🔄 Gerando versões Base64...")
-    file.seek(0)  # Resetar cursor para ler novamente
-    dados_base64 = processar_imagem_base64(file)
-    
-    # Retornar caminhos relativos (para URL) + base64
+    # ── Fase 5 — base64 NÃO é mais gerada no upload ──────────────────
+    # Até 2026-07-21 esta função gerava, além dos três arquivos em disco,
+    # TRÊS cópias base64 do mesmo conteúdo, gravadas em colunas TEXT.
+    # Medição do banco de desenvolvimento nesse dia:
+    #   pg_total_relation_size('rdo_foto') = 16 GB (TOAST = 16 GB)
+    #   28.870 fotos × ~442 KB de base64 cada
+    #   28.860 delas JÁ tinham o arquivo em disco — pura duplicata.
+    # A função `processar_imagem_base64` continua existindo: é o que o
+    # script de migração usa para RECUPERAR as 10 fotos legadas que só
+    # existem em base64, e o caminho de restauração de emergência.
+
     base_relativo = f"uploads/rdo/{admin_id}/{rdo_id}"
-    
+
     resultado = {
-        # Campos legados (arquivos físicos - compatibilidade)
         'arquivo_original': f"{base_relativo}/{os.path.basename(caminho_original)}",
         'arquivo_otimizado': f"{base_relativo}/{os.path.basename(caminho_otimizado)}",
         'thumbnail': f"{base_relativo}/{os.path.basename(caminho_thumbnail)}",
         'nome_original': file.filename,
         'tamanho_bytes': tamanho,
-        # Novos campos (base64 - persistência total)
-        'imagem_original_base64': dados_base64['imagem_original_base64'],
-        'imagem_otimizada_base64': dados_base64['imagem_otimizada_base64'],
-        'thumbnail_base64': dados_base64['thumbnail_base64']
     }
-    
-    logger.info(f"✅ Foto processada com sucesso: {file.filename}")
-    logger.info(f"   📁 Arquivos físicos salvos (backup)")
-    logger.info(f"   💾 Base64 gerados (persistência no banco)")
+
+    logger.info("✅ Foto processada (disco): %s → %s (%s bytes)",
+                file.filename, resultado['arquivo_otimizado'], tamanho)
     return resultado

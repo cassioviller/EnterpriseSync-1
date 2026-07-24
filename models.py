@@ -1392,11 +1392,20 @@ class RDOFoto(db.Model):
     tamanho_bytes = db.Column(db.BigInteger)
     ordem = db.Column(db.Integer, default=0)
     
-    # [READY] ARMAZENAMENTO PERSISTENTE (v9.0.4) - Fotos em Base64 no banco de dados
-    # Solução: Igual aos funcionários - fotos NUNCA são perdidas em deploy/restart
-    imagem_original_base64 = db.Column(db.Text)  # Backup completo da imagem original
-    imagem_otimizada_base64 = db.Column(db.Text)  # Versão otimizada (1200px) para visualização
-    thumbnail_base64 = db.Column(db.Text)  # Miniatura (300px) para listagem rápida
+    # ── Fase 5 — LEGADO em processo de migração ──────────────────────
+    # `db.deferred(...)`: estas três colunas TEXT somam 16 GB (medido em
+    # 2026-07-21) e NÃO podem vir em toda consulta. Elas só carregam
+    # quando explicitamente acessadas — o que hoje só acontece no script
+    # de migração e no caminho de fallback dos templates.
+    #
+    # ATENÇÃO: é `db.deferred(db.Column(...))`, NÃO
+    # `db.Column(..., deferred=True)`. Conferido nesta versão
+    # (SQLAlchemy 2.0.41 + Flask-SQLAlchemy 3.1.1): passar `deferred` como
+    # kwarg de Column levanta
+    # `TypeError: Additional arguments should be named <dialectname>_<argument>`.
+    imagem_original_base64 = db.deferred(db.Column(db.Text))
+    imagem_otimizada_base64 = db.deferred(db.Column(db.Text))
+    thumbnail_base64 = db.deferred(db.Column(db.Text))
 
     # ── Fase 5 — marcador de onde a foto realmente mora ───────────────
     # 'banco' = as colunas base64 acima são a fonte de verdade.
@@ -1414,8 +1423,13 @@ class RDOFoto(db.Model):
 
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relacionamento com RDO
-    rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='selectin', order_by='RDOFoto.ordem', cascade='all, delete-orphan', passive_deletes=True))
+    # Fase 5 — `lazy='selectin'` fazia TODA consulta de RDO (inclusive a
+    # listagem paginada de crud_rdo_completo.py:80) carregar as fotos de
+    # todos os RDOs da página. Com as colunas base64 deferred isso ficou
+    # barato, mas 'select' evita o SELECT extra quando ninguém pede foto.
+    rdo = db.relationship('RDO', backref=db.backref(
+        'fotos', lazy='select', order_by='RDOFoto.ordem',
+        cascade='all, delete-orphan', passive_deletes=True))
 
 
 class RDOTransicaoEstado(db.Model):
