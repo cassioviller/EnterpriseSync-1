@@ -5820,6 +5820,61 @@ class TarefaVinculo(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class CronogramaAcao(db.Model):
+    """Pilha de desfazer/refazer do editor de cronograma (Fase 3).
+
+    Uma linha por ação do usuário na grade (editar célula, criar/excluir
+    tarefa, vínculo, recuar/desrecuar, reordenar). Os payloads guardam o
+    diff **por campo** — só o que aquela ação mudou, não a linha inteira.
+    Isso é deliberado: com a linha inteira, um Ctrl+Z depois de um
+    apontamento de RDO restauraria um `percentual_concluido` antigo e
+    destruiria progresso apurado que não fazia parte da ação desfeita.
+
+    Formato dos payloads (o mesmo nos dois lados):
+
+        {"tarefas":  {"<tarefa_id>": {"<campo>": <valor>, ...}, ...},
+         "vinculos": {"<pred_id>-<suc_id>": {"tipo": ..., "lag_dias": ...}
+                                            | null, ...}}
+
+    Vínculo é chaveado pelo par natural (que já é UNIQUE) e não por id,
+    para o desfazer poder recriá-lo sem forçar PK nem mexer em sequence.
+    Tarefa é chaveada por id e nunca ressuscita: com a flag ligada a
+    exclusão é lógica (`ativa=False`), então criar/excluir viram mutação
+    de campo e apontamentos de RDO continuam apontando para a linha certa.
+
+    Invariante da pilha: toda ação nova apaga as `desfeita=True` do escopo
+    (ação nova descarta o refazer pendente), então a pilha é sempre um
+    bloco de `desfeita=False` embaixo e um bloco de `desfeita=True` em
+    cima — por isso desfazer/refazer são só as pontas de um ORDER BY id.
+    Escopo = (obra, usuário, modo cliente/interno); podada em 50 ações.
+
+    Migração espelho: 224. Serviço: services/cronograma_undo.py.
+    """
+    __tablename__ = 'cronograma_acao'
+    __table_args__ = (
+        db.Index('ix_cronograma_acao_pilha',
+                 'obra_id', 'usuario_id', 'is_cliente', 'id'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False,
+                         index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False,
+                           index=True)
+    # Pilhas separadas: o plano do cliente (?cliente=1) e o interno são
+    # conjuntos de tarefas distintos — misturá-los aplicaria o payload no
+    # conjunto errado.
+    is_cliente = db.Column(db.Boolean, nullable=False, default=False,
+                           server_default='false')
+    tipo_acao = db.Column(db.String(32), nullable=False)
+    payload_antes = db.Column(db.JSON, nullable=False)
+    payload_depois = db.Column(db.JSON, nullable=False)
+    desfeita = db.Column(db.Boolean, nullable=False, default=False,
+                         server_default='false')
+    criada_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MÓDULO V2: APONTAMENTO DE PRODUÇÃO RDO ↔ CRONOGRAMA — Migration 76
 # ─────────────────────────────────────────────────────────────────────────────

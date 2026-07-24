@@ -142,9 +142,13 @@ def portal_obra(token: str):
 
     admin_id = obra.admin_id
 
+    # Tarefa arquivada (`ativa=False`) não é mostrada ao cliente: ela saiu do
+    # escopo por reconciliação de .mpp ou por exclusão na grade do editor v2
+    # (Fase 3, que troca o hard delete por arquivamento).
     tarefas = (
         TarefaCronograma.query
         .filter_by(obra_id=obra.id, admin_id=admin_id)
+        .filter(TarefaCronograma.ativa.is_(True))
         .order_by(TarefaCronograma.ordem)
         .all()
     )
@@ -166,6 +170,7 @@ def portal_obra(token: str):
     _tarefas_cliente = (
         TarefaCronograma.query
         .filter_by(obra_id=obra.id, admin_id=admin_id, is_cliente=True)
+        .filter(TarefaCronograma.ativa.is_(True))
         .order_by(TarefaCronograma.ordem)
         .all()
     )

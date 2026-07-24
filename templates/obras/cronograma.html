@@ -31,6 +31,18 @@
       {% if editor_v2 %}
       {# Editor v2 (Fase 2) — ações de grade sobre a célula selecionada.
          Só existe com a flag ligada: sem ela o cabeçalho é o de sempre. #}
+      <div class="btn-group btn-group-sm" role="group" aria-label="Histórico">
+        <button class="btn btn-outline-secondary" id="btnDesfazer"
+                {% if not pode_desfazer %}disabled{% endif %}
+                onclick="desfazerAcao()" title="Desfazer (Ctrl+Z)">
+          <i class="fas fa-rotate-left"></i>
+        </button>
+        <button class="btn btn-outline-secondary" id="btnRefazer"
+                {% if not pode_refazer %}disabled{% endif %}
+                onclick="refazerAcao()" title="Refazer (Ctrl+Y)">
+          <i class="fas fa-rotate-right"></i>
+        </button>
+      </div>
       <div class="btn-group btn-group-sm" role="group" aria-label="Ações da grade">
         <button class="btn btn-outline-secondary" id="btnRecuar" disabled
                 onclick="recuarSelecionada()"
@@ -1294,6 +1306,8 @@ async function salvarCampo(tarefaId, campo, valor, el, oldRaw) {
     });
     const data = await res.json();
     if (data.status === 'ok') {
+      // Fase 3: ação registrada no servidor — o desfazer passa a existir
+      if (EDITOR_V2) marcarAcaoNova();
       if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
         // Editor v2: batch-update sem reload — aplica só a tarefa editada
         // e os diffs do motor; NÃO chama recalcularTudo (o PUT já recalculou).
@@ -1859,6 +1873,8 @@ async function salvarNovaTarefa() {
     bootstrap.Modal.getInstance(document.getElementById('modalNovaTarefa'))?.hide();
     tarefas.push(data.tarefa);
     adicionarLinhaTabela(data.tarefa);
+    // Fase 3: ação registrada no servidor — o desfazer passa a existir
+    if (EDITOR_V2) marcarAcaoNova();
     if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
       // Editor v2: cascata do motor aplicada sem reload nem recálculo extra.
       data.tarefas_afetadas.forEach(t => updateTarefaLocal(t));
@@ -2029,6 +2045,8 @@ async function salvarEditar() {
     const data = await res.json();
     if (data.status === 'ok') {
       bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvasEditar')).hide();
+      // Fase 3: ação registrada no servidor — o desfazer passa a existir
+      if (EDITOR_V2) marcarAcaoNova();
       if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
         // Editor v2: aplica a tarefa editada + diffs do motor, sem trocar o
         // array inteiro (preserva a ordem visual local) e sem recalcularTudo.
@@ -2156,6 +2174,8 @@ async function excluirTarefa(id, nome, doContrato) {
       }
       if (EDITOR_V2 && gradeSel && gradeSel.tarefaId === id) limparSelecao();
 
+      // Fase 3: ação registrada no servidor — o desfazer passa a existir
+      if (EDITOR_V2) marcarAcaoNova();
       if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
         // Editor v2: ex-sucessoras refluídas pelo motor — atualiza células de
         // datas/duração/pred sem reload (o bloco acima só corrige hierarquia).
@@ -2252,6 +2272,8 @@ document.addEventListener('mouseup', async e => {
     });
     const data = await res.json();
     if (data.status === 'ok') {
+      // Fase 3: ação registrada no servidor — o desfazer passa a existir
+      if (EDITOR_V2) marcarAcaoNova();
       if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
         // Editor v2: tarefa movida + cascata do motor, sem trocar o array
         // inteiro e sem recálculo extra no cliente.
@@ -2530,6 +2552,7 @@ function initRowDrag() {
         return;
       }
       renderGantt();
+      if (EDITOR_V2) marcarAcaoNova();
       toast('Ordem salva');
 
       if (EDITOR_V2) {
@@ -2798,6 +2821,7 @@ async function _acaoHierarquia(acao) {
     toast((data && (data.msg || data.error)) || `Erro ${res.status}`, 'error');
     return;
   }
+  marcarAcaoNova();
   _aplicarListaServidor(data, tarefaId);
   const row = _rowDe(tarefaId);
   if (row) selecionarCelula(row, col);
@@ -2828,6 +2852,7 @@ async function inserirLinha(posicao) {
     return;
   }
   // `tarefas` primeiro: adicionarLinhaTabela deriva daí quem é tarefa-pai.
+  marcarAcaoNova();
   tarefas = data.tarefas;
   adicionarLinhaTabela(data.tarefa);
   _aplicarListaServidor(data, data.tarefa.id);
@@ -2843,6 +2868,57 @@ function excluirSelecionada() {
   if (!t) return;
   excluirTarefa(t.id, t.nome_tarefa, !!t.gerada_por_proposta_item_id);
 }
+
+// ── Desfazer / refazer (Fase 3) ──
+
+function atualizarBotoesHistorico(podeDesfazer, podeRefazer) {
+  const d = document.getElementById('btnDesfazer');
+  const r = document.getElementById('btnRefazer');
+  if (d) d.disabled = !podeDesfazer;
+  if (r) r.disabled = !podeRefazer;
+}
+
+// Toda ação nova torna o desfazer possível e descarta o refazer pendente —
+// é a mesma invariante que `registrar_acao` aplica no servidor, então dá
+// para refletir na toolbar sem consultar nada.
+function marcarAcaoNova() { atualizarBotoesHistorico(true, false); }
+
+async function _historico(acao) {
+  let data = null, res;
+  try {
+    res = await fetch(apiUrl(`/${acao}`), { method: 'POST' });
+    try { data = await res.clone().json(); } catch(_) {}
+  } catch(e) {
+    console.error('[cronograma] Erro de rede ao ' + acao, e);
+    toast('Erro de rede ao ' + acao, 'error');
+    return;
+  }
+  if (!res.ok || !data || data.status !== 'ok') {
+    // Pilha vazia devolve 400 com mensagem pronta ('Não há nada para...').
+    toast((data && (data.msg || data.error)) || `Erro ${res.status}`, 'error');
+    if (res.status === 400) atualizarBotoesHistorico(
+      acao !== 'desfazer', acao !== 'refazer');
+    return;
+  }
+  // A lista completa já reflete o estado restaurado (inclusive tarefas que
+  // voltaram a existir ou sumiram por arquivamento) — reconstruir as linhas
+  // é mais simples e seguro do que aplicar o diff no DOM.
+  const idsServidor = new Set(data.tarefas.map(t => t.id));
+  document.querySelectorAll('#tarefasBody tr.tarefa-row').forEach(row => {
+    if (!idsServidor.has(Number(row.dataset.id))) row.remove();
+  });
+  tarefas = data.tarefas;
+  data.tarefas.forEach(t => {
+    if (!_rowDe(t.id)) adicionarLinhaTabela(t);
+  });
+  _aplicarListaServidor(data, null);
+  atualizarBotoesHistorico(data.pode_desfazer, data.pode_refazer);
+  if (gradeSel && !_rowDe(gradeSel.tarefaId)) limparSelecao();
+  toast(acao === 'desfazer' ? 'Ação desfeita' : 'Ação refeita');
+}
+
+function desfazerAcao() { _historico('desfazer'); }
+function refazerAcao()  { _historico('refazer'); }
 
 // ── Init da grade ──
 function initGrade() {
@@ -2867,6 +2943,16 @@ function initGrade() {
     // Guards: nunca sequestrar um campo em edição nem um modal/offcanvas.
     if (e.target.closest?.('input, select, textarea, [contenteditable]')) return;
     if (document.querySelector('.modal.show, .offcanvas.show')) return;
+
+    // Fase 3 — Ctrl+Z/Ctrl+Y ANTES do guard de seleção: desfazer não depende
+    // de haver célula selecionada. (Ctrl+Y e Ctrl+Shift+Z, como no Project.)
+    if (e.ctrlKey || e.metaKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); desfazerAcao(); return; }
+      if (k === 'y' || (k === 'z' && e.shiftKey)) {
+        e.preventDefault(); refazerAcao(); return;
+      }
+    }
     if (!gradeSel) return;
 
     // Alt+Shift+setas ANTES das setas puras (indent/outdent do Project).

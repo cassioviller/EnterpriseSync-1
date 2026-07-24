@@ -228,7 +228,16 @@ def montar_fisico_financeiro(obra_id: int, admin_id: int) -> dict:
     sab = cal.considerar_sabado if cal else False
     dom = cal.considerar_domingo if cal else False
 
-    tarefas = TarefaCronograma.query.filter_by(obra_id=obra_id, admin_id=admin_id).all()
+    # Tarefa arquivada (`ativa=False`) não entra: ela foi removida por uma
+    # reconciliação de .mpp ou excluída na grade do editor v2 (Fase 3, que
+    # troca o hard delete por arquivamento). Contá-la aqui inflava etapas e
+    # percentuais com trabalho que não existe mais.
+    tarefas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .all()
+    )
     por_id = {t.id: t for t in tarefas}
 
     custos = ObraServicoCusto.query.filter_by(obra_id=obra_id, admin_id=admin_id).all()

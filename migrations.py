@@ -3976,6 +3976,57 @@ def _migration_223_backfill_vinculos_de_predecessora():
         raise
 
 
+def _migration_224_cronograma_acao():
+    """Cronograma editável Fase 3 — tabela `cronograma_acao` (pilha de
+    desfazer/refazer por obra + usuário + modo).
+
+    ATENÇÃO (mesma nota das migrations 207/222): `db.create_all()` roda ANTES
+    das migrações, então numa base onde o modelo `CronogramaAcao` já foi
+    importado a tabela já existe e todo o DDL abaixo é no-op — por isso tudo
+    é `IF NOT EXISTS` e o índice composto tem o MESMO nome declarado no
+    `__table_args__` do modelo (create_all e migração convergem).
+
+    O índice composto cobre a única consulta da pilha: as pontas de
+    `WHERE obra_id=? AND usuario_id=? AND is_cliente=? ORDER BY id`.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_acao (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL
+                        REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+                    is_cliente BOOLEAN NOT NULL DEFAULT FALSE,
+                    tipo_acao VARCHAR(32) NOT NULL,
+                    payload_antes JSON NOT NULL,
+                    payload_depois JSON NOT NULL,
+                    desfeita BOOLEAN NOT NULL DEFAULT FALSE,
+                    criada_em TIMESTAMP
+                )
+            """))
+            # Mesmos nomes que o create_all gera para index=True
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_acao_obra_id "
+                "ON cronograma_acao(obra_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_acao_admin_id "
+                "ON cronograma_acao(admin_id)"))
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_acao_usuario_id "
+                "ON cronograma_acao(usuario_id)"))
+            # Nome idêntico ao db.Index do __table_args__ de CronogramaAcao
+            conn.execute(sa_text(
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_acao_pilha "
+                "ON cronograma_acao(obra_id, usuario_id, is_cliente, id)"))
+        logger.info("[Migration 224] cronograma_acao criada.")
+    except Exception as e:
+        logger.error(f"[Migration 224] Falha: {e}", exc_info=True)
+        raise
+
+
 def migration_230_obra_transicao_estado():
     """Fase 2 — tabela `obra_transicao_estado` (histórico de transições).
 
@@ -5447,6 +5498,7 @@ def executar_migracoes():
             (221, "Cronograma editável — backfill de modo_apontamento congelando a dedução vigente (no-op de comportamento)", migration_221_backfill_modo_apontamento),
             (222, "Cronograma editável Fase 1 — tabela tarefa_vinculo + is_critica/folga_dias + flag cronograma_editor_v2 (default FALSE)", _migration_222_tarefa_vinculo_e_colunas),
             (223, "Cronograma editável Fase 1 — backfill predecessora_id → tarefa_vinculo TI/0 (intra-obra/tenant; sujas puladas e logadas)", _migration_223_backfill_vinculos_de_predecessora),
+            (224, "Cronograma editável Fase 3 — tabela cronograma_acao (pilha de desfazer/refazer por obra+usuário+modo)", _migration_224_cronograma_acao),
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
             (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
             (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),

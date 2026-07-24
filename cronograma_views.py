@@ -5,16 +5,26 @@ Rotas JSON para CRUD de tarefas + recálculo automático de datas.
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime
+from functools import wraps
 
 from flask import Blueprint, jsonify, redirect, render_template, request, send_file, url_for, flash
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from models import (
     db, Obra, TarefaCronograma, TarefaVinculo, RDOApontamentoCronograma,
     CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
     RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario,
     ComposicaoServico, SubatividadeMaoObra,
+)
+from services.cronograma_undo import (
+    MSG_NADA_DESFAZER,
+    MSG_NADA_REFAZER,
+    desfazer as undo_desfazer,
+    estado_pilha,
+    refazer as undo_refazer,
+    registrar_acao,
+    snapshot_obra,
 )
 from services.cronograma_predecessor_parser import (
     ErroParsePredecessora,
@@ -104,6 +114,51 @@ def _editor_v2_on() -> bool:
     """
     from utils.tenant import cronograma_editor_v2_ativo
     return cronograma_editor_v2_ativo()
+
+
+def _com_undo(tipo_acao: str):
+    """Fase 3 — empilha a ação da rota na pilha de desfazer/refazer.
+
+    Envolve a view por FORA (fica logo abaixo de `@login_required`): tira um
+    snapshot da obra antes, deixa a rota rodar, e compara depois. Nenhuma
+    rota precisa saber que existe histórico.
+
+    Duas propriedades vêm de graça do diff:
+
+    * rota que devolveu 400/404 fez rollback ⇒ o diff é vazio ⇒ **nada é
+      empilhado**, sem tratamento caso a caso;
+    * a cascata de datas do motor entra no payload porque realmente mudou.
+
+    Com a flag desligada o decorator é transparente (chama a view e sai).
+    Falha ao gravar o histórico é logada e engolida: a edição já commitou e
+    não pode cair por causa do registro.
+    """
+    def decorator(view):
+        @wraps(view)
+        def wrapper(obra_id: int, *args, **kwargs):
+            if not _editor_v2_on():
+                return view(obra_id, *args, **kwargs)
+            admin_id = _admin_id()
+            cliente_mode = _modo_cliente()
+            try:
+                antes = snapshot_obra(obra_id, admin_id, cliente_mode)
+            except Exception:
+                logger.exception('[undo] falha no snapshot inicial de %s — '
+                                 'ação seguirá sem histórico', obra_id)
+                return view(obra_id, *args, **kwargs)
+
+            resposta = view(obra_id, *args, **kwargs)
+
+            try:
+                registrar_acao(obra_id, admin_id, current_user.id, cliente_mode,
+                               tipo_acao, antes)
+            except Exception:
+                db.session.rollback()
+                logger.exception('[undo] falha ao empilhar ação %r da obra %s '
+                                 '(a edição foi preservada)', tipo_acao, obra_id)
+            return resposta
+        return wrapper
+    return decorator
 
 
 def _mapas_vinculos(obra_id: int, admin_id: int, cliente_mode: bool,
@@ -394,6 +449,13 @@ def cronograma_obra(obra_id: int):
     # (calcular_progresso_geral_obra_v2), em vez da média simples de todas as
     # tarefas (que dupla-conta os pais) ou do rollup hierárquico (que superestima).
     # Só no cronograma da empresa; o modo cliente mantém a média do template.
+    # Fase 3 — estado inicial da pilha de desfazer/refazer deste usuário
+    # nesta obra e neste modo.
+    pode_desfazer = pode_refazer = False
+    if flag_on:
+        pode_desfazer, pode_refazer = estado_pilha(obra_id, current_user.id,
+                                                   cliente_mode)
+
     progresso_geral_header = None
     if not cliente_mode:
         progresso_geral_header = calcular_progresso_geral_obra_v2(
@@ -420,6 +482,10 @@ def cronograma_obra(obra_id: int):
         modo_cliente=cliente_mode,
         # Fase 1 (editor v2): o Step D define `const EDITOR_V2` a partir daqui.
         editor_v2=flag_on,
+        # Fase 3: estado inicial dos botões Desfazer/Refazer. Com a flag off
+        # nem a toolbar existe, então nem se consulta a pilha.
+        pode_desfazer=pode_desfazer,
+        pode_refazer=pode_refazer,
         base_template='base_iframe.html' if cliente_mode else 'base_completo.html',
     )
 
@@ -430,6 +496,7 @@ def cronograma_obra(obra_id: int):
 
 @cronograma_bp.route('/obra/<int:obra_id>/tarefa', methods=['POST'])
 @login_required
+@_com_undo('criar_tarefa')
 def criar_tarefa(obra_id: int):
     guard = _check_v2()
     if guard:
@@ -741,6 +808,7 @@ def criar_tarefa(obra_id: int):
 
 @cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>', methods=['PUT', 'PATCH'])
 @login_required
+@_com_undo('editar_tarefa')
 def atualizar_tarefa(obra_id: int, tarefa_id: int):
     guard = _check_v2()
     if guard:
@@ -1046,6 +1114,7 @@ def atualizar_tarefa(obra_id: int, tarefa_id: int):
 
 @cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>', methods=['DELETE'])
 @login_required
+@_com_undo('excluir_tarefa')
 def excluir_tarefa(obra_id: int, tarefa_id: int):
     guard = _check_v2()
     if guard:
@@ -1067,14 +1136,34 @@ def excluir_tarefa(obra_id: int, tarefa_id: int):
     TarefaCronograma.query.filter_by(tarefa_pai_id=tarefa_id).update({'tarefa_pai_id': novo_pai})
     TarefaCronograma.query.filter_by(predecessora_id=tarefa_id).update({'predecessora_id': None})
 
-    db.session.delete(tarefa)
-    db.session.commit()
-    logger.info(f"[OK] TarefaCronograma excluída id={tarefa_id} cliente={cliente_mode}")
-
-    # Editor v2: os vínculos da tarefa caem por CASCADE (FK de tarefa_vinculo);
-    # o recálculo reflui as ex-sucessoras. Excluir não cria ciclo — o guard é
-    # só defensivo (dado sujo pré-existente não pode derrubar a exclusão).
     flag_on = _editor_v2_on()
+    if flag_on:
+        # ── Fase 3: exclusão LÓGICA (spec §6) ──
+        # O hard delete levaria junto os apontamentos de RDO da tarefa e
+        # impediria o desfazer de restaurá-los. Arquivando, a linha nunca sai
+        # da tabela: desfazer é só `ativa=True`, e nenhum id ressuscita — os
+        # apontamentos e itens de medição continuam apontando para ela.
+        # Os vínculos, esses, morrem mesmo (o motor não pode enxergar ponta
+        # arquivada); o par natural fica no payload e o desfazer os recria.
+        tarefa.ativa = False
+        tarefa.arquivada_em = datetime.utcnow()
+        TarefaVinculo.query.filter(
+            TarefaVinculo.obra_id == obra_id,
+            TarefaVinculo.admin_id == admin_id,
+            db.or_(TarefaVinculo.predecessora_id == tarefa_id,
+                   TarefaVinculo.sucessora_id == tarefa_id),
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        logger.info(f"[OK] TarefaCronograma arquivada id={tarefa_id} "
+                    f"cliente={cliente_mode} (editor v2)")
+    else:
+        db.session.delete(tarefa)
+        db.session.commit()
+        logger.info(f"[OK] TarefaCronograma excluída id={tarefa_id} cliente={cliente_mode}")
+
+    # Editor v2: o recálculo reflui as ex-sucessoras. Excluir não cria ciclo —
+    # o guard é só defensivo (dado sujo pré-existente não pode derrubar a
+    # exclusão).
     afetadas: list = []
     if flag_on:
         try:
@@ -1219,6 +1308,7 @@ def _recalc_e_resposta_vinculo(obra_id: int, admin_id: int, cliente_mode: bool,
 
 @cronograma_bp.route('/obra/<int:obra_id>/vinculo', methods=['POST'])
 @login_required
+@_com_undo('criar_vinculo')
 def criar_vinculo(obra_id: int):
     guard = _guard_rotas_vinculo(obra_id)
     if guard:
@@ -1284,6 +1374,7 @@ def criar_vinculo(obra_id: int):
 
 @cronograma_bp.route('/obra/<int:obra_id>/vinculo/<int:vid>', methods=['PUT', 'PATCH'])
 @login_required
+@_com_undo('editar_vinculo')
 def atualizar_vinculo(obra_id: int, vid: int):
     """Edita tipo/lag de um vínculo existente (endpoints não mudam aqui —
     para religar tarefas, exclua e crie outro vínculo)."""
@@ -1317,6 +1408,7 @@ def atualizar_vinculo(obra_id: int, vid: int):
 
 @cronograma_bp.route('/obra/<int:obra_id>/vinculo/<int:vid>', methods=['DELETE'])
 @login_required
+@_com_undo('excluir_vinculo')
 def excluir_vinculo(obra_id: int, vid: int):
     guard = _guard_rotas_vinculo(obra_id)
     if guard:
@@ -1461,6 +1553,7 @@ def _resposta_grade(obra_id: int, admin_id: int, cliente_mode: bool,
 @cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>/recuar',
                      methods=['POST'])
 @login_required
+@_com_undo('recuar_tarefa')
 def recuar_tarefa(obra_id: int, tarefa_id: int):
     """Fase 2 — indent (semântica Project): o novo pai é a irmã ANTERIOR
     (tarefa mais próxima ACIMA na ordem visual com o mesmo `tarefa_pai_id`);
@@ -1543,6 +1636,7 @@ def recuar_tarefa(obra_id: int, tarefa_id: int):
 @cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>/desrecuar',
                      methods=['POST'])
 @login_required
+@_com_undo('desrecuar_tarefa')
 def desrecuar_tarefa(obra_id: int, tarefa_id: int):
     """Fase 2 — outdent: X (com a subárvore) sobe para o nível do pai antigo
     e vira a PRÓXIMA irmã dele, logo após a subárvore inteira dele.
@@ -1610,11 +1704,101 @@ def desrecuar_tarefa(obra_id: int, tarefa_id: int):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DESFAZER / REFAZER (editor v2, Fase 3) — plano Step C2
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _resposta_undo(obra_id: int, admin_id: int, cliente_mode: bool,
+                   acao, afetadas: list):
+    """Resposta de desfazer/refazer: o shape das rotas irmãs (com `nivel`)
+    mais o estado da pilha, que a toolbar usa para habilitar os botões.
+
+    `tarefa` vem `null` de propósito — desfazer não tem uma linha "foco";
+    o front aplica `tarefas` inteiro.
+    """
+    todas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .order_by(TarefaCronograma.ordem, TarefaCronograma.id)
+        .all()
+    )
+    vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode,
+                                      tarefas=todas)
+    ordenadas, nivel_map = ordenar_arvore_visual(todas, com_nivel=True)
+    _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+
+    def _com_nivel(t: TarefaCronograma) -> dict:
+        d = _tarefa_to_dict(t, **_kw)
+        d['nivel'] = nivel_map.get(t.id, 0)
+        return d
+
+    # Só as afetadas que continuam visíveis: uma tarefa que o desfazer
+    # arquivou sai da grade pelo `tarefas` completo, não por `tarefas_afetadas`.
+    visiveis = {t.id for t in todas}
+    pode_desfazer, pode_refazer = estado_pilha(obra_id, current_user.id,
+                                               cliente_mode)
+    return jsonify({
+        'status': 'ok',
+        'tarefa': None,
+        'tarefas': [_com_nivel(t) for t in ordenadas],
+        'tarefas_afetadas': [_com_nivel(t) for t in afetadas
+                             if t.id in visiveis],
+        'tipo_acao': acao.tipo_acao,
+        'pode_desfazer': pode_desfazer,
+        'pode_refazer': pode_refazer,
+    })
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/desfazer', methods=['POST'])
+@login_required
+def desfazer_acao(obra_id: int):
+    """Fase 3 — desfaz a última ação do usuário nesta obra (e neste modo),
+    com toda a cascata que ela provocou.
+
+    Não é decorada com `_com_undo`: desfazer não é uma ação nova, ela move
+    o ponteiro da pilha (`desfeita=True`) para o refazer poder reaplicá-la.
+    """
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    acao, afetadas = undo_desfazer(obra_id, admin_id, current_user.id,
+                                   cliente_mode)
+    if acao is None:
+        return jsonify({'status': 'error', 'msg': MSG_NADA_DESFAZER}), 400
+    logger.info(f"[OK] Ação desfeita id={acao.id} tipo={acao.tipo_acao} "
+                f"obra={obra_id} usuario={current_user.id} (editor v2)")
+    return _resposta_undo(obra_id, admin_id, cliente_mode, acao, afetadas)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/refazer', methods=['POST'])
+@login_required
+def refazer_acao(obra_id: int):
+    """Fase 3 — reaplica a ação desfeita mais antiga (o topo da pilha de
+    refazer). Uma ação NOVA descarta o refazer pendente — quem faz isso é
+    `registrar_acao`, não esta rota."""
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    acao, afetadas = undo_refazer(obra_id, admin_id, current_user.id,
+                                  cliente_mode)
+    if acao is None:
+        return jsonify({'status': 'error', 'msg': MSG_NADA_REFAZER}), 400
+    logger.info(f"[OK] Ação refeita id={acao.id} tipo={acao.tipo_acao} "
+                f"obra={obra_id} usuario={current_user.id} (editor v2)")
+    return _resposta_undo(obra_id, admin_id, cliente_mode, acao, afetadas)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # REORDENAR TAREFAS (drag & drop)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @cronograma_bp.route('/obra/<int:obra_id>/reordenar', methods=['POST'])
 @login_required
+@_com_undo('reordenar')
 def reordenar(obra_id: int):
     """
     Persiste a nova ordem dos itens do cronograma da obra. Espera JSON:
