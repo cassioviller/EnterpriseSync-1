@@ -1397,7 +1397,21 @@ class RDOFoto(db.Model):
     imagem_original_base64 = db.Column(db.Text)  # Backup completo da imagem original
     imagem_otimizada_base64 = db.Column(db.Text)  # Versão otimizada (1200px) para visualização
     thumbnail_base64 = db.Column(db.Text)  # Miniatura (300px) para listagem rápida
-    
+
+    # ── Fase 5 — marcador de onde a foto realmente mora ───────────────
+    # 'banco' = as colunas base64 acima são a fonte de verdade.
+    # 'disco' = os caminhos arquivo_original/arquivo_otimizado/thumbnail
+    #           são a fonte de verdade e a base64 pode ser liberada.
+    #
+    # Medido em 2026-07-21: rdo_foto ocupa 16 GB (TOAST), com 28.870
+    # fotos das quais 28.860 JÁ têm arquivo em disco — a base64 é
+    # duplicata. O marcador existe para que a migração
+    # (scripts/migrar_fotos_rdo_para_disco.py) seja feita em duas
+    # passadas reversíveis: primeiro marca 'disco' com a base64 ainda
+    # presente, só depois libera o TEXT.
+    armazenamento = db.Column(db.String(10), nullable=False, default='banco',
+                              server_default='banco', index=True)
+
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamento com RDO

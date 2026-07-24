@@ -53,6 +53,53 @@ def get_upload_base():
     return base
 
 UPLOAD_BASE = get_upload_base()
+
+
+def caminho_absoluto(caminho_relativo):
+    """Resolve o caminho gravado no banco para um caminho absoluto real.
+
+    Fase 5 — conserta a inconsistência que impede o volume persistente de
+    funcionar. `salvar_foto_rdo` (linha 377) devolve sempre o relativo
+    `uploads/rdo/<admin>/<rdo>/<arquivo>`, mas GRAVA em `UPLOAD_BASE`,
+    que é `$UPLOADS_PATH/rdo` quando a variável existe. Quem serve a foto
+    (crud_rdo_completo.py) montava
+    `os.path.join(os.getcwd(), 'static', caminho)` — que só acerta quando
+    UPLOADS_PATH está VAZIO. Definir a variável quebrava a exibição de
+    todas as fotos, o que na prática impedia migrar para o volume.
+    (O descasamento do servir foi corrigido em 23/07 com
+    `_resolver_arquivo_foto`; esta função centraliza a resolução e
+    acrescenta a recusa de travessia, que o resolver não tinha.)
+
+    Devolve `None` para caminho vazio, absoluto ou com travessia de
+    diretório — o valor vem do banco, mas isso não é motivo para confiar.
+    """
+    if not caminho_relativo:
+        return None
+    relativo = str(caminho_relativo).strip().lstrip('/')
+    if not relativo or os.path.isabs(caminho_relativo):
+        return None
+
+    # `uploads/rdo/...` é o formato gravado; o prefixo `uploads/` mapeia
+    # para a raiz de UPLOAD_BASE menos o sufixo 'rdo'.
+    if relativo.startswith('uploads/'):
+        sufixo = relativo[len('uploads/'):]
+        if os.environ.get('UPLOADS_PATH'):
+            base = os.environ['UPLOADS_PATH']
+            candidato = os.path.join(base, sufixo)
+        else:
+            candidato = os.path.join(os.getcwd(), 'static', relativo)
+    else:
+        candidato = os.path.join(os.getcwd(), 'static', relativo)
+
+    candidato = os.path.normpath(candidato)
+    raiz = os.path.normpath(
+        os.environ.get('UPLOADS_PATH')
+        or os.path.join(os.getcwd(), 'static', 'uploads'))
+    if not candidato.startswith(raiz + os.sep) and candidato != raiz:
+        logger.error("🚫 caminho fora da raiz de uploads recusado: %r",
+                     caminho_relativo)
+        return None
+    return candidato
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_FOTOS_POR_RDO = 20
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}

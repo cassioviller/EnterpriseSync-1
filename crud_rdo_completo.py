@@ -730,12 +730,16 @@ def upload_foto_rdo(rdo_id):
                     nome_arquivo=resultado['nome_original'],
                     caminho_arquivo=resultado['arquivo_original'],
                     descricao=legenda,
+                    legenda=legenda,
                     arquivo_original=resultado['arquivo_original'],
                     arquivo_otimizado=resultado['arquivo_otimizado'],
                     thumbnail=resultado['thumbnail'],
                     nome_original=resultado['nome_original'],
                     tamanho_bytes=resultado['tamanho_bytes'],
-                    ordem=fotos_existentes + len(fotos_criadas)
+                    ordem=fotos_existentes + len(fotos_criadas),
+                    # Fase 5 — esta rota grava em disco e nunca preenche
+                    # as colunas base64: a fonte de verdade é o arquivo.
+                    armazenamento='disco',
                 )
                 
                 db.session.add(nova_foto)
@@ -790,15 +794,20 @@ def _resolver_arquivo_foto(caminho):
     como fallback. Lê o ambiente a cada chamada (não no import) para valer
     também quando a variável muda entre deploys.
     """
+    # Fase 5 — a resolução principal (UPLOADS_PATH ou static/) mora em
+    # caminho_absoluto, que também recusa travessia de diretório. O
+    # fallback legado (foto gravada em static/ ANTES de o volume existir)
+    # continua aqui, com a mesma guarda de raiz.
+    from services.rdo_foto_service import caminho_absoluto
     candidatos = []
-    uploads_path = os.environ.get('UPLOADS_PATH', '')
-    if uploads_path:
-        base = uploads_path if os.path.isabs(uploads_path) else os.path.join(os.getcwd(), uploads_path)
-        partes = caminho.split('/')
-        # o relativo começa com 'uploads/'; sob UPLOADS_PATH esse prefixo não existe
-        relativo = os.path.join(*partes[1:]) if partes[0] == 'uploads' and len(partes) > 1 else caminho
-        candidatos.append(os.path.join(base, relativo))
-    candidatos.append(os.path.join(os.getcwd(), 'static', caminho))
+    principal = caminho_absoluto(caminho)
+    if principal:
+        candidatos.append(principal)
+    raiz_legado = os.path.normpath(os.path.join(os.getcwd(), 'static', 'uploads'))
+    legado = os.path.normpath(
+        os.path.join(os.getcwd(), 'static', str(caminho).lstrip('/')))
+    if legado.startswith(raiz_legado + os.sep):
+        candidatos.append(legado)
     for candidato in candidatos:
         if os.path.exists(candidato):
             return candidato
@@ -935,8 +944,10 @@ def deletar_foto(foto_id):
         # Deletar arquivos físicos
         for caminho_rel in [foto.arquivo_original, foto.arquivo_otimizado, foto.thumbnail]:
             if caminho_rel:
-                caminho_completo = os.path.join(os.getcwd(), 'static', caminho_rel)
-                if os.path.exists(caminho_completo):
+                # Fase 5 — resolve por UPLOADS_PATH (e legado em static/);
+                # o join fixo em static/ deixava o arquivo órfão no volume.
+                caminho_completo = _resolver_arquivo_foto(caminho_rel)
+                if caminho_completo and os.path.exists(caminho_completo):
                     try:
                         os.remove(caminho_completo)
                     except Exception as e:

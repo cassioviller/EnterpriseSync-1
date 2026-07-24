@@ -5031,6 +5031,56 @@ def migration_263_rdo_retificador():
     logger.info("[Migration 263] Concluída com sucesso")
 
 
+def migration_264_rdo_foto_armazenamento():
+    """Fase 5 — rdo_foto.armazenamento ('banco' | 'disco').
+
+    APENAS o marcador. NÃO move nem apaga NADA — a migração de dado é
+    feita por `scripts/migrar_fotos_rdo_para_disco.py`, que roda em
+    dry-run por padrão e exige volume persistente montado.
+
+    Backfill conservador: TUDO que tem base64 fica 'banco', mesmo já
+    tendo arquivo em disco. Marcar 'disco' aqui declararia que o arquivo
+    foi verificado — e neste ponto ninguém verificou.
+    """
+    logger.info("[Migration 264] Iniciando — rdo_foto.armazenamento")
+
+    db.session.execute(text("""
+        ALTER TABLE rdo_foto
+        ADD COLUMN IF NOT EXISTS armazenamento VARCHAR(10)
+    """))
+    db.session.commit()
+
+    com_base64 = db.session.execute(text("""
+        UPDATE rdo_foto SET armazenamento = 'banco'
+        WHERE armazenamento IS NULL
+          AND (imagem_original_base64 IS NOT NULL
+               OR imagem_otimizada_base64 IS NOT NULL
+               OR thumbnail_base64 IS NOT NULL)
+    """)).rowcount
+    so_disco = db.session.execute(text("""
+        UPDATE rdo_foto SET armazenamento = 'disco'
+        WHERE armazenamento IS NULL
+    """)).rowcount
+    db.session.commit()
+    logger.info("[Migration 264] backfill: %s marcadas 'banco', "
+                "%s marcadas 'disco' (não tinham base64)",
+                com_base64, so_disco)
+
+    db.session.execute(text("""
+        ALTER TABLE rdo_foto ALTER COLUMN armazenamento SET DEFAULT 'banco'
+    """))
+    db.session.execute(text("""
+        ALTER TABLE rdo_foto ALTER COLUMN armazenamento SET NOT NULL
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_foto_armazenamento
+        ON rdo_foto (armazenamento)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 264] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5302,6 +5352,7 @@ def executar_migracoes():
             (261, "Fase 5 — tabela rdo_transicao_estado (trilha do ciclo de vida do RDO)", migration_261_rdo_transicao_estado),
             (262, "Fase 5 — tabela rdo_assinatura (autoria + hash + carimbo de tempo + IP)", migration_262_rdo_assinatura),
             (263, "Fase 5 — rdo.rdo_retificado_id + motivo_retificacao (RDO retificador)", migration_263_rdo_retificador),
+            (264, "Fase 5 — rdo_foto.armazenamento ('banco'|'disco'): marcador da migração de fotos", migration_264_rdo_foto_armazenamento),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
