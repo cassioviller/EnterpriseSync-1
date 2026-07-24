@@ -26,16 +26,27 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `main` · 🔬 23/07: **à frente de `origin/main` com a Fase 3
-inteira** (mergeada por fast-forward de `feat/fase-3-compras-governanca`
-após gate verde) **mais a rodada de pendências de 23/07** (fotos ×
-UPLOADS_PATH, skips de precondição, gitleaks, fechamento das 3 rotas da
-triagem — ver Fase 0.5 abaixo). 🔬 23/07 ~14h: **gate completo VERDE sobre
-o estado final** (`41034faa`): `pytest tests/ -m "not browser"` → **1122
-passed, 6 skipped, 0 falhas** em 38min04s. O push segue travado no item
-humano nº 2 — que piorou: o `gh` perdeu a autenticação na recriação do
-ambiente e refazer o login é interativo. `origin/main` continua em
-`8fe6ac9` (merge do M10).
+Branch: `main` · 🔬 24/07: **à frente de `origin/main` com as Fases 3 E 4
+inteiras** mais a rodada de pendências de 23/07 (fotos × UPLOADS_PATH,
+skips de precondição, gitleaks, fechamento das 3 rotas da triagem — ver
+Fase 0.5 abaixo). 🔬 24/07 ~00h: **gate completo VERDE sobre a Fase 4**
+(worktree em `6775b391` pré-rebase): `pytest tests/ -m "not browser"` →
+**1177 passed, 6 skipped, 0 falhas** em 44min10s. A Fase 4 (centro de
+custo obrigatório) foi mergeada em `main` por fast-forward após esse gate.
+🔬 24/07: revisão de premissas P5-P9 apensada aos planos das Fases 5-9
+(`941e6738`) e fix do achado R10 — PDF de medição do portal agora respeita
+expiração de token (`fe605252`). O push segue travado no item humano nº 2 —
+que piorou: o `gh` perdeu a autenticação na recriação do ambiente e refazer
+o login é interativo. `origin/main` continua em `8fe6ac9` (merge do M10).
+
+> ⚠️ **Armadilha de gate descoberta em 23/07 à noite:** `app.py:596-664`
+> dispara `scripts/seed_demo_alfa.py` em subprocesso a CADA boot do app em
+> dev (`SIGE_ENABLE_DEMO_SEED` default `"true"`) — inclusive quando o
+> pytest importa `main` na coleção. O seed pede lock exclusivo na tabela
+> `obra` e trava a suíte no meio (impasse que o Postgres não detecta,
+> porque a conexão do pytest fica ociosa em transação). **Rode todo gate
+> com `SIGE_ENABLE_DEMO_SEED=false`.** Dois gates travaram em ~30% por
+> isso antes do diagnóstico.
 
 ## ✅ RETOMADA de 22/07 — resolvida em 23/07
 
@@ -56,7 +67,25 @@ zero**. Nenhum código foi perdido. Dos 4 itens da retomada, 3 fecharam:
    aborto de boot em produção) foram cobertos pelo gate do item 2 contra
    banco vivo.
 
-Parado em: Fase 4 (centro de custo obrigatório). A **Fase 3 (compras com
+Parado em: Fase 5 (RDO com ciclo de vida e assinatura) — plano já
+revalidado em 23/07 (apêndice "Revisão de premissas" no próprio plano).
+
+A **Fase 4 (centro de custo obrigatório) fechou em 24/07 — 13/13 tasks**,
+44 testes da fase + 123 de regressão dirigida
+(`fase-4-centro-custo-obrigatorio.md`). Entregou: migrations 250-254
+(UNIQUE por tenant + centro ADM semeado + `gestao_custo_pai.obra_id`
+derivada + CHECK `ck_gestao_custo_filho_destino` NOT VALID → VALIDATE),
+`registrar_custo_automatico` exigindo destino em 10 módulos, telas de
+gestão de custos com "Destino do custo *", folha e almoxarifado carimbando
+o centro ADM. Backfill R1-R5 aplicado no banco de dev: 649 pais por
+unanimidade, 77 filhos órfãos → 0 (carimbados `[FASE4:R5]`); constraint
+validada (`convalidated=true`). 🔬 24/07: **mergeada em `main`**
+(fast-forward `6775b391`, gate completo verde antes do merge — 1177
+passed). Pendência humana, não de código: revisar as linhas `[FASE4:R5]`
+(o relatório `python scripts/relatorio_destino_custo.py` lista nome a
+nome) e as decisões D1-D8 do plano seguem com os `Recomendado:` adotados.
+
+A **Fase 3 (compras com
 governança) fechou em 23/07 — 12/12 tasks**, 91 testes verdes
 (`fase-3-compras-governanca.md`; runbook em `docs/fase-3-rollout.md`).
 Entregou o fluxo requisição→aprovação→alçada→pedido, o `PapelObra.COMPRADOR`
@@ -329,7 +358,7 @@ gate, o branch foi **mergeado em `main`** (fast-forward, 23/07).
 | **1.5** | Cronograma editável + RDO em % | ✅ **22/07** — 14/14 tasks | `cronograma-editavel-rdo-percentual.md` |
 | **2** | Máquina de estados da Obra + handoff do GP | ✅ **22/07** — 14/14 tasks | `fase-2-maquina-estados-obra.md` + `docs/fase-2-rollout.md` |
 | **3** | Compras com governança | ✅ **23/07** — 12/12 tasks | `fase-3-compras-governanca.md` + `docs/fase-3-rollout.md` |
-| **4** | Centro de custo obrigatório | ⬜ | `fase-4-centro-custo-obrigatorio.md` |
+| **4** | Centro de custo obrigatório | ✅ **24/07** — 13/13 tasks | `fase-4-centro-custo-obrigatorio.md` |
 | **5** | RDO com ciclo de vida e assinatura | ⬜ | `fase-5-rdo-ciclo-vida-assinatura.md` |
 | **6** | Orçamento versionado e aditivo | ⬜ | `fase-6-orcamento-versionado-aditivo.md` |
 | **7** | Planejamento avançado (CPM, baseline, EVM) | ⬜ | `fase-7-planejamento-avancado-cpm-evm.md` |
