@@ -656,3 +656,70 @@ def test_duplicar_rdo_assinado_e_permitido():
     with app.app_context():
         assert db.session.get(RDO, rid).estado == ASSINADO
         assert RDO.query.filter(RDO.obra_id == oid, RDO.id != rid).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# Rotas anônimas e exclusão
+# ---------------------------------------------------------------------------
+
+def test_visualizar_rdo_exige_login():
+    """views/rdo.py:928 dizia literalmente 'SEM VERIFICAÇÃO DE PERMISSÃO'.
+
+    Um RDO assinado que qualquer anônimo lê pela URL não tem valor
+    probatório nenhum — e a numeração (`RDO-<admin_id>-<ano>-NNN`) é
+    sequencial e adivinhável.
+    """
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid = rdo.id
+
+    resposta = app.test_client().get(f'/rdo/{rid}', follow_redirects=False)
+    assert resposta.status_code in (302, 401), (
+        f'/rdo/{rid} devolveu {resposta.status_code} para anônimo')
+    if resposta.status_code == 302:
+        assert '/login' in resposta.headers.get('Location', '')
+
+
+def test_visualizar_rdo_de_outro_tenant_devolve_404():
+    with app.app_context():
+        admin_a, admin_b = _admin('A'), _admin('B')
+        obra_b = _obra(admin_b.id)
+        rdo_b = _rdo(obra_b, admin_b.id)
+        rid, aid = rdo_b.id, admin_a.id
+
+    resposta = _cliente_de(aid).get(f'/rdo/{rid}', follow_redirects=False)
+    assert resposta.status_code in (302, 404), (
+        f'RDO de outro tenant devolveu {resposta.status_code}')
+
+
+def test_excluir_rdo_assinado_pela_rota_e_recusado():
+    from services.rdo_ciclo_vida import ASSINADO
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+        rid, aid = rdo.id, admin.id
+
+    _cliente_de(aid).post(f'/rdo/excluir/{rid}', follow_redirects=True)
+
+    with app.app_context():
+        sobrevivente = db.session.get(RDO, rid)
+        assert sobrevivente is not None, 'RDO assinado foi excluído'
+        assert sobrevivente.estado == ASSINADO
+
+
+def test_excluir_rdo_em_rascunho_continua_funcionando():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        rid, aid = rdo.id, admin.id
+
+    _cliente_de(aid).post(f'/rdo/excluir/{rid}', follow_redirects=True)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid) is None

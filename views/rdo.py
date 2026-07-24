@@ -475,7 +475,20 @@ def excluir_rdo(rdo_id):
         if not rdo:
             flash('RDO não encontrado.', 'error')
             return redirect(url_for('main.rdos'))
-        
+
+        # Fase 5 — RDO assinado/aprovado/retificado não se apaga. A guarda
+        # `before_flush` (services/rdo_ciclo_vida) barraria o delete de
+        # qualquer jeito, mas ela levanta no commit, depois de o
+        # `cancelar_custos_rdo` abaixo já ter mexido no financeiro. Este
+        # early-return evita o efeito colateral e dá uma mensagem decente.
+        from services.rdo_ciclo_vida import ROTULOS, e_imutavel, estado_de
+        if e_imutavel(rdo):
+            flash(f'RDO {rdo.numero_rdo} está '
+                  f'{ROTULOS[estado_de(rdo)].lower()} e não pode ser '
+                  f'excluído. Para corrigir, emita um RDO retificador.',
+                  'error')
+            return redirect(url_for('main.visualizar_rdo', id=rdo_id))
+
         # Excluir TODAS as dependências em ordem (incluindo notificacoes!)
 
         # V2: Cancelar registros financeiros ANTES de deletar RDOMaoObra/RDOCustoDiario
