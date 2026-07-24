@@ -28,6 +28,37 @@
               title="Aplicar template de cronograma">
         <i class="fas fa-layer-group me-1"></i> Aplicar Template
       </button>
+      {% if editor_v2 %}
+      {# Editor v2 (Fase 2) — ações de grade sobre a célula selecionada.
+         Só existe com a flag ligada: sem ela o cabeçalho é o de sempre. #}
+      <div class="btn-group btn-group-sm" role="group" aria-label="Ações da grade">
+        <button class="btn btn-outline-secondary" id="btnRecuar" disabled
+                onclick="recuarSelecionada()"
+                title="Recuar — vira subtarefa da linha acima (Alt+Shift+→)">
+          <i class="fas fa-indent"></i>
+        </button>
+        <button class="btn btn-outline-secondary" id="btnDesrecuar" disabled
+                onclick="desrecuarSelecionada()"
+                title="Desrecuar — sobe um nível na hierarquia (Alt+Shift+←)">
+          <i class="fas fa-outdent"></i>
+        </button>
+        <button class="btn btn-outline-secondary" id="btnInserirAcima" disabled
+                onclick="inserirLinha('acima')"
+                title="Inserir linha acima da selecionada">
+          <i class="fas fa-arrow-up"></i><i class="fas fa-plus fa-xs ms-1"></i>
+        </button>
+        <button class="btn btn-outline-secondary" id="btnInserirAbaixo" disabled
+                onclick="inserirLinha('abaixo')"
+                title="Inserir linha abaixo da selecionada">
+          <i class="fas fa-arrow-down"></i><i class="fas fa-plus fa-xs ms-1"></i>
+        </button>
+        <button class="btn btn-outline-danger" id="btnExcluirLinha" disabled
+                onclick="excluirSelecionada()"
+                title="Excluir a linha selecionada">
+          <i class="fas fa-trash-can"></i>
+        </button>
+      </div>
+      {% endif %}
       <button class="btn btn-outline-primary btn-sm" id="btnRecalcular" onclick="recalcularTudo()">
         <i class="fas fa-sync-alt me-1"></i> Recalcular
       </button>
@@ -876,6 +907,15 @@
 
 /* Offcanvas progress preview */
 #ed_perc { accent-color: #1976d2; }
+
+/* Editor v2 (Fase 2) — grade tipo planilha. A classe .grade-cel-sel só é
+   aplicada pelo JS com a flag cronograma_editor_v2 ligada; com a flag off
+   nenhum elemento a recebe e a regra fica inerte. */
+.grade-cel-sel {
+  outline: 2px solid #1976d2;
+  outline-offset: -2px;
+  background: rgba(25, 118, 210, .07);
+}
 
 /* Task #19 — feedback visual SortableJS para reordenação de linhas */
 .tarefa-row.sortable-ghost { opacity: .35; background: #fff3cd !important; }
@@ -2034,9 +2074,15 @@ function adicionarLinhaTabela(t) {
         : '—');
 
   const resp = t.responsavel || 'empresa';
-  const respBadge = resp === 'terceiros'
+  let respBadge = resp === 'terceiros'
     ? `<span class="badge bg-warning text-dark" style="font-size:.7rem"><i class="fas fa-hard-hat me-1"></i>Terceiros</span>`
     : `<span class="badge bg-info text-dark" style="font-size:.7rem"><i class="fas fa-building me-1"></i>Empresa</span>`;
+  if (EDITOR_V2) {
+    // Editor v2: a grade edita a coluna Responsável pelo span `.resp-val`,
+    // como nas linhas renderizadas pelo servidor. Com a flag off o HTML da
+    // célula continua exatamente o mesmo de antes.
+    respBadge = `<span class="resp-val" ondblclick="iniciarEdicao(this,${t.id},'responsavel')" title="Duplo-clique para editar">${respBadge}</span>`;
+  }
 
   const planCell = resp === 'terceiros'
     ? `<span class="text-muted small">—</span>`
@@ -2102,46 +2148,13 @@ async function excluirTarefa(id, nome, doContrato) {
 
       // Se o backend devolveu a lista atualizada, sincronizar data-pai nas linhas
       // que foram re-parentadas (filhos do grupo excluído herdaram um novo pai).
+      // Helper compartilhado com recuar/desrecuar/inserir (Fase 2); sem `nivel`
+      // na resposta ele reproduz a indentação legada de 22px.
       if (data.tarefas && data.tarefas.length) {
         tarefas = data.tarefas;
-        // Atualizar data-pai e indentação de cada linha existente no DOM
-        data.tarefas.forEach(t => {
-          const row = document.querySelector(`tr.tarefa-row[data-id="${t.id}"]`);
-          if (!row) return;
-          const novoPai = t.tarefa_pai_id || '';
-          row.dataset.pai = novoPai;
-          // Indentação do nome
-          const nomeDiv = row.querySelector('.nome-cell > div');
-          if (nomeDiv) nomeDiv.style.paddingLeft = novoPai ? '22px' : '0';
-          // Classe de filho (escondido quando pai recolhido)
-          if (novoPai) {
-            row.classList.add('tarefa-filho');
-          } else {
-            row.classList.remove('tarefa-filho');
-            row.classList.remove('d-none');
-          }
-        });
-        // Recalcular quais linhas são tarefa-pai após a mudança
-        const paiIdsNovos = new Set(data.tarefas.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
-        document.querySelectorAll('tr.tarefa-row').forEach(row => {
-          const rid = Number(row.dataset.id);
-          const ePai = paiIdsNovos.has(rid);
-          row.classList.toggle('tarefa-pai', ePai);
-          // Adicionar/remover botão de toggle no nome
-          const nomeDiv = row.querySelector('.nome-cell > div');
-          if (!nomeDiv) return;
-          const temToggle = !!nomeDiv.querySelector('.toggle-btn');
-          if (ePai && !temToggle) {
-            const placeholder = nomeDiv.querySelector('.toggle-placeholder');
-            if (placeholder) {
-              placeholder.outerHTML = `<button class="btn-toggle toggle-btn" onclick="toggleFilhas(${rid})" data-expanded="false" title="Expandir/recolher subtarefas"><i class="fas fa-chevron-right fa-xs" id="icon-${rid}"></i></button>`;
-            }
-          } else if (!ePai && temToggle) {
-            const btn = nomeDiv.querySelector('.toggle-btn');
-            if (btn) btn.outerHTML = '<span class="toggle-placeholder"></span>';
-          }
-        });
+        sincronizarHierarquiaDOM(data.tarefas);
       }
+      if (EDITOR_V2 && gradeSel && gradeSel.tarefaId === id) limparSelecao();
 
       if (EDITOR_V2 && Array.isArray(data.tarefas_afetadas)) {
         // Editor v2: ex-sucessoras refluídas pelo motor — atualiza células de
@@ -2535,6 +2548,358 @@ function initRowDrag() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GRADE TIPO PLANILHA (editor v2, Fase 2)
+//
+// Tudo aqui só é ativado por initGrade(), chamado apenas com EDITOR_V2 —
+// com a flag off nenhum listener é registrado e a UX é a de sempre (o
+// ondblclick renderizado pelo servidor continua sendo o único caminho de
+// edição). O servidor é a autoridade da hierarquia: o front manda só a
+// AÇÃO (recuar/desrecuar/inserir) e reaplica a lista que voltar.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Colunas por cellIndex: 0 grip, 1 #, 2 nome, 3 dur, 4 início, 5 término,
+// 6 pred, 7 qtd/un, 8 resp, 9 planejado, 10 realizado, 11 ações.
+const COLS_NAV = [2, 3, 4, 5, 6, 7, 8];        // 5 é selecionável, não editável
+const COLS_CAMPO = {2: 'nome_tarefa', 3: 'duracao_dias', 4: 'data_inicio',
+                    6: 'predecessora_id', 7: 'quantidade_total',
+                    8: 'responsavel'};
+const COLS_SPAN = {2: '.nome-tarefa', 3: '.dur-val', 4: '.inicio-val',
+                   6: '.pred-val', 7: '.qty-val', 8: '.resp-val'};
+// Colunas que uma tarefa-resumo não edita (datas/duração vêm do roll-up).
+const COLS_SO_FOLHA = [3, 4, 7, 6];
+
+let gradeSel = null;   // { tarefaId, col } | null
+
+function _rowDe(tarefaId) {
+  return document.querySelector(`tr.tarefa-row[data-id="${tarefaId}"]`);
+}
+
+function _linhasVisiveis() {
+  return [...document.querySelectorAll('#tarefasBody tr.tarefa-row:not(.d-none)')];
+}
+
+function _ePai(tarefaId) {
+  return tarefas.some(t => t.tarefa_pai_id === tarefaId);
+}
+
+function selecionarCelula(row, col) {
+  document.querySelectorAll('.grade-cel-sel')
+    .forEach(td => td.classList.remove('grade-cel-sel'));
+  const td = row?.cells?.[col];
+  if (!td) { gradeSel = null; atualizarToolbarGrade(); return; }
+  td.classList.add('grade-cel-sel');
+  gradeSel = { tarefaId: Number(row.dataset.id), col };
+  td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  atualizarToolbarGrade();
+}
+
+function limparSelecao() {
+  document.querySelectorAll('.grade-cel-sel')
+    .forEach(td => td.classList.remove('grade-cel-sel'));
+  gradeSel = null;
+  atualizarToolbarGrade();
+}
+
+function atualizarToolbarGrade() {
+  const temSel = !!(gradeSel && _rowDe(gradeSel.tarefaId));
+  ['btnRecuar', 'btnDesrecuar', 'btnInserirAcima', 'btnInserirAbaixo',
+   'btnExcluirLinha'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.disabled = !temSel;
+  });
+}
+
+// Setas/Tab: vertical pula linhas ocultas (grupos recolhidos); horizontal
+// dá wrap para a linha vizinha, como numa planilha.
+function moverSelecao(dLinha, dCol) {
+  if (!gradeSel) return;
+  const visiveis = _linhasVisiveis();
+  const row = _rowDe(gradeSel.tarefaId);
+  let iLinha = visiveis.indexOf(row);
+  if (iLinha < 0) return;
+  let iCol = COLS_NAV.indexOf(gradeSel.col);
+  if (iCol < 0) iCol = 0;
+
+  if (dLinha) {
+    iLinha = Math.min(Math.max(iLinha + dLinha, 0), visiveis.length - 1);
+  }
+  if (dCol) {
+    iCol += dCol;
+    if (iCol >= COLS_NAV.length) {
+      if (iLinha < visiveis.length - 1) { iLinha++; iCol = 0; }
+      else iCol = COLS_NAV.length - 1;
+    } else if (iCol < 0) {
+      if (iLinha > 0) { iLinha--; iCol = COLS_NAV.length - 1; }
+      else iCol = 0;
+    }
+  }
+  selecionarCelula(visiveis[iLinha], COLS_NAV[iCol]);
+}
+
+// Navegação de dentro do editor: Tab commita e anda, Enter commita e desce.
+// Registrado UMA vez por span (o span sobrevive ao re-render das células).
+function _wireNavEdicao(span) {
+  if (span.dataset.gradeNav === '1') return;
+  span.dataset.gradeNav = '1';
+  span.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      // Editor com mais de um campo (qtd + unidade): o primeiro Tab é
+      // interno, só o último sai da célula.
+      const campos = [...span.querySelectorAll('input, select')];
+      const i = campos.indexOf(e.target);
+      if (campos.length > 1 && i >= 0 &&
+          ((!e.shiftKey && i < campos.length - 1) || (e.shiftKey && i > 0))) return;
+      e.preventDefault();
+      if (e.target.blur) e.target.blur();   // dispara o commit do editor
+      moverSelecao(0, e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Enter') {
+      // O editor existente já tratou (preventDefault + blur → commit);
+      // aqui só continua a navegação.
+      moverSelecao(1, 0);
+    } else if (e.key === 'Escape') {
+      const row = _rowDe(gradeSel && gradeSel.tarefaId);
+      if (row && gradeSel) setTimeout(() => selecionarCelula(row, gradeSel.col), 0);
+    }
+  });
+}
+
+// Pré-checagens são CORTESIA (toast imediato); o backend continua sendo
+// autoritativo e devolve a mesma recusa se algo escapar.
+function entrarEdicao(charInicial) {
+  if (!gradeSel) return;
+  const { tarefaId, col } = gradeSel;
+  const row = _rowDe(tarefaId);
+  const campo = COLS_CAMPO[col];
+  if (!row || !campo) return;
+  if (_ePai(tarefaId) && COLS_SO_FOLHA.includes(col)) {
+    toast('Tarefa-resumo: datas e duração vêm das subtarefas', 'warning');
+    return;
+  }
+  const t = tarefas.find(x => x.id === tarefaId);
+  if (col === 4 && t && (t.percentual_concluido || 0) > 0) {
+    toast('Tarefa já iniciada — o início não pode ser alterado', 'warning');
+    return;
+  }
+  const span = row.querySelector(COLS_SPAN[col]);
+  if (!span) return;
+  _wireNavEdicao(span);
+  iniciarEdicao(span, tarefaId, campo);
+  if (charInicial) {
+    const inp = span.querySelector('input:not([type=date])');
+    if (inp) {
+      inp.value = charInicial;
+      // input[type=number] rejeita setSelectionRange (InvalidStateError) —
+      // o cursor já fica no fim, então a falha é benigna.
+      try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(_) {}
+    }
+  }
+}
+
+// ── Hierarquia: DOM ──
+
+// Extraído de excluirTarefa (Fase 1) e agora compartilhado por excluir,
+// recuar, desrecuar e inserir. `nivel` vem do servidor nas rotas da Fase 2;
+// sem ele o fallback reproduz exatamente a indentação legada (22px).
+function sincronizarHierarquiaDOM(lista) {
+  if (!lista || !lista.length) return;
+  lista.forEach(t => {
+    const row = _rowDe(t.id);
+    if (!row) return;
+    const novoPai = t.tarefa_pai_id || '';
+    row.dataset.pai = novoPai;
+    const nivel = (typeof t.nivel === 'number') ? t.nivel : null;
+    if (nivel !== null) row.dataset.nivel = nivel;
+    const nomeDiv = row.querySelector('.nome-cell > div');
+    if (nomeDiv) {
+      nomeDiv.style.paddingLeft = nivel === null
+        ? (novoPai ? '22px' : '0')
+        : (nivel * 20) + 'px';
+    }
+    if (novoPai) {
+      row.classList.add('tarefa-filho');
+    } else {
+      row.classList.remove('tarefa-filho');
+      row.classList.remove('d-none');
+    }
+  });
+  // Recalcular quais linhas são tarefa-pai após a mudança
+  const paiIds = new Set(lista.filter(t => t.tarefa_pai_id).map(t => t.tarefa_pai_id));
+  document.querySelectorAll('tr.tarefa-row').forEach(row => {
+    const rid = Number(row.dataset.id);
+    const ePai = paiIds.has(rid);
+    row.classList.toggle('tarefa-pai', ePai);
+    const nomeDiv = row.querySelector('.nome-cell > div');
+    if (!nomeDiv) return;
+    const temToggle = !!nomeDiv.querySelector('.toggle-btn');
+    if (ePai && !temToggle) {
+      const placeholder = nomeDiv.querySelector('.toggle-placeholder');
+      if (placeholder) {
+        placeholder.outerHTML = `<button class="btn-toggle toggle-btn" onclick="toggleFilhas(${rid})" data-expanded="false" title="Expandir/recolher subtarefas"><i class="fas fa-chevron-right fa-xs" id="icon-${rid}"></i></button>`;
+      }
+    } else if (!ePai && temToggle) {
+      const btn = nomeDiv.querySelector('.toggle-btn');
+      if (btn) btn.outerHTML = '<span class="toggle-placeholder"></span>';
+    }
+  });
+}
+
+// Depois de um recuar/inserir a linha pode cair dentro de um grupo
+// recolhido — expandir a linhagem inteira para ela não sumir da tela.
+function _revelarLinhagem(tarefaId) {
+  const row = _rowDe(tarefaId);
+  if (!row) return;
+  row.classList.remove('d-none');
+  let paiId = row.dataset.pai;
+  const vistos = new Set();
+  while (paiId && !vistos.has(paiId)) {
+    vistos.add(paiId);
+    const pai = _rowDe(paiId);
+    if (!pai) break;
+    pai.classList.remove('d-none');
+    document.querySelectorAll(`.tarefa-row[data-pai="${paiId}"]`)
+      .forEach(r => r.classList.remove('d-none'));
+    const icon = document.getElementById(`icon-${paiId}`);
+    const btn = icon?.closest('.toggle-btn');
+    if (btn) { btn.dataset.expanded = 'true'; icon.className = 'fas fa-chevron-down fa-xs'; }
+    paiId = pai.dataset.pai;
+  }
+}
+
+// Reaplica no DOM a lista completa devolvida pelo servidor: ordem visual,
+// hierarquia, cascata do motor e renumeração (# e predecessoras).
+function _aplicarListaServidor(data, idFoco) {
+  tarefas = data.tarefas;
+  _restaurarOrdemDOM(document.getElementById('tarefasBody'),
+                     data.tarefas.map(t => t.id));
+  sincronizarHierarquiaDOM(data.tarefas);
+  data.tarefas.forEach(t => updateTarefaLocal(t));
+  (data.tarefas_afetadas || []).forEach(t => updateTarefaLocal(t));
+  if (idFoco) _revelarLinhagem(idFoco);
+  renumerarTudo();
+  renderGantt();
+}
+
+async function _acaoHierarquia(acao) {
+  if (!gradeSel) return;
+  const { tarefaId, col } = gradeSel;
+  let data = null, res;
+  try {
+    res = await fetch(apiUrl(`/tarefa/${tarefaId}/${acao}`), { method: 'POST' });
+    try { data = await res.clone().json(); } catch(_) {}
+  } catch(e) {
+    console.error('[cronograma] Erro de rede ao ' + acao, e);
+    toast('Erro de rede ao ' + acao, 'error');
+    return;
+  }
+  if (!res.ok || !data || data.status !== 'ok') {
+    // Mensagens do backend (sem irmã acima, vínculos, tarefa iniciada)
+    // chegam prontas em data.msg e aparecem verbatim.
+    toast((data && (data.msg || data.error)) || `Erro ${res.status}`, 'error');
+    return;
+  }
+  _aplicarListaServidor(data, tarefaId);
+  const row = _rowDe(tarefaId);
+  if (row) selecionarCelula(row, col);
+  toast(acao === 'recuar' ? 'Tarefa recuada' : 'Tarefa promovida');
+}
+
+function recuarSelecionada()    { _acaoHierarquia('recuar'); }
+function desrecuarSelecionada() { _acaoHierarquia('desrecuar'); }
+
+async function inserirLinha(posicao) {
+  if (!gradeSel) return;
+  const ref = gradeSel.tarefaId;
+  let data = null, res;
+  try {
+    res = await fetch(apiUrl('/tarefa'), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ nome_tarefa: 'Nova tarefa', duracao_dias: 1,
+                             ref_tarefa_id: ref, posicao }),
+    });
+    try { data = await res.clone().json(); } catch(_) {}
+  } catch(e) {
+    console.error('[cronograma] Erro de rede ao inserir linha', e);
+    toast('Erro de rede ao inserir linha', 'error');
+    return;
+  }
+  if (!res.ok || !data || data.status !== 'ok') {
+    toast((data && (data.msg || data.error)) || `Erro ${res.status}`, 'error');
+    return;
+  }
+  // `tarefas` primeiro: adicionarLinhaTabela deriva daí quem é tarefa-pai.
+  tarefas = data.tarefas;
+  adicionarLinhaTabela(data.tarefa);
+  _aplicarListaServidor(data, data.tarefa.id);
+  document.getElementById('emptyState')?.remove();
+  const row = _rowDe(data.tarefa.id);
+  if (row) { selecionarCelula(row, 2); entrarEdicao(); }
+  toast('Linha inserida');
+}
+
+function excluirSelecionada() {
+  if (!gradeSel) return;
+  const t = tarefas.find(x => x.id === gradeSel.tarefaId);
+  if (!t) return;
+  excluirTarefa(t.id, t.nome_tarefa, !!t.gerada_por_proposta_item_id);
+}
+
+// ── Init da grade ──
+function initGrade() {
+  const tbody = document.getElementById('tarefasBody');
+  if (!tbody) return;
+
+  // 1º clique seleciona, clique na célula já selecionada entra em edição.
+  tbody.addEventListener('click', e => {
+    if (e.target.closest('input, select, textarea, button, a, label, .drag-handle')) return;
+    const td = e.target.closest('td');
+    const row = e.target.closest('tr.tarefa-row');
+    if (!td || !row || !COLS_NAV.includes(td.cellIndex)) return;
+    if (gradeSel && gradeSel.tarefaId === Number(row.dataset.id)
+        && gradeSel.col === td.cellIndex) {
+      entrarEdicao();
+    } else {
+      selecionarCelula(row, td.cellIndex);
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    // Guards: nunca sequestrar um campo em edição nem um modal/offcanvas.
+    if (e.target.closest?.('input, select, textarea, [contenteditable]')) return;
+    if (document.querySelector('.modal.show, .offcanvas.show')) return;
+    if (!gradeSel) return;
+
+    // Alt+Shift+setas ANTES das setas puras (indent/outdent do Project).
+    if (e.altKey && e.shiftKey &&
+        (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      e.preventDefault();
+      if (e.key === 'ArrowRight') recuarSelecionada(); else desrecuarSelecionada();
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    switch (e.key) {
+      case 'ArrowUp':    e.preventDefault(); moverSelecao(-1, 0); break;
+      case 'ArrowDown':  e.preventDefault(); moverSelecao(1, 0);  break;
+      case 'ArrowLeft':  e.preventDefault(); moverSelecao(0, -1); break;
+      case 'ArrowRight': e.preventDefault(); moverSelecao(0, 1);  break;
+      case 'Tab':        e.preventDefault(); moverSelecao(0, e.shiftKey ? -1 : 1); break;
+      case 'Enter':      e.preventDefault(); moverSelecao(1, 0);  break;
+      case 'F2':         e.preventDefault(); entrarEdicao();      break;
+      case 'Escape':     limparSelecao();                         break;
+      default:
+        // Caractere imprimível abre a edição já com ele digitado
+        // (Ctrl/Meta/Alt já retornaram acima — Ctrl+Z/Y ficam para a Fase 3).
+        if (e.key.length === 1) {
+          e.preventDefault();
+          entrarEdicao(e.key);
+        }
+    }
+  });
+
+  atualizarToolbarGrade();
+}
+
 // ── Init ──
 function updatePredBadges() {
   if (EDITOR_V2) {
@@ -2560,6 +2925,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderGantt();
   syncScroll();
   initRowDrag();
+  // Fase 2 (editor v2): grade tipo planilha. Sem a flag nenhum listener de
+  // seleção/teclado é registrado.
+  if (EDITOR_V2) initGrade();
 
   // Carregar templates ao abrir o modal (dentro do DOMContentLoaded
   // para garantir que o elemento #modalAplicarTemplate já foi parseado)

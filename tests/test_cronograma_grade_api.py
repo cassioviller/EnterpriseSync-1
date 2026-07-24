@@ -1,0 +1,439 @@
+"""Fase 2 (editor v2) — integração da API da grade tipo planilha (plano Step D).
+
+Cobre o Step A+B do plano `2026-07-24-cronograma-fase2-plano.md`:
+
+  * `POST /cronograma/obra/<id>/tarefa/<tid>/recuar` (indent, semântica
+    Project: novo pai = irmã anterior; X entra como última filha) — sucesso
+    com roll-up, sem irmã acima → 400, folha-com-vínculo que viraria resumo
+    → 400, folha iniciada → 400, sob resumo já existente → última filha;
+  * `POST .../desrecuar` (outdent): raiz → 400, filha vira irmã do ex-pai
+    logo após a subárvore dele, ex-pai sem filhas volta a ser folha;
+  * inserção posicionada em `POST /cronograma/obra/<id>/tarefa`
+    (`ref_tarefa_id` + `posicao`), incluindo "abaixo" de resumo (cai depois
+    da subárvore inteira), referência inválida → 400 e flag off ignorando
+    os campos novos;
+  * as rotas novas "não existem" (404 opaco) com a flag desligada e para
+    tenant vizinho;
+  * renumeração visual: indent PRESERVA a numeração (a irmã anterior está
+    imediatamente acima), outdent DESLOCA — e `predecessoras_texto` sai
+    fresco na resposta.
+
+NOTA de harness (mesma disciplina de `test_cronograma_vinculos_api.py`):
+requests dos test clients ficam FORA de app_context aberto — Flask-Login
+cacheia `g._login_user` e congela o primeiro usuário resolvido.
+"""
+import os
+import sys
+from datetime import date
+
+import pytest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import main  # noqa: F401 — registra os blueprints
+from app import app, db
+from models import (
+    ConfiguracaoEmpresa,
+    Obra,
+    TarefaCronograma,
+    TarefaVinculo,
+    Usuario,
+)
+from test_cronograma_endpoints_m05 import _client_como
+from test_cronograma_versao_service import (
+    _ambiente,
+    _rdo_com_apontamento,
+    _tarefa,
+)
+
+pytestmark = pytest.mark.integration
+
+MSG_SEM_IRMA = ('Não é possível recuar: não há tarefa acima no mesmo '
+                'nível para ser o novo grupo')
+MSG_JA_RAIZ = 'A tarefa já está no nível raiz — não é possível desrecuar'
+MSG_REF_INVALIDA = 'Tarefa de referência não encontrada nesta obra'
+MSG_POSICAO_INVALIDA = "Posição inválida: use 'acima' ou 'abaixo'"
+
+
+@pytest.fixture(autouse=True)
+def _config():
+    app.config['TESTING'] = True
+    app.config['WTF_CSRF_ENABLED'] = False
+    if not app.secret_key:
+        app.secret_key = 'test-grade-cronograma'
+    yield
+
+
+def _flag_editor_v2(admin_id: int, ativo: bool) -> None:
+    """Liga/desliga a flag DIRETO na coluna (mesmo helper da Fase 1)."""
+    config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+    if config is None:
+        config = ConfiguracaoEmpresa(admin_id=admin_id,
+                                     nome_empresa=f'Empresa {admin_id}')
+        db.session.add(config)
+    config.cronograma_editor_v2 = bool(ativo)
+    db.session.commit()
+
+
+def _cenario(flag: bool = True) -> dict:
+    """Tenant novo com obra e três folhas raiz (ordem 0/5/10 — de propósito
+    esparsa, para que a renumeração flat do plano fique visível):
+
+        linha 1 — 'Fundação'  A: 01/07/2026 (qua), 5 dias úteis → fim 07/07
+        linha 2 — 'Alvenaria' B: 01/07/2026, 3 dias úteis      → fim 03/07
+        linha 3 — 'Cobertura' C: 01/07/2026, 2 dias úteis      → fim 02/07
+    """
+    with app.app_context():
+        admin, obra = _ambiente()
+        _flag_editor_v2(admin.id, flag)
+        a = _tarefa(obra, admin, 'Fundação', ordem=0, duracao_dias=5,
+                    data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 7))
+        b = _tarefa(obra, admin, 'Alvenaria', ordem=5, duracao_dias=3,
+                    data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 3))
+        c = _tarefa(obra, admin, 'Cobertura', ordem=10, duracao_dias=2,
+                    data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 2))
+        return {'admin_id': admin.id, 'obra_id': obra.id,
+                'a_id': a.id, 'b_id': b.id, 'c_id': c.id}
+
+
+def _base(ctx) -> str:
+    return f"/cronograma/obra/{ctx['obra_id']}"
+
+
+def _por_id(lista: list, tarefa_id: int) -> dict | None:
+    return next((t for t in lista if t['id'] == tarefa_id), None)
+
+
+def _ordem_visual(obra_id: int) -> list[tuple[int, int]]:
+    """`[(tarefa_id, ordem)]` como está no banco, na ordem visual."""
+    with app.app_context():
+        return [
+            (t.id, t.ordem)
+            for t in TarefaCronograma.query
+            .filter_by(obra_id=obra_id)
+            .order_by(TarefaCronograma.ordem, TarefaCronograma.id).all()
+        ]
+
+
+def _pai_de(tarefa_id: int) -> int | None:
+    with app.app_context():
+        return db.session.get(TarefaCronograma, tarefa_id).tarefa_pai_id
+
+
+def _grupo(ctx, filhas: int = 1) -> dict:
+    """Transforma A em tarefa-resumo com `filhas` subtarefas ('Etapa 1..n').
+
+    Devolve `ctx` acrescido de `f1_id`/`f2_id`.
+    """
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        admin = db.session.get(Usuario, ctx['admin_id'])
+        for i in range(filhas):
+            f = _tarefa(obra, admin, f'Etapa {i + 1}', ordem=1 + i,
+                        duracao_dias=2, tarefa_pai_id=ctx['a_id'],
+                        data_inicio=date(2026, 7, 1),
+                        data_fim=date(2026, 7, 2))
+            ctx[f'f{i + 1}_id'] = f.id
+    return ctx
+
+
+# ---------------------------------------------------------------------------
+# Recuar (indent)
+# ---------------------------------------------------------------------------
+
+def test_recuar_torna_irma_anterior_um_resumo_com_rollup():
+    """(1) B recuada sob A: A vira resumo e herda as datas de B pelo roll-up."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    corpo = r.get_json()
+    assert corpo['status'] == 'ok'
+    assert corpo['tarefa']['id'] == ctx['b_id']
+    assert corpo['tarefa']['nivel'] == 1
+
+    # a lista completa volta em ordem visual, com `nivel` em cada item
+    ids = [t['id'] for t in corpo['tarefas']]
+    assert ids == [ctx['a_id'], ctx['b_id'], ctx['c_id']]
+    assert [t['nivel'] for t in corpo['tarefas']] == [0, 1, 0]
+
+    # A virou resumo: roll-up sobrescreve datas/duração com as da única filha
+    a = _por_id(corpo['tarefas_afetadas'], ctx['a_id'])
+    assert a is not None, corpo['tarefas_afetadas']
+    assert a['data_inicio'] == '2026-07-01'
+    assert a['data_fim'] == '2026-07-03'
+    assert a['duracao_dias'] == 3
+
+    assert _pai_de(ctx['b_id']) == ctx['a_id']
+
+
+def test_recuar_primeira_linha_400():
+    """(2) Sem irmã acima no mesmo nível não há grupo possível."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['a_id']}/recuar")
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == MSG_SEM_IRMA
+    assert _pai_de(ctx['a_id']) is None
+
+
+def test_recuar_primeira_filha_de_grupo_400():
+    """(3) Mesma mensagem quando X é a primeira filha do próprio grupo."""
+    ctx = _grupo(_cenario(), filhas=2)
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['f1_id']}/recuar")
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == MSG_SEM_IRMA
+    assert _pai_de(ctx['f1_id']) == ctx['a_id']
+
+
+def test_recuar_sob_folha_com_vinculo_400_sem_persistir():
+    """(4) A folha que viraria resumo tem vínculos — rejeita, nunca muta."""
+    ctx = _cenario()
+    with app.app_context():
+        db.session.add(TarefaVinculo(
+            admin_id=ctx['admin_id'], obra_id=ctx['obra_id'],
+            predecessora_id=ctx['a_id'], sucessora_id=ctx['c_id'],
+            tipo='TI', lag_dias=0))
+        db.session.commit()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == (
+        'A tarefa "Fundação" tem vínculos de predecessora/sucessora e '
+        'viraria uma tarefa-resumo — remova os vínculos dela antes de recuar')
+    assert _pai_de(ctx['b_id']) is None
+    with app.app_context():
+        assert TarefaVinculo.query.filter_by(obra_id=ctx['obra_id']).count() == 1
+
+
+def test_recuar_sob_folha_iniciada_400():
+    """(5) Tarefa com apontamento de RDO é âncora — não pode virar resumo."""
+    ctx = _cenario()
+    with app.app_context():
+        obra = db.session.get(Obra, ctx['obra_id'])
+        admin = db.session.get(Usuario, ctx['admin_id'])
+        a = db.session.get(TarefaCronograma, ctx['a_id'])
+        _rdo_com_apontamento(obra, admin, a)
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == (
+        'A tarefa "Fundação" já foi iniciada e não pode virar tarefa-resumo')
+    assert _pai_de(ctx['b_id']) is None
+
+
+def test_recuar_sob_resumo_entra_como_ultima_filha_e_renumera_flat():
+    """(6) Sob um resumo existente X entra no fim; `ordem` vira 0..n-1."""
+    ctx = _grupo(_cenario(), filhas=2)   # A(resumo) > Etapa 1, Etapa 2
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    corpo = r.get_json()
+    assert [t['id'] for t in corpo['tarefas']] == [
+        ctx['a_id'], ctx['f1_id'], ctx['f2_id'], ctx['b_id'], ctx['c_id']]
+    assert [t['nivel'] for t in corpo['tarefas']] == [0, 1, 1, 1, 0]
+    assert _pai_de(ctx['b_id']) == ctx['a_id']
+    # renumeração flat (o cenário nasce com ordem 0/5/10)
+    assert _ordem_visual(ctx['obra_id']) == [
+        (ctx['a_id'], 0), (ctx['f1_id'], 1), (ctx['f2_id'], 2),
+        (ctx['b_id'], 3), (ctx['c_id'], 4)]
+
+
+# ---------------------------------------------------------------------------
+# Desrecuar (outdent)
+# ---------------------------------------------------------------------------
+
+def test_desrecuar_tarefa_raiz_400():
+    """(7) Já está no nível raiz."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/desrecuar")
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == MSG_JA_RAIZ
+
+
+def test_desrecuar_filha_vira_irma_do_pai_apos_a_subarvore():
+    """(8) X sai do grupo e cai DEPOIS da subárvore inteira do ex-pai; as
+    irmãs seguintes permanecem no grupo (desvio deliberado do Project puro)."""
+    ctx = _grupo(_cenario(), filhas=2)   # A(resumo) > Etapa 1, Etapa 2
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['f1_id']}/desrecuar")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    corpo = r.get_json()
+    assert [t['id'] for t in corpo['tarefas']] == [
+        ctx['a_id'], ctx['f2_id'], ctx['f1_id'], ctx['b_id'], ctx['c_id']]
+    assert [t['nivel'] for t in corpo['tarefas']] == [0, 1, 0, 0, 0]
+    assert _pai_de(ctx['f1_id']) is None
+    assert _pai_de(ctx['f2_id']) == ctx['a_id']   # irmã seguinte fica no grupo
+
+
+def test_desrecuar_ultima_filha_faz_ex_pai_voltar_a_ser_folha():
+    """(8b) Pai → folha: sem filhas, mantém as datas do último roll-up e
+    volta na lista para o front atualizar as classes."""
+    ctx = _grupo(_cenario(), filhas=1)   # A(resumo) > Etapa 1
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['f1_id']}/desrecuar")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    corpo = r.get_json()
+    assert [t['id'] for t in corpo['tarefas']] == [
+        ctx['a_id'], ctx['f1_id'], ctx['b_id'], ctx['c_id']]
+    assert [t['nivel'] for t in corpo['tarefas']] == [0, 0, 0, 0]
+    assert _por_id(corpo['tarefas'], ctx['a_id']) is not None
+    with app.app_context():
+        assert TarefaCronograma.query.filter_by(
+            tarefa_pai_id=ctx['a_id']).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Escopo: flag off e cross-tenant
+# ---------------------------------------------------------------------------
+
+def test_rotas_de_hierarquia_nao_existem_com_flag_off():
+    """(9) Flag desligada ⇒ 404 opaco, como qualquer URL desconhecida."""
+    ctx = _cenario(flag=False)
+    c = _client_como(ctx['admin_id'])
+    r_rec = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    r_des = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/desrecuar")
+    assert (r_rec.status_code, r_des.status_code) == (404, 404)
+    assert _pai_de(ctx['b_id']) is None
+
+
+def test_recuar_cross_tenant_404_opaco_sem_persistir():
+    """(10) Tenant vizinho com a flag ligada mesmo assim não enxerga a obra."""
+    ctx = _cenario()
+    with app.app_context():
+        vizinho, _obra_b = _ambiente()
+        _flag_editor_v2(vizinho.id, True)   # flag ligada: o 404 é do escopo
+        vid = vizinho.id
+    c = _client_como(vid)
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    assert r.status_code == 404
+    assert _pai_de(ctx['b_id']) is None
+
+
+# ---------------------------------------------------------------------------
+# Inserir acima/abaixo (Step B)
+# ---------------------------------------------------------------------------
+
+def _criar(c, ctx, **body):
+    return c.post(f"{_base(ctx)}/tarefa",
+                  json={'nome_tarefa': 'Nova tarefa', 'duracao_dias': 1,
+                        **body})
+
+
+def test_inserir_acima_e_abaixo_posiciona_como_irma():
+    """(11) `posicao` relativa à referência, herdando o pai dela."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+
+    r = _criar(c, ctx, ref_tarefa_id=ctx['b_id'], posicao='acima')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    nova_acima = r.get_json()['tarefa']['id']
+    assert [t['id'] for t in r.get_json()['tarefas']] == [
+        ctx['a_id'], nova_acima, ctx['b_id'], ctx['c_id']]
+
+    r = _criar(c, ctx, ref_tarefa_id=ctx['b_id'], posicao='abaixo')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    nova_abaixo = r.get_json()['tarefa']['id']
+    assert [t['id'] for t in r.get_json()['tarefas']] == [
+        ctx['a_id'], nova_acima, ctx['b_id'], nova_abaixo, ctx['c_id']]
+    assert _pai_de(nova_abaixo) is None
+
+
+def test_inserir_abaixo_de_resumo_cai_apos_a_subarvore():
+    """(11) 'abaixo' de um grupo = próxima IRMÃ dele, não última filha."""
+    ctx = _grupo(_cenario(), filhas=2)
+    c = _client_como(ctx['admin_id'])
+    r = _criar(c, ctx, ref_tarefa_id=ctx['a_id'], posicao='abaixo')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    corpo = r.get_json()
+    nova = corpo['tarefa']['id']
+    assert [t['id'] for t in corpo['tarefas']] == [
+        ctx['a_id'], ctx['f1_id'], ctx['f2_id'], nova,
+        ctx['b_id'], ctx['c_id']]
+    assert [t['nivel'] for t in corpo['tarefas']] == [0, 1, 1, 0, 0, 0]
+    assert _pai_de(nova) is None
+
+
+def test_inserir_dentro_de_grupo_herda_o_pai_da_referencia():
+    """(11) Referência é filha ⇒ a nova nasce irmã dela, dentro do grupo."""
+    ctx = _grupo(_cenario(), filhas=2)
+    c = _client_como(ctx['admin_id'])
+    r = _criar(c, ctx, ref_tarefa_id=ctx['f1_id'], posicao='abaixo')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    corpo = r.get_json()
+    nova = corpo['tarefa']['id']
+    assert [t['id'] for t in corpo['tarefas']] == [
+        ctx['a_id'], ctx['f1_id'], nova, ctx['f2_id'],
+        ctx['b_id'], ctx['c_id']]
+    assert _pai_de(nova) == ctx['a_id']
+
+
+def test_inserir_com_referencia_ou_posicao_invalida_400_sem_criar():
+    """(11) Referência inexistente/de outra obra e posição fora do enum."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = _criar(c, ctx, ref_tarefa_id=999_999, posicao='abaixo')
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == MSG_REF_INVALIDA
+
+    r = _criar(c, ctx, ref_tarefa_id=ctx['b_id'], posicao='ao_lado')
+    assert r.status_code == 400
+    assert r.get_json()['msg'] == MSG_POSICAO_INVALIDA
+
+    with app.app_context():
+        assert TarefaCronograma.query.filter_by(
+            obra_id=ctx['obra_id']).count() == 3
+
+
+def test_inserir_com_flag_off_ignora_ref_e_anexa_no_fim():
+    """(11) Flag off = comportamento legado byte-idêntico (anexa no fim)."""
+    ctx = _cenario(flag=False)
+    c = _client_como(ctx['admin_id'])
+    r = _criar(c, ctx, ref_tarefa_id=ctx['a_id'], posicao='acima')
+    assert r.status_code == 201, r.get_data(as_text=True)
+    corpo = r.get_json()
+    assert 'tarefas' not in corpo          # resposta legada não muda de shape
+    nova = corpo['tarefa']['id']
+    assert _pai_de(nova) is None
+    ordens = dict(_ordem_visual(ctx['obra_id']))
+    assert ordens[nova] > ordens[ctx['c_id']]
+
+
+# ---------------------------------------------------------------------------
+# Numeração visual e predecessoras
+# ---------------------------------------------------------------------------
+
+def test_recuar_preserva_numeracao_e_desrecuar_desloca():
+    """(12) A irmã anterior está imediatamente acima, então o indent NÃO
+    muda a ordem visual; o outdent muda — e `predecessoras_texto` volta
+    recalculado sobre as linhas novas."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    # C (linha 3) depende de B (linha 2)
+    r = c.put(f"{_base(ctx)}/tarefa/{ctx['c_id']}",
+              json={'predecessoras_texto': '2'})
+    assert r.status_code == 200, r.get_data(as_text=True)
+
+    # indent de B sob A: visual continua A, B, C → C ainda aponta para a 2
+    r = c.post(f"{_base(ctx)}/tarefa/{ctx['b_id']}/recuar")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    c_dict = _por_id(r.get_json()['tarefas'], ctx['c_id'])
+    assert c_dict['predecessoras_texto'] == '2'
+
+    # outdent de B: nada muda aqui (A ficou sem filhas, B volta para a raiz
+    # logo após A) — mas com uma irmã seguinte no grupo a numeração desloca
+    ctx2 = _grupo(_cenario(), filhas=2)     # A > Etapa 1(2), Etapa 2(3)
+    c2 = _client_como(ctx2['admin_id'])
+    r = c2.put(f"{_base(ctx2)}/tarefa/{ctx2['b_id']}",
+               json={'predecessoras_texto': '3'})   # B depende de Etapa 2
+    assert r.status_code == 200, r.get_data(as_text=True)
+    r = c2.post(f"{_base(ctx2)}/tarefa/{ctx2['f1_id']}/desrecuar")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    tarefas = r.get_json()['tarefas']
+    # nova ordem: A(1), Etapa 2(2), Etapa 1(3), B(4), C(5)
+    assert [t['id'] for t in tarefas] == [
+        ctx2['a_id'], ctx2['f2_id'], ctx2['f1_id'], ctx2['b_id'], ctx2['c_id']]
+    b_dict = _por_id(tarefas, ctx2['b_id'])
+    assert b_dict['predecessoras_texto'] == '2'   # Etapa 2 agora é a linha 2

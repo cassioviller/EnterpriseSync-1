@@ -663,6 +663,59 @@ def criar_tarefa(obra_id: int):
                 predecessora_id=v.predecessora_id, sucessora_id=tarefa.id,
                 tipo=v.tipo, lag_dias=v.lag_dias))
 
+    # ── Fase 2 (Step B): inserir acima/abaixo de uma linha de referência ──
+    # Campos ausentes ⇒ comportamento de sempre (anexa no fim). Só este
+    # branch flag-ON conhece `ref_tarefa_id`/`posicao` — com a flag OFF o
+    # caminho legado já retornou lá em cima e os campos são ignorados.
+    ref_raw = data.get('ref_tarefa_id')
+    if ref_raw not in (None, ''):
+        try:
+            ref_id = int(ref_raw)
+        except (ValueError, TypeError):
+            ref_id = None
+        ref = None
+        if ref_id:
+            ref = TarefaCronograma.query.filter_by(
+                id=ref_id, obra_id=obra_id, admin_id=admin_id,
+                is_cliente=cliente_mode,
+            ).filter(TarefaCronograma.ativa.is_(True)).first()
+        if ref is None or ref.id == tarefa.id:
+            db.session.rollback()
+            return jsonify({
+                'status': 'error',
+                'msg': 'Tarefa de referência não encontrada nesta obra',
+            }), 400
+        posicao = str(data.get('posicao') or '').strip().lower()
+        if posicao not in ('acima', 'abaixo'):
+            db.session.rollback()
+            return jsonify({
+                'status': 'error',
+                'msg': "Posição inválida: use 'acima' ou 'abaixo'",
+            }), 400
+
+        _, _nivel_map, filhas_map = _estrutura_visual(
+            obra_id, admin_id, cliente_mode)
+        # A nova tarefa (já em sessão, anexada no fim) sai de onde caiu e
+        # vira IRMÃ da referência — herda o `tarefa_pai_id` dela.
+        atuais = filhas_map.get(tarefa.tarefa_pai_id or None, [])
+        atuais[:] = [t for t in atuais if t.id != tarefa.id]
+        tarefa.tarefa_pai_id = ref.tarefa_pai_id
+        irmas = filhas_map.setdefault(ref.tarefa_pai_id or None, [])
+        pos_ref = next((i for i, t in enumerate(irmas) if t.id == ref.id),
+                       len(irmas) - 1)
+        # 'abaixo' = irmã seguinte: no DFS cai DEPOIS da subárvore inteira
+        # da referência; 'acima' cai imediatamente antes dela.
+        irmas.insert(pos_ref if posicao == 'acima' else pos_ref + 1, tarefa)
+
+        resultado, erro = _aplicar_hierarquia(obra_id, admin_id, cliente_mode,
+                                              filhas_map)
+        if erro:
+            return erro
+        logger.info(f"[OK] TarefaCronograma criada id={tarefa.id} "
+                    f"obra_id={obra_id} (editor v2, {posicao} de {ref.id})")
+        return _resposta_grade(obra_id, admin_id, cliente_mode, tarefa,
+                               resultado.tarefas_afetadas, status_http=201)
+
     try:
         resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode,
                                     commit=False)
@@ -1278,6 +1331,282 @@ def excluir_vinculo(obra_id: int, vid: int):
 
     db.session.delete(vinculo)
     return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode, None)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HIERARQUIA DA GRADE (editor v2, Fase 2) — recuar/desrecuar (plano Step A)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _estrutura_visual(obra_id: int, admin_id: int, cliente_mode: bool):
+    """Fase 2 — estrutura visual da grade em UMA query de tarefas.
+
+    Devolve `(ordenadas, nivel_map, filhas_map)`:
+      * `ordenadas` — tarefas na ordem VISUAL (DFS de `ordenar_arvore_visual`,
+        a MESMA numeração da grade e do parser de predecessoras);
+      * `nivel_map` — task_id → profundidade (0 = raiz);
+      * `filhas_map` — pai_id (None = raiz) → filhas na ordem entre irmãs
+        (`ORDER BY ordem, id`, como a grade).
+
+    O frontend envia SÓ a ação (recuar/desrecuar/inserir); a fonte de verdade
+    da estrutura é sempre o servidor.
+    """
+    tarefas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .order_by(TarefaCronograma.ordem, TarefaCronograma.id)
+        .all()
+    )
+    ordenadas, nivel_map = ordenar_arvore_visual(tarefas, com_nivel=True)
+    filhas_map: dict[int | None, list] = {}
+    for t in tarefas:
+        filhas_map.setdefault(t.tarefa_pai_id or None, []).append(t)
+    return ordenadas, nivel_map, filhas_map
+
+
+def _ciclo_hierarquico(novo_pai_id: int | None, tarefa_id: int,
+                       por_id: dict) -> bool:
+    """Check ascendente de ciclo hierárquico (defensivo — mesma lógica do
+    bloco `tarefa_pai_id` de `atualizar_tarefa`): True quando `tarefa_id`
+    aparece na cadeia de ancestrais do novo pai."""
+    visitados: set[int] = set()
+    cursor = novo_pai_id
+    while cursor is not None:
+        if cursor == tarefa_id:
+            return True
+        if cursor in visitados:
+            break  # cadeia corrompida, não loop infinito
+        visitados.add(cursor)
+        anc = por_id.get(cursor)
+        cursor = anc.tarefa_pai_id if anc else None
+    return False
+
+
+def _aplicar_hierarquia(obra_id: int, admin_id: int, cliente_mode: bool,
+                        filhas_map: dict):
+    """Fase 2 — persistência comum de recuar/desrecuar/inserir-posicionado.
+
+    Recebe `filhas_map` JÁ com a mudança aplicada (`tarefa_pai_id` mutado nos
+    objetos ORM + listas de irmãs reposicionadas) e:
+      1. reconstrói a lista visual alvo (o MESMO DFS de
+         `ordenar_arvore_visual`);
+      2. renumera `ordem = idx` para TODAS as tarefas do modo — a estratégia
+         flat do `/reordenar`, para nunca colidir com o drag & drop;
+      3. `flush()` + `recalcular_obra(commit=False)` + commit ÚNICO.
+
+    Devolve `(resultado, erro)`: com `ErroCiclo` o rollback desfaz TUDO
+    (re-parent + renumeração) e `erro` é a resposta 400 pronta; senão
+    `resultado` carrega as `tarefas_afetadas` do recálculo.
+    """
+    ordenadas: list = []
+
+    def _dfs(node) -> None:
+        ordenadas.append(node)
+        for filha in filhas_map.get(node.id, []):
+            _dfs(filha)
+
+    for raiz in filhas_map.get(None, []):
+        _dfs(raiz)
+
+    for idx, t in enumerate(ordenadas):
+        t.ordem = idx
+    try:
+        db.session.flush()
+        resultado = recalcular_obra(obra_id, admin_id, cliente=cliente_mode,
+                                    commit=False)
+        db.session.commit()
+    except ErroCiclo as exc:
+        db.session.rollback()
+        return None, (jsonify({'status': 'error', 'msg': str(exc)}), 400)
+    return resultado, None
+
+
+def _resposta_grade(obra_id: int, admin_id: int, cliente_mode: bool,
+                    tarefa: TarefaCronograma, afetadas: list,
+                    status_http: int = 200):
+    """Resposta padrão das rotas de hierarquia (plano A3) — o shape das rotas
+    irmãs + `nivel`:
+
+        {status:'ok', tarefa, tarefas (ordem visual completa), tarefas_afetadas}
+
+    Serializa DEPOIS do commit com `_mapas_vinculos` — a numeração visual
+    muda com a hierarquia e `predecessoras_texto` precisa sair fresco.
+    `nivel` é injetado pós-serialização (`d['nivel'] = nivel_map...`).
+    """
+    todas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .order_by(TarefaCronograma.ordem, TarefaCronograma.id)
+        .all()
+    )
+    vmap, _, t2l, _ = _mapas_vinculos(obra_id, admin_id, cliente_mode,
+                                      tarefas=todas)
+    ordenadas, nivel_map = ordenar_arvore_visual(todas, com_nivel=True)
+    _kw = dict(vinculos_por_sucessora=vmap, tarefa_para_linha=t2l)
+
+    def _com_nivel(t: TarefaCronograma) -> dict:
+        d = _tarefa_to_dict(t, **_kw)
+        d['nivel'] = nivel_map.get(t.id, 0)
+        return d
+
+    return jsonify({
+        'status': 'ok',
+        'tarefa': _com_nivel(tarefa),
+        'tarefas': [_com_nivel(t) for t in ordenadas],
+        'tarefas_afetadas': [_com_nivel(t) for t in afetadas],
+    }), status_http
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>/recuar',
+                     methods=['POST'])
+@login_required
+def recuar_tarefa(obra_id: int, tarefa_id: int):
+    """Fase 2 — indent (semântica Project): o novo pai é a irmã ANTERIOR
+    (tarefa mais próxima ACIMA na ordem visual com o mesmo `tarefa_pai_id`);
+    X entra como ÚLTIMA filha, levando a própria subárvore junto.
+
+    Rejeita com 400 quando não há irmã anterior, quando o novo pai é folha
+    com vínculos (viraria resumo — a Fase 1 nunca muta vínculos em silêncio;
+    auto-remover seria destrutivo antes do undo da Fase 3) ou folha já
+    iniciada (âncora de apontamento não pode virar resumo).
+    """
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    tarefa = TarefaCronograma.query.filter_by(
+        id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
+    ).filter(TarefaCronograma.ativa.is_(True)).first()
+    if not tarefa:
+        return jsonify({'status': 'error', 'msg': 'Tarefa não encontrada'}), 404
+
+    ordenadas, _nivel_map, filhas_map = _estrutura_visual(
+        obra_id, admin_id, cliente_mode)
+    irmas = filhas_map.get(tarefa.tarefa_pai_id or None, [])
+    pos = next((i for i, t in enumerate(irmas) if t.id == tarefa.id), None)
+    if not pos:  # None (dado sujo) ou 0 (primeira do nível)
+        return jsonify({
+            'status': 'error',
+            'msg': ('Não é possível recuar: não há tarefa acima no mesmo '
+                    'nível para ser o novo grupo'),
+        }), 400
+    novo_pai = irmas[pos - 1]
+
+    if not filhas_map.get(novo_pai.id):
+        # P é folha e VIRARIA resumo — decisão crítica do plano: rejeitar.
+        tem_vinculo = db.session.query(TarefaVinculo.id).filter(
+            TarefaVinculo.obra_id == obra_id,
+            TarefaVinculo.admin_id == admin_id,
+            db.or_(TarefaVinculo.predecessora_id == novo_pai.id,
+                   TarefaVinculo.sucessora_id == novo_pai.id),
+        ).first() is not None
+        if tem_vinculo:
+            return jsonify({
+                'status': 'error',
+                'msg': (f'A tarefa "{novo_pai.nome_tarefa}" tem vínculos de '
+                        'predecessora/sucessora e viraria uma tarefa-resumo — '
+                        'remova os vínculos dela antes de recuar'),
+            }), 400
+        if novo_pai.id in ids_tarefas_iniciadas(obra_id, admin_id,
+                                                cliente=cliente_mode):
+            return jsonify({
+                'status': 'error',
+                'msg': (f'A tarefa "{novo_pai.nome_tarefa}" já foi iniciada '
+                        'e não pode virar tarefa-resumo'),
+            }), 400
+
+    # Defesa: a irmã anterior nunca é descendente de X, mas o check ascendente
+    # fica (mesmo padrão de `atualizar_tarefa`) contra dado sujo.
+    por_id = {t.id: t for t in ordenadas}
+    if _ciclo_hierarquico(novo_pai.id, tarefa.id, por_id):
+        return jsonify({
+            'status': 'error',
+            'msg': 'Hierarquia circular: uma tarefa não pode ser pai de seu próprio ancestral.',
+        }), 400
+
+    irmas.pop(pos)
+    tarefa.tarefa_pai_id = novo_pai.id
+    filhas_map.setdefault(novo_pai.id, []).append(tarefa)
+
+    resultado, erro = _aplicar_hierarquia(obra_id, admin_id, cliente_mode,
+                                          filhas_map)
+    if erro:
+        return erro
+    logger.info(f"[OK] Tarefa recuada id={tarefa_id} novo_pai={novo_pai.id} "
+                f"obra={obra_id} (editor v2)")
+    return _resposta_grade(obra_id, admin_id, cliente_mode, tarefa,
+                           resultado.tarefas_afetadas)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/tarefa/<int:tarefa_id>/desrecuar',
+                     methods=['POST'])
+@login_required
+def desrecuar_tarefa(obra_id: int, tarefa_id: int):
+    """Fase 2 — outdent: X (com a subárvore) sobe para o nível do pai antigo
+    e vira a PRÓXIMA irmã dele, logo após a subárvore inteira dele.
+
+    Desvio deliberado do Project puro: as irmãs SEGUINTES de X permanecem no
+    pai antigo (não são re-parentadas sob X) — a operação fica local e
+    reversível por um recuar. O pai antigo que ficar sem filhas vira folha
+    naturalmente (datas do último roll-up até o próximo recálculo); ele volta
+    em `tarefas` para o front atualizar as classes.
+    """
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    tarefa = TarefaCronograma.query.filter_by(
+        id=tarefa_id, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
+    ).filter(TarefaCronograma.ativa.is_(True)).first()
+    if not tarefa:
+        return jsonify({'status': 'error', 'msg': 'Tarefa não encontrada'}), 404
+    if tarefa.tarefa_pai_id is None:
+        return jsonify({
+            'status': 'error',
+            'msg': 'A tarefa já está no nível raiz — não é possível desrecuar',
+        }), 400
+
+    ordenadas, _nivel_map, filhas_map = _estrutura_visual(
+        obra_id, admin_id, cliente_mode)
+    por_id = {t.id: t for t in ordenadas}
+    pai = por_id.get(tarefa.tarefa_pai_id)
+    if pai is None:
+        # Pai fora da grade (inativo/dado sujo) — nada seguro a fazer.
+        return jsonify({
+            'status': 'error',
+            'msg': 'Hierarquia inconsistente — recarregue o cronograma',
+        }), 400
+    avo_id = pai.tarefa_pai_id or None
+
+    # Defesa (mesmo padrão de `atualizar_tarefa`): o avô é ancestral de X,
+    # nunca descendente — o check só dispara com dado sujo.
+    if _ciclo_hierarquico(avo_id, tarefa.id, por_id):
+        return jsonify({
+            'status': 'error',
+            'msg': 'Hierarquia circular: uma tarefa não pode ser pai de seu próprio ancestral.',
+        }), 400
+
+    filhas_pai = filhas_map.get(pai.id, [])
+    filhas_pai[:] = [t for t in filhas_pai if t.id != tarefa.id]
+    tarefa.tarefa_pai_id = avo_id
+    irmas_avo = filhas_map.setdefault(avo_id, [])
+    pos_pai = next((i for i, t in enumerate(irmas_avo) if t.id == pai.id),
+                   len(irmas_avo) - 1)
+    # Irmã seguinte do pai antigo: no DFS isso cai DEPOIS da subárvore
+    # inteira dele (que já não contém X).
+    irmas_avo.insert(pos_pai + 1, tarefa)
+
+    resultado, erro = _aplicar_hierarquia(obra_id, admin_id, cliente_mode,
+                                          filhas_map)
+    if erro:
+        return erro
+    logger.info(f"[OK] Tarefa desrecuada id={tarefa_id} novo_pai={avo_id} "
+                f"obra={obra_id} (editor v2)")
+    return _resposta_grade(obra_id, admin_id, cliente_mode, tarefa,
+                           resultado.tarefas_afetadas)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
