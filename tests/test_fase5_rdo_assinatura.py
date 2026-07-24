@@ -205,3 +205,157 @@ def test_assinatura_e_apagada_junto_com_o_rdo():
         db.session.delete(rdo)
         db.session.commit()
         assert RDOAssinatura.query.filter_by(rdo_id=rid).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Hash canônico
+# ---------------------------------------------------------------------------
+
+def test_hash_e_determinista():
+    from services.rdo_hash import calcular_hash
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        assert calcular_hash(rdo) == calcular_hash(rdo)
+
+
+def test_hash_tem_64_hex():
+    from services.rdo_hash import calcular_hash
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        h = calcular_hash(rdo)
+        assert len(h) == 64
+        assert all(c in '0123456789abcdef' for c in h)
+
+
+def test_hash_muda_quando_o_comentario_muda():
+    from services.rdo_hash import calcular_hash
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        antes = calcular_hash(rdo)
+        rdo.comentario_geral = 'Choveu; frente parada após as 14h.'
+        db.session.commit()
+        assert calcular_hash(rdo) != antes
+
+
+def test_hash_muda_quando_a_mao_de_obra_muda():
+    from models import RDOMaoObra
+    from services.rdo_hash import calcular_hash
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        rdo = _rdo(obra, admin.id)
+        antes = calcular_hash(rdo)
+        db.session.add(RDOMaoObra(
+            rdo_id=rdo.id, admin_id=admin.id, funcionario_id=func.id,
+            funcao_exercida='Montador', horas_trabalhadas=8.0))
+        db.session.commit()
+        db.session.refresh(rdo)
+        assert calcular_hash(rdo) != antes
+
+
+def test_hash_nao_depende_da_ordem_de_insercao_da_mao_de_obra():
+    """Duas linhas iguais em ordem trocada têm que dar o mesmo hash."""
+    from models import RDOMaoObra
+    from services.rdo_hash import calcular_hash
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        f1, f2 = _funcionario(admin.id, 'A'), _funcionario(admin.id, 'B')
+        r1, r2 = _rdo(obra, admin.id), _rdo(obra, admin.id)
+        for func, horas in ((f1, 8.0), (f2, 6.0)):
+            db.session.add(RDOMaoObra(rdo_id=r1.id, admin_id=admin.id,
+                                      funcionario_id=func.id,
+                                      funcao_exercida='Montador',
+                                      horas_trabalhadas=horas))
+        for func, horas in ((f2, 6.0), (f1, 8.0)):
+            db.session.add(RDOMaoObra(rdo_id=r2.id, admin_id=admin.id,
+                                      funcionario_id=func.id,
+                                      funcao_exercida='Montador',
+                                      horas_trabalhadas=horas))
+        db.session.commit()
+        db.session.refresh(r1)
+        db.session.refresh(r2)
+        from services.rdo_hash import payload_canonico
+        assert payload_canonico(r1)['mao_obra'] == \
+            payload_canonico(r2)['mao_obra']
+
+
+def test_hash_nao_inclui_os_bytes_da_foto():
+    """A assinatura não pode amarrar-se ao formato de armazenamento.
+
+    A Task 15 migra as fotos de base64 no banco para arquivo em disco.
+    Se o hash cobrisse os bytes, toda assinatura anterior à migração
+    ficaria inválida por uma mudança que não alterou o conteúdo
+    declarado.
+    """
+    from models import RDOFoto
+    from services.rdo_hash import calcular_hash, payload_canonico
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        foto = RDOFoto(
+            admin_id=admin.id, rdo_id=rdo.id,
+            nome_arquivo='p3.webp', caminho_arquivo='uploads/rdo/x/p3.webp',
+            nome_original='p3.jpg', descricao='Painel P3 montado',
+            ordem=0, imagem_otimizada_base64='data:image/webp;base64,AAAA')
+        db.session.add(foto)
+        db.session.commit()
+        db.session.refresh(rdo)
+
+        antes = calcular_hash(rdo)
+        assert payload_canonico(rdo)['fotos'] == \
+            [[foto.id, 'p3.jpg', 'Painel P3 montado']]
+
+        foto.imagem_otimizada_base64 = None
+        foto.arquivo_otimizado = 'uploads/rdo/x/p3.webp'
+        db.session.commit()
+        db.session.refresh(rdo)
+        assert calcular_hash(rdo) == antes, (
+            'mover a foto de base64 para disco invalidou a assinatura — o '
+            'hash está cobrindo bytes de armazenamento')
+
+
+def test_verificar_integridade_detecta_adulteracao():
+    from models import RDOAssinatura
+    from services.rdo_hash import calcular_hash, verificar_integridade
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        rdo = _rdo(obra, admin.id)
+        a = RDOAssinatura(
+            rdo_id=rdo.id, admin_id=admin.id, usuario_id=op.id,
+            funcionario_id=func.id, papel='executor',
+            nome_signatario=op.nome, hash_conteudo=calcular_hash(rdo),
+            algoritmo='sha256', provedor='interno')
+        db.session.add(a)
+        db.session.commit()
+
+        assert verificar_integridade(a) is True
+
+        # Adulteração por fora do ORM: UPDATE direto no banco, que é
+        # exatamente o cenário contra o qual o hash existe.
+        from sqlalchemy import text
+        db.session.execute(
+            text("UPDATE rdo SET comentario_geral = :c WHERE id = :i"),
+            {'c': 'texto trocado no banco', 'i': rdo.id})
+        db.session.commit()
+        db.session.expire_all()
+
+        assert verificar_integridade(a) is False
