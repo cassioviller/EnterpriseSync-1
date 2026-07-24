@@ -1439,6 +1439,83 @@ class RDOTransicaoEstado(db.Model):
                 f'{self.estado_anterior}→{self.estado_novo}>')
 
 
+class RDOAssinatura(db.Model):
+    """Assinatura eletrônica de um RDO — Fase 5.
+
+    ESCOPO JURÍDICO ADOTADO (ver docs/superpowers/plans/
+    2026-07-21-fase-5-rdo-ciclo-vida-assinatura.md, seção "A decisão
+    jurídica"): registro de AUTORIA + INTEGRIDADE, não ICP-Brasil.
+    Base legal: MP 2.200-2/2001, art. 10, §2º — outros meios de
+    comprovação de autoria e integridade, admitidos pelas partes. O RDO é
+    documento interno construtora ↔ equipe; o que é oponível a terceiro
+    (medição assinada pelo cliente) fica para a Fase 9a, e é lá que
+    ICP-Brasil/Clicksign/D4Sign se justificam.
+
+    `provedor` nasce 'interno' exatamente para que um provedor externo
+    entre depois sem migração de schema: bastaria gravar 'clicksign' e
+    preencher `referencia_externa`.
+
+    A identidade vem da Fase 1: `usuario_id` é quem logou,
+    `funcionario_id` é a pessoa de RH (`Usuario.funcionario_id`), e
+    `nome_signatario`/`cargo_signatario` são SNAPSHOT do momento — se a
+    pessoa mudar de cargo ou sair, a assinatura continua dizendo quem
+    assinou e em que função.
+    """
+    __tablename__ = 'rdo_assinatura'
+    __table_args__ = (
+        db.UniqueConstraint('rdo_id', 'papel', name='uq_rdo_assinatura_papel'),
+        db.Index('ix_rdo_assinatura_rdo_papel', 'rdo_id', 'papel'),
+    )
+
+    # Papéis de assinatura. Deliberadamente três: quem executou, quem
+    # responde pela obra, e a ciência do cliente (Fase 9a a preenche pelo
+    # portal; aqui a coluna já existe para não migrar de novo).
+    PAPEL_EXECUTOR = 'executor'
+    PAPEL_GESTOR = 'gestor'
+    PAPEL_CLIENTE = 'cliente'
+    PAPEIS = (PAPEL_EXECUTOR, PAPEL_GESTOR, PAPEL_CLIENTE)
+
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'),
+                       nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                           nullable=True)
+    funcionario_id = db.Column(
+        db.Integer, db.ForeignKey('funcionario.id', ondelete='SET NULL'),
+        nullable=True)
+
+    papel = db.Column(db.String(20), nullable=False)
+    nome_signatario = db.Column(db.String(200), nullable=False)
+    cargo_signatario = db.Column(db.String(120), nullable=True)
+
+    # Integridade: SHA-256 do payload canônico (services/rdo_hash.py).
+    hash_conteudo = db.Column(db.String(128), nullable=False)
+    algoritmo = db.Column(db.String(20), nullable=False, default='sha256')
+    provedor = db.Column(db.String(30), nullable=False, default='interno')
+    referencia_externa = db.Column(db.String(200), nullable=True)
+
+    # Carimbo de tempo do SERVIDOR — não do cliente.
+    assinado_em = db.Column(db.DateTime, default=datetime.utcnow,
+                            nullable=False)
+    # IP real do cliente: ProxyFix(x_for=1) está ativo em app.py:94.
+    ip = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(400), nullable=True)
+    observacao = db.Column(db.Text, nullable=True)
+
+    rdo = db.relationship(
+        'RDO',
+        backref=db.backref('assinaturas', lazy='selectin',
+                           cascade='all, delete-orphan',
+                           passive_deletes=True,
+                           order_by='RDOAssinatura.assinado_em'))
+
+    def __repr__(self):
+        return (f'<RDOAssinatura rdo={self.rdo_id} papel={self.papel} '
+                f'por={self.nome_signatario}>')
+
+
 # ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====
 
 class Restaurante(db.Model):

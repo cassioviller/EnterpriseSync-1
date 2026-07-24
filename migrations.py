@@ -4936,6 +4936,57 @@ def migration_261_rdo_transicao_estado():
     logger.info("[Migration 261] Concluída com sucesso")
 
 
+def migration_262_rdo_assinatura():
+    """Fase 5 — tabela rdo_assinatura (autoria + integridade).
+
+    Aditiva e vazia. NENHUMA assinatura histórica é fabricada: os RDOs
+    existentes nunca foram assinados, e inventar autoria é o oposto do
+    que a tabela existe para provar.
+
+    UNIQUE (rdo_id, papel): um papel assina uma vez. Reassinatura depois
+    de correção é RDO retificador (migration 263), não sobrescrita.
+    """
+    logger.info("[Migration 262] Iniciando — tabela rdo_assinatura")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS rdo_assinatura (
+            id SERIAL PRIMARY KEY,
+            rdo_id INTEGER NOT NULL REFERENCES rdo(id) ON DELETE CASCADE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            usuario_id INTEGER REFERENCES usuario(id),
+            funcionario_id INTEGER REFERENCES funcionario(id) ON DELETE SET NULL,
+            papel VARCHAR(20) NOT NULL,
+            nome_signatario VARCHAR(200) NOT NULL,
+            cargo_signatario VARCHAR(120),
+            hash_conteudo VARCHAR(128) NOT NULL,
+            algoritmo VARCHAR(20) NOT NULL DEFAULT 'sha256',
+            provedor VARCHAR(30) NOT NULL DEFAULT 'interno',
+            referencia_externa VARCHAR(200),
+            assinado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+            ip VARCHAR(45),
+            user_agent VARCHAR(400),
+            observacao TEXT
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_rdo_assinatura_papel
+        ON rdo_assinatura (rdo_id, papel)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_assinatura_rdo_id
+        ON rdo_assinatura (rdo_id)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_assinatura_admin_id
+        ON rdo_assinatura (admin_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 262] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5205,6 +5256,7 @@ def executar_migracoes():
             (254, "Fase 4 — VALIDATE do CHECK de destino (varre o histórico; aborta e retenta se houver pendência)", migration_254_validate_check_destino_custo),
             (260, "Fase 5 — rdo.estado (ciclo de vida) + backfill histórico como 'preenchido'", migration_260_rdo_estado),
             (261, "Fase 5 — tabela rdo_transicao_estado (trilha do ciclo de vida do RDO)", migration_261_rdo_transicao_estado),
+            (262, "Fase 5 — tabela rdo_assinatura (autoria + hash + carimbo de tempo + IP)", migration_262_rdo_assinatura),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas
