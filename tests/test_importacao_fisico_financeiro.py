@@ -904,6 +904,33 @@ def test_fixture_rdos_sem_mao_de_obra():
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
+@pytest.mark.integration
+def test_import_cria_rdos_em_estado_preenchido():
+    """Fase 5 — o RDO importado é histórico consolidado (dirige a medição
+    pelos apontamentos), não um rascunho a submeter. Tem de nascer
+    'preenchido', coerente com o status='Finalizado' que o importador já
+    grava e com o backfill da migration 260.
+
+    Se cair no default do modelo ('rascunho'), a tela mostra "Submeter" e
+    submeter dispararia rdo_finalizado → lancar_custos_rdo sobre uma
+    medição que a importação já dirigiu — custo em duplicidade.
+    """
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from services.rdo_ciclo_vida import PREENCHIDO
+    from models import RDO
+
+    with app.app_context():
+        admin_id = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), admin_id)['obra_id']
+        rdos = RDO.query.filter_by(obra_id=oid).all()
+        assert rdos, 'a fixture tem seção rdos — deveria ter criado RDOs'
+        assert all(r.estado == PREENCHIDO for r in rdos), (
+            'RDO importado nasceu em %r, deveria ser preenchido' %
+            {r.estado for r in rdos})
+        # o campo legado continua 'Finalizado' (≥9 consumidores filtram por ele)
+        assert all(r.status == 'Finalizado' for r in rdos)
+
+
 def test_import_anexa_fotos_do_rdo(tmp_path):
     """Um RDO com `fotos` (legendas em ordem) anexa RDOFoto lendo os arquivos
     numerados de fotos_rdos/<data>/; a legenda e os arquivos em disco são

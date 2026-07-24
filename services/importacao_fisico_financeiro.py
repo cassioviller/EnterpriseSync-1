@@ -433,6 +433,7 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
     from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
                         CustoObra, NotificacaoCliente, MovimentacaoEstoque,
                         AlocacaoEquipe, TarefaCronograma)
+    from services.rdo_ciclo_vida import PREENCHIDO
     from utils.cronograma_engine import calcular_progresso_rdo
 
     if not rdos:
@@ -481,6 +482,16 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
             numero_rdo=f"RDO-{obra.id}-{dia.strftime('%Y%m%d')}",
             obra_id=obra.id, admin_id=admin_id, criado_por_id=admin_id,
             data_relatorio=dia, local='Campo', status='Finalizado',
+            # Fase 5 — o RDO importado é histórico já consolidado (dirige a
+            # medição pelos apontamentos abaixo), não um rascunho a submeter.
+            # Nasce 'preenchido', coerente com o status='Finalizado' que já
+            # gravava e com o backfill da migration 260. SEM trilha de
+            # transição, pela mesma razão do backfill: não houve submissão de
+            # um usuário, é materialização de dado. Deixá-lo em 'rascunho' (o
+            # default do modelo) faria a tela mostrar "Submeter", e submeter
+            # dispararia rdo_finalizado → lancar_custos_rdo em cima de uma
+            # medição que a importação já dirigiu (custo em duplicidade).
+            estado=PREENCHIDO,
             clima_geral=(item.get('clima') or 'Não informado')[:50],
             precipitacao=(item.get('precipitacao') or '')[:20],
             comentario_geral=item.get('comentario') or '',
