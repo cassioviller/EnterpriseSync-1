@@ -221,3 +221,84 @@ def transicionar(rdo, novo_estado: str, *, usuario=None, funcionario=None,
                 'motivo=%r', rdo.id, atual, novo_estado,
                 getattr(usuario, 'id', None), funcionario_id, ip, motivo)
     return trilha
+
+
+# ── Guarda de imutabilidade ──────────────────────────────────────────
+# Por que um listener de sessão em vez de editar as oito rotas de
+# escrita: porque não dá para PROVAR que nenhuma foi esquecida. São oito
+# lugares hoje (views/rdo.py:698,1540,1630,1755,2614,3967;
+# rdo_editar_sistema.py:221; crud_rdo_completo.py:338,572), mais o
+# import físico-financeiro, mais os scripts de seed. Um ponto só é
+# auditável; oito não são.
+#
+# O molde de listener em modelo de RDO já existe no repo:
+# models.py:1614 (RDOServicoSubatividade before_insert/update) e
+# models.py:7649 (RDO after_insert). Aqui é `before_flush` de SESSÃO
+# porque precisamos ver inserts, updates E deletes de uma vez.
+
+# Filhos do RDO cuja escrita também é bloqueada. RDOTransicaoEstado e
+# RDOAssinatura ficam DE FORA de propósito: são o registro da própria
+# transição, e bloqueá-los tornaria impossível assinar.
+_MODELOS_FILHOS = (
+    'RDOMaoObra', 'RDOServicoSubatividade', 'RDOEquipamento',
+    'RDOOcorrencia', 'RDOFoto', 'RDOApontamentoCronograma',
+    'RDOSubempreitadaApontamento',
+)
+
+
+def _rdo_id_do_objeto(obj):
+    """Devolve o rdo_id que o objeto afeta, ou None se não for do RDO."""
+    nome = type(obj).__name__
+    if nome == 'RDO':
+        return obj.id
+    if nome in _MODELOS_FILHOS:
+        return getattr(obj, 'rdo_id', None)
+    return None
+
+
+def _registrar_guarda():
+    from sqlalchemy import event as sa_event
+
+    @sa_event.listens_for(db.session, 'before_flush')
+    def _guarda_imutabilidade(session, flush_context, instances):
+        if _BYPASS.get():
+            return
+
+        candidatos = {}
+        for coleccao in (session.new, session.dirty, session.deleted):
+            for obj in coleccao:
+                rdo_id = _rdo_id_do_objeto(obj)
+                if rdo_id is not None:
+                    candidatos.setdefault(rdo_id, []).append(obj)
+
+        if not candidatos:
+            return
+
+        with session.no_autoflush:
+            for rdo_id, objetos in candidatos.items():
+                alvo = session.get(RDO, rdo_id)
+                if alvo is None:
+                    continue
+                # `estado` recém-atribuído nesta sessão não vale: o que
+                # importa é o estado PERSISTIDO. Sem bypass, mudar estado
+                # é justamente o que não pode acontecer por fora.
+                from sqlalchemy import inspect as sa_inspect
+                historico = sa_inspect(alvo).attrs.estado.history
+                persistido = (historico.deleted[0] if historico.deleted
+                              else alvo.estado)
+                if persistido not in ESTADOS_IMUTAVEIS:
+                    continue
+                nomes = sorted({type(o).__name__ for o in objetos})
+                logger.warning(
+                    '[ciclo-vida] escrita BARRADA em rdo=%s (estado=%s): %s',
+                    rdo_id, persistido, nomes)
+                raise RDOImutavel(
+                    f'RDO {alvo.numero_rdo or alvo.id} está '
+                    f'{ROTULOS.get(persistido, persistido).lower()} e não '
+                    f'aceita mais alteração ({", ".join(nomes)}). Para '
+                    f'corrigir, emita um RDO retificador.')
+
+    logger.info('[ciclo-vida] guarda de imutabilidade registrada')
+
+
+_registrar_guarda()

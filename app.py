@@ -1052,5 +1052,17 @@ for bp_name in csrf_exempt_blueprints:
         csrf.exempt(bp)
         logging.info(f"[OK] CSRF exempt: {bp_name}")
 
+# Fase 5 — importar registra o listener `before_flush` que impede escrita
+# em RDO assinado/aprovado/retificado. Sem este import a guarda não
+# existe e as oito rotas de escrita de RDO voltam a poder reescrever
+# documento assinado. Import tardio de propósito: o módulo depende de
+# `models` já configurado.
+try:
+    import services.rdo_ciclo_vida  # noqa: F401
+    logging.info("[OK] Fase 5: guarda de imutabilidade de RDO ativa")
+except Exception as _e_ciclo:
+    logging.error("[ERRO] Fase 5: guarda de imutabilidade NÃO registrada: %s",
+                  _e_ciclo)
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

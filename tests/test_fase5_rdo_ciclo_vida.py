@@ -117,17 +117,30 @@ def test_status_legado_continua_finalizado():
 
 
 def test_backfill_marcou_os_rdos_historicos_como_preenchido():
-    """Migration 260: histórico vira 'preenchido', NUNCA 'assinado'."""
+    """Migration 260: histórico vira 'preenchido', NUNCA 'assinado'.
+
+    O plano original asseverava `count(estado='assinado') == 0` no banco
+    inteiro — verdade só no instante pós-migration. Num banco compartilhado
+    a própria suíte cria RDOs legitimamente assinados (via transicionar,
+    que grava trilha). O invariante durável é: assinado SEM trilha de
+    transição para 'assinado' não existe — seria autoria forjada por
+    backfill.
+    """
     from sqlalchemy import text
     from services.rdo_ciclo_vida import ASSINADO
 
     with app.app_context():
-        forjados = db.session.execute(text(
-            "SELECT count(*) FROM rdo WHERE estado = :e"), {'e': ASSINADO}
-        ).scalar()
+        forjados = db.session.execute(text("""
+            SELECT count(*) FROM rdo r
+            WHERE r.estado = :e
+              AND NOT EXISTS (
+                  SELECT 1 FROM rdo_transicao_estado t
+                  WHERE t.rdo_id = r.id AND t.estado_novo = :e
+              )
+        """), {'e': ASSINADO}).scalar()
         assert forjados == 0, (
-            f'{forjados} RDO(s) históricos foram marcados como assinados pelo '
-            f'backfill — isso é forjar autoria')
+            f'{forjados} RDO(s) estão assinados SEM trilha de transição — '
+            f'autoria forjada (backfill ou escrita por fora da máquina)')
         orfaos = db.session.execute(text(
             "SELECT count(*) FROM rdo WHERE estado IS NULL")).scalar()
         assert orfaos == 0, f'{orfaos} RDO(s) ficaram sem estado após o backfill'
@@ -301,3 +314,170 @@ def test_garantir_editavel_recusa_assinado():
         db.session.commit()
         with pytest.raises(RDOImutavel):
             garantir_editavel(rdo)
+
+
+# ---------------------------------------------------------------------------
+# Guarda de imutabilidade
+# ---------------------------------------------------------------------------
+
+def _assinar_direto(rdo, admin):
+    """Leva o RDO até 'assinado' sem passar pela rota (Task 7 ainda não existe)."""
+    from services.rdo_ciclo_vida import ASSINADO, PREENCHIDO, transicionar
+    transicionar(rdo, PREENCHIDO, usuario=admin)
+    transicionar(rdo, ASSINADO, usuario=admin)
+    db.session.commit()
+
+
+def test_editar_rdo_assinado_e_barrado_no_flush():
+    from services.rdo_ciclo_vida import RDOImutavel
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+
+        rdo.comentario_geral = 'reescrevendo a história'
+        with pytest.raises(RDOImutavel):
+            db.session.commit()
+        db.session.rollback()
+        assert db.session.get(RDO, rdo.id).comentario_geral == \
+            'Concretagem do radier.'
+
+
+def test_inserir_mao_de_obra_em_rdo_assinado_e_barrado():
+    from models import RDOMaoObra
+    from services.rdo_ciclo_vida import RDOImutavel
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        func = Funcionario(
+            nome=f'Pedreiro {_sfx()}', cpf=_sfx().ljust(14, '0')[:14],
+            codigo=f'FF5{_sfx()[:6].upper()}', data_admissao=date(2025, 1, 1),
+            admin_id=admin.id, ativo=True,
+        )
+        db.session.add(func)
+        db.session.commit()
+        _assinar_direto(rdo, admin)
+
+        db.session.add(RDOMaoObra(
+            rdo_id=rdo.id, admin_id=admin.id, funcionario_id=func.id,
+            funcao_exercida='Pedreiro', horas_trabalhadas=8.0))
+        with pytest.raises(RDOImutavel):
+            db.session.commit()
+        db.session.rollback()
+        assert RDOMaoObra.query.filter_by(rdo_id=rdo.id).count() == 0
+
+
+def test_apontamento_de_cronograma_em_rdo_assinado_e_barrado():
+    """Ponto de contato com o plano irmão (modo de apontamento)."""
+    from models import RDOApontamentoCronograma, TarefaCronograma
+    from services.rdo_ciclo_vida import RDOImutavel
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        tarefa = TarefaCronograma(
+            obra_id=obra.id, nome_tarefa='Radier', ordem=1, duracao_dias=5,
+            quantidade_total=100.0, unidade_medida='m2',
+            percentual_concluido=0.0, data_inicio=date(2026, 6, 20),
+            data_fim=date(2026, 6, 25), admin_id=admin.id)
+        db.session.add(tarefa)
+        rdo = _rdo(obra, admin.id)
+        db.session.commit()
+        _assinar_direto(rdo, admin)
+
+        db.session.add(RDOApontamentoCronograma(
+            rdo_id=rdo.id, tarefa_cronograma_id=tarefa.id, admin_id=admin.id,
+            quantidade_executada_dia=10.0, quantidade_acumulada=10.0,
+            percentual_realizado=10.0))
+        with pytest.raises(RDOImutavel):
+            db.session.commit()
+        db.session.rollback()
+
+
+def test_excluir_rdo_assinado_e_barrado():
+    from services.rdo_ciclo_vida import RDOImutavel
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+
+        db.session.delete(rdo)
+        with pytest.raises(RDOImutavel):
+            db.session.commit()
+        db.session.rollback()
+        assert db.session.get(RDO, rdo.id) is not None
+
+
+def test_transicao_de_estado_atravessa_a_guarda():
+    """assinado → aprovado escreve no RDO imutável e PRECISA passar."""
+    from services.rdo_ciclo_vida import APROVADO, transicionar
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+
+        transicionar(rdo, APROVADO, usuario=admin)
+        db.session.commit()
+        assert db.session.get(RDO, rdo.id).estado == APROVADO
+
+
+def test_bypass_nao_vaza_entre_transacoes():
+    """Depois da transição, a guarda tem que estar de pé de novo."""
+    from services.rdo_ciclo_vida import (APROVADO, RDOImutavel, bypass_ativo,
+                                         transicionar)
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+        transicionar(rdo, APROVADO, usuario=admin)
+        db.session.commit()
+
+        assert bypass_ativo() is False
+        rdo.comentario_geral = 'depois da aprovação'
+        with pytest.raises(RDOImutavel):
+            db.session.commit()
+        db.session.rollback()
+
+
+def test_qualquer_caminho_de_escrita_e_barrado():
+    """A prova de que a guarda vale para as rotas que ninguém migrou.
+
+    `salvar_rdo_flexivel` (views/rdo.py:3967) é o caminho mais obscuro do
+    módulo — sem nenhuma noção de estado. Se a guarda pega ele, pega os
+    outros sete.
+    """
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _assinar_direto(rdo, admin)
+        rid, oid, aid = rdo.id, obra.id, admin.id
+
+    cliente = app.test_client()
+    with cliente.session_transaction() as sess:
+        sess['_user_id'] = str(aid)
+        sess['_fresh'] = True
+
+    resposta = cliente.post('/salvar-rdo-flexivel', data={
+        'rdo_id': str(rid),
+        'obra_id': str(oid),
+        'data_relatorio': '2026-06-22',
+        'comentario_geral': 'tentativa de reescrita',
+    }, follow_redirects=True)
+    assert resposta.status_code in (200, 302)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).comentario_geral == \
+            'Concretagem do radier.', (
+            'salvar_rdo_flexivel reescreveu um RDO assinado — a guarda '
+            'before_flush não pegou este caminho')
