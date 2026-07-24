@@ -4987,6 +4987,50 @@ def migration_262_rdo_assinatura():
     logger.info("[Migration 262] Concluída com sucesso")
 
 
+def migration_263_rdo_retificador():
+    """Fase 5 — rdo.rdo_retificado_id + rdo.motivo_retificacao.
+
+    Aditiva e idempotente. Auto-FK: o RDO retificador aponta para o RDO
+    que ele substitui. Nenhuma linha histórica é preenchida — não há como
+    saber, retroativamente, qual RDO antigo corrigiu qual.
+    """
+    logger.info("[Migration 263] Iniciando — rdo.rdo_retificado_id")
+
+    db.session.execute(text("""
+        ALTER TABLE rdo
+        ADD COLUMN IF NOT EXISTS rdo_retificado_id INTEGER
+    """))
+    db.session.execute(text("""
+        ALTER TABLE rdo
+        ADD COLUMN IF NOT EXISTS motivo_retificacao TEXT
+    """))
+    db.session.commit()
+
+    existe_fk = db.session.execute(text("""
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_rdo_retificado_id'
+          AND table_name = 'rdo'
+        LIMIT 1
+    """)).fetchone()
+    if not existe_fk:
+        db.session.execute(text("""
+            ALTER TABLE rdo
+            ADD CONSTRAINT fk_rdo_retificado_id
+            FOREIGN KEY (rdo_retificado_id) REFERENCES rdo(id)
+            ON DELETE SET NULL
+        """))
+        db.session.commit()
+        logger.info("[Migration 263] FK fk_rdo_retificado_id criada")
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_rdo_retificado_id
+        ON rdo (rdo_retificado_id)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 263] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5257,6 +5301,7 @@ def executar_migracoes():
             (260, "Fase 5 — rdo.estado (ciclo de vida) + backfill histórico como 'preenchido'", migration_260_rdo_estado),
             (261, "Fase 5 — tabela rdo_transicao_estado (trilha do ciclo de vida do RDO)", migration_261_rdo_transicao_estado),
             (262, "Fase 5 — tabela rdo_assinatura (autoria + hash + carimbo de tempo + IP)", migration_262_rdo_assinatura),
+            (263, "Fase 5 — rdo.rdo_retificado_id + motivo_retificacao (RDO retificador)", migration_263_rdo_retificador),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

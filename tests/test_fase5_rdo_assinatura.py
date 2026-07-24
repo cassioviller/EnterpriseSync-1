@@ -774,3 +774,150 @@ def test_finalizar_rdo_ja_preenchido_e_no_op():
         assert transicoes == 1, (
             f'{transicoes} transições para preenchido — o no-op de '
             f'`transicionar` não está funcionando')
+
+
+# ---------------------------------------------------------------------------
+# RDO retificador
+# ---------------------------------------------------------------------------
+
+def test_retificar_cria_rdo_novo_e_marca_o_original():
+    from services.rdo_ciclo_vida import RASCUNHO, RETIFICADO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        f_ap, f_ge = _funcionario(admin.id, 'Ap'), _funcionario(admin.id, 'Ge')
+        ap, ge = _operador(admin.id, f_ap), _operador(admin.id, f_ge, 'Gestor')
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid, geid, oid = rdo.id, ap.id, ge.id, obra.id
+
+    _assinar_pela_rota(rid, apid)
+    resposta = _cliente_de(geid).post(
+        f'/rdo/{rid}/retificar',
+        data={'motivo': 'horas do Márcio lançadas em dobro'},
+        follow_redirects=False)
+    assert resposta.status_code in (200, 302)
+
+    with app.app_context():
+        original = db.session.get(RDO, rid)
+        assert original.estado == RETIFICADO
+
+        novo = RDO.query.filter_by(rdo_retificado_id=rid).first()
+        assert novo is not None, 'nenhum RDO retificador foi criado'
+        assert novo.id != rid
+        assert novo.estado == RASCUNHO
+        assert novo.obra_id == oid
+        assert novo.data_relatorio == original.data_relatorio, (
+            'o retificador tem que ser do MESMO dia do original')
+        assert novo.numero_rdo != original.numero_rdo
+
+
+def test_retificador_copia_o_conteudo_do_original():
+    from models import RDOMaoObra, RDOServicoSubatividade
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        f_ap, f_ge = _funcionario(admin.id, 'Ap'), _funcionario(admin.id, 'Ge')
+        ap, ge = _operador(admin.id, f_ap), _operador(admin.id, f_ge, 'Gestor')
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        db.session.add(RDOMaoObra(
+            rdo_id=rdo.id, admin_id=admin.id, funcionario_id=f_ap.id,
+            funcao_exercida='Montador', horas_trabalhadas=8.0))
+        db.session.add(RDOServicoSubatividade(
+            rdo_id=rdo.id, admin_id=admin.id,
+            nome_subatividade='Montagem de painel', percentual_conclusao=40.0,
+            ordem_execucao=1))
+        db.session.commit()
+        _preencher(rdo, ap)
+        rid, apid, geid = rdo.id, ap.id, ge.id
+
+    _assinar_pela_rota(rid, apid)
+    _cliente_de(geid).post(f'/rdo/{rid}/retificar', data={'motivo': 'ajuste'})
+
+    with app.app_context():
+        novo = RDO.query.filter_by(rdo_retificado_id=rid).first()
+        assert novo.comentario_geral == \
+            'Montagem dos perfis de aço do painel P3.'
+        assert RDOMaoObra.query.filter_by(rdo_id=novo.id).count() == 1
+        assert RDOServicoSubatividade.query.filter_by(
+            rdo_id=novo.id).count() == 1
+        sub = RDOServicoSubatividade.query.filter_by(rdo_id=novo.id).first()
+        assert sub.percentual_conclusao == 40.0
+
+
+def test_original_retificado_continua_imutavel():
+    from services.rdo_ciclo_vida import RDOImutavel
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        f_ap, f_ge = _funcionario(admin.id, 'Ap'), _funcionario(admin.id, 'Ge')
+        ap, ge = _operador(admin.id, f_ap), _operador(admin.id, f_ge, 'Gestor')
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid, geid = rdo.id, ap.id, ge.id
+
+    _assinar_pela_rota(rid, apid)
+    _cliente_de(geid).post(f'/rdo/{rid}/retificar', data={'motivo': 'ajuste'})
+
+    with app.app_context():
+        original = db.session.get(RDO, rid)
+        original.comentario_geral = 'mexendo no retificado'
+        with pytest.raises(RDOImutavel):
+            db.session.commit()
+        db.session.rollback()
+
+
+def test_retificar_exige_motivo():
+    from services.rdo_ciclo_vida import ASSINADO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        f_ap, f_ge = _funcionario(admin.id, 'Ap'), _funcionario(admin.id, 'Ge')
+        ap, ge = _operador(admin.id, f_ap), _operador(admin.id, f_ge, 'Gestor')
+        _vincular(ap, obra, PapelObra.APONTADOR)
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, ap)
+        rid, apid, geid = rdo.id, ap.id, ge.id
+
+    _assinar_pela_rota(rid, apid)
+    _cliente_de(geid).post(f'/rdo/{rid}/retificar', data={'motivo': '  '})
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == ASSINADO
+        assert RDO.query.filter_by(rdo_retificado_id=rid).count() == 0
+
+
+def test_nao_retifica_rdo_em_rascunho():
+    """RDO não assinado se corrige editando, não retificando."""
+    from services.rdo_ciclo_vida import RASCUNHO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id, 'Ge')
+        ge = _operador(admin.id, func, 'Gestor')
+        _vincular(ge, obra, PapelObra.GESTOR)
+        rdo = _rdo(obra, admin.id)
+        rid, geid = rdo.id, ge.id
+
+    _cliente_de(geid).post(f'/rdo/{rid}/retificar', data={'motivo': 'x'})
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == RASCUNHO
+        assert RDO.query.filter_by(rdo_retificado_id=rid).count() == 0

@@ -1142,6 +1142,22 @@ class RDO(db.Model):
     estado = db.Column(db.String(20), nullable=False, default='rascunho',
                        server_default='rascunho', index=True)
 
+    # Fase 5 — RDO retificador. Um RDO é um documento de DATA: "versionar"
+    # o RDO de 22/06 é emitir outro RDO de 22/06 que diz o que o primeiro
+    # deveria ter dito, com o primeiro preservado e marcado 'retificado'.
+    # É a prática de campo, e resolve o UNIQUE de `numero_rdo` sem gambiarra.
+    # ON DELETE SET NULL: apagar o retificador não pode estourar a FK do
+    # original (que, por ser 'retificado', a guarda de imutabilidade
+    # impede de apagar mesmo).
+    rdo_retificado_id = db.Column(
+        db.Integer, db.ForeignKey('rdo.id', ondelete='SET NULL'),
+        nullable=True, index=True)
+    motivo_retificacao = db.Column(db.Text, nullable=True)
+
+    rdo_retificado = db.relationship(
+        'RDO', remote_side=[id], foreign_keys=[rdo_retificado_id],
+        backref=db.backref('retificadores', lazy='dynamic'))
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

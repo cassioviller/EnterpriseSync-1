@@ -1746,6 +1746,43 @@ def reabrir_rdo(id):
     return redirect(url_for('main.visualizar_rdo', id=id))
 
 
+@main_bp.route('/rdo/<int:id>/retificar', methods=['POST'])
+@login_required
+def retificar_rdo(id):
+    """Emite um RDO retificador de um RDO assinado/aprovado.
+
+    Autorização: `pode_editar_obra` (Fase 1). Retificar é ato de gestão —
+    o documento original fica no acervo, marcado `retificado`.
+    """
+    from services.rdo_assinatura import criar_retificador
+    from services.rdo_ciclo_vida import CicloVidaInvalido
+    from utils.autorizacao import pode_editar_obra
+
+    rdo = _rdo_do_tenant_ou_404(id)
+
+    if not pode_editar_obra(rdo.obra_id):
+        flash('Só o gestor da obra pode emitir RDO retificador.', 'error')
+        return redirect(url_for('main.visualizar_rdo', id=id))
+
+    try:
+        novo = criar_retificador(
+            rdo, current_user, motivo=request.form.get('motivo'))
+        db.session.commit()
+        flash(f'RDO retificador {novo.numero_rdo} criado a partir do '
+              f'{rdo.numero_rdo}. Corrija e assine o novo documento.',
+              'success')
+        return redirect(url_for('main.visualizar_rdo', id=novo.id))
+    except CicloVidaInvalido as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO RETIFICAR RDO {id}: {e}", exc_info=True)
+        flash('Erro ao emitir o RDO retificador.', 'error')
+
+    return redirect(url_for('main.visualizar_rdo', id=id))
+
+
 @main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
 @admin_required
 def duplicar_rdo(id):

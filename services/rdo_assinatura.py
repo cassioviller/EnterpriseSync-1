@@ -158,3 +158,125 @@ def aprovar(rdo, usuario, *, observacao=None):
     logger.info('[assinatura] rdo=%s APROVADO por usuario=%s ip=%s',
                 rdo.id, usuario.id, ip)
     return assinatura
+
+
+# Campos do cabeçalho do RDO que o retificador herda. `status` fica de
+# fora porque é preenchido pelo default ('Finalizado'); `estado` fica de
+# fora porque o retificador nasce em rascunho.
+_CAMPOS_CABECALHO = (
+    'clima_geral', 'temperatura_media', 'umidade_relativa',
+    'vento_velocidade', 'precipitacao', 'condicoes_trabalho',
+    'observacoes_climaticas', 'local', 'comentario_geral',
+)
+
+
+def criar_retificador(rdo, usuario, *, motivo):
+    """Emite um RDO retificador do `rdo` e marca o original.
+
+    O retificador nasce em `rascunho`, no MESMO dia do original, com uma
+    cópia do conteúdo (cabeçalho, subatividades, mão de obra,
+    equipamentos, ocorrências). Fotos e apontamentos de cronograma NÃO
+    são copiados de propósito:
+
+      * fotos custam três cópias base64 por unidade no banco —
+        duplicá-las por retificação dobra o custo do problema que a
+        Task 15 existe para resolver;
+      * apontamentos de cronograma são acumulativos entre RDOs
+        (services/cronograma_apontamento_service.py). Copiar somaria
+        produção duas vezes. Quem retifica reaponta o que mudou.
+
+    Não faz commit. Devolve o RDO novo.
+    """
+    from models import (RDO, RDOEquipamento, RDOMaoObra, RDOOcorrencia,
+                        RDOServicoSubatividade)
+    from services.rdo_ciclo_vida import (ESTADOS_IMUTAVEIS, RASCUNHO,
+                                         RETIFICADO)
+
+    motivo = (motivo or '').strip()
+    if not motivo:
+        raise AssinaturaInvalida(
+            'Informe o motivo da retificação — ele fica no documento.')
+
+    atual = estado_de(rdo)
+    if atual not in ESTADOS_IMUTAVEIS or atual == RETIFICADO:
+        raise AssinaturaInvalida(
+            f'Só um RDO assinado ou aprovado pode ser retificado — este '
+            f'está em "{atual}". Se ele ainda é editável, corrija-o '
+            f'direto.')
+
+    from views.rdo import _gerar_numero_rdo_unico
+
+    admin_id = rdo.admin_id or rdo.obra.admin_id
+    novo = RDO(
+        obra_id=rdo.obra_id,
+        data_relatorio=rdo.data_relatorio,
+        admin_id=admin_id,
+        criado_por_id=usuario.id,
+        numero_rdo=_gerar_numero_rdo_unico(rdo.obra_id, rdo.data_relatorio,
+                                           admin_id),
+        estado=RASCUNHO,
+        rdo_retificado_id=rdo.id,
+        motivo_retificacao=motivo,
+    )
+    for campo in _CAMPOS_CABECALHO:
+        setattr(novo, campo, getattr(rdo, campo, None))
+    db.session.add(novo)
+    db.session.flush()
+
+    for sub in RDOServicoSubatividade.query.filter_by(rdo_id=rdo.id).all():
+        db.session.add(RDOServicoSubatividade(
+            rdo_id=novo.id, admin_id=admin_id, servico_id=sub.servico_id,
+            nome_subatividade=sub.nome_subatividade,
+            descricao_subatividade=sub.descricao_subatividade,
+            percentual_conclusao=sub.percentual_conclusao,
+            percentual_anterior=sub.percentual_anterior,
+            incremento_dia=sub.incremento_dia,
+            observacoes_tecnicas=sub.observacoes_tecnicas,
+            ordem_execucao=sub.ordem_execucao,
+            subatividade_mestre_id=sub.subatividade_mestre_id,
+            quantidade_produzida=sub.quantidade_produzida,
+            meta_produtividade_snapshot=sub.meta_produtividade_snapshot,
+            unidade_medida_snapshot=sub.unidade_medida_snapshot,
+        ))
+
+    for mo in RDOMaoObra.query.filter_by(rdo_id=rdo.id).all():
+        db.session.add(RDOMaoObra(
+            rdo_id=novo.id, admin_id=admin_id,
+            funcionario_id=mo.funcionario_id,
+            funcao_exercida=mo.funcao_exercida,
+            horas_trabalhadas=mo.horas_trabalhadas,
+            tarefa_cronograma_id=mo.tarefa_cronograma_id,
+            peso_distribuicao=mo.peso_distribuicao,
+        ))
+
+    for eq in RDOEquipamento.query.filter_by(rdo_id=rdo.id).all():
+        db.session.add(RDOEquipamento(
+            rdo_id=novo.id, admin_id=admin_id,
+            nome_equipamento=eq.nome_equipamento, quantidade=eq.quantidade,
+            horas_uso=eq.horas_uso,
+            estado_conservacao=eq.estado_conservacao,
+        ))
+
+    for oc in RDOOcorrencia.query.filter_by(rdo_id=rdo.id).all():
+        db.session.add(RDOOcorrencia(
+            rdo_id=novo.id, admin_id=admin_id,
+            tipo_ocorrencia=oc.tipo_ocorrencia, severidade=oc.severidade,
+            descricao_ocorrencia=oc.descricao_ocorrencia,
+            problemas_identificados=oc.problemas_identificados,
+            acoes_corretivas=oc.acoes_corretivas,
+            responsavel_acao=oc.responsavel_acao,
+            prazo_resolucao=oc.prazo_resolucao,
+            status_resolucao=oc.status_resolucao,
+        ))
+
+    ip, _ua = _contexto_request()
+    transicionar(rdo, RETIFICADO, usuario=usuario, motivo=motivo, ip=ip,
+                 detalhes={'rdo_retificador_id': novo.id})
+    # No-op de estado (o retificador já nasce em rascunho): documentação
+    # executável de que ele nasce editável, sem gravar trilha.
+    transicionar(novo, RASCUNHO, usuario=usuario, motivo=motivo, ip=ip,
+                 detalhes={'rdo_retificado_id': rdo.id})
+
+    logger.info('[assinatura] rdo=%s RETIFICADO por rdo=%s usuario=%s '
+                'motivo=%r', rdo.id, novo.id, usuario.id, motivo)
+    return novo
