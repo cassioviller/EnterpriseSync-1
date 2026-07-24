@@ -4840,6 +4840,59 @@ def migration_254_validate_check_destino_custo():
         total, com_obra, total - com_obra)
 
 
+def migration_260_rdo_estado():
+    """Fase 5 — coluna rdo.estado (ciclo de vida) + backfill honesto.
+
+    Aditiva e idempotente. A coluna `status` NÃO é tocada: ela continua
+    valendo 'Finalizado' para os ≥9 consumidores que filtram por ela.
+
+    Backfill deliberadamente conservador:
+      status = 'Rascunho'  (legado da migration 154) → estado 'rascunho'
+      qualquer outro valor                           → estado 'preenchido'
+
+    NENHUM RDO histórico vira 'assinado'. Os RDOs existentes nunca foram
+    assinados por pessoa nenhuma — marcá-los como assinados seria forjar
+    autoria, exatamente o oposto do que esta fase entrega.
+    """
+    logger.info("[Migration 260] Iniciando — rdo.estado")
+
+    db.session.execute(text("""
+        ALTER TABLE rdo
+        ADD COLUMN IF NOT EXISTS estado VARCHAR(20)
+    """))
+    db.session.commit()
+
+    atualizados_rascunho = db.session.execute(text("""
+        UPDATE rdo SET estado = 'rascunho'
+        WHERE estado IS NULL AND lower(coalesce(status, '')) = 'rascunho'
+    """)).rowcount
+    atualizados_preenchido = db.session.execute(text("""
+        UPDATE rdo SET estado = 'preenchido'
+        WHERE estado IS NULL
+    """)).rowcount
+    db.session.commit()
+    logger.info("[Migration 260] backfill: %s rascunho, %s preenchido",
+                atualizados_rascunho, atualizados_preenchido)
+
+    db.session.execute(text("""
+        ALTER TABLE rdo ALTER COLUMN estado SET DEFAULT 'rascunho'
+    """))
+    db.session.execute(text("""
+        ALTER TABLE rdo ALTER COLUMN estado SET NOT NULL
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_estado ON rdo (estado)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_obra_estado ON rdo (obra_id, estado)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 260] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5107,6 +5160,7 @@ def executar_migracoes():
             (252, "Fase 4 — gestao_custo_pai.obra_id (nullable, derivada dos filhos)", migration_252_gestao_custo_pai_obra_id),
             (253, "Fase 4 — CHECK ck_gestao_custo_filho_destino em modo NOT VALID (trava a escrita nova)", migration_253_check_destino_custo_not_valid),
             (254, "Fase 4 — VALIDATE do CHECK de destino (varre o histórico; aborta e retenta se houver pendência)", migration_254_validate_check_destino_custo),
+            (260, "Fase 5 — rdo.estado (ciclo de vida) + backfill histórico como 'preenchido'", migration_260_rdo_estado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

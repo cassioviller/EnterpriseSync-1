@@ -1126,6 +1126,22 @@ class RDO(db.Model):
     
     # Status e controle
     status = db.Column(db.String(20), default='Finalizado')  # Task #12: RDO sempre Finalizado
+
+    # ── Fase 5 — ciclo de vida ────────────────────────────────────────
+    # `status` acima NÃO muda: ≥9 consumidores filtram por
+    # `status == 'Finalizado'` (cronograma_views.py:2458,2488;
+    # portal_obras_views.py:239; services/medicao_service.py:243;
+    # services/rdo_custos.py:330; services/metricas_produtividade.py:186,
+    # 972,1302,1320,1397,1416). Reinterpretar aquela coluna seria uma
+    # quebra silenciosa em produção. O ciclo de vida mora AQUI.
+    #
+    # String(20) e não db.Enum: o sistema de migrações escreve DDL cru e
+    # criar um TYPE nativo do Postgres exigiria bloco DO $$; além disso
+    # `status` já é String — consistência dentro da mesma tabela.
+    # Os valores válidos vivem em services/rdo_ciclo_vida.ESTADOS.
+    estado = db.Column(db.String(20), nullable=False, default='rascunho',
+                       server_default='rascunho', index=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
