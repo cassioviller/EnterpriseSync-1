@@ -359,3 +359,218 @@ def test_verificar_integridade_detecta_adulteracao():
         db.session.expire_all()
 
         assert verificar_integridade(a) is False
+
+
+# ---------------------------------------------------------------------------
+# Rota de assinatura
+# ---------------------------------------------------------------------------
+
+def _liga_escopo(admin_id):
+    """Revisão de premissas 23/07, item 20: sem `escopo_obra_ativo=TRUE`
+    todo autenticado do tenant é GESTOR e a distinção de papel não vale."""
+    from scripts.flag_escopo_obra import definir_flag
+    definir_flag(admin_id, True)
+
+
+def _preencher(rdo, usuario):
+    from services.rdo_ciclo_vida import PREENCHIDO, transicionar
+    transicionar(rdo, PREENCHIDO, usuario=usuario)
+    db.session.commit()
+
+
+def test_apontador_assina_e_o_rdo_fica_assinado():
+    from models import RDOAssinatura
+    from services.rdo_ciclo_vida import ASSINADO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id, criado_por_id=op.id)
+        _preencher(rdo, op)
+        rid, opid, fid = rdo.id, op.id, func.id
+
+    cliente = _cliente_de(opid)
+    resposta = cliente.post(f'/rdo/{rid}/assinar',
+                            data={'observacao': 'conferido em campo'},
+                            follow_redirects=False)
+    assert resposta.status_code in (200, 302)
+
+    with app.app_context():
+        rdo = db.session.get(RDO, rid)
+        assert rdo.estado == ASSINADO
+        assinaturas = RDOAssinatura.query.filter_by(rdo_id=rid).all()
+        assert len(assinaturas) == 1
+        a = assinaturas[0]
+        assert a.papel == RDOAssinatura.PAPEL_EXECUTOR
+        assert a.funcionario_id == fid, (
+            'a assinatura não ficou ancorada na identidade real da Fase 1')
+        assert a.usuario_id == opid
+        assert len(a.hash_conteudo) == 64
+        assert a.provedor == 'interno'
+        assert a.assinado_em is not None
+
+
+def test_assinatura_grava_ip_e_user_agent():
+    from models import RDOAssinatura
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid = rdo.id, op.id
+
+    cliente = _cliente_de(opid)
+    cliente.post(f'/rdo/{rid}/assinar',
+                 headers={'X-Forwarded-For': '203.0.113.42',
+                          'User-Agent': 'SIGE-Teste/9.0'})
+
+    with app.app_context():
+        a = RDOAssinatura.query.filter_by(rdo_id=rid).first()
+        assert a is not None
+        assert a.ip == '203.0.113.42', (
+            f'IP gravado foi {a.ip!r} — ProxyFix(x_for=1) está em app.py:94')
+        assert a.user_agent == 'SIGE-Teste/9.0'
+
+
+def test_hash_gravado_confere_com_o_conteudo():
+    from models import RDOAssinatura
+    from services.rdo_hash import verificar_integridade
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid = rdo.id, op.id
+
+    _cliente_de(opid).post(f'/rdo/{rid}/assinar')
+
+    with app.app_context():
+        a = RDOAssinatura.query.filter_by(rdo_id=rid).first()
+        assert verificar_integridade(a) is True
+
+
+def test_leitor_nao_assina():
+    from models import RDOAssinatura
+    from services.rdo_ciclo_vida import PREENCHIDO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.LEITOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, opid = rdo.id, op.id
+
+    resposta = _cliente_de(opid).post(f'/rdo/{rid}/assinar',
+                                      follow_redirects=False)
+    assert resposta.status_code in (302, 403, 404)
+
+    with app.app_context():
+        assert RDOAssinatura.query.filter_by(rdo_id=rid).count() == 0
+        assert db.session.get(RDO, rid).estado == PREENCHIDO
+
+
+def test_anonimo_nao_assina():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, admin)
+        rid = rdo.id
+
+    resposta = app.test_client().post(f'/rdo/{rid}/assinar',
+                                      follow_redirects=False)
+    assert resposta.status_code in (302, 401), (
+        f'/rdo/{rid}/assinar devolveu {resposta.status_code} para anônimo')
+
+
+def test_nao_assina_rdo_em_rascunho():
+    from models import RDOAssinatura
+    from services.rdo_ciclo_vida import RASCUNHO
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)  # continua rascunho
+        rid, opid = rdo.id, op.id
+
+    _cliente_de(opid).post(f'/rdo/{rid}/assinar')
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).estado == RASCUNHO
+        assert RDOAssinatura.query.filter_by(rdo_id=rid).count() == 0
+
+
+def test_usuario_sem_vinculo_de_funcionario_nao_assina():
+    """Sem identidade real (Fase 1), não há autoria a registrar."""
+    from models import RDOAssinatura
+
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        suf = _sfx()
+        sem_vinculo = Usuario(
+            username=f'f5n_{suf}', email=f'f5n_{suf}@test.local',
+            nome='Sem vinculo', password_hash=generate_password_hash('x'),
+            tipo_usuario=TipoUsuario.FUNCIONARIO, ativo=True,
+            admin_id=admin.id,
+        )
+        db.session.add(sem_vinculo)
+        db.session.commit()
+        _vincular(sem_vinculo, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, admin)
+        rid, uid = rdo.id, sem_vinculo.id
+
+    _cliente_de(uid).post(f'/rdo/{rid}/assinar')
+
+    with app.app_context():
+        assert RDOAssinatura.query.filter_by(rdo_id=rid).count() == 0, (
+            'assinou sem identidade — voltamos a adivinhar quem é a pessoa')
+
+
+def test_rdo_assinado_nao_aceita_mais_edicao_pela_rota():
+    with app.app_context():
+        admin = _admin()
+        _liga_escopo(admin.id)
+        obra = _obra(admin.id)
+        func = _funcionario(admin.id)
+        op = _operador(admin.id, func)
+        _vincular(op, obra, PapelObra.APONTADOR)
+        rdo = _rdo(obra, admin.id)
+        _preencher(rdo, op)
+        rid, oid, opid, aid = rdo.id, obra.id, op.id, admin.id
+
+    _cliente_de(opid).post(f'/rdo/{rid}/assinar')
+
+    _cliente_de(aid).post('/salvar-rdo-flexivel', data={
+        'rdo_id': str(rid), 'obra_id': str(oid),
+        'data_relatorio': '2026-06-22',
+        'comentario_geral': 'reescrita pós-assinatura',
+    }, follow_redirects=True)
+
+    with app.app_context():
+        assert db.session.get(RDO, rid).comentario_geral == \
+            'Montagem dos perfis de aço do painel P3.'

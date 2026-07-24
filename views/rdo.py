@@ -1594,6 +1594,64 @@ def finalizar_rdo(id):
         flash('Erro ao finalizar RDO.', 'error')
         return redirect(url_for('main.rdos'))
 
+# ── Fase 5 — ciclo de vida e assinatura ──────────────────────────────
+def _rdo_do_tenant_ou_404(rdo_id):
+    """RDO do tenant do usuário logado, ou 404.
+
+    404 e não 403 de propósito: não vazar sequer a existência de RDO de
+    outra empresa. Mesma escolha travada em
+    tests/test_cronograma_permissoes.py.
+    """
+    from flask import abort
+
+    from utils.tenant import get_tenant_admin_id
+    tenant = get_tenant_admin_id()
+    if tenant is None:
+        abort(404)
+    rdo = RDO.query.join(Obra).filter(
+        RDO.id == rdo_id, Obra.admin_id == tenant).first()
+    if rdo is None:
+        abort(404)
+    return rdo
+
+
+@main_bp.route('/rdo/<int:id>/assinar', methods=['POST'])
+@login_required
+def assinar_rdo(id):
+    """Assina o RDO (papel 'executor') e o torna imutável.
+
+    Autorização: `pode_apontar_na_obra` (Fase 1) — GESTOR ou APONTADOR da
+    obra. LEITOR não assina.
+    """
+    from services.rdo_assinatura import assinar
+    from services.rdo_ciclo_vida import CicloVidaInvalido
+    from utils.autorizacao import pode_apontar_na_obra
+
+    rdo = _rdo_do_tenant_ou_404(id)
+
+    if not pode_apontar_na_obra(rdo.obra_id):
+        flash('Você não tem permissão para assinar RDO nesta obra.', 'error')
+        return redirect(url_for('main.visualizar_rdo', id=id))
+
+    try:
+        assinatura = assinar(
+            rdo, current_user,
+            observacao=(request.form.get('observacao') or '').strip() or None)
+        db.session.commit()
+        flash(f'RDO {rdo.numero_rdo} assinado por '
+              f'{assinatura.nome_signatario}. O documento não aceita mais '
+              f'edição — para corrigir, emita um RDO retificador.', 'success')
+    except CicloVidaInvalido as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"ERRO ASSINAR RDO {id}: {e}", exc_info=True)
+        flash('Erro ao assinar o RDO.', 'error')
+
+    return redirect(url_for('main.visualizar_rdo', id=id))
+
+
 @main_bp.route('/rdo/<int:id>/duplicar', methods=['POST'])
 @admin_required
 def duplicar_rdo(id):
