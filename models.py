@@ -1388,6 +1388,57 @@ class RDOFoto(db.Model):
     rdo = db.relationship('RDO', backref=db.backref('fotos', lazy='selectin', order_by='RDOFoto.ordem', cascade='all, delete-orphan', passive_deletes=True))
 
 
+class RDOTransicaoEstado(db.Model):
+    """Trilha de auditoria do ciclo de vida do RDO — Fase 5.
+
+    Copia deliberadamente a forma de `CronogramaImportacaoEvento`
+    (models.py:5639), que é — ao lado de `ObraTransicaoEstado` (Fase 2) —
+    state machine auditado do sistema: evento + detalhes JSON +
+    usuario_id + criado_em. Antes desta tabela o RDO não tinha trilha
+    nenhuma — o próprio serviço de apontamento registra a lacuna em
+    services/cronograma_apontamento_service.py:28: "não há tabela de
+    eventos de RDO".
+
+    `estado_anterior` é nullable porque a primeira linha de um RDO criado
+    já dentro da Fase 5 registra a entrada em 'rascunho' vindo do nada.
+    """
+    __tablename__ = 'rdo_transicao_estado'
+    __table_args__ = (
+        db.Index('ix_rdo_transicao_rdo_criado', 'rdo_id', 'criado_em'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    rdo_id = db.Column(db.Integer, db.ForeignKey('rdo.id', ondelete='CASCADE'),
+                       nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                         nullable=False, index=True)
+    estado_anterior = db.Column(db.String(20), nullable=True)
+    estado_novo = db.Column(db.String(20), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'),
+                           nullable=True)
+    # A pessoa de RH por trás do login (Fase 1). Redundante com
+    # usuario_id por desenho: se o vínculo mudar depois, a trilha
+    # continua dizendo quem era na época.
+    funcionario_id = db.Column(
+        db.Integer, db.ForeignKey('funcionario.id', ondelete='SET NULL'),
+        nullable=True)
+    motivo = db.Column(db.Text, nullable=True)
+    ip = db.Column(db.String(45), nullable=True)  # 45 = IPv6 completo
+    detalhes = db.Column(db.JSON, nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    rdo = db.relationship(
+        'RDO',
+        backref=db.backref('transicoes', lazy='dynamic',
+                           cascade='all, delete-orphan',
+                           passive_deletes=True,
+                           order_by='RDOTransicaoEstado.criado_em'))
+
+    def __repr__(self):
+        return (f'<RDOTransicaoEstado rdo={self.rdo_id} '
+                f'{self.estado_anterior}→{self.estado_novo}>')
+
+
 # ===== MÓDULO ALIMENTAÇÃO - Gestão de Refeições =====
 
 class Restaurante(db.Model):

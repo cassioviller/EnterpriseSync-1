@@ -4893,6 +4893,49 @@ def migration_260_rdo_estado():
     logger.info("[Migration 260] Concluída com sucesso")
 
 
+def migration_261_rdo_transicao_estado():
+    """Fase 5 — tabela rdo_transicao_estado (trilha do ciclo de vida).
+
+    Aditiva: criar vazia é seguro. Nenhuma linha histórica é inventada —
+    não existe informação de quem transicionou os RDOs antigos, e
+    fabricar autoria é justamente o que esta fase veio impedir.
+    """
+    logger.info("[Migration 261] Iniciando — tabela rdo_transicao_estado")
+
+    db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS rdo_transicao_estado (
+            id SERIAL PRIMARY KEY,
+            rdo_id INTEGER NOT NULL REFERENCES rdo(id) ON DELETE CASCADE,
+            admin_id INTEGER NOT NULL REFERENCES usuario(id),
+            estado_anterior VARCHAR(20),
+            estado_novo VARCHAR(20) NOT NULL,
+            usuario_id INTEGER REFERENCES usuario(id),
+            funcionario_id INTEGER REFERENCES funcionario(id) ON DELETE SET NULL,
+            motivo TEXT,
+            ip VARCHAR(45),
+            detalhes JSON,
+            criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """))
+    db.session.commit()
+
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_transicao_estado_rdo_id
+        ON rdo_transicao_estado (rdo_id)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_transicao_estado_admin_id
+        ON rdo_transicao_estado (admin_id)
+    """))
+    db.session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_rdo_transicao_rdo_criado
+        ON rdo_transicao_estado (rdo_id, criado_em)
+    """))
+    db.session.commit()
+
+    logger.info("[Migration 261] Concluída com sucesso")
+
+
 def executar_migracoes():
     """
     Execute todas as migrações necessárias automaticamente com rastreamento
@@ -5161,6 +5204,7 @@ def executar_migracoes():
             (253, "Fase 4 — CHECK ck_gestao_custo_filho_destino em modo NOT VALID (trava a escrita nova)", migration_253_check_destino_custo_not_valid),
             (254, "Fase 4 — VALIDATE do CHECK de destino (varre o histórico; aborta e retenta se houver pendência)", migration_254_validate_check_destino_custo),
             (260, "Fase 5 — rdo.estado (ciclo de vida) + backfill histórico como 'preenchido'", migration_260_rdo_estado),
+            (261, "Fase 5 — tabela rdo_transicao_estado (trilha do ciclo de vida do RDO)", migration_261_rdo_transicao_estado),
         ]
         
         # Executar migrações — skip em memória para as já aplicadas

@@ -131,3 +131,52 @@ def test_backfill_marcou_os_rdos_historicos_como_preenchido():
         orfaos = db.session.execute(text(
             "SELECT count(*) FROM rdo WHERE estado IS NULL")).scalar()
         assert orfaos == 0, f'{orfaos} RDO(s) ficaram sem estado após o backfill'
+
+
+# ---------------------------------------------------------------------------
+# Trilha de transições
+# ---------------------------------------------------------------------------
+
+def test_modelo_de_transicao_existe_e_persiste():
+    from models import RDOTransicaoEstado
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        t = RDOTransicaoEstado(
+            rdo_id=rdo.id, admin_id=admin.id,
+            estado_anterior='rascunho', estado_novo='preenchido',
+            usuario_id=admin.id, motivo='submissão do dia',
+            ip='203.0.113.7', detalhes={'origem': 'teste'},
+        )
+        db.session.add(t)
+        db.session.commit()
+        tid = t.id
+
+    with app.app_context():
+        recarregado = db.session.get(RDOTransicaoEstado, tid)
+        assert recarregado.estado_anterior == 'rascunho'
+        assert recarregado.estado_novo == 'preenchido'
+        assert recarregado.detalhes == {'origem': 'teste'}
+        assert recarregado.criado_em is not None
+
+
+def test_transicao_e_apagada_junto_com_o_rdo():
+    """ON DELETE CASCADE: excluir RDO não pode deixar trilha órfã."""
+    from models import RDOTransicaoEstado
+
+    with app.app_context():
+        admin = _admin()
+        obra = _obra(admin.id)
+        rdo = _rdo(obra, admin.id)
+        db.session.add(RDOTransicaoEstado(
+            rdo_id=rdo.id, admin_id=admin.id,
+            estado_anterior='rascunho', estado_novo='preenchido',
+            usuario_id=admin.id,
+        ))
+        db.session.commit()
+        rid = rdo.id
+        db.session.delete(rdo)
+        db.session.commit()
+        assert RDOTransicaoEstado.query.filter_by(rdo_id=rid).count() == 0
