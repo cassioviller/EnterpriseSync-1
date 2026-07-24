@@ -275,3 +275,48 @@ def test_com_governanca_a_trilha_marca_ciencia():
             obra_id=oid, acao='compra_aprovar').all()
         assert eventos
         assert any((e.detalhes or {}).get('modo') == 'ciencia' for e in eventos)
+
+
+# ---------------------------------------------------------------------------
+# 8 — o PDF de medição do portal respeita a expiração do token
+#     (achado R10 da revisão de premissas da Fase 9, 2026-07-23:
+#      medicao_views.portal_pdf_extrato não checava token_cliente_expira_em)
+# ---------------------------------------------------------------------------
+
+def _medicao(admin_id, obra_id):
+    from models import MedicaoObra
+    m = MedicaoObra(
+        obra_id=obra_id, admin_id=admin_id, numero=1,
+        periodo_inicio=date(2026, 7, 1), periodo_fim=date(2026, 7, 15),
+        status='APROVADA')
+    db.session.add(m)
+    db.session.commit()
+    return m
+
+
+def test_pdf_de_medicao_do_portal_recusa_token_expirado():
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(
+            admin.id, expira_em=datetime.utcnow() - timedelta(days=1))
+        med = _medicao(admin.id, obra.id)
+        token, mid = obra.token_cliente, med.id
+
+    anon = app.test_client()
+    r = anon.get(f'/medicao/portal/pdf/{mid}?token={token}')
+    assert r.status_code == 404
+
+
+def test_pdf_de_medicao_do_portal_token_sem_data_segue_valendo():
+    """Mesma semântica de _get_obra_by_token: token pré-migration 247
+    (sem data) continua valendo até ser rotacionado."""
+    with app.app_context():
+        admin = _admin()
+        obra = _obra_com_token(admin.id, expira_em=None)
+        med = _medicao(admin.id, obra.id)
+        token, mid = obra.token_cliente, med.id
+
+    anon = app.test_client()
+    r = anon.get(f'/medicao/portal/pdf/{mid}?token={token}')
+    assert r.status_code == 200
+    assert r.headers['Content-Type'] == 'application/pdf'

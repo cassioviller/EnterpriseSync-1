@@ -520,6 +520,15 @@ def portal_pdf_extrato(medicao_id):
     if not obra:
         abort(403)
 
+    # Fase 3 — token expirado é ausência, como em portal_obras_views
+    # (_get_obra_by_token). Token sem data (pré-migration 247) segue valendo.
+    if obra.token_cliente_expira_em and \
+            obra.token_cliente_expira_em < datetime.utcnow():
+        logging.getLogger(__name__).warning(
+            '[PORTAL] token expirado usado no PDF de medição — obra %s '
+            '(expirou em %s)', obra.id, obra.token_cliente_expira_em)
+        abort(404)
+
     medicao = MedicaoObra.query.filter_by(id=medicao_id, obra_id=obra.id).first()
     if not medicao:
         abort(404)
