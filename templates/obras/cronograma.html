@@ -75,6 +75,14 @@
           <i class="fas fa-trash-can"></i>
         </button>
       </div>
+      {# Fase 5 — manual de uso do editor. PDF estático versionado no repo
+         (gerado por scripts/manual_cronograma_pdf.py); descreve só recursos
+         do editor v2, então fica dentro do bloco da flag. #}
+      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+         href="{{ url_for('static', filename='docs/manual-cronograma.pdf') }}"
+         title="Manual de uso do cronograma (PDF)">
+        <i class="fas fa-book me-1"></i> Manual (PDF)
+      </a>
       {% endif %}
       <button class="btn btn-outline-primary btn-sm" id="btnRecalcular" onclick="recalcularTudo()">
         <i class="fas fa-sync-alt me-1"></i> Recalcular
