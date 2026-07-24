@@ -4027,6 +4027,76 @@ def _migration_224_cronograma_acao():
         raise
 
 
+def _migration_225_cronograma_baseline():
+    """Cronograma editável Fase 4 — linha de base: `cronograma_baseline` e
+    `cronograma_baseline_item`.
+
+    ATENÇÃO (mesma nota das migrations 207/222/224): `db.create_all()` roda
+    ANTES das migrações, então numa base onde os modelos já foram importados
+    as tabelas já existem e todo o DDL abaixo é no-op — por isso tudo é
+    `IF NOT EXISTS` e os nomes de índice/constraint são os MESMOS declarados
+    nos `__table_args__` dos modelos (create_all e migração convergem).
+
+    O índice ÚNICO PARCIAL `WHERE ativa` é o que garante "uma linha de base
+    ativa por obra e por modo" no banco, e não só na aplicação.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_baseline (
+                    id SERIAL PRIMARY KEY,
+                    obra_id INTEGER NOT NULL
+                        REFERENCES obra(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    nome VARCHAR(120) NOT NULL,
+                    criada_em TIMESTAMP,
+                    criada_por INTEGER REFERENCES usuario(id),
+                    ativa BOOLEAN NOT NULL DEFAULT TRUE,
+                    is_cliente BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """))
+            conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS cronograma_baseline_item (
+                    id SERIAL PRIMARY KEY,
+                    baseline_id INTEGER NOT NULL
+                        REFERENCES cronograma_baseline(id) ON DELETE CASCADE,
+                    tarefa_id INTEGER NOT NULL
+                        REFERENCES tarefa_cronograma(id) ON DELETE CASCADE,
+                    admin_id INTEGER NOT NULL REFERENCES usuario(id),
+                    data_inicio DATE,
+                    data_fim DATE,
+                    duracao_dias INTEGER,
+                    CONSTRAINT uq_baseline_item_tarefa
+                        UNIQUE (baseline_id, tarefa_id)
+                )
+            """))
+            # Convergência com bases onde a tabela já existia sem a coluna
+            # (o CREATE acima é no-op nelas). Idempotente nos dois sentidos.
+            conn.execute(sa_text(
+                "ALTER TABLE cronograma_baseline_item ADD COLUMN IF NOT EXISTS "
+                "admin_id INTEGER REFERENCES usuario(id)"))
+            for ddl in (
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_baseline_obra_id "
+                "ON cronograma_baseline(obra_id)",
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_baseline_admin_id "
+                "ON cronograma_baseline(admin_id)",
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_baseline_item_baseline_id "
+                "ON cronograma_baseline_item(baseline_id)",
+                "CREATE INDEX IF NOT EXISTS ix_cronograma_baseline_item_tarefa_id "
+                "ON cronograma_baseline_item(tarefa_id)",
+                # Nome idêntico ao db.Index do __table_args__ do modelo
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_cronograma_baseline_ativa_unica "
+                "ON cronograma_baseline(obra_id, is_cliente) WHERE ativa",
+            ):
+                conn.execute(sa_text(ddl))
+        logger.info("[Migration 225] cronograma_baseline + "
+                    "cronograma_baseline_item criadas.")
+    except Exception as e:
+        logger.error(f"[Migration 225] Falha: {e}", exc_info=True)
+        raise
+
+
 def migration_230_obra_transicao_estado():
     """Fase 2 — tabela `obra_transicao_estado` (histórico de transições).
 
@@ -5499,6 +5569,7 @@ def executar_migracoes():
             (222, "Cronograma editável Fase 1 — tabela tarefa_vinculo + is_critica/folga_dias + flag cronograma_editor_v2 (default FALSE)", _migration_222_tarefa_vinculo_e_colunas),
             (223, "Cronograma editável Fase 1 — backfill predecessora_id → tarefa_vinculo TI/0 (intra-obra/tenant; sujas puladas e logadas)", _migration_223_backfill_vinculos_de_predecessora),
             (224, "Cronograma editável Fase 3 — tabela cronograma_acao (pilha de desfazer/refazer por obra+usuário+modo)", _migration_224_cronograma_acao),
+            (225, "Cronograma editável Fase 4 — cronograma_baseline + itens (linha de base, uma ativa por obra via índice parcial)", _migration_225_cronograma_baseline),
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
             (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
             (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),

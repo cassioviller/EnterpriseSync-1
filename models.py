@@ -5875,6 +5875,75 @@ class CronogramaAcao(db.Model):
     criada_em = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class CronogramaBaseline(db.Model):
+    """Linha de base do cronograma — o planejado congelado (Fase 4).
+
+    Separada de propósito de `CronogramaVersao`, que serve só ao fluxo de
+    importação de .mpp (spec §1). Aqui é o "salvar o plano de hoje para
+    comparar com o real depois", no sentido do MS Project.
+
+    Uma ativa por obra e por modo, garantido por índice único PARCIAL
+    (`WHERE ativa`): é o tipo de invariante que quebra em silêncio se ficar
+    só no código. A ativação também desativa as irmãs em código — o índice
+    é a rede de segurança, não o mecanismo.
+
+    `is_cliente` entra na chave porque o plano do cliente e o interno são
+    conjuntos de tarefas distintos. A UI é interna apenas (spec §5: "o
+    portal do cliente não muda"); escopar a tabela evita que isso vaze.
+
+    Migração espelho: 225.
+    """
+    __tablename__ = 'cronograma_baseline'
+    __table_args__ = (
+        db.Index('ix_cronograma_baseline_ativa_unica',
+                 'obra_id', 'is_cliente', unique=True,
+                 postgresql_where=db.text('ativa')),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obra.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False,
+                         index=True)
+    nome = db.Column(db.String(120), nullable=False)
+    criada_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criada_por = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    ativa = db.Column(db.Boolean, nullable=False, default=True,
+                      server_default='true')
+    is_cliente = db.Column(db.Boolean, nullable=False, default=False,
+                           server_default='false')
+
+    itens = db.relationship('CronogramaBaselineItem', backref='baseline',
+                            cascade='all, delete-orphan', lazy='dynamic')
+
+
+class CronogramaBaselineItem(db.Model):
+    """Datas congeladas de UMA tarefa no momento em que a baseline foi salva.
+
+    Nunca é reescrito: editar a tarefa depois muda a tarefa, não a linha de
+    base — é isso que torna o desvio (`fim atual − fim da baseline`) uma
+    medida honesta de atraso.
+    """
+    __tablename__ = 'cronograma_baseline_item'
+    __table_args__ = (
+        db.UniqueConstraint('baseline_id', 'tarefa_id',
+                            name='uq_baseline_item_tarefa'),
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    baseline_id = db.Column(
+        db.Integer, db.ForeignKey('cronograma_baseline.id', ondelete='CASCADE'),
+        nullable=False, index=True)
+    tarefa_id = db.Column(
+        db.Integer, db.ForeignKey('tarefa_cronograma.id', ondelete='CASCADE'),
+        nullable=False, index=True)
+    # Redundante com baseline.admin_id, mas é a convenção de tenancy do
+    # projeto (toda tabela carrega o tenant) e evita join para escopar.
+    admin_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False,
+                         index=True)
+    data_inicio = db.Column(db.Date, nullable=True)
+    data_fim = db.Column(db.Date, nullable=True)
+    duracao_dias = db.Column(db.Integer, nullable=True)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MÓDULO V2: APONTAMENTO DE PRODUÇÃO RDO ↔ CRONOGRAMA — Migration 76
 # ─────────────────────────────────────────────────────────────────────────────

@@ -31,6 +31,11 @@
       {% if editor_v2 %}
       {# Editor v2 (Fase 2) — ações de grade sobre a célula selecionada.
          Só existe com a flag ligada: sem ela o cabeçalho é o de sempre. #}
+      <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalBaseline()"
+              title="{% if baseline_ativa %}Linha de base ativa: {{ baseline_ativa.nome }}{% else %}Congelar o planejado atual para comparar com o real{% endif %}">
+        <i class="fas fa-flag-checkered me-1"></i> Linha de base
+        {% if baseline_ativa %}<span class="badge bg-success ms-1">on</span>{% endif %}
+      </button>
       <div class="btn-group btn-group-sm" role="group" aria-label="Histórico">
         <button class="btn btn-outline-secondary" id="btnDesfazer"
                 {% if not pode_desfazer %}disabled{% endif %}
@@ -161,6 +166,12 @@
               <th class="th-resp" title="Responsável pela execução">Responsável</th>
               <th class="th-perc" title="Progresso planejado para hoje (cálculo linear de datas)">Planejado</th>
               <th class="th-perc" title="Progresso realizado, calculado automaticamente pelos apontamentos do RDO">Realizado</th>
+              {% if baseline_ativa %}
+              {# Fase 4 — só existe quando há linha de base ativa; sem ela a
+                 tabela tem exatamente as colunas de sempre e os índices de
+                 célula da Fase 2 seguem intactos. #}
+              <th class="th-perc" title="Atraso em relação à linha de base &quot;{{ baseline_ativa.nome }}&quot; (término atual − término congelado)">Desvio</th>
+              {% endif %}
               <th class="th-act"></th>
             </tr>
           </thead>
@@ -348,6 +359,12 @@
                 </div>
                 {% endif %}
               </td>
+
+              {% if baseline_ativa %}
+              {# Desvio (Fase 4) — preenchido pelo JS (renderDesvios), que é a
+                 mesma fonte usada quando a baseline muda sem reload. #}
+              <td class="td-perc desvio-val" data-id="{{ t.id }}"></td>
+              {% endif %}
 
               {# Ações #}
               <td class="td-actions">
@@ -920,6 +937,17 @@
 /* Offcanvas progress preview */
 #ed_perc { accent-color: #1976d2; }
 
+/* Editor v2 (Fase 4) — linha de base. Barra cinza fina logo abaixo da barra
+   real, na mesma .gantt-row. `pointer-events:none` para não atrapalhar o
+   drag da barra de cima. Só é emitida quando há baseline ativa. */
+.gantt-bar-baseline {
+  position: absolute; height: 5px; top: calc(50% + 11px);
+  background: #9ca3af; border-radius: 2px; opacity: .85;
+  pointer-events: none; z-index: 1;
+}
+.desvio-atraso    { color: #dc2626; font-weight: 700; }
+.desvio-adiantado { color: #16a34a; font-weight: 700; }
+
 /* Editor v2 (Fase 2) — grade tipo planilha. A classe .grade-cel-sel só é
    aplicada pelo JS com a flag cronograma_editor_v2 ligada; com a flag off
    nenhum elemento a recebe e a regra fica inerte. */
@@ -950,6 +978,11 @@ const DAY_W    = 26;
 const EDITOR_V2 = {{ 'true' if editor_v2 else 'false' }};
 
 let tarefas = {{ tarefas_dict | tojson }};
+
+// Fase 4 (editor v2): datas congeladas da linha de base ativa, indexadas por
+// tarefa_id. Vazio = sem baseline (nem barra cinza, nem coluna Desvio).
+let BASELINE_MAP = {{ baseline_map | tojson if baseline_map is defined else '{}' }};
+const BASELINE_NOME = {{ (baseline_ativa.nome if baseline_ativa else '') | tojson }};
 
 // ── Toast ──
 function toast(msg, tipo='success') {
@@ -2379,7 +2412,18 @@ function renderGantt() {
       const planMarker = (plan > 0 && plan < 100)
         ? `<div class="gantt-plan-marker" style="left:${planW}px" title="Planejado hoje: ${plan}%"></div>`
         : '';
-      barHtml = `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}"
+      // Fase 4: barra cinza do planejado congelado, logo abaixo da real.
+      // Mesmo cálculo de geometria; some sozinha quando não há item.
+      const bl = BASELINE_MAP[t.id];
+      if (bl && bl.data_inicio && bl.data_fim) {
+        const bI = new Date(bl.data_inicio + 'T00:00:00');
+        const bF = new Date(bl.data_fim    + 'T00:00:00');
+        const blLeft = Math.round((bI - dMin) / 86400000) * DAY_W;
+        const blWid  = (Math.round((bF - bI) / 86400000) + 1) * DAY_W;
+        barHtml += `<div class="gantt-bar-baseline" style="left:${blLeft}px;width:${blWid}px"
+          title="Linha de base: ${formatDate(bl.data_inicio)} → ${formatDate(bl.data_fim)}"></div>`;
+      }
+      barHtml += `<div class="gantt-bar ${barClass}" data-tarefa-id="${t.id}"
         style="left:${leftPx}px;width:${widPx}px"
         title="${t.nome_tarefa} — Real: ${perc}% / Plan: ${plan}% — ${formatDate(t.data_inicio)} → ${formatDate(t.data_fim)}${tipExtra}">
         <div class="gantt-progress" style="width:${progW}px"></div>
@@ -2407,6 +2451,10 @@ function renderGantt() {
   container.querySelectorAll('.gantt-bar[data-tarefa-id]').forEach(barEl => {
     initGanttBarDrag(barEl, parseInt(barEl.dataset.tarefaId), dMin);
   });
+
+  // Fase 4: toda mudança de datas passa por aqui, então a coluna Desvio
+  // acompanha sem que cada chamador precise lembrar dela.
+  if (EDITOR_V2) renderDesvios();
 }
 
 // ── Row Drag & Drop (Task #19 — SortableJS + persistência confiável) ──
@@ -2920,6 +2968,124 @@ async function _historico(acao) {
 function desfazerAcao() { _historico('desfazer'); }
 function refazerAcao()  { _historico('refazer'); }
 
+// ── Linha de base (Fase 4) ──
+
+// Desvio = término atual − término congelado, em dias corridos.
+// Positivo = atrasado (vermelho); negativo = adiantado (verde).
+function renderDesvios() {
+  document.querySelectorAll('td.desvio-val').forEach(td => {
+    const id = Number(td.dataset.id);
+    const t = tarefas.find(x => x.id === id);
+    const bl = BASELINE_MAP[id];
+    if (!t || !t.data_fim || !bl || !bl.data_fim) {
+      td.innerHTML = '<span class="text-muted small">—</span>';
+      return;
+    }
+    const dias = Math.round(
+      (new Date(t.data_fim + 'T00:00:00') - new Date(bl.data_fim + 'T00:00:00'))
+      / 86400000);
+    const cls = dias > 0 ? 'desvio-atraso' : dias < 0 ? 'desvio-adiantado' : 'text-muted';
+    const txt = dias > 0 ? `+${dias}d` : dias < 0 ? `${dias}d` : '0d';
+    td.innerHTML = `<span class="small ${cls}" title="Linha de base: ${formatDate(bl.data_fim)}">${txt}</span>`;
+  });
+}
+
+async function _baselineFetch(url, opts) {
+  let data = null, res;
+  try {
+    res = await fetch(url, opts);
+    try { data = await res.clone().json(); } catch(_) {}
+  } catch(e) {
+    console.error('[cronograma] Erro de rede na linha de base', e);
+    toast('Erro de rede na linha de base', 'error');
+    return null;
+  }
+  if (!res.ok || !data || data.status !== 'ok') {
+    toast((data && (data.msg || data.error)) || `Erro ${res.status}`, 'error');
+    return null;
+  }
+  return data;
+}
+
+// A coluna Desvio é renderizada pelo servidor só quando JÁ existia baseline
+// no load. Ao criar a primeira sem reload não há <td> para preencher — daí
+// o aviso de recarregar, em vez de montar a coluna no DOM à mão.
+function _aplicarBaselineMap(map) {
+  const tinhaColuna = !!document.querySelector('td.desvio-val');
+  BASELINE_MAP = map || {};
+  renderGantt();
+  renderDesvios();
+  if (!tinhaColuna && Object.keys(BASELINE_MAP).length) {
+    toast('Linha de base ativa. Recarregue para ver a coluna Desvio.', 'warning');
+  }
+}
+
+async function salvarBaseline() {
+  const nome = (document.getElementById('bl_nome')?.value || '').trim();
+  const ativar = document.getElementById('bl_ativar')?.checked !== false;
+  const data = await _baselineFetch(apiUrl('/baseline'), {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ nome, ativar }),
+  });
+  if (!data) return;
+  if (ativar) _aplicarBaselineMap(data.baseline_map);
+  toast(`Linha de base "${data.baseline.nome}" salva`);
+  await carregarBaselines();
+}
+
+async function ativarBaseline(id) {
+  const data = await _baselineFetch(apiUrl(`/baseline/${id}/ativar`),
+                                    { method: 'POST' });
+  if (!data) return;
+  _aplicarBaselineMap(data.baseline_map);
+  toast('Linha de base ativada');
+  await carregarBaselines();
+}
+
+async function excluirBaseline(id, nome) {
+  if (!confirm(`Excluir a linha de base "${nome}"?`)) return;
+  const data = await _baselineFetch(apiUrl(`/baseline/${id}`),
+                                    { method: 'DELETE' });
+  if (!data) return;
+  _aplicarBaselineMap(data.baseline_map);
+  toast('Linha de base excluída');
+  await carregarBaselines();
+}
+
+async function carregarBaselines() {
+  const box = document.getElementById('bl_lista');
+  if (!box) return;
+  const data = await _baselineFetch(apiUrl('/baselines'), {});
+  if (!data) { box.innerHTML = '<div class="text-muted small">Erro ao carregar.</div>'; return; }
+  if (!data.baselines.length) {
+    box.innerHTML = '<div class="text-muted small">Nenhuma linha de base salva ainda.</div>';
+    return;
+  }
+  box.innerHTML = data.baselines.map(b => `
+    <div class="d-flex align-items-center justify-content-between border rounded px-2 py-1 mb-1">
+      <div class="small">
+        ${b.ativa ? '<span class="badge bg-success me-1">ativa</span>' : ''}
+        <strong>${b.nome}</strong>
+        <span class="text-muted">— ${b.total_itens} tarefa(s)</span>
+      </div>
+      <div class="btn-group btn-group-sm">
+        ${b.ativa ? '' : `<button class="btn btn-outline-primary" onclick="ativarBaseline(${b.id})" title="Usar esta na comparação"><i class="fas fa-check"></i></button>`}
+        <button class="btn btn-outline-danger" onclick="excluirBaseline(${b.id}, '${b.nome.replace(/'/g, '')}')" title="Excluir"><i class="fas fa-trash-can"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+function abrirModalBaseline() {
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  const inp = document.getElementById('bl_nome');
+  if (inp) inp.value = `Linha de base ${hoje}`;
+  const chk = document.getElementById('bl_ativar');
+  if (chk) chk.checked = true;
+  carregarBaselines();
+  bootstrap.Modal.getOrCreateInstance(
+    document.getElementById('modalBaseline')).show();
+}
+
 // ── Init da grade ──
 function initGrade() {
   const tbody = document.getElementById('tarefasBody');
@@ -3014,6 +3180,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Fase 2 (editor v2): grade tipo planilha. Sem a flag nenhum listener de
   // seleção/teclado é registrado.
   if (EDITOR_V2) initGrade();
+  // Fase 4: a coluna Desvio só existe quando o servidor renderizou os <td>
+  // (ou seja, quando há linha de base ativa) — sem ela isto é um no-op.
+  if (EDITOR_V2) renderDesvios();
 
   // Carregar templates ao abrir o modal (dentro do DOMContentLoaded
   // para garantir que o elemento #modalAplicarTemplate já foi parseado)
@@ -3041,6 +3210,50 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
+
+{% if editor_v2 %}
+{# ── Modal Linha de Base (Fase 4) ── #}
+<div class="modal fade" id="modalBaseline" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">
+          <i class="fas fa-flag-checkered me-2 text-secondary"></i>
+          Linha de Base
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info border-0 py-2 small mb-3">
+          <i class="fas fa-info-circle me-1"></i>
+          A linha de base congela as datas de hoje. Depois disso, o Gantt mostra
+          uma barra cinza com o planejado original e a grade ganha a coluna
+          <strong>Desvio</strong> — quantos dias cada tarefa atrasou ou adiantou.
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nome</label>
+          <input type="text" id="bl_nome" class="form-control" maxlength="120">
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="bl_ativar" checked>
+          <label class="form-check-label small" for="bl_ativar">
+            Usar esta linha de base na comparação
+          </label>
+        </div>
+        <hr>
+        <div class="fw-semibold small mb-2">Linhas de base salvas</div>
+        <div id="bl_lista"><div class="text-muted small">Carregando...</div></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarBaseline()">
+          <i class="fas fa-flag-checkered me-1"></i> Salvar linha de base
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {# ── Modal Aplicar Template ── #}
 <div class="modal fade" id="modalAplicarTemplate" tabindex="-1">

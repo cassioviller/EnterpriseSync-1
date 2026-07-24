@@ -13,6 +13,7 @@ from flask_login import current_user, login_required
 
 from models import (
     db, Obra, TarefaCronograma, TarefaVinculo, RDOApontamentoCronograma,
+    CronogramaBaseline, CronogramaBaselineItem,
     CronogramaTemplate, CronogramaTemplateItem, SubatividadeMestre, Servico,
     RDO, RDOMaoObra, RDOServicoSubatividade, Funcionario,
     ComposicaoServico, SubatividadeMaoObra,
@@ -456,6 +457,17 @@ def cronograma_obra(obra_id: int):
         pode_desfazer, pode_refazer = estado_pilha(obra_id, current_user.id,
                                                    cliente_mode)
 
+    # Fase 4 — linha de base ativa. Só na visão interna (spec §5: "o portal
+    # do cliente não muda"); sem baseline o `baseline_map` fica vazio e nem a
+    # coluna Desvio nem as barras cinzas são renderizadas.
+    baseline_ativa = None
+    baseline_map: dict = {}
+    if flag_on and not cliente_mode:
+        _bl = _baseline_ativa(obra_id, admin_id, cliente_mode)
+        if _bl is not None:
+            baseline_ativa = _baseline_to_dict(_bl)
+            baseline_map = _itens_da_baseline(_bl)
+
     progresso_geral_header = None
     if not cliente_mode:
         progresso_geral_header = calcular_progresso_geral_obra_v2(
@@ -486,6 +498,9 @@ def cronograma_obra(obra_id: int):
         # nem a toolbar existe, então nem se consulta a pilha.
         pode_desfazer=pode_desfazer,
         pode_refazer=pode_refazer,
+        # Fase 4: barra cinza no Gantt + coluna "Desvio (dias)".
+        baseline_ativa=baseline_ativa,
+        baseline_map=baseline_map,
         base_template='base_iframe.html' if cliente_mode else 'base_completo.html',
     )
 
@@ -1790,6 +1805,186 @@ def refazer_acao(obra_id: int):
     logger.info(f"[OK] Ação refeita id={acao.id} tipo={acao.tipo_acao} "
                 f"obra={obra_id} usuario={current_user.id} (editor v2)")
     return _resposta_undo(obra_id, admin_id, cliente_mode, acao, afetadas)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LINHA DE BASE (editor v2, Fase 4) — plano Step B
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _baseline_ativa(obra_id: int, admin_id: int, cliente_mode: bool):
+    return CronogramaBaseline.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode, ativa=True
+    ).first()
+
+
+def _itens_da_baseline(baseline) -> dict:
+    """`tarefa_id → {data_inicio, data_fim, duracao_dias}` (datas em ISO).
+
+    É o formato que o front consome direto: o Gantt desenha a barra cinza e
+    a coluna Desvio subtrai as datas.
+    """
+    if baseline is None:
+        return {}
+    return {
+        item.tarefa_id: {
+            'data_inicio': item.data_inicio.isoformat() if item.data_inicio else None,
+            'data_fim': item.data_fim.isoformat() if item.data_fim else None,
+            'duracao_dias': item.duracao_dias,
+        }
+        for item in baseline.itens
+    }
+
+
+def _baseline_to_dict(baseline) -> dict:
+    return {
+        'id': baseline.id,
+        'nome': baseline.nome,
+        'ativa': baseline.ativa,
+        'criada_em': baseline.criada_em.isoformat() if baseline.criada_em else None,
+        'total_itens': baseline.itens.count(),
+    }
+
+
+def _desativar_baselines(obra_id: int, admin_id: int, cliente_mode: bool,
+                         exceto_id: int | None = None) -> None:
+    """Desativa as irmãs. O índice único parcial (`WHERE ativa`) garante a
+    invariante no banco; isto é o mecanismo normal."""
+    query = CronogramaBaseline.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode, ativa=True)
+    if exceto_id is not None:
+        query = query.filter(CronogramaBaseline.id != exceto_id)
+    query.update({'ativa': False}, synchronize_session=False)
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/baseline', methods=['POST'])
+@login_required
+def criar_baseline(obra_id: int):
+    """Fase 4 — congela o planejado atual como linha de base.
+
+    Só entram tarefas ATIVAS que já têm início e fim; tarefa sem datas não
+    tem o que congelar. Salvar de novo cria OUTRA baseline (o histórico é
+    preservado) e, por padrão, passa a ser a ativa — `ativar: false` guarda
+    sem trocar a comparação corrente.
+
+    Não é decorada com `_com_undo`: baseline não altera nenhuma tarefa, então
+    o diff seria vazio de qualquer forma.
+    """
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    data = request.get_json(silent=True) or {}
+
+    tarefas = (
+        TarefaCronograma.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .filter(TarefaCronograma.ativa.is_(True))
+        .filter(TarefaCronograma.data_inicio.isnot(None))
+        .filter(TarefaCronograma.data_fim.isnot(None))
+        .all()
+    )
+    if not tarefas:
+        return jsonify({
+            'status': 'error',
+            'msg': 'Não há tarefas com datas para congelar na linha de base',
+        }), 400
+
+    nome = (data.get('nome') or '').strip() or \
+        f"Linha de base {date.today().strftime('%d/%m/%Y')}"
+    ativar = data.get('ativar')
+    ativar = True if ativar is None else bool(ativar)
+
+    if ativar:
+        _desativar_baselines(obra_id, admin_id, cliente_mode)
+
+    baseline = CronogramaBaseline(
+        obra_id=obra_id, admin_id=admin_id, nome=nome[:120],
+        criada_por=current_user.id, ativa=ativar, is_cliente=cliente_mode)
+    db.session.add(baseline)
+    db.session.flush()
+    for t in tarefas:
+        db.session.add(CronogramaBaselineItem(
+            baseline_id=baseline.id, tarefa_id=t.id, admin_id=admin_id,
+            data_inicio=t.data_inicio, data_fim=t.data_fim,
+            duracao_dias=t.duracao_dias))
+    db.session.commit()
+
+    logger.info(f"[OK] Linha de base criada id={baseline.id} obra={obra_id} "
+                f"itens={len(tarefas)} ativa={ativar} (editor v2)")
+    return jsonify({
+        'status': 'ok',
+        'baseline': _baseline_to_dict(baseline),
+        'baseline_map': _itens_da_baseline(baseline) if ativar else {},
+    }), 201
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/baselines')
+@login_required
+def listar_baselines(obra_id: int):
+    """Fase 4 — histórico de linhas de base da obra, mais recente primeiro."""
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    baselines = (
+        CronogramaBaseline.query
+        .filter_by(obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode)
+        .order_by(CronogramaBaseline.id.desc()).all()
+    )
+    return jsonify({'status': 'ok',
+                    'baselines': [_baseline_to_dict(b) for b in baselines]})
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/baseline/<int:bid>/ativar',
+                     methods=['POST'])
+@login_required
+def ativar_baseline(obra_id: int, bid: int):
+    """Fase 4 — troca a linha de base usada na comparação."""
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    baseline = CronogramaBaseline.query.filter_by(
+        id=bid, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
+    ).first()
+    if baseline is None:
+        return jsonify({'status': 'error',
+                        'msg': 'Linha de base não encontrada'}), 404
+
+    _desativar_baselines(obra_id, admin_id, cliente_mode, exceto_id=bid)
+    baseline.ativa = True
+    db.session.commit()
+    logger.info(f"[OK] Linha de base ativada id={bid} obra={obra_id} (editor v2)")
+    return jsonify({'status': 'ok', 'baseline': _baseline_to_dict(baseline),
+                    'baseline_map': _itens_da_baseline(baseline)})
+
+
+@cronograma_bp.route('/obra/<int:obra_id>/baseline/<int:bid>',
+                     methods=['DELETE'])
+@login_required
+def excluir_baseline(obra_id: int, bid: int):
+    """Fase 4 — remove uma linha de base (os itens caem por CASCADE)."""
+    guard = _guard_rotas_vinculo(obra_id)
+    if guard:
+        return guard
+    admin_id = _admin_id()
+    cliente_mode = _modo_cliente()
+    baseline = CronogramaBaseline.query.filter_by(
+        id=bid, obra_id=obra_id, admin_id=admin_id, is_cliente=cliente_mode
+    ).first()
+    if baseline is None:
+        return jsonify({'status': 'error',
+                        'msg': 'Linha de base não encontrada'}), 404
+    db.session.delete(baseline)
+    db.session.commit()
+    logger.info(f"[OK] Linha de base excluída id={bid} obra={obra_id} (editor v2)")
+    # Sem baseline ativa o front limpa as barras cinzas e a coluna Desvio.
+    ativa = _baseline_ativa(obra_id, admin_id, cliente_mode)
+    return jsonify({'status': 'ok',
+                    'baseline_map': _itens_da_baseline(ativa)})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
