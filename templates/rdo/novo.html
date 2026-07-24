@@ -1215,8 +1215,15 @@ function _rdoV2RenderTarefaCard(t, isPai, depth, contadorFilhos) {
                     <span class="text-muted small">%</span>
                 </div>`;
             }
+            // Referência do quantitativo cadastrado. No modo quantidade é o
+            // total a executar (como sempre). No modo percentual é só
+            // LEITURA — a tarefa é apontada em %, mas saber "150 m³" ajuda
+            // quem está em campo. Sem total ou sem unidade não mostra nada:
+            // o pedido explícito foi nunca exibir "0" nem "—".
+            const mostraTotal = t.quantidade_total
+                && (modo === 'quantidade' || t.unidade_medida);
             acaoInner = `
-                ${t.quantidade_total && modo === 'quantidade' ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
+                ${mostraTotal ? `<small class="text-muted">Total: ${qty_total}</small>` : ''}
                 ${inputBlock}
                 <button type="button"
                         class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 px-2"

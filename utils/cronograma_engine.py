@@ -208,10 +208,32 @@ def _planejado_na_data(data_inicio, data_fim, duracao_dias, marco,
     return min(100.0, round(dias_passados / duracao_dias * 100, 2))
 
 
-def _atualizar_percentual_sem_commit(tarefa, admin_id: int) -> None:
+def _percentual_livre(admin_id) -> bool:
+    """Flag `rdo_percentual_livre` do tenant (migração 226, default FALSE).
+
+    PONTO ÚNICO de leitura no engine. Ligada, as funções de derivação abaixo
+    param de calcular `quantidade_acumulada / quantidade_total` e passam a
+    usar o `percentual_realizado` do apontamento mais recente para TODA
+    tarefa — inclusive as que têm quantitativo cadastrado, que com a flag
+    ligada é só referência de leitura na tela do RDO.
+
+    Continuidade garantida pela dupla escrita do serviço de apontamento:
+    linha quantitativa antiga já gravou `percentual_realizado`, então uma
+    tarefa em 62% continua em 62% no instante em que a flag liga.
+    """
+    from utils.tenant import rdo_percentual_livre_on
+    return rdo_percentual_livre_on(admin_id)
+
+
+def _atualizar_percentual_sem_commit(tarefa, admin_id: int,
+                                     percentual_livre=None) -> None:
     """
     Versão sem commit de atualizar_percentual_tarefa — para uso em batch.
     Usa o apontamento mais recente (por data_relatorio) de cada tarefa.
+
+    `percentual_livre`: estado já resolvido da flag (ver `_percentual_livre`).
+    `None` consulta — quem chama em laço passa o booleano para não consultar
+    a configuração uma vez por tarefa.
     """
     from models import RDOApontamentoCronograma, RDO, db
 
@@ -229,9 +251,13 @@ def _atualizar_percentual_sem_commit(tarefa, admin_id: int) -> None:
         .first()
     )
 
+    if percentual_livre is None:
+        percentual_livre = _percentual_livre(admin_id)
+
     if ultimo is None:
         tarefa.percentual_concluido = 0.0
-    elif tarefa.quantidade_total and tarefa.quantidade_total > 0:
+    elif (not percentual_livre
+            and tarefa.quantidade_total and tarefa.quantidade_total > 0):
         tarefa.percentual_concluido = min(
             100.0,
             round(float(ultimo.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
@@ -301,6 +327,9 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
     # Mapa tarefa_id → (quantidade_acumulada, percentual_realizado)
     mapa = {r.tarefa_cronograma_id: r for r in rows}
 
+    # Uma consulta para a obra inteira, não uma por tarefa.
+    percentual_livre = _percentual_livre(admin_id)
+
     for tarefa in tarefas:
         # Tarefas de terceiros: percentual é gerenciado manualmente (checkbox),
         # não deve ser sobrescrito pela sincronização com o RDO
@@ -309,7 +338,8 @@ def sincronizar_percentuais_obra(obra_id: int, admin_id: int, cliente: bool = Fa
         r = mapa.get(tarefa.id)
         if r is None:
             tarefa.percentual_concluido = 0.0
-        elif tarefa.quantidade_total and tarefa.quantidade_total > 0:
+        elif (not percentual_livre
+                and tarefa.quantidade_total and tarefa.quantidade_total > 0):
             tarefa.percentual_concluido = min(
                 100.0,
                 round(float(r.quantidade_acumulada) / tarefa.quantidade_total * 100, 2)
@@ -349,9 +379,10 @@ def rollup_percentual_pos_recalculo(tarefas: list, pai_ids: set, admin_id: int) 
     pela duração das filhas, de baixo para cima. O commit é do caller.
     """
     # Sincronizar percentual_concluido de folhas com o último apontamento do RDO
+    percentual_livre = _percentual_livre(admin_id)  # uma consulta para o lote
     for tarefa in tarefas:
         if tarefa.id not in pai_ids:  # só folhas recebem sync do RDO
-            _atualizar_percentual_sem_commit(tarefa, admin_id)
+            _atualizar_percentual_sem_commit(tarefa, admin_id, percentual_livre)
 
     # Bottom-up: % dos pais calculado a partir dos filhos (média ponderada por duração)
     pais = [t for t in tarefas if t.id in pai_ids]
@@ -484,7 +515,8 @@ def recalcular_cronograma(obra_id: int, admin_id: int, cliente: bool = False) ->
 # Progresso RDO ↔ Cronograma
 # ─────────────────────────────────────────────────────────────────────────────
 
-def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dict:
+def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int,
+                           percentual_livre=None) -> dict:
     """
     Retorna um dict com:
     - percentual_planejado: quanto deveria estar concluído até data_rdo (linear
@@ -498,6 +530,10 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
       • data_inicio ≤ data_rdo < data_fim    → interpolação linear (dias úteis)
       • data_rdo ≥ data_fim                  → 100.0
       • sem data_inicio ou sem duracao_dias  → None  (sem plano calculável)
+
+    `percentual_livre`: estado já resolvido da flag `rdo_percentual_livre`
+    (ver `_percentual_livre`). `None` consulta; quem chama em laço sobre a
+    obra inteira passa o booleano.
     """
     from models import TarefaCronograma, RDOApontamentoCronograma, db
 
@@ -529,13 +565,19 @@ def calcular_progresso_rdo(tarefa_id: int, data_rdo: date, admin_id: int) -> dic
         .scalar()
     ) or 0.0
 
+    if percentual_livre is None:
+        percentual_livre = _percentual_livre(admin_id)
+
     perc_realizado = 0.0
-    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+    if (not percentual_livre
+            and tarefa.quantidade_total and tarefa.quantidade_total > 0):
         perc_realizado = min(100.0, round(acumulado / tarefa.quantidade_total * 100, 2))
     else:
-        # Tarefa sem quantidade física: o avanço é o percentual_realizado do
-        # ÚLTIMO apontamento até data_rdo (mesma fonte que
-        # sincronizar_percentuais_obra). Antes esse caso devolvia sempre 0.
+        # Tarefa sem quantidade física — ou QUALQUER tarefa quando a flag
+        # `rdo_percentual_livre` está ligada: o avanço é o
+        # `percentual_realizado` do ÚLTIMO apontamento até data_rdo (mesma
+        # fonte que sincronizar_percentuais_obra). Antes esse caso devolvia
+        # sempre 0.
         ultimo = (
             db.session.query(RDOApontamentoCronograma.percentual_realizado)
             .join(RDO, RDO.id == RDOApontamentoCronograma.rdo_id)
@@ -655,8 +697,10 @@ def calcular_progresso_geral_obra_v2(obra_id: int, data_ref: date,
     ) and len({(t.unidade_medida or '').strip().lower()
                for t in nao_marcos}) == 1
 
+    percentual_livre = _percentual_livre(admin_id)  # uma consulta para a obra
+
     for t in folhas_efetivas:
-        prog = calcular_progresso_rdo(t.id, data_ref, admin_id)
+        prog = calcular_progresso_rdo(t.id, data_ref, admin_id, percentual_livre)
         perc_real = float(prog.get('percentual_realizado') or 0.0)
         # Sem plano calculável conta como 0 no agregado planejado.
         perc_plan = float(prog.get('percentual_planejado') or 0.0)
@@ -926,7 +970,21 @@ def atualizar_percentual_tarefa(tarefa_id: int, admin_id: int) -> None:
         .scalar()
     ) or 0.0
 
-    if tarefa.quantidade_total and tarefa.quantidade_total > 0:
+    tem_total = bool(tarefa.quantidade_total and tarefa.quantidade_total > 0)
+    percentual_livre = _percentual_livre(admin_id)
+
+    if percentual_livre:
+        # Flag ligada: a parcela da EMPRESA vem do percentual_realizado do
+        # último apontamento (o quantitativo da tarefa é só referência).
+        # A parcela da SUBEMPREITADA continua sendo quantidade produzida —
+        # é o que a sub reporta — e só é conversível em % quando a tarefa
+        # tem total cadastrado, exatamente como no ramo quantitativo abaixo
+        # (sem total, `qtd_sub` já era ignorado hoje).
+        pct_empresa = min(100.0, float(ultimo.percentual_realizado or 0)) if ultimo else 0.0
+        pct_sub = (round(float(qtd_sub) / tarefa.quantidade_total * 100, 2)
+                   if tem_total and qtd_sub else 0.0)
+        tarefa.percentual_concluido = min(100.0, round(pct_empresa + pct_sub, 2))
+    elif tem_total:
         # Empresa: quantidade_acumulada do último RDO (evita dupla contagem);
         # subempreitada: soma da produção registrada.
         acum_empresa = float(ultimo.quantidade_acumulada) if ultimo else 0.0

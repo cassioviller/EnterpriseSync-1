@@ -108,25 +108,17 @@ def _modo_deduzido(tarefa) -> str:
     return 'percentual'
 
 
-def modo_da_tarefa(tarefa) -> str:
-    """Modo de apontamento que a UI deve oferecer para a tarefa (spec §4.1).
+def _modo_sem_flag(tarefa) -> str:
+    """Resolução do modo IGNORANDO a flag `rdo_percentual_livre`.
 
-    Ordem de resolução, do mais forte para o mais fraco:
+    É o corpo que `modo_da_tarefa` tinha até o RDO em porcentagem livre:
+    marco → escolha explícita → dedução legada. Continua sendo a resposta
+    certa em dois lugares:
 
-      1. **marco** → 'percentual' sempre. Marco é binário (0 ou 100) e a
-         validação `MarcoApenasZeroOuCem` depende disso. Nem a escolha
-         explícita do usuário sobrepõe.
-      2. **escolha explícita** em `tarefa.modo_apontamento` (coluna criada
-         na migration 220). É o ponto do requisito "RDO em porcentagem":
-         uma tarefa com quantitativo levantado pode, ainda assim, ser
-         apontada em %.
-      3. **dedução legada** (`_modo_deduzido`) quando a coluna é NULL ou
-         traz valor fora do domínio.
-
-    Falha tolerante no passo 3: valor inválido não levanta. Esta função roda
-    dentro do laço que monta a tela inteira de apontamento
-    (`cronograma_views.py:917`); uma linha corrompida não pode derrubar o
-    RDO do dia.
+      - com a flag desligada (caminho normal, byte-idêntico ao de hoje);
+      - na CLASSIFICAÇÃO DE LINHA HISTÓRICA de `recomputar_cadeia`, que
+        descreve como aquela linha foi gravada no passado e não pode mudar
+        de leitura porque alguém ligou uma flag hoje.
     """
     if getattr(tarefa, 'is_marco', False):
         return 'percentual'
@@ -136,6 +128,48 @@ def modo_da_tarefa(tarefa) -> str:
         return escolhido
 
     return _modo_deduzido(tarefa)
+
+
+def modo_da_tarefa(tarefa, percentual_livre=None) -> str:
+    """Modo de apontamento que a UI deve oferecer para a tarefa (spec §4.1).
+
+    Ordem de resolução, do mais forte para o mais fraco:
+
+      1. **marco** → 'percentual' sempre. Marco é binário (0 ou 100) e a
+         validação `MarcoApenasZeroOuCem` depende disso. Nem a escolha
+         explícita do usuário sobrepõe.
+      2. **flag `rdo_percentual_livre` do tenant** → 'percentual' para toda
+         tarefa. Sobrepõe inclusive a escolha explícita: a migration 221
+         congelou `modo_apontamento='quantidade'` na maioria das tarefas
+         existentes, e o pedido do dono é apontar tudo em %. A coluna NÃO é
+         reescrita — desligar a flag devolve a escolha antiga.
+      3. **escolha explícita** em `tarefa.modo_apontamento` (coluna criada
+         na migration 220).
+      4. **dedução legada** (`_modo_deduzido`) quando a coluna é NULL ou
+         traz valor fora do domínio.
+
+    `percentual_livre`: estado da flag já resolvido pelo caller. `None` (o
+    default) faz a função consultar por `tarefa.admin_id` — cômodo para
+    chamada avulsa, uma query cada. Quem chama em laço sobre a obra inteira
+    (`cronograma_views.tarefas_rdo`, engine) resolve uma vez e passa o
+    booleano, para não consultar a configuração por tarefa.
+
+    Falha tolerante no passo 4: valor inválido não levanta. Esta função roda
+    dentro do laço que monta a tela inteira de apontamento
+    (`cronograma_views.py:917`); uma linha corrompida não pode derrubar o
+    RDO do dia.
+    """
+    if getattr(tarefa, 'is_marco', False):
+        return 'percentual'
+
+    if percentual_livre is None:
+        from utils.tenant import rdo_percentual_livre_on
+        percentual_livre = rdo_percentual_livre_on(
+            getattr(tarefa, 'admin_id', None))
+    if percentual_livre:
+        return 'percentual'
+
+    return _modo_sem_flag(tarefa)
 
 
 def _is_marco(tarefa) -> bool:
@@ -219,8 +253,14 @@ def recomputar_cadeia(tarefa_id: int, a_partir_de, admin_id: int) -> int:
         # tarefa com quantidade e sem unidade era 'percentual' na tela e
         # 'quantitativo' aqui. Agora as duas pontas usam o mesmo resolver —
         # que, desde a migration 220, respeita a escolha do usuário.
+        #
+        # `_modo_sem_flag` e não `modo_da_tarefa`: isto classifica uma linha
+        # ANTIGA (pré-migration 209) pelo formato em que ela foi gravada.
+        # Ligar `rdo_percentual_livre` muda como se aponta de hoje em
+        # diante, não como o histórico foi escrito — reinterpretar uma linha
+        # quantitativa como percentual aqui zeraria o acumulado dela.
         tipo = ap.tipo_apontamento or (
-            'quantitativo' if modo_da_tarefa(tarefa) == 'quantidade'
+            'quantitativo' if _modo_sem_flag(tarefa) == 'quantidade'
             else 'percentual')
         antes = (ap.quantidade_acumulada, ap.percentual_realizado,
                  ap.percentual_incremento_dia, ap.percentual_acumulado)
@@ -274,18 +314,33 @@ def registrar_apontamento(rdo, tarefa, *, quantidade_dia=None,
     # Guard de modo: honra a ESCOLHA do usuário. Marco não entra aqui —
     # `modo_da_tarefa` já resolve marco para 'percentual' antes de olhar a
     # coluna, e a validação binária é a MarcoApenasZeroOuCem mais abaixo.
-    modo_escolhido = (getattr(tarefa, 'modo_apontamento', None) or '').strip().lower()
-    if modo_escolhido in MODOS_APONTAMENTO and not getattr(tarefa, 'is_marco', False):
-        if quantidade_dia is not None and modo_escolhido != 'quantidade':
-            raise ModoIncompativel(
-                f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
-                f'apontamento em PERCENTUAL — envie o % acumulado, não '
-                f'quantidade.')
-        if percentual_acumulado is not None and modo_escolhido != 'percentual':
-            raise ModoIncompativel(
-                f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
-                f'apontamento por QUANTIDADE ({tarefa.unidade_medida or "un"}) '
-                f'— envie a quantidade do dia, não percentual.')
+    #
+    # Com `rdo_percentual_livre` ligada o guard segue a flag, não a coluna:
+    # a migration 221 congelou 'quantidade' na maioria das tarefas, então
+    # ler a coluna aqui recusaria justamente o apontamento em % que a flag
+    # existe para permitir. Nesse estado só o modo percentual é aceito.
+    from utils.tenant import rdo_percentual_livre_on
+    percentual_livre = rdo_percentual_livre_on(admin_id)
+    if not getattr(tarefa, 'is_marco', False):
+        if percentual_livre:
+            if quantidade_dia is not None:
+                raise ModoIncompativel(
+                    f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
+                    f'apontamento em PERCENTUAL — envie o % acumulado, não '
+                    f'quantidade.')
+        else:
+            modo_escolhido = (getattr(tarefa, 'modo_apontamento', None) or '').strip().lower()
+            if modo_escolhido in MODOS_APONTAMENTO:
+                if quantidade_dia is not None and modo_escolhido != 'quantidade':
+                    raise ModoIncompativel(
+                        f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
+                        f'apontamento em PERCENTUAL — envie o % acumulado, não '
+                        f'quantidade.')
+                if percentual_acumulado is not None and modo_escolhido != 'percentual':
+                    raise ModoIncompativel(
+                        f'A tarefa "{tarefa.nome_tarefa}" está configurada para '
+                        f'apontamento por QUANTIDADE ({tarefa.unidade_medida or "un"}) '
+                        f'— envie a quantidade do dia, não percentual.')
 
     from sqlalchemy import func as sqlfunc
 

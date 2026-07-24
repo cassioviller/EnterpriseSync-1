@@ -4168,6 +4168,18 @@ class ConfiguracaoEmpresa(db.Model):
     cronograma_editor_v2 = db.Column(db.Boolean, nullable=False, default=False,
                                      server_default='false')
 
+    # RDO em porcentagem livre — flag de rollout por tenant. Com ela ligada,
+    # TODA tarefa é apontada em percentual acumulado no RDO (o quantitativo
+    # cadastrado vira só referência de leitura) e a derivação de
+    # `percentual_concluido` passa a ler o `percentual_realizado` do
+    # apontamento mais recente em vez de `quantidade_acumulada/total`.
+    # Default FALSE = comportamento atual byte-idêntico; a coluna
+    # `tarefa_cronograma.modo_apontamento` NÃO é reescrita, então desligar a
+    # flag restaura tudo. Liga-se por scripts/flag_rdo_percentual_livre.py.
+    # Irmã de cronograma_editor_v2 (acima); migração espelho: 226.
+    rdo_percentual_livre = db.Column(db.Boolean, nullable=False, default=False,
+                                     server_default='false')
+
     # REMOVIDO: Campos transferidos para PropostaTemplate para evitar conflitos
     # itens_inclusos_padrao, itens_exclusos_padrao, condicoes_padrao, 
     # condicoes_pagamento_padrao, garantias_padrao, observacoes_gerais_padrao

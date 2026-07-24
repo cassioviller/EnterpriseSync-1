@@ -4097,6 +4097,32 @@ def _migration_225_cronograma_baseline():
         raise
 
 
+def _migration_226_flag_rdo_percentual_livre():
+    """RDO em porcentagem livre — flag de rollout
+    `configuracao_empresa.rdo_percentual_livre` (default FALSE).
+
+    Com ela desligada o sistema se comporta exatamente como hoje (modo de
+    apontamento deduzido/escolhido por tarefa, percentual derivado do
+    quantitativo acumulado). Ligada, todo apontamento do RDO é percentual
+    acumulado e a derivação lê `percentual_realizado`. Nenhum dado é
+    reescrito — desligar a flag reverte.
+
+    Idempotente (`ADD COLUMN IF NOT EXISTS`), no padrão das migrations
+    211/222: numa base onde o modelo já foi importado o `db.create_all()`
+    anterior já criou a coluna e o DDL é no-op.
+    """
+    from sqlalchemy import text as sa_text
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE configuracao_empresa ADD COLUMN IF NOT EXISTS "
+                "rdo_percentual_livre BOOLEAN NOT NULL DEFAULT FALSE"))
+        logger.info("[Migration 226] rdo_percentual_livre criada (default FALSE).")
+    except Exception as e:
+        logger.error(f"[Migration 226] Falha: {e}", exc_info=True)
+        raise
+
+
 def migration_230_obra_transicao_estado():
     """Fase 2 — tabela `obra_transicao_estado` (histórico de transições).
 
@@ -5570,6 +5596,7 @@ def executar_migracoes():
             (223, "Cronograma editável Fase 1 — backfill predecessora_id → tarefa_vinculo TI/0 (intra-obra/tenant; sujas puladas e logadas)", _migration_223_backfill_vinculos_de_predecessora),
             (224, "Cronograma editável Fase 3 — tabela cronograma_acao (pilha de desfazer/refazer por obra+usuário+modo)", _migration_224_cronograma_acao),
             (225, "Cronograma editável Fase 4 — cronograma_baseline + itens (linha de base, uma ativa por obra via índice parcial)", _migration_225_cronograma_baseline),
+            (226, "RDO em porcentagem livre — flag configuracao_empresa.rdo_percentual_livre (default FALSE)", _migration_226_flag_rdo_percentual_livre),
             (230, "Fase 2 — tabela obra_transicao_estado (historico de transicoes: de/para/quem/quando/motivo)", migration_230_obra_transicao_estado),
             (231, "Fase 2 — obra.estado (VARCHAR+CHECK) + backfill derivado de status/ativo + historico do backfill", migration_231_obra_estado),
             (232, "Fase 2 — alinha obra.status (espelho legado) ao obra.estado derivado pela 231", migration_232_normalizar_status_legado),

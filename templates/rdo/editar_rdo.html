@@ -1521,6 +1521,15 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
         ? `${t.quantidade_acumulada.toFixed(2)} ${t.unidade_medida}`
         : `0 ${t.unidade_medida}`;
     const qty_hoje  = t.quantidade_executada_hoje ?? rdoV2QtdAnterior[t.id] ?? 0;
+    // Modo decidido pelo backend (tarefas_rdo.tipo_modo) — mesmo contrato do
+    // RDO novo (templates/rdo/novo.html:1118). Até o RDO em porcentagem
+    // livre esta tela era só-quantidade: tarefa sem `quantidade_total` não
+    // ganhava campo nenhum. Com a flag ligada TODA tarefa vem 'percentual',
+    // então sem este ramo a edição do RDO ficaria sem onde apontar.
+    const modo = t.tipo_modo || (t.quantidade_total > 0 ? 'quantidade' : 'percentual');
+    const isMarco = !!t.is_marco;
+    const pctAnterior = t.percentual_acumulado_anterior ?? 0;
+    const pctHoje = t.percentual_acumulado_hoje;
     const indent  = depth > 0 ? `ms-${Math.min(depth * 3, 5)}` : '';
     const bgCard  = isPai ? '#f0f7ff' : '#ffffff';
     const boldCls = isPai ? 'fw-bold' : '';
@@ -1528,7 +1537,8 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
     const isTerceiros = resp === 'terceiros';
     const isSub = resp === 'subempreitada';
     const isEmpresa = resp === 'empresa';
-    const hasInput = !isPai && isEmpresa && t.quantidade_total > 0;
+    const hasInput = !isPai && isEmpresa && modo === 'quantidade' && t.quantidade_total > 0;
+    const hasInputPct = !isPai && isEmpresa && modo === 'percentual';
     const expandido = _rdoV2EditPaisExpandidos.has(t.id);
     const chevronIcon = expandido ? 'fa-chevron-down' : 'fa-chevron-right';
     const badgeResp = !isPai ? _rdoBadgeResponsavelEdit(resp) : '';
@@ -1576,10 +1586,50 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
         } else {
             const equipeEdit = (_cronTaskEquipeEdit[t.id] || []);
             const nEquipe = equipeEdit.length;
+            // Referência do quantitativo. No modo quantidade ela é o total a
+            // executar e a sua ausência é um aviso (a tarefa não tem como ser
+            // apontada). No modo percentual é só LEITURA: aparece quando há
+            // total E unidade, e some sem alarde quando não há — apontar em %
+            // não depende de quantitativo.
+            const refQtd = modo === 'quantidade'
+              ? (t.quantidade_total
+                  ? `<small class="text-muted">Total: ${qty_total}</small>`
+                  : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`)
+              : ((t.quantidade_total && t.unidade_medida)
+                  ? `<small class="text-muted">Total: ${qty_total}</small>`
+                  : '');
+            // Marco é binário (0/100) — mesmo afford do RDO novo
+            // (templates/rdo/novo.html:1173), não um campo livre de %.
+            const pctBlock = !hasInputPct ? '' : (isMarco ? `
+              <div class="form-check m-0" onclick="event.stopPropagation()">
+                <input class="form-check-input" type="checkbox" id="chk_marco_edit_${t.id}"
+                       ${(pctHoje ?? 0) >= 100 ? 'checked' : ''}
+                       onchange="salvarApontamentoPctEdit(${t.id}, this.checked ? 100 : 0)"
+                       style="transform:scale(1.2)">
+                <label class="form-check-label small fw-semibold ms-1" for="chk_marco_edit_${t.id}">
+                  Marco concluído
+                </label>
+              </div>` : `
+              <div class="d-flex align-items-center gap-1" style="min-width:200px" onclick="event.stopPropagation()">
+                <small class="text-muted" title="Percentual anterior">Ant: ${pctAnterior.toFixed(1)}%</small>
+                <input type="number"
+                       id="pct_edit_${t.id}"
+                       class="form-control form-control-sm"
+                       style="width:90px;transition:background .3s"
+                       min="0" max="150" step="0.1"
+                       placeholder="% acum."
+                       value="${pctHoje != null ? pctHoje : ''}"
+                       title="Percentual ACUMULADO da tarefa (%)">
+                <button id="btn_save_${t.id}" class="btn btn-primary btn-sm px-2"
+                        onclick="event.stopPropagation(); salvarApontamentoPctEdit(${t.id})"
+                        title="Salvar apontamento">
+                  <i class="fas fa-save fa-xs"></i>
+                </button>
+                <span class="text-muted small">%</span>
+              </div>`);
             acaoInner = `
-              ${t.quantidade_total
-                ? `<small class="text-muted">Total: ${qty_total}</small>`
-                : `<small class="text-warning fst-italic"><i class="fas fa-exclamation-circle fa-xs me-1"></i>Sem qtd. definida</small>`}
+              ${refQtd}
+              ${pctBlock}
               ${hasInput ? `
               <div class="d-flex align-items-center gap-1" style="min-width:200px" onclick="event.stopPropagation()">
                 <small class="text-muted">Acum: ${qty_acum}</small>
@@ -1642,7 +1692,9 @@ function _rdoV2EditRenderTarefaCard(t, isPai, depth, contadorFilhos) {
 
     // Task #154: subgrupos (isPai) também mostram a barra Planejado/Realizado
     // calculada a partir das filhas (mesmo critério do cronograma).
-    const mostrarBarra = hasInput || isPai;
+    // `hasInputPct`: no modo percentual a folha também é apontada aqui, e é
+    // esta barra que `salvarApontamentoPctEdit` atualiza (percReal_/barReal_).
+    const mostrarBarra = hasInput || hasInputPct || isPai;
     const progresso = mostrarBarra ? `
       <div class="px-3 pb-2">
         ${planejadoBlock}
@@ -1769,6 +1821,77 @@ async function salvarApontamentoEdit(tarefaId) {
             setTimeout(() => {
                 input.style.backgroundColor = '';
                 input.style.borderColor = '';
+                if (btn) { btn.classList.remove('btn-success'); btn.classList.add('btn-primary'); btn.innerHTML = '<i class="fas fa-save fa-xs"></i>'; }
+            }, 2000);
+        } else {
+            if (btn) { btn.classList.add('btn-danger'); btn.classList.remove('btn-primary'); setTimeout(() => { btn.classList.remove('btn-danger'); btn.classList.add('btn-primary'); }, 2000); }
+            alert(data.msg || 'Erro ao salvar apontamento');
+        }
+    } catch(e) {
+        alert('Erro de rede ao salvar apontamento');
+    }
+}
+
+// Apontamento em % ACUMULADO na edição do RDO (modo percentual — sempre,
+// quando a flag `rdo_percentual_livre` do tenant está ligada). Espelha as
+// confirmações de `apontarPercentualRDO` do RDO novo
+// (templates/rdo/novo.html:1394): sobre-execução e retrocesso são pedidos
+// ao usuário ANTES de enviar; o servidor valida de novo e é ele quem manda.
+// `valorFixo` vem do checkbox de marco (0/100); senão lê o campo.
+async function salvarApontamentoPctEdit(tarefaId, valorFixo) {
+    const input = document.getElementById(`pct_edit_${tarefaId}`);
+    const pct = valorFixo != null ? valorFixo : parseFloat(input?.value);
+    if (isNaN(pct)) return;
+
+    const t = (window.__tarefasRDOAll || []).find(x => x.id === tarefaId);
+    const ant = t?.percentual_acumulado_anterior ?? 0;
+    const corpo = {tarefa_cronograma_id: tarefaId, percentual_acumulado: pct};
+
+    if (pct > 100) {
+        if (!confirm(`O acumulado ${pct}% passa de 100%. Confirmar sobre-execução? ` +
+                     `(o agregado da obra considera no máximo 100%)`)) {
+            if (input) input.value = '';
+            return;
+        }
+        corpo.permitir_sobreexecucao = true;
+    }
+    if (pct < ant) {
+        const just = prompt(
+            `O acumulado ${pct}% é MENOR que o anterior (${ant}%). ` +
+            `Isso é uma correção retroativa. Informe a justificativa:`);
+        if (!just || !just.trim()) {
+            if (input) input.value = '';
+            return;
+        }
+        corpo.permitir_retrocesso = true;
+        corpo.justificativa = just.trim();
+    }
+
+    const btn = document.getElementById(`btn_save_${tarefaId}`);
+    try {
+        const res = await fetch(`/cronograma/rdo/${rdoId}/apontar`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(corpo),
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            const ap = data.apontamento;
+            const semPlano = (ap.percentual_planejado === null || ap.percentual_planejado === undefined);
+            const cor = semPlano
+                ? '#6c757d'
+                : (ap.percentual_realizado >= ap.percentual_planejado ? '#28a745' : '#dc3545');
+            const percEl = document.getElementById(`percReal_${tarefaId}`);
+            const barEl  = document.getElementById(`barReal_${tarefaId}`);
+            if (percEl) { percEl.textContent = ap.percentual_realizado.toFixed(1) + '%'; percEl.style.color = cor; }
+            if (barEl)  { barEl.style.width = Math.min(ap.percentual_realizado, 100) + '%'; barEl.style.background = cor; }
+            if (input) {
+                input.style.backgroundColor = '#d4edda';
+                input.style.borderColor = '#28a745';
+            }
+            if (btn) { btn.classList.remove('btn-primary'); btn.classList.add('btn-success'); btn.innerHTML = '<i class="fas fa-check fa-xs"></i>'; }
+            setTimeout(() => {
+                if (input) { input.style.backgroundColor = ''; input.style.borderColor = ''; }
                 if (btn) { btn.classList.remove('btn-success'); btn.classList.add('btn-primary'); btn.innerHTML = '<i class="fas fa-save fa-xs"></i>'; }
             }, 2000);
         } else {

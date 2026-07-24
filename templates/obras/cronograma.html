@@ -504,7 +504,11 @@
             <label class="form-label fw-semibold small text-uppercase text-muted ls-1">Unidade</label>
             <input type="text" id="nt_unidade" class="form-control" placeholder="ex: m²">
           </div>
-          <div class="col-md-6">
+          {# RDO em porcentagem livre: com a flag do tenant ligada não há
+             escolha — toda tarefa é apontada em % —, então o seletor some.
+             O campo continua existindo (e vazio) para o POST seguir com o
+             mesmo contrato. #}
+          <div class="col-md-6{% if rdo_percentual_livre %} d-none{% endif %}" id="nt_modo_col">
             <label class="form-label fw-semibold small text-uppercase text-muted ls-1">
               <i class="fas fa-ruler-combined me-1 text-primary"></i>Como apontar no RDO
             </label>
@@ -620,7 +624,8 @@
         <label class="form-label fw-semibold small text-uppercase text-muted">Unidade</label>
         <input type="text" id="ed_unidade" class="form-control" placeholder="ex: m²">
       </div>
-      <div class="col-12" id="ed_modo_row">
+      {# Some com `rdo_percentual_livre` ligada — ver nota no modal de nova tarefa. #}
+      <div class="col-12{% if rdo_percentual_livre %} d-none{% endif %}" id="ed_modo_row">
         <label class="form-label fw-semibold small text-uppercase text-muted">
           <i class="fas fa-ruler-combined me-1 text-primary"></i>Como apontar no RDO
         </label>
@@ -984,6 +989,10 @@ const DAY_W    = 26;
 // Fase 1 (editor v2): todo comportamento novo fica atrás desta flag —
 // com ela desligada, nenhum caminho de código JS muda.
 const EDITOR_V2 = {{ 'true' if editor_v2 else 'false' }};
+// RDO em porcentagem livre: com a flag ligada o seletor "Como apontar no
+// RDO" nasce escondido (d-none no Jinja) e o JS que reexibe a linha para
+// tarefas-folha precisa respeitar isso.
+const RDO_PERCENTUAL_LIVRE = {{ 'true' if rdo_percentual_livre else 'false' }};
 
 let tarefas = {{ tarefas_dict | tojson }};
 
@@ -2007,7 +2016,7 @@ function abrirEditar(tarefaId) {
     unidRow?.classList.remove('d-none');
     inicioRow?.classList.remove('d-none');
     fimRow?.classList.remove('d-none');
-    modoRow?.classList.remove('d-none');
+    if (!RDO_PERCENTUAL_LIVRE) modoRow?.classList.remove('d-none');
     duracaoEl.disabled = false;
     duracaoEl.title = '';
   }

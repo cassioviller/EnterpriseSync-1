@@ -160,3 +160,32 @@ def cronograma_editor_v2_ativo() -> bool:
     except Exception as e:
         logger.warning(f"Flag cronograma_editor_v2 indisponível ({e}) — assumindo desligada")
         return False
+
+
+def rdo_percentual_livre_on(admin_id) -> bool:
+    """Flag do RDO em porcentagem livre para o tenant `admin_id`.
+
+    PONTO ÚNICO de leitura de `configuracao_empresa.rdo_percentual_livre`
+    (migração 226, default FALSE). Ligada, todo apontamento do RDO é
+    percentual acumulado e a derivação de `percentual_concluido` lê o
+    `percentual_realizado` do apontamento mais recente. Liga-se por
+    `scripts/flag_rdo_percentual_livre.py`.
+
+    Diferente de `cronograma_mpp_ativo`/`cronograma_editor_v2`, recebe o
+    `admin_id` EXPLÍCITO: quem chama é o engine e o serviço de apontamento,
+    que rodam também fora de request (jobs, importador, testes) e já
+    carregam o tenant da tarefa. Views passam `get_tenant_admin_id()`.
+
+    NUNCA levanta: sem admin_id, sem linha de configuração ou com erro de
+    banco, devolve False (comportamento atual).
+    """
+    if not admin_id:
+        return False
+
+    try:
+        from models import ConfiguracaoEmpresa
+        config = ConfiguracaoEmpresa.query.filter_by(admin_id=admin_id).first()
+        return bool(config and config.rdo_percentual_livre)
+    except Exception as e:
+        logger.warning(f"Flag rdo_percentual_livre indisponível ({e}) — assumindo desligada")
+        return False

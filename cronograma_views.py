@@ -419,6 +419,7 @@ def cronograma_obra(obra_id: int):
 
     # Fase 1 (editor v2): com a flag ligada, os dicts levam
     # `predecessoras_texto` real (mapas da obra em uma query — sem N+1).
+    from utils.tenant import rdo_percentual_livre_on
     flag_on = _editor_v2_on()
     _kw_v2: dict = {}
     if flag_on:
@@ -501,6 +502,12 @@ def cronograma_obra(obra_id: int):
         # Fase 4: barra cinza no Gantt + coluna "Desvio (dias)".
         baseline_ativa=baseline_ativa,
         baseline_map=baseline_map,
+        # RDO em porcentagem livre: com a flag ligada não existe escolha de
+        # modo — toda tarefa é apontada em % —, então o seletor "Como apontar
+        # no RDO" some dos modais. A API segue aceitando `modo_apontamento`
+        # (inerte enquanto a flag estiver ligada), o que mantém a coluna
+        # intacta para quando/se a flag for desligada.
+        rdo_percentual_livre=rdo_percentual_livre_on(admin_id),
         base_template='base_iframe.html' if cliente_mode else 'base_completo.html',
     )
 
@@ -2151,10 +2158,16 @@ def tarefas_rdo(obra_id: int):
 
     # Montar dict com progresso
     from services.cronograma_apontamento_service import modo_da_tarefa
+    from utils.tenant import rdo_percentual_livre_on
+    # RDO em porcentagem livre: uma leitura da flag para a obra inteira, e o
+    # booleano viaja para o resolvedor — senão seria uma consulta por tarefa
+    # dentro do laço que monta a tela de apontamento.
+    percentual_livre = rdo_percentual_livre_on(admin_id)
     resultado = []
     item_por_id: dict[int, dict] = {}
     for t in tarefas:
-        progresso = calcular_progresso_rdo(t.id, data_rdo, admin_id)
+        progresso = calcular_progresso_rdo(t.id, data_rdo, admin_id,
+                                           percentual_livre)
 
         # Buscar apontamento específico deste RDO para esta tarefa (se existir)
         qty_hoje = 0.0
@@ -2188,7 +2201,7 @@ def tarefas_rdo(obra_id: int):
         if ant_row is not None:
             pct_anterior = float(ant_row[0] if ant_row[0] is not None
                                  else (ant_row[1] or 0.0))
-        tipo_modo = modo_da_tarefa(t)
+        tipo_modo = modo_da_tarefa(t, percentual_livre)
         saldo = None
         if tipo_modo == 'quantidade':
             saldo = round(float(t.quantidade_total or 0)
