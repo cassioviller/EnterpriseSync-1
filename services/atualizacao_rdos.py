@@ -103,8 +103,15 @@ class IndiceTarefas:
     def __init__(self, obra_id, mapa_mpp_nome=None):
         from models import TarefaCronograma
         self.mapa_mpp_nome = mapa_mpp_nome or {}
+        # `is_cliente=False`: o cronograma do CLIENTE é uma cópia com os
+        # mesmos nomes (e às vezes o mesmo `mpp_uid`) que NÃO recebe sync —
+        # `sincronizar_percentuais_obra` roda com `cliente=False`. Sem este
+        # filtro, uma obra com as duas visões daria empate na resolução por
+        # nome e, no pior caso, gravaria o apontamento na cópia do cliente,
+        # onde o físico nunca se move. Mesmo filtro explícito que o endpoint
+        # `tarefas-rdo` ganhou na Task #147 (cronograma_views.py:2148).
         tarefas = TarefaCronograma.query.filter_by(
-            obra_id=obra_id, ativa=True).all()
+            obra_id=obra_id, ativa=True, is_cliente=False).all()
         self._por_id = {t.id: t for t in tarefas}
         self._por_uid = {}
         self._por_nome = {}

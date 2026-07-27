@@ -151,6 +151,15 @@ def parse_mensagens(texto):
             atual.corpo += '\n' + linha
     if atual is not None:
         mensagens.append(atual.finalizar())
+
+    # Export em outro formato de data (locale US: "7/8/26, 8:59 AM - ") não
+    # casa RE_CABECALHO e sairia como "0 dia(s) de RDO" — resultado vazio que
+    # parece "não teve RDO" em vez de "não entendi o arquivo". Falha alto.
+    if not mensagens and texto.strip():
+        raise ValueError(
+            'Nenhuma mensagem reconhecida no export. O parser espera o formato '
+            '"DD/MM/AAAA HH:MM - Autor: texto" (exportação em pt-BR). Confira '
+            'o idioma/locale do celular que gerou o arquivo.')
     return mensagens
 
 
@@ -402,6 +411,18 @@ def _extensao(nome):
     return os.path.splitext(nome)[1].lower()
 
 
+def _ordem_numerica(nome):
+    """Chave de ordenação de `1.jpg`, `2.png`… — a MESMA de
+    `services/rdo_fotos_import.listar_imagens_ordenadas`.
+
+    Ordenar por `(len, nome)` parece equivalente e não é: com extensões
+    misturadas, `2.jpg` (5 caracteres) vem antes de `1.jpeg` (6) e as
+    legendas grudam nas fotos erradas.
+    """
+    base = os.path.splitext(os.path.basename(nome))[0]
+    return (0, int(base), '') if base.isdigit() else (1, 0, base.lower())
+
+
 def escrever_fotos(bloco, base_fotos, ler_midia, dry_run, forcar):
     """Grava as fotos do dia em `fotos_rdos/<AAAA-MM-DD>/N.ext`.
 
@@ -425,7 +446,7 @@ def escrever_fotos(bloco, base_fotos, ler_midia, dry_run, forcar):
     if os.path.isdir(pasta):
         existentes = sorted(
             (f for f in os.listdir(pasta) if _extensao(f) in EXTENSOES_IMAGEM),
-            key=lambda f: (len(f), f),
+            key=_ordem_numerica,
         )
 
     if existentes and not forcar:

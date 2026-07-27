@@ -307,6 +307,64 @@ def test_fallback_por_nome_desambigua_pelo_avo():
 
 
 @pytest.mark.integration
+def test_ignora_a_copia_do_cronograma_do_cliente():
+    """O cronograma do CLIENTE é uma cópia com os mesmos nomes e não recebe
+    sync (`sincronizar_percentuais_obra` roda com cliente=False). Se ele
+    entrasse no índice, a resolução por nome empataria — e no pior caso o
+    apontamento iria para a cópia onde o físico nunca se move."""
+    from services.atualizacao_rdos import IndiceTarefas, atualizar_rdos
+    from models import RDOApontamentoCronograma, RDO, TarefaCronograma
+    with app.app_context():
+        admin_id, obra, tarefas = _ambiente(com_mpp_uid=False)
+        alvo = tarefas[59]
+        # cópia-cliente idêntica em nome, pai e mpp_uid
+        clone = TarefaCronograma(
+            obra_id=obra.id, admin_id=admin_id,
+            tarefa_pai_id=alvo.tarefa_pai_id,
+            nome_tarefa=alvo.nome_tarefa, ordem=alvo.ordem + 500,
+            duracao_dias=alvo.duracao_dias, data_inicio=alvo.data_inicio,
+            data_fim=alvo.data_fim, is_cliente=True)
+        db.session.add(clone)
+        db.session.commit()
+
+        assert clone.id not in IndiceTarefas(obra.id, _MAPA)._por_id
+        rel = atualizar_rdos(obra, admin_id, _payload(mpp=59, pct=45),
+                             com_fotos=False, mapa_mpp_nome=_MAPA)
+        assert rel['pendencias'] == []
+        rdo = RDO.query.filter_by(obra_id=obra.id).one()
+        ap = RDOApontamentoCronograma.query.filter_by(rdo_id=rdo.id).one()
+        assert ap.tarefa_cronograma_id == alvo.id
+        assert TarefaCronograma.query.get(clone.id).percentual_concluido == 0.0
+
+
+def test_parser_ordena_pasta_existente_por_numero_e_nao_por_tamanho(tmp_path):
+    """Com extensões misturadas, ordenar por (len, nome) põe `2.jpg` antes de
+    `1.jpeg` e as legendas grudam nas fotos erradas."""
+    base = tmp_path / 'fotos'
+    (base / '2026-07-07').mkdir(parents=True)
+    for nome in ('1.jpeg', '2.jpg', '10.jpg'):
+        (base / '2026-07-07' / nome).write_bytes(b'x')
+    txt = tmp_path / 'conversa.txt'
+    txt.write_text(_CONVERSA, encoding='utf-8')
+    payload, _ = _converter(txt=str(txt), base_fotos=str(base))
+    assert [f['arquivo'] for f in payload['rdos'][0]['fotos']] == \
+        ['1.jpeg', '2.jpg', '10.jpg']
+    # a 1ª legenda do chat tem de ficar no 1.jpeg
+    assert payload['rdos'][0]['fotos'][0]['legenda'] == 'Limpeza nas valas'
+
+
+def test_parser_recusa_export_em_formato_desconhecido(tmp_path):
+    """Export em locale US não casa o cabeçalho. Devolver 0 dias em silêncio
+    pareceria "não teve RDO" em vez de "não entendi o arquivo"."""
+    import pytest as _pytest
+    txt = tmp_path / 'conversa.txt'
+    txt.write_text('7/8/26, 8:59 AM - Alan: Obra Itu - RDO – 07/07/2026\n',
+                   encoding='utf-8')
+    with _pytest.raises(ValueError, match='Nenhuma mensagem reconhecida'):
+        _converter(txt=str(txt), base_fotos=str(tmp_path / 'fotos'))
+
+
+@pytest.mark.integration
 def test_fallback_ambiguo_sem_caminho_vira_pendencia_listando_candidatos():
     from services.atualizacao_rdos import atualizar_rdos
     with app.app_context():
