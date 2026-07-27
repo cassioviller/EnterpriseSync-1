@@ -234,3 +234,43 @@ def test_import_e_atomico_quando_falha_depois_dos_rdos(monkeypatch):
             'import deixou de ser tudo-ou-nada: as linhas antigas foram '
             f'apagadas e recriadas ({len(antes[0] - depois[0])} tarefa(s) e '
             f'{len(antes[1] - depois[1])} RDO(s) sumiram)')
+
+
+# ---------------------------------------------------------------------------
+# Varredura P4 — silêncio onde deveria haver erro
+# ---------------------------------------------------------------------------
+
+def test_import_avisa_quando_descarta_apontamento_de_tarefa_inexistente():
+    """Era um `continue` mudo: um id de tarefa errado no JSON — typo, ou um
+    cronograma que mudou entre a geração e o import — descartava o apontamento
+    sem rastro, e o físico daquele dia não entrava. O caso irmão
+    (`_vincular_etapa_tarefas`) já avisava; este não."""
+    import json
+
+    from services import importacao_fisico_financeiro as ff
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    with open(caminho, encoding='utf-8') as fh:
+        payload = json.load(fh)
+
+    # um id que não existe no cronograma do payload
+    payload['rdos'] = [{
+        'data': '2026-07-14', 'comentario': 'teste',
+        'apontamentos': [{'tarefa_mpp': 999999, 'pct': 50}],
+    }]
+
+    with app.app_context():
+        from models import TipoUsuario, Usuario
+        tag = datetime.utcnow().strftime('%H%M%S%f')
+        admin = Usuario(username=f'p4_{tag}', email=f'p4_{tag}@test.local',
+                        nome=f'P4 {tag}',
+                        password_hash=generate_password_hash('Senha@2026'),
+                        tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+                        versao_sistema='v2')
+        db.session.add(admin)
+        db.session.commit()
+
+        res = ff.importar_fisico_financeiro(payload, admin.id)
+        assert any('999999' in a and 'descartado' in a for a in res['avisos']), \
+            res['avisos']

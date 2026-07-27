@@ -20,7 +20,8 @@
 | 7 | Code review profundo — estrutura + varredura 1 | ✅ | `ef4bec3a` |
 | 8 | Correção dos 5 achados da varredura 1 | ✅ | `1e0ed9b3` |
 | 9 | Varredura 2 (commit alheio) + correção | ✅ | `a8373ffa` |
-| 10 | Varredura 3 (premissa desmentida) + correção | ✅ | (neste commit) |
+| 10 | Varredura 3 (premissa desmentida) + correção | ✅ | `c32e3380` |
+| 11 | Varredura 4 (silêncio) + correção | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -275,6 +276,22 @@ runbook foi corrigido com a tabela do que sobrevive e do que não.
 
 4 testes novos; sem a correção falham com `assert None == <id>`.
 Regressão da área: **80 passed**.
+
+## 11 · Varredura 4 — silêncio onde deveria haver erro
+
+205 `except`/`continue` mudos no repositório, mas **97 são em `migrations.py`**
+(idempotência por construção) e boa parte do resto é parsing defensivo de
+formulário. O critério que separou ruído de defeito: **o silêncio descarta
+dado que o usuário mandou, num caminho que grava?**
+
+🟡 **D1** — o import descartava apontamento de tarefa inexistente com um
+`continue` mudo. Um `tarefa_mpp` errado no JSON (typo, ou cronograma que mudou
+entre a geração e o import) sumia sem rastro e o físico do dia não entrava. O
+caso irmão (`_vincular_etapa_tarefas`) já avisava; este não. Agora acrescenta
+à lista `avisos`, que o import devolve e a rota/CLI imprime.
+
+Registrei como **ruído avaliado e descartado** os 14 de `views/rdo.py`
+(parsing de formulário, o primeiro deles já loga) e os 97 de `migrations.py`.
 
 ## Regressão final da rodada
 

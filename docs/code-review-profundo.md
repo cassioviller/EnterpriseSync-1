@@ -285,3 +285,46 @@ Registradas para não serem re-investigadas:
 | "flag `rdo_percentual_livre` desligada ⇒ comportamento byte-idêntico" | ✅ já coberto por teste dedicado em `test_rdo_percentual_livre.py` |
 | "reimportar não duplica" (o import é upsert por `(codigo, admin_id)`) | ✅ coberto por `test_importacao_fisico_financeiro.py` |
 | "assinado sem trilha de transição = 0" (Fase 5) | ✅ invariante global testado — e esta sessão provou que ele PEGA violação, ao acusar 4 RDOs que meu próprio teste tinha criado |
+
+## Varredura 4 — P4: silêncio onde deveria haver erro ✅ 27/07
+
+**Método:** varrer `except` que engole a exceção sem log, e `continue` que
+descarta dado sem aviso. 205 ocorrências — mas **97 são em `migrations.py`**,
+onde engolir "já existe" é o design idempotente, e boa parte do resto é
+parsing defensivo de formulário (`float()`, `int()`, `strptime`), que é
+legítimo.
+
+O critério que separou ruído de defeito: **o silêncio descarta dado que o
+usuário mandou, num caminho que grava?**
+
+### 🟡 D1 · O import descartava apontamento de tarefa inexistente sem rastro
+
+`services/importacao_fisico_financeiro.py::_materializar_rdos` — era:
+
+```python
+db_id = tid_to_db.get(tmpp)
+if db_id is None:
+    continue          # mudo
+```
+
+Um `tarefa_mpp` errado no JSON — um typo, ou um cronograma que mudou entre a
+geração do arquivo e o import — **descartava o apontamento sem rastro nenhum**,
+e o físico daquele dia simplesmente não entrava. Ninguém tinha como saber.
+
+O caso irmão já avisava: `_vincular_etapa_tarefas` (linha 237) acrescenta
+`"Etapa X: tarefa N do .mpp não encontrada."` à lista `avisos`, que o import
+devolve e a rota/CLI imprime. O caminho dos RDOs não.
+
+**Correção:** `avisos` passou a ser encaminhado até `_materializar_rdos`, e o
+descarte vira `"RDO <data>: tarefa N do .mpp não encontrada — apontamento
+descartado."` Foi exatamente esse defeito que me fez, no serviço novo
+(`services/atualizacao_rdos.py`), transformar tarefa não resolvida em
+**pendência no relatório** desde o início.
+
+### Avaliados e descartados como ruído
+
+- `views/rdo.py` (14 ocorrências) — parsing defensivo de campo de formulário
+  (`float(horas)`, `int(funcionario_id)`). Um campo malformado pula a linha;
+  a primeira dessas ocorrências **já loga**. Sem evidência de perda real e a
+  UI controla o formato: não é defeito, é guarda.
+- `migrations.py` (97) — idempotência por construção.

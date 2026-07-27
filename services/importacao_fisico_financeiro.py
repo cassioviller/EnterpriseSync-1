@@ -333,13 +333,14 @@ def _restaurar_fotos_preservadas(rdo, admin_id, snapshots):
     return len(snapshots)
 
 
-def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
+def _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos=None):
     """Cria os RDOs da obra a partir do payload (seção `rdos`), referenciando as
     tarefas pelo id do .mpp (traduzido por `tid_to_db`). Idempotente: apaga os RDOs
     da obra antes de recriar. Mão de obra é só realismo do documento (não gera
     custo). Retorna o nº de RDOs criados. Ver docs/superpowers/specs/
     2026-06-30-rdos-no-import* (histórico) e ESTADO_ATUALIZACAO_BAIA.md
     (fluxo atual, M09 — atualização de cronograma migrou para a UI da obra)."""
+    avisos = avisos if avisos is not None else []
     from app import db
     from models import (RDO, RDOMaoObra, RDOApontamentoCronograma, Funcionario,
                         CustoObra, NotificacaoCliente, MovimentacaoEstoque,
@@ -422,6 +423,15 @@ def _materializar_rdos(obra, admin_id, rdos, tid_to_db):
             tmpp = ap.get('tarefa_mpp')
             db_id = tid_to_db.get(tmpp)
             if db_id is None:
+                # Varredura P4 do code review (27/07): isto era um `continue`
+                # mudo. Um id de tarefa errado no JSON — um typo, ou um
+                # cronograma que mudou entre a geração e o import — descartava
+                # o apontamento sem rastro nenhum, e o físico daquele dia
+                # simplesmente não entrava. `_vincular_etapa_tarefas` já
+                # avisava no caso irmão (linha 237); aqui não avisava.
+                avisos.append(
+                    f"RDO {dia.isoformat()}: tarefa {tmpp} do .mpp não "
+                    f"encontrada — apontamento descartado.")
                 continue
             # Planejado (curva do cronograma até a data do RDO). A tela do RDO lê o
             # valor GRAVADO no apontamento (não recalcula) — sem isto, o import
@@ -662,7 +672,8 @@ def _importar_medicoes(obra, admin_id: int, payload: dict):
     obra.fluxo_caixa_planilha = payload.get('fluxo_caixa_mensal')
 
 
-def _importar_rdos(obra, admin_id: int, payload: dict, tid_to_db: dict):
+def _importar_rdos(obra, admin_id: int, payload: dict, tid_to_db: dict,
+                   avisos: list = None):
     """Materializa os RDOs (físico real) do payload — ou sintéticos do
     pct_fisico. NÃO sincroniza percentual aqui.
 
@@ -676,7 +687,7 @@ def _importar_rdos(obra, admin_id: int, payload: dict, tid_to_db: dict):
     `services/atualizacao_rdos.py`."""
     from app import db
     rdos = payload.get('rdos') or _rdos_sinteticos_do_pct_fisico(payload)
-    _materializar_rdos(obra, admin_id, rdos, tid_to_db)
+    _materializar_rdos(obra, admin_id, rdos, tid_to_db, avisos)
     db.session.flush()
 
 
@@ -746,7 +757,7 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     # pelo último apontamento. `tid_to_db` foi montado em _materializar_cronograma_mpp.
     # Sem seção `rdos`, deriva o físico do `pct_fisico` do cronograma (lança a
     # porcentagem da obra sem adicionar pessoas) — ver _rdos_sinteticos_do_pct_fisico.
-    _importar_rdos(obra, admin_id, payload, tid_to_db)
+    _importar_rdos(obra, admin_id, payload, tid_to_db, avisos)
 
     # M09 §4.2 — a criação inicial passa a registrar versão + snapshots +
     # CronogramaImportacao(origem='json_canonico'): a obra nasce integrada
