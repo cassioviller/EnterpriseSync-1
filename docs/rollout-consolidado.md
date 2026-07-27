@@ -192,7 +192,7 @@ Nenhuma é bug de código; todas são prontidão.
 | 1 | **Três flags sem runbook** (`cronograma_mpp_ativo`, `cronograma_editor_v2`, `rdo_percentual_livre`) | Ligar vira improviso; sem passo-a-passo nem critério de rollback escrito | ✅ **fechada 27/07** |
 | 2 | **`flag_rdo_percentual_livre --ligar` sem guard** | A flag de maior alcance era a única que não recusava nada. E o achado que veio junto: 148 apontamentos legados fariam tarefas **perder físico** ao ligar | ✅ **fechada 27/07** |
 | 3 | **`flag_cronograma_editor_v2` avisa depois de gravar** | Mesma forma do nº 2 | ✅ **fechada 27/07** |
-| 4 | **Conferência visual do RDO percentual nunca feita** | Risco previsto no plano de 24/07 | ⏳ **em aberto** — é passo 5 do runbook novo |
+| 4 | **Conferência visual do RDO percentual nunca feita** | Risco previsto no plano de 24/07 | ✅ **fechada 27/07** — telas conferidas em dev com a flag ligada; evidências em `docs/img/rdo-pct-*.png` |
 | 5 | **Nenhuma medição de produção** | Todo dimensionamento das ondas 1-3 é chute até a Onda 0 | ⏳ **em aberto** — ação humana |
 | 6 | **Linhas `[FASE4:R5]` não revisadas** | 77 filhos órfãos carimbados no backfill de dev; produção não foi olhada | ⏳ **em aberto** — ação humana |
 

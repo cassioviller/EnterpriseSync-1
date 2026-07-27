@@ -78,9 +78,16 @@ O `--ligar` **recusa** quando isso existiria, e lista as tarefas.
    - No modal do cronograma, o seletor "Como apontar no RDO" **some** com a
      flag ligada.
 
-   > ⚠️ Esta conferência visual era risco explícito do plano de 24/07 e
-   > **não tem registro de ter sido feita em nenhum ambiente**. Faça-a numa
-   > obra de homologação antes de qualquer tenant real.
+   > ✅ **Feita em 27/07**, em dev, no tenant `visual_rdo` com a obra da
+   > Baia importada (101 tarefas, 26 RDOs) e a flag ligada pelo CLI (o guard
+   > deixou passar — a Baia não tem linha legada sem percentual). Evidências
+   > em `docs/img/rdo-pct-*.png`:
+   >
+   > | Tela | O que a captura mostra |
+   > |---|---|
+   > | `rdo-pct-novo-card-total-48un.png` | Novo RDO: todos os cards pedem % acumulado; "Total: 48 un" só na tarefa com quantitativo; nenhuma mostra "Total: 0"; "Ant: X%" com o acumulado anterior |
+   > | `rdo-pct-editar-continuidade.png` | Editar RDO (a tela que era só-quantidade): campo de % em todos os cards; nivelamento com Ant: 60% → realizado 80%, o histórico real de 21-22/07 |
+   > | `rdo-pct-cronograma-sem-seletor.png` | Modal de tarefa-folha no cronograma: seletor "Como apontar no RDO" presente no DOM e **invisível** (2 no DOM, 0 visíveis); Quantidade/Unidade seguem editáveis como referência |
 
 6. **Rode uma semana** com um tenant só. O que observar: alguém reclamou que
    o avanço de uma frente mudou sozinho?

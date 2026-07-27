@@ -22,7 +22,9 @@
 | 9 | Varredura 2 (commit alheio) + correção | ✅ | `a8373ffa` |
 | 10 | Varredura 3 (premissa desmentida) + correção | ✅ | `c32e3380` |
 | 11 | Varredura 4 (silêncio) + correção | ✅ | `fe88d78f` |
-| 12 | Varreduras 5-6 + scope único do cronograma | ✅ | (neste commit) |
+| 12 | Varreduras 5-6 + scope único do cronograma | ✅ | `61bdba6a` |
+| 13 | Decisão: acesso aberto p/ todos (RBAC adiado) | ✅ | `cda59240` |
+| 14 | Conferência visual do RDO percentual | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -326,6 +328,31 @@ impede a volta é mover a convenção para onde esquecê-la exija esforço.
 código: é tratar toda frase de continuidade ("é preservado", "é
 byte-idêntico", "o dual-write mantém") como hipótese até uma query dizer o
 contrário. **Duas dessas frases eram minhas.**
+
+## 13-14 · Decisão de acesso e a conferência visual do RDO percentual
+
+**Decisão do Cássio (27/07):** acesso aberto para todos por enquanto — não há
+níveis de acesso definidos. `escopo_obra_ativo` e `compras_governanca_ativa`
+ficam desligadas **por decisão de negócio**; detalhe e consequências em
+`docs/rollout-consolidado.md`.
+
+**Conferência visual (passo 5 do runbook) — feita e aprovada.** App real em
+dev, tenant `visual_rdo`, obra da Baia importada, flag ligada pelo CLI
+(o guard deixou passar, como devia). Playwright + Chromium headless — que
+**não subia neste ambiente** (libnspr4/libnss3/libgbm ausentes) e passou a
+subir com `LD_LIBRARY_PATH` apontando para as libs do nix store
+(nss, nspr, mesa, xkbcommon, alsa-lib).
+
+| Verificação | Resultado |
+|---|---|
+| Novo RDO: cards pedem % acumulado | ✅ todos, inclusive sem quantitativo |
+| "Total: 48 un" como referência de leitura | ✅ só na tarefa com quantitativo; nunca "Total: 0" |
+| Editar RDO (era só-quantidade) | ✅ modo % presente; Ant: 60% → 80% = histórico real de 21-22/07 |
+| Seletor "Como apontar no RDO" no cronograma | ✅ invisível na tarefa-folha (2 no DOM, 0 visíveis) |
+
+Evidências versionadas em `docs/img/rdo-pct-*.png` (3 capturas, ~540 KB).
+Com isso, **a flag `rdo_percentual_livre` está pronta para ser ligada na
+Baia real** — era a última pendência técnica do pedido original.
 
 ## Regressão final da rodada
 
