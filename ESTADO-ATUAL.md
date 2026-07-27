@@ -1,6 +1,7 @@
 # ESTADO ATUAL — SIGE / Veks
 
-> Snapshot de **2026-07-23** (3ª revisão, após o fecho da Fase 3).
+> Snapshot de **2026-07-27** (4ª revisão, após o editor de cronograma v2 e o
+> RDO em porcentagem livre).
 > Este é o documento a ler PRIMEIRO ao retomar. Os demais (`DEVOLUTIVA.md`,
 > `DOSSIE-REPO.md`, `FECHO-FASE-0.5.md`) são o detalhe; este é o mapa.
 
@@ -26,18 +27,72 @@ defeito de fabricação que produziu os cinco erros.
 
 ## Onde estamos
 
-Branch: `main` · 🔬 24/07: **à frente de `origin/main` com as Fases 3 E 4
-inteiras** mais a rodada de pendências de 23/07 (fotos × UPLOADS_PATH,
-skips de precondição, gitleaks, fechamento das 3 rotas da triagem — ver
-Fase 0.5 abaixo). 🔬 24/07 ~00h: **gate completo VERDE sobre a Fase 4**
-(worktree em `6775b391` pré-rebase): `pytest tests/ -m "not browser"` →
-**1177 passed, 6 skipped, 0 falhas** em 44min10s. A Fase 4 (centro de
-custo obrigatório) foi mergeada em `main` por fast-forward após esse gate.
-🔬 24/07: revisão de premissas P5-P9 apensada aos planos das Fases 5-9
-(`941e6738`) e fix do achado R10 — PDF de medição do portal agora respeita
-expiração de token (`fe605252`). O push segue travado no item humano nº 2 —
-que piorou: o `gh` perdeu a autenticação na recriação do ambiente e refazer
-o login é interativo. `origin/main` continua em `8fe6ac9` (merge do M10).
+Branch: `main` · 🔬 27/07: **`origin/main == main == bdee680a`, árvore
+limpa**. O item humano nº 2 (push travado) **fechou em 24/07** — o reflog
+de `origin/main` registra os pushes de `35fe1a67` e `bdee680a`. O `gh` CLI
+continua deslogado *nesta máquina* (`gh auth status` → "not logged into any
+GitHub hosts"), o que é outra coisa: `git push` funciona, o que falta é a
+API do GitHub (PR, fetch de branch de triagem). Refazer o login é
+interativo — item humano, agora restrito ao `gh`.
+
+🔬 24/07 ~00h: **gate completo VERDE sobre a Fase 4** (worktree em
+`6775b391` pré-rebase): `pytest tests/ -m "not browser"` → **1177 passed,
+6 skipped, 0 falhas** em 44min10s. A Fase 4 (centro de custo obrigatório)
+foi mergeada em `main` por fast-forward após esse gate. 🔬 24/07: revisão
+de premissas P5-P9 apensada aos planos das Fases 5-9 (`941e6738`) e fix do
+achado R10 — PDF de medição do portal agora respeita expiração de token
+(`fe605252`).
+
+### 🔬 24/07 — editor de cronograma v2 (5 fases) em `main`
+
+Commits `73f58d3e` → `8fda59f5`, todos em `main`: **Fase 1** motor de
+agendamento estilo MS Project; **Fase 2** grade tipo planilha; **Fase 3**
+desfazer/refazer; **Fase 4** linha de base; **Fase 5** manual de uso em
+PDF. Spec e planos em `docs/superpowers/{specs,plans}/2026-07-24-cronograma-*`.
+
+### 🔬 24/07 — RDO em porcentagem livre (`bdee680a`), atrás de flag
+
+Todo apontamento de produção do RDO passa a ser em **percentual acumulado**
+para toda tarefa de toda obra do tenant; o quantitativo cadastrado vira
+referência de leitura. Tudo atrás de
+`configuracao_empresa.rdo_percentual_livre` — **migração 226, default
+FALSE**: com a flag desligada o comportamento é byte-idêntico ao de hoje.
+📖 Peças: helper único `utils.tenant.rdo_percentual_livre_on(admin_id)`
+(admin_id EXPLÍCITO — engine e serviço rodam fora de request), resolvedor
+`modo_da_tarefa` sobrepondo a escolha explícita, derivação
+percentual-first em `utils/cronograma_engine.py`, guard de modo em
+`registrar_apontamento` seguindo o resolvedor, modo percentual na tela de
+**editar** RDO (que era só-quantidade) e `scripts/flag_rdo_percentual_livre.py`.
+🧮 24/07 (número da mensagem do commit `bdee680a`, **não reconferido**):
+`tests/test_rdo_percentual_livre.py` (23 testes) + regressão de **1507
+testes, 0 falhas**. 📖 27/07: o arquivo de teste existe e está em `main`.
+
+> ⚠️ **Pendências de rollout desta entrega** (não são de código):
+> (1) a flag **nasce desligada** e **não existe `docs/rdo-percentual-livre-rollout.md`**
+> — Fases 1, 2, 3 e 5 têm runbook, esta não; (2) a **conferência visual dos
+> dois fluxos de RDO (novo + editar) com a flag ligada** era risco explícito
+> do plano ("subir app local, como na Fase 5") e **não tem registro de ter
+> sido feita**; (3) ligar a flag em qualquer tenant segue sem decisão.
+
+### 🔬 27/07 — RDOs da Baia vindos do WhatsApp, por caminho não-destrutivo
+
+O diário da obra Baias Kabod (Itu/SP) vive no grupo de WhatsApp da Veks. O
+export trouxe **12 RDOs de 07/07 a 22/07** que o sistema não tinha (a série
+parava em 13/07, com 4 dias sem físico). Entrar com eles exigiu um caminho
+novo: até aqui, RDO em lote só existia pela seção `"rdos"` do reimport
+físico-financeiro, que **apaga** tarefas, propostas, orçamentos, medições e
+todos os RDOs da obra — e que é recusado em obra já versionada por .mpp.
+
+📖 Entregou: `scripts/whatsapp_para_rdos.py` (export → payload + fotos com
+legenda na ordem do chat), `services/atualizacao_rdos.py` (upsert por
+`(obra_id, data_relatorio)`, RDO imutável da Fase 5 pulado com aviso,
+apontamento via `registrar_apontamento`, tarefa não resolvida vira pendência
+no relatório), `scripts/atualizar_rdos_obra.py` (CLI genérico com
+`--dry-run`), `services/rdo_fotos_import.py` (helper de fotos compartilhado
+com o importador) e `docs/rdo/regras_apontamento_baia.json`.
+🔬 27/07 ponta a ponta em dev: **12 RDOs criados, 22 apontamentos, 0
+pendências**, com tarefas/propostas/medições idênticas antes e depois.
+Detalhe e o de-para a revisar: `ESTADO_ATUALIZACAO_BAIA.md` (rodada 27/07).
 
 > ⚠️ **Armadilha de gate descoberta em 23/07 à noite:** `app.py:596-664`
 > dispara `scripts/seed_demo_alfa.py` em subprocesso a CADA boot do app em
@@ -113,8 +168,9 @@ governança) fechou em 23/07 — 12/12 tasks**, 91 testes verdes
 (`fase-3-compras-governanca.md`; runbook em `docs/fase-3-rollout.md`).
 Entregou o fluxo requisição→aprovação→alçada→pedido, o `PapelObra.COMPRADOR`
 e as correções de segurança do portal por token. 🔬 23/07: **mergeada em
-`main`** (fast-forward, gate verde antes do merge; o push segue travado no
-item humano nº 2). Pendências de rollout, não de código:
+`main`** (fast-forward, gate verde antes do merge; o push estava travado no
+item humano nº 2 — 🔬 27/07: já subiu, ver "Onde estamos").
+Pendências de rollout, não de código:
 ligar `compras_governanca_ativa` por tenant só depois dos passos 1-3 do
 runbook e da confirmação do Cássio sobre os valores de alçada (decisão D1;
 recomendação semeada: R$ 5.000 / R$ 30.000 / acima).
@@ -487,7 +543,7 @@ Flask-Login**: a identidade é o token na URL, sem sessão e sem `current_user`.
 
 | Item | Situação |
 |---|---|
-| Triagem de `fix/bloco2-segredos` e `fix/bloco1-blindagem-acesso` | ❌ os branches nem existem localmente — a triagem exige `git fetch`, travado no item humano nº 2 (auth) |
+| Triagem de `fix/bloco2-segredos` e `fix/bloco1-blindagem-acesso` | ❌ os branches nem existem localmente — a triagem exige `git fetch`. 🔬 27/07: o `git push` destravou, mas o `gh` segue deslogado; conferir se os branches ainda existem no remoto antes de planejar a triagem |
 | `gitleaks`/`trufflehog` | ✅ **23/07** — gitleaks 8.21.2 varreu os 3.921 commits: **24 achados**, ver abaixo |
 | Conflito `opencv-python` × `headless` | ❌ entra por `deepface`/`retina-face`; exige decidir sobre reconhecimento facial |
 | `psycopg2-binary` → `psycopg2` compilado | ⏸️ recomendado (1h); psycopg 3 **não** agora. 🔬 23/07: sem `pg_config` no ambiente de dev — a troca é no Dockerfile (adicionar `libpq-dev`+`gcc` no estágio de build) e só se valida no build de produção |
