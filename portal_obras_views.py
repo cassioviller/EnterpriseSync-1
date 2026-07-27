@@ -720,8 +720,17 @@ def gerar_medicao(obra_id: int):
         ultimo_dia = calendar.monthrange(date.today().year, date.today().month)[1]
         data_fim_med = date.today().replace(day=ultimo_dia)
 
+    # `is_cliente=False` + `ativa=True` são obrigatórios aqui porque este
+    # percentual vira DINHEIRO (`valor_medido`, abaixo). A cópia-cliente do
+    # cronograma nunca recebe sync — todos os pontos de produção chamam
+    # `sincronizar_percentuais_obra` com `cliente=False` —, então as tarefas
+    # dela entram na média com o percentual parado e a DILUEM; as arquivadas
+    # entram com o percentual que tinham quando foram arquivadas.
+    # 🔬 27/07 (dev): sem os filtros, 107 obras davam percentual diferente —
+    # numa amostra, 8,75% em vez de 11,67%, ou seja 25% a menos de valor.
     tarefas_empresa = TarefaCronograma.query.filter_by(
-        obra_id=obra_id, admin_id=admin_id, responsavel='empresa'
+        obra_id=obra_id, admin_id=admin_id, responsavel='empresa',
+        is_cliente=False, ativa=True
     ).all()
 
     total = len(tarefas_empresa)

@@ -149,3 +149,26 @@ depende de o autor saber que a cópia-cliente existe.
 _scope_ explícito — por exemplo `TarefaCronograma.do_cronograma_interno(obra_id, admin_id)`
 como classmethod única — para que esquecer o filtro exija sair do caminho
 padrão, em vez de ser o caminho padrão.
+
+### Correções aplicadas — 27/07
+
+Autorizadas pelo dono, inclusive a A1 (que muda número financeiro).
+
+| Achado | Erro | Correção |
+|---|---|---|
+| 🔴 A1 | `portal_obras_views.py:723` — média incluía cópia-cliente (percentual parado) e arquivadas; o resultado virava `percentual_executado` e `valor_medido` | `+ is_cliente=False, ativa=True`, com o número medido registrado no comentário |
+| 🟠 A2 | `medicao_views.py:54` — lista de vínculo com nomes duplicados e tarefa arquivada | mesmos dois filtros |
+| 🟡 A3 | `services/obra_handoff.py:121` — `total_tarefas` inflado no dossiê | mesmos dois filtros |
+| 🟡 A4 | `views/orcamentos_views.py:260` — obra "tem cronograma" só com tarefa arquivada | mesmos dois filtros |
+| 🟡 A5 | `services/entregas_terceiros.py:165` — entrega duplicada no dropdown do RDO | `is_cliente.is_(False)` + `ativa.is_(True)` (o `admin_id` condicional foi mantido: é defesa em profundidade opcional documentada na própria docstring) |
+
+**Prova de que o teste pega o defeito.** `tests/test_escopo_cronograma_interno.py`
+monta a obra com as três populações (interna a 60%, cópia-cliente a 0%,
+arquivada a 0%) e exige 60%. Revertendo a correção do A1, o teste falha com
+**`assert 20.0 == 60.0`** — a diluição exata de (60+0+0)/3. Num contrato de
+R$ 100.000, R$ 20.000 medidos em vez de R$ 60.000.
+
+5 testes, todos verdes com a correção. Duas armadilhas de ambiente que o teste
+precisou tratar e ficam registradas: sem `import main` os blueprints não estão
+registrados (a rota devolve BuildError), e sem desligar `WTF_CSRF_ENABLED` o
+POST é rejeitado com 302 — o teste passaria testando o redirect, não a regra.

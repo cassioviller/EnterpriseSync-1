@@ -16,7 +16,9 @@
 | 3 | Code review do próprio trabalho — 3 defeitos | ✅ | (neste commit) |
 | 4 | Revisão de prontidão + plano de rollout | ✅ | (neste commit) |
 | 5 | Lacuna 2+3 — guard nas flags sem rede | ✅ | (neste commit) |
-| 6 | Lacuna 1 — três runbooks faltantes | ✅ | (neste commit) |
+| 6 | Lacuna 1 — três runbooks faltantes | ✅ | `d2946ae9` |
+| 7 | Code review profundo — estrutura + varredura 1 | ✅ | `ef4bec3a` |
+| 8 | Correção dos 5 achados da varredura 1 | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -187,6 +189,42 @@ ordem → rollback → o que a entrega deliberadamente NÃO fez).
 aponta cada runbook, e a tabela de lacunas marca 1, 2 e 3 como fechadas.
 
 ---
+
+## 7-8 · Code review profundo — estrutura, varredura 1 e correções
+
+Estrutura em `docs/code-review-profundo.md`: revisar **por padrão de defeito**,
+não por arquivo. Seis padrões derivados de defeitos reais desta sessão; achado
+só entra depois de confirmado com evidência.
+
+### O achado 🔴 da varredura 1 — dinheiro
+
+`portal_obras_views.py:723`, `gerar_medicao`: o percentual e o **valor** da
+medição saíam de uma média que incluía a **cópia-cliente** do cronograma
+(que nunca recebe sync, então entra com percentual parado) e as tarefas
+**arquivadas**.
+
+🔬 Medições que definiram a severidade: **141 obras** têm as duas visões
+ativas — eu supunha que a cópia-cliente fosse rara — e há **217 tarefas
+arquivadas em 187 obras**. **107 obras** teriam percentual de medição
+diferente com os filtros postos; amostra: **8,75% → 11,67%**, valor medido
+**25% menor**.
+
+O teste prova o defeito: revertendo a correção, `assert 20.0 == 60.0` — a
+diluição exata de (60+0+0)/3. Num contrato de R$ 100.000, R$ 20.000 medidos
+em vez de R$ 60.000.
+
+Corrigidos os cinco (A1 com autorização explícita do dono, por mudar número
+financeiro): `portal_obras_views.py`, `medicao_views.py`,
+`services/obra_handoff.py`, `views/orcamentos_views.py`,
+`services/entregas_terceiros.py`. Novo arquivo
+`tests/test_escopo_cronograma_interno.py` (5 testes). Suítes que tocam o
+código alterado: **115 passed**.
+
+### Achado secundário, ainda em aberto
+
+Aquela média é **simples**; `calcular_progresso_geral_obra_v2` pondera por
+duração. São **duas definições de "% da obra"** convivendo — e a menos
+rigorosa é a que gera dinheiro. Não unifiquei: é decisão de negócio.
 
 ## Regressão final da rodada
 

@@ -257,8 +257,13 @@ def editar(id):
                 id=proposta_aprovada.obra_id, admin_id=admin_id
             ).first()
             if _obra:
+                # "Tem cronograma?" é sobre o cronograma interno VIVO: uma
+                # obra cujas tarefas foram todas arquivadas responderia que
+                # sim, e a cópia-cliente responderia por uma obra sem
+                # cronograma interno nenhum.
                 n_tarefas = TarefaCronograma.query.filter_by(
-                    obra_id=_obra.id, admin_id=admin_id
+                    obra_id=_obra.id, admin_id=admin_id,
+                    is_cliente=False, ativa=True
                 ).count()
                 if n_tarefas > 0:
                     obra_com_cronograma = _obra

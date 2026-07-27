@@ -165,6 +165,11 @@ def listar_tarefas_terceiros(obra_id, admin_id=None):
     q = TarefaCronograma.query.filter(
         TarefaCronograma.obra_id == obra_id,
         TarefaCronograma.responsavel == 'terceiros',
+        # Cronograma interno e vivo: a cópia-cliente duplicaria cada entrega
+        # no dropdown do RDO, e a arquivada ofereceria entrega de tarefa que
+        # não existe mais.
+        TarefaCronograma.is_cliente.is_(False),
+        TarefaCronograma.ativa.is_(True),
         not_(subq_tem_filha),
     )
     if admin_id is not None:

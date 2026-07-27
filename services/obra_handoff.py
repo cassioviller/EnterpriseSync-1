@@ -118,8 +118,11 @@ def dossie_handoff(obra) -> dict:
                        obra.id, exc_info=True)
 
     try:
+        # Cronograma interno e vivo — senão o dossiê de passagem de obra
+        # relata cópia-cliente e tarefa arquivada como se fossem trabalho.
         total_tarefas = TarefaCronograma.query.filter_by(
-            obra_id=obra.id, admin_id=obra.admin_id).count()
+            obra_id=obra.id, admin_id=obra.admin_id,
+            is_cliente=False, ativa=True).count()
     except Exception:
         total_tarefas = 0
 
