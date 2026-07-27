@@ -328,3 +328,69 @@ descartado."` Foi exatamente esse defeito que me fez, no serviço novo
   a primeira dessas ocorrências **já loga**. Sem evidência de perda real e a
   UI controla o formato: não é defeito, é guarda.
 - `migrations.py` (97) — idempotência por construção.
+
+## Varreduras 5 e 6 — P3 e P6 ✅ 27/07
+
+Fechadas juntas porque as duas já tinham sido resolvidas no caminho, e a
+varredura formal serviu para confirmar que não sobrou instância.
+
+### P3 — guard depois do efeito
+
+Universo fechado: existem **cinco** flags de tenant. Todas foram examinadas.
+
+| Flag | Guard |
+|---|---|
+| `escopo_obra_ativo` | ✅ já recusava (`usuario_obra` vazia) |
+| `compras_governanca_ativa` | ✅ já recusava (faixa de alçada + escopo) |
+| `cronograma_mpp_ativo` | — governa borda visual; não há efeito a guardar |
+| `cronograma_editor_v2` | ✅ corrigido em 27/07 (`15cac501`) |
+| `rdo_percentual_livre` | ✅ corrigido em 27/07 (`15cac501`) |
+
+**Nenhuma instância restante.** O padrão nasceu das duas flags mais novas —
+as duas escritas depois que o costume de guardar antes já existia nas
+antigas, e sem ninguém conferir contra elas.
+
+### P6 — duas implementações da mesma convenção
+
+| Instância | Situação |
+|---|---|
+| Duas ordenações de foto numerada (`(len, nome)` × chave numérica) | ✅ unificada em 27/07 (`991e0475`) |
+| Filtro do cronograma interno repetido em 6 lugares | ✅ virou `TarefaCronograma.do_cronograma_interno` |
+| **Duas definições de "% da obra"**: média simples (`gerar_medicao`) × ponderada por duração (`calcular_progresso_geral_obra_v2`) | ⏳ **em aberto — decisão de negócio** |
+
+A terceira é a que importa e **não é minha para decidir**: a média simples é
+a que gera `valor_medido`. Unificar muda dinheiro em obras com tarefas de
+durações muito diferentes. Fica registrada como pergunta ao dono, não como
+defeito a corrigir.
+
+---
+
+# Fecho da revisão — 27/07
+
+| Varredura | Padrão | Achados | Corrigidos |
+|---|---|---|---|
+| 1 | P1 escopo esquecido | 5 (1 🔴) | 5 |
+| 2 | P5 commit alheio | 1 🟠 | 1 |
+| 3 | P2 premissa desmentida | 1 🟠 | 1 |
+| 4 | P4 silêncio | 1 🟡 | 1 |
+| 5 | P3 guard tardio | 0 restantes | (2 antes) |
+| 6 | P6 convenção duplicada | 2 + 1 em aberto | 2 |
+
+**Toda correção tem teste que prova o defeito** — cada uma foi verificada
+revertendo o fix e confirmando a falha. Um teste chegou a passar com o
+defeito de volta (o de atomicidade, que comparava `count()` em vez de
+identidade) e foi corrigido.
+
+## O que a revisão sugere sobre o repositório
+
+Os defeitos não estavam espalhados ao acaso: **quatro dos oito nasceram de
+uma convenção que o código não consegue lembrar sozinho** — filtrar
+`is_cliente`, guardar antes de gravar, avisar em vez de descartar,
+sincronizar depois do commit. A correção pontual resolve a instância; o que
+impede a volta é mover a convenção para um lugar onde esquecê-la exija
+esforço. Foi o que `do_cronograma_interno` fez com o P1.
+
+Os outros quatro nasceram de **afirmar sem medir**. A defesa aqui não é
+código: é o hábito de tratar toda frase de continuidade ("é preservado", "é
+byte-idêntico", "o dual-write mantém") como hipótese até que uma query diga
+o contrário. Duas dessas frases eram minhas.

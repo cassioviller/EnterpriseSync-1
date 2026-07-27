@@ -100,18 +100,14 @@ class IndiceTarefas:
     for única.
     """
 
-    def __init__(self, obra_id, mapa_mpp_nome=None):
+    def __init__(self, obra_id, admin_id, mapa_mpp_nome=None):
         from models import TarefaCronograma
         self.mapa_mpp_nome = mapa_mpp_nome or {}
-        # `is_cliente=False`: o cronograma do CLIENTE é uma cópia com os
-        # mesmos nomes (e às vezes o mesmo `mpp_uid`) que NÃO recebe sync —
-        # `sincronizar_percentuais_obra` roda com `cliente=False`. Sem este
-        # filtro, uma obra com as duas visões daria empate na resolução por
-        # nome e, no pior caso, gravaria o apontamento na cópia do cliente,
-        # onde o físico nunca se move. Mesmo filtro explícito que o endpoint
-        # `tarefas-rdo` ganhou na Task #147 (cronograma_views.py:2148).
-        tarefas = TarefaCronograma.query.filter_by(
-            obra_id=obra_id, ativa=True, is_cliente=False).all()
+        # Escopo do cronograma interno e vivo: sem ele, uma obra com as duas
+        # visões daria empate na resolução por nome e, no pior caso, gravaria
+        # o apontamento na cópia do cliente, onde o físico nunca se move.
+        # Ver `TarefaCronograma.do_cronograma_interno`.
+        tarefas = TarefaCronograma.do_cronograma_interno(obra_id, admin_id).all()
         self._por_id = {t.id: t for t in tarefas}
         self._por_uid = {}
         self._por_nome = {}
@@ -224,7 +220,7 @@ def atualizar_rdos(obra, admin_id, rdos, *, dry_run=False, com_fotos=True,
     from utils.cronograma_engine import get_calendario
     get_calendario(admin_id)
 
-    indice = IndiceTarefas(obra.id, mapa_mpp_nome)
+    indice = IndiceTarefas(obra.id, admin_id, mapa_mpp_nome)
     itens = sorted((i for i in (rdos or []) if i.get('data')),
                    key=lambda i: _data(i['data']))
 

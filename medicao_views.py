@@ -51,13 +51,10 @@ def gestao_itens(obra_id):
         obra_id=obra_id, admin_id=admin_id
     ).order_by(ItemMedicaoComercial.id).all()
 
-    # Cronograma INTERNO e vivo: sem `is_cliente=False` a tela de vínculo
-    # mostra os nomes em duplicata nas obras que têm as duas visões (141 em
-    # 27/07), e sem `ativa=True` deixa vincular item de medição a tarefa já
-    # arquivada por uma reimportação de cronograma.
-    tarefas = TarefaCronograma.query.filter_by(
-        obra_id=obra_id, admin_id=admin_id, is_cliente=False, ativa=True
-    ).order_by(TarefaCronograma.ordem).all()
+    # Sem o escopo, a tela de vínculo mostra os nomes em duplicata nas obras
+    # com as duas visões e deixa vincular item de medição a tarefa arquivada.
+    tarefas = TarefaCronograma.do_cronograma_interno(
+        obra_id, admin_id).order_by(TarefaCronograma.ordem).all()
 
     medicoes = MedicaoObra.query.filter_by(
         obra_id=obra_id, admin_id=admin_id

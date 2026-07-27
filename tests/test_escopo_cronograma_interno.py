@@ -274,3 +274,30 @@ def test_import_avisa_quando_descarta_apontamento_de_tarefa_inexistente():
         res = ff.importar_fisico_financeiro(payload, admin.id)
         assert any('999999' in a and 'descartado' in a for a in res['avisos']), \
             res['avisos']
+
+
+def test_scope_unico_aplica_os_dois_filtros():
+    """`do_cronograma_interno` é o ponto único que carrega a convenção. Se
+    alguém relaxar o filtro aqui, os cinco consumidores voltam a vazar de uma
+    vez — por isso o teste é sobre o scope, não sobre cada chamador."""
+    from models import TarefaCronograma
+    with app.app_context():
+        ctx = _ambiente()
+        achadas = TarefaCronograma.do_cronograma_interno(
+            ctx['obra'].id, ctx['admin_id']).all()
+        assert [t.id for t in achadas] == [ctx['interna'].id]
+        assert ctx['do_cliente'].id not in [t.id for t in achadas]
+        assert ctx['arquivada'].id not in [t.id for t in achadas]
+
+
+def test_scope_nao_vaza_entre_tenants():
+    from models import TarefaCronograma
+    with app.app_context():
+        ctx = _ambiente()
+        outro = _ambiente()
+        do_primeiro = TarefaCronograma.do_cronograma_interno(
+            ctx['obra'].id, ctx['admin_id']).all()
+        assert [t.id for t in do_primeiro] == [ctx['interna'].id]
+        # obra de um tenant + admin_id do outro = vazio, nunca "o que existir"
+        assert TarefaCronograma.do_cronograma_interno(
+            ctx['obra'].id, outro['admin_id']).count() == 0

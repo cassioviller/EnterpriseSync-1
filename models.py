@@ -5802,6 +5802,40 @@ class TarefaCronograma(db.Model):
     folga_dias = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @classmethod
+    def do_cronograma_interno(cls, obra_id, admin_id):
+        """Query do cronograma INTERNO e VIVO da obra — o único que conta.
+
+        Existe por causa da varredura P1 do code review de 27/07, que achou
+        **cinco** consumidores lendo a obra inteira. Duas populações se
+        infiltravam:
+
+        * **cópia-cliente** (`is_cliente=True`) — o cronograma que o cliente
+          enxerga. Ela NUNCA recebe sincronização de percentual
+          (`sincronizar_percentuais_obra` roda com `cliente=False` em todos os
+          pontos de produção), então entra em qualquer média com o percentual
+          parado. 🔬 27/07: 141 obras têm as duas visões ativas;
+        * **arquivada** (`ativa=False`) — tarefa removida por reimportação de
+          cronograma, que por disciplina do M05 nunca é deletada. 🔬 27/07:
+          217 delas, em 187 obras.
+
+        O pior caso encontrado gerava dinheiro: `gerar_medicao` calculava o
+        `percentual_executado` e o `valor_medido` sobre a média das três
+        populações juntas — 107 obras teriam percentual diferente, numa
+        amostra 8,75% em vez de 11,67%.
+
+        O filtro é uma convenção que o código **não tem como lembrar**: quem
+        escreve a query precisa saber que a cópia-cliente existe. Este
+        classmethod inverte o ônus — esquecer o escopo passa a exigir sair do
+        caminho padrão, em vez de ser o caminho padrão.
+
+        Use `.query` direto só quando quiser MESMO as outras populações (o
+        cronograma do cliente, ou o histórico de arquivadas), e diga por quê
+        num comentário.
+        """
+        return cls.query.filter_by(obra_id=obra_id, admin_id=admin_id,
+                                   is_cliente=False, ativa=True)
+
 
 class TarefaVinculo(db.Model):
     """Vínculo tipado entre duas tarefas-folha do cronograma (Fase 1).

@@ -327,7 +327,7 @@ def test_ignora_a_copia_do_cronograma_do_cliente():
         db.session.add(clone)
         db.session.commit()
 
-        assert clone.id not in IndiceTarefas(obra.id, _MAPA)._por_id
+        assert clone.id not in IndiceTarefas(obra.id, admin_id, _MAPA)._por_id
         rel = atualizar_rdos(obra, admin_id, _payload(mpp=59, pct=45),
                              com_fotos=False, mapa_mpp_nome=_MAPA)
         assert rel['pendencias'] == []

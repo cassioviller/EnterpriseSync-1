@@ -261,10 +261,8 @@ def editar(id):
                 # obra cujas tarefas foram todas arquivadas responderia que
                 # sim, e a cópia-cliente responderia por uma obra sem
                 # cronograma interno nenhum.
-                n_tarefas = TarefaCronograma.query.filter_by(
-                    obra_id=_obra.id, admin_id=admin_id,
-                    is_cliente=False, ativa=True
-                ).count()
+                n_tarefas = TarefaCronograma.do_cronograma_interno(
+                    _obra.id, admin_id).count()
                 if n_tarefas > 0:
                     obra_com_cronograma = _obra
     except Exception:

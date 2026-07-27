@@ -21,7 +21,8 @@
 | 8 | Correção dos 5 achados da varredura 1 | ✅ | `1e0ed9b3` |
 | 9 | Varredura 2 (commit alheio) + correção | ✅ | `a8373ffa` |
 | 10 | Varredura 3 (premissa desmentida) + correção | ✅ | `c32e3380` |
-| 11 | Varredura 4 (silêncio) + correção | ✅ | (neste commit) |
+| 11 | Varredura 4 (silêncio) + correção | ✅ | `fe88d78f` |
+| 12 | Varreduras 5-6 + scope único do cronograma | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -292,6 +293,39 @@ caso irmão (`_vincular_etapa_tarefas`) já avisava; este não. Agora acrescenta
 
 Registrei como **ruído avaliado e descartado** os 14 de `views/rdo.py`
 (parsing de formulário, o primeiro deles já loga) e os 97 de `migrations.py`.
+
+## 12 · Fecho da revisão — P3, P6 e a correção estrutural
+
+**P3 (guard tardio)** — universo fechado: existem 5 flags de tenant, todas
+examinadas. As duas antigas já guardavam antes de gravar; as duas novas foram
+corrigidas em `15cac501`; a quinta governa borda visual e não tem efeito a
+guardar. **Nenhuma instância restante.**
+
+**P6 (convenção duplicada)** — as duas ordenações de foto foram unificadas, e
+o filtro do cronograma repetido em 6 lugares virou um scope único. Sobra uma,
+**e ela é decisão sua**: existem duas definições de "% da obra" — média
+simples (`gerar_medicao`) × ponderada por duração
+(`calcular_progresso_geral_obra_v2`). A média simples é a que gera
+`valor_medido`. Unificar muda dinheiro em obras com tarefas de durações muito
+diferentes.
+
+**A correção estrutural.** `TarefaCronograma.do_cronograma_interno(obra_id,
+admin_id)` passa a ser o ponto único que carrega a convenção
+`is_cliente=False + ativa=True`, adotado nos 6 consumidores. Esquecer o
+escopo passa a exigir sair do caminho padrão, em vez de ser o caminho padrão.
+
+### O que a revisão sugere sobre o repositório
+
+Os oito defeitos não estavam espalhados ao acaso. **Quatro nasceram de uma
+convenção que o código não conseguia lembrar sozinho** — filtrar
+`is_cliente`, guardar antes de gravar, avisar em vez de descartar,
+sincronizar depois do commit. A correção pontual resolve a instância; o que
+impede a volta é mover a convenção para onde esquecê-la exija esforço.
+
+**Os outros quatro nasceram de afirmar sem medir.** A defesa aqui não é
+código: é tratar toda frase de continuidade ("é preservado", "é
+byte-idêntico", "o dual-write mantém") como hipótese até uma query dizer o
+contrário. **Duas dessas frases eram minhas.**
 
 ## Regressão final da rodada
 
