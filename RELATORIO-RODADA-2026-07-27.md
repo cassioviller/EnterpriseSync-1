@@ -15,7 +15,7 @@
 | 2 | RDOs da Baia via WhatsApp (caminho não-destrutivo) | ✅ | `70046475` |
 | 3 | Code review do próprio trabalho — 3 defeitos | ✅ | (neste commit) |
 | 4 | Revisão de prontidão + plano de rollout | ✅ | (neste commit) |
-| 5 | Lacuna 2 — guard nas flags sem rede | ⏳ pendente | — |
+| 5 | Lacuna 2+3 — guard nas flags sem rede | ✅ | (neste commit) |
 | 6 | Lacuna 1 — três runbooks faltantes | ⏳ pendente | — |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
@@ -132,12 +132,49 @@ zero medições de produção; linhas `[FASE4:R5]` não revisadas.
 **O plano:** 5 ondas, começando pela Onda 0 (deploy + 3 medições de leitura,
 que não mudam nada e destravam a estimativa de todo o resto).
 
+## 5 · Lacunas 2 e 3 — guard nas duas flags que não tinham rede
+
+### 🔎 O achado que mudou o rollout do RDO percentual
+
+A entrega de 24/07 afirmava, no commit e no aviso do próprio script, que a
+continuidade estava garantida: *"a linha quantitativa antiga já grava
+`percentual_realizado`, então a tarefa em 62% continua em 62% ao ligar a
+flag"*. **Isso vale para o que a dupla escrita do M07 escreve hoje, não para
+toda linha legada.**
+
+🔬 27/07, banco de dev (⚠️ dominado por carga de suíte — prova a FORMA, não o
+volume de produção): **148 apontamentos** com `quantidade_acumulada > 0` e
+`percentual_realizado = 0`, em **133 tarefas de 84 tenants**. Nessas tarefas o
+`percentual_concluido` hoje sai da quantidade; com a flag ligada passaria a
+sair do percentual — que é 0. **A obra perderia avanço físico na tela sem
+ninguém apontar nada.**
+
+Daí o guard: `tarefas_que_regridem(admin_id)` compara, tarefa a tarefa, o %
+de hoje com o % de depois, usando a mesma fórmula dos dois lados. O `--ligar`
+**recusa antes de gravar** e lista as tarefas; `--forcar` passa por cima;
+desligar reverte de qualquer forma.
+
+### O mesmo defeito de forma nas duas flags
+
+Ambas chamavam `definir_flag` **primeiro** e imprimiam o aviso **depois** —
+quem lesse o aviso já estava com a flag ligada. Agora o guard vem antes:
+
+| Script | O que passou a recusar |
+|---|---|
+| `flag_rdo_percentual_livre.py` | tarefas que perderiam físico (com `--forcar`) |
+| `flag_cronograma_editor_v2.py` | calendário do tenant que considera sábado/domingo, incompatível com o motor seg–sex desta fase (com `--forcar`) |
+
+Também corrigi o texto do aviso do RDO percentual, que afirmava a premissa
+derrubada acima.
+
+**Testes:** +7 em `tests/test_rdo_percentual_livre.py` (30, eram 23) e o
+arquivo novo `tests/test_flag_cronograma_editor_v2.py` (6) — **essa flag não
+tinha teste nenhum desde 24/07**. Suítes: 76 passed.
+
 ---
 
 ## Pendente nesta rodada
 
-- [ ] **Lacuna 2** — guard no `flag_rdo_percentual_livre --ligar` (e o mesmo
-      tratamento no `flag_cronograma_editor_v2`).
 - [ ] **Lacuna 1** — os três runbooks faltantes:
       `rdo-percentual-livre-rollout.md`, `cronograma-editor-v2-rollout.md`,
       `cronograma-mpp-rollout.md`.

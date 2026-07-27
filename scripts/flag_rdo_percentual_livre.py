@@ -77,6 +77,69 @@ def status_flag(admin_id: int) -> dict:
     }
 
 
+def tarefas_que_regridem(admin_id: int) -> list:
+    """Tarefas que PERDERIAM físico se a flag fosse ligada agora.
+
+    A premissa de continuidade da entrega — "linha quantitativa antiga já
+    grava `percentual_realizado`, então a tarefa em 62% continua em 62%" —
+    vale para o que o serviço de apontamento escreve HOJE (dupla escrita do
+    M07), mas **não vale para toda linha legada**: existem apontamentos com
+    `quantidade_acumulada > 0` e `percentual_realizado = 0`, escritos antes
+    da dupla escrita ou por caminhos que só preenchiam quantidade.
+
+    🔬 27/07, banco de dev (⚠️ dominado por carga de suíte — prova a FORMA do
+    problema, não o volume de produção): 148 apontamentos assim, em 133
+    tarefas de 84 tenants.
+
+    Nessas tarefas o `percentual_concluido` hoje sai de
+    `quantidade_acumulada / quantidade_total` e, com a flag ligada, passaria
+    a sair do `percentual_realizado` — que é 0. A obra perderia avanço físico
+    na tela sem ninguém apontar nada. Daí o guard.
+
+    Devolve `[{'tarefa_id', 'nome', 'obra_id', 'pct_hoje', 'pct_apos'}]` da
+    tarefa mais recente para trás. Requer app_context; nunca levanta.
+    """
+    try:
+        from app import db
+        from sqlalchemy import text
+
+        linhas = db.session.execute(text("""
+            SELECT t.id, t.nome_tarefa, t.obra_id,
+                   ult.quantidade_acumulada, ult.percentual_realizado,
+                   t.quantidade_total
+            FROM tarefa_cronograma t
+            JOIN LATERAL (
+                SELECT a.quantidade_acumulada, a.percentual_realizado
+                FROM rdo_apontamento_cronograma a
+                JOIN rdo r ON r.id = a.rdo_id
+                WHERE a.tarefa_cronograma_id = t.id
+                  AND a.admin_id = :admin
+                ORDER BY r.data_relatorio DESC, a.id DESC
+                LIMIT 1
+            ) ult ON TRUE
+            WHERE t.admin_id = :admin
+              AND t.ativa IS TRUE
+              AND t.is_cliente IS FALSE
+              AND t.quantidade_total IS NOT NULL
+              AND t.quantidade_total > 0
+        """), {'admin': admin_id}).fetchall()
+    except Exception:
+        return []
+
+    regressoes = []
+    for tid, nome, obra_id, acum, pct_real, total in linhas:
+        # Mesma fórmula de `_atualizar_percentual_sem_commit`, dos dois lados.
+        pct_hoje = min(100.0, round(float(acum or 0) / float(total) * 100, 2))
+        pct_apos = min(100.0, float(pct_real or 0))
+        if pct_apos < pct_hoje - 0.01:
+            regressoes.append({
+                'tarefa_id': tid, 'nome': nome, 'obra_id': obra_id,
+                'pct_hoje': pct_hoje, 'pct_apos': pct_apos,
+            })
+    regressoes.sort(key=lambda r: r['pct_hoje'] - r['pct_apos'], reverse=True)
+    return regressoes
+
+
 def tarefas_quantitativas(admin_id: int) -> int:
     """Quantas tarefas do tenant hoje são apontadas por quantidade.
 
@@ -101,21 +164,43 @@ def main(argv=None) -> int:
     grupo.add_argument('--ligar', action='store_true')
     grupo.add_argument('--desligar', action='store_true')
     grupo.add_argument('--status', action='store_true')
+    parser.add_argument('--forcar', action='store_true',
+                        help='liga mesmo com tarefas que perderiam físico')
     args = parser.parse_args(argv)
 
     from app import app
 
     with app.app_context():
-        if args.status:
-            estado = status_flag(args.admin_id)
-        else:
+        estado = status_flag(args.admin_id)
+        if not estado['admin_existe']:
+            print(f"admin_id {args.admin_id} não existe")
+            return 1
+
+        # Guard ANTES de gravar. A versão anterior deste script chamava
+        # `definir_flag` primeiro e só depois imprimia um aviso — quem lesse
+        # o aviso já estaria com a flag ligada.
+        regressoes = tarefas_que_regridem(args.admin_id) if args.ligar else []
+        if regressoes and not args.forcar:
+            print(f'ABORTADO: {len(regressoes)} tarefa(s) do tenant '
+                  f'{args.admin_id} PERDERIAM avanço físico ao ligar a flag.')
+            print('Elas têm quantidade acumulada mas `percentual_realizado` '
+                  'zerado no apontamento mais recente — hoje o % sai da '
+                  'quantidade, e com a flag ligada sairia do percentual.')
+            for r in regressoes[:10]:
+                print(f"  obra {r['obra_id']} · tarefa {r['tarefa_id']} "
+                      f"{r['nome'][:44]:<44} {r['pct_hoje']:6.2f}% → "
+                      f"{r['pct_apos']:6.2f}%")
+            if len(regressoes) > 10:
+                print(f'  … e mais {len(regressoes) - 10}.')
+            print('Corrija os apontamentos dessas tarefas (reapontar o % na '
+                  'tela do RDO resolve) ou use --forcar se a perda for '
+                  'aceitável. Desligar a flag reverte de qualquer forma.')
+            return 1
+
+        if not args.status:
             definir_flag(args.admin_id, args.ligar)
             estado = status_flag(args.admin_id)
         quantitativas = tarefas_quantitativas(args.admin_id) if args.ligar else 0
-
-    if not estado['admin_existe']:
-        print(f"admin_id {args.admin_id} não existe")
-        return 1
 
     print(f"admin_id={estado['admin_id']} "
           f"versao_sistema={estado['versao_sistema']} "
@@ -123,8 +208,11 @@ def main(argv=None) -> int:
     if quantitativas:
         print(f"AVISO: {quantitativas} tarefa(s) deste tenant estavam em modo "
               "'quantidade' e passam a ser apontadas em % acumulado. O "
-              "percentual atual é preservado (as linhas quantitativas já "
-              "gravam percentual_realizado); desligar a flag reverte.")
+              "percentual atual é preservado nas tarefas cujo apontamento "
+              "mais recente já grava `percentual_realizado` — que é o que a "
+              "dupla escrita do M07 garante para o que se aponta HOJE, não "
+              "para toda linha legada. O guard acima verificou tarefa a "
+              "tarefa; desligar a flag reverte de qualquer forma.")
     return 0
 
 

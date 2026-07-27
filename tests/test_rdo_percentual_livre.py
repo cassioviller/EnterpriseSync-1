@@ -535,3 +535,116 @@ def test_n_tarefas_apontadas_conta_apontamento_percentual(ctx):
             ctx['obra_id'], D0, ctx['admin_id'])
         assert agregado['n_tarefas_apontadas'] == 1
         assert agregado['progresso_geral_pct'] == 30.0
+
+
+# ---------------------------------------------------------------------------
+# 7 — guard do rollout (27/07): a flag não pode fazer obra perder físico
+# ---------------------------------------------------------------------------
+
+def _apontamento_legado(ctx, tarefa, data_rdo, acumulada, pct_realizado):
+    """Grava a linha DIRETO no modelo, como os caminhos antigos faziam.
+
+    É o formato que existe no banco antes da dupla escrita do M07: quantidade
+    acumulada preenchida e `percentual_realizado` zerado. `registrar_apontamento`
+    não consegue produzir isso — e é justamente essa linha que faz a tarefa
+    despencar quando a flag liga.
+    """
+    from models import RDOApontamentoCronograma
+    ap = RDOApontamentoCronograma(
+        rdo_id=_rdo(ctx, data_rdo).id, tarefa_cronograma_id=tarefa.id,
+        admin_id=ctx['admin_id'], quantidade_executada_dia=acumulada,
+        quantidade_acumulada=acumulada, percentual_realizado=pct_realizado)
+    db.session.add(ap)
+    db.session.commit()
+    return ap
+
+
+def test_guard_detecta_tarefa_que_perderia_fisico(ctx):
+    """A premissa de continuidade da entrega ("a linha quantitativa antiga já
+    grava percentual_realizado") vale para o que o M07 escreve hoje, NÃO para
+    toda linha legada. 🔬 27/07 em dev: 148 apontamentos com
+    `quantidade_acumulada > 0` e `percentual_realizado = 0`, em 133 tarefas de
+    84 tenants. Essas tarefas cairiam a 0% no instante em que a flag ligasse.
+    """
+    from scripts.flag_rdo_percentual_livre import tarefas_que_regridem
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=48.0, unidade_medida='un')
+        _apontamento_legado(ctx, t, D0, acumulada=24.0, pct_realizado=0.0)
+
+        regressoes = tarefas_que_regridem(ctx['admin_id'])
+        assert [r['tarefa_id'] for r in regressoes] == [t.id]
+        assert regressoes[0]['pct_hoje'] == 50.0    # 24/48
+        assert regressoes[0]['pct_apos'] == 0.0
+
+
+def test_guard_ignora_tarefa_com_dupla_escrita_em_dia(ctx):
+    """Linha escrita pelo serviço de apontamento tem os dois campos — a
+    continuidade vale e a tarefa não pode aparecer no relatório do guard."""
+    from scripts.flag_rdo_percentual_livre import tarefas_que_regridem
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=48.0, unidade_medida='un')
+        registrar_apontamento(_rdo(ctx, D0), t, quantidade_dia=24.0,
+                              admin_id=ctx['admin_id'])
+        db.session.commit()
+        assert tarefas_que_regridem(ctx['admin_id']) == []
+
+
+def test_cli_recusa_ligar_quando_ha_regressao_e_nao_grava(ctx):
+    from scripts.flag_rdo_percentual_livre import main, status_flag
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=48.0, unidade_medida='un')
+        _apontamento_legado(ctx, t, D0, acumulada=24.0, pct_realizado=0.0)
+
+    assert main([str(ctx['admin_id']), '--ligar']) == 1
+    with app.app_context():
+        # o ponto do guard: recusar ANTES de gravar. A versão anterior
+        # chamava definir_flag e só depois avisava.
+        assert status_flag(ctx['admin_id'])['rdo_percentual_livre'] is False
+
+
+def test_cli_forcar_liga_mesmo_com_regressao(ctx):
+    from scripts.flag_rdo_percentual_livre import main, status_flag
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=48.0, unidade_medida='un')
+        _apontamento_legado(ctx, t, D0, acumulada=24.0, pct_realizado=0.0)
+
+    assert main([str(ctx['admin_id']), '--ligar', '--forcar']) == 0
+    with app.app_context():
+        assert status_flag(ctx['admin_id'])['rdo_percentual_livre'] is True
+
+
+def test_cli_liga_sem_obstaculo_quando_nao_ha_regressao(ctx):
+    from scripts.flag_rdo_percentual_livre import main, status_flag
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=48.0, unidade_medida='un')
+        registrar_apontamento(_rdo(ctx, D0), t, quantidade_dia=24.0,
+                              admin_id=ctx['admin_id'])
+        db.session.commit()
+
+    assert main([str(ctx['admin_id']), '--ligar']) == 0
+    with app.app_context():
+        assert status_flag(ctx['admin_id'])['rdo_percentual_livre'] is True
+
+
+def test_cli_status_nunca_grava(ctx):
+    from scripts.flag_rdo_percentual_livre import main, status_flag
+
+    assert main([str(ctx['admin_id']), '--status']) == 0
+    with app.app_context():
+        assert status_flag(ctx['admin_id'])['rdo_percentual_livre'] is False
+
+
+def test_guard_nao_ve_tarefa_de_outro_tenant(ctx):
+    """Índice por tenant: a regressão de um tenant não pode bloquear o rollout
+    de outro."""
+    from scripts.flag_rdo_percentual_livre import tarefas_que_regridem
+
+    with app.app_context():
+        t = _tarefa(ctx, quantidade_total=48.0, unidade_medida='un')
+        _apontamento_legado(ctx, t, D0, acumulada=24.0, pct_realizado=0.0)
+        assert tarefas_que_regridem(ctx['admin_id'] + 999_999) == []

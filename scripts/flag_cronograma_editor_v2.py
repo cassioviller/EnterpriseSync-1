@@ -98,31 +98,42 @@ def main(argv=None) -> int:
     grupo.add_argument('--ligar', action='store_true')
     grupo.add_argument('--desligar', action='store_true')
     grupo.add_argument('--status', action='store_true')
+    parser.add_argument('--forcar', action='store_true',
+                        help='liga mesmo com calendário divergente')
     args = parser.parse_args(argv)
 
     from app import app
 
     with app.app_context():
-        if args.status:
-            estado = status_flag(args.admin_id)
-        else:
+        estado = status_flag(args.admin_id)
+        if not estado['admin_existe']:
+            print(f"admin_id {args.admin_id} não existe")
+            return 1
+
+        # Guard ANTES de gravar: a versão anterior chamava `definir_flag`
+        # primeiro e só depois avisava — quem lesse o aviso já estaria com o
+        # motor novo ligado, e o recálculo já teria outro calendário.
+        diverge = args.ligar and calendario_diverge(args.admin_id)
+        if diverge and not args.forcar:
+            print(f'ABORTADO: o CalendarioEmpresa do tenant {args.admin_id} '
+                  f'considera sábado e/ou domingo, mas o motor novo usa '
+                  f'calendário fixo seg–sex nesta fase.')
+            print('Ligar agora faria o recálculo IGNORAR essa configuração e '
+                  'mover as datas do cronograma. Ajuste o calendário do '
+                  'tenant, ou use --forcar se a mudança de datas for '
+                  'aceitável. Desligar a flag reverte o motor, mas NÃO '
+                  'desfaz um recálculo já aplicado.')
+            return 1
+
+        if not args.status:
             definir_flag(args.admin_id, args.ligar)
             estado = status_flag(args.admin_id)
-        diverge = args.ligar and calendario_diverge(args.admin_id)
-
-    if not estado['admin_existe']:
-        print(f"admin_id {args.admin_id} não existe")
-        return 1
 
     print(f"admin_id={estado['admin_id']} "
           f"versao_sistema={estado['versao_sistema']} "
           f"cronograma_editor_v2={estado['cronograma_editor_v2']}")
     if estado['cronograma_editor_v2'] and estado['versao_sistema'] != 'v2':
         print("AVISO: flag ligada mas o tenant não é V2 — o motor novo segue inativo.")
-    if diverge:
-        print("AVISO: o CalendarioEmpresa deste tenant considera sábado e/ou "
-              "domingo, mas o motor novo usa calendário fixo seg–sex nesta "
-              "fase — o recálculo vai ignorar essa configuração.")
     return 0
 
 
