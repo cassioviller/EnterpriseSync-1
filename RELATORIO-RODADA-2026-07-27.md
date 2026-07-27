@@ -377,6 +377,18 @@ a resolução da obra por `username` funciona; e o guard de fotos do dry-run
 **O ciclo operacional da Baia está fechado**: exportar o grupo → 2 comandos
 → RDOs com texto, físico e fotos no sistema.
 
+### Complemento (pergunta do Cássio: "conferiu certinho?")
+
+A conferência inicial era de LEITURA das telas. Faltava a ESCRITA — digitar
+um % e salvar, o gesto do dia a dia. Feito: no Editar RDO de 22/07, digitei
+**25** no card "Execução Ferragem Calçada" (Ant: 0%) e salvei pelo botão.
+A barra "Realizado" saltou de 0% para **25,0% na própria tela**, e no banco:
+`pct=25.0, tipo=percentual, acumulado=25.0`; `percentual_concluido` da tarefa
+sincronizou para 25.0. Nenhum diálogo de erro (correto — não é retrocesso).
+Evidência: `docs/img/rdo-pct-apontamento-salvo-pela-tela.png`. O apontamento
+de teste foi removido em seguida e a tarefa voltou a 0%, para o tenant de
+conferência seguir fiel ao JSON canônico.
+
 ## Regressão final da rodada
 
 🔬 27/07, sequencial, `SIGE_ENABLE_DEMO_SEED=false`:
