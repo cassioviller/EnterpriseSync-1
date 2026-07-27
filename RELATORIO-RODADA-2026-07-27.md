@@ -24,7 +24,8 @@
 | 11 | Varredura 4 (silêncio) + correção | ✅ | `fe88d78f` |
 | 12 | Varreduras 5-6 + scope único do cronograma | ✅ | `61bdba6a` |
 | 13 | Decisão: acesso aberto p/ todos (RBAC adiado) | ✅ | `cda59240` |
-| 14 | Conferência visual do RDO percentual | ✅ | (neste commit) |
+| 14 | Conferência visual do RDO percentual | ✅ | `e84cff79` |
+| 15 | Teste ponta a ponta do import da Baia (WhatsApp→tela) | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -353,6 +354,28 @@ subir com `LD_LIBRARY_PATH` apontando para as libs do nix store
 Evidências versionadas em `docs/img/rdo-pct-*.png` (3 capturas, ~540 KB).
 Com isso, **a flag `rdo_percentual_livre` está pronta para ser ligada na
 Baia real** — era a última pendência técnica do pedido original.
+
+## 15 · Teste ponta a ponta do novo import da Baia — WhatsApp até a tela
+
+O fluxo completo do runbook, executado no app real (tenant `visual_rdo`,
+obra da Baia com flag percentual ligada, RDOs existentes **sem fotos** — o
+cenário de atualização, não de criação):
+
+| Passo | Resultado |
+|---|---|
+| 1 · Parser sobre `conversa (2).zip` | 12 dias, 12 com fotos, sugestões das regras impressas |
+| 2 · CLI `--dry-run` (por **username**, não id) | 0 criados / **12 atualizados**, fotos deliberadamente não processadas, transação revertida |
+| 3 · Aplicar | 12 atualizados, **57 fotos anexadas** |
+| 4 · Aplicar de novo (idempotência) | **0 fotos** — "álbum preservado" em todos os 12 dias |
+| 5 · Tela Editar RDO de 22/07 | Fotos reais da obra com as legendas exatas do chat (`docs/img/rdo-baia-fotos-do-whatsapp.png`) |
+
+Detalhes que o teste confirmou de graça: payload sem apontamentos **não
+zera** o físico existente (0 apontamentos gravados, percentuais intactos);
+a resolução da obra por `username` funciona; e o guard de fotos do dry-run
+(achado do code review) evita lixo em disco.
+
+**O ciclo operacional da Baia está fechado**: exportar o grupo → 2 comandos
+→ RDOs com texto, físico e fotos no sistema.
 
 ## Regressão final da rodada
 
