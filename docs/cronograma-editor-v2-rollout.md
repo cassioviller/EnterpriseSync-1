@@ -79,9 +79,33 @@ Devolve o motor antigo **imediatamente**. Mas atenção ao limite:
 > (snapshot antes) não é burocracia — é o único jeito de voltar as datas.
 > `CronogramaVersao` também permite restaurar, se a obra for versionada.
 
-Vínculos criados na tabela `tarefa_vinculo` permanecem; com a flag desligada
-o sistema volta a usar `predecessora_id` (TI/0), que o dual-write manteve
-alimentado.
+### ⚠️ O que o rollback preserva de DEPENDÊNCIA — e o que ele perde
+
+Este parágrafo estava **errado** na 1ª versão deste runbook (27/07) e foi
+corrigido pela varredura P2 do code review no mesmo dia. Ele dizia que o
+dual-write mantinha `predecessora_id` alimentado. **Não mantinha**: a
+sincronização só existia numa direção (`predecessora_id` → `tarefa_vinculo`,
+em `sincronizar_vinculos_de_predecessora_id`), e o CRUD novo gravava só a
+tabela nova. 🔬 27/07 (dev): 517 de 722 vínculos (72%) não tinham reflexo no
+campo legado.
+
+Desde a correção, o CRUD espelha o vínculo no campo legado — **mas o espelho
+é parcial por natureza da coluna**, não por limitação de implementação:
+
+| Vínculo criado com o v2 ligado | Sobrevive ao rollback? |
+|---|---|
+| Única predecessora, tipo TI, lag 0 | ✅ sim |
+| Segunda predecessora da mesma tarefa | ❌ não — a coluna guarda UMA |
+| Tipo II, TT ou IT | ❌ não — a coluna é sempre TI |
+| Lag diferente de 0 | ❌ não — a coluna não tem lag |
+
+Nos casos ❌ o campo fica **NULL de propósito**: perder a dependência no
+rollback é melhor do que reintroduzi-la com o tipo errado.
+
+Consequência prática: **se o tenant usou dependências que só o v2 expressa,
+o rollback não é reversão completa.** Os vínculos continuam na tabela
+`tarefa_vinculo` (nada é apagado) e voltam a valer quando a flag religar —
+mas, enquanto ela estiver desligada, o motor antigo não os enxerga.
 
 ## O que estas cinco fases deliberadamente NÃO fizeram
 

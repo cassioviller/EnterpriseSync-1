@@ -218,7 +218,7 @@ reimportando —, em vez de "derivados apagados e sem versão".
 > conjunto de ids tem de ser o mesmo. Com o defeito, ele acusa
 > **"101 tarefa(s) e 26 RDO(s) sumiram"**.
 
-### Não confirmados nesta varredura
+### Não confirmados nesta varredura 2
 
 - `utils/notifications.py::verificar_estouros_obra` comita, e o nome sugere
   leitura — mas a docstring **declara** o commit e o chamador é uma view de
@@ -228,3 +228,60 @@ reimportando —, em vez de "derivados apagados e sem versão".
 - `services/orcamento_operacional.py::garantir_operacional` tem a MESMA forma
   do `get_calendario` (cria-se-não-existe), mas usa `flush()` + tratamento de
   `IntegrityError` — está correto.
+
+## Varredura 3 — P2: premissa documentada que o dado desmente ✅ 27/07
+
+**Método:** extrair dos docs e commits as afirmações de continuidade,
+equivalência, idempotência e reversibilidade — as que sustentam decisão de
+rollout — e **medir cada uma**. Foi o padrão que já tinha rendido o achado das
+148 linhas legadas no `rdo_percentual_livre`.
+
+### 🟠 C1 · O dual-write do editor v2 só existia numa direção
+
+A afirmação, repetida no commit da Fase 1 e **no runbook que eu mesmo escrevi
+horas antes** (`docs/cronograma-editor-v2-rollout.md`):
+
+> "com a flag desligada o sistema volta a usar `predecessora_id` (TI/0), que
+> o dual-write manteve alimentado"
+
+**Falso.** A sincronização existe só no sentido
+`predecessora_id → tarefa_vinculo` (`sincronizar_vinculos_de_predecessora_id`,
+usada no pós-importação .mpp e na geração por proposta). O CRUD novo
+(`cronograma_views.py::criar_vinculo`) gravava **apenas** `TarefaVinculo`; o
+campo legado — que é o que o motor antigo lê — ficava NULL. Não há nenhum
+código no repositório que faça o caminho inverso.
+
+**Consequência:** toda dependência criada com o editor v2 ligado **sumia no
+rollback**, em silêncio. O runbook prometia uma reversão que não acontecia.
+
+🔬 **Medido (dev, 27/07): 517 de 722 vínculos (72%)** não tinham reflexo no
+campo legado; **490** deles seriam representáveis por ele.
+
+**Correção:** `_espelhar_no_campo_legado()` passa a manter `predecessora_id`
+em dia na criação e na exclusão de vínculo. E o runbook foi corrigido com a
+tabela do que sobrevive:
+
+| Vínculo criado com o v2 ligado | Sobrevive ao rollback? |
+|---|---|
+| Única predecessora, TI, lag 0 | ✅ |
+| Segunda predecessora da mesma tarefa | ❌ a coluna guarda UMA |
+| Tipo II, TT ou IT | ❌ a coluna é sempre TI |
+| Lag ≠ 0 | ❌ a coluna não tem lag |
+
+Nos casos ❌ o campo fica **NULL de propósito**: perder a dependência no
+rollback é melhor do que reintroduzi-la com o tipo errado. **O espelho é
+parcial por natureza da coluna, não por limitação de implementação** — e o
+runbook agora diz isso, em vez de prometer reversão completa.
+
+4 testes novos em `tests/test_cronograma_vinculos_api.py`. Sem a correção,
+falham com `assert None == <id>`.
+
+### Premissas verificadas e CONFIRMADAS
+
+Registradas para não serem re-investigadas:
+
+| Premissa | Veredito |
+|---|---|
+| "flag `rdo_percentual_livre` desligada ⇒ comportamento byte-idêntico" | ✅ já coberto por teste dedicado em `test_rdo_percentual_livre.py` |
+| "reimportar não duplica" (o import é upsert por `(codigo, admin_id)`) | ✅ coberto por `test_importacao_fisico_financeiro.py` |
+| "assinado sem trilha de transição = 0" (Fase 5) | ✅ invariante global testado — e esta sessão provou que ele PEGA violação, ao acusar 4 RDOs que meu próprio teste tinha criado |

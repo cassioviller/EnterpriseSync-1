@@ -19,7 +19,8 @@
 | 6 | Lacuna 1 — três runbooks faltantes | ✅ | `d2946ae9` |
 | 7 | Code review profundo — estrutura + varredura 1 | ✅ | `ef4bec3a` |
 | 8 | Correção dos 5 achados da varredura 1 | ✅ | `1e0ed9b3` |
-| 9 | Varredura 2 (commit alheio) + correção | ✅ | (neste commit) |
+| 9 | Varredura 2 (commit alheio) + correção | ✅ | `a8373ffa` |
+| 10 | Varredura 3 (premissa desmentida) + correção | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -248,6 +249,32 @@ era em `services/atualizacao_rdos.py`.
 Registrei também três candidatos **não confirmados** (`verificar_estouros_obra`,
 `calcular_horas_folha`, `garantir_operacional`): nome de leitura, papel de
 escrita — ou, no caso do último, implementação correta com `flush()`.
+
+## 10 · Varredura 3 — a premissa que eu mesmo repeti horas antes
+
+O commit da Fase 1 do editor v2, **e o runbook que escrevi hoje**, afirmavam:
+
+> "com a flag desligada o sistema volta a usar `predecessora_id` (TI/0), que
+> o dual-write manteve alimentado"
+
+**Falso.** A sincronização existe só no sentido `predecessora_id →
+tarefa_vinculo`. O CRUD novo gravava apenas a tabela nova; o campo legado —
+que é o que o motor antigo lê — ficava NULL. **Toda dependência criada com o
+editor v2 ligado sumia no rollback, em silêncio.** O runbook prometia uma
+reversão que não acontecia.
+
+🔬 Medido (dev): **517 de 722 vínculos (72%)** sem reflexo no campo legado;
+490 seriam representáveis.
+
+Correção: `_espelhar_no_campo_legado()` mantém `predecessora_id` em dia na
+criação e exclusão de vínculo. **Mas o espelho é parcial por natureza da
+coluna** — ela guarda UMA predecessora, sempre TI, sem lag. Vínculo II/TT/IT,
+lag ≠ 0 ou segunda predecessora ficam NULL **de propósito**: perder a
+dependência no rollback é melhor do que reintroduzi-la com o tipo errado. O
+runbook foi corrigido com a tabela do que sobrevive e do que não.
+
+4 testes novos; sem a correção falham com `assert None == <id>`.
+Regressão da área: **80 passed**.
 
 ## Regressão final da rodada
 

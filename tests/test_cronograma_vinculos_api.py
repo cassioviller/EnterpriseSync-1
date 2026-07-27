@@ -380,3 +380,83 @@ def test_dual_write_remocao_de_predecessora_limpa_vinculo():
     with app.app_context():
         assert db.session.get(TarefaCronograma, ctx['b_id']).predecessora_id is None
         assert TarefaVinculo.query.filter_by(sucessora_id=ctx['b_id']).count() == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Varredura P2 do code review (27/07) — o espelho no campo legado
+# ─────────────────────────────────────────────────────────────────────────────
+# A dupla escrita só existia numa direção: com a flag DESLIGADA, gravar
+# `predecessora_id` criava o vínculo TI/0. Com a flag LIGADA, o CRUD gravava só
+# `tarefa_vinculo` e o campo legado — que é o que o motor antigo lê — ficava
+# NULL. Toda dependência criada com o v2 ligado sumia no rollback.
+# 🔬 27/07 (dev): 517 de 722 vínculos (72%) sem reflexo no campo legado.
+
+def test_vinculo_TI0_criado_com_v2_ligado_espelha_no_campo_legado():
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/vinculo", json={
+        'predecessora_id': ctx['a_id'], 'sucessora_id': ctx['b_id'],
+        'tipo': 'TI', 'lag_dias': 0,
+    })
+    assert r.status_code == 201, r.get_data(as_text=True)
+
+    with app.app_context():
+        b = db.session.get(TarefaCronograma, ctx['b_id'])
+        assert b.predecessora_id == ctx['a_id'], (
+            'sem o espelho, desligar a flag perde esta dependência')
+
+
+def test_vinculo_que_o_campo_legado_nao_representa_fica_NULL():
+    """O campo guarda UMA predecessora, sempre TI, sem lag. Vínculo II — ou
+    lag ≠ 0 — não cabe: melhor perder no rollback do que reintroduzir com o
+    tipo errado."""
+    ctx = _cenario()
+    c = _client_como(ctx['admin_id'])
+    r = c.post(f"{_base(ctx)}/vinculo", json={
+        'predecessora_id': ctx['a_id'], 'sucessora_id': ctx['b_id'],
+        'tipo': 'II', 'lag_dias': 2,
+    })
+    assert r.status_code == 201, r.get_data(as_text=True)
+
+    with app.app_context():
+        assert db.session.get(TarefaCronograma, ctx['b_id']).predecessora_id is None
+
+
+def test_segunda_predecessora_zera_o_espelho():
+    """Com 2 predecessoras o campo legado não consegue dizer a verdade —
+    então ele passa a NÃO dizer nada, em vez de dizer metade."""
+    ctx = _cenario()
+    with app.app_context():
+        admin = db.session.get(Usuario, ctx['admin_id'])
+        obra = db.session.get(Obra, ctx['obra_id'])
+        c_tarefa = _tarefa(obra, admin, 'Cobertura', ordem=2, duracao_dias=2,
+                           data_inicio=date(2026, 7, 1), data_fim=date(2026, 7, 2))
+        c_id = c_tarefa.id
+
+    cli = _client_como(ctx['admin_id'])
+    assert cli.post(f"{_base(ctx)}/vinculo", json={
+        'predecessora_id': ctx['a_id'], 'sucessora_id': ctx['b_id'],
+        'tipo': 'TI', 'lag_dias': 0}).status_code == 201
+    with app.app_context():
+        assert db.session.get(TarefaCronograma, ctx['b_id']).predecessora_id == ctx['a_id']
+
+    assert cli.post(f"{_base(ctx)}/vinculo", json={
+        'predecessora_id': c_id, 'sucessora_id': ctx['b_id'],
+        'tipo': 'TI', 'lag_dias': 0}).status_code == 201
+    with app.app_context():
+        assert db.session.get(TarefaCronograma, ctx['b_id']).predecessora_id is None
+
+
+def test_excluir_vinculo_limpa_o_espelho():
+    ctx = _cenario(com_vinculo=True)
+    with app.app_context():
+        b = db.session.get(TarefaCronograma, ctx['b_id'])
+        b.predecessora_id = ctx['a_id']
+        db.session.commit()
+
+    c = _client_como(ctx['admin_id'])
+    r = c.delete(f"{_base(ctx)}/vinculo/{ctx['vinculo_id']}")
+    assert r.status_code == 200, r.get_data(as_text=True)
+
+    with app.app_context():
+        assert db.session.get(TarefaCronograma, ctx['b_id']).predecessora_id is None

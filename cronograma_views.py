@@ -1303,6 +1303,42 @@ def _guard_rotas_vinculo(obra_id: int):
     return None
 
 
+def _espelhar_no_campo_legado(obra_id: int, admin_id: int, sucessora_id: int):
+    """Mantém `TarefaCronograma.predecessora_id` refletindo o vínculo, quando
+    o campo legado consegue representá-lo.
+
+    Achado P2 do code review de 27/07. A dupla escrita entre as duas
+    representações só existia numa direção: com a flag `cronograma_editor_v2`
+    DESLIGADA, gravar `predecessora_id` também criava um `TarefaVinculo` TI/0
+    (`sincronizar_vinculos_de_predecessora_id`). Com a flag LIGADA, o CRUD
+    novo gravava só a tabela nova — e o campo legado, que é o que o motor
+    antigo lê, ficava NULL.
+
+    Consequência: toda dependência criada com o editor v2 ligado sumia no
+    rollback. 🔬 27/07 (dev): 517 de 722 vínculos (72%) não tinham reflexo no
+    campo legado; 490 deles seriam representáveis.
+
+    ⚠️ **O espelho é PARCIAL por natureza, e isso não é conserto de código.**
+    `predecessora_id` guarda UMA predecessora, sempre TI com lag 0; a tabela
+    nova guarda N, com tipo e lag. Uma tarefa com 3 predecessoras, ou com um
+    vínculo II/TT/IT, ou com lag ≠ 0, **não cabe** no campo legado. Nesses
+    casos o campo fica NULL de propósito — melhor perder a dependência no
+    rollback do que reintroduzi-la com o tipo errado. O runbook
+    `docs/cronograma-editor-v2-rollout.md` diz exatamente o que sobrevive.
+    """
+    vinculos = TarefaVinculo.query.filter_by(
+        obra_id=obra_id, admin_id=admin_id, sucessora_id=sucessora_id).all()
+    tarefa = TarefaCronograma.query.filter_by(
+        id=sucessora_id, obra_id=obra_id, admin_id=admin_id).first()
+    if tarefa is None:
+        return
+    representaveis = [v for v in vinculos
+                      if v.tipo == 'TI' and not (v.lag_dias or 0)]
+    tarefa.predecessora_id = (representaveis[0].predecessora_id
+                              if len(vinculos) == 1 and representaveis
+                              else None)
+
+
 def _recalc_e_resposta_vinculo(obra_id: int, admin_id: int, cliente_mode: bool,
                                vinculo: TarefaVinculo | None, status_http: int = 200):
     """Recalcula (motor novo, commit único) e monta a resposta padrão das
@@ -1388,6 +1424,7 @@ def criar_vinculo(obra_id: int):
         tipo=tipo, lag_dias=lag_dias,
     )
     db.session.add(vinculo)
+    _espelhar_no_campo_legado(obra_id, admin_id, suc_id)
     # Ciclo é detectado ANTES do commit: recalcular_obra levanta ErroCiclo e
     # o rollback descarta o vínculo pendente.
     return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode,
@@ -1443,7 +1480,10 @@ def excluir_vinculo(obra_id: int, vid: int):
     if not vinculo:
         return jsonify({'status': 'error', 'msg': 'Vínculo não encontrado'}), 404
 
+    sucessora_id = vinculo.sucessora_id
     db.session.delete(vinculo)
+    db.session.flush()
+    _espelhar_no_campo_legado(obra_id, admin_id, sucessora_id)
     return _recalc_e_resposta_vinculo(obra_id, admin_id, cliente_mode, None)
 
 
