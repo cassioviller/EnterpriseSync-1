@@ -664,14 +664,20 @@ def _importar_medicoes(obra, admin_id: int, payload: dict):
 
 def _importar_rdos(obra, admin_id: int, payload: dict, tid_to_db: dict):
     """Materializa os RDOs (físico real) do payload — ou sintéticos do
-    pct_fisico — e sincroniza os percentuais das tarefas. Extraído literalmente
-    do bloco final de importar_fisico_financeiro."""
+    pct_fisico. NÃO sincroniza percentual aqui.
+
+    A sincronização mudou de lugar em 27/07 (varredura P5 do code review):
+    `sincronizar_percentuais_obra` **comita**, e chamá-la daqui quebrava a
+    transação do import no meio. Tudo o que veio antes — inclusive o
+    `_limpar_derivados`, que é destrutivo — ficava commitado antes de
+    `_registrar_versao_inicial` rodar; uma falha ali deixava a obra com os
+    derivados antigos apagados, os novos gravados e **sem a versão nº1** que
+    o guard do M09 usa. Agora ela roda depois do commit final, como em
+    `services/atualizacao_rdos.py`."""
     from app import db
     rdos = payload.get('rdos') or _rdos_sinteticos_do_pct_fisico(payload)
     _materializar_rdos(obra, admin_id, rdos, tid_to_db)
     db.session.flush()
-    from utils.cronograma_engine import sincronizar_percentuais_obra
-    sincronizar_percentuais_obra(obra.id, admin_id)
 
 
 # ----------------------------------------------------------------------
@@ -748,6 +754,16 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     _registrar_versao_inicial(obra, admin_id, payload)
 
     db.session.commit()
+
+    # Fora da transação do import, de propósito: `sincronizar_percentuais_obra`
+    # comita por conta própria. Chamada lá de dentro de `_importar_rdos`, ela
+    # fechava a transação no meio e o import deixava de ser tudo-ou-nada
+    # (varredura P5 do code review de 27/07). Aqui, o pior caso é a obra ficar
+    # importada com o percentual dessincronizado — recuperável reimportando ou
+    # apontando —, e não com os derivados apagados e sem versão nº1.
+    from utils.cronograma_engine import sincronizar_percentuais_obra
+    sincronizar_percentuais_obra(obra.id, admin_id)
+
     return {'obra_id': obra.id, 'orcamento_id': orc.id,
             'proposta_id': proposta.id, 'avisos': avisos}
 

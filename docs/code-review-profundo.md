@@ -172,3 +172,59 @@ R$ 100.000, R$ 20.000 medidos em vez de R$ 60.000.
 precisou tratar e ficam registradas: sem `import main` os blueprints não estão
 registrados (a rota devolve BuildError), e sem desligar `WTF_CSRF_ENABLED` o
 POST é rejeitado com 302 — o teste passaria testando o redirect, não a regra.
+
+## Varredura 2 — P5: commit alheio dentro de transação ✅ 27/07
+
+**Método:** enumerar as funções de `services/` e `utils/` que chamam
+`session.commit()` (48) e cruzar com quantos módulos as importam. Uma função
+que comita e é usada como biblioteca é perigosa: **o chamador não vê o
+commit**. A heurística por nome (`get_`, `calcular_`, `verificar_`) rendeu
+pouco — o que rendeu foi olhar a *posição da chamada* dentro de fluxos que
+montam trabalho antes de fechar.
+
+### 🟠 B1 · O import físico-financeiro NÃO era atômico
+
+`services/importacao_fisico_financeiro.py` — a ordem era:
+
+```
+_recusar_se_versionada_pelo_fluxo_novo(obra)
+_limpar_derivados(obra, admin_id)        ← DESTRUTIVO: apaga tarefas,
+                                            propostas, orçamentos, medições
+_importar_comercial / _importar_cronograma / _importar_custos
+_importar_medicoes
+_importar_rdos(...)  →  sincronizar_percentuais_obra()  ← COMITA AQUI
+_registrar_versao_inicial(...)
+db.session.commit()                      ← o commit "de verdade"
+```
+
+`sincronizar_percentuais_obra` comita por conta própria. Chamada de dentro de
+`_importar_rdos`, ela **fechava a transação no meio**: tudo o que veio antes —
+inclusive a limpeza destrutiva — ficava gravado antes de
+`_registrar_versao_inicial` rodar.
+
+Uma falha ali deixava a obra com os derivados antigos **apagados**, os novos
+gravados e **sem a `CronogramaVersao` nº1** — justamente o registro de que o
+guard do M09 depende para decidir se um reimport é permitido.
+
+**Correção:** a sincronização saiu de `_importar_rdos` e passou a rodar
+**depois** do commit final, como já era em `services/atualizacao_rdos.py`. O
+pior caso vira "obra importada com percentual dessincronizado" — recuperável
+reimportando —, em vez de "derivados apagados e sem versão".
+
+> ⚠️ **A primeira versão do teste não provava nada.** Ela comparava
+> `count()` de tarefas e RDOs antes/depois — e o reimport recria a MESMA
+> quantidade, então a contagem batia mesmo com a transação quebrada. O teste
+> passava com o defeito de volta. A asserção correta é por **identidade**: o
+> conjunto de ids tem de ser o mesmo. Com o defeito, ele acusa
+> **"101 tarefa(s) e 26 RDO(s) sumiram"**.
+
+### Não confirmados nesta varredura
+
+- `utils/notifications.py::verificar_estouros_obra` comita, e o nome sugere
+  leitura — mas a docstring **declara** o commit e o chamador é uma view de
+  render (sem trabalho pendente). Nome ruim, não defeito.
+- `event_manager.py::calcular_horas_folha` comita duas vezes; é handler de
+  evento, escritor por natureza. Mesmo caso: nome de leitura, papel de escrita.
+- `services/orcamento_operacional.py::garantir_operacional` tem a MESMA forma
+  do `get_calendario` (cria-se-não-existe), mas usa `flush()` + tratamento de
+  `IntegrityError` — está correto.

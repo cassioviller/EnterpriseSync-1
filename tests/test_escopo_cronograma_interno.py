@@ -39,6 +39,21 @@ def _sem_csrf():
     app.config['WTF_CSRF_ENABLED'] = anterior
 
 
+@pytest.fixture(autouse=True)
+def _fotos_base_isolada(tmp_path):
+    """Mesmo padrão de test_importacao_fisico_financeiro.py: o teste de
+    atomicidade importa a fixture canônica duas vezes e, sem isolar, cada
+    import materializa as 57 fotos REAIS de `fotos_rdos/` com WebP + base64 —
+    minutos gastos em imagem que nenhum assert olha."""
+    from services import importacao_fisico_financeiro as ff
+    orig = ff.FOTOS_RDO_BASE
+    vazio = tmp_path / '_fotos_vazio'
+    vazio.mkdir(exist_ok=True)
+    ff.FOTOS_RDO_BASE = str(vazio)
+    yield
+    ff.FOTOS_RDO_BASE = orig
+
+
 def _ambiente(valor_contrato=100000.0):
     """Obra com 3 tarefas 'empresa': interna viva a 60%, cópia-cliente a 0% e
     arquivada a 0%. Só a primeira pode contar em qualquer leitura."""
@@ -155,3 +170,67 @@ def test_orcamento_nao_considera_cronograma_so_de_tarefa_arquivada():
             obra_id=ctx['obra'].id, admin_id=ctx['admin_id'],
             is_cliente=False, ativa=True).count()
         assert vivas == 0
+
+
+# ---------------------------------------------------------------------------
+# Varredura P5 — commit alheio dentro de transação
+# ---------------------------------------------------------------------------
+
+def test_import_e_atomico_quando_falha_depois_dos_rdos(monkeypatch):
+    """`sincronizar_percentuais_obra` COMITA. Chamada de dentro de
+    `_importar_rdos`, ela fechava a transação do import no meio: tudo o que
+    veio antes — inclusive o `_limpar_derivados`, que é destrutivo — ficava
+    gravado antes de `_registrar_versao_inicial` rodar. Uma falha ali deixava
+    a obra com os derivados antigos apagados, os novos gravados e SEM a versão
+    nº1 que o guard do M09 usa.
+
+    Este teste importa uma vez, depois reimporta com falha injetada no passo
+    seguinte, e exige que a obra continue como estava.
+    """
+    import json
+
+    from models import RDO, TarefaCronograma
+    from services import importacao_fisico_financeiro as ff
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    with open(caminho, encoding='utf-8') as fh:
+        payload = json.load(fh)
+
+    with app.app_context():
+        from models import TipoUsuario, Usuario
+        tag = datetime.utcnow().strftime('%H%M%S%f')
+        admin = Usuario(username=f'atm_{tag}', email=f'atm_{tag}@test.local',
+                        nome=f'Atomico {tag}',
+                        password_hash=generate_password_hash('Senha@2026'),
+                        tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+                        versao_sistema='v2')
+        db.session.add(admin)
+        db.session.commit()
+        aid = admin.id
+
+        oid = ff.importar_fisico_financeiro(payload, aid)['obra_id']
+
+        # A comparação tem de ser por IDENTIDADE, não por contagem: o reimport
+        # recria a MESMA quantidade de linhas, então `count()` fica igual
+        # mesmo com a transação quebrada. A primeira versão deste teste
+        # passava com o defeito de volta — ela não provava nada.
+        ids = lambda: (  # noqa: E731
+            {t.id for t in TarefaCronograma.query.filter_by(obra_id=oid)},
+            {r.id for r in RDO.query.filter_by(obra_id=oid)})
+        antes = ids()
+        assert antes[0] and antes[1]
+
+        def _explode(*a, **kw):
+            raise RuntimeError('falha injetada depois dos RDOs')
+
+        monkeypatch.setattr(ff, '_registrar_versao_inicial', _explode)
+        with pytest.raises(RuntimeError):
+            ff.importar_fisico_financeiro(payload, aid)
+        db.session.rollback()
+
+        depois = ids()
+        assert depois == antes, (
+            'import deixou de ser tudo-ou-nada: as linhas antigas foram '
+            f'apagadas e recriadas ({len(antes[0] - depois[0])} tarefa(s) e '
+            f'{len(antes[1] - depois[1])} RDO(s) sumiram)')

@@ -18,7 +18,8 @@
 | 5 | Lacuna 2+3 — guard nas flags sem rede | ✅ | (neste commit) |
 | 6 | Lacuna 1 — três runbooks faltantes | ✅ | `d2946ae9` |
 | 7 | Code review profundo — estrutura + varredura 1 | ✅ | `ef4bec3a` |
-| 8 | Correção dos 5 achados da varredura 1 | ✅ | (neste commit) |
+| 8 | Correção dos 5 achados da varredura 1 | ✅ | `1e0ed9b3` |
+| 9 | Varredura 2 (commit alheio) + correção | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -225,6 +226,28 @@ código alterado: **115 passed**.
 Aquela média é **simples**; `calcular_progresso_geral_obra_v2` pondera por
 duração. São **duas definições de "% da obra"** convivendo — e a menos
 rigorosa é a que gera dinheiro. Não unifiquei: é decisão de negócio.
+
+## 9 · Varredura 2 — o import físico-financeiro não era atômico
+
+`sincronizar_percentuais_obra` **comita**. Chamada de dentro de
+`_importar_rdos`, ela fechava a transação do import no meio — e tudo o que
+vinha antes, **inclusive o `_limpar_derivados`, que é destrutivo**, ficava
+gravado antes de `_registrar_versao_inicial` rodar. Uma falha ali deixava a
+obra com os derivados antigos apagados, os novos gravados e **sem a
+`CronogramaVersao` nº1** de que o guard do M09 depende.
+
+Correção: a sincronização passou a rodar **depois** do commit final, como já
+era em `services/atualizacao_rdos.py`.
+
+> ⚠️ **Lição do próprio teste.** A 1ª versão comparava `count()` de tarefas e
+> RDOs antes/depois — e o reimport recria a mesma quantidade, então a contagem
+> batia mesmo com a transação quebrada: **o teste passava com o defeito de
+> volta**. Corrigido para comparar **identidade** (conjunto de ids). Agora
+> acusa "101 tarefa(s) e 26 RDO(s) sumiram".
+
+Registrei também três candidatos **não confirmados** (`verificar_estouros_obra`,
+`calcular_horas_folha`, `garantir_operacional`): nome de leitura, papel de
+escrita — ou, no caso do último, implementação correta com `flush()`.
 
 ## Regressão final da rodada
 
