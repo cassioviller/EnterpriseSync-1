@@ -16,7 +16,7 @@
 | 3 | Code review do próprio trabalho — 3 defeitos | ✅ | (neste commit) |
 | 4 | Revisão de prontidão + plano de rollout | ✅ | (neste commit) |
 | 5 | Lacuna 2+3 — guard nas flags sem rede | ✅ | (neste commit) |
-| 6 | Lacuna 1 — três runbooks faltantes | ⏳ pendente | — |
+| 6 | Lacuna 1 — três runbooks faltantes | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -171,13 +171,26 @@ derrubada acima.
 arquivo novo `tests/test_flag_cronograma_editor_v2.py` (6) — **essa flag não
 tinha teste nenhum desde 24/07**. Suítes: 76 passed.
 
+## 6 · Lacuna 1 — os três runbooks que faltavam
+
+Das cinco flags que seguram as entregas, **três não tinham runbook**. Agora
+todas têm, no padrão dos das Fases 1-5 (o que a flag muda → pré-requisitos →
+ordem → rollback → o que a entrega deliberadamente NÃO fez).
+
+| Runbook | O ponto que ele existe para não deixar passar |
+|---|---|
+| `docs/rdo-percentual-livre-rollout.md` | As tarefas que perdem físico, e o passo 5 — a **conferência visual dos dois fluxos de RDO**, que continua sem ter sido feita |
+| `docs/cronograma-editor-v2-rollout.md` | **Desligar a flag reverte o MOTOR, não o DADO**: datas já recalculadas continuam gravadas. Daí o snapshot antes de ligar |
+| `docs/cronograma-mpp-rollout.md` | O bloqueio nº 1 é `versao_sistema='v2'`, que **mascara as outras quatro portas** — por isso o diagnóstico vem antes de tudo. E a flag governa a borda visual, **não é controle de acesso** |
+
+`docs/rollout-consolidado.md` foi atualizado: a tabela das cinco flags agora
+aponta cada runbook, e a tabela de lacunas marca 1, 2 e 3 como fechadas.
+
 ---
 
 ## Pendente nesta rodada
 
-- [ ] **Lacuna 1** — os três runbooks faltantes:
-      `rdo-percentual-livre-rollout.md`, `cronograma-editor-v2-rollout.md`,
-      `cronograma-mpp-rollout.md`.
+Nada. Os dois itens que estavam abertos (lacunas 1 e 2+3) foram fechados.
 
 ## Fora do escopo desta rodada, e continua em aberto
 

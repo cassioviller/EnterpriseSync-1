@@ -21,9 +21,13 @@ medições em produção que ninguém fez** e **três decisões de negócio**.
 |---|---|---|---|
 | `escopo_obra_ativo` | Fase 1.5 — RBAC por obra | `fase-1-rollout.md` | ✅ recusa se `usuario_obra` vazia e há usuário não-admin |
 | `compras_governanca_ativa` | Fase 3 — requisição→alçada→pedido | `fase-3-rollout.md` | ✅ recusa sem faixa de alçada; checa o escopo |
-| `cronograma_mpp_ativo` | M03 — importação de cronograma .mpp | ❌ **não existe** | — |
-| `cronograma_editor_v2` | Editor de cronograma v2 (5 fases, 24/07) | ❌ **não existe** | ⚠️ só avisa (calendário sáb/dom) |
-| `rdo_percentual_livre` | RDO em porcentagem livre (24/07) | ❌ **não existe** | ⚠️ **nenhum** — o aviso sai depois de gravar |
+| `cronograma_mpp_ativo` | M08/M09/M10 — importação de cronograma .mpp | ✅ `cronograma-mpp-rollout.md` | — (governa borda visual, não acesso) |
+| `cronograma_editor_v2` | Editor de cronograma v2 (5 fases, 24/07) | ✅ `cronograma-editor-v2-rollout.md` | ✅ recusa calendário com sáb/dom |
+| `rdo_percentual_livre` | RDO em porcentagem livre (24/07) | ✅ `rdo-percentual-livre-rollout.md` | ✅ recusa tarefas que perderiam físico |
+
+> 🔬 27/07: as três últimas linhas eram lacunas desta revisão (runbook
+> inexistente; guard ausente ou *post-hoc*) e foram fechadas na mesma rodada.
+> Ver `RELATORIO-RODADA-2026-07-27.md`.
 
 Duas fases **não têm flag**, de propósito, e por isso já estão valendo:
 
@@ -135,20 +139,22 @@ Só depois de a Onda 1 ter rodado uma semana sem incidente.
 3. `python scripts/flag_compras_governanca.py <ID> --ligar`.
 4. Ciclo completo numa obra piloto, com três pessoas: cria → aprova → emite.
 
-## Onda 4 — as entregas de 24/07 (sem runbook hoje)
+## Onda 4 — as entregas de 24/07
 
-Independentes das ondas 1-3; podem correr em paralelo com a 2.
+Independentes das ondas 1-3; podem correr em paralelo com a 2. Cada uma tem
+runbook próprio desde 27/07, e o `--ligar` das duas **recusa antes de gravar**.
 
-- **`cronograma_editor_v2`** — o guard só *avisa* se o calendário do tenant
-  considera sábado ou domingo (o motor novo é seg-sex fixo nesta fase), e o
-  aviso sai **depois** de gravar. Confira o calendário antes.
-- **`rdo_percentual_livre`** — muda o apontamento de TODA tarefa de TODA obra
-  do tenant para percentual acumulado. O percentual atual é preservado, e
-  desligar reverte. **O `--ligar` não tem guard nenhum**: o aviso sobre as
-  tarefas em modo `quantidade` é impresso depois da gravação.
-  ⚠️ Antes de ligar em qualquer tenant, falta a **conferência visual dos dois
-  fluxos de RDO** (novo e editar) com a flag ligada — era risco explícito do
-  plano e não tem registro de ter sido feita.
+- **`cronograma_editor_v2`** → `docs/cronograma-editor-v2-rollout.md`.
+  O guard recusa tenant cujo calendário considera sábado/domingo (o motor novo
+  é seg-sex fixo nesta fase). ⚠️ Tire um snapshot do cronograma **antes**:
+  desligar a flag reverte o motor, não as datas que ele já gravou.
+- **`rdo_percentual_livre`** → `docs/rdo-percentual-livre-rollout.md`.
+  O guard recusa quando existem tarefas que **perderiam avanço físico** — as
+  que têm quantidade acumulada e `percentual_realizado` zerado no apontamento
+  mais recente (🔬 dev 27/07: 148 apontamentos, 133 tarefas, 84 tenants).
+  ⚠️ Continua faltando a **conferência visual dos dois fluxos de RDO** (novo e
+  editar) com a flag ligada — risco explícito do plano de 24/07, sem registro
+  de ter sido feita em nenhum ambiente.
 
 ---
 
@@ -156,20 +162,20 @@ Independentes das ondas 1-3; podem correr em paralelo com a 2.
 
 Nenhuma é bug de código; todas são prontidão.
 
-| # | Lacuna | Consequência |
-|---|---|---|
-| 1 | **Três flags sem runbook** (`cronograma_mpp_ativo`, `cronograma_editor_v2`, `rdo_percentual_livre`) | Ligar vira improviso; não há passo-a-passo nem critério de rollback escrito |
-| 2 | **`flag_rdo_percentual_livre --ligar` sem guard** | É a flag de maior alcance (toda tarefa de toda obra) e a única que não recusa nada. O aviso é *post-hoc* |
-| 3 | **`flag_cronograma_editor_v2` avisa depois de gravar** | Mesma forma do nº 2, com impacto menor |
-| 4 | **Conferência visual do RDO percentual nunca feita** | Risco previsto no plano, em aberto |
-| 5 | **Nenhuma medição de produção** | Todo dimensionamento das ondas 1-3 é chute até a Onda 0 |
-| 6 | **Linhas `[FASE4:R5]` não revisadas** | 77 filhos órfãos foram carimbados no backfill de dev; produção não foi olhada |
+| # | Lacuna | Consequência | Estado |
+|---|---|---|---|
+| 1 | **Três flags sem runbook** (`cronograma_mpp_ativo`, `cronograma_editor_v2`, `rdo_percentual_livre`) | Ligar vira improviso; sem passo-a-passo nem critério de rollback escrito | ✅ **fechada 27/07** |
+| 2 | **`flag_rdo_percentual_livre --ligar` sem guard** | A flag de maior alcance era a única que não recusava nada. E o achado que veio junto: 148 apontamentos legados fariam tarefas **perder físico** ao ligar | ✅ **fechada 27/07** |
+| 3 | **`flag_cronograma_editor_v2` avisa depois de gravar** | Mesma forma do nº 2 | ✅ **fechada 27/07** |
+| 4 | **Conferência visual do RDO percentual nunca feita** | Risco previsto no plano de 24/07 | ⏳ **em aberto** — é passo 5 do runbook novo |
+| 5 | **Nenhuma medição de produção** | Todo dimensionamento das ondas 1-3 é chute até a Onda 0 | ⏳ **em aberto** — ação humana |
+| 6 | **Linhas `[FASE4:R5]` não revisadas** | 77 filhos órfãos carimbados no backfill de dev; produção não foi olhada | ⏳ **em aberto** — ação humana |
 
 ## O que eu recomendo fazer primeiro
 
 **A Onda 0.** São três comandos de leitura, não mudam nada e destravam a
 conversa inteira — hoje não dá para estimar nem priorizar sem eles.
 
-Em paralelo, e barato: **escrever os três runbooks faltantes** e **pôr guard
-no `flag_rdo_percentual_livre`** (lacunas 1 e 2), para que a Onda 4 não seja
-o único rollout sem rede.
+As lacunas 1, 2 e 3 já foram fechadas em 27/07 (runbooks escritos, guards
+postos, ver `RELATORIO-RODADA-2026-07-27.md`). As três restantes — 4, 5 e 6 —
+**dependem de ação humana**, não de código.
