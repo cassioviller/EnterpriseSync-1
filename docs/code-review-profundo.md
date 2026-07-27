@@ -1,0 +1,151 @@
+# Code review profundo — estrutura e registro de achados
+
+> Aberto em **2026-07-27**. Documento vivo: a estrutura é fixa, os achados
+> entram por varredura concluída. Se a sessão cair, o que está registrado
+> aqui está verificado.
+
+## Por que revisar por PADRÃO e não por arquivo
+
+O repositório tem ~150 arquivos de teste e dezenas de milhares de linhas de
+serviço. Ler arquivo por arquivo não converge, e cansa antes de chegar no
+que importa.
+
+Mas esta sessão produziu uma evidência melhor: **os defeitos encontrados têm
+formas recorrentes**, e cada forma é varrível pelo código inteiro. Dos seis
+defeitos reais achados hoje — três no meu próprio código, um numa premissa da
+entrega de 24/07, dois nos guards das flags — nenhum foi surpresa isolada:
+todos são instâncias de um padrão que já tinha mordido antes.
+
+Um exemplo do porquê isso funciona: o filtro `is_cliente` esquecido no
+`IndiceTarefas` é **exatamente** o mesmo defeito que a Task #147 já corrigira
+no endpoint `tarefas-rdo`. Uma varredura pelo padrão teria achado os dois de
+uma vez; uma leitura por arquivo achou um em julho e o outro em setembro.
+
+## Os seis padrões, derivados de defeitos reais
+
+| # | Padrão | Instância confirmada | Como varrer |
+|---|---|---|---|
+| P1 | **Filtro de escopo esquecido** — query sem `admin_id`, `is_cliente` ou `ativa` | `IndiceTarefas` (27/07) e Task #147 no `tarefas-rdo` | grep de `.query.filter_by(` e `.filter(` sobre modelos multi-tenant, conferindo as chaves |
+| P2 | **Premissa documentada que o dado desmente** | "a linha quantitativa antiga já grava `percentual_realizado`" — 148 linhas provam o contrário | extrair afirmações de continuidade/equivalência dos docs e commits e **medir cada uma** |
+| P3 | **Guard depois do efeito** | as duas flags gravavam e avisavam depois | grep de `definir_flag`/`commit` seguido de `print("AVISO` ou validação |
+| P4 | **Silêncio onde deveria haver erro** | `tarefa_mpp` desconhecido descartado; parser em locale estranho; foto ausente | grep de `except Exception: pass`, `continue` sem log, `or []`, `.get(...)` sem checagem |
+| P5 | **Commit alheio dentro de transação** | `get_calendario` comita no meio de `registrar_apontamento` | grep de `session.commit()` em funções utilitárias/leitura |
+| P6 | **Duas implementações da mesma convenção** | duas ordenações de foto numerada divergindo | grep de constantes/regras duplicadas (ordenação, normalização, parsing de data) |
+
+## Severidade — o critério
+
+| Nível | Definição | Exemplo desta sessão |
+|---|---|---|
+| 🔴 | Dado errado gravado, ou vazamento entre tenants, **sem sinal visível** | apontamento na cópia do cliente: o físico não se move e nada acusa |
+| 🟠 | Perda ou corrupção visível, mas detectável | tarefas caindo a 0% ao ligar a flag |
+| 🟡 | Comportamento confuso, recuperável | parser devolvendo "0 dias" em vez de erro |
+| ⚪ | Manutenção: duplicação, nome ruim, comentário mentiroso | as duas ordenações de foto |
+
+Um achado só entra neste documento **depois de confirmado com evidência** —
+uma query no banco, uma execução, ou `arquivo:linha` lido. Suspeita sem
+confirmação vai para "a investigar", não para "achados".
+
+## Ordem das varreduras
+
+Por severidade potencial, não por facilidade:
+
+1. **P1 — escopo esquecido** 🔴 (multi-tenant é o ativo mais crítico)
+2. **P5 — commit alheio** 🔴 (corrompe transação silenciosamente)
+3. **P2 — premissa desmentida** 🟠 (cada uma pode virar rollout errado)
+4. **P4 — silêncio** 🟡
+5. **P3 — guard tardio** 🟡
+6. **P6 — convenção duplicada** ⚪
+
+---
+
+# Achados
+
+> Vazio até a primeira varredura fechar. Cada achado traz evidência e
+> severidade; o que não foi confirmado fica em "a investigar".
+
+## Varredura 1 — P1: filtro de escopo esquecido ✅ 27/07
+
+**Método:** grep de `TarefaCronograma.query.filter_by(` e `.filter(` em
+`*.py`, `services/`, `utils/`, `views/`, `scripts/`, separando as buscas por
+`id=` (PK + tenant, onde `is_cliente` é irrelevante) das buscas **por obra**,
+que devolvem conjuntos. 26 ocorrências sem `is_cliente`; 5 são por obra.
+
+**Duas medições que definiram a severidade** (🔬 27/07, banco de dev — ⚠️
+dominado por carga de suíte; prova a forma, não o volume de produção):
+
+| | |
+|---|---|
+| Obras com as **duas visões** (empresa + cliente) ativas | **141** |
+| Tarefas **arquivadas** (`ativa=False`) | 217, em **187 obras** |
+
+Eu tinha suposto que a cópia-cliente fosse rara — são 141 obras.
+
+### 🔴 A1 · `gerar_medicao` calcula % e VALOR da medição sobre tarefas-cliente e arquivadas
+
+`portal_obras_views.py:723`
+
+```python
+tarefas_empresa = TarefaCronograma.query.filter_by(
+    obra_id=obra_id, admin_id=admin_id, responsavel='empresa'
+).all()                                    # sem is_cliente, sem ativa
+total = len(tarefas_empresa)
+perc = sum(t.percentual_concluido or 0 for t in tarefas_empresa) / total
+valor_medido = round(float(obra.valor_contrato) * perc / 100, 2)
+```
+
+O resultado vira uma linha de `MedicaoObra` com `percentual_executado` e
+`valor_medido` — **documento de medição, dinheiro**.
+
+As tarefas da cópia-cliente **nunca recebem sync**: `sincronizar_percentuais_obra`
+é chamada com `cliente=False` em todos os pontos de produção
+(`utils/cronograma_engine.py:884`, `services/atualizacao_rdos.py:337`,
+`services/importacao_fisico_financeiro.py:674`); só `cronograma_views.py:402`
+passa `cliente_mode`. Então elas entram na média com `percentual_concluido`
+parado — **diluindo o percentual e subestimando o valor medido**.
+
+🔬 **Impacto medido: 107 obras** teriam percentual de medição diferente com os
+filtros postos. Amostra: **8,75% → 11,67%** — o valor medido sai **25% menor**
+do que deveria.
+
+> Achado secundário, do padrão P6: esta média é **simples**, enquanto
+> `calcular_progresso_geral_obra_v2` pondera por duração. São **duas
+> definições de "% da obra"** convivendo — e é a menos rigorosa que gera
+> dinheiro.
+
+**Não corrigido de propósito:** consertar muda números de medição já
+apresentados ao cliente. É decisão do dono, não do revisor.
+
+### 🟠 A2 · Tela de medição lista tarefa-cliente e arquivada
+
+`medicao_views.py:54` — a lista que vai para `gestao_itens.html` (onde se
+vinculam tarefas a itens de medição com peso) inclui a cópia-cliente e as
+arquivadas. Consequência: **nomes duplicados na tela de vínculo** nas 141
+obras, e possibilidade de vincular um item de medição a uma tarefa arquivada.
+
+### 🟡 A3 · Contagem inflada no dossiê de handoff
+
+`services/obra_handoff.py:121` — `total_tarefas` conta cópia-cliente e
+arquivadas. Número errado num relatório de passagem de obra.
+
+### 🟡 A4 · `obra_com_cronograma` pode ser verdade só com tarefa arquivada
+
+`views/orcamentos_views.py:260` — `n_tarefas > 0` decide se a obra "já tem
+cronograma". Uma obra cujo cronograma inteiro foi arquivado responde que sim.
+
+### 🟡 A5 · Entregas de terceiros sem escopo, e com tenant condicional
+
+`services/entregas_terceiros.py:165` — sem `is_cliente`, sem `ativa`, e o
+`admin_id` só entra `if admin_id is not None`. Entrega de terceiro duplicada
+nas obras com as duas visões.
+
+### Conclusão da varredura 1
+
+O padrão P1 é **real e sistêmico**: 5 ocorrências fora do código que eu
+escrevi, uma delas gerando dinheiro. O `is_cliente` esquecido não é descuido
+pontual — é uma convenção que o código **não tem como lembrar**, porque
+depende de o autor saber que a cópia-cliente existe.
+
+**Recomendação estrutural** (além de corrigir as 5): dar ao modelo um
+_scope_ explícito — por exemplo `TarefaCronograma.do_cronograma_interno(obra_id, admin_id)`
+como classmethod única — para que esquecer o filtro exija sair do caminho
+padrão, em vez de ser o caminho padrão.
