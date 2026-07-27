@@ -699,6 +699,17 @@ def importar_fisico_financeiro(payload: dict, admin_id: int) -> dict:
     from models import Obra
     from services.cliente_resolver import obter_ou_criar_cliente
 
+    # Aquece o calendário do tenant ANTES de abrir trabalho (P5 residual do
+    # code review de 27/07): `get_calendario` cria o calendário padrão e
+    # **comita** quando não existe, e `_materializar_rdos` o chama lá no
+    # meio via `calcular_progresso_rdo`. Na PRIMEIRA importação de um tenant
+    # sem calendário, esse commit alheio fechava a transação no meio — um
+    # worker morto por timeout (gunicorn 30s dev / 120s produção) deixava a
+    # obra parcial: 101 tarefas e 1 RDO gravados, sem medições, fotos nem
+    # versão nº1. Visto acontecer de verdade no teste de upload de 27/07.
+    from utils.cronograma_engine import get_calendario
+    get_calendario(admin_id)
+
     obra_j = payload['obra']
     contrato = payload.get('contrato', {})
     data_inicio = _parse_date(contrato.get('data_inicio')) or date.today()

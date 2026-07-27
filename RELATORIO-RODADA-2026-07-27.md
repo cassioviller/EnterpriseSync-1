@@ -25,7 +25,10 @@
 | 12 | Varreduras 5-6 + scope único do cronograma | ✅ | `61bdba6a` |
 | 13 | Decisão: acesso aberto p/ todos (RBAC adiado) | ✅ | `cda59240` |
 | 14 | Conferência visual do RDO percentual | ✅ | `e84cff79` |
-| 15 | Teste ponta a ponta do import da Baia (WhatsApp→tela) | ✅ | (neste commit) |
+| 15 | Teste ponta a ponta do import da Baia (WhatsApp→tela) | ✅ | `6f546cf3` |
+| 16 | Teste de escrita pela tela (digitar % e salvar) | ✅ | `bae7a4a3` |
+| 17 | Teste do upload de JSON pela tela + fix de atomicidade | ✅ | (neste commit) |
+| 18 | Auditoria de deploy EasyPanel (checklist novo) | ✅ | (neste commit) |
 
 `main` == `origin/main` até o bloco 2. Os blocos 3 e 4 estão neste commit.
 
@@ -388,6 +391,40 @@ sincronizou para 25.0. Nenhum diálogo de erro (correto — não é retrocesso).
 Evidência: `docs/img/rdo-pct-apontamento-salvo-pela-tela.png`. O apontamento
 de teste foi removido em seguida e a tarefa voltou a 0%, para o tenant de
 conferência seguir fiel ao JSON canônico.
+
+## 17-18 · Upload de JSON pela tela, o defeito que ele revelou, e a auditoria de deploy
+
+**O teste da tela** (`/importacao/fisico-financeiro`, tenant `import_ui`):
+
+- Payload **leve** → ✅ funciona de ponta a ponta: obra criada com
+  cronograma, RDO e versão nº1; reimportar arquiva a v1 e cria a v2 (M09).
+- Payload **da Baia (99 fotos)** → ❌ **não completa**: cada foto passa por
+  WebP + thumbnail dentro do request e o worker estoura o timeout. 🔬 Tempo
+  real medido via CLI: **119s** — no fio dos 120s do gunicorn de produção.
+  Regra que foi para o checklist: **payload pesado vai por CLI, não pela
+  tela.**
+
+**O defeito que o teste revelou (e o fix):** quando o worker morreu no meio,
+sobrou **obra parcial** no banco — 101 tarefas e 1 RDO gravados, sem
+medições nem versão. Causa: na PRIMEIRA importação de um tenant sem
+calendário, `get_calendario` (chamado lá no fundo por
+`calcular_progresso_rdo`) criava o calendário e **comitava no meio da
+transação** — o P5 residual que o teste de atomicidade original não pegava,
+porque o tenant dele ganhava calendário no primeiro import. Corrigido
+(aquecimento antes da transação) e travado por teste novo que, sem o fix,
+falha com *"primeira importação deixou obra parcial para trás"*. A obra
+parcial do teste foi consertada pelo reimport CLI (26 RDOs, versão nº1).
+
+**A auditoria de deploy** virou documento próprio:
+**`docs/deploy-checklist-easypanel.md`**. Resumo do que importa:
+
+| Achado | Consequência |
+|---|---|
+| Pipeline sólido: digest fixado, lockfile `--frozen`, não-root, backup pré-migração que ABORTA se falhar, `DATABASE_URL`/`SESSION_SECRET` obrigatórias | ✅ pronto |
+| Migrações 48 e 132 **falham em banco recriado** (são legadas, schema antigo) — e **não derrubam o deploy** | benigno para 48/132, mas: |
+| `executar_migracoes` engole falha individual; a promessa "falha aborta o boot" do `app.py` só dispara em colapso total | ⚠️ migração NOVA que falhar sobe assim mesmo — **grep no log após todo deploy** |
+| Sem JVM na imagem | `.mpp` degrada para 422 com instrução (deliberado); `.xml` funciona |
+| Import pesado × timeout 120s | usar CLI (regra no checklist) |
 
 ## Regressão final da rodada
 

@@ -301,3 +301,51 @@ def test_scope_nao_vaza_entre_tenants():
         # obra de um tenant + admin_id do outro = vazio, nunca "o que existir"
         assert TarefaCronograma.do_cronograma_interno(
             ctx['obra'].id, outro['admin_id']).count() == 0
+
+
+def test_primeira_importacao_de_tenant_sem_calendario_e_atomica(monkeypatch):
+    """O buraco que o teste de atomicidade original NÃO pegava: na PRIMEIRA
+    importação de um tenant sem CalendarioEmpresa, `get_calendario` (chamado
+    lá no fundo por `calcular_progresso_rdo`) criava o calendário e COMITAVA
+    no meio da transação. Worker morto por timeout deixava obra parcial —
+    aconteceu de verdade no teste de upload de 27/07: 101 tarefas e 1 RDO
+    gravados, sem medições nem versão nº1.
+
+    Com o aquecimento do calendário antes da transação, uma falha no meio
+    não deixa NADA da obra para trás (o calendário em si pode sobrar — é
+    padrão do tenant e inofensivo)."""
+    import json
+
+    from models import Obra, RDO, TarefaCronograma
+    from services import importacao_fisico_financeiro as ff
+
+    caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
+                           'cronograma_fisico_financeiro_baias.json')
+    with open(caminho, encoding='utf-8') as fh:
+        payload = json.load(fh)
+
+    with app.app_context():
+        from models import CalendarioEmpresa, TipoUsuario, Usuario
+        tag = datetime.utcnow().strftime('%H%M%S%f')
+        admin = Usuario(username=f'cal_{tag}', email=f'cal_{tag}@test.local',
+                        nome=f'Sem Calendario {tag}',
+                        password_hash=generate_password_hash('Senha@2026'),
+                        tipo_usuario=TipoUsuario.ADMIN, ativo=True,
+                        versao_sistema='v2')
+        db.session.add(admin)
+        db.session.commit()
+        aid = admin.id
+        assert CalendarioEmpresa.query.filter_by(admin_id=aid).first() is None
+
+        def _explode(*a, **kw):
+            raise RuntimeError('falha injetada — simula worker/erro no fim')
+
+        monkeypatch.setattr(ff, '_registrar_versao_inicial', _explode)
+        with pytest.raises(RuntimeError):
+            ff.importar_fisico_financeiro(payload, aid)
+        db.session.rollback()
+
+        assert Obra.query.filter_by(admin_id=aid).count() == 0, \
+            'primeira importação deixou obra parcial para trás'
+        assert TarefaCronograma.query.filter_by(admin_id=aid).count() == 0
+        assert RDO.query.filter_by(admin_id=aid).count() == 0
