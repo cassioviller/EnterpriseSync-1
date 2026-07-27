@@ -15,6 +15,31 @@ tudo o que muda comportamento nasceu atrás de flag desligada — corretamente �
 e nenhuma flag foi ligada em nenhum tenant. O gargalo não é código: são **duas
 medições em produção que ninguém fez** e **três decisões de negócio**.
 
+## ⚖️ DECISÃO do Cássio — 27/07: acesso aberto para todos, por enquanto
+
+> "Por enquanto todos os perfis vão ter acesso, porque não tem níveis de
+> acesso definidos ainda."
+
+Consequências práticas, registradas para ninguém retomar isso por engano:
+
+- **`escopo_obra_ativo` fica DESLIGADA por decisão de negócio** — não por
+  pendência técnica. As Ondas 1 e 3 abaixo ficam suspensas até a empresa
+  definir os papéis (quem é gestor de quê).
+- **`compras_governanca_ativa` fica junto**: a dependência é dura — ligar a
+  governança sem o escopo seria uma alçada de mentira (qualquer um aprovaria).
+- **Fase 5 continua valendo como AUTORIA, sem alçada**: assinar/aprovar RDO
+  funciona e registra QUEM fez (identidade + hash + trilha), mas qualquer
+  usuário autenticado do tenant pode fazê-lo. É o comportamento conhecido e
+  documentado do passo 0 do runbook da Fase 5 — aceito por esta decisão.
+- **A medição "obras sem gestor" (Onda 0) deixa de ser urgente** — vira
+  pré-requisito de quando a decisão de papéis for tomada.
+- **O que segue liberável independente disso**: `cronograma_mpp_ativo`,
+  `cronograma_editor_v2` e `rdo_percentual_livre` (Onda 4) — nenhuma das três
+  depende de papel de acesso.
+
+Quando a empresa definir os níveis de acesso, o caminho de volta é o mesmo de
+sempre: Onda 0 (medir) → Onda 1 (escopo num piloto) → Onda 3 (compras).
+
 ## As cinco flags e o que cada uma segura
 
 | Flag | Entrega que ela segura | Runbook | Guard do `--ligar` |
