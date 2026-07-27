@@ -20,6 +20,12 @@ fotos_rdos/
 
 Formatos aceitos: `jpg, jpeg, png, gif, webp` (máx. 5 MB, até 20 fotos por RDO).
 
+> 💡 **Não numere à mão se as fotos vieram do WhatsApp.**
+> `python scripts/whatsapp_para_rdos.py --zip "conversa.zip" --obra-marcador "Obra Itu"`
+> extrai as imagens do export já numeradas na ordem do chat e monta a lista
+> `fotos` com a legenda de cada uma. Pasta que já tem arquivo é preservada
+> (só regrava com `--forcar`). Vídeo `.mp4` é ignorado com aviso.
+
 ## Como isso vira foto no RDO
 
 No `cronograma_fisico_financeiro_baias.json`, o RDO do dia ganha uma lista

@@ -12,6 +12,14 @@
 > em obra já migrada; segue valendo apenas como criação inicial. RDOs do
 > dia a dia: registre pela tela de Novo RDO (M07 — modos quantitativo e
 > percentual). Ver `ESTADO_ATUALIZACAO_BAIA.md`.
+>
+> **ATUALIZAÇÃO (2026-07-27):** para acrescentar RDOs EM LOTE a uma obra em
+> andamento, use o caminho não-destrutivo — `scripts/atualizar_rdos_obra.py`
+> (serviço `services/atualizacao_rdos.py`): faz upsert por data, não apaga
+> tarefa/proposta/medição/RDO nenhum e funciona em obra já versionada por
+> .mpp. E se os RDOs vêm do grupo de WhatsApp, `scripts/whatsapp_para_rdos.py`
+> monta o payload e extrai as fotos com as legendas. O reimport descrito
+> abaixo continua valendo só para **criação inicial**.
 
 ---
 
@@ -36,7 +44,10 @@
 O avanço físico da obra vem dos **RDOs** (seção `rdos` do JSON). Cada RDO tem
 **apontamentos** que dizem "tal tarefa está em X%". O app acumula isso por data e
 calcula o progresso geral (`calcular_progresso_geral_obra_v2`). Hoje a Baia tem
-**19 RDOs** (relatório de 22/06 a 13/07; sem RDO em domingos e no feriado 05/07).
+**26 RDOs** (22/06 a 22/07). Não há RDO nos domingos nem nos fins de semana de
+11-12 e 18-19/07 — a obra trabalhou alguns sábados (27/06, 04/07), outros não.
+Os 12 últimos (07/07 a 22/07) vieram do export do WhatsApp em 27/07 — ver
+`ESTADO_ATUALIZACAO_BAIA.md`.
 
 > Se o JSON **não** tiver a seção `rdos`, o import cai num modo de fallback: cria
 > **1 RDO sintético** a partir do `pct_fisico` das tarefas. Como agora usamos RDOs

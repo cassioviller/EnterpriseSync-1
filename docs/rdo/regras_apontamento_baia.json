@@ -1,0 +1,227 @@
+{
+  "obra": "Baias Kabod — Fazenda Santa Mônica, Itu/SP (código 10)",
+  "descricao": [
+    "De-para atividade do RDO → tarefa do cronograma, para o parser",
+    "scripts/whatsapp_para_rdos.py --regras. Cada regra casa um bullet da seção",
+    "'Atividades executadas' quando TODAS as palavras de 'quando' aparecem nele",
+    "(sem acento, minúsculas) e o galpão do bullet bate com o da regra.",
+    "",
+    "IMPORTANTE — os ids do cronograma NÃO seguem a ordem que a intuição sugere:",
+    "  11–52 = Galpão B     55–96 = Galpão A",
+    "Os dois galpões repetem os mesmos nomes de tarefa e têm o MESMO pai",
+    "('Fundação'); só o avô ('Galpão A'/'Galpão B') distingue.",
+    "",
+    "'forma' diz de onde sai o percentual:",
+    "  pct    → usa o N% escrito no bullet; se não houver, o campo 'pct' da regra",
+    "  fracao → 'X de um total de Y' vira X/Y*100 (ex.: 37,50 m de 57,50 m = 65%)",
+    "  marco  → 100 quando o bullet diz finalizada/concluída/todas; senão 'pct_parcial'",
+    "",
+    "'nao_quando' derruba a regra: bullet de PREPARAÇÃO cita o serviço que virá",
+    "depois ('limpeza das valas ... para a camada de concreto magro') e casaria",
+    "a regra de um serviço que ainda não começou.",
+    "",
+    "Toda sugestão sai marcada 'sugerido: true' e NÃO vira apontamento sem",
+    "--aplicar-sugestoes. O % de uma tarefa é decisão de engenharia; o script",
+    "só evita redigitar o óbvio."
+  ],
+  "regras": [
+    {
+      "id": "ferragem-fundacao-b",
+      "quando": [
+        "armação",
+        "viga"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 14,
+      "tarefa_nome": "Execução de Ferragens Para Fundação (Galpão B)",
+      "forma": "fracao",
+      "observacao": "Única tarefa com quantitativo (48 un). Confira se o dia deve entrar em quantidade em vez de percentual."
+    },
+    {
+      "id": "ferragem-fundacao-a",
+      "quando": [
+        "armação",
+        "viga"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 59,
+      "tarefa_nome": "Execução de Ferragens Para Fundação (Galpão A)",
+      "forma": "fracao"
+    },
+    {
+      "id": "blocos-coroamento-a",
+      "quando": [
+        "blocos de coroamento"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 59,
+      "tarefa_nome": "Execução de Ferragens Para Fundação (Galpão A)",
+      "forma": "pct"
+    },
+    {
+      "id": "concretagem-brocas-b",
+      "quando": [
+        "concretagem",
+        "brocas"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 15,
+      "tarefa_nome": "Concretagem das Brocas (Galpão B)",
+      "forma": "marco"
+    },
+    {
+      "id": "concretagem-brocas-a",
+      "quando": [
+        "concretagem",
+        "brocas"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 60,
+      "tarefa_nome": "Concretagem das Brocas (Galpão A)",
+      "forma": "marco"
+    },
+    {
+      "id": "concreto-magro-b",
+      "quando": [
+        "concreto magro"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 16,
+      "tarefa_nome": "Aplicação Concreto Magro nas Vigas Baldrames (Galpão B)",
+      "forma": "marco",
+      "pct_parcial": 60,
+      "nao_quando": [
+        "limpeza das valas",
+        "preparando a frente"
+      ]
+    },
+    {
+      "id": "concreto-magro-a",
+      "quando": [
+        "concreto magro"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 61,
+      "tarefa_nome": "Aplicação Concreto Magro nas Vigas Baldrames (Galpão A)",
+      "forma": "marco",
+      "pct_parcial": 60,
+      "nao_quando": [
+        "limpeza das valas",
+        "preparando a frente"
+      ]
+    },
+    {
+      "id": "escavacao-hidraulica-b",
+      "quando": [
+        "escava",
+        "esgoto"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 13,
+      "tarefa_nome": "Escavação Para Instalação Da Hidraulica (Galpão B)",
+      "forma": "marco",
+      "pct_parcial": 50,
+      "nao_quando": [
+        "instalacao da tubulacao concluida"
+      ]
+    },
+    {
+      "id": "escavacao-hidraulica-a",
+      "quando": [
+        "escava",
+        "esgoto"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 57,
+      "tarefa_nome": "Escavação Para Instalação Da Hidraulica (Galpão A)",
+      "forma": "marco",
+      "pct_parcial": 50,
+      "nao_quando": [
+        "instalacao da tubulacao concluida"
+      ]
+    },
+    {
+      "id": "infra-hidraulica-b",
+      "quando": [
+        "instalação",
+        "esgoto"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 39,
+      "tarefa_nome": "Instalação Infra Hidráulica (Galpão B)",
+      "forma": "marco",
+      "observacao": "ANTECIPAÇÃO: a tarefa está planejada para agosto. Apontar aqui muda o físico de uma etapa futura — confirme antes de aplicar."
+    },
+    {
+      "id": "infra-hidraulica-a",
+      "quando": [
+        "instalação",
+        "esgoto"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 84,
+      "tarefa_nome": "Instalação Infra Hidráulica (Galpão A)",
+      "forma": "marco",
+      "observacao": "ANTECIPAÇÃO: ver a regra irmã do Galpão B."
+    },
+    {
+      "id": "ferragem-calcada-sapatas-a",
+      "quando": [
+        "armação",
+        "sapatas"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 66,
+      "tarefa_nome": "Execução Ferragem Calçada, Travamento Chapas Base (Galpão A)",
+      "forma": "pct"
+    },
+    {
+      "id": "nivelamento-calcada-b",
+      "quando": [
+        "solo",
+        "calçada"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 20,
+      "tarefa_nome": "AJR - Maquinário: Nivelamento Das Calçadas (Galpão B)",
+      "forma": "pct"
+    },
+    {
+      "id": "nivelamento-calcada-a",
+      "quando": [
+        "solo",
+        "calçada"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 65,
+      "tarefa_nome": "AJR - Maquinário: Nivelamento Das Calçadas (Galpão A)",
+      "forma": "pct"
+    },
+    {
+      "id": "chapas-base-b",
+      "quando": [
+        "chapas-base",
+        "locação"
+      ],
+      "galpao": "B",
+      "tarefa_mpp": 17,
+      "tarefa_nome": "Locação das Chapas Base com Topógrafo (Galpão B)",
+      "forma": "pct"
+    },
+    {
+      "id": "chapas-base-a",
+      "quando": [
+        "chapas-base",
+        "locação"
+      ],
+      "galpao": "A",
+      "tarefa_mpp": 62,
+      "tarefa_nome": "Locação das Chapas Base com Topógrafo (Galpão A)",
+      "forma": "pct"
+    }
+  ],
+  "sem_tarefa_no_cronograma": [
+    "Protótipo do cocho de alimentação em Light Steel Frame (LSF) — iniciado em 21/07 e finalizado em 22/07. NÃO existe tarefa de cocho no cronograma: o sistema construtivo (alvenaria × LSF) segue indefinido e é a causa declarada do atraso. Enquanto não houver decisão e tarefa, fica só no texto do RDO.",
+    "Limpeza das valas, protetores de plástico nos vergalhões, demarcação — serviços de preparação sem tarefa própria."
+  ]
+}

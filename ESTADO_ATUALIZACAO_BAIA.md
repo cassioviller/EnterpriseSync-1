@@ -1,7 +1,107 @@
 # Estado da atualização da obra Baia — físico-financeiro
 
-> Documento de handoff. Última atualização: **2026-07-21** (M09).
+> Documento de handoff. Última atualização: **2026-07-27**.
 > Resume o que foi feito nesta rodada e o que ainda falta.
+
+---
+
+## Rodada 2026-07-27 — RDOs de 07/07 a 22/07 vindos do WhatsApp
+
+O diário da obra vive no grupo **"📝 Diário de Obras - Veks Engenharia"**: o
+Eng. Alan posta o RDO de cada dia em texto (Efetivo / Atividades Executadas /
+Observações / Próximas Atividades) e as fotos logo abaixo, cada uma com a
+legenda na linha seguinte. O export do grupo (`conversa (2).zip`) trouxe **12
+RDOs da Obra Itu, de 07/07 a 22/07**. No sistema, a série parava em 13/07 e os
+dias 07, 09, 10 e 13/07 tinham texto mas `apontamentos: []`.
+
+**Caminho novo, não-destrutivo.** Até aqui, entrar com RDO em lote só existia
+pela seção `"rdos"` do reimport físico-financeiro — que apaga tarefas,
+propostas, orçamentos, medições e todos os RDOs da obra antes de recriar, e
+que é **recusado** em obra já versionada por .mpp (guard do M09). Ou seja:
+acrescentar sete dias ao diário de uma obra em andamento não tinha caminho.
+Agora tem:
+
+| Peça | O que faz |
+|---|---|
+| `scripts/whatsapp_para_rdos.py` | export do WhatsApp → payload `{"rdos": […]}` + fotos em `fotos_rdos/<data>/N.jpg` na ordem das legendas |
+| `docs/rdo/regras_apontamento_baia.json` | de-para revisável atividade→tarefa/%, usado pelo parser (`--regras`) |
+| `services/atualizacao_rdos.py` | upsert por `(obra_id, data_relatorio)`; **não apaga nada**; pula RDO imutável da Fase 5 com aviso; apontamento via `registrar_apontamento` |
+| `scripts/atualizar_rdos_obra.py` | CLI genérico por obra, com `--dry-run` |
+| `services/rdo_fotos_import.py` | `_materializar_fotos_rdo` extraído, usado pelos dois caminhos |
+
+🔬 27/07 — ponta a ponta em dev, sobre a obra importada só até 06/07:
+**12 RDOs criados, 22 apontamentos, 0 pendências**; tarefas (101), propostas
+(1) e medições (6) **idênticas antes e depois**. A resolução de tarefa caiu
+inteira no fallback por NOME (`mpp_uid` vem NULL do import JSON) e acertou os
+dois galpões.
+
+> ⚠️ **Os ids do cronograma são contraintuitivos: 11–52 = Galpão B, 55–96 =
+> Galpão A.** Os dois galpões repetem os mesmos nomes de tarefa E o mesmo pai
+> ("Fundação"); só o avô distingue.
+
+### O de-para aplicado — REVISAR
+
+O texto do RDO é narrativa ("armação de 37,50 m da primeira viga longitudinal
+do Galpão A, de um total de 57,50 m"); o % é leitura de engenharia. Foi esta:
+
+| Dia | Tarefa | Valor | Base no texto |
+|---|---|---|---|
+| 07/07 | 14 Ferragens Fundação (B) | qtd 11 | 11 vigas transversais |
+| 08/07 | 15 / 60 Concretagem das Brocas | 100% | "todas as brocas dos Galpões A e B" |
+| 08/07 | 16 / 61 Concreto Magro | 60% | magro nas longitudinais; transversais suspensas |
+| 08/07 | 14 Ferragens Fundação (B) | qtd 3 | 3 vigas longitudinais |
+| 09-10/07 | 14 Ferragens Fundação (B) | qtd 1 + 1 | 1 viga longitudinal por dia |
+| 13/07 | 59 Ferragens Fundação (A) | 35% | 20,00 m de 57,50 m |
+| 14/07 | 59 | 65% | 37,50 m de 57,50 m |
+| 15/07 | 59 | 75% | longitudinais concluídas; faltam transversais |
+| 15/07 | 13 / 57 Escavação Hidráulica | 100% | 22 escavações de esgoto, A e B |
+| 16/07 | 59 | 85% | 8 vigas transversais |
+| 16/07 | 39 / 84 Instalação Infra Hidráulica | 100% | "concluída a instalação … das 22 baias" |
+| 17/07 | 59 | 100% | "finalizando a etapa de armação das vigas baldrame" |
+| 17/07 | 66 Ferragem Calçada (A) | 15% | 2 sapatas dos troncos |
+| 20/07 | 66 | 60% | 10 sapatas |
+| 21/07 | 20 Nivelamento Calçadas (B) | 60% | rebaixo de 15 cm no Galpão B |
+| 22/07 | 65 Nivelamento Calçadas (A) | 60% | rebaixo de 15 cm no Galpão A |
+| 22/07 | 20 | 80% | compactação do solo do Galpão B |
+
+**Três pontos que precisam do seu aval:**
+
+1. **39 / 84 "Instalação Infra Hidráulica" a 100% é ANTECIPAÇÃO** — a tarefa
+   está planejada para agosto. O RDO de 16/07 diz que a instalação do esgoto
+   das 22 baias foi concluída; se essa não for a mesma tarefa, tire os dois
+   apontamentos.
+2. **A tarefa 14 estoura o quantitativo.** Ela é a única com
+   `quantidade_total` (48 un) e já chegou a 48 no acumulado 30/06–06/07 — em
+   que, aliás, o JSON antigo lançou **24 brocas do Galpão A na tarefa do
+   Galpão B**. Os dias 07–10/07 somam mais 16 un e o engine **clampa em 100%**
+   com warning. Não reescrevi os dias antigos (fora do escopo desta rodada).
+3. **O protótipo do cocho em LSF (21 e 22/07) não tem tarefa no cronograma** —
+   o sistema construtivo (alvenaria × LSF) segue indefinido e é a causa
+   declarada do atraso. Fica só no texto do RDO.
+
+### Como repetir na próxima semana
+
+```bash
+python scripts/whatsapp_para_rdos.py --zip "conversa.zip" \
+    --obra-marcador "Obra Itu" --regras docs/rdo/regras_apontamento_baia.json \
+    --saida /tmp/payload_rdos.json --dry-run          # revisa
+SIGE_ENABLE_DEMO_SEED=false python scripts/atualizar_rdos_obra.py \
+    <admin> 10 /tmp/payload_rdos.json --dry-run       # revisa a resolução
+SIGE_ENABLE_DEMO_SEED=false python scripts/atualizar_rdos_obra.py \
+    <admin> 10 /tmp/payload_rdos.json                 # aplica
+```
+
+Os dois passos de `--dry-run` existem porque o de-para atividade→tarefa é
+julgamento: o parser **sugere** (`_sugestoes`), e nada vira apontamento sem
+`--aplicar-sugestoes` ou edição à mão.
+
+### Dados no repositório
+
+`cronograma_fisico_financeiro_baias.json` (e o symlink
+`tests/fixtures/…`) passou de 19 para **26 RDOs**. As fotos novas entraram em
+`fotos_rdos/2026-07-14` … `2026-07-22` (**31 arquivos, +9 MB**; a pasta vai a
+30 MB). Os dias que já existiam ficaram com o texto e as legendas que já
+tinham — foram revisados à mão antes; só o físico foi acrescentado.
 
 ---
 

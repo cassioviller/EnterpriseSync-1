@@ -699,9 +699,9 @@ def test_fixture_baia_traz_rdos_do_relatorio():
         caminho = os.path.join(os.path.dirname(__file__), 'fixtures',
                                'cronograma_fisico_financeiro_baias.json')
         payload = json.load(open(caminho, encoding='utf-8'))
-        assert len(payload.get('rdos', [])) == 19
+        assert len(payload.get('rdos', [])) == 26
         oid = importar_fisico_financeiro(payload, aid)['obra_id']
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 19
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 26
         por_nome = {t.nome_tarefa: float(t.percentual_concluido or 0) for t in
                     TarefaCronograma.query.filter_by(obra_id=oid, admin_id=aid).all()}
         assert por_nome['Estudo de Solo SPT'] == 100.0
@@ -900,7 +900,7 @@ def test_fixture_rdos_sem_mao_de_obra():
         aid = _novo_admin()
         oid = importar_fisico_financeiro(d, aid)['obra_id']
         rdo_ids = [r.id for r in RDO.query.filter_by(obra_id=oid, admin_id=aid).all()]
-        assert len(rdo_ids) == 19
+        assert len(rdo_ids) == 26
         assert RDOMaoObra.query.filter(RDOMaoObra.rdo_id.in_(rdo_ids)).count() == 0
 
 
@@ -1210,7 +1210,7 @@ def test_reimport_limpa_custo_obra_referenciando_rdo():
         # reimporta — não deve levantar IntegrityError de FK
         oid2 = importar_fisico_financeiro(payload, aid)['obra_id']
         assert oid2 == oid
-        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 19
+        assert RDO.query.filter_by(obra_id=oid, admin_id=aid).count() == 26
         assert CustoObra.query.filter_by(obra_id=oid, tipo='mao_obra').count() == 0
 
 

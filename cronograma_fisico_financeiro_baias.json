@@ -2323,7 +2323,12 @@
    "precipitacao": "Sem chuva",
    "comentario": "Efetivo: 05 colaboradores.\n\nAtividades executadas:\n• Limpeza das valas das vigas baldrame do Galpão B, preparando a frente para a camada de concreto magro.\n• Instalação dos espaçadores nas armaduras das brocas, garantindo o cobrimento especificado em projeto.\n• Armação de 11 vigas transversais do Galpão B, dando continuidade à montagem das armaduras das fundações.\n\nObservações:\n• As atividades mantiveram a obra preparada para a sequência prevista de concretagem das fundações.\n• Espaçadores instalados previamente à concretagem, assegurando o posicionamento das ferragens durante o lançamento.\n• Vistoria técnica com a Eng. Ana Luísa (Fort Gerenciadora): conferidos espaçamentos entre brocas, armaduras e condições das fundações — sem restrições para a concretagem programada.\n• Solicitada limpeza do fundo das valas (acúmulo de solo pela movimentação dos equipamentos) e atenção na concretagem das brocas para evitar desprendimento de terra para o interior das perfurações.\n• Ensaio tecnológico do concreto já contratado, conforme controle de qualidade da obra.\n\nPróximas atividades (08/07): concreto magro nas vigas baldrame dos Galpões A e B; concretagem das brocas dos Galpões A e B; continuidade da armação dos blocos de coroamento e vigas baldrame.",
    "mao_de_obra": 0,
-   "apontamentos": [],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 11
+    }
+   ],
    "fotos": [
     "Limpeza nas valas para receber o magro de concreto",
     "Instalação dos distanciadores nas brocas para fixação no concreto",
@@ -2344,6 +2349,18 @@
     {
      "tarefa_mpp": 15,
      "pct": 100
+    },
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 3
+    },
+    {
+     "tarefa_mpp": 16,
+     "pct": 60
+    },
+    {
+     "tarefa_mpp": 61,
+     "pct": 60
     }
    ],
    "fotos": [
@@ -2368,7 +2385,12 @@
    "precipitacao": "Sem chuva",
    "comentario": "Efetivo: 05 colaboradores.\n\nAtividades executadas:\n• Armação de uma viga longitudinal do Galpão B, dando continuidade à montagem das armaduras das vigas baldrame conforme projeto estrutural.\n\nObservações:\n• Sem ocorrências relevantes; serviços em conformidade com o planejamento.\n• Questionado ao Gustavo o acabamento das calçadas das baias; solicitou confirmar com a Eng. Ana Luísa (Fort Gerenciadora), que informou ter entendido já estar definido, mas retomaria a conversa com o Gustavo.\n\nPróximas atividades (10/07): finalização da armação da primeira viga longitudinal do Galpão B; início da armação da segunda viga longitudinal do Galpão B; continuidade da montagem das armaduras das vigas baldrame.",
    "mao_de_obra": 0,
-   "apontamentos": [],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 1
+    }
+   ],
    "fotos": [
     "Execução de armação de uma viga longitudinal do Galpão B",
     "Execução de armação de uma viga longitudinal do Galpão B",
@@ -2382,7 +2404,12 @@
    "precipitacao": "Sem chuva",
    "comentario": "Efetivo: 05 colaboradores.\n\nAtividades executadas:\n• Armação da segunda viga longitudinal do Galpão B, dando continuidade à montagem das armaduras das vigas baldrame conforme projeto estrutural.\n\nObservações:\n• Definido que o acabamento das calçadas será executado no padrão camurçado, conforme orientação do Gustavo.\n• Permanece pendente a definição do sistema construtivo dos cochos de alimentação animal (alvenaria x Light Steel Frame). A ausência dessa definição passa a impactar o cronograma: pelo planejamento, a partir de 13/07 seria iniciada a montagem e posicionamento das vigas baldrame para concretagem prevista em 16/07 — não é possível o posicionamento definitivo até a decisão ser formalizada.\n\nPróximas atividades (13/07): finalização da armação da segunda viga longitudinal do Galpão B; início da armação da primeira viga longitudinal do Galpão A; acompanhamento da definição dos cochos, visando liberar a montagem das vigas baldrame.",
    "mao_de_obra": 0,
-   "apontamentos": [],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 14,
+     "quantidade": 1
+    }
+   ],
    "fotos": [
     "Execução de armação da segunda viga longitudinal do Galpão B"
    ]
@@ -2393,13 +2420,271 @@
    "precipitacao": "Sem chuva",
    "comentario": "Efetivo: 05 colaboradores.\n\nAtividades executadas:\n• Armação de aproximadamente 20,00 m da primeira viga longitudinal do Galpão A (de um total de 57,50 m previstos para a etapa).\n• Armação de 06 blocos de coroamento do Galpão A.\n• Locação dos protetores de plástico em todos os vergalhões das brocas dos dois galpões.\n\nObservações:\n• Permanece pendente a definição do sistema construtivo dos cochos (alvenaria x Light Steel Frame).\n• Em razão da indefinição, reprogramado o cronograma: concretagem da 1ª etapa das vigas baldrame do Galpão B postergada para 22/07.\n• Eng. Gustavo informado de que, mantida a indefinição, a Veks tem atividades em obra somente até 20/07, com risco de paralisação parcial das frentes após essa data.\n• Engenharia avalia com a projetista estratégia para concretar as vigas baldrame perimetrais, deixando as transversais (apoio dos cochos) para etapa posterior — ainda com impacto, pois a ausência das transversais impede a escavação interna das baias para drenagem e, consequentemente, a concretagem das calçadas.\n• Recebido o material da infraestrutura de esgoto das baias, disponível para execução quando liberada a frente.\n• Eng. Gustavo solicitou revisão do projeto dos pilares dos portões, aumentando a altura de 0,60 m para 1,20 m — já encaminhado à projetista.\n• Novo alinhamento do posicionamento das chapas-base; pendente manifestação da Eng. Ana Luísa (Fort Gerenciadora) quanto à execução conforme detalhamento proposto.\n• Eng. Alan elaborará desenho preliminar dos portões para envio à Kabod (aprovação e início da fabricação).\n• Pendente o pagamento ao fornecedor das chapas-base, necessário para fabricação/montagem dos dispositivos de travamento antes da concretagem das vigas baldrame.\n• Todas as tábuas de madeira de acabamento deverão receber pintura na cor preta, conforme definição de projeto.\n\nPróximas atividades (14/07): continuidade da armação da primeira viga longitudinal do Galpão A; continuidade da armação dos blocos de coroamento; acompanhamento das definições dos cochos, revisão dos projetos estruturais e liberação das chapas-base.",
    "mao_de_obra": 0,
-   "apontamentos": [],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 59,
+     "pct": 35
+    }
+   ],
    "fotos": [
     "Limpeza do concreto magro e colocação dos tampões em todos os vergalhões das brocas",
     "Execução de armação da viga longitudinal do Galpão A",
     "Execução de armação da viga longitudinal do Galpão A",
     "Chegada do material de infraestrutura de esgoto",
     "Execução de armação da viga longitudinal do Galpão A"
+   ]
+  },
+  {
+   "data": "2026-07-14",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 05 colaboradores\n\nAtividades executadas:\n• Foi executada a armação de 37,50 m da primeira viga longitudinal do Galpão A, de um total de 57,50 m previstos para esta etapa.\n• Foi executada a armação de 06 blocos de coroamento do Galpão A, dando continuidade à montagem das armaduras das fundações.\n\nObservações:\n• Até a presente data permanece pendente a definição do sistema construtivo dos cochos de alimentação animal. Essa indefinição já impacta diretamente o cronograma executivo da obra, uma vez que impede a conclusão do detalhamento estrutural e a continuidade das etapas subsequentes de fundação e infraestrutura.\n• Permanece pendente o pagamento da medição prevista, impossibilitando a aquisição dos materiais da estrutura metálica da cobertura. Essa situação impede que a fabricação desses elementos ocorra em paralelo às atividades atualmente executadas em campo, comprometendo o planejamento originalmente estabelecido.\n• Considerando as ocorrências acima, a previsão de entrega da obra passa a sofrer impacto, estimando-se, neste momento, um acréscimo mínimo de 01 (uma) semana no cronograma executivo, com previsão de conclusão em 13/10/2026. Essa previsão será reavaliada à medida que as pendências forem solucionadas.\n• Será avaliada, em conjunto com o Eng. Gustavo (Kabod), a viabilidade de antecipar a escavação interna das baias para execução da camada drenante, buscando reduzir os impactos provocados pelas atuais indefinições e otimizar o cronograma da obra.\n• Até o encerramento deste relatório, permanece pendente o retorno da Eng. Ana Luísa (Fort Gerenciadora) quanto à definição do posicionamento das chapas-base em relação ao nível da calçada, informação necessária para continuidade das atividades relacionadas às vigas baldrame.\n\nPróximas atividades (15/07):\n• Início da armação da segunda viga longitudinal do Galpão A.\n• Continuidade da armação dos blocos de coroamento do Galpão A.\n• Início da escavação das valas para instalação de infra de esgoto nas baias do Galpão B.\n• Avaliação técnica da estratégia executiva para mitigação dos impactos no cronograma.",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de armação da primeira viga longitudinal do Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Locação do trado a gasolina para escavação de vala na execução da infra de esgoto"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de armação da primeira viga longitudinal do Galpão A"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de armação da primeira viga longitudinal do Galpão A"
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 59,
+     "pct": 65
+    }
+   ]
+  },
+  {
+   "data": "2026-07-15",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 07 colaboradores (05 colaboradores na execução das armaduras e 02 colaboradores na execução da infraestrutura de esgoto)\n\nAtividades executadas:\n• Foi concluída a armação da segunda viga longitudinal do Galpão A, totalizando 57,50 m de armadura executada nesta etapa.\n• Foram executadas 22 escavações destinadas à instalação da infraestrutura de esgoto das baias dos Galpões A e B, preparando a frente de serviço para a instalação da tubulação.\n\nObservações:\n• Até a presente data permanece pendente a definição do sistema construtivo dos cochos de alimentação animal. Essa indefinição continua impactando diretamente o cronograma executivo da obra, uma vez que interfere na continuidade das atividades de fundação e na programação das próximas etapas construtivas.\n• Permanece pendente o pagamento da medição prevista, impossibilitando a aquisição dos materiais da estrutura metálica da cobertura. Como consequência, a fabricação desses elementos não pôde ser iniciada em paralelo às atividades atualmente executadas em campo, impactando o planejamento inicialmente estabelecido e a previsão de conclusão da obra.\n• Em reunião com o Eng. Gustavo, foi apresentada a alternativa de antecipar a escavação interna das baias antes da concretagem das vigas baldrame, visando reduzir os impactos no cronograma. Após análise, essa estratégia foi descartada, tendo em vista que a indefinição do sistema construtivo dos cochos interfere diretamente na configuração da fundação, impossibilitando a execução segura dessa etapa.\n• Até o encerramento deste relatório, permanece pendente o retorno da Eng. Ana Luísa (Fort Gerenciadora) quanto à definição da cota de posicionamento das chapas-base em relação ao nível acabado das calçadas, informação necessária para continuidade das atividades relacionadas às vigas baldrame.\n\nPróximas atividades (16/07):\n• Início da armação das 12 vigas transversais do Galpão A.\n• Instalação da infraestrutura de esgoto das 22 baias dos Galpões A e B.\n• Continuidade do acompanhamento das definições técnicas pendentes, visando minimizar os impactos no cronograma executivo da obra.",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Registro de execução das chapas base pelo fornecedor"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de escavação de vala para instalação de infra de esgoto"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de armação da segunda viga longitudinal do Galpão A"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de escavação de vala para instalação de infra de esgoto"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Execução de escavação de vala para instalação de infra de esgoto"
+    },
+    {
+     "arquivo": "6.jpg",
+     "legenda": "Execução de escavação de vala para instalação de infra de esgoto"
+    },
+    {
+     "arquivo": "7.jpg",
+     "legenda": "Registro de execução das chapas base pelo fornecedor"
+    },
+    {
+     "arquivo": "8.jpg",
+     "legenda": "Registro de execução das chapas base pelo fornecedor"
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 59,
+     "pct": 75
+    },
+    {
+     "tarefa_mpp": 13,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 57,
+     "pct": 100
+    }
+   ]
+  },
+  {
+   "data": "2026-07-16",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 07 colaboradores (05 colaboradores na armação das ferragens e 02 colaboradores na execução da infraestrutura de esgoto)\n\nAtividades executadas:\n• Foi executada a armação de 08 vigas transversais do Galpão A, dando continuidade à montagem das armaduras das vigas baldrame conforme projeto estrutural.\n• Foi concluída a instalação da infraestrutura de esgoto das 22 baias dos Galpões A e B, incluindo o aterramento das valas após o posicionamento da tubulação.\n\nObservações:\n• Até o presente momento permanece pendente a definição do sistema construtivo dos cochos de alimentação animal. Essa indefinição continua impactando diretamente o cronograma executivo da obra, uma vez que impede a definição final das vigas transversais e a continuidade das etapas subsequentes da fundação.\n• Ficou definido, em alinhamento técnico, que as chapas-base dos pilares metálicos permanecerão posicionadas 3 cm abaixo do nível da calçada acabada, possibilitando o chumbamento posterior e evitando que as chapas fiquem aparentes após a execução do piso.\n• A equipe de engenharia permanece acompanhando a revisão dos detalhes estruturais relacionados às chapas-base e aos cochos de alimentação, buscando minimizar os impactos no cronograma executivo da obra.\n\nPróximas atividades (17/07):\n• Conclusão da armação das vigas transversais restantes do Galpão A.\n• Continuidade da preparação das vigas baldrame para concretagem.\n• Acompanhamento das definições técnicas referentes ao sistema construtivo dos cochos e à revisão dos detalhes estruturais.",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de armação das vigas transversais do Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de armação das vigas transversais do Galpão A"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de infra de esgoto dos bebedouros das baias do Galpão B"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de infra de esgoto dos bebedouros das baias do Galpão A"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Execução de infra de esgoto dos bebedouros das baias"
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 59,
+     "pct": 85
+    },
+    {
+     "tarefa_mpp": 39,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 84,
+     "pct": 100
+    }
+   ]
+  },
+  {
+   "data": "2026-07-17",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 05 colaboradores\n\nAtividades executadas:\n• Foi concluída a armação das 04 vigas transversais restantes do Galpão A, finalizando a etapa de armação das vigas baldrame do galpão.\n• Foi executada a armação de 02 sapatas destinadas aos pilares dos troncos de madeira, conforme projeto estrutural.\n\nObservações:\n• Até o presente momento permanece pendente a definição do sistema construtivo dos cochos de alimentação animal. Essa indefinição continua impactando diretamente o cronograma executivo da obra, impedindo o avanço das etapas subsequentes da fundação e da estrutura.\n• Em razão das indefinições técnicas relacionadas aos cochos de alimentação e dos impactos já identificados no cronograma executivo, foi elaborado e encaminhado ao Eng. Gustavo um Relatório Técnico de Situação da Obra, apresentando a condição atual da execução e os possíveis cenários para continuidade dos serviços. O documento contempla as seguintes alternativas para tomada de decisão:\n\nContinuidade da obra conforme o projeto estrutural originalmente aprovado;\nRevisão do projeto estrutural para execução dos cochos em alvenaria;\nRevisão do projeto estrutural para execução dos cochos em Light Steel Frame (LSF);\nLiberação parcial das frentes de serviço, permitindo a concretagem por etapas enquanto permanece pendente a definição dos cochos;\nParalisação temporária da obra até definição formal do sistema construtivo a ser adotado.\n\nPróximas atividades (20/07):\n• Finalização das armações das sapatas dos troncos.\n• Aguardar definição do sistema construtivo dos cochos de alimentação para reprogramação das atividades subsequentes.\n• Continuidade da execução das fundações conforme o cenário técnico a ser definido.\n• Acompanhamento das revisões de projeto e atualização do cronograma executivo da obra.",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Finalização das armações das vigas transversais do Galpão A"
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 59,
+     "pct": 100
+    },
+    {
+     "tarefa_mpp": 66,
+     "pct": 15
+    }
+   ]
+  },
+  {
+   "data": "2026-07-20",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 05 colaboradores\n\nAtividades executadas:\n• Foi executada a armação das 10 sapatas destinadas aos pilares dos troncos de madeira, conforme projeto estrutural.\n• Foi finalizado o enchimento das valas da infraestrutura de esgoto dos Galpões A e B, concluindo essa etapa dos serviços.\n\nObservações:\n• Até o presente momento permanece pendente a definição do sistema construtivo dos cochos de alimentação animal. Essa indefinição continua impactando diretamente o cronograma executivo da obra e a programação das próximas etapas da fundação.\n• Foi conversado juntamente com a Kabod Cabana para ser executado um protótipo de 2,0m do Cocho em LSF, onde será iniciado amanhã (21/7).\n• Em alinhamento técnico com o Eng. Gustavo, foi analisada a necessidade de utilização de uma chapa de arremate entre a placa de OSB da cobertura em telha shingle e a cantoneira de acabamento do beiral. Após consulta ao fornecedor do sistema, foi sugerida como solução a inversão do perfil tipo U, posicionando-o com o dorso voltado para o beiral, eliminando a necessidade da chapa de arremate e mantendo o acabamento previsto.\n\nPróximas atividades (21/07):\n• Rebaixo de 15cm de solo na área das calçadas dos dois galpões\n• Início na execução do protótipo do cocho de alimentação em LSF",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de armação dos blocos das sapatas dos troncos"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Enchimento das valas de infra do esgoto"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": ""
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 66,
+     "pct": 60
+    }
+   ]
+  },
+  {
+   "data": "2026-07-21",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 05 colaboradores + 01 operador de retroescavadeira + 2 montadores de Steel Frame\n\nAtividades executadas:\n• Foi realizada a demarcação das áreas destinadas ao rebaixamento do solo para execução das calçadas.\n• Foi executada a retirada de aproximadamente 15 cm da camada superficial do solo das calçadas do Galpão B, conforme cotas de projeto.\n• Foi iniciada a execução do protótipo do cocho em Light Steel Frame (LSF), destinado à avaliação técnica e aprovação do Grupo Mônica.\n\nObservações:\n• Embora ainda permaneça pendente a definição do sistema construtivo definitivo dos cochos de alimentação, foi iniciada a fabricação de um protótipo em Light Steel Frame (LSF), que será apresentado ao Grupo Mônica para avaliação. Após sua aprovação ou eventual reprovação, será definida a solução construtiva a ser adotada para execução dos cochos.\n• O Eng. Gustavo encaminhou referências fotográficas do acabamento superficial desejado para as calçadas, definindo como padrão de execução o acabamento do tipo camurçado, que será considerado nas próximas etapas de concretagem.\n• Ainda não é possível revisar completamente o cronograma devido a indefinição do sistema construtivo dos cochos, que impactam diretamente na etapa atual da obra (fundação).\n\nPróximas atividades (22/07):\n• Executar o rebaixamento do solo das calçadas do Galpão A.\n• Executar a compactação do solo das calçadas do Galpão B.\n• Dar continuidade à preparação das frentes de serviço para a concretagem das fundações e calçadas, conforme definições técnicas da obra.",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de remoção de solo da calçada do Galpão B"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução do protótipo do Cocho em LSF"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de remoção de solo da calçada do Galpão B"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Execução de remoção de solo da calçada do Galpão B"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Execução de remoção de solo da calçada do Galpão B"
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 20,
+     "pct": 60
+    }
+   ]
+  },
+  {
+   "data": "2026-07-22",
+   "clima": "Não informado",
+   "precipitacao": "Não informado",
+   "comentario": "Efetivo: 06 colaboradores + 01 operador de retroescavadeira + 02 montadores de Light Steel Frame\n\nAtividades executadas:\n• Foi realizada a demarcação das áreas destinadas ao rebaixamento do solo para execução das calçadas.\n• Foi executada a retirada de aproximadamente 15 cm da camada superficial do solo das calçadas do Galpão A, conforme cotas de projeto.\n• Foi executado a compactação do solo das calçadas do Galpão B.\n• Foi finalizada a execução do protótipo do cocho em Light Steel Frame (LSF), destinado à avaliação técnica do Grupo Mônica.\n\nObservações:\n• Em alinhamento com a Eng. Ana Luísa (Fort Gerenciadora), ficou programada para o dia 23/07 a apresentação e fixação do protótipo do cocho em LSF nas dependências da Fazenda, possibilitando sua avaliação pela equipe do Grupo Mônica para posterior definição do sistema construtivo a ser adotado.\n• Foi emitido o Parecer Técnico do projetista estrutural validando a metodologia executiva adotada para as fundações, consistente na execução das perfurações das brocas, posterior escavação das valas e, por fim, concretagem das brocas. O documento foi encaminhado ao Eng. Gustavo para conhecimento e registro.\n• No protótipo do cocho foi aplicada apenas a primeira demão de Basecoat, permanecendo prevista a execução da segunda demão após sua instalação na Fazenda.\n• Em alinhamento entre o Eng. Gustavo e a equipe da VEKS Engenharia, ficou definida a montagem das armaduras das vigas transversais juntamente com as vigas longitudinais na primeira etapa de concretagem (vigas longitudinais e calçadas). Essa solução foi adotada para eliminar a necessidade de execução de arranques nos blocos de coroamento ou de futuras ligações com chumbadores químicos, considerando a sinalização de que o Grupo Mônica demonstra tendência à adoção do sistema de cochos em Light Steel Frame (LSF).\n\nPróximas atividades (23/07):\n• Transporte e instalação do protótipo do cocho em LSF para avaliação do Grupo Mônica.\n• Continuidade da preparação das formas, armaduras e chapas-base para a primeira etapa de concretagem.\n• Acompanhamento da definição final do sistema construtivo dos cochos para programação das etapas subsequentes da obra.",
+   "mao_de_obra": 0,
+   "fotos": [
+    {
+     "arquivo": "1.jpg",
+     "legenda": "Execução de remoção de solo da calçada do Galpão A"
+    },
+    {
+     "arquivo": "2.jpg",
+     "legenda": "Execução de remoção de solo da calçada do Galpão A"
+    },
+    {
+     "arquivo": "3.jpg",
+     "legenda": "Execução de compactação de solo das calçadas do Galpão B"
+    },
+    {
+     "arquivo": "4.jpg",
+     "legenda": "Finalização da execução do protótipo do cocho em LSF"
+    },
+    {
+     "arquivo": "5.jpg",
+     "legenda": "Finalização da execução do protótipo do cocho em LSF"
+    }
+   ],
+   "apontamentos": [
+    {
+     "tarefa_mpp": 65,
+     "pct": 60
+    },
+    {
+     "tarefa_mpp": 20,
+     "pct": 80
+    }
    ]
   }
  ]

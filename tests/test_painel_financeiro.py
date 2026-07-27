@@ -12,6 +12,25 @@ from app import app, db
 D = Decimal
 
 
+@pytest.fixture(autouse=True)
+def _fotos_base_isolada(tmp_path):
+    """Isola FOTOS_RDO_BASE numa pasta VAZIA — mesmo padrão de
+    tests/test_importacao_fisico_financeiro.py.
+
+    Este arquivo importa a fixture canônica da Baia em ~15 testes e não
+    verifica foto nenhuma. Sem o isolamento, cada import materializa as fotos
+    REAIS de `fotos_rdos/` (57 desde 27/07, eram 26) com otimização WebP +
+    base64 — minutos de suíte gastos em imagem que nenhum assert olha.
+    """
+    from services import importacao_fisico_financeiro as ff
+    orig = ff.FOTOS_RDO_BASE
+    vazio = tmp_path / '_fotos_vazio'
+    vazio.mkdir(exist_ok=True)
+    ff.FOTOS_RDO_BASE = str(vazio)
+    yield
+    ff.FOTOS_RDO_BASE = orig
+
+
 def _novo_admin():
     from models import Usuario, TipoUsuario
     tag = datetime.utcnow().strftime('%H%M%S%f')

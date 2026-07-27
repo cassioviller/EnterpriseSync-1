@@ -176,7 +176,8 @@ def test_migracao_completa_da_baia_com_equivalencia_e_rollback(
 
     monkeypatch.setenv('UPLOADS_PATH', str(tmp_path))
 
-    # 1) Criação inicial pela fixture canônica (101 tarefas, 19 RDOs).
+    # 1) Criação inicial pela fixture canônica (101 tarefas, 26 RDOs — eram 19
+    #    até 27/07, quando os 7 dias de 14 a 22/07 vieram do WhatsApp).
     with app.app_context():
         admin, _ = _ambiente()
         aid = admin.id
@@ -187,7 +188,7 @@ def test_migracao_completa_da_baia_com_equivalencia_e_rollback(
             obra_id=oid, status='ativa').one()
         versao_pre_id = versao_pre.id
     assert estado_a['n_tarefas_ativas'] == 101
-    assert len(estado_a['rdos']) == 19
+    assert len(estado_a['rdos']) == 26
     assert estado_a['n_apontamentos'] > 0
 
     # 2) Upload do .mpp REAL de origem pelo pipeline novo (M03).
