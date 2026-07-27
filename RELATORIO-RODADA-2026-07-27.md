@@ -188,6 +188,14 @@ aponta cada runbook, e a tabela de lacunas marca 1, 2 e 3 como fechadas.
 
 ---
 
+## Regressão final da rodada
+
+🔬 27/07, sequencial, `SIGE_ENABLE_DEMO_SEED=false`:
+**225 passed, 0 falhas, 3min19s** sobre `test_atualizacao_rdos`,
+`test_rdo_percentual_livre`, `test_flag_cronograma_editor_v2`,
+`test_importacao_fisico_financeiro`, `test_fase5_rdo_ciclo_vida`,
+`test_fase5_rdo_fotos` e `test_painel_financeiro`.
+
 ## Pendente nesta rodada
 
 Nada. Os dois itens que estavam abertos (lacunas 1 e 2+3) foram fechados.
