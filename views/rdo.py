@@ -937,6 +937,43 @@ def criar_rdo():
         flash(f'Erro ao criar RDO: {str(e)}', 'error')
         return redirect(url_for('main.novo_rdo'))
 
+def caminho_ancestrais_tarefa(tarefa, cache=None):
+    """Onde a tarefa mora no cronograma: ``'Fundação < Galpão B < Baias'``, do
+    pai imediato para cima. A raiz (nome da obra) fica de fora — é igual para
+    toda tarefa e só ocuparia espaço no card.
+
+    Existe porque a tela do RDO mostrava só `nome_tarefa`. No cronograma da
+    Baia as mesmas atividades existem nos dois galpões (101 tarefas com split
+    Galpão A/B), então dois cards idênticos apareciam lado a lado e liam-se
+    como lançamento em duplicidade — relato de 28/07/2026 no RDO de 22/07,
+    onde "AJR - Maquinário: …" (Galpão B, 60→80%) e "Ajr - Maquinário: …"
+    (Galpão A, 0→60%) só se distinguiam por um acaso de grafia herdado do
+    .mpp. É a mesma informação que `_rotulo_ancestrais` usa em
+    services/atualizacao_rdos.py:132 para desempatar nomes na importação.
+
+    `cache` (dict opcional) evita reconsultar o mesmo pai a cada apontamento
+    do RDO. O laço para em ciclo de `tarefa_pai_id` em vez de girar para
+    sempre — a coluna é auto-referente e nada no banco garante aciclicidade.
+    """
+    from models import TarefaCronograma
+    if tarefa is None:
+        return ''
+    if cache is None:
+        cache = {}
+    cadeia, vistos, atual = [], set(), tarefa
+    while atual is not None and atual.id not in vistos:
+        vistos.add(atual.id)
+        pai_id = atual.tarefa_pai_id
+        if pai_id is None:
+            break
+        if pai_id not in cache:
+            cache[pai_id] = TarefaCronograma.query.get(pai_id)
+        atual = cache[pai_id]
+        if atual is not None:
+            cadeia.append(atual.nome_tarefa)
+    return ' < '.join(cadeia[:-1]) if len(cadeia) > 1 else ''
+
+
 def _estado_para_template(rdo):
     """Rótulo + cor do estado, para o selo da tela. Nunca levanta."""
     try:
@@ -1489,12 +1526,14 @@ def visualizar_rdo(id):
                 # significa "Sem plano" (tarefa sem data_inicio/duração) e
                 # número significa o planejado calculado quando o apontamento
                 # foi salvo. Sem mais recálculo redundante na view.
+                _cache_pai: dict = {}
                 for ap in aps:
                     t = ap.tarefa
                     plan = ap.percentual_planejado
                     apontamentos_cronograma.append({
                         'tarefa_id': ap.tarefa_cronograma_id,
                         'nome_tarefa': t.nome_tarefa if t else '—',
+                        'caminho_tarefa': caminho_ancestrais_tarefa(t, _cache_pai),
                         'unidade_medida': (t.unidade_medida or '') if t else '',
                         'quantidade_total': t.quantidade_total if t else None,
                         'quantidade_executada_dia': ap.quantidade_executada_dia,

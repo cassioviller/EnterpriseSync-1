@@ -1513,6 +1513,14 @@ console.log('Initializing RDO view with light theme...');
                                 <h6 class="card-title mb-0 fw-semibold">
                                     <i class="fas fa-tasks me-1 text-secondary fa-xs"></i>
                                     {{ ap.nome_tarefa }}
+                                    {% if ap.caminho_tarefa %}
+                                    {# Onde a tarefa mora no cronograma. Sem isto, a mesma
+                                       atividade em dois galpões vira dois cards idênticos e
+                                       parece lançamento em duplicidade. #}
+                                    <div class="small text-muted fw-normal mt-1">
+                                        <i class="fas fa-sitemap me-1 fa-xs"></i>{{ ap.caminho_tarefa }}
+                                    </div>
+                                    {% endif %}
                                 </h6>
                                 <span class="badge" style="background:{{ badge_bg }}"
                                       title="{% if sem_plano %}Tarefa sem data de início ou duração no cronograma — comparativo planejado vs. realizado indisponível.{% endif %}">

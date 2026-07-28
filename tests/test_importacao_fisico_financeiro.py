@@ -1241,3 +1241,55 @@ def test_import_sem_rdos_lanca_pct_fisico_sem_mao_de_obra():
         prog = calcular_progresso_geral_obra_v2(oid, date.today(), aid)
         assert prog['progresso_geral_pct'] > 0
         assert prog['n_tarefas_apontadas'] == com_fisico
+
+
+@pytest.mark.integration
+def test_apontamentos_do_mesmo_nome_em_galpoes_distintos_sao_distinguiveis():
+    """Duas tarefas com o MESMO nome em galpões diferentes precisam aparecer
+    distinguíveis no RDO — senão a tela mostra dois cards idênticos e o
+    usuário lê como lançamento em duplicidade (relato de 28/07/2026 no RDO de
+    22/07 da Baia).
+
+    O caso real: "AJR - Maquinário: …" (Galpão B, 60→80%) e
+    "Ajr - Maquinário: …" (Galpão A, 0→60%) no mesmo dia. Só se distinguiam
+    por um acaso de grafia herdado do .mpp — a atividade seguinte que
+    repetisse a grafia ficaria indistinguível.
+    """
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import TarefaCronograma
+    from views.rdo import caminho_ancestrais_tarefa
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+
+        alvo = 'nivelamento das calçadas'
+        tarefas = [t for t in TarefaCronograma.query.filter_by(
+            obra_id=oid, admin_id=aid).all()
+            if alvo in (t.nome_tarefa or '').lower()]
+        assert len(tarefas) == 2, (
+            f'esperava a atividade nos dois galpões, achei {len(tarefas)}')
+
+        caminhos = {caminho_ancestrais_tarefa(t) for t in tarefas}
+        assert len(caminhos) == 2, (
+            f'os dois cards teriam o mesmo rótulo: {caminhos}')
+        assert any('Galpão A' in c for c in caminhos), caminhos
+        assert any('Galpão B' in c for c in caminhos), caminhos
+        # a raiz (nome da obra) não entra no rótulo — ocuparia espaço à toa
+        assert not any('Fazenda Santa Mônica' in c for c in caminhos), caminhos
+
+
+@pytest.mark.integration
+def test_caminho_ancestrais_nao_gira_em_ciclo_de_pai():
+    """`tarefa_pai_id` é auto-referente e nada no banco impede um ciclo. Sem a
+    guarda de visitados, a tela do RDO travaria o worker em laço infinito."""
+    from services.importacao_fisico_financeiro import importar_fisico_financeiro
+    from models import TarefaCronograma
+    from views.rdo import caminho_ancestrais_tarefa
+    with app.app_context():
+        aid = _novo_admin()
+        oid = importar_fisico_financeiro(_carregar_json(), aid)['obra_id']
+        a, b = TarefaCronograma.query.filter_by(
+            obra_id=oid, admin_id=aid).limit(2).all()
+        a.tarefa_pai_id, b.tarefa_pai_id = b.id, a.id
+        db.session.commit()
+        assert isinstance(caminho_ancestrais_tarefa(a), str)  # termina
